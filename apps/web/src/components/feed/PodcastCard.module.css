@@ -4,13 +4,13 @@
   position: relative;
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-sm);
-  transition: box-shadow var(--transition-base), transform var(--transition-base);
+  transition: box-shadow 350ms var(--ease-out-expo), transform 350ms var(--ease-out-expo);
   overflow: hidden;
 }
 
 .card:hover {
-  box-shadow: var(--shadow-lg);
-  transform: translateY(-4px);
+  box-shadow: var(--shadow-xl);
+  transform: translateY(-6px);
 }
 
 .cardLink {
@@ -250,7 +250,8 @@
 
 .playButton:hover {
   transform: translate(-50%, -50%) scale(1.08);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  box-shadow: var(--shadow-primary-glow);
+  transition: all var(--transition-spring);
 }
 
 .playButton:active {

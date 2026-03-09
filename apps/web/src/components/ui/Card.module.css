@@ -17,6 +17,12 @@
   background: transparent;
 }
 
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+}
+
 .padnone { padding: 0; }
 .padsmall { padding: var(--spacing-sm); }
 .padmedium { padding: var(--spacing-lg); }
@@ -33,5 +39,7 @@
 
 .clickable:hover {
   border-color: var(--color-border-hover);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
+  transition: all 350ms var(--ease-out-expo);
 }

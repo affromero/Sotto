@@ -1,23 +1,36 @@
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: var(--z-modal);
-  animation: fadeIn 0.15s ease;
+  animation: fadeIn 0.2s var(--ease-out-expo);
   padding: var(--spacing-md);
 }
 
 .modal {
   background: var(--color-surface);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-2xl);
   box-shadow: var(--shadow-2xl);
-  animation: slideUp 0.2s ease;
+  animation: modalEnter 0.35s var(--ease-out-expo);
   max-height: 90vh;
   overflow-y: auto;
   width: 100%;
+}
+
+@keyframes modalEnter {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .small { max-width: 400px; }
