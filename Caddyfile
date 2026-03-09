@@ -1,9 +1,18 @@
 # sotto.fm — Caddy site fragment
 # Deployed to: /etc/caddy/conf.d/sotto.fm
 # Imported by the shared /etc/caddy/Caddyfile on sotto-prod
+#
+# Blue-green deploy: both slots listed, Caddy auto-routes to whichever is healthy.
+# During normal operation only one slot is up. During transitions both are briefly up.
 
 sotto.fm {
-	reverse_proxy localhost:3000
+	reverse_proxy localhost:3000 localhost:3010 {
+		lb_policy first
+		health_uri /api/health
+		health_interval 5s
+		health_timeout 3s
+		health_status 200
+	}
 
 	encode gzip zstd
 
@@ -27,7 +36,13 @@ sotto.fm {
 }
 
 maps.sotto.fm {
-	reverse_proxy localhost:3002
+	reverse_proxy localhost:3002 localhost:3012 {
+		lb_policy first
+		health_uri /api/health
+		health_interval 5s
+		health_timeout 3s
+		health_status 200
+	}
 
 	encode gzip zstd
 
@@ -50,7 +65,13 @@ maps.sotto.fm {
 www.sotto.fm {
 	# Telegram webhook — proxy directly (Telegram can't resolve apex .fm domains)
 	handle /api/telegram/webhook {
-		reverse_proxy localhost:3000
+		reverse_proxy localhost:3000 localhost:3010 {
+			lb_policy first
+			health_uri /api/health
+			health_interval 5s
+			health_timeout 3s
+			health_status 200
+		}
 	}
 
 	# Everything else redirects to apex
