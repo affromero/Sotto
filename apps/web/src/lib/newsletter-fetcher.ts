@@ -1,11 +1,11 @@
 /**
  * Newsletter/RSS fetcher for "In the News" grounded questions.
- * Fetches from a curated, politically balanced set of RSS feeds,
- * caches results in Redis, and returns recent articles.
+ * Reads from the IngestedArticle DB table (populated by news-ingest worker),
+ * falls back to live RSS fetch when the table is empty (cold start).
  */
 import { JSDOM } from 'jsdom';
 import type { NewsTimeRange } from '@sotto/shared';
-import { cache } from './redis';
+import { prisma } from './prisma';
 import { logger } from './logger';
 
 // ── Types ───────────────────────────────────────────────────────
@@ -18,35 +18,55 @@ export interface NewsArticle {
   source: string;
 }
 
-interface FeedConfig {
+export interface FeedConfig {
   name: string;
   url: string;
+  category?: string;
 }
 
 // ── Curated feed list (balanced across political spectrum + topics) ──
 
 const FEEDS: FeedConfig[] = [
   // LEFT / LEFT-CENTER
-  { name: 'Vox', url: 'https://www.vox.com/rss/index.xml' },
-  { name: 'The Atlantic', url: 'https://www.theatlantic.com/feed/all/' },
-  { name: 'NPR', url: 'https://feeds.npr.org/1001/rss.xml' },
+  { name: 'Vox', url: 'https://www.vox.com/rss/index.xml', category: 'politics' },
+  { name: 'The Atlantic', url: 'https://www.theatlantic.com/feed/all/', category: 'culture' },
+  { name: 'NPR', url: 'https://feeds.npr.org/1001/rss.xml', category: 'politics' },
 
   // CENTER
-  { name: 'Reuters', url: 'https://www.reutersagency.com/feed/' },
-  { name: 'AP News', url: 'https://feedx.net/rss/ap.xml' },
-  { name: 'BBC News', url: 'https://feeds.bbci.co.uk/news/rss.xml' },
-  { name: 'Axios', url: 'https://api.axios.com/feed/' },
+  { name: 'Reuters', url: 'https://www.reutersagency.com/feed/', category: 'world' },
+  { name: 'AP News', url: 'https://feedx.net/rss/ap.xml', category: 'world' },
+  { name: 'BBC News', url: 'https://feeds.bbci.co.uk/news/rss.xml', category: 'world' },
+  { name: 'Axios', url: 'https://api.axios.com/feed/', category: 'politics' },
 
   // RIGHT-CENTER / RIGHT
-  { name: 'The Wall Street Journal', url: 'https://feeds.a.dj.com/rss/RSSWorldNews.xml' },
-  { name: 'The Economist', url: 'https://www.economist.com/rss' },
-  { name: 'National Review', url: 'https://www.nationalreview.com/feed/' },
+  { name: 'The Wall Street Journal', url: 'https://feeds.a.dj.com/rss/RSSWorldNews.xml', category: 'business' },
+  { name: 'The Economist', url: 'https://www.economist.com/rss', category: 'business' },
+  { name: 'National Review', url: 'https://www.nationalreview.com/feed/', category: 'politics' },
 
   // SCIENCE / TECH (non-partisan)
-  { name: 'MIT Technology Review', url: 'https://www.technologyreview.com/feed/' },
-  { name: 'Ars Technica', url: 'https://feeds.arstechnica.com/arstechnica/index' },
-  { name: 'Nature News', url: 'https://www.nature.com/nature.rss' },
-  { name: 'Rest of World', url: 'https://restofworld.org/feed/' },
+  { name: 'MIT Technology Review', url: 'https://www.technologyreview.com/feed/', category: 'tech' },
+  { name: 'Ars Technica', url: 'https://feeds.arstechnica.com/arstechnica/index', category: 'tech' },
+  { name: 'Nature News', url: 'https://www.nature.com/nature.rss', category: 'science' },
+  { name: 'Rest of World', url: 'https://restofworld.org/feed/', category: 'tech' },
+
+  // AGGREGATORS (Google News topic feeds)
+  { name: 'Google News — Top Stories', url: 'https://news.google.com/rss', category: 'world' },
+  { name: 'Google News — Tech', url: 'https://news.google.com/rss/topics/CAAqJggKIiBDQkFTRWdvSUwyMHZNRGRqTVhZU0FtVnVHZ0pWVXlnQVAB', category: 'tech' },
+  { name: 'Google News — Science', url: 'https://news.google.com/rss/topics/CAAqJggKIiBDQkFTRWdvSUwyMHZNRFp0Y1RjU0FtVnVHZ0pWVXlnQVAB', category: 'science' },
+  { name: 'Google News — Business', url: 'https://news.google.com/rss/topics/CAAqJggKIiBDQkFTRWdvSUwyMHZNRGx6TVdZU0FtVnVHZ0pWVXlnQVAB', category: 'business' },
+
+  // TECH / STARTUPS
+  { name: 'Hacker News — Best', url: 'https://hnrss.org/best', category: 'tech' },
+  { name: 'Techmeme', url: 'https://www.techmeme.com/feed.xml', category: 'tech' },
+
+  // REDDIT (public RSS — no API key needed)
+  { name: 'Reddit — World News', url: 'https://www.reddit.com/r/worldnews/.rss', category: 'world' },
+  { name: 'Reddit — Science', url: 'https://www.reddit.com/r/science/.rss', category: 'science' },
+  { name: 'Reddit — Technology', url: 'https://www.reddit.com/r/technology/.rss', category: 'tech' },
+
+  // INTERNATIONAL
+  { name: 'The Guardian', url: 'https://www.theguardian.com/world/rss', category: 'world' },
+  { name: 'Al Jazeera', url: 'https://www.aljazeera.com/xml/rss/all.xml', category: 'world' },
 ];
 
 // ── Time range helpers ──────────────────────────────────────────
@@ -57,14 +77,6 @@ const TIME_RANGE_MS: Record<NewsTimeRange, number> = {
   '24h': 24 * 60 * 60 * 1000,
   '1w': 7 * 24 * 60 * 60 * 1000,
   '1m': 30 * 24 * 60 * 60 * 1000,
-};
-
-const CACHE_TTL: Record<NewsTimeRange, number> = {
-  '1h': 5 * 60,      // 5 min
-  '12h': 15 * 60,     // 15 min
-  '24h': 30 * 60,     // 30 min
-  '1w': 60 * 60,      // 1 hour
-  '1m': 2 * 60 * 60,  // 2 hours
 };
 
 const FETCH_TIMEOUT = 8000;
@@ -146,43 +158,54 @@ async function fetchFeed(feed: FeedConfig): Promise<NewsArticle[]> {
 export async function fetchNewsletterArticles(
   timeRange: NewsTimeRange = '1w'
 ): Promise<NewsArticle[]> {
-  const cacheKey = `newsletter:articles:${timeRange}`;
-  const cached = await cache.get<NewsArticle[]>(cacheKey).catch(() => null);
-  if (cached && cached.length > 0) return cached;
+  const cutoff = new Date(Date.now() - TIME_RANGE_MS[timeRange]);
 
+  // Try DB first (populated by news-ingest worker)
+  try {
+    const rows = await prisma.ingestedArticle.findMany({
+      where: { pubDate: { gte: cutoff } },
+      orderBy: { pubDate: 'desc' },
+      take: 100,
+    });
+
+    if (rows.length > 0) {
+      return rows.map((r) => ({
+        title: r.title,
+        url: r.url,
+        summary: r.summary ?? '',
+        pubDate: r.pubDate?.toISOString() ?? '',
+        source: r.source,
+      }));
+    }
+  } catch (err) {
+    logger.warn('Failed to read IngestedArticle table, falling back to live fetch', {
+      error: (err as Error).message,
+    });
+  }
+
+  // Fallback: live RSS fetch (cold start / empty table)
   const results = await Promise.allSettled(FEEDS.map(fetchFeed));
-
-  const cutoff = Date.now() - TIME_RANGE_MS[timeRange];
+  const cutoffMs = cutoff.getTime();
   const allArticles: NewsArticle[] = [];
 
   for (const result of results) {
     if (result.status !== 'fulfilled') continue;
     for (const article of result.value) {
-      // Filter by publication date if parseable
       if (article.pubDate) {
         const pubTime = new Date(article.pubDate).getTime();
-        if (!isNaN(pubTime) && pubTime < cutoff) continue;
+        if (!isNaN(pubTime) && pubTime < cutoffMs) continue;
       }
       allArticles.push(article);
     }
   }
 
-  // Sort newest first, take top 40
   allArticles.sort((a, b) => {
     const timeA = new Date(a.pubDate).getTime() || 0;
     const timeB = new Date(b.pubDate).getTime() || 0;
     return timeB - timeA;
   });
 
-  const sliced = allArticles.slice(0, 40);
-
-  if (sliced.length > 0) {
-    await cache.set(cacheKey, sliced, CACHE_TTL[timeRange]).catch((err) => {
-      logger.warn('Failed to cache newsletter articles', { error: (err as Error).message });
-    });
-  }
-
-  return sliced;
+  return allArticles.slice(0, 100);
 }
 
 export function formatArticlesForPrompt(articles: NewsArticle[]): string {
@@ -191,5 +214,5 @@ export function formatArticlesForPrompt(articles: NewsArticle[]): string {
     .join('\n\n');
 }
 
-/** Exported for testing */
-export { FEEDS, parseRssFeed };
+/** Exported for testing + news-ingest worker */
+export { FEEDS, parseRssFeed, fetchFeed };
