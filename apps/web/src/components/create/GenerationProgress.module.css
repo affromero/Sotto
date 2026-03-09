@@ -62,34 +62,10 @@
   animation: ripple 3s ease-out 2s infinite;
 }
 
-/* Orb inner content: audio bars */
-.orbBars {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  height: 20px;
-}
-
-.orbBar {
-  width: 3px;
-  border-radius: 2px;
-  background: var(--color-text-inverse);
-  animation: barBounce 1.2s ease-in-out infinite;
-}
-
-.orbBar:nth-child(1) {
-  height: 8px;
-  animation-delay: 0s;
-}
-
-.orbBar:nth-child(2) {
-  height: 16px;
-  animation-delay: 0.2s;
-}
-
-.orbBar:nth-child(3) {
-  height: 12px;
-  animation-delay: 0.4s;
+/* Orb inner content: Lottie loader */
+.orbLottie {
+  width: 36px;
+  height: 36px;
 }
 
 /* Orb percentage text */

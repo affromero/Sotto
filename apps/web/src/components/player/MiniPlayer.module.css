@@ -45,6 +45,11 @@
   justify-content: center;
 }
 
+.artworkWaveform {
+  width: 32px;
+  height: 32px;
+}
+
 .artworkLetter {
   font-family: var(--font-heading);
   font-size: var(--font-size-xl);
