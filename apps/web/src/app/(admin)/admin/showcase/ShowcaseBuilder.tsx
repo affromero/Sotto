@@ -232,6 +232,28 @@ export function ShowcaseBuilder({ providers }: ShowcaseBuilderProps) {
     }
   }, [selectedPodcastId]);
 
+  // Generate video with transitions at provider boundaries
+  const generateVideo = useCallback(async () => {
+    if (!selectedPodcastId) return;
+    setStatus('generating');
+    setMessage('');
+    try {
+      const res = await fetch(`/api/admin/showcase/${selectedPodcastId}/video`, {
+        method: 'POST',
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error ?? 'Video trigger failed');
+      }
+      const data = await res.json();
+      setMessage(`Video pipeline started — ${data.transitionsCreated} provider transition(s) created`);
+      setStatus('success');
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'Video trigger failed');
+      setStatus('error');
+    }
+  }, [selectedPodcastId]);
+
   const providerMap = Object.fromEntries(providers.map((p) => [p.id, p]));
 
   // Find boundary after a segment
@@ -413,6 +435,14 @@ export function ShowcaseBuilder({ providers }: ShowcaseBuilderProps) {
               disabled={status === 'saving' || status === 'generating'}
             >
               {status === 'generating' ? 'Generating…' : 'Generate Audio'}
+            </button>
+            <button
+              type="button"
+              className={styles.btnSecondary}
+              onClick={generateVideo}
+              disabled={status === 'saving' || status === 'generating'}
+            >
+              Generate Video
             </button>
           </div>
 
