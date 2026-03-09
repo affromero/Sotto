@@ -13,6 +13,7 @@ const {
     videoGeneration: { update: vi.fn() },
     segment: { findMany: vi.fn() },
     avatarOverlay: { findMany: vi.fn().mockResolvedValue([]) },
+    segmentTransition: { findMany: vi.fn().mockResolvedValue([]) },
   },
   mockUploadFile: vi.fn().mockResolvedValue('https://cdn.example.com/video.mp4'),
   mockAddJob: vi.fn(),

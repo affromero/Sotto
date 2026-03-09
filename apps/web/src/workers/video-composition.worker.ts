@@ -120,6 +120,22 @@ export async function processVideoComposition(job: Job<ComposeVideoPayload>): Pr
         height: o.height,
       }));
 
+    // Fetch ready transition assets
+    const transitionRecords = await prisma.segmentTransition.findMany({
+      where: { videoGenerationId, enabled: true, status: 'ready' },
+      orderBy: { fromSegmentOrder: 'asc' },
+      select: { fromSegmentOrder: true, toSegmentOrder: true, assetUrl: true, durationSeconds: true },
+    });
+
+    const transitionInputs = transitionRecords
+      .filter((t) => t.assetUrl)
+      .map((t) => ({
+        fromSegmentOrder: t.fromSegmentOrder,
+        toSegmentOrder: t.toSegmentOrder,
+        assetUrl: t.assetUrl!,
+        durationSeconds: t.durationSeconds,
+      }));
+
     await job.updateProgress(20);
 
     // POST to Remotion sidecar
@@ -145,6 +161,7 @@ export async function processVideoComposition(job: Job<ComposeVideoPayload>): Pr
           bodyFont: 'Inter',
         },
         ...(avatarOverlayInputs.length > 0 && { avatarOverlays: avatarOverlayInputs }),
+        ...(transitionInputs.length > 0 && { transitions: transitionInputs }),
       }),
     });
 
