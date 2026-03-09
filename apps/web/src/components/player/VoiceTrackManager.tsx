@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from 'react';
 import Image from 'next/image';
 import { X, RefreshCw, Trash2, Star, Plus, Loader2, Check, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { AudioConfigPanel, type AudioConfig } from '@/components/player/AudioConfigPanel';
 import type { VoiceTrackSummary } from '@sotto/shared';
 import styles from './VoiceTrackManager.module.css';
 
@@ -38,6 +39,7 @@ export function VoiceTrackManager({
   const [rejectionReason, setRejectionReason] = useState('');
   const [addName, setAddName] = useState('');
   const [showAddInput, setShowAddInput] = useState(false);
+  const [audioConfig, setAudioConfig] = useState<AudioConfig | null>(null);
 
   // Poll for in-progress tracks
   useEffect(() => {
@@ -156,6 +158,10 @@ export function VoiceTrackManager({
     }
   }, [podcastId, onTracksChange, rejectionReason]);
 
+  const handleConfigChange = useCallback((config: AudioConfig) => {
+    setAudioConfig(config);
+  }, []);
+
   const handleAddTrack = useCallback(async () => {
     if (!addName.trim()) return;
     setError(null);
@@ -166,10 +172,11 @@ export function VoiceTrackManager({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: addName.trim(),
-          voices: [
-            { speaker: 'Host', voiceId: '' },
-            { speaker: 'Expert', voiceId: '' },
-          ],
+          ttsProvider: audioConfig?.ttsProvider,
+          ttsModel: audioConfig?.ttsModel,
+          voices: audioConfig?.voices && audioConfig.voices.length > 0
+            ? audioConfig.voices.map(v => ({ speaker: v.speaker, voiceId: v.voiceId || '' }))
+            : [{ speaker: 'Host', voiceId: '' }, { speaker: 'Expert', voiceId: '' }],
         }),
       });
       if (!res.ok) {
@@ -183,8 +190,8 @@ export function VoiceTrackManager({
         status: newTrack.status,
         audioUrl: null,
         duration: null,
-        ttsProvider: null,
-        ttsModel: null,
+        ttsProvider: audioConfig?.ttsProvider || null,
+        ttsModel: audioConfig?.ttsModel || null,
         failureReason: null,
         voices: [],
         contributor: null,
@@ -192,12 +199,13 @@ export function VoiceTrackManager({
         proposalMessage: null,
       }]);
       setAddName('');
+      setAudioConfig(null);
       setShowAddInput(false);
       onTracksChange?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create');
     }
-  }, [podcastId, addName, onTracksChange]);
+  }, [podcastId, addName, audioConfig, onTracksChange]);
 
   if (!isOpen) return null;
 
@@ -403,28 +411,30 @@ export function VoiceTrackManager({
           {/* Add Voice Track */}
           <div className={styles.addSection}>
             {showAddInput ? (
-              <div className={styles.addForm}>
+              <div
+                className={styles.addForm}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') { setShowAddInput(false); setAddName(''); setAudioConfig(null); }
+                }}
+              >
                 <input
                   type="text"
                   value={addName}
                   onChange={(e) => setAddName(e.target.value)}
                   placeholder='e.g., "British Narrator"'
                   className={styles.addInput}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleAddTrack();
-                    if (e.key === 'Escape') { setShowAddInput(false); setAddName(''); }
-                  }}
                   autoFocus
                 />
+                <AudioConfigPanel speakers={['Host', 'Expert']} onConfigChange={handleConfigChange} />
                 <div className={styles.addFormActions}>
                   <Button
                     variant="ghost"
-                    onClick={() => { setShowAddInput(false); setAddName(''); }}
+                    onClick={() => { setShowAddInput(false); setAddName(''); setAudioConfig(null); }}
                   >
                     Cancel
                   </Button>
                   <Button variant="primary" onClick={handleAddTrack} disabled={!addName.trim()}>
-                    Create
+                    Generate
                   </Button>
                 </div>
               </div>
