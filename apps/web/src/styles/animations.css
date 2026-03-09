@@ -1,0 +1,106 @@
+/* ==========================================================================
+   SCROLL REVEAL ANIMATION SYSTEM
+   Global data-attribute-based reveal system. Elements with [data-reveal]
+   animate in when they enter the viewport (via useScrollReveal hook).
+   ========================================================================== */
+
+/* Base: hidden state */
+[data-reveal] {
+  opacity: 0;
+  transform: translateY(24px);
+  transition:
+    opacity 0.6s var(--ease-out-expo),
+    transform 0.6s var(--ease-out-expo);
+  transition-delay: calc(var(--reveal-index, 0) * 80ms);
+}
+
+/* Visible state */
+[data-reveal][data-visible] {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Variant: scale up */
+[data-reveal="scale"] {
+  transform: scale(0.95);
+}
+[data-reveal="scale"][data-visible] {
+  transform: scale(1);
+}
+
+/* Variant: from left */
+[data-reveal="left"] {
+  transform: translateX(-24px);
+}
+[data-reveal="left"][data-visible] {
+  transform: translateX(0);
+}
+
+/* Variant: from right */
+[data-reveal="right"] {
+  transform: translateX(24px);
+}
+[data-reveal="right"][data-visible] {
+  transform: translateX(0);
+}
+
+/* ==========================================================================
+   KEYFRAMES
+   ========================================================================== */
+
+@keyframes springPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  60% {
+    transform: scale(1.05);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes gentleBounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* ==========================================================================
+   REDUCED MOTION
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  [data-reveal] {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  [data-reveal][data-visible] {
+    transform: none;
+  }
+
+  [data-reveal="scale"],
+  [data-reveal="scale"][data-visible],
+  [data-reveal="left"],
+  [data-reveal="left"][data-visible],
+  [data-reveal="right"],
+  [data-reveal="right"][data-visible] {
+    transform: none;
+  }
+}

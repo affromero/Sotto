@@ -6,6 +6,9 @@ import { WaitlistProvider } from '@/components/landing/WaitlistProvider';
 import { AuthCTA } from '@/components/landing/AuthCTA';
 import { PoweredByProviders } from '@/components/landing/PoweredByProviders';
 import { JsonLd } from '@/components/landing/JsonLd';
+import { HeroGradientBlob } from '@/components/landing/HeroGradientBlob';
+import { LottieAnimation } from '@/components/ui/LottieAnimation';
+import heroWaveform from '../../public/lottie/hero-waveform.json';
 import styles from './page.module.css';
 
 const VOICE_TRAITS = [
@@ -22,13 +25,13 @@ const VOICE_TRAITS = [
 export default function LandingPage() {
   return (
     <WaitlistProvider>
-    <LandingShell revealClassName={styles.rev} visibleClassName={styles.vis}>
+    <LandingShell>
       <JsonLd />
       <LandingNav />
 
       {/* ====== HERO ====== */}
       <section className={styles.hero} aria-label="Introduction">
-        <div className={styles.heroGlow} aria-hidden="true" />
+        <HeroGradientBlob />
         <div className={styles.heroContent}>
           <div className={styles.badge}>
             <span className={styles.badgeDot} aria-hidden="true" />
@@ -44,11 +47,11 @@ export default function LandingPage() {
           </p>
           <AuthCTA source="hero" />
         </div>
-        <div className={styles.heroWave} aria-hidden="true">
-          {Array.from({ length: 64 }, (_, i) => (
-            <span key={i} className={styles.bar} style={{ '--i': i } as React.CSSProperties} />
-          ))}
-        </div>
+        <LottieAnimation
+          animationData={heroWaveform}
+          className={styles.heroWave}
+          ariaHidden
+        />
       </section>
 
       {/* ====== PILLARS ====== */}
@@ -56,7 +59,7 @@ export default function LandingPage() {
         <div className={styles.inner}>
           <h2 className={styles.srOnly}>Key Features</h2>
           <div className={styles.pillars}>
-            <article className={`${styles.pillar} ${styles.rev}`}>
+            <article className={styles.pillar} data-reveal>
               <div className={styles.pIcon}>
                 <svg
                   width="24"
@@ -81,7 +84,7 @@ export default function LandingPage() {
                 swap the voice. It&apos;s GitHub for podcasts.
               </p>
             </article>
-            <article className={`${styles.pillar} ${styles.rev} ${styles.d1}`}>
+            <article className={styles.pillar} data-reveal style={{ "--reveal-index": 1 } as React.CSSProperties}>
               <div className={`${styles.pIcon} ${styles.pIconNavy}`}>
                 <svg
                   width="24"
@@ -106,7 +109,7 @@ export default function LandingPage() {
                 transcripts, social features, and interactive Q&amp;A on top.
               </p>
             </article>
-            <article className={`${styles.pillar} ${styles.rev} ${styles.d2}`}>
+            <article className={styles.pillar} data-reveal style={{ "--reveal-index": 2 } as React.CSSProperties}>
               <div className={styles.pIcon}>
                 <svg
                   width="24"
@@ -129,7 +132,7 @@ export default function LandingPage() {
               </p>
             </article>
           </div>
-          <div className={`${styles.importPlatforms} ${styles.rev}`}>
+          <div className={styles.importPlatforms} data-reveal>
             <span className={styles.importPlatformsLabel}>Import from</span>
             <div className={styles.importPlatformsList}>
               <span className={`${styles.importPlatformPill} ${styles.importPlatformPillHighlight}`}>
@@ -150,7 +153,7 @@ export default function LandingPage() {
       </section>
 
       {/* ====== TRUST STRIP ====== */}
-      <div className={`${styles.trustStrip} ${styles.rev}`} aria-label="Verification promise">
+      <div className={styles.trustStrip} data-reveal aria-label="Verification promise">
         <div className={styles.trustStripInner}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={styles.trustStripIcon}>
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
@@ -170,7 +173,7 @@ export default function LandingPage() {
       <section className={`${styles.section} ${styles.sectionAlt}`} aria-label="Product demo">
         <div className={styles.inner}>
           <div className={styles.split}>
-            <div className={`${styles.splitText} ${styles.rev}`}>
+            <div className={styles.splitText} data-reveal>
               <span className={styles.overline}>See it in action</span>
               <h2 className={styles.h2}>From curiosity to podcast in under a minute</h2>
               <p className={styles.bodyLg}>
@@ -179,7 +182,7 @@ export default function LandingPage() {
                 producers.
               </p>
             </div>
-            <div className={`${styles.splitVisual} ${styles.rev} ${styles.d1}`}>
+            <div className={styles.splitVisual} data-reveal style={{ "--reveal-index": 1 } as React.CSSProperties}>
               <div className={styles.chatMock}>
                 <div className={styles.chatHeader}>
                   <div className={styles.chatHeaderDot} aria-hidden="true" />
@@ -236,7 +239,7 @@ export default function LandingPage() {
       <section className={styles.section} aria-label="Interactive feature">
         <div className={styles.inner}>
           <div className={`${styles.split} ${styles.splitReverse}`}>
-            <div className={`${styles.splitText} ${styles.rev}`}>
+            <div className={styles.splitText} data-reveal>
               <span className={styles.overline}>Interactive</span>
               <h2 className={styles.h2}>The podcast that pauses when you&apos;re curious</h2>
               <p className={styles.bodyLg}>
@@ -245,7 +248,7 @@ export default function LandingPage() {
                 your Q&amp;A gets woven back into the conversation.
               </p>
             </div>
-            <div className={`${styles.splitVisual} ${styles.rev} ${styles.d1}`}>
+            <div className={styles.splitVisual} data-reveal style={{ "--reveal-index": 1 } as React.CSSProperties}>
               <div className={styles.interruptMock}>
                 <div className={styles.interruptPlaying}>
                   <div className={styles.interruptWave} aria-hidden="true">
@@ -307,7 +310,7 @@ export default function LandingPage() {
         aria-label="Voice selection"
       >
         <div className={styles.inner}>
-          <div className={`${styles.centered} ${styles.rev}`}>
+          <div className={styles.centered} data-reveal>
             <span className={styles.overline}>Voices</span>
             <h2 className={styles.h2}>Every podcast sounds different. By design.</h2>
             <p className={styles.bodyLg}>
@@ -319,7 +322,7 @@ export default function LandingPage() {
             {VOICE_TRAITS.map((v, i) => (
               <div
                 key={v.trait}
-                className={`${styles.voiceCard} ${styles.rev}`}
+                className={styles.voiceCard} data-reveal
                 style={{ '--vi': i } as React.CSSProperties}
               >
                 <div className={`${styles.voiceAvatar} ${i % 2 !== 0 ? styles.voiceAvatarF : ''}`}>
@@ -332,7 +335,7 @@ export default function LandingPage() {
               </div>
             ))}
           </div>
-          <div className={`${styles.voicePairing} ${styles.rev}`}>
+          <div className={styles.voicePairing} data-reveal>
             <div className={styles.pairingExample}>
               <div className={`${styles.pairingRole} ${styles.pairingHost}`}>
                 <span className={styles.pairingDot} />
@@ -358,7 +361,7 @@ export default function LandingPage() {
       <section className={styles.section} aria-label="Voice cloning and sharing">
         <div className={styles.inner}>
           <div className={`${styles.split} ${styles.splitReverse}`}>
-            <div className={`${styles.splitText} ${styles.rev}`}>
+            <div className={styles.splitText} data-reveal>
               <span className={styles.overline}>Voice Sharing</span>
               <h2 className={styles.h2}>Clone your voice. Share it — or sell it.</h2>
               <p className={styles.bodyLg}>
@@ -439,7 +442,7 @@ export default function LandingPage() {
                 </div>
               </div>
             </div>
-            <div className={`${styles.splitVisual} ${styles.rev} ${styles.d1}`}>
+            <div className={styles.splitVisual} data-reveal style={{ "--reveal-index": 1 } as React.CSSProperties}>
               <div className={styles.voiceSharingMock}>
                 <div className={styles.vsMockHeader}>
                   <span className={styles.vsMockTitle}>My Voice Clones</span>
@@ -546,7 +549,7 @@ export default function LandingPage() {
       <section className={styles.section} aria-label="Fork and remix">
         <div className={styles.inner}>
           <div className={`${styles.split} ${styles.splitReverse}`}>
-            <div className={`${styles.splitText} ${styles.rev}`}>
+            <div className={styles.splitText} data-reveal>
               <span className={styles.overline}>Fork &amp; Remix</span>
               <h2 className={styles.h2}>Build on what others started</h2>
               <p className={styles.bodyLg}>
@@ -629,7 +632,7 @@ export default function LandingPage() {
                 </div>
               </div>
             </div>
-            <div className={`${styles.splitVisual} ${styles.rev} ${styles.d1}`}>
+            <div className={styles.splitVisual} data-reveal style={{ "--reveal-index": 1 } as React.CSSProperties}>
               <div className={styles.forkMock}>
                 <div className={styles.forkOriginal}>
                   <div className={styles.forkCardLabel}>Original</div>
@@ -732,12 +735,12 @@ export default function LandingPage() {
       {/* ====== USE CASES ====== */}
       <section className={styles.section} aria-label="Use cases">
         <div className={styles.inner}>
-          <div className={`${styles.centered} ${styles.rev}`}>
+          <div className={styles.centered} data-reveal>
             <span className={styles.overline}>Built for the curious</span>
             <h2 className={styles.h2}>Turn any topic into a podcast worth sharing</h2>
           </div>
           <div className={styles.useCases}>
-            <article className={`${styles.useCase} ${styles.rev}`}>
+            <article className={styles.useCase} data-reveal>
               <div className={styles.useCaseIcon} aria-hidden="true">
                 <svg
                   width="28"
@@ -759,7 +762,7 @@ export default function LandingPage() {
                 and asking questions in real time.
               </p>
             </article>
-            <article className={`${styles.useCase} ${styles.rev} ${styles.d1}`}>
+            <article className={styles.useCase} data-reveal style={{ "--reveal-index": 1 } as React.CSSProperties}>
               <div className={styles.useCaseIcon} aria-hidden="true">
                 <svg
                   width="28"
@@ -781,7 +784,7 @@ export default function LandingPage() {
                 in 10 focused minutes.
               </p>
             </article>
-            <article className={`${styles.useCase} ${styles.rev} ${styles.d2}`}>
+            <article className={styles.useCase} data-reveal style={{ "--reveal-index": 2 } as React.CSSProperties}>
               <div className={styles.useCaseIcon} aria-hidden="true">
                 <svg
                   width="28"
@@ -805,7 +808,7 @@ export default function LandingPage() {
                 adapts to every learner.
               </p>
             </article>
-            <article className={`${styles.useCase} ${styles.rev} ${styles.d3}`}>
+            <article className={styles.useCase} data-reveal style={{ "--reveal-index": 3 } as React.CSSProperties}>
               <div className={styles.useCaseIcon} aria-hidden="true">
                 <svg
                   width="28"
@@ -836,7 +839,7 @@ export default function LandingPage() {
       <section className={styles.botSection} aria-label="Bot integrations">
         <div className={styles.botGlow} aria-hidden="true" />
         <div className={styles.inner}>
-          <div className={`${styles.centered} ${styles.rev}`}>
+          <div className={styles.centered} data-reveal>
             <span className={styles.overlineLight}>Generate from anywhere</span>
             <h2 className={styles.h2Light}>Tweet it. Message it. Done.</h2>
             <p className={styles.bodyLgLight}>
@@ -845,7 +848,7 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <div className={`${styles.botGrid} ${styles.rev} ${styles.d1}`}>
+          <div className={styles.botGrid} data-reveal style={{ "--reveal-index": 1 } as React.CSSProperties}>
             {/* Twitter / X column */}
             <div className={styles.botColumn}>
               <span className={styles.botLabel}>
@@ -1179,12 +1182,12 @@ export default function LandingPage() {
       {/* ====== HOW IT WORKS ====== */}
       <section className={`${styles.section} ${styles.sectionAlt}`} aria-label="How it works">
         <div className={styles.inner}>
-          <div className={`${styles.centered} ${styles.rev}`}>
+          <div className={styles.centered} data-reveal>
             <span className={styles.overline}>How it works</span>
             <h2 className={styles.h2}>Three steps. One incredible podcast.</h2>
           </div>
           <div className={styles.steps}>
-            <div className={`${styles.step} ${styles.rev}`}>
+            <div className={styles.step} data-reveal>
               <div className={styles.stepNum}>1</div>
               <div className={styles.stepContent}>
                 <h3>Create or import</h3>
@@ -1196,7 +1199,7 @@ export default function LandingPage() {
               </div>
             </div>
             <div className={styles.stepLine} aria-hidden="true" />
-            <div className={`${styles.step} ${styles.rev} ${styles.d1}`}>
+            <div className={styles.step} data-reveal style={{ "--reveal-index": 1 } as React.CSSProperties}>
               <div className={styles.stepNum}>2</div>
               <div className={styles.stepContent}>
                 <h3>Listen, ask, fork</h3>
@@ -1207,7 +1210,7 @@ export default function LandingPage() {
               </div>
             </div>
             <div className={styles.stepLine} aria-hidden="true" />
-            <div className={`${styles.step} ${styles.rev} ${styles.d2}`}>
+            <div className={styles.step} data-reveal style={{ "--reveal-index": 2 } as React.CSSProperties}>
               <div className={styles.stepNum}>3</div>
               <div className={styles.stepContent}>
                 <h3>Share on the feed</h3>
@@ -1224,7 +1227,7 @@ export default function LandingPage() {
       {/* ====== OPEN VERIFICATION STANDARD ====== */}
       <section id="verification" className={styles.section} aria-label="Open verification standard">
         <div className={styles.inner}>
-          <div className={`${styles.centered} ${styles.rev}`}>
+          <div className={styles.centered} data-reveal>
             <span className={styles.overline}>Open Verification Standard</span>
             <div className={styles.verificationV2Row}>
               <span className={styles.verificationV2Pill}>Bayesian v2</span>
@@ -1236,7 +1239,7 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <div className={`${styles.verificationGrid} ${styles.rev} ${styles.d1}`}>
+          <div className={styles.verificationGrid} data-reveal style={{ "--reveal-index": 1 } as React.CSSProperties}>
             {/* ACADEMIC */}
             <div
               className={styles.verificationCard}
@@ -1480,7 +1483,7 @@ export default function LandingPage() {
             </div>
           </div>
 
-          <div className={`${styles.verificationCallout} ${styles.rev} ${styles.d2}`}>
+          <div className={styles.verificationCallout} data-reveal style={{ "--reveal-index": 2 } as React.CSSProperties}>
             <span className={styles.verificationCalloutIcon} aria-hidden="true">
               &#x1F50D;
             </span>
@@ -1490,7 +1493,7 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <p className={`${styles.verificationFooter} ${styles.rev} ${styles.d3}`}>
+          <p className={styles.verificationFooter} data-reveal style={{ "--reveal-index": 3 } as React.CSSProperties}>
             Scoring logic is open source &mdash;{' '}
             <a
               href="https://github.com/SottoFM/reference-verification-standard"
@@ -1504,11 +1507,19 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ====== POWERED BY ====== */}
+      <section
+        className={`${styles.section} ${styles.sectionAlt}`} data-reveal
+        aria-label="Powered by"
+      >
+        <PoweredByProviders />
+      </section>
+
       {/* ====== EARLY ACCESS PRICING ====== */}
       <section className={styles.creatorSection} aria-label="Early access">
         <div className={styles.creatorGlow} aria-hidden="true" />
         <div className={styles.inner}>
-          <div className={`${styles.centered} ${styles.rev}`}>
+          <div className={styles.centered} data-reveal>
             <span className={styles.overlineLight}>Early access</span>
             <h2 className={styles.h2Light}>
               Free during
@@ -1532,14 +1543,16 @@ export default function LandingPage() {
               <span className={styles.creatorStatLabel}>Bring your own keys</span>
             </div>
           </div>
-          <div className={`${styles.byokProviders} ${styles.rev}`}>
+          <div className={styles.byokProviders} data-reveal>
             <span className={styles.byokProvidersLabel}>Supported BYOK providers</span>
             <div className={styles.byokProvidersList}>
               <span className={styles.byokProviderPill}>Anthropic</span>
               <span className={styles.byokProviderPill}>OpenAI</span>
+              <span className={styles.byokProviderPill}>Google</span>
               <span className={styles.byokProviderPill}>ElevenLabs</span>
               <span className={styles.byokProviderPill}>Cartesia</span>
               <span className={styles.byokProviderPill}>Hume</span>
+              <span className={styles.byokProviderPill}>Together AI</span>
             </div>
           </div>
         </div>
@@ -1548,7 +1561,7 @@ export default function LandingPage() {
       {/* ====== FINAL CTA ====== */}
       <section className={styles.cta} aria-label="Get started">
         <div className={styles.ctaGlow} aria-hidden="true" />
-        <div className={`${styles.ctaContent} ${styles.rev}`}>
+        <div className={styles.ctaContent} data-reveal>
           <h2 className={styles.ctaTitle}>
             Start creating <em>today.</em>
           </h2>
@@ -1557,14 +1570,6 @@ export default function LandingPage() {
           </p>
           <AuthCTA source="cta" />
         </div>
-      </section>
-
-      {/* ====== POWERED BY ====== */}
-      <section
-        className={`${styles.section} ${styles.sectionAlt} ${styles.rev}`}
-        aria-label="Powered by"
-      >
-        <PoweredByProviders />
       </section>
 
       {/* ====== FOOTER ====== */}

@@ -1,7 +1,7 @@
 import styles from './Card.module.css';
 
 interface CardProps {
-  variant?: 'default' | 'elevated' | 'outlined';
+  variant?: 'default' | 'elevated' | 'outlined' | 'glass';
   padding?: 'none' | 'small' | 'medium' | 'large';
   children: React.ReactNode;
   className?: string;
