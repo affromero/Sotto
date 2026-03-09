@@ -112,7 +112,7 @@ describe('POST /api/podcasts/[id]/video', () => {
     mockVideoGenCreate.mockResolvedValue({ id: 'vg-1', podcastId: 'pod-1', status: 'PENDING' });
     mockSegmentVisualCreateMany.mockResolvedValue({ count: 2 });
     mockSegmentVisualFindMany.mockResolvedValue([
-      { id: 'sv-1', segmentId: 'seg-1', visualType: 'AI_ILLUSTRATION', prompt: 'test', metadata: null },
+      { id: 'sv-1', segmentId: 'seg-1', visualType: 'AI_ILLUSTRATION', visualMode: 'image', prompt: 'test', metadata: null },
     ]);
     mockVideoGenUpdate.mockResolvedValue({});
     mockAddJob.mockResolvedValue({});
