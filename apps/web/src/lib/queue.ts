@@ -271,6 +271,8 @@ export interface GenerateAvatarPayload {
   avatarOverlayId: string;
   speaker: string;
   avatarId: string;
+  avatarProvider?: 'heygen' | 'runway';
+  isPreset?: boolean;
 }
 
 export interface GenerateVoiceTrackAudioPayload {
