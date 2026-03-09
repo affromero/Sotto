@@ -60,7 +60,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   // Parse optional body
   let imageModel: string | undefined;
   let pipeline: {
-    version: 1;
+    version: 1 | 2;
     defaultImageModel: string;
     defaultVideoModel: string;
     segments: Array<{
@@ -72,6 +72,17 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       prompt: string | null;
       metadata: Record<string, unknown> | null;
       endStatePrompt?: string | null;
+      subVisuals?: Array<{
+        subOrder: number;
+        startOffset: number;
+        duration: number;
+        visualType: string;
+        visualMode: 'image' | 'video' | 'programmatic';
+        model: string | null;
+        prompt: string | null;
+        metadata: Record<string, unknown> | null;
+        endStatePrompt?: string | null;
+      }>;
     }>;
   } | undefined;
 
@@ -201,18 +212,42 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const EXTERNAL_MODES = new Set(['image', 'video']);
 
     await prisma.segmentVisual.createMany({
-      data: pipeline.segments.map((seg) => ({
-        videoGenerationId: videoGeneration.id,
-        segmentId: seg.segmentId,
-        order: seg.order,
-        visualType: seg.visualType as 'AI_ILLUSTRATION' | 'STOCK_FOOTAGE' | 'DATA_CHART' | 'QUOTE' | 'COMPARISON' | 'TIMELINE' | 'DIAGRAM' | 'TEXT_CARD',
-        visualMode: seg.visualMode,
-        videoModel: seg.visualMode === 'video' ? seg.model : null,
-        prompt: seg.prompt,
-        endStatePrompt: seg.endStatePrompt ?? null,
-        metadata: seg.metadata ? (seg.metadata as unknown as Prisma.InputJsonValue) : Prisma.JsonNull,
-        status: EXTERNAL_MODES.has(seg.visualMode) ? 'pending' : 'ready',
-      })),
+      data: pipeline.segments.flatMap((seg) => {
+        // If segment has sub-visuals (version 2), create one record per sub-visual
+        if (seg.subVisuals && seg.subVisuals.length > 0) {
+          return seg.subVisuals.map((sv) => ({
+            videoGenerationId: videoGeneration.id,
+            segmentId: seg.segmentId,
+            order: seg.order,
+            subOrder: sv.subOrder,
+            startOffset: sv.startOffset,
+            subDuration: sv.duration,
+            visualType: sv.visualType as 'AI_ILLUSTRATION' | 'STOCK_FOOTAGE' | 'DATA_CHART' | 'QUOTE' | 'COMPARISON' | 'TIMELINE' | 'DIAGRAM' | 'TEXT_CARD',
+            visualMode: sv.visualMode,
+            videoModel: sv.visualMode === 'video' ? sv.model : null,
+            prompt: sv.prompt,
+            endStatePrompt: sv.endStatePrompt ?? null,
+            metadata: sv.metadata ? (sv.metadata as unknown as Prisma.InputJsonValue) : Prisma.JsonNull,
+            status: EXTERNAL_MODES.has(sv.visualMode) ? 'pending' : 'ready',
+          }));
+        }
+        // Single visual (version 1 or no sub-visuals)
+        return [{
+          videoGenerationId: videoGeneration.id,
+          segmentId: seg.segmentId,
+          order: seg.order,
+          subOrder: 0,
+          startOffset: 0,
+          subDuration: null as number | null,
+          visualType: seg.visualType as 'AI_ILLUSTRATION' | 'STOCK_FOOTAGE' | 'DATA_CHART' | 'QUOTE' | 'COMPARISON' | 'TIMELINE' | 'DIAGRAM' | 'TEXT_CARD',
+          visualMode: seg.visualMode,
+          videoModel: seg.visualMode === 'video' ? seg.model : null,
+          prompt: seg.prompt,
+          endStatePrompt: seg.endStatePrompt ?? null,
+          metadata: seg.metadata ? (seg.metadata as unknown as Prisma.InputJsonValue) : Prisma.JsonNull,
+          status: EXTERNAL_MODES.has(seg.visualMode) ? 'pending' : 'ready',
+        }];
+      }),
     });
 
     await prisma.videoGeneration.update({
@@ -220,19 +255,15 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       data: { status: 'GENERATING_VISUALS' },
     });
 
-    const externals = pipeline.segments.filter((s) => EXTERNAL_MODES.has(s.visualMode));
+    // Find all visuals that need external asset generation
+    const allVisuals = await prisma.segmentVisual.findMany({
+      where: { videoGenerationId: videoGeneration.id },
+      select: { id: true, segmentId: true, visualType: true, visualMode: true, prompt: true, metadata: true },
+    });
+    const externalVisuals = allVisuals.filter((v) => EXTERNAL_MODES.has(v.visualMode ?? ''));
 
-    if (externals.length > 0) {
-      const visuals = await prisma.segmentVisual.findMany({
-        where: { videoGenerationId: videoGeneration.id },
-        select: { id: true, segmentId: true, visualType: true, prompt: true, metadata: true },
-      });
-      const visualBySegment = new Map(visuals.map((v) => [v.segmentId, v]));
-
-      for (const ext of externals) {
-        const visual = visualBySegment.get(ext.segmentId);
-        if (!visual) continue;
-
+    if (externalVisuals.length > 0) {
+      for (const visual of externalVisuals) {
         await addJob(visualGenerationQueue, JobType.GENERATE_VISUAL, {
           podcastId,
           videoGenerationId: videoGeneration.id,
@@ -322,9 +353,12 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
           firstFrameUrl: true,
           lastFrameUrl: true,
           order: true,
+          subOrder: true,
+          startOffset: true,
+          subDuration: true,
           visualMode: true,
         },
-        orderBy: { order: 'asc' },
+        orderBy: [{ order: 'asc' }, { subOrder: 'asc' }],
       },
       avatarOverlays: {
         select: {

@@ -63,10 +63,10 @@ async function generateAiVideo(
     requestedModel: videoModel,
   });
 
-  // Get the segment linked to this visual for duration
+  // Get duration: prefer subDuration (sub-visual), fall back to parent segment duration
   const visual = await prisma.segmentVisual.findUnique({
     where: { id: segmentVisualId },
-    select: { segmentId: true },
+    select: { segmentId: true, subDuration: true },
   });
   const segment = visual?.segmentId
     ? await prisma.segment.findUnique({ where: { id: visual.segmentId }, select: { duration: true } })
@@ -76,7 +76,7 @@ async function generateAiVideo(
   const videoModels = await fetchAllVideoModels();
   const pricing = videoModels.find((m) => m.modelId === videoModel);
   const maxDuration = pricing?.maxDuration ?? 10;
-  const rawDuration = segment?.duration ?? 5;
+  const rawDuration = visual?.subDuration ?? segment?.duration ?? 5;
   const clipCount = Math.ceil(rawDuration / maxDuration);
 
   // Always generate first-frame image for all video segments

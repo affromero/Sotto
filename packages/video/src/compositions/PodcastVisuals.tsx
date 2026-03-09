@@ -1,6 +1,6 @@
 import React from 'react';
 import { AbsoluteFill, Sequence, useCurrentFrame, useVideoConfig, interpolate, prefetch } from 'remotion';
-import type { VisualsInput } from '../types';
+import type { VisualsInput, VideoSegment } from '../types';
 import { resolveSegmentComponent } from './segments';
 import { SottoWatermark } from './shared/SottoWatermark';
 import { AttributionOverlay } from './shared/AttributionOverlay';
@@ -35,13 +35,21 @@ export const PodcastVisuals: React.FC<VisualsInput> = ({
 }) => {
   const { fps } = useVideoConfig();
 
-  // Prefetch all image/video assets so they're ready before their segment plays
+  // Prefetch all image/video assets — including sub-visual assets
   React.useEffect(() => {
     const cleanups: (() => void)[] = [];
     for (const segment of segments) {
       if (segment.assetUrl) {
         const { free } = prefetch(segment.assetUrl, { method: 'blob-url' });
         cleanups.push(free);
+      }
+      if (segment.subVisuals) {
+        for (const sv of segment.subVisuals) {
+          if (sv.assetUrl) {
+            const { free } = prefetch(sv.assetUrl, { method: 'blob-url' });
+            cleanups.push(free);
+          }
+        }
       }
     }
     return () => cleanups.forEach((fn) => fn());
@@ -53,6 +61,54 @@ export const PodcastVisuals: React.FC<VisualsInput> = ({
         {segments.map((segment) => {
           const fromFrame = Math.round(segment.startTime * fps);
           const durationFrames = Math.round(segment.duration * fps);
+
+          // Multi-visual: render nested sequences within the segment window
+          if (segment.subVisuals && segment.subVisuals.length > 1) {
+            return (
+              <Sequence
+                key={segment.segmentId}
+                from={fromFrame}
+                durationInFrames={durationFrames}
+              >
+                {segment.subVisuals.map((sv) => {
+                  const subFromFrame = Math.round(sv.startOffset * fps);
+                  const subDurationFrames = Math.round(sv.duration * fps);
+                  const SubComponent = resolveSegmentComponent(sv.visualType);
+
+                  // Build a synthetic VideoSegment for the sub-visual component
+                  const subSegment: VideoSegment = {
+                    ...segment,
+                    visualType: sv.visualType,
+                    prompt: sv.prompt,
+                    metadata: sv.metadata,
+                    assetUrl: sv.assetUrl,
+                    assetType: sv.assetType,
+                  };
+
+                  return (
+                    <Sequence
+                      key={`${segment.segmentId}-${sv.subOrder}`}
+                      from={subFromFrame}
+                      durationInFrames={subDurationFrames}
+                    >
+                      <SegmentWithFade durationInFrames={subDurationFrames}>
+                        <SubComponent segment={subSegment} />
+                        {typeof sv.metadata?.photographer === 'string' && (
+                          <AttributionOverlay
+                            photographer={sv.metadata.photographer}
+                            source="Pexels"
+                          />
+                        )}
+                      </SegmentWithFade>
+                    </Sequence>
+                  );
+                })}
+                <SpeakerLabel speaker={segment.speaker} branding={branding} />
+              </Sequence>
+            );
+          }
+
+          // Single visual (backward compat) — existing code path
           const SegmentComponent = resolveSegmentComponent(segment.visualType);
 
           return (

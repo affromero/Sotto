@@ -70,7 +70,7 @@ describe('video-composition worker', () => {
       text: 'Hello',
       startTime: 0,
       duration: 5,
-      segmentVisuals: [{ visualType: 'AI_ILLUSTRATION', prompt: 'editorial', metadata: null, assetUrl: 'https://cdn.example.com/vis.png', assetType: 'image/png' }],
+      segmentVisuals: [{ visualType: 'AI_ILLUSTRATION', prompt: 'editorial', metadata: null, assetUrl: 'https://cdn.example.com/vis.png', assetType: 'image/png', subOrder: 0, startOffset: 0, subDuration: 5 }],
     },
     {
       id: 'seg-2',
@@ -79,7 +79,7 @@ describe('video-composition worker', () => {
       text: 'Data shows...',
       startTime: 5,
       duration: 8,
-      segmentVisuals: [{ visualType: 'TEXT_CARD', prompt: null, metadata: { headline: 'Stats' }, assetUrl: null, assetType: null }],
+      segmentVisuals: [{ visualType: 'TEXT_CARD', prompt: null, metadata: { headline: 'Stats' }, assetUrl: null, assetType: null, subOrder: 0, startOffset: 0, subDuration: 8 }],
     },
   ];
 
