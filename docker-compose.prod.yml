@@ -51,6 +51,7 @@ services:
         max-file: '3'
 
   web:
+    image: ghcr.io/affromero/sotto-web:latest
     build:
       context: .
       dockerfile: apps/web/Dockerfile
@@ -100,6 +101,7 @@ services:
         max-file: '5'
 
   workers:
+    image: ghcr.io/affromero/sotto-workers:latest
     build:
       context: .
       dockerfile: apps/web/Dockerfile.workers
@@ -133,6 +135,7 @@ services:
         max-file: '5'
 
   kittentts:
+    image: ghcr.io/affromero/sotto-kittentts:latest
     build:
       context: ./services/kittentts
       dockerfile: Dockerfile
@@ -191,6 +194,7 @@ services:
         max-file: '3'
 
   remotion:
+    image: ghcr.io/affromero/sotto-remotion:latest
     build:
       context: .
       dockerfile: services/remotion/Dockerfile
@@ -216,6 +220,7 @@ services:
         max-file: '3'
 
   maps:
+    image: ghcr.io/affromero/sotto-maps:latest
     build:
       context: .
       dockerfile: apps/maps/Dockerfile
@@ -246,23 +251,6 @@ services:
       options:
         max-size: '10m'
         max-file: '3'
-
-  migrate:
-    build:
-      context: .
-      dockerfile: apps/web/Dockerfile
-      target: builder
-    env_file:
-      - .env
-    environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-sotto}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-sotto}?schema=public
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - sotto-network
-    profiles:
-      - migration
 
 volumes:
   sotto_postgres_data:

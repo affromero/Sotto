@@ -1,22 +1,9 @@
 name: Deploy
 
-# Disabled — using /sotto-deploy skill instead (direct SSH deploy)
-# on:
-#   push:
-#     branches: [main]
-#     paths:
-
-on: workflow_dispatch
-# Manual trigger only — uncomment the push trigger above to re-enable auto-deploy
-# Original paths filter:
-#      - 'apps/web/**'
-#      - 'packages/**'
-#      - 'package.json'
-#      - 'package-lock.json'
-#      - 'docker-compose.prod.yml'
-#      - 'apps/web/Dockerfile'
-#      - 'apps/web/Dockerfile.workers'
-#      - '.github/workflows/deploy.yml'
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
 
 concurrency:
   group: deploy
@@ -42,9 +29,78 @@ jobs:
       - run: npm test
       - run: npm run build
 
+  publish:
+    name: Publish ${{ matrix.name }}
+    needs: ci
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: web
+            file: apps/web/Dockerfile
+            context: .
+            image: sotto-web
+          - name: workers
+            file: apps/web/Dockerfile.workers
+            context: .
+            image: sotto-workers
+          - name: remotion
+            file: services/remotion/Dockerfile
+            context: .
+            image: sotto-remotion
+          - name: kittentts
+            file: services/kittentts/Dockerfile
+            context: services/kittentts
+            image: sotto-kittentts
+          - name: maps
+            file: apps/maps/Dockerfile
+            context: .
+            image: sotto-maps
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          ssh-key: ${{ secrets.SUBMODULE_SSH_KEY }}
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Short SHA
+        id: sha
+        run: echo "short=${GITHUB_SHA::8}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
+          push: true
+          tags: |
+            ghcr.io/affromero/${{ matrix.image }}:latest
+            ghcr.io/affromero/${{ matrix.image }}:${{ steps.sha.outputs.short }}
+          build-args: |
+            COMMIT_SHA=${{ steps.sha.outputs.short }}
+            NEXT_PUBLIC_APP_URL=https://sotto.fm
+            NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=${{ secrets.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
+            NEXT_PUBLIC_VAPID_PUBLIC_KEY=${{ secrets.NEXT_PUBLIC_VAPID_PUBLIC_KEY }}
+            NEXT_PUBLIC_MAPBOX_TOKEN=${{ secrets.NEXT_PUBLIC_MAPBOX_TOKEN }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+
   deploy:
     name: Deploy to Production
-    needs: ci
+    needs: publish
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment: production
     outputs:
@@ -89,17 +145,23 @@ jobs:
             doppler secrets download --no-file --format env > .env
             chmod 600 .env
 
-            echo "Building containers..."
-            export COMMIT_SHA=$(git rev-parse --short HEAD)
-            docker compose -f docker-compose.prod.yml build
+            echo "Syncing Caddy config..."
+            sudo cp ~/sotto/Caddyfile /etc/caddy/conf.d/sotto.fm
+            sudo caddy reload --config /etc/caddy/Caddyfile --force
+
+            echo "Pulling pre-built images from GHCR..."
+            docker compose -f docker-compose.prod.yml pull web workers remotion kittentts maps
 
             echo "Running database migrations..."
-            docker compose -f docker-compose.prod.yml --profile migration run --build --rm migrate npx prisma db push --schema=prisma/schema.prisma
+            docker compose -f docker-compose.prod.yml run --rm --no-deps \
+              -e DATABASE_URL="postgresql://${POSTGRES_USER:-sotto}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-sotto}?schema=public" \
+              web npx prisma@6 db push --skip-generate --schema=apps/web/prisma/schema.prisma
 
             echo "Restarting services..."
             docker compose -f docker-compose.prod.yml up -d --force-recreate --remove-orphans
 
             echo "Waiting for health check..."
+            COMMIT_SHA=$(git rev-parse --short HEAD)
             for i in $(seq 1 12); do
               sleep 10
               HEALTH=$(curl -sf http://localhost:3000/api/health 2>/dev/null || echo "")
@@ -152,7 +214,7 @@ jobs:
   notify:
     name: Telegram Notification
     needs: [ci, deploy]
-    if: always()
+    if: always() && github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
