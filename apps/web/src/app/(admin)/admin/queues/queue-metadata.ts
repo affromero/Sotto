@@ -174,6 +174,10 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
     description: 'Generates lip-synced avatar overlays via HeyGen',
     stage: 'Video Pipeline',
   },
+  'transition-generation': {
+    description: 'Generates AI video transitions between segment visuals',
+    stage: 'Video Pipeline',
+  },
   'place-enrichment': {
     description: 'Resolves place names to coordinates via gazetteers for map visuals',
     stage: 'Video Pipeline',

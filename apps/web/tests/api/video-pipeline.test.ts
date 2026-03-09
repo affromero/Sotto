@@ -105,6 +105,11 @@ vi.mock('@/lib/providers/fal-endpoints', () => ({
   FAL_VIDEO_MODEL_IDS: new Set(['fal-wan2.5-480p']),
 }));
 
+vi.mock('@/lib/providers/video-registry', () => ({
+  getAllVideoProviderMeta: () => [],
+  videoModelSupportsLastFrame: () => false,
+}));
+
 vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
@@ -145,6 +150,7 @@ describe('POST /api/podcasts/[id]/video/pipeline', () => {
         { segmentId: 'seg-1', order: 0, subVisuals: [{ subOrder: 0, startOffsetFraction: 0, durationFraction: 1, visualType: 'AI_ILLUSTRATION', prompt: 'A test image', metadata: null, endStatePrompt: null }] },
         { segmentId: 'seg-2', order: 1, subVisuals: [{ subOrder: 0, startOffsetFraction: 0, durationFraction: 1, visualType: 'QUOTE', prompt: null, metadata: { text: 'Indeed' }, endStatePrompt: null }] },
       ],
+      transitionRecommendations: [],
       inputTokens: 100,
       outputTokens: 50,
       model: 'claude-haiku-4-5-20251001',
@@ -155,7 +161,7 @@ describe('POST /api/podcasts/[id]/video/pipeline', () => {
     const res = await POST(createRequest('POST'), routeParams);
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.version).toBe(2);
+    expect(body.version).toBe(3);
     expect(body.segments).toHaveLength(2);
     expect(body.segments[0].visualType).toBe('AI_ILLUSTRATION');
     expect(body.segments[0].visualMode).toBe('image');
