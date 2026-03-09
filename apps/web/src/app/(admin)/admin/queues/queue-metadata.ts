@@ -178,4 +178,8 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
     description: 'Resolves place names to coordinates via gazetteers for map visuals',
     stage: 'Video Pipeline',
   },
+  'news-ingest': {
+    description: 'Fetches RSS feeds and ingests articles into the database (every 30min)',
+    stage: 'Platform Ops',
+  },
 };
