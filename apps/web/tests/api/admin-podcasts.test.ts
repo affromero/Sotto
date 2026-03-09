@@ -8,6 +8,8 @@ const mockPodcastCreate = vi.fn();
 const mockPodcastUpdate = vi.fn();
 const mockPodcastUpdateMany = vi.fn();
 const mockTransaction = vi.fn();
+const mockDiscoveryCreate = vi.fn();
+const mockAddJob = vi.fn();
 
 vi.mock('@/lib/auth', () => ({
   auth: (...args: unknown[]) => mockAuth(...args),
@@ -33,6 +35,9 @@ vi.mock('@/lib/prisma', () => ({
       update: (...args: unknown[]) => mockPodcastUpdate(...args),
       updateMany: (...args: unknown[]) => mockPodcastUpdateMany(...args),
     },
+    discovery: {
+      create: (...args: unknown[]) => mockDiscoveryCreate(...args),
+    },
     $transaction: (...args: unknown[]) => mockTransaction(...args),
   },
   prismaUnfiltered: {
@@ -43,6 +48,12 @@ vi.mock('@/lib/prisma', () => ({
     },
     $transaction: (...args: unknown[]) => mockTransaction(...args),
   },
+}));
+
+vi.mock('@/lib/queue', () => ({
+  contentExtractionQueue: { name: 'content-extraction' },
+  addJob: (...args: unknown[]) => mockAddJob(...args),
+  JobType: { EXTRACT_CONTENT: 'extract_content' },
 }));
 
 import { POST } from '@/app/api/admin/podcasts/create-as-sotto/route';
@@ -117,10 +128,10 @@ describe('POST /api/admin/podcasts/create-as-sotto', () => {
     expect(body).toMatchObject({ error: 'title and topic are required' });
   });
 
-  it('creates podcast owned by @sotto successfully', async () => {
+  it('creates podcast owned by @sotto successfully (no metadata)', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
     mockUserFindUnique.mockResolvedValueOnce({ id: 'sotto-id' });
-    const created = {
+    mockPodcastCreate.mockResolvedValue({
       id: 'pod-1',
       userId: 'sotto-id',
       title: 'Test Podcast',
@@ -128,15 +139,74 @@ describe('POST /api/admin/podcasts/create-as-sotto', () => {
       status: 'PENDING',
       visibility: 'PUBLIC',
       source: 'WEB',
-    };
-    mockPodcastCreate.mockResolvedValue(created);
+    });
 
     const request = createPostRequest({ title: 'Test Podcast', topic: 'AI' });
     const response = await POST(request);
     const body = await response.json();
 
     expect(response.status).toBe(201);
-    expect(body).toEqual(created);
+    expect(body).toMatchObject({ id: 'pod-1', status: 'PENDING' });
+    expect(mockDiscoveryCreate).not.toHaveBeenCalled();
+    expect(mockAddJob).not.toHaveBeenCalled();
+  });
+
+  it('creates podcast with metadata, Discovery, and queues pipeline', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
+    mockUserFindUnique.mockResolvedValueOnce({ id: 'sotto-id' });
+    mockPodcastCreate.mockResolvedValue({
+      id: 'pod-2',
+      status: 'EXTRACTING',
+    });
+    mockDiscoveryCreate.mockResolvedValue({ id: 'disc-1' });
+    mockAddJob.mockResolvedValue({ id: 'job-1' });
+
+    const metadata = {
+      topic: 'Sotto Features',
+      depth: 'quick_overview',
+      audience: 'New users',
+      audienceLevel: 'beginner',
+      tone: 'casual',
+      focusAreas: ['AI generation', 'Forking'],
+      durationTarget: 2,
+      speakers: [
+        { name: 'Host', description: 'Warm guide' },
+        { name: 'Expert', description: 'Product expert' },
+      ],
+    };
+
+    const request = createPostRequest({
+      title: 'Sotto Features',
+      topic: 'Sotto Features',
+      metadata,
+    });
+    const response = await POST(request);
+    const body = await response.json();
+
+    expect(response.status).toBe(201);
+    expect(body).toMatchObject({ id: 'pod-2', status: 'EXTRACTING' });
+
+    // Discovery record created with sotto user ID
+    expect(mockDiscoveryCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        podcastId: 'pod-2',
+        userId: 'sotto-id',
+        topic: 'Sotto Features',
+        durationTarget: 2,
+      }),
+    });
+
+    // Pipeline job queued with admin priority
+    expect(mockAddJob).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'content-extraction' }),
+      'extract_content',
+      expect.objectContaining({
+        podcastId: 'pod-2',
+        userId: 'sotto-id',
+        useAdminCredits: true,
+      }),
+      { priority: 1 },
+    );
   });
 });
 

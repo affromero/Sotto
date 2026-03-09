@@ -322,7 +322,7 @@ const draftMetadataSchema = z.object({
   audience: z.string().optional(),
   focusAreas: z.array(z.string()).optional(),
   tone: z.string().optional(),
-  durationTarget: z.number().min(5).max(40).optional(),
+  durationTarget: z.number().min(1).max(40).optional(),
   ready: z.boolean().optional(),
 });
 
