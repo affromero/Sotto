@@ -788,9 +788,10 @@ export const configureAvatarsSchema = z.object({
 export const updateAvatarPositionsSchema = z.object({
   positions: z.array(z.object({
     speaker: z.string().min(1),
-    posX: z.number().min(0).max(1),
-    posY: z.number().min(0).max(1),
-    width: z.number().min(0.05).max(0.8),
-    height: z.number().min(0.05).max(0.8),
+    posX: z.number().min(0).max(1).optional(),
+    posY: z.number().min(0).max(1).optional(),
+    width: z.number().min(0.05).max(0.8).optional(),
+    height: z.number().min(0.05).max(0.8).optional(),
+    maskShape: z.enum(['none', 'rounded', 'circle', 'hexagon', 'diamond', 'blob', 'squircle']).optional(),
   })),
 });

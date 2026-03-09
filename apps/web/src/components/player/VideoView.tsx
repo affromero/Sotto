@@ -10,7 +10,8 @@ import { findActiveIndex, buildVideoSegments, computeTotalFrames } from '@/lib/s
 import type { SegmentVisualData } from '@/lib/segment-utils';
 import { getSpeakerIndex, getUniqueSpeakers } from '@/lib/speaker-colors';
 import { usePlayer } from '@/components/providers/AudioPlayerProvider';
-import { AvatarOverlay } from '@/components/player/AvatarOverlay';
+import { AvatarOverlay, AVATAR_MASK_SHAPES } from '@/components/player/AvatarOverlay';
+import type { AvatarMaskShape } from '@/components/player/AvatarOverlay';
 import type { AvatarOverlayData } from '@/types/avatar';
 import type { SegmentData } from '@/types/podcast';
 import type { ReferenceData } from '@/types/reference';
@@ -28,6 +29,7 @@ interface VideoViewProps {
   avatarsVisible?: boolean;
   onAvatarsVisibleChange?: (visible: boolean) => void;
   onAvatarPositionChange?: (speaker: string, pos: { posX: number; posY: number; width: number; height: number }) => void;
+  onMaskShapeChange?: (speaker: string, shape: AvatarMaskShape) => void;
 }
 
 const FPS = DEFAULT_RENDER_CONFIG.fps;
@@ -44,11 +46,13 @@ export function VideoView({
   avatarsVisible,
   onAvatarsVisibleChange,
   onAvatarPositionChange,
+  onMaskShapeChange,
 }: VideoViewProps) {
   const playerRef = useRef<PlayerRef>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const { isPlaying } = usePlayer();
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
+  const [shapePickerSpeaker, setShapePickerSpeaker] = useState<string | null>(null);
 
   // Track container pixel dimensions for avatar positioning
   useEffect(() => {
@@ -178,9 +182,50 @@ export function VideoView({
             containerWidth={containerSize.width}
             containerHeight={containerSize.height}
             editable={isOwner ?? false}
+            maskShape={(overlay.maskShape as AvatarMaskShape) ?? 'none'}
             onPositionChange={(pos) => onAvatarPositionChange?.(overlay.speaker, pos)}
           />
         ))}
+        {isOwner && avatarsVisible && readyOverlays.length > 0 && onMaskShapeChange && (
+          <div className={styles.shapePicker}>
+            {readyOverlays.map((overlay) => (
+              <div key={overlay.id} className={styles.shapePickerRow}>
+                <button
+                  className={styles.shapePickerToggle}
+                  onClick={() => setShapePickerSpeaker(
+                    shapePickerSpeaker === overlay.speaker ? null : overlay.speaker,
+                  )}
+                  type="button"
+                  aria-label={`Change shape for ${overlay.speaker}`}
+                  title={`Shape: ${overlay.maskShape ?? 'none'}`}
+                >
+                  {overlay.speaker}
+                </button>
+                {shapePickerSpeaker === overlay.speaker && (
+                  <div className={styles.shapeOptions} role="listbox" aria-label="Mask shapes">
+                    {AVATAR_MASK_SHAPES.map((shape) => (
+                      <button
+                        key={shape}
+                        className={`${styles.shapeOption} ${(overlay.maskShape ?? 'none') === shape ? styles.shapeOptionActive : ''}`}
+                        onClick={() => {
+                          onMaskShapeChange(overlay.speaker, shape);
+                          setShapePickerSpeaker(null);
+                        }}
+                        type="button"
+                        role="option"
+                        aria-selected={(overlay.maskShape ?? 'none') === shape}
+                        aria-label={shape}
+                      >
+                        <span className={`${styles.shapePreview} ${styles[`preview_${shape}`]}`} />
+                        <span className={styles.shapeLabel}>{shape}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {activeSegment && (
