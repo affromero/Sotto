@@ -58,6 +58,7 @@ import { processVisualGeneration } from './visual-generation.worker';
 import { processVideoComposition } from './video-composition.worker';
 import { processAvatarGeneration } from './avatar-generation.worker';
 import { processPlaceEnrichment } from './place-enrichment.worker';
+import { processTransitionGeneration } from './transition-generation.worker';
 import { processNewsIngest } from './news-ingest.worker';
 import { isR2MonitoringConfigured } from '@/lib/cloudflare-r2-usage';
 import { startPricingRefreshInterval } from '@/lib/pricing';
@@ -102,6 +103,7 @@ const workers = [
   createWorker('video-composition', processVideoComposition, { concurrency: 1, lockDuration: 600000 }),
   createWorker('avatar-generation', processAvatarGeneration, { concurrency: 2, lockDuration: 600000 }),
   createWorker('place-enrichment', processPlaceEnrichment, { concurrency: 3 }),
+  createWorker('transition-generation', processTransitionGeneration, { concurrency: 3, lockDuration: 600000 }),
   createWorker('news-ingest', processNewsIngest, { concurrency: 1 }),
 ];
 

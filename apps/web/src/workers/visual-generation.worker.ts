@@ -6,6 +6,7 @@ import {
   JobType,
   videoCompositionQueue,
   avatarGenerationQueue,
+  transitionGenerationQueue,
 } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { resolveImageProvider } from '@/lib/providers/image';
@@ -408,6 +409,34 @@ async function checkAllReady(videoGenerationId: string, podcastId: string): Prom
           failureReason: `${failed} visual(s) failed to generate`,
         },
       });
+      return;
+    }
+
+    // Check for enabled transitions needing generation
+    const pendingTransitions = await prisma.segmentTransition.count({
+      where: { videoGenerationId, enabled: true, status: 'pending' },
+    });
+
+    if (pendingTransitions > 0) {
+      await prisma.videoGeneration.update({
+        where: { id: videoGenerationId },
+        data: { status: 'GENERATING_TRANSITIONS' },
+      });
+      const podcast = await prisma.podcast.findUniqueOrThrow({
+        where: { id: podcastId },
+        select: { userId: true },
+      });
+      const transitions = await prisma.segmentTransition.findMany({
+        where: { videoGenerationId, enabled: true, status: 'pending' },
+      });
+      for (const t of transitions) {
+        await addJob(transitionGenerationQueue, JobType.GENERATE_TRANSITION, {
+          podcastId,
+          videoGenerationId,
+          transitionId: t.id,
+          userId: podcast.userId,
+        });
+      }
       return;
     }
 
