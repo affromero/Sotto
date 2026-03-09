@@ -1507,6 +1507,14 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ====== POWERED BY ====== */}
+      <section
+        className={`${styles.section} ${styles.sectionAlt}`} data-reveal
+        aria-label="Powered by"
+      >
+        <PoweredByProviders />
+      </section>
+
       {/* ====== EARLY ACCESS PRICING ====== */}
       <section className={styles.creatorSection} aria-label="Early access">
         <div className={styles.creatorGlow} aria-hidden="true" />
@@ -1540,9 +1548,11 @@ export default function LandingPage() {
             <div className={styles.byokProvidersList}>
               <span className={styles.byokProviderPill}>Anthropic</span>
               <span className={styles.byokProviderPill}>OpenAI</span>
+              <span className={styles.byokProviderPill}>Google</span>
               <span className={styles.byokProviderPill}>ElevenLabs</span>
               <span className={styles.byokProviderPill}>Cartesia</span>
               <span className={styles.byokProviderPill}>Hume</span>
+              <span className={styles.byokProviderPill}>Together AI</span>
             </div>
           </div>
         </div>
@@ -1560,14 +1570,6 @@ export default function LandingPage() {
           </p>
           <AuthCTA source="cta" />
         </div>
-      </section>
-
-      {/* ====== POWERED BY ====== */}
-      <section
-        className={`${styles.section} ${styles.sectionAlt}`} data-reveal
-        aria-label="Powered by"
-      >
-        <PoweredByProviders />
       </section>
 
       {/* ====== FOOTER ====== */}

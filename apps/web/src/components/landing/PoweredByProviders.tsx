@@ -13,11 +13,36 @@ const VOICE_PROVIDERS: ProviderEntry[] = [
   { name: 'OpenAI', brand: '#10A37F' },
   { name: 'Cartesia', brand: '#38BDF8' },
   { name: 'Hume', brand: '#FF6B35' },
+  { name: 'Fal', brand: '#7C3AED' },
+  { name: 'MiniMax', brand: '#06B6D4' },
+  { name: 'Replicate', brand: '#2563EB' },
 ];
 
 const AI_PROVIDERS: ProviderEntry[] = [
   { name: 'Anthropic', brand: '#D4A574' },
   { name: 'OpenAI', brand: '#10A37F' },
+  { name: 'Google', brand: '#4285F4' },
+  { name: 'Together AI', brand: '#6366F1' },
+];
+
+const IMAGE_PROVIDERS: ProviderEntry[] = [
+  { name: 'FLUX', brand: '#1A1A2E' },
+  { name: 'Recraft', brand: '#F97316' },
+  { name: 'Ideogram', brand: '#8B5CF6' },
+  { name: 'Stable Diffusion', brand: '#A855F7' },
+  { name: 'Google Imagen', brand: '#4285F4' },
+];
+
+const VIDEO_PROVIDERS: ProviderEntry[] = [
+  { name: 'Veo', brand: '#4285F4' },
+  { name: 'Kling', brand: '#10B981' },
+  { name: 'Wan', brand: '#EC4899' },
+  { name: 'Hailuo', brand: '#06B6D4' },
+];
+
+const AVATAR_PROVIDERS: ProviderEntry[] = [
+  { name: 'HeyGen', brand: '#3B82F6' },
+  { name: 'Runway', brand: '#1A1A2E' },
 ];
 
 const AUTO_SPEED = 0.4; // px per frame (~24px/s at 60fps)
@@ -129,6 +154,9 @@ export function PoweredByProviders() {
     <div className={styles.root}>
       <MarqueeTrack items={VOICE_PROVIDERS} label="Voice" />
       <MarqueeTrack items={AI_PROVIDERS} label="Intelligence" reverse />
+      <MarqueeTrack items={IMAGE_PROVIDERS} label="Images" />
+      <MarqueeTrack items={VIDEO_PROVIDERS} label="Video" reverse />
+      <MarqueeTrack items={AVATAR_PROVIDERS} label="Avatars" />
 
       <div className={styles.security}>
         <svg
