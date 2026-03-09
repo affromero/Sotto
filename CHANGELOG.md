@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.10.0] - 2026-03-09
+
+### Added
+- **Admin Showcase Builder**: Multi-provider TTS podcast builder at `/admin/showcase` — assign different TTS providers per segment, preview provider boundaries, generate mixed-provider audio, and trigger video with transitions at provider change points
+- 7 avatar mask shapes with owner-facing shape picker
+- Runway video pricing via pricetoken 0.11.1
+
+### Fixed
+- Video tab now appears first in player view toggle
+- Pinned Prisma to ~6.19.x to prevent breaking v7 upgrade
+
+### Changed
+- Audio generation worker supports segment-level provider overrides via `getPlatformTtsKey` helper
+
 ## [0.9.0] - 2026-03-09
 
 ### Added
