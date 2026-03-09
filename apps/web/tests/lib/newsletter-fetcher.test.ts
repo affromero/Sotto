@@ -2,13 +2,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ---- Mocks ----
 
-const mockCacheGet = vi.fn();
-const mockCacheSet = vi.fn();
+const mockFindMany = vi.fn();
 
-vi.mock('@/lib/redis', () => ({
-  cache: {
-    get: (...args: unknown[]) => mockCacheGet(...args),
-    set: (...args: unknown[]) => mockCacheSet(...args),
+vi.mock('@/lib/prisma', () => ({
+  prisma: {
+    ingestedArticle: {
+      findMany: (...args: unknown[]) => mockFindMany(...args),
+    },
   },
 }));
 
@@ -29,8 +29,7 @@ import {
 describe('newsletter-fetcher', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockCacheGet.mockResolvedValue(null);
-    mockCacheSet.mockResolvedValue(undefined);
+    mockFindMany.mockResolvedValue([]);
   });
 
   describe('FEEDS', () => {
@@ -154,19 +153,38 @@ describe('newsletter-fetcher', () => {
   });
 
   describe('fetchNewsletterArticles', () => {
-    it('returns cached articles when available', async () => {
-      const cachedArticles = [
-        { title: 'Cached Article', url: 'https://example.com', summary: 'cached', pubDate: '2026-02-27', source: 'Test' },
+    it('returns articles from DB when available', async () => {
+      const dbArticles = [
+        {
+          id: 'art1',
+          title: 'DB Article',
+          url: 'https://example.com/db',
+          summary: 'From database',
+          source: 'Reuters',
+          sourceUrl: 'https://reuters.com/feed',
+          category: 'world',
+          pubDate: new Date('2026-03-08T10:00:00Z'),
+          fetchedAt: new Date(),
+        },
       ];
-      mockCacheGet.mockResolvedValue(cachedArticles);
+      mockFindMany.mockResolvedValue(dbArticles);
 
       const result = await fetchNewsletterArticles('1w');
-      expect(result).toEqual(cachedArticles);
-      expect(mockCacheGet).toHaveBeenCalledWith('newsletter:articles:1w');
+      expect(result).toHaveLength(1);
+      expect(result[0].title).toBe('DB Article');
+      expect(result[0].source).toBe('Reuters');
+      expect(result[0].pubDate).toBe('2026-03-08T10:00:00.000Z');
+      expect(mockFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          orderBy: { pubDate: 'desc' },
+          take: 100,
+        })
+      );
     });
 
-    it('fetches from feeds when cache is empty', async () => {
-      // Mock fetch to return a simple RSS feed
+    it('falls back to live RSS when DB is empty', async () => {
+      mockFindMany.mockResolvedValue([]);
+
       const originalFetch = globalThis.fetch;
       globalThis.fetch = vi.fn().mockResolvedValue({
         ok: true,
@@ -185,13 +203,36 @@ describe('newsletter-fetcher', () => {
       expect(result.length).toBeGreaterThan(0);
       expect(result[0].title).toBe('Fresh Article');
 
-      // Should cache results
-      expect(mockCacheSet).toHaveBeenCalled();
+      globalThis.fetch = originalFetch;
+    });
+
+    it('falls back to live RSS when DB query fails', async () => {
+      mockFindMany.mockRejectedValue(new Error('DB connection failed'));
+
+      const originalFetch = globalThis.fetch;
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(`<?xml version="1.0"?>
+<rss version="2.0"><channel>
+  <item>
+    <title>Fallback Article</title>
+    <link>https://example.com/fallback</link>
+    <description>Fallback</description>
+    <pubDate>${new Date().toUTCString()}</pubDate>
+  </item>
+</channel></rss>`),
+      });
+
+      const result = await fetchNewsletterArticles('1w');
+      expect(result.length).toBeGreaterThan(0);
+      expect(result[0].title).toBe('Fallback Article');
 
       globalThis.fetch = originalFetch;
     });
 
-    it('handles feed fetch failures gracefully', async () => {
+    it('handles both DB empty and feed failures gracefully', async () => {
+      mockFindMany.mockResolvedValue([]);
+
       const originalFetch = globalThis.fetch;
       globalThis.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
 
@@ -201,9 +242,10 @@ describe('newsletter-fetcher', () => {
       globalThis.fetch = originalFetch;
     });
 
-    it('limits results to 100 articles', async () => {
+    it('limits fallback results to 100 articles', async () => {
+      mockFindMany.mockResolvedValue([]);
+
       const originalFetch = globalThis.fetch;
-      // Each feed returns 5 articles, 26 feeds × 5 = 130, should be capped at 100
       const items = Array.from({ length: 5 }, (_, i) =>
         `<item><title>Article ${i}</title><link>https://example.com/${i}</link><description>Desc</description><pubDate>${new Date().toUTCString()}</pubDate></item>`
       ).join('');
