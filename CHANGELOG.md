@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.8.0] - 2026-03-09
+
+### Added
+- **Invitation links**: Admins can generate single-use, 24h-expiry invite links that auto-approve the recipient on the waitlist
+- **Public invite page**: `/invite/[code]` validates and redeems invitation codes — users enter their email, then sign in with Google/Apple
+- **Admin invitations UI**: Generate, copy, enable/disable invitation links from the waitlist admin page
+- **Invitation API**: `POST/GET/PATCH /api/admin/invitations` for admin CRUD, `POST /api/invite/redeem` for public redemption
+
+### Fixed
+- Canonical URLs and OpenGraph metadata added to profile and collections pages
+
 ## [0.7.0] - 2026-03-09
 
 ### Added
