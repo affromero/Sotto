@@ -43,20 +43,21 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   }
 
   await Promise.all(
-    parsed.data.positions.map((pos) =>
-      prisma.avatarOverlay.updateMany({
+    parsed.data.positions.map((pos) => {
+      const data: Record<string, number | string> = {};
+      if (pos.posX !== undefined) data.posX = pos.posX;
+      if (pos.posY !== undefined) data.posY = pos.posY;
+      if (pos.width !== undefined) data.width = pos.width;
+      if (pos.height !== undefined) data.height = pos.height;
+      if (pos.maskShape !== undefined) data.maskShape = pos.maskShape;
+      return prisma.avatarOverlay.updateMany({
         where: {
           videoGenerationId: videoGeneration.id,
           speaker: pos.speaker,
         },
-        data: {
-          posX: pos.posX,
-          posY: pos.posY,
-          width: pos.width,
-          height: pos.height,
-        },
-      }),
-    ),
+        data,
+      });
+    }),
   );
 
   return NextResponse.json({ success: true });

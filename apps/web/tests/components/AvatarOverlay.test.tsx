@@ -85,4 +85,32 @@ describe('AvatarOverlay', () => {
     const overlay = screen.getByLabelText('Avatar overlay for Host');
     expect(overlay.className).not.toContain('maskedOverlay');
   });
+
+  it('applies hexagon mask classes when maskShape is hexagon', () => {
+    render(<AvatarOverlay {...defaultProps} maskShape="hexagon" />);
+    const overlay = screen.getByLabelText('Avatar overlay for Host');
+    expect(overlay.className).toContain('maskedOverlay');
+    expect(overlay.className).toContain('maskHexagon');
+  });
+
+  it('applies diamond mask classes when maskShape is diamond', () => {
+    render(<AvatarOverlay {...defaultProps} maskShape="diamond" />);
+    const overlay = screen.getByLabelText('Avatar overlay for Host');
+    expect(overlay.className).toContain('maskedOverlay');
+    expect(overlay.className).toContain('maskDiamond');
+  });
+
+  it('applies blob mask classes when maskShape is blob', () => {
+    render(<AvatarOverlay {...defaultProps} maskShape="blob" />);
+    const overlay = screen.getByLabelText('Avatar overlay for Host');
+    expect(overlay.className).toContain('maskedOverlay');
+    expect(overlay.className).toContain('maskBlob');
+  });
+
+  it('applies squircle mask classes when maskShape is squircle', () => {
+    render(<AvatarOverlay {...defaultProps} maskShape="squircle" />);
+    const overlay = screen.getByLabelText('Avatar overlay for Host');
+    expect(overlay.className).toContain('maskedOverlay');
+    expect(overlay.className).toContain('maskSquircle');
+  });
 });
