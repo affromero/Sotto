@@ -1,11 +1,11 @@
 /**
  * Newsletter/RSS fetcher for "In the News" grounded questions.
- * Fetches from a curated, politically balanced set of RSS feeds,
- * caches results in Redis, and returns recent articles.
+ * Reads from the IngestedArticle DB table (populated by news-ingest worker),
+ * falls back to live RSS fetch when the table is empty (cold start).
  */
 import { JSDOM } from 'jsdom';
 import type { NewsTimeRange } from '@sotto/shared';
-import { cache } from './redis';
+import { prisma } from './prisma';
 import { logger } from './logger';
 
 // ── Types ───────────────────────────────────────────────────────
@@ -77,14 +77,6 @@ const TIME_RANGE_MS: Record<NewsTimeRange, number> = {
   '24h': 24 * 60 * 60 * 1000,
   '1w': 7 * 24 * 60 * 60 * 1000,
   '1m': 30 * 24 * 60 * 60 * 1000,
-};
-
-const CACHE_TTL: Record<NewsTimeRange, number> = {
-  '1h': 5 * 60,      // 5 min
-  '12h': 15 * 60,     // 15 min
-  '24h': 30 * 60,     // 30 min
-  '1w': 60 * 60,      // 1 hour
-  '1m': 2 * 60 * 60,  // 2 hours
 };
 
 const FETCH_TIMEOUT = 8000;
@@ -166,43 +158,54 @@ async function fetchFeed(feed: FeedConfig): Promise<NewsArticle[]> {
 export async function fetchNewsletterArticles(
   timeRange: NewsTimeRange = '1w'
 ): Promise<NewsArticle[]> {
-  const cacheKey = `newsletter:articles:${timeRange}`;
-  const cached = await cache.get<NewsArticle[]>(cacheKey).catch(() => null);
-  if (cached && cached.length > 0) return cached;
+  const cutoff = new Date(Date.now() - TIME_RANGE_MS[timeRange]);
 
+  // Try DB first (populated by news-ingest worker)
+  try {
+    const rows = await prisma.ingestedArticle.findMany({
+      where: { pubDate: { gte: cutoff } },
+      orderBy: { pubDate: 'desc' },
+      take: 100,
+    });
+
+    if (rows.length > 0) {
+      return rows.map((r) => ({
+        title: r.title,
+        url: r.url,
+        summary: r.summary ?? '',
+        pubDate: r.pubDate?.toISOString() ?? '',
+        source: r.source,
+      }));
+    }
+  } catch (err) {
+    logger.warn('Failed to read IngestedArticle table, falling back to live fetch', {
+      error: (err as Error).message,
+    });
+  }
+
+  // Fallback: live RSS fetch (cold start / empty table)
   const results = await Promise.allSettled(FEEDS.map(fetchFeed));
-
-  const cutoff = Date.now() - TIME_RANGE_MS[timeRange];
+  const cutoffMs = cutoff.getTime();
   const allArticles: NewsArticle[] = [];
 
   for (const result of results) {
     if (result.status !== 'fulfilled') continue;
     for (const article of result.value) {
-      // Filter by publication date if parseable
       if (article.pubDate) {
         const pubTime = new Date(article.pubDate).getTime();
-        if (!isNaN(pubTime) && pubTime < cutoff) continue;
+        if (!isNaN(pubTime) && pubTime < cutoffMs) continue;
       }
       allArticles.push(article);
     }
   }
 
-  // Sort newest first, take top 100
   allArticles.sort((a, b) => {
     const timeA = new Date(a.pubDate).getTime() || 0;
     const timeB = new Date(b.pubDate).getTime() || 0;
     return timeB - timeA;
   });
 
-  const sliced = allArticles.slice(0, 100);
-
-  if (sliced.length > 0) {
-    await cache.set(cacheKey, sliced, CACHE_TTL[timeRange]).catch((err) => {
-      logger.warn('Failed to cache newsletter articles', { error: (err as Error).message });
-    });
-  }
-
-  return sliced;
+  return allArticles.slice(0, 100);
 }
 
 export function formatArticlesForPrompt(articles: NewsArticle[]): string {
