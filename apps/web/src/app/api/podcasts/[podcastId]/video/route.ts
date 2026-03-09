@@ -84,6 +84,16 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         endStatePrompt?: string | null;
       }>;
     }>;
+    transitions?: Array<{
+      fromSegmentOrder: number;
+      toSegmentOrder: number;
+      fromSegmentId: string;
+      toSegmentId: string;
+      enabled: boolean;
+      recommended?: boolean;
+      transitionModel: string | null;
+      durationSeconds?: number;
+    }>;
   } | undefined;
 
   try {
@@ -115,6 +125,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   if (existing?.status === 'FAILED') {
     if (pipeline) {
       // New pipeline provided — start fresh (user changed settings)
+      await prisma.segmentTransition.deleteMany({ where: { videoGenerationId: existing.id } });
       await prisma.segmentVisual.deleteMany({ where: { videoGenerationId: existing.id } });
       await prisma.videoGeneration.delete({ where: { id: existing.id } });
       // Fall through to create new generation
@@ -250,6 +261,27 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       }),
     });
 
+    // Create SegmentTransition records from pipeline (enabled ones only)
+    if (pipeline.transitions && pipeline.transitions.length > 0) {
+      const enabledTransitions = pipeline.transitions.filter((t) => t.enabled);
+      if (enabledTransitions.length > 0) {
+        await prisma.segmentTransition.createMany({
+          data: enabledTransitions.map((t) => ({
+            videoGenerationId: videoGeneration.id,
+            fromSegmentId: t.fromSegmentId,
+            toSegmentId: t.toSegmentId,
+            fromSegmentOrder: t.fromSegmentOrder,
+            toSegmentOrder: t.toSegmentOrder,
+            transitionModel: t.transitionModel,
+            recommended: t.recommended ?? false,
+            enabled: true,
+            durationSeconds: t.durationSeconds ?? 1,
+            status: 'pending',
+          })),
+        });
+      }
+    }
+
     await prisma.videoGeneration.update({
       where: { id: videoGeneration.id },
       data: { status: 'GENERATING_VISUALS' },
@@ -376,6 +408,22 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
           durationSeconds: true,
         },
       },
+      transitions: {
+        select: {
+          id: true,
+          fromSegmentOrder: true,
+          toSegmentOrder: true,
+          transitionModel: true,
+          status: true,
+          assetUrl: true,
+          assetType: true,
+          enabled: true,
+          recommended: true,
+          durationSeconds: true,
+          cost: true,
+        },
+        orderBy: { fromSegmentOrder: 'asc' },
+      },
     },
   });
 
@@ -394,6 +442,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     createdAt: videoGeneration.createdAt,
     segmentVisuals: videoGeneration.visuals,
     avatarOverlays: videoGeneration.avatarOverlays,
+    transitions: videoGeneration.transitions,
   });
 }
 
@@ -429,6 +478,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
       videoUrl: true,
       visuals: { select: { assetUrl: true } },
       avatarOverlays: { select: { videoUrl: true, concatAudioUrl: true } },
+      transitions: { select: { assetUrl: true } },
     },
   });
 
@@ -453,6 +503,13 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
     }
     if (overlay.concatAudioUrl) {
       const key = extractR2Key(overlay.concatAudioUrl);
+      if (key) deletePromises.push(deleteFile(key));
+    }
+  }
+
+  for (const transition of videoGeneration.transitions) {
+    if (transition.assetUrl) {
+      const key = extractR2Key(transition.assetUrl);
       if (key) deletePromises.push(deleteFile(key));
     }
   }
