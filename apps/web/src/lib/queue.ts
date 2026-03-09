@@ -47,6 +47,7 @@ export enum JobType {
   FETCH_PRICING = 'fetch_pricing',
   CLASSIFY_VISUALS = 'classify_visuals',
   GENERATE_VISUAL = 'generate_visual',
+  GENERATE_TRANSITION = 'generate_transition',
   COMPOSE_VIDEO = 'compose_video',
   GENERATE_AVATAR = 'generate_avatar',
   PLACE_ENRICHMENT = 'place_enrichment',
@@ -273,6 +274,13 @@ export interface GenerateAvatarPayload {
   avatarId: string;
 }
 
+export interface GenerateTransitionPayload {
+  podcastId: string;
+  videoGenerationId: string;
+  transitionId: string;
+  userId: string;
+}
+
 export interface GenerateVoiceTrackAudioPayload {
   podcastId: string;
   voiceTrackId: string;
@@ -453,7 +461,7 @@ function setupQueueEvents(queue: Queue, queueName: string): void {
       const AI_QUEUES = ['script-generation', 'script-verification', 'reference-validation'];
 
       // Handle video pipeline failures separately — podcast is already READY
-      const VIDEO_QUEUES = ['visual-classification', 'visual-generation', 'video-composition', 'avatar-generation', 'place-enrichment'];
+      const VIDEO_QUEUES = ['visual-classification', 'visual-generation', 'transition-generation', 'video-composition', 'avatar-generation', 'place-enrichment'];
       if (VIDEO_QUEUES.includes(queueName)) {
         const videoGenerationId = (job?.data as Record<string, unknown>)?.videoGenerationId as string | undefined;
         if (!videoGenerationId) return;
@@ -810,6 +818,7 @@ export const r2UsageQueue = createQueue('r2-usage', { attempts: 2, skipEvents: t
 export const pricingFetchQueue = createQueue('pricing-fetch', { attempts: 2, skipEvents: true });
 export const visualClassificationQueue = createQueue('visual-classification', { attempts: 2 });
 export const visualGenerationQueue = createQueue('visual-generation', { attempts: 3 });
+export const transitionGenerationQueue = createQueue('transition-generation', { attempts: 3 });
 export const videoCompositionQueue = createQueue('video-composition', { attempts: 2 });
 export const avatarGenerationQueue = createQueue('avatar-generation', { attempts: 2 });
 export const placeEnrichmentQueue = createQueue('place-enrichment', { attempts: 2 });
@@ -850,6 +859,7 @@ export const ALL_QUEUE_NAMES = [
   'pricing-fetch',
   'visual-classification',
   'visual-generation',
+  'transition-generation',
   'video-composition',
   'avatar-generation',
   'place-enrichment',
