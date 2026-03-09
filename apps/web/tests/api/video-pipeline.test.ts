@@ -142,8 +142,8 @@ describe('POST /api/podcasts/[id]/video/pipeline', () => {
     mockUserAiKeyFindMany.mockResolvedValue([]);
     mockClassifySegmentVisuals.mockResolvedValue({
       classifications: [
-        { segmentId: 'seg-1', order: 0, visualType: 'AI_ILLUSTRATION', prompt: 'A test image', metadata: null },
-        { segmentId: 'seg-2', order: 1, visualType: 'QUOTE', prompt: null, metadata: { text: 'Indeed' } },
+        { segmentId: 'seg-1', order: 0, subVisuals: [{ subOrder: 0, startOffsetFraction: 0, durationFraction: 1, visualType: 'AI_ILLUSTRATION', prompt: 'A test image', metadata: null, endStatePrompt: null }] },
+        { segmentId: 'seg-2', order: 1, subVisuals: [{ subOrder: 0, startOffsetFraction: 0, durationFraction: 1, visualType: 'QUOTE', prompt: null, metadata: { text: 'Indeed' }, endStatePrompt: null }] },
       ],
       inputTokens: 100,
       outputTokens: 50,
@@ -155,7 +155,7 @@ describe('POST /api/podcasts/[id]/video/pipeline', () => {
     const res = await POST(createRequest('POST'), routeParams);
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.version).toBe(1);
+    expect(body.version).toBe(2);
     expect(body.segments).toHaveLength(2);
     expect(body.segments[0].visualType).toBe('AI_ILLUSTRATION');
     expect(body.segments[0].visualMode).toBe('image');
