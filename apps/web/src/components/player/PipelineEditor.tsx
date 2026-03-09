@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { SegmentNode } from './SegmentNode';
-import type { VideoPipeline, PipelineSegmentNode, FalModelsResponse } from '@/types/pipeline';
-import { estimateSegmentCost, estimatePipelineCost, formatCost } from '@/lib/video-cost-estimator';
+import { TransitionConnector } from './TransitionConnector';
+import type { VideoPipeline, PipelineSegmentNode, PipelineTransition, FalModelsResponse } from '@/types/pipeline';
+import { estimateSegmentCost, estimatePipelineCost, estimateTransitionCost, formatCost } from '@/lib/video-cost-estimator';
 import { getSpeakerIndex, getUniqueSpeakers } from '@/lib/speaker-colors';
 import styles from './PipelineEditor.module.css';
 
@@ -18,13 +19,15 @@ interface PipelineEditorProps {
 
 export function PipelineEditor({ pipeline, falModels, onApprove, onCancel }: PipelineEditorProps) {
   const [segments, setSegments] = useState<PipelineSegmentNode[]>(pipeline.segments);
+  const [transitions, setTransitions] = useState<PipelineTransition[]>(pipeline.transitions ?? []);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const cardListRef = useRef<HTMLDivElement>(null);
 
   const allSpeakers = useMemo(() => getUniqueSpeakers(segments), [segments]);
+  const enabledTransitions = useMemo(() => transitions.filter((t) => t.enabled), [transitions]);
   const totalCost = useMemo(
-    () => estimatePipelineCost(segments, falModels.imageModels, falModels.videoModels),
-    [segments, falModels.imageModels, falModels.videoModels],
+    () => estimatePipelineCost(segments, falModels.imageModels, falModels.videoModels, transitions),
+    [segments, falModels.imageModels, falModels.videoModels, transitions],
   );
   const totalDuration = useMemo(
     () => segments.reduce((sum, s) => sum + s.duration, 0),
@@ -45,13 +48,28 @@ export function PipelineEditor({ pipeline, falModels, onApprove, onCancel }: Pip
     [falModels.imageModels, falModels.videoModels],
   );
 
+  const handleTransitionUpdate = useCallback(
+    (fromOrder: number, toOrder: number, updates: Partial<PipelineTransition>) => {
+      setTransitions((prev) =>
+        prev.map((t) => {
+          if (t.fromSegmentOrder !== fromOrder || t.toSegmentOrder !== toOrder) return t;
+          const updated = { ...t, ...updates };
+          updated.estimatedCost = estimateTransitionCost(updated, falModels.videoModels);
+          return updated;
+        }),
+      );
+    },
+    [falModels.videoModels],
+  );
+
   const handleApprove = useCallback(() => {
     onApprove({
       ...pipeline,
       segments,
-      totalEstimatedCost: estimatePipelineCost(segments, falModels.imageModels, falModels.videoModels),
+      transitions,
+      totalEstimatedCost: estimatePipelineCost(segments, falModels.imageModels, falModels.videoModels, transitions),
     });
-  }, [pipeline, segments, onApprove, falModels.imageModels, falModels.videoModels]);
+  }, [pipeline, segments, transitions, onApprove, falModels.imageModels, falModels.videoModels]);
 
   const toggleExpand = useCallback((segmentId: string) => {
     setExpandedId((prev) => (prev === segmentId ? null : segmentId));
@@ -73,26 +91,40 @@ export function PipelineEditor({ pipeline, falModels, onApprove, onCancel }: Pip
       </div>
 
       <div className={styles.cardList} ref={cardListRef} role="list" aria-label="Video storyboard scenes">
-        {segments.map((seg, i) => (
-          <div key={seg.segmentId} role="listitem" data-segment-id={seg.segmentId}>
-            <SegmentNode
-              segment={seg}
-              index={i}
-              speakerIndex={getSpeakerIndex(seg.speaker, allSpeakers)}
-              imageModels={falModels.imageModels}
-              videoModels={falModels.videoModels}
-              hasFalKey={falModels.hasFalKey}
-              isExpanded={expandedId === seg.segmentId}
-              onToggleExpand={() => toggleExpand(seg.segmentId)}
-              onUpdate={handleSegmentUpdate}
-            />
-          </div>
-        ))}
+        {segments.map((seg, i) => {
+          const transition = transitions.find((t) => t.fromSegmentOrder === seg.order);
+          return (
+            <div key={seg.segmentId}>
+              <div role="listitem" data-segment-id={seg.segmentId}>
+                <SegmentNode
+                  segment={seg}
+                  index={i}
+                  speakerIndex={getSpeakerIndex(seg.speaker, allSpeakers)}
+                  imageModels={falModels.imageModels}
+                  videoModels={falModels.videoModels}
+                  hasFalKey={falModels.hasFalKey}
+                  isExpanded={expandedId === seg.segmentId}
+                  onToggleExpand={() => toggleExpand(seg.segmentId)}
+                  onUpdate={handleSegmentUpdate}
+                />
+              </div>
+              {transition && (
+                <TransitionConnector
+                  transition={transition}
+                  videoModels={falModels.videoModels}
+                  onUpdate={handleTransitionUpdate}
+                />
+              )}
+            </div>
+          );
+        })}
       </div>
 
       <div className={styles.footer}>
         <p className={styles.approvalSummary}>
-          {segments.length} scene{segments.length !== 1 ? 's' : ''}, ~{Math.ceil(totalDuration)}s video
+          {segments.length} scene{segments.length !== 1 ? 's' : ''}
+          {enabledTransitions.length > 0 && ` · ${enabledTransitions.length} transition${enabledTransitions.length !== 1 ? 's' : ''}`}
+          , ~{Math.ceil(totalDuration)}s video
           <br />
           <span className={styles.costLabel}>Free</span> · est. {formatCost(totalCost)} on us
         </p>
