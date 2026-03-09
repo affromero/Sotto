@@ -48,8 +48,10 @@
 
 .podcastTitle {
   font: var(--text-h1);
+  font-size: clamp(1.5rem, 3vw + 0.5rem, 2.25rem);
   color: var(--color-text-primary);
   line-height: 1.2;
+  letter-spacing: -0.5px;
 }
 
 .podcastDescription {
