@@ -8,3 +8,4 @@ export { SottoWatermark } from './compositions/shared/SottoWatermark';
 export { SpeakerLabel } from './compositions/shared/SpeakerLabel';
 export { Background } from './compositions/shared/Background';
 export { AvatarPip } from './compositions/shared/AvatarPip';
+export { ProviderBadge } from './compositions/shared/ProviderBadge';
