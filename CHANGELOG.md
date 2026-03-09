@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.8.2] - 2026-03-09
+
+### Added
+- **Voice track audio config**: "Add Voice Track" form now embeds the full AudioConfigPanel — users can select TTS provider, model, and custom voices instead of the system silently auto-picking
+
 ## [0.8.0] - 2026-03-09
 
 ### Added
