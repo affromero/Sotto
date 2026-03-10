@@ -87,6 +87,8 @@ export type NotificationType =
   | 'VOICE_TRACK_FAILED'
   | 'VOICE_TRACK_READY'
   | 'VIDEO_READY'
+  | 'MUSIC_READY'
+  | 'MUSIC_FAILED'
   | 'PIPELINE_FAILURE'
   | 'REFERRAL_SIGNUP';
 
@@ -160,5 +162,11 @@ export type VideoStatus =
   | 'GENERATING_TRANSITIONS'
   | 'GENERATING_AVATARS'
   | 'COMPOSING'
+  | 'READY'
+  | 'FAILED';
+
+export type MusicStatus =
+  | 'PENDING'
+  | 'GENERATING'
   | 'READY'
   | 'FAILED';

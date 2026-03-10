@@ -1,6 +1,7 @@
 'use client';
 
 import { usePlayer } from '@/components/providers/AudioPlayerProvider';
+import { MusicControls } from './MusicControls';
 import styles from './PlaybackControls.module.css';
 
 const PLAYBACK_RATES = [0.5, 0.75, 1, 1.25, 1.5, 2];
@@ -101,6 +102,8 @@ export function PlaybackControls() {
           aria-label="Volume"
         />
       </div>
+
+      <MusicControls />
     </div>
   );
 }
