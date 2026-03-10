@@ -500,6 +500,47 @@
   object-fit: contain;
 }
 
+/* JSON import zone */
+
+.importZone {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.importTextarea {
+  width: 100%;
+  min-height: 200px;
+  padding: var(--spacing-md);
+  border: 2px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 12px;
+  color: var(--color-text-primary);
+  background: var(--color-surface);
+  resize: vertical;
+}
+
+.importTextarea:focus {
+  border-color: var(--color-primary);
+  outline: none;
+}
+
+.importActions {
+  display: flex;
+  gap: var(--spacing-sm);
+  align-items: center;
+}
+
+.lockIcon {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  opacity: 0.6;
+}
+
 /* Preview step */
 
 .previewContainer {
