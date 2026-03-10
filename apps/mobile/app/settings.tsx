@@ -189,6 +189,56 @@ export default function SettingsScreen() {
           </View>
         </View>
 
+        {/* Creator Section */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.textTertiary }]}>Creator</Text>
+          <View style={[styles.card, { backgroundColor: colors.surface }]}>
+            <Pressable
+              style={({ pressed }) => [
+                styles.row,
+                pressed && styles.rowPressed,
+              ]}
+              onPress={() => router.push('/analytics')}
+            >
+              <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>Analytics</Text>
+              <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+            </Pressable>
+            <View style={styles.rowSeparator} />
+            <Pressable
+              style={({ pressed }) => [
+                styles.row,
+                pressed && styles.rowPressed,
+              ]}
+              onPress={() => router.push('/voices')}
+            >
+              <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>Voice Marketplace</Text>
+              <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+            </Pressable>
+            <View style={styles.rowSeparator} />
+            <Pressable
+              style={({ pressed }) => [
+                styles.row,
+                pressed && styles.rowPressed,
+              ]}
+              onPress={() => router.push('/settings/billing')}
+            >
+              <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>Billing & Plan</Text>
+              <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+            </Pressable>
+            <View style={styles.rowSeparator} />
+            <Pressable
+              style={({ pressed }) => [
+                styles.row,
+                pressed && styles.rowPressed,
+              ]}
+              onPress={() => router.push('/settings/referral')}
+            >
+              <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>Refer a Friend</Text>
+              <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+            </Pressable>
+          </View>
+        </View>
+
         {/* Appearance Section */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.textTertiary }]}>Appearance</Text>
