@@ -1773,6 +1773,7 @@ model AutoModelConfig {
   proIncludedMusicModels  Json?
   // Daily limits (migrated from FreeTierConfig)
   dailyGenerationLimit    Int      @default(1)
+  dailyGenerationLimitPro Int      @default(5)
   dailyVideoLimit         Int      @default(1)
   dailyVideoLimitPro      Int      @default(2)
   dailyMusicLimit         Int      @default(1)

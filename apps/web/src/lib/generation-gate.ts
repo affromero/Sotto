@@ -82,10 +82,10 @@ async function hasInFlightGeneration(userId: string): Promise<boolean> {
  *
  * Priority:
  * 1. BYOK user (has TTS key)  → always allowed, no counting
- * 2. PRO user                  → always allowed, no daily limit
- * 3. Admin/System              → always allowed
+ * 2. Admin/System              → always allowed
+ * 3. PRO user                  → check Redis, limit = dailyGenerationLimitPro (default 5)
  * 4. Free user                 → check in-flight generation, then Redis rolling-window daily counter
- *                                (TTL 24h, configurable limit via FreeTierConfig)
+ *                                (TTL 24h, configurable limit via AutoModelConfig)
  */
 export async function checkGenerationGate(userId: string): Promise<GenerationGateResult> {
   const [hasTts, config, user] = await Promise.all([
@@ -102,9 +102,13 @@ export async function checkGenerationGate(userId: string): Promise<GenerationGat
   const isPrivileged = user.role === 'ADMIN' || user.role === 'SYSTEM';
 
   const baseLimit =
-    user.dailyGenerationOverride !== null ? user.dailyGenerationOverride : config.dailyGenerationLimit;
+    user.dailyGenerationOverride !== null
+      ? user.dailyGenerationOverride
+      : isProUser
+        ? config.dailyGenerationLimitPro
+        : config.dailyGenerationLimit;
 
-  // Only compute referral bonus for free users (BYOK/PRO/Admin bypass early below)
+  // Only compute referral bonus for free users
   const referralBonus =
     isByokUser || isProUser || isPrivileged
       ? 0
@@ -118,9 +122,9 @@ export async function checkGenerationGate(userId: string): Promise<GenerationGat
     isProUser,
   };
 
-  // BYOK, PRO, and privileged users bypass all counters
-  if (isByokUser || isProUser || isPrivileged) {
-    return { ...baseResult, allowed: true, reason: 'ok', isByokUser: isByokUser || isPrivileged };
+  // BYOK and privileged users bypass all counters
+  if (isByokUser || isPrivileged) {
+    return { ...baseResult, allowed: true, reason: 'ok', isByokUser: true };
   }
 
   // Per-user unlimited override (dailyGenerationOverride === 0)
@@ -138,8 +142,8 @@ export async function checkGenerationGate(userId: string): Promise<GenerationGat
     return { ...baseResult, allowed: false, reason: 'no_provider' };
   }
 
-  // Free user: check for in-flight generation before allowing a new one
-  if (await hasInFlightGeneration(userId)) {
+  // Free user only: check for in-flight generation before allowing a new one
+  if (!isProUser && await hasInFlightGeneration(userId)) {
     return {
       ...baseResult,
       allowed: false,
@@ -147,7 +151,7 @@ export async function checkGenerationGate(userId: string): Promise<GenerationGat
     };
   }
 
-  // Free user: check Redis rolling 24h window
+  // Check Redis rolling 24h window (both Free and Pro)
   const { count: dailyUsed, ttl } = await getDailyCount(userId);
 
   if (dailyUsed >= effectiveDailyLimit) {
@@ -305,7 +309,11 @@ export async function getFreeTierStatus(userId: string): Promise<{
   const isProUser = user.plan === 'PRO';
 
   const baseLimit =
-    user.dailyGenerationOverride !== null ? user.dailyGenerationOverride : config.dailyGenerationLimit;
+    user.dailyGenerationOverride !== null
+      ? user.dailyGenerationOverride
+      : isProUser
+        ? config.dailyGenerationLimitPro
+        : config.dailyGenerationLimit;
 
   const referralBonus =
     isByokUser || isPrivileged || isProUser
@@ -322,7 +330,7 @@ export async function getFreeTierStatus(userId: string): Promise<{
     isProUser,
   };
 
-  if (base.isByokUser || isProUser) return base;
+  if (base.isByokUser) return base;
 
   const hasAllocations = config.ttsAllocations.length > 0 || config.aiAllocations.length > 0;
   if (!hasAllocations) return base;
