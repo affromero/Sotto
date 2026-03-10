@@ -3,8 +3,8 @@ import { logger } from './logger';
 const RUNWAY_API_BASE = 'https://api.dev.runwayml.com/v1';
 const RUNWAY_VERSION_HEADER = '2024-11-06';
 
-/** HTTP status codes that indicate a billing/auth issue — never worth retrying. */
-const NON_RETRYABLE_STATUS_CODES = new Set([401, 402, 403]);
+/** HTTP status codes that are never worth retrying (client errors: bad request, auth, billing). */
+const NON_RETRYABLE_STATUS_CODES = new Set([400, 401, 402, 403]);
 
 /** Error message substrings that indicate credit/billing exhaustion. */
 const NON_RETRYABLE_PATTERNS = [
