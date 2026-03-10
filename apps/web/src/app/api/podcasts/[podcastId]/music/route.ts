@@ -14,6 +14,7 @@ type RouteParams = { params: Promise<{ podcastId: string }> };
 
 /**
  * POST — Trigger background music generation for a READY podcast.
+ * Allows multiple generations per podcast. Blocks if one is already in progress.
  */
 export async function POST(request: NextRequest, { params }: RouteParams) {
   const { podcastId } = await params;
@@ -69,23 +70,17 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     // No body — use defaults
   }
 
-  // Idempotency: return existing generation if in progress
-  const existing = await prisma.musicGeneration.findUnique({
-    where: { podcastId },
-    select: { id: true, status: true, musicUrl: true },
+  // Block if a generation is already in progress for this podcast
+  const inProgress = await prisma.musicGeneration.findFirst({
+    where: { podcastId, status: { in: ['PENDING', 'GENERATING'] } },
+    select: { id: true, status: true },
   });
 
-  if (existing && existing.status !== 'FAILED') {
+  if (inProgress) {
     return NextResponse.json({
-      musicGenerationId: existing.id,
-      status: existing.status,
-      musicUrl: existing.musicUrl,
+      musicGenerationId: inProgress.id,
+      status: inProgress.status,
     });
-  }
-
-  // Delete failed generation to start fresh
-  if (existing?.status === 'FAILED') {
-    await prisma.musicGeneration.delete({ where: { id: existing.id } });
   }
 
   // Increment daily counter (non-admin, non-BYOK users)
@@ -123,7 +118,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 }
 
 /**
- * GET — Poll music generation status.
+ * GET — List all music generations for a podcast + available models with pricing.
  */
 export async function GET(request: NextRequest, { params }: RouteParams) {
   const { podcastId } = await params;
@@ -147,7 +142,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     return errorResponse('Forbidden', 403);
   }
 
-  const musicGeneration = await prisma.musicGeneration.findUnique({
+  const generations = await prisma.musicGeneration.findMany({
     where: { podcastId },
     select: {
       id: true,
@@ -158,32 +153,19 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       provider: true,
       model: true,
       failureReason: true,
+      selected: true,
       createdAt: true,
     },
+    orderBy: { createdAt: 'desc' },
   });
 
   // Resolve available models for this user (BYOK keys + platform keys)
   const availableModels = await getAvailableModelsForUser(authResult.userId);
 
-  if (!musicGeneration) {
-    return NextResponse.json({ status: null, availableModels });
-  }
-
-  return NextResponse.json({
-    musicGenerationId: musicGeneration.id,
-    status: musicGeneration.status,
-    musicUrl: musicGeneration.musicUrl,
-    duration: musicGeneration.duration,
-    fileSize: musicGeneration.fileSize,
-    provider: musicGeneration.provider,
-    model: musicGeneration.model,
-    failureReason: musicGeneration.failureReason,
-    createdAt: musicGeneration.createdAt,
-    availableModels,
-  });
+  return NextResponse.json({ generations, availableModels });
 }
 
-async function getAvailableModelsForUser(userId: string): Promise<Array<{ id: string; label: string; provider: string }>> {
+async function getAvailableModelsForUser(userId: string): Promise<Array<{ id: string; label: string; provider: string; costPerTrack: number }>> {
   // Check which music providers the user has access to (BYOK or platform)
   const byokKeys = await prisma.userTtsKey.findMany({
     where: { userId, provider: { in: ['suno', 'elevenlabs'] }, isValid: true },
@@ -196,18 +178,19 @@ async function getAvailableModelsForUser(userId: string): Promise<Array<{ id: st
   if (byokProviders.has('elevenlabs') || process.env.ELEVENLABS_API_KEY) availableProviders.add('elevenlabs');
 
   const allMeta = getAllMusicProviderMeta();
-  const models: Array<{ id: string; label: string; provider: string }> = [];
+  const models: Array<{ id: string; label: string; provider: string; costPerTrack: number }> = [];
   for (const meta of allMeta) {
     if (!availableProviders.has(meta.id)) continue;
     for (const model of meta.models) {
-      models.push({ id: model.id, label: model.displayName, provider: meta.displayName });
+      models.push({ id: model.id, label: model.displayName, provider: meta.displayName, costPerTrack: model.costPerTrack });
     }
   }
   return models;
 }
 
 /**
- * DELETE — Remove music and allow regeneration.
+ * DELETE — Remove a specific music generation or all generations for the podcast.
+ * Pass ?generationId=<id> to delete a specific one, or omit to delete all.
  */
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   const { podcastId } = await params;
@@ -231,35 +214,61 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     return errorResponse('Forbidden', 403);
   }
 
-  const musicGeneration = await prisma.musicGeneration.findUnique({
+  const generationId = request.nextUrl.searchParams.get('generationId');
+
+  if (generationId) {
+    // Delete a specific generation
+    const gen = await prisma.musicGeneration.findFirst({
+      where: { id: generationId, podcastId },
+      select: { id: true, musicUrl: true, selected: true },
+    });
+
+    if (!gen) {
+      return errorResponse('Music generation not found', 404);
+    }
+
+    // Delete R2 file
+    if (gen.musicUrl) {
+      const key = extractR2Key(gen.musicUrl);
+      if (key) {
+        await deleteFile(key).catch((err: unknown) => {
+          logger.warn('Failed to delete music file from R2', { key, error: err instanceof Error ? err.message : String(err) });
+        });
+      }
+    }
+
+    // If deleting the selected generation, clear Podcast.musicUrl
+    const updates = [prisma.musicGeneration.delete({ where: { id: gen.id } })];
+    if (gen.selected) {
+      updates.push(prisma.podcast.update({ where: { id: podcastId }, data: { musicUrl: null } }));
+    }
+    await prisma.$transaction(updates);
+
+    logger.info('Music generation deleted', { podcastId, generationId });
+    return NextResponse.json({ success: true });
+  }
+
+  // Delete all generations for this podcast
+  const allGens = await prisma.musicGeneration.findMany({
     where: { podcastId },
     select: { id: true, musicUrl: true },
   });
 
-  if (!musicGeneration) {
-    return errorResponse('No music generation found', 404);
-  }
+  // Delete R2 files
+  await Promise.allSettled(
+    allGens
+      .filter((g) => g.musicUrl)
+      .map((g) => {
+        const key = extractR2Key(g.musicUrl!);
+        return key ? deleteFile(key) : Promise.resolve();
+      }),
+  );
 
-  // Delete R2 file
-  if (musicGeneration.musicUrl) {
-    const key = extractR2Key(musicGeneration.musicUrl);
-    if (key) {
-      await deleteFile(key).catch((err: unknown) => {
-        logger.warn('Failed to delete music file from R2', { key, error: err instanceof Error ? err.message : String(err) });
-      });
-    }
-  }
-
-  // Delete record and clear podcast musicUrl
   await prisma.$transaction([
-    prisma.musicGeneration.delete({ where: { id: musicGeneration.id } }),
-    prisma.podcast.update({
-      where: { id: podcastId },
-      data: { musicUrl: null },
-    }),
+    prisma.musicGeneration.deleteMany({ where: { podcastId } }),
+    prisma.podcast.update({ where: { id: podcastId }, data: { musicUrl: null } }),
   ]);
 
-  logger.info('Music generation deleted', { podcastId });
-
+  logger.info('All music generations deleted', { podcastId });
   return NextResponse.json({ success: true });
 }
