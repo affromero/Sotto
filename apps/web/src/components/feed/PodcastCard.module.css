@@ -245,48 +245,46 @@
 
 .forkButton {
   position: absolute;
-  bottom: calc(var(--space-3) + 24px);
+  top: var(--space-3);
   right: var(--space-3);
   z-index: 2;
   display: inline-flex;
   align-items: center;
-  gap: var(--space-1);
-  padding: 8px var(--space-3);
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
   border-radius: var(--radius-full);
-  border: 1px solid rgba(217, 119, 6, 0.25);
-  background: rgba(255, 255, 255, 0.95);
+  border: none;
+  background: rgba(255, 255, 255, 0.2);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  color: var(--color-primary);
-  font: var(--text-caption);
-  font-weight: 700;
+  color: #fff;
   cursor: pointer;
   opacity: 0;
-  transform: translateY(4px);
   transition: all var(--transition-fast);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.forkButton span {
+  display: none;
 }
 
 .card:hover .forkButton {
   opacity: 1;
-  transform: translateY(0);
 }
 
 .forkButton:hover {
-  background: #fff;
-  border-color: var(--color-primary);
-  box-shadow: var(--shadow-primary-glow);
+  background: rgba(255, 255, 255, 0.4);
 }
 
 .forkButton:active {
-  transform: scale(0.95);
+  transform: scale(0.9);
 }
 
 /* Always show fork button on touch devices */
 @media (hover: none) {
   .forkButton {
     opacity: 1;
-    transform: translateY(0);
   }
 }
 
@@ -300,16 +298,6 @@
   border-radius: var(--radius-xl);
 }
 
-/* Hide fork button text on compact variant */
-.compact .forkButton {
-  bottom: calc(var(--space-2) + 20px);
-  right: var(--space-2);
-  padding: 6px;
-}
-
-.compact .forkButton span {
-  display: none;
-}
 
 /* ── Mobile ─────────────────────────────────── */
 
@@ -354,13 +342,5 @@
 
   .forkButton {
     transition: opacity var(--transition-fast);
-  }
-
-  .card:hover .forkButton {
-    transform: translateY(0);
-  }
-
-  .forkButton:active {
-    transform: none;
   }
 }
