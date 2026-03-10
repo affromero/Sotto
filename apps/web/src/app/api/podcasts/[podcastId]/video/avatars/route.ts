@@ -229,7 +229,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         avatarOverlayId: overlay.id,
         speaker: overlay.speaker,
         avatarId: overlay.avatarId,
-        avatarProvider: (avatarConfig?.avatarProvider ?? 'heygen') as 'heygen' | 'runway',
+        avatarProvider: (overlay.avatarProvider ?? avatarConfig?.avatarProvider ?? 'heygen') as 'heygen' | 'runway',
         isPreset: avatarConfig?.isPreset,
       });
     }
