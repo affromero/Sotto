@@ -35,6 +35,7 @@ import { formatTime } from '../../lib/formatters';
 import { usePlaybackTelemetry } from '../../lib/usePlaybackTelemetry';
 import type { PlaybackSnapshot } from '../../lib/usePlaybackTelemetry';
 import { ForkModal } from '../../components/ForkModal';
+import { CommentSection } from '../../components/CommentSection';
 
 const PLAYBACK_SPEEDS = [0.5, 1, 1.25, 1.5, 2] as const;
 
@@ -631,6 +632,12 @@ export default function PodcastScreen() {
             </View>
           );
         }}
+        ListFooterComponent={
+          <CommentSection
+            podcastId={podcast.id}
+            commentCount={podcast.commentCount}
+          />
+        }
         ListEmptyComponent={
           <Text style={styles.emptyTranscript}>No transcript available.</Text>
         }
