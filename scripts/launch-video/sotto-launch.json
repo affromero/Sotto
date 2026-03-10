@@ -8,7 +8,6 @@
     "ttsProvider": "elevenlabs",
     "ttsModel": "eleven_v3",
     "ttsVoiceId": "VOICEID_PLACEHOLDER",
-    "backgroundMusicUrl": "MUSIC_URL_PLACEHOLDER",
     "backgroundMusicVolume": 0.07,
     "subtitles": {
       "enabled": true,
@@ -292,7 +291,6 @@
         "typingSounds": false
       },
       "avatar": {
-        "videoUrl": "AVATAR_CLIP_URL_PLACEHOLDER",
         "posX": 0.72,
         "posY": 0.05,
         "width": 0.25,
