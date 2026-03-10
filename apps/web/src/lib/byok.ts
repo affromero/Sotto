@@ -83,16 +83,19 @@ export interface ByokKeyInfo {
 
 /**
  * Store (upsert) a BYOK key for a specific provider.
+ * Accepts TTS providers and music providers (e.g. 'suno').
  */
 export async function storeByokKey(
   userId: string,
-  provider: TtsProviderId,
+  provider: TtsProviderId | 'suno',
   credentials: ByokCredentials
 ): Promise<void> {
   const encryptedKey = encryptApiKey(credentials.apiKey);
   const encryptedExtra = credentials.userId
     ? encryptApiKey(JSON.stringify({ userId: credentials.userId }))
     : null;
+
+  const label = provider === 'suno' ? 'Suno' : getProviderMeta(provider).displayName;
 
   await prisma.userTtsKey.upsert({
     where: { userId_provider: { userId, provider } },
@@ -108,7 +111,7 @@ export async function storeByokKey(
       encryptedKey,
       extraData: encryptedExtra,
       isValid: true,
-      label: getProviderMeta(provider).displayName,
+      label,
     },
   });
 
@@ -172,7 +175,7 @@ export async function getByokExtraData(
 /**
  * Remove a user's BYOK key for a specific provider.
  */
-export async function removeByokKey(userId: string, provider?: TtsProviderId): Promise<void> {
+export async function removeByokKey(userId: string, provider?: TtsProviderId | 'suno'): Promise<void> {
   const targetProvider = provider ?? 'elevenlabs';
 
   await prisma.userTtsKey
@@ -228,12 +231,27 @@ export async function hasByokKey(userId: string, provider?: TtsProviderId | stri
  * Validate a BYOK key against the provider's API.
  */
 export async function validateByokKey(
-  provider: TtsProviderId,
+  provider: TtsProviderId | 'suno',
   credentials: ByokCredentials
 ): Promise<boolean> {
+  // Suno is a music provider — validate via sunoapi.org credits endpoint
+  if (provider === 'suno') {
+    return validateSunoKey(credentials.apiKey);
+  }
   const creds: Record<string, string> = { apiKey: credentials.apiKey };
   if (credentials.userId) creds.userId = credentials.userId;
   return validateProviderCredentials(provider, creds);
+}
+
+async function validateSunoKey(apiKey: string): Promise<boolean> {
+  try {
+    const res = await fetch('https://api.sunoapi.org/api/v1/generate/get-credits', {
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
 }
 
 // Legacy exports for backward compat

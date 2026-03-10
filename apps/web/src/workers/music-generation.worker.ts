@@ -85,6 +85,14 @@ export async function processMusicGeneration(job: Job<GenerateMusicPayload>): Pr
     title: podcast.title,
   });
 
+  // Persist external task ID for recovery (Suno async polling)
+  if ('externalTaskId' in provider && provider.externalTaskId) {
+    await prisma.musicGeneration.update({
+      where: { id: musicGenerationId },
+      data: { externalTaskId: provider.externalTaskId as string },
+    });
+  }
+
   await job.updateProgress(80);
 
   // Upload to R2

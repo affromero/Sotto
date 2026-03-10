@@ -3,6 +3,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import styles from './MusicGenerator.module.css';
 
+interface ModelOption {
+  id: string;
+  label: string;
+  provider: string;
+}
+
 interface MusicGeneratorProps {
   podcastId: string;
   initialMusicUrl: string | null;
@@ -16,6 +22,32 @@ export function MusicGenerator({ podcastId, initialMusicUrl, onMusicReady, onMus
   const [status, setStatus] = useState<MusicStatus>(initialMusicUrl ? 'READY' : null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [availableModels, setAvailableModels] = useState<ModelOption[]>([]);
+  const [selectedModel, setSelectedModel] = useState<string>('');
+
+  // Fetch available models on mount
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/podcasts/${podcastId}/music`);
+        if (!res.ok || cancelled) return;
+        const data = await res.json();
+        if (cancelled) return;
+        if (data.availableModels?.length) {
+          setAvailableModels(data.availableModels);
+          setSelectedModel(data.availableModels[0].id);
+        }
+        if (data.status) setStatus(data.status);
+        if (data.status === 'READY' && data.musicUrl) {
+          onMusicReady(data.musicUrl, 0.15);
+        }
+      } catch {
+        // Silently fail — models will be empty
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [podcastId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const poll = useCallback(async () => {
     const res = await fetch(`/api/podcasts/${podcastId}/music`);
@@ -45,7 +77,7 @@ export function MusicGenerator({ podcastId, initialMusicUrl, onMusicReady, onMus
       const res = await fetch(`/api/podcasts/${podcastId}/music`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ model: selectedModel || undefined }),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -109,15 +141,38 @@ export function MusicGenerator({ podcastId, initialMusicUrl, onMusicReady, onMus
     );
   }
 
+  if (!availableModels.length) {
+    return (
+      <div className={styles.container}>
+        <p className={styles.noProviders}>
+          No music provider configured. Add a Suno or ElevenLabs key in Settings.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className={styles.container}>
+      <select
+        className={styles.modelSelect}
+        value={selectedModel}
+        onChange={(e) => setSelectedModel(e.target.value)}
+        disabled={loading}
+        aria-label="Select music model"
+      >
+        {availableModels.map((m) => (
+          <option key={m.id} value={m.id}>
+            {m.label}
+          </option>
+        ))}
+      </select>
       <button
         className={styles.generateButton}
         onClick={handleGenerate}
         disabled={loading}
         aria-label="Generate background music"
       >
-        {loading ? 'Starting...' : 'Generate Background Music'}
+        {loading ? 'Starting...' : 'Generate'}
       </button>
       {error && <p className={styles.error}>{error}</p>}
     </div>
