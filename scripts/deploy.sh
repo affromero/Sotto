@@ -105,6 +105,13 @@ GHCR_TOKEN=$(doppler secrets get GHCR_READ_TOKEN --plain)
 echo "${GHCR_TOKEN}" | docker login ghcr.io -u affromero --password-stdin
 docker compose -f "$COMPOSE_INFRA" pull remotion
 
+# --- Pre-build cleanup (prevent disk exhaustion) ---
+
+echo ""
+echo "=== Pre-build cleanup ==="
+docker image prune -af --filter "until=24h" 2>/dev/null || true
+docker builder prune -af 2>/dev/null || true
+
 # --- Build new slot ---
 
 echo ""
