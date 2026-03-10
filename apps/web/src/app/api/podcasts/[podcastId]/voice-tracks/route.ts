@@ -165,20 +165,22 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     plan,
   });
 
-  // Resolve per-voice provider: parse "elevenlabs:eleven_v3" → provider "elevenlabs"
+  // Resolve per-voice provider: parse "elevenlabs:eleven_v3" → provider "elevenlabs", model "eleven_v3"
   const resolvedVoiceProviders = await Promise.all(
     resolvedVoices.map(async (v) => {
       if (v.provider) {
-        const [providerKey] = v.provider.split(':');
+        const [providerKey, ...modelParts] = v.provider.split(':');
+        const modelKey = modelParts.join(':') || undefined;
         const resolved = await resolveTtsProvider({
           userId,
           podcastId,
           requestedProvider: providerKey as TtsProviderId,
+          requestedModel: modelKey,
           plan,
         });
-        return { speaker: v.speaker, voiceId: v.voiceId, providerId: resolved.providerId };
+        return { speaker: v.speaker, voiceId: v.voiceId, providerId: resolved.providerId, ttsModel: resolved.provider.getModelId() };
       }
-      return { speaker: v.speaker, voiceId: v.voiceId, providerId: fallback.providerId };
+      return { speaker: v.speaker, voiceId: v.voiceId, providerId: fallback.providerId, ttsModel: fallback.provider.getModelId() };
     }),
   );
 
@@ -214,6 +216,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   const uniqueProviders = [...new Set(resolvedVoiceProviders.map(v => v.providerId))];
   const trackProvider = uniqueProviders.length === 1 ? uniqueProviders[0] : 'mixed';
 
+  // Derive track-level model from resolved voices (use explicit body ttsModel, or first resolved model)
+  const resolvedModels = [...new Set(resolvedVoiceProviders.map(v => v.ttsModel).filter(Boolean))];
+  const trackModel = ttsModel || resolvedModels[0] || null;
+
   // Create voice track, voice assignments, and segments in a transaction
   const voiceTrack = await prisma.$transaction(async (tx) => {
     const track = await tx.voiceTrack.create({
@@ -222,7 +228,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         name,
         status: 'GENERATING_AUDIO',
         ttsProvider: trackProvider,
-        ttsModel: ttsModel || null,
+        ttsModel: trackModel,
       },
     });
 

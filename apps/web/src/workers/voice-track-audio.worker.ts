@@ -13,6 +13,7 @@ import { getByokKey } from '@/lib/byok';
 import { cleanTextForTts } from '@/lib/tts-text-cleaner';
 import { estimateDurationFromText } from '@/lib/duration';
 import { logUsage } from '@/lib/usage-logger';
+import { isModelAccessError } from '@/lib/byok-errors';
 import { logger } from '@/lib/logger';
 import * as path from 'path';
 import * as os from 'os';
@@ -189,30 +190,56 @@ export async function processVoiceTrackAudio(job: Job<GenerateVoiceTrackAudioPay
 
   let audioBuffer: Buffer;
   let semaphoreReleased = false;
+  let effectiveSource = source;
   try {
     audioBuffer = await provider.generateSpeech({ text: ttsText, voiceId });
   } catch (err) {
-    await semaphore.release(semaphoreKey);
-    semaphoreReleased = true;
-
-    // On 429, update cached concurrency limit so BullMQ retry uses the correct value
     const errMsg = err instanceof Error ? err.message : String(err);
-    if (resolvedApiKey && /\(429\)/.test(errMsg)) {
-      if (providerId === 'cartesia') {
-        await updateCartesiaConcurrencyFromError(resolvedApiKey, errMsg);
-      } else if (providerId === 'hume') {
-        await updateHumeConcurrencyFromError(resolvedApiKey, errMsg);
+
+    // BYOK model-access 404 → retry with platform key
+    if (source === 'byok' && isModelAccessError(errMsg)) {
+      logger.warn('BYOK key lacks model access, retrying with platform key', {
+        providerId, voiceTrackId, segmentId, error: errMsg,
+      });
+      try {
+        const platformResolved = await resolveTtsProvider({
+          userId,
+          podcastId,
+          requestedProvider: providerId,
+          requestedModel: voiceTrack.ttsModel,
+          plan: voiceTrack.podcast.user.plan as 'FREE' | 'PRO',
+          skipByok: true,
+        });
+        audioBuffer = await platformResolved.provider.generateSpeech({ text: ttsText, voiceId });
+        effectiveSource = 'platform';
+      } catch {
+        // Platform fallback also failed — release semaphore and throw original error
+        await semaphore.release(semaphoreKey);
+        semaphoreReleased = true;
+        throw err;
       }
-      logger.warn('TTS 429 — concurrency limit cached, BullMQ will retry', { providerId, voiceTrackId, segmentId });
+    } else {
+      await semaphore.release(semaphoreKey);
+      semaphoreReleased = true;
+
+      // On 429, update cached concurrency limit so BullMQ retry uses the correct value
+      if (resolvedApiKey && /\(429\)/.test(errMsg)) {
+        if (providerId === 'cartesia') {
+          await updateCartesiaConcurrencyFromError(resolvedApiKey, errMsg);
+        } else if (providerId === 'hume') {
+          await updateHumeConcurrencyFromError(resolvedApiKey, errMsg);
+        }
+        logger.warn('TTS 429 — concurrency limit cached, BullMQ will retry', { providerId, voiceTrackId, segmentId });
+      }
+      throw err;
     }
-    throw err;
   } finally {
     if (!semaphoreReleased) {
       await semaphore.release(semaphoreKey);
     }
   }
 
-  const service = source === 'byok' ? `${providerId}_byok` : providerId;
+  const service = effectiveSource === 'byok' ? `${providerId}_byok` : providerId;
   const durationMs = Date.now() - startTime;
 
   await job.updateProgress(60);
