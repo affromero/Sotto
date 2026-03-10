@@ -6,7 +6,7 @@ export interface DiscoveryMessage {
   createdAt: string;
 }
 
-export type VerificationMode = 'standard' | 'relaxed';
+export type VerificationMode = 'standard' | 'relaxed' | 'showcase';
 
 export interface DiscoveryMetadata {
   topic: string;
