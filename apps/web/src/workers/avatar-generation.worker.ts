@@ -2,7 +2,7 @@ import { type Job, UnrecoverableError } from 'bullmq';
 import type { GenerateAvatarPayload } from '@/lib/queue';
 import { addJob, JobType, videoCompositionQueue } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
-import { uploadFile } from '@/lib/r2';
+import { uploadFile, deleteFile } from '@/lib/r2';
 import { logger } from '@/lib/logger';
 import { logUsage } from '@/lib/usage-logger';
 import { submitAvatarVideo, pollAvatarVideo, isNonRetryableHeyGenError } from '@/lib/heygen';
@@ -349,10 +349,21 @@ async function processRunwayAvatar(job: Job<GenerateAvatarPayload>): Promise<voi
           },
         });
 
-        // Update chunk checkpoint
+        // Upload chunk to R2 for progressive playback
+        const chunkBuffer = await readFile(chunk.outputPath);
+        const chunkR2Key = `podcasts/${podcastId}/avatars/${speaker}-chunk-${i}.webm`;
+        const chunkR2Url = await uploadFile(chunkR2Key, chunkBuffer, 'video/webm');
+        const cumulativeDuration = chunks.slice(0, i + 1).reduce((sum, c) => sum + c.durationSeconds, 0);
+
+        // Update chunk checkpoint + progressive preview URL
         await prisma.avatarOverlay.update({
           where: { id: avatarOverlayId },
-          data: { runwayChunkIndex: i + 1, runwaySessionId: null },
+          data: {
+            runwayChunkIndex: i + 1,
+            runwaySessionId: null,
+            chunkVideoUrl: chunkR2Url,
+            chunkDurationSeconds: cumulativeDuration,
+          },
         });
       } finally {
         // Always clean up session
@@ -375,10 +386,16 @@ async function processRunwayAvatar(job: Job<GenerateAvatarPayload>): Promise<voi
     const webmKey = `podcasts/${podcastId}/avatars/${speaker}-avatar.webm`;
     const videoUrl = await uploadFile(webmKey, webmBuffer, 'video/webm');
 
-    // Update overlay as ready with rounded mask
+    // Clean up chunk files from R2
+    for (let i = 0; i < chunks.length; i++) {
+      const chunkKey = `podcasts/${podcastId}/avatars/${speaker}-chunk-${i}.webm`;
+      await deleteFile(chunkKey).catch(() => {});
+    }
+
+    // Update overlay as ready with rounded mask, clear chunk preview fields
     await prisma.avatarOverlay.update({
       where: { id: avatarOverlayId },
-      data: { videoUrl, status: 'ready', maskShape: 'rounded' },
+      data: { videoUrl, status: 'ready', maskShape: 'rounded', chunkVideoUrl: null, chunkDurationSeconds: null },
     });
 
     logUsage({
