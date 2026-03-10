@@ -62,7 +62,7 @@
   padding: 0 var(--spacing-sm);
   border-radius: var(--radius-full);
   border: 1px solid transparent;
-  background: var(--color-surface-hover);
+  background: transparent;
   color: var(--color-text-secondary);
   font-family: var(--font-body);
   font-size: var(--font-size-sm);

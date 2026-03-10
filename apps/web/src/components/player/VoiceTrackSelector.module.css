@@ -57,11 +57,19 @@
   box-shadow: var(--shadow-xs);
 }
 
+:global([data-theme='dark']) .pill {
+  box-shadow: none;
+}
+
 .pill:hover {
   border-color: var(--color-primary);
   background: var(--color-primary-light, #FEF3C7);
   box-shadow: var(--shadow-sm);
   transform: translateY(-1px);
+}
+
+:global([data-theme='dark']) .pill:hover {
+  box-shadow: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

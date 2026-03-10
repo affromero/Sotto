@@ -88,10 +88,9 @@
 :global([data-theme='dark']) .player {
   background: var(--glass-bg);
   backdrop-filter: blur(var(--glass-blur-strong));
-  border: 1px solid rgba(217, 119, 6, 0.10);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   box-shadow:
     0 4px 24px rgba(0, 0, 0, 0.3),
-    0 0 0 1px rgba(255, 255, 255, 0.04) inset,
     0 1px 0 rgba(255, 255, 255, 0.06) inset;
 }
 

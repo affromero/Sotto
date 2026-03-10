@@ -369,6 +369,10 @@
   background: var(--color-primary-subtle);
 }
 
+:global([data-theme='dark']) .actionBtnActive {
+  border-color: rgba(217, 119, 6, 0.25);
+}
+
 .actionBtnActive:hover {
   color: var(--color-primary);
   background: var(--color-primary-light);
@@ -546,10 +550,6 @@
   align-items: center;
   gap: var(--spacing-sm);
   flex-wrap: wrap;
-  padding: var(--spacing-md);
-  background: var(--color-surface);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-xs);
 }
 
 .videoFailed {
