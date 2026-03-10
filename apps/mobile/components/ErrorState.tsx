@@ -1,4 +1,5 @@
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { Text, Pressable, StyleSheet } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { colors, spacing, typography, borderRadius } from '@sotto/shared';
 
 interface ErrorStateProps {
@@ -8,14 +9,14 @@ interface ErrorStateProps {
 
 export function ErrorState({ message, onRetry }: ErrorStateProps) {
   return (
-    <View style={styles.container}>
+    <Animated.View entering={FadeIn.duration(500)} style={styles.container}>
       <Text style={styles.message}>{message}</Text>
       {onRetry && (
         <Pressable style={styles.retryButton} onPress={onRetry}>
           <Text style={styles.retryButtonText}>Try Again</Text>
         </Pressable>
       )}
-    </View>
+    </Animated.View>
   );
 }
 

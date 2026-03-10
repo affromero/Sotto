@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+import { authenticateRequest } from '@/lib/api-keys';
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
 
@@ -19,14 +19,16 @@ const QUEUE_MAX = 10;
 /**
  * GET /api/queue — User's listening queue.
  */
-export async function GET() {
-  const session = await auth();
-  if (!session?.user?.id) {
+export async function GET(request: NextRequest) {
+  const authResult = await authenticateRequest(request);
+  if (!authResult) {
     return errorResponse('Unauthorized', 401);
   }
 
+  const userId = authResult.userId;
+
   const queue = await prisma.listeningQueue.findMany({
-    where: { userId: session.user.id, podcast: { deletedAt: null } },
+    where: { userId, podcast: { deletedAt: null } },
     orderBy: { position: 'asc' },
     include: {
       podcast: {
@@ -65,10 +67,12 @@ export async function GET() {
  * POST /api/queue — Add podcast to listening queue.
  */
 export async function POST(request: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) {
+  const authResult = await authenticateRequest(request);
+  if (!authResult) {
     return errorResponse('Unauthorized', 401);
   }
+
+  const userId = authResult.userId;
 
   const body = await request.json();
   const parsed = addToQueueSchema.safeParse(body);
@@ -78,7 +82,7 @@ export async function POST(request: NextRequest) {
 
   // Check queue size
   const currentCount = await prisma.listeningQueue.count({
-    where: { userId: session.user.id },
+    where: { userId },
   });
 
   if (currentCount >= QUEUE_MAX) {
@@ -87,7 +91,7 @@ export async function POST(request: NextRequest) {
 
   // Get next position
   const maxPos = await prisma.listeningQueue.findFirst({
-    where: { userId: session.user.id },
+    where: { userId },
     orderBy: { position: 'desc' },
     select: { position: true },
   });
@@ -97,12 +101,12 @@ export async function POST(request: NextRequest) {
   const item = await prisma.listeningQueue.upsert({
     where: {
       userId_podcastId: {
-        userId: session.user.id,
+        userId,
         podcastId: parsed.data.podcastId,
       },
     },
     create: {
-      userId: session.user.id,
+      userId,
       podcastId: parsed.data.podcastId,
       position: nextPosition,
       source: parsed.data.source,
@@ -117,10 +121,12 @@ export async function POST(request: NextRequest) {
  * DELETE /api/queue — Remove podcast from queue.
  */
 export async function DELETE(request: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) {
+  const authResult = await authenticateRequest(request);
+  if (!authResult) {
     return errorResponse('Unauthorized', 401);
   }
+
+  const userId = authResult.userId;
 
   const { searchParams } = request.nextUrl;
   const podcastId = searchParams.get('podcastId');
@@ -129,7 +135,7 @@ export async function DELETE(request: NextRequest) {
   }
 
   await prisma.listeningQueue.deleteMany({
-    where: { userId: session.user.id, podcastId },
+    where: { userId, podcastId },
   });
 
   return NextResponse.json({ removed: podcastId });
@@ -139,10 +145,12 @@ export async function DELETE(request: NextRequest) {
  * PATCH /api/queue — Reorder queue item.
  */
 export async function PATCH(request: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) {
+  const authResult = await authenticateRequest(request);
+  if (!authResult) {
     return errorResponse('Unauthorized', 401);
   }
+
+  const userId = authResult.userId;
 
   const body = await request.json();
   const parsed = reorderSchema.safeParse(body);
@@ -151,7 +159,7 @@ export async function PATCH(request: NextRequest) {
   }
 
   await prisma.listeningQueue.updateMany({
-    where: { userId: session.user.id, podcastId: parsed.data.podcastId },
+    where: { userId, podcastId: parsed.data.podcastId },
     data: { position: parsed.data.newPosition },
   });
 

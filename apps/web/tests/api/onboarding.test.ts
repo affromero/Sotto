@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
 const mockAuth = vi.fn();
+const mockAuthenticateRequest = vi.fn();
 const mockUserUpdate = vi.fn();
 const mockTagFindMany = vi.fn();
 const mockTagUpsert = vi.fn();
@@ -9,6 +10,10 @@ const mockTransaction = vi.fn();
 
 vi.mock('@/lib/auth', () => ({
   auth: (...args: unknown[]) => mockAuth(...args),
+}));
+
+vi.mock('@/lib/api-keys', () => ({
+  authenticateRequest: (...args: unknown[]) => mockAuthenticateRequest(...args),
 }));
 
 vi.mock('@/lib/prisma', () => ({
@@ -108,7 +113,7 @@ describe('POST /api/onboarding/interests', () => {
   });
 
   it('returns 401 when unauthenticated', async () => {
-    mockAuth.mockResolvedValue(null);
+    mockAuthenticateRequest.mockResolvedValue(null);
 
     const response = await saveInterests(createRequest({ tagIds: [] }));
     const body = await response.json();
@@ -118,7 +123,7 @@ describe('POST /api/onboarding/interests', () => {
   });
 
   it('returns 400 for invalid request body', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
 
     const response = await saveInterests(createRequest({ tagIds: 'not-an-array' }));
     const body = await response.json();
@@ -128,7 +133,7 @@ describe('POST /api/onboarding/interests', () => {
   });
 
   it('returns 400 when combined tags exceed 20', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     const tagIds = Array.from({ length: 15 }, (_, i) => `tag-${i}`);
     const customTags = Array.from({ length: 6 }, (_, i) => ({
       name: `Custom ${i}`,
@@ -143,7 +148,7 @@ describe('POST /api/onboarding/interests', () => {
   });
 
   it('returns 400 when some tag IDs do not exist', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockTagFindMany.mockResolvedValue([{ id: 'tag-1', parentId: 'parent-1' }]);
 
     const response = await saveInterests(createRequest({ tagIds: ['tag-1', 'tag-missing'] }));
@@ -154,7 +159,7 @@ describe('POST /api/onboarding/interests', () => {
   });
 
   it('returns 400 when top-level tags are selected', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockTagFindMany.mockResolvedValue([
       { id: 'tag-1', parentId: null },
     ]);
@@ -167,7 +172,7 @@ describe('POST /api/onboarding/interests', () => {
   });
 
   it('saves interests and returns success', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockTagFindMany.mockResolvedValue([
       { id: 'tag-1', parentId: 'parent-1' },
       { id: 'tag-2', parentId: 'parent-1' },
@@ -193,7 +198,7 @@ describe('POST /api/onboarding/interests', () => {
   });
 
   it('returns 400 for unknown parent category in custom tags', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     // First call: tag validation for tagIds (empty), second call: parent lookup for custom tags
     mockTagFindMany.mockResolvedValueOnce([]); // no parent found
 

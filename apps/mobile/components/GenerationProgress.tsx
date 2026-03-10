@@ -9,6 +9,7 @@ import Animated, {
   Easing,
   FadeIn,
 } from 'react-native-reanimated';
+import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography, STAGE_MESSAGES, resolveMessage } from '@sotto/shared';
 
 const CYCLE_INTERVAL_MS = 9_000;
@@ -65,7 +66,7 @@ function StepDot({
   if (state === 'completed') {
     return (
       <View style={[styles.dot, styles.dotCompleted]}>
-        <Text style={styles.checkmark}>{'\u2713'}</Text>
+        <Ionicons name="checkmark" size={12} color={colors.textInverse} />
       </View>
     );
   }

@@ -11,7 +11,9 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography, borderRadius } from '@sotto/shared';
+import { shadowSm } from '../../lib/shadows';
 import type { PodcastSummary } from '@sotto/shared';
 import { api } from '../../lib/api';
 import { deleteToken } from '../../lib/auth';
@@ -102,12 +104,14 @@ function MyPodcastItem({
           {podcast.topic}
         </Text>
         <View style={styles.podcastItemMeta}>
-          <Text style={styles.podcastItemStat}>
-            {'\u25B6'} {formatCount(podcast.playCount)}
-          </Text>
-          <Text style={styles.podcastItemStat}>
-            {'\u2665'} {formatCount(podcast.likeCount)}
-          </Text>
+          <View style={styles.podcastItemStatRow}>
+            <Ionicons name="play" size={13} color={colors.textTertiary} />
+            <Text style={styles.podcastItemStat}>{formatCount(podcast.playCount)}</Text>
+          </View>
+          <View style={styles.podcastItemStatRow}>
+            <Ionicons name="heart" size={13} color={colors.textTertiary} />
+            <Text style={styles.podcastItemStat}>{formatCount(podcast.likeCount)}</Text>
+          </View>
           <Text style={styles.podcastItemDuration}>
             {formatDuration(podcast.duration)}
           </Text>
@@ -202,7 +206,7 @@ export default function ProfileScreen() {
           onPress={handleSettingsPress}
           hitSlop={8}
         >
-          <Text style={styles.settingsIcon}>{'\u2699'}</Text>
+          <Ionicons name="settings-outline" size={22} color={colors.textSecondary} />
         </Pressable>
       </View>
 
@@ -246,9 +250,21 @@ export default function ProfileScreen() {
         ]}
         onPress={() => router.push('/ideas')}
       >
-        <Text style={styles.savedIdeasIcon}>{'\uD83D\uDD16'}</Text>
+        <Ionicons name="bookmark-outline" size={20} color={colors.primary} style={styles.savedIdeasIcon} />
         <Text style={styles.savedIdeasLabel}>Saved Ideas</Text>
-        <Text style={styles.savedIdeasChevron}>{'\u203A'}</Text>
+        <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+      </Pressable>
+
+      <Pressable
+        style={({ pressed }) => [
+          styles.savedIdeasRow,
+          pressed && styles.savedIdeasRowPressed,
+        ]}
+        onPress={() => router.push('/collections')}
+      >
+        <Ionicons name="albums-outline" size={20} color={colors.primary} style={styles.savedIdeasIcon} />
+        <Text style={styles.savedIdeasLabel}>Collections</Text>
+        <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
       </Pressable>
 
       <View style={styles.sectionHeader}>
@@ -349,8 +365,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
+    ...shadowSm,
   },
   settingsIcon: {
     fontSize: 22,
@@ -382,8 +397,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.lg,
     paddingVertical: spacing.md,
     marginBottom: spacing.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
+    ...shadowSm,
   },
   statItem: {
     flex: 1,
@@ -413,8 +427,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.lg,
     padding: spacing.md,
     marginBottom: spacing.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
+    ...shadowSm,
   },
   savedIdeasRowPressed: {
     backgroundColor: colors.surfaceHover,
@@ -449,8 +462,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm + 2,
     backgroundColor: colors.surface,
     borderRadius: borderRadius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
+    ...shadowSm,
   },
   podcastItemPressed: {
     backgroundColor: colors.surfaceHover,
@@ -481,6 +493,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
+  },
+  podcastItemStatRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   podcastItemStat: {
     fontFamily: typography.fontBody,

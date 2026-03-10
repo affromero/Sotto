@@ -1,5 +1,6 @@
 import { Image, View, Text, StyleSheet } from 'react-native';
 import { colors, typography } from '@sotto/shared';
+import { shadowSm } from '../lib/shadows';
 
 interface AvatarProps {
   uri: string | null | undefined;
@@ -43,6 +44,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: colors.primaryLight,
+    ...shadowSm,
   },
   initial: {
     fontFamily: typography.fontHeading,

@@ -9,18 +9,40 @@ import {
   TextInput,
   Alert,
   FlatList,
+  Share,
 } from 'react-native';
-import { useLocalSearchParams, Stack } from 'expo-router';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withSequence,
+  withRepeat,
+  withTiming,
+  Easing,
+} from 'react-native-reanimated';
+import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import TrackPlayer, { useProgress, usePlaybackState, State } from 'react-native-track-player';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography, borderRadius, getContentBadgeLabel } from '@sotto/shared';
+import { getPodcastGradient } from '../../lib/gradients';
 import type { PodcastDetail, SegmentData } from '@sotto/shared';
 import { api } from '../../lib/api';
 import { setupPlayer, loadTrack } from '../../lib/audio-player';
 import { formatTime } from '../../lib/formatters';
 import { usePlaybackTelemetry } from '../../lib/usePlaybackTelemetry';
 import type { PlaybackSnapshot } from '../../lib/usePlaybackTelemetry';
+import { ForkModal } from '../../components/ForkModal';
+import { CommentSection } from '../../components/CommentSection';
+import { ReferencesTab } from '../../components/ReferencesTab';
+import { VoiceTrackPicker } from '../../components/VoiceTrackPicker';
+import { ForkLineage } from '../../components/ForkLineage';
+import { VersionHistory } from '../../components/VersionHistory';
+import { AddToCollectionSheet } from '../../components/AddToCollectionSheet';
+import { usePlayerStore } from '../../lib/player-store';
+import type { VoiceTrackSummary } from '@sotto/shared';
 
 const PLAYBACK_SPEEDS = [0.5, 1, 1.25, 1.5, 2] as const;
 
@@ -39,6 +61,7 @@ function findCurrentSegmentIndex(
 
 export default function PodcastScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
   const transcriptRef = useRef<FlatList<SegmentData>>(null);
@@ -50,12 +73,51 @@ export default function PodcastScreen() {
   const [questionText, setQuestionText] = useState('');
   const [progressBarWidth, setProgressBarWidth] = useState(0);
   const [teleprompterEnabled, setTeleprompterEnabled] = useState(false);
+  const [forkModalVisible, setForkModalVisible] = useState(false);
+  const [voicePickerVisible, setVoicePickerVisible] = useState(false);
+  const [versionHistoryVisible, setVersionHistoryVisible] = useState(false);
+  const [collectionSheetVisible, setCollectionSheetVisible] = useState(false);
+  const [activeVoiceTrackId, setActiveVoiceTrackId] = useState<string | null>(null);
+  const setCurrentPodcast = usePlayerStore((s) => s.setCurrentPodcast);
   const lastSeekFromRef = useRef<number | undefined>(undefined);
   const interactionCountRef = useRef(0);
 
   const { position, duration: trackDuration } = useProgress(1000);
   const playbackState = usePlaybackState();
   const isPlaying = playbackState.state === State.Playing;
+
+  // Animation values for player buttons
+  const playScale = useSharedValue(1);
+  const likeScale = useSharedValue(1);
+
+  const playAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: playScale.value }],
+  }));
+
+  const likeAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: likeScale.value }],
+  }));
+
+  const saveScale = useSharedValue(1);
+  const saveAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: saveScale.value }],
+  }));
+
+  // Question FAB pulse
+  const fabScale = useSharedValue(1);
+  useEffect(() => {
+    fabScale.value = withRepeat(
+      withSequence(
+        withTiming(1.05, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
+        withTiming(1.0, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
+      ),
+      -1,
+      false,
+    );
+  }, [fabScale]);
+  const fabAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: fabScale.value }],
+  }));
 
   const {
     data: podcast,
@@ -84,6 +146,38 @@ export default function PodcastScreen() {
           likeCount: previous.isLiked
             ? previous.likeCount - 1
             : previous.likeCount + 1,
+        });
+      }
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(['podcast', id], context.previous);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['podcast', id] });
+    },
+  });
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      if (podcast?.isSaved) {
+        await api.delete(`/podcasts/${id}/save`);
+      } else {
+        await api.post(`/podcasts/${id}/save`);
+      }
+    },
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ['podcast', id] });
+      const previous = queryClient.getQueryData<PodcastDetail>(['podcast', id]);
+      if (previous) {
+        queryClient.setQueryData<PodcastDetail>(['podcast', id], {
+          ...previous,
+          isSaved: !previous.isSaved,
+          saveCount: previous.isSaved
+            ? previous.saveCount - 1
+            : previous.saveCount + 1,
         });
       }
       return { previous };
@@ -135,15 +229,25 @@ export default function PodcastScreen() {
       podcast.title,
       podcast.user?.name ?? 'Sotto',
     );
-  }, [playerReady, podcast?.id, podcast?.audioUrl, podcast?.title, podcast?.user?.name]);
+    setCurrentPodcast({
+      id: podcast.id,
+      title: podcast.title,
+      creator: podcast.user?.name ?? 'Sotto',
+      audioUrl: podcast.audioUrl,
+    });
+  }, [playerReady, podcast?.id, podcast?.audioUrl, podcast?.title, podcast?.user?.name, setCurrentPodcast]);
 
   const handlePlayPause = useCallback(async () => {
+    playScale.value = withSequence(
+      withSpring(0.9, { damping: 15, stiffness: 400 }),
+      withSpring(1.0, { damping: 10, stiffness: 200 }),
+    );
     if (isPlaying) {
       await TrackPlayer.pause();
     } else {
       await TrackPlayer.play();
     }
-  }, [isPlaying]);
+  }, [isPlaying, playScale]);
 
   const handleSkipForward = useCallback(async () => {
     const current = await TrackPlayer.getProgress();
@@ -182,6 +286,26 @@ export default function PodcastScreen() {
       timestamp: position,
     });
   }, [questionText, position, interactMutation]);
+
+  const handleVoiceTrackSelect = useCallback(async (track: VoiceTrackSummary) => {
+    if (!track.audioUrl) return;
+    setActiveVoiceTrackId(track.id);
+    setVoicePickerVisible(false);
+    await loadTrack(
+      podcast?.id ?? id,
+      track.audioUrl,
+      podcast?.title ?? '',
+      track.contributor?.name ?? 'Sotto',
+    );
+  }, [podcast?.id, podcast?.title, id]);
+
+  const handleShare = useCallback(async () => {
+    if (!podcast) return;
+    await Share.share({
+      message: `${podcast.title} — Listen on Sotto\nhttps://sotto.fm/podcast/${podcast.id}`,
+      url: `https://sotto.fm/podcast/${podcast.id}`,
+    });
+  }, [podcast]);
 
   // Playback telemetry
   const playbackSnapshot: PlaybackSnapshot = useMemo(() => ({
@@ -238,10 +362,20 @@ export default function PodcastScreen() {
     );
   }
 
+  const gradient = getPodcastGradient(podcast.id);
+  const currentUser = queryClient.getQueryData<{ id: string }>(['user', 'me']);
+  const isOwner = currentUser?.id === podcast.user?.id;
+
   const listHeader = (
     <>
-      {/* Header */}
+      {/* Header with ambient gradient */}
       <View style={styles.header}>
+        <LinearGradient
+          colors={[gradient.colors[0] + '14', 'transparent']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.ambientGradient}
+        />
         <Text style={styles.title} numberOfLines={2}>
           {podcast.title}
         </Text>
@@ -320,17 +454,19 @@ export default function PodcastScreen() {
             accessibilityLabel="Skip backward 15 seconds"
             accessibilityRole="button"
           >
-            <Text style={styles.skipText}>-15</Text>
+            <Ionicons name="play-back" size={24} color={colors.primary} />
           </Pressable>
 
-          <Pressable
-            onPress={handlePlayPause}
-            style={styles.playButton}
-            accessibilityLabel={isPlaying ? 'Pause' : 'Play'}
-            accessibilityRole="button"
-          >
-            <Text style={styles.playIcon}>{isPlaying ? '\u275A\u275A' : '\u25B6'}</Text>
-          </Pressable>
+          <Animated.View style={playAnimatedStyle}>
+            <Pressable
+              onPress={handlePlayPause}
+              style={styles.playButton}
+              accessibilityLabel={isPlaying ? 'Pause' : 'Play'}
+              accessibilityRole="button"
+            >
+              <Ionicons name={isPlaying ? 'pause' : 'play'} size={28} color={colors.textInverse} style={!isPlaying && styles.playIconOffset} />
+            </Pressable>
+          </Animated.View>
 
           <Pressable
             onPress={handleSkipForward}
@@ -338,11 +474,11 @@ export default function PodcastScreen() {
             accessibilityLabel="Skip forward 15 seconds"
             accessibilityRole="button"
           >
-            <Text style={styles.skipText}>+15</Text>
+            <Ionicons name="play-forward" size={24} color={colors.primary} />
           </Pressable>
         </View>
 
-        {/* Speed + Like Row */}
+        {/* Action Row: Speed + Social Icons */}
         <View style={styles.actionRow}>
           <Pressable
             onPress={handleSpeedToggle}
@@ -355,22 +491,107 @@ export default function PodcastScreen() {
             </Text>
           </Pressable>
 
-          <Pressable
-            onPress={() => likeMutation.mutate()}
-            style={styles.likeButton}
-            accessibilityLabel={podcast.isLiked ? 'Unlike podcast' : 'Like podcast'}
-            accessibilityRole="button"
-          >
-            <Text
-              style={[
-                styles.likeIcon,
-                podcast.isLiked && styles.likeIconActive,
-              ]}
+          <View style={styles.actionIcons}>
+            <Pressable
+              onPress={() => {
+                likeScale.value = withSequence(
+                  withSpring(1.3, { damping: 8, stiffness: 400 }),
+                  withSpring(1.0, { damping: 10, stiffness: 200 }),
+                );
+                likeMutation.mutate();
+              }}
+              style={styles.actionIcon}
+              accessibilityLabel={podcast.isLiked ? 'Unlike podcast' : 'Like podcast'}
+              accessibilityRole="button"
             >
-              {podcast.isLiked ? '\u2665' : '\u2661'}
-            </Text>
-            <Text style={styles.likeCount}>{podcast.likeCount}</Text>
-          </Pressable>
+              <Animated.View style={likeAnimatedStyle}>
+                <Ionicons
+                  name={podcast.isLiked ? 'heart' : 'heart-outline'}
+                  size={22}
+                  color={podcast.isLiked ? colors.error : colors.textSecondary}
+                />
+              </Animated.View>
+              {isOwner && <Text style={styles.actionCount}>{podcast.likeCount}</Text>}
+            </Pressable>
+
+            <Pressable
+              onPress={() => {
+                saveScale.value = withSequence(
+                  withSpring(1.3, { damping: 8, stiffness: 400 }),
+                  withSpring(1.0, { damping: 10, stiffness: 200 }),
+                );
+                saveMutation.mutate();
+              }}
+              onLongPress={() => setCollectionSheetVisible(true)}
+              style={styles.actionIcon}
+              accessibilityLabel={podcast.isSaved ? 'Unsave podcast' : 'Save podcast'}
+              accessibilityHint="Long press to add to collection"
+              accessibilityRole="button"
+            >
+              <Animated.View style={saveAnimatedStyle}>
+                <Ionicons
+                  name={podcast.isSaved ? 'bookmark' : 'bookmark-outline'}
+                  size={22}
+                  color={podcast.isSaved ? colors.primary : colors.textSecondary}
+                />
+              </Animated.View>
+              {isOwner && <Text style={styles.actionCount}>{podcast.saveCount}</Text>}
+            </Pressable>
+
+            <Pressable
+              onPress={handleShare}
+              style={styles.actionIcon}
+              accessibilityLabel="Share podcast"
+              accessibilityRole="button"
+            >
+              <Ionicons name="share-outline" size={22} color={colors.textSecondary} />
+            </Pressable>
+
+            <Pressable
+              onPress={() => setForkModalVisible(true)}
+              style={styles.actionIcon}
+              accessibilityLabel="Fork podcast"
+              accessibilityRole="button"
+            >
+              <Ionicons name="git-branch-outline" size={22} color={colors.textSecondary} />
+              {isOwner && podcast.forks.length > 0 && (
+                <Text style={styles.actionCount}>{podcast.forks.length}</Text>
+              )}
+            </Pressable>
+
+            {podcast.voiceTracks.length > 1 && (
+              <Pressable
+                onPress={() => setVoicePickerVisible(true)}
+                style={styles.actionIcon}
+                accessibilityLabel="Voice tracks"
+                accessibilityRole="button"
+              >
+                <Ionicons name="mic-outline" size={22} color={colors.textSecondary} />
+              </Pressable>
+            )}
+
+            {podcast.versions.length > 1 && (
+              <Pressable
+                onPress={() => setVersionHistoryVisible(true)}
+                style={styles.actionIcon}
+                accessibilityLabel="Version history"
+                accessibilityRole="button"
+              >
+                <Ionicons name="time-outline" size={22} color={colors.textSecondary} />
+              </Pressable>
+            )}
+
+            {isOwner && (
+              <Pressable
+                onPress={() => router.push(`/podcast/${podcast.id}/edit`)}
+                style={styles.actionIcon}
+                accessibilityLabel="Edit podcast"
+                accessibilityRole="button"
+              >
+                <Ionicons name="create-outline" size={22} color={colors.textSecondary} />
+              </Pressable>
+            )}
+          </View>
         </View>
       </View>
 
@@ -477,23 +698,42 @@ export default function PodcastScreen() {
             </View>
           );
         }}
+        ListFooterComponent={
+          <>
+            {podcast.references.length > 0 && (
+              <ReferencesTab references={podcast.references} />
+            )}
+            <ForkLineage
+              podcastId={podcast.id}
+              forkedFromId={podcast.forkedFromId}
+              forkCount={podcast.forkCount}
+            />
+            <CommentSection
+              podcastId={podcast.id}
+              commentCount={podcast.commentCount}
+            />
+          </>
+        }
         ListEmptyComponent={
           <Text style={styles.emptyTranscript}>No transcript available.</Text>
         }
       />
 
       {/* Ask a Question FAB */}
-      <Pressable
-        onPress={() => setQuestionModalVisible(true)}
-        style={[
-          styles.askButton,
-          { bottom: Math.max(spacing.lg, insets.bottom + spacing.sm) },
-        ]}
-        accessibilityLabel="Ask a question about this podcast"
-        accessibilityRole="button"
-      >
-        <Text style={styles.askButtonText}>Ask a Question</Text>
-      </Pressable>
+      <Animated.View style={[
+        styles.askButton,
+        { bottom: Math.max(spacing.lg, insets.bottom + spacing.sm) },
+        fabAnimatedStyle,
+      ]}>
+        <Pressable
+          onPress={() => setQuestionModalVisible(true)}
+          style={styles.askButtonInner}
+          accessibilityLabel="Ask a question about this podcast"
+          accessibilityRole="button"
+        >
+          <Text style={styles.askButtonText}>Ask a Question</Text>
+        </Pressable>
+      </Animated.View>
 
       {/* Question Modal */}
       <Modal
@@ -552,6 +792,34 @@ export default function PodcastScreen() {
           </View>
         </View>
       </Modal>
+
+      <ForkModal
+        visible={forkModalVisible}
+        onClose={() => setForkModalVisible(false)}
+        podcastId={podcast.id}
+        podcastTitle={podcast.title}
+      />
+
+      <VoiceTrackPicker
+        visible={voicePickerVisible}
+        onClose={() => setVoicePickerVisible(false)}
+        voiceTracks={podcast.voiceTracks}
+        activeTrackId={activeVoiceTrackId ?? podcast.defaultVoiceTrackId}
+        onSelect={handleVoiceTrackSelect}
+      />
+
+      <VersionHistory
+        visible={versionHistoryVisible}
+        onClose={() => setVersionHistoryVisible(false)}
+        versions={podcast.versions}
+        currentVersion={podcast.currentVersion}
+      />
+
+      <AddToCollectionSheet
+        visible={collectionSheetVisible}
+        onClose={() => setCollectionSheetVisible(false)}
+        podcastId={podcast.id}
+      />
     </View>
   );
 }
@@ -605,6 +873,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
     paddingBottom: spacing.md,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  ambientGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 120,
   },
   title: {
     fontFamily: typography.fontHeading,
@@ -726,10 +1003,8 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 6,
   },
-  playIcon: {
-    fontSize: 28,
-    color: colors.textInverse,
-    marginLeft: 2,
+  playIconOffset: {
+    marginLeft: 3,
   },
 
   // Speed + Like
@@ -754,23 +1029,21 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.textSecondary,
   },
-  likeButton: {
+  actionIcons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  actionIcon: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
     paddingVertical: spacing.xs + 2,
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.xs + 2,
   },
-  likeIcon: {
-    fontSize: 22,
-    color: colors.textSecondary,
-  },
-  likeIconActive: {
-    color: colors.error,
-  },
-  likeCount: {
+  actionCount: {
     fontFamily: typography.fontBody,
-    fontSize: 14,
+    fontSize: 13,
     color: colors.textSecondary,
   },
 
@@ -823,6 +1096,8 @@ const styles = StyleSheet.create({
   },
   segmentRowActive: {
     backgroundColor: colors.primaryLighter,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.primary,
   },
   speakerBadge: {
     alignSelf: 'flex-start',
@@ -884,15 +1159,18 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: spacing.lg,
     right: spacing.lg,
-    backgroundColor: colors.accent,
-    paddingVertical: spacing.sm + 6,
     borderRadius: borderRadius.lg,
-    alignItems: 'center',
+    overflow: 'hidden',
     shadowColor: colors.accent,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 8,
     elevation: 6,
+  },
+  askButtonInner: {
+    backgroundColor: colors.accent,
+    paddingVertical: spacing.sm + 6,
+    alignItems: 'center',
   },
   askButtonText: {
     fontFamily: typography.fontBody,
