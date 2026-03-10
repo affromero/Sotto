@@ -6,10 +6,10 @@ import * as AudioPlayerProvider from '@/components/providers/AudioPlayerProvider
 
 vi.mock('@/components/providers/AudioPlayerProvider');
 
-// Mock LottieAnimation to avoid lottie-web Canvas dependency in jsdom
-vi.mock('@/components/ui/LottieAnimation', () => ({
-  LottieAnimation: ({ className }: { className?: string }) => (
-    <div data-testid="lottie-animation" className={className} />
+// Mock WaveformBars to avoid animation dependency in jsdom
+vi.mock('@/components/ui/WaveformBars', () => ({
+  WaveformBars: ({ className }: { className?: string }) => (
+    <div data-testid="waveform-bars" className={className} />
   ),
 }));
 
@@ -75,7 +75,7 @@ describe('MiniPlayer', () => {
       isPlaying: true,
     });
     render(<MiniPlayer podcastTitle="Test Podcast" />);
-    expect(screen.getByTestId('lottie-animation')).toBeInTheDocument();
+    expect(screen.getByTestId('waveform-bars')).toBeInTheDocument();
   });
 
   it('displays first letter of podcast title in artwork when paused', () => {
