@@ -10,6 +10,9 @@ import { DEFAULT_RENDER_CONFIG, DEFAULT_BRANDING, RenderStatus } from '@sotto/vi
 
 export const renderRouter = Router();
 
+/** Supported composition IDs — both use the same Remotion bundle. */
+type CompositionId = 'PodcastVideo' | 'LaunchVideo';
+
 interface RenderJob {
   status: RenderStatusValue;
   progress: number;
@@ -38,7 +41,7 @@ function getBundlePath(): Promise<string> {
   return bundlePromise!;
 }
 
-async function executeRender(jobId: string, input: RenderInput): Promise<void> {
+async function executeRender(jobId: string, compositionId: CompositionId, input: Record<string, unknown>): Promise<void> {
   const job = jobs.get(jobId);
   if (!job) return;
 
@@ -49,11 +52,11 @@ async function executeRender(jobId: string, input: RenderInput): Promise<void> {
 
   try {
     const serveUrl = await getBundlePath();
-    const config = input.config ?? DEFAULT_RENDER_CONFIG;
+    const config = (input.config as typeof DEFAULT_RENDER_CONFIG) ?? DEFAULT_RENDER_CONFIG;
 
     const composition = await selectComposition({
       serveUrl,
-      id: 'PodcastVideo',
+      id: compositionId,
       inputProps: input,
     });
 
@@ -99,25 +102,47 @@ renderRouter.post('/', (req, res) => {
     return;
   }
 
-  const body = req.body as Partial<RenderInput>;
-  if (!body.audioUrl || !body.segments?.length) {
-    res.status(400).json({ error: 'audioUrl and segments are required' });
-    return;
+  const { compositionId: rawCompositionId, ...body } = req.body;
+  const compositionId: CompositionId = rawCompositionId === 'LaunchVideo' ? 'LaunchVideo' : 'PodcastVideo';
+
+  // Validate based on composition type
+  if (compositionId === 'PodcastVideo') {
+    const podcastBody = body as Partial<RenderInput>;
+    if (!podcastBody.audioUrl || !podcastBody.segments?.length) {
+      res.status(400).json({ error: 'audioUrl and segments are required for PodcastVideo' });
+      return;
+    }
+  } else if (compositionId === 'LaunchVideo') {
+    if (!body.scenes?.length) {
+      res.status(400).json({ error: 'scenes are required for LaunchVideo' });
+      return;
+    }
   }
 
-  const input: RenderInput = {
-    audioUrl: body.audioUrl,
-    segments: body.segments,
-    config: body.config ?? DEFAULT_RENDER_CONFIG,
-    branding: body.branding ?? DEFAULT_BRANDING,
-    transitions: body.transitions,
-  };
+  // Build input — for PodcastVideo, apply defaults; for LaunchVideo, pass through
+  let input: Record<string, unknown>;
+  if (compositionId === 'PodcastVideo') {
+    const podcastBody = body as Partial<RenderInput>;
+    input = {
+      audioUrl: podcastBody.audioUrl,
+      segments: podcastBody.segments,
+      config: podcastBody.config ?? DEFAULT_RENDER_CONFIG,
+      branding: podcastBody.branding ?? DEFAULT_BRANDING,
+      transitions: podcastBody.transitions,
+      avatarOverlays: podcastBody.avatarOverlays,
+    };
+  } else {
+    input = {
+      ...body,
+      config: body.config ?? DEFAULT_RENDER_CONFIG,
+    };
+  }
 
   const jobId = uuidv4();
   jobs.set(jobId, { status: RenderStatus.QUEUED, progress: 0 });
 
   // Fire and forget — render runs in background
-  executeRender(jobId, input);
+  executeRender(jobId, compositionId, input);
 
   res.status(202).json({ jobId });
 });

@@ -3,6 +3,8 @@ import type { ComposeDemoPayload } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { uploadFile } from '@/lib/r2';
 import { logger } from '@/lib/logger';
+import type { LaunchSceneInput, LaunchVideoInput } from '@sotto/video';
+import { DEFAULT_RENDER_CONFIG } from '@sotto/video';
 
 if (!process.env.REMOTION_URL) {
   throw new Error('REMOTION_URL is not set — demo composition worker cannot start');
@@ -10,7 +12,17 @@ if (!process.env.REMOTION_URL) {
 
 const REMOTION_URL = process.env.REMOTION_URL;
 const POLL_INTERVAL_MS = 5000;
-const STITCH_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
+const RENDER_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
+
+/** Probe media duration via the sidecar /probe endpoint. */
+async function probeDuration(url: string): Promise<number> {
+  const response = await fetch(`${REMOTION_URL}/probe?url=${encodeURIComponent(url)}`);
+  if (!response.ok) {
+    throw new Error(`Probe failed for ${url}: ${response.status}`);
+  }
+  const { durationSec } = (await response.json()) as { durationSec: number };
+  return durationSec;
+}
 
 export async function processDemoComposition(job: Job<ComposeDemoPayload>): Promise<void> {
   const { projectId } = job.data;
@@ -41,52 +53,66 @@ export async function processDemoComposition(job: Job<ComposeDemoPayload>): Prom
   });
 
   try {
-    // Build stitch payload — include cinematic fields for launch video composition
-    const scenes = project.scenes.map((scene) => ({
+    // Probe durations for all scenes in parallel
+    const durationProbes = project.scenes.map(async (scene) => {
+      const [recordingDurationSec, voiceoverDurationSec] = await Promise.all([
+        probeDuration(scene.recordingUrl!),
+        scene.voiceoverUrl ? probeDuration(scene.voiceoverUrl) : Promise.resolve(undefined),
+      ]);
+      return { recordingDurationSec, voiceoverDurationSec };
+    });
+    const durations = await Promise.all(durationProbes);
+    await job.updateProgress(8);
+
+    // Build LaunchVideo payload with pre-calculated durations
+    const scenes: LaunchSceneInput[] = project.scenes.map((scene, i) => ({
       recordingUrl: scene.recordingUrl!,
       voiceoverUrl: scene.voiceoverUrl ?? undefined,
-      visualUrl: scene.visualUrl ?? undefined,
-      visualType: scene.visualType ?? undefined,
       transitionUrl: scene.transitionUrl ?? undefined,
-      timingSegments: (scene.timingSegments as { start: number; end: number; speed: number }[] | null) ?? undefined,
-      sfxConfig: (scene.sfxConfig as Record<string, unknown> | null) ?? undefined,
-      actionTimingLog: (scene.actionTimingLog as Array<{ type: string; timestampMs: number; meta?: Record<string, unknown> }> | null) ?? undefined,
-      providerBanner: (scene.providerBanner as Record<string, unknown> | null) ?? undefined,
-      overlays: (scene.overlays as Array<Record<string, unknown>> | null) ?? undefined,
-      subtitles: (scene.subtitles as Record<string, unknown> | null) ?? undefined,
-      narration: scene.narration,
-      avatarConfig: (scene.avatarConfig as Record<string, unknown> | null) ?? undefined,
+      timingSegments: (scene.timingSegments as unknown as LaunchSceneInput['timingSegments']) ?? undefined,
+      sfxConfig: (scene.sfxConfig as unknown as LaunchSceneInput['sfxConfig']) ?? undefined,
+      actionTimingLog: (scene.actionTimingLog as unknown as LaunchSceneInput['actionTimingLog']) ?? undefined,
+      providerBanner: (scene.providerBanner as unknown as LaunchSceneInput['providerBanner']) ?? undefined,
+      overlays: (scene.overlays as unknown as LaunchSceneInput['overlays']) ?? undefined,
+      subtitles: (scene.subtitles as unknown as LaunchSceneInput['subtitles']) ?? undefined,
+      narration: scene.narration ?? undefined,
+      avatarConfig: (scene.avatarConfig as unknown as LaunchSceneInput['avatarConfig']) ?? undefined,
+      recordingDurationSec: durations[i].recordingDurationSec,
+      voiceoverDurationSec: durations[i].voiceoverDurationSec,
     }));
 
-    const stitchResponse = await fetch(`${REMOTION_URL}/stitch`, {
+    const renderPayload: LaunchVideoInput & { compositionId: string } = {
+      compositionId: 'LaunchVideo',
+      scenes,
+      backgroundMusicUrl: project.backgroundMusicUrl ?? undefined,
+      backgroundMusicVolume: project.backgroundMusicVolume ?? undefined,
+      gradeVideo: true,
+      config: { ...DEFAULT_RENDER_CONFIG, width: 1280, height: 720, fps: 30 },
+    };
+
+    const renderResponse = await fetch(`${REMOTION_URL}/render`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        scenes,
-        output: { width: 1280, height: 720, fps: 30 },
-        gradeVideo: true,
-        backgroundMusicUrl: project.backgroundMusicUrl ?? undefined,
-        backgroundMusicVolume: project.backgroundMusicVolume ?? undefined,
-      }),
+      body: JSON.stringify(renderPayload),
     });
 
-    if (!stitchResponse.ok) {
-      const text = await stitchResponse.text().catch(() => 'unknown');
-      throw new Error(`Stitch request failed (${stitchResponse.status}): ${text}`);
+    if (!renderResponse.ok) {
+      const text = await renderResponse.text().catch(() => 'unknown');
+      throw new Error(`Render request failed (${renderResponse.status}): ${text}`);
     }
 
-    const { jobId: stitchJobId } = (await stitchResponse.json()) as { jobId: string };
+    const { jobId: renderJobId } = (await renderResponse.json()) as { jobId: string };
     await job.updateProgress(10);
 
     // Poll for completion
-    const deadline = Date.now() + STITCH_TIMEOUT_MS;
+    const deadline = Date.now() + RENDER_TIMEOUT_MS;
 
     while (Date.now() < deadline) {
       await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
 
-      const statusResponse = await fetch(`${REMOTION_URL}/stitch/${stitchJobId}/status`);
+      const statusResponse = await fetch(`${REMOTION_URL}/render/${renderJobId}/status`);
       if (!statusResponse.ok) {
-        throw new Error(`Failed to check stitch status: ${statusResponse.status}`);
+        throw new Error(`Failed to check render status: ${statusResponse.status}`);
       }
 
       const status = (await statusResponse.json()) as { status: string; progress: number; error?: string };
@@ -96,7 +122,7 @@ export async function processDemoComposition(job: Job<ComposeDemoPayload>): Prom
         break;
       }
       if (status.status === 'error') {
-        throw new Error(`Stitching failed: ${status.error ?? 'unknown'}`);
+        throw new Error(`Rendering failed: ${status.error ?? 'unknown'}`);
       }
 
       const progress = Math.min(65, 10 + Math.round((status.progress ?? 0) * 0.55));
@@ -108,9 +134,9 @@ export async function processDemoComposition(job: Job<ComposeDemoPayload>): Prom
     }
 
     // Download the output
-    const outputResponse = await fetch(`${REMOTION_URL}/stitch/${stitchJobId}/output`);
+    const outputResponse = await fetch(`${REMOTION_URL}/render/${renderJobId}/output`);
     if (!outputResponse.ok) {
-      throw new Error(`Failed to download stitched video: ${outputResponse.status}`);
+      throw new Error(`Failed to download rendered video: ${outputResponse.status}`);
     }
 
     const videoBuffer = Buffer.from(await outputResponse.arrayBuffer());
