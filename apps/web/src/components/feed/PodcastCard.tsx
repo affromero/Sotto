@@ -195,7 +195,7 @@ export function PodcastCard({
         aria-label={`Fork ${podcast.title}`}
         type="button"
       >
-        <GitFork size={16} aria-hidden="true" />
+        <GitFork size={18} strokeWidth={2.5} aria-hidden="true" />
         <span>Fork</span>
       </button>
     </article>
