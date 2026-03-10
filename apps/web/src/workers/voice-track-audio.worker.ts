@@ -2,26 +2,14 @@ import { Job } from 'bullmq';
 import { GenerateVoiceTrackAudioPayload, addJob, JobType, voiceTrackStitchingQueue } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { resolveTtsProvider } from '@/lib/providers';
-import { getProviderMeta, type TtsProviderId } from '@/lib/providers/tts-registry';
+import { type TtsProviderId } from '@/lib/providers/tts-registry';
 import { uploadVoiceTrackSegmentAudio } from '@/lib/r2';
-import { getAudioDuration } from '@/lib/audio-stitcher';
-import { getElevenLabsConcurrencyLimit } from '@/lib/elevenlabs';
-import { getCartesiaConcurrencyLimit, updateCartesiaConcurrencyFromError } from '@/lib/providers/tts/cartesia.provider';
-import { getHumeConcurrencyLimit, updateHumeConcurrencyFromError } from '@/lib/providers/tts/hume.provider';
-import { semaphore } from '@/lib/redis';
-import { getByokKey } from '@/lib/byok';
-import { cleanTextForTts } from '@/lib/tts-text-cleaner';
-import { estimateDurationFromText } from '@/lib/duration';
-import { logUsage } from '@/lib/usage-logger';
-import { isModelAccessError } from '@/lib/byok-errors';
+import type { VoiceMatchMetadata } from '@/lib/voice-pool';
+import { generateTtsAudio } from '@/lib/tts-generation';
 import { logger } from '@/lib/logger';
-import * as path from 'path';
-import * as os from 'os';
-import * as crypto from 'crypto';
-import { writeFile, rm } from 'fs/promises';
 
 export async function processVoiceTrackAudio(job: Job<GenerateVoiceTrackAudioPayload>): Promise<void> {
-  const { podcastId, voiceTrackId, voiceTrackSegmentId, segmentId, speaker, text } = job.data;
+  const { podcastId, voiceTrackId, voiceTrackSegmentId, segmentId, speaker, text, previousText, nextText, direction } = job.data;
 
   logger.info('Generating voice track audio for segment', { podcastId, voiceTrackId, segmentId, speaker });
   await job.updateProgress(10);
@@ -89,7 +77,20 @@ export async function processVoiceTrackAudio(job: Job<GenerateVoiceTrackAudioPay
   });
 
   const userId = voiceTrack.podcast.userId;
-  const startTime = Date.now();
+
+  // Fetch discovery metadata for topic-aware voice selection (feature parity with audio-generation)
+  const discovery = await prisma.discovery.findUnique({
+    where: { podcastId },
+    select: { tone: true, audienceLevel: true, audience: true },
+  });
+
+  const voiceMetadata: VoiceMatchMetadata | undefined = discovery
+    ? {
+        tone: discovery.tone as VoiceMatchMetadata['tone'],
+        audienceLevel: discovery.audienceLevel as VoiceMatchMetadata['audienceLevel'],
+        audience: discovery.audience as VoiceMatchMetadata['audience'],
+      }
+    : undefined;
 
   // Resolve provider per-speaker: use the speaker's VoiceTrackVoice.provider if set, else fall back to track-level
   const trackVoice = voiceTrack.voices.find(v => v.speaker === speaker);
@@ -118,7 +119,7 @@ export async function processVoiceTrackAudio(job: Job<GenerateVoiceTrackAudioPay
   // Use voice track voice assignment if provider matches, otherwise let provider pick from pool
   const voiceId = (trackVoice?.voiceId && trackVoice.provider === providerId)
     ? trackVoice.voiceId
-    : provider.getVoiceId(speaker, podcastId);
+    : provider.getVoiceId(speaker, podcastId, voiceMetadata);
 
   // Persist resolved voice for retry consistency
   if (!trackVoice || trackVoice.provider !== providerId || trackVoice.voiceId !== voiceId) {
@@ -135,154 +136,47 @@ export async function processVoiceTrackAudio(job: Job<GenerateVoiceTrackAudioPay
     }
   }
 
-  // Resolve the raw API key for concurrency lookups
-  const resolvedApiKey = await getByokKey(userId, providerId)
-    || (providerId === 'elevenlabs' ? process.env.ELEVENLABS_API_KEY
-      : providerId === 'cartesia' ? process.env.CARTESIA_API_KEY
-      : providerId === 'hume' ? process.env.HUME_API_KEY
-      : undefined);
-
-  let concurrencyLimit = 5;
-  if (providerId === 'elevenlabs' && resolvedApiKey) {
-    concurrencyLimit = await getElevenLabsConcurrencyLimit(resolvedApiKey);
-  } else if (providerId === 'cartesia' && resolvedApiKey) {
-    concurrencyLimit = await getCartesiaConcurrencyLimit(resolvedApiKey);
-  } else if (providerId === 'hume' && resolvedApiKey) {
-    concurrencyLimit = await getHumeConcurrencyLimit(resolvedApiKey);
-  }
-
-  const semaphoreKey = `tts:sem:${userId}:${providerId}`;
-
-  logger.info('Using TTS provider for voice track', {
+  // ---- Shared TTS generation core ----
+  const result = await generateTtsAudio({
+    text,
+    voiceId,
     speaker,
+    previousText,
+    nextText,
+    direction,
+    provider,
     providerId,
     source,
-    voiceId,
-    voiceTrackId,
-    concurrencyLimit,
+    userId,
+    podcastId,
+    requestedModel: voiceTrack.ttsModel,
+    plan: voiceTrack.podcast.user.plan as 'FREE' | 'PRO',
+    usageCategory: 'voice_track_audio',
+    extraMetadata: { voiceTrackId },
+    isAborted: async () => {
+      const check = await prisma.voiceTrack.findUnique({
+        where: { id: voiceTrackId },
+        select: { status: true },
+      });
+      return check?.status === 'FAILED';
+    },
   });
 
-  // Acquire a semaphore slot
-  let acquired = false;
-  for (let attempt = 0; attempt < 30; attempt++) {
-    acquired = await semaphore.acquire(semaphoreKey, concurrencyLimit);
-    if (acquired) break;
-    const delay = Math.min(1000 * Math.pow(1.5, attempt), 15000);
-    await new Promise((resolve) => setTimeout(resolve, delay));
-
-    // Re-check if voice track failed while waiting
-    const check = await prisma.voiceTrack.findUnique({
-      where: { id: voiceTrackId },
-      select: { status: true },
-    });
-    if (check?.status === 'FAILED') {
-      logger.info('Voice track failed while waiting for semaphore, skipping', { voiceTrackId, segmentId });
-      await job.updateProgress(100);
-      return;
-    }
+  if (!result) {
+    logger.info('Voice track failed while waiting for semaphore, skipping', { voiceTrackId, segmentId });
+    await job.updateProgress(100);
+    return;
   }
-
-  if (!acquired) {
-    throw new Error(`Timed out waiting for TTS semaphore (${providerId}, limit ${concurrencyLimit})`);
-  }
-
-  const ttsText = cleanTextForTts(text);
-
-  let audioBuffer: Buffer;
-  let semaphoreReleased = false;
-  let effectiveSource = source;
-  try {
-    audioBuffer = await provider.generateSpeech({ text: ttsText, voiceId });
-  } catch (err) {
-    const errMsg = err instanceof Error ? err.message : String(err);
-
-    // BYOK model-access 404 → retry with platform key
-    if (source === 'byok' && isModelAccessError(errMsg)) {
-      logger.warn('BYOK key lacks model access, retrying with platform key', {
-        providerId, voiceTrackId, segmentId, error: errMsg,
-      });
-      try {
-        const platformResolved = await resolveTtsProvider({
-          userId,
-          podcastId,
-          requestedProvider: providerId,
-          requestedModel: voiceTrack.ttsModel,
-          plan: voiceTrack.podcast.user.plan as 'FREE' | 'PRO',
-          skipByok: true,
-        });
-        audioBuffer = await platformResolved.provider.generateSpeech({ text: ttsText, voiceId });
-        effectiveSource = 'platform';
-      } catch {
-        // Platform fallback also failed — release semaphore and throw original error
-        await semaphore.release(semaphoreKey);
-        semaphoreReleased = true;
-        throw err;
-      }
-    } else {
-      await semaphore.release(semaphoreKey);
-      semaphoreReleased = true;
-
-      // On 429, update cached concurrency limit so BullMQ retry uses the correct value
-      if (resolvedApiKey && /\(429\)/.test(errMsg)) {
-        if (providerId === 'cartesia') {
-          await updateCartesiaConcurrencyFromError(resolvedApiKey, errMsg);
-        } else if (providerId === 'hume') {
-          await updateHumeConcurrencyFromError(resolvedApiKey, errMsg);
-        }
-        logger.warn('TTS 429 — concurrency limit cached, BullMQ will retry', { providerId, voiceTrackId, segmentId });
-      }
-      throw err;
-    }
-  } finally {
-    if (!semaphoreReleased) {
-      await semaphore.release(semaphoreKey);
-    }
-  }
-
-  const service = effectiveSource === 'byok' ? `${providerId}_byok` : providerId;
-  const durationMs = Date.now() - startTime;
 
   await job.updateProgress(60);
 
   // Upload to R2
-  const audioUrl = await uploadVoiceTrackSegmentAudio(podcastId, voiceTrackId, segmentId, audioBuffer);
-
-  // Measure actual audio duration via FFprobe
-  let segmentDuration: number;
-  const tmpPath = path.join(os.tmpdir(), `sotto-probe-vt-${crypto.randomUUID()}.mp3`);
-  try {
-    await writeFile(tmpPath, audioBuffer);
-    segmentDuration = await getAudioDuration(tmpPath);
-  } catch (err) {
-    logger.warn('FFprobe duration extraction failed, estimating from text length', {
-      voiceTrackSegmentId,
-      error: err instanceof Error ? err.message : String(err),
-    });
-    segmentDuration = estimateDurationFromText(text);
-  } finally {
-    await rm(tmpPath, { force: true }).catch(() => {});
-  }
+  const audioUrl = await uploadVoiceTrackSegmentAudio(podcastId, voiceTrackId, segmentId, result.audioBuffer);
 
   // Update voice track segment with audio URL and duration
   await prisma.voiceTrackSegment.update({
     where: { id: voiceTrackSegmentId },
-    data: { audioUrl, duration: segmentDuration },
-  });
-
-  // Log TTS cost
-  const charCount = text.length;
-  const meta = getProviderMeta(providerId);
-  const totalCost = (charCount / 1000) * meta.platformCostPerKChar;
-
-  logUsage({
-    service,
-    category: 'voice_track_audio',
-    inputTokens: charCount,
-    totalCost,
-    durationMs,
-    podcastId,
-    userId,
-    metadata: { voiceId, speaker, source, voiceTrackId },
+    data: { audioUrl, duration: result.segmentDuration },
   });
 
   await job.updateProgress(90);
@@ -312,5 +206,5 @@ export async function processVoiceTrackAudio(job: Job<GenerateVoiceTrackAudioPay
   }
 
   await job.updateProgress(100);
-  logger.info('Voice track audio generation complete for segment', { voiceTrackId, segmentId, service });
+  logger.info('Voice track audio generation complete for segment', { voiceTrackId, segmentId, service: result.service });
 }
