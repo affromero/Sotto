@@ -66,6 +66,7 @@ interface AutoModelFormProps {
     freeIncludedMusicModels: string[] | null;
     proIncludedMusicModels: string[] | null;
     dailyGenerationLimit: number;
+    dailyGenerationLimitPro: number;
     dailyVideoLimit: number;
     dailyVideoLimitPro: number;
     dailyMusicLimit: number;
@@ -502,6 +503,7 @@ export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttPro
 
   // Daily limits
   const [dailyGenerationLimit, setDailyGenerationLimit] = useState(initialConfig.dailyGenerationLimit);
+  const [dailyGenerationLimitPro, setDailyGenerationLimitPro] = useState(initialConfig.dailyGenerationLimitPro);
   const [dailyVideoLimit, setDailyVideoLimit] = useState(initialConfig.dailyVideoLimit);
   const [dailyVideoLimitPro, setDailyVideoLimitPro] = useState(initialConfig.dailyVideoLimitPro);
   const [dailyMusicLimit, setDailyMusicLimit] = useState(initialConfig.dailyMusicLimit);
@@ -610,6 +612,7 @@ export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttPro
           proIncludedMusicModels: setToArray(proIncludedMusic),
           // Daily limits
           dailyGenerationLimit,
+          dailyGenerationLimitPro,
           dailyVideoLimit,
           dailyVideoLimitPro,
           dailyMusicLimit,
@@ -816,11 +819,15 @@ export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttPro
       <fieldset className={styles.section}>
         <legend className={styles.sectionTitle}>Daily Limits</legend>
         <p className={styles.platformDescription}>
-          Maximum generations per user per day. 0 = unlimited. Video limits apply to both free and pro tiers separately.
+          Maximum generations per user per day. 0 = unlimited.
         </p>
 
-        <div className={styles.field}>
-          <label className={styles.label} htmlFor="dailyGenerationLimit">Daily Generation Limit (Free)</label>
+        <div className={styles.dailyLimitsGrid}>
+          <span className={styles.dailyLimitsHeader} />
+          <span className={styles.dailyLimitsHeader}>Free</span>
+          <span className={styles.dailyLimitsHeader}>Pro</span>
+
+          <label className={styles.dailyLimitsLabel} htmlFor="dailyGenerationLimit">Podcasts</label>
           <input
             id="dailyGenerationLimit"
             type="number"
@@ -829,10 +836,16 @@ export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttPro
             value={dailyGenerationLimit}
             onChange={(e) => setDailyGenerationLimit(parseInt(e.target.value, 10) || 0)}
           />
-        </div>
+          <input
+            id="dailyGenerationLimitPro"
+            type="number"
+            className={styles.select}
+            min={0}
+            value={dailyGenerationLimitPro}
+            onChange={(e) => setDailyGenerationLimitPro(parseInt(e.target.value, 10) || 0)}
+          />
 
-        <div className={styles.field}>
-          <label className={styles.label} htmlFor="dailyVideoLimit">Daily Video Limit (Free)</label>
+          <label className={styles.dailyLimitsLabel} htmlFor="dailyVideoLimit">Videos</label>
           <input
             id="dailyVideoLimit"
             type="number"
@@ -841,10 +854,6 @@ export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttPro
             value={dailyVideoLimit}
             onChange={(e) => setDailyVideoLimit(parseInt(e.target.value, 10) || 0)}
           />
-        </div>
-
-        <div className={styles.field}>
-          <label className={styles.label} htmlFor="dailyVideoLimitPro">Daily Video Limit (Pro)</label>
           <input
             id="dailyVideoLimitPro"
             type="number"
@@ -853,10 +862,8 @@ export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttPro
             value={dailyVideoLimitPro}
             onChange={(e) => setDailyVideoLimitPro(parseInt(e.target.value, 10) || 0)}
           />
-        </div>
 
-        <div className={styles.field}>
-          <label className={styles.label} htmlFor="dailyMusicLimit">Daily Music Limit (Free)</label>
+          <label className={styles.dailyLimitsLabel} htmlFor="dailyMusicLimit">Music</label>
           <input
             id="dailyMusicLimit"
             type="number"
@@ -865,10 +872,6 @@ export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttPro
             value={dailyMusicLimit}
             onChange={(e) => setDailyMusicLimit(parseInt(e.target.value, 10) || 0)}
           />
-        </div>
-
-        <div className={styles.field}>
-          <label className={styles.label} htmlFor="dailyMusicLimitPro">Daily Music Limit (Pro)</label>
           <input
             id="dailyMusicLimitPro"
             type="number"
