@@ -1,7 +1,13 @@
 import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { useQueryClient } from '@tanstack/react-query';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography, borderRadius, getContentBadgeLabel } from '@sotto/shared';
 import type { PodcastSummary } from '@sotto/shared';
 import { Avatar } from './Avatar';
+import { AnimatedPressable } from './AnimatedPressable';
+import { getPodcastGradient } from '../lib/gradients';
+import { shadowLg, shadowSm } from '../lib/shadows';
 import { formatDuration, formatCount, timeAgo, formatDurationMinutes } from '../lib/formatters';
 
 interface PodcastCardFeedProps {
@@ -33,88 +39,95 @@ function FeedCard({
   podcast: PodcastSummary;
   onPress: () => void;
 }) {
+  const queryClient = useQueryClient();
+  const currentUser = queryClient.getQueryData<{ id: string }>(['user', 'me']);
+  const isOwner = currentUser?.id === podcast.user.id;
+  const gradient = getPodcastGradient(podcast.id);
+
   return (
-    <Pressable
-      style={({ pressed }) => [styles.feedCard, pressed && styles.feedCardPressed]}
+    <AnimatedPressable
+      style={styles.feedCard}
       onPress={onPress}
     >
-      <View style={styles.feedHeader}>
-        <Avatar
-          uri={podcast.user.image}
-          name={podcast.user.name}
-          size={36}
+      <LinearGradient
+        colors={gradient.colors}
+        start={gradient.start}
+        end={gradient.end}
+        style={styles.feedGradient}
+      >
+        {/* Bottom scrim for text readability */}
+        <LinearGradient
+          colors={['transparent', 'rgba(0,0,0,0.45)']}
+          style={styles.feedScrim}
         />
-        <View style={styles.feedHeaderText}>
-          <Text style={styles.creatorName} numberOfLines={1}>
-            {podcast.user.name ?? 'Unknown'}
-          </Text>
-          {podcast.user.handle ? (
-            <Text style={styles.creatorHandle} numberOfLines={1}>
-              @{podcast.user.handle}
-            </Text>
-          ) : null}
-        </View>
-        <View style={styles.headerRight}>
-          <View
-            style={[
-              styles.contentBadge,
-              podcast.source !== 'IMPORT' || !podcast.isHumanContent
-                ? styles.contentBadgeAi
-                : styles.contentBadgeHuman,
-            ]}
-          >
-            <Text
-              style={[
-                styles.contentBadgeText,
-                podcast.source !== 'IMPORT' || !podcast.isHumanContent
-                  ? styles.contentBadgeTextAi
-                  : styles.contentBadgeTextHuman,
-              ]}
-            >
-              {getContentBadgeLabel(podcast)}
+
+        {/* Top row: avatar + badges */}
+        <View style={styles.feedHeader}>
+          <Avatar
+            uri={podcast.user.image}
+            name={podcast.user.name}
+            size={32}
+          />
+          <View style={styles.feedHeaderText}>
+            <Text style={styles.creatorName} numberOfLines={1}>
+              {podcast.user.name ?? 'Unknown'}
             </Text>
           </View>
-          <Text style={styles.timeAgo}>{timeAgo(podcast.createdAt)}</Text>
-        </View>
-      </View>
-
-      <Text style={styles.feedTitle} numberOfLines={2}>
-        {podcast.title}
-      </Text>
-      <Text style={styles.feedTopic} numberOfLines={1}>
-        {podcast.topic}
-      </Text>
-
-      {podcast.tags.length > 0 ? (
-        <View style={styles.tagRow}>
-          {podcast.tags.slice(0, 3).map((tag) => (
-            <View key={tag.id} style={styles.tag}>
-              <Text style={styles.tagText}>{tag.name}</Text>
+          <View style={styles.headerRight}>
+            <View style={styles.contentBadge}>
+              <Text style={styles.contentBadgeText}>
+                {getContentBadgeLabel(podcast)}
+              </Text>
             </View>
-          ))}
+            <Text style={styles.timeAgo}>{timeAgo(podcast.createdAt)}</Text>
+          </View>
         </View>
-      ) : null}
 
-      <View style={styles.feedFooter}>
-        <View style={styles.statRow}>
-          <Text style={styles.statIcon}>&#9654;</Text>
-          <Text style={styles.statText}>{formatCount(podcast.playCount)}</Text>
-        </View>
-        <View style={styles.statRow}>
-          <Text style={styles.statIcon}>&#9825;</Text>
-          <Text style={styles.statText}>{formatCount(podcast.likeCount)}</Text>
-        </View>
-        <View style={styles.statRow}>
-          <Text style={styles.statIcon}>&#8631;</Text>
-          <Text style={styles.statText}>{formatCount(podcast.forkCount)}</Text>
-        </View>
-        <View style={styles.durationBadge}>
-          <Text style={styles.durationText}>
-            {formatDuration(podcast.duration)}
+        {/* Bottom content over scrim */}
+        <View style={styles.feedBottom}>
+          <Text style={styles.feedTitle} numberOfLines={2}>
+            {podcast.title}
           </Text>
+          <Text style={styles.feedTopic} numberOfLines={1}>
+            {podcast.topic}
+          </Text>
+
+          {podcast.tags.length > 0 ? (
+            <View style={styles.tagRow}>
+              {podcast.tags.slice(0, 3).map((tag) => (
+                <View key={tag.id} style={styles.tag}>
+                  <Text style={styles.tagText}>{tag.name}</Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
+
+          <View style={styles.feedFooter}>
+            {isOwner && (
+              <>
+                <View style={styles.statRow}>
+                  <Ionicons name="play" size={13} color="rgba(255,255,255,0.7)" />
+                  <Text style={styles.statText}>{formatCount(podcast.playCount)}</Text>
+                </View>
+                <View style={styles.statRow}>
+                  <Ionicons name="heart-outline" size={13} color="rgba(255,255,255,0.7)" />
+                  <Text style={styles.statText}>{formatCount(podcast.likeCount)}</Text>
+                </View>
+                <View style={styles.statRow}>
+                  <Ionicons name="git-branch-outline" size={13} color="rgba(255,255,255,0.7)" />
+                  <Text style={styles.statText}>{formatCount(podcast.forkCount)}</Text>
+                </View>
+              </>
+            )}
+            <View style={[styles.durationBadge, !isOwner && styles.durationBadgeOnly]}>
+              <Text style={styles.durationText}>
+                {formatDuration(podcast.duration)}
+              </Text>
+            </View>
+          </View>
         </View>
-      </View>
-    </Pressable>
+      </LinearGradient>
+    </AnimatedPressable>
   );
 }
 
@@ -125,6 +138,10 @@ function CompactCard({
   podcast: PodcastSummary;
   onPress: () => void;
 }) {
+  const queryClient = useQueryClient();
+  const currentUser = queryClient.getQueryData<{ id: string }>(['user', 'me']);
+  const isOwner = currentUser?.id === podcast.user.id;
+
   return (
     <Pressable
       onPress={onPress}
@@ -145,10 +162,14 @@ function CompactCard({
               {formatDurationMinutes(podcast.duration)}
             </Text>
           )}
-          <Text style={styles.compactMetaDot}>{'\u00B7'}</Text>
-          <Text style={styles.compactMetaText}>
-            {podcast.likeCount} {podcast.likeCount === 1 ? 'like' : 'likes'}
-          </Text>
+          {isOwner && (
+            <>
+              <Text style={styles.compactMetaDot}>{'\u00B7'}</Text>
+              <Text style={styles.compactMetaText}>
+                {podcast.likeCount} {podcast.likeCount === 1 ? 'like' : 'likes'}
+              </Text>
+            </>
+          )}
           {podcast.status !== 'READY' && (
             <>
               <Text style={styles.compactMetaDot}>{'\u00B7'}</Text>
@@ -157,44 +178,47 @@ function CompactCard({
           )}
         </View>
       </View>
-      <Text style={styles.chevron}>{'\u203A'}</Text>
+      <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  // Feed variant
+  // Feed variant — gradient cover card
   feedCard: {
-    backgroundColor: colors.surface,
     borderRadius: borderRadius.lg,
-    padding: spacing.md,
     marginBottom: spacing.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
+    overflow: 'hidden',
+    ...shadowLg,
   },
-  feedCardPressed: {
-    backgroundColor: colors.surfaceHover,
+  feedGradient: {
+    minHeight: 180,
+    justifyContent: 'space-between',
+  },
+  feedScrim: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: '70%',
   },
   feedHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.sm + 4,
+    padding: spacing.md,
   },
   feedHeaderText: {
     flex: 1,
-    marginLeft: spacing.sm + 2,
+    marginLeft: spacing.sm,
   },
   creatorName: {
     fontFamily: typography.fontBody,
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
-    color: colors.textPrimary,
-  },
-  creatorHandle: {
-    fontFamily: typography.fontBody,
-    fontSize: 12,
-    color: colors.textSecondary,
-    marginTop: 1,
+    color: '#FFFFFF',
+    textShadowColor: 'rgba(0,0,0,0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   headerRight: {
     flexDirection: 'row',
@@ -202,43 +226,40 @@ const styles = StyleSheet.create({
     gap: spacing.xs + 2,
   },
   contentBadge: {
-    paddingHorizontal: spacing.xs + 2,
-    paddingVertical: 2,
-    borderRadius: borderRadius.sm,
-  },
-  contentBadgeAi: {
-    backgroundColor: colors.primaryLighter,
-  },
-  contentBadgeHuman: {
-    backgroundColor: colors.successLighter,
+    paddingHorizontal: spacing.xs + 4,
+    paddingVertical: 3,
+    borderRadius: borderRadius.full,
+    backgroundColor: 'rgba(255,255,255,0.2)',
   },
   contentBadgeText: {
     fontFamily: typography.fontBody,
     fontSize: 10,
     fontWeight: '600',
-  },
-  contentBadgeTextAi: {
-    color: colors.primary,
-  },
-  contentBadgeTextHuman: {
-    color: colors.success,
+    color: '#FFFFFF',
   },
   timeAgo: {
     fontFamily: typography.fontBody,
     fontSize: 12,
-    color: colors.textTertiary,
+    color: 'rgba(255,255,255,0.7)',
+  },
+  feedBottom: {
+    padding: spacing.md,
+    zIndex: 1,
   },
   feedTitle: {
     fontFamily: typography.fontHeading,
     fontSize: 20,
-    color: colors.textPrimary,
+    color: '#FFFFFF',
     marginBottom: 4,
     lineHeight: 26,
+    textShadowColor: 'rgba(0,0,0,0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   feedTopic: {
     fontFamily: typography.fontBody,
     fontSize: 14,
-    color: colors.textSecondary,
+    color: 'rgba(255,255,255,0.8)',
     marginBottom: spacing.sm,
   },
   tagRow: {
@@ -250,14 +271,14 @@ const styles = StyleSheet.create({
   tag: {
     paddingHorizontal: spacing.sm + 2,
     paddingVertical: 3,
-    borderRadius: borderRadius.sm,
-    backgroundColor: colors.primaryLighter,
+    borderRadius: borderRadius.full,
+    backgroundColor: 'rgba(255,255,255,0.2)',
   },
   tagText: {
     fontFamily: typography.fontBody,
     fontSize: 11,
     fontWeight: '500',
-    color: colors.primaryHover,
+    color: '#FFFFFF',
   },
   feedFooter: {
     flexDirection: 'row',
@@ -269,27 +290,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
   },
-  statIcon: {
-    fontSize: 13,
-    color: colors.textTertiary,
-  },
   statText: {
     fontFamily: typography.fontBody,
     fontSize: 13,
-    color: colors.textSecondary,
+    color: 'rgba(255,255,255,0.7)',
   },
   durationBadge: {
     marginLeft: 'auto',
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
-    borderRadius: borderRadius.sm,
-    backgroundColor: colors.accentSubtle,
+    borderRadius: borderRadius.full,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  durationBadgeOnly: {
+    marginLeft: 0,
   },
   durationText: {
     fontFamily: typography.fontBody,
     fontSize: 12,
     fontWeight: '500',
-    color: colors.accent,
+    color: '#FFFFFF',
   },
 
   // Compact variant
@@ -298,8 +318,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
+    backgroundColor: colors.surface,
+    ...shadowSm,
+    marginBottom: 1,
   },
   compactContent: {
     flex: 1,
@@ -339,9 +360,5 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: colors.warning,
     fontWeight: '600',
-  },
-  chevron: {
-    fontSize: 24,
-    color: colors.textTertiary,
   },
 });

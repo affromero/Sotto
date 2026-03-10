@@ -140,7 +140,8 @@ export { BRAND } from './brand';
 export type { Brand } from './brand';
 
 // Theme / design tokens
-export { colors, spacing, typography, borderRadius } from './theme';
+export { colors, darkColors, spacing, typography, borderRadius } from './theme';
+export type { ColorScheme } from './theme';
 
 // Generation messages (rotating sub-messages for pipeline stages)
 export { STAGE_MESSAGES, resolveMessage } from './generation-messages';

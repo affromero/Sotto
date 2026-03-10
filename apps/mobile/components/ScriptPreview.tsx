@@ -17,6 +17,7 @@ interface ScriptPreviewProps {
   podcastId: string;
   onApprove: () => void;
   onRegenerate: () => void;
+  onEdit?: (turns: Turn[]) => void;
 }
 
 interface Turn {
@@ -57,7 +58,7 @@ function TurnRow({ turn, uniqueSpeakers }: { turn: Turn; uniqueSpeakers: string[
   );
 }
 
-export function ScriptPreview({ podcastId, onApprove, onRegenerate }: ScriptPreviewProps) {
+export function ScriptPreview({ podcastId, onApprove, onRegenerate, onEdit }: ScriptPreviewProps) {
   const { data, isLoading, isError, error, refetch } = useQuery<ScriptResponse>({
     queryKey: ['podcast-script', podcastId],
     queryFn: async () => {
@@ -150,8 +151,13 @@ export function ScriptPreview({ podcastId, onApprove, onRegenerate }: ScriptPrev
 
       <View style={styles.footer}>
         <Pressable style={styles.secondaryButton} onPress={handleRegenerate}>
-          <Text style={styles.secondaryButtonText}>Regenerate Script</Text>
+          <Text style={styles.secondaryButtonText}>Regenerate</Text>
         </Pressable>
+        {onEdit && data?.turns && (
+          <Pressable style={styles.secondaryButton} onPress={() => onEdit(data.turns)}>
+            <Text style={styles.secondaryButtonText}>Edit</Text>
+          </Pressable>
+        )}
         <Pressable style={styles.primaryButton} onPress={onApprove}>
           <Text style={styles.primaryButtonText}>Generate Audio</Text>
         </Pressable>

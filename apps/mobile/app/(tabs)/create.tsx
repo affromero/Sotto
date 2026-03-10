@@ -14,7 +14,9 @@ import {
 } from 'react-native';
 import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
+import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography, borderRadius } from '@sotto/shared';
+import { shadowPrimaryGlow } from '../../lib/shadows';
 import type { DiscoveryMetadata } from '@sotto/shared';
 import Animated, {
   useSharedValue,
@@ -34,6 +36,8 @@ import { DurationPicker } from '../../components/DurationPicker';
 import { VisibilityPicker } from '../../components/VisibilityPicker';
 import { GenerationProgress } from '../../components/GenerationProgress';
 import { ScriptPreview } from '../../components/ScriptPreview';
+import { DraftsList } from '../../components/DraftsList';
+import { ScriptEditor } from '../../components/ScriptEditor';
 
 type Step = 'discovery' | 'voice' | 'scripting' | 'script-preview' | 'generating';
 
@@ -114,6 +118,8 @@ export default function CreateScreen() {
   // Step state machine
   const [step, setStep] = useState<Step>('discovery');
   const [podcastId, setPodcastId] = useState<string | null>(null);
+  const [scriptEditorVisible, setScriptEditorVisible] = useState(false);
+  const [scriptTurns, setScriptTurns] = useState<{ speaker: string; text: string; direction?: string }[]>([]);
 
   // Discovery state
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -474,6 +480,40 @@ export default function CreateScreen() {
           }
           ListHeaderComponent={
             messages.length === 0 ? (
+              <>
+              <DraftsList
+                onResume={async (draftId) => {
+                  try {
+                    const res = await api.get(`/drafts/${draftId}`);
+                    const draft = res.data;
+                    if (draft.discovery?.messages) {
+                      setMessages(
+                        draft.discovery.messages.map((m: { role: string; content: string; chips?: string[] }) => ({
+                          id: m.role + Math.random(),
+                          role: m.role as 'user' | 'assistant',
+                          content: m.content,
+                          chips: m.chips,
+                        })),
+                      );
+                    }
+                    if (draft.discovery) {
+                      setMetadata({
+                        topic: draft.discovery.topic,
+                        depth: draft.discovery.depth,
+                        audienceLevel: draft.discovery.audienceLevel,
+                        audience: draft.discovery.audience,
+                        focusAreas: draft.discovery.focusAreas,
+                        tone: draft.discovery.tone,
+                        durationTarget: draft.discovery.durationTarget,
+                        speakers: draft.discovery.speakers,
+                      } as DiscoveryMetadata);
+                    }
+                    setPodcastId(draftId);
+                  } catch {
+                    Alert.alert('Error', 'Failed to load draft.');
+                  }
+                }}
+              />
               <View style={styles.greetingChipsContainer}>
                 <ScrollView
                   horizontal
@@ -501,11 +541,12 @@ export default function CreateScreen() {
                     ]}
                     onPress={() => setShowInspire(true)}
                   >
-                    <Text style={styles.inspireMeIcon}>{'\u2728'}</Text>
+                    <Ionicons name="sparkles" size={16} color={colors.primary} />
                     <Text style={styles.inspireMeButtonText}>Inspire me</Text>
                   </Pressable>
                 </Animated.View>
               </View>
+              </>
             ) : null
           }
           ListFooterComponent={
@@ -608,13 +649,14 @@ export default function CreateScreen() {
             <Pressable
               style={({ pressed }) => [
                 styles.sendButton,
+                inputText.trim() && !isDiscovering && styles.sendButtonGlow,
                 pressed && styles.sendButtonPressed,
                 (!inputText.trim() || isDiscovering) && styles.sendButtonDisabled,
               ]}
               onPress={handleSend}
               disabled={!inputText.trim() || isDiscovering}
             >
-              <Text style={styles.sendButtonIcon}>&#8593;</Text>
+              <Ionicons name="arrow-up" size={20} color={colors.textInverse} />
             </Pressable>
           </View>
         </View>
@@ -710,11 +752,23 @@ export default function CreateScreen() {
   function renderScriptPreviewStep() {
     if (!podcastId) return null;
     return (
-      <ScriptPreview
-        podcastId={podcastId}
-        onApprove={() => approveMutation.mutate()}
-        onRegenerate={() => regenerateMutation.mutate()}
-      />
+      <>
+        <ScriptPreview
+          podcastId={podcastId}
+          onApprove={() => approveMutation.mutate()}
+          onRegenerate={() => regenerateMutation.mutate()}
+          onEdit={(turns) => {
+            setScriptTurns(turns);
+            setScriptEditorVisible(true);
+          }}
+        />
+        <ScriptEditor
+          visible={scriptEditorVisible}
+          onClose={() => setScriptEditorVisible(false)}
+          podcastId={podcastId}
+          turns={scriptTurns}
+        />
+      </>
     );
   }
 
@@ -747,7 +801,10 @@ export default function CreateScreen() {
               ? 'Add an AI provider key to create podcasts'
               : 'Add a TTS provider key to create podcasts'}
         </Text>
-        <Text style={styles.keyWarningLink}>Add keys {'\u203A'}</Text>
+        <View style={styles.keyWarningLinkRow}>
+          <Text style={styles.keyWarningLink}>Add keys</Text>
+          <Ionicons name="chevron-forward" size={14} color={colors.primary} />
+        </View>
       </Pressable>
     );
   }
@@ -765,7 +822,7 @@ export default function CreateScreen() {
                     style={styles.headerBack}
                     accessibilityLabel="Go back"
                   >
-                    <Text style={styles.headerBackText}>‹</Text>
+                    <Ionicons name="chevron-back" size={24} color={colors.primary} />
                   </Pressable>
                 )
               : undefined,
@@ -830,6 +887,11 @@ const styles = StyleSheet.create({
     color: colors.warning,
     flex: 1,
     lineHeight: 18,
+  },
+  keyWarningLinkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
   },
   keyWarningLink: {
     fontFamily: typography.fontBody,
@@ -1057,6 +1119,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 2,
+  },
+  sendButtonGlow: {
+    ...shadowPrimaryGlow,
   },
   sendButtonPressed: {
     backgroundColor: colors.primaryHover,

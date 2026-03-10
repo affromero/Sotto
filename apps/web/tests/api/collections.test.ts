@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
-const mockAuth = vi.fn();
+const mockAuthenticateRequest = vi.fn();
 const mockCollectionFindMany = vi.fn();
 const mockCollectionCreate = vi.fn();
 
-vi.mock('@/lib/auth', () => ({
-  auth: (...args: unknown[]) => mockAuth(...args),
+vi.mock('@/lib/api-keys', () => ({
+  authenticateRequest: (...args: unknown[]) => mockAuthenticateRequest(...args),
 }));
 
 vi.mock('@/lib/prisma', () => ({
@@ -27,6 +27,12 @@ vi.mock('@/lib/logger', () => ({
 
 import { GET, POST } from '@/app/api/collections/route';
 
+function createGetRequest(): NextRequest {
+  return new NextRequest(new URL('http://localhost:3000/api/collections'), {
+    method: 'GET',
+  });
+}
+
 function createPostRequest(body: unknown): NextRequest {
   return new NextRequest(new URL('http://localhost:3000/api/collections'), {
     method: 'POST',
@@ -41,19 +47,9 @@ describe('GET /api/collections', () => {
   });
 
   it('returns 401 when user is not authenticated', async () => {
-    mockAuth.mockResolvedValue(null);
+    mockAuthenticateRequest.mockResolvedValue(null);
 
-    const response = await GET();
-    const body = await response.json();
-
-    expect(response.status).toBe(401);
-    expect(body).toMatchObject({ error: 'Unauthorized' });
-  });
-
-  it('returns 401 when session exists but user.id is missing', async () => {
-    mockAuth.mockResolvedValue({ user: {} });
-
-    const response = await GET();
+    const response = await GET(createGetRequest());
     const body = await response.json();
 
     expect(response.status).toBe(401);
@@ -61,10 +57,10 @@ describe('GET /api/collections', () => {
   });
 
   it('returns empty array when user has no collections', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockCollectionFindMany.mockResolvedValue([]);
 
-    const response = await GET();
+    const response = await GET(createGetRequest());
     const body = await response.json();
 
     expect(response.status).toBe(200);
@@ -72,7 +68,7 @@ describe('GET /api/collections', () => {
   });
 
   it('returns collections with serialized dates', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     const now = new Date('2024-01-01T00:00:00.000Z');
     mockCollectionFindMany.mockResolvedValue([
       {
@@ -86,7 +82,7 @@ describe('GET /api/collections', () => {
       },
     ]);
 
-    const response = await GET();
+    const response = await GET(createGetRequest());
     const body = await response.json();
 
     expect(response.status).toBe(200);
@@ -102,7 +98,7 @@ describe('POST /api/collections', () => {
   });
 
   it('returns 401 when user is not authenticated', async () => {
-    mockAuth.mockResolvedValue(null);
+    mockAuthenticateRequest.mockResolvedValue(null);
 
     const request = createPostRequest({ name: 'Test' });
     const response = await POST(request);
@@ -113,7 +109,7 @@ describe('POST /api/collections', () => {
   });
 
   it('returns 400 when name is missing', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
 
     const request = createPostRequest({});
     const response = await POST(request);
@@ -124,7 +120,7 @@ describe('POST /api/collections', () => {
   });
 
   it('returns 400 when name is empty string', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
 
     const request = createPostRequest({ name: '' });
     const response = await POST(request);
@@ -135,7 +131,7 @@ describe('POST /api/collections', () => {
   });
 
   it('returns 400 for invalid JSON body', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
 
     const request = new NextRequest(new URL('http://localhost:3000/api/collections'), {
       method: 'POST',
@@ -150,7 +146,7 @@ describe('POST /api/collections', () => {
   });
 
   it('creates collection and returns 201 with serialized date', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     const now = new Date('2024-01-01T00:00:00.000Z');
     mockCollectionCreate.mockResolvedValue({
       id: 'col-1',
@@ -173,7 +169,7 @@ describe('POST /api/collections', () => {
   });
 
   it('passes description and isPublic to prisma create', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     const now = new Date('2024-01-01T00:00:00.000Z');
     mockCollectionCreate.mockResolvedValue({
       id: 'col-2',

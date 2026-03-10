@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
-const mockAuth = vi.fn();
+const mockAuthenticateRequest = vi.fn();
 const mockFollowFindMany = vi.fn();
 const mockActivityFindMany = vi.fn();
 const mockActivityCount = vi.fn();
@@ -9,8 +9,8 @@ const mockPodcastFindMany = vi.fn();
 const mockUserFindMany = vi.fn();
 const mockCollectionFindMany = vi.fn();
 
-vi.mock('@/lib/auth', () => ({
-  auth: (...args: unknown[]) => mockAuth(...args),
+vi.mock('@/lib/api-keys', () => ({
+  authenticateRequest: (...args: unknown[]) => mockAuthenticateRequest(...args),
 }));
 
 vi.mock('@/lib/prisma', () => ({
@@ -56,17 +56,7 @@ describe('GET /api/activity', () => {
   });
 
   it('returns 401 when unauthenticated', async () => {
-    mockAuth.mockResolvedValue(null);
-
-    const response = await GET(createRequest());
-    const body = await response.json();
-
-    expect(response.status).toBe(401);
-    expect(body).toMatchObject({ error: 'Unauthorized' });
-  });
-
-  it('returns 401 when session has no user id', async () => {
-    mockAuth.mockResolvedValue({ user: {} });
+    mockAuthenticateRequest.mockResolvedValue(null);
 
     const response = await GET(createRequest());
     const body = await response.json();
@@ -76,7 +66,7 @@ describe('GET /api/activity', () => {
   });
 
   it('returns 400 for invalid pagination params', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
 
     const response = await GET(createRequest({ page: '0' }));
     const body = await response.json();
@@ -86,7 +76,7 @@ describe('GET /api/activity', () => {
   });
 
   it('returns empty activities when user follows nobody', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockFollowFindMany.mockResolvedValue([]);
 
     const response = await GET(createRequest());
@@ -97,7 +87,7 @@ describe('GET /api/activity', () => {
   });
 
   it('returns enriched activities with podcast targets', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockFollowFindMany.mockResolvedValue([{ followingId: 'user-2' }]);
 
     const now = new Date();
@@ -127,7 +117,7 @@ describe('GET /api/activity', () => {
   });
 
   it('returns enriched activities with user targets', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockFollowFindMany.mockResolvedValue([{ followingId: 'user-2' }]);
 
     const now = new Date();
@@ -155,7 +145,7 @@ describe('GET /api/activity', () => {
   });
 
   it('sets hasMore true when more pages exist', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockFollowFindMany.mockResolvedValue([{ followingId: 'user-2' }]);
 
     const now = new Date();
