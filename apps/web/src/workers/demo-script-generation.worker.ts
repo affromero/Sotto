@@ -53,12 +53,13 @@ export async function processDemoScriptGeneration(
   await job.updateProgress(10);
 
   // Render the walkthrough prompt
+  const durationTarget = job.data.durationTarget ?? project.features.length * 30;
   const systemPrompt = loadAndRender('demo/walkthrough.md', {
     PRODUCT_CONTEXT: getDemoProductContext(),
     FEATURES: getDemoFeatureDescriptions(project.features),
     APP_SELECTORS: getAppSelectorReference(),
     INTERCEPTOR_CATALOG: getInterceptorCatalog(),
-    DURATION_TARGET: String(project.features.length * 30), // ~30s per feature
+    DURATION_TARGET: String(durationTarget),
   });
 
   const userMessage = [
@@ -71,7 +72,7 @@ export async function processDemoScriptGeneration(
   const response = await ai.generateResponse(
     systemPrompt,
     [{ role: 'user', content: userMessage }],
-    { maxTokens: 8192 },
+    { maxTokens: 8192, model: project.aiModel ?? undefined },
   );
 
   await job.updateProgress(60);
@@ -87,7 +88,7 @@ export async function processDemoScriptGeneration(
   // Delete any existing scenes (in case of regeneration)
   await prisma.demoScene.deleteMany({ where: { projectId } });
 
-  // Create scenes in bulk
+  // Create scenes in bulk — apply project default TTS config to each scene
   await prisma.demoScene.createMany({
     data: scenes.map((scene, index) => ({
       projectId,
@@ -97,6 +98,9 @@ export async function processDemoScriptGeneration(
       actions: scene.actions as unknown as import('@prisma/client').Prisma.InputJsonValue,
       visualType: scene.visualSuggestion?.type ?? null,
       visualPrompt: scene.visualSuggestion?.prompt ?? null,
+      ttsProvider: project.defaultTtsProvider,
+      ttsModel: project.defaultTtsModel,
+      ttsVoiceId: project.defaultTtsVoiceId,
     })),
   });
 

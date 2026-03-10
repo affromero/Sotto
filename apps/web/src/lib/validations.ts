@@ -20,6 +20,10 @@ export const createDemoProjectSchema = z.object({
   description: z.string().max(2000).optional(),
   features: z.array(z.string()).min(1).max(10),
   durationTarget: z.number().min(30).max(300).default(120),
+  aiModel: z.string().max(100).optional(),
+  defaultTtsProvider: z.string().max(50).optional(),
+  defaultTtsModel: z.string().max(100).optional(),
+  defaultTtsVoiceId: z.string().max(200).optional(),
 });
 
 /**

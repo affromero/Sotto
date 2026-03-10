@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
     return errorResponse(parsed.error.issues[0].message, 400);
   }
 
-  const { title, description, features, durationTarget } = parsed.data;
+  const { title, description, features, durationTarget, aiModel, defaultTtsProvider, defaultTtsModel, defaultTtsVoiceId } = parsed.data;
 
   const project = await prisma.demoProject.create({
     data: {
@@ -37,19 +37,19 @@ export async function POST(request: NextRequest) {
       title,
       description,
       features,
+      aiModel,
+      defaultTtsProvider,
+      defaultTtsModel,
+      defaultTtsVoiceId,
     },
   });
 
   await addJob(
     demoScriptQueue,
     JobType.GENERATE_DEMO_SCRIPT,
-    { projectId: project.id },
+    { projectId: project.id, durationTarget },
     { jobId: `demo-script-${project.id}-${Date.now()}` },
   );
-
-  // Store durationTarget as metadata hint (used by the worker via project features length)
-  // The worker calculates duration from features count, but we pass the user's preference here
-  void durationTarget;
 
   return NextResponse.json({ id: project.id, status: project.status }, { status: 201 });
 }
