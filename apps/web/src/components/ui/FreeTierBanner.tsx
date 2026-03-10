@@ -82,8 +82,6 @@ export function FreeTierBanner({
     localStorage.setItem(DISMISS_KEY, Date.now().toString());
   }, []);
 
-  // Pro users don't need this banner
-  if (isProUser) return null;
   if (dismissed) return null;
 
   // BYOK users and admin-granted unlimited (dailyLimit === 0) see a subtle Pro upsell
@@ -158,53 +156,58 @@ export function FreeTierBanner({
 
   const exhausted = dailyUsed >= dailyLimit;
   const variant = exhausted ? 'exhausted' : dailyUsed >= dailyLimit - 1 ? 'warning' : 'info';
+  const tierLabel = isProUser ? 'Pro' : 'Free tier';
 
   return (
     <div
       className={`${styles.banner} ${styles[variant]}`}
       role="status"
-      aria-label="Free tier status"
+      aria-label={`${tierLabel} status`}
     >
       <div className={styles.content}>
         <div>
           <p className={styles.title}>
             {exhausted
               ? `Daily limit reached — ${countdown > 0 ? `resets in ${formatReset(countdown)}` : 'resets soon'}`
-              : `${dailyLimit - dailyUsed} of ${dailyLimit} free podcast${dailyLimit - dailyUsed !== 1 ? 's' : ''} remaining today`}
+              : `${dailyLimit - dailyUsed} of ${dailyLimit} podcast${dailyLimit - dailyUsed !== 1 ? 's' : ''} remaining today`}
           </p>
           <p className={styles.description}>
             {exhausted
-              ? 'Upgrade to Pro for unlimited generation, or add your own API keys (BYOK).'
-              : `Free tier: ${dailyLimit} podcast${dailyLimit !== 1 ? 's' : ''} per day, platform AI and voices included.`}
+              ? isProUser
+                ? 'Add your own API keys (BYOK) for unlimited generation.'
+                : 'Upgrade to Pro for more daily podcasts, or add your own API keys (BYOK).'
+              : `${tierLabel}: ${dailyLimit} podcast${dailyLimit !== 1 ? 's' : ''} per day.`}
           </p>
         </div>
         <div className={styles.actions}>
-          {waitlistState === 'success' ? (
-            <span className={styles.successText}>You&apos;re on the list!</span>
-          ) : (
-            <button
-              type="button"
-              className={styles.waitlistButton}
-              onClick={() => handleJoinWaitlist('pro-banner-free')}
-              disabled={waitlistState === 'loading'}
-            >
-              {waitlistState === 'loading' ? 'Joining...' : 'Join Pro Waitlist'}
-              <svg
-                className={styles.linkArrow}
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
+          {!isProUser && (
+            waitlistState === 'success' ? (
+              <span className={styles.successText}>You&apos;re on the list!</span>
+            ) : (
+              <button
+                type="button"
+                className={styles.waitlistButton}
+                onClick={() => handleJoinWaitlist('pro-banner-free')}
+                disabled={waitlistState === 'loading'}
               >
-                <line x1="5" y1="12" x2="19" y2="12" />
-                <polyline points="12 5 19 12 12 19" />
-              </svg>
-            </button>
+                {waitlistState === 'loading' ? 'Joining...' : 'Join Pro Waitlist'}
+                <svg
+                  className={styles.linkArrow}
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                  <polyline points="12 5 19 12 12 19" />
+                </svg>
+              </button>
+            )
           )}
           {exhausted && (
             <Link href="/onboarding?step=keys" className={styles.linkSecondary}>

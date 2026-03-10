@@ -70,6 +70,7 @@ const baseConfig = {
   sttProvider: 'openai',
   sttModel: 'whisper-1',
   dailyGenerationLimit: 1,
+  dailyGenerationLimitPro: 5,
   aiAllocations: [],
   ttsAllocations: [],
 };
@@ -85,6 +86,7 @@ describe('checkGenerationGate', () => {
     mockRedisGet.mockResolvedValue('0');
     mockRedisTtl.mockResolvedValue(-1);
     mockGetActiveReferralCount.mockResolvedValue(0);
+    mockPodcastCount.mockResolvedValue(0);
   });
 
   afterEach(() => {
@@ -103,16 +105,47 @@ describe('checkGenerationGate', () => {
     expect(mockRedisGet).not.toHaveBeenCalled();
   });
 
-  it('allows PRO users without checking the daily counter', async () => {
+  it('allows PRO users when under dailyGenerationLimitPro', async () => {
     mockHasByokKey.mockResolvedValue(false);
     mockGetAutoModelConfig.mockResolvedValue(baseConfig);
     mockUser.mockResolvedValue({ role: 'USER', plan: 'PRO', dailyGenerationOverride: null });
+    mockRedisGet.mockResolvedValue('3'); // 3 < 5 pro limit
 
     const result = await checkGenerationGate('user-1');
 
     expect(result.allowed).toBe(true);
     expect(result.isProUser).toBe(true);
-    expect(mockRedisGet).not.toHaveBeenCalled();
+    expect(result.dailyLimit).toBe(5);
+    expect(result.dailyUsed).toBe(3);
+  });
+
+  it('blocks PRO users when dailyGenerationLimitPro is reached', async () => {
+    mockHasByokKey.mockResolvedValue(false);
+    mockGetAutoModelConfig.mockResolvedValue(baseConfig);
+    mockUser.mockResolvedValue({ role: 'USER', plan: 'PRO', dailyGenerationOverride: null });
+    mockRedisGet.mockResolvedValue('5'); // 5 >= 5 pro limit
+    mockRedisTtl.mockResolvedValue(4000);
+
+    const result = await checkGenerationGate('user-1');
+
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toBe('daily_limit_reached');
+    expect(result.dailyLimit).toBe(5);
+    expect(result.dailyUsed).toBe(5);
+    expect(result.resetInSeconds).toBe(4000);
+  });
+
+  it('PRO users skip in-flight generation check', async () => {
+    mockHasByokKey.mockResolvedValue(false);
+    mockGetAutoModelConfig.mockResolvedValue(baseConfig);
+    mockUser.mockResolvedValue({ role: 'USER', plan: 'PRO', dailyGenerationOverride: null });
+    mockPodcastCount.mockResolvedValue(1); // in-flight podcast exists
+    mockRedisGet.mockResolvedValue('0');
+
+    const result = await checkGenerationGate('user-1');
+
+    expect(result.allowed).toBe(true);
+    expect(mockPodcastCount).not.toHaveBeenCalled();
   });
 
   it('allows admin users regardless of daily counter', async () => {
@@ -460,20 +493,18 @@ describe('getFreeTierStatus', () => {
     expect(mockFreeProviderUsageFindMany).not.toHaveBeenCalled();
   });
 
-  it('returns isProUser true for PRO plan users and skips quota fetch', async () => {
-    const config = {
-      ...baseConfig,
-      ttsAllocations: [{ provider: 'elevenlabs', model: 'eleven_v3', quota: 3 }],
-    };
+  it('returns Pro daily limit and remaining for PRO users', async () => {
     mockHasByokKey.mockResolvedValue(false);
-    mockGetAutoModelConfig.mockResolvedValue(config);
+    mockGetAutoModelConfig.mockResolvedValue(baseConfig);
     mockUser.mockResolvedValue({ role: 'USER', plan: 'PRO', dailyGenerationOverride: null });
+    mockRedisGet.mockResolvedValue('2');
 
     const result = await getFreeTierStatus('user-1');
 
     expect(result.isProUser).toBe(true);
-    expect(result.ttsQuotas).toBeUndefined();
-    expect(mockFreeProviderUsageFindMany).not.toHaveBeenCalled();
+    expect(result.dailyLimit).toBe(5);
+    expect(result.dailyUsed).toBe(2);
+    expect(result.dailyRemaining).toBe(3);
   });
 
   it('includes resetInSeconds when Redis TTL is set', async () => {
