@@ -13,6 +13,10 @@ export interface AvatarOverlayData {
   durationSeconds: number | null;
   avatarProvider?: string | null;
   maskShape?: string | null;
+  chunkVideoUrl?: string | null;
+  chunkDurationSeconds?: number | null;
+  runwayChunkIndex?: number | null;
+  runwayTotalChunks?: number | null;
 }
 
 export interface HeyGenAvatarData {
