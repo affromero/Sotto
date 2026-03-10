@@ -261,7 +261,7 @@
     },
     {
       "title": "Video Playback",
-      "narration": "Each segment of your script is classified — illustration, stock footage, text card — and matched with AI-generated visuals. The result is a polished video podcast, ready to share.",
+      "narration": "Each segment is classified — illustration, stock footage, map, or text card — and matched with AI-generated visuals. Images or short video clips, tailored to your content. The result is a polished video podcast, ready to share.",
       "actions": [
         { "type": "waitForSelector", "selector": "video, [class*='videoPlayer']", "timeout": 5000 },
         { "type": "wait", "ms": 1000 },
