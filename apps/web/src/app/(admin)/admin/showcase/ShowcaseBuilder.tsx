@@ -25,8 +25,17 @@ interface PodcastOption {
   title: string;
   status: string;
   ttsProvider: string | null;
+  aiModel: string | null;
   segmentCount: number;
   updatedAt: string;
+}
+
+interface AiModelOption {
+  id: string;
+  displayName: string;
+  tier: string;
+  group: string;
+  hint?: string;
 }
 
 interface SegmentData {
@@ -198,12 +207,16 @@ export function ShowcaseBuilder({ providers }: ShowcaseBuilderProps) {
   const [generatingAll, setGeneratingAll] = useState(false);
   const videoPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // AI model state
+  const [aiModels, setAiModels] = useState<AiModelOption[]>([]);
+
   // Creation form state
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [createTopic, setCreateTopic] = useState('');
   const [createTitle, setCreateTitle] = useState('');
   const [createDuration, setCreateDuration] = useState(2);
   const [createFeatures, setCreateFeatures] = useState<Set<string>>(new Set());
+  const [createAiModel, setCreateAiModel] = useState('');
 
   // Polling ref for in-progress podcasts
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -225,9 +238,22 @@ export function ShowcaseBuilder({ providers }: ShowcaseBuilderProps) {
     }
   }, []);
 
+  // Fetch available AI models
+  const fetchAiModels = useCallback(async () => {
+    try {
+      const res = await fetch('/api/ai-models');
+      if (!res.ok) return;
+      const d = await res.json();
+      setAiModels(d.models ?? []);
+    } catch {
+      // Non-critical — selector will be empty
+    }
+  }, []);
+
   useEffect(() => {
     fetchPodcasts();
-  }, [fetchPodcasts]);
+    fetchAiModels();
+  }, [fetchPodcasts, fetchAiModels]);
 
   // Poll for status updates when a selected podcast is in progress
   useEffect(() => {
@@ -525,6 +551,7 @@ export function ShowcaseBuilder({ providers }: ShowcaseBuilderProps) {
           title: createTitle.trim() || undefined,
           featureFocus: createFeatures.size > 0 ? [...createFeatures] : undefined,
           durationTarget: createDuration,
+          aiModel: createAiModel || undefined,
         }),
       });
       if (!res.ok) {
@@ -547,11 +574,12 @@ export function ShowcaseBuilder({ providers }: ShowcaseBuilderProps) {
       setCreateTitle('');
       setCreateDuration(2);
       setCreateFeatures(new Set());
+      setCreateAiModel('');
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'Create failed');
       setStatus('error');
     }
-  }, [createTopic, createTitle, createDuration, createFeatures, fetchPodcasts]);
+  }, [createTopic, createTitle, createDuration, createFeatures, createAiModel, fetchPodcasts]);
 
   // Toggle feature selection
   const toggleFeature = useCallback((slug: string) => {
@@ -673,6 +701,26 @@ export function ShowcaseBuilder({ providers }: ShowcaseBuilderProps) {
                 </div>
 
                 <div className={styles.formField}>
+                  <label className={styles.formLabel} htmlFor="demo-ai-model">
+                    AI Model
+                  </label>
+                  <select
+                    id="demo-ai-model"
+                    className={styles.select}
+                    value={createAiModel}
+                    onChange={(e) => setCreateAiModel(e.target.value)}
+                    aria-label="AI model for script generation"
+                  >
+                    <option value="">Auto (platform default)</option>
+                    {aiModels.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.displayName}{m.hint ? ` (${m.hint})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className={styles.formField}>
                   <label className={styles.formLabel}>Feature Focus</label>
                   <div className={styles.featureGrid}>
                     {FEATURE_OPTIONS.map((f) => (
@@ -722,7 +770,7 @@ export function ShowcaseBuilder({ providers }: ShowcaseBuilderProps) {
               <option value="">— Choose a podcast —</option>
               {podcasts.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.title} ({p.segmentCount} segments, {p.status})
+                  {p.title} ({p.segmentCount} segments, {p.status}{p.aiModel ? `, ${p.aiModel}` : ''})
                 </option>
               ))}
             </select>
@@ -737,6 +785,9 @@ export function ShowcaseBuilder({ providers }: ShowcaseBuilderProps) {
                   {selectedPodcast.status.replace(/_/g, ' ')}
                 </span>
                 <span className={styles.metaItem}>{selectedPodcast.segmentCount} segments</span>
+                {selectedPodcast.aiModel && (
+                  <span className={styles.metaItem}>Model: {selectedPodcast.aiModel}</span>
+                )}
               </div>
             </div>
           )}
