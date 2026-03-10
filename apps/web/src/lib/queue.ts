@@ -52,6 +52,12 @@ export enum JobType {
   GENERATE_AVATAR = 'generate_avatar',
   PLACE_ENRICHMENT = 'place_enrichment',
   INGEST_NEWS = 'ingest_news',
+  GENERATE_DEMO_SCRIPT = 'generate_demo_script',
+  GENERATE_DEMO_RECORDING = 'generate_demo_recording',
+  GENERATE_DEMO_VOICEOVER = 'generate_demo_voiceover',
+  GENERATE_DEMO_VISUAL = 'generate_demo_visual',
+  GENERATE_DEMO_TRANSITION = 'generate_demo_transition',
+  COMPOSE_DEMO = 'compose_demo',
 }
 
 /**
@@ -215,6 +221,34 @@ export interface AutoTweetPayload {
 export interface PollTwitterTrendsPayload {}
 
 export interface NewsIngestPayload {}
+
+export interface GenerateDemoScriptPayload {
+  projectId: string;
+}
+
+export interface GenerateDemoRecordingPayload {
+  projectId: string;
+  sceneId: string;
+}
+
+export interface GenerateDemoVoiceoverPayload {
+  projectId: string;
+  sceneId: string;
+}
+
+export interface GenerateDemoVisualPayload {
+  projectId: string;
+  sceneId: string;
+}
+
+export interface GenerateDemoTransitionPayload {
+  projectId: string;
+  sceneId: string;
+}
+
+export interface ComposeDemoPayload {
+  projectId: string;
+}
 
 export interface AdminThreadToPodcastPayload {
   tweetUrl: string;
@@ -825,6 +859,12 @@ export const videoCompositionQueue = createQueue('video-composition', { attempts
 export const avatarGenerationQueue = createQueue('avatar-generation', { attempts: 2 });
 export const placeEnrichmentQueue = createQueue('place-enrichment', { attempts: 2 });
 export const newsIngestQueue = createQueue('news-ingest', { attempts: 2, skipEvents: true });
+export const demoScriptQueue = createQueue('demo-script', { attempts: 2 });
+export const demoRecordingQueue = createQueue('demo-recording', { attempts: 2 });
+export const demoVoiceoverQueue = createQueue('demo-voiceover', { attempts: 2 });
+export const demoVisualQueue = createQueue('demo-visual', { attempts: 2 });
+export const demoTransitionQueue = createQueue('demo-transition', { attempts: 2 });
+export const demoCompositionQueue = createQueue('demo-composition', { attempts: 2 });
 
 /** All queue names — single source of truth for admin and health endpoints */
 export const ALL_QUEUE_NAMES = [
@@ -866,4 +906,10 @@ export const ALL_QUEUE_NAMES = [
   'avatar-generation',
   'place-enrichment',
   'news-ingest',
+  'demo-script',
+  'demo-recording',
+  'demo-voiceover',
+  'demo-visual',
+  'demo-transition',
+  'demo-composition',
 ] as const;

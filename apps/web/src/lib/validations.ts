@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /**
- * Demo podcast creation validation (admin showcase)
+ * Demo podcast creation validation (admin showcase — legacy, kept for old API)
  */
 export const createDemoSchema = z.object({
   topic: z.string().min(1).max(500),
@@ -10,6 +10,50 @@ export const createDemoSchema = z.object({
   durationTarget: z.number().min(1).max(3).default(2),
   speakers: z.array(z.object({ name: z.string(), description: z.string() })).max(4).optional(),
   aiModel: z.string().optional(),
+});
+
+/**
+ * Demo Video Studio — DemoProject creation
+ */
+export const createDemoProjectSchema = z.object({
+  title: z.string().min(1).max(200),
+  description: z.string().max(2000).optional(),
+  features: z.array(z.string()).min(1).max(10),
+  durationTarget: z.number().min(30).max(300).default(120),
+});
+
+/**
+ * DemoAction Zod schema — discriminated union matching the DemoAction type
+ */
+export const demoActionSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('navigate'), url: z.string() }),
+  z.object({ type: z.literal('click'), selector: z.string() }),
+  z.object({ type: z.literal('type'), selector: z.string(), text: z.string(), speed: z.object({ min: z.number(), max: z.number() }).optional() }),
+  z.object({ type: z.literal('wait'), ms: z.number() }),
+  z.object({ type: z.literal('scroll'), distance: z.number(), duration: z.number().optional() }),
+  z.object({ type: z.literal('zoom'), selector: z.string(), scale: z.number().optional(), duration: z.number().optional() }),
+  z.object({ type: z.literal('zoomReset'), duration: z.number().optional() }),
+  z.object({ type: z.literal('hover'), selector: z.string() }),
+  z.object({ type: z.literal('waitForSelector'), selector: z.string(), timeout: z.number().optional() }),
+  z.object({ type: z.literal('intercept'), name: z.string(), options: z.record(z.unknown()) }),
+  z.object({ type: z.literal('clearIntercept'), name: z.string() }),
+  z.object({ type: z.literal('keypress'), key: z.string() }),
+  z.object({ type: z.literal('screenshot'), label: z.string().optional() }),
+]);
+
+/**
+ * Demo Video Studio — DemoScene update
+ */
+export const updateDemoSceneSchema = z.object({
+  title: z.string().min(1).max(200).optional(),
+  narration: z.string().optional(),
+  actions: z.array(demoActionSchema).optional(),
+  visualPrompt: z.string().optional(),
+  visualType: z.enum(['ai_image', 'ai_video', 'map']).nullable().optional(),
+  ttsProvider: z.string().optional(),
+  ttsModel: z.string().optional(),
+  ttsVoiceId: z.string().optional(),
+  transitionType: z.enum(['fade', 'dissolve', 'wipe']).nullable().optional(),
 });
 
 /**

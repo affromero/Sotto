@@ -60,6 +60,7 @@ import { processAvatarGeneration } from './avatar-generation.worker';
 import { processPlaceEnrichment } from './place-enrichment.worker';
 import { processTransitionGeneration } from './transition-generation.worker';
 import { processNewsIngest } from './news-ingest.worker';
+import { processDemoScriptGeneration } from './demo-script-generation.worker';
 import { isR2MonitoringConfigured } from '@/lib/cloudflare-r2-usage';
 import { startPricingRefreshInterval } from '@/lib/pricing';
 
@@ -105,6 +106,7 @@ const workers = [
   createWorker('place-enrichment', processPlaceEnrichment, { concurrency: 3 }),
   createWorker('transition-generation', processTransitionGeneration, { concurrency: 3, lockDuration: 600000 }),
   createWorker('news-ingest', processNewsIngest, { concurrency: 1 }),
+  createWorker('demo-script', processDemoScriptGeneration, { concurrency: 2 }),
 ];
 
 // Set up Twitter mentions polling if credentials are configured

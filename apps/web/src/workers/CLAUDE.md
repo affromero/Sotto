@@ -39,6 +39,7 @@ BullMQ workers that process async jobs. Each worker runs in a separate thread wi
 | `transition-generation`     | `transition-generation`     | 3      | Adjacent segment visuals → generate inter-segment transition clips (fal video) → upload to R2                  | Creates SegmentTransition records with asset URLs, queues video-composition when all done |
 | `video-composition`         | `video-composition`         | 1      | All segment visuals + transitions ready → POST to Remotion sidecar → poll for completion → upload MP4 to R2    | Sets VideoGeneration.status=READY, Podcast.videoUrl, queues VIDEO_READY notification    |
 | `news-ingest`               | `news-ingest`               | 1      | Scheduled (every 30min) → fetch all RSS feeds → upsert into IngestedArticle → prune >30 days                  | Populates IngestedArticle table for `/api/news` + `fetchNewsletterArticles()` DB reads  |
+| `demo-script-generation`    | `demo-script`               | 2      | DemoProject features + description → Claude walkthrough prompt → JSON scenes with browser actions + narration  | Creates DemoScene records, sets project status SCRIPT_READY                              |
 
 ## Pipeline Flow
 
