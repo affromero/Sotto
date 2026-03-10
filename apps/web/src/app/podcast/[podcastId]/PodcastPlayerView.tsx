@@ -421,6 +421,18 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
     [podcast.id],
   );
 
+  const dismissVideoError = useCallback(async () => {
+    setVideoState('idle');
+    setVideoError(null);
+    setVideoGenerationId(null);
+    // Delete failed generation from DB so it doesn't reappear on refresh
+    try {
+      await fetch(`/api/podcasts/${podcast.id}/video`, { method: 'DELETE' });
+    } catch {
+      // Best-effort — local state already cleared
+    }
+  }, [podcast.id]);
+
   const avatarPositionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleAvatarPositionChange = useCallback(
     (speaker: string, pos: { posX: number; posY: number; width: number; height: number }) => {
@@ -993,11 +1005,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
               onChangeAvatars={() => {
                 setShowAvatarPicker(true);
               }}
-              onDismiss={() => {
-                setVideoState('idle');
-                setVideoError(null);
-                setVideoGenerationId(null);
-              }}
+              onDismiss={dismissVideoError}
             />
           )}
           {videoState === 'ready' && !showVideoEditor && (
@@ -1050,7 +1058,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
             <div className={styles.videoFailed}>
               <button
                 className={styles.videoDismiss}
-                onClick={() => { setVideoState('idle'); setVideoError(null); setVideoGenerationId(null); }}
+                onClick={dismissVideoError}
                 type="button"
                 aria-label="Dismiss error"
               >
