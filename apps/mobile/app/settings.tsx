@@ -116,10 +116,21 @@ export default function SettingsScreen() {
                 styles.row,
                 pressed && styles.rowPressed,
               ]}
+              onPress={() => router.push('/settings/profile')}
+            >
+              <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>Edit Profile</Text>
+              <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+            </Pressable>
+            <View style={styles.rowSeparator} />
+            <Pressable
+              style={({ pressed }) => [
+                styles.row,
+                pressed && styles.rowPressed,
+              ]}
               onPress={() => router.push('/settings/api-keys')}
             >
               <View style={styles.rowLabelWithStatus}>
-                <Text style={styles.rowLabel}>API Keys</Text>
+                <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>API Keys</Text>
                 <View
                   style={[
                     styles.keyStatusDot,
@@ -129,6 +140,39 @@ export default function SettingsScreen() {
                   ]}
                 />
               </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+            </Pressable>
+            <View style={styles.rowSeparator} />
+            <Pressable
+              style={({ pressed }) => [
+                styles.row,
+                pressed && styles.rowPressed,
+              ]}
+              onPress={() => router.push('/settings/notifications')}
+            >
+              <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>Notifications</Text>
+              <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+            </Pressable>
+            <View style={styles.rowSeparator} />
+            <Pressable
+              style={({ pressed }) => [
+                styles.row,
+                pressed && styles.rowPressed,
+              ]}
+              onPress={() => router.push('/settings/interests')}
+            >
+              <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>Interests</Text>
+              <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+            </Pressable>
+            <View style={styles.rowSeparator} />
+            <Pressable
+              style={({ pressed }) => [
+                styles.row,
+                pressed && styles.rowPressed,
+              ]}
+              onPress={() => router.push('/settings/accounts')}
+            >
+              <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>Connected Accounts</Text>
               <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
             </Pressable>
           </View>

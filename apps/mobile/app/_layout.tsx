@@ -78,8 +78,10 @@ function useProtectedRoute() {
       // Token exists locally — validate against the backend.
       // A 401 triggers the Axios interceptor: deleteToken() + notifyAuthRevoked().
       // The listener above handles the redirect.
+      let userData: { hasCompletedOnboarding?: boolean } | null = null;
       try {
-        await api.get('/users/me');
+        const res = await api.get('/users/me');
+        userData = res.data;
       } catch {
         // Network errors / timeouts → trust the local token.
         // Runtime 401s on other endpoints will be caught by the interceptor.
@@ -91,7 +93,12 @@ function useProtectedRoute() {
         setIsReady(true);
         if (stillValid) {
           const inAuthGroup = segments[0] === 'auth';
-          if (inAuthGroup) router.replace('/(tabs)');
+          const inOnboarding = segments[0] === 'onboarding';
+          if (userData && userData.hasCompletedOnboarding === false && !inOnboarding) {
+            router.replace('/onboarding');
+          } else if (inAuthGroup) {
+            router.replace('/(tabs)');
+          }
           registerForPushNotifications().catch(() => {});
         }
         // If !stillValid: onAuthRevoked already queued router.replace('/auth/login')
@@ -140,7 +147,9 @@ export default function RootLayout() {
             >
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
               <Stack.Screen name="auth/login" options={{ headerShown: false }} />
+              <Stack.Screen name="onboarding/index" options={{ headerShown: false }} />
               <Stack.Screen name="podcast/[id]" options={{ headerShown: false }} />
+              <Stack.Screen name="podcast/[id]/edit" options={{ title: 'Edit Podcast' }} />
               <Stack.Screen name="user/[userId]" options={{ title: '' }} />
             </Stack>
             <MiniPlayer />

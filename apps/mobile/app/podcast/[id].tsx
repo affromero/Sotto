@@ -20,7 +20,7 @@ import Animated, {
   withTiming,
   Easing,
 } from 'react-native-reanimated';
-import { useLocalSearchParams, Stack } from 'expo-router';
+import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import TrackPlayer, { useProgress, usePlaybackState, State } from 'react-native-track-player';
@@ -60,6 +60,7 @@ function findCurrentSegmentIndex(
 
 export default function PodcastScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
   const transcriptRef = useRef<FlatList<SegmentData>>(null);
@@ -573,6 +574,17 @@ export default function PodcastScreen() {
                 accessibilityRole="button"
               >
                 <Ionicons name="time-outline" size={22} color={colors.textSecondary} />
+              </Pressable>
+            )}
+
+            {isOwner && (
+              <Pressable
+                onPress={() => router.push(`/podcast/${podcast.id}/edit`)}
+                style={styles.actionIcon}
+                accessibilityLabel="Edit podcast"
+                accessibilityRole="button"
+              >
+                <Ionicons name="create-outline" size={22} color={colors.textSecondary} />
               </Pressable>
             )}
           </View>
