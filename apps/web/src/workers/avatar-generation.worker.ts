@@ -80,7 +80,13 @@ async function processHeyGenAvatar(job: Job<GenerateAvatarPayload>): Promise<voi
         throw new Error(`No segments found for speaker "${speaker}"`);
       }
 
-      const segmentsWithAudio = segments.filter((s) => s.audioUrl);
+      // Filter to enabled segments only (empty array = all enabled)
+      const enabled = overlay.enabledSegmentIds;
+      const filteredSegments = enabled.length > 0
+        ? segments.filter((s) => enabled.includes(s.id))
+        : segments;
+
+      const segmentsWithAudio = filteredSegments.filter((s) => s.audioUrl);
       if (segmentsWithAudio.length === 0) {
         throw new Error(`No audio segments found for speaker "${speaker}"`);
       }
@@ -262,7 +268,13 @@ async function processRunwayAvatar(job: Job<GenerateAvatarPayload>): Promise<voi
         throw new Error(`No segments found for speaker "${speaker}"`);
       }
 
-      const segmentsWithAudio = segments.filter((s) => s.audioUrl);
+      // Filter to enabled segments only (empty array = all enabled)
+      const enabled = overlay.enabledSegmentIds;
+      const filteredSegments = enabled.length > 0
+        ? segments.filter((s) => enabled.includes(s.id))
+        : segments;
+
+      const segmentsWithAudio = filteredSegments.filter((s) => s.audioUrl);
       if (segmentsWithAudio.length === 0) {
         throw new Error(`No audio segments found for speaker "${speaker}"`);
       }

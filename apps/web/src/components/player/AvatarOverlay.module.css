@@ -4,6 +4,18 @@
   pointer-events: none;
   border-radius: 8px;
   overflow: hidden;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.visible {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.hidden {
+  opacity: 0;
+  transform: scale(0.92);
+  pointer-events: none !important;
 }
 
 .editable {
@@ -39,7 +51,6 @@
   color: #e0e0e0;
   font-size: 10px;
   font-weight: 600;
-  text-transform: uppercase;
   border-radius: 4px;
   pointer-events: none;
   letter-spacing: 0.05em;
@@ -136,6 +147,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .overlay,
   .editable,
   .resizeHandle {
     transition: none;

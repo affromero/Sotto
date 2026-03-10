@@ -412,6 +412,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
           runwayTotalChunks: true,
           avatarProvider: true,
           maskShape: true,
+          enabledSegmentIds: true,
         },
       },
       transitions: {
