@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+import { authenticateRequest } from '@/lib/api-keys';
 import { prisma } from '@/lib/prisma';
 import { checkRateLimit } from '@/lib/redis';
 import { createCommentSchema, paginationSchema } from '@/lib/validations';
@@ -44,8 +44,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
   // For private/unlisted podcasts, only the owner can view comments
   if (podcast.visibility !== 'PUBLIC') {
-    const session = await auth();
-    if (session?.user?.id !== podcast.userId) {
+    const authResult = await authenticateRequest(request);
+    if (authResult?.userId !== podcast.userId) {
       return errorResponse('Not found', 404);
     }
   }
@@ -84,16 +84,24 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
 export async function POST(request: NextRequest, { params }: RouteParams) {
   const { podcastId } = await params;
-  const session = await auth();
+  const authResult = await authenticateRequest(request);
 
-  if (!session?.user?.id) {
+  if (!authResult) {
     return errorResponse('Unauthorized', 401);
   }
 
-  const suspended = checkSuspension(session);
-  if (suspended) return suspended;
+  // Session-based suspension check (skip for API key auth — those have separate controls)
+  const authHeader = request.headers.get('authorization');
+  if (!authHeader?.startsWith('Bearer ')) {
+    const { auth } = await import('@/lib/auth');
+    const session = await auth();
+    if (session) {
+      const suspended = checkSuspension(session);
+      if (suspended) return suspended;
+    }
+  }
 
-  const userId = session.user.id;
+  const userId = authResult.userId;
 
   // Rate limit: 30 comments per hour
   const rateLimit = await checkRateLimit(`comment:${userId}`, 30, 3600);

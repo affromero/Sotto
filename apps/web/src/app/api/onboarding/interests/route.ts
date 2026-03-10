@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+import { authenticateRequest } from '@/lib/api-keys';
 import { prisma } from '@/lib/prisma';
 import { onboardingInterestsSchema } from '@/lib/validations';
 import { generateTagSlug } from '@/lib/slugify';
@@ -7,8 +7,8 @@ import { logger } from '@/lib/logger';
 import { errorResponse } from '@/lib/api-response';
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
+    const authResult = await authenticateRequest(request);
+    if (!authResult) {
       return errorResponse('Unauthorized', 401);
     }
 
@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { tagIds, customTags } = validation.data;
-    const userId = session.user.id;
+    const userId = authResult.userId;
 
     // Enforce combined limit of 20
     if (tagIds.length + customTags.length > 20) {

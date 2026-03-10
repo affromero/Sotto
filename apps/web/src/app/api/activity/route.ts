@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+import { authenticateRequest } from '@/lib/api-keys';
 import { prisma } from '@/lib/prisma';
 import { paginationSchema } from '@/lib/validations';
 
 import { errorResponse } from '@/lib/api-response';
 export async function GET(request: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) {
+  const authResult = await authenticateRequest(request);
+  if (!authResult) {
     return errorResponse('Unauthorized', 401);
   }
 
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
 
   // Get list of users the current user follows
   const following = await prisma.follow.findMany({
-    where: { followerId: session.user.id },
+    where: { followerId: authResult.userId },
     select: { followingId: true },
   });
 
