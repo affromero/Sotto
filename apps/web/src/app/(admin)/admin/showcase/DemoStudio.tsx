@@ -70,7 +70,6 @@ const FEATURE_OPTIONS: { slug: string; label: string; desc: string }[] = [
   { slug: 'creation-flow', label: 'Podcast Generation', desc: 'Chat with AI → generate a 2-voice podcast with sound effects and citations' },
   { slug: 'interrupt', label: 'Interrupt Q&A', desc: 'Pause playback to ask questions — AI answers in context' },
   { slug: 'fork', label: 'Fork', desc: 'Remix any podcast with your own angle, tone, or focus areas' },
-  { slug: 'voice-comparison', label: 'Voice Comparison', desc: 'Compare 8+ TTS providers side-by-side on the same script' },
   { slug: 'import', label: 'Import', desc: 'Import human-made podcasts — transcribe and add social features' },
   { slug: 'social-feed', label: 'Social Feed', desc: 'Public feed with search, filters, follows, and collections' },
   { slug: 'byok', label: 'BYOK', desc: 'Bring Your Own API Keys for unlimited free usage' },
@@ -116,6 +115,7 @@ export function DemoStudio({ providers }: { providers: ProviderInfo[] }) {
   const [defaultTtsProvider, setDefaultTtsProvider] = useState('');
   const [defaultTtsModel, setDefaultTtsModel] = useState('');
   const [defaultTtsVoiceId, setDefaultTtsVoiceId] = useState('');
+  const [showcaseProviders, setShowcaseProviders] = useState<string[]>([]);
 
   // AI models (fetched from API)
   const [aiModels, setAiModels] = useState<{ id: string; displayName: string; group?: string }[]>([]);
@@ -180,6 +180,7 @@ export function DemoStudio({ providers }: { providers: ProviderInfo[] }) {
           defaultTtsProvider: defaultTtsProvider || undefined,
           defaultTtsModel: defaultTtsModel || undefined,
           defaultTtsVoiceId: defaultTtsVoiceId || undefined,
+          showcaseProviders: showcaseProviders.length > 0 ? showcaseProviders : undefined,
         }),
       });
       if (!res.ok) {
@@ -198,12 +199,13 @@ export function DemoStudio({ providers }: { providers: ProviderInfo[] }) {
       setDefaultTtsProvider('');
       setDefaultTtsModel('');
       setDefaultTtsVoiceId('');
+      setShowcaseProviders([]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setLoading(false);
     }
-  }, [title, description, features, durationTarget, aiModel, defaultTtsProvider, defaultTtsModel, defaultTtsVoiceId, loadProjects, loadProject]);
+  }, [title, description, features, durationTarget, aiModel, defaultTtsProvider, defaultTtsModel, defaultTtsVoiceId, showcaseProviders, loadProjects, loadProject]);
 
   // Save scene edits
   const saveScene = useCallback(async (sceneId: string, data: Partial<DemoScene>) => {
@@ -444,6 +446,24 @@ export function DemoStudio({ providers }: { providers: ProviderInfo[] }) {
                     onChange={(e) => setDefaultTtsVoiceId(e.target.value)}
                     placeholder="Voice ID (optional)"
                   />
+                </div>
+              </fieldset>
+              <fieldset className={styles.fieldset}>
+                <legend className={styles.formLabel}>TTS providers to showcase (voice comparison)</legend>
+                <div className={styles.chipGrid}>
+                  {providers.map((p) => (
+                    <button
+                      key={p.id}
+                      className={styles.chip}
+                      data-selected={showcaseProviders.includes(p.id) ? 'true' : undefined}
+                      onClick={() => setShowcaseProviders((prev) =>
+                        prev.includes(p.id) ? prev.filter((x) => x !== p.id) : [...prev, p.id]
+                      )}
+                    >
+                      <strong>{p.displayName}</strong>
+                      <span className={styles.chipDesc}>{p.qualityTier}</span>
+                    </button>
+                  ))}
                 </div>
               </fieldset>
               <button

@@ -2267,6 +2267,9 @@ model DemoProject {
   defaultTtsModel    String?
   defaultTtsVoiceId  String?
 
+  // TTS providers to showcase — voice comparison baked into the creation flow
+  showcaseProviders String[]
+
   createdAt DateTime          @default(now())
   updatedAt DateTime          @updatedAt
   scenes    DemoScene[]

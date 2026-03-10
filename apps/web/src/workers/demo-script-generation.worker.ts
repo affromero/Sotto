@@ -8,6 +8,7 @@ import {
   getDemoFeatureDescriptions,
   getAppSelectorReference,
   getInterceptorCatalog,
+  getVoiceComparisonInstructions,
 } from '@/lib/demo-context';
 import type { GenerateDemoScriptPayload } from '@/lib/queue';
 
@@ -60,6 +61,7 @@ export async function processDemoScriptGeneration(
     APP_SELECTORS: getAppSelectorReference(),
     INTERCEPTOR_CATALOG: getInterceptorCatalog(),
     DURATION_TARGET: String(durationTarget),
+    VOICE_COMPARISON: getVoiceComparisonInstructions(project.showcaseProviders),
   });
 
   const userMessage = [

@@ -5,7 +5,6 @@ const FEATURE_CATALOG: Record<string, string> = {
   'creation-flow': 'Chat with AI to create a podcast. Describe your topic, pick a tone and depth, and Sotto generates a full 2-voice conversational podcast with sound effects and citations.',
   'interrupt': 'Interrupt mid-playback to ask questions. AI answers in context, and your Q&A can be baked back into the podcast as a new version.',
   'fork': 'Fork any podcast — like GitHub for audio. Take someone else\'s podcast, remix it with your own angle, tone, or focus areas. The original is always credited.',
-  'voice-comparison': 'Compare 8+ TTS providers side-by-side on the same script. ElevenLabs, OpenAI, Cartesia, Hume, Fal, Replicate, MiniMax — hear the difference instantly.',
   'import': 'Import any human-made podcast. Sotto transcribes it, adds social features (comments, Q&A, forking), and puts it on the feed alongside AI-generated content.',
   'social-feed': 'A public feed of podcasts — AI and human, side by side. Search, filter by topic, discover new voices, follow creators, and build collections.',
   'byok': 'Bring Your Own Keys — use your own API keys for LLM and TTS providers. All features become unlimited and free. No subscription required.',
@@ -116,6 +115,37 @@ export function getAppSelectorReference(): string {
     '- `a[href="/settings"]` — settings link',
     '- `input[aria-label="API Key"]` — BYOK key input',
     '- `button:has-text("Save Key")` — save API key button',
+  ].join('\n');
+}
+
+/**
+ * Generate the voice comparison section for the walkthrough prompt.
+ * When providers are selected, instructs the AI to weave provider switching
+ * into the podcast creation flow — replaying the same segments with each provider.
+ */
+export function getVoiceComparisonInstructions(providerNames: string[]): string {
+  if (providerNames.length === 0) {
+    return 'No voice comparison requested. Skip this section.';
+  }
+
+  return [
+    `The demo must include a **voice comparison** section as part of the podcast creation flow.`,
+    `After the podcast is generated, the recording switches between TTS providers to showcase voice quality differences.`,
+    '',
+    `Providers to compare: **${providerNames.join(', ')}**`,
+    '',
+    'How to implement this in the walkthrough:',
+    '1. After the podcast is fully generated and playing, pause playback.',
+    '2. For each provider: open the voice/provider selector in the player UI, switch to that provider, then play a short segment (5–8 seconds).',
+    '3. Keep transitions quick — the viewer should hear the difference immediately, not wait for loading.',
+    '4. Use the `intercept` action to mock instant audio regeneration for each provider switch.',
+    '5. The narration should name each provider as it plays: "ElevenLabs. OpenAI TTS. Cartesia."',
+    '6. Keep narration minimal during the comparison — let the voices speak for themselves.',
+    '7. Use `zoom` on the provider name/label in the UI so the viewer can read which provider is active.',
+    '',
+    'Relevant selectors:',
+    '- `[data-testid="voice-track-list"]` — voice track sidebar',
+    '- `button:has-text("Add Voice Track")` — add voice track',
   ].join('\n');
 }
 
