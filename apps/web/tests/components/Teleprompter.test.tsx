@@ -1,25 +1,12 @@
-import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, act } from '@testing-library/react';
+import { describe, it, expect, vi, beforeAll } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { Teleprompter } from '@/components/player/Teleprompter';
 import type { SegmentData } from '@/types/podcast';
 import type { ReferenceData } from '@/types/reference';
 
-// jsdom doesn't implement scrollIntoView or matchMedia
+// jsdom doesn't implement scrollIntoView
 beforeAll(() => {
   Element.prototype.scrollIntoView = vi.fn();
-  Object.defineProperty(window, 'matchMedia', {
-    writable: true,
-    value: vi.fn().mockImplementation((query: string) => ({
-      matches: false,
-      media: query,
-      onchange: null,
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      dispatchEvent: vi.fn(),
-    })),
-  });
 });
 
 const mockSegments: SegmentData[] = [
@@ -149,65 +136,17 @@ describe('Teleprompter', () => {
     expect(screen.getByLabelText('Teleprompter view')).toBeInTheDocument();
   });
 
-  describe('scroll-follow', () => {
-    beforeEach(() => {
-      vi.useFakeTimers();
-    });
+  it('does not call scrollIntoView during playback', () => {
+    (Element.prototype.scrollIntoView as ReturnType<typeof vi.fn>).mockClear();
 
-    afterEach(() => {
-      vi.useRealTimers();
-      vi.restoreAllMocks();
-    });
+    const { rerender } = render(
+      <Teleprompter segments={mockSegments} references={[]} currentTime={0} />
+    );
 
-    it('pauses auto-scroll on mousemove', () => {
-      render(
-        <Teleprompter segments={mockSegments} references={[]} currentTime={0} />
-      );
+    rerender(
+      <Teleprompter segments={mockSegments} references={[]} currentTime={6} />
+    );
 
-      (Element.prototype.scrollIntoView as ReturnType<typeof vi.fn>).mockClear();
-
-      // User moves mouse — should pause auto-scroll
-      act(() => {
-        window.dispatchEvent(new Event('mousemove'));
-      });
-
-      // scrollIntoView should NOT be called while user is active
-      expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
-    });
-
-    it('resumes auto-scroll after 3s idle', () => {
-      render(
-        <Teleprompter segments={mockSegments} references={[]} currentTime={0} />
-      );
-
-      // User moves mouse — disengages
-      act(() => {
-        window.dispatchEvent(new Event('mousemove'));
-      });
-
-      (Element.prototype.scrollIntoView as ReturnType<typeof vi.fn>).mockClear();
-
-      // Wait 3s — should re-engage and scroll root into view
-      act(() => {
-        vi.advanceTimersByTime(3000);
-      });
-
-      expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
-    });
-
-    it('segment click seeks without forcing scroll-back', () => {
-      const onSegmentClick = vi.fn();
-      render(
-        <Teleprompter segments={mockSegments} references={[]} currentTime={6} onSegmentClick={onSegmentClick} />
-      );
-
-      (Element.prototype.scrollIntoView as ReturnType<typeof vi.fn>).mockClear();
-
-      // Click a segment — should seek but NOT immediately scroll back
-      fireEvent.click(screen.getByText('Welcome to the show!'));
-
-      expect(onSegmentClick).toHaveBeenCalledWith(0);
-      expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
-    });
+    expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
   });
 });
