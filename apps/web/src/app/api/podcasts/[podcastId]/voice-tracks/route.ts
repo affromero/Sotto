@@ -7,6 +7,8 @@ import { getTierFeatures } from '@/lib/tier-features';
 import { checkGenerationGate } from '@/lib/generation-gate';
 import { computeVoiceCharges } from '@/lib/voice-pricing';
 import { resolveTtsProvider } from '@/lib/providers';
+import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
+import { resolveAutoModel } from '@/lib/auto-model-config';
 import { checkRateLimit } from '@/lib/redis';
 import { checkSuspension } from '@/lib/auth-guards';
 import { getProviderMeta, type TtsProviderId } from '@/lib/providers/tts-registry';
@@ -155,27 +157,41 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
   }
 
-  // Resolve TTS provider per speaker — each voice entry may specify its own provider
+  // Resolve TTS provider per speaker — same priority system as from-scratch generation.
+  // Use selectFreeTierProviders() for free users (allocation-based) or resolveAutoModel() for PRO
+  // to get the correct provider+model pair, avoiding default model fallbacks that BYOK keys may lack.
   const plan = gate.isProUser ? 'PRO' : 'FREE';
+  const selected = gate.isByokUser
+    ? null
+    : await selectFreeTierProviders(userId);
+  const autoModel = selected
+    ? null
+    : await resolveAutoModel(plan);
+
   const fallback = await resolveTtsProvider({
     userId,
     podcastId,
     requestedProvider: (ttsProvider as TtsProviderId | null) ?? undefined,
-    requestedModel: ttsModel,
+    requestedModel: ttsModel ?? selected?.ttsModel ?? autoModel?.ttsModel,
     plan,
   });
 
   // Resolve per-voice provider: parse "elevenlabs:eleven_v3" → provider "elevenlabs", model "eleven_v3"
+  // When no explicit model suffix, use the allocation/config model for that provider.
   const resolvedVoiceProviders = await Promise.all(
     resolvedVoices.map(async (v) => {
       if (v.provider) {
         const [providerKey, ...modelParts] = v.provider.split(':');
-        const modelKey = modelParts.join(':') || undefined;
+        const explicitModel = modelParts.join(':') || undefined;
+        // Use explicit model, or the model from the same priority system as from-scratch
+        const modelForProvider = explicitModel
+          ?? (selected?.ttsProvider === providerKey ? selected.ttsModel : undefined)
+          ?? (autoModel?.ttsProvider === providerKey ? autoModel.ttsModel : undefined);
         const resolved = await resolveTtsProvider({
           userId,
           podcastId,
           requestedProvider: providerKey as TtsProviderId,
-          requestedModel: modelKey,
+          requestedModel: modelForProvider,
           plan,
         });
         return { speaker: v.speaker, voiceId: v.voiceId, providerId: resolved.providerId, ttsModel: resolved.provider.getModelId() };
