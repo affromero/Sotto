@@ -37,7 +37,7 @@ export async function processDemoVoiceover(job: Job<GenerateDemoVoiceoverPayload
 
   await prisma.demoScene.update({
     where: { id: sceneId },
-    data: { voiceoverStatus: 'GENERATING' },
+    data: { voiceoverStatus: 'GENERATING', failedReason: null },
   });
 
   try {
@@ -72,7 +72,7 @@ export async function processDemoVoiceover(job: Job<GenerateDemoVoiceoverPayload
 
     await prisma.demoScene.update({
       where: { id: sceneId },
-      data: { voiceoverStatus: 'FAILED' },
+      data: { voiceoverStatus: 'FAILED', failedReason: message },
     });
 
     throw err;

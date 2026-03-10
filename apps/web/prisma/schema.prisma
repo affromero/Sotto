@@ -2352,6 +2352,7 @@ model DemoScene {
   visualType      String? // 'ai_image' | 'ai_video' | 'map' | null
   visualPrompt    String? // editable prompt for AI visual
   compositedUrl   String? // scene-level composite (recording + voiceover + visual)
+  failedReason    String? // last error message from any asset worker
 
   // Timing — speed zones within the recording
   // TimingSegment[]: [{ start: 0, end: 5, speed: 1 }, { start: 5, end: 25, speed: 8 }, ...]
