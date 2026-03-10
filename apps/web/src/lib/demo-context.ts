@@ -68,3 +68,81 @@ export function getDemoFeatureSlugs(): string[] {
 export function getDemoFeatureLabel(slug: string): string {
   return slug.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
+
+/**
+ * Curated list of real CSS selectors in the Sotto app.
+ * Used by the AI walkthrough prompt so generated scripts target real elements.
+ */
+export function getAppSelectorReference(): string {
+  return [
+    '## Navigation & Layout',
+    '- `nav` — main navigation bar',
+    '- `a[href="/"]` — home/logo link',
+    '- `a[href="/explore"]` — explore page link',
+    '- `a[href="/create"]` — create page link',
+    '- `button[aria-label="User menu"]` — user avatar dropdown',
+    '',
+    '## Create / Discovery Chat',
+    '- `textarea[aria-label="Chat message input"]` — discovery chat input',
+    '- `button[aria-label="Send message"]` — send message button',
+    '- `[data-chip]` — suggestion chip buttons',
+    '- `button:has-text("Create Podcast")` — final create CTA',
+    '',
+    '## Player & Playback',
+    '- `.playerControls` — mini player controls area',
+    '- `button[aria-label="Play"]` — play button',
+    '- `button[aria-label="Pause"]` — pause button',
+    '- `button[aria-label="Ask a question"]` — interrupt/Q&A button',
+    '- `input[aria-label="Your question"]` — Q&A input field',
+    '',
+    '## Podcast Detail',
+    '- `button[aria-label="Fork podcast"]` — fork button',
+    '- `button[aria-label="Share podcast"]` — share button',
+    '- `button[aria-label="Save to collection"]` — save button',
+    '- `[data-testid="script-section"]` — script review area',
+    '- `button:has-text("Approve Script")` — script approval button',
+    '',
+    '## Feed & Explore',
+    '- `[data-testid="podcast-card"]` — podcast card in feed',
+    '- `input[aria-label="Search podcasts"]` — search input',
+    '- `[data-testid="filter-bar"]` — filter/sort bar',
+    '',
+    '## Voice Comparison',
+    '- `[data-testid="voice-track-list"]` — voice track sidebar',
+    '- `button:has-text("Compare Voices")` — compare button',
+    '- `button:has-text("Add Voice Track")` — add voice track',
+    '',
+    '## Settings & BYOK',
+    '- `a[href="/settings"]` — settings link',
+    '- `input[aria-label="API Key"]` — BYOK key input',
+    '- `button:has-text("Save Key")` — save API key button',
+  ].join('\n');
+}
+
+/**
+ * Documents available API interceptors for the walkthrough prompt.
+ * Maps to functions in scripts/recording/lib/interceptors.ts.
+ */
+export function getInterceptorCatalog(): string {
+  return [
+    '## discovery',
+    'Mocks POST /api/discovery SSE stream.',
+    'Options: `{ textChunks: string[], chips: string[], metadata: { topic, depth, audienceLevel, audience, focusAreas, tone, durationTarget, speakers } }`',
+    'Use when: the demo shows the creation/chat flow. Set up before typing in the chat.',
+    '',
+    '## interact',
+    'Mocks POST /api/podcasts/{id}/interact + GET polling.',
+    'Options: `{ podcastId: string, interactionId: string, answer: string, answerDelay?: number }`',
+    'Use when: demo shows the interrupt/Q&A feature during playback.',
+    '',
+    '## fork',
+    'Mocks POST /api/podcasts/{id}/fork.',
+    'Options: `{ podcastId: string, forkId: string }`',
+    'Use when: demo shows forking a podcast.',
+    '',
+    '## scriptApprove',
+    'Mocks POST /api/podcasts/{id}/script/approve.',
+    'Options: `{ podcastId: string }`',
+    'Use when: demo shows script review and approval.',
+  ].join('\n');
+}

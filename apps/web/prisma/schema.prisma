@@ -197,6 +197,9 @@ model User {
   // Invitation links created by admin
   invitationLinks InvitationLink[] @relation("InvitationLinksCreated")
 
+  // Demo projects (admin video studio)
+  demoProjects DemoProject[]
+
   @@index([role])
   @@index([handle])
   @@index([referredById])
@@ -2226,4 +2229,77 @@ model IngestedArticle {
   @@index([pubDate])
   @@index([category, pubDate])
   @@index([fetchedAt])
+}
+
+// ============ DEMO VIDEO STUDIO ============
+
+enum DemoProjectStatus {
+  DRAFT
+  SCRIPT_READY
+  GENERATING_ASSETS
+  COMPOSING
+  READY
+  FAILED
+}
+
+enum DemoSceneAssetStatus {
+  PENDING
+  GENERATING
+  READY
+  FAILED
+}
+
+model DemoProject {
+  id           String            @id @default(cuid())
+  userId       String
+  user         User              @relation(fields: [userId], references: [id])
+  title        String
+  description  String?
+  features     String[] // feature slugs to demonstrate
+  status       DemoProjectStatus @default(DRAFT)
+  failedReason String?
+  videoUrl     String? // final composed video
+  audioUrl     String? // final stitched voiceover
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  scenes       DemoScene[]
+
+  @@index([userId])
+}
+
+model DemoScene {
+  id        String      @id @default(cuid())
+  projectId String
+  project   DemoProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  order     Int // 0-indexed scene order
+  title     String // "User creates a podcast"
+  narration String // voiceover text for this scene
+  actions   Json // DemoAction[] — browser automation steps
+  duration  Float? // estimated duration in seconds
+
+  // Independent asset URLs — each generated separately
+  recordingUrl    String?
+  recordingStatus DemoSceneAssetStatus @default(PENDING)
+  voiceoverUrl    String?
+  voiceoverStatus DemoSceneAssetStatus @default(PENDING)
+  visualUrl       String?
+  visualStatus    DemoSceneAssetStatus @default(PENDING)
+  visualType      String? // 'ai_image' | 'ai_video' | 'map' | null
+  visualPrompt    String? // editable prompt for AI visual
+  compositedUrl   String? // scene-level composite (recording + voiceover + visual)
+
+  // TTS config per scene (admin picks voice)
+  ttsProvider String?
+  ttsModel    String?
+  ttsVoiceId  String?
+
+  // Transition to next scene
+  transitionType   String? // 'fade' | 'dissolve' | 'wipe' | null
+  transitionUrl    String? // generated transition clip
+  transitionStatus DemoSceneAssetStatus @default(PENDING)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([projectId, order])
 }

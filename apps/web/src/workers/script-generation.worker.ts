@@ -110,7 +110,6 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
         model,
         provider,
         webSearchEnabled: tierFeatures.webSearchEnabled,
-        mode: podcast.verificationMode === 'showcase' ? 'demo' : 'standard',
       });
 
   await job.updateProgress(50);
