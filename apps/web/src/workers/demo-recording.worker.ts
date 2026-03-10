@@ -31,7 +31,7 @@ export async function processDemoRecording(job: Job<GenerateDemoRecordingPayload
   // Mark as generating
   await prisma.demoScene.update({
     where: { id: sceneId },
-    data: { recordingStatus: 'GENERATING' },
+    data: { recordingStatus: 'GENERATING', failedReason: null },
   });
 
   try {
@@ -143,7 +143,7 @@ export async function processDemoRecording(job: Job<GenerateDemoRecordingPayload
 
     await prisma.demoScene.update({
       where: { id: sceneId },
-      data: { recordingStatus: 'FAILED' },
+      data: { recordingStatus: 'FAILED', failedReason: message },
     });
 
     throw err;

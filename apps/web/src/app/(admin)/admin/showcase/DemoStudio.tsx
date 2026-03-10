@@ -40,6 +40,7 @@ interface DemoScene {
   overlays: unknown | null;
   subtitles: unknown | null;
   actionTimingLog: unknown | null;
+  failedReason: string | null;
 }
 
 interface DemoProject {
@@ -401,6 +402,7 @@ export function DemoStudio() {
                     url={scene.recordingUrl}
                     onGenerate={() => generateAsset(scene.id, 'record')}
                     mediaType="video"
+                    failedReason={scene.recordingStatus === 'FAILED' ? scene.failedReason : null}
                   />
                   <AssetStatus
                     label="Voiceover"
@@ -408,6 +410,7 @@ export function DemoStudio() {
                     url={scene.voiceoverUrl}
                     onGenerate={() => generateAsset(scene.id, 'voiceover')}
                     mediaType="audio"
+                    failedReason={scene.voiceoverStatus === 'FAILED' ? scene.failedReason : null}
                   />
                   {scene.visualType && (
                     <AssetStatus
@@ -416,6 +419,7 @@ export function DemoStudio() {
                       url={scene.visualUrl}
                       onGenerate={() => generateAsset(scene.id, 'visual')}
                       mediaType={scene.visualType === 'ai_video' ? 'video' : 'image'}
+                      failedReason={scene.visualStatus === 'FAILED' ? scene.failedReason : null}
                     />
                   )}
                   {scene.transitionType && (
@@ -425,6 +429,7 @@ export function DemoStudio() {
                       url={scene.transitionUrl}
                       onGenerate={() => generateAsset(scene.id, 'transition')}
                       mediaType="video"
+                      failedReason={scene.transitionStatus === 'FAILED' ? scene.failedReason : null}
                     />
                   )}
                 </div>
@@ -511,12 +516,14 @@ function AssetStatus({
   url,
   onGenerate,
   mediaType,
+  failedReason,
 }: {
   label: string;
   status: string;
   url: string | null;
   onGenerate: () => void;
   mediaType: 'video' | 'audio' | 'image';
+  failedReason?: string | null;
 }) {
   const [previewing, setPreviewing] = useState(false);
 
@@ -528,6 +535,9 @@ function AssetStatus({
           {statusBadge(status)}
         </span>
       </div>
+      {status === 'FAILED' && failedReason && (
+        <p className={styles.failedReason}>{failedReason}</p>
+      )}
       {url && status === 'READY' && (
         <button className={styles.previewBtn} onClick={() => setPreviewing(!previewing)}>
           {previewing ? 'Hide' : 'Preview'}
