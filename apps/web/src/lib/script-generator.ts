@@ -360,6 +360,7 @@ export async function generateScript(params: {
   model?: string;
   provider?: string;
   webSearchEnabled?: boolean;
+  mode?: 'standard' | 'demo';
 }): Promise<{
   turns: ScriptTurn[];
   soundCues: SoundCue[];

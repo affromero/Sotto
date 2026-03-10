@@ -186,4 +186,28 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
     description: 'Fetches RSS feeds and ingests articles into the database (every 30min)',
     stage: 'Platform Ops',
   },
+  'demo-script': {
+    description: 'Generates demo video scripts from project features',
+    stage: 'Video Pipeline',
+  },
+  'demo-recording': {
+    description: 'Records browser sessions via Playwright for demo scenes',
+    stage: 'Video Pipeline',
+  },
+  'demo-voiceover': {
+    description: 'Generates TTS voiceover narration for demo scenes',
+    stage: 'Video Pipeline',
+  },
+  'demo-visual': {
+    description: 'Generates visual assets for demo scenes',
+    stage: 'Video Pipeline',
+  },
+  'demo-transition': {
+    description: 'Creates transition clips between demo scenes',
+    stage: 'Video Pipeline',
+  },
+  'demo-composition': {
+    description: 'Composes final demo video from all scene assets',
+    stage: 'Video Pipeline',
+  },
 };

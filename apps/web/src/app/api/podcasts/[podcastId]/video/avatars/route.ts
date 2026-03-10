@@ -231,6 +231,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       });
     }
 
+    await prisma.videoGeneration.update({
+      where: { id: videoGeneration.id },
+      data: { status: 'GENERATING_AVATARS' },
+    });
+
     generationStarted = true;
     logger.info('Auto-started avatar generation for completed video', {
       podcastId,
