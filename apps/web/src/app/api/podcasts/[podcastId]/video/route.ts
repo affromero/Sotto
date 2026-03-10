@@ -406,6 +406,12 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
           width: true,
           height: true,
           durationSeconds: true,
+          chunkVideoUrl: true,
+          chunkDurationSeconds: true,
+          runwayChunkIndex: true,
+          runwayTotalChunks: true,
+          avatarProvider: true,
+          maskShape: true,
         },
       },
       transitions: {
@@ -477,7 +483,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
       id: true,
       videoUrl: true,
       visuals: { select: { assetUrl: true } },
-      avatarOverlays: { select: { videoUrl: true, concatAudioUrl: true } },
+      avatarOverlays: { select: { videoUrl: true, concatAudioUrl: true, chunkVideoUrl: true } },
       transitions: { select: { assetUrl: true } },
     },
   });
@@ -503,6 +509,10 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
     }
     if (overlay.concatAudioUrl) {
       const key = extractR2Key(overlay.concatAudioUrl);
+      if (key) deletePromises.push(deleteFile(key));
+    }
+    if (overlay.chunkVideoUrl) {
+      const key = extractR2Key(overlay.chunkVideoUrl);
       if (key) deletePromises.push(deleteFile(key));
     }
   }
