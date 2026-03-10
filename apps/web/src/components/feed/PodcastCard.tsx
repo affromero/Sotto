@@ -119,13 +119,6 @@ export function PodcastCard({
         onClick={handleClick}
       >
         <div className={styles.cover}>
-          <div className={styles.coverBadges}>
-            <span className={styles.contentBadge}>
-              {getContentBadgeLabel(podcast)}
-            </span>
-            {duration && <span className={styles.duration}>{duration}</span>}
-          </div>
-
           <div className={styles.coverContent}>
             {podcast.forkedFromId && (
               <p className={styles.remixSubline}>
@@ -136,20 +129,25 @@ export function PodcastCard({
             <p className={styles.topic}>{podcast.topic}</p>
           </div>
 
+          {podcast.tags.length > 0 && (
+            <div className={styles.coverTags} aria-label="Tags">
+              {podcast.tags.slice(0, 3).map((tag) => (
+                <span key={tag.id} className={styles.coverTag}>
+                  {tag.name}
+                </span>
+              ))}
+            </div>
+          )}
+
           <div className={styles.coverMeta}>
             <div className={styles.coverMetaLeft}>
               <time className={styles.coverDate} dateTime={podcast.createdAt} suppressHydrationWarning>
                 {formatDate(podcast.createdAt)}
               </time>
-              {podcast.tags.length > 0 && (
-                <div className={styles.coverTags} aria-label="Tags">
-                  {podcast.tags.slice(0, 3).map((tag) => (
-                    <span key={tag.id} className={styles.coverTag}>
-                      {tag.name}
-                    </span>
-                  ))}
-                </div>
-              )}
+              <span className={styles.contentBadge}>
+                {getContentBadgeLabel(podcast)}
+              </span>
+              {duration && <span className={styles.duration}>{duration}</span>}
             </div>
             {showStats && (
               <div className={styles.coverStats}>
