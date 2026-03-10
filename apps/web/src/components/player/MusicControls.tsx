@@ -30,7 +30,7 @@ export function MusicControls() {
   return (
     <div className={styles.musicControls}>
       <button
-        className={styles.muteButton}
+        className={`${styles.muteButton} ${player.isMusicMuted ? styles.muted : ''}`}
         onClick={player.toggleMusicMute}
         aria-label={player.isMusicMuted ? 'Unmute music' : 'Mute music'}
         title={player.isMusicMuted ? 'Unmute music' : 'Mute music'}
@@ -39,6 +39,7 @@ export function MusicControls() {
           <path d="M9 18V5l12-2v13" />
           <circle cx="6" cy="18" r="3" />
           <circle cx="18" cy="16" r="3" />
+          {player.isMusicMuted && <line x1="1" y1="1" x2="23" y2="23" />}
         </svg>
       </button>
       <input
