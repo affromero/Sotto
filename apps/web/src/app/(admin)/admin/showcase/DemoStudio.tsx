@@ -323,21 +323,17 @@ export function DemoStudio() {
                 >
                   {loading ? 'Importing...' : selectedProject ? 'Re-import Script' : 'Import & Create Project'}
                 </button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".json"
-                  onChange={handleFileUpload}
-                  className={styles.hiddenInput}
-                  aria-label="Upload JSON file"
-                />
-                <button
-                  className={styles.secondaryBtn}
-                  onClick={() => fileInputRef.current?.click()}
-                  type="button"
-                >
+                <label className={styles.secondaryBtn} role="button" tabIndex={0}>
                   Upload JSON File
-                </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".json"
+                    onChange={handleFileUpload}
+                    className={styles.hiddenInput}
+                    aria-label="Upload JSON file"
+                  />
+                </label>
               </div>
             </div>
           </div>
