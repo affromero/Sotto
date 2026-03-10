@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import NextImage from 'next/image';
 import {
   Image as ImageIcon, Film, BarChart3, Quote, GitCompare, Clock, Network, Type,
-  AlertTriangle, RefreshCw, Pencil,
+  AlertTriangle, RefreshCw, Pencil, Users,
 } from 'lucide-react';
 import styles from './VideoProgress.module.css';
 
@@ -21,12 +21,24 @@ interface SegmentVisual {
   visualMode: string | null;
 }
 
+interface AvatarOverlay {
+  id: string;
+  speaker: string;
+  avatarId: string;
+  avatarName: string | null;
+  previewImageUrl: string | null;
+  videoUrl: string | null;
+  status: string;
+  durationSeconds: number | null;
+}
+
 interface VideoStatusResponse {
   videoGenerationId: string;
   status: 'PENDING' | 'CLASSIFYING' | 'GENERATING_VISUALS' | 'GENERATING_TRANSITIONS' | 'GENERATING_AVATARS' | 'COMPOSING' | 'READY' | 'FAILED';
   videoUrl: string | null;
   failureReason: string | null;
   segmentVisuals: SegmentVisual[];
+  avatarOverlays?: AvatarOverlay[];
 }
 
 interface VideoProgressProps {
@@ -35,6 +47,7 @@ interface VideoProgressProps {
   onComplete: (visuals: SegmentVisual[]) => void;
   onFailed?: (reason: string) => void;
   onRequestEdit?: (visuals: SegmentVisual[]) => void;
+  onChangeAvatars?: () => void;
 }
 
 const STAGES = ['CLASSIFYING', 'GENERATING_VISUALS', 'GENERATING_TRANSITIONS', 'GENERATING_AVATARS', 'COMPOSING', 'READY'] as const;
@@ -150,7 +163,7 @@ function FilmstripThumbnail({ visual }: { visual: SegmentVisual }) {
   );
 }
 
-export function VideoProgress({ podcastId, videoGenerationId, onComplete, onFailed, onRequestEdit }: VideoProgressProps) {
+export function VideoProgress({ podcastId, videoGenerationId, onComplete, onFailed, onRequestEdit, onChangeAvatars }: VideoProgressProps) {
   const [data, setData] = useState<VideoStatusResponse | null>(null);
   const [retryError, setRetryError] = useState<string | null>(null);
   const [retrying, setRetrying] = useState(false);
@@ -266,6 +279,13 @@ export function VideoProgress({ podcastId, videoGenerationId, onComplete, onFail
     progressPercent = Math.round(((currentStage + 0.5) / STAGES.length) * 100);
   }
 
+  // Avatar overlay state
+  const avatarOverlays = data?.avatarOverlays || [];
+  const hasAvatars = avatarOverlays.length > 0;
+  const avatarsFailed = avatarOverlays.some((a) => a.status === 'failed');
+  const avatarsProcessing = avatarOverlays.some((a) => a.status === 'processing' || a.status === 'concatenating' || a.status === 'submitting');
+  const avatarsReady = hasAvatars && avatarOverlays.every((a) => a.status === 'ready');
+
   const isComposing = currentStatus === 'COMPOSING';
   const isFailed = currentStatus === 'FAILED';
   const errorMessage = retryError || (isFailed ? (data?.failureReason || 'Video generation failed.') : null);
@@ -334,6 +354,50 @@ export function VideoProgress({ podcastId, videoGenerationId, onComplete, onFail
               <FilmstripThumbnail key={v.id} visual={v} />
             ))}
           </div>
+        </div>
+      )}
+
+      {hasAvatars && (
+        <div className={styles.avatarSection}>
+          <span className={styles.filmstripLabel}>Avatars</span>
+          <div className={styles.avatarList}>
+            {avatarOverlays.map((overlay) => {
+              const statusClass = overlay.status === 'ready' ? styles.avatarReady
+                : overlay.status === 'failed' ? styles.avatarFailed
+                : (overlay.status === 'processing' || overlay.status === 'concatenating' || overlay.status === 'submitting') ? styles.avatarProcessing
+                : styles.avatarPending;
+              return (
+                <div key={overlay.id} className={`${styles.avatarItem} ${statusClass}`}>
+                  {overlay.previewImageUrl ? (
+                    <img src={overlay.previewImageUrl} alt={overlay.avatarName || overlay.speaker} className={styles.avatarThumb} width={32} height={32} />
+                  ) : (
+                    <div className={styles.avatarThumbPlaceholder}><Users size={14} /></div>
+                  )}
+                  <div className={styles.avatarInfo}>
+                    <span className={styles.avatarSpeaker}>{overlay.speaker}</span>
+                    <span className={styles.avatarStatus}>
+                      {overlay.status === 'ready' ? 'Ready' : overlay.status === 'failed' ? 'Failed' : overlay.status === 'pending' ? 'Pending' : 'Processing...'}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {avatarsFailed && onChangeAvatars && (
+            <button className={styles.editButton} onClick={onChangeAvatars} type="button">
+              <Users size={14} />
+              Change Avatars
+            </button>
+          )}
+          {avatarsReady && onChangeAvatars && (
+            <button className={styles.editButton} onClick={onChangeAvatars} type="button">
+              <Users size={14} />
+              Change Avatars
+            </button>
+          )}
+          {avatarsProcessing && (
+            <p className={styles.counter}>Generating avatar overlays...</p>
+          )}
         </div>
       )}
 

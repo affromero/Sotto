@@ -6,12 +6,21 @@ import { estimateAvatarCost, formatAvatarCost } from '@/lib/avatar-cost-estimato
 import type { UnifiedAvatarData } from '@/types/avatar';
 import styles from './AvatarPicker.module.css';
 
+export interface ExistingAvatarOverlay {
+  speaker: string;
+  avatarId: string;
+  avatarProvider: 'heygen' | 'runway';
+  status: string;
+  isPreset?: boolean;
+}
+
 interface AvatarPickerProps {
   podcastId: string;
   speakers: string[];
   onConfigured: (data: { videoGenerationId: string; generationStarted: boolean }) => void;
   onCancel: () => void;
   podcastDuration: number;
+  existingOverlays?: ExistingAvatarOverlay[];
 }
 
 const MAX_DURATION = 600;
@@ -28,14 +37,23 @@ interface AvatarPricing {
   includedOnPlatform: boolean;
 }
 
-export function AvatarPicker({ podcastId, speakers, onConfigured, onCancel, podcastDuration }: AvatarPickerProps) {
+export function AvatarPicker({ podcastId, speakers, onConfigured, onCancel, podcastDuration, existingOverlays }: AvatarPickerProps) {
   const [avatars, setAvatars] = useState<UnifiedAvatarData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selections, setSelections] = useState<Record<string, AvatarSelection>>({});
+  const [selections, setSelections] = useState<Record<string, AvatarSelection>>(() => {
+    if (!existingOverlays?.length) return {};
+    const initial: Record<string, AvatarSelection> = {};
+    for (const ov of existingOverlays) {
+      initial[ov.speaker] = { avatarId: ov.avatarId, provider: ov.avatarProvider, isPreset: ov.isPreset ?? false };
+    }
+    return initial;
+  });
   const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState('');
-  const [activeProvider, setActiveProvider] = useState<'heygen' | 'runway'>('heygen');
+  const [activeProvider, setActiveProvider] = useState<'heygen' | 'runway'>(
+    existingOverlays?.some((ov) => ov.avatarProvider === 'runway') ? 'runway' : 'heygen',
+  );
   const [availableProviders, setAvailableProviders] = useState<{ heygen: boolean; runway: boolean }>({ heygen: false, runway: false });
   const [pricing, setPricing] = useState<AvatarPricing>({ costPerMinute: 0, includedOnPlatform: false });
 
@@ -250,7 +268,7 @@ export function AvatarPicker({ podcastId, speakers, onConfigured, onCancel, podc
             disabled={selectedCount === 0 || submitting || overDuration}
             type="button"
           >
-            {submitting ? 'Configuring...' : 'Add Avatars'}
+            {submitting ? 'Configuring...' : existingOverlays?.length ? 'Update Avatars' : 'Add Avatars'}
           </button>
         </div>
       </div>
