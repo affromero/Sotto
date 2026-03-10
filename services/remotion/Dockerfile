@@ -11,6 +11,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Tell Remotion to use system Chromium
 ENV REMOTION_CHROME_EXECUTABLE=/usr/bin/chromium
 
+# Install Playwright Chromium for browser recording
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+RUN npx playwright install chromium --with-deps
+
 WORKDIR /app
 
 # Copy root workspace files
