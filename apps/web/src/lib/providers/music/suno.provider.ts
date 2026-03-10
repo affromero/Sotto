@@ -96,6 +96,7 @@ export class SunoMusicProvider implements MusicProvider {
         model: apiModel,
         style: params.style || 'ambient',
         title: params.title || 'Background Music',
+        callBackUrl: 'https://sotto.fm/api/webhooks/noop',
       }),
     });
 
