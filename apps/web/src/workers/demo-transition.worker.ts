@@ -43,7 +43,7 @@ export async function processDemoTransition(job: Job<GenerateDemoTransitionPaylo
 
   await prisma.demoScene.update({
     where: { id: sceneId },
-    data: { transitionStatus: 'GENERATING' },
+    data: { transitionStatus: 'GENERATING', failedReason: null },
   });
 
   try {
@@ -103,7 +103,7 @@ export async function processDemoTransition(job: Job<GenerateDemoTransitionPaylo
 
     await prisma.demoScene.update({
       where: { id: sceneId },
-      data: { transitionStatus: 'FAILED' },
+      data: { transitionStatus: 'FAILED', failedReason: message },
     });
 
     throw err;

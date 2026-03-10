@@ -26,7 +26,7 @@ export async function processDemoVisual(job: Job<GenerateDemoVisualPayload>): Pr
 
   await prisma.demoScene.update({
     where: { id: sceneId },
-    data: { visualStatus: 'GENERATING' },
+    data: { visualStatus: 'GENERATING', failedReason: null },
   });
 
   try {
@@ -138,7 +138,7 @@ export async function processDemoVisual(job: Job<GenerateDemoVisualPayload>): Pr
 
     await prisma.demoScene.update({
       where: { id: sceneId },
-      data: { visualStatus: 'FAILED' },
+      data: { visualStatus: 'FAILED', failedReason: message },
     });
 
     throw err;

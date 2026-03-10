@@ -479,6 +479,16 @@
   font: var(--text-body-xs);
 }
 
+.failedReason {
+  font: var(--text-body-xs);
+  color: var(--color-error, #ef4444);
+  margin: 0;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: #fef2f2;
+  border-radius: var(--radius-sm);
+  word-break: break-word;
+}
+
 .previewBtn {
   background: none;
   border: none;
