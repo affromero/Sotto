@@ -18,13 +18,24 @@ export const createDemoSchema = z.object({
 export const createDemoProjectSchema = z.object({
   title: z.string().min(1).max(200),
   description: z.string().max(2000).optional(),
-  features: z.array(z.string()).min(1).max(10),
+  features: z.array(z.string()).max(10).default([]),
   durationTarget: z.number().min(30).max(300).default(120),
   aiModel: z.string().max(100).optional(),
   defaultTtsProvider: z.string().max(50).optional(),
   defaultTtsModel: z.string().max(100).optional(),
   defaultTtsVoiceId: z.string().max(200).optional(),
   showcaseProviders: z.array(z.string().max(50)).max(10).optional(),
+  scriptJson: z.unknown().optional(), // LaunchVideoScript — validated separately via launchVideoScriptSchema
+});
+
+export const updateDemoProjectSchema = z.object({
+  title: z.string().min(1).max(200).optional(),
+  description: z.string().max(2000).optional(),
+  features: z.array(z.string()).max(10).optional(),
+  backgroundMusicUrl: z.string().url().nullable().optional(),
+  backgroundMusicVolume: z.number().min(0).max(1).optional(),
+  avatarClipUrl: z.string().url().nullable().optional(),
+  podcastId: z.string().nullable().optional(),
 });
 
 /**
@@ -79,6 +90,12 @@ export const updateDemoSceneSchema = z.object({
   ttsVoiceId: z.string().optional(),
   transitionType: z.enum(['fade', 'dissolve', 'wipe']).nullable().optional(),
   timingSegments: timingSegmentsArraySchema.nullable().optional(),
+  // Launch video cinematic fields
+  sfxConfig: z.record(z.unknown()).nullable().optional(),
+  providerBanner: z.record(z.unknown()).nullable().optional(),
+  avatarConfig: z.record(z.unknown()).nullable().optional(),
+  overlays: z.array(z.record(z.unknown())).nullable().optional(),
+  subtitles: z.record(z.unknown()).nullable().optional(),
 });
 
 /**
