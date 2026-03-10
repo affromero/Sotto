@@ -8,6 +8,7 @@ import {
   RefreshControl,
   StyleSheet,
 } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { colors, spacing, typography, borderRadius } from '@sotto/shared';
@@ -15,6 +16,7 @@ import type { PodcastSummary, FeedResponse, FeedSort } from '@sotto/shared';
 import { api } from '../../lib/api';
 import { globalStyles } from '../../lib/theme';
 import { PodcastCard } from '../../components/PodcastCard';
+import { SkeletonCard } from '../../components/SkeletonCard';
 import { EmptyState } from '../../components/EmptyState';
 import { ErrorState } from '../../components/ErrorState';
 
@@ -62,12 +64,14 @@ export default function FeedScreen() {
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const renderItem = useCallback(
-    ({ item }: { item: PodcastSummary }) => (
-      <PodcastCard
-        podcast={item}
-        variant="feed"
-        onPress={() => router.push(`/podcast/${item.id}`)}
-      />
+    ({ item, index }: { item: PodcastSummary; index: number }) => (
+      <Animated.View entering={FadeInDown.delay(index * 80).duration(500)}>
+        <PodcastCard
+          podcast={item}
+          variant="feed"
+          onPress={() => router.push(`/podcast/${item.id}`)}
+        />
+      </Animated.View>
     ),
     [router],
   );
@@ -122,8 +126,10 @@ export default function FeedScreen() {
         onEndReachedThreshold={0.5}
         ListEmptyComponent={
           isLoading ? (
-            <View style={styles.centered}>
-              <ActivityIndicator size="large" color={colors.primary} />
+            <View style={styles.skeletonContainer}>
+              <SkeletonCard />
+              <SkeletonCard />
+              <SkeletonCard />
             </View>
           ) : isError ? (
             <ErrorState
@@ -190,11 +196,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: spacing.xl,
+  skeletonContainer: {
+    paddingHorizontal: spacing.md,
+    gap: spacing.md,
+    paddingTop: spacing.sm,
   },
   footerLoader: {
     paddingVertical: spacing.lg,

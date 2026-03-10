@@ -16,6 +16,7 @@ import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography, borderRadius } from '@sotto/shared';
+import { shadowPrimaryGlow } from '../../lib/shadows';
 import type { DiscoveryMetadata } from '@sotto/shared';
 import Animated, {
   useSharedValue,
@@ -609,6 +610,7 @@ export default function CreateScreen() {
             <Pressable
               style={({ pressed }) => [
                 styles.sendButton,
+                inputText.trim() && !isDiscovering && styles.sendButtonGlow,
                 pressed && styles.sendButtonPressed,
                 (!inputText.trim() || isDiscovering) && styles.sendButtonDisabled,
               ]}
@@ -1066,6 +1068,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 2,
+  },
+  sendButtonGlow: {
+    ...shadowPrimaryGlow,
   },
   sendButtonPressed: {
     backgroundColor: colors.primaryHover,
