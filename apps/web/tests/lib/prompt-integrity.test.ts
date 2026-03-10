@@ -59,7 +59,6 @@ const EXPECTED_FILES = [
   'generation/eli5-section.md',
   'generation/script-revision-factcheck.md',
   'generation/script-revision-user.md',
-  'generation/demo-script-generator.md',
   'feeds/taste-quiz.md',
   'feeds/for-you.md',
   'feeds/curiosity.md',
@@ -125,12 +124,6 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
   ].sort(),
   'audio/tts-tag-converter.md': [
     'PROVIDER_DOCS', 'PROVIDER_NAME', 'TURNS_JSON',
-  ].sort(),
-  'generation/demo-script-generator.md': [
-    'CONTENT_SAFETY', 'DURATION_TARGET', 'EXPERT_SPEAKER', 'FEATURE_FOCUS',
-    'HOST_SPEAKER', 'PRODUCT_CONTEXT', 'SPEAKER_SECTION',
-    'VOICE_DELIVERY_GUIDELINES', 'VOICE_REALISM',
-    'WORD_COUNT_IDEAL', 'WORD_COUNT_MAX', 'WORD_COUNT_MIN',
   ].sort(),
   'demo/walkthrough.md': [
     'APP_SELECTORS', 'DURATION_TARGET', 'FEATURES',
