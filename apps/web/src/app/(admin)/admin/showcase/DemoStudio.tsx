@@ -2,21 +2,15 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import styles from './DemoStudio.module.css';
-import { ActionEditor } from './ActionEditor';
 import { TimingEditor, computeAdjustedDuration, type TimingSegment } from './TimingEditor';
+import { ScriptViewer } from './ScriptViewer';
+import { PodcastPrep } from './PodcastPrep';
+import { VideoReview } from './VideoReview';
+import { AvatarPrep } from './AvatarPrep';
 
-interface ProviderModel {
-  id: string;
-  displayName: string;
-}
-
-interface ProviderInfo {
-  id: string;
-  displayName: string;
-  qualityTier: string;
-  defaultModel: string;
-  models: ProviderModel[];
-}
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 interface DemoScene {
   id: string;
@@ -40,6 +34,12 @@ interface DemoScene {
   transitionUrl: string | null;
   transitionStatus: string;
   timingSegments: TimingSegment[] | null;
+  sfxConfig: unknown | null;
+  providerBanner: unknown | null;
+  avatarConfig: unknown | null;
+  overlays: unknown | null;
+  subtitles: unknown | null;
+  actionTimingLog: unknown | null;
 }
 
 interface DemoProject {
@@ -53,31 +53,22 @@ interface DemoProject {
   createdAt: string;
   scenes?: DemoScene[];
   _count?: { scenes: number };
+  backgroundMusicUrl: string | null;
+  backgroundMusicVolume: number | null;
+  podcastId: string | null;
+  avatarClipUrl: string | null;
 }
 
-type Step = 'features' | 'script' | 'voices' | 'assets' | 'timing' | 'preview';
+type Step = 'script' | 'podcast' | 'video' | 'avatar' | 'assets' | 'timing' | 'compose';
 
 const STEPS: { key: Step; label: string; number: number }[] = [
-  { key: 'features', label: 'Features', number: 1 },
-  { key: 'script', label: 'Script', number: 2 },
-  { key: 'voices', label: 'Voices', number: 3 },
-  { key: 'assets', label: 'Assets', number: 4 },
-  { key: 'timing', label: 'Timing', number: 5 },
-  { key: 'preview', label: 'Preview', number: 6 },
-];
-
-const FEATURE_OPTIONS: { slug: string; label: string; desc: string }[] = [
-  { slug: 'creation-flow', label: 'Podcast Generation', desc: 'Chat with AI → generate a 2-voice podcast with sound effects and citations' },
-  { slug: 'interrupt', label: 'Interrupt Q&A', desc: 'Pause playback to ask questions — AI answers in context' },
-  { slug: 'fork', label: 'Fork', desc: 'Remix any podcast with your own angle, tone, or focus areas' },
-  { slug: 'import', label: 'Import', desc: 'Import human-made podcasts — transcribe and add social features' },
-  { slug: 'social-feed', label: 'Social Feed', desc: 'Public feed with search, filters, follows, and collections' },
-  { slug: 'byok', label: 'BYOK', desc: 'Bring Your Own API Keys for unlimited free usage' },
-  { slug: 'voice-cloning', label: 'Voice Cloning', desc: 'Clone your voice, set a price, let others request access' },
-  { slug: 'script-review', label: 'Script Review', desc: 'Review, edit, and approve AI scripts before audio generation' },
-  { slug: 'video-generation', label: 'Video Generation', desc: 'Turn podcasts into videos with AI visuals and transitions' },
-  { slug: 'collections', label: 'Collections', desc: 'Curate and share podcast playlists others can follow' },
-  { slug: 'multi-speaker', label: 'Multi-Speaker', desc: 'Up to 4 custom speakers per podcast' },
+  { key: 'script', label: 'Script', number: 1 },
+  { key: 'podcast', label: 'Podcast', number: 2 },
+  { key: 'video', label: 'Video', number: 3 },
+  { key: 'avatar', label: 'Avatar', number: 4 },
+  { key: 'assets', label: 'Recording', number: 5 },
+  { key: 'timing', label: 'Timing', number: 6 },
+  { key: 'compose', label: 'Compose', number: 7 },
 ];
 
 function statusBadge(status: string): string {
@@ -99,115 +90,89 @@ function statusColor(status: string): string {
   }
 }
 
-export function DemoStudio({ providers }: { providers: ProviderInfo[] }) {
+// ---------------------------------------------------------------------------
+// Main orchestrator
+// ---------------------------------------------------------------------------
+
+export function DemoStudio() {
   const [projects, setProjects] = useState<DemoProject[]>([]);
   const [selectedProject, setSelectedProject] = useState<DemoProject | null>(null);
-  const [step, setStep] = useState<Step>('features');
+  const [step, setStep] = useState<Step>('script');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [scriptJson, setScriptJson] = useState('');
 
-  // Create form state
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [features, setFeatures] = useState<string[]>([]);
-  const [durationTarget, setDurationTarget] = useState(120);
-  const [aiModel, setAiModel] = useState('');
-  const [defaultTtsProvider, setDefaultTtsProvider] = useState('');
-  const [defaultTtsModel, setDefaultTtsModel] = useState('');
-  const [defaultTtsVoiceId, setDefaultTtsVoiceId] = useState('');
-  const [showcaseProviders, setShowcaseProviders] = useState<string[]>([]);
-
-  // AI models (fetched from API)
-  const [aiModels, setAiModels] = useState<{ id: string; displayName: string; group?: string }[]>([]);
-
-  // Load projects
   const loadProjects = useCallback(async () => {
     const res = await fetch('/api/admin/demo');
     if (res.ok) setProjects(await res.json());
   }, []);
 
-  // Load project with scenes
   const loadProject = useCallback(async (id: string) => {
     const res = await fetch(`/api/admin/demo/${id}`);
     if (res.ok) {
       const project: DemoProject = await res.json();
       setSelectedProject(project);
-      // Auto-advance step based on status
-      if (project.status === 'DRAFT') setStep('features');
-      else if (project.status === 'SCRIPT_READY') setStep('script');
-      else if (project.status === 'GENERATING_ASSETS') setStep('assets');
-      else if (project.status === 'READY') setStep('preview');
-      else setStep('features');
+      if (project.status === 'SCRIPT_READY' || project.status === 'DRAFT') setStep('script');
+      else if (project.status === 'READY') setStep('compose');
+      else setStep('script');
     }
   }, []);
 
   useEffect(() => { loadProjects(); }, [loadProjects]);
 
-  // Fetch AI models
-  useEffect(() => {
-    fetch('/api/ai-models').then(async (res) => {
-      if (res.ok) {
-        const data = await res.json();
-        setAiModels(data.models ?? []);
-      }
-    }).catch(() => {});
-  }, []);
-
-  // Poll for status updates on selected project
+  // Poll for status updates
   useEffect(() => {
     if (!selectedProject) return;
-    if (selectedProject.status === 'DRAFT' || selectedProject.status === 'GENERATING_ASSETS') {
+    if (selectedProject.status === 'DRAFT' || selectedProject.status === 'GENERATING_ASSETS' || selectedProject.status === 'COMPOSING') {
       const interval = setInterval(() => loadProject(selectedProject.id), 3000);
       return () => clearInterval(interval);
     }
   }, [selectedProject, loadProject]);
 
-  // Create project
-  const createProject = useCallback(async () => {
-    if (!title || features.length === 0) return;
+  // Import JSON script
+  const importScript = useCallback(async () => {
+    if (!scriptJson.trim()) return;
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/admin/demo', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title,
-          description: description || undefined,
-          features,
-          durationTarget,
-          aiModel: aiModel || undefined,
-          defaultTtsProvider: defaultTtsProvider || undefined,
-          defaultTtsModel: defaultTtsModel || undefined,
-          defaultTtsVoiceId: defaultTtsVoiceId || undefined,
-          showcaseProviders: showcaseProviders.length > 0 ? showcaseProviders : undefined,
-        }),
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Failed to create project');
+      let parsed: unknown;
+      try { parsed = JSON.parse(scriptJson); } catch { throw new Error('Invalid JSON'); }
+
+      // If no project selected, create one
+      if (!selectedProject) {
+        const res = await fetch('/api/admin/demo', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: 'Launch Video', scriptJson: parsed }),
+        });
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error || 'Failed to create project');
+        }
+        const { id } = await res.json();
+        await loadProjects();
+        await loadProject(id);
+      } else {
+        // Import into existing project
+        const res = await fetch(`/api/admin/demo/${selectedProject.id}/import-script`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ script: parsed }),
+        });
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error || 'Failed to import script');
+        }
+        await loadProject(selectedProject.id);
       }
-      const { id } = await res.json();
-      await loadProjects();
-      await loadProject(id);
-      setStep('script');
-      setTitle('');
-      setDescription('');
-      setFeatures([]);
-      setDurationTarget(120);
-      setAiModel('');
-      setDefaultTtsProvider('');
-      setDefaultTtsModel('');
-      setDefaultTtsVoiceId('');
-      setShowcaseProviders([]);
+      setScriptJson('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setLoading(false);
     }
-  }, [title, description, features, durationTarget, aiModel, defaultTtsProvider, defaultTtsModel, defaultTtsVoiceId, showcaseProviders, loadProjects, loadProject]);
+  }, [scriptJson, selectedProject, loadProjects, loadProject]);
 
-  // Save scene edits
   const saveScene = useCallback(async (sceneId: string, data: Partial<DemoScene>) => {
     if (!selectedProject) return;
     const res = await fetch(`/api/admin/demo/${selectedProject.id}/scenes/${sceneId}`, {
@@ -218,45 +183,29 @@ export function DemoStudio({ providers }: { providers: ProviderInfo[] }) {
     if (res.ok) await loadProject(selectedProject.id);
   }, [selectedProject, loadProject]);
 
-  // Generate individual asset
   const generateAsset = useCallback(async (sceneId: string, assetType: string) => {
     if (!selectedProject) return;
-    await fetch(`/api/admin/demo/${selectedProject.id}/scenes/${sceneId}/${assetType}`, {
-      method: 'POST',
-    });
+    await fetch(`/api/admin/demo/${selectedProject.id}/scenes/${sceneId}/${assetType}`, { method: 'POST' });
     await loadProject(selectedProject.id);
   }, [selectedProject, loadProject]);
 
-  // Generate all assets
   const generateAllAssets = useCallback(async () => {
     if (!selectedProject) return;
     setLoading(true);
     await fetch(`/api/admin/demo/${selectedProject.id}/generate-assets`, { method: 'POST' });
     await loadProject(selectedProject.id);
-    setStep('assets');
     setLoading(false);
   }, [selectedProject, loadProject]);
 
-  // Regenerate script
-  const regenerateScript = useCallback(async () => {
-    if (!selectedProject) return;
-    setLoading(true);
-    await fetch(`/api/admin/demo/${selectedProject.id}/regenerate`, { method: 'POST' });
-    await loadProject(selectedProject.id);
-    setLoading(false);
-  }, [selectedProject, loadProject]);
-
-  // Compose final video
   const composeVideo = useCallback(async () => {
     if (!selectedProject) return;
     setLoading(true);
     await fetch(`/api/admin/demo/${selectedProject.id}/compose`, { method: 'POST' });
     await loadProject(selectedProject.id);
-    setStep('preview');
+    setStep('compose');
     setLoading(false);
   }, [selectedProject, loadProject]);
 
-  // Delete project
   const deleteProject = useCallback(async (id: string) => {
     await fetch(`/api/admin/demo/${id}`, { method: 'DELETE' });
     if (selectedProject?.id === id) setSelectedProject(null);
@@ -264,21 +213,22 @@ export function DemoStudio({ providers }: { providers: ProviderInfo[] }) {
   }, [selectedProject, loadProjects]);
 
   const scenes = selectedProject?.scenes ?? [];
+  const hasScenes = scenes.length > 0;
   const hasRecordings = scenes.some((s) => s.recordingStatus === 'READY');
+  const allAssetsReady = scenes.length > 0 && scenes.every((s) => s.recordingStatus === 'READY' && s.voiceoverStatus === 'READY');
 
   const isUnlocked = (s: Step): boolean => {
-    if (s === 'features') return true;
+    if (s === 'script') return true;
+    if (s === 'avatar') return true; // independent
     if (!selectedProject) return false;
-    const status = selectedProject.status;
-    if (s === 'script') return status !== 'DRAFT';
-    if (s === 'voices') return status !== 'DRAFT';
-    if (s === 'assets') return status !== 'DRAFT';
+    if (s === 'podcast') return hasScenes;
+    if (s === 'video') return !!selectedProject.podcastId;
+    if (s === 'assets') return hasScenes;
     if (s === 'timing') return hasRecordings;
-    if (s === 'preview') return status === 'READY' || status === 'COMPOSING';
+    if (s === 'compose') return allAssetsReady;
     return false;
   };
 
-  // Compute total adjusted duration across all scenes
   const totalAdjustedDuration = scenes.reduce((sum, s) => {
     if (s.timingSegments && s.timingSegments.length > 0) {
       return sum + computeAdjustedDuration(s.timingSegments);
@@ -288,7 +238,6 @@ export function DemoStudio({ providers }: { providers: ProviderInfo[] }) {
 
   return (
     <div className={styles.root}>
-      {/* Step navigation */}
       <nav className={styles.stepNav}>
         {STEPS.map((s) => (
           <button
@@ -301,20 +250,20 @@ export function DemoStudio({ providers }: { providers: ProviderInfo[] }) {
           >
             <span className={styles.stepNumber}>{s.number}</span>
             {s.label}
+            {!isUnlocked(s.key) && <span className={styles.lockIcon}>locked</span>}
           </button>
         ))}
       </nav>
 
       {error && <div className={styles.errorBanner}>{error}</div>}
 
-      {/* Step 1: Features */}
-      {step === 'features' && (
+      {/* Step 1: Script — project list + JSON import + scene viewer */}
+      {step === 'script' && (
         <div className={styles.panel}>
-          {/* Project list */}
           <div className={styles.section}>
-            <h2 className={styles.sectionTitle}>Demo Projects</h2>
+            <h2 className={styles.sectionTitle}>Projects</h2>
             {projects.length === 0 ? (
-              <p className={styles.emptyText}>No projects yet. Create one below.</p>
+              <p className={styles.emptyText}>No projects yet. Import a JSON script below.</p>
             ) : (
               <div className={styles.projectList}>
                 {projects.map((p) => (
@@ -329,9 +278,7 @@ export function DemoStudio({ providers }: { providers: ProviderInfo[] }) {
                   >
                     <span className={styles.projectTitle}>{p.title}</span>
                     <span className={styles.projectMeta}>
-                      {p.status === 'DRAFT'
-                        ? 'Generating script...'
-                        : `${p._count?.scenes ?? 0} scenes · ${p.status}`}
+                      {p._count?.scenes ?? p.scenes?.length ?? 0} scenes · {p.status}
                     </span>
                     <button
                       className={styles.deleteBtn}
@@ -346,206 +293,69 @@ export function DemoStudio({ providers }: { providers: ProviderInfo[] }) {
             )}
           </div>
 
-          {/* Create form */}
           <div className={styles.section}>
-            <h2 className={styles.sectionTitle}>New Demo</h2>
-            <div className={styles.formGrid}>
-              <label className={styles.formLabel}>
-                Title
-                <input
-                  type="text"
-                  className={styles.input}
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="My Product Demo"
-                />
-              </label>
-              <label className={styles.formLabel}>
-                Description
-                <textarea
-                  className={styles.textarea}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Optional description..."
-                  rows={2}
-                />
-              </label>
-              <fieldset className={styles.fieldset}>
-                <legend className={styles.formLabel}>Features to demonstrate</legend>
-                <div className={styles.chipGrid}>
-                  {FEATURE_OPTIONS.map((f) => (
-                    <button
-                      key={f.slug}
-                      className={styles.chip}
-                      data-selected={features.includes(f.slug) ? 'true' : undefined}
-                      onClick={() => setFeatures((prev) =>
-                        prev.includes(f.slug) ? prev.filter((x) => x !== f.slug) : [...prev, f.slug]
-                      )}
-                      title={f.desc}
-                    >
-                      <strong>{f.label}</strong>
-                      <span className={styles.chipDesc}>{f.desc}</span>
-                    </button>
-                  ))}
-                </div>
-              </fieldset>
-              <label className={styles.formLabel}>
-                Duration target: {durationTarget}s
-                <input
-                  type="range"
-                  min={30}
-                  max={300}
-                  step={10}
-                  value={durationTarget}
-                  onChange={(e) => setDurationTarget(Number(e.target.value))}
-                  className={styles.slider}
-                />
-              </label>
-              <label className={styles.formLabel}>
-                AI Model (script generation)
-                <select
-                  className={styles.select}
-                  value={aiModel}
-                  onChange={(e) => setAiModel(e.target.value)}
+            <h2 className={styles.sectionTitle}>Import Launch Video Script</h2>
+            <div className={styles.importZone}>
+              <textarea
+                className={styles.importTextarea}
+                value={scriptJson}
+                onChange={(e) => setScriptJson(e.target.value)}
+                placeholder='Paste your LaunchVideoScript JSON here...'
+              />
+              <div className={styles.importActions}>
+                <button
+                  className={styles.primaryBtn}
+                  onClick={importScript}
+                  disabled={loading || !scriptJson.trim()}
                 >
-                  <option value="">Default</option>
-                  {aiModels.map((m) => (
-                    <option key={m.id} value={m.id}>{m.displayName}{m.group ? ` (${m.group})` : ''}</option>
-                  ))}
-                </select>
-              </label>
-              <fieldset className={styles.fieldset}>
-                <legend className={styles.formLabel}>Default voice (all scenes)</legend>
-                <div className={styles.voiceRow}>
-                  <select
-                    className={styles.select}
-                    value={defaultTtsProvider}
-                    onChange={(e) => { setDefaultTtsProvider(e.target.value); setDefaultTtsModel(''); setDefaultTtsVoiceId(''); }}
-                  >
-                    <option value="">Default (ElevenLabs)</option>
-                    {providers.map((p) => (
-                      <option key={p.id} value={p.id}>{p.displayName}</option>
-                    ))}
-                  </select>
-                  {providers.find((p) => p.id === defaultTtsProvider) && (
-                    <select
-                      className={styles.select}
-                      value={defaultTtsModel}
-                      onChange={(e) => setDefaultTtsModel(e.target.value)}
-                    >
-                      <option value="">Default model</option>
-                      {providers.find((p) => p.id === defaultTtsProvider)?.models.map((m) => (
-                        <option key={m.id} value={m.id}>{m.displayName}</option>
-                      ))}
-                    </select>
-                  )}
-                  <input
-                    type="text"
-                    className={styles.input}
-                    value={defaultTtsVoiceId}
-                    onChange={(e) => setDefaultTtsVoiceId(e.target.value)}
-                    placeholder="Voice ID (optional)"
-                  />
-                </div>
-              </fieldset>
-              <fieldset className={styles.fieldset}>
-                <legend className={styles.formLabel}>TTS providers to showcase (voice comparison)</legend>
-                <div className={styles.chipGrid}>
-                  {providers.map((p) => (
-                    <button
-                      key={p.id}
-                      className={styles.chip}
-                      data-selected={showcaseProviders.includes(p.id) ? 'true' : undefined}
-                      onClick={() => setShowcaseProviders((prev) =>
-                        prev.includes(p.id) ? prev.filter((x) => x !== p.id) : [...prev, p.id]
-                      )}
-                    >
-                      <strong>{p.displayName}</strong>
-                      <span className={styles.chipDesc}>{p.qualityTier}</span>
-                    </button>
-                  ))}
-                </div>
-              </fieldset>
-              <button
-                className={styles.primaryBtn}
-                onClick={createProject}
-                disabled={loading || !title || features.length === 0}
-              >
-                {loading ? 'Creating...' : 'Create Demo'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Step 2: Script */}
-      {step === 'script' && selectedProject && (
-        <div className={styles.panel}>
-          <div className={styles.sectionHeader}>
-            <h2 className={styles.sectionTitle}>Walkthrough Script</h2>
-            <button
-              className={styles.secondaryBtn}
-              onClick={regenerateScript}
-              disabled={loading}
-            >
-              Regenerate Script
-            </button>
-          </div>
-          {selectedProject.status === 'DRAFT' ? (
-            <div className={styles.generatingBanner}>
-              <span className={styles.spinner} />
-              <div>
-                <strong>Generating walkthrough script...</strong>
-                <p className={styles.emptyText}>
-                  AI is creating scenes with browser actions and narration for the selected features.
-                  This typically takes 15–30 seconds.
-                </p>
+                  {loading ? 'Importing...' : selectedProject ? 'Re-import Script' : 'Import & Create Project'}
+                </button>
               </div>
             </div>
-          ) : (
-            <div className={styles.sceneList}>
-              {scenes.map((scene) => (
-                <SceneEditor
-                  key={scene.id}
-                  scene={scene}
-                  onSave={(data) => saveScene(scene.id, data)}
-                />
-              ))}
+          </div>
+
+          {selectedProject && hasScenes && (
+            <div className={styles.section}>
+              <h2 className={styles.sectionTitle}>Scene Overview</h2>
+              <ScriptViewer scenes={scenes} />
             </div>
           )}
-          {scenes.length > 0 && (
-            <button className={styles.primaryBtn} onClick={() => setStep('voices')}>
-              Continue to Voices
-            </button>
+        </div>
+      )}
+
+      {/* Step 2: Podcast */}
+      {step === 'podcast' && selectedProject && (
+        <div className={styles.panel}>
+          <h2 className={styles.sectionTitle}>Podcast Pre-Production</h2>
+          <PodcastPrep project={selectedProject} />
+        </div>
+      )}
+
+      {/* Step 3: Video */}
+      {step === 'video' && selectedProject && (
+        <div className={styles.panel}>
+          <h2 className={styles.sectionTitle}>Video Segments</h2>
+          <VideoReview project={selectedProject} />
+        </div>
+      )}
+
+      {/* Step 4: Avatar */}
+      {step === 'avatar' && (
+        <div className={styles.panel}>
+          <h2 className={styles.sectionTitle}>Avatar Pre-Production</h2>
+          {selectedProject ? (
+            <AvatarPrep project={selectedProject} />
+          ) : (
+            <p className={styles.emptyText}>Select or create a project first.</p>
           )}
         </div>
       )}
 
-      {/* Step 3: Voices */}
-      {step === 'voices' && selectedProject && (
-        <div className={styles.panel}>
-          <h2 className={styles.sectionTitle}>Voice Configuration</h2>
-          <div className={styles.sceneList}>
-            {scenes.map((scene) => (
-              <VoiceConfig
-                key={scene.id}
-                scene={scene}
-                providers={providers}
-                onSave={(data) => saveScene(scene.id, data)}
-              />
-            ))}
-          </div>
-          <button className={styles.primaryBtn} onClick={() => setStep('assets')}>
-            Continue to Assets
-          </button>
-        </div>
-      )}
-
-      {/* Step 4: Assets */}
+      {/* Step 5: Recording (Assets) */}
       {step === 'assets' && selectedProject && (
         <div className={styles.panel}>
           <div className={styles.sectionHeader}>
-            <h2 className={styles.sectionTitle}>Asset Generation</h2>
+            <h2 className={styles.sectionTitle}>Recording &amp; Voiceover</h2>
             <button
               className={styles.primaryBtn}
               onClick={generateAllAssets}
@@ -597,15 +407,10 @@ export function DemoStudio({ providers }: { providers: ProviderInfo[] }) {
               </div>
             ))}
           </div>
-          {hasRecordings && (
-            <button className={styles.primaryBtn} onClick={() => setStep('timing')}>
-              Continue to Timing
-            </button>
-          )}
         </div>
       )}
 
-      {/* Step 5: Timing */}
+      {/* Step 6: Timing */}
       {step === 'timing' && selectedProject && (
         <div className={styles.panel}>
           <div className={styles.sectionHeader}>
@@ -625,21 +430,30 @@ export function DemoStudio({ providers }: { providers: ProviderInfo[] }) {
               />
             ))}
           </div>
-          {scenes.every((s) => s.recordingStatus === 'READY' && s.voiceoverStatus === 'READY') && (
+        </div>
+      )}
+
+      {/* Step 7: Compose */}
+      {step === 'compose' && selectedProject && (
+        <div className={styles.panel}>
+          <h2 className={styles.sectionTitle}>Compose &amp; Preview</h2>
+          {allAssetsReady && selectedProject.status !== 'READY' && selectedProject.status !== 'COMPOSING' && (
             <button className={styles.primaryBtn} onClick={composeVideo} disabled={loading}>
               {loading ? 'Composing...' : 'Compose Final Video'}
             </button>
           )}
-        </div>
-      )}
-
-      {/* Step 6: Preview */}
-      {step === 'preview' && selectedProject && (
-        <div className={styles.panel}>
-          <h2 className={styles.sectionTitle}>Preview</h2>
-          {selectedProject.status === 'COMPOSING' ? (
-            <p className={styles.emptyText}>Composing final video...</p>
-          ) : selectedProject.videoUrl ? (
+          {selectedProject.status === 'COMPOSING' && (
+            <div className={styles.generatingBanner}>
+              <span className={styles.spinner} />
+              <div>
+                <strong>Composing final video...</strong>
+                <p className={styles.emptyText}>
+                  SFX mixing, text overlays, avatar PiP, background music, and warm amber grading.
+                </p>
+              </div>
+            </div>
+          )}
+          {selectedProject.videoUrl && (
             <div className={styles.previewContainer}>
               <video
                 className={styles.videoPlayer}
@@ -647,17 +461,14 @@ export function DemoStudio({ providers }: { providers: ProviderInfo[] }) {
                 controls
                 preload="metadata"
               />
-              <a
-                className={styles.primaryBtn}
-                href={selectedProject.videoUrl}
-                download
-              >
+              <a className={styles.primaryBtn} href={selectedProject.videoUrl} download>
                 Download Video
               </a>
             </div>
-          ) : (
+          )}
+          {!selectedProject.videoUrl && selectedProject.status !== 'COMPOSING' && !allAssetsReady && (
             <p className={styles.emptyText}>
-              No video yet. Go to Assets and generate all assets, then compose.
+              All recordings and voiceovers must be READY before composing.
             </p>
           )}
         </div>
@@ -666,143 +477,9 @@ export function DemoStudio({ providers }: { providers: ProviderInfo[] }) {
   );
 }
 
-// ── Sub-components ──────────────────────────────────────────
-
-function SceneEditor({
-  scene,
-  onSave,
-}: {
-  scene: DemoScene;
-  onSave: (data: Partial<DemoScene>) => void;
-}) {
-  const [title, setTitle] = useState(scene.title);
-  const [narration, setNarration] = useState(scene.narration);
-  const [actions, setActions] = useState(scene.actions);
-  const [expanded, setExpanded] = useState(false);
-  const dirty = title !== scene.title || narration !== scene.narration || actions !== scene.actions;
-
-  return (
-    <div className={styles.sceneCard}>
-      <button className={styles.sceneHeader} onClick={() => setExpanded(!expanded)}>
-        <span className={styles.sceneOrder}>{scene.order + 1}</span>
-        <span className={styles.sceneTitle}>{scene.title}</span>
-        <span className={styles.expandIcon}>{expanded ? '−' : '+'}</span>
-      </button>
-      {expanded && (
-        <div className={styles.sceneBody}>
-          <label className={styles.formLabel}>
-            Title
-            <input
-              type="text"
-              className={styles.input}
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-            />
-          </label>
-          <label className={styles.formLabel}>
-            Narration
-            <textarea
-              className={styles.textarea}
-              value={narration}
-              onChange={(e) => setNarration(e.target.value)}
-              rows={4}
-            />
-          </label>
-          <div className={styles.formLabel}>
-            Actions ({(actions as unknown[]).length} steps)
-            <ActionEditor
-              actions={actions as Array<Record<string, unknown>>}
-              onChange={setActions}
-            />
-          </div>
-          {dirty && (
-            <button
-              className={styles.secondaryBtn}
-              onClick={() => onSave({ title, narration, actions })}
-            >
-              Save Changes
-            </button>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function VoiceConfig({
-  scene,
-  providers,
-  onSave,
-}: {
-  scene: DemoScene;
-  providers: ProviderInfo[];
-  onSave: (data: Partial<DemoScene>) => void;
-}) {
-  const [ttsProvider, setTtsProvider] = useState(scene.ttsProvider ?? '');
-  const [ttsModel, setTtsModel] = useState(scene.ttsModel ?? '');
-  const [ttsVoiceId, setTtsVoiceId] = useState(scene.ttsVoiceId ?? '');
-
-  const selectedProvider = providers.find((p) => p.id === ttsProvider);
-
-  return (
-    <div className={styles.sceneCard}>
-      <div className={styles.sceneHeader}>
-        <span className={styles.sceneOrder}>{scene.order + 1}</span>
-        <span className={styles.sceneTitle}>{scene.title}</span>
-      </div>
-      <div className={styles.voiceForm}>
-        <label className={styles.formLabel}>
-          Provider
-          <select
-            className={styles.select}
-            value={ttsProvider}
-            onChange={(e) => { setTtsProvider(e.target.value); setTtsModel(''); setTtsVoiceId(''); }}
-          >
-            <option value="">Default (ElevenLabs)</option>
-            {providers.map((p) => (
-              <option key={p.id} value={p.id}>{p.displayName}</option>
-            ))}
-          </select>
-        </label>
-        {selectedProvider && (
-          <label className={styles.formLabel}>
-            Model
-            <select
-              className={styles.select}
-              value={ttsModel}
-              onChange={(e) => setTtsModel(e.target.value)}
-            >
-              <option value="">Default ({selectedProvider.defaultModel})</option>
-              {selectedProvider.models.map((m) => (
-                <option key={m.id} value={m.id}>{m.displayName}</option>
-              ))}
-            </select>
-          </label>
-        )}
-        <label className={styles.formLabel}>
-          Voice ID
-          <input
-            type="text"
-            className={styles.input}
-            value={ttsVoiceId}
-            onChange={(e) => setTtsVoiceId(e.target.value)}
-            placeholder="Voice ID (optional)"
-          />
-        </label>
-        <button
-          className={styles.secondaryBtn}
-          onClick={() => onSave({
-            ttsProvider: ttsProvider || undefined,
-            ttsModel: ttsModel || undefined,
-            ttsVoiceId: ttsVoiceId || undefined,
-          } as Partial<DemoScene>)}
-        >
-          Save Voice
-        </button>
-      </div>
-    </div>
-  );
-}
+// ---------------------------------------------------------------------------
+// Sub-components (kept in same file — small, tightly coupled)
+// ---------------------------------------------------------------------------
 
 function AssetStatus({
   label,
