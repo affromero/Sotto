@@ -774,8 +774,10 @@ async function executeStitch(jobId: string, input: StitchRequest): Promise<void>
   }
 }
 
-// POST /stitch — start a new stitch job
+// POST /stitch — DEPRECATED: use POST /render with compositionId='LaunchVideo' instead.
+// Kept for rollback safety — remove after confirming /render works in production.
 stitchRouter.post('/', (req, res) => {
+  console.warn('DEPRECATED: POST /stitch called — migrate to POST /render with compositionId=LaunchVideo');
   const body = req.body as Partial<StitchRequest>;
   if (!body.scenes?.length) {
     res.status(400).json({ error: 'scenes array is required' });
