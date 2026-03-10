@@ -79,6 +79,7 @@ export interface AutoModelConfigData {
   proIncludedMusicModels: string[] | null;
   // Daily limits & allocations (migrated from FreeTierConfig)
   dailyGenerationLimit: number;
+  dailyGenerationLimitPro: number;
   dailyVideoLimit: number;
   dailyVideoLimitPro: number;
   dailyMusicLimit: number;
@@ -122,6 +123,7 @@ const SEEDS = {
   proMusicProvider: 'suno',
   proMusicModel: 'suno-v5',
   dailyGenerationLimit: 1,
+  dailyGenerationLimitPro: 5,
   dailyVideoLimit: 1,
   dailyVideoLimitPro: 2,
   dailyMusicLimit: 1,
@@ -261,6 +263,7 @@ export async function getAutoModelConfig(): Promise<AutoModelConfigData> {
     proIncludedMusicModels: includedModelsSchema.parse(row.proIncludedMusicModels),
     // Daily limits & allocations
     dailyGenerationLimit: row.dailyGenerationLimit,
+    dailyGenerationLimitPro: row.dailyGenerationLimitPro,
     dailyVideoLimit: row.dailyVideoLimit,
     dailyVideoLimitPro: row.dailyVideoLimitPro,
     dailyMusicLimit: row.dailyMusicLimit,
@@ -314,6 +317,7 @@ export async function setAutoModelConfig(
     proIncludedMusicModels?: string[] | null;
     // Daily limits & allocations
     dailyGenerationLimit?: number;
+    dailyGenerationLimitPro?: number;
     dailyVideoLimit?: number;
     dailyVideoLimitPro?: number;
     dailyMusicLimit?: number;
@@ -406,6 +410,7 @@ export async function setAutoModelConfig(
 
   // Daily limits & allocations
   if (data.dailyGenerationLimit !== undefined) update.dailyGenerationLimit = data.dailyGenerationLimit;
+  if (data.dailyGenerationLimitPro !== undefined) update.dailyGenerationLimitPro = data.dailyGenerationLimitPro;
   if (data.dailyVideoLimit !== undefined) update.dailyVideoLimit = data.dailyVideoLimit;
   if (data.dailyVideoLimitPro !== undefined) update.dailyVideoLimitPro = data.dailyVideoLimitPro;
   if (data.dailyMusicLimit !== undefined) update.dailyMusicLimit = data.dailyMusicLimit;
