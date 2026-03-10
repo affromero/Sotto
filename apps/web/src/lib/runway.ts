@@ -146,7 +146,7 @@ export async function createRealtimeSession(params: {
     ? { type: 'runway-preset', presetId: params.avatarId }
     : { type: 'custom', avatarId: params.avatarId };
 
-  const body: Record<string, unknown> = { avatar };
+  const body: Record<string, unknown> = { model: 'gwm1_avatars', avatar };
   if (params.maxDuration) body.maxDuration = params.maxDuration;
 
   const res = await fetch(`${RUNWAY_API_BASE}/realtime_sessions`, {

@@ -121,6 +121,7 @@ beforeEach(() => {
   mockRequireAdmin.mockResolvedValue(null);
   mockFetchAvatarModels.mockResolvedValue([
     { modelId: 'heygen-avatar-standard', displayName: 'Standard Avatar', costPerMinute: 1.0, avatarType: 'standard', maxDuration: null },
+    { modelId: 'runway-characters', displayName: 'Runway Characters', costPerMinute: 0.2, avatarType: 'standard', maxDuration: null },
   ]);
   mockGetAutoModelConfig.mockResolvedValue({
     freeAvatarModel: 'heygen-avatar-standard',
@@ -176,6 +177,7 @@ describe('GET /api/podcasts/[podcastId]/video/avatars', () => {
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.avatars[0].provider).toBe('runway');
+    expect(data.pricing.costPerMinute).toBe(0.2);
     expect(mockListUnifiedAvatars).toHaveBeenCalledWith('test-runway-key', 'runway');
   });
 

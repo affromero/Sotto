@@ -15,25 +15,20 @@ vi.mock('@/lib/providers/ai-registry', () => ({
 import { estimateAvatarCost, formatAvatarCost } from '@/lib/avatar-cost-estimator';
 
 describe('estimateAvatarCost', () => {
-  it('calculates cost for 1 speaker at default rate', () => {
-    // 5 min × $1.00/min = $5.00
-    const cost = estimateAvatarCost(300, 1);
-    expect(cost).toBeCloseTo(5.0, 2);
+  it('calculates cost from costPerMinute', () => {
+    // 5 min × $0.20/min = $1.00
+    const cost = estimateAvatarCost(300, 1, 0.20);
+    expect(cost).toBeCloseTo(1.0, 2);
   });
 
   it('scales linearly with speaker count', () => {
-    const oneSpeaker = estimateAvatarCost(300, 1);
-    const twoSpeakers = estimateAvatarCost(300, 2);
+    const oneSpeaker = estimateAvatarCost(300, 1, 0.50);
+    const twoSpeakers = estimateAvatarCost(300, 2, 0.50);
     expect(twoSpeakers).toBeCloseTo(oneSpeaker * 2, 4);
   });
 
-  it('accepts custom cost per minute', () => {
-    const cost = estimateAvatarCost(60, 1, 0.50); // $0.50/min, 1 minute
-    expect(cost).toBeCloseTo(0.50, 2);
-  });
-
   it('handles zero duration', () => {
-    const cost = estimateAvatarCost(0, 2);
+    const cost = estimateAvatarCost(0, 2, 1.0);
     expect(cost).toBe(0);
   });
 });

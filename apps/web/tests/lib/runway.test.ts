@@ -162,6 +162,7 @@ describe('createRealtimeSession', () => {
 
     expect(sessionId).toBe('session-123');
     const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+    expect(body.model).toBe('gwm1_avatars');
     expect(body.avatar).toEqual({ type: 'runway-preset', presetId: 'influencer' });
   });
 
@@ -179,6 +180,7 @@ describe('createRealtimeSession', () => {
     });
 
     const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+    expect(body.model).toBe('gwm1_avatars');
     expect(body.avatar).toEqual({ type: 'custom', avatarId: 'custom-av-1' });
     expect(body.maxDuration).toBe(300);
   });

@@ -69,10 +69,9 @@ export async function fetchAvatarModels(): Promise<AvatarModelInfo[]> {
 export function estimateAvatarCost(
   durationSeconds: number,
   speakerCount: number,
-  costPerMinute?: number,
+  costPerMinute: number,
 ): number {
-  const rate = costPerMinute ?? 1.0;
-  const perSpeakerCost = (durationSeconds / 60) * rate;
+  const perSpeakerCost = (durationSeconds / 60) * costPerMinute;
   return perSpeakerCost * speakerCount;
 }
 
