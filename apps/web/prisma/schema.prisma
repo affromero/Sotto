@@ -2270,6 +2270,12 @@ model DemoProject {
   // TTS providers to showcase — voice comparison baked into the creation flow
   showcaseProviders String[]
 
+  // Launch video fields
+  backgroundMusicUrl    String?
+  backgroundMusicVolume Float?
+  podcastId             String? // links to the podcast being showcased
+  avatarClipUrl         String? // pre-generated avatar clip R2 URL
+
   createdAt DateTime          @default(now())
   updatedAt DateTime          @updatedAt
   scenes    DemoScene[]
@@ -2312,6 +2318,14 @@ model DemoScene {
   transitionType   String? // 'fade' | 'dissolve' | 'wipe' | null
   transitionUrl    String? // generated transition clip
   transitionStatus DemoSceneAssetStatus @default(PENDING)
+
+  // Launch video cinematic fields
+  sfxConfig       Json? // SceneSfxConfig
+  providerBanner  Json? // ProviderBannerConfig
+  avatarConfig    Json? // AvatarConfig
+  overlays        Json? // TextOverlayConfig[]
+  subtitles       Json? // SubtitleConfig
+  actionTimingLog Json? // ActionTimingEntry[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
