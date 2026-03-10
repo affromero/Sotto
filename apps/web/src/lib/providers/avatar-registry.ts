@@ -69,9 +69,9 @@ const AVATAR_PROVIDERS: Record<AvatarProviderId, AvatarProviderMeta> = {
     id: 'runway',
     displayName: 'Runway',
     getApiKeyUrl: 'https://dev.runwayml.com',
-    defaultModel: 'runway-avatar-realtime',
+    defaultModel: 'runway-characters',
     models: [
-      { id: 'runway-avatar-realtime', displayName: 'Realtime Avatar', tier: 'premium' },
+      { id: 'runway-characters', displayName: 'Runway Characters (GWM-1 Avatars)', tier: 'premium' },
     ],
     platformKeyEnv: 'RUNWAY_API_KEY',
     auth: {
