@@ -1,12 +1,26 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import styles from './MusicGenerator.module.css';
 
 interface ModelOption {
   id: string;
   label: string;
   provider: string;
+  costPerTrack: number;
+}
+
+interface MusicGenerationItem {
+  id: string;
+  status: 'PENDING' | 'GENERATING' | 'READY' | 'FAILED';
+  musicUrl: string | null;
+  duration: number | null;
+  fileSize: number | null;
+  provider: string | null;
+  model: string | null;
+  failureReason: string | null;
+  selected: boolean;
+  createdAt: string;
 }
 
 interface MusicGeneratorProps {
@@ -15,8 +29,6 @@ interface MusicGeneratorProps {
   onMusicReady: (musicUrl: string, volume: number) => void;
   onMusicRemoved: () => void;
 }
-
-type MusicStatus = 'PENDING' | 'GENERATING' | 'READY' | 'FAILED' | null;
 
 function MusicNoteIcon() {
   return (
@@ -39,14 +51,59 @@ function WaveformIcon() {
   );
 }
 
-export function MusicGenerator({ podcastId, initialMusicUrl, onMusicReady, onMusicRemoved }: MusicGeneratorProps) {
-  const [status, setStatus] = useState<MusicStatus>(initialMusicUrl ? 'READY' : null);
+function PlayIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M8 5v14l11-7z" />
+    </svg>
+  );
+}
+
+function PauseIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+      <rect x="6" y="4" width="4" height="16" />
+      <rect x="14" y="4" width="4" height="16" />
+    </svg>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  );
+}
+
+function formatCost(cost: number): string {
+  return `$${cost.toFixed(2)}`;
+}
+
+function formatModelLabel(model: ModelOption): string {
+  return `${model.label} (${model.provider}) — ${formatCost(model.costPerTrack)}/track`;
+}
+
+export function MusicGenerator({ podcastId, onMusicReady, onMusicRemoved }: MusicGeneratorProps) {
+  const [generations, setGenerations] = useState<MusicGenerationItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [availableModels, setAvailableModels] = useState<ModelOption[]>([]);
   const [selectedModel, setSelectedModel] = useState<string>('');
+  const [previewingId, setPreviewingId] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Fetch available models on mount
+  const hasInProgress = generations.some((g) => g.status === 'PENDING' || g.status === 'GENERATING');
+  const selectedGen = generations.find((g) => g.selected);
+
+  // Notify parent when selected generation changes
+  useEffect(() => {
+    if (selectedGen?.musicUrl) {
+      onMusicReady(selectedGen.musicUrl, 0.15);
+    }
+  }, [selectedGen?.musicUrl]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch generations + models on mount
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -59,37 +116,31 @@ export function MusicGenerator({ podcastId, initialMusicUrl, onMusicReady, onMus
           setAvailableModels(data.availableModels);
           setSelectedModel(data.availableModels[0].id);
         }
-        if (data.status) setStatus(data.status);
-        if (data.status === 'READY' && data.musicUrl) {
-          onMusicReady(data.musicUrl, 0.15);
+        if (data.generations) {
+          setGenerations(data.generations);
         }
       } catch {
-        // Silently fail — models will be empty
+        // Silently fail
       }
     })();
     return () => { cancelled = true; };
-  }, [podcastId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [podcastId]);
 
   const poll = useCallback(async () => {
     const res = await fetch(`/api/podcasts/${podcastId}/music`);
     if (!res.ok) return;
     const data = await res.json();
-    if (!data.status) return;
-    setStatus(data.status);
-    if (data.status === 'READY' && data.musicUrl) {
-      onMusicReady(data.musicUrl, 0.15);
+    if (data.generations) {
+      setGenerations(data.generations);
     }
-    if (data.status === 'FAILED') {
-      setError(data.failureReason || 'Music generation failed');
-    }
-  }, [podcastId, onMusicReady]);
+  }, [podcastId]);
 
-  // Poll while generating
+  // Poll while any generation is in progress
   useEffect(() => {
-    if (status !== 'PENDING' && status !== 'GENERATING') return;
+    if (!hasInProgress) return;
     const interval = setInterval(poll, 5000);
     return () => clearInterval(interval);
-  }, [status, poll]);
+  }, [hasInProgress, poll]);
 
   const handleGenerate = async () => {
     setLoading(true);
@@ -105,8 +156,7 @@ export function MusicGenerator({ podcastId, initialMusicUrl, onMusicReady, onMus
         setError(data.error || 'Failed to start music generation');
         return;
       }
-      const data = await res.json();
-      setStatus(data.status);
+      await poll();
     } catch {
       setError('Failed to start music generation');
     } finally {
@@ -114,13 +164,51 @@ export function MusicGenerator({ podcastId, initialMusicUrl, onMusicReady, onMus
     }
   };
 
-  const handleRemove = async () => {
+  const handleSelect = async (generationId: string) => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/podcasts/${podcastId}/music/select`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ generationId }),
+      });
+      if (res.ok) {
+        await poll();
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (generationId: string) => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/podcasts/${podcastId}/music?generationId=${generationId}`, {
+        method: 'DELETE',
+      });
+      if (res.ok) {
+        if (previewingId === generationId) {
+          stopPreview();
+        }
+        await poll();
+        // If deleted the selected one, notify parent
+        const deleted = generations.find((g) => g.id === generationId);
+        if (deleted?.selected) {
+          onMusicRemoved();
+        }
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteAll = async () => {
     setLoading(true);
     try {
       const res = await fetch(`/api/podcasts/${podcastId}/music`, { method: 'DELETE' });
       if (res.ok) {
-        setStatus(null);
-        setError(null);
+        stopPreview();
+        setGenerations([]);
         onMusicRemoved();
       }
     } finally {
@@ -128,60 +216,41 @@ export function MusicGenerator({ podcastId, initialMusicUrl, onMusicReady, onMus
     }
   };
 
-  // ── Generating ──────────────────────────────────────────────
-  if (status === 'PENDING' || status === 'GENERATING') {
-    return (
-      <div className={styles.container}>
-        <span className={styles.label}>
-          <span className={styles.musicIcon}><MusicNoteIcon /></span>
-          Background Music
-        </span>
-        <span className={styles.divider} />
-        <div className={styles.generating}>
-          <WaveformIcon />
-          <span>Generating...</span>
-        </div>
-      </div>
-    );
-  }
+  const togglePreview = (gen: MusicGenerationItem) => {
+    if (previewingId === gen.id) {
+      stopPreview();
+      return;
+    }
+    stopPreview();
+    if (!gen.musicUrl) return;
+    const audio = new Audio(gen.musicUrl);
+    audio.volume = 0.5;
+    audio.play();
+    audio.addEventListener('ended', () => setPreviewingId(null));
+    audioRef.current = audio;
+    setPreviewingId(gen.id);
+  };
 
-  // ── Ready ───────────────────────────────────────────────────
-  if (status === 'READY') {
-    return (
-      <div className={styles.container}>
-        <span className={styles.label}>
-          <span className={styles.musicIcon}><MusicNoteIcon /></span>
-          Background Music
-        </span>
-        <span className={styles.divider} />
-        <span className={styles.readyIndicator}>
-          <span className={styles.readyDot} />
-          Active
-        </span>
-        <div className={styles.actions}>
-          <button
-            className={styles.secondaryAction}
-            onClick={handleGenerate}
-            disabled={loading}
-            aria-label="Regenerate background music"
-          >
-            Regenerate
-          </button>
-          <button
-            className={styles.removeAction}
-            onClick={handleRemove}
-            disabled={loading}
-            aria-label="Remove background music"
-          >
-            Remove
-          </button>
-        </div>
-      </div>
-    );
-  }
+  const stopPreview = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    setPreviewingId(null);
+  };
+
+  // Cleanup audio on unmount
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
 
   // ── No provider ─────────────────────────────────────────────
-  if (!availableModels.length) {
+  if (!availableModels.length && !generations.length) {
     return (
       <div className={styles.container}>
         <span className={styles.label}>
@@ -196,36 +265,129 @@ export function MusicGenerator({ podcastId, initialMusicUrl, onMusicReady, onMus
     );
   }
 
-  // ── Default: model picker + generate ────────────────────────
   return (
-    <div className={styles.container}>
-      <span className={styles.label}>
-        <span className={styles.musicIcon}><MusicNoteIcon /></span>
-        Background Music
-      </span>
-      <span className={styles.divider} />
-      <select
-        className={styles.modelSelect}
-        value={selectedModel}
-        onChange={(e) => setSelectedModel(e.target.value)}
-        disabled={loading}
-        aria-label="Select music model"
-      >
-        {availableModels.map((m) => (
-          <option key={m.id} value={m.id}>
-            {m.label}
-          </option>
-        ))}
-      </select>
-      <button
-        className={styles.generateButton}
-        onClick={handleGenerate}
-        disabled={loading}
-        aria-label="Generate background music"
-      >
-        {loading ? 'Starting...' : 'Generate'}
-      </button>
+    <div className={styles.root}>
+      {/* ── Header + Generate controls ──────────────────────────── */}
+      <div className={styles.container}>
+        <span className={styles.label}>
+          <span className={styles.musicIcon}><MusicNoteIcon /></span>
+          Background Music
+        </span>
+        <span className={styles.divider} />
+
+        {availableModels.length > 0 && (
+          <>
+            <select
+              className={styles.modelSelect}
+              value={selectedModel}
+              onChange={(e) => setSelectedModel(e.target.value)}
+              disabled={loading || hasInProgress}
+              aria-label="Select music model and see price per track"
+            >
+              {availableModels.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {formatModelLabel(m)}
+                </option>
+              ))}
+            </select>
+            <button
+              className={styles.generateButton}
+              onClick={handleGenerate}
+              disabled={loading || hasInProgress}
+              aria-label="Generate background music"
+            >
+              {hasInProgress ? 'Generating...' : loading ? 'Starting...' : 'Generate'}
+            </button>
+          </>
+        )}
+
+        {generations.length > 1 && (
+          <div className={styles.actions}>
+            <button
+              className={styles.removeAction}
+              onClick={handleDeleteAll}
+              disabled={loading}
+              aria-label="Remove all music generations"
+            >
+              Remove All
+            </button>
+          </div>
+        )}
+      </div>
+
       {error && <p className={styles.error}>{error}</p>}
+
+      {/* ── Generations list ────────────────────────────────────── */}
+      {generations.length > 0 && (
+        <ul className={styles.generationList} aria-label="Music generations">
+          {generations.map((gen) => (
+            <li key={gen.id} className={`${styles.generationItem} ${gen.selected ? styles.generationItemSelected : ''}`}>
+              {/* Status indicator */}
+              {gen.status === 'READY' && gen.selected && (
+                <span className={styles.readyIndicator} aria-label="Active">
+                  <span className={styles.readyDot} />
+                  Active
+                </span>
+              )}
+              {gen.status === 'READY' && !gen.selected && (
+                <span className={styles.candidateLabel}>Ready</span>
+              )}
+              {(gen.status === 'PENDING' || gen.status === 'GENERATING') && (
+                <span className={styles.generating}>
+                  <WaveformIcon />
+                  <span>Generating...</span>
+                </span>
+              )}
+              {gen.status === 'FAILED' && (
+                <span className={styles.failedLabel}>Failed</span>
+              )}
+
+              {/* Model info */}
+              <span className={styles.genModel}>
+                {gen.model || 'Default'}
+              </span>
+
+              {/* Actions */}
+              <div className={styles.genActions}>
+                {gen.status === 'READY' && gen.musicUrl && (
+                  <button
+                    className={styles.previewButton}
+                    onClick={() => togglePreview(gen)}
+                    aria-label={previewingId === gen.id ? 'Stop preview' : 'Preview music'}
+                  >
+                    {previewingId === gen.id ? <PauseIcon /> : <PlayIcon />}
+                    {previewingId === gen.id ? 'Stop' : 'Preview'}
+                  </button>
+                )}
+                {gen.status === 'READY' && !gen.selected && (
+                  <button
+                    className={styles.selectButton}
+                    onClick={() => handleSelect(gen.id)}
+                    disabled={loading}
+                    aria-label="Use this music"
+                  >
+                    <CheckIcon />
+                    Use
+                  </button>
+                )}
+                <button
+                  className={styles.deleteButton}
+                  onClick={() => handleDelete(gen.id)}
+                  disabled={loading || gen.status === 'PENDING' || gen.status === 'GENERATING'}
+                  aria-label="Delete this music generation"
+                >
+                  &times;
+                </button>
+              </div>
+
+              {/* Failure reason */}
+              {gen.status === 'FAILED' && gen.failureReason && (
+                <p className={styles.failureReason}>{gen.failureReason}</p>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

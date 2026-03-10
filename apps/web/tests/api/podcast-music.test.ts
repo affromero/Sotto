@@ -13,9 +13,13 @@ const mockExtractR2Key = vi.fn();
 
 const mockPodcastFindUnique = vi.fn();
 const mockPodcastUpdate = vi.fn();
-const mockMusicGenFindUnique = vi.fn();
+const mockMusicGenFindFirst = vi.fn();
+const mockMusicGenFindMany = vi.fn();
 const mockMusicGenCreate = vi.fn();
 const mockMusicGenDelete = vi.fn();
+const mockMusicGenDeleteMany = vi.fn();
+const mockMusicGenUpdate = vi.fn();
+const mockMusicGenUpdateMany = vi.fn();
 const mockTransaction = vi.fn();
 
 vi.mock('@/lib/prisma', () => ({
@@ -25,9 +29,13 @@ vi.mock('@/lib/prisma', () => ({
       update: (...args: unknown[]) => mockPodcastUpdate(...args),
     },
     musicGeneration: {
-      findUnique: (...args: unknown[]) => mockMusicGenFindUnique(...args),
+      findFirst: (...args: unknown[]) => mockMusicGenFindFirst(...args),
+      findMany: (...args: unknown[]) => mockMusicGenFindMany(...args),
       create: (...args: unknown[]) => mockMusicGenCreate(...args),
       delete: (...args: unknown[]) => mockMusicGenDelete(...args),
+      deleteMany: (...args: unknown[]) => mockMusicGenDeleteMany(...args),
+      update: (...args: unknown[]) => mockMusicGenUpdate(...args),
+      updateMany: (...args: unknown[]) => mockMusicGenUpdateMany(...args),
     },
     userTtsKey: {
       findMany: vi.fn().mockResolvedValue([]),
@@ -82,7 +90,8 @@ vi.mock('@/lib/api-response', () => ({
 // ---- Import under test ----
 
 import { POST, GET, DELETE } from '@/app/api/podcasts/[podcastId]/music/route';
-import { PATCH } from '@/app/api/podcasts/[podcastId]/music/volume/route';
+import { PATCH as PATCH_VOLUME } from '@/app/api/podcasts/[podcastId]/music/volume/route';
+import { PATCH as PATCH_SELECT } from '@/app/api/podcasts/[podcastId]/music/select/route';
 
 // ---- Helpers ----
 
@@ -100,14 +109,23 @@ function createGetRequest(): NextRequest {
   });
 }
 
-function createDeleteRequest(): NextRequest {
-  return new NextRequest(new URL('http://localhost:3000/api/podcasts/pod-1/music'), {
-    method: 'DELETE',
+function createDeleteRequest(generationId?: string): NextRequest {
+  const url = generationId
+    ? `http://localhost:3000/api/podcasts/pod-1/music?generationId=${generationId}`
+    : 'http://localhost:3000/api/podcasts/pod-1/music';
+  return new NextRequest(new URL(url), { method: 'DELETE' });
+}
+
+function createPatchVolumeRequest(body: unknown): NextRequest {
+  return new NextRequest(new URL('http://localhost:3000/api/podcasts/pod-1/music/volume'), {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+    headers: { 'Content-Type': 'application/json' },
   });
 }
 
-function createPatchRequest(body: unknown): NextRequest {
-  return new NextRequest(new URL('http://localhost:3000/api/podcasts/pod-1/music/volume'), {
+function createSelectRequest(body: unknown): NextRequest {
+  return new NextRequest(new URL('http://localhost:3000/api/podcasts/pod-1/music/select'), {
     method: 'PATCH',
     body: JSON.stringify(body),
     headers: { 'Content-Type': 'application/json' },
@@ -134,7 +152,7 @@ describe('POST /api/podcasts/[id]/music', () => {
     });
     mockTryIncrementMusicGeneration.mockResolvedValue(true);
     mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'user-1', status: 'READY' });
-    mockMusicGenFindUnique.mockResolvedValue(null);
+    mockMusicGenFindFirst.mockResolvedValue(null);
     mockMusicGenCreate.mockResolvedValue({ id: 'mg-1', podcastId: 'pod-1', status: 'PENDING' });
     mockAddJob.mockResolvedValue({});
   });
@@ -241,11 +259,10 @@ describe('POST /api/podcasts/[id]/music', () => {
     });
   });
 
-  it('returns existing generation when one is in progress (idempotency)', async () => {
-    mockMusicGenFindUnique.mockResolvedValue({
+  it('returns in-progress generation instead of creating a new one', async () => {
+    mockMusicGenFindFirst.mockResolvedValue({
       id: 'mg-existing',
       status: 'GENERATING',
-      musicUrl: null,
     });
 
     const res = await POST(createPostRequest(), routeParams);
@@ -258,33 +275,14 @@ describe('POST /api/podcasts/[id]/music', () => {
     expect(mockAddJob).not.toHaveBeenCalled();
   });
 
-  it('returns existing completed generation (idempotency)', async () => {
-    mockMusicGenFindUnique.mockResolvedValue({
-      id: 'mg-done',
-      status: 'COMPLETED',
-      musicUrl: 'https://r2.example.com/music.mp3',
-    });
+  it('allows new generation when previous ones exist but none in progress', async () => {
+    // findFirst for in-progress returns null (no PENDING/GENERATING)
+    mockMusicGenFindFirst.mockResolvedValue(null);
 
     const res = await POST(createPostRequest(), routeParams);
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.musicGenerationId).toBe('mg-done');
-    expect(body.musicUrl).toBe('https://r2.example.com/music.mp3');
-
-    expect(mockMusicGenCreate).not.toHaveBeenCalled();
-  });
-
-  it('deletes failed generation and creates a new one', async () => {
-    mockMusicGenFindUnique.mockResolvedValue({
-      id: 'mg-failed',
-      status: 'FAILED',
-      musicUrl: null,
-    });
-
-    const res = await POST(createPostRequest(), routeParams);
-    expect(res.status).toBe(200);
-
-    expect(mockMusicGenDelete).toHaveBeenCalledWith({ where: { id: 'mg-failed' } });
+    expect(body.musicGenerationId).toBe('mg-1');
     expect(mockMusicGenCreate).toHaveBeenCalled();
     expect(mockAddJob).toHaveBeenCalled();
   });
@@ -337,6 +335,7 @@ describe('GET /api/podcasts/[id]/music', () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockRequireAdmin.mockResolvedValue(null);
     mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'user-1' });
+    mockMusicGenFindMany.mockResolvedValue([]);
   });
 
   it('returns 401 when unauthenticated', async () => {
@@ -359,68 +358,80 @@ describe('GET /api/podcasts/[id]/music', () => {
     expect(res.status).toBe(403);
   });
 
-  it('returns { status: null } when no music generation exists', async () => {
-    mockMusicGenFindUnique.mockResolvedValue(null);
+  it('returns empty generations array when none exist', async () => {
+    mockMusicGenFindMany.mockResolvedValue([]);
     const res = await GET(createGetRequest(), routeParams);
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body).toMatchObject({ status: null });
+    expect(body.generations).toEqual([]);
+    expect(body.availableModels).toBeDefined();
   });
 
-  it('returns music generation record when it exists', async () => {
+  it('returns all generations for the podcast', async () => {
     const createdAt = new Date().toISOString();
-    mockMusicGenFindUnique.mockResolvedValue({
-      id: 'mg-1',
-      status: 'COMPLETED',
-      musicUrl: 'https://r2.example.com/music.mp3',
-      duration: 120.5,
-      fileSize: 1024000,
-      provider: 'suno',
-      model: 'suno-v4',
-      failureReason: null,
-      createdAt,
-    });
+    mockMusicGenFindMany.mockResolvedValue([
+      {
+        id: 'mg-1',
+        status: 'READY',
+        musicUrl: 'https://r2.example.com/music1.mp3',
+        duration: 120,
+        fileSize: 1024000,
+        provider: 'suno',
+        model: 'suno-v5',
+        failureReason: null,
+        selected: true,
+        createdAt,
+      },
+      {
+        id: 'mg-2',
+        status: 'READY',
+        musicUrl: 'https://r2.example.com/music2.mp3',
+        duration: 115,
+        fileSize: 980000,
+        provider: 'suno',
+        model: 'suno-v4',
+        failureReason: null,
+        selected: false,
+        createdAt,
+      },
+    ]);
 
     const res = await GET(createGetRequest(), routeParams);
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body).toMatchObject({
-      musicGenerationId: 'mg-1',
-      status: 'COMPLETED',
-      musicUrl: 'https://r2.example.com/music.mp3',
-      duration: 120.5,
-      fileSize: 1024000,
-      provider: 'suno',
-      model: 'suno-v4',
-      failureReason: null,
-      createdAt,
-    });
+    expect(body.generations).toHaveLength(2);
+    expect(body.generations[0].id).toBe('mg-1');
+    expect(body.generations[0].selected).toBe(true);
+    expect(body.generations[1].selected).toBe(false);
   });
 
-  it('returns failure reason when generation failed', async () => {
-    mockMusicGenFindUnique.mockResolvedValue({
-      id: 'mg-1',
-      status: 'FAILED',
-      musicUrl: null,
-      duration: null,
-      fileSize: null,
-      provider: 'suno',
-      model: 'suno-v4',
-      failureReason: 'Provider timeout',
-      createdAt: new Date().toISOString(),
-    });
+  it('returns failure reason for failed generations', async () => {
+    mockMusicGenFindMany.mockResolvedValue([
+      {
+        id: 'mg-1',
+        status: 'FAILED',
+        musicUrl: null,
+        duration: null,
+        fileSize: null,
+        provider: 'suno',
+        model: 'suno-v4',
+        failureReason: 'Provider timeout',
+        selected: false,
+        createdAt: new Date().toISOString(),
+      },
+    ]);
 
     const res = await GET(createGetRequest(), routeParams);
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.status).toBe('FAILED');
-    expect(body.failureReason).toBe('Provider timeout');
+    expect(body.generations[0].status).toBe('FAILED');
+    expect(body.generations[0].failureReason).toBe('Provider timeout');
   });
 
   it('allows admin to poll status for another user podcast', async () => {
     mockRequireAdmin.mockResolvedValue('admin-1');
     mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'other-user' });
-    mockMusicGenFindUnique.mockResolvedValue(null);
+    mockMusicGenFindMany.mockResolvedValue([]);
 
     const res = await GET(createGetRequest(), routeParams);
     expect(res.status).toBe(200);
@@ -435,13 +446,18 @@ describe('DELETE /api/podcasts/[id]/music', () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockRequireAdmin.mockResolvedValue(null);
     mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'user-1' });
-    mockMusicGenFindUnique.mockResolvedValue({
+    mockMusicGenFindFirst.mockResolvedValue({
       id: 'mg-1',
       musicUrl: 'https://r2.example.com/music/pod-1.mp3',
+      selected: true,
     });
+    mockMusicGenFindMany.mockResolvedValue([
+      { id: 'mg-1', musicUrl: 'https://r2.example.com/music/pod-1.mp3' },
+    ]);
     mockExtractR2Key.mockReturnValue('music/pod-1.mp3');
     mockDeleteFile.mockResolvedValue(undefined);
     mockMusicGenDelete.mockResolvedValue({});
+    mockMusicGenDeleteMany.mockResolvedValue({ count: 1 });
     mockPodcastUpdate.mockResolvedValue({});
     mockTransaction.mockImplementation(async (ops: unknown[]) => {
       for (const op of ops as Promise<unknown>[]) {
@@ -470,35 +486,77 @@ describe('DELETE /api/podcasts/[id]/music', () => {
     expect(res.status).toBe(403);
   });
 
-  it('returns 404 when no music generation exists', async () => {
-    mockMusicGenFindUnique.mockResolvedValue(null);
-    const res = await DELETE(createDeleteRequest(), routeParams);
-    expect(res.status).toBe(404);
-    const body = await res.json();
-    expect(body).toMatchObject({ error: 'No music generation found' });
-  });
-
-  it('deletes R2 file, music generation record, and clears podcast musicUrl', async () => {
-    const res = await DELETE(createDeleteRequest(), routeParams);
+  it('deletes a specific generation by generationId', async () => {
+    const res = await DELETE(createDeleteRequest('mg-1'), routeParams);
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toEqual({ success: true });
 
+    expect(mockMusicGenFindFirst).toHaveBeenCalledWith({
+      where: { id: 'mg-1', podcastId: 'pod-1' },
+      select: { id: true, musicUrl: true, selected: true },
+    });
     expect(mockExtractR2Key).toHaveBeenCalledWith('https://r2.example.com/music/pod-1.mp3');
     expect(mockDeleteFile).toHaveBeenCalledWith('music/pod-1.mp3');
+  });
+
+  it('clears Podcast.musicUrl when deleting the selected generation', async () => {
+    mockMusicGenFindFirst.mockResolvedValue({
+      id: 'mg-1',
+      musicUrl: 'https://r2.example.com/music/pod-1.mp3',
+      selected: true,
+    });
+
+    const res = await DELETE(createDeleteRequest('mg-1'), routeParams);
+    expect(res.status).toBe(200);
+    // Transaction should be called (delete + clear musicUrl)
     expect(mockTransaction).toHaveBeenCalledTimes(1);
   });
 
-  it('succeeds even when music generation has no musicUrl', async () => {
-    mockMusicGenFindUnique.mockResolvedValue({ id: 'mg-1', musicUrl: null });
+  it('does not clear Podcast.musicUrl when deleting a non-selected generation', async () => {
+    mockMusicGenFindFirst.mockResolvedValue({
+      id: 'mg-2',
+      musicUrl: 'https://r2.example.com/music/mg-2.mp3',
+      selected: false,
+    });
+
+    const res = await DELETE(createDeleteRequest('mg-2'), routeParams);
+    expect(res.status).toBe(200);
+    // Should just delete the record, no transaction needed
+    expect(mockMusicGenDelete).toHaveBeenCalledWith({ where: { id: 'mg-2' } });
+  });
+
+  it('returns 404 when specific generationId not found', async () => {
+    mockMusicGenFindFirst.mockResolvedValue(null);
+    const res = await DELETE(createDeleteRequest('mg-nonexistent'), routeParams);
+    expect(res.status).toBe(404);
+    const body = await res.json();
+    expect(body).toMatchObject({ error: 'Music generation not found' });
+  });
+
+  it('deletes all generations when no generationId provided', async () => {
+    mockMusicGenFindMany.mockResolvedValue([
+      { id: 'mg-1', musicUrl: 'https://r2.example.com/music1.mp3' },
+      { id: 'mg-2', musicUrl: 'https://r2.example.com/music2.mp3' },
+    ]);
+
     const res = await DELETE(createDeleteRequest(), routeParams);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toEqual({ success: true });
+    expect(mockTransaction).toHaveBeenCalledTimes(1);
+  });
+
+  it('succeeds when deleting generation with no musicUrl', async () => {
+    mockMusicGenFindFirst.mockResolvedValue({ id: 'mg-1', musicUrl: null, selected: false });
+    const res = await DELETE(createDeleteRequest('mg-1'), routeParams);
     expect(res.status).toBe(200);
     expect(mockDeleteFile).not.toHaveBeenCalled();
   });
 
-  it('succeeds even when R2 deletion fails (logs warning)', async () => {
+  it('succeeds even when R2 deletion fails', async () => {
     mockDeleteFile.mockRejectedValue(new Error('R2 timeout'));
-    const res = await DELETE(createDeleteRequest(), routeParams);
+    const res = await DELETE(createDeleteRequest('mg-1'), routeParams);
     expect(res.status).toBe(200);
   });
 
@@ -506,7 +564,89 @@ describe('DELETE /api/podcasts/[id]/music', () => {
     mockRequireAdmin.mockResolvedValue('admin-1');
     mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'other-user' });
 
-    const res = await DELETE(createDeleteRequest(), routeParams);
+    const res = await DELETE(createDeleteRequest('mg-1'), routeParams);
+    expect(res.status).toBe(200);
+  });
+});
+
+// ---- Tests: PATCH /api/podcasts/[id]/music/select ----
+
+describe('PATCH /api/podcasts/[id]/music/select', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockRequireAdmin.mockResolvedValue(null);
+    mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'user-1' });
+    mockMusicGenFindFirst.mockResolvedValue({
+      id: 'mg-2',
+      status: 'READY',
+      musicUrl: 'https://r2.example.com/music2.mp3',
+    });
+    mockMusicGenUpdateMany.mockResolvedValue({ count: 1 });
+    mockMusicGenUpdate.mockResolvedValue({});
+    mockPodcastUpdate.mockResolvedValue({});
+    mockTransaction.mockImplementation(async (ops: unknown[]) => {
+      for (const op of ops as Promise<unknown>[]) {
+        await op;
+      }
+    });
+  });
+
+  it('returns 401 when unauthenticated', async () => {
+    mockAuthenticateRequest.mockResolvedValue(null);
+    const res = await PATCH_SELECT(createSelectRequest({ generationId: 'mg-2' }), routeParams);
+    expect(res.status).toBe(401);
+  });
+
+  it('returns 404 when podcast not found', async () => {
+    mockPodcastFindUnique.mockResolvedValue(null);
+    const res = await PATCH_SELECT(createSelectRequest({ generationId: 'mg-2' }), routeParams);
+    expect(res.status).toBe(404);
+  });
+
+  it('returns 403 when user is not the owner and not admin', async () => {
+    mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'other-user' });
+    const res = await PATCH_SELECT(createSelectRequest({ generationId: 'mg-2' }), routeParams);
+    expect(res.status).toBe(403);
+  });
+
+  it('returns 400 when body is invalid', async () => {
+    const res = await PATCH_SELECT(createSelectRequest({}), routeParams);
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 404 when generation not found', async () => {
+    mockMusicGenFindFirst.mockResolvedValue(null);
+    const res = await PATCH_SELECT(createSelectRequest({ generationId: 'mg-nonexistent' }), routeParams);
+    expect(res.status).toBe(404);
+  });
+
+  it('returns 400 when generation is not READY', async () => {
+    mockMusicGenFindFirst.mockResolvedValue({
+      id: 'mg-2',
+      status: 'GENERATING',
+      musicUrl: null,
+    });
+    const res = await PATCH_SELECT(createSelectRequest({ generationId: 'mg-2' }), routeParams);
+    expect(res.status).toBe(400);
+  });
+
+  it('selects a generation and updates Podcast.musicUrl', async () => {
+    const res = await PATCH_SELECT(createSelectRequest({ generationId: 'mg-2' }), routeParams);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.success).toBe(true);
+    expect(body.musicUrl).toBe('https://r2.example.com/music2.mp3');
+
+    // Transaction: deselect all, select target, update podcast
+    expect(mockTransaction).toHaveBeenCalledTimes(1);
+  });
+
+  it('allows admin to select for another user podcast', async () => {
+    mockRequireAdmin.mockResolvedValue('admin-1');
+    mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'other-user' });
+
+    const res = await PATCH_SELECT(createSelectRequest({ generationId: 'mg-2' }), routeParams);
     expect(res.status).toBe(200);
   });
 });
@@ -524,7 +664,7 @@ describe('PATCH /api/podcasts/[id]/music/volume', () => {
 
   it('returns 401 when unauthenticated', async () => {
     mockAuthenticateRequest.mockResolvedValue(null);
-    const res = await PATCH(createPatchRequest({ volume: 0.5 }), routeParams);
+    const res = await PATCH_VOLUME(createPatchVolumeRequest({ volume: 0.5 }), routeParams);
     expect(res.status).toBe(401);
     const body = await res.json();
     expect(body).toMatchObject({ error: 'Unauthorized' });
@@ -532,18 +672,18 @@ describe('PATCH /api/podcasts/[id]/music/volume', () => {
 
   it('returns 404 when podcast not found', async () => {
     mockPodcastFindUnique.mockResolvedValue(null);
-    const res = await PATCH(createPatchRequest({ volume: 0.5 }), routeParams);
+    const res = await PATCH_VOLUME(createPatchVolumeRequest({ volume: 0.5 }), routeParams);
     expect(res.status).toBe(404);
   });
 
   it('returns 403 when user is not the owner and not admin', async () => {
     mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'other-user' });
-    const res = await PATCH(createPatchRequest({ volume: 0.5 }), routeParams);
+    const res = await PATCH_VOLUME(createPatchVolumeRequest({ volume: 0.5 }), routeParams);
     expect(res.status).toBe(403);
   });
 
   it('updates volume and returns new value', async () => {
-    const res = await PATCH(createPatchRequest({ volume: 0.75 }), routeParams);
+    const res = await PATCH_VOLUME(createPatchVolumeRequest({ volume: 0.75 }), routeParams);
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toEqual({ volume: 0.75 });
@@ -555,36 +695,36 @@ describe('PATCH /api/podcasts/[id]/music/volume', () => {
   });
 
   it('accepts volume of 0 (mute)', async () => {
-    const res = await PATCH(createPatchRequest({ volume: 0 }), routeParams);
+    const res = await PATCH_VOLUME(createPatchVolumeRequest({ volume: 0 }), routeParams);
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toEqual({ volume: 0 });
   });
 
   it('accepts volume of 1 (max)', async () => {
-    const res = await PATCH(createPatchRequest({ volume: 1 }), routeParams);
+    const res = await PATCH_VOLUME(createPatchVolumeRequest({ volume: 1 }), routeParams);
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toEqual({ volume: 1 });
   });
 
   it('rejects volume below 0', async () => {
-    const res = await PATCH(createPatchRequest({ volume: -0.1 }), routeParams);
+    const res = await PATCH_VOLUME(createPatchVolumeRequest({ volume: -0.1 }), routeParams);
     expect(res.status).toBe(400);
   });
 
   it('rejects volume above 1', async () => {
-    const res = await PATCH(createPatchRequest({ volume: 1.5 }), routeParams);
+    const res = await PATCH_VOLUME(createPatchVolumeRequest({ volume: 1.5 }), routeParams);
     expect(res.status).toBe(400);
   });
 
   it('rejects missing volume field', async () => {
-    const res = await PATCH(createPatchRequest({}), routeParams);
+    const res = await PATCH_VOLUME(createPatchVolumeRequest({}), routeParams);
     expect(res.status).toBe(400);
   });
 
   it('rejects non-numeric volume', async () => {
-    const res = await PATCH(createPatchRequest({ volume: 'loud' }), routeParams);
+    const res = await PATCH_VOLUME(createPatchVolumeRequest({ volume: 'loud' }), routeParams);
     expect(res.status).toBe(400);
   });
 
@@ -592,7 +732,7 @@ describe('PATCH /api/podcasts/[id]/music/volume', () => {
     mockRequireAdmin.mockResolvedValue('admin-1');
     mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'other-user' });
 
-    const res = await PATCH(createPatchRequest({ volume: 0.3 }), routeParams);
+    const res = await PATCH_VOLUME(createPatchVolumeRequest({ volume: 0.3 }), routeParams);
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toEqual({ volume: 0.3 });
