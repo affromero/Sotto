@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { requireAdmin } from '@/lib/auth-guards';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { errorResponse } from '@/lib/api-response';
@@ -127,7 +128,7 @@ export async function POST(
         data: {
           podcastId,
           status: 'PENDING',
-          pipelineJson: pipeline ?? undefined,
+          pipelineJson: pipeline ? (pipeline as unknown as Prisma.InputJsonValue) : undefined,
         },
         select: { id: true, status: true, avatarsVisible: true },
       });
@@ -137,7 +138,7 @@ export async function POST(
         where: { id: videoGen.id },
         data: {
           status: 'PENDING',
-          pipelineJson: pipeline ?? undefined,
+          pipelineJson: pipeline ? (pipeline as unknown as Prisma.InputJsonValue) : undefined,
           failureReason: null,
           technicalError: null,
         },
