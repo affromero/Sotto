@@ -224,6 +224,7 @@ export interface NewsIngestPayload {}
 
 export interface GenerateDemoScriptPayload {
   projectId: string;
+  durationTarget?: number;
 }
 
 export interface GenerateDemoRecordingPayload {

@@ -2256,13 +2256,20 @@ model DemoProject {
   title        String
   description  String?
   features     String[] // feature slugs to demonstrate
+  aiModel      String? // AI model for script generation (e.g. "claude-sonnet-4-20250514")
   status       DemoProjectStatus @default(DRAFT)
   failedReason String?
   videoUrl     String? // final composed video
   audioUrl     String? // final stitched voiceover
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
-  scenes       DemoScene[]
+
+  // Default TTS config — applied to all new scenes
+  defaultTtsProvider String?
+  defaultTtsModel    String?
+  defaultTtsVoiceId  String?
+
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  scenes    DemoScene[]
 
   @@index([userId])
 }

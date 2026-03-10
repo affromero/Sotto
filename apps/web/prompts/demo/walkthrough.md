@@ -26,11 +26,26 @@ These mock API responses so the demo doesn't depend on real backend processing:
 
 {{INTERCEPTOR_CATALOG}}
 
+## Narration Tone
+
+Write narration as a **technical product narrator** — direct, precise, factual. Think Apple WWDC engineering sessions or Stripe product demos, NOT a hype video or sales pitch.
+
+Rules:
+- **Never** address the viewer ("Welcome", "Let's", "You'll see", "I'll show you")
+- **Never** use filler ("So", "Now", "Great", "Basically", "Simply")
+- **Never** use marketing language ("bold", "powerful", "revolutionary", "seamlessly")
+- State what the product does, not what the viewer should feel
+- Use present tense, third person: "The user types a topic. The AI generates a two-voice script."
+- Keep sentences short. One idea per sentence. No conjunctions chaining 3+ clauses.
+
+Good: "A new podcast appears in the feed with cover art, title, and duration. Listeners can play it directly or fork it with their own angle."
+Bad: "Welcome — let's see how easy it is to create a podcast! I'll walk you through the amazing creation flow."
+
 ## Scene Structure
 
 Each scene is an object with:
-- `title` (string): Short scene name, e.g. "User creates a podcast"
-- `narration` (string): What the narrator says during this scene. Write naturally — warm, confident, conversational. No marketing buzzwords.
+- `title` (string): Short scene name, e.g. "Create a podcast"
+- `narration` (string): What the narrator says during this scene. Follow the tone rules above strictly.
 - `actions` (array): Browser automation steps (see Action Types below)
 - `visualSuggestion` (object | null): Optional supplementary visual
   - `type`: "ai_image" | "ai_video" | "map"

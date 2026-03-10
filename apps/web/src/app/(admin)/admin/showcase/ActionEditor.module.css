@@ -81,7 +81,7 @@
 }
 
 .moveBtn:hover:not(:disabled) {
-  background: #f3f4f6;
+  background: var(--color-hover, #f3f4f6);
   color: var(--color-text-primary);
 }
 
@@ -109,8 +109,9 @@
   border-radius: var(--radius-sm);
   font: var(--text-body-xs);
   color: var(--color-text-primary);
-  background: #fff;
+  background: var(--color-surface);
   min-height: 32px;
+  color-scheme: light dark;
 }
 
 .paramInput:focus {

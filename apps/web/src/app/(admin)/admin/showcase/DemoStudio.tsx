@@ -63,15 +63,20 @@ const STEPS: { key: Step; label: string; number: number }[] = [
   { key: 'preview', label: 'Preview', number: 5 },
 ];
 
-const FEATURE_OPTIONS = [
-  'creation-flow', 'interrupt', 'fork', 'voice-comparison', 'import',
-  'social-feed', 'byok', 'voice-cloning', 'script-review',
-  'video-generation', 'collections', 'multi-speaker',
+const FEATURE_OPTIONS: { slug: string; label: string; desc: string }[] = [
+  { slug: 'creation-flow', label: 'Podcast Generation', desc: 'Chat with AI → generate a 2-voice podcast with sound effects and citations' },
+  { slug: 'interrupt', label: 'Interrupt Q&A', desc: 'Pause playback to ask questions — AI answers in context' },
+  { slug: 'fork', label: 'Fork', desc: 'Remix any podcast with your own angle, tone, or focus areas' },
+  { slug: 'voice-comparison', label: 'Voice Comparison', desc: 'Compare 8+ TTS providers side-by-side on the same script' },
+  { slug: 'import', label: 'Import', desc: 'Import human-made podcasts — transcribe and add social features' },
+  { slug: 'social-feed', label: 'Social Feed', desc: 'Public feed with search, filters, follows, and collections' },
+  { slug: 'byok', label: 'BYOK', desc: 'Bring Your Own API Keys for unlimited free usage' },
+  { slug: 'voice-cloning', label: 'Voice Cloning', desc: 'Clone your voice, set a price, let others request access' },
+  { slug: 'script-review', label: 'Script Review', desc: 'Review, edit, and approve AI scripts before audio generation' },
+  { slug: 'video-generation', label: 'Video Generation', desc: 'Turn podcasts into videos with AI visuals and transitions' },
+  { slug: 'collections', label: 'Collections', desc: 'Curate and share podcast playlists others can follow' },
+  { slug: 'multi-speaker', label: 'Multi-Speaker', desc: 'Up to 4 custom speakers per podcast' },
 ];
-
-function featureLabel(slug: string): string {
-  return slug.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-}
 
 function statusBadge(status: string): string {
   switch (status) {
@@ -104,6 +109,13 @@ export function DemoStudio({ providers }: { providers: ProviderInfo[] }) {
   const [description, setDescription] = useState('');
   const [features, setFeatures] = useState<string[]>([]);
   const [durationTarget, setDurationTarget] = useState(120);
+  const [aiModel, setAiModel] = useState('');
+  const [defaultTtsProvider, setDefaultTtsProvider] = useState('');
+  const [defaultTtsModel, setDefaultTtsModel] = useState('');
+  const [defaultTtsVoiceId, setDefaultTtsVoiceId] = useState('');
+
+  // AI models (fetched from API)
+  const [aiModels, setAiModels] = useState<{ id: string; displayName: string; group?: string }[]>([]);
 
   // Load projects
   const loadProjects = useCallback(async () => {
@@ -128,6 +140,16 @@ export function DemoStudio({ providers }: { providers: ProviderInfo[] }) {
 
   useEffect(() => { loadProjects(); }, [loadProjects]);
 
+  // Fetch AI models
+  useEffect(() => {
+    fetch('/api/ai-models').then(async (res) => {
+      if (res.ok) {
+        const data = await res.json();
+        setAiModels(data.models ?? []);
+      }
+    }).catch(() => {});
+  }, []);
+
   // Poll for status updates on selected project
   useEffect(() => {
     if (!selectedProject) return;
@@ -146,7 +168,16 @@ export function DemoStudio({ providers }: { providers: ProviderInfo[] }) {
       const res = await fetch('/api/admin/demo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, description: description || undefined, features, durationTarget }),
+        body: JSON.stringify({
+          title,
+          description: description || undefined,
+          features,
+          durationTarget,
+          aiModel: aiModel || undefined,
+          defaultTtsProvider: defaultTtsProvider || undefined,
+          defaultTtsModel: defaultTtsModel || undefined,
+          defaultTtsVoiceId: defaultTtsVoiceId || undefined,
+        }),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -155,12 +186,21 @@ export function DemoStudio({ providers }: { providers: ProviderInfo[] }) {
       const { id } = await res.json();
       await loadProjects();
       await loadProject(id);
+      setStep('script');
+      setTitle('');
+      setDescription('');
+      setFeatures([]);
+      setDurationTarget(120);
+      setAiModel('');
+      setDefaultTtsProvider('');
+      setDefaultTtsModel('');
+      setDefaultTtsVoiceId('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setLoading(false);
     }
-  }, [title, description, features, durationTarget, loadProjects, loadProject]);
+  }, [title, description, features, durationTarget, aiModel, defaultTtsProvider, defaultTtsModel, defaultTtsVoiceId, loadProjects, loadProject]);
 
   // Save scene edits
   const saveScene = useCallback(async (sceneId: string, data: Partial<DemoScene>) => {
@@ -262,15 +302,20 @@ export function DemoStudio({ providers }: { providers: ProviderInfo[] }) {
             ) : (
               <div className={styles.projectList}>
                 {projects.map((p) => (
-                  <button
+                  <div
                     key={p.id}
                     className={styles.projectCard}
+                    role="button"
+                    tabIndex={0}
                     data-selected={selectedProject?.id === p.id ? 'true' : undefined}
                     onClick={() => loadProject(p.id)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') loadProject(p.id); }}
                   >
                     <span className={styles.projectTitle}>{p.title}</span>
                     <span className={styles.projectMeta}>
-                      {p._count?.scenes ?? 0} scenes &middot; {p.status}
+                      {p.status === 'DRAFT'
+                        ? 'Generating script...'
+                        : `${p._count?.scenes ?? 0} scenes · ${p.status}`}
                     </span>
                     <button
                       className={styles.deleteBtn}
@@ -279,7 +324,7 @@ export function DemoStudio({ providers }: { providers: ProviderInfo[] }) {
                     >
                       &times;
                     </button>
-                  </button>
+                  </div>
                 ))}
               </div>
             )}
@@ -314,14 +359,16 @@ export function DemoStudio({ providers }: { providers: ProviderInfo[] }) {
                 <div className={styles.chipGrid}>
                   {FEATURE_OPTIONS.map((f) => (
                     <button
-                      key={f}
+                      key={f.slug}
                       className={styles.chip}
-                      data-selected={features.includes(f) ? 'true' : undefined}
+                      data-selected={features.includes(f.slug) ? 'true' : undefined}
                       onClick={() => setFeatures((prev) =>
-                        prev.includes(f) ? prev.filter((x) => x !== f) : [...prev, f]
+                        prev.includes(f.slug) ? prev.filter((x) => x !== f.slug) : [...prev, f.slug]
                       )}
+                      title={f.desc}
                     >
-                      {featureLabel(f)}
+                      <strong>{f.label}</strong>
+                      <span className={styles.chipDesc}>{f.desc}</span>
                     </button>
                   ))}
                 </div>
@@ -338,6 +385,53 @@ export function DemoStudio({ providers }: { providers: ProviderInfo[] }) {
                   className={styles.slider}
                 />
               </label>
+              <label className={styles.formLabel}>
+                AI Model (script generation)
+                <select
+                  className={styles.select}
+                  value={aiModel}
+                  onChange={(e) => setAiModel(e.target.value)}
+                >
+                  <option value="">Default</option>
+                  {aiModels.map((m) => (
+                    <option key={m.id} value={m.id}>{m.displayName}{m.group ? ` (${m.group})` : ''}</option>
+                  ))}
+                </select>
+              </label>
+              <fieldset className={styles.fieldset}>
+                <legend className={styles.formLabel}>Default voice (all scenes)</legend>
+                <div className={styles.voiceRow}>
+                  <select
+                    className={styles.select}
+                    value={defaultTtsProvider}
+                    onChange={(e) => { setDefaultTtsProvider(e.target.value); setDefaultTtsModel(''); setDefaultTtsVoiceId(''); }}
+                  >
+                    <option value="">Default (ElevenLabs)</option>
+                    {providers.map((p) => (
+                      <option key={p.id} value={p.id}>{p.displayName}</option>
+                    ))}
+                  </select>
+                  {providers.find((p) => p.id === defaultTtsProvider) && (
+                    <select
+                      className={styles.select}
+                      value={defaultTtsModel}
+                      onChange={(e) => setDefaultTtsModel(e.target.value)}
+                    >
+                      <option value="">Default model</option>
+                      {providers.find((p) => p.id === defaultTtsProvider)?.models.map((m) => (
+                        <option key={m.id} value={m.id}>{m.displayName}</option>
+                      ))}
+                    </select>
+                  )}
+                  <input
+                    type="text"
+                    className={styles.input}
+                    value={defaultTtsVoiceId}
+                    onChange={(e) => setDefaultTtsVoiceId(e.target.value)}
+                    placeholder="Voice ID (optional)"
+                  />
+                </div>
+              </fieldset>
               <button
                 className={styles.primaryBtn}
                 onClick={createProject}
@@ -364,7 +458,16 @@ export function DemoStudio({ providers }: { providers: ProviderInfo[] }) {
             </button>
           </div>
           {selectedProject.status === 'DRAFT' ? (
-            <p className={styles.emptyText}>Generating script...</p>
+            <div className={styles.generatingBanner}>
+              <span className={styles.spinner} />
+              <div>
+                <strong>Generating walkthrough script...</strong>
+                <p className={styles.emptyText}>
+                  AI is creating scenes with browser actions and narration for the selected features.
+                  This typically takes 15–30 seconds.
+                </p>
+              </div>
+            </div>
           ) : (
             <div className={styles.sceneList}>
               {scenes.map((scene) => (
