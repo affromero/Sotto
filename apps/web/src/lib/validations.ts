@@ -46,6 +46,25 @@ export const demoActionSchema = z.discriminatedUnion('type', [
 ]);
 
 /**
+ * Timing segment — speed zone within a recording
+ */
+export const timingSegmentSchema = z.object({
+  start: z.number().min(0),
+  end: z.number().min(0),
+  speed: z.number().min(0).max(16), // 0 = skip, max 16x
+}).refine((s) => s.end > s.start, { message: 'end must be greater than start' });
+
+const timingSegmentsArraySchema = z.array(timingSegmentSchema).refine(
+  (segs) => {
+    for (let i = 1; i < segs.length; i++) {
+      if (Math.abs(segs[i].start - segs[i - 1].end) > 0.01) return false;
+    }
+    return true;
+  },
+  { message: 'Timing segments must be contiguous (no gaps or overlaps)' },
+);
+
+/**
  * Demo Video Studio — DemoScene update
  */
 export const updateDemoSceneSchema = z.object({
@@ -58,6 +77,7 @@ export const updateDemoSceneSchema = z.object({
   ttsModel: z.string().optional(),
   ttsVoiceId: z.string().optional(),
   transitionType: z.enum(['fade', 'dissolve', 'wipe']).nullable().optional(),
+  timingSegments: timingSegmentsArraySchema.nullable().optional(),
 });
 
 /**

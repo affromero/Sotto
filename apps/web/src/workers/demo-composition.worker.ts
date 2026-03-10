@@ -48,6 +48,7 @@ export async function processDemoComposition(job: Job<ComposeDemoPayload>): Prom
       visualUrl: scene.visualUrl ?? undefined,
       visualType: scene.visualType ?? undefined,
       transitionUrl: scene.transitionUrl ?? undefined,
+      timingSegments: (scene.timingSegments as { start: number; end: number; speed: number }[] | null) ?? undefined,
     }));
 
     const stitchResponse = await fetch(`${REMOTION_URL}/stitch`, {

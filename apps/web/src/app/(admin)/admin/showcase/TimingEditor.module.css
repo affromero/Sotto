@@ -1,0 +1,323 @@
+.card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--color-surface);
+  border: none;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  font: var(--text-body-sm);
+  min-height: 44px;
+}
+
+.order {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: #fff;
+  font: var(--text-body-xs);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.title {
+  flex: 1;
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+.durationBadge {
+  font: var(--text-body-xs);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+}
+
+.originalDuration {
+  font-weight: 400;
+  color: var(--color-text-secondary);
+}
+
+.noRecording {
+  font: var(--text-body-xs);
+  color: var(--color-text-secondary);
+  font-style: italic;
+}
+
+.expandIcon {
+  color: var(--color-text-secondary);
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.body {
+  padding: var(--spacing-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  border-top: 1px solid var(--color-border);
+}
+
+/* Video preview */
+
+.video {
+  width: 100%;
+  max-height: 360px;
+  border-radius: var(--radius-sm);
+  background: #000;
+}
+
+/* Split button */
+
+.splitRow {
+  display: flex;
+  justify-content: center;
+}
+
+.splitBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font: var(--text-body-xs);
+  font-weight: 500;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  min-height: 36px;
+  transition: border-color 0.15s ease;
+}
+
+.splitBtn:hover {
+  border-color: var(--color-primary);
+}
+
+/* Timeline */
+
+.timeline {
+  position: relative;
+  display: flex;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  overflow: visible;
+  cursor: pointer;
+  user-select: none;
+}
+
+.timelineGroup {
+  position: relative;
+  display: flex;
+  min-width: 20px;
+}
+
+.timelineSegment {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 2px;
+  margin: 0 1px;
+  transition: opacity 0.15s ease;
+}
+
+.timelineSegment[data-skip='true'] {
+  opacity: 0.4;
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 4px,
+    rgba(0, 0, 0, 0.15) 4px,
+    rgba(0, 0, 0, 0.15) 8px
+  );
+}
+
+.segmentLabel {
+  font: var(--text-body-xs);
+  font-weight: 600;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+}
+
+.handle {
+  position: absolute;
+  right: -4px;
+  top: -2px;
+  bottom: -2px;
+  width: 8px;
+  cursor: col-resize;
+  z-index: 2;
+  background: var(--color-text-primary);
+  opacity: 0;
+  border-radius: 4px;
+  transition: opacity 0.15s ease;
+}
+
+.handle:hover,
+.handle:active {
+  opacity: 0.6;
+}
+
+.playhead {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  background: var(--color-text-primary);
+  pointer-events: none;
+  z-index: 3;
+  border-radius: 1px;
+}
+
+/* Segment list */
+
+.segmentList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.segmentRow {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  min-height: 40px;
+}
+
+.segmentTime {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  min-width: 120px;
+}
+
+.speedControls {
+  display: flex;
+  gap: 2px;
+  flex: 1;
+}
+
+.speedBtn {
+  padding: 4px 8px;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font: var(--text-body-xs);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  min-height: 32px;
+  min-width: 36px;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.speedBtn:hover {
+  border-color: var(--color-primary);
+  color: var(--color-text-primary);
+}
+
+.speedBtn[data-active='true'] {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fff;
+}
+
+.speedBtn[data-skip='true'][data-active='true'] {
+  background: var(--color-error, #ef4444);
+  border-color: var(--color-error, #ef4444);
+}
+
+.segmentResult {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  min-width: 50px;
+  text-align: right;
+}
+
+.mergeBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  color: var(--color-text-secondary);
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  min-width: 28px;
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s ease;
+}
+
+.mergeBtn:hover {
+  color: var(--color-primary);
+}
+
+/* Duration summary */
+
+.summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font: var(--text-body-xs);
+  color: var(--color-text-secondary);
+}
+
+.summary strong {
+  color: var(--color-text-primary);
+}
+
+.voiceoverCompare[data-warn='true'] {
+  color: var(--color-error, #ef4444);
+  font-weight: 600;
+}
+
+/* Save button */
+
+.saveBtn {
+  align-self: flex-end;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-sm) var(--spacing-lg);
+  background: var(--color-primary);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  font: var(--text-body-sm);
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 44px;
+  transition: opacity 0.15s ease;
+}
+
+.saveBtn:hover {
+  opacity: 0.9;
+}

@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import styles from './DemoStudio.module.css';
 import { ActionEditor } from './ActionEditor';
+import { TimingEditor, computeAdjustedDuration, type TimingSegment } from './TimingEditor';
 
 interface ProviderModel {
   id: string;
@@ -38,6 +39,7 @@ interface DemoScene {
   transitionType: string | null;
   transitionUrl: string | null;
   transitionStatus: string;
+  timingSegments: TimingSegment[] | null;
 }
 
 interface DemoProject {
@@ -53,14 +55,15 @@ interface DemoProject {
   _count?: { scenes: number };
 }
 
-type Step = 'features' | 'script' | 'voices' | 'assets' | 'preview';
+type Step = 'features' | 'script' | 'voices' | 'assets' | 'timing' | 'preview';
 
 const STEPS: { key: Step; label: string; number: number }[] = [
   { key: 'features', label: 'Features', number: 1 },
   { key: 'script', label: 'Script', number: 2 },
   { key: 'voices', label: 'Voices', number: 3 },
   { key: 'assets', label: 'Assets', number: 4 },
-  { key: 'preview', label: 'Preview', number: 5 },
+  { key: 'timing', label: 'Timing', number: 5 },
+  { key: 'preview', label: 'Preview', number: 6 },
 ];
 
 const FEATURE_OPTIONS: { slug: string; label: string; desc: string }[] = [
@@ -259,6 +262,8 @@ export function DemoStudio({ providers }: { providers: ProviderInfo[] }) {
   }, [selectedProject, loadProjects]);
 
   const scenes = selectedProject?.scenes ?? [];
+  const hasRecordings = scenes.some((s) => s.recordingStatus === 'READY');
+
   const isUnlocked = (s: Step): boolean => {
     if (s === 'features') return true;
     if (!selectedProject) return false;
@@ -266,9 +271,18 @@ export function DemoStudio({ providers }: { providers: ProviderInfo[] }) {
     if (s === 'script') return status !== 'DRAFT';
     if (s === 'voices') return status !== 'DRAFT';
     if (s === 'assets') return status !== 'DRAFT';
+    if (s === 'timing') return hasRecordings;
     if (s === 'preview') return status === 'READY' || status === 'COMPOSING';
     return false;
   };
+
+  // Compute total adjusted duration across all scenes
+  const totalAdjustedDuration = scenes.reduce((sum, s) => {
+    if (s.timingSegments && s.timingSegments.length > 0) {
+      return sum + computeAdjustedDuration(s.timingSegments);
+    }
+    return sum + (s.duration ?? 0);
+  }, 0);
 
   return (
     <div className={styles.root}>
@@ -563,15 +577,43 @@ export function DemoStudio({ providers }: { providers: ProviderInfo[] }) {
               </div>
             ))}
           </div>
-          {scenes.every((s) => s.recordingStatus === 'READY' && s.voiceoverStatus === 'READY') && (
-            <button className={styles.primaryBtn} onClick={composeVideo} disabled={loading}>
-              Compose Final Video
+          {hasRecordings && (
+            <button className={styles.primaryBtn} onClick={() => setStep('timing')}>
+              Continue to Timing
             </button>
           )}
         </div>
       )}
 
-      {/* Step 5: Preview */}
+      {/* Step 5: Timing */}
+      {step === 'timing' && selectedProject && (
+        <div className={styles.panel}>
+          <div className={styles.sectionHeader}>
+            <h2 className={styles.sectionTitle}>Timing &amp; Speed</h2>
+            {totalAdjustedDuration > 0 && (
+              <span className={styles.totalDuration}>
+                Total: {Math.floor(totalAdjustedDuration / 60)}:{(totalAdjustedDuration % 60).toFixed(1).padStart(4, '0')}
+              </span>
+            )}
+          </div>
+          <div className={styles.sceneList}>
+            {scenes.map((scene) => (
+              <TimingEditor
+                key={scene.id}
+                scene={scene}
+                onSave={(data) => saveScene(scene.id, data)}
+              />
+            ))}
+          </div>
+          {scenes.every((s) => s.recordingStatus === 'READY' && s.voiceoverStatus === 'READY') && (
+            <button className={styles.primaryBtn} onClick={composeVideo} disabled={loading}>
+              {loading ? 'Composing...' : 'Compose Final Video'}
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Step 6: Preview */}
       {step === 'preview' && selectedProject && (
         <div className={styles.panel}>
           <h2 className={styles.sectionTitle}>Preview</h2>

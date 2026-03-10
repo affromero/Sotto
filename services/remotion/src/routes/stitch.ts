@@ -11,12 +11,19 @@ const execFileAsync = promisify(execFile);
 
 export const stitchRouter = Router();
 
+interface TimingSegment {
+  start: number;
+  end: number;
+  speed: number; // 0 = skip
+}
+
 interface StitchScene {
   recordingUrl: string;
   voiceoverUrl?: string;
   visualUrl?: string;
   visualType?: string;
   transitionUrl?: string;
+  timingSegments?: TimingSegment[];
 }
 
 interface StitchRequest {
@@ -41,9 +48,77 @@ async function downloadFile(url: string, dest: string): Promise<void> {
   fs.writeFileSync(dest, buffer);
 }
 
+/** Get duration of a media file in seconds. */
+async function probeDuration(filePath: string): Promise<number> {
+  const { stdout } = await execFileAsync('ffprobe', [
+    '-v', 'error',
+    '-show_entries', 'format=duration',
+    '-of', 'csv=p=0',
+    filePath,
+  ]);
+  return parseFloat(stdout.trim());
+}
+
 /**
- * Composite a single scene: overlay voiceover onto recording, trim/stretch
- * video to match voiceover duration (voiceover is source of truth).
+ * Apply timing segments to a recording: extract time ranges, apply per-segment
+ * speed via setpts, then concat the pieces. Returns the timing-adjusted video path.
+ */
+async function applyTimingSegments(
+  tmpDir: string,
+  index: number,
+  recordingPath: string,
+  segments: TimingSegment[],
+  width: number,
+  height: number,
+): Promise<string> {
+  const activeSegments = segments.filter((s) => s.speed > 0);
+  if (activeSegments.length === 0) {
+    throw new Error(`Scene ${index}: all timing segments are skipped`);
+  }
+
+  // If single segment at 1x covering the whole recording, just return as-is
+  if (activeSegments.length === 1 && activeSegments[0].speed === 1) {
+    return recordingPath;
+  }
+
+  const segmentPaths: string[] = [];
+
+  for (let si = 0; si < activeSegments.length; si++) {
+    const seg = activeSegments[si];
+    const segPath = path.join(tmpDir, `scene_${index}_tseg_${si}.mp4`);
+    const ptsMultiplier = 1 / seg.speed; // speed 4x → PTS * 0.25
+
+    await execFileAsync('ffmpeg', [
+      '-ss', String(seg.start),
+      '-to', String(seg.end),
+      '-i', recordingPath,
+      '-filter:v', `scale=${width}:${height},setpts=${ptsMultiplier}*PTS,fps=30`,
+      '-an',
+      '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
+      '-y', segPath,
+    ]);
+
+    segmentPaths.push(segPath);
+  }
+
+  // Concat all timing-adjusted segments
+  const concatPath = path.join(tmpDir, `scene_${index}_timing_concat.txt`);
+  fs.writeFileSync(concatPath, segmentPaths.map((p) => `file '${p}'`).join('\n'));
+
+  const outputPath = path.join(tmpDir, `scene_${index}_timing_adjusted.mp4`);
+  await execFileAsync('ffmpeg', [
+    '-f', 'concat', '-safe', '0',
+    '-i', concatPath,
+    '-c', 'copy',
+    '-y', outputPath,
+  ]);
+
+  return outputPath;
+}
+
+/**
+ * Composite a single scene: apply timing segments (if any), overlay voiceover,
+ * trim/stretch video to match voiceover duration (voiceover is pacing anchor).
  */
 async function compositeScene(
   tmpDir: string,
@@ -55,39 +130,57 @@ async function compositeScene(
   const recordingPath = path.join(tmpDir, `scene_${index}_recording.mp4`);
   await downloadFile(scene.recordingUrl, recordingPath);
 
+  // Apply timing segments if present
+  let videoPath = recordingPath;
+  if (scene.timingSegments && scene.timingSegments.length > 0) {
+    videoPath = await applyTimingSegments(tmpDir, index, recordingPath, scene.timingSegments, width, height);
+  }
+
   if (!scene.voiceoverUrl) {
-    return recordingPath;
+    return videoPath;
   }
 
   const voiceoverPath = path.join(tmpDir, `scene_${index}_voiceover.mp3`);
   await downloadFile(scene.voiceoverUrl, voiceoverPath);
 
-  // Get voiceover duration (source of truth)
-  const { stdout: durationStr } = await execFileAsync('ffprobe', [
-    '-v', 'error',
-    '-show_entries', 'format=duration',
-    '-of', 'csv=p=0',
-    voiceoverPath,
-  ]);
-  const voDuration = parseFloat(durationStr.trim());
+  const voDuration = await probeDuration(voiceoverPath);
+  const adjustedDuration = await probeDuration(videoPath);
 
   const outputPath = path.join(tmpDir, `scene_${index}_composited.mp4`);
 
-  // Stretch/trim recording to match voiceover duration, mix audio
-  await execFileAsync('ffmpeg', [
-    '-i', recordingPath,
-    '-i', voiceoverPath,
-    '-filter_complex', [
-      `[0:v]scale=${width}:${height},setpts=PTS*${voDuration}/DURATION,fps=30[v]`,
-      `[1:a]aformat=sample_rates=44100:channel_layouts=stereo[a]`,
-    ].join(';'),
-    '-map', '[v]',
-    '-map', '[a]',
-    '-t', String(voDuration),
-    '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
-    '-c:a', 'aac', '-b:a', '192k',
-    '-y', outputPath,
-  ]);
+  // If timing-adjusted duration closely matches voiceover, just mux them
+  // Otherwise stretch/trim video to match voiceover
+  const durationRatio = voDuration / adjustedDuration;
+  const needsStretch = Math.abs(durationRatio - 1) > 0.05; // >5% difference
+
+  if (needsStretch) {
+    await execFileAsync('ffmpeg', [
+      '-i', videoPath,
+      '-i', voiceoverPath,
+      '-filter_complex', [
+        `[0:v]setpts=${durationRatio}*PTS,fps=30[v]`,
+        `[1:a]aformat=sample_rates=44100:channel_layouts=stereo[a]`,
+      ].join(';'),
+      '-map', '[v]',
+      '-map', '[a]',
+      '-t', String(voDuration),
+      '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
+      '-c:a', 'aac', '-b:a', '192k',
+      '-y', outputPath,
+    ]);
+  } else {
+    // Durations close enough — just mux video + audio
+    await execFileAsync('ffmpeg', [
+      '-i', videoPath,
+      '-i', voiceoverPath,
+      '-map', '0:v',
+      '-map', '1:a',
+      '-t', String(voDuration),
+      '-c:v', 'copy',
+      '-c:a', 'aac', '-b:a', '192k',
+      '-y', outputPath,
+    ]);
+  }
 
   return outputPath;
 }
