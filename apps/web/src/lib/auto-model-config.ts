@@ -70,10 +70,19 @@ export interface AutoModelConfigData {
   proAvatarModel: string;
   freeIncludedAvatarModels: string[] | null;
   proIncludedAvatarModels: string[] | null;
+  // Music
+  freeMusicProvider: string;
+  freeMusicModel: string;
+  proMusicProvider: string;
+  proMusicModel: string;
+  freeIncludedMusicModels: string[] | null;
+  proIncludedMusicModels: string[] | null;
   // Daily limits & allocations (migrated from FreeTierConfig)
   dailyGenerationLimit: number;
   dailyVideoLimit: number;
   dailyVideoLimitPro: number;
+  dailyMusicLimit: number;
+  dailyMusicLimitPro: number;
   aiAllocations: ProviderAllocation[];
   ttsAllocations: ProviderAllocation[];
 }
@@ -108,9 +117,15 @@ const SEEDS = {
   freeAvatarModel: getAvatarProviderMeta('heygen').defaultModel,
   proAvatarProvider: 'heygen',
   proAvatarModel: getAvatarProviderMeta('heygen').defaultModel,
+  freeMusicProvider: 'suno',
+  freeMusicModel: 'suno-v5',
+  proMusicProvider: 'suno',
+  proMusicModel: 'suno-v5',
   dailyGenerationLimit: 1,
   dailyVideoLimit: 1,
   dailyVideoLimitPro: 2,
+  dailyMusicLimit: 1,
+  dailyMusicLimitPro: 3,
 };
 
 /**
@@ -237,10 +252,19 @@ export async function getAutoModelConfig(): Promise<AutoModelConfigData> {
     proAvatarModel: row.proAvatarModel,
     freeIncludedAvatarModels: includedModelsSchema.parse(row.freeIncludedAvatarModels),
     proIncludedAvatarModels: includedModelsSchema.parse(row.proIncludedAvatarModels),
+    // Music
+    freeMusicProvider: row.freeMusicProvider,
+    freeMusicModel: row.freeMusicModel,
+    proMusicProvider: row.proMusicProvider,
+    proMusicModel: row.proMusicModel,
+    freeIncludedMusicModels: includedModelsSchema.parse(row.freeIncludedMusicModels),
+    proIncludedMusicModels: includedModelsSchema.parse(row.proIncludedMusicModels),
     // Daily limits & allocations
     dailyGenerationLimit: row.dailyGenerationLimit,
     dailyVideoLimit: row.dailyVideoLimit,
     dailyVideoLimitPro: row.dailyVideoLimitPro,
+    dailyMusicLimit: row.dailyMusicLimit,
+    dailyMusicLimitPro: row.dailyMusicLimitPro,
     aiAllocations: parseAllocations(row.aiAllocations),
     ttsAllocations: parseAllocations(row.ttsAllocations),
   };
@@ -281,10 +305,19 @@ export async function setAutoModelConfig(
     proAvatarModel?: string;
     freeIncludedAvatarModels?: string[] | null;
     proIncludedAvatarModels?: string[] | null;
+    // Music
+    freeMusicProvider?: string;
+    freeMusicModel?: string;
+    proMusicProvider?: string;
+    proMusicModel?: string;
+    freeIncludedMusicModels?: string[] | null;
+    proIncludedMusicModels?: string[] | null;
     // Daily limits & allocations
     dailyGenerationLimit?: number;
     dailyVideoLimit?: number;
     dailyVideoLimitPro?: number;
+    dailyMusicLimit?: number;
+    dailyMusicLimitPro?: number;
     aiAllocations?: ProviderAllocation[];
     ttsAllocations?: ProviderAllocation[];
   },
@@ -363,10 +396,20 @@ export async function setAutoModelConfig(
   if (data.freeIncludedAvatarModels !== undefined) update.freeIncludedAvatarModels = data.freeIncludedAvatarModels;
   if (data.proIncludedAvatarModels !== undefined) update.proIncludedAvatarModels = data.proIncludedAvatarModels;
 
+  // Music
+  if (data.freeMusicProvider) update.freeMusicProvider = data.freeMusicProvider;
+  if (data.freeMusicModel) update.freeMusicModel = data.freeMusicModel;
+  if (data.proMusicProvider) update.proMusicProvider = data.proMusicProvider;
+  if (data.proMusicModel) update.proMusicModel = data.proMusicModel;
+  if (data.freeIncludedMusicModels !== undefined) update.freeIncludedMusicModels = data.freeIncludedMusicModels;
+  if (data.proIncludedMusicModels !== undefined) update.proIncludedMusicModels = data.proIncludedMusicModels;
+
   // Daily limits & allocations
   if (data.dailyGenerationLimit !== undefined) update.dailyGenerationLimit = data.dailyGenerationLimit;
   if (data.dailyVideoLimit !== undefined) update.dailyVideoLimit = data.dailyVideoLimit;
   if (data.dailyVideoLimitPro !== undefined) update.dailyVideoLimitPro = data.dailyVideoLimitPro;
+  if (data.dailyMusicLimit !== undefined) update.dailyMusicLimit = data.dailyMusicLimit;
+  if (data.dailyMusicLimitPro !== undefined) update.dailyMusicLimitPro = data.dailyMusicLimitPro;
   if (data.aiAllocations !== undefined) update.aiAllocations = data.aiAllocations;
   if (data.ttsAllocations !== undefined) update.ttsAllocations = data.ttsAllocations;
 
@@ -481,4 +524,17 @@ export async function resolveAvatarModel(plan: 'FREE' | 'PRO' = 'PRO'): Promise<
   return plan === 'FREE'
     ? { avatarProvider: config.freeAvatarProvider, avatarModel: config.freeAvatarModel }
     : { avatarProvider: config.proAvatarProvider, avatarModel: config.proAvatarModel };
+}
+
+/**
+ * Resolve the music provider and model for background music generation.
+ */
+export async function resolveMusicModel(plan: 'FREE' | 'PRO' = 'PRO'): Promise<{
+  musicProvider: string;
+  musicModel: string;
+}> {
+  const config = await getAutoModelConfig();
+  return plan === 'FREE'
+    ? { musicProvider: config.freeMusicProvider, musicModel: config.freeMusicModel }
+    : { musicProvider: config.proMusicProvider, musicModel: config.proMusicModel };
 }

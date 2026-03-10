@@ -59,9 +59,17 @@ interface AutoModelFormProps {
     proAvatarModel: string;
     freeIncludedAvatarModels: string[] | null;
     proIncludedAvatarModels: string[] | null;
+    freeMusicProvider: string;
+    freeMusicModel: string;
+    proMusicProvider: string;
+    proMusicModel: string;
+    freeIncludedMusicModels: string[] | null;
+    proIncludedMusicModels: string[] | null;
     dailyGenerationLimit: number;
     dailyVideoLimit: number;
     dailyVideoLimitPro: number;
+    dailyMusicLimit: number;
+    dailyMusicLimitPro: number;
   };
   aiProviders: ProviderOption[];
   ttsProviders: ProviderOption[];
@@ -69,6 +77,7 @@ interface AutoModelFormProps {
   imageProviders: ProviderOption[];
   videoProviders: ProviderOption[];
   avatarProviders: ProviderOption[];
+  musicProviders: ProviderOption[];
 }
 
 function usePlanState(initial: PlanConfig, providers: { ai: ProviderOption[]; tts: ProviderOption[]; stt: ProviderOption[] }) {
@@ -434,7 +443,7 @@ function IncludedModelsEditor({
   );
 }
 
-export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttProviders, imageProviders, videoProviders, avatarProviders }: AutoModelFormProps) {
+export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttProviders, imageProviders, videoProviders, avatarProviders, musicProviders }: AutoModelFormProps) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -485,10 +494,18 @@ export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttPro
   const [freeIncludedAvatar, setFreeIncludedAvatar] = useState<Set<string>>(new Set(initialConfig.freeIncludedAvatarModels ?? []));
   const [proIncludedAvatar, setProIncludedAvatar] = useState<Set<string>>(new Set(initialConfig.proIncludedAvatarModels ?? []));
 
+  // Music provider/model state (free + pro)
+  const freeMusic = useProviderModelState(initialConfig.freeMusicProvider, initialConfig.freeMusicModel, musicProviders);
+  const proMusic = useProviderModelState(initialConfig.proMusicProvider, initialConfig.proMusicModel, musicProviders);
+  const [freeIncludedMusic, setFreeIncludedMusic] = useState<Set<string>>(new Set(initialConfig.freeIncludedMusicModels ?? []));
+  const [proIncludedMusic, setProIncludedMusic] = useState<Set<string>>(new Set(initialConfig.proIncludedMusicModels ?? []));
+
   // Daily limits
   const [dailyGenerationLimit, setDailyGenerationLimit] = useState(initialConfig.dailyGenerationLimit);
   const [dailyVideoLimit, setDailyVideoLimit] = useState(initialConfig.dailyVideoLimit);
   const [dailyVideoLimitPro, setDailyVideoLimitPro] = useState(initialConfig.dailyVideoLimitPro);
+  const [dailyMusicLimit, setDailyMusicLimit] = useState(initialConfig.dailyMusicLimit);
+  const [dailyMusicLimitPro, setDailyMusicLimitPro] = useState(initialConfig.dailyMusicLimitPro);
 
   // Platform AI
   const [platformAiProvider, setPlatformAiProvider] = useState(initialConfig.platform.aiProvider);
@@ -540,6 +557,7 @@ export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttPro
   const imageHandlers = makeIncludedHandlers(setFreeIncludedImage, setProIncludedImage);
   const videoHandlers = makeIncludedHandlers(setFreeIncludedVideo, setProIncludedVideo);
   const avatarHandlers = makeIncludedHandlers(setFreeIncludedAvatar, setProIncludedAvatar);
+  const musicHandlers = makeIncludedHandlers(setFreeIncludedMusic, setProIncludedMusic);
 
   const setToArray = (s: Set<string>) => s.size > 0 ? [...s] : null;
 
@@ -583,10 +601,19 @@ export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttPro
           proAvatarModel: proAvatar.model,
           freeIncludedAvatarModels: setToArray(freeIncludedAvatar),
           proIncludedAvatarModels: setToArray(proIncludedAvatar),
+          // Music
+          freeMusicProvider: freeMusic.provider,
+          freeMusicModel: freeMusic.model,
+          proMusicProvider: proMusic.provider,
+          proMusicModel: proMusic.model,
+          freeIncludedMusicModels: setToArray(freeIncludedMusic),
+          proIncludedMusicModels: setToArray(proIncludedMusic),
           // Daily limits
           dailyGenerationLimit,
           dailyVideoLimit,
           dailyVideoLimitPro,
+          dailyMusicLimit,
+          dailyMusicLimitPro,
         }),
       });
 
@@ -729,6 +756,28 @@ export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttPro
         onClear={avatarHandlers.onClear}
       />
 
+      <ModalityTierSection
+        title="Music Generation"
+        description="AI-generated background music provider and model for podcasts."
+        freeState={freeMusic}
+        proState={proMusic}
+        providers={musicProviders}
+      />
+
+      <IncludedModelsEditor
+        title="Included Music Models"
+        description="Control which music models are available for background music generation."
+        providers={musicProviders}
+        freeIncluded={freeIncludedMusic}
+        proIncluded={proIncludedMusic}
+        freeDefault={`${freeMusic.provider}:${freeMusic.model}`}
+        proDefault={`${proMusic.provider}:${proMusic.model}`}
+        compositeIds
+        onFreeChange={musicHandlers.onFreeChange}
+        onProChange={musicHandlers.onProChange}
+        onClear={musicHandlers.onClear}
+      />
+
       <fieldset className={styles.section}>
         <legend className={styles.sectionTitle}>Platform Operations</legend>
         <p className={styles.platformDescription}>
@@ -803,6 +852,30 @@ export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttPro
             min={0}
             value={dailyVideoLimitPro}
             onChange={(e) => setDailyVideoLimitPro(parseInt(e.target.value, 10) || 0)}
+          />
+        </div>
+
+        <div className={styles.field}>
+          <label className={styles.label} htmlFor="dailyMusicLimit">Daily Music Limit (Free)</label>
+          <input
+            id="dailyMusicLimit"
+            type="number"
+            className={styles.select}
+            min={0}
+            value={dailyMusicLimit}
+            onChange={(e) => setDailyMusicLimit(parseInt(e.target.value, 10) || 0)}
+          />
+        </div>
+
+        <div className={styles.field}>
+          <label className={styles.label} htmlFor="dailyMusicLimitPro">Daily Music Limit (Pro)</label>
+          <input
+            id="dailyMusicLimitPro"
+            type="number"
+            className={styles.select}
+            min={0}
+            value={dailyMusicLimitPro}
+            onChange={(e) => setDailyMusicLimitPro(parseInt(e.target.value, 10) || 0)}
           />
         </div>
       </fieldset>

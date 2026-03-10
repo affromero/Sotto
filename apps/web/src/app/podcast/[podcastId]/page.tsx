@@ -257,7 +257,7 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
   const visibility = podcast.visibility;
 
   // Resolve audio URLs: presigned for PRIVATE/UNLISTED, public CDN for PUBLIC
-  const [resolvedAudioUrl, resolvedSegments, resolvedVersions, resolvedVoiceTracks, resolvedVideoUrl] =
+  const [resolvedAudioUrl, resolvedSegments, resolvedVersions, resolvedVoiceTracks, resolvedVideoUrl, resolvedMusicUrl] =
     await Promise.all([
       resolveAudioUrl(podcast.audioUrl, visibility),
       Promise.all(
@@ -303,6 +303,7 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
         }))
       ),
       podcast.videoUrl ? resolveAudioUrl(podcast.videoUrl, visibility) : Promise.resolve(null),
+      podcast.musicUrl ? resolveAudioUrl(podcast.musicUrl, visibility) : Promise.resolve(null),
     ]);
 
   const podcastData = {
@@ -348,6 +349,8 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
     })),
     pdfUrl: podcast.pdfUrl,
     videoUrl: resolvedVideoUrl ?? null,
+    musicUrl: resolvedMusicUrl ?? null,
+    musicVolume: podcast.musicVolume,
     tags: podcast.tags.map((pt) => pt.tag),
     forkedFrom: podcast.forkedFrom
       ? {

@@ -896,3 +896,14 @@ export const updateAvatarPositionsSchema = z.object({
     maskShape: z.enum(['none', 'rounded', 'circle', 'hexagon', 'diamond', 'blob', 'squircle']).optional(),
   })),
 });
+
+/**
+ * Music generation
+ */
+export const generateMusicSchema = z.object({
+  model: z.string().max(100).optional(),
+});
+
+export const updateMusicVolumeSchema = z.object({
+  volume: z.number().min(0).max(1),
+});

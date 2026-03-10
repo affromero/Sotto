@@ -15,7 +15,8 @@ export type PipelineStage =
   | 'Analytics'
   | 'Platform Ops'
   | 'Voice Features'
-  | 'Video Pipeline';
+  | 'Video Pipeline'
+  | 'Music Pipeline';
 
 interface QueueMeta {
   description: string;
@@ -31,6 +32,7 @@ export const PIPELINE_STAGE_ORDER: PipelineStage[] = [
   'Platform Ops',
   'Voice Features',
   'Video Pipeline',
+  'Music Pipeline',
 ];
 
 export const QUEUE_METADATA: Record<string, QueueMeta> = {
@@ -209,5 +211,9 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
   'demo-composition': {
     description: 'Composes final demo video from all scene assets',
     stage: 'Video Pipeline',
+  },
+  'music-generation': {
+    description: 'Generates AI background music for podcasts via Suno or ElevenLabs',
+    stage: 'Music Pipeline',
   },
 };
