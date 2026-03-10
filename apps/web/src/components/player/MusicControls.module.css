@@ -18,6 +18,10 @@
   transition: color 0.15s ease, background-color 0.15s ease;
 }
 
+.muteButton.muted {
+  opacity: 0.4;
+}
+
 .muteButton:hover {
   color: var(--color-primary, #d97706);
   background-color: var(--color-surface-hover, rgba(0, 0, 0, 0.05));
