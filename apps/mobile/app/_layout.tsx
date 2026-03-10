@@ -20,6 +20,7 @@ import { useThemeColors, useThemeStore } from '../lib/useThemeColors';
 import { api, onAuthRevoked } from '../lib/api';
 import { registerForPushNotifications } from '../lib/notifications';
 import { EventProvider } from '../components/EventProvider';
+import { MiniPlayer } from '../components/MiniPlayer';
 
 const queryClient = new QueryClient();
 
@@ -142,6 +143,7 @@ export default function RootLayout() {
               <Stack.Screen name="podcast/[id]" options={{ headerShown: false }} />
               <Stack.Screen name="user/[userId]" options={{ title: '' }} />
             </Stack>
+            <MiniPlayer />
           </EventProvider>
         </QueryClientProvider>
       </GestureHandlerRootView>
