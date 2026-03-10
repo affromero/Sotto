@@ -65,6 +65,7 @@ window.runCapture = async function(config) {
     // Decode audio and publish
     const audioBytes = Uint8Array.from(atob(config.audioBase64), c => c.charCodeAt(0));
     const audioCtx = new AudioContext({ sampleRate: 48000 });
+    await audioCtx.resume(); // Headless Chromium starts AudioContext suspended — must resume before playback
     const audioBuffer = await audioCtx.decodeAudioData(audioBytes.buffer);
 
     const source = audioCtx.createBufferSource();

@@ -13,6 +13,7 @@ export interface AvatarOverlayData {
   durationSeconds: number | null;
   avatarProvider?: string | null;
   maskShape?: string | null;
+  enabledSegmentIds?: string[];
 }
 
 export interface HeyGenAvatarData {

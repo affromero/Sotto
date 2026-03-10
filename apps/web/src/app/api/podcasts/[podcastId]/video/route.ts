@@ -406,6 +406,9 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
           width: true,
           height: true,
           durationSeconds: true,
+          avatarProvider: true,
+          maskShape: true,
+          enabledSegmentIds: true,
         },
       },
       transitions: {

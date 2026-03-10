@@ -297,6 +297,118 @@
   letter-spacing: 0.05em;
 }
 
+/* Advanced segment visibility */
+
+.advancedSection {
+  padding: 0 24px 12px;
+  flex-shrink: 0;
+}
+
+.advancedToggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.advancedToggle:hover {
+  color: #ccc;
+}
+
+.segmentToggles {
+  margin-top: 8px;
+}
+
+.advancedHint {
+  margin: 0 0 10px;
+  font-size: 11px;
+  color: #777;
+}
+
+.segmentSpeakerGroup {
+  margin-bottom: 12px;
+}
+
+.segmentSpeakerHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.segmentSpeakerName {
+  font-size: 12px;
+  font-weight: 600;
+  color: #ccc;
+}
+
+.segmentToggleAll {
+  background: none;
+  border: none;
+  color: #d97706;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px 0;
+}
+
+.segmentToggleAll:hover {
+  color: #f59e0b;
+}
+
+.segmentList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.segmentItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  color: #bbb;
+  transition: background 0.1s;
+}
+
+.segmentItem:hover {
+  background: #2a2a2a;
+}
+
+.segmentCheckbox {
+  accent-color: #d97706;
+  flex-shrink: 0;
+}
+
+.segmentOrder {
+  color: #888;
+  font-weight: 600;
+  font-size: 11px;
+  min-width: 24px;
+}
+
+.segmentText {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.segmentDuration {
+  color: #666;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
 .runwayNotice {
   padding: 0 24px 4px;
   margin: 0;

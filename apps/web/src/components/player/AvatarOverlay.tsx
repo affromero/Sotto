@@ -21,6 +21,7 @@ interface AvatarOverlayProps {
   onPositionChange: (pos: { posX: number; posY: number; width: number; height: number }) => void;
   editable: boolean;
   maskShape?: AvatarMaskShape;
+  visible?: boolean;
 }
 
 export function AvatarOverlay({
@@ -37,6 +38,7 @@ export function AvatarOverlay({
   onPositionChange,
   editable,
   maskShape,
+  visible = true,
 }: AvatarOverlayProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -139,7 +141,7 @@ export function AvatarOverlay({
   return (
     <div
       ref={overlayRef}
-      className={`${styles.overlay} ${editable ? styles.editable : ''} ${dragging ? styles.dragging : ''} ${maskClass}`}
+      className={`${styles.overlay} ${visible ? styles.visible : styles.hidden} ${editable ? styles.editable : ''} ${dragging ? styles.dragging : ''} ${maskClass}`}
       style={{
         left: pxLeft,
         top: pxTop,

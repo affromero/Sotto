@@ -51,7 +51,6 @@
   display: inline-block;
   font-size: var(--font-size-xs);
   font-weight: 700;
-  text-transform: uppercase;
   letter-spacing: 0.05em;
   padding: 2px var(--spacing-sm);
   border-radius: var(--radius-sm);
@@ -174,7 +173,6 @@
   font-family: var(--font-body);
   font-size: 10px;
   font-weight: 600;
-  text-transform: uppercase;
   letter-spacing: 0.05em;
   color: #F5F5F5;
   background: rgba(0, 0, 0, 0.6);

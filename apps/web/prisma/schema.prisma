@@ -2200,6 +2200,7 @@ model AvatarOverlay {
   runwaySessionId   String?
   runwayChunkIndex  Int?
   runwayTotalChunks Int?
+  enabledSegmentIds String[] @default([])
   posX              Float    @default(0.02)
   posY              Float    @default(0.55)
   width             Float    @default(0.25)

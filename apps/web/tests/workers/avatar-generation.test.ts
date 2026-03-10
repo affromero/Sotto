@@ -93,6 +93,7 @@ beforeEach(() => {
     runwaySessionId: null,
     runwayChunkIndex: null,
     runwayTotalChunks: null,
+    enabledSegmentIds: [],
     posX: 0.02,
     posY: 0.55,
     width: 0.25,
@@ -210,6 +211,7 @@ describe('processAvatarGeneration', () => {
       runwaySessionId: null,
       runwayChunkIndex: null,
       runwayTotalChunks: null,
+      enabledSegmentIds: [],
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -243,6 +245,7 @@ describe('processAvatarGeneration', () => {
       runwaySessionId: null,
       runwayChunkIndex: null,
       runwayTotalChunks: null,
+      enabledSegmentIds: [],
       createdAt: new Date(),
       updatedAt: new Date(),
     });
