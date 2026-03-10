@@ -58,6 +58,7 @@ export enum JobType {
   GENERATE_DEMO_VISUAL = 'generate_demo_visual',
   GENERATE_DEMO_TRANSITION = 'generate_demo_transition',
   COMPOSE_DEMO = 'compose_demo',
+  GENERATE_MUSIC = 'generate_music',
 }
 
 /**
@@ -333,6 +334,12 @@ export interface StitchVoiceTrackPayload {
   voiceTrackSegmentIds: string[];
 }
 
+export interface GenerateMusicPayload {
+  podcastId: string;
+  musicGenerationId: string;
+  userId: string;
+}
+
 /**
  * Queue configuration
  */
@@ -561,6 +568,37 @@ function setupQueueEvents(queue: Queue, queueName: string): void {
               logger.warn('Failed to send admin video-failure Telegram', { adminId: admin.id, error: err instanceof Error ? err.message : String(err) });
             });
           }
+        }
+        return;
+      }
+
+      // Handle music generation failures — podcast is already READY
+      const MUSIC_QUEUES = ['music-generation'];
+      if (MUSIC_QUEUES.includes(queueName)) {
+        const musicGenerationId = (job?.data as Record<string, unknown>)?.musicGenerationId as string | undefined;
+        if (!musicGenerationId) return;
+
+        const maxAttempts = job?.opts?.attempts ?? 3;
+        const isTerminal = job?.attemptsMade != null && job.attemptsMade >= maxAttempts;
+        if (!isTerminal) return;
+
+        const descriptive = `[${queueName}] ${args.failedReason || 'Unknown error'}`;
+        await prisma.musicGeneration.update({
+          where: { id: musicGenerationId },
+          data: { status: 'FAILED', failureReason: descriptive },
+        }).catch((err: unknown) => {
+          logger.error('Failed to mark MusicGeneration FAILED', { musicGenerationId, error: err instanceof Error ? err.message : String(err) });
+        });
+
+        // Notify user
+        if (notifQueue) {
+          await notifQueue.add('send_notification', {
+            userId: podcast.userId,
+            type: 'MUSIC_FAILED',
+            title: 'Music Generation Failed',
+            message: `Background music generation failed: ${args.failedReason || 'Unknown error'}`,
+            data: { podcastId },
+          });
         }
         return;
       }
@@ -872,6 +910,7 @@ export const demoVoiceoverQueue = createQueue('demo-voiceover', { attempts: 2 })
 export const demoVisualQueue = createQueue('demo-visual', { attempts: 2 });
 export const demoTransitionQueue = createQueue('demo-transition', { attempts: 2 });
 export const demoCompositionQueue = createQueue('demo-composition', { attempts: 2 });
+export const musicGenerationQueue = createQueue('music-generation', { attempts: 3 });
 
 /** All queue names — single source of truth for admin and health endpoints */
 export const ALL_QUEUE_NAMES = [
@@ -919,4 +958,5 @@ export const ALL_QUEUE_NAMES = [
   'demo-visual',
   'demo-transition',
   'demo-composition',
+  'music-generation',
 ] as const;
