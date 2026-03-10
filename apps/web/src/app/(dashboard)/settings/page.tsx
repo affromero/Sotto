@@ -97,7 +97,7 @@ export default async function SettingsPage() {
   const aiProviderMeta = getAllAiProviderClientMeta();
   const ttsProviderMeta = getAllTtsProviderClientMeta();
   const musicProviderMeta = getMusicByokProviderMeta();
-  const configuredMusicProviders = configuredProviders.filter((p) => p.provider === 'suno');
+  const configuredMusicProviders = configuredProviders.filter((p) => (p.provider as string) === 'suno');
   const isTwitterProviderAvailable = !!process.env.TWITTER_CLIENT_ID && !!process.env.TWITTER_CLIENT_SECRET;
 
   return (
