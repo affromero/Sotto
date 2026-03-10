@@ -56,14 +56,11 @@ export function VoiceRenditionForkModal({
       return;
     }
 
-    const voices = audioConfig.voices
-      .filter(v => v.voiceId)
-      .map(v => ({ speaker: v.speaker, voiceId: v.voiceId! }));
-
-    if (voices.length === 0) {
-      setError('Please assign at least one voice');
-      return;
-    }
+    const voices = audioConfig.voices.map(v => ({
+      speaker: v.speaker,
+      voiceId: v.voiceId || '',
+      provider: v.provider,
+    }));
 
     setLoading(true);
     setError(null);
@@ -74,8 +71,6 @@ export function VoiceRenditionForkModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: name.trim(),
-          ttsProvider: audioConfig.ttsProvider,
-          ttsModel: audioConfig.ttsModel,
           voices,
           ...(paymentIntentIds ? { paymentIntentIds } : {}),
           ...(skipPaidVoices ? { skipPaidVoices: true } : {}),
