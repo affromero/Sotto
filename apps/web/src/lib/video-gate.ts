@@ -93,9 +93,9 @@ export async function checkVideoGenerationGate(userId: string): Promise<VideoGat
     return { ...baseResult, allowed: true };
   }
 
-  // Admin/System bypass
+  // Admin/System bypass (set isByokUser so downstream code skips the counter)
   if (isPrivileged) {
-    return { ...baseResult, allowed: true };
+    return { ...baseResult, allowed: true, isByokUser: true };
   }
 
   // Check Redis rolling 24h window
@@ -189,7 +189,8 @@ export async function checkAvatarGenerationGate(userId: string): Promise<VideoGa
   }
 
   if (hasByok) return { ...baseResult, allowed: true };
-  if (isPrivileged) return { ...baseResult, allowed: true };
+  // Admin/System bypass (set isByokUser so downstream code skips the counter)
+  if (isPrivileged) return { ...baseResult, allowed: true, isByokUser: true };
 
   const { count: dailyUsed, ttl } = await getAvatarDailyCount(userId);
 
