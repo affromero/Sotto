@@ -7,11 +7,15 @@ describe('FreeTierBanner', () => {
     localStorage.clear();
   });
 
-  it('renders nothing for pro users', () => {
-    const { container } = render(
-      <FreeTierBanner dailyUsed={0} dailyLimit={1} isByokUser={false} isProUser={true} />
+  it('renders daily limit banner for pro users', () => {
+    render(
+      <FreeTierBanner dailyUsed={0} dailyLimit={5} isByokUser={false} isProUser={true} />
     );
-    expect(container.firstChild).toBeNull();
+    expect(screen.getByRole('status', { name: 'Pro status' })).toBeInTheDocument();
+    expect(screen.getByText(/5 of 5 podcasts remaining today/)).toBeInTheDocument();
+    expect(screen.getByText(/Pro: 5 podcasts per day/)).toBeInTheDocument();
+    // Pro users don't see the waitlist button
+    expect(screen.queryByText('Join Pro Waitlist')).not.toBeInTheDocument();
   });
 
   it('shows unlimited banner for BYOK users', () => {
@@ -42,7 +46,7 @@ describe('FreeTierBanner', () => {
       <FreeTierBanner dailyUsed={0} dailyLimit={1} isByokUser={false} isProUser={false} />
     );
     expect(screen.getByRole('status', { name: 'Free tier status' })).toBeInTheDocument();
-    expect(screen.getByText(/1 of 1 free podcast.* remaining today/)).toBeInTheDocument();
+    expect(screen.getByText(/1 of 1 podcast remaining today/)).toBeInTheDocument();
   });
 
   it('shows daily limit reached for exhausted free users', () => {

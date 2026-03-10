@@ -127,10 +127,10 @@ export default async function BillingPage() {
         )}
       </section>
 
-      {/* Free Tier */}
+      {/* Daily Usage */}
       {!freeTier.isByokUser && (
         <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>Free Tier</h2>
+          <h2 className={styles.sectionTitle}>Daily Usage</h2>
           <div className={styles.creditCard}>
             <div className={styles.creditBalance}>
               {freeTier.dailyRemaining}/{freeTier.dailyLimit}
@@ -141,7 +141,7 @@ export default async function BillingPage() {
           </div>
           {freeTier.dailyRemaining === 0 && (
             <p className={styles.manageText}>
-              You&apos;ve used today&apos;s free podcasts.{' '}
+              You&apos;ve used today&apos;s podcasts.{' '}
               <Link href="/onboarding?step=keys">Add a voice provider key</Link> for unlimited access.
             </p>
           )}

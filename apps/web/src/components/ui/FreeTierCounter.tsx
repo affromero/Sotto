@@ -18,9 +18,14 @@ export function FreeTierCounter({
   if (isByokUser) return null;
 
   if (isProUser) {
+    const remaining = Math.max(0, dailyLimit - dailyUsed);
+    const variant = remaining === 0 ? 'exhausted' : remaining <= 1 ? 'warning' : 'pro';
     return (
-      <span className={`${styles.pill} ${styles.pro}`} aria-label="Pro plan">
-        Pro
+      <span
+        className={`${styles.pill} ${styles[variant]}`}
+        aria-label={`Pro: ${dailyUsed} of ${dailyLimit} podcasts used today`}
+      >
+        Pro {dailyUsed}/{dailyLimit}
       </span>
     );
   }

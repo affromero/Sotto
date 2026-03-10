@@ -30,7 +30,7 @@ vi.mock('@/lib/byok', () => ({
 }));
 
 vi.mock('@/lib/auto-model-config', () => ({
-  getAutoModelConfig: vi.fn().mockResolvedValue({ free: { ttsProvider: 'openai', ttsModel: 'tts-1-hd' }, dailyGenerationLimit: 3, dailyVideoLimit: 1, dailyVideoLimitPro: 2, aiAllocations: [], ttsAllocations: [] }),
+  getAutoModelConfig: vi.fn().mockResolvedValue({ free: { ttsProvider: 'openai', ttsModel: 'tts-1-hd' }, dailyGenerationLimit: 3, dailyGenerationLimitPro: 5, dailyVideoLimit: 1, dailyVideoLimitPro: 2, aiAllocations: [], ttsAllocations: [] }),
   resolveAutoModel: vi.fn().mockResolvedValue({
     aiProvider: 'anthropic',
     aiModel: 'claude-haiku-4-5-20251001',

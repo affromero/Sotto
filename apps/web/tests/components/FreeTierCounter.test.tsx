@@ -10,11 +10,12 @@ describe('FreeTierCounter', () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it('renders Pro pill for pro users', () => {
+  it('renders Pro pill with daily usage for pro users', () => {
     render(
-      <FreeTierCounter dailyUsed={0} dailyLimit={1} isByokUser={false} isProUser={true} />
+      <FreeTierCounter dailyUsed={2} dailyLimit={5} isByokUser={false} isProUser={true} />
     );
-    expect(screen.getByText('Pro')).toBeInTheDocument();
+    expect(screen.getByText('Pro 2/5')).toBeInTheDocument();
+    expect(screen.getByLabelText('Pro: 2 of 5 podcasts used today')).toBeInTheDocument();
   });
 
   it('renders Unlimited pill when dailyLimit is 0 (admin override)', () => {
