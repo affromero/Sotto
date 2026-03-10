@@ -62,10 +62,9 @@
   animation: ripple 3s ease-out 2s infinite;
 }
 
-/* Orb inner content: Lottie loader */
+/* Orb inner content: spinner */
 .orbLottie {
-  width: 36px;
-  height: 36px;
+  --spinner-size: 36px;
 }
 
 /* Orb percentage text */

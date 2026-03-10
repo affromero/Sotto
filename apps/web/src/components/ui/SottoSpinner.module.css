@@ -1,0 +1,57 @@
+.root {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--spinner-size, 40px);
+  height: var(--spinner-size, 40px);
+  color: var(--color-primary);
+}
+
+/* Rotating dashed arc — matches original Lottie:
+   60px circle, 3px stroke, dash 50 / gap 140, full rotation in 2s */
+.arc {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  animation: spin 2s linear infinite;
+  will-change: transform;
+}
+
+/* Pulsing center dot — matches original Lottie:
+   8px dot scaling 80%→120%→80%, opacity 40%→100%→40%, 2s loop */
+.dot {
+  width: calc(var(--spinner-size, 40px) * 0.2);
+  height: calc(var(--spinner-size, 40px) * 0.2);
+  border-radius: 50%;
+  background: currentColor;
+  animation: pulse 2s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(0.8);
+    opacity: 0.4;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .arc {
+    animation: none;
+  }
+
+  .dot {
+    animation: none;
+    opacity: 0.7;
+  }
+}
