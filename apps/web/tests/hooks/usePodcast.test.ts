@@ -11,6 +11,8 @@ const mockPodcastData: PodcastDetail = {
   audioUrl: 'https://example.com/audio.mp3',
   pdfUrl: null,
   videoUrl: null,
+  musicUrl: null,
+  musicVolume: 0.15,
   duration: 600,
   visibility: 'PUBLIC',
   createdAt: '2024-01-01T00:00:00Z',

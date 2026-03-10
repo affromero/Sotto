@@ -61,7 +61,7 @@ export async function processMusicGeneration(job: Job<GenerateMusicPayload>): Pr
   await job.updateProgress(30);
 
   // Build prompt from podcast metadata
-  const tags = podcast.tags.map((t) => t.tag.name);
+  const tags = podcast.tags.map((t: { tag: { name: string } }) => t.tag.name);
   const prompt = buildMusicPrompt({
     title: podcast.title,
     topic: podcast.topic,
