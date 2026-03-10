@@ -76,7 +76,7 @@ vi.mock('@/lib/voice-pricing', () => ({
 }));
 
 vi.mock('@/lib/providers', () => ({
-  resolveTtsProvider: vi.fn().mockResolvedValue({ providerId: 'elevenlabs' }),
+  resolveTtsProvider: vi.fn().mockResolvedValue({ providerId: 'elevenlabs', provider: { getModelId: () => 'eleven_v3' } }),
 }));
 
 vi.mock('@/lib/slugify', () => ({

@@ -123,21 +123,27 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   const resolvedVoiceProviders = await Promise.all(
     resolvedVoices.map(async (v) => {
       if (v.provider) {
-        const [providerKey] = v.provider.split(':');
+        const [providerKey, ...modelParts] = v.provider.split(':');
+        const modelKey = modelParts.join(':') || undefined;
         const resolved = await resolveTtsProvider({
           userId,
           podcastId,
           requestedProvider: providerKey as TtsProviderId,
+          requestedModel: modelKey,
           plan,
         });
-        return { speaker: v.speaker, voiceId: v.voiceId, providerId: resolved.providerId };
+        return { speaker: v.speaker, voiceId: v.voiceId, providerId: resolved.providerId, ttsModel: resolved.provider.getModelId() };
       }
-      return { speaker: v.speaker, voiceId: v.voiceId, providerId: fallback.providerId };
+      return { speaker: v.speaker, voiceId: v.voiceId, providerId: fallback.providerId, ttsModel: fallback.provider.getModelId() };
     }),
   );
 
   const uniqueProviders = [...new Set(resolvedVoiceProviders.map(v => v.providerId))];
   const trackProvider = uniqueProviders.length === 1 ? uniqueProviders[0] : 'mixed';
+
+  // Derive track-level model from resolved voices
+  const resolvedModels = [...new Set(resolvedVoiceProviders.map(v => v.ttsModel).filter(Boolean))];
+  const trackModel = ttsModel || resolvedModels[0] || null;
 
   // Create voice-only fork podcast + voice track in a transaction
   const { forkPodcast, voiceTrack } = await prisma.$transaction(async (tx) => {
@@ -153,7 +159,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         forkedFromId: podcastId,
         isVoiceOnlyFork: true,
         ttsProvider: trackProvider,
-        ttsModel: ttsModel || null,
+        ttsModel: trackModel,
       },
     });
 
@@ -174,7 +180,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         name,
         status: 'GENERATING_AUDIO',
         ttsProvider: trackProvider,
-        ttsModel: ttsModel || null,
+        ttsModel: trackModel,
       },
     });
 
