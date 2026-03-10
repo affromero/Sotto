@@ -22,6 +22,7 @@ export const createVoiceTrackSchema = z.object({
   voices: z.array(z.object({
     speaker: z.string(),
     voiceId: z.string(),
+    provider: z.string().optional(),
   })).min(1),
   paymentIntentIds: z.array(z.string()).optional(),
   skipPaidVoices: z.boolean().optional(),
@@ -42,6 +43,7 @@ export const voiceForkBodySchema = z.object({
   voices: z.array(z.object({
     speaker: z.string(),
     voiceId: z.string(),
+    provider: z.string().optional(),
   })).min(1),
   paymentIntentIds: z.array(z.string()).optional(),
   skipPaidVoices: z.boolean().optional(),

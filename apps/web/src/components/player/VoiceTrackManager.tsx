@@ -11,6 +11,7 @@ import styles from './VoiceTrackManager.module.css';
 interface VoiceTrackManagerProps {
   podcastId: string;
   voiceTracks: VoiceTrackSummary[];
+  speakers: string[];
   isOpen: boolean;
   onClose: () => void;
   onTracksChange?: () => void;
@@ -28,6 +29,7 @@ const STATUS_LABELS: Record<string, string> = {
 export function VoiceTrackManager({
   podcastId,
   voiceTracks: initialTracks,
+  speakers,
   isOpen,
   onClose,
   onTracksChange,
@@ -172,11 +174,9 @@ export function VoiceTrackManager({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: addName.trim(),
-          ttsProvider: audioConfig?.ttsProvider,
-          ttsModel: audioConfig?.ttsModel,
           voices: audioConfig?.voices && audioConfig.voices.length > 0
-            ? audioConfig.voices.map(v => ({ speaker: v.speaker, voiceId: v.voiceId || '' }))
-            : [{ speaker: 'Host', voiceId: '' }, { speaker: 'Expert', voiceId: '' }],
+            ? audioConfig.voices.map(v => ({ speaker: v.speaker, voiceId: v.voiceId || '', provider: v.provider }))
+            : speakers.map(s => ({ speaker: s, voiceId: '' })),
         }),
       });
       if (!res.ok) {
@@ -190,8 +190,8 @@ export function VoiceTrackManager({
         status: newTrack.status,
         audioUrl: null,
         duration: null,
-        ttsProvider: audioConfig?.ttsProvider || null,
-        ttsModel: audioConfig?.ttsModel || null,
+        ttsProvider: null,
+        ttsModel: null,
         failureReason: null,
         voices: [],
         contributor: null,
@@ -425,7 +425,7 @@ export function VoiceTrackManager({
                   className={styles.addInput}
                   autoFocus
                 />
-                <AudioConfigPanel speakers={['Host', 'Expert']} onConfigChange={handleConfigChange} />
+                <AudioConfigPanel speakers={speakers} onConfigChange={handleConfigChange} />
                 <div className={styles.addFormActions}>
                   <Button
                     variant="ghost"
