@@ -6,6 +6,7 @@ import fs from 'fs';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { gradeVideo } from '../lib/grade';
+import { downloadFile, probeDuration } from '../lib/media-utils';
 
 const execFileAsync = promisify(execFile);
 
@@ -113,22 +114,7 @@ const KEYSTROKE_SFX = path.join(SFX_DIR, 'keystroke.mp3');
 // Helpers
 // ---------------------------------------------------------------------------
 
-async function downloadFile(url: string, dest: string): Promise<void> {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`Failed to download ${url}: ${response.status}`);
-  const buffer = Buffer.from(await response.arrayBuffer());
-  fs.writeFileSync(dest, buffer);
-}
-
-async function probeDuration(filePath: string): Promise<number> {
-  const { stdout } = await execFileAsync('ffprobe', [
-    '-v', 'error',
-    '-show_entries', 'format=duration',
-    '-of', 'csv=p=0',
-    filePath,
-  ]);
-  return parseFloat(stdout.trim());
-}
+// downloadFile and probeDuration imported from ../lib/media-utils
 
 /**
  * Build an FFmpeg filter_complex string that mixes SFX tracks into an audio stream.
@@ -788,8 +774,10 @@ async function executeStitch(jobId: string, input: StitchRequest): Promise<void>
   }
 }
 
-// POST /stitch — start a new stitch job
+// POST /stitch — DEPRECATED: use POST /render with compositionId='LaunchVideo' instead.
+// Kept for rollback safety — remove after confirming /render works in production.
 stitchRouter.post('/', (req, res) => {
+  console.warn('DEPRECATED: POST /stitch called — migrate to POST /render with compositionId=LaunchVideo');
   const body = req.body as Partial<StitchRequest>;
   if (!body.scenes?.length) {
     res.status(400).json({ error: 'scenes array is required' });

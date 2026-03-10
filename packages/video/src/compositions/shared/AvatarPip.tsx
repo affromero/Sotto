@@ -1,6 +1,7 @@
 import React from 'react';
 import { OffthreadVideo, useVideoConfig } from 'remotion';
 import type { AvatarOverlayInput } from '../../types';
+import { AvatarEntrance } from '../effects/AvatarEntrance';
 
 export const AvatarPip: React.FC<{ overlay: AvatarOverlayInput }> = ({ overlay }) => {
   const { width: videoWidth, height: videoHeight } = useVideoConfig();
@@ -30,12 +31,14 @@ export const AvatarPip: React.FC<{ overlay: AvatarOverlayInput }> = ({ overlay }
         }),
       }}
     >
-      <OffthreadVideo
-        src={overlay.videoUrl}
-        style={{ width: '100%', height: '100%', objectFit: hasMask ? 'cover' : 'contain' }}
-        transparent={!hasMask}
-        muted
-      />
+      <AvatarEntrance>
+        <OffthreadVideo
+          src={overlay.videoUrl}
+          style={{ width: '100%', height: '100%', objectFit: hasMask ? 'cover' : 'contain' }}
+          transparent={!hasMask}
+          muted
+        />
+      </AvatarEntrance>
     </div>
   );
 };
