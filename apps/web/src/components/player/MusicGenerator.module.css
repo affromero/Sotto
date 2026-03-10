@@ -1,5 +1,11 @@
 /* ── MusicGenerator ────────────────────────────────────────────── */
 
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
 .container {
   display: flex;
   align-items: center;
@@ -114,13 +120,6 @@
   outline-offset: 2px;
 }
 
-/* ── Spacer (pushes actions to the right) ────────────────────── */
-
-.spacer {
-  flex: 1;
-  min-width: 0;
-}
-
 /* ── Secondary / Remove Actions ──────────────────────────────── */
 
 .actions {
@@ -128,28 +127,6 @@
   align-items: center;
   gap: 0.5rem;
   margin-left: auto;
-}
-
-.secondaryAction {
-  padding: 0.25rem 0.625rem;
-  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.12));
-  border-radius: 6px;
-  background: none;
-  color: var(--color-text-secondary, #9ca3af);
-  font-size: 0.75rem;
-  font-family: inherit;
-  cursor: pointer;
-  transition: color 0.15s ease, border-color 0.15s ease;
-}
-
-.secondaryAction:hover {
-  color: var(--color-primary, #d97706);
-  border-color: var(--color-primary, #d97706);
-}
-
-.secondaryAction:disabled {
-  opacity: 0.4;
-  cursor: default;
 }
 
 .removeAction {
@@ -182,22 +159,6 @@
   gap: 0.5rem;
   color: var(--color-text-secondary, #9ca3af);
   font-size: 0.8125rem;
-}
-
-.spinner {
-  display: inline-block;
-  width: 14px;
-  height: 14px;
-  border: 2px solid rgba(217, 119, 6, 0.2);
-  border-top-color: var(--color-primary, #d97706);
-  border-radius: 50%;
-  animation: spin 0.75s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 /* ── Waveform animation (generating state) ───────────────────── */
@@ -236,6 +197,7 @@
   color: #22c55e;
   font-size: 0.75rem;
   font-weight: 500;
+  white-space: nowrap;
 }
 
 .readyDot {
@@ -266,6 +228,158 @@
   color: #ef4444;
   font-size: 0.75rem;
   margin: 0;
+  padding: 0 0.875rem;
+}
+
+/* ── Generation List ─────────────────────────────────────────── */
+
+.generationList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.generationItem {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.5rem 0.875rem;
+  border-radius: 8px;
+  background: var(--color-surface-elevated, rgba(255, 255, 255, 0.02));
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.06));
+  transition: border-color 0.15s ease;
+  flex-wrap: wrap;
+}
+
+.generationItemSelected {
+  border-color: rgba(34, 197, 94, 0.3);
+  background: rgba(34, 197, 94, 0.04);
+}
+
+/* ── Candidate / Failed labels ───────────────────────────────── */
+
+.candidateLabel {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-text-secondary, #9ca3af);
+  white-space: nowrap;
+}
+
+.failedLabel {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #ef4444;
+  white-space: nowrap;
+}
+
+.failureReason {
+  font-size: 0.6875rem;
+  color: #ef4444;
+  opacity: 0.8;
+  margin: 0;
   width: 100%;
-  padding-top: 0.25rem;
+  padding-top: 0.125rem;
+}
+
+/* ── Model info in generation item ───────────────────────────── */
+
+.genModel {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary, #9ca3af);
+  opacity: 0.7;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+/* ── Generation item actions ─────────────────────────────────── */
+
+.genActions {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.previewButton,
+.selectButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  min-height: 2.75rem;
+  min-width: 2.75rem;
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.12));
+  border-radius: 6px;
+  background: none;
+  color: var(--color-text-secondary, #9ca3af);
+  font-size: 0.6875rem;
+  font-family: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+  justify-content: center;
+}
+
+.previewButton:hover {
+  color: var(--color-primary, #d97706);
+  border-color: var(--color-primary, #d97706);
+}
+
+.selectButton:hover {
+  color: #22c55e;
+  border-color: #22c55e;
+}
+
+.previewButton:disabled,
+.selectButton:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.previewButton:focus-visible,
+.selectButton:focus-visible {
+  outline: 2px solid var(--color-primary, #d97706);
+  outline-offset: 1px;
+}
+
+.deleteButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem;
+  min-width: 2.75rem;
+  padding: 0.25rem;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  color: var(--color-text-secondary, #9ca3af);
+  font-size: 1rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+  line-height: 1;
+  opacity: 0.5;
+}
+
+.deleteButton:hover {
+  color: #ef4444;
+  border-color: #ef4444;
+  opacity: 1;
+}
+
+.deleteButton:disabled {
+  opacity: 0.2;
+  cursor: default;
+}
+
+.deleteButton:focus-visible {
+  outline: 2px solid #ef4444;
+  outline-offset: 1px;
+  opacity: 1;
 }
