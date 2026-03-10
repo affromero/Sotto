@@ -36,6 +36,8 @@ import { DurationPicker } from '../../components/DurationPicker';
 import { VisibilityPicker } from '../../components/VisibilityPicker';
 import { GenerationProgress } from '../../components/GenerationProgress';
 import { ScriptPreview } from '../../components/ScriptPreview';
+import { DraftsList } from '../../components/DraftsList';
+import { ScriptEditor } from '../../components/ScriptEditor';
 
 type Step = 'discovery' | 'voice' | 'scripting' | 'script-preview' | 'generating';
 
@@ -116,6 +118,8 @@ export default function CreateScreen() {
   // Step state machine
   const [step, setStep] = useState<Step>('discovery');
   const [podcastId, setPodcastId] = useState<string | null>(null);
+  const [scriptEditorVisible, setScriptEditorVisible] = useState(false);
+  const [scriptTurns, setScriptTurns] = useState<{ speaker: string; text: string; direction?: string }[]>([]);
 
   // Discovery state
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -476,6 +480,40 @@ export default function CreateScreen() {
           }
           ListHeaderComponent={
             messages.length === 0 ? (
+              <>
+              <DraftsList
+                onResume={async (draftId) => {
+                  try {
+                    const res = await api.get(`/drafts/${draftId}`);
+                    const draft = res.data;
+                    if (draft.discovery?.messages) {
+                      setMessages(
+                        draft.discovery.messages.map((m: { role: string; content: string; chips?: string[] }) => ({
+                          id: m.role + Math.random(),
+                          role: m.role as 'user' | 'assistant',
+                          content: m.content,
+                          chips: m.chips,
+                        })),
+                      );
+                    }
+                    if (draft.discovery) {
+                      setMetadata({
+                        topic: draft.discovery.topic,
+                        depth: draft.discovery.depth,
+                        audienceLevel: draft.discovery.audienceLevel,
+                        audience: draft.discovery.audience,
+                        focusAreas: draft.discovery.focusAreas,
+                        tone: draft.discovery.tone,
+                        durationTarget: draft.discovery.durationTarget,
+                        speakers: draft.discovery.speakers,
+                      } as DiscoveryMetadata);
+                    }
+                    setPodcastId(draftId);
+                  } catch {
+                    Alert.alert('Error', 'Failed to load draft.');
+                  }
+                }}
+              />
               <View style={styles.greetingChipsContainer}>
                 <ScrollView
                   horizontal
@@ -508,6 +546,7 @@ export default function CreateScreen() {
                   </Pressable>
                 </Animated.View>
               </View>
+              </>
             ) : null
           }
           ListFooterComponent={
@@ -713,11 +752,23 @@ export default function CreateScreen() {
   function renderScriptPreviewStep() {
     if (!podcastId) return null;
     return (
-      <ScriptPreview
-        podcastId={podcastId}
-        onApprove={() => approveMutation.mutate()}
-        onRegenerate={() => regenerateMutation.mutate()}
-      />
+      <>
+        <ScriptPreview
+          podcastId={podcastId}
+          onApprove={() => approveMutation.mutate()}
+          onRegenerate={() => regenerateMutation.mutate()}
+          onEdit={(turns) => {
+            setScriptTurns(turns);
+            setScriptEditorVisible(true);
+          }}
+        />
+        <ScriptEditor
+          visible={scriptEditorVisible}
+          onClose={() => setScriptEditorVisible(false)}
+          podcastId={podcastId}
+          turns={scriptTurns}
+        />
+      </>
     );
   }
 
