@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { requireAdmin } from '@/lib/auth-guards';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { errorResponse } from '@/lib/api-response';
@@ -39,6 +40,7 @@ export async function POST(request: NextRequest) {
   const discovery = await prisma.discovery.create({
     data: {
       podcastId: podcast.id,
+      userId: adminId,
       topic,
       depth: 'quick_overview',
       audienceLevel: 'intermediate',
@@ -46,7 +48,7 @@ export async function POST(request: NextRequest) {
       focusAreas: featureFocus ?? [],
       tone: 'casual',
       durationTarget,
-      speakers: speakers ?? undefined,
+      speakers: speakers ? (speakers as unknown as Prisma.InputJsonValue) : undefined,
     },
   });
 
