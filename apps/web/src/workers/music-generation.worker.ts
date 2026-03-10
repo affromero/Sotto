@@ -95,27 +95,39 @@ export async function processMusicGeneration(job: Job<GenerateMusicPayload>): Pr
 
   await job.updateProgress(80);
 
-  // Upload to R2
-  const r2Key = `podcasts/${podcastId}/music.mp3`;
+  // Upload to R2 (unique key per generation to avoid overwrites)
+  const r2Key = `podcasts/${podcastId}/music/${musicGenerationId}.mp3`;
   const musicUrl = await uploadFile(r2Key, buffer, 'audio/mpeg');
 
   await job.updateProgress(90);
 
-  // Update MusicGeneration + denormalize to Podcast
-  await prisma.$transaction([
+  // Auto-select if this is the first generation for this podcast
+  const existingCount = await prisma.musicGeneration.count({
+    where: { podcastId, status: 'READY' },
+  });
+  const isFirst = existingCount === 0;
+
+  // Update MusicGeneration; auto-select + denormalize only if first
+  const txOps = [
     prisma.musicGeneration.update({
       where: { id: musicGenerationId },
       data: {
         status: 'READY',
         musicUrl,
         fileSize: buffer.length,
+        selected: isFirst,
       },
     }),
-    prisma.podcast.update({
-      where: { id: podcastId },
-      data: { musicUrl },
-    }),
-  ]);
+  ];
+  if (isFirst) {
+    txOps.push(
+      prisma.podcast.update({
+        where: { id: podcastId },
+        data: { musicUrl },
+      }),
+    );
+  }
+  await prisma.$transaction(txOps);
 
   // Log usage for cost tracking
   const service = source === 'byok' ? `${providerId}_byok` : providerId;

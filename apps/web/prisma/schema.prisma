@@ -397,7 +397,7 @@ model Podcast {
   voiceTrackProposals VoiceTrack[] @relation("VoiceTrackProposals")
   defaultVoiceTrackId String?
   videoGeneration   VideoGeneration?
-  musicGeneration   MusicGeneration?
+  musicGenerations  MusicGeneration[]
   audioFingerprint  AudioFingerprint?
   duplicateSource   DuplicateMatch[] @relation("DuplicateSource")
   duplicateMatches  DuplicateMatch[] @relation("DuplicateMatch")
@@ -2149,7 +2149,7 @@ model VideoGeneration {
 
 model MusicGeneration {
   id             String      @id @default(cuid())
-  podcastId      String      @unique
+  podcastId      String
   status         MusicStatus @default(PENDING)
   musicUrl       String?
   duration       Int?        // seconds
@@ -2159,12 +2159,14 @@ model MusicGeneration {
   prompt         String?     @db.Text
   externalTaskId String?     // Suno taskId for async polling
   failureReason  String?     @db.Text
+  selected       Boolean     @default(false)
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
 
   podcast Podcast @relation(fields: [podcastId], references: [id], onDelete: Cascade)
 
   @@index([podcastId])
+  @@index([podcastId, selected])
 }
 
 model SegmentTransition {
