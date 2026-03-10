@@ -60,6 +60,12 @@ import { processAvatarGeneration } from './avatar-generation.worker';
 import { processPlaceEnrichment } from './place-enrichment.worker';
 import { processTransitionGeneration } from './transition-generation.worker';
 import { processNewsIngest } from './news-ingest.worker';
+import { processDemoScriptGeneration } from './demo-script-generation.worker';
+import { processDemoRecording } from './demo-recording.worker';
+import { processDemoVoiceover } from './demo-voiceover.worker';
+import { processDemoVisual } from './demo-visual.worker';
+import { processDemoTransition } from './demo-transition.worker';
+import { processDemoComposition } from './demo-composition.worker';
 import { isR2MonitoringConfigured } from '@/lib/cloudflare-r2-usage';
 import { startPricingRefreshInterval } from '@/lib/pricing';
 
@@ -105,6 +111,12 @@ const workers = [
   createWorker('place-enrichment', processPlaceEnrichment, { concurrency: 3 }),
   createWorker('transition-generation', processTransitionGeneration, { concurrency: 3, lockDuration: 600000 }),
   createWorker('news-ingest', processNewsIngest, { concurrency: 1 }),
+  createWorker('demo-script', processDemoScriptGeneration, { concurrency: 2 }),
+  createWorker('demo-recording', processDemoRecording, { concurrency: 1, lockDuration: 600000 }),
+  createWorker('demo-voiceover', processDemoVoiceover, { concurrency: 5 }),
+  createWorker('demo-visual', processDemoVisual, { concurrency: 3 }),
+  createWorker('demo-transition', processDemoTransition, { concurrency: 2 }),
+  createWorker('demo-composition', processDemoComposition, { concurrency: 1, lockDuration: 900000 }),
 ];
 
 // Set up Twitter mentions polling if credentials are configured

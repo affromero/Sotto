@@ -25,11 +25,12 @@ interface MarkFailedOptions {
 /**
  * Mark a podcast as FAILED, recording the status it was in when the failure occurred.
  * Idempotent: skips if the podcast is already FAILED.
+ * Returns true if the status was actually changed, false if skipped.
  */
 export async function markPodcastFailed(
   podcastId: string,
   options?: string | MarkFailedOptions,
-): Promise<void> {
+): Promise<boolean> {
   const opts: MarkFailedOptions =
     typeof options === 'string' ? { failureReason: options } : options ?? {};
 
@@ -39,7 +40,7 @@ export async function markPodcastFailed(
   });
 
   if (!podcast || podcast.status === 'READY' || podcast.status === 'FAILED' || podcast.status === 'SCRIPT_READY' || podcast.status === 'DRAFT') {
-    return;
+    return false;
   }
 
   await prisma.podcast.update({
@@ -67,6 +68,8 @@ export async function markPodcastFailed(
     failedAtStatus: podcast.status,
     failureReason: opts.failureReason,
   });
+
+  return true;
 }
 
 /**
