@@ -2197,9 +2197,11 @@ model AvatarOverlay {
   durationSeconds   Float?
   avatarProvider    String?
   maskShape         String?
-  runwaySessionId   String?
-  runwayChunkIndex  Int?
-  runwayTotalChunks Int?
+  runwaySessionId      String?
+  runwayChunkIndex     Int?
+  runwayTotalChunks    Int?
+  chunkVideoUrl        String?
+  chunkDurationSeconds Float?
   posX              Float    @default(0.02)
   posY              Float    @default(0.55)
   width             Float    @default(0.25)
