@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.13.0] - 2026-03-10
+
+### Added
+- **Demo Video Studio**: Evolved the admin Showcase Builder into a full 7-step demo video creation workflow — create AI-narrated product videos with custom visuals, voices, and avatars from `/admin/showcase`
+- **Demo script generation**: New `ADMIN` podcast source and demo-specific prompt template that produces self-referential Sotto product scripts with visual-oriented narration and no citation requirements
+- **Script review panel**: Inline script editing, approval, and regeneration directly within the builder workflow
+- **Visual pipeline editor**: Per-segment visual classification, prompt editing, model selection, transition configuration, and cost estimation
+- **Avatar assignment panel**: Per-speaker avatar selection from HeyGen/Runway with position controls, mask shape selector, and live position preview
+- **Generate-all orchestrator**: Non-blocking state-machine API endpoint that advances the pipeline (script → audio → video) with a single action
+- **Preview & publish panel**: Video/audio player with segment visual timeline, visibility controls (public/unlisted/private), and link copy/download actions
+
+### Changed
+- Showcase Builder page renamed to "Demo Video Studio" to reflect expanded capabilities
+
+### Fixed
+- Podcast player UI modernized with glassmorphism and micro-interactions
+- Lottie dependency replaced with lightweight CSS waveform animations
+- Discovery page shows actionable error message on 429 rate limit
+- Deploy pre-build prune prevents disk exhaustion during deploys
+
 ## [0.12.0] - 2026-03-10
 
 ### Added
