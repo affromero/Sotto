@@ -1,45 +1,23 @@
-/* HeroSection — Featured podcast layout at top of feed */
+/* HeroSection — Top-of-feed podcast grid */
 
 .root {
   width: 100%;
 }
 
-/* Mobile: single featured card, full-width */
 .grid {
   display: grid;
   grid-template-columns: 1fr;
   gap: var(--space-5);
 }
 
-/* Hide side cards on mobile — only show featured */
-.grid > *:not(:first-child) {
-  display: none;
-}
-
-/* Tablet: featured full-width, 2 defaults below */
 @media (min-width: 768px) {
-  .grid > *:not(:first-child) {
-    display: block;
-  }
-
   .grid {
     grid-template-columns: repeat(2, 1fr);
   }
-
-  /* Featured spans full width on tablet */
-  .grid > *:first-child {
-    grid-column: 1 / -1;
-  }
 }
 
-/* Desktop: 3-column, featured spans 2 */
 @media (min-width: 1024px) {
   .grid {
     grid-template-columns: repeat(3, 1fr);
-  }
-
-  /* Featured spans 2 columns (handled by PodcastCard.module.css .featured) */
-  .grid > *:first-child {
-    grid-column: span 2;
   }
 }

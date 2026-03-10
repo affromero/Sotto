@@ -12,18 +12,10 @@ interface HeroSectionProps {
 export function HeroSection({ podcasts, onPlay }: HeroSectionProps) {
   if (podcasts.length === 0) return null;
 
-  const [featured, ...rest] = podcasts;
-  const sidePodcasts = rest.slice(0, 2);
-
   return (
     <section className={styles.root} aria-label="Featured podcasts">
       <div className={styles.grid}>
-        <PodcastCard
-          podcast={featured}
-          variant="featured"
-          onPlay={onPlay}
-        />
-        {sidePodcasts.map((podcast) => (
+        {podcasts.slice(0, 3).map((podcast) => (
           <PodcastCard
             key={podcast.id}
             podcast={podcast}

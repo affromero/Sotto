@@ -290,16 +290,6 @@
   }
 }
 
-/* ── Variant: Featured ──────────────────────── */
-
-.featured .cover {
-  height: 160px;
-}
-
-.featured .title {
-  font-size: var(--font-size-xl);
-}
-
 /* ── Variant: Compact ───────────────────────── */
 
 .compact {
@@ -333,17 +323,6 @@
     height: 120px;
   }
 
-  .featured .cover {
-    height: 140px;
-  }
-}
-
-/* ── Featured: span 2 grid columns on desktop ─ */
-
-@media (min-width: 1024px) {
-  .featured {
-    grid-column: span 2;
-  }
 }
 
 /* ── Reduced motion ─────────────────────────── */

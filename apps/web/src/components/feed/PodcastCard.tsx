@@ -14,7 +14,7 @@ import styles from './PodcastCard.module.css';
 
 interface PodcastCardProps {
   podcast: PodcastSummary;
-  variant?: 'default' | 'featured' | 'compact';
+  variant?: 'default' | 'compact';
   onPlay?: (id: string) => void;
   position?: number;
   feedSort?: string;
