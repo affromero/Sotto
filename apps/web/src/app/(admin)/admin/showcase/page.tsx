@@ -18,7 +18,7 @@ export default function ShowcasePage() {
       <div className={styles.header}>
         <h1 className={styles.title}>Demo Video Studio</h1>
         <p className={styles.subtitle}>
-          Create AI-narrated product demo videos with custom visuals, voices, and avatars.
+          Create AI-narrated product demo videos with custom visuals and voices.
         </p>
       </div>
       <DemoStudio providers={providers} />

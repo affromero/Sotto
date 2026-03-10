@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import NextImage from 'next/image';
 import {
   Image as ImageIcon, Film, BarChart3, Quote, GitCompare, Clock, Network, Type,
-  AlertTriangle, RefreshCw, Pencil, Users,
+  AlertTriangle, RefreshCw, Pencil, Users, X,
 } from 'lucide-react';
 import styles from './VideoProgress.module.css';
 
@@ -48,6 +48,7 @@ interface VideoProgressProps {
   onFailed?: (reason: string) => void;
   onRequestEdit?: (visuals: SegmentVisual[]) => void;
   onChangeAvatars?: () => void;
+  onDismiss?: () => void;
 }
 
 const STAGES = ['CLASSIFYING', 'GENERATING_VISUALS', 'GENERATING_TRANSITIONS', 'GENERATING_AVATARS', 'COMPOSING', 'READY'] as const;
@@ -163,7 +164,7 @@ function FilmstripThumbnail({ visual }: { visual: SegmentVisual }) {
   );
 }
 
-export function VideoProgress({ podcastId, videoGenerationId, onComplete, onFailed, onRequestEdit, onChangeAvatars }: VideoProgressProps) {
+export function VideoProgress({ podcastId, videoGenerationId, onComplete, onFailed, onRequestEdit, onChangeAvatars, onDismiss }: VideoProgressProps) {
   const [data, setData] = useState<VideoStatusResponse | null>(null);
   const [retryError, setRetryError] = useState<string | null>(null);
   const [retrying, setRetrying] = useState(false);
@@ -406,6 +407,11 @@ export function VideoProgress({ podcastId, videoGenerationId, onComplete, onFail
           <div className={styles.errorMessage}>
             <AlertTriangle size={16} />
             <p>{errorMessage}</p>
+            {onDismiss && (
+              <button className={styles.dismissButton} onClick={onDismiss} type="button" aria-label="Dismiss error">
+                <X size={14} />
+              </button>
+            )}
           </div>
           <div className={styles.errorActions}>
             {onRequestEdit && visuals.length > 0 && (
