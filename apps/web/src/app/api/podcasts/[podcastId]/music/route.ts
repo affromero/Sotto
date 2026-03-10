@@ -8,6 +8,7 @@ import { generateMusicSchema } from '@/lib/validations';
 import { addJob, JobType, musicGenerationQueue } from '@/lib/queue';
 import { deleteFile, extractR2Key } from '@/lib/r2';
 import { logger } from '@/lib/logger';
+import { getAllMusicProviderMeta, type MusicProviderId } from '@/lib/providers/music-registry';
 
 type RouteParams = { params: Promise<{ podcastId: string }> };
 
@@ -161,8 +162,11 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     },
   });
 
+  // Resolve available models for this user (BYOK keys + platform keys)
+  const availableModels = await getAvailableModelsForUser(authResult.userId);
+
   if (!musicGeneration) {
-    return NextResponse.json({ status: null });
+    return NextResponse.json({ status: null, availableModels });
   }
 
   return NextResponse.json({
@@ -175,7 +179,31 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     model: musicGeneration.model,
     failureReason: musicGeneration.failureReason,
     createdAt: musicGeneration.createdAt,
+    availableModels,
   });
+}
+
+async function getAvailableModelsForUser(userId: string): Promise<Array<{ id: string; label: string; provider: string }>> {
+  // Check which music providers the user has access to (BYOK or platform)
+  const byokKeys = await prisma.userTtsKey.findMany({
+    where: { userId, provider: { in: ['suno', 'elevenlabs'] }, isValid: true },
+    select: { provider: true },
+  });
+  const byokProviders = new Set(byokKeys.map((k) => k.provider));
+
+  const availableProviders = new Set<MusicProviderId>();
+  if (byokProviders.has('suno') || process.env.SUNO_API_KEY) availableProviders.add('suno');
+  if (byokProviders.has('elevenlabs') || process.env.ELEVENLABS_API_KEY) availableProviders.add('elevenlabs');
+
+  const allMeta = getAllMusicProviderMeta();
+  const models: Array<{ id: string; label: string; provider: string }> = [];
+  for (const meta of allMeta) {
+    if (!availableProviders.has(meta.id)) continue;
+    for (const model of meta.models) {
+      models.push({ id: model.id, label: model.displayName, provider: meta.displayName });
+    }
+  }
+  return models;
 }
 
 /**

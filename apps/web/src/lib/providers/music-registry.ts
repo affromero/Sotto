@@ -26,10 +26,13 @@ const MUSIC_PROVIDERS: Record<MusicProviderId, MusicProviderMeta> = {
   suno: {
     id: 'suno',
     displayName: 'Suno',
-    getApiKeyUrl: 'https://kie.ai/dashboard',
+    getApiKeyUrl: 'https://sunoapi.org/dashboard',
     defaultModel: 'suno-v5',
     models: [
+      { id: 'suno-v4', displayName: 'Suno V4', costPerTrack: 0.05 },
       { id: 'suno-v4.5', displayName: 'Suno V4.5', costPerTrack: 0.05 },
+      { id: 'suno-v4.5-plus', displayName: 'Suno V4.5 Plus', costPerTrack: 0.08 },
+      { id: 'suno-v4.5-all', displayName: 'Suno V4.5 All', costPerTrack: 0.08 },
       { id: 'suno-v5', displayName: 'Suno V5', costPerTrack: 0.10 },
     ],
     platformKeyEnv: 'SUNO_API_KEY',
@@ -71,4 +74,29 @@ export function getMusicModelProvider(modelId: string): MusicProviderId | null {
     if (provider.models.some((m) => m.id === modelId)) return provider.id;
   }
   return null;
+}
+
+/** Client-safe metadata for settings UI. */
+export interface MusicProviderClientMeta {
+  id: MusicProviderId;
+  displayName: string;
+  getApiKeyUrl: string;
+  /** Note shown below the provider name (e.g. "unofficial"). */
+  note?: string;
+  models: MusicModelOption[];
+}
+
+/** Only providers that support BYOK key entry (not ElevenLabs — already in TTS). */
+const MUSIC_BYOK_CLIENT_META: MusicProviderClientMeta[] = [
+  {
+    id: 'suno',
+    displayName: 'Suno',
+    getApiKeyUrl: 'https://sunoapi.org/dashboard',
+    note: 'Unofficial third-party API',
+    models: MUSIC_PROVIDERS.suno.models,
+  },
+];
+
+export function getMusicByokProviderMeta(): MusicProviderClientMeta[] {
+  return MUSIC_BYOK_CLIENT_META;
 }
