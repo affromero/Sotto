@@ -38,6 +38,21 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       timingSegments: data.timingSegments !== undefined
         ? (data.timingSegments as unknown as Prisma.InputJsonValue)
         : undefined,
+      sfxConfig: data.sfxConfig !== undefined
+        ? (data.sfxConfig as unknown as Prisma.InputJsonValue)
+        : undefined,
+      providerBanner: data.providerBanner !== undefined
+        ? (data.providerBanner as unknown as Prisma.InputJsonValue)
+        : undefined,
+      avatarConfig: data.avatarConfig !== undefined
+        ? (data.avatarConfig as unknown as Prisma.InputJsonValue)
+        : undefined,
+      overlays: data.overlays !== undefined
+        ? (data.overlays as unknown as Prisma.InputJsonValue)
+        : undefined,
+      subtitles: data.subtitles !== undefined
+        ? (data.subtitles as unknown as Prisma.InputJsonValue)
+        : undefined,
     },
   });
 

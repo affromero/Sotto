@@ -1,4 +1,5 @@
 import { Job } from 'bullmq';
+import { Prisma } from '@prisma/client';
 import type { GenerateDemoRecordingPayload } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { uploadFile } from '@/lib/r2';
@@ -82,9 +83,21 @@ export async function processDemoRecording(job: Job<GenerateDemoRecordingPayload
         throw new Error(`Failed to check record status: ${statusResponse.status}`);
       }
 
-      const status = (await statusResponse.json()) as { status: string; progress: number; error?: string };
+      const status = (await statusResponse.json()) as {
+        status: string;
+        progress: number;
+        error?: string;
+        actionTimingLog?: Array<{ type: string; timestampMs: number; meta?: Record<string, unknown> }>;
+      };
 
       if (status.status === 'done') {
+        // Store timing log for SFX placement during composition
+        if (status.actionTimingLog) {
+          await prisma.demoScene.update({
+            where: { id: sceneId },
+            data: { actionTimingLog: status.actionTimingLog as unknown as Prisma.InputJsonValue },
+          });
+        }
         await job.updateProgress(70);
         break;
       }
