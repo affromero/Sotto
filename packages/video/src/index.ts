@@ -5,7 +5,7 @@ export { PodcastVisuals } from './compositions/PodcastVisuals';
 export { LaunchVideo, computeSceneLayouts } from './compositions/LaunchVideo';
 export { LaunchScene } from './compositions/LaunchScene';
 export { resolveSegmentComponent } from './compositions/segments';
-export { KenBurns } from './compositions/effects/KenBurns';
+export { KenBurns, AvatarEntrance, KineticText, SceneTransition, SubtitleTrack, ParticleField } from './compositions/effects';
 export { SottoWatermark } from './compositions/shared/SottoWatermark';
 export { SpeakerLabel } from './compositions/shared/SpeakerLabel';
 export { Background } from './compositions/shared/Background';
