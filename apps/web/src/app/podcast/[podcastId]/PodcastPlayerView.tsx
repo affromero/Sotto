@@ -916,6 +916,12 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
               podcastId={podcast.id}
               speakers={[...new Set(podcast.segments.map(s => s.speaker))]}
               podcastDuration={podcast.duration ?? 0}
+              existingOverlays={avatarOverlays.length > 0 ? avatarOverlays.map((ov) => ({
+                speaker: ov.speaker,
+                avatarId: ov.avatarId,
+                avatarProvider: (ov.avatarProvider ?? 'heygen') as 'heygen' | 'runway',
+                status: ov.status,
+              })) : undefined}
               onConfigured={({ videoGenerationId: vgId, generationStarted }) => {
                 setShowAvatarPicker(false);
                 if (generationStarted && vgId) {
@@ -957,6 +963,9 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
                 }
                 setVideoState('failed');
                 setShowVideoEditor(true);
+              }}
+              onChangeAvatars={() => {
+                setShowAvatarPicker(true);
               }}
             />
           )}

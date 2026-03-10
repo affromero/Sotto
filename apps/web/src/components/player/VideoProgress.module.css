@@ -303,6 +303,92 @@
   padding: 1px 3px;
 }
 
+/* Avatar overlays */
+
+.avatarSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.avatarList {
+  display: flex;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.avatarItem {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: 6px 10px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-background);
+}
+
+.avatarPending {
+  border-color: var(--color-border);
+}
+
+.avatarProcessing {
+  border-color: var(--color-primary);
+}
+
+.avatarReady {
+  border-color: var(--color-success);
+}
+
+.avatarFailed {
+  border-color: var(--color-error);
+}
+
+.avatarThumb {
+  border-radius: var(--radius-full);
+  object-fit: cover;
+}
+
+.avatarThumbPlaceholder {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  background: var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-tertiary);
+}
+
+.avatarInfo {
+  display: flex;
+  flex-direction: column;
+}
+
+.avatarSpeaker {
+  font: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  line-height: 1.2;
+}
+
+.avatarStatus {
+  font: var(--text-caption);
+  color: var(--color-text-tertiary);
+  line-height: 1.2;
+}
+
+.avatarFailed .avatarStatus {
+  color: var(--color-error);
+}
+
+.avatarProcessing .avatarStatus {
+  color: var(--color-primary);
+}
+
+.avatarReady .avatarStatus {
+  color: var(--color-success);
+}
+
 /* Error + retry */
 
 .errorBlock {
