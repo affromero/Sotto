@@ -28,7 +28,7 @@
 
 .cover {
   position: relative;
-  height: 120px;
+  min-height: 120px;
   background: linear-gradient(
     var(--cover-angle, 145deg),
     var(--cover-from, var(--color-primary)),
@@ -39,6 +39,8 @@
   flex-direction: column;
   justify-content: flex-end;
   padding: var(--space-4);
+  /* Clear the absolutely-positioned badges (top offset + badge height + gap) */
+  padding-top: calc(var(--space-3) + 24px + var(--space-2));
   gap: var(--space-1);
 }
 
@@ -310,7 +312,7 @@
 /* ── Variant: Featured ──────────────────────── */
 
 .featured .cover {
-  height: 160px;
+  min-height: 160px;
 }
 
 .featured .title {
@@ -324,9 +326,10 @@
 }
 
 .compact .cover {
-  height: 100px;
+  min-height: 100px;
   border-radius: var(--radius-xl);
   padding: var(--space-3);
+  padding-top: calc(var(--space-2) + 24px + var(--space-2));
 }
 
 .compact .coverBadges {
@@ -359,11 +362,11 @@
   }
 
   .cover {
-    height: 100px;
+    min-height: 100px;
   }
 
   .featured .cover {
-    height: 130px;
+    min-height: 130px;
   }
 }
 
