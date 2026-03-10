@@ -35,6 +35,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       ttsModel: data.ttsModel,
       ttsVoiceId: data.ttsVoiceId,
       transitionType: data.transitionType,
+      timingSegments: data.timingSegments !== undefined
+        ? (data.timingSegments as unknown as Prisma.InputJsonValue)
+        : undefined,
     },
   });
 

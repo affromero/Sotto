@@ -86,6 +86,14 @@
   margin: 0;
 }
 
+.totalDuration {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+}
+
 .emptyText {
   font: var(--text-body-sm);
   color: var(--color-text-secondary);
