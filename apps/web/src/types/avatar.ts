@@ -17,6 +17,7 @@ export interface AvatarOverlayData {
   chunkDurationSeconds?: number | null;
   runwayChunkIndex?: number | null;
   runwayTotalChunks?: number | null;
+  enabledSegmentIds?: string[];
 }
 
 export interface HeyGenAvatarData {

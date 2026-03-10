@@ -78,6 +78,41 @@ export function VideoView({
   const speakers = useMemo(() => getUniqueSpeakers(segments), [segments]);
   const activeIndex = findActiveIndex(segments, currentTime);
   const activeSegment = segments[activeIndex] ?? null;
+
+  // Show avatar only when the matching speaker is active AND the segment is enabled
+  const visibleOverlays = useMemo(() => {
+    if (!activeSegment) return [];
+    return playableOverlays.filter((o) => {
+      if (o.speaker !== activeSegment.speaker) return false;
+      // If enabledSegmentIds is set, only show on those segments
+      const enabled = o.enabledSegmentIds;
+      if (enabled && enabled.length > 0) return enabled.includes(activeSegment.id);
+      return true;
+    });
+  }, [playableOverlays, activeSegment]);
+
+  // Compute avatar video time: cumulative duration of prior enabled same-speaker segments + elapsed in current
+  const avatarTimeMap = useMemo(() => {
+    const map = new Map<string, number>();
+    if (!activeSegment) return map;
+    for (const overlay of playableOverlays) {
+      const enabled = overlay.enabledSegmentIds;
+      const isEnabled = (segId: string) => !enabled || enabled.length === 0 || enabled.includes(segId);
+      let avatarTime = 0;
+      for (let i = 0; i < segments.length; i++) {
+        if (segments[i].speaker !== overlay.speaker) continue;
+        if (!isEnabled(segments[i].id)) continue;
+        if (i < activeIndex) {
+          avatarTime += segments[i].duration ?? 0;
+        } else if (i === activeIndex) {
+          avatarTime += currentTime - (segments[i].startTime ?? 0);
+          break;
+        }
+      }
+      map.set(overlay.speaker, avatarTime);
+    }
+    return map;
+  }, [playableOverlays, segments, activeIndex, activeSegment, currentTime]);
   // Find the active sub-visual based on elapsed time within the segment
   const activeVisual = useMemo(() => {
     if (!activeSegment) return null;
@@ -181,13 +216,14 @@ export function VideoView({
             posY={overlay.posY}
             width={overlay.width}
             height={overlay.height}
-            currentTime={currentTime}
-            isPlaying={isPlaying}
+            currentTime={avatarTimeMap.get(overlay.speaker) ?? 0}
+            isPlaying={isPlaying && visibleOverlays.some((v) => v.id === overlay.id)}
             containerWidth={containerSize.width}
             containerHeight={containerSize.height}
             editable={isOwner ?? false}
             maskShape={(overlay.maskShape as AvatarMaskShape) ?? 'none'}
             onPositionChange={(pos) => onAvatarPositionChange?.(overlay.speaker, pos)}
+            visible={visibleOverlays.some((v) => v.id === overlay.id)}
           />
         ))}
         {isOwner && avatarsVisible && playableOverlays.length > 0 && onMaskShapeChange && (
@@ -200,10 +236,10 @@ export function VideoView({
                     shapePickerSpeaker === overlay.speaker ? null : overlay.speaker,
                   )}
                   type="button"
-                  aria-label={`Change shape for ${overlay.speaker}`}
+                  aria-label={`Change shape for ${overlay.avatarName ?? overlay.speaker}`}
                   title={`Shape: ${overlay.maskShape ?? 'none'}`}
                 >
-                  {overlay.speaker}
+                  {overlay.avatarName ?? overlay.speaker}
                 </button>
                 {shapePickerSpeaker === overlay.speaker && (
                   <div className={styles.shapeOptions} role="listbox" aria-label="Mask shapes">
