@@ -19,6 +19,7 @@ import { PodcastCard } from '../../components/PodcastCard';
 import { SkeletonCard } from '../../components/SkeletonCard';
 import { EmptyState } from '../../components/EmptyState';
 import { ErrorState } from '../../components/ErrorState';
+import { FeaturedCarousel } from '../../components/FeaturedCarousel';
 
 const SORT_OPTIONS: { label: string; value: FeedSort }[] = [
   { label: 'Trending', value: 'trending' },
@@ -81,8 +82,9 @@ export default function FeedScreen() {
     [],
   );
 
-  return (
-    <View style={globalStyles.screenContainer}>
+  const listHeader = (
+    <>
+      <FeaturedCarousel />
       <View style={styles.sortRow}>
         {SORT_OPTIONS.map((option) => (
           <Pressable
@@ -104,11 +106,16 @@ export default function FeedScreen() {
           </Pressable>
         ))}
       </View>
+    </>
+  );
 
+  return (
+    <View style={globalStyles.screenContainer}>
       <FlatList
         data={podcasts}
         renderItem={renderItem}
         keyExtractor={keyExtractor}
+        ListHeaderComponent={listHeader}
         contentContainerStyle={
           podcasts.length === 0
             ? styles.emptyListContainer
