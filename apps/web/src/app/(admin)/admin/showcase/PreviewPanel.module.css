@@ -1,0 +1,218 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+/* Player section */
+
+.playerSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.videoPlayer {
+  width: 100%;
+  max-height: 480px;
+  border-radius: var(--radius-md);
+  background: #000;
+}
+
+.audioFallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-xl, 48px) var(--spacing-lg);
+  background: #1a1a1a;
+  border-radius: var(--radius-md);
+}
+
+.audioLabel {
+  font: var(--text-body-sm);
+  color: #9ca3af;
+  margin: 0;
+}
+
+.audioPlayer {
+  width: 100%;
+  max-width: 400px;
+}
+
+.playerControls {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.toggleLabel {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.metaText {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Segment visual timeline */
+
+.timelineFieldset {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-md);
+  margin: 0;
+}
+
+.timelineLegend {
+  font: var(--text-label);
+  color: var(--color-text-primary);
+  padding: 0 var(--spacing-xs);
+}
+
+.timeline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+}
+
+.timelineItem {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: 4px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font: var(--text-body-xs);
+  color: var(--color-text-secondary);
+}
+
+.timelineItem[data-status='ready'] {
+  border-color: #a7f3d0;
+  background: #ecfdf5;
+}
+
+.timelineItem[data-status='pending'] {
+  border-color: #fde68a;
+  background: #fffbeb;
+}
+
+.timelineItem[data-status='failed'] {
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+
+.timelineOrder {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.timelineType {
+  text-transform: lowercase;
+}
+
+.timelineStatus {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Publish controls */
+
+.publishFieldset {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-md);
+  margin: 0;
+}
+
+.publishLegend {
+  font: var(--text-label);
+  color: var(--color-text-primary);
+  padding: 0 var(--spacing-xs);
+}
+
+.visibilityRow {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-md);
+}
+
+.visibilityLabel {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+}
+
+.visibilitySelect {
+  font: var(--text-body-sm);
+  color: var(--color-text-primary);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  cursor: pointer;
+  min-width: 140px;
+}
+
+.visibilitySelect:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.linkRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+
+.linkBtn {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  font: var(--text-body-sm);
+  color: var(--color-text-primary);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  min-height: 44px;
+  text-decoration: none;
+  transition: border-color 0.15s ease;
+}
+
+.linkBtn:hover {
+  border-color: var(--color-primary);
+}
+
+.publishedNote {
+  font: var(--text-body-sm);
+  color: #065f46;
+  margin: var(--spacing-sm) 0 0;
+}
+
+/* Banner */
+
+.banner {
+  font: var(--text-body-sm);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+}
+
+.banner[data-variant='success'] {
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+
+.banner[data-variant='error'] {
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}

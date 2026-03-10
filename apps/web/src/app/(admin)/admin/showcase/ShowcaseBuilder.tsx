@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { AvatarPanel } from './AvatarPanel';
+import { PreviewPanel } from './PreviewPanel';
 import { ScriptReviewPanel } from './ScriptReviewPanel';
 import { VisualPipelinePanel } from './VisualPipelinePanel';
 import styles from './ShowcaseBuilder.module.css';
@@ -158,7 +159,11 @@ function getUnlockedSteps(podcastStatus: string | undefined): Set<StepId> {
     unlocked.add('generate');
   }
 
-  // Preview: placeholder (Phase 4)
+  // Preview: unlocked when video generation is done (or audio is ready for audio-only preview)
+  // The component itself checks videoStatus internally
+  if (podcastStatus === 'READY') {
+    unlocked.add('preview');
+  }
 
   return unlocked;
 }
@@ -1011,13 +1016,10 @@ export function ShowcaseBuilder({ providers }: ShowcaseBuilderProps) {
         </div>
       )}
 
-      {/* Step 7: Preview — Placeholder */}
-      {activeStep === 'preview' && (
+      {/* Step 7: Preview & Publish */}
+      {activeStep === 'preview' && selectedPodcastId && (
         <div className={styles.stepContent}>
-          <div className={styles.placeholderStep}>
-            <h3 className={styles.placeholderTitle}>Preview & Publish</h3>
-            <p className={styles.placeholderText}>Coming in Phase 4 — preview generated video and publish to feed.</p>
-          </div>
+          <PreviewPanel podcastId={selectedPodcastId} />
         </div>
       )}
 
