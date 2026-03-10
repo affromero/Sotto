@@ -428,6 +428,7 @@ enum PodcastSource {
   TELEGRAM
   API
   IMPORT
+  ADMIN
 }
 
 // ============ DISCOVERY (Chat-Based) ============

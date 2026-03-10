@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import styles from './ShowcaseBuilder.module.css';
 
 interface ProviderModel {
@@ -55,7 +55,7 @@ interface Boundary {
   toProvider: string | null;
 }
 
-type Status = 'idle' | 'loading' | 'saving' | 'generating' | 'success' | 'error';
+type Status = 'idle' | 'loading' | 'saving' | 'generating' | 'creating' | 'success' | 'error';
 
 const PROVIDER_COLORS: Record<string, string> = {
   elevenlabs: '#6366f1',
@@ -67,6 +67,24 @@ const PROVIDER_COLORS: Record<string, string> = {
   minimax: '#ec4899',
   kittentts: '#6b7280',
 };
+
+const FEATURE_OPTIONS = [
+  { slug: 'creation-flow', label: 'Creation Flow' },
+  { slug: 'interrupt', label: 'Interrupt & Q&A' },
+  { slug: 'fork', label: 'Fork & Remix' },
+  { slug: 'voice-comparison', label: 'Voice Comparison' },
+  { slug: 'import', label: 'Import Podcasts' },
+  { slug: 'social-feed', label: 'Social Feed' },
+  { slug: 'byok', label: 'Bring Your Own Keys' },
+  { slug: 'voice-cloning', label: 'Voice Cloning' },
+  { slug: 'script-review', label: 'Script Review' },
+  { slug: 'video-generation', label: 'Video Generation' },
+  { slug: 'collections', label: 'Collections' },
+  { slug: 'multi-speaker', label: 'Multi-Speaker' },
+];
+
+/** Statuses that indicate in-progress generation */
+const IN_PROGRESS_STATUSES = ['SCRIPTING', 'VERIFYING_SCRIPT', 'VALIDATING_REFERENCES', 'GENERATING_AUDIO', 'STITCHING'];
 
 interface ShowcaseBuilderProps {
   providers: ProviderInfo[];
@@ -82,13 +100,61 @@ export function ShowcaseBuilder({ providers }: ShowcaseBuilderProps) {
   const [status, setStatus] = useState<Status>('idle');
   const [message, setMessage] = useState('');
 
-  // Fetch eligible podcasts on mount
-  useEffect(() => {
-    fetch('/api/admin/showcase')
-      .then((r) => r.json())
-      .then((d) => setPodcasts(d.podcasts ?? []))
-      .catch(() => setMessage('Failed to load podcasts'));
+  // Creation form state
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [createTopic, setCreateTopic] = useState('');
+  const [createTitle, setCreateTitle] = useState('');
+  const [createDuration, setCreateDuration] = useState(2);
+  const [createFeatures, setCreateFeatures] = useState<Set<string>>(new Set());
+
+  // Polling ref for in-progress podcasts
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Fetch eligible podcasts
+  const fetchPodcasts = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/showcase');
+      const d = await res.json();
+      setPodcasts(d.podcasts ?? []);
+      return d.podcasts ?? [];
+    } catch {
+      setMessage('Failed to load podcasts');
+      return [];
+    }
   }, []);
+
+  useEffect(() => {
+    fetchPodcasts();
+  }, [fetchPodcasts]);
+
+  // Poll for status updates when a selected podcast is in progress
+  useEffect(() => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+
+    const selectedPodcast = podcasts.find((p) => p.id === selectedPodcastId);
+    if (!selectedPodcast || !IN_PROGRESS_STATUSES.includes(selectedPodcast.status)) return;
+
+    pollRef.current = setInterval(async () => {
+      const updated = await fetchPodcasts();
+      const current = updated.find((p: PodcastOption) => p.id === selectedPodcastId);
+      if (current && !IN_PROGRESS_STATUSES.includes(current.status)) {
+        if (pollRef.current) clearInterval(pollRef.current);
+        pollRef.current = null;
+        if (current.status === 'SCRIPT_READY' || current.status === 'READY') {
+          setMessage(`Demo "${current.title}" is ready`);
+          setStatus('success');
+          loadSegments(current.id);
+        }
+      }
+    }, 3000);
+
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, [selectedPodcastId, podcasts, fetchPodcasts]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load segments when podcast is selected
   const loadSegments = useCallback(async (podcastId: string) => {
@@ -254,14 +320,166 @@ export function ShowcaseBuilder({ providers }: ShowcaseBuilderProps) {
     }
   }, [selectedPodcastId]);
 
+  // Create demo podcast
+  const createDemo = useCallback(async () => {
+    if (!createTopic.trim()) return;
+    setStatus('creating');
+    setMessage('');
+    try {
+      const res = await fetch('/api/admin/showcase/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          topic: createTopic.trim(),
+          title: createTitle.trim() || undefined,
+          featureFocus: createFeatures.size > 0 ? [...createFeatures] : undefined,
+          durationTarget: createDuration,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error ?? 'Create failed');
+      }
+      const data = await res.json();
+
+      // Refresh podcast list and select the new one
+      const updated = await fetchPodcasts();
+      const newPodcast = updated.find((p: PodcastOption) => p.id === data.podcastId);
+      if (newPodcast) {
+        setSelectedPodcastId(data.podcastId);
+      }
+
+      setMessage(`Demo created — generating script...`);
+      setStatus('success');
+      setShowCreateForm(false);
+      setCreateTopic('');
+      setCreateTitle('');
+      setCreateDuration(2);
+      setCreateFeatures(new Set());
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'Create failed');
+      setStatus('error');
+    }
+  }, [createTopic, createTitle, createDuration, createFeatures, fetchPodcasts]);
+
+  // Toggle feature selection
+  const toggleFeature = useCallback((slug: string) => {
+    setCreateFeatures((prev) => {
+      const next = new Set(prev);
+      if (next.has(slug)) next.delete(slug);
+      else next.add(slug);
+      return next;
+    });
+  }, []);
+
   const providerMap = Object.fromEntries(providers.map((p) => [p.id, p]));
 
   // Find boundary after a segment
   const getBoundaryAfter = (segmentId: string) =>
     boundaries.find((b) => b.afterSegmentId === segmentId);
 
+  const selectedPodcast = podcasts.find((p) => p.id === selectedPodcastId);
+  const isInProgress = selectedPodcast && IN_PROGRESS_STATUSES.includes(selectedPodcast.status);
+
   return (
     <div className={styles.root}>
+      {/* Create Demo section */}
+      <fieldset className={styles.fieldset}>
+        <legend className={styles.legend}>Create Demo</legend>
+        {!showCreateForm ? (
+          <button
+            type="button"
+            className={styles.btnPrimary}
+            onClick={() => setShowCreateForm(true)}
+          >
+            Create Demo Podcast
+          </button>
+        ) : (
+          <div className={styles.createForm}>
+            <div className={styles.formField}>
+              <label className={styles.formLabel} htmlFor="demo-topic">
+                Topic *
+              </label>
+              <textarea
+                id="demo-topic"
+                className={styles.textarea}
+                value={createTopic}
+                onChange={(e) => setCreateTopic(e.target.value)}
+                placeholder="e.g., How Sotto turns any conversation into a podcast"
+                rows={2}
+                maxLength={500}
+              />
+            </div>
+
+            <div className={styles.formField}>
+              <label className={styles.formLabel} htmlFor="demo-title">
+                Title (optional)
+              </label>
+              <input
+                id="demo-title"
+                type="text"
+                className={styles.input}
+                value={createTitle}
+                onChange={(e) => setCreateTitle(e.target.value)}
+                placeholder="Auto-generated from topic if blank"
+                maxLength={200}
+              />
+            </div>
+
+            <div className={styles.formField}>
+              <label className={styles.formLabel}>
+                Duration: {createDuration} min
+              </label>
+              <input
+                type="range"
+                className={styles.slider}
+                min={1}
+                max={3}
+                step={0.5}
+                value={createDuration}
+                onChange={(e) => setCreateDuration(Number(e.target.value))}
+                aria-label="Duration target in minutes"
+              />
+            </div>
+
+            <div className={styles.formField}>
+              <label className={styles.formLabel}>Feature Focus</label>
+              <div className={styles.featureGrid}>
+                {FEATURE_OPTIONS.map((f) => (
+                  <label key={f.slug} className={styles.featureChip} data-selected={createFeatures.has(f.slug)}>
+                    <input
+                      type="checkbox"
+                      checked={createFeatures.has(f.slug)}
+                      onChange={() => toggleFeature(f.slug)}
+                      className={styles.hiddenCheckbox}
+                    />
+                    {f.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className={styles.formActions}>
+              <button
+                type="button"
+                className={styles.btnPrimary}
+                onClick={createDemo}
+                disabled={!createTopic.trim() || status === 'creating'}
+              >
+                {status === 'creating' ? 'Creating...' : 'Create Demo'}
+              </button>
+              <button
+                type="button"
+                className={styles.btnGhost}
+                onClick={() => setShowCreateForm(false)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </fieldset>
+
       {/* Podcast selector */}
       <fieldset className={styles.fieldset}>
         <legend className={styles.legend}>Select Podcast</legend>
@@ -279,6 +497,14 @@ export function ShowcaseBuilder({ providers }: ShowcaseBuilderProps) {
           ))}
         </select>
       </fieldset>
+
+      {/* In-progress status */}
+      {isInProgress && (
+        <div className={styles.progressBanner} role="status">
+          <span className={styles.spinner} />
+          {selectedPodcast.title} — {selectedPodcast.status.replace(/_/g, ' ').toLowerCase()}...
+        </div>
+      )}
 
       {segments.length > 0 && (
         <>
@@ -445,18 +671,18 @@ export function ShowcaseBuilder({ providers }: ShowcaseBuilderProps) {
               Generate Video
             </button>
           </div>
-
-          {/* Status banner */}
-          {message && (
-            <div
-              className={styles.banner}
-              data-variant={status === 'error' ? 'error' : 'success'}
-              role="alert"
-            >
-              {message}
-            </div>
-          )}
         </>
+      )}
+
+      {/* Status banner */}
+      {message && (
+        <div
+          className={styles.banner}
+          data-variant={status === 'error' ? 'error' : 'success'}
+          role="alert"
+        >
+          {message}
+        </div>
       )}
     </div>
   );

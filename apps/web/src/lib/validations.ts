@@ -1,6 +1,18 @@
 import { z } from 'zod';
 
 /**
+ * Demo podcast creation validation (admin showcase)
+ */
+export const createDemoSchema = z.object({
+  topic: z.string().min(1).max(500),
+  title: z.string().max(200).optional(),
+  featureFocus: z.array(z.string()).max(10).optional(),
+  durationTarget: z.number().min(1).max(3).default(2),
+  speakers: z.array(z.object({ name: z.string(), description: z.string() })).max(4).optional(),
+  aiModel: z.string().optional(),
+});
+
+/**
  * Voice track validation schemas
  */
 export const createVoiceTrackSchema = z.object({

@@ -46,7 +46,7 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
     useAdminCredits ? Promise.resolve(null) : getAiKey(userId),
     useAdminCredits ? Promise.resolve(true) : hasByokKey(userId),
     prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { plan: true, role: true } }),
-    prisma.podcast.findUniqueOrThrow({ where: { id: podcastId }, select: { aiModel: true } }),
+    prisma.podcast.findUniqueOrThrow({ where: { id: podcastId }, select: { aiModel: true, verificationMode: true } }),
     prisma.discovery.findUniqueOrThrow({ where: { id: discoveryId } }),
   ]);
 
@@ -110,6 +110,7 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
         model,
         provider,
         webSearchEnabled: tierFeatures.webSearchEnabled,
+        mode: podcast.verificationMode === 'showcase' ? 'demo' : 'standard',
       });
 
   await job.updateProgress(50);
