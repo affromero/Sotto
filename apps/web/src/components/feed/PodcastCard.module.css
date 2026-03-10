@@ -28,7 +28,7 @@
 
 .cover {
   position: relative;
-  height: 180px;
+  height: 120px;
   background: linear-gradient(
     var(--cover-angle, 145deg),
     var(--cover-from, var(--color-primary)),
@@ -310,7 +310,7 @@
 /* ── Variant: Featured ──────────────────────── */
 
 .featured .cover {
-  height: 240px;
+  height: 160px;
 }
 
 .featured .title {
@@ -324,7 +324,7 @@
 }
 
 .compact .cover {
-  height: 160px;
+  height: 100px;
   border-radius: var(--radius-xl);
   padding: var(--space-3);
 }
@@ -359,11 +359,11 @@
   }
 
   .cover {
-    height: 140px;
+    height: 100px;
   }
 
   .featured .cover {
-    height: 180px;
+    height: 130px;
   }
 }
 
