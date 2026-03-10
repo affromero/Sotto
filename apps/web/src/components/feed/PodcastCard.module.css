@@ -39,8 +39,6 @@
   flex-direction: column;
   justify-content: flex-end;
   padding: var(--space-4);
-  /* Clear the absolutely-positioned badges (top offset + badge height + gap) */
-  padding-top: calc(var(--space-3) + 24px + var(--space-2));
   gap: var(--space-1);
 }
 
@@ -67,17 +65,16 @@
   background: rgba(0, 0, 0, 0.12);
 }
 
-/* Cover badges (top row) */
+/* Cover badges (top row — in-flow, pushed to top via margin-bottom: auto) */
 .coverBadges {
-  position: absolute;
-  top: var(--space-3);
-  left: var(--space-4);
-  right: var(--space-4);
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
-  z-index: 1;
+  margin-bottom: auto;
+  flex-shrink: 0;
 }
 
 .contentBadge {
@@ -329,13 +326,6 @@
   height: 100px;
   border-radius: var(--radius-xl);
   padding: var(--space-3);
-  padding-top: calc(var(--space-2) + 24px + var(--space-2));
-}
-
-.compact .coverBadges {
-  top: var(--space-2);
-  left: var(--space-3);
-  right: var(--space-3);
 }
 
 .compact .coverContent {
