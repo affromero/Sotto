@@ -1,0 +1,190 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.toolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-xs);
+}
+
+.toolBtn {
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  font: var(--text-body-xs);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  min-height: 36px;
+  transition: border-color 0.15s ease;
+}
+
+.toolBtn:hover {
+  border-color: var(--color-primary);
+  color: var(--color-text-primary);
+}
+
+/* Action list */
+
+.actionList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.actionCard {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--spacing-sm);
+  background: var(--color-surface);
+}
+
+.actionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-xs);
+}
+
+.actionType {
+  font: var(--text-body-xs);
+  font-weight: 600;
+  color: var(--color-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.actionControls {
+  display: flex;
+  gap: 2px;
+}
+
+.moveBtn,
+.removeBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  min-width: 28px;
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.moveBtn:hover:not(:disabled) {
+  background: #f3f4f6;
+  color: var(--color-text-primary);
+}
+
+.moveBtn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.removeBtn:hover {
+  background: #fef2f2;
+  color: var(--color-error, #ef4444);
+}
+
+/* Params */
+
+.actionParams {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.paramInput {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font: var(--text-body-xs);
+  color: var(--color-text-primary);
+  background: #fff;
+  min-height: 32px;
+}
+
+.paramInput:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.noParams {
+  font: var(--text-body-xs);
+  color: var(--color-text-secondary);
+  font-style: italic;
+}
+
+/* Add row */
+
+.addRow {
+  display: flex;
+}
+
+.addSelect {
+  flex: 1;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-sm);
+  font: var(--text-body-xs);
+  color: var(--color-text-secondary);
+  background: transparent;
+  cursor: pointer;
+  min-height: 36px;
+}
+
+.addSelect:hover {
+  border-color: var(--color-primary);
+}
+
+/* JSON editor */
+
+.jsonEditor {
+  width: 100%;
+  padding: var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-text-primary);
+  background: var(--color-surface);
+  resize: vertical;
+}
+
+.jsonEditor:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.jsonError {
+  font: var(--text-body-xs);
+  color: var(--color-error, #ef4444);
+}
+
+.applyBtn {
+  align-self: flex-end;
+  padding: var(--spacing-xs) var(--spacing-md);
+  background: var(--color-primary);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  font: var(--text-body-xs);
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 36px;
+  transition: opacity 0.15s ease;
+}
+
+.applyBtn:hover {
+  opacity: 0.9;
+}
