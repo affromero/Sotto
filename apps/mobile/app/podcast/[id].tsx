@@ -36,6 +36,12 @@ import { usePlaybackTelemetry } from '../../lib/usePlaybackTelemetry';
 import type { PlaybackSnapshot } from '../../lib/usePlaybackTelemetry';
 import { ForkModal } from '../../components/ForkModal';
 import { CommentSection } from '../../components/CommentSection';
+import { ReferencesTab } from '../../components/ReferencesTab';
+import { VoiceTrackPicker } from '../../components/VoiceTrackPicker';
+import { ForkLineage } from '../../components/ForkLineage';
+import { VersionHistory } from '../../components/VersionHistory';
+import { usePlayerStore } from '../../lib/player-store';
+import type { VoiceTrackSummary } from '@sotto/shared';
 
 const PLAYBACK_SPEEDS = [0.5, 1, 1.25, 1.5, 2] as const;
 
@@ -66,6 +72,10 @@ export default function PodcastScreen() {
   const [progressBarWidth, setProgressBarWidth] = useState(0);
   const [teleprompterEnabled, setTeleprompterEnabled] = useState(false);
   const [forkModalVisible, setForkModalVisible] = useState(false);
+  const [voicePickerVisible, setVoicePickerVisible] = useState(false);
+  const [versionHistoryVisible, setVersionHistoryVisible] = useState(false);
+  const [activeVoiceTrackId, setActiveVoiceTrackId] = useState<string | null>(null);
+  const setCurrentPodcast = usePlayerStore((s) => s.setCurrentPodcast);
   const lastSeekFromRef = useRef<number | undefined>(undefined);
   const interactionCountRef = useRef(0);
 
@@ -216,7 +226,13 @@ export default function PodcastScreen() {
       podcast.title,
       podcast.user?.name ?? 'Sotto',
     );
-  }, [playerReady, podcast?.id, podcast?.audioUrl, podcast?.title, podcast?.user?.name]);
+    setCurrentPodcast({
+      id: podcast.id,
+      title: podcast.title,
+      creator: podcast.user?.name ?? 'Sotto',
+      audioUrl: podcast.audioUrl,
+    });
+  }, [playerReady, podcast?.id, podcast?.audioUrl, podcast?.title, podcast?.user?.name, setCurrentPodcast]);
 
   const handlePlayPause = useCallback(async () => {
     playScale.value = withSequence(
@@ -267,6 +283,18 @@ export default function PodcastScreen() {
       timestamp: position,
     });
   }, [questionText, position, interactMutation]);
+
+  const handleVoiceTrackSelect = useCallback(async (track: VoiceTrackSummary) => {
+    if (!track.audioUrl) return;
+    setActiveVoiceTrackId(track.id);
+    setVoicePickerVisible(false);
+    await loadTrack(
+      podcast?.id ?? id,
+      track.audioUrl,
+      podcast?.title ?? '',
+      track.contributor?.name ?? 'Sotto',
+    );
+  }, [podcast?.id, podcast?.title, id]);
 
   const handleShare = useCallback(async () => {
     if (!podcast) return;
@@ -525,6 +553,28 @@ export default function PodcastScreen() {
                 <Text style={styles.actionCount}>{podcast.forks.length}</Text>
               )}
             </Pressable>
+
+            {podcast.voiceTracks.length > 1 && (
+              <Pressable
+                onPress={() => setVoicePickerVisible(true)}
+                style={styles.actionIcon}
+                accessibilityLabel="Voice tracks"
+                accessibilityRole="button"
+              >
+                <Ionicons name="mic-outline" size={22} color={colors.textSecondary} />
+              </Pressable>
+            )}
+
+            {podcast.versions.length > 1 && (
+              <Pressable
+                onPress={() => setVersionHistoryVisible(true)}
+                style={styles.actionIcon}
+                accessibilityLabel="Version history"
+                accessibilityRole="button"
+              >
+                <Ionicons name="time-outline" size={22} color={colors.textSecondary} />
+              </Pressable>
+            )}
           </View>
         </View>
       </View>
@@ -633,10 +683,20 @@ export default function PodcastScreen() {
           );
         }}
         ListFooterComponent={
-          <CommentSection
-            podcastId={podcast.id}
-            commentCount={podcast.commentCount}
-          />
+          <>
+            {podcast.references.length > 0 && (
+              <ReferencesTab references={podcast.references} />
+            )}
+            <ForkLineage
+              podcastId={podcast.id}
+              forkedFromId={podcast.forkedFromId}
+              forkCount={podcast.forkCount}
+            />
+            <CommentSection
+              podcastId={podcast.id}
+              commentCount={podcast.commentCount}
+            />
+          </>
         }
         ListEmptyComponent={
           <Text style={styles.emptyTranscript}>No transcript available.</Text>
@@ -722,6 +782,21 @@ export default function PodcastScreen() {
         onClose={() => setForkModalVisible(false)}
         podcastId={podcast.id}
         podcastTitle={podcast.title}
+      />
+
+      <VoiceTrackPicker
+        visible={voicePickerVisible}
+        onClose={() => setVoicePickerVisible(false)}
+        voiceTracks={podcast.voiceTracks}
+        activeTrackId={activeVoiceTrackId ?? podcast.defaultVoiceTrackId}
+        onSelect={handleVoiceTrackSelect}
+      />
+
+      <VersionHistory
+        visible={versionHistoryVisible}
+        onClose={() => setVersionHistoryVisible(false)}
+        versions={podcast.versions}
+        currentVersion={podcast.currentVersion}
       />
     </View>
   );
