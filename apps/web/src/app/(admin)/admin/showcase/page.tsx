@@ -2,7 +2,7 @@ import { getAllProviderMeta } from '@/lib/providers/tts-registry';
 import { ShowcaseBuilder } from './ShowcaseBuilder';
 import styles from './page.module.css';
 
-export const metadata = { title: 'Showcase Builder — Sotto Admin' };
+export const metadata = { title: 'Demo Video Studio — Sotto Admin' };
 
 export default function ShowcasePage() {
   const providers = getAllProviderMeta().map((p) => ({
@@ -16,9 +16,9 @@ export default function ShowcasePage() {
   return (
     <div className={styles.container}>
       <div className={styles.header}>
-        <h1 className={styles.title}>Showcase Builder</h1>
+        <h1 className={styles.title}>Demo Video Studio</h1>
         <p className={styles.subtitle}>
-          Build multi-provider showcase podcasts with per-segment TTS assignments.
+          Create AI-narrated product demo videos with custom visuals, voices, and avatars.
         </p>
       </div>
       <ShowcaseBuilder providers={providers} />

@@ -9,7 +9,7 @@ export async function GET() {
   if (!adminId) return errorResponse('Forbidden', 403);
 
   const podcasts = await prisma.podcast.findMany({
-    where: { status: { in: ['SCRIPT_READY', 'READY'] } },
+    where: { status: { in: ['SCRIPTING', 'VERIFYING_SCRIPT', 'SCRIPT_READY', 'GENERATING_AUDIO', 'STITCHING', 'READY'] } },
     orderBy: { updatedAt: 'desc' },
     take: 100,
     select: {
