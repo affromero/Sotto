@@ -103,14 +103,9 @@ export default async function FeedPage() {
   const serializedAll = serializePodcasts(podcasts);
   const serializedTrending = serializePodcasts(trending);
 
-  // Only show hero when there are enough podcasts to justify featuring some
-  const hasEnoughForHero = serializedAll.length >= 6;
-  const heroPodcasts = hasEnoughForHero ? serializedTrending.slice(0, 3) : [];
-  const remainingTrending = hasEnoughForHero ? serializedTrending.slice(3) : serializedTrending;
-
-  // Exclude hero podcasts from the main grid to avoid duplication
-  const heroIds = new Set(heroPodcasts.map((p) => p.id));
-  const gridPodcasts = serializedAll.filter((p) => !heroIds.has(p.id));
+  // Exclude trending from main grid to avoid duplication
+  const trendingIds = new Set(serializedTrending.map((p) => p.id));
+  const gridPodcasts = serializedAll.filter((p) => !trendingIds.has(p.id));
 
   const topBarUser = session?.user
     ? { name: session.user.name, email: session.user.email, image: session.user.image, id: session.user.id }
@@ -123,8 +118,7 @@ export default async function FeedPage() {
         <div className={styles.container}>
           <FeedClient
             initialPodcasts={gridPodcasts}
-            heroPodcasts={heroPodcasts}
-            trendingPodcasts={remainingTrending}
+            trendingPodcasts={serializedTrending}
             tags={tags}
             isAuthenticated={isAuthenticated}
             currentUserId={session?.user?.id ?? null}

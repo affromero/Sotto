@@ -1,4 +1,4 @@
-/* TrendingSection — Horizontal trending podcast carousel */
+/* TrendingSection — Trending podcast grid */
 
 .root {
   width: 100%;
@@ -32,49 +32,20 @@
   text-decoration: underline;
 }
 
-/* Horizontal scroll container */
-.scrollContainer {
-  display: flex;
+.grid {
+  display: grid;
+  grid-template-columns: 1fr;
   gap: var(--space-4);
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  -webkit-overflow-scrolling: touch;
-  padding-bottom: var(--space-2);
-
-  /* Hide scrollbar */
-  scrollbar-width: none;
-  -ms-overflow-style: none;
 }
 
-.scrollContainer::-webkit-scrollbar {
-  display: none;
-}
-
-/* Card wrapper for sizing */
-.cardWrapper {
-  flex: 0 0 auto;
-  width: 200px;
-  scroll-snap-align: start;
-}
-
-/* Mobile */
-@media (max-width: 767px) {
-  .cardWrapper {
-    width: calc(50vw - var(--space-8));
-    min-width: 180px;
-  }
-}
-
-/* Tablet */
 @media (min-width: 768px) {
-  .cardWrapper {
-    width: 240px;
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 
-/* Desktop */
 @media (min-width: 1024px) {
-  .cardWrapper {
-    width: 260px;
+  .grid {
+    grid-template-columns: repeat(3, 1fr);
   }
 }

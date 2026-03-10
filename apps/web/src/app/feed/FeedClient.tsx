@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { SearchBar } from '@/components/feed/SearchBar';
 import { TagFilter } from '@/components/feed/TagFilter';
 import { FilterPanel, type AdvancedFilters } from '@/components/feed/FilterPanel';
-import { HeroSection } from '@/components/feed/HeroSection';
 import { TrendingSection } from '@/components/feed/TrendingSection';
 import { SuggestedFollows } from '@/components/feed/SuggestedFollows';
 import { FeedGrid } from '@/components/feed/FeedGrid';
@@ -26,7 +25,6 @@ type SearchMode = 'podcasts' | 'people';
 
 interface FeedClientProps {
   initialPodcasts: PodcastSummary[];
-  heroPodcasts: PodcastSummary[];
   trendingPodcasts: PodcastSummary[];
   tags: Tag[];
   isAuthenticated?: boolean;
@@ -48,7 +46,7 @@ const MODE_VALID = new Set<ModeOption>(['all', 'remixes']);
 const TAB_VALID = new Set<FeedTab>(['discover', 'activity']);
 const SEARCH_MODE_VALID = new Set<SearchMode>(['podcasts', 'people']);
 
-export function FeedClient({ initialPodcasts, heroPodcasts, trendingPodcasts, tags, isAuthenticated, currentUserId }: FeedClientProps) {
+export function FeedClient({ initialPodcasts, trendingPodcasts, tags, isAuthenticated, currentUserId }: FeedClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -261,7 +259,6 @@ export function FeedClient({ initialPodcasts, heroPodcasts, trendingPodcasts, ta
     !hasActiveFilters &&
     sort === 'recent' &&
     mode === 'all';
-  const showHero = isDefaultView && searchMode === 'podcasts' && heroPodcasts.length > 0;
   const showTrending = isDefaultView && searchMode === 'podcasts' && trendingPodcasts.length > 0;
   const showSuggested = isAuthenticated && currentUserId && isDefaultView && searchMode === 'podcasts';
   const isPeopleMode = searchMode === 'people';
@@ -302,8 +299,6 @@ export function FeedClient({ initialPodcasts, heroPodcasts, trendingPodcasts, ta
           aria-labelledby={isAuthenticated ? 'feed-discover-tab' : undefined}
           className={styles.discoverPanel}
         >
-          {showHero && <HeroSection podcasts={heroPodcasts} />}
-
           <div className={styles.filters}>
             <div className={styles.searchRow}>
               <SearchBar

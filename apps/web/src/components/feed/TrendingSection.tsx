@@ -21,15 +21,13 @@ export function TrendingSection({ podcasts, onPlay }: TrendingSectionProps) {
           See all
         </Link>
       </div>
-      <div className={styles.scrollContainer}>
+      <div className={styles.grid}>
         {podcasts.map((podcast) => (
-          <div key={podcast.id} className={styles.cardWrapper}>
-            <PodcastCard
-              podcast={podcast}
-              variant="compact"
-              onPlay={onPlay}
-            />
-          </div>
+          <PodcastCard
+            key={podcast.id}
+            podcast={podcast}
+            onPlay={onPlay}
+          />
         ))}
       </div>
     </section>
