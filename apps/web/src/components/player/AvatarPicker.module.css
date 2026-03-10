@@ -213,6 +213,11 @@
   color: #aaa;
 }
 
+.costLabel {
+  color: #22c55e;
+  font-weight: 600;
+}
+
 .footerActions {
   display: flex;
   gap: 10px;

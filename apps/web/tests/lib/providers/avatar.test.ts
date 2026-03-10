@@ -126,7 +126,7 @@ describe('resolveAvatarProvider', () => {
       freeAvatarProvider: 'heygen',
       proAvatarProvider: 'runway',
       freeAvatarModel: 'heygen-avatar-v2',
-      proAvatarModel: 'runway-avatar-realtime',
+      proAvatarModel: 'runway-characters',
     } as never);
 
     const result = await resolveAvatarProvider({ userId: 'user-1', plan: 'PRO' });
@@ -142,7 +142,7 @@ describe('resolveAvatarProvider', () => {
       freeAvatarProvider: 'heygen',
       proAvatarProvider: 'runway',
       freeAvatarModel: 'heygen-avatar-v2',
-      proAvatarModel: 'runway-avatar-realtime',
+      proAvatarModel: 'runway-characters',
     } as never);
 
     const result = await resolveAvatarProvider({ userId: 'user-1', plan: 'PRO' });
@@ -160,8 +160,8 @@ describe('resolveAvatarProvider', () => {
     vi.mocked(getAutoModelConfig).mockResolvedValue({
       freeAvatarProvider: 'runway',
       proAvatarProvider: 'runway',
-      freeAvatarModel: 'runway-avatar-realtime',
-      proAvatarModel: 'runway-avatar-realtime',
+      freeAvatarModel: 'runway-characters',
+      proAvatarModel: 'runway-characters',
     } as never);
 
     const result = await resolveAvatarProvider({ userId: 'user-1', plan: 'FREE' });
@@ -175,8 +175,8 @@ describe('resolveAvatarProvider', () => {
     vi.mocked(getAutoModelConfig).mockResolvedValue({
       freeAvatarProvider: 'runway',
       proAvatarProvider: 'runway',
-      freeAvatarModel: 'runway-avatar-realtime',
-      proAvatarModel: 'runway-avatar-realtime',
+      freeAvatarModel: 'runway-characters',
+      proAvatarModel: 'runway-characters',
     } as never);
 
     const result = await resolveAvatarProvider({ userId: 'user-1', plan: 'FREE' });

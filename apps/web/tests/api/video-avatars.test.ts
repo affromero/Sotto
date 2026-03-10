@@ -18,6 +18,16 @@ const mockAddJob = vi.fn();
 
 const mockRedisGet = vi.fn();
 const mockRedisSet = vi.fn();
+const mockFetchAvatarModels = vi.fn();
+const mockGetAutoModelConfig = vi.fn();
+
+vi.mock('@/lib/avatar-cost-estimator', () => ({
+  fetchAvatarModels: (...args: unknown[]) => mockFetchAvatarModels(...args),
+}));
+
+vi.mock('@/lib/auto-model-config', () => ({
+  getAutoModelConfig: (...args: unknown[]) => mockGetAutoModelConfig(...args),
+}));
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
@@ -109,6 +119,15 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
   mockRequireAdmin.mockResolvedValue(null);
+  mockFetchAvatarModels.mockResolvedValue([
+    { modelId: 'heygen-avatar-standard', displayName: 'Standard Avatar', costPerMinute: 1.0, avatarType: 'standard', maxDuration: null },
+  ]);
+  mockGetAutoModelConfig.mockResolvedValue({
+    freeAvatarModel: 'heygen-avatar-standard',
+    proAvatarModel: 'heygen-avatar-standard',
+    freeIncludedAvatarModels: null,
+    proIncludedAvatarModels: null,
+  });
   process.env.HEYGEN_API_KEY = 'test-heygen-key';
 });
 
@@ -124,6 +143,8 @@ describe('GET /api/podcasts/[podcastId]/video/avatars', () => {
     const data = await res.json();
     expect(data.avatars).toEqual(cached);
     expect(data.providers).toBeDefined();
+    expect(data.pricing).toBeDefined();
+    expect(data.pricing.costPerMinute).toBe(1.0);
     expect(mockListUnifiedAvatars).not.toHaveBeenCalled();
   });
 
