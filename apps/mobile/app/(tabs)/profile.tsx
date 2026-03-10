@@ -13,6 +13,7 @@ import { useRouter } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography, borderRadius } from '@sotto/shared';
+import { shadowSm } from '../../lib/shadows';
 import type { PodcastSummary } from '@sotto/shared';
 import { api } from '../../lib/api';
 import { deleteToken } from '../../lib/auth';
@@ -352,8 +353,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
+    ...shadowSm,
   },
   settingsIcon: {
     fontSize: 22,
@@ -385,8 +385,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.lg,
     paddingVertical: spacing.md,
     marginBottom: spacing.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
+    ...shadowSm,
   },
   statItem: {
     flex: 1,
@@ -416,8 +415,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.lg,
     padding: spacing.md,
     marginBottom: spacing.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
+    ...shadowSm,
   },
   savedIdeasRowPressed: {
     backgroundColor: colors.surfaceHover,
@@ -452,8 +450,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm + 2,
     backgroundColor: colors.surface,
     borderRadius: borderRadius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
+    ...shadowSm,
   },
   podcastItemPressed: {
     backgroundColor: colors.surfaceHover,

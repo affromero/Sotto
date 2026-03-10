@@ -13,6 +13,7 @@ import { openBrowserAsync } from 'expo-web-browser';
 import Constants from 'expo-constants';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography, borderRadius } from '@sotto/shared';
+import { shadowSm } from '../lib/shadows';
 import { api } from '../lib/api';
 import { deleteToken } from '../lib/auth';
 
@@ -218,9 +219,8 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
     borderRadius: borderRadius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
     overflow: 'hidden',
+    ...shadowSm,
   },
   row: {
     flexDirection: 'row',
