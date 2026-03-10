@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.12.0] - 2026-03-10
+
+### Added
+- **Mobile app**: Full iOS feature parity — player with MiniPlayer, comments, activity feed, search with advanced filters, collections, profile editing, settings, analytics, voice marketplace, billing, referrals, script editing, draft resumption, voice clone management, onboarding, and save/share/fork flows
+- **Mobile design system**: Cozy Evening dark mode, Ionicons, entrance animations, press feedback, skeleton loading, shadows, gradients, and animated pressable components
+- **Showcase verification mode**: Admin-only `verificationMode: 'showcase'` for curated demo podcasts — uses standard script verification but skips reference validation, pausing at SCRIPT_READY for manual review
+
+### Changed
+- Landing page overhauled to lead with core capabilities and reflect all podcast formats
+
+### Fixed
+- Mobile Bearer token auth via `authenticateRequest()`
+- Hero reverted to CSS bar waveform, fork icon fixed, dashboard enhancements
+
 ## [0.11.0] - 2026-03-10
 
 ### Added
