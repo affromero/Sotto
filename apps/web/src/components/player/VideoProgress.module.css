@@ -408,9 +408,29 @@
 }
 
 .errorMessage p {
+  flex: 1;
   font: var(--text-body-sm);
   margin: 0;
   word-break: break-word;
+}
+
+.dismissButton {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-error);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.dismissButton:hover {
+  background: var(--color-error-light);
 }
 
 .errorActions {

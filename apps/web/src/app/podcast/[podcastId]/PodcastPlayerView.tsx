@@ -22,6 +22,7 @@ import {
   Shield,
   Video,
   Users,
+  X,
 } from 'lucide-react';
 import { usePlayer } from '@/components/providers/AudioPlayerProvider';
 import { AudioPlayer } from '@/components/player/AudioPlayer';
@@ -212,6 +213,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
   const [showVideoEditor, setShowVideoEditor] = useState(false);
   const [avatarOverlays, setAvatarOverlays] = useState<AvatarOverlayData[]>([]);
   const [avatarsVisible, setAvatarsVisible] = useState(true);
+  const [avatarGenerating, setAvatarGenerating] = useState(false);
   const [lineageData, setLineageData] = useState<{
     ancestors: Array<{
       id: string;
@@ -306,10 +308,16 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (!data?.status) return;
-        if (data.status === 'READY' && data.segmentVisuals?.length > 0) {
+        if ((data.status === 'READY' || data.status === 'GENERATING_AVATARS') && data.segmentVisuals?.length > 0) {
           setVideoState('ready');
           setSegmentVisuals(data.segmentVisuals);
-          if (data.avatarOverlays) setAvatarOverlays(data.avatarOverlays);
+          if (data.avatarOverlays) {
+            setAvatarOverlays(data.avatarOverlays);
+            const hasInProgress = data.avatarOverlays.some(
+              (o: AvatarOverlayData) => ['pending', 'concatenating', 'submitting', 'processing'].includes(o.status)
+            );
+            if (hasInProgress) setAvatarGenerating(true);
+          }
           if (typeof data.avatarsVisible === 'boolean') setAvatarsVisible(data.avatarsVisible);
         } else if (data.status === 'FAILED') {
           setVideoState('failed');
@@ -321,6 +329,27 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
       })
       .catch(() => {});
   }, [isOwner, liveStatus, podcast.id]);
+
+  // Poll avatar overlay status while avatars are generating (independent of video state)
+  useEffect(() => {
+    if (!avatarGenerating) return;
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/podcasts/${podcast.id}/video`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.avatarOverlays) {
+          setAvatarOverlays(data.avatarOverlays);
+          const allDone = data.avatarOverlays.every(
+            (o: AvatarOverlayData) => o.status === 'ready' || o.status === 'failed'
+          );
+          if (allDone) setAvatarGenerating(false);
+        }
+      } catch { /* ignore */ }
+    };
+    const interval = setInterval(poll, 5000);
+    return () => clearInterval(interval);
+  }, [avatarGenerating, podcast.id]);
 
   // Auto-select video tab when visuals become available; fall back to transcript when removed
   useEffect(() => {
@@ -922,13 +951,10 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
                 avatarProvider: (ov.avatarProvider ?? 'heygen') as 'heygen' | 'runway',
                 status: ov.status,
               })) : undefined}
-              onConfigured={({ videoGenerationId: vgId, generationStarted }) => {
+              onConfigured={({ generationStarted }) => {
                 setShowAvatarPicker(false);
-                if (generationStarted && vgId) {
-                  setVideoGenerationId(vgId);
-                  setVideoState('generating');
-                } else if (videoState === 'idle') {
-                  handleGenerateVideo();
+                if (generationStarted) {
+                  setAvatarGenerating(true);
                 }
               }}
               onCancel={() => setShowAvatarPicker(false)}
@@ -967,6 +993,11 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
               onChangeAvatars={() => {
                 setShowAvatarPicker(true);
               }}
+              onDismiss={() => {
+                setVideoState('idle');
+                setVideoError(null);
+                setVideoGenerationId(null);
+              }}
             />
           )}
           {videoState === 'ready' && !showVideoEditor && (
@@ -989,8 +1020,16 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
                 onClick={() => setShowAvatarPicker(true)}
               >
                 <Users size={16} />
-                Add Avatars
+                {avatarOverlays.length > 0 ? 'Change Avatars' : 'Add Avatars'}
               </Button>
+              {avatarGenerating && (
+                <div className={styles.avatarGeneratingBadge}>
+                  <RefreshCw size={14} className={styles.avatarSpinner} />
+                  <span>
+                    Generating avatars ({avatarOverlays.filter(o => o.status === 'ready').length}/{avatarOverlays.length})
+                  </span>
+                </div>
+              )}
             </div>
           )}
           {showVideoEditor && (videoState === 'ready' || videoState === 'failed') && falModels && (
@@ -1009,6 +1048,14 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
           )}
           {videoState === 'failed' && !showVideoEditor && (
             <div className={styles.videoFailed}>
+              <button
+                className={styles.videoDismiss}
+                onClick={() => { setVideoState('idle'); setVideoError(null); setVideoGenerationId(null); }}
+                type="button"
+                aria-label="Dismiss error"
+              >
+                <X size={16} />
+              </button>
               <p className={styles.videoError}>{videoError?.message || 'Video generation failed.'}</p>
               <Button
                 variant="secondary"

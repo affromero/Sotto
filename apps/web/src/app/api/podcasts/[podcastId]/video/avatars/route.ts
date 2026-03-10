@@ -216,11 +216,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       }
     }
 
-    await prisma.videoGeneration.update({
-      where: { id: videoGeneration.id },
-      data: { status: 'GENERATING_AVATARS' },
-    });
-
     for (const overlay of overlays) {
       const avatarConfig = parsed.data.avatars.find((a) => a.speaker === overlay.speaker);
       await addJob(avatarGenerationQueue, JobType.GENERATE_AVATAR, {
