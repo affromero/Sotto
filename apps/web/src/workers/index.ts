@@ -65,6 +65,7 @@ import { processDemoRecording } from './demo-recording.worker';
 import { processDemoVoiceover } from './demo-voiceover.worker';
 import { processDemoVisual } from './demo-visual.worker';
 import { processDemoTransition } from './demo-transition.worker';
+import { processDemoComposition } from './demo-composition.worker';
 import { isR2MonitoringConfigured } from '@/lib/cloudflare-r2-usage';
 import { startPricingRefreshInterval } from '@/lib/pricing';
 
@@ -115,6 +116,7 @@ const workers = [
   createWorker('demo-voiceover', processDemoVoiceover, { concurrency: 5 }),
   createWorker('demo-visual', processDemoVisual, { concurrency: 3 }),
   createWorker('demo-transition', processDemoTransition, { concurrency: 2 }),
+  createWorker('demo-composition', processDemoComposition, { concurrency: 1, lockDuration: 900000 }),
 ];
 
 // Set up Twitter mentions polling if credentials are configured

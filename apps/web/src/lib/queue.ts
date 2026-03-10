@@ -659,11 +659,17 @@ function setupQueueEvents(queue: Queue, queueName: string): void {
       const errorId = `err_${Array.from(crypto.getRandomValues(new Uint8Array(6)))
         .map(b => b.toString(16).padStart(2, '0')).join('')}`;
 
-      await markPodcastFailed(podcastId, {
+      const didTransition = await markPodcastFailed(podcastId, {
         failureReason,
         technicalError: args.failedReason ?? undefined,
         errorId,
       });
+
+      // Only send notifications if this is the first failure (deduplication)
+      if (!didTransition) {
+        logger.info('Podcast already failed, skipping duplicate notifications', { podcastId });
+        return;
+      }
 
       // Queue a podcast failure notification
       if (notifQueue) {
