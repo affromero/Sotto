@@ -689,6 +689,131 @@
 }
 
 /* ==========================================================================
+   VIDEO SHOWCASE MOCKUP
+   ========================================================================== */
+
+.videoMock {
+  background: var(--color-background);
+  border-radius: var(--radius-2xl);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-xl);
+  overflow: hidden;
+}
+
+.videoMockHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 20px;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.videoSegments {
+  padding: 8px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.videoSegment {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 8px;
+  border-radius: var(--radius-lg);
+  transition: background var(--transition-fast);
+}
+
+.videoSegment:hover {
+  background: rgba(217, 119, 6, 0.04);
+}
+
+.videoSegmentNum {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--color-primary-lighter);
+  color: var(--color-primary);
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.videoSegmentContent {
+  flex: 1;
+  min-width: 0;
+}
+
+.videoSegmentLabel {
+  font-size: 14px;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.videoSegmentType {
+  display: inline-flex;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.videoTypeIllustration {
+  background: rgba(217, 119, 6, 0.1);
+  color: var(--color-primary);
+}
+
+.videoTypeChart {
+  background: rgba(30, 58, 95, 0.1);
+  color: var(--color-accent);
+}
+
+.videoTypeStock {
+  background: rgba(22, 163, 74, 0.1);
+  color: #16a34a;
+}
+
+.videoTypeTimeline {
+  background: rgba(107, 114, 128, 0.1);
+  color: var(--color-text-secondary);
+}
+
+.videoMockFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.videoAvatarToggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+  color: var(--color-primary);
+}
+
+.videoVisualCount {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+}
+
+/* ==========================================================================
    VOICES
    ========================================================================== */
 
