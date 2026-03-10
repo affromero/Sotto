@@ -9,6 +9,8 @@ export const AVATAR_MASK_SHAPES: AvatarMaskShape[] = ['none', 'rounded', 'circle
 
 interface AvatarOverlayProps {
   videoUrl: string;
+  maxDuration?: number;
+  streaming?: boolean;
   speaker: string;
   posX: number;
   posY: number;
@@ -25,6 +27,8 @@ interface AvatarOverlayProps {
 
 export function AvatarOverlay({
   videoUrl,
+  maxDuration,
+  streaming,
   speaker,
   posX,
   posY,
@@ -44,26 +48,45 @@ export function AvatarOverlay({
   const [resizing, setResizing] = useState(false);
   const dragStartRef = useRef({ x: 0, y: 0, posX: 0, posY: 0 });
   const resizeStartRef = useRef({ x: 0, y: 0, width: 0, height: 0 });
+  const prevUrlRef = useRef(videoUrl);
 
   // Sync video playback with audio currentTime
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !video.readyState) return;
+    // Guard partial duration — hold last frame
+    if (maxDuration && currentTime > maxDuration) {
+      video.pause();
+      video.currentTime = maxDuration - 0.1;
+      return;
+    }
     const diff = Math.abs(video.currentTime - currentTime);
     if (diff > 0.3) {
       video.currentTime = currentTime;
     }
-  }, [currentTime]);
+  }, [currentTime, maxDuration]);
 
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
-    if (isPlaying) {
+    if (isPlaying && (!maxDuration || currentTime <= maxDuration)) {
       video.play().catch(() => {});
     } else {
       video.pause();
     }
-  }, [isPlaying]);
+  }, [isPlaying, maxDuration, currentTime]);
+
+  // Seamless src switch when videoUrl changes (chunk → final)
+  useEffect(() => {
+    if (prevUrlRef.current !== videoUrl) {
+      prevUrlRef.current = videoUrl;
+      const video = videoRef.current;
+      if (video) {
+        video.currentTime = currentTime;
+        if (isPlaying) video.play().catch(() => {});
+      }
+    }
+  }, [videoUrl]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Convert normalized to pixel positions
   const pxLeft = posX * containerWidth;
@@ -139,7 +162,7 @@ export function AvatarOverlay({
   return (
     <div
       ref={overlayRef}
-      className={`${styles.overlay} ${editable ? styles.editable : ''} ${dragging ? styles.dragging : ''} ${maskClass}`}
+      className={`${styles.overlay} ${editable ? styles.editable : ''} ${dragging ? styles.dragging : ''} ${streaming ? styles.streaming : ''} ${maskClass}`}
       style={{
         left: pxLeft,
         top: pxTop,

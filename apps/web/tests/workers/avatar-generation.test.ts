@@ -93,6 +93,8 @@ beforeEach(() => {
     runwaySessionId: null,
     runwayChunkIndex: null,
     runwayTotalChunks: null,
+    chunkVideoUrl: null,
+    chunkDurationSeconds: null,
     posX: 0.02,
     posY: 0.55,
     width: 0.25,
@@ -210,6 +212,8 @@ describe('processAvatarGeneration', () => {
       runwaySessionId: null,
       runwayChunkIndex: null,
       runwayTotalChunks: null,
+    chunkVideoUrl: null,
+    chunkDurationSeconds: null,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -243,6 +247,8 @@ describe('processAvatarGeneration', () => {
       runwaySessionId: null,
       runwayChunkIndex: null,
       runwayTotalChunks: null,
+    chunkVideoUrl: null,
+    chunkDurationSeconds: null,
       createdAt: new Date(),
       updatedAt: new Date(),
     });

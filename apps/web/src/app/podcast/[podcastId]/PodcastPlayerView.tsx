@@ -1034,7 +1034,11 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
                 <div className={styles.avatarGeneratingBadge}>
                   <RefreshCw size={14} className={styles.avatarSpinner} />
                   <span>
-                    Generating avatars ({avatarOverlays.filter(o => o.status === 'ready').length}/{avatarOverlays.length})
+                    {(() => {
+                      const rw = avatarOverlays.find(o => o.avatarProvider === 'runway' && (o.runwayTotalChunks ?? 0) > 1);
+                      if (rw) return `Recording chunk ${rw.runwayChunkIndex ?? 0}/${rw.runwayTotalChunks}`;
+                      return `Generating avatars (${avatarOverlays.filter(o => o.status === 'ready').length}/${avatarOverlays.length})`;
+                    })()}
                   </span>
                 </div>
               )}
