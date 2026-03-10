@@ -38,12 +38,14 @@ export default function LandingPage() {
             {BRAND.tagline}
           </div>
           <h1 className={styles.heroTitle}>
-            Create. Fork.
+            Any topic.
             <br />
-            <em>Remix. Share.</em>
+            <em>Studio-quality podcast.</em>
           </h1>
           <p className={styles.heroSub}>
-            {BRAND.subline}
+            Sotto writes a fact-checked two-voice script, generates audio with
+            professional AI voices from 7 providers, and turns it into video &mdash;
+            all in minutes.
           </p>
           <AuthCTA source="hero" />
         </div>
@@ -54,10 +56,10 @@ export default function LandingPage() {
         />
       </section>
 
-      {/* ====== PILLARS ====== */}
-      <section className={styles.section} id="features" aria-label="Key features">
+      {/* ====== CORE CAPABILITIES ====== */}
+      <section className={styles.section} id="features" aria-label="Core capabilities">
         <div className={styles.inner}>
-          <h2 className={styles.srOnly}>Key Features</h2>
+          <h2 className={styles.srOnly}>Core Capabilities</h2>
           <div className={styles.pillars}>
             <article className={styles.pillar} data-reveal>
               <div className={styles.pIcon}>
@@ -72,16 +74,16 @@ export default function LandingPage() {
                   strokeLinejoin="round"
                   aria-hidden="true"
                 >
-                  <circle cx="7" cy="5" r="3" />
-                  <circle cx="7" cy="19" r="3" />
-                  <circle cx="19" cy="12" r="3" />
-                  <path d="M7 8v8M10 19h6a3 3 0 0 0 0-6h-6" />
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                  <path d="M9 15l2 2 4-4" />
                 </svg>
               </div>
-              <h3>Fork &amp; Remix</h3>
+              <h3>AI Script Generation</h3>
               <p>
-                Found a podcast you love? Fork it. Change the angle, go deeper on a subtopic,
-                swap the voice. It&apos;s GitHub for podcasts.
+                Describe any topic. Sotto researches, writes a two-voice script with
+                citations, and fact-checks every claim through multiple verification
+                loops. Review and edit every line before generating.
               </p>
             </article>
             <article className={styles.pillar} data-reveal style={{ "--reveal-index": 1 } as React.CSSProperties}>
@@ -97,16 +99,15 @@ export default function LandingPage() {
                   strokeLinejoin="round"
                   aria-hidden="true"
                 >
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="7 10 12 15 17 10" />
-                  <line x1="12" y1="15" x2="12" y2="3" />
+                  <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
+                  <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z" />
                 </svg>
               </div>
-              <h3>Import Any Podcast</h3>
+              <h3>7 Voice Providers</h3>
               <p>
-                Send straight from NotebookLM with our Chrome extension — one click, no download.
-                Or import from Spotify, Apple Podcasts, YouTube videos, or any audio file. Sotto adds
-                transcripts, social features, and interactive Q&amp;A on top.
+                ElevenLabs, Cartesia, Hume, OpenAI, and more &mdash; or clone your own
+                voice. Every podcast gets a unique host&ndash;expert pair matched by tone,
+                accent, and style.
               </p>
             </article>
             <article className={styles.pillar} data-reveal style={{ "--reveal-index": 2 } as React.CSSProperties}>
@@ -122,52 +123,20 @@ export default function LandingPage() {
                   strokeLinejoin="round"
                   aria-hidden="true"
                 >
-                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                  <polygon points="23 7 16 12 23 17 23 7" />
+                  <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
                 </svg>
               </div>
-              <h3>Ask Questions Live</h3>
+              <h3>Video Generation</h3>
               <p>
-                Pause mid-playback to ask a question. Get an answer in full context. Your Q&amp;A
-                gets woven back into the episode permanently.
+                Turn any podcast into video with AI illustrations, animated data charts,
+                stock footage, timelines, and lip-synced avatar presenters. Control the
+                visual style for every segment.
               </p>
             </article>
           </div>
-          <div className={styles.importPlatforms} data-reveal>
-            <span className={styles.importPlatformsLabel}>Import from</span>
-            <div className={styles.importPlatformsList}>
-              <span className={`${styles.importPlatformPill} ${styles.importPlatformPillHighlight}`}>
-                NotebookLM
-                <span className={styles.importPlatformBadge}>Chrome Extension</span>
-              </span>
-              <span className={styles.importPlatformPill}>Spotify</span>
-              <span className={styles.importPlatformPill}>Apple Podcasts</span>
-              <span className={styles.importPlatformPill}>YouTube</span>
-              <span
-                className={`${styles.importPlatformPill} ${styles.importPlatformPillMuted}`}
-              >
-                Any audio file
-              </span>
-            </div>
-          </div>
         </div>
       </section>
-
-      {/* ====== TRUST STRIP ====== */}
-      <div className={styles.trustStrip} data-reveal aria-label="Verification promise">
-        <div className={styles.trustStripInner}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={styles.trustStripIcon}>
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-            <path d="M9 12l2 2 4-4" />
-          </svg>
-          <span>Every claim fact-checked. Every source verified. No hallucinations.</span>
-          <a href="#verification" className={styles.trustStripLink}>
-            See how
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M7 17l9.2-9.2M17 17V8H8" />
-            </svg>
-          </a>
-        </div>
-      </div>
 
       {/* ====== DEMO ====== */}
       <section className={`${styles.section} ${styles.sectionAlt}`} aria-label="Product demo">
@@ -235,67 +204,107 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ====== INTERRUPT ====== */}
-      <section className={styles.section} aria-label="Interactive feature">
+      {/* ====== TRUST STRIP ====== */}
+      <div className={styles.trustStrip} data-reveal aria-label="Verification promise">
+        <div className={styles.trustStripInner}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={styles.trustStripIcon}>
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+            <path d="M9 12l2 2 4-4" />
+          </svg>
+          <span>Every claim fact-checked. Every source verified. No hallucinations.</span>
+          <a href="#verification" className={styles.trustStripLink}>
+            See how
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M7 17l9.2-9.2M17 17V8H8" />
+            </svg>
+          </a>
+        </div>
+      </div>
+
+      {/* ====== VIDEO SHOWCASE ====== */}
+      <section className={styles.section} aria-label="Video generation">
         <div className={styles.inner}>
           <div className={`${styles.split} ${styles.splitReverse}`}>
             <div className={styles.splitText} data-reveal>
-              <span className={styles.overline}>Interactive</span>
-              <h2 className={styles.h2}>The podcast that pauses when you&apos;re curious</h2>
+              <span className={styles.overline}>Video Pipeline</span>
+              <h2 className={styles.h2}>From podcast to video in one click</h2>
               <p className={styles.bodyLg}>
-                Unlike anything you&apos;ve listened to before. Tap to interrupt, ask a follow-up,
-                and get an answer drawn from the full context of what you&apos;ve been hearing. Then
-                your Q&amp;A gets woven back into the conversation.
+                Every segment gets classified and paired with the right visual &mdash;
+                AI-generated illustrations, animated data charts, stock footage, or comparison
+                diagrams. Add lip-synced avatar presenters for a professional studio look.
               </p>
             </div>
             <div className={styles.splitVisual} data-reveal style={{ "--reveal-index": 1 } as React.CSSProperties}>
-              <div className={styles.interruptMock}>
-                <div className={styles.interruptPlaying}>
-                  <div className={styles.interruptWave} aria-hidden="true">
-                    {Array.from({ length: 32 }, (_, i) => (
-                      <span
-                        key={i}
-                        className={styles.interruptBar}
-                        style={{ '--j': i } as React.CSSProperties}
-                      />
-                    ))}
+              <div className={styles.videoMock}>
+                <div className={styles.videoMockHeader}>
+                  <div className={styles.chatHeaderDot} aria-hidden="true" />
+                  <span>Video Pipeline</span>
+                </div>
+                <div className={styles.videoSegments}>
+                  <div className={styles.videoSegment}>
+                    <span className={styles.videoSegmentNum}>1</span>
+                    <div className={styles.videoSegmentContent}>
+                      <span className={styles.videoSegmentLabel}>
+                        CRISPR molecular scissors
+                      </span>
+                    </div>
+                    <span className={`${styles.videoSegmentType} ${styles.videoTypeIllustration}`}>
+                      AI Illustration
+                    </span>
                   </div>
-                  <div className={styles.interruptTranscript}>
-                    <p>
-                      <span className={styles.speakerHost}>Host:</span> &ldquo;...so the Cas9
-                      protein acts like molecular scissors, cutting the DNA at a precise
-                      location&mdash;&rdquo;
-                    </p>
+                  <div className={styles.videoSegment}>
+                    <span className={styles.videoSegmentNum}>2</span>
+                    <div className={styles.videoSegmentContent}>
+                      <span className={styles.videoSegmentLabel}>
+                        Gene therapy success rates
+                      </span>
+                    </div>
+                    <span className={`${styles.videoSegmentType} ${styles.videoTypeChart}`}>
+                      Data Chart
+                    </span>
+                  </div>
+                  <div className={styles.videoSegment}>
+                    <span className={styles.videoSegmentNum}>3</span>
+                    <div className={styles.videoSegmentContent}>
+                      <span className={styles.videoSegmentLabel}>
+                        Laboratory research setting
+                      </span>
+                    </div>
+                    <span className={`${styles.videoSegmentType} ${styles.videoTypeStock}`}>
+                      Stock Footage
+                    </span>
+                  </div>
+                  <div className={styles.videoSegment}>
+                    <span className={styles.videoSegmentNum}>4</span>
+                    <div className={styles.videoSegmentContent}>
+                      <span className={styles.videoSegmentLabel}>
+                        Key milestones in gene editing
+                      </span>
+                    </div>
+                    <span className={`${styles.videoSegmentType} ${styles.videoTypeTimeline}`}>
+                      Timeline
+                    </span>
                   </div>
                 </div>
-                <div className={styles.interruptPause}>
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                    aria-hidden="true"
-                  >
-                    <rect x="5" y="3" width="4" height="14" rx="1" />
-                    <rect x="11" y="3" width="4" height="14" rx="1" />
-                  </svg>
-                  You paused to ask:
-                </div>
-                <div className={styles.interruptQuestion}>
-                  &ldquo;Wait, what exactly is a guide RNA?&rdquo;
-                </div>
-                <div className={styles.interruptAnswer}>
-                  <div className={styles.chatAvatar} aria-hidden="true">
-                    S
+                <div className={styles.videoMockFooter}>
+                  <div className={styles.videoAvatarToggle}>
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                      <circle cx="12" cy="7" r="4" />
+                    </svg>
+                    Avatars: On
                   </div>
-                  <div>
-                    <p className={styles.interruptAnswerLabel}>Sotto answered:</p>
-                    <p>
-                      &ldquo;Think of it as GPS coordinates for CRISPR. The guide RNA tells Cas9
-                      exactly where on the genome to make its cut. Without it, the scissors have no
-                      target.&rdquo;
-                    </p>
-                  </div>
+                  <span className={styles.videoVisualCount}>9 visual types</span>
                 </div>
               </div>
             </div>
@@ -314,8 +323,9 @@ export default function LandingPage() {
             <span className={styles.overline}>Voices</span>
             <h2 className={styles.h2}>Every podcast sounds different. By design.</h2>
             <p className={styles.bodyLg}>
-              Choose from dozens of AI voices across providers or clone your own. Every podcast pairs
-              a unique host and expert for natural, engaging conversation.
+              Choose from 7 TTS providers &mdash; ElevenLabs, Cartesia, Hume, OpenAI, Fal, MiniMax,
+              and Replicate &mdash; or clone your own voice. Every podcast pairs a unique host and
+              expert for natural, engaging conversation.
             </p>
           </div>
           <div className={styles.voiceGrid}>
@@ -488,347 +498,87 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ====== VOICE PROTECTION ====== */}
-      <section className={styles.section} aria-label="Voice protection">
+      {/* ====== SOCIAL ====== */}
+      <section className={`${styles.section} ${styles.sectionAlt}`} aria-label="Social features">
         <div className={styles.inner}>
-          <div className={styles.centered}>
-            <span className={styles.overline}>Voice Protection</span>
-            <h2 className={styles.h2}>Your voice is yours. We make sure it stays that way.</h2>
+          <div className={styles.centered} data-reveal>
+            <span className={styles.overline}>Community</span>
+            <h2 className={styles.h2}>Fork, import, remix</h2>
             <p className={styles.bodyLg}>
-              Every voice on Sotto goes through verification. No exceptions.
+              Sotto is a social podcast network. Build on what others started, bring in podcasts from
+              anywhere, and interact with every episode.
             </p>
           </div>
           <div className={styles.pillars}>
-            <div className={styles.pillar}>
+            <article className={styles.pillar} data-reveal>
               <div className={styles.pIcon}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                  <path d="M9 12l2 2 4-4" />
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <circle cx="7" cy="5" r="3" />
+                  <circle cx="7" cy="19" r="3" />
+                  <circle cx="19" cy="12" r="3" />
+                  <path d="M7 8v8M10 19h6a3 3 0 0 0 0-6h-6" />
                 </svg>
               </div>
-              <h3>Verified Ownership</h3>
+              <h3>Fork &amp; Remix</h3>
               <p>
-                Every voice clone requires a live verification challenge. You record a phrase,
-                we match it to your upload. Only you can put your voice on Sotto.
+                Found a podcast you love? Fork it. Change the angle, swap voices, go deeper on a
+                subtopic. Credit always links back to the original.
               </p>
-            </div>
-            <div className={styles.pillar}>
-              <div className={styles.pIcon}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M12 2a10 10 0 1 0 10 10" />
-                  <path d="M12 12l7-7" />
-                  <circle cx="12" cy="12" r="3" />
-                </svg>
-              </div>
-              <h3>Impersonation Detection</h3>
-              <p>
-                Every upload is compared against our voiceprint database. If someone tries
-                to clone a verified voice, we auto-block it and notify the owner instantly.
-              </p>
-            </div>
-            <div className={styles.pillar}>
+            </article>
+            <article className={styles.pillar} data-reveal style={{ "--reveal-index": 1 } as React.CSSProperties}>
               <div className={`${styles.pIcon} ${styles.pIconNavy}`}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                  <circle cx="9" cy="7" r="4" />
-                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                </svg>
-              </div>
-              <h3>Creator Protection</h3>
-              <p>
-                Verified creators get a badge, priority in the marketplace, and full control
-                over who uses their voice. Approve, deny, or monetize — on your terms.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ====== FORK & REMIX ====== */}
-      <section className={styles.section} aria-label="Fork and remix">
-        <div className={styles.inner}>
-          <div className={`${styles.split} ${styles.splitReverse}`}>
-            <div className={styles.splitText} data-reveal>
-              <span className={styles.overline}>Fork &amp; Remix</span>
-              <h2 className={styles.h2}>Build on what others started</h2>
-              <p className={styles.bodyLg}>
-                Found a podcast you love? Fork it. Take someone else&apos;s script as a starting
-                point and make it yours — change the angle, update the focus, go deeper on a
-                subtopic. It&apos;s GitHub for podcasts.
-              </p>
-              <div className={styles.forkFeatures}>
-                <div className={styles.forkFeature}>
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 16 16"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <circle cx="5" cy="3.5" r="2.5" />
-                    <circle cx="5" cy="12.5" r="2.5" />
-                    <circle cx="13" cy="8" r="2.5" />
-                    <path d="M5 6v4M7.5 12.5h3a2.5 2.5 0 0 0 0-5h-3" />
-                  </svg>
-                  <span>Fork any public podcast</span>
-                </div>
-                <div className={styles.forkFeature}>
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 16 16"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path d="M11 4H2v10h10V5" />
-                    <path d="M14 1H5v3h9V1z" />
-                    <path d="M5 8h4M5 11h6" />
-                  </svg>
-                  <span>Edit the script, swap voices, add your twist</span>
-                </div>
-                <div className={styles.forkFeature}>
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 16 16"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path d="M8 1v6m0 0l-3-3m3 3l3-3" />
-                    <path d="M1 11v2a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2" />
-                  </svg>
-                  <span>Regenerate with your own voice</span>
-                </div>
-                <div className={styles.forkFeature}>
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 16 16"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path d="M14.5 8A6.5 6.5 0 1 1 8 1.5" />
-                    <path d="M8 8l4-4" />
-                    <circle cx="13" cy="3" r="2" />
-                  </svg>
-                  <span>Credit always links back to the original</span>
-                </div>
-              </div>
-            </div>
-            <div className={styles.splitVisual} data-reveal style={{ "--reveal-index": 1 } as React.CSSProperties}>
-              <div className={styles.forkMock}>
-                <div className={styles.forkOriginal}>
-                  <div className={styles.forkCardLabel}>Original</div>
-                  <div className={styles.forkCardContent}>
-                    <p className={styles.forkCardTitle}>How CRISPR Is Changing Medicine</p>
-                    <p className={styles.forkCardMeta}>by Dr. Sarah K. · 8 min · 342 listens</p>
-                    <div className={styles.forkCardTags}>
-                      <span>Biology</span>
-                      <span>Gene Editing</span>
-                      <span>Ethics</span>
-                    </div>
-                  </div>
-                </div>
-                <div className={styles.forkArrowDown} aria-hidden="true">
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 20 20"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <circle cx="5" cy="3" r="2" />
-                    <circle cx="5" cy="17" r="2" />
-                    <circle cx="15" cy="10" r="2" />
-                    <path d="M5 5v10M7 17h6a2 2 0 0 0 0-4H7" />
-                  </svg>
-                  <span>Fork</span>
-                </div>
-                <div className={styles.forkRemixed}>
-                  <div className={`${styles.forkCardLabel} ${styles.forkCardLabelNew}`}>
-                    Your remix
-                  </div>
-                  <div className={styles.forkCardContent}>
-                    <p className={styles.forkCardTitle}>CRISPR for Cancer: The Ethical Debate</p>
-                    <p className={styles.forkCardMeta}>
-                      Narrowed focus · Your voice · Updated sources
-                    </p>
-                    <div className={styles.forkCardEdits}>
-                      <span className={styles.forkEditBadge}>
-                        <svg
-                          width="12"
-                          height="12"
-                          viewBox="0 0 12 12"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="1.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          aria-hidden="true"
-                        >
-                          <path d="M8.5 1.5l2 2L4 10H2V8z" />
-                        </svg>
-                        Script edited
-                      </span>
-                      <span className={styles.forkEditBadge}>
-                        <svg
-                          width="12"
-                          height="12"
-                          viewBox="0 0 12 12"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="1.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          aria-hidden="true"
-                        >
-                          <path d="M6 1a2 2 0 0 0-2 2v4a2 2 0 0 0 4 0V3a2 2 0 0 0-2-2z" />
-                          <path d="M10 5.5v1a4 4 0 0 1-8 0v-1" />
-                        </svg>
-                        Voice changed
-                      </span>
-                      <span className={styles.forkEditBadge}>
-                        <svg
-                          width="12"
-                          height="12"
-                          viewBox="0 0 12 12"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="1.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          aria-hidden="true"
-                        >
-                          <path d="M1 6h10M6 1v10" />
-                        </svg>
-                        3 sources added
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ====== USE CASES ====== */}
-      <section className={styles.section} aria-label="Use cases">
-        <div className={styles.inner}>
-          <div className={styles.centered} data-reveal>
-            <span className={styles.overline}>Built for the curious</span>
-            <h2 className={styles.h2}>Turn any topic into a podcast worth sharing</h2>
-          </div>
-          <div className={styles.useCases}>
-            <article className={styles.useCase} data-reveal>
-              <div className={styles.useCaseIcon} aria-hidden="true">
                 <svg
-                  width="28"
-                  height="28"
+                  width="24"
+                  height="24"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
-                  strokeWidth="1.5"
+                  strokeWidth="2"
                   strokeLinecap="round"
                   strokeLinejoin="round"
+                  aria-hidden="true"
                 >
-                  <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
-                  <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
                 </svg>
               </div>
-              <h3>Students</h3>
+              <h3>Import Any Podcast</h3>
               <p>
-                Turn dense research papers into digestible conversations. Study smarter by listening
-                and asking questions in real time.
+                Bring podcasts from NotebookLM, Spotify, Apple Podcasts, YouTube, or any audio
+                file. Sotto adds transcripts, social features, and interactive Q&amp;A.
               </p>
             </article>
-            <article className={styles.useCase} data-reveal style={{ "--reveal-index": 1 } as React.CSSProperties}>
-              <div className={styles.useCaseIcon} aria-hidden="true">
+            <article className={styles.pillar} data-reveal style={{ "--reveal-index": 2 } as React.CSSProperties}>
+              <div className={styles.pIcon}>
                 <svg
-                  width="28"
-                  height="28"
+                  width="24"
+                  height="24"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
-                  strokeWidth="1.5"
+                  strokeWidth="2"
                   strokeLinecap="round"
                   strokeLinejoin="round"
+                  aria-hidden="true"
                 >
-                  <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
-                  <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                 </svg>
               </div>
-              <h3>Professionals</h3>
+              <h3>Ask Questions Live</h3>
               <p>
-                Stay current on industry trends during your commute. Get up to speed on any subject
-                in 10 focused minutes.
-              </p>
-            </article>
-            <article className={styles.useCase} data-reveal style={{ "--reveal-index": 2 } as React.CSSProperties}>
-              <div className={styles.useCaseIcon} aria-hidden="true">
-                <svg
-                  width="28"
-                  height="28"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                  <circle cx="9" cy="7" r="4" />
-                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                </svg>
-              </div>
-              <h3>Educators</h3>
-              <p>
-                Create engaging supplementary material for your students. Interactive audio that
-                adapts to every learner.
-              </p>
-            </article>
-            <article className={styles.useCase} data-reveal style={{ "--reveal-index": 3 } as React.CSSProperties}>
-              <div className={styles.useCaseIcon} aria-hidden="true">
-                <svg
-                  width="28"
-                  height="28"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <circle cx="12" cy="12" r="10" />
-                  <line x1="2" y1="12" x2="22" y2="12" />
-                  <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-                </svg>
-              </div>
-              <h3>Researchers</h3>
-              <p>
-                Make your work accessible to a wider audience. Transform complex findings into
-                compelling conversations anyone can follow.
+                Pause mid-playback to ask a follow-up. Get an answer drawn from the full context.
+                Your Q&amp;A gets woven back into the episode permanently.
               </p>
             </article>
           </div>
@@ -1179,6 +929,109 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ====== USE CASES ====== */}
+      <section className={styles.section} aria-label="Use cases">
+        <div className={styles.inner}>
+          <div className={styles.centered} data-reveal>
+            <span className={styles.overline}>Built for the curious</span>
+            <h2 className={styles.h2}>Turn any topic into a podcast worth sharing</h2>
+          </div>
+          <div className={styles.useCases}>
+            <article className={styles.useCase} data-reveal>
+              <div className={styles.useCaseIcon} aria-hidden="true">
+                <svg
+                  width="28"
+                  height="28"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+                  <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+                </svg>
+              </div>
+              <h3>Students</h3>
+              <p>
+                Turn dense research papers into digestible conversations. Study smarter by listening
+                and asking questions in real time.
+              </p>
+            </article>
+            <article className={styles.useCase} data-reveal style={{ "--reveal-index": 1 } as React.CSSProperties}>
+              <div className={styles.useCaseIcon} aria-hidden="true">
+                <svg
+                  width="28"
+                  height="28"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+                  <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
+                </svg>
+              </div>
+              <h3>Professionals</h3>
+              <p>
+                Stay current on industry trends during your commute. Get up to speed on any subject
+                in 10 focused minutes.
+              </p>
+            </article>
+            <article className={styles.useCase} data-reveal style={{ "--reveal-index": 2 } as React.CSSProperties}>
+              <div className={styles.useCaseIcon} aria-hidden="true">
+                <svg
+                  width="28"
+                  height="28"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                </svg>
+              </div>
+              <h3>Educators</h3>
+              <p>
+                Create engaging supplementary material for your students. Interactive audio that
+                adapts to every learner.
+              </p>
+            </article>
+            <article className={styles.useCase} data-reveal style={{ "--reveal-index": 3 } as React.CSSProperties}>
+              <div className={styles.useCaseIcon} aria-hidden="true">
+                <svg
+                  width="28"
+                  height="28"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="2" y1="12" x2="22" y2="12" />
+                  <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                </svg>
+              </div>
+              <h3>Researchers</h3>
+              <p>
+                Make your work accessible to a wider audience. Transform complex findings into
+                compelling conversations anyone can follow.
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+
       {/* ====== HOW IT WORKS ====== */}
       <section className={`${styles.section} ${styles.sectionAlt}`} aria-label="How it works">
         <div className={styles.inner}>
@@ -1190,11 +1043,10 @@ export default function LandingPage() {
             <div className={styles.step} data-reveal>
               <div className={styles.stepNum}>1</div>
               <div className={styles.stepContent}>
-                <h3>Create or import</h3>
+                <h3>Describe your topic</h3>
                 <p>
-                  Chat with Sotto to generate a multi-voice podcast from any topic or video. Or import from
-                  NotebookLM with our Chrome extension, Spotify, Apple Podcasts, YouTube — any
-                  audio file works.
+                  Chat with Sotto about what you want to learn. AI researches your topic, writes a
+                  two-voice script with citations, and verifies every claim.
                 </p>
               </div>
             </div>
@@ -1202,10 +1054,11 @@ export default function LandingPage() {
             <div className={styles.step} data-reveal style={{ "--reveal-index": 1 } as React.CSSProperties}>
               <div className={styles.stepNum}>2</div>
               <div className={styles.stepContent}>
-                <h3>Listen, ask, fork</h3>
+                <h3>Choose voices and generate</h3>
                 <p>
-                  Follow along with an interactive transcript. Pause to ask questions anytime. Fork
-                  any public podcast to remix it with your own angle.
+                  Pick from 7 TTS providers &mdash; ElevenLabs, Cartesia, Hume, and more &mdash;
+                  or use your cloned voice. Sotto generates studio-quality audio with distinct
+                  host and expert voices.
                 </p>
               </div>
             </div>
@@ -1213,10 +1066,10 @@ export default function LandingPage() {
             <div className={styles.step} data-reveal style={{ "--reveal-index": 2 } as React.CSSProperties}>
               <div className={styles.stepNum}>3</div>
               <div className={styles.stepContent}>
-                <h3>Share on the feed</h3>
+                <h3>Share, fork, or create video</h3>
                 <p>
-                  Your podcasts join a social feed. Discover what others are learning. Follow
-                  creators, explore fork lineages, and build on each other&apos;s work.
+                  Publish to the social feed, fork any public podcast, or generate a full video
+                  with AI illustrations, data charts, and avatar presenters.
                 </p>
               </div>
             </div>
