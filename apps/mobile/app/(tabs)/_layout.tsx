@@ -1,6 +1,7 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '@sotto/shared';
+import { shadowMd } from '../../lib/shadows';
 
 export default function TabLayout() {
   return (
@@ -8,7 +9,7 @@ export default function TabLayout() {
       screenOptions={{
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textSecondary,
-        tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
+        tabBarStyle: { backgroundColor: colors.surface, borderTopWidth: 0, ...shadowMd },
         headerStyle: { backgroundColor: colors.background },
         headerTintColor: colors.textPrimary,
       }}

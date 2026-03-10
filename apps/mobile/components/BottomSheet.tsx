@@ -7,7 +7,9 @@ import {
   StyleSheet,
   Dimensions,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography, borderRadius } from '@sotto/shared';
+import { shadowXl } from '../lib/shadows';
 
 const WINDOW_HEIGHT = Dimensions.get('window').height;
 
@@ -44,7 +46,7 @@ export function BottomSheet({
                 accessibilityLabel="Close"
                 accessibilityRole="button"
               >
-                <Text style={styles.closeButtonText}>✕</Text>
+                <Ionicons name="close" size={18} color={colors.textSecondary} />
               </Pressable>
             </View>
           )}
@@ -67,6 +69,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: borderRadius.xl,
     borderTopRightRadius: borderRadius.xl,
     paddingBottom: spacing.xl,
+    ...shadowXl,
   },
   handleBar: {
     width: 36,
@@ -95,10 +98,6 @@ const styles = StyleSheet.create({
     height: 32,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  closeButtonText: {
-    fontSize: 18,
-    color: colors.textSecondary,
   },
   scrollContent: {
     maxHeight: WINDOW_HEIGHT * 0.7,

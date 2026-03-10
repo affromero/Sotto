@@ -12,6 +12,7 @@ import { useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography, borderRadius } from '@sotto/shared';
+import { shadowSm } from '../../lib/shadows';
 import type { NotificationData } from '@sotto/shared';
 import { api } from '../../lib/api';
 import { globalStyles } from '../../lib/theme';
@@ -223,8 +224,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     backgroundColor: colors.background,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
+    zIndex: 1,
+    ...shadowSm,
   },
   markAllButton: {
     paddingVertical: spacing.xs + 2,
