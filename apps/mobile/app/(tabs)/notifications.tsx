@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography, borderRadius } from '@sotto/shared';
 import type { NotificationData } from '@sotto/shared';
 import { api } from '../../lib/api';
@@ -18,19 +19,19 @@ import { timeAgo } from '../../lib/formatters';
 import { EmptyState } from '../../components/EmptyState';
 import { ErrorState } from '../../components/ErrorState';
 
-const NOTIFICATION_ICONS: Record<string, string> = {
-  PODCAST_READY: '\u{1F3A7}',
-  PODCAST_FAILED: '\u{26A0}',
-  NEW_FOLLOWER: '\u{1F464}',
-  NEW_LIKE: '\u{2764}',
-  NEW_FORK: '\u{1F500}',
-  INTERACTION_ANSWERED: '\u{1F4AC}',
-  NEW_COMMENT: '\u{1F4DD}',
-  SYSTEM: '\u{2139}',
+const NOTIFICATION_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
+  PODCAST_READY: 'headset',
+  PODCAST_FAILED: 'warning-outline',
+  NEW_FOLLOWER: 'person-add-outline',
+  NEW_LIKE: 'heart',
+  NEW_FORK: 'git-branch-outline',
+  INTERACTION_ANSWERED: 'chatbubble-outline',
+  NEW_COMMENT: 'chatbubbles-outline',
+  SYSTEM: 'information-circle-outline',
 };
 
-function getNotificationIcon(type: string): string {
-  return NOTIFICATION_ICONS[type] ?? '\u{1F514}';
+function getNotificationIcon(type: string): keyof typeof Ionicons.glyphMap {
+  return NOTIFICATION_ICONS[type] ?? 'notifications-outline';
 }
 
 function NotificationItem({
@@ -50,9 +51,7 @@ function NotificationItem({
       onPress={onPress}
     >
       <View style={styles.iconContainer}>
-        <Text style={styles.iconText}>
-          {getNotificationIcon(notification.type)}
-        </Text>
+        <Ionicons name={getNotificationIcon(notification.type)} size={20} color={colors.textSecondary} />
       </View>
       <View style={styles.notificationContent}>
         <View style={styles.notificationHeader}>
@@ -205,7 +204,7 @@ export default function NotificationsScreen() {
             />
           ) : (
             <EmptyState
-              icon={'\u{1F514}'}
+              iconName="notifications-outline"
               title="No notifications yet"
               subtitle="When someone likes your podcast, follows you, or your podcast finishes generating, you will see it here."
             />

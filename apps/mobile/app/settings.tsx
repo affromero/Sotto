@@ -11,6 +11,7 @@ import { useRouter, Stack } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { openBrowserAsync } from 'expo-web-browser';
 import Constants from 'expo-constants';
+import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography, borderRadius } from '@sotto/shared';
 import { api } from '../lib/api';
 import { deleteToken } from '../lib/auth';
@@ -120,7 +121,7 @@ export default function SettingsScreen() {
                   ]}
                 />
               </View>
-              <Text style={styles.rowChevron}>{'\u203A'}</Text>
+              <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
             </Pressable>
           </View>
         </View>
@@ -137,7 +138,7 @@ export default function SettingsScreen() {
               onPress={() => openBrowserAsync('https://sotto.fm/privacy')}
             >
               <Text style={styles.rowLabel}>Privacy Policy</Text>
-              <Text style={styles.rowChevron}>{'\u203A'}</Text>
+              <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
             </Pressable>
             <View style={styles.rowSeparator} />
             <Pressable
@@ -148,7 +149,7 @@ export default function SettingsScreen() {
               onPress={() => openBrowserAsync('https://sotto.fm/terms')}
             >
               <Text style={styles.rowLabel}>Terms of Service</Text>
-              <Text style={styles.rowChevron}>{'\u203A'}</Text>
+              <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
             </Pressable>
             <View style={styles.rowSeparator} />
             <Pressable
@@ -159,7 +160,7 @@ export default function SettingsScreen() {
               onPress={() => openBrowserAsync('https://sotto.fm/support')}
             >
               <Text style={styles.rowLabel}>Support</Text>
-              <Text style={styles.rowChevron}>{'\u203A'}</Text>
+              <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
             </Pressable>
           </View>
         </View>

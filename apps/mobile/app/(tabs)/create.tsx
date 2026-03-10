@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
+import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography, borderRadius } from '@sotto/shared';
 import type { DiscoveryMetadata } from '@sotto/shared';
 import Animated, {
@@ -501,7 +502,7 @@ export default function CreateScreen() {
                     ]}
                     onPress={() => setShowInspire(true)}
                   >
-                    <Text style={styles.inspireMeIcon}>{'\u2728'}</Text>
+                    <Ionicons name="sparkles" size={16} color={colors.primary} />
                     <Text style={styles.inspireMeButtonText}>Inspire me</Text>
                   </Pressable>
                 </Animated.View>
@@ -614,7 +615,7 @@ export default function CreateScreen() {
               onPress={handleSend}
               disabled={!inputText.trim() || isDiscovering}
             >
-              <Text style={styles.sendButtonIcon}>&#8593;</Text>
+              <Ionicons name="arrow-up" size={20} color={colors.textInverse} />
             </Pressable>
           </View>
         </View>
@@ -747,7 +748,10 @@ export default function CreateScreen() {
               ? 'Add an AI provider key to create podcasts'
               : 'Add a TTS provider key to create podcasts'}
         </Text>
-        <Text style={styles.keyWarningLink}>Add keys {'\u203A'}</Text>
+        <View style={styles.keyWarningLinkRow}>
+          <Text style={styles.keyWarningLink}>Add keys</Text>
+          <Ionicons name="chevron-forward" size={14} color={colors.primary} />
+        </View>
       </Pressable>
     );
   }
@@ -765,7 +769,7 @@ export default function CreateScreen() {
                     style={styles.headerBack}
                     accessibilityLabel="Go back"
                   >
-                    <Text style={styles.headerBackText}>‹</Text>
+                    <Ionicons name="chevron-back" size={24} color={colors.primary} />
                   </Pressable>
                 )
               : undefined,
@@ -830,6 +834,11 @@ const styles = StyleSheet.create({
     color: colors.warning,
     flex: 1,
     lineHeight: 18,
+  },
+  keyWarningLinkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
   },
   keyWarningLink: {
     fontFamily: typography.fontBody,

@@ -1,4 +1,5 @@
 import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography, borderRadius, getContentBadgeLabel } from '@sotto/shared';
 import type { PodcastSummary } from '@sotto/shared';
 import { Avatar } from './Avatar';
@@ -97,15 +98,15 @@ function FeedCard({
 
       <View style={styles.feedFooter}>
         <View style={styles.statRow}>
-          <Text style={styles.statIcon}>&#9654;</Text>
+          <Ionicons name="play" size={13} color={colors.textTertiary} />
           <Text style={styles.statText}>{formatCount(podcast.playCount)}</Text>
         </View>
         <View style={styles.statRow}>
-          <Text style={styles.statIcon}>&#9825;</Text>
+          <Ionicons name="heart-outline" size={13} color={colors.textTertiary} />
           <Text style={styles.statText}>{formatCount(podcast.likeCount)}</Text>
         </View>
         <View style={styles.statRow}>
-          <Text style={styles.statIcon}>&#8631;</Text>
+          <Ionicons name="git-branch-outline" size={13} color={colors.textTertiary} />
           <Text style={styles.statText}>{formatCount(podcast.forkCount)}</Text>
         </View>
         <View style={styles.durationBadge}>
@@ -157,7 +158,7 @@ function CompactCard({
           )}
         </View>
       </View>
-      <Text style={styles.chevron}>{'\u203A'}</Text>
+      <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
     </Pressable>
   );
 }
