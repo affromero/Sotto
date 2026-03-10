@@ -1,5 +1,5 @@
 import { getAllProviderMeta } from '@/lib/providers/tts-registry';
-import { ShowcaseBuilder } from './ShowcaseBuilder';
+import { DemoStudio } from './DemoStudio';
 import styles from './page.module.css';
 
 export const metadata = { title: 'Demo Video Studio — Sotto Admin' };
@@ -21,7 +21,7 @@ export default function ShowcasePage() {
           Create AI-narrated product demo videos with custom visuals, voices, and avatars.
         </p>
       </div>
-      <ShowcaseBuilder providers={providers} />
+      <DemoStudio providers={providers} />
     </div>
   );
 }
