@@ -60,12 +60,19 @@ describe('isNonRetryableRunwayError', () => {
 });
 
 describe('listRunwayPresets', () => {
-  it('returns all 8 preset avatars', () => {
+  it('returns all 9 preset avatars', () => {
     const presets = listRunwayPresets();
-    expect(presets).toHaveLength(8);
-    expect(presets[0].id).toBe('influencer');
-    expect(presets[0].name).toBe('Influencer');
-    expect(presets[0].previewImageUrl).toContain('influencer.png');
+    expect(presets).toHaveLength(9);
+    // Portal presets come first with real thumbnails
+    expect(presets[0].id).toBe('cat-character');
+    expect(presets[0].name).toContain('Mochi');
+    expect(presets[0].previewImageUrl).toContain('runway-static-assets');
+    // API-only presets use placeholder
+    const apiOnly = presets.find((p) => p.id === 'influencer');
+    expect(apiOnly).toBeDefined();
+    expect(apiOnly!.previewImageUrl).toContain('gwm-1-avatars');
+    // game-character-man is new
+    expect(presets.find((p) => p.id === 'game-character-man')).toBeDefined();
   });
 
   it('returns stable references (static data)', () => {
