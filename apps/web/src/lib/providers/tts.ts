@@ -276,12 +276,14 @@ export async function resolveTtsProvider(context: {
   requestedProvider?: TtsProviderId | 'auto' | null;
   requestedModel?: string | null;
   plan?: 'FREE' | 'PRO';
+  /** Skip BYOK key lookup and go straight to platform keys. Used for fallback retries. */
+  skipByok?: boolean;
 }): Promise<ResolvedProvider> {
   const { userId, requestedProvider, requestedModel } = context;
 
   // Case 1+2: Specific provider requested
   if (requestedProvider && requestedProvider !== 'auto') {
-    const byokKey = await getByokKey(userId, requestedProvider);
+    const byokKey = context.skipByok ? null : await getByokKey(userId, requestedProvider);
     if (byokKey) {
       const extraData = await getByokExtraData(userId, requestedProvider);
       const provider = await createTtsProviderAsync(
