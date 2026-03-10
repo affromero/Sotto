@@ -532,6 +532,10 @@
   align-items: center;
 }
 
+.hiddenInput {
+  display: none;
+}
+
 .lockIcon {
   display: inline-flex;
   align-items: center;
