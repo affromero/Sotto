@@ -26,10 +26,13 @@ const MUSIC_PROVIDERS: Record<MusicProviderId, MusicProviderMeta> = {
   suno: {
     id: 'suno',
     displayName: 'Suno',
-    getApiKeyUrl: 'https://kie.ai/dashboard',
+    getApiKeyUrl: 'https://sunoapi.org/dashboard',
     defaultModel: 'suno-v5',
     models: [
+      { id: 'suno-v4', displayName: 'Suno V4', costPerTrack: 0.05 },
       { id: 'suno-v4.5', displayName: 'Suno V4.5', costPerTrack: 0.05 },
+      { id: 'suno-v4.5-plus', displayName: 'Suno V4.5 Plus', costPerTrack: 0.08 },
+      { id: 'suno-v4.5-all', displayName: 'Suno V4.5 All', costPerTrack: 0.08 },
       { id: 'suno-v5', displayName: 'Suno V5', costPerTrack: 0.10 },
     ],
     platformKeyEnv: 'SUNO_API_KEY',

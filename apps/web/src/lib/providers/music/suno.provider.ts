@@ -1,35 +1,63 @@
 /**
- * Suno music provider via Kie.ai API — async generation with polling.
+ * Suno music provider via sunoapi.org — async generation with polling.
  */
 import { logger } from '../../logger';
 import type { MusicProvider } from '../music';
 
-/** Suno model ID → Kie.ai API model name. */
+const BASE_URL = 'https://api.sunoapi.org';
+
+/** Internal model ID → sunoapi.org API model value. */
 function getSunoApiModel(model: string): string {
-  if (model === 'suno-v4.5') return 'V4.5';
-  return 'V5'; // default
+  const map: Record<string, string> = {
+    'suno-v4': 'V4',
+    'suno-v4.5': 'V4_5',
+    'suno-v4.5-plus': 'V4_5PLUS',
+    'suno-v4.5-all': 'V4_5ALL',
+    'suno-v5': 'V5',
+  };
+  return map[model] ?? 'V5';
 }
 
-interface KieTaskResponse {
-  data: {
+interface SunoSubmitResponse {
+  code: number;
+  msg: string;
+  data?: {
     taskId: string;
   };
 }
 
-interface KieStatusResponse {
-  data: {
-    status: string; // 'pending' | 'processing' | 'completed' | 'failed'
+interface SunoStatusResponse {
+  code: number;
+  msg: string;
+  data?: {
+    taskId: string;
+    status: string;
     response?: {
-      audioUrl?: string;
-      sunoData?: Array<{ audio_url?: string }>;
+      taskId?: string;
+      sunoData?: Array<{
+        id: string;
+        audioUrl?: string;
+        streamAudioUrl?: string;
+        duration?: number;
+      }>;
     };
+    errorMessage?: string | null;
   };
 }
+
+/** Terminal failure statuses from sunoapi.org. */
+const FAILED_STATUSES = new Set([
+  'CREATE_TASK_FAILED',
+  'GENERATE_AUDIO_FAILED',
+  'CALLBACK_EXCEPTION',
+  'SENSITIVE_WORD_ERROR',
+]);
 
 export class SunoMusicProvider implements MusicProvider {
   readonly providerId = 'suno' as const;
   private apiKey: string;
   private model: string;
+  private _externalTaskId: string | null = null;
 
   constructor(apiKey: string, model: string) {
     this.apiKey = apiKey;
@@ -38,6 +66,11 @@ export class SunoMusicProvider implements MusicProvider {
 
   getModelId(): string {
     return this.model;
+  }
+
+  /** Exposed so the worker can persist taskId for recovery. */
+  get externalTaskId(): string | null {
+    return this._externalTaskId;
   }
 
   async generateMusic(params: {
@@ -50,8 +83,7 @@ export class SunoMusicProvider implements MusicProvider {
     const apiModel = getSunoApiModel(this.model);
     logger.info('Submitting Suno music job', { model: this.model, apiModel });
 
-    // Submit generation
-    const submitRes = await fetch('https://api.kie.ai/api/v1/generate', {
+    const submitRes = await fetch(`${BASE_URL}/api/v1/generate`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -72,12 +104,17 @@ export class SunoMusicProvider implements MusicProvider {
       throw new Error(`Suno submit failed (${submitRes.status}): ${errorText}`);
     }
 
-    const submitData = (await submitRes.json()) as KieTaskResponse;
-    const taskId = submitData.data.taskId;
-    logger.info('Suno task submitted', { taskId });
+    const submitData = (await submitRes.json()) as SunoSubmitResponse;
 
-    // Poll for completion with exponential backoff
-    const audioUrl = await this.pollForCompletion(taskId);
+    if (submitData.code !== 200 || !submitData.data?.taskId) {
+      throw new Error(`Suno submit error: ${submitData.msg ?? 'no taskId in response'}`);
+    }
+
+    this._externalTaskId = submitData.data.taskId;
+    logger.info('Suno task submitted', { taskId: this._externalTaskId });
+
+    // Poll for completion
+    const audioUrl = await this.pollForCompletion(this._externalTaskId);
 
     // Download audio
     const audioRes = await fetch(audioUrl);
@@ -96,9 +133,10 @@ export class SunoMusicProvider implements MusicProvider {
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       await new Promise((resolve) => setTimeout(resolve, delay));
 
-      const statusRes = await fetch(`https://api.kie.ai/api/v1/status/${taskId}`, {
-        headers: { Authorization: `Bearer ${this.apiKey}` },
-      });
+      const statusRes = await fetch(
+        `${BASE_URL}/api/v1/generate/record-info?taskId=${encodeURIComponent(taskId)}`,
+        { headers: { Authorization: `Bearer ${this.apiKey}` } },
+      );
 
       if (!statusRes.ok) {
         logger.warn('Suno status check failed', { taskId, status: statusRes.status });
@@ -106,22 +144,20 @@ export class SunoMusicProvider implements MusicProvider {
         continue;
       }
 
-      const statusData = (await statusRes.json()) as KieStatusResponse;
-      const status = statusData.data.status;
+      const statusData = (await statusRes.json()) as SunoStatusResponse;
+      const status = statusData.data?.status;
 
-      if (status === 'completed') {
-        const audioUrl =
-          statusData.data.response?.audioUrl ||
-          statusData.data.response?.sunoData?.[0]?.audio_url;
-
+      if (status === 'SUCCESS') {
+        const audioUrl = statusData.data?.response?.sunoData?.[0]?.audioUrl;
         if (!audioUrl) {
-          throw new Error('Suno completed but no audio URL returned');
+          throw new Error('Suno completed but no audio URL in response');
         }
         return audioUrl;
       }
 
-      if (status === 'failed') {
-        throw new Error('Suno music generation failed');
+      if (status && FAILED_STATUSES.has(status)) {
+        const reason = statusData.data?.errorMessage ?? status;
+        throw new Error(`Suno music generation failed: ${reason}`);
       }
 
       // Exponential backoff, cap at 30s
