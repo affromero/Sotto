@@ -41,26 +41,25 @@ export const PodcastVisuals: React.FC<VisualsInput> = ({
   // Prefetch all image/video assets — including sub-visual and transition assets
   React.useEffect(() => {
     const cleanups: (() => void)[] = [];
-    for (const segment of segments) {
-      if (segment.assetUrl) {
-        const { free } = prefetch(segment.assetUrl, { method: 'blob-url' });
+    const tryPrefetch = (url: string) => {
+      try {
+        const { free } = prefetch(url, { method: 'blob-url' });
         cleanups.push(free);
+      } catch {
+        // Asset may be missing or CORS-blocked — non-fatal, skip prefetch
       }
+    };
+    for (const segment of segments) {
+      if (segment.assetUrl) tryPrefetch(segment.assetUrl);
       if (segment.subVisuals) {
         for (const sv of segment.subVisuals) {
-          if (sv.assetUrl) {
-            const { free } = prefetch(sv.assetUrl, { method: 'blob-url' });
-            cleanups.push(free);
-          }
+          if (sv.assetUrl) tryPrefetch(sv.assetUrl);
         }
       }
     }
     if (transitions) {
       for (const t of transitions) {
-        if (t.assetUrl) {
-          const { free } = prefetch(t.assetUrl, { method: 'blob-url' });
-          cleanups.push(free);
-        }
+        if (t.assetUrl) tryPrefetch(t.assetUrl);
       }
     }
     return () => cleanups.forEach((fn) => fn());

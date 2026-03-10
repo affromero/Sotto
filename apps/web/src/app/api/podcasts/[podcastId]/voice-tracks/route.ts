@@ -9,11 +9,52 @@ import { computeVoiceCharges } from '@/lib/voice-pricing';
 import { resolveTtsProvider } from '@/lib/providers';
 import { checkRateLimit } from '@/lib/redis';
 import { checkSuspension } from '@/lib/auth-guards';
-import type { TtsProviderId } from '@/lib/providers/tts-registry';
+import { getProviderMeta, type TtsProviderId } from '@/lib/providers/tts-registry';
+import { findByVoiceId } from '@/lib/voice-pool';
 import type { GenerateVoiceTrackAudioPayload } from '@/lib/queue';
 
 import { errorResponse } from '@/lib/api-response';
 type RouteParams = { params: Promise<{ podcastId: string }> };
+
+/**
+ * Build a display name from resolved voice assignments.
+ * Format: "Aria [ElevenLabs] · Nova [OpenAI]"
+ * Groups voices by provider: "Aria + River [ElevenLabs] · Nova [OpenAI]"
+ */
+function buildTrackName(
+  voices: Array<{ speaker: string; voiceId: string; providerId: TtsProviderId }>,
+): string {
+  // Group by provider, preserving speaker order
+  const byProvider = new Map<string, string[]>();
+  for (const v of voices) {
+    const providerLabel = getProviderMeta(v.providerId).displayName;
+    const voiceName = v.voiceId
+      ? (findByVoiceId(v.voiceId)?.name ?? v.voiceId)
+      : 'Auto';
+    const existing = byProvider.get(providerLabel) ?? [];
+    if (!existing.includes(voiceName)) {
+      existing.push(voiceName);
+    }
+    byProvider.set(providerLabel, existing);
+  }
+
+  return Array.from(byProvider.entries())
+    .map(([provider, names]) => `${names.join(' + ')} [${provider}]`)
+    .join(' · ');
+}
+
+/**
+ * Build a stable fingerprint from voice assignments for dedup.
+ * Sorted by speaker to be order-independent.
+ */
+function buildVoiceFingerprint(
+  voices: Array<{ speaker: string; voiceId: string; providerId: string }>,
+): string {
+  return voices
+    .map((v) => `${v.speaker}:${v.providerId}:${v.voiceId || 'auto'}`)
+    .sort()
+    .join('|');
+}
 
 export async function POST(request: NextRequest, { params }: RouteParams) {
   const { podcastId } = await params;
@@ -87,7 +128,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return errorResponse(parsed.error.flatten(), 400);
   }
 
-  const { name, ttsProvider, ttsModel, voices, paymentIntentIds, skipPaidVoices } = parsed.data;
+  const { ttsProvider, ttsModel, voices, paymentIntentIds, skipPaidVoices } = parsed.data;
 
   // Check paid voices
   const voicesWithIds = voices.filter(v => !!v.voiceId);
@@ -140,6 +181,34 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return { speaker: v.speaker, voiceId: v.voiceId, providerId: fallback.providerId };
     }),
   );
+
+  // Dedup: check if a voice track with the exact same voice combination already exists
+  const fingerprint = buildVoiceFingerprint(resolvedVoiceProviders);
+  const existingTracks = await prisma.voiceTrack.findMany({
+    where: { podcastId },
+    select: {
+      id: true,
+      status: true,
+      audioUrl: true,
+      voices: { select: { speaker: true, voiceId: true, provider: true } },
+    },
+  });
+
+  for (const existing of existingTracks) {
+    const existingFingerprint = existing.voices
+      .map((v) => `${v.speaker}:${v.provider || 'auto'}:${v.voiceId || 'auto'}`)
+      .sort()
+      .join('|');
+    if (existingFingerprint === fingerprint) {
+      return NextResponse.json(
+        { id: existing.id, status: existing.status, duplicate: true },
+        { status: 200 },
+      );
+    }
+  }
+
+  // Auto-generate track name from resolved voices
+  const name = buildTrackName(resolvedVoiceProviders);
 
   // Determine track-level provider for display — use first voice's provider or "mixed" if they differ
   const uniqueProviders = [...new Set(resolvedVoiceProviders.map(v => v.providerId))];
@@ -209,7 +278,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     await addJob(voiceTrackAudioQueue, JobType.GENERATE_VOICE_TRACK_AUDIO, payload);
   }
 
-  return NextResponse.json({ id: voiceTrack.id, status: voiceTrack.status }, { status: 201 });
+  return NextResponse.json({ id: voiceTrack.id, status: voiceTrack.status, name }, { status: 201 });
 }
 
 export async function GET(_request: NextRequest, { params }: RouteParams) {
@@ -257,7 +326,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
       ttsProvider: true,
       ttsModel: true,
       failureReason: isOwner ? true : false,
-      voices: { select: { speaker: true, voiceId: true } },
+      voices: { select: { speaker: true, voiceId: true, provider: true } },
       proposalStatus: true,
       proposalMessage: true,
       contributor: {

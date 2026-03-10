@@ -102,7 +102,6 @@ export const updateDemoSceneSchema = z.object({
  * Voice track validation schemas
  */
 export const createVoiceTrackSchema = z.object({
-  name: z.string().min(1).max(100),
   ttsProvider: z.string().optional(),
   ttsModel: z.string().optional(),
   voices: z.array(z.object({

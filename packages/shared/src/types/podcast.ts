@@ -97,7 +97,7 @@ export interface VoiceTrackSummary {
   ttsProvider: string | null;
   ttsModel: string | null;
   failureReason: string | null;
-  voices: Array<{ speaker: string; voiceId: string }>;
+  voices: Array<{ speaker: string; voiceId: string; provider?: string | null }>;
   contributor: VoiceTrackContributor | null;
   proposalStatus: 'PENDING' | 'ACCEPTED' | 'REJECTED' | null;
   proposalMessage: string | null;

@@ -348,8 +348,8 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
       cumulativeTime += seg.duration ?? 0;
     }
 
-    // Note: segment audio files are preserved in R2 for downstream consumers
-    // (avatar generation, voice tracks). Cleanup handled by storage-cleanup admin endpoint.
+    // Note: segment audio files are NEVER deleted from R2 — they are needed by
+    // avatar generation, voice tracks, and future provider-versioned audio.
 
     await job.updateProgress(95);
 
