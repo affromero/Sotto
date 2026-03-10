@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { ScriptReviewPanel } from './ScriptReviewPanel';
+import { VisualPipelinePanel } from './VisualPipelinePanel';
 import styles from './ShowcaseBuilder.module.css';
 
 interface ProviderModel {
@@ -86,6 +88,62 @@ const FEATURE_OPTIONS = [
 /** Statuses that indicate in-progress generation */
 const IN_PROGRESS_STATUSES = ['SCRIPTING', 'VERIFYING_SCRIPT', 'VALIDATING_REFERENCES', 'GENERATING_AUDIO', 'STITCHING'];
 
+/** Step definitions for the workflow */
+type StepId = 'create' | 'script' | 'voices' | 'visuals' | 'avatars' | 'generate' | 'preview';
+
+interface StepDef {
+  id: StepId;
+  label: string;
+  number: number;
+}
+
+const STEPS: StepDef[] = [
+  { id: 'create', label: 'Create / Select', number: 1 },
+  { id: 'script', label: 'Script', number: 2 },
+  { id: 'voices', label: 'Voices', number: 3 },
+  { id: 'visuals', label: 'Visuals', number: 4 },
+  { id: 'avatars', label: 'Avatars', number: 5 },
+  { id: 'generate', label: 'Generate', number: 6 },
+  { id: 'preview', label: 'Preview', number: 7 },
+];
+
+/** Determine which steps are unlocked based on podcast status */
+function getUnlockedSteps(podcastStatus: string | undefined): Set<StepId> {
+  const unlocked = new Set<StepId>(['create']);
+  if (!podcastStatus) return unlocked;
+
+  // Script step: unlocked when script exists (SCRIPT_READY or later)
+  const scriptReadyStatuses = ['SCRIPT_READY', 'GENERATING_AUDIO', 'STITCHING', 'READY'];
+  if (scriptReadyStatuses.includes(podcastStatus)) {
+    unlocked.add('script');
+  }
+
+  // Voices step: unlocked at SCRIPT_READY or later
+  if (scriptReadyStatuses.includes(podcastStatus)) {
+    unlocked.add('voices');
+  }
+
+  // Visuals step: unlocked only when audio is done (READY)
+  if (podcastStatus === 'READY') {
+    unlocked.add('visuals');
+  }
+
+  // Avatars: placeholder (Phase 3)
+  // Generate: placeholder
+  // Preview: placeholder (Phase 4)
+
+  return unlocked;
+}
+
+/** Determine the best default step based on status */
+function getDefaultStep(podcastStatus: string | undefined): StepId {
+  if (!podcastStatus) return 'create';
+  if (podcastStatus === 'READY') return 'visuals';
+  if (podcastStatus === 'SCRIPT_READY') return 'script';
+  if (IN_PROGRESS_STATUSES.includes(podcastStatus)) return 'create';
+  return 'create';
+}
+
 interface ShowcaseBuilderProps {
   providers: ProviderInfo[];
 }
@@ -99,6 +157,7 @@ export function ShowcaseBuilder({ providers }: ShowcaseBuilderProps) {
   const [boundaries, setBoundaries] = useState<Boundary[]>([]);
   const [status, setStatus] = useState<Status>('idle');
   const [message, setMessage] = useState('');
+  const [activeStep, setActiveStep] = useState<StepId>('create');
 
   // Creation form state
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -109,6 +168,10 @@ export function ShowcaseBuilder({ providers }: ShowcaseBuilderProps) {
 
   // Polling ref for in-progress podcasts
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const selectedPodcast = podcasts.find((p) => p.id === selectedPodcastId);
+  const unlockedSteps = getUnlockedSteps(selectedPodcast?.status);
+  const isInProgress = selectedPodcast && IN_PROGRESS_STATUSES.includes(selectedPodcast.status);
 
   // Fetch eligible podcasts
   const fetchPodcasts = useCallback(async () => {
@@ -134,7 +197,6 @@ export function ShowcaseBuilder({ providers }: ShowcaseBuilderProps) {
       pollRef.current = null;
     }
 
-    const selectedPodcast = podcasts.find((p) => p.id === selectedPodcastId);
     if (!selectedPodcast || !IN_PROGRESS_STATUSES.includes(selectedPodcast.status)) return;
 
     pollRef.current = setInterval(async () => {
@@ -147,6 +209,7 @@ export function ShowcaseBuilder({ providers }: ShowcaseBuilderProps) {
           setMessage(`Demo "${current.title}" is ready`);
           setStatus('success');
           loadSegments(current.id);
+          setActiveStep(getDefaultStep(current.status));
         }
       }
     }, 3000);
@@ -163,6 +226,7 @@ export function ShowcaseBuilder({ providers }: ShowcaseBuilderProps) {
     setBoundaries([]);
     if (!podcastId) {
       setSegments([]);
+      setActiveStep('create');
       return;
     }
     setStatus('loading');
@@ -176,6 +240,22 @@ export function ShowcaseBuilder({ providers }: ShowcaseBuilderProps) {
       setStatus('error');
     }
   }, []);
+
+  // When podcast is selected, update active step
+  const handlePodcastSelect = useCallback(async (podcastId: string) => {
+    await loadSegments(podcastId);
+    const podcast = podcasts.find((p) => p.id === podcastId);
+    setActiveStep(getDefaultStep(podcast?.status));
+  }, [loadSegments, podcasts]);
+
+  // Callback for when script/audio status changes (from ScriptReviewPanel)
+  const handleStatusChange = useCallback(async () => {
+    const updated = await fetchPodcasts();
+    const current = updated.find((p: PodcastOption) => p.id === selectedPodcastId);
+    if (current) {
+      setActiveStep(getDefaultStep(current.status));
+    }
+  }, [fetchPodcasts, selectedPodcastId]);
 
   // Fetch voice catalog for a provider (cached)
   const getVoices = useCallback(async (providerId: string): Promise<CatalogVoice[]> => {
@@ -378,125 +458,38 @@ export function ShowcaseBuilder({ providers }: ShowcaseBuilderProps) {
   const getBoundaryAfter = (segmentId: string) =>
     boundaries.find((b) => b.afterSegmentId === segmentId);
 
-  const selectedPodcast = podcasts.find((p) => p.id === selectedPodcastId);
-  const isInProgress = selectedPodcast && IN_PROGRESS_STATUSES.includes(selectedPodcast.status);
+  // Navigate to a step (only if unlocked)
+  const goToStep = useCallback((stepId: StepId) => {
+    if (unlockedSteps.has(stepId)) {
+      setActiveStep(stepId);
+    }
+  }, [unlockedSteps]);
 
   return (
     <div className={styles.root}>
-      {/* Create Demo section */}
-      <fieldset className={styles.fieldset}>
-        <legend className={styles.legend}>Create Demo</legend>
-        {!showCreateForm ? (
-          <button
-            type="button"
-            className={styles.btnPrimary}
-            onClick={() => setShowCreateForm(true)}
-          >
-            Create Demo Podcast
-          </button>
-        ) : (
-          <div className={styles.createForm}>
-            <div className={styles.formField}>
-              <label className={styles.formLabel} htmlFor="demo-topic">
-                Topic *
-              </label>
-              <textarea
-                id="demo-topic"
-                className={styles.textarea}
-                value={createTopic}
-                onChange={(e) => setCreateTopic(e.target.value)}
-                placeholder="e.g., How Sotto turns any conversation into a podcast"
-                rows={2}
-                maxLength={500}
-              />
-            </div>
-
-            <div className={styles.formField}>
-              <label className={styles.formLabel} htmlFor="demo-title">
-                Title (optional)
-              </label>
-              <input
-                id="demo-title"
-                type="text"
-                className={styles.input}
-                value={createTitle}
-                onChange={(e) => setCreateTitle(e.target.value)}
-                placeholder="Auto-generated from topic if blank"
-                maxLength={200}
-              />
-            </div>
-
-            <div className={styles.formField}>
-              <label className={styles.formLabel}>
-                Duration: {createDuration} min
-              </label>
-              <input
-                type="range"
-                className={styles.slider}
-                min={1}
-                max={3}
-                step={0.5}
-                value={createDuration}
-                onChange={(e) => setCreateDuration(Number(e.target.value))}
-                aria-label="Duration target in minutes"
-              />
-            </div>
-
-            <div className={styles.formField}>
-              <label className={styles.formLabel}>Feature Focus</label>
-              <div className={styles.featureGrid}>
-                {FEATURE_OPTIONS.map((f) => (
-                  <label key={f.slug} className={styles.featureChip} data-selected={createFeatures.has(f.slug)}>
-                    <input
-                      type="checkbox"
-                      checked={createFeatures.has(f.slug)}
-                      onChange={() => toggleFeature(f.slug)}
-                      className={styles.hiddenCheckbox}
-                    />
-                    {f.label}
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <div className={styles.formActions}>
-              <button
-                type="button"
-                className={styles.btnPrimary}
-                onClick={createDemo}
-                disabled={!createTopic.trim() || status === 'creating'}
-              >
-                {status === 'creating' ? 'Creating...' : 'Create Demo'}
-              </button>
-              <button
-                type="button"
-                className={styles.btnGhost}
-                onClick={() => setShowCreateForm(false)}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
-      </fieldset>
-
-      {/* Podcast selector */}
-      <fieldset className={styles.fieldset}>
-        <legend className={styles.legend}>Select Podcast</legend>
-        <select
-          className={styles.select}
-          value={selectedPodcastId}
-          onChange={(e) => loadSegments(e.target.value)}
-          aria-label="Select a podcast"
-        >
-          <option value="">— Choose a podcast —</option>
-          {podcasts.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.title} ({p.segmentCount} segments, {p.status})
-            </option>
-          ))}
-        </select>
-      </fieldset>
+      {/* Step navigation */}
+      <nav className={styles.stepNav} aria-label="Workflow steps">
+        {STEPS.map((step) => {
+          const isUnlocked = unlockedSteps.has(step.id);
+          const isActive = activeStep === step.id;
+          return (
+            <button
+              key={step.id}
+              type="button"
+              className={styles.stepBtn}
+              data-active={isActive}
+              data-unlocked={isUnlocked}
+              onClick={() => goToStep(step.id)}
+              disabled={!isUnlocked}
+              aria-current={isActive ? 'step' : undefined}
+              aria-label={`Step ${step.number}: ${step.label}${!isUnlocked ? ' (locked)' : ''}`}
+            >
+              <span className={styles.stepNumber}>{step.number}</span>
+              <span className={styles.stepLabel}>{step.label}</span>
+            </button>
+          );
+        })}
+      </nav>
 
       {/* In-progress status */}
       {isInProgress && (
@@ -506,172 +499,360 @@ export function ShowcaseBuilder({ providers }: ShowcaseBuilderProps) {
         </div>
       )}
 
-      {segments.length > 0 && (
-        <>
-          {/* Range assignment toolbar */}
-          <div className={styles.toolbar}>
-            <label className={styles.toolbarLabel}>
-              <input
-                type="checkbox"
-                checked={selected.size === segments.length && segments.length > 0}
-                onChange={selectAll}
-                aria-label="Select all segments"
-              />
-              {selected.size > 0 ? `${selected.size} selected` : 'Select all'}
-            </label>
-            {selected.size > 0 && (
-              <select
-                className={styles.selectSmall}
-                defaultValue=""
-                onChange={(e) => {
-                  bulkAssign(e.target.value);
-                  e.target.value = '';
-                }}
-                aria-label="Assign provider to selected segments"
+      {/* Step 1: Create / Select */}
+      {activeStep === 'create' && (
+        <div className={styles.stepContent}>
+          {/* Create Demo section */}
+          <fieldset className={styles.fieldset}>
+            <legend className={styles.legend}>Create Demo</legend>
+            {!showCreateForm ? (
+              <button
+                type="button"
+                className={styles.btnPrimary}
+                onClick={() => setShowCreateForm(true)}
               >
-                <option value="" disabled>Assign provider…</option>
-                {providers.map((p) => (
-                  <option key={p.id} value={p.id}>{p.displayName}</option>
-                ))}
-              </select>
-            )}
-          </div>
-
-          {/* Segment list */}
-          <div className={styles.segmentList} role="list" aria-label="Podcast segments">
-            {segments.map((seg) => {
-              const boundary = getBoundaryAfter(seg.id);
-              return (
-                <div key={seg.id}>
-                  <div
-                    className={styles.segmentCard}
-                    role="listitem"
-                    data-has-provider={!!seg.ttsProvider}
-                  >
-                    <div className={styles.segmentHeader}>
-                      <input
-                        type="checkbox"
-                        checked={selected.has(seg.id)}
-                        onChange={() => toggleSelect(seg.id)}
-                        aria-label={`Select segment ${seg.order}`}
-                      />
-                      <span className={styles.segmentOrder}>#{seg.order}</span>
-                      <span className={styles.segmentSpeaker}>{seg.speaker}</span>
-                      {seg.ttsProvider && (
-                        <span
-                          className={styles.providerBadge}
-                          style={{ backgroundColor: PROVIDER_COLORS[seg.ttsProvider] ?? '#6b7280' }}
-                        >
-                          {providerMap[seg.ttsProvider]?.displayName ?? seg.ttsProvider}
-                        </span>
-                      )}
-                      {seg.audioUrl && (
-                        <span className={styles.audioBadge}>Has Audio</span>
-                      )}
-                    </div>
-
-                    <p className={styles.segmentText}>
-                      {seg.text.length > 150 ? `${seg.text.slice(0, 150)}…` : seg.text}
-                    </p>
-
-                    <div className={styles.segmentControls}>
-                      <select
-                        className={styles.selectSmall}
-                        value={seg.ttsProvider ?? ''}
-                        onChange={(e) => handleProviderChange(seg.id, e.target.value)}
-                        aria-label={`Provider for segment ${seg.order}`}
-                      >
-                        <option value="">— Provider —</option>
-                        {providers.map((p) => (
-                          <option key={p.id} value={p.id}>{p.displayName}</option>
-                        ))}
-                      </select>
-
-                      {seg.ttsProvider && providerMap[seg.ttsProvider] && (
-                        <select
-                          className={styles.selectSmall}
-                          value={seg.ttsModel ?? ''}
-                          onChange={(e) => updateSegment(seg.id, 'ttsModel', e.target.value || null)}
-                          aria-label={`Model for segment ${seg.order}`}
-                        >
-                          <option value="">Default model</option>
-                          {providerMap[seg.ttsProvider].models.map((m) => (
-                            <option key={m.id} value={m.id}>{m.displayName}</option>
-                          ))}
-                        </select>
-                      )}
-
-                      {seg.ttsProvider && voiceCache[seg.ttsProvider] && (
-                        <select
-                          className={styles.selectSmall}
-                          value={seg.ttsVoiceId ?? ''}
-                          onChange={(e) => updateSegment(seg.id, 'ttsVoiceId', e.target.value || null)}
-                          aria-label={`Voice for segment ${seg.order}`}
-                        >
-                          <option value="">Auto-assign voice</option>
-                          {voiceCache[seg.ttsProvider].map((v) => (
-                            <option key={v.id} value={v.id}>
-                              {v.name}{v.gender ? ` (${v.gender})` : ''}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Provider boundary indicator */}
-                  {boundary && (
-                    <div className={styles.boundary} aria-label="Provider transition boundary">
-                      <span
-                        className={styles.boundaryDot}
-                        style={{ backgroundColor: PROVIDER_COLORS[boundary.fromProvider ?? ''] ?? '#6b7280' }}
-                      />
-                      <span className={styles.boundaryLine} />
-                      <span className={styles.boundaryLabel}>
-                        {providerMap[boundary.fromProvider ?? '']?.displayName ?? boundary.fromProvider}
-                        {' → '}
-                        {providerMap[boundary.toProvider ?? '']?.displayName ?? boundary.toProvider}
-                      </span>
-                      <span className={styles.boundaryLine} />
-                      <span
-                        className={styles.boundaryDot}
-                        style={{ backgroundColor: PROVIDER_COLORS[boundary.toProvider ?? ''] ?? '#6b7280' }}
-                      />
-                    </div>
-                  )}
+                Create Demo Podcast
+              </button>
+            ) : (
+              <div className={styles.createForm}>
+                <div className={styles.formField}>
+                  <label className={styles.formLabel} htmlFor="demo-topic">
+                    Topic *
+                  </label>
+                  <textarea
+                    id="demo-topic"
+                    className={styles.textarea}
+                    value={createTopic}
+                    onChange={(e) => setCreateTopic(e.target.value)}
+                    placeholder="e.g., How Sotto turns any conversation into a podcast"
+                    rows={2}
+                    maxLength={500}
+                  />
                 </div>
-              );
-            })}
-          </div>
 
-          {/* Actions bar */}
-          <div className={styles.actions}>
-            <button
-              type="button"
-              className={styles.btnPrimary}
-              onClick={saveAssignments}
-              disabled={status === 'saving' || status === 'generating'}
+                <div className={styles.formField}>
+                  <label className={styles.formLabel} htmlFor="demo-title">
+                    Title (optional)
+                  </label>
+                  <input
+                    id="demo-title"
+                    type="text"
+                    className={styles.input}
+                    value={createTitle}
+                    onChange={(e) => setCreateTitle(e.target.value)}
+                    placeholder="Auto-generated from topic if blank"
+                    maxLength={200}
+                  />
+                </div>
+
+                <div className={styles.formField}>
+                  <label className={styles.formLabel}>
+                    Duration: {createDuration} min
+                  </label>
+                  <input
+                    type="range"
+                    className={styles.slider}
+                    min={1}
+                    max={3}
+                    step={0.5}
+                    value={createDuration}
+                    onChange={(e) => setCreateDuration(Number(e.target.value))}
+                    aria-label="Duration target in minutes"
+                  />
+                </div>
+
+                <div className={styles.formField}>
+                  <label className={styles.formLabel}>Feature Focus</label>
+                  <div className={styles.featureGrid}>
+                    {FEATURE_OPTIONS.map((f) => (
+                      <label key={f.slug} className={styles.featureChip} data-selected={createFeatures.has(f.slug)}>
+                        <input
+                          type="checkbox"
+                          checked={createFeatures.has(f.slug)}
+                          onChange={() => toggleFeature(f.slug)}
+                          className={styles.hiddenCheckbox}
+                        />
+                        {f.label}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div className={styles.formActions}>
+                  <button
+                    type="button"
+                    className={styles.btnPrimary}
+                    onClick={createDemo}
+                    disabled={!createTopic.trim() || status === 'creating'}
+                  >
+                    {status === 'creating' ? 'Creating...' : 'Create Demo'}
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.btnGhost}
+                    onClick={() => setShowCreateForm(false)}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </fieldset>
+
+          {/* Podcast selector */}
+          <fieldset className={styles.fieldset}>
+            <legend className={styles.legend}>Select Podcast</legend>
+            <select
+              className={styles.select}
+              value={selectedPodcastId}
+              onChange={(e) => handlePodcastSelect(e.target.value)}
+              aria-label="Select a podcast"
             >
-              {status === 'saving' ? 'Saving…' : 'Save Assignments'}
-            </button>
-            <button
-              type="button"
-              className={styles.btnSecondary}
-              onClick={generateAudio}
-              disabled={status === 'saving' || status === 'generating'}
-            >
-              {status === 'generating' ? 'Generating…' : 'Generate Audio'}
-            </button>
-            <button
-              type="button"
-              className={styles.btnSecondary}
-              onClick={generateVideo}
-              disabled={status === 'saving' || status === 'generating'}
-            >
-              Generate Video
-            </button>
+              <option value="">— Choose a podcast —</option>
+              {podcasts.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.title} ({p.segmentCount} segments, {p.status})
+                </option>
+              ))}
+            </select>
+          </fieldset>
+
+          {/* Selected podcast info */}
+          {selectedPodcast && (
+            <div className={styles.podcastInfo}>
+              <h3 className={styles.podcastTitle}>{selectedPodcast.title}</h3>
+              <div className={styles.podcastMeta}>
+                <span className={styles.statusBadge} data-status={selectedPodcast.status}>
+                  {selectedPodcast.status.replace(/_/g, ' ')}
+                </span>
+                <span className={styles.metaItem}>{selectedPodcast.segmentCount} segments</span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Step 2: Script Review */}
+      {activeStep === 'script' && selectedPodcastId && (
+        <div className={styles.stepContent}>
+          <ScriptReviewPanel
+            podcastId={selectedPodcastId}
+            podcastStatus={selectedPodcast?.status ?? ''}
+            onStatusChange={handleStatusChange}
+          />
+        </div>
+      )}
+
+      {/* Step 3: Voices — existing per-segment TTS assignment */}
+      {activeStep === 'voices' && selectedPodcastId && (
+        <div className={styles.stepContent}>
+          {segments.length > 0 ? (
+            <>
+              {/* Range assignment toolbar */}
+              <div className={styles.toolbar}>
+                <label className={styles.toolbarLabel}>
+                  <input
+                    type="checkbox"
+                    checked={selected.size === segments.length && segments.length > 0}
+                    onChange={selectAll}
+                    aria-label="Select all segments"
+                  />
+                  {selected.size > 0 ? `${selected.size} selected` : 'Select all'}
+                </label>
+                {selected.size > 0 && (
+                  <select
+                    className={styles.selectSmall}
+                    defaultValue=""
+                    onChange={(e) => {
+                      bulkAssign(e.target.value);
+                      e.target.value = '';
+                    }}
+                    aria-label="Assign provider to selected segments"
+                  >
+                    <option value="" disabled>Assign provider...</option>
+                    {providers.map((p) => (
+                      <option key={p.id} value={p.id}>{p.displayName}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              {/* Segment list */}
+              <div className={styles.segmentList} role="list" aria-label="Podcast segments">
+                {segments.map((seg) => {
+                  const boundary = getBoundaryAfter(seg.id);
+                  return (
+                    <div key={seg.id}>
+                      <div
+                        className={styles.segmentCard}
+                        role="listitem"
+                        data-has-provider={!!seg.ttsProvider}
+                      >
+                        <div className={styles.segmentHeader}>
+                          <input
+                            type="checkbox"
+                            checked={selected.has(seg.id)}
+                            onChange={() => toggleSelect(seg.id)}
+                            aria-label={`Select segment ${seg.order}`}
+                          />
+                          <span className={styles.segmentOrder}>#{seg.order}</span>
+                          <span className={styles.segmentSpeaker}>{seg.speaker}</span>
+                          {seg.ttsProvider && (
+                            <span
+                              className={styles.providerBadge}
+                              style={{ backgroundColor: PROVIDER_COLORS[seg.ttsProvider] ?? '#6b7280' }}
+                            >
+                              {providerMap[seg.ttsProvider]?.displayName ?? seg.ttsProvider}
+                            </span>
+                          )}
+                          {seg.audioUrl && (
+                            <span className={styles.audioBadge}>Has Audio</span>
+                          )}
+                        </div>
+
+                        <p className={styles.segmentText}>
+                          {seg.text.length > 150 ? `${seg.text.slice(0, 150)}...` : seg.text}
+                        </p>
+
+                        <div className={styles.segmentControls}>
+                          <select
+                            className={styles.selectSmall}
+                            value={seg.ttsProvider ?? ''}
+                            onChange={(e) => handleProviderChange(seg.id, e.target.value)}
+                            aria-label={`Provider for segment ${seg.order}`}
+                          >
+                            <option value="">— Provider —</option>
+                            {providers.map((p) => (
+                              <option key={p.id} value={p.id}>{p.displayName}</option>
+                            ))}
+                          </select>
+
+                          {seg.ttsProvider && providerMap[seg.ttsProvider] && (
+                            <select
+                              className={styles.selectSmall}
+                              value={seg.ttsModel ?? ''}
+                              onChange={(e) => updateSegment(seg.id, 'ttsModel', e.target.value || null)}
+                              aria-label={`Model for segment ${seg.order}`}
+                            >
+                              <option value="">Default model</option>
+                              {providerMap[seg.ttsProvider].models.map((m) => (
+                                <option key={m.id} value={m.id}>{m.displayName}</option>
+                              ))}
+                            </select>
+                          )}
+
+                          {seg.ttsProvider && voiceCache[seg.ttsProvider] && (
+                            <select
+                              className={styles.selectSmall}
+                              value={seg.ttsVoiceId ?? ''}
+                              onChange={(e) => updateSegment(seg.id, 'ttsVoiceId', e.target.value || null)}
+                              aria-label={`Voice for segment ${seg.order}`}
+                            >
+                              <option value="">Auto-assign voice</option>
+                              {voiceCache[seg.ttsProvider].map((v) => (
+                                <option key={v.id} value={v.id}>
+                                  {v.name}{v.gender ? ` (${v.gender})` : ''}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Provider boundary indicator */}
+                      {boundary && (
+                        <div className={styles.boundary} aria-label="Provider transition boundary">
+                          <span
+                            className={styles.boundaryDot}
+                            style={{ backgroundColor: PROVIDER_COLORS[boundary.fromProvider ?? ''] ?? '#6b7280' }}
+                          />
+                          <span className={styles.boundaryLine} />
+                          <span className={styles.boundaryLabel}>
+                            {providerMap[boundary.fromProvider ?? '']?.displayName ?? boundary.fromProvider}
+                            {' → '}
+                            {providerMap[boundary.toProvider ?? '']?.displayName ?? boundary.toProvider}
+                          </span>
+                          <span className={styles.boundaryLine} />
+                          <span
+                            className={styles.boundaryDot}
+                            style={{ backgroundColor: PROVIDER_COLORS[boundary.toProvider ?? ''] ?? '#6b7280' }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Actions bar */}
+              <div className={styles.actions}>
+                <button
+                  type="button"
+                  className={styles.btnPrimary}
+                  onClick={saveAssignments}
+                  disabled={status === 'saving' || status === 'generating'}
+                >
+                  {status === 'saving' ? 'Saving...' : 'Save Assignments'}
+                </button>
+                <button
+                  type="button"
+                  className={styles.btnSecondary}
+                  onClick={generateAudio}
+                  disabled={status === 'saving' || status === 'generating'}
+                >
+                  {status === 'generating' ? 'Generating...' : 'Generate Audio'}
+                </button>
+                <button
+                  type="button"
+                  className={styles.btnSecondary}
+                  onClick={generateVideo}
+                  disabled={status === 'saving' || status === 'generating'}
+                >
+                  Generate Video
+                </button>
+              </div>
+            </>
+          ) : (
+            <p className={styles.emptyStep}>No segments loaded. Approve the script first to create segments.</p>
+          )}
+        </div>
+      )}
+
+      {/* Step 4: Visuals — Pipeline editor */}
+      {activeStep === 'visuals' && selectedPodcastId && (
+        <div className={styles.stepContent}>
+          <VisualPipelinePanel podcastId={selectedPodcastId} />
+        </div>
+      )}
+
+      {/* Step 5: Avatars — Placeholder */}
+      {activeStep === 'avatars' && (
+        <div className={styles.stepContent}>
+          <div className={styles.placeholderStep}>
+            <h3 className={styles.placeholderTitle}>Avatar Configuration</h3>
+            <p className={styles.placeholderText}>Coming in Phase 3 — configure avatar appearance and behavior for each speaker.</p>
           </div>
-        </>
+        </div>
+      )}
+
+      {/* Step 6: Generate — Placeholder */}
+      {activeStep === 'generate' && (
+        <div className={styles.stepContent}>
+          <div className={styles.placeholderStep}>
+            <h3 className={styles.placeholderTitle}>Generate Video</h3>
+            <p className={styles.placeholderText}>Coming soon — trigger video generation and track progress.</p>
+          </div>
+        </div>
+      )}
+
+      {/* Step 7: Preview — Placeholder */}
+      {activeStep === 'preview' && (
+        <div className={styles.stepContent}>
+          <div className={styles.placeholderStep}>
+            <h3 className={styles.placeholderTitle}>Preview & Publish</h3>
+            <p className={styles.placeholderText}>Coming in Phase 4 — preview generated video and publish to feed.</p>
+          </div>
+        </div>
       )}
 
       {/* Status banner */}
