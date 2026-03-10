@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
     return errorResponse(parsed.error.issues[0].message, 400);
   }
 
-  const { title, description, features, durationTarget, aiModel, defaultTtsProvider, defaultTtsModel, defaultTtsVoiceId } = parsed.data;
+  const { title, description, features, durationTarget, aiModel, defaultTtsProvider, defaultTtsModel, defaultTtsVoiceId, showcaseProviders } = parsed.data;
 
   const project = await prisma.demoProject.create({
     data: {
@@ -41,6 +41,7 @@ export async function POST(request: NextRequest) {
       defaultTtsProvider,
       defaultTtsModel,
       defaultTtsVoiceId,
+      showcaseProviders: showcaseProviders ?? [],
     },
   });
 

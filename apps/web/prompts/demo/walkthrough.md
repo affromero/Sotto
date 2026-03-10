@@ -69,6 +69,10 @@ Each action has a `type` field. Valid types:
 - `keypress` — `{ type: "keypress", key: "Enter" }` — Press a key
 - `screenshot` — `{ type: "screenshot", label?: "..." }` — Capture a still frame
 
+## Voice Comparison
+
+{{VOICE_COMPARISON}}
+
 ## Guidelines
 
 1. **Start with an intercept** before any action that triggers an API call, so the demo doesn't depend on real processing.

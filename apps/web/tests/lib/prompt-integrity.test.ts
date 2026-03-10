@@ -127,7 +127,7 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
   ].sort(),
   'demo/walkthrough.md': [
     'APP_SELECTORS', 'DURATION_TARGET', 'FEATURES',
-    'INTERCEPTOR_CATALOG', 'PRODUCT_CONTEXT',
+    'INTERCEPTOR_CATALOG', 'PRODUCT_CONTEXT', 'VOICE_COMPARISON',
   ].sort(),
 };
 

@@ -24,6 +24,7 @@ export const createDemoProjectSchema = z.object({
   defaultTtsProvider: z.string().max(50).optional(),
   defaultTtsModel: z.string().max(100).optional(),
   defaultTtsVoiceId: z.string().max(200).optional(),
+  showcaseProviders: z.array(z.string().max(50)).max(10).optional(),
 });
 
 /**
