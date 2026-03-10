@@ -6,7 +6,7 @@ const DEFAULT_RESUME_DELAY = 3000;
 
 const SCROLL_INPUT_EVENTS = ['wheel', 'touchstart'] as const;
 
-function isScrollable(el: HTMLElement): boolean {
+export function isScrollable(el: HTMLElement): boolean {
   if (el.scrollHeight <= el.clientHeight) return false;
   const overflow = getComputedStyle(el).overflowY;
   return overflow === 'auto' || overflow === 'scroll';
