@@ -1,8 +1,7 @@
 'use client';
 
 import { usePlayer } from '@/components/providers/AudioPlayerProvider';
-import { LottieAnimation } from '@/components/ui/LottieAnimation';
-import miniWaveform from '../../../public/lottie/mini-waveform.json';
+import { WaveformBars } from '@/components/ui/WaveformBars';
 import styles from './MiniPlayer.module.css';
 
 interface MiniPlayerProps {
@@ -26,11 +25,7 @@ export function MiniPlayer({ podcastTitle, onExpand, onClose }: MiniPlayerProps)
         <button className={styles.artworkButton} onClick={onExpand} aria-label="Expand player">
           <div className={styles.artwork}>
             {player.isPlaying ? (
-              <LottieAnimation
-                animationData={miniWaveform}
-                className={styles.artworkWaveform}
-                ariaHidden
-              />
+              <WaveformBars className={styles.artworkWaveform} />
             ) : (
               <span className={styles.artworkLetter}>
                 {podcastTitle?.charAt(0).toUpperCase() || 'P'}

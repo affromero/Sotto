@@ -3,8 +3,7 @@
 import { useMemo } from 'react';
 import { Check, AlertCircle, Pause, ShieldCheck } from 'lucide-react';
 import { useRotatingMessage } from '@/lib/hooks/useRotatingMessage';
-import { LottieAnimation } from '@/components/ui/LottieAnimation';
-import sottoLoader from '../../../public/lottie/sotto-loader.json';
+import { SottoSpinner } from '@/components/ui/SottoSpinner';
 import styles from './GenerationProgress.module.css';
 
 const VERIFICATION_STAGES = new Set(['VERIFYING_SCRIPT', 'VALIDATING_REFERENCES']);
@@ -90,11 +89,7 @@ export function GenerationProgress({ status, progress, error, topic }: Generatio
           ) : progress !== undefined && isActive ? (
             <span className={styles.orbPercent}>{Math.round(progress)}%</span>
           ) : (
-            <LottieAnimation
-              animationData={sottoLoader}
-              className={styles.orbLottie}
-              ariaHidden
-            />
+            <SottoSpinner className={styles.orbLottie} />
           )}
         </div>
       </div>
