@@ -68,8 +68,10 @@ export function VideoView({
     return () => observer.disconnect();
   }, []);
 
-  const readyOverlays = useMemo(
-    () => (avatarOverlays ?? []).filter((o) => o.status === 'ready' && o.videoUrl),
+  const playableOverlays = useMemo(
+    () => (avatarOverlays ?? []).filter(
+      (o) => (o.status === 'ready' && o.videoUrl) || (o.chunkVideoUrl && o.status !== 'failed'),
+    ),
     [avatarOverlays],
   );
 
@@ -158,7 +160,7 @@ export function VideoView({
           controls={false}
           aria-label={title ? `Video for ${title}` : 'Podcast video'}
         />
-        {isOwner && readyOverlays.length > 0 && onAvatarsVisibleChange && (
+        {isOwner && playableOverlays.length > 0 && onAvatarsVisibleChange && (
           <button
             className={styles.avatarToggle}
             onClick={() => onAvatarsVisibleChange(!avatarsVisible)}
@@ -168,10 +170,12 @@ export function VideoView({
             {avatarsVisible ? 'Hide Avatars' : 'Show Avatars'}
           </button>
         )}
-        {avatarsVisible && containerSize.width > 0 && readyOverlays.map((overlay) => (
+        {avatarsVisible && containerSize.width > 0 && playableOverlays.map((overlay) => (
           <AvatarOverlay
             key={overlay.id}
-            videoUrl={overlay.videoUrl!}
+            videoUrl={overlay.videoUrl ?? overlay.chunkVideoUrl!}
+            maxDuration={overlay.videoUrl ? undefined : (overlay.chunkDurationSeconds ?? undefined)}
+            streaming={!overlay.videoUrl && !!overlay.chunkVideoUrl}
             speaker={overlay.speaker}
             posX={overlay.posX}
             posY={overlay.posY}
@@ -186,9 +190,9 @@ export function VideoView({
             onPositionChange={(pos) => onAvatarPositionChange?.(overlay.speaker, pos)}
           />
         ))}
-        {isOwner && avatarsVisible && readyOverlays.length > 0 && onMaskShapeChange && (
+        {isOwner && avatarsVisible && playableOverlays.length > 0 && onMaskShapeChange && (
           <div className={styles.shapePicker}>
-            {readyOverlays.map((overlay) => (
+            {playableOverlays.map((overlay) => (
               <div key={overlay.id} className={styles.shapePickerRow}>
                 <button
                   className={styles.shapePickerToggle}
