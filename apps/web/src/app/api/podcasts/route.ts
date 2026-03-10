@@ -239,6 +239,10 @@ export async function POST(request: NextRequest) {
 
   const verificationMode = parsed.data.metadata?.verificationMode ?? 'standard';
 
+  if (verificationMode === 'showcase' && !isAdmin) {
+    return errorResponse('Showcase verification mode is admin-only.', 403);
+  }
+
   // Compute auto-resolution flags
   const aiAutoResolved = !parsed.data.aiModel && !!autoResolvedAiModel;
   const ttsAutoResolved = !parsed.data.ttsProvider && !parsed.data.ttsModel && !!autoResolvedTtsProvider;

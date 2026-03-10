@@ -300,7 +300,7 @@ model Podcast {
   ttsModel        String? // e.g. 'eleven_v3', 'tts-1-hd', 'sonic-2', 'premium', 'octave'
   aiProvider      String?  // 'anthropic' | 'openai'
   aiModel         String?  // e.g. 'claude-sonnet-4-5-20250929', 'claude-opus-4-6'
-  verificationMode String  @default("standard") // standard, relaxed
+  verificationMode String  @default("standard") // standard, relaxed, showcase
   aiAutoResolved  Boolean @default(false)
   ttsAutoResolved Boolean @default(false)
   sttProvider     String? // null = auto; 'openai' | 'elevenlabs' | 'together' | 'deepgram' | 'assemblyai'
