@@ -75,3 +75,28 @@ export function getMusicModelProvider(modelId: string): MusicProviderId | null {
   }
   return null;
 }
+
+/** Client-safe metadata for settings UI. */
+export interface MusicProviderClientMeta {
+  id: MusicProviderId;
+  displayName: string;
+  getApiKeyUrl: string;
+  /** Note shown below the provider name (e.g. "unofficial"). */
+  note?: string;
+  models: MusicModelOption[];
+}
+
+/** Only providers that support BYOK key entry (not ElevenLabs — already in TTS). */
+const MUSIC_BYOK_CLIENT_META: MusicProviderClientMeta[] = [
+  {
+    id: 'suno',
+    displayName: 'Suno',
+    getApiKeyUrl: 'https://sunoapi.org/dashboard',
+    note: 'Unofficial third-party API',
+    models: MUSIC_PROVIDERS.suno.models,
+  },
+];
+
+export function getMusicByokProviderMeta(): MusicProviderClientMeta[] {
+  return MUSIC_BYOK_CLIENT_META;
+}

@@ -402,7 +402,7 @@ export const userSearchSchema = z.object({
  * BYOK API key validation (multi-provider)
  */
 export const byokSchema = z.object({
-  provider: z.enum(['elevenlabs', 'openai', 'cartesia', 'hume', 'fal', 'replicate']),
+  provider: z.enum(['elevenlabs', 'openai', 'cartesia', 'hume', 'fal', 'replicate', 'suno']),
   apiKey: z.string().min(10).max(500),
 });
 

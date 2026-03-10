@@ -101,6 +101,44 @@
   }
 }
 
+.modelSelect {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 8px;
+  background: var(--color-surface, #fff);
+  color: var(--color-text, #1a1a1a);
+  font-size: 0.875rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M3 4.5L6 7.5L9 4.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.5rem center;
+  padding-right: 1.75rem;
+  min-width: 0;
+}
+
+.modelSelect:hover {
+  border-color: var(--color-primary, #d97706);
+}
+
+.modelSelect:focus-visible {
+  outline: 2px solid var(--color-primary, #d97706);
+  outline-offset: 2px;
+}
+
+.modelSelect:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.noProviders {
+  color: var(--color-text-secondary, #6b7280);
+  font-size: 0.8125rem;
+  margin: 0;
+}
+
 .error {
   color: #dc2626;
   font-size: 0.8125rem;
