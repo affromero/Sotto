@@ -175,6 +175,17 @@ export default function SettingsScreen() {
               <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>Connected Accounts</Text>
               <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
             </Pressable>
+            <View style={styles.rowSeparator} />
+            <Pressable
+              style={({ pressed }) => [
+                styles.row,
+                pressed && styles.rowPressed,
+              ]}
+              onPress={() => router.push('/settings/voices')}
+            >
+              <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>Voice Clones</Text>
+              <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+            </Pressable>
           </View>
         </View>
 
