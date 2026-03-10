@@ -4,6 +4,7 @@ import { ONBOARDING_TAG_SLUGS } from '@/lib/tag-icons';
 import { listByokProviders, listAiProviders } from '@/lib/byok';
 import { getAllAiProviderClientMeta } from '@/lib/providers/ai-registry';
 import { getAllTtsProviderClientMeta } from '@/lib/providers/tts-registry';
+import { getMusicByokProviderMeta } from '@/lib/providers/music-registry';
 import { getReferralBonus, getActiveReferralCount } from '@/lib/referrals';
 import { SettingsForm } from './SettingsForm';
 import styles from './page.module.css';
@@ -95,6 +96,8 @@ export default async function SettingsPage() {
   const configuredAiProviders = aiKeys.map((k) => ({ provider: k.provider, isValid: k.isValid }));
   const aiProviderMeta = getAllAiProviderClientMeta();
   const ttsProviderMeta = getAllTtsProviderClientMeta();
+  const musicProviderMeta = getMusicByokProviderMeta();
+  const configuredMusicProviders = configuredProviders.filter((p) => p.provider === 'suno');
   const isTwitterProviderAvailable = !!process.env.TWITTER_CLIENT_ID && !!process.env.TWITTER_CLIENT_SECRET;
 
   return (
@@ -123,6 +126,8 @@ export default async function SettingsPage() {
         configuredAiProviders={configuredAiProviders}
         aiProviderMeta={aiProviderMeta}
         ttsProviderMeta={ttsProviderMeta}
+        musicProviderMeta={musicProviderMeta}
+        configuredMusicProviders={configuredMusicProviders}
         isTwitterProviderAvailable={isTwitterProviderAvailable}
         initialEmailNotifications={user.emailNotifications}
         initialPushNotifications={user.pushNotifications}
