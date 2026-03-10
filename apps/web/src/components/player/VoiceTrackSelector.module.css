@@ -54,11 +54,20 @@
   white-space: nowrap;
   transition: all 0.15s ease;
   min-height: 44px;
+  box-shadow: var(--shadow-xs);
 }
 
 .pill:hover {
   border-color: var(--color-primary);
   background: var(--color-primary-light, #FEF3C7);
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pill:hover {
+    transform: none;
+  }
 }
 
 .pillActive {
@@ -119,13 +128,15 @@
 /* Add pill */
 .addPill {
   composes: pill;
-  border-style: dashed;
+  border-color: transparent;
+  background: var(--color-primary-subtle);
   color: var(--color-text-secondary);
 }
 
 .addPill:hover {
   color: var(--color-primary);
-  border-color: var(--color-primary);
+  background: var(--color-primary-light, #FEF3C7);
+  border-color: transparent;
 }
 
 .proposalCount {

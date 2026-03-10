@@ -306,10 +306,10 @@
 /* Player Section */
 
 .playerSection {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-xl);
-  padding: var(--spacing-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  padding: 0 var(--spacing-lg);
 }
 
 /* Actions Row */
@@ -546,6 +546,10 @@
   align-items: center;
   gap: var(--spacing-sm);
   flex-wrap: wrap;
+  padding: var(--spacing-md);
+  background: var(--color-surface);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-xs);
 }
 
 .videoFailed {
@@ -618,7 +622,7 @@
   }
 
   .playerSection {
-    padding: var(--spacing-md);
+    padding: 0 var(--spacing-md);
   }
 
   .failedState {
