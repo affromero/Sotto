@@ -316,6 +316,15 @@
   gap: var(--space-1);
 }
 
+.compact .topic,
+.compact .coverTags {
+  display: none;
+}
+
+.compact .title {
+  -webkit-line-clamp: 2;
+}
+
 /* Hide fork button text on compact variant */
 .compact .forkButton {
   bottom: calc(var(--space-2) + 20px);
@@ -336,11 +345,11 @@
   }
 
   .cover {
-    height: 100px;
+    height: 120px;
   }
 
   .featured .cover {
-    height: 130px;
+    height: 140px;
   }
 }
 
