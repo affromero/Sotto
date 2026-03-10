@@ -60,7 +60,7 @@ export interface ProviderBannerConfig {
 }
 
 export interface AvatarConfig {
-  videoUrl: string;              // pre-generated avatar clip (R2 URL)
+  videoUrl?: string;             // pre-generated avatar clip (R2 URL), filled post-generation
   posX?: number;                 // 0.0-1.0, default 0.72
   posY?: number;                 // default 0.05
   width?: number;                // default 0.25
@@ -119,7 +119,7 @@ const providerBannerConfigSchema = z.object({
 });
 
 const avatarConfigSchema = z.object({
-  videoUrl: z.string().url(),
+  videoUrl: z.string().url().optional(),
   posX: z.number().min(0).max(1).optional(),
   posY: z.number().min(0).max(1).optional(),
   width: z.number().min(0.05).max(1).optional(),
