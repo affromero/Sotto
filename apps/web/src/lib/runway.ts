@@ -53,6 +53,7 @@ export interface RunwayAvatar {
 export type RunwayPresetId =
   | 'influencer'
   | 'game-character'
+  | 'game-character-man'
   | 'music-superstar'
   | 'cat-character'
   | 'tennis-coach'
@@ -107,15 +108,24 @@ export async function listRunwayAvatars(apiKey: string): Promise<RunwayAvatar[]>
   return avatars;
 }
 
+/** Runway's CDN base for preset avatar images. */
+const RUNWAY_PRESET_CDN = 'https://runway-static-assets.s3.us-east-1.amazonaws.com/calliope-demo/presets-3-3';
+
+/** Fallback thumbnail for presets without official portal images (API-only presets). */
+const RUNWAY_PLACEHOLDER = 'https://d3phaj0sisr2ct.cloudfront.net/devportal/models-v2/gwm-1-avatars.jpg';
+
 const RUNWAY_PRESETS: Array<{ id: RunwayPresetId; name: string; previewImageUrl: string }> = [
-  { id: 'influencer', name: 'Influencer', previewImageUrl: 'https://storage.dev.runwayml.com/presets/influencer.png' },
-  { id: 'game-character', name: 'Game Character', previewImageUrl: 'https://storage.dev.runwayml.com/presets/game-character.png' },
-  { id: 'music-superstar', name: 'Music Superstar', previewImageUrl: 'https://storage.dev.runwayml.com/presets/music-superstar.png' },
-  { id: 'cat-character', name: 'Cat Character', previewImageUrl: 'https://storage.dev.runwayml.com/presets/cat-character.png' },
-  { id: 'tennis-coach', name: 'Tennis Coach', previewImageUrl: 'https://storage.dev.runwayml.com/presets/tennis-coach.png' },
-  { id: 'human-resource', name: 'Human Resource', previewImageUrl: 'https://storage.dev.runwayml.com/presets/human-resource.png' },
-  { id: 'fashion-designer', name: 'Fashion Designer', previewImageUrl: 'https://storage.dev.runwayml.com/presets/fashion-designer.png' },
-  { id: 'cooking-teacher', name: 'Cooking Teacher', previewImageUrl: 'https://storage.dev.runwayml.com/presets/cooking-teacher.png' },
+  // 4 portal presets — real thumbnails from Runway CDN
+  { id: 'cat-character', name: 'Mochi — Animal Character', previewImageUrl: `${RUNWAY_PRESET_CDN}/InApp_Avatar_4_input.png` },
+  { id: 'music-superstar', name: 'Mina — Music Superstar', previewImageUrl: `${RUNWAY_PRESET_CDN}/InApp_Avatar_2.png` },
+  { id: 'fashion-designer', name: 'Sofia — Fashion Designer', previewImageUrl: `${RUNWAY_PRESET_CDN}/Dev-Avatar-3_input.png` },
+  { id: 'cooking-teacher', name: 'Marco — Cooking Teacher', previewImageUrl: `${RUNWAY_PRESET_CDN}/Dev-Avatar-4.png` },
+  // 5 API-only presets — valid via Runway API but no official portal thumbnails
+  { id: 'influencer', name: 'Influencer', previewImageUrl: RUNWAY_PLACEHOLDER },
+  { id: 'game-character', name: 'Game Character', previewImageUrl: RUNWAY_PLACEHOLDER },
+  { id: 'game-character-man', name: 'Game Character (Male)', previewImageUrl: RUNWAY_PLACEHOLDER },
+  { id: 'tennis-coach', name: 'Tennis Coach', previewImageUrl: RUNWAY_PLACEHOLDER },
+  { id: 'human-resource', name: 'Human Resource', previewImageUrl: RUNWAY_PLACEHOLDER },
 ];
 
 /** Static list of Runway preset avatars — no API call needed. */
