@@ -244,7 +244,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
       logger.info('Script duration adjusted', { podcastId });
     }
 
-    if (references.length > 0) {
+    if (references.length > 0 && verificationMode !== 'showcase') {
       await prisma.podcast.update({
         where: { id: podcastId },
         data: { status: 'VALIDATING_REFERENCES' },

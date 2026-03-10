@@ -354,6 +354,40 @@ describe('processScriptVerification', () => {
     });
   });
 
+  describe('verification pass — showcase mode skips reference validation', () => {
+    beforeEach(() => {
+      mockPrismaPodcastFindUniqueOrThrow
+        .mockResolvedValueOnce({ aiModel: null, verificationMode: 'showcase' })
+        .mockResolvedValueOnce({ source: 'WEB' });
+    });
+
+    it('skips reference validation and pauses at SCRIPT_READY', async () => {
+      const job = createMockJob(defaultPayload);
+      await processScriptVerification(job);
+
+      expect(mockAddJob).not.toHaveBeenCalledWith(
+        { name: 'reference-validation' },
+        'validate_references',
+        expect.anything()
+      );
+      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
+        where: { id: 'podcast-001' },
+        data: { status: 'SCRIPT_READY' },
+      });
+    });
+
+    it('sends SCRIPT_READY notification even with references present', async () => {
+      const job = createMockJob(defaultPayload);
+      await processScriptVerification(job);
+
+      expect(mockAddJob).toHaveBeenCalledWith(
+        { name: 'notifications' },
+        'send_notification',
+        expect.objectContaining({ type: 'SCRIPT_READY' })
+      );
+    });
+  });
+
   describe('verification pass — with duration adjustment', () => {
     const durationVerdict = {
       ...passedVerdict,
