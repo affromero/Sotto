@@ -14,9 +14,10 @@ import type {
   TimingSegment,
   TextOverlayConfig,
   ProviderBannerConfig,
-  SubtitleConfig,
   LaunchAvatarConfig,
 } from '../types';
+import { AvatarEntrance } from './effects/AvatarEntrance';
+import { SubtitleTrack as SubtitleTrackEffect } from './effects/SubtitleTrack';
 
 // ---------------------------------------------------------------------------
 // SFX base URL — served statically from the Remotion sidecar
@@ -73,12 +74,14 @@ export const LaunchScene: React.FC<LaunchSceneProps> = ({ scene, sceneIndex, fps
         <TextOverlay key={`overlay-${sceneIndex}-${i}`} config={overlay} fps={fps} />
       ))}
 
-      {/* Subtitles */}
+      {/* Subtitles — use enhanced effect component */}
       {scene.subtitles?.enabled && scene.narration && (
-        <SubtitleTrack
-          config={scene.subtitles}
+        <SubtitleTrackEffect
           narration={scene.narration}
-          durationInFrames={durationInFrames}
+          style={scene.subtitles.style}
+          position={scene.subtitles.position}
+          fontSize={scene.subtitles.fontSize}
+          highlightCurrentWord
         />
       )}
 
@@ -425,73 +428,6 @@ function overlayPositionStyle(position: string): React.CSSProperties {
 }
 
 // ---------------------------------------------------------------------------
-// Subtitle track — narration split into ~8-word chunks
-// ---------------------------------------------------------------------------
-
-const SubtitleTrack: React.FC<{
-  config: SubtitleConfig;
-  narration: string;
-  durationInFrames: number;
-}> = ({ config, narration, durationInFrames }) => {
-  const frame = useCurrentFrame();
-
-  const words = narration.split(/\s+/);
-  const chunkSize = 8;
-  const chunks: string[] = [];
-  for (let i = 0; i < words.length; i += chunkSize) {
-    chunks.push(words.slice(i, i + chunkSize).join(' '));
-  }
-
-  const framesPerChunk = Math.ceil(durationInFrames / chunks.length);
-  const isCinematic = config.style === 'cinematic';
-  const isTop = config.position === 'top';
-  const fontSize = config.fontSize ?? 32;
-
-  const currentChunkIndex = Math.min(Math.floor(frame / framesPerChunk), chunks.length - 1);
-
-  const FADE_FRAMES = 8;
-  const chunkStartFrame = currentChunkIndex * framesPerChunk;
-  const chunkEndFrame = chunkStartFrame + framesPerChunk;
-
-  const opacity = interpolate(
-    frame,
-    [chunkStartFrame, chunkStartFrame + FADE_FRAMES, chunkEndFrame - FADE_FRAMES, chunkEndFrame],
-    [0, 1, 1, 0],
-    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
-  );
-
-  return (
-    <div
-      style={{
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        ...(isTop ? { top: '5%' } : { bottom: '8%' }),
-        display: 'flex',
-        justifyContent: 'center',
-        opacity,
-      }}
-    >
-      <div
-        style={{
-          fontFamily: 'Inter, sans-serif',
-          fontSize,
-          fontWeight: isCinematic ? 700 : 400,
-          color: 'white',
-          textAlign: 'center',
-          maxWidth: '80%',
-          ...(isCinematic
-            ? { backgroundColor: 'rgba(0, 0, 0, 0.6)', padding: '10px 20px', borderRadius: 8 }
-            : { textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8)' }),
-        }}
-      >
-        {chunks[currentChunkIndex]}
-      </div>
-    </div>
-  );
-};
-
-// ---------------------------------------------------------------------------
 // Avatar PiP — extends existing AvatarPip pattern with timed show/hide
 // ---------------------------------------------------------------------------
 
@@ -549,12 +485,14 @@ const LaunchAvatarPip: React.FC<{
         }),
       }}
     >
-      <OffthreadVideo
-        src={config.videoUrl!}
-        style={{ width: '100%', height: '100%', objectFit: hasMask ? 'cover' : 'contain' }}
-        transparent={!hasMask}
-        muted
-      />
+      <AvatarEntrance enterAt={showFrame}>
+        <OffthreadVideo
+          src={config.videoUrl!}
+          style={{ width: '100%', height: '100%', objectFit: hasMask ? 'cover' : 'contain' }}
+          transparent={!hasMask}
+          muted
+        />
+      </AvatarEntrance>
     </div>
   );
 };
