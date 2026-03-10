@@ -1,7 +1,9 @@
-export type { VideoSegment, RenderConfig, RenderInput, VisualsInput, Branding, RenderStatusValue, VisualTypeValue, AvatarOverlayInput } from './types';
+export type { VideoSegment, RenderConfig, RenderInput, VisualsInput, Branding, RenderStatusValue, VisualTypeValue, AvatarOverlayInput, LaunchSceneInput, LaunchVideoInput, TimingSegment, ActionTimingEntry, SceneSfxConfig, ProviderBannerConfig, TextOverlayConfig, SubtitleConfig, LaunchAvatarConfig } from './types';
 export { DEFAULT_RENDER_CONFIG, DEFAULT_BRANDING, RenderStatus, VisualType } from './types';
 export { PodcastVideo } from './compositions/PodcastVideo';
 export { PodcastVisuals } from './compositions/PodcastVisuals';
+export { LaunchVideo, computeSceneLayouts } from './compositions/LaunchVideo';
+export { LaunchScene } from './compositions/LaunchScene';
 export { resolveSegmentComponent } from './compositions/segments';
 export { KenBurns } from './compositions/effects/KenBurns';
 export { SottoWatermark } from './compositions/shared/SottoWatermark';

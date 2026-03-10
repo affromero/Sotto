@@ -116,3 +116,88 @@ export const DEFAULT_BRANDING: Branding = {
   headingFont: 'DM Serif Display',
   bodyFont: 'Inter',
 };
+
+// ---------------------------------------------------------------------------
+// Launch Video types (demo/launch composition pipeline)
+// ---------------------------------------------------------------------------
+
+export interface TimingSegment {
+  start: number;
+  end: number;
+  speed: number; // 0 = skip, 1 = normal, 8 = fast
+}
+
+export interface ActionTimingEntry {
+  type: string;
+  timestampMs: number;
+  meta?: Record<string, unknown>;
+}
+
+export interface SceneSfxConfig {
+  clickSounds?: boolean;
+  typingSounds?: boolean;
+  ambientUrl?: string;
+  ambientVolume?: number;
+  cues?: Array<{ atSeconds: number; sfxUrl: string; volume?: number }>;
+}
+
+export interface ProviderBannerConfig {
+  provider: string;
+  showAtSeconds?: number;
+  hideAtSeconds?: number | null;
+  position?: 'bottom-left' | 'bottom-right' | 'top-left' | 'top-right';
+}
+
+export interface TextOverlayConfig {
+  text: string;
+  position: 'center' | 'bottom-center' | 'top-center' | 'bottom-left' | 'bottom-right';
+  showAtSeconds: number;
+  hideAtSeconds: number;
+  fontSize?: number;
+  backgroundColor?: string;
+  textColor?: string;
+}
+
+export interface SubtitleConfig {
+  enabled: boolean;
+  style?: 'default' | 'cinematic';
+  position?: 'bottom' | 'top';
+  fontSize?: number;
+}
+
+export interface LaunchAvatarConfig {
+  videoUrl?: string;
+  posX?: number;
+  posY?: number;
+  width?: number;
+  height?: number;
+  maskShape?: 'none' | 'rounded' | 'circle';
+  showAtSeconds?: number;
+  hideAtSeconds?: number | null;
+}
+
+export interface LaunchSceneInput {
+  recordingUrl: string;
+  voiceoverUrl?: string;
+  timingSegments?: TimingSegment[];
+  sfxConfig?: SceneSfxConfig;
+  actionTimingLog?: ActionTimingEntry[];
+  providerBanner?: ProviderBannerConfig;
+  overlays?: TextOverlayConfig[];
+  subtitles?: SubtitleConfig;
+  narration?: string;
+  avatarConfig?: LaunchAvatarConfig;
+  transitionUrl?: string;
+  /** Pre-calculated by worker via /probe — seconds */
+  recordingDurationSec?: number;
+  /** Pre-calculated by worker via /probe — seconds */
+  voiceoverDurationSec?: number;
+}
+
+export interface LaunchVideoInput {
+  scenes: LaunchSceneInput[];
+  backgroundMusicUrl?: string;
+  backgroundMusicVolume?: number;
+  gradeVideo?: boolean;
+  config?: RenderConfig;
+}
