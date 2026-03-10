@@ -20,7 +20,6 @@
   text-decoration: none;
   transition:
     background var(--transition-fast),
-    transform var(--transition-fast),
     box-shadow var(--transition-fast);
   box-shadow: 0 2px 8px rgba(217, 119, 6, 0.3);
 }
@@ -28,7 +27,6 @@
 .btnPrimary:hover {
   background: var(--color-primary-hover);
   color: #fff;
-  transform: translateY(-2px);
   box-shadow: 0 4px 16px rgba(217, 119, 6, 0.4);
 }
 
