@@ -1,19 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+import { authenticateRequest } from '@/lib/api-keys';
 import { prisma } from '@/lib/prisma';
 import { createCollectionSchema } from '@/lib/validations';
 import { logger } from '@/lib/logger';
 import { errorResponse } from '@/lib/api-response';
 
-export async function GET() {
-  const session = await auth();
+export async function GET(request: NextRequest) {
+  const authResult = await authenticateRequest(request);
 
-  if (!session?.user?.id) {
+  if (!authResult) {
     return errorResponse('Unauthorized', 401);
   }
 
+  const userId = authResult.userId;
+
   const collections = await prisma.collection.findMany({
-    where: { userId: session.user.id },
+    where: { userId },
     orderBy: { updatedAt: 'desc' },
     select: {
       id: true,
@@ -35,11 +37,13 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const session = await auth();
+  const authResult = await authenticateRequest(request);
 
-  if (!session?.user?.id) {
+  if (!authResult) {
     return errorResponse('Unauthorized', 401);
   }
+
+  const userId = authResult.userId;
 
   let body: unknown;
   try {
@@ -60,7 +64,7 @@ export async function POST(request: NextRequest) {
       name,
       description: description ?? null,
       isPublic: isPublic ?? true,
-      userId: session.user.id,
+      userId,
     },
     select: {
       id: true,
@@ -73,12 +77,12 @@ export async function POST(request: NextRequest) {
     },
   });
 
-  logger.info('Collection created', { collectionId: collection.id, userId: session.user.id });
+  logger.info('Collection created', { collectionId: collection.id, userId });
 
   // Fire-and-forget activity record
   prisma.activity.create({
     data: {
-      userId: session.user.id,
+      userId,
       type: 'COLLECTION_CREATED',
       targetId: collection.id,
       targetType: 'collection',

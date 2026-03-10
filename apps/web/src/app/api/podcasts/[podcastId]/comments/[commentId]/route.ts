@@ -1,19 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+import { authenticateRequest } from '@/lib/api-keys';
 import { prisma } from '@/lib/prisma';
 
 import { errorResponse } from '@/lib/api-response';
 type RouteParams = { params: Promise<{ podcastId: string; commentId: string }> };
 
-export async function DELETE(_request: NextRequest, { params }: RouteParams) {
+export async function DELETE(request: NextRequest, { params }: RouteParams) {
   const { podcastId, commentId } = await params;
-  const session = await auth();
+  const authResult = await authenticateRequest(request);
 
-  if (!session?.user?.id) {
+  if (!authResult) {
     return errorResponse('Unauthorized', 401);
   }
 
-  const userId = session.user.id;
+  const userId = authResult.userId;
 
   const comment = await prisma.comment.findUnique({
     where: { id: commentId },
