@@ -502,3 +502,126 @@
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+
+/* Pipeline progress bar */
+
+.pipelineProgress {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: var(--spacing-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+}
+
+.pipelineStage {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  flex-shrink: 0;
+}
+
+.pipelineDot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font: var(--text-body-xs);
+  font-weight: 600;
+  border: 2px solid var(--color-border);
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  flex-shrink: 0;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.pipelineStage[data-done='true'] .pipelineDot {
+  background: #ecfdf5;
+  border-color: #065f46;
+  color: #065f46;
+}
+
+.pipelineStage[data-current='true'] .pipelineDot {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fff;
+}
+
+.pipelineLabel {
+  font: var(--text-body-xs);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.pipelineStage[data-current='true'] .pipelineLabel {
+  color: var(--color-text-primary);
+  font-weight: 600;
+}
+
+.pipelineStage[data-done='true'] .pipelineLabel {
+  color: #065f46;
+}
+
+.pipelineConnector {
+  display: block;
+  width: 24px;
+  height: 2px;
+  background: var(--color-border);
+  margin: 0 var(--spacing-xs);
+  flex-shrink: 0;
+  transition: background 0.2s ease;
+}
+
+.pipelineConnector[data-done='true'] {
+  background: #065f46;
+}
+
+/* Video status card */
+
+.videoStatusCard {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.videoStatusLabel {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+}
+
+.videoStatusValue {
+  font: var(--text-body-sm);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  background: #f3f4f6;
+  color: var(--color-text-secondary);
+}
+
+.videoStatusValue[data-status='READY'] {
+  background: #ecfdf5;
+  color: #065f46;
+}
+
+.videoStatusValue[data-status='FAILED'] {
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.videoStatusValue[data-status='GENERATING_VISUALS'],
+.videoStatusValue[data-status='GENERATING_TRANSITIONS'],
+.videoStatusValue[data-status='GENERATING_AVATARS'],
+.videoStatusValue[data-status='COMPOSING'] {
+  background: #fffbeb;
+  color: #92400e;
+}
