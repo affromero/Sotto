@@ -50,6 +50,13 @@ enum VideoStatus {
   FAILED
 }
 
+enum MusicStatus {
+  PENDING
+  GENERATING
+  READY
+  FAILED
+}
+
 // ============ USERS & AUTH ============
 
 model User {
@@ -342,6 +349,10 @@ model Podcast {
   // Video generation
   videoUrl String?
 
+  // Background music
+  musicUrl          String?
+  musicVolume       Float     @default(0.15)
+
   // Import fields
   importedAudioKey    String?
   originalFormat      String?
@@ -386,6 +397,7 @@ model Podcast {
   voiceTrackProposals VoiceTrack[] @relation("VoiceTrackProposals")
   defaultVoiceTrackId String?
   videoGeneration   VideoGeneration?
+  musicGeneration   MusicGeneration?
   audioFingerprint  AudioFingerprint?
   duplicateSource   DuplicateMatch[] @relation("DuplicateSource")
   duplicateMatches  DuplicateMatch[] @relation("DuplicateMatch")
@@ -883,6 +895,8 @@ enum NotificationType {
   REFERRAL_SIGNUP
   VOICE_TRACK_FAILED
   VIDEO_READY
+  MUSIC_READY
+  MUSIC_FAILED
   RENDITION_PROPOSED
   RENDITION_ACCEPTED
   RENDITION_REJECTED
@@ -1750,10 +1764,19 @@ model AutoModelConfig {
   proAvatarModel          String   @default("heygen-avatar-standard")
   freeIncludedAvatarModels Json?
   proIncludedAvatarModels  Json?
+  // Music (AI-generated background music)
+  freeMusicProvider       String   @default("suno")
+  freeMusicModel          String   @default("suno-v5")
+  proMusicProvider        String   @default("suno")
+  proMusicModel           String   @default("suno-v5")
+  freeIncludedMusicModels Json?
+  proIncludedMusicModels  Json?
   // Daily limits (migrated from FreeTierConfig)
   dailyGenerationLimit    Int      @default(1)
   dailyVideoLimit         Int      @default(1)
   dailyVideoLimitPro      Int      @default(2)
+  dailyMusicLimit         Int      @default(1)
+  dailyMusicLimitPro      Int      @default(3)
   aiAllocations           Json     @default("[]")
   ttsAllocations          Json     @default("[]")
   updatedAt               DateTime @updatedAt
@@ -2117,6 +2140,28 @@ model VideoGeneration {
   visuals        SegmentVisual[]
   avatarOverlays AvatarOverlay[]
   transitions    SegmentTransition[]
+
+  @@index([podcastId])
+}
+
+// ============ MUSIC GENERATION ============
+
+model MusicGeneration {
+  id             String      @id @default(cuid())
+  podcastId      String      @unique
+  status         MusicStatus @default(PENDING)
+  musicUrl       String?
+  duration       Int?        // seconds
+  fileSize       Int?        // bytes
+  provider       String?     // 'suno' | 'elevenlabs'
+  model          String?     // e.g., 'suno-v5', 'eleven-music-v1'
+  prompt         String?     @db.Text
+  externalTaskId String?     // Suno taskId for async polling
+  failureReason  String?     @db.Text
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  podcast Podcast @relation(fields: [podcastId], references: [id], onDelete: Cascade)
 
   @@index([podcastId])
 }

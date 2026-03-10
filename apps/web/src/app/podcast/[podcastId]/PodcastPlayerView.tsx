@@ -61,6 +61,7 @@ import { VideoProgress } from '@/components/player/VideoProgress';
 import { VideoView } from '@/components/player/VideoView';
 import { PipelineEditor } from '@/components/player/PipelineEditor';
 import { VideoEditor } from '@/components/player/VideoEditor';
+import { MusicGenerator } from '@/components/player/MusicGenerator';
 import { AvatarPicker } from '@/components/player/AvatarPicker';
 import type { AvatarOverlayData } from '@/types/avatar';
 import type { AvatarMaskShape } from '@/components/player/AvatarOverlay';
@@ -162,6 +163,7 @@ function PlayerBridge({
 export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, currentUserId, canMakePrivate, videoStatus }: PodcastPlayerViewProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const player = usePlayer();
   const [liked, setLiked] = useState(podcast.isLiked);
   const [likeCount, setLikeCount] = useState(podcast.likeCount);
   const [saved, setSaved] = useState(podcast.isSaved);
@@ -227,6 +229,13 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
       user: { name: string | null; handle: string | null };
     }>;
   } | null>(null);
+
+  // Load background music on mount if available
+  useEffect(() => {
+    if (podcast.musicUrl && player) {
+      player.loadMusic(podcast.musicUrl, podcast.musicVolume);
+    }
+  }, [podcast.musicUrl, podcast.musicVolume]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Check if user has already rated this podcast
   useEffect(() => {
@@ -1099,6 +1108,18 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
               </Button>
             </div>
           )}
+        </section>
+      )}
+
+      {/* Music Section */}
+      {isReady && isOwner && (
+        <section aria-label="Background Music">
+          <MusicGenerator
+            podcastId={podcast.id}
+            initialMusicUrl={podcast.musicUrl}
+            onMusicReady={(url, vol) => player?.loadMusic(url, vol)}
+            onMusicRemoved={() => player?.clearMusic()}
+          />
         </section>
       )}
 

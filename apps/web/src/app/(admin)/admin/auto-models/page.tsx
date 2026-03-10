@@ -5,6 +5,7 @@ import { getAllSttProviderMeta } from '@/lib/providers/stt-registry';
 import { getAllImageProviderMeta } from '@/lib/providers/image-registry';
 import { getAllVideoProviderMeta } from '@/lib/providers/video-registry';
 import { getAllAvatarProviderMeta } from '@/lib/providers/avatar-registry';
+import { getAllMusicProviderMeta } from '@/lib/providers/music-registry';
 import { AutoModelForm } from './AutoModelForm';
 import styles from './page.module.css';
 
@@ -76,6 +77,17 @@ export default async function AutoModelsPage() {
     })),
   }));
 
+  const musicProviders = getAllMusicProviderMeta().map((p) => ({
+    id: p.id,
+    displayName: p.displayName,
+    models: p.models.map((m) => ({
+      id: m.id,
+      displayName: m.displayName,
+      tier: 'standard' as const,
+      price: `$${m.costPerTrack}/track`,
+    })),
+  }));
+
   return (
     <div className={styles.container}>
       <div className={styles.header}>
@@ -93,6 +105,7 @@ export default async function AutoModelsPage() {
         imageProviders={imageProviders}
         videoProviders={videoProviders}
         avatarProviders={avatarProviders}
+        musicProviders={musicProviders}
       />
 
       <div className={styles.platformNote}>

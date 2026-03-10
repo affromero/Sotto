@@ -1,0 +1,108 @@
+.container {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.generateButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--color-primary, #d97706);
+  border-radius: 8px;
+  background: none;
+  color: var(--color-primary, #d97706);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.generateButton:hover {
+  background-color: var(--color-primary, #d97706);
+  color: #fff;
+}
+
+.generateButton:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.generateButton:focus-visible {
+  outline: 2px solid var(--color-primary, #d97706);
+  outline-offset: 2px;
+}
+
+.secondaryAction {
+  padding: 0.375rem 0.75rem;
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 6px;
+  background: none;
+  color: var(--color-text-secondary, #6b7280);
+  font-size: 0.8125rem;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.secondaryAction:hover {
+  color: var(--color-primary, #d97706);
+  border-color: var(--color-primary, #d97706);
+}
+
+.secondaryAction:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.removeAction {
+  padding: 0.375rem 0.75rem;
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 6px;
+  background: none;
+  color: var(--color-text-secondary, #6b7280);
+  font-size: 0.8125rem;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.removeAction:hover {
+  color: #dc2626;
+  border-color: #dc2626;
+}
+
+.removeAction:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.generating {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--color-text-secondary, #6b7280);
+  font-size: 0.875rem;
+}
+
+.spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--color-border, #e5e7eb);
+  border-top-color: var(--color-primary, #d97706);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.error {
+  color: #dc2626;
+  font-size: 0.8125rem;
+  margin: 0;
+}
