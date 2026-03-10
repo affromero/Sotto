@@ -10,6 +10,12 @@ interface DemoAction {
   [key: string]: unknown;
 }
 
+export interface ActionTimingEntry {
+  type: string;
+  timestampMs: number;
+  meta?: Record<string, unknown>;
+}
+
 /** Inject a visible cursor dot that tracks mouse movement. */
 async function injectCursor(page: Page): Promise<void> {
   await page.evaluate(`
@@ -141,13 +147,19 @@ async function humanClick(page: Page, selector: string): Promise<void> {
 /**
  * Execute a sequence of DemoAction steps on a Playwright page.
  * Injects a visible cursor on the first navigate action.
+ * Returns an action timing log for SFX placement.
  */
-export async function executeActions(page: Page, actions: DemoAction[]): Promise<void> {
+export async function executeActions(page: Page, actions: DemoAction[]): Promise<ActionTimingEntry[]> {
   let cursorInjected = false;
+  const startTime = Date.now();
+  const timingLog: ActionTimingEntry[] = [];
 
   for (const action of actions) {
+    const timestampMs = Date.now() - startTime;
+
     switch (action.type) {
       case 'navigate': {
+        timingLog.push({ type: 'navigate', timestampMs });
         await page.goto(action.url as string, { waitUntil: 'networkidle' });
         if (!cursorInjected) {
           await injectCursor(page);
@@ -156,20 +168,31 @@ export async function executeActions(page: Page, actions: DemoAction[]): Promise
         break;
       }
       case 'click':
+        timingLog.push({ type: 'click', timestampMs });
         await humanClick(page, action.selector as string);
         break;
       case 'type': {
+        const text = action.text as string;
         const speed = action.speed as { min: number; max: number } | undefined;
-        await humanType(page, action.selector as string, action.text as string, speed);
+        const avgDelay = speed ? (speed.min + speed.max) / 2 : 45;
+        timingLog.push({
+          type: 'type',
+          timestampMs,
+          meta: { charCount: text.length, estimatedDurationMs: text.length * avgDelay },
+        });
+        await humanType(page, action.selector as string, text, speed);
         break;
       }
       case 'wait':
+        timingLog.push({ type: 'wait', timestampMs, meta: { ms: action.ms } });
         await page.waitForTimeout(action.ms as number);
         break;
       case 'scroll':
+        timingLog.push({ type: 'scroll', timestampMs });
         await smoothScroll(page, action.distance as number, action.duration as number | undefined);
         break;
       case 'zoom':
+        timingLog.push({ type: 'zoom', timestampMs });
         await zoomToElement(
           page,
           action.selector as string,
@@ -178,18 +201,22 @@ export async function executeActions(page: Page, actions: DemoAction[]): Promise
         );
         break;
       case 'zoomReset':
+        timingLog.push({ type: 'zoomReset', timestampMs });
         await zoomReset(page, action.duration as number | undefined);
         break;
       case 'hover':
+        timingLog.push({ type: 'hover', timestampMs });
         await page.locator(action.selector as string).hover();
         break;
       case 'waitForSelector':
+        timingLog.push({ type: 'waitForSelector', timestampMs });
         await page.locator(action.selector as string).waitFor({
           state: 'visible',
           timeout: (action.timeout as number) ?? 10000,
         });
         break;
       case 'intercept':
+        timingLog.push({ type: 'intercept', timestampMs, meta: { name: action.name } });
         await setupInterceptor(
           page,
           action.name as string,
@@ -197,12 +224,15 @@ export async function executeActions(page: Page, actions: DemoAction[]): Promise
         );
         break;
       case 'clearIntercept':
+        timingLog.push({ type: 'clearIntercept', timestampMs, meta: { name: action.name } });
         await clearInterceptor(page, action.name as string);
         break;
       case 'keypress':
+        timingLog.push({ type: 'keypress', timestampMs, meta: { key: action.key } });
         await page.keyboard.press(action.key as string);
         break;
       case 'screenshot':
+        timingLog.push({ type: 'screenshot', timestampMs });
         // Screenshots are captured automatically by recordVideo
         await page.waitForTimeout(500);
         break;
@@ -210,4 +240,6 @@ export async function executeActions(page: Page, actions: DemoAction[]): Promise
         console.warn(`Unknown action type: ${action.type}`);
     }
   }
+
+  return timingLog;
 }

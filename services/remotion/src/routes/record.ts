@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import os from 'os';
 import fs from 'fs';
-import { executeActions } from '../lib/actions';
+import { executeActions, type ActionTimingEntry } from '../lib/actions';
 import { gradeVideo } from '../lib/grade';
 
 export const recordRouter = Router();
@@ -22,6 +22,7 @@ interface RecordJob {
   progress: number;
   outputPath?: string;
   error?: string;
+  actionTimingLog?: ActionTimingEntry[];
 }
 
 const jobs = new Map<string, RecordJob>();
@@ -61,8 +62,9 @@ async function executeRecording(jobId: string, input: RecordRequest): Promise<vo
     const page = await context.newPage();
     job.progress = 10;
 
-    // Execute browser actions
-    await executeActions(page, input.actions);
+    // Execute browser actions and capture timing log
+    const timingLog = await executeActions(page, input.actions);
+    job.actionTimingLog = timingLog;
     job.progress = 70;
 
     // Close page + context to finalize the video recording
@@ -128,6 +130,7 @@ recordRouter.get('/:jobId/status', (req, res) => {
     status: job.status,
     progress: job.progress,
     ...(job.error && { error: job.error }),
+    ...(job.actionTimingLog && { actionTimingLog: job.actionTimingLog }),
   });
 });
 
