@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { AvatarPanel } from './AvatarPanel';
 import { ScriptReviewPanel } from './ScriptReviewPanel';
 import { VisualPipelinePanel } from './VisualPipelinePanel';
 import styles from './ShowcaseBuilder.module.css';
@@ -88,6 +89,33 @@ const FEATURE_OPTIONS = [
 /** Statuses that indicate in-progress generation */
 const IN_PROGRESS_STATUSES = ['SCRIPTING', 'VERIFYING_SCRIPT', 'VALIDATING_REFERENCES', 'GENERATING_AUDIO', 'STITCHING'];
 
+/** Video generation statuses */
+const VIDEO_IN_PROGRESS_STATUSES = ['PENDING', 'CLASSIFYING', 'GENERATING_VISUALS', 'GENERATING_TRANSITIONS', 'GENERATING_AVATARS', 'COMPOSING'];
+
+/** Pipeline stages for progress display */
+const PIPELINE_STAGES = [
+  { key: 'script', label: 'Script' },
+  { key: 'audio', label: 'Audio' },
+  { key: 'visuals', label: 'Visuals' },
+  { key: 'transitions', label: 'Transitions' },
+  { key: 'avatars', label: 'Avatars' },
+  { key: 'composing', label: 'Composing' },
+  { key: 'ready', label: 'Ready' },
+] as const;
+
+/** Map podcast + video status to the active pipeline stage */
+function getActiveStage(podcastStatus: string, videoStatus: string | null): string {
+  if (['SCRIPTING', 'VERIFYING_SCRIPT', 'VALIDATING_REFERENCES', 'SCRIPT_READY'].includes(podcastStatus)) return 'script';
+  if (['GENERATING_AUDIO', 'STITCHING'].includes(podcastStatus)) return 'audio';
+  if (!videoStatus || videoStatus === 'PENDING') return 'audio';
+  if (videoStatus === 'CLASSIFYING' || videoStatus === 'GENERATING_VISUALS') return 'visuals';
+  if (videoStatus === 'GENERATING_TRANSITIONS') return 'transitions';
+  if (videoStatus === 'GENERATING_AVATARS') return 'avatars';
+  if (videoStatus === 'COMPOSING') return 'composing';
+  if (videoStatus === 'READY') return 'ready';
+  return 'script';
+}
+
 /** Step definitions for the workflow */
 type StepId = 'create' | 'script' | 'voices' | 'visuals' | 'avatars' | 'generate' | 'preview';
 
@@ -126,10 +154,10 @@ function getUnlockedSteps(podcastStatus: string | undefined): Set<StepId> {
   // Visuals step: unlocked only when audio is done (READY)
   if (podcastStatus === 'READY') {
     unlocked.add('visuals');
+    unlocked.add('avatars');
+    unlocked.add('generate');
   }
 
-  // Avatars: placeholder (Phase 3)
-  // Generate: placeholder
   // Preview: placeholder (Phase 4)
 
   return unlocked;
@@ -158,6 +186,12 @@ export function ShowcaseBuilder({ providers }: ShowcaseBuilderProps) {
   const [status, setStatus] = useState<Status>('idle');
   const [message, setMessage] = useState('');
   const [activeStep, setActiveStep] = useState<StepId>('create');
+
+  // Video/generation state
+  const [videoStatus, setVideoStatus] = useState<string | null>(null);
+  const [avatarsVisible, setAvatarsVisible] = useState(true);
+  const [generatingAll, setGeneratingAll] = useState(false);
+  const videoPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Creation form state
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -256,6 +290,78 @@ export function ShowcaseBuilder({ providers }: ShowcaseBuilderProps) {
       setActiveStep(getDefaultStep(current.status));
     }
   }, [fetchPodcasts, selectedPodcastId]);
+
+  // Fetch video generation status
+  const fetchVideoStatus = useCallback(async (podcastId: string) => {
+    try {
+      const res = await fetch(`/api/podcasts/${podcastId}/video`);
+      if (!res.ok) return;
+      const data = await res.json();
+      setVideoStatus(data.status ?? null);
+      if (data.avatarsVisible !== undefined) setAvatarsVisible(data.avatarsVisible);
+    } catch {
+      // Non-critical
+    }
+  }, []);
+
+  // Poll video status when generation is in progress
+  useEffect(() => {
+    if (videoPollRef.current) {
+      clearInterval(videoPollRef.current);
+      videoPollRef.current = null;
+    }
+
+    if (!selectedPodcastId || !videoStatus || !VIDEO_IN_PROGRESS_STATUSES.includes(videoStatus)) return;
+
+    videoPollRef.current = setInterval(async () => {
+      await fetchVideoStatus(selectedPodcastId);
+    }, 3000);
+
+    return () => {
+      if (videoPollRef.current) clearInterval(videoPollRef.current);
+    };
+  }, [selectedPodcastId, videoStatus, fetchVideoStatus]);
+
+  // Fetch video status when podcast is selected and READY
+  useEffect(() => {
+    if (selectedPodcast?.status === 'READY' && selectedPodcastId) {
+      fetchVideoStatus(selectedPodcastId);
+    }
+  }, [selectedPodcast?.status, selectedPodcastId, fetchVideoStatus]);
+
+  // Generate everything (state-machine orchestrator)
+  const generateAll = useCallback(async () => {
+    if (!selectedPodcastId) return;
+    setGeneratingAll(true);
+    setMessage('');
+    try {
+      const res = await fetch(`/api/admin/showcase/${selectedPodcastId}/generate-all`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error ?? 'Generate failed');
+      }
+      const data = await res.json();
+      setMessage(data.message);
+      setStatus('success');
+
+      // Refresh podcast list to pick up status change
+      await fetchPodcasts();
+
+      // Start video polling if video step was triggered
+      if (data.videoStatus) {
+        setVideoStatus(data.videoStatus);
+      }
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'Generate failed');
+      setStatus('error');
+    } finally {
+      setGeneratingAll(false);
+    }
+  }, [selectedPodcastId, fetchPodcasts]);
 
   // Fetch voice catalog for a provider (cached)
   const getVoices = useCallback(async (providerId: string): Promise<CatalogVoice[]> => {
@@ -825,23 +931,83 @@ export function ShowcaseBuilder({ providers }: ShowcaseBuilderProps) {
         </div>
       )}
 
-      {/* Step 5: Avatars — Placeholder */}
-      {activeStep === 'avatars' && (
+      {/* Step 5: Avatars */}
+      {activeStep === 'avatars' && selectedPodcastId && (
         <div className={styles.stepContent}>
-          <div className={styles.placeholderStep}>
-            <h3 className={styles.placeholderTitle}>Avatar Configuration</h3>
-            <p className={styles.placeholderText}>Coming in Phase 3 — configure avatar appearance and behavior for each speaker.</p>
-          </div>
+          <AvatarPanel
+            podcastId={selectedPodcastId}
+            avatarsVisible={avatarsVisible}
+            onAvatarsVisibleChange={setAvatarsVisible}
+          />
         </div>
       )}
 
-      {/* Step 6: Generate — Placeholder */}
-      {activeStep === 'generate' && (
+      {/* Step 6: Generate — Progress dashboard */}
+      {activeStep === 'generate' && selectedPodcastId && (
         <div className={styles.stepContent}>
-          <div className={styles.placeholderStep}>
-            <h3 className={styles.placeholderTitle}>Generate Video</h3>
-            <p className={styles.placeholderText}>Coming soon — trigger video generation and track progress.</p>
+          {/* Pipeline progress bar */}
+          <div className={styles.pipelineProgress}>
+            {PIPELINE_STAGES.map((stage, i) => {
+              const active = getActiveStage(selectedPodcast?.status ?? '', videoStatus);
+              const activeIdx = PIPELINE_STAGES.findIndex((s) => s.key === active);
+              const stageIdx = i;
+              const isDone = stageIdx < activeIdx;
+              const isCurrent = stageIdx === activeIdx;
+              return (
+                <div
+                  key={stage.key}
+                  className={styles.pipelineStage}
+                  data-done={isDone}
+                  data-current={isCurrent}
+                >
+                  <span className={styles.pipelineDot}>
+                    {isDone ? '\u2713' : stage.key === 'ready' && isCurrent ? '\u2713' : i + 1}
+                  </span>
+                  <span className={styles.pipelineLabel}>{stage.label}</span>
+                  {i < PIPELINE_STAGES.length - 1 && <span className={styles.pipelineConnector} data-done={isDone} />}
+                </div>
+              );
+            })}
           </div>
+
+          {/* Video status info */}
+          {videoStatus && (
+            <div className={styles.videoStatusCard}>
+              <span className={styles.videoStatusLabel}>Video Pipeline</span>
+              <span className={styles.videoStatusValue} data-status={videoStatus}>
+                {videoStatus.replace(/_/g, ' ')}
+              </span>
+            </div>
+          )}
+
+          {/* Generate All button */}
+          <div className={styles.actions}>
+            <button
+              type="button"
+              className={styles.btnPrimary}
+              onClick={generateAll}
+              disabled={generatingAll || (selectedPodcast?.status !== 'SCRIPT_READY' && selectedPodcast?.status !== 'READY')}
+            >
+              {generatingAll ? 'Starting...' : 'Generate Everything'}
+            </button>
+            {selectedPodcast?.status === 'READY' && !videoStatus && (
+              <button
+                type="button"
+                className={styles.btnSecondary}
+                onClick={generateAll}
+                disabled={generatingAll}
+              >
+                Generate Video Only
+              </button>
+            )}
+          </div>
+
+          {/* Status explanation */}
+          {selectedPodcast && selectedPodcast.status !== 'SCRIPT_READY' && selectedPodcast.status !== 'READY' && (
+            <p className={styles.emptyStep}>
+              Podcast is currently {selectedPodcast.status.replace(/_/g, ' ').toLowerCase()}. Wait for it to finish before generating.
+            </p>
+          )}
         </div>
       )}
 
