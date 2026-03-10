@@ -267,7 +267,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     where: { podcastId },
     select: {
       id: true,
-      avatarOverlays: { select: { id: true, videoUrl: true, concatAudioUrl: true } },
+      avatarOverlays: { select: { id: true, videoUrl: true, concatAudioUrl: true, chunkVideoUrl: true } },
     },
   });
 
@@ -284,6 +284,10 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     }
     if (overlay.concatAudioUrl) {
       const key = extractR2Key(overlay.concatAudioUrl);
+      if (key) deletePromises.push(deleteFile(key));
+    }
+    if (overlay.chunkVideoUrl) {
+      const key = extractR2Key(overlay.chunkVideoUrl);
       if (key) deletePromises.push(deleteFile(key));
     }
   }

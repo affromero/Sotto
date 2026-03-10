@@ -30,6 +30,9 @@ interface AvatarOverlay {
   videoUrl: string | null;
   status: string;
   durationSeconds: number | null;
+  avatarProvider?: string | null;
+  runwayChunkIndex?: number | null;
+  runwayTotalChunks?: number | null;
 }
 
 interface VideoStatusResponse {
@@ -377,7 +380,12 @@ export function VideoProgress({ podcastId, videoGenerationId, onComplete, onFail
                   <div className={styles.avatarInfo}>
                     <span className={styles.avatarSpeaker}>{overlay.speaker}</span>
                     <span className={styles.avatarStatus}>
-                      {overlay.status === 'ready' ? 'Ready' : overlay.status === 'failed' ? 'Failed' : overlay.status === 'pending' ? 'Pending' : 'Processing...'}
+                      {overlay.status === 'ready' ? 'Ready'
+                        : overlay.status === 'failed' ? 'Failed'
+                        : overlay.status === 'pending' ? 'Pending'
+                        : overlay.avatarProvider === 'runway' && (overlay.runwayTotalChunks ?? 0) > 1
+                          ? `Chunk ${overlay.runwayChunkIndex ?? 0}/${overlay.runwayTotalChunks}`
+                          : 'Processing...'}
                     </span>
                   </div>
                 </div>
