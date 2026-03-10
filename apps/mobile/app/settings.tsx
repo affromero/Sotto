@@ -12,8 +12,9 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { openBrowserAsync } from 'expo-web-browser';
 import Constants from 'expo-constants';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, typography, borderRadius } from '@sotto/shared';
+import { colors as defaultColors, spacing, typography, borderRadius } from '@sotto/shared';
 import { shadowSm } from '../lib/shadows';
+import { useThemeColors, useThemeStore } from '../lib/useThemeColors';
 import { api } from '../lib/api';
 import { deleteToken } from '../lib/auth';
 
@@ -22,9 +23,15 @@ interface KeyStatus {
   isValid: boolean;
 }
 
+const SCHEME_LABELS = { system: 'System', light: 'Light', dark: 'Dark' } as const;
+const SCHEME_OPTIONS = ['system', 'light', 'dark'] as const;
+
 export default function SettingsScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const colors = useThemeColors();
+  const scheme = useThemeStore((s) => s.scheme);
+  const setScheme = useThemeStore((s) => s.setScheme);
 
   const { data: aiKeys } = useQuery<{ keys: KeyStatus[] }>({
     queryKey: ['settings', 'ai-keys'],
@@ -91,7 +98,7 @@ export default function SettingsScreen() {
   const appVersion = Constants.expoConfig?.version ?? '0.0.0';
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <Stack.Screen
         options={{
           title: 'Settings',
@@ -102,8 +109,8 @@ export default function SettingsScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Account Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Account</Text>
-          <View style={styles.card}>
+          <Text style={[styles.sectionTitle, { color: colors.textTertiary }]}>Account</Text>
+          <View style={[styles.card, { backgroundColor: colors.surface }]}>
             <Pressable
               style={({ pressed }) => [
                 styles.row,
@@ -127,10 +134,43 @@ export default function SettingsScreen() {
           </View>
         </View>
 
+        {/* Appearance Section */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.textTertiary }]}>Appearance</Text>
+          <View style={[styles.card, { backgroundColor: colors.surface }]}>
+            <View style={styles.row}>
+              <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>Theme</Text>
+              <View style={styles.schemeRow}>
+                {SCHEME_OPTIONS.map((opt) => (
+                  <Pressable
+                    key={opt}
+                    style={[
+                      styles.schemeChip,
+                      { borderColor: colors.border },
+                      scheme === opt && { backgroundColor: colors.primary, borderColor: colors.primary },
+                    ]}
+                    onPress={() => setScheme(opt)}
+                  >
+                    <Text
+                      style={[
+                        styles.schemeChipText,
+                        { color: colors.textSecondary },
+                        scheme === opt && { color: colors.textInverse },
+                      ]}
+                    >
+                      {SCHEME_LABELS[opt]}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          </View>
+        </View>
+
         {/* Legal Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Legal</Text>
-          <View style={styles.card}>
+          <Text style={[styles.sectionTitle, { color: colors.textTertiary }]}>Legal</Text>
+          <View style={[styles.card, { backgroundColor: colors.surface }]}>
             <Pressable
               style={({ pressed }) => [
                 styles.row,
@@ -168,8 +208,8 @@ export default function SettingsScreen() {
 
         {/* About Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>About</Text>
-          <View style={styles.card}>
+          <Text style={[styles.sectionTitle, { color: colors.textTertiary }]}>About</Text>
+          <View style={[styles.card, { backgroundColor: colors.surface }]}>
             <View style={styles.row}>
               <Text style={styles.rowLabel}>Version</Text>
               <Text style={styles.rowValue}>{appVersion}</Text>
@@ -182,11 +222,12 @@ export default function SettingsScreen() {
           <Pressable
             style={({ pressed }) => [
               styles.deleteButton,
-              pressed && styles.deleteButtonPressed,
+              { borderColor: colors.error },
+              pressed && { backgroundColor: colors.errorLighter },
             ]}
             onPress={handleDeleteAccount}
           >
-            <Text style={styles.deleteButtonText}>Delete Account</Text>
+            <Text style={[styles.deleteButtonText, { color: colors.error }]}>Delete Account</Text>
           </Pressable>
         </View>
       </ScrollView>
@@ -197,7 +238,6 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
   },
   scrollContent: {
     paddingVertical: spacing.lg,
@@ -210,14 +250,14 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontBody,
     fontSize: 13,
     fontWeight: '600',
-    color: colors.textTertiary,
+    color: defaultColors.textTertiary,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: spacing.sm,
     marginLeft: spacing.xs,
   },
   card: {
-    backgroundColor: colors.surface,
+    backgroundColor: defaultColors.surface,
     borderRadius: borderRadius.lg,
     overflow: 'hidden',
     ...shadowSm,
@@ -231,11 +271,11 @@ const styles = StyleSheet.create({
     minHeight: 48,
   },
   rowPressed: {
-    backgroundColor: colors.surfaceHover,
+    backgroundColor: defaultColors.surfaceHover,
   },
   rowSeparator: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: colors.border,
+    backgroundColor: defaultColors.border,
     marginLeft: spacing.md,
   },
   rowLabelWithStatus: {
@@ -249,40 +289,54 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   keyStatusDotGreen: {
-    backgroundColor: colors.success,
+    backgroundColor: defaultColors.success,
   },
   keyStatusDotAmber: {
-    backgroundColor: colors.warning,
+    backgroundColor: defaultColors.warning,
   },
   rowLabel: {
     fontFamily: typography.fontBody,
     fontSize: 16,
-    color: colors.textPrimary,
+    color: defaultColors.textPrimary,
   },
   rowChevron: {
     fontSize: 22,
-    color: colors.textTertiary,
+    color: defaultColors.textTertiary,
   },
   rowValue: {
     fontFamily: typography.fontBody,
     fontSize: 16,
-    color: colors.textSecondary,
+    color: defaultColors.textSecondary,
   },
   deleteButton: {
     paddingVertical: spacing.md,
     borderRadius: borderRadius.lg,
     borderWidth: 1,
-    borderColor: colors.error,
+    borderColor: defaultColors.error,
     alignItems: 'center',
     marginTop: spacing.md,
   },
   deleteButtonPressed: {
-    backgroundColor: colors.errorLighter,
+    backgroundColor: defaultColors.errorLighter,
   },
   deleteButtonText: {
     fontFamily: typography.fontBody,
     fontSize: 16,
     fontWeight: '600',
-    color: colors.error,
+  },
+  schemeRow: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+  },
+  schemeChip: {
+    paddingVertical: spacing.xs + 2,
+    paddingHorizontal: spacing.sm + 4,
+    borderRadius: borderRadius.full,
+    borderWidth: 1,
+  },
+  schemeChipText: {
+    fontFamily: typography.fontBody,
+    fontSize: 13,
+    fontWeight: '500',
   },
 });
