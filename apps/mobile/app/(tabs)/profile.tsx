@@ -255,6 +255,18 @@ export default function ProfileScreen() {
         <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
       </Pressable>
 
+      <Pressable
+        style={({ pressed }) => [
+          styles.savedIdeasRow,
+          pressed && styles.savedIdeasRowPressed,
+        ]}
+        onPress={() => router.push('/collections')}
+      >
+        <Ionicons name="albums-outline" size={20} color={colors.primary} style={styles.savedIdeasIcon} />
+        <Text style={styles.savedIdeasLabel}>Collections</Text>
+        <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+      </Pressable>
+
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Your Podcasts</Text>
       </View>
