@@ -18,6 +18,27 @@ interface MusicGeneratorProps {
 
 type MusicStatus = 'PENDING' | 'GENERATING' | 'READY' | 'FAILED' | null;
 
+function MusicNoteIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 18V5l12-2v13" />
+      <circle cx="6" cy="18" r="3" />
+      <circle cx="18" cy="16" r="3" />
+    </svg>
+  );
+}
+
+function WaveformIcon() {
+  return (
+    <div className={styles.waveform}>
+      <span className={styles.waveBar} />
+      <span className={styles.waveBar} />
+      <span className={styles.waveBar} />
+      <span className={styles.waveBar} />
+    </div>
+  );
+}
+
 export function MusicGenerator({ podcastId, initialMusicUrl, onMusicReady, onMusicRemoved }: MusicGeneratorProps) {
   const [status, setStatus] = useState<MusicStatus>(initialMusicUrl ? 'READY' : null);
   const [error, setError] = useState<string | null>(null);
@@ -107,52 +128,82 @@ export function MusicGenerator({ podcastId, initialMusicUrl, onMusicReady, onMus
     }
   };
 
+  // ── Generating ──────────────────────────────────────────────
   if (status === 'PENDING' || status === 'GENERATING') {
     return (
       <div className={styles.container}>
+        <span className={styles.label}>
+          <span className={styles.musicIcon}><MusicNoteIcon /></span>
+          Background Music
+        </span>
+        <span className={styles.divider} />
         <div className={styles.generating}>
-          <span className={styles.spinner} />
-          <span>Generating background music...</span>
+          <WaveformIcon />
+          <span>Generating...</span>
         </div>
       </div>
     );
   }
 
+  // ── Ready ───────────────────────────────────────────────────
   if (status === 'READY') {
     return (
       <div className={styles.container}>
-        <button
-          className={styles.secondaryAction}
-          onClick={handleGenerate}
-          disabled={loading}
-          aria-label="Regenerate background music"
-        >
-          Regenerate Music
-        </button>
-        <button
-          className={styles.removeAction}
-          onClick={handleRemove}
-          disabled={loading}
-          aria-label="Remove background music"
-        >
-          Remove Music
-        </button>
+        <span className={styles.label}>
+          <span className={styles.musicIcon}><MusicNoteIcon /></span>
+          Background Music
+        </span>
+        <span className={styles.divider} />
+        <span className={styles.readyIndicator}>
+          <span className={styles.readyDot} />
+          Active
+        </span>
+        <div className={styles.actions}>
+          <button
+            className={styles.secondaryAction}
+            onClick={handleGenerate}
+            disabled={loading}
+            aria-label="Regenerate background music"
+          >
+            Regenerate
+          </button>
+          <button
+            className={styles.removeAction}
+            onClick={handleRemove}
+            disabled={loading}
+            aria-label="Remove background music"
+          >
+            Remove
+          </button>
+        </div>
       </div>
     );
   }
 
+  // ── No provider ─────────────────────────────────────────────
   if (!availableModels.length) {
     return (
       <div className={styles.container}>
+        <span className={styles.label}>
+          <span className={styles.musicIcon}><MusicNoteIcon /></span>
+          Background Music
+        </span>
+        <span className={styles.divider} />
         <p className={styles.noProviders}>
-          No music provider configured. Add a Suno or ElevenLabs key in Settings.
+          Add a <a href="/settings">Suno or ElevenLabs key</a> to generate music.
         </p>
       </div>
     );
   }
 
+  // ── Default: model picker + generate ────────────────────────
   return (
     <div className={styles.container}>
+      <span className={styles.label}>
+        <span className={styles.musicIcon}><MusicNoteIcon /></span>
+        Background Music
+      </span>
+      <span className={styles.divider} />
       <select
         className={styles.modelSelect}
         value={selectedModel}

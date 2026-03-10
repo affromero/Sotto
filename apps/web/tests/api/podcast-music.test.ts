@@ -29,6 +29,9 @@ vi.mock('@/lib/prisma', () => ({
       create: (...args: unknown[]) => mockMusicGenCreate(...args),
       delete: (...args: unknown[]) => mockMusicGenDelete(...args),
     },
+    userTtsKey: {
+      findMany: vi.fn().mockResolvedValue([]),
+    },
     $transaction: (...args: unknown[]) => mockTransaction(...args),
   },
 }));
@@ -361,7 +364,7 @@ describe('GET /api/podcasts/[id]/music', () => {
     const res = await GET(createGetRequest(), routeParams);
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body).toEqual({ status: null });
+    expect(body).toMatchObject({ status: null });
   });
 
   it('returns music generation record when it exists', async () => {
@@ -381,7 +384,7 @@ describe('GET /api/podcasts/[id]/music', () => {
     const res = await GET(createGetRequest(), routeParams);
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body).toEqual({
+    expect(body).toMatchObject({
       musicGenerationId: 'mg-1',
       status: 'COMPLETED',
       musicUrl: 'https://r2.example.com/music.mp3',

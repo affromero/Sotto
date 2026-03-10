@@ -37,6 +37,8 @@ const defaultProps = {
   configuredAiProviders: [],
   aiProviderMeta: [],
   ttsProviderMeta: [],
+  musicProviderMeta: [],
+  configuredMusicProviders: [],
   initialPreferredAiModel: null,
   initialPreferredTtsProvider: null,
   initialPreferredTtsModel: null,
