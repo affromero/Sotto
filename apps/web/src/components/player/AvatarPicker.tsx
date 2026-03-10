@@ -1,9 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { User, AlertTriangle, Search } from 'lucide-react';
+import { User, AlertTriangle, Search, ChevronDown, ChevronUp } from 'lucide-react';
 import { estimateAvatarCost, formatAvatarCost } from '@/lib/avatar-cost-estimator';
 import type { UnifiedAvatarData } from '@/types/avatar';
+import type { SegmentData } from '@/types/podcast';
 import styles from './AvatarPicker.module.css';
 
 export interface ExistingAvatarOverlay {
@@ -17,6 +18,7 @@ export interface ExistingAvatarOverlay {
 interface AvatarPickerProps {
   podcastId: string;
   speakers: string[];
+  segments: SegmentData[];
   onConfigured: (data: { videoGenerationId: string; generationStarted: boolean }) => void;
   onCancel: () => void;
   podcastDuration: number;
@@ -37,7 +39,7 @@ interface AvatarPricing {
   includedOnPlatform: boolean;
 }
 
-export function AvatarPicker({ podcastId, speakers, onConfigured, onCancel, podcastDuration, existingOverlays }: AvatarPickerProps) {
+export function AvatarPicker({ podcastId, speakers, segments, onConfigured, onCancel, podcastDuration, existingOverlays }: AvatarPickerProps) {
   const [avatars, setAvatars] = useState<UnifiedAvatarData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -51,6 +53,9 @@ export function AvatarPicker({ podcastId, speakers, onConfigured, onCancel, podc
   });
   const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState('');
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  // Per-speaker segment enablement: empty = all enabled (default)
+  const [enabledSegments, setEnabledSegments] = useState<Record<string, Set<string>>>({});
   const [activeProvider, setActiveProvider] = useState<'heygen' | 'runway'>(
     existingOverlays?.some((ov) => ov.avatarProvider === 'runway') ? 'runway' : 'heygen',
   );
@@ -81,6 +86,15 @@ export function AvatarPicker({ podcastId, speakers, onConfigured, onCancel, podc
     return list.slice(0, VISIBLE_COUNT);
   }, [avatars, search]);
 
+  // Group segments by speaker for the advanced settings UI
+  const segmentsBySpeaker = useMemo(() => {
+    const map: Record<string, SegmentData[]> = {};
+    for (const seg of segments) {
+      (map[seg.speaker] ??= []).push(seg);
+    }
+    return map;
+  }, [segments]);
+
   const handleSelect = useCallback((speaker: string, avatar: UnifiedAvatarData) => {
     setSelections((prev) => {
       if (prev[speaker]?.avatarId === avatar.id) {
@@ -92,13 +106,41 @@ export function AvatarPicker({ podcastId, speakers, onConfigured, onCancel, podc
     });
   }, []);
 
+  const handleToggleSegment = useCallback((speaker: string, segmentId: string) => {
+    setEnabledSegments((prev) => {
+      const speakerSegs = segmentsBySpeaker[speaker] ?? [];
+      const current = prev[speaker] ?? new Set(speakerSegs.map((s) => s.id));
+      const next = new Set(current);
+      if (next.has(segmentId)) {
+        next.delete(segmentId);
+      } else {
+        next.add(segmentId);
+      }
+      return { ...prev, [speaker]: next };
+    });
+  }, [segmentsBySpeaker]);
+
+  const handleToggleAllSegments = useCallback((speaker: string, enable: boolean) => {
+    setEnabledSegments((prev) => {
+      const speakerSegs = segmentsBySpeaker[speaker] ?? [];
+      return { ...prev, [speaker]: enable ? new Set(speakerSegs.map((s) => s.id)) : new Set() };
+    });
+  }, [segmentsBySpeaker]);
+
   const handleSubmit = useCallback(async () => {
-    const configured = Object.entries(selections).map(([speaker, sel]) => ({
-      speaker,
-      avatarId: sel.avatarId,
-      avatarProvider: sel.provider,
-      isPreset: sel.isPreset,
-    }));
+    const configured = Object.entries(selections).map(([speaker, sel]) => {
+      const speakerSegs = segmentsBySpeaker[speaker] ?? [];
+      const enabled = enabledSegments[speaker];
+      // Only send enabledSegmentIds if user customized (not all enabled)
+      const allEnabled = !enabled || enabled.size === speakerSegs.length;
+      return {
+        speaker,
+        avatarId: sel.avatarId,
+        avatarProvider: sel.provider,
+        isPreset: sel.isPreset,
+        enabledSegmentIds: allEnabled ? undefined : [...enabled],
+      };
+    });
     if (configured.length === 0) return;
 
     setSubmitting(true);
@@ -120,7 +162,7 @@ export function AvatarPicker({ podcastId, speakers, onConfigured, onCancel, podc
     } finally {
       setSubmitting(false);
     }
-  }, [selections, podcastId, onConfigured]);
+  }, [selections, podcastId, onConfigured, segmentsBySpeaker, enabledSegments]);
 
   const selectedCount = Object.keys(selections).length;
   const estimatedCost = estimateAvatarCost(podcastDuration, selectedCount, pricing.costPerMinute);
@@ -242,6 +284,67 @@ export function AvatarPicker({ podcastId, speakers, onConfigured, onCancel, podc
         <p className={styles.runwayNotice}>
           Runway avatars render in real-time (~{Math.ceil(podcastDuration / 60)} min)
         </p>
+      )}
+
+      {selectedCount > 0 && (
+        <div className={styles.advancedSection}>
+          <button
+            className={styles.advancedToggle}
+            onClick={() => setShowAdvanced(!showAdvanced)}
+            type="button"
+            aria-expanded={showAdvanced}
+          >
+            <span>Segment visibility</span>
+            {showAdvanced ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          </button>
+          {showAdvanced && (
+            <div className={styles.segmentToggles}>
+              <p className={styles.advancedHint}>
+                Choose which segments the avatar appears on. Fewer segments = lower cost.
+              </p>
+              {speakers.filter((sp) => selections[sp]).map((speaker) => {
+                const speakerSegs = segmentsBySpeaker[speaker] ?? [];
+                const enabled = enabledSegments[speaker] ?? new Set(speakerSegs.map((s) => s.id));
+                const allOn = enabled.size === speakerSegs.length;
+                return (
+                  <div key={speaker} className={styles.segmentSpeakerGroup}>
+                    <div className={styles.segmentSpeakerHeader}>
+                      <span className={styles.segmentSpeakerName}>{speaker}</span>
+                      <button
+                        className={styles.segmentToggleAll}
+                        onClick={() => handleToggleAllSegments(speaker, !allOn)}
+                        type="button"
+                      >
+                        {allOn ? 'Deselect all' : 'Select all'}
+                      </button>
+                    </div>
+                    <div className={styles.segmentList}>
+                      {speakerSegs.map((seg, idx) => (
+                        <label key={seg.id} className={styles.segmentItem}>
+                          <input
+                            type="checkbox"
+                            checked={enabled.has(seg.id)}
+                            onChange={() => handleToggleSegment(speaker, seg.id)}
+                            className={styles.segmentCheckbox}
+                          />
+                          <span className={styles.segmentOrder}>#{idx + 1}</span>
+                          <span className={styles.segmentText}>
+                            {seg.text.length > 60 ? `${seg.text.slice(0, 60)}...` : seg.text}
+                          </span>
+                          {seg.duration && (
+                            <span className={styles.segmentDuration}>
+                              {Math.round(seg.duration)}s
+                            </span>
+                          )}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       )}
 
       <div className={styles.footer}>

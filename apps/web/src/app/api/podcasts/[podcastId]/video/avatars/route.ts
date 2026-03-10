@@ -169,11 +169,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           speaker: avatar.speaker,
           avatarId: avatar.avatarId,
           avatarProvider: avatar.avatarProvider ?? null,
+          enabledSegmentIds: avatar.enabledSegmentIds ?? [],
           status: 'pending',
         },
         update: {
           avatarId: avatar.avatarId,
           avatarProvider: avatar.avatarProvider ?? null,
+          enabledSegmentIds: avatar.enabledSegmentIds ?? [],
           status: 'pending',
           videoUrl: null,
           concatAudioUrl: null,
