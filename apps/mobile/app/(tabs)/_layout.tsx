@@ -1,9 +1,11 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { colors } from '@sotto/shared';
 import { shadowMd } from '../../lib/shadows';
+import { useThemeColors } from '../../lib/useThemeColors';
 
 export default function TabLayout() {
+  const colors = useThemeColors();
+
   return (
     <Tabs
       screenOptions={{

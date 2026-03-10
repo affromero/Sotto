@@ -15,8 +15,8 @@ import {
   Inter_500Medium,
   Inter_600SemiBold,
 } from '@expo-google-fonts/inter';
-import { colors } from '@sotto/shared';
 import { isAuthenticated, onAuthSuccess } from '../lib/auth';
+import { useThemeColors, useThemeStore } from '../lib/useThemeColors';
 import { api, onAuthRevoked } from '../lib/api';
 import { registerForPushNotifications } from '../lib/notifications';
 import { EventProvider } from '../components/EventProvider';
@@ -112,6 +112,8 @@ export default function RootLayout() {
     'Inter-SemiBold': Inter_600SemiBold,
   });
 
+  const colors = useThemeColors();
+  const isDark = useThemeStore((s) => s.resolved === 'dark');
   const { isChecking } = useProtectedRoute();
 
   if (!fontsLoaded || isChecking) {
@@ -127,7 +129,7 @@ export default function RootLayout() {
       <GestureHandlerRootView style={{ flex: 1 }}>
         <QueryClientProvider client={queryClient}>
           <EventProvider>
-            <StatusBar style="dark" />
+            <StatusBar style={isDark ? 'light' : 'dark'} />
             <Stack
               screenOptions={{
                 headerStyle: { backgroundColor: colors.background },
