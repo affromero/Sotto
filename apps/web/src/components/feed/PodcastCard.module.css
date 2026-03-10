@@ -154,16 +154,33 @@
   margin: 0;
 }
 
-/* ── Cover tags (frosted glass pills) ──────── */
+/* ── Cover meta (date + tags + stats bottom row) ── */
 
-.coverTags {
+.coverMeta {
   position: relative;
   z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.coverMetaLeft {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* ── Cover tags (frosted glass pills, inline with date) */
+
+.coverTags {
   display: flex;
   flex-wrap: nowrap;
   gap: var(--space-1);
   overflow: hidden;
-  margin-top: var(--space-1);
 }
 
 .coverTag {
@@ -178,18 +195,6 @@
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   flex-shrink: 0;
-}
-
-/* ── Cover meta (date + stats bottom row) ──── */
-
-.coverMeta {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  margin-top: var(--space-1);
 }
 
 .coverDate {
