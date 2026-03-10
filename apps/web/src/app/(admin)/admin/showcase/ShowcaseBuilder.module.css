@@ -4,6 +4,155 @@
   gap: var(--spacing-lg);
 }
 
+/* Step navigation */
+
+.stepNav {
+  display: flex;
+  gap: 2px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 4px;
+  overflow-x: auto;
+}
+
+.stepBtn {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  min-height: 44px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.stepBtn[data-active='true'] {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.stepBtn[data-unlocked='true']:not([data-active='true']):hover {
+  background: #f3f4f6;
+}
+
+.stepBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.stepNumber {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  font: var(--text-body-xs);
+  font-weight: 600;
+  border: 1.5px solid currentColor;
+  flex-shrink: 0;
+}
+
+.stepBtn[data-active='true'] .stepNumber {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.stepLabel {
+  font: var(--text-body-sm);
+}
+
+/* Step content area */
+
+.stepContent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+/* Podcast info (step 1 selection summary) */
+
+.podcastInfo {
+  padding: var(--spacing-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.podcastTitle {
+  font: var(--text-label);
+  color: var(--color-text-primary);
+  margin: 0 0 var(--spacing-xs);
+}
+
+.podcastMeta {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.statusBadge {
+  font: var(--text-body-xs);
+  color: var(--color-text-secondary);
+  background: #f3f4f6;
+  border-radius: var(--radius-sm);
+  padding: 2px 8px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.statusBadge[data-status='READY'] {
+  color: #065f46;
+  background: #ecfdf5;
+}
+
+.statusBadge[data-status='SCRIPT_READY'] {
+  color: #1e40af;
+  background: #eff6ff;
+}
+
+.metaItem {
+  font: var(--text-body-xs);
+  color: var(--color-text-secondary);
+}
+
+/* Empty step message */
+
+.emptyStep {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  padding: var(--spacing-lg) 0;
+  margin: 0;
+}
+
+/* Placeholder steps */
+
+.placeholderStep {
+  padding: var(--spacing-xl, 48px) var(--spacing-lg);
+  text-align: center;
+  border: 2px dashed var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.placeholderTitle {
+  font: var(--text-label);
+  color: var(--color-text-primary);
+  margin: 0 0 var(--spacing-xs);
+}
+
+.placeholderText {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
 /* Fieldset */
 
 .fieldset {
