@@ -27,6 +27,9 @@ export async function setupInterceptor(
     case 'scriptApprove':
       await interceptScriptApprove(page, options);
       break;
+    case 'avatar':
+      await interceptAvatar(page, options);
+      break;
     default:
       console.warn(`Unknown interceptor: ${name}`);
   }
@@ -48,6 +51,9 @@ export async function clearInterceptor(page: Page, name: string): Promise<void> 
       break;
     case 'scriptApprove':
       await page.unroute('**/api/podcasts/*/script/approve');
+      break;
+    case 'avatar':
+      await page.unroute('**/api/podcasts/*/avatar/session');
       break;
     default:
       console.warn(`Unknown interceptor to clear: ${name}`);
@@ -163,6 +169,32 @@ async function interceptScriptApprove(
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ success: true }),
+      });
+    },
+  );
+}
+
+/**
+ * Avatar interceptor — makes the avatar session API return instantly with
+ * a pre-generated video URL, skipping all generation wait time during recording.
+ */
+async function interceptAvatar(
+  page: Page,
+  options: Record<string, unknown>,
+): Promise<void> {
+  const podcastId = options.podcastId as string;
+  const videoUrl = options.videoUrl as string;
+
+  await page.route(
+    `**/api/podcasts/${podcastId}/avatar/session`,
+    async (route: Route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'READY',
+          videoUrl,
+        }),
       });
     },
   );
