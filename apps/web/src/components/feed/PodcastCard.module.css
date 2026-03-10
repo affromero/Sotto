@@ -65,45 +65,22 @@
   background: rgba(0, 0, 0, 0.12);
 }
 
-/* Cover badges (top row — in-flow, pushed to top via margin-bottom: auto) */
-.coverBadges {
-  position: relative;
-  z-index: 1;
-  display: flex;
+/* Content badge + duration (inline in meta row) */
+.contentBadge,
+.duration {
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  margin-bottom: auto;
+  padding: 1px var(--space-2);
+  font: var(--text-caption);
+  font-size: var(--font-size-xs);
+  color: rgba(255, 255, 255, 0.65);
+  white-space: nowrap;
   flex-shrink: 0;
 }
 
 .contentBadge {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px var(--space-2);
-  font: var(--text-caption);
-  font-size: var(--font-size-xs);
   font-weight: 600;
   text-transform: uppercase;
-  border-radius: var(--radius-full);
-  white-space: nowrap;
-  background: rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  color: #fff;
-}
-
-.duration {
-  font: var(--text-caption);
-  color: #fff;
-  white-space: nowrap;
-  padding: 2px var(--space-2);
-  background: rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border-radius: var(--radius-full);
-  flex-shrink: 0;
-  margin-left: auto;
 }
 
 /* ── Cover content (title + topic) ─────────── */
@@ -154,29 +131,11 @@
   margin: 0;
 }
 
-/* ── Cover meta (date + tags + stats bottom row) ── */
-
-.coverMeta {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  margin-top: var(--space-1);
-}
-
-.coverMetaLeft {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
-  overflow: hidden;
-}
-
-/* ── Cover tags (frosted glass pills, inline with date) */
+/* ── Cover tags (frosted glass pills) ──────── */
 
 .coverTags {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-wrap: nowrap;
   gap: var(--space-1);
@@ -195,6 +154,26 @@
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   flex-shrink: 0;
+}
+
+/* ── Cover meta (date + badges + stats bottom row) ── */
+
+.coverMeta {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.coverMetaLeft {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  overflow: hidden;
 }
 
 .coverDate {
