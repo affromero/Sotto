@@ -386,6 +386,7 @@ export async function POST(request: NextRequest) {
       } catch (error) {
         const status = (error as { status?: number }).status;
         const isAuthError = status === 401 || status === 403;
+        const isRateLimited = status === 429;
 
         if (isAuthError && aiKey) {
           await prisma.userAiKey.updateMany({
@@ -396,11 +397,15 @@ export async function POST(request: NextRequest) {
 
         const errorMessage = isAuthError
           ? 'Your AI API key is invalid or has been revoked. Please update it in Settings.'
-          : 'An error occurred while generating a response. Please try again.';
+          : isRateLimited
+            ? 'Rate limit reached — wait a moment and try again, or switch to a different model in Settings.'
+            : 'An error occurred while generating a response. Please try again.';
+
+        const errorKind = isAuthError ? 'auth_error' : isRateLimited ? 'rate_limited' : 'exception';
 
         logger.info('Discovery: exception path triggered', {
           userId: authed.userId,
-          errorKind: isAuthError ? 'auth_error' : 'exception',
+          errorKind,
           errorMessage: error instanceof Error ? error.message : String(error),
         });
         try {
@@ -408,7 +413,7 @@ export async function POST(request: NextRequest) {
             data: {
               userId: authed.userId,
               userMessage: (message ?? content ?? '').slice(0, 2000),
-              errorKind: isAuthError ? 'auth_error' : 'exception',
+              errorKind,
               errorDetail: error instanceof Error
                 ? `${error.message}\n${error.stack ?? ''}`.slice(0, 4000)
                 : String(error).slice(0, 4000),
