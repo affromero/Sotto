@@ -90,11 +90,14 @@ export async function processVoiceTrackAudio(job: Job<GenerateVoiceTrackAudioPay
   const userId = voiceTrack.podcast.userId;
   const startTime = Date.now();
 
-  // Resolve provider using the multi-provider system
+  // Resolve provider per-speaker: use the speaker's VoiceTrackVoice.provider if set, else fall back to track-level
+  const trackVoice = voiceTrack.voices.find(v => v.speaker === speaker);
+  const requestedProvider = (trackVoice?.provider || voiceTrack.ttsProvider) as TtsProviderId | null;
+
   const { provider, source, providerId } = await resolveTtsProvider({
     userId,
     podcastId,
-    requestedProvider: (voiceTrack.ttsProvider as TtsProviderId | null) ?? undefined,
+    requestedProvider: requestedProvider ?? undefined,
     requestedModel: voiceTrack.ttsModel,
     plan: voiceTrack.podcast.user.plan as 'FREE' | 'PRO',
   });
@@ -112,7 +115,6 @@ export async function processVoiceTrackAudio(job: Job<GenerateVoiceTrackAudioPay
   }
 
   // Use voice track voice assignment if provider matches, otherwise let provider pick from pool
-  const trackVoice = voiceTrack.voices.find(v => v.speaker === speaker);
   const voiceId = (trackVoice?.voiceId && trackVoice.provider === providerId)
     ? trackVoice.voiceId
     : provider.getVoiceId(speaker, podcastId);

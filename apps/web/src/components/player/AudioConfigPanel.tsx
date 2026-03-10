@@ -1,37 +1,24 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { TtsModelDropdown } from '@/components/create/TtsModelDropdown';
-import { VoiceCard } from '@/components/discovery/VoiceCard';
-import { HumeVoiceBrowser } from '@/components/discovery/HumeVoiceBrowser';
 import styles from './AudioConfigPanel.module.css';
 
-interface VoiceProfile {
+interface TtsOption {
   id: string;
-  name: string;
-  gender: string;
-  accent: string;
-  ageRange: string;
-  character: string;
+  displayName: string;
+  badge?: string;
+  group?: string;
+  hint?: string;
 }
 
-interface VoiceClone {
+interface VoiceOption {
   id: string;
   name: string;
-  externalVoiceId: string;
-  sourceType: string;
-  provider: string;
-  createdAt: string;
-}
-
-interface SharedVoice extends VoiceClone {
-  owner: { id: string; name: string | null };
+  category: 'pool' | 'clone' | 'shared';
 }
 
 export interface AudioConfig {
-  ttsProvider: string | undefined;
-  ttsModel: string | undefined;
-  voices: Array<{ speaker: string; voiceId: string | null }>;
+  voices: Array<{ speaker: string; voiceId: string | null; provider?: string }>;
 }
 
 interface AudioConfigPanelProps {
@@ -40,239 +27,163 @@ interface AudioConfigPanelProps {
   failedProvider?: string | null;
 }
 
-const SPEAKER_COLORS = [
-  'var(--color-speaker-0)',
-  'var(--color-speaker-1)',
-  'var(--color-speaker-2)',
-  'var(--color-speaker-3)',
-];
+interface SpeakerConfig {
+  provider: string; // '' = auto
+  voiceId: string;  // '' = auto
+}
+
+const SPEAKER_COLOR_CLASSES = ['speaker0', 'speaker1', 'speaker2', 'speaker3'] as const;
+
+function parseProviderFromOption(optionId: string): { provider: string; model: string } {
+  if (!optionId || optionId === 'auto') return { provider: '', model: '' };
+  const [provider, ...rest] = optionId.split(':');
+  return { provider, model: rest.join(':') };
+}
 
 export function AudioConfigPanel({ speakers, onConfigChange, failedProvider }: AudioConfigPanelProps) {
-  const [ttsProvider, setTtsProvider] = useState<string | undefined>();
-  const [ttsModel, setTtsModel] = useState<string | undefined>();
-  const [customMode, setCustomMode] = useState(false);
-  const [voiceMap, setVoiceMap] = useState<Record<string, string>>({});
-  const [poolVoices, setPoolVoices] = useState<VoiceProfile[]>([]);
-  const [userClones, setUserClones] = useState<VoiceClone[]>([]);
-  const [sharedVoices, setSharedVoices] = useState<SharedVoice[]>([]);
-  const [loaded, setLoaded] = useState(false);
-
-  // Load voice options — re-fetch when provider changes
-  useEffect(() => {
-    async function load() {
-      setLoaded(false);
-      try {
-        const params = new URLSearchParams();
-        if (ttsProvider) params.set('provider', ttsProvider);
-        const url = `/api/voices${params.size ? `?${params}` : ''}`;
-        const res = await fetch(url);
-        if (res.ok) {
-          const data = await res.json();
-          setPoolVoices(data.poolVoices || []);
-          setUserClones(data.userClones || []);
-          setSharedVoices(data.sharedVoices || []);
-        }
-      } catch {
-        // Non-critical — defaults to auto-assign
-      } finally {
-        setLoaded(true);
-      }
+  const [providerOptions, setProviderOptions] = useState<TtsOption[]>([]);
+  const [speakerConfigs, setSpeakerConfigs] = useState<Record<string, SpeakerConfig>>(() => {
+    const initial: Record<string, SpeakerConfig> = {};
+    for (const s of speakers) {
+      initial[s] = { provider: '', voiceId: '' };
     }
-    load();
-  }, [ttsProvider]);
+    return initial;
+  });
+  // Voice options keyed by provider ID (e.g., 'elevenlabs')
+  const [voicesByProvider, setVoicesByProvider] = useState<Record<string, VoiceOption[]>>({});
+  const [loadingVoices, setLoadingVoices] = useState<Record<string, boolean>>({});
 
-  // Emit config changes
-  const emitConfig = useCallback(() => {
-    const voices: AudioConfig['voices'] = customMode
-      ? Object.entries(voiceMap)
-          .filter(([, voiceId]) => !!voiceId)
-          .map(([speaker, voiceId]) => ({ speaker, voiceId }))
-      : [];
-    onConfigChange({ ttsProvider, ttsModel, voices });
-  }, [ttsProvider, ttsModel, customMode, voiceMap, onConfigChange]);
-
+  // Fetch available TTS providers on mount
   useEffect(() => {
-    emitConfig();
-  }, [emitConfig]);
-
-  const handleProviderChange = useCallback((provider: string | undefined, model: string | undefined) => {
-    setTtsProvider((prev) => {
-      // Clear voice selections when provider changes (voice IDs are provider-specific)
-      if (prev !== provider) setVoiceMap({});
-      return provider;
-    });
-    setTtsModel(model);
+    fetch('/api/tts-options')
+      .then((res) => res.json())
+      .then((data) => {
+        setProviderOptions(data.options || []);
+      })
+      .catch(() => {});
   }, []);
 
-  function handleToggleCustom() {
-    setCustomMode((prev) => !prev);
-    if (customMode) {
-      setVoiceMap({});
-    }
-  }
+  // Fetch voices for a provider (cached in voicesByProvider)
+  const fetchVoicesForProvider = useCallback(async (providerKey: string) => {
+    if (!providerKey || voicesByProvider[providerKey]) return;
 
-  function handleSelectVoice(speaker: string, voiceId: string) {
-    setVoiceMap((prev) => ({ ...prev, [speaker]: voiceId }));
-  }
+    setLoadingVoices((prev) => ({ ...prev, [providerKey]: true }));
+    try {
+      const res = await fetch(`/api/voices?provider=${providerKey}`);
+      if (res.ok) {
+        const data = await res.json();
+        const voices: VoiceOption[] = [
+          ...(data.userClones || []).map((c: { externalVoiceId: string; name: string }) => ({
+            id: c.externalVoiceId,
+            name: c.name,
+            category: 'clone' as const,
+          })),
+          ...(data.sharedVoices || []).map((v: { externalVoiceId: string; name: string }) => ({
+            id: v.externalVoiceId,
+            name: v.name,
+            category: 'shared' as const,
+          })),
+          ...(data.poolVoices || []).map((v: { id: string; name: string }) => ({
+            id: v.id,
+            name: v.name,
+            category: 'pool' as const,
+          })),
+        ];
+        setVoicesByProvider((prev) => ({ ...prev, [providerKey]: voices }));
+      }
+    } catch {
+      // Non-critical
+    } finally {
+      setLoadingVoices((prev) => ({ ...prev, [providerKey]: false }));
+    }
+  }, [voicesByProvider]);
+
+  // Emit config whenever speakerConfigs change
+  useEffect(() => {
+    const voices = speakers.map((speaker) => {
+      const cfg = speakerConfigs[speaker] || { provider: '', voiceId: '' };
+      return {
+        speaker,
+        voiceId: cfg.voiceId || null,
+        provider: cfg.provider || undefined,
+      };
+    });
+    onConfigChange({ voices });
+  }, [speakerConfigs, speakers, onConfigChange]);
+
+  const handleProviderChange = useCallback((speaker: string, optionId: string) => {
+    const { provider } = parseProviderFromOption(optionId);
+    setSpeakerConfigs((prev) => ({
+      ...prev,
+      [speaker]: { provider: optionId, voiceId: '' }, // Reset voice when provider changes
+    }));
+    // Fetch voices for this provider if not cached
+    if (provider) {
+      fetchVoicesForProvider(provider);
+    }
+  }, [fetchVoicesForProvider]);
+
+  const handleVoiceChange = useCallback((speaker: string, voiceId: string) => {
+    setSpeakerConfigs((prev) => ({
+      ...prev,
+      [speaker]: { ...prev[speaker], voiceId },
+    }));
+  }, []);
 
   return (
     <div className={styles.container}>
-      <div className={styles.header}>
-        <h3 className={styles.title}>Audio Configuration</h3>
-        <p className={styles.subtitle}>
-          Choose a voice provider and optionally pick voices for each speaker.
-        </p>
-      </div>
-
       {failedProvider && (
         <div className={styles.failedProviderInfo}>
           Previous attempt failed with {failedProvider}. Pick a different provider to retry.
         </div>
       )}
 
-      <div className={styles.providerSection}>
-        <TtsModelDropdown
-          ttsProvider={ttsProvider}
-          ttsModel={ttsModel}
-          onChange={handleProviderChange}
-        />
+      <div className={styles.speakerList}>
+        {speakers.map((speaker, i) => {
+          const cfg = speakerConfigs[speaker] || { provider: '', voiceId: '' };
+          const colorClass = styles[SPEAKER_COLOR_CLASSES[i % SPEAKER_COLOR_CLASSES.length]];
+          const { provider: providerKey } = parseProviderFromOption(cfg.provider);
+          const voices = providerKey ? voicesByProvider[providerKey] || [] : [];
+          const isLoadingVoices = providerKey ? loadingVoices[providerKey] : false;
+
+          return (
+            <div key={speaker} className={styles.speakerRow}>
+              <span className={`${styles.speakerLabel} ${colorClass}`}>
+                {speaker}
+              </span>
+              <div className={styles.dropdowns}>
+                <select
+                  className={styles.providerSelect}
+                  value={cfg.provider}
+                  onChange={(e) => handleProviderChange(speaker, e.target.value)}
+                  aria-label={`${speaker} voice provider`}
+                >
+                  <option value="">Auto</option>
+                  {providerOptions.map((opt) => (
+                    <option key={opt.id} value={opt.id}>
+                      {opt.displayName}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  className={styles.voiceSelect}
+                  value={cfg.voiceId}
+                  onChange={(e) => handleVoiceChange(speaker, e.target.value)}
+                  disabled={!providerKey || isLoadingVoices}
+                  aria-label={`${speaker} voice`}
+                >
+                  <option value="">Auto</option>
+                  {voices.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.category === 'clone' ? `${v.name} (yours)` : v.category === 'shared' ? `${v.name} (shared)` : v.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          );
+        })}
       </div>
-
-      {!customMode && (
-        <div className={styles.autoAssign}>
-          <div className={styles.autoAssignIcon} aria-hidden="true">
-            <svg
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-              <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-              <line x1="12" y1="19" x2="12" y2="23" />
-              <line x1="8" y1="23" x2="16" y2="23" />
-            </svg>
-          </div>
-          <div className={styles.autoAssignText}>
-            <span className={styles.autoAssignTitle}>Auto-assign Voices</span>
-            <span className={styles.autoAssignHint}>
-              Voices will be matched to your script automatically.
-            </span>
-          </div>
-        </div>
-      )}
-
-      {loaded && (
-        <div className={styles.toggleRow}>
-          <div className={styles.toggleLabel}>
-            <span className={styles.toggleTitle}>Choose Custom Voices</span>
-            <span className={styles.toggleHint}>
-              Pick specific voices for each speaker
-            </span>
-          </div>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={customMode}
-            className={styles.toggle}
-            onClick={handleToggleCustom}
-            aria-label="Toggle custom voice selection"
-          >
-            <span className={styles.toggleKnob} />
-          </button>
-        </div>
-      )}
-
-      {customMode && speakers.map((speaker, i) => {
-        const selectedVoiceId = voiceMap[speaker];
-        const colorIdx = i % SPEAKER_COLORS.length;
-        return (
-          <div key={speaker} className={styles.speakerSection}>
-            <span
-              className={styles.speakerLabel}
-              style={{ color: SPEAKER_COLORS[colorIdx] }}
-            >
-              {speaker} Voice
-            </span>
-            {ttsProvider === 'hume' ? (
-              <HumeVoiceBrowser
-                selectedVoiceId={selectedVoiceId}
-                onSelect={(voiceId) => handleSelectVoice(speaker, voiceId)}
-              />
-            ) : (
-              <>
-                {(() => {
-                  const providerClones = ttsProvider
-                    ? userClones.filter((c) => c.provider === ttsProvider)
-                    : userClones;
-                  const providerShared = ttsProvider
-                    ? sharedVoices.filter((v) => v.provider === ttsProvider)
-                    : sharedVoices;
-                  return (
-                    <>
-                      {providerClones.length > 0 && (
-                        <>
-                          <span className={styles.clonesLabel}>Your Voices</span>
-                          <div className={styles.voiceGrid}>
-                            {providerClones.map((clone) => (
-                              <VoiceCard
-                                key={clone.externalVoiceId}
-                                voiceId={clone.externalVoiceId}
-                                name={clone.name}
-                                accent="custom"
-                                character="Cloned voice"
-                                isSelected={selectedVoiceId === clone.externalVoiceId}
-                                onSelect={() => handleSelectVoice(speaker, clone.externalVoiceId)}
-                              />
-                            ))}
-                          </div>
-                          <div className={styles.separator} />
-                        </>
-                      )}
-                      {providerShared.length > 0 && (
-                        <>
-                          <span className={styles.clonesLabel}>Shared With You</span>
-                          <div className={styles.voiceGrid}>
-                            {providerShared.map((voice) => (
-                              <VoiceCard
-                                key={voice.externalVoiceId}
-                                voiceId={voice.externalVoiceId}
-                                name={voice.name}
-                                accent="shared"
-                                character={`by ${voice.owner.name || 'Unknown'}`}
-                                isSelected={selectedVoiceId === voice.externalVoiceId}
-                                onSelect={() => handleSelectVoice(speaker, voice.externalVoiceId)}
-                              />
-                            ))}
-                          </div>
-                          <div className={styles.separator} />
-                        </>
-                      )}
-                      <div className={styles.voiceGrid}>
-                        {poolVoices.map((voice) => (
-                          <VoiceCard
-                            key={voice.id}
-                            voiceId={voice.id}
-                            name={voice.name}
-                            accent={voice.accent}
-                            character={voice.character}
-                            isSelected={selectedVoiceId === voice.id}
-                            onSelect={() => handleSelectVoice(speaker, voice.id)}
-                          />
-                        ))}
-                      </div>
-                    </>
-                  );
-                })()}
-              </>
-            )}
-          </div>
-        );
-      })}
     </div>
   );
 }

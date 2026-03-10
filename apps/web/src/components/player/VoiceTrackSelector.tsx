@@ -15,6 +15,7 @@ interface VoiceTrackSelectorProps {
   voiceTracks: VoiceTrackSummary[];
   defaultVoiceTrackId: string | null;
   isOwner: boolean;
+  speakers: string[];
   onTracksChange?: () => void;
 }
 
@@ -36,6 +37,7 @@ export function VoiceTrackSelector({
   voiceTracks,
   defaultVoiceTrackId,
   isOwner,
+  speakers,
   onTracksChange,
 }: VoiceTrackSelectorProps) {
   const player = usePlayer();
@@ -246,6 +248,7 @@ export function VoiceTrackSelector({
         <VoiceTrackManager
           podcastId={podcastId}
           voiceTracks={voiceTracks}
+          speakers={speakers}
           isOpen={managerOpen}
           onClose={() => setManagerOpen(false)}
           onTracksChange={onTracksChange}

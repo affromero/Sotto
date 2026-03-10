@@ -114,14 +114,36 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
   }
 
-  // Resolve TTS provider
-  const { providerId } = await resolveTtsProvider({
+  // Resolve TTS provider per speaker — each voice entry may specify its own provider
+  const plan = gate.isProUser ? 'PRO' : 'FREE';
+  const fallback = await resolveTtsProvider({
     userId,
     podcastId,
     requestedProvider: (ttsProvider as TtsProviderId | null) ?? undefined,
     requestedModel: ttsModel,
-    plan: gate.isProUser ? 'PRO' : 'FREE',
+    plan,
   });
+
+  // Resolve per-voice provider: parse "elevenlabs:eleven_v3" → provider "elevenlabs"
+  const resolvedVoiceProviders = await Promise.all(
+    resolvedVoices.map(async (v) => {
+      if (v.provider) {
+        const [providerKey] = v.provider.split(':');
+        const resolved = await resolveTtsProvider({
+          userId,
+          podcastId,
+          requestedProvider: providerKey as TtsProviderId,
+          plan,
+        });
+        return { speaker: v.speaker, voiceId: v.voiceId, providerId: resolved.providerId };
+      }
+      return { speaker: v.speaker, voiceId: v.voiceId, providerId: fallback.providerId };
+    }),
+  );
+
+  // Determine track-level provider for display — use first voice's provider or "mixed" if they differ
+  const uniqueProviders = [...new Set(resolvedVoiceProviders.map(v => v.providerId))];
+  const trackProvider = uniqueProviders.length === 1 ? uniqueProviders[0] : 'mixed';
 
   // Create voice track, voice assignments, and segments in a transaction
   const voiceTrack = await prisma.$transaction(async (tx) => {
@@ -130,18 +152,18 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         podcastId,
         name,
         status: 'GENERATING_AUDIO',
-        ttsProvider: providerId,
+        ttsProvider: trackProvider,
         ttsModel: ttsModel || null,
       },
     });
 
-    // Create voice assignments
+    // Create voice assignments with per-speaker providers
     await tx.voiceTrackVoice.createMany({
-      data: resolvedVoices.map(v => ({
+      data: resolvedVoiceProviders.map(v => ({
         voiceTrackId: track.id,
         speaker: v.speaker,
         voiceId: v.voiceId,
-        provider: providerId,
+        provider: v.providerId,
       })),
     });
 

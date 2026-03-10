@@ -185,7 +185,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
   const [regenerateFeedback, setRegenerateFeedback] = useState('');
   const [scriptTurns, setScriptTurns] = useState<Array<{ speaker: string; text: string }> | null>(null);
   const [scriptRefs, setScriptRefs] = useState<ReferenceData[]>([]);
-  const [audioConfig, setAudioConfig] = useState<AudioConfig>({ ttsProvider: undefined, ttsModel: undefined, voices: [] });
+  const [audioConfig, setAudioConfig] = useState<AudioConfig>({ voices: [] });
   const playerSectionRef = useRef<HTMLElement>(null);
   const [showRatingPrompt, setShowRatingPrompt] = useState(false);
   const [hasRated, setHasRated] = useState(false);
@@ -458,9 +458,12 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
     setRetrying(true);
     try {
       const body: Record<string, unknown> = {};
-      if (audioConfig.ttsProvider) {
-        body.ttsProvider = audioConfig.ttsProvider;
-        body.ttsModel = audioConfig.ttsModel;
+      // Extract provider from first voice with an explicit provider (for retry)
+      const firstVoiceProvider = audioConfig.voices.find(v => v.provider)?.provider;
+      if (firstVoiceProvider) {
+        const [provider, ...modelParts] = firstVoiceProvider.split(':');
+        body.ttsProvider = provider;
+        if (modelParts.length) body.ttsModel = modelParts.join(':');
       }
       const response = await fetch(`/api/podcasts/${podcast.id}/generate`, {
         method: 'POST',
@@ -495,9 +498,12 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
     setApproving(true);
     try {
       const body: Record<string, unknown> = {};
-      if (audioConfig.ttsProvider) {
-        body.ttsProvider = audioConfig.ttsProvider;
-        body.ttsModel = audioConfig.ttsModel;
+      // Extract provider from first voice with an explicit provider
+      const firstVoiceProvider = audioConfig.voices.find(v => v.provider)?.provider;
+      if (firstVoiceProvider) {
+        const [provider, ...modelParts] = firstVoiceProvider.split(':');
+        body.ttsProvider = provider;
+        if (modelParts.length) body.ttsModel = modelParts.join(':');
       }
       if (audioConfig.voices.length > 0) {
         body.voices = audioConfig.voices;
@@ -820,6 +826,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
               voiceTracks={podcast.voiceTracks}
               defaultVoiceTrackId={podcast.defaultVoiceTrackId}
               isOwner={isOwner}
+              speakers={[...new Set(podcast.segments.map(s => s.speaker))]}
             />
           )}
           {isOwner && podcast.isVoiceOnlyFork && podcast.forkedFrom && isReady &&

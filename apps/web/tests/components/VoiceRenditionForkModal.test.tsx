@@ -47,11 +47,9 @@ vi.mock('@/components/player/AudioConfigPanel', () => ({
         data-testid="set-config"
         onClick={() =>
           onConfigChange({
-            ttsProvider: 'elevenlabs',
-            ttsModel: null,
             voices: [
-              { speaker: 'HOST', voiceId: 'voice-1' },
-              { speaker: 'EXPERT', voiceId: 'voice-2' },
+              { speaker: 'HOST', voiceId: 'voice-1', provider: 'elevenlabs' },
+              { speaker: 'EXPERT', voiceId: 'voice-2', provider: 'elevenlabs' },
             ],
           })
         }
