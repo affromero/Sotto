@@ -41,7 +41,7 @@ export function TranscriptPanel({
     if (isFollowing && container && isScrollable(container)) {
       activeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
-  }, [currentTime, isFollowing]);
+  }, [currentTime, isFollowing, scrollContainerRef]);
 
   const hasRefs = references.length > 0;
 
