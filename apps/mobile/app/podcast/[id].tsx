@@ -15,13 +15,18 @@ import Animated, {
   useAnimatedStyle,
   withSpring,
   withSequence,
+  withRepeat,
+  withTiming,
+  Easing,
 } from 'react-native-reanimated';
 import { useLocalSearchParams, Stack } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import TrackPlayer, { useProgress, usePlaybackState, State } from 'react-native-track-player';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography, borderRadius, getContentBadgeLabel } from '@sotto/shared';
+import { getPodcastGradient } from '../../lib/gradients';
 import type { PodcastDetail, SegmentData } from '@sotto/shared';
 import { api } from '../../lib/api';
 import { setupPlayer, loadTrack } from '../../lib/audio-player';
@@ -74,6 +79,22 @@ export default function PodcastScreen() {
 
   const likeAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: likeScale.value }],
+  }));
+
+  // Question FAB pulse
+  const fabScale = useSharedValue(1);
+  useEffect(() => {
+    fabScale.value = withRepeat(
+      withSequence(
+        withTiming(1.05, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
+        withTiming(1.0, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
+      ),
+      -1,
+      false,
+    );
+  }, [fabScale]);
+  const fabAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: fabScale.value }],
   }));
 
   const {
@@ -261,10 +282,18 @@ export default function PodcastScreen() {
     );
   }
 
+  const gradient = getPodcastGradient(podcast.id);
+
   const listHeader = (
     <>
-      {/* Header */}
+      {/* Header with ambient gradient */}
       <View style={styles.header}>
+        <LinearGradient
+          colors={[gradient.colors[0] + '14', 'transparent']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.ambientGradient}
+        />
         <Text style={styles.title} numberOfLines={2}>
           {podcast.title}
         </Text>
@@ -513,17 +542,20 @@ export default function PodcastScreen() {
       />
 
       {/* Ask a Question FAB */}
-      <Pressable
-        onPress={() => setQuestionModalVisible(true)}
-        style={[
-          styles.askButton,
-          { bottom: Math.max(spacing.lg, insets.bottom + spacing.sm) },
-        ]}
-        accessibilityLabel="Ask a question about this podcast"
-        accessibilityRole="button"
-      >
-        <Text style={styles.askButtonText}>Ask a Question</Text>
-      </Pressable>
+      <Animated.View style={[
+        styles.askButton,
+        { bottom: Math.max(spacing.lg, insets.bottom + spacing.sm) },
+        fabAnimatedStyle,
+      ]}>
+        <Pressable
+          onPress={() => setQuestionModalVisible(true)}
+          style={styles.askButtonInner}
+          accessibilityLabel="Ask a question about this podcast"
+          accessibilityRole="button"
+        >
+          <Text style={styles.askButtonText}>Ask a Question</Text>
+        </Pressable>
+      </Animated.View>
 
       {/* Question Modal */}
       <Modal
@@ -635,6 +667,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
     paddingBottom: spacing.md,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  ambientGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 120,
   },
   title: {
     fontFamily: typography.fontHeading,
@@ -851,6 +892,8 @@ const styles = StyleSheet.create({
   },
   segmentRowActive: {
     backgroundColor: colors.primaryLighter,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.primary,
   },
   speakerBadge: {
     alignSelf: 'flex-start',
@@ -912,15 +955,18 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: spacing.lg,
     right: spacing.lg,
-    backgroundColor: colors.accent,
-    paddingVertical: spacing.sm + 6,
     borderRadius: borderRadius.lg,
-    alignItems: 'center',
+    overflow: 'hidden',
     shadowColor: colors.accent,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 8,
     elevation: 6,
+  },
+  askButtonInner: {
+    backgroundColor: colors.accent,
+    paddingVertical: spacing.sm + 6,
+    alignItems: 'center',
   },
   askButtonText: {
     fontFamily: typography.fontBody,
