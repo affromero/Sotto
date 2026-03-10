@@ -41,7 +41,7 @@ export async function processDemoComposition(job: Job<ComposeDemoPayload>): Prom
   });
 
   try {
-    // Build stitch payload
+    // Build stitch payload — include cinematic fields for launch video composition
     const scenes = project.scenes.map((scene) => ({
       recordingUrl: scene.recordingUrl!,
       voiceoverUrl: scene.voiceoverUrl ?? undefined,
@@ -49,6 +49,13 @@ export async function processDemoComposition(job: Job<ComposeDemoPayload>): Prom
       visualType: scene.visualType ?? undefined,
       transitionUrl: scene.transitionUrl ?? undefined,
       timingSegments: (scene.timingSegments as { start: number; end: number; speed: number }[] | null) ?? undefined,
+      sfxConfig: (scene.sfxConfig as Record<string, unknown> | null) ?? undefined,
+      actionTimingLog: (scene.actionTimingLog as Array<{ type: string; timestampMs: number; meta?: Record<string, unknown> }> | null) ?? undefined,
+      providerBanner: (scene.providerBanner as Record<string, unknown> | null) ?? undefined,
+      overlays: (scene.overlays as Array<Record<string, unknown>> | null) ?? undefined,
+      subtitles: (scene.subtitles as Record<string, unknown> | null) ?? undefined,
+      narration: scene.narration,
+      avatarConfig: (scene.avatarConfig as Record<string, unknown> | null) ?? undefined,
     }));
 
     const stitchResponse = await fetch(`${REMOTION_URL}/stitch`, {
@@ -58,6 +65,8 @@ export async function processDemoComposition(job: Job<ComposeDemoPayload>): Prom
         scenes,
         output: { width: 1280, height: 720, fps: 30 },
         gradeVideo: true,
+        backgroundMusicUrl: project.backgroundMusicUrl ?? undefined,
+        backgroundMusicVolume: project.backgroundMusicVolume ?? undefined,
       }),
     });
 
