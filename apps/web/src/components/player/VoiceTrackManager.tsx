@@ -39,8 +39,8 @@ export function VoiceTrackManager({
   const [loading, setLoading] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
-  const [addName, setAddName] = useState('');
   const [showAddInput, setShowAddInput] = useState(false);
+  const [addLoading, setAddLoading] = useState(false);
   const [audioConfig, setAudioConfig] = useState<AudioConfig | null>(null);
 
   // Poll for in-progress tracks
@@ -165,15 +165,14 @@ export function VoiceTrackManager({
   }, []);
 
   const handleAddTrack = useCallback(async () => {
-    if (!addName.trim()) return;
     setError(null);
+    setAddLoading(true);
 
     try {
       const res = await fetch(`/api/podcasts/${podcastId}/voice-tracks`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: addName.trim(),
           voices: audioConfig?.voices && audioConfig.voices.length > 0
             ? audioConfig.voices.map(v => ({ speaker: v.speaker, voiceId: v.voiceId || '', provider: v.provider }))
             : speakers.map(s => ({ speaker: s, voiceId: '' })),
@@ -184,9 +183,13 @@ export function VoiceTrackManager({
         throw new Error(data.error || 'Failed to create');
       }
       const newTrack = await res.json();
+      if (newTrack.duplicate) {
+        setError('This voice combination already exists.');
+        return;
+      }
       setTracks(prev => [...prev, {
         id: newTrack.id,
-        name: addName.trim(),
+        name: newTrack.name ?? 'Voice Track',
         status: newTrack.status,
         audioUrl: null,
         duration: null,
@@ -198,14 +201,15 @@ export function VoiceTrackManager({
         proposalStatus: null,
         proposalMessage: null,
       }]);
-      setAddName('');
       setAudioConfig(null);
       setShowAddInput(false);
       onTracksChange?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create');
+    } finally {
+      setAddLoading(false);
     }
-  }, [podcastId, addName, audioConfig, onTracksChange]);
+  }, [podcastId, audioConfig, speakers, onTracksChange]);
 
   if (!isOpen) return null;
 
@@ -414,26 +418,18 @@ export function VoiceTrackManager({
               <div
                 className={styles.addForm}
                 onKeyDown={(e) => {
-                  if (e.key === 'Escape') { setShowAddInput(false); setAddName(''); setAudioConfig(null); }
+                  if (e.key === 'Escape') { setShowAddInput(false); setAudioConfig(null); }
                 }}
               >
-                <input
-                  type="text"
-                  value={addName}
-                  onChange={(e) => setAddName(e.target.value)}
-                  placeholder='e.g., "British Narrator"'
-                  className={styles.addInput}
-                  autoFocus
-                />
                 <AudioConfigPanel speakers={speakers} onConfigChange={handleConfigChange} />
                 <div className={styles.addFormActions}>
                   <Button
                     variant="ghost"
-                    onClick={() => { setShowAddInput(false); setAddName(''); setAudioConfig(null); }}
+                    onClick={() => { setShowAddInput(false); setAudioConfig(null); }}
                   >
                     Cancel
                   </Button>
-                  <Button variant="primary" onClick={handleAddTrack} disabled={!addName.trim()}>
+                  <Button variant="primary" onClick={handleAddTrack} loading={addLoading}>
                     Generate
                   </Button>
                 </div>
