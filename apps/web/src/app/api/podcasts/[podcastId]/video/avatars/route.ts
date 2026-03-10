@@ -6,6 +6,8 @@ import { errorResponse } from '@/lib/api-response';
 import { checkAvatarGenerationGate, tryIncrementAvatarGeneration } from '@/lib/video-gate';
 import { configureAvatarsSchema } from '@/lib/validations';
 import { listUnifiedAvatars } from '@/lib/providers/avatar';
+import { fetchAvatarModels } from '@/lib/avatar-cost-estimator';
+import { getAutoModelConfig } from '@/lib/auto-model-config';
 import { deleteFile, extractR2Key } from '@/lib/r2';
 import { addJob, JobType, avatarGenerationQueue } from '@/lib/queue';
 import { logger } from '@/lib/logger';
@@ -37,6 +39,23 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   const apiKey = provider === 'runway' ? process.env.RUNWAY_API_KEY : process.env.HEYGEN_API_KEY;
   if (!apiKey) return errorResponse('Avatar generation is not configured', 503);
 
+  // Fetch pricing + config in parallel with avatar list
+  const [avatarModels, config] = await Promise.all([
+    fetchAvatarModels().catch(() => []),
+    getAutoModelConfig(),
+  ]);
+
+  // Determine the default avatar model and included list for this user's plan
+  const avatarModel = gate.isProUser ? config.proAvatarModel : config.freeAvatarModel;
+  const includedModels = (gate.isProUser ? config.proIncludedAvatarModels : config.freeIncludedAvatarModels) ?? [];
+
+  // Find cost per minute for the active provider's model
+  const matchedModel = avatarModels.find((m) => m.modelId === avatarModel);
+  const costPerMinute = matchedModel?.costPerMinute ?? null;
+  const includedOnPlatform = includedModels.includes(avatarModel);
+
+  const pricingMeta = { costPerMinute, includedOnPlatform };
+
   // Check Redis cache
   const redis = createRedisConnection('avatar-cache');
   const cacheKey = `avatars:${provider}:${podcastId}`;
@@ -49,6 +68,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           heygen: !!process.env.HEYGEN_API_KEY,
           runway: !!process.env.RUNWAY_API_KEY,
         },
+        pricing: pricingMeta,
       });
     }
   } catch {
@@ -71,6 +91,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         heygen: !!process.env.HEYGEN_API_KEY,
         runway: !!process.env.RUNWAY_API_KEY,
       },
+      pricing: pricingMeta,
     });
   } catch (err) {
     logger.error('Failed to list avatars', {
