@@ -5,20 +5,7 @@ import { uploadFile } from '@/lib/r2';
 import { logger } from '@/lib/logger';
 import { createTtsProviderAsync } from '@/lib/providers/tts';
 import type { TtsProviderId } from '@/lib/providers/tts-registry';
-
-/** Return the platform API key for a given TTS provider. */
-function getPlatformTtsKey(pid: TtsProviderId): string | undefined {
-  switch (pid) {
-    case 'elevenlabs': return process.env.ELEVENLABS_API_KEY;
-    case 'openai': return process.env.OPENAI_API_KEY;
-    case 'cartesia': return process.env.CARTESIA_API_KEY;
-    case 'hume': return process.env.HUME_API_KEY;
-    case 'fal': case 'minimax': return process.env.FAL_KEY;
-    case 'replicate': return process.env.REPLICATE_API_TOKEN;
-    case 'kittentts': return undefined;
-    default: return undefined;
-  }
-}
+import { getPlatformTtsKey } from '@/lib/tts-generation';
 
 export async function processDemoVoiceover(job: Job<GenerateDemoVoiceoverPayload>): Promise<void> {
   const { projectId, sceneId } = job.data;
