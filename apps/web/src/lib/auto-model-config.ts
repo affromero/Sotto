@@ -155,6 +155,7 @@ export async function getAutoModelConfig(): Promise<AutoModelConfigData> {
   const AVATAR_MODEL_MIGRATIONS: Record<string, string> = {
     'avatar-iii': 'heygen-avatar-standard',
     'avatar-iv': 'heygen-avatar-iv',
+    'runway-avatar-realtime': 'runway-characters',
   };
   for (const [field, label] of [
     ['freeAvatarModel', 'free'] as const,

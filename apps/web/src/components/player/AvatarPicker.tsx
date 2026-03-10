@@ -23,6 +23,11 @@ interface AvatarSelection {
   isPreset: boolean;
 }
 
+interface AvatarPricing {
+  costPerMinute: number | null;
+  includedOnPlatform: boolean;
+}
+
 export function AvatarPicker({ podcastId, speakers, onConfigured, onCancel, podcastDuration }: AvatarPickerProps) {
   const [avatars, setAvatars] = useState<UnifiedAvatarData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,15 +37,21 @@ export function AvatarPicker({ podcastId, speakers, onConfigured, onCancel, podc
   const [search, setSearch] = useState('');
   const [activeProvider, setActiveProvider] = useState<'heygen' | 'runway'>('heygen');
   const [availableProviders, setAvailableProviders] = useState<{ heygen: boolean; runway: boolean }>({ heygen: false, runway: false });
+  const [pricing, setPricing] = useState<AvatarPricing>({ costPerMinute: null, includedOnPlatform: false });
 
   const overDuration = podcastDuration > MAX_DURATION;
 
   useEffect(() => {
     fetch(`/api/podcasts/${podcastId}/video/avatars?provider=${activeProvider}`)
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error('Failed to load avatars'))))
-      .then((data: { avatars: UnifiedAvatarData[]; providers: { heygen: boolean; runway: boolean } }) => {
+      .then((data: {
+        avatars: UnifiedAvatarData[];
+        providers: { heygen: boolean; runway: boolean };
+        pricing?: AvatarPricing;
+      }) => {
         setAvatars(data.avatars);
         setAvailableProviders(data.providers);
+        if (data.pricing) setPricing(data.pricing);
       })
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load avatars'))
       .finally(() => setLoading(false));
@@ -94,7 +105,7 @@ export function AvatarPicker({ podcastId, speakers, onConfigured, onCancel, podc
   }, [selections, podcastId, onConfigured]);
 
   const selectedCount = Object.keys(selections).length;
-  const estimatedCost = estimateAvatarCost(podcastDuration, selectedCount);
+  const estimatedCost = estimateAvatarCost(podcastDuration, selectedCount, pricing.costPerMinute ?? undefined);
 
   // Check if any selection uses Runway
   const hasRunwaySelection = Object.values(selections).some((s) => s.provider === 'runway');
@@ -218,7 +229,15 @@ export function AvatarPicker({ podcastId, speakers, onConfigured, onCancel, podc
       <div className={styles.footer}>
         <p className={styles.costEstimate}>
           {selectedCount > 0
-            ? `${selectedCount} avatar${selectedCount > 1 ? 's' : ''}, est. ${formatAvatarCost(estimatedCost)}`
+            ? (
+              <>
+                {selectedCount} avatar{selectedCount > 1 ? 's' : ''}
+                {pricing.includedOnPlatform
+                  ? <>, <span className={styles.costLabel}>Included</span> &middot; est. {formatAvatarCost(estimatedCost)} on us</>
+                  : <>, est. {formatAvatarCost(estimatedCost)}</>
+                }
+              </>
+            )
             : 'Select avatars for each speaker'}
         </p>
         <div className={styles.footerActions}>
