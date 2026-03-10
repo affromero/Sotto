@@ -14,6 +14,7 @@ import { useLocalSearchParams, Stack } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import TrackPlayer, { useProgress, usePlaybackState, State } from 'react-native-track-player';
+import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography, borderRadius, getContentBadgeLabel } from '@sotto/shared';
 import type { PodcastDetail, SegmentData } from '@sotto/shared';
 import { api } from '../../lib/api';
@@ -320,7 +321,7 @@ export default function PodcastScreen() {
             accessibilityLabel="Skip backward 15 seconds"
             accessibilityRole="button"
           >
-            <Text style={styles.skipText}>-15</Text>
+            <Ionicons name="play-back" size={24} color={colors.primary} />
           </Pressable>
 
           <Pressable
@@ -329,7 +330,7 @@ export default function PodcastScreen() {
             accessibilityLabel={isPlaying ? 'Pause' : 'Play'}
             accessibilityRole="button"
           >
-            <Text style={styles.playIcon}>{isPlaying ? '\u275A\u275A' : '\u25B6'}</Text>
+            <Ionicons name={isPlaying ? 'pause' : 'play'} size={28} color={colors.textInverse} style={!isPlaying && styles.playIconOffset} />
           </Pressable>
 
           <Pressable
@@ -338,7 +339,7 @@ export default function PodcastScreen() {
             accessibilityLabel="Skip forward 15 seconds"
             accessibilityRole="button"
           >
-            <Text style={styles.skipText}>+15</Text>
+            <Ionicons name="play-forward" size={24} color={colors.primary} />
           </Pressable>
         </View>
 
@@ -361,14 +362,11 @@ export default function PodcastScreen() {
             accessibilityLabel={podcast.isLiked ? 'Unlike podcast' : 'Like podcast'}
             accessibilityRole="button"
           >
-            <Text
-              style={[
-                styles.likeIcon,
-                podcast.isLiked && styles.likeIconActive,
-              ]}
-            >
-              {podcast.isLiked ? '\u2665' : '\u2661'}
-            </Text>
+            <Ionicons
+              name={podcast.isLiked ? 'heart' : 'heart-outline'}
+              size={22}
+              color={podcast.isLiked ? colors.error : colors.textSecondary}
+            />
             <Text style={styles.likeCount}>{podcast.likeCount}</Text>
           </Pressable>
         </View>
@@ -726,10 +724,8 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 6,
   },
-  playIcon: {
-    fontSize: 28,
-    color: colors.textInverse,
-    marginLeft: 2,
+  playIconOffset: {
+    marginLeft: 3,
   },
 
   // Speed + Like
