@@ -213,6 +213,16 @@ describe('TranscriptPanel', () => {
       expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalled();
     });
 
+    it('does not scroll page when container is not scrollable', () => {
+      const { rerender } = render(
+        <TranscriptPanel segments={mockSegments} currentTime={0} />
+      );
+      // Container is NOT scrollable (default jsdom: scrollHeight === clientHeight)
+      (HTMLElement.prototype.scrollIntoView as ReturnType<typeof vi.fn>).mockClear();
+      rerender(<TranscriptPanel segments={mockSegments} currentTime={6} />);
+      expect(HTMLElement.prototype.scrollIntoView).not.toHaveBeenCalled();
+    });
+
     it('segment click re-engages auto-scroll', () => {
       const onSegmentClick = vi.fn();
       const { container, rerender } = render(

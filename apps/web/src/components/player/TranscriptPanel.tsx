@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef } from 'react';
 import { parseTextWithCitations } from '@/lib/citation-parser';
-import { useScrollFollow } from '@/lib/hooks/useScrollFollow';
+import { useScrollFollow, isScrollable } from '@/lib/hooks/useScrollFollow';
 import { getSpeakerIndex, getUniqueSpeakers } from '@/lib/speaker-colors';
 import { SegmentQuestionBadge } from '@/components/player/SegmentQuestionBadge';
 import { ClaimFlagButton } from '@/components/player/ClaimFlagButton';
@@ -37,7 +37,8 @@ export function TranscriptPanel({
   const speakers = useMemo(() => getUniqueSpeakers(segments), [segments]);
 
   useEffect(() => {
-    if (isFollowing) {
+    const container = scrollContainerRef.current;
+    if (isFollowing && container && isScrollable(container)) {
       activeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   }, [currentTime, isFollowing]);
