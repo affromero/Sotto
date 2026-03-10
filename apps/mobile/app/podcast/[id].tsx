@@ -10,6 +10,12 @@ import {
   Alert,
   FlatList,
 } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withSequence,
+} from 'react-native-reanimated';
 import { useLocalSearchParams, Stack } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -57,6 +63,18 @@ export default function PodcastScreen() {
   const { position, duration: trackDuration } = useProgress(1000);
   const playbackState = usePlaybackState();
   const isPlaying = playbackState.state === State.Playing;
+
+  // Animation values for player buttons
+  const playScale = useSharedValue(1);
+  const likeScale = useSharedValue(1);
+
+  const playAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: playScale.value }],
+  }));
+
+  const likeAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: likeScale.value }],
+  }));
 
   const {
     data: podcast,
@@ -139,12 +157,16 @@ export default function PodcastScreen() {
   }, [playerReady, podcast?.id, podcast?.audioUrl, podcast?.title, podcast?.user?.name]);
 
   const handlePlayPause = useCallback(async () => {
+    playScale.value = withSequence(
+      withSpring(0.9, { damping: 15, stiffness: 400 }),
+      withSpring(1.0, { damping: 10, stiffness: 200 }),
+    );
     if (isPlaying) {
       await TrackPlayer.pause();
     } else {
       await TrackPlayer.play();
     }
-  }, [isPlaying]);
+  }, [isPlaying, playScale]);
 
   const handleSkipForward = useCallback(async () => {
     const current = await TrackPlayer.getProgress();
@@ -324,14 +346,16 @@ export default function PodcastScreen() {
             <Ionicons name="play-back" size={24} color={colors.primary} />
           </Pressable>
 
-          <Pressable
-            onPress={handlePlayPause}
-            style={styles.playButton}
-            accessibilityLabel={isPlaying ? 'Pause' : 'Play'}
-            accessibilityRole="button"
-          >
-            <Ionicons name={isPlaying ? 'pause' : 'play'} size={28} color={colors.textInverse} style={!isPlaying && styles.playIconOffset} />
-          </Pressable>
+          <Animated.View style={playAnimatedStyle}>
+            <Pressable
+              onPress={handlePlayPause}
+              style={styles.playButton}
+              accessibilityLabel={isPlaying ? 'Pause' : 'Play'}
+              accessibilityRole="button"
+            >
+              <Ionicons name={isPlaying ? 'pause' : 'play'} size={28} color={colors.textInverse} style={!isPlaying && styles.playIconOffset} />
+            </Pressable>
+          </Animated.View>
 
           <Pressable
             onPress={handleSkipForward}
@@ -357,16 +381,24 @@ export default function PodcastScreen() {
           </Pressable>
 
           <Pressable
-            onPress={() => likeMutation.mutate()}
+            onPress={() => {
+              likeScale.value = withSequence(
+                withSpring(1.3, { damping: 8, stiffness: 400 }),
+                withSpring(1.0, { damping: 10, stiffness: 200 }),
+              );
+              likeMutation.mutate();
+            }}
             style={styles.likeButton}
             accessibilityLabel={podcast.isLiked ? 'Unlike podcast' : 'Like podcast'}
             accessibilityRole="button"
           >
-            <Ionicons
-              name={podcast.isLiked ? 'heart' : 'heart-outline'}
-              size={22}
-              color={podcast.isLiked ? colors.error : colors.textSecondary}
-            />
+            <Animated.View style={likeAnimatedStyle}>
+              <Ionicons
+                name={podcast.isLiked ? 'heart' : 'heart-outline'}
+                size={22}
+                color={podcast.isLiked ? colors.error : colors.textSecondary}
+              />
+            </Animated.View>
             <Text style={styles.likeCount}>{podcast.likeCount}</Text>
           </Pressable>
         </View>

@@ -1,4 +1,5 @@
-import { View, Text, StyleSheet } from 'react-native';
+import { Text, StyleSheet } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography } from '@sotto/shared';
 
@@ -11,7 +12,7 @@ interface EmptyStateProps {
 
 export function EmptyState({ icon, iconName, title, subtitle }: EmptyStateProps) {
   return (
-    <View style={styles.container}>
+    <Animated.View entering={FadeIn.duration(500)} style={styles.container}>
       {iconName ? (
         <Ionicons name={iconName} size={48} color={colors.textTertiary} style={styles.iconSpacing} />
       ) : icon ? (
@@ -19,7 +20,7 @@ export function EmptyState({ icon, iconName, title, subtitle }: EmptyStateProps)
       ) : null}
       <Text style={styles.title}>{title}</Text>
       {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
-    </View>
+    </Animated.View>
   );
 }
 

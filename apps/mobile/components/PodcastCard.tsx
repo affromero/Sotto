@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography, borderRadius, getContentBadgeLabel } from '@sotto/shared';
 import type { PodcastSummary } from '@sotto/shared';
 import { Avatar } from './Avatar';
+import { AnimatedPressable } from './AnimatedPressable';
 import { getPodcastGradient } from '../lib/gradients';
 import { shadowLg, shadowSm } from '../lib/shadows';
 import { formatDuration, formatCount, timeAgo, formatDurationMinutes } from '../lib/formatters';
@@ -40,8 +41,8 @@ function FeedCard({
   const gradient = getPodcastGradient(podcast.id);
 
   return (
-    <Pressable
-      style={({ pressed }) => [styles.feedCard, pressed && styles.feedCardPressed]}
+    <AnimatedPressable
+      style={styles.feedCard}
       onPress={onPress}
     >
       <LinearGradient
@@ -118,7 +119,7 @@ function FeedCard({
           </View>
         </View>
       </LinearGradient>
-    </Pressable>
+    </AnimatedPressable>
   );
 }
 
@@ -173,9 +174,6 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     overflow: 'hidden',
     ...shadowLg,
-  },
-  feedCardPressed: {
-    opacity: 0.92,
   },
   feedGradient: {
     minHeight: 180,
