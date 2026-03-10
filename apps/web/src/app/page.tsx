@@ -43,9 +43,9 @@ export default function LandingPage() {
             <em>Studio-quality podcast.</em>
           </h1>
           <p className={styles.heroSub}>
-            Sotto writes a fact-checked two-voice script, generates audio with
-            professional AI voices from 7 providers, and turns it into video &mdash;
-            all in minutes.
+            Sotto writes a fact-checked script &mdash; dialogue, monologue, or panel &mdash;
+            generates audio with professional AI voices from 7 providers, and turns it
+            into video. All in minutes.
           </p>
           <AuthCTA source="hero" />
         </div>
@@ -81,9 +81,10 @@ export default function LandingPage() {
               </div>
               <h3>AI Script Generation</h3>
               <p>
-                Describe any topic. Sotto researches, writes a two-voice script with
-                citations, and fact-checks every claim through multiple verification
-                loops. Review and edit every line before generating.
+                Describe any topic. Sotto researches, writes a script &mdash; dialogue,
+                monologue, or panel &mdash; with citations and fact-checks every claim
+                through multiple verification loops. Review and edit every line before
+                generating.
               </p>
             </article>
             <article className={styles.pillar} data-reveal style={{ "--reveal-index": 1 } as React.CSSProperties}>
@@ -106,8 +107,8 @@ export default function LandingPage() {
               <h3>7 Voice Providers</h3>
               <p>
                 ElevenLabs, Cartesia, Hume, OpenAI, and more &mdash; or clone your own
-                voice. Every podcast gets a unique host&ndash;expert pair matched by tone,
-                accent, and style.
+                voice. Dialogue, monologue, panel &mdash; every format gets voices matched
+                by tone, accent, and style.
               </p>
             </article>
             <article className={styles.pillar} data-reveal style={{ "--reveal-index": 2 } as React.CSSProperties}>
@@ -324,8 +325,8 @@ export default function LandingPage() {
             <h2 className={styles.h2}>Every podcast sounds different. By design.</h2>
             <p className={styles.bodyLg}>
               Choose from 7 TTS providers &mdash; ElevenLabs, Cartesia, Hume, OpenAI, Fal, MiniMax,
-              and Replicate &mdash; or clone your own voice. Every podcast pairs a unique host and
-              expert for natural, engaging conversation.
+              and Replicate &mdash; or clone your own voice. Dialogues, monologues, panels &mdash;
+              every format gets voices matched for natural, engaging conversation.
             </p>
           </div>
           <div className={styles.voiceGrid}>
@@ -349,19 +350,20 @@ export default function LandingPage() {
             <div className={styles.pairingExample}>
               <div className={`${styles.pairingRole} ${styles.pairingHost}`}>
                 <span className={styles.pairingDot} />
-                Host
+                Speaker A
               </div>
               <div className={styles.pairingLine} aria-hidden="true" />
               <div className={styles.pairingLabel}>contrasting voices</div>
               <div className={styles.pairingLine} aria-hidden="true" />
               <div className={`${styles.pairingRole} ${styles.pairingExpert}`}>
                 <span className={styles.pairingDot} />
-                Expert
+                Speaker B
               </div>
             </div>
             <p className={styles.pairingHint}>
               Sotto automatically pairs voices with different genders, accents, or tones for
-              auditory contrast. Or pick your own combination.
+              auditory contrast &mdash; whether it&apos;s a dialogue, panel, or solo narration.
+              Or pick your own combination.
             </p>
           </div>
         </div>
@@ -1046,7 +1048,7 @@ export default function LandingPage() {
                 <h3>Describe your topic</h3>
                 <p>
                   Chat with Sotto about what you want to learn. AI researches your topic, writes a
-                  two-voice script with citations, and verifies every claim.
+                  script with citations, and verifies every claim.
                 </p>
               </div>
             </div>
@@ -1058,7 +1060,7 @@ export default function LandingPage() {
                 <p>
                   Pick from 7 TTS providers &mdash; ElevenLabs, Cartesia, Hume, and more &mdash;
                   or use your cloned voice. Sotto generates studio-quality audio with distinct
-                  host and expert voices.
+                  voices matched to your format.
                 </p>
               </div>
             </div>
