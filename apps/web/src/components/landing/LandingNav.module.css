@@ -120,15 +120,12 @@
   font-weight: 600;
   border-radius: var(--radius-lg);
   text-decoration: none;
-  transition:
-    background var(--transition-fast),
-    transform var(--transition-fast);
+  transition: background var(--transition-fast);
 }
 
 .navCta:hover {
   background: var(--color-primary-hover);
   color: #fff;
-  transform: translateY(-1px);
 }
 
 /* Hamburger */

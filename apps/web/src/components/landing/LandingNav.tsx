@@ -28,15 +28,10 @@ export function LandingNav() {
         <Link href="/" className={styles.navLogo} aria-label="Sotto home">
           Sotto
         </Link>
-        <div className={`${styles.navLinks} ${menuOpen ? styles.navLinksOpen : ''}`}>
-          <a href="#features" onClick={() => setMenuOpen(false)}>
-            Features
-          </a>
-          <Link href="/voices" onClick={() => setMenuOpen(false)}>
-            Voices
-          </Link>
-        </div>
         <div className={styles.navRight}>
+          <Link href="/create" className={styles.navSign}>
+            Create
+          </Link>
           <Link href="/feed" className={styles.navCta}>
             Explore Feed
           </Link>
