@@ -3,6 +3,7 @@ import path from 'path';
 import { renderRouter, preWarmBundle } from './routes/render';
 import { recordRouter } from './routes/record';
 import { stitchRouter } from './routes/stitch';
+import { probeRouter } from './routes/probe';
 
 const app = express();
 app.use(express.json({ limit: '50mb' }));
@@ -16,6 +17,7 @@ app.use('/assets/sfx', express.static(path.resolve(__dirname, '../assets/sfx')))
 app.use('/render', renderRouter);
 app.use('/record', recordRouter);
 app.use('/stitch', stitchRouter);
+app.use('/probe', probeRouter);
 
 // GET /health — health check
 app.get('/health', (_req, res) => {
