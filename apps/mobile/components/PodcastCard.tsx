@@ -1,4 +1,5 @@
 import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { useQueryClient } from '@tanstack/react-query';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography, borderRadius, getContentBadgeLabel } from '@sotto/shared';
@@ -38,6 +39,9 @@ function FeedCard({
   podcast: PodcastSummary;
   onPress: () => void;
 }) {
+  const queryClient = useQueryClient();
+  const currentUser = queryClient.getQueryData<{ id: string }>(['user', 'me']);
+  const isOwner = currentUser?.id === podcast.user.id;
   const gradient = getPodcastGradient(podcast.id);
 
   return (
@@ -99,19 +103,23 @@ function FeedCard({
           ) : null}
 
           <View style={styles.feedFooter}>
-            <View style={styles.statRow}>
-              <Ionicons name="play" size={13} color="rgba(255,255,255,0.7)" />
-              <Text style={styles.statText}>{formatCount(podcast.playCount)}</Text>
-            </View>
-            <View style={styles.statRow}>
-              <Ionicons name="heart-outline" size={13} color="rgba(255,255,255,0.7)" />
-              <Text style={styles.statText}>{formatCount(podcast.likeCount)}</Text>
-            </View>
-            <View style={styles.statRow}>
-              <Ionicons name="git-branch-outline" size={13} color="rgba(255,255,255,0.7)" />
-              <Text style={styles.statText}>{formatCount(podcast.forkCount)}</Text>
-            </View>
-            <View style={styles.durationBadge}>
+            {isOwner && (
+              <>
+                <View style={styles.statRow}>
+                  <Ionicons name="play" size={13} color="rgba(255,255,255,0.7)" />
+                  <Text style={styles.statText}>{formatCount(podcast.playCount)}</Text>
+                </View>
+                <View style={styles.statRow}>
+                  <Ionicons name="heart-outline" size={13} color="rgba(255,255,255,0.7)" />
+                  <Text style={styles.statText}>{formatCount(podcast.likeCount)}</Text>
+                </View>
+                <View style={styles.statRow}>
+                  <Ionicons name="git-branch-outline" size={13} color="rgba(255,255,255,0.7)" />
+                  <Text style={styles.statText}>{formatCount(podcast.forkCount)}</Text>
+                </View>
+              </>
+            )}
+            <View style={[styles.durationBadge, !isOwner && styles.durationBadgeOnly]}>
               <Text style={styles.durationText}>
                 {formatDuration(podcast.duration)}
               </Text>
@@ -130,6 +138,10 @@ function CompactCard({
   podcast: PodcastSummary;
   onPress: () => void;
 }) {
+  const queryClient = useQueryClient();
+  const currentUser = queryClient.getQueryData<{ id: string }>(['user', 'me']);
+  const isOwner = currentUser?.id === podcast.user.id;
+
   return (
     <Pressable
       onPress={onPress}
@@ -150,10 +162,14 @@ function CompactCard({
               {formatDurationMinutes(podcast.duration)}
             </Text>
           )}
-          <Text style={styles.compactMetaDot}>{'\u00B7'}</Text>
-          <Text style={styles.compactMetaText}>
-            {podcast.likeCount} {podcast.likeCount === 1 ? 'like' : 'likes'}
-          </Text>
+          {isOwner && (
+            <>
+              <Text style={styles.compactMetaDot}>{'\u00B7'}</Text>
+              <Text style={styles.compactMetaText}>
+                {podcast.likeCount} {podcast.likeCount === 1 ? 'like' : 'likes'}
+              </Text>
+            </>
+          )}
           {podcast.status !== 'READY' && (
             <>
               <Text style={styles.compactMetaDot}>{'\u00B7'}</Text>
@@ -285,6 +301,9 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: borderRadius.full,
     backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  durationBadgeOnly: {
+    marginLeft: 0,
   },
   durationText: {
     fontFamily: typography.fontBody,

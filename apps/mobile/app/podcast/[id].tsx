@@ -9,6 +9,7 @@ import {
   TextInput,
   Alert,
   FlatList,
+  Share,
 } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -33,6 +34,7 @@ import { setupPlayer, loadTrack } from '../../lib/audio-player';
 import { formatTime } from '../../lib/formatters';
 import { usePlaybackTelemetry } from '../../lib/usePlaybackTelemetry';
 import type { PlaybackSnapshot } from '../../lib/usePlaybackTelemetry';
+import { ForkModal } from '../../components/ForkModal';
 
 const PLAYBACK_SPEEDS = [0.5, 1, 1.25, 1.5, 2] as const;
 
@@ -62,6 +64,7 @@ export default function PodcastScreen() {
   const [questionText, setQuestionText] = useState('');
   const [progressBarWidth, setProgressBarWidth] = useState(0);
   const [teleprompterEnabled, setTeleprompterEnabled] = useState(false);
+  const [forkModalVisible, setForkModalVisible] = useState(false);
   const lastSeekFromRef = useRef<number | undefined>(undefined);
   const interactionCountRef = useRef(0);
 
@@ -79,6 +82,11 @@ export default function PodcastScreen() {
 
   const likeAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: likeScale.value }],
+  }));
+
+  const saveScale = useSharedValue(1);
+  const saveAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: saveScale.value }],
   }));
 
   // Question FAB pulse
@@ -124,6 +132,38 @@ export default function PodcastScreen() {
           likeCount: previous.isLiked
             ? previous.likeCount - 1
             : previous.likeCount + 1,
+        });
+      }
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(['podcast', id], context.previous);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['podcast', id] });
+    },
+  });
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      if (podcast?.isSaved) {
+        await api.delete(`/podcasts/${id}/save`);
+      } else {
+        await api.post(`/podcasts/${id}/save`);
+      }
+    },
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ['podcast', id] });
+      const previous = queryClient.getQueryData<PodcastDetail>(['podcast', id]);
+      if (previous) {
+        queryClient.setQueryData<PodcastDetail>(['podcast', id], {
+          ...previous,
+          isSaved: !previous.isSaved,
+          saveCount: previous.isSaved
+            ? previous.saveCount - 1
+            : previous.saveCount + 1,
         });
       }
       return { previous };
@@ -227,6 +267,14 @@ export default function PodcastScreen() {
     });
   }, [questionText, position, interactMutation]);
 
+  const handleShare = useCallback(async () => {
+    if (!podcast) return;
+    await Share.share({
+      message: `${podcast.title} — Listen on Sotto\nhttps://sotto.fm/podcast/${podcast.id}`,
+      url: `https://sotto.fm/podcast/${podcast.id}`,
+    });
+  }, [podcast]);
+
   // Playback telemetry
   const playbackSnapshot: PlaybackSnapshot = useMemo(() => ({
     podcastId: id,
@@ -283,6 +331,8 @@ export default function PodcastScreen() {
   }
 
   const gradient = getPodcastGradient(podcast.id);
+  const currentUser = queryClient.getQueryData<{ id: string }>(['user', 'me']);
+  const isOwner = currentUser?.id === podcast.user?.id;
 
   const listHeader = (
     <>
@@ -396,7 +446,7 @@ export default function PodcastScreen() {
           </Pressable>
         </View>
 
-        {/* Speed + Like Row */}
+        {/* Action Row: Speed + Social Icons */}
         <View style={styles.actionRow}>
           <Pressable
             onPress={handleSpeedToggle}
@@ -409,27 +459,72 @@ export default function PodcastScreen() {
             </Text>
           </Pressable>
 
-          <Pressable
-            onPress={() => {
-              likeScale.value = withSequence(
-                withSpring(1.3, { damping: 8, stiffness: 400 }),
-                withSpring(1.0, { damping: 10, stiffness: 200 }),
-              );
-              likeMutation.mutate();
-            }}
-            style={styles.likeButton}
-            accessibilityLabel={podcast.isLiked ? 'Unlike podcast' : 'Like podcast'}
-            accessibilityRole="button"
-          >
-            <Animated.View style={likeAnimatedStyle}>
-              <Ionicons
-                name={podcast.isLiked ? 'heart' : 'heart-outline'}
-                size={22}
-                color={podcast.isLiked ? colors.error : colors.textSecondary}
-              />
-            </Animated.View>
-            <Text style={styles.likeCount}>{podcast.likeCount}</Text>
-          </Pressable>
+          <View style={styles.actionIcons}>
+            <Pressable
+              onPress={() => {
+                likeScale.value = withSequence(
+                  withSpring(1.3, { damping: 8, stiffness: 400 }),
+                  withSpring(1.0, { damping: 10, stiffness: 200 }),
+                );
+                likeMutation.mutate();
+              }}
+              style={styles.actionIcon}
+              accessibilityLabel={podcast.isLiked ? 'Unlike podcast' : 'Like podcast'}
+              accessibilityRole="button"
+            >
+              <Animated.View style={likeAnimatedStyle}>
+                <Ionicons
+                  name={podcast.isLiked ? 'heart' : 'heart-outline'}
+                  size={22}
+                  color={podcast.isLiked ? colors.error : colors.textSecondary}
+                />
+              </Animated.View>
+              {isOwner && <Text style={styles.actionCount}>{podcast.likeCount}</Text>}
+            </Pressable>
+
+            <Pressable
+              onPress={() => {
+                saveScale.value = withSequence(
+                  withSpring(1.3, { damping: 8, stiffness: 400 }),
+                  withSpring(1.0, { damping: 10, stiffness: 200 }),
+                );
+                saveMutation.mutate();
+              }}
+              style={styles.actionIcon}
+              accessibilityLabel={podcast.isSaved ? 'Unsave podcast' : 'Save podcast'}
+              accessibilityRole="button"
+            >
+              <Animated.View style={saveAnimatedStyle}>
+                <Ionicons
+                  name={podcast.isSaved ? 'bookmark' : 'bookmark-outline'}
+                  size={22}
+                  color={podcast.isSaved ? colors.primary : colors.textSecondary}
+                />
+              </Animated.View>
+              {isOwner && <Text style={styles.actionCount}>{podcast.saveCount}</Text>}
+            </Pressable>
+
+            <Pressable
+              onPress={handleShare}
+              style={styles.actionIcon}
+              accessibilityLabel="Share podcast"
+              accessibilityRole="button"
+            >
+              <Ionicons name="share-outline" size={22} color={colors.textSecondary} />
+            </Pressable>
+
+            <Pressable
+              onPress={() => setForkModalVisible(true)}
+              style={styles.actionIcon}
+              accessibilityLabel="Fork podcast"
+              accessibilityRole="button"
+            >
+              <Ionicons name="git-branch-outline" size={22} color={colors.textSecondary} />
+              {isOwner && podcast.forks.length > 0 && (
+                <Text style={styles.actionCount}>{podcast.forks.length}</Text>
+              )}
+            </Pressable>
+          </View>
         </View>
       </View>
 
@@ -614,6 +709,13 @@ export default function PodcastScreen() {
           </View>
         </View>
       </Modal>
+
+      <ForkModal
+        visible={forkModalVisible}
+        onClose={() => setForkModalVisible(false)}
+        podcastId={podcast.id}
+        podcastTitle={podcast.title}
+      />
     </View>
   );
 }
@@ -823,23 +925,21 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.textSecondary,
   },
-  likeButton: {
+  actionIcons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  actionIcon: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
     paddingVertical: spacing.xs + 2,
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.xs + 2,
   },
-  likeIcon: {
-    fontSize: 22,
-    color: colors.textSecondary,
-  },
-  likeIconActive: {
-    color: colors.error,
-  },
-  likeCount: {
+  actionCount: {
     fontFamily: typography.fontBody,
-    fontSize: 14,
+    fontSize: 13,
     color: colors.textSecondary,
   },
 
