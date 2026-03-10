@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import styles from './DemoStudio.module.css';
 import { TimingEditor, computeAdjustedDuration, type TimingSegment } from './TimingEditor';
 import { ScriptViewer } from './ScriptViewer';
@@ -101,6 +101,19 @@ export function DemoStudio() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [scriptJson, setScriptJson] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result;
+      if (typeof text === 'string') setScriptJson(text);
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  }, []);
 
   const loadProjects = useCallback(async () => {
     const res = await fetch('/api/admin/demo');
@@ -309,6 +322,21 @@ export function DemoStudio() {
                   disabled={loading || !scriptJson.trim()}
                 >
                   {loading ? 'Importing...' : selectedProject ? 'Re-import Script' : 'Import & Create Project'}
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".json"
+                  onChange={handleFileUpload}
+                  className={styles.hiddenInput}
+                  aria-label="Upload JSON file"
+                />
+                <button
+                  className={styles.secondaryBtn}
+                  onClick={() => fileInputRef.current?.click()}
+                  type="button"
+                >
+                  Upload JSON File
                 </button>
               </div>
             </div>
