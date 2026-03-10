@@ -269,9 +269,22 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     select: { id: true, segmentId: true },
   });
 
+  // Fetch script turns for delivery directions (same pattern as segment-creator.ts)
+  const script = await prisma.script.findUnique({
+    where: { podcastId },
+    select: { turns: true },
+  });
+  const scriptTurns = (script?.turns ?? []) as Array<{ speaker: string; text: string; direction?: string }>;
+  const orderedSegments = podcast.segments;
+
   for (const vtSeg of vtSegments) {
-    const podcastSeg = podcast.segments.find(s => s.id === vtSeg.segmentId);
-    if (!podcastSeg) continue;
+    const segIndex = orderedSegments.findIndex(s => s.id === vtSeg.segmentId);
+    if (segIndex === -1) continue;
+    const podcastSeg = orderedSegments[segIndex];
+
+    const previousText = segIndex > 0 ? orderedSegments[segIndex - 1].text.slice(-500) : undefined;
+    const nextText = segIndex < orderedSegments.length - 1 ? orderedSegments[segIndex + 1].text.slice(0, 500) : undefined;
+    const direction = scriptTurns[podcastSeg.order]?.direction;
 
     const payload: GenerateVoiceTrackAudioPayload = {
       podcastId,
@@ -280,6 +293,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       segmentId: vtSeg.segmentId,
       speaker: podcastSeg.speaker,
       text: podcastSeg.text,
+      previousText,
+      nextText,
+      direction,
     };
     await addJob(voiceTrackAudioQueue, JobType.GENERATE_VOICE_TRACK_AUDIO, payload);
   }

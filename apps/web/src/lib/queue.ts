@@ -326,6 +326,9 @@ export interface GenerateVoiceTrackAudioPayload {
   segmentId: string;
   speaker: string;
   text: string;
+  previousText?: string;
+  nextText?: string;
+  direction?: string;
 }
 
 export interface StitchVoiceTrackPayload {
