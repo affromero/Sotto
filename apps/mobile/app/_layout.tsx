@@ -150,6 +150,8 @@ export default function RootLayout() {
               <Stack.Screen name="onboarding/index" options={{ headerShown: false }} />
               <Stack.Screen name="podcast/[id]" options={{ headerShown: false }} />
               <Stack.Screen name="podcast/[id]/edit" options={{ title: 'Edit Podcast' }} />
+              <Stack.Screen name="collections/index" options={{ title: 'Collections' }} />
+              <Stack.Screen name="collections/[id]" options={{ title: '' }} />
               <Stack.Screen name="user/[userId]" options={{ title: '' }} />
             </Stack>
             <MiniPlayer />
