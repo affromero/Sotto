@@ -28,7 +28,7 @@ const mockPrismaSegmentCreate = vi.fn().mockImplementation((args) => ({
 }));
 
 const mockPrismaPodcastUpdate = vi.fn().mockResolvedValue({});
-const mockPrismaPodcastFindUniqueOrThrow = vi.fn().mockResolvedValue({ aiModel: null });
+const mockPrismaPodcastFindUniqueOrThrow = vi.fn().mockResolvedValue({ aiModel: null, verificationMode: 'standard' });
 const mockPrismaTagFindMany = vi
   .fn()
   .mockResolvedValue([
@@ -225,7 +225,7 @@ describe('processScriptGeneration', () => {
       podcastId: 'podcast-001',
     });
     mockPrismaPodcastUpdate.mockResolvedValue({});
-    mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({ aiModel: null });
+    mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({ aiModel: null, verificationMode: 'standard' });
     mockPrismaSegmentCreate.mockImplementation((args) => ({
       id: `segment-${args.data.order}`,
       ...args.data,
@@ -1019,6 +1019,40 @@ describe('processScriptGeneration', () => {
 
       // Progress tracked
       expect(job.updateProgress).toHaveBeenCalledWith(100);
+    });
+  });
+
+  describe('demo mode (showcase)', () => {
+    it('passes mode: demo when verificationMode is showcase', async () => {
+      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+        aiModel: null,
+        verificationMode: 'showcase',
+      });
+
+      const job = createMockJob(defaultPayload);
+      await processScriptGeneration(job);
+
+      expect(mockGenerateScript).toHaveBeenCalledWith(
+        expect.objectContaining({
+          mode: 'demo',
+        })
+      );
+    });
+
+    it('passes mode: standard for non-showcase verificationMode', async () => {
+      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+        aiModel: null,
+        verificationMode: 'standard',
+      });
+
+      const job = createMockJob(defaultPayload);
+      await processScriptGeneration(job);
+
+      expect(mockGenerateScript).toHaveBeenCalledWith(
+        expect.objectContaining({
+          mode: 'standard',
+        })
+      );
     });
   });
 });

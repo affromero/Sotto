@@ -22,7 +22,7 @@ export type PodcastStatus =
 
 export type PodcastVisibility = 'PUBLIC' | 'UNLISTED' | 'PRIVATE';
 
-export type PodcastSource = 'WEB' | 'TWITTER' | 'TELEGRAM' | 'API' | 'IMPORT';
+export type PodcastSource = 'WEB' | 'TWITTER' | 'TELEGRAM' | 'API' | 'IMPORT' | 'ADMIN';
 
 export type Speaker = string;
 
