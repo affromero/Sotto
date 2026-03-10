@@ -906,3 +906,7 @@ export const generateMusicSchema = z.object({
 export const updateMusicVolumeSchema = z.object({
   volume: z.number().min(0).max(1),
 });
+
+export const selectMusicGenerationSchema = z.object({
+  generationId: z.string().min(1).max(100),
+});
