@@ -49,10 +49,17 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   const avatarModel = gate.isProUser ? config.proAvatarModel : config.freeAvatarModel;
   const includedModels = (gate.isProUser ? config.proIncludedAvatarModels : config.freeIncludedAvatarModels) ?? [];
 
-  // Find cost per minute for the active provider's model
-  const matchedModel = avatarModels.find((m) => m.modelId === avatarModel);
-  const costPerMinute = matchedModel?.costPerMinute ?? null;
-  const includedOnPlatform = includedModels.includes(avatarModel);
+  // Find cost per minute — use the configured model only if it matches the active provider,
+  // otherwise fall back to any model from the active provider
+  let matchedModel = avatarModels.find((m) => m.modelId === avatarModel && m.modelId.startsWith(provider));
+  if (!matchedModel) {
+    matchedModel = avatarModels.find((m) => m.modelId.startsWith(provider));
+  }
+  if (!matchedModel) {
+    return errorResponse(`No pricing found for ${provider} avatar model`, 503);
+  }
+  const costPerMinute = matchedModel.costPerMinute;
+  const includedOnPlatform = includedModels.includes(matchedModel.modelId);
 
   const pricingMeta = { costPerMinute, includedOnPlatform };
 

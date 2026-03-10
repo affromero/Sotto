@@ -24,7 +24,7 @@ interface AvatarSelection {
 }
 
 interface AvatarPricing {
-  costPerMinute: number | null;
+  costPerMinute: number;
   includedOnPlatform: boolean;
 }
 
@@ -37,7 +37,7 @@ export function AvatarPicker({ podcastId, speakers, onConfigured, onCancel, podc
   const [search, setSearch] = useState('');
   const [activeProvider, setActiveProvider] = useState<'heygen' | 'runway'>('heygen');
   const [availableProviders, setAvailableProviders] = useState<{ heygen: boolean; runway: boolean }>({ heygen: false, runway: false });
-  const [pricing, setPricing] = useState<AvatarPricing>({ costPerMinute: null, includedOnPlatform: false });
+  const [pricing, setPricing] = useState<AvatarPricing>({ costPerMinute: 0, includedOnPlatform: false });
 
   const overDuration = podcastDuration > MAX_DURATION;
 
@@ -105,7 +105,7 @@ export function AvatarPicker({ podcastId, speakers, onConfigured, onCancel, podc
   }, [selections, podcastId, onConfigured]);
 
   const selectedCount = Object.keys(selections).length;
-  const estimatedCost = estimateAvatarCost(podcastDuration, selectedCount, pricing.costPerMinute ?? undefined);
+  const estimatedCost = estimateAvatarCost(podcastDuration, selectedCount, pricing.costPerMinute);
 
   // Check if any selection uses Runway
   const hasRunwaySelection = Object.values(selections).some((s) => s.provider === 'runway');
