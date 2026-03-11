@@ -251,13 +251,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       },
     });
 
-    // Create voice assignments with per-speaker providers
+    // Create voice assignments with per-speaker provider + model
     await tx.voiceTrackVoice.createMany({
       data: resolvedVoiceProviders.map(v => ({
         voiceTrackId: track.id,
         speaker: v.speaker,
         voiceId: v.voiceId,
         provider: v.providerId,
+        ttsModel: v.ttsModel || null,
       })),
     });
 

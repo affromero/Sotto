@@ -2010,11 +2010,12 @@ model VoiceTrack {
 }
 
 model VoiceTrackVoice {
-  id           String @id @default(cuid())
+  id           String  @id @default(cuid())
   voiceTrackId String
   speaker      String
   voiceId      String
   provider     String? // TTS provider that assigned the voiceId
+  ttsModel     String? // TTS model for this speaker's provider
 
   voiceTrack VoiceTrack @relation(fields: [voiceTrackId], references: [id], onDelete: Cascade)
 
