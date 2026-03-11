@@ -128,39 +128,49 @@ export function DemoStudio() {
   }, []);
 
   const loadProjects = useCallback(async () => {
-    const res = await fetch('/api/admin/demo');
-    if (!res.ok) {
-      setError(`Failed to load projects: ${res.status} ${await res.text()}`);
-      return;
+    try {
+      const res = await fetch('/api/admin/demo');
+      if (!res.ok) {
+        setError(`Failed to load projects: ${res.status} ${await res.text()}`);
+        return;
+      }
+      setProjects(await res.json());
+    } catch (err) {
+      setError(`Failed to load projects: ${err instanceof Error ? err.message : String(err)}`);
     }
-    setProjects(await res.json());
   }, []);
 
   const loadProject = useCallback(async (id: string, navigate = false) => {
-    const res = await fetch(`/api/admin/demo/${id}`);
-    if (!res.ok) {
-      setError(`Failed to load project: ${res.status} ${await res.text()}`);
-      return;
-    }
-    const project: DemoProject = await res.json();
-    setSelectedProject(project);
-    // Only navigate on initial project selection, not on refresh/polling
-    if (navigate) {
-      if (project.status === 'SCRIPT_READY' || project.status === 'DRAFT') setStep('script');
-      else if (project.status === 'READY') setStep('compose');
-      else setStep('script');
+    try {
+      const res = await fetch(`/api/admin/demo/${id}`);
+      if (!res.ok) {
+        setError(`Failed to load project: ${res.status} ${await res.text()}`);
+        return;
+      }
+      const project: DemoProject = await res.json();
+      setSelectedProject(project);
+      if (navigate) {
+        if (project.status === 'SCRIPT_READY' || project.status === 'DRAFT') setStep('script');
+        else if (project.status === 'READY') setStep('compose');
+        else setStep('script');
+      }
+    } catch (err) {
+      setError(`Failed to load project: ${err instanceof Error ? err.message : String(err)}`);
     }
   }, []);
 
-  // Load TTS options for the picker
   const loadTtsOptions = useCallback(async () => {
-    const res = await fetch('/api/tts-options');
-    if (!res.ok) {
-      setError(`Failed to load TTS options: ${res.status} ${await res.text()}`);
-      return;
+    try {
+      const res = await fetch('/api/tts-options');
+      if (!res.ok) {
+        setError(`Failed to load TTS options: ${res.status} ${await res.text()}`);
+        return;
+      }
+      const data = await res.json();
+      setTtsOptions(data.options ?? []);
+    } catch (err) {
+      setError(`Failed to load TTS options: ${err instanceof Error ? err.message : String(err)}`);
     }
-    const data = await res.json();
-    setTtsOptions(data.options ?? []);
   }, []);
 
   useEffect(() => { loadProjects(); loadTtsOptions(); }, [loadProjects, loadTtsOptions]);
@@ -754,16 +764,20 @@ function TtsPicker({
     let cancelled = false;
     async function fetchVoices() {
       setLoadingVoices(true);
-      const res = await fetch(`/api/voices?provider=${currentProvider}`);
-      if (!cancelled && res.ok) {
-        const data = await res.json();
-        setVoices((data.poolVoices ?? []).map((v: VoiceOption) => ({
-          id: v.id,
-          name: v.name,
-          gender: v.gender,
-          accent: v.accent,
-          character: v.character,
-        })));
+      try {
+        const res = await fetch(`/api/voices?provider=${currentProvider}`);
+        if (!cancelled && res.ok) {
+          const data = await res.json();
+          setVoices((data.poolVoices ?? []).map((v: VoiceOption) => ({
+            id: v.id,
+            name: v.name,
+            gender: v.gender,
+            accent: v.accent,
+            character: v.character,
+          })));
+        }
+      } catch {
+        // Voice list unavailable — non-critical, picker falls back to "Default voice"
       }
       if (!cancelled) setLoadingVoices(false);
     }
