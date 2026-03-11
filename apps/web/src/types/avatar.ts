@@ -18,6 +18,7 @@ export interface AvatarOverlayData {
   runwayChunkIndex?: number | null;
   runwayTotalChunks?: number | null;
   enabledSegmentIds?: string[];
+  voiceTrackId?: string | null;
 }
 
 export interface HeyGenAvatarData {
