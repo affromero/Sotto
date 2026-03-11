@@ -168,6 +168,12 @@ export async function processSegmentRegeneration(
     data: { status: 'STALE' },
   });
 
+  // Mark READY video generation as stale — segment timeline has shifted
+  await prisma.videoGeneration.updateMany({
+    where: { podcastId, status: 'READY' },
+    data: { status: 'STALE' },
+  });
+
   // Queue re-stitch with skipSfx (SFX positions are invalid after inserting a segment)
   const allSegments = await prisma.segment.findMany({
     where: { podcastId },
