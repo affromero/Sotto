@@ -373,6 +373,31 @@ export async function cloneVoice(
 }
 
 /**
+ * Fetch a single voice by ID to validate it exists and get its metadata.
+ * Returns null if the voice is not found (404).
+ */
+export async function getVoiceById(
+  voiceId: string,
+  apiKeyOverride?: string
+): Promise<{ name: string; labels: Record<string, string> } | null> {
+  const apiKey = apiKeyOverride || getApiKey();
+  if (!apiKey) throw new Error('ElevenLabs API key not configured');
+
+  const response = await fetch(`${ELEVENLABS_BASE_URL}/voices/${voiceId}`, {
+    headers: { 'xi-api-key': apiKey },
+  });
+
+  if (response.status === 404) return null;
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`ElevenLabs API error (${response.status}): ${text}`);
+  }
+
+  const data = await response.json();
+  return { name: data.name as string, labels: (data.labels ?? {}) as Record<string, string> };
+}
+
+/**
  * Delete a cloned voice from ElevenLabs.
  */
 export async function deleteClonedVoice(voiceId: string, apiKeyOverride?: string): Promise<void> {
