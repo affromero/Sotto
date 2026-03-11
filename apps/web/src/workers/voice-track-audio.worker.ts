@@ -96,11 +96,13 @@ export async function processVoiceTrackAudio(job: Job<GenerateVoiceTrackAudioPay
   const trackVoice = voiceTrack.voices.find(v => v.speaker === speaker);
   const requestedProvider = (trackVoice?.provider || voiceTrack.ttsProvider) as TtsProviderId | null;
 
+  // Don't pass track-level ttsModel — voice tracks have mixed providers, so a
+  // single model (e.g. OpenAI's tts-1-hd) would be invalid for other providers
+  // (e.g. ElevenLabs). Let resolveTtsProvider pick the correct model per provider.
   const { provider, source, providerId } = await resolveTtsProvider({
     userId,
     podcastId,
     requestedProvider: requestedProvider ?? undefined,
-    requestedModel: voiceTrack.ttsModel,
     plan: voiceTrack.podcast.user.plan as 'FREE' | 'PRO',
   });
 
@@ -149,7 +151,6 @@ export async function processVoiceTrackAudio(job: Job<GenerateVoiceTrackAudioPay
     source,
     userId,
     podcastId,
-    requestedModel: voiceTrack.ttsModel,
     plan: voiceTrack.podcast.user.plan as 'FREE' | 'PRO',
     usageCategory: 'voice_track_audio',
     extraMetadata: { voiceTrackId },
