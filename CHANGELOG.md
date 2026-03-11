@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.14.0] - 2026-03-11
+
+### Added
+- **Background music**: Multi-provider music generation for podcasts with Suno BYOK support, dynamic model picker, and multi-generation selection with pricing
+- **Launch Video pipeline**: 7-step orchestration UI with SFX, overlays, subtitles, avatar PiP, action timing log, and avatar interceptor for instant recording
+- **Progressive avatar playback**: Runway chunks uploaded to R2 during recording with streaming indicator and chunk preview in player
+- **Per-scene composition**: Professional recording workflow with per-scene TTS picker and voice comparison baked into creation flow
+- **Pro daily generation limits**: Configurable daily limits for Pro users with billing integration, usage banners, and counter UI
+- **Unified Remotion video**: Consolidated video rendering on Remotion React with motion effects library, parameterized `/render` route, `/probe` endpoint, and deprecated `/stitch`
+- **Shared TTS generation module**: Extracted reusable TTS generation core (`lib/tts-generation.ts`) with unit tests
+- **Demo Studio enhancements**: Timing step with per-segment speed controls, dark mode inputs, AI/TTS selectors, voice comparison in creation flow
+
+### Changed
+- Voice tracks simplified to per-speaker provider/voice dropdowns
+- Feed cards redesigned: removed hero section, uniform card sizes, badges moved to bottom meta row, compact gradient covers
+- Landing page: replaced Features/Voices with Create link, removed hover jump
+
+### Fixed
+- TTS model resolution for BYOK users — per-voice model stored on VoiceTrackVoice, correct provider/model priority in voice track creation, ElevenLabs 404 fallback
+- Player scroll lock removed — guarded `scrollIntoView` with `isScrollable` check and removed page-level scroll hijack
+- Showcase crash prevention — all async callbacks wrapped in try/catch
+- Runway avatar fixes — real preset thumbnails, correct pricing lookup, 400 treated as non-retryable
+- Feed card title overlap and badge layout fixes
+- Video dismiss now deletes failed generation from DB
+- Suno provider switched to sunoapi.org with correct `callBackUrl` field
+
 ## [0.13.0] - 2026-03-10
 
 ### Added
