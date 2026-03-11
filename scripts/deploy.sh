@@ -104,6 +104,7 @@ echo "=== Pulling remotion from GHCR ==="
 GHCR_TOKEN=$(doppler secrets get GHCR_READ_TOKEN --plain)
 echo "${GHCR_TOKEN}" | docker login ghcr.io -u affromero --password-stdin
 docker compose -f "$COMPOSE_INFRA" pull remotion
+docker compose -f "$COMPOSE_INFRA" up -d --no-deps remotion
 
 # --- Pre-build cleanup (prevent disk exhaustion) ---
 
