@@ -1,5 +1,5 @@
 /* ==========================================================================
-   HERO CHAPTER — clean, focused: headline + subtitle + CTA
+   HERO CHAPTER — centered headline with atmospheric depth
    ========================================================================== */
 
 .root {
@@ -10,31 +10,47 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 120px var(--spacing-lg) 80px;
+  padding: 140px var(--spacing-lg) var(--section-pad-y);
   overflow: hidden;
 }
 
-.glow {
+/* Noise texture overlay */
+.root::before {
+  content: '';
   position: absolute;
-  top: 20%;
+  inset: 0;
+  background-image: var(--noise-texture);
+  background-repeat: repeat;
+  background-size: 200px 200px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Ambient glow — amber top-center, parallax via scroll-progress */
+.root::after {
+  content: '';
+  position: absolute;
+  top: 15%;
   left: 50%;
   width: 800px;
   height: 800px;
   background: radial-gradient(
-    circle,
-    rgba(217, 119, 6, 0.1) 0%,
+    ellipse,
+    rgba(217, 119, 6, 0.12) 0%,
     rgba(217, 119, 6, 0.03) 40%,
     transparent 70%
   );
-  transform: translateX(-50%);
+  transform: translateX(-50%) translateY(calc((1 - var(--scroll-progress, 0)) * 30px));
   pointer-events: none;
+  z-index: 0;
 }
 
+/* Content — centered stack */
 .content {
   position: relative;
   z-index: 1;
   text-align: center;
-  max-width: 680px;
+  max-width: 720px;
   width: 100%;
   animation: heroFadeIn 1s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
@@ -80,21 +96,24 @@
   50% { opacity: 0.4; }
 }
 
-/* Title */
+/* Title — dramatic typography, gradient emphasis */
 .title {
   font-family: var(--font-heading);
   font-size: clamp(3rem, 6vw + 1rem, 5rem);
   font-weight: 400;
   line-height: 1.05;
   color: #fff;
-  letter-spacing: -2px;
+  letter-spacing: -3px;
   margin-bottom: 24px;
   animation: heroFadeIn 0.9s var(--ease-out-expo) 0.2s both;
 }
 
 .title em {
   font-style: normal;
-  color: var(--color-primary);
+  background: var(--gradient-warm);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 /* Subtitle */
@@ -113,13 +132,17 @@
   animation: heroFadeIn 0.9s var(--ease-out-expo) 0.5s both;
 }
 
-/* Mobile */
+/* ==========================================================================
+   MOBILE
+   ========================================================================== */
+
 @media (max-width: 767px) {
   .root {
     padding: 100px var(--spacing-md) 60px;
   }
 
   .title {
+    font-size: clamp(2.5rem, 8vw, 3.5rem);
     letter-spacing: -1px;
   }
 
@@ -127,6 +150,10 @@
     font-size: 17px;
   }
 }
+
+/* ==========================================================================
+   REDUCED MOTION
+   ========================================================================== */
 
 @media (prefers-reduced-motion: reduce) {
   .content,

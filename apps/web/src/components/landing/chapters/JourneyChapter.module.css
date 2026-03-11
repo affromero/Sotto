@@ -1,9 +1,9 @@
 /* ==========================================================================
-   JOURNEY CHAPTER — 3-step alternating split layout (Airbnb-style)
+   JOURNEY CHAPTER — 3-step alternating split layout with glassmorphism mocks
    ========================================================================== */
 
 .root {
-  padding: 120px var(--spacing-lg);
+  padding: var(--section-pad-y) var(--spacing-lg);
   max-width: var(--max-content-width);
   margin: 0 auto;
 }
@@ -30,6 +30,31 @@
   font-weight: 400;
   color: var(--color-text);
   line-height: 1.15;
+}
+
+/* ==========================================================================
+   STEPS CONTAINER — vertical connecting line
+   ========================================================================== */
+
+.stepsContainer {
+  position: relative;
+}
+
+.stepsContainer::before {
+  content: '';
+  position: absolute;
+  left: 22px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    var(--color-primary) 20%,
+    var(--color-primary) 80%,
+    transparent
+  );
+  opacity: 0.2;
 }
 
 /* ==========================================================================
@@ -64,6 +89,16 @@
 .splitVisual {
   display: flex;
   justify-content: center;
+}
+
+/* Bleeding visuals — extend past content boundary */
+.split .splitVisual {
+  margin-right: -40px;
+}
+
+.splitReverse .splitVisual {
+  margin-left: -40px;
+  margin-right: 0;
 }
 
 /* Step number + text */
@@ -105,25 +140,24 @@
   color: var(--color-text-secondary, #6B7280);
 }
 
-/* Decorative line (hidden) */
-.stepLine {
-  display: none;
-}
-
 /* ==========================================================================
-   MOCK UI COMPONENTS — large, rounded, warm depth
+   MOCK UI COMPONENTS — glassmorphism, rich shadows
    ========================================================================== */
 
 .mockChat,
 .mockScript,
 .mockPlayer {
   width: 100%;
-  max-width: 420px;
+  max-width: 440px;
   background: var(--color-surface);
-  border: 1px solid rgba(0, 0, 0, 0.06);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-2xl);
   overflow: hidden;
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--shadow-xl);
+  transform: translateY(calc((1 - var(--scroll-progress, 0)) * 15px));
+  transition: transform 0.1s linear;
 }
 
 .mockHeader {
@@ -149,7 +183,10 @@
   padding: 20px;
 }
 
-/* Chat mock */
+/* ==========================================================================
+   CHAT MOCK — messages, typing indicator, chips
+   ========================================================================== */
+
 .mockMsg {
   display: flex;
   gap: 10px;
@@ -198,6 +235,36 @@
   font-weight: 700;
 }
 
+/* Typing indicator */
+.typingIndicator {
+  display: flex;
+  gap: 4px;
+  padding: 8px 0;
+  margin-left: 42px;
+  margin-bottom: 10px;
+}
+
+.typingIndicator span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-text-tertiary);
+  animation: typingBounce 1.4s ease-in-out infinite;
+}
+
+.typingIndicator span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.typingIndicator span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes typingBounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30% { transform: translateY(-4px); opacity: 1; }
+}
+
 .mockChips {
   display: flex;
   gap: 8px;
@@ -218,7 +285,10 @@
   opacity: 0.35;
 }
 
-/* Script mock */
+/* ==========================================================================
+   SCRIPT MOCK — line numbers, citations, actions
+   ========================================================================== */
+
 .scriptTurn {
   margin-bottom: 16px;
   padding-bottom: 16px;
@@ -228,6 +298,26 @@
 .scriptTurn:last-of-type {
   border-bottom: none;
   padding-bottom: 0;
+}
+
+.scriptLineRow {
+  display: flex;
+  gap: 12px;
+}
+
+.lineNum {
+  flex-shrink: 0;
+  width: 20px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+  text-align: right;
+  padding-top: 2px;
+  user-select: none;
+}
+
+.scriptContent {
+  flex: 1;
 }
 
 .scriptSpeaker {
@@ -245,6 +335,13 @@
 
 .scriptSpeaker[data-speaker='expert'] {
   color: var(--color-accent);
+}
+
+.citation {
+  color: var(--color-primary);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: default;
 }
 
 .scriptTurn p {
@@ -274,7 +371,10 @@
   color: #fff;
 }
 
-/* Player mock */
+/* ==========================================================================
+   PLAYER MOCK — play button, waveform animation, controls
+   ========================================================================== */
+
 .playerTitle {
   font-family: var(--font-heading);
   font-size: 1.25rem;
@@ -288,12 +388,33 @@
   margin-bottom: 20px;
 }
 
+.playerPlayRow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.playButton {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: var(--color-primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
 .playerWaveform {
+  flex: 1;
   display: flex;
   align-items: flex-end;
   gap: 3px;
   height: 36px;
-  margin-bottom: 16px;
 }
 
 .playerBar {
@@ -303,6 +424,9 @@
   border-radius: 2px;
   opacity: 0.35;
   height: calc(8px + sin(var(--i, 0) * 0.5) * 24px);
+  transform-origin: bottom;
+  animation: waveformPulse 1.5s ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * 50ms);
 }
 
 .playerBar:nth-child(-n+12) {
@@ -338,11 +462,15 @@
 
 @media (max-width: 767px) {
   .root {
-    padding: 80px var(--spacing-md);
+    padding: var(--section-pad-y-sm) var(--spacing-md);
   }
 
   .header {
     margin-bottom: 48px;
+  }
+
+  .stepsContainer::before {
+    display: none;
   }
 
   .split {
@@ -357,6 +485,12 @@
 
   .splitVisual {
     order: -1;
+  }
+
+  /* Remove bleeding on mobile */
+  .split .splitVisual,
+  .splitReverse .splitVisual {
+    margin: 0;
   }
 
   .mockChat,
@@ -375,5 +509,22 @@
     opacity: 1;
     transform: none;
     transition: none;
+  }
+
+  .mockChat,
+  .mockScript,
+  .mockPlayer {
+    transform: none;
+    transition: none;
+  }
+
+  .playerBar {
+    animation: none;
+    opacity: 0.5;
+  }
+
+  .typingIndicator span {
+    animation: none;
+    opacity: 0.4;
   }
 }

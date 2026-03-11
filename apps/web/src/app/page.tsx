@@ -6,6 +6,8 @@ import { HeroChapter } from '@/components/landing/chapters/HeroChapter';
 import { JourneyChapter } from '@/components/landing/chapters/JourneyChapter';
 import { TrustChapter } from '@/components/landing/chapters/TrustChapter';
 import { NetworkChapter } from '@/components/landing/chapters/NetworkChapter';
+import { ShowcaseChapter } from '@/components/landing/chapters/ShowcaseChapter';
+import { BotChapter } from '@/components/landing/chapters/BotChapter';
 import { ConvertChapter } from '@/components/landing/chapters/ConvertChapter';
 import styles from './page.module.css';
 
@@ -19,8 +21,10 @@ export default function LandingPage() {
         <div className={styles.chapters}>
           <HeroChapter />
           <JourneyChapter />
+          <ShowcaseChapter />
           <TrustChapter />
           <NetworkChapter />
+          <BotChapter />
           <ConvertChapter />
         </div>
       </LandingShell>

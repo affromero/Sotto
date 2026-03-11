@@ -1,11 +1,18 @@
 import { ScrollChapter } from '../ScrollChapter';
 import styles from './TrustChapter.module.css';
 
+const DOMAINS = [
+  { name: 'Academic', threshold: 82, dotClass: 'dotAcademic' },
+  { name: 'News', threshold: 65, dotClass: 'dotNews' },
+  { name: 'Government', threshold: 72, dotClass: 'dotGovernment' },
+  { name: 'General', threshold: 68, dotClass: 'dotGeneral' },
+] as const;
+
 export function TrustChapter() {
   return (
     <ScrollChapter id="verification">
       <div className={styles.root}>
-        {/* Trust strip */}
+        {/* Trust strip — full bleed */}
         <div className={styles.strip} data-reveal>
           <svg
             width="20"
@@ -27,9 +34,9 @@ export function TrustChapter() {
           </span>
         </div>
 
-        {/* Verification summary */}
-        <div className={styles.content}>
-          <div className={styles.header} data-reveal>
+        {/* Asymmetric 2-column */}
+        <div className={styles.columns}>
+          <div className={styles.colText} data-reveal>
             <span className={styles.overline}>Open Verification Standard</span>
             <div className={styles.pillRow}>
               <span className={styles.pill}>Bayesian v2</span>
@@ -39,70 +46,52 @@ export function TrustChapter() {
               Every reference is scored by its domain &mdash; because news articles don&apos;t
               need DOIs, and Wikipedia isn&apos;t held to the same bar as Nature.
             </p>
+
+            <p className={styles.footer}>
+              Scoring logic is open source &mdash;{' '}
+              <a
+                href="https://github.com/SottoFM/reference-verification-standard"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                view on GitHub
+              </a>
+              . Community improvements welcome.
+            </p>
           </div>
 
-          {/* Simplified verification card */}
-          <div className={styles.card} data-reveal>
-            <div className={styles.domains}>
-              <div className={styles.domain}>
-                <span
-                  className={styles.domainDot}
-                  style={{ background: '#1E3A5F' }}
-                  aria-hidden="true"
-                />
-                <span className={styles.domainName}>Academic</span>
-                <span className={styles.domainThreshold}>Bayes &ge; 82%</span>
+          <div className={styles.colVisual} data-reveal>
+            <div className={styles.card}>
+              <div className={styles.domains}>
+                {DOMAINS.map((d) => (
+                  <div key={d.name} className={styles.domain}>
+                    <span
+                      className={`${styles.domainDot} ${styles[d.dotClass]}`}
+                      aria-hidden="true"
+                    />
+                    <span className={styles.domainName}>{d.name}</span>
+                    <span className={styles.domainThreshold}>
+                      Bayes &ge; {d.threshold}%
+                    </span>
+                    <div className={styles.progressTrack}>
+                      <div
+                        className={styles.progressFill}
+                        style={{ '--fill-pct': `${d.threshold}%` } as React.CSSProperties}
+                      />
+                    </div>
+                  </div>
+                ))}
               </div>
-              <div className={styles.domain}>
-                <span
-                  className={styles.domainDot}
-                  style={{ background: '#D97706' }}
-                  aria-hidden="true"
-                />
-                <span className={styles.domainName}>News</span>
-                <span className={styles.domainThreshold}>Bayes &ge; 65%</span>
-              </div>
-              <div className={styles.domain}>
-                <span
-                  className={styles.domainDot}
-                  style={{ background: '#16A34A' }}
-                  aria-hidden="true"
-                />
-                <span className={styles.domainName}>Government</span>
-                <span className={styles.domainThreshold}>Bayes &ge; 72%</span>
-              </div>
-              <div className={styles.domain}>
-                <span
-                  className={styles.domainDot}
-                  style={{ background: '#6B7280' }}
-                  aria-hidden="true"
-                />
-                <span className={styles.domainName}>General</span>
-                <span className={styles.domainThreshold}>Bayes &ge; 68%</span>
-              </div>
-            </div>
 
-            <div className={styles.cardCallout}>
-              <p>
-                <strong>Claim-level verification</strong> &mdash; AI reads the exact sentence
-                that cites each reference and checks whether the source actually supports
-                the claim.
-              </p>
+              <div className={styles.cardCallout}>
+                <p>
+                  <strong>Claim-level verification</strong> &mdash; AI reads the exact sentence
+                  that cites each reference and checks whether the source actually supports
+                  the claim.
+                </p>
+              </div>
             </div>
           </div>
-
-          {/* Open source callout */}
-          <p className={styles.footer} data-reveal>
-            Scoring logic is open source &mdash;{' '}
-            <a
-              href="https://github.com/SottoFM/reference-verification-standard"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              view on GitHub
-            </a>
-            . Community improvements welcome.
-          </p>
         </div>
       </div>
     </ScrollChapter>
