@@ -11,6 +11,7 @@ interface AvatarOverlayProps {
   videoUrl: string;
   maxDuration?: number;
   streaming?: boolean;
+  failed?: boolean;
   speaker: string;
   posX: number;
   posY: number;
@@ -30,6 +31,7 @@ export function AvatarOverlay({
   videoUrl,
   maxDuration,
   streaming,
+  failed,
   speaker,
   posX,
   posY,
@@ -164,7 +166,7 @@ export function AvatarOverlay({
   return (
     <div
       ref={overlayRef}
-      className={`${styles.overlay} ${visible ? styles.visible : styles.hidden} ${editable ? styles.editable : ''} ${dragging ? styles.dragging : ''} ${streaming ? styles.streaming : ''} ${maskClass}`}
+      className={`${styles.overlay} ${visible ? styles.visible : styles.hidden} ${editable ? styles.editable : ''} ${dragging ? styles.dragging : ''} ${streaming ? styles.streaming : ''} ${failed ? styles.failed : ''} ${maskClass}`}
       style={{
         left: pxLeft,
         top: pxTop,
@@ -176,14 +178,18 @@ export function AvatarOverlay({
       onPointerUp={handlePointerUp}
       aria-label={`Avatar overlay for ${speaker}`}
     >
-      <video
-        ref={videoRef}
-        src={videoUrl}
-        className={`${styles.video} ${maskShape && maskShape !== 'none' ? styles.maskedVideo : ''}`}
-        muted
-        playsInline
-        loop
-      />
+      {failed ? (
+        <div className={styles.failedPlaceholder} aria-label={`Avatar for ${speaker} unavailable`} />
+      ) : (
+        <video
+          ref={videoRef}
+          src={videoUrl}
+          className={`${styles.video} ${maskShape && maskShape !== 'none' ? styles.maskedVideo : ''}`}
+          muted
+          playsInline
+          loop
+        />
+      )}
       {editable && (
         <>
           <span className={styles.speakerTag}>{speaker}</span>

@@ -51,6 +51,8 @@ const typeIcons: Record<string, typeof Bell> = {
   VOICE_VERIFICATION_FAILED: ShieldCheck,
   CONTENT_REMOVED: Trash2,
   REFERRAL_SIGNUP: Gift,
+  VIDEO_FAILED: AlertTriangle,
+  AVATAR_FAILED: AlertTriangle,
 };
 
 function getRelativeTime(dateString: string): string {
