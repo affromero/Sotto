@@ -14,7 +14,7 @@
 .playerView {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-sm);
+  gap: 4px;
 }
 
 /* Breadcrumb */
@@ -44,7 +44,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--spacing-sm);
-  margin-bottom: var(--spacing-md);
+  margin-bottom: var(--spacing-xs);
 }
 
 .podcastTitle {
@@ -310,7 +310,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--spacing-sm);
-  margin-top: var(--spacing-md);
+  margin-top: var(--spacing-xs);
 }
 
 /* Actions Row */
@@ -443,7 +443,7 @@
   border-radius: var(--radius-lg);
   padding: 0;
   align-self: flex-start;
-  margin-top: var(--spacing-sm);
+  margin-top: 0;
 }
 
 .viewToggleBtn {
@@ -498,19 +498,11 @@
 }
 
 .questionsSection {
-  margin-top: var(--spacing-lg);
+  margin-top: var(--spacing-md);
 }
 
 .commentsSection {
-  margin-top: var(--spacing-lg);
-}
-
-.versionSection {
-  margin-top: var(--spacing-lg);
-}
-
-.lineageSection {
-  margin-top: var(--spacing-lg);
+  margin-top: var(--spacing-md);
 }
 
 .verificationBadge {
@@ -533,6 +525,101 @@
   margin-top: var(--spacing-lg);
   padding-top: var(--spacing-lg);
   border-top: 1px solid var(--color-border);
+}
+
+/* Owner Toolbar — compact icon-only buttons */
+
+.ownerToolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.toolbarBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  transition: color var(--transition-fast), background var(--transition-fast);
+}
+
+.toolbarBtn:hover:not(:disabled) {
+  color: var(--color-text-primary);
+  background: var(--color-surface-hover);
+}
+
+.toolbarBtn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.toolbarBtn[data-loading='true'] {
+  animation: avatar-spin 1s linear infinite;
+}
+
+.videoQuotaCompact {
+  font: var(--text-caption);
+  color: var(--color-text-tertiary);
+  margin-left: var(--spacing-xs);
+}
+
+/* Collapsible Details */
+
+.detailsSection {
+  margin-top: var(--spacing-sm);
+}
+
+.detailsSummary {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-sm) 0;
+  font: var(--text-body-sm);
+  font-weight: 500;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  transition: color var(--transition-fast);
+}
+
+.detailsSummary::-webkit-details-marker {
+  display: none;
+}
+
+.detailsSummary::before {
+  content: '';
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform var(--transition-fast);
+}
+
+.detailsSection[open] > .detailsSummary::before {
+  transform: rotate(45deg);
+}
+
+.detailsSummary:hover {
+  color: var(--color-text-primary);
+}
+
+.detailsContent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  padding-top: var(--spacing-xs);
 }
 
 /* Video Section (Owner Tools) */
