@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma';
 
-interface ShowcasePodcast {
+export interface ShowcasePodcast {
   podcastId: string;
   title: string;
   creatorName: string;
