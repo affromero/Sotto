@@ -85,9 +85,9 @@ export const updateDemoSceneSchema = z.object({
   actions: z.array(demoActionSchema).optional(),
   visualPrompt: z.string().optional(),
   visualType: z.enum(['ai_image', 'ai_video', 'map']).nullable().optional(),
-  ttsProvider: z.string().optional(),
-  ttsModel: z.string().optional(),
-  ttsVoiceId: z.string().optional(),
+  ttsProvider: z.string().nullable().optional(),
+  ttsModel: z.string().nullable().optional(),
+  ttsVoiceId: z.string().nullable().optional(),
   transitionType: z.enum(['fade', 'dissolve', 'wipe']).nullable().optional(),
   timingSegments: timingSegmentsArraySchema.nullable().optional(),
   // Launch video cinematic fields
