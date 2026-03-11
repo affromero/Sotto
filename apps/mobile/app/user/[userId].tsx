@@ -129,6 +129,7 @@ export default function UserProfileScreen() {
       />
 
       <FlatList<PodcastSummary>
+        testID="user-profile-podcast-list"
         data={podcasts ?? []}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
@@ -138,15 +139,15 @@ export default function UserProfileScreen() {
               <Avatar uri={user.image} name={displayName} size={88} />
             </View>
 
-            <Text style={styles.name}>{displayName}</Text>
+            <Text style={styles.name} testID="user-profile-name">{displayName}</Text>
             {user.handle ? (
-              <Text style={styles.handle}>@{user.handle}</Text>
+              <Text style={styles.handle} testID="user-profile-handle">@{user.handle}</Text>
             ) : null}
             {user.bio ? (
               <Text style={styles.bio}>{user.bio}</Text>
             ) : null}
 
-            <View style={styles.statsRow}>
+            <View style={styles.statsRow} testID="user-profile-stats-row">
               <View style={styles.statItem}>
                 <Text style={styles.statValue}>
                   {formatCount(user.podcastCount)}
@@ -176,6 +177,7 @@ export default function UserProfileScreen() {
                 user.isFollowing && styles.followButtonActive,
               ]}
               disabled={followMutation.isPending}
+              testID="user-profile-follow-button"
               accessibilityLabel={
                 user.isFollowing ? 'Unfollow this user' : 'Follow this user'
               }

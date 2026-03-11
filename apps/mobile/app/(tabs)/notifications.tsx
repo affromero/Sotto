@@ -50,6 +50,7 @@ function NotificationItem({
         pressed && styles.notificationItemPressed,
       ]}
       onPress={onPress}
+      testID={`notifications-item-${notification.id}`}
     >
       <View style={styles.iconContainer}>
         <Ionicons name={getNotificationIcon(notification.type)} size={20} color={colors.textSecondary} />
@@ -162,6 +163,7 @@ export default function NotificationsScreen() {
             ]}
             onPress={() => markAllReadMutation.mutate()}
             disabled={markAllReadMutation.isPending}
+            testID="notifications-mark-all-read"
           >
             <Text style={styles.markAllButtonText}>
               {markAllReadMutation.isPending
@@ -176,6 +178,7 @@ export default function NotificationsScreen() {
         data={notifications}
         renderItem={renderItem}
         keyExtractor={keyExtractor}
+        testID="notifications-list"
         contentContainerStyle={
           !notifications || notifications.length === 0
             ? styles.emptyListContainer
