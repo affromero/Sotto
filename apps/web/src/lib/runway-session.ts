@@ -76,6 +76,11 @@ window.runCapture = async function(config) {
     const audioTrack = new LivekitClient.LocalAudioTrack(dest.stream.getAudioTracks()[0]);
     await room.localParticipant.publishTrack(audioTrack);
 
+    // Start audio immediately so Runway receives it from the moment the track is published.
+    // Previously source.start(0) was called after recorder.start(), meaning Runway processed
+    // a silent track and generated idle/mouth-closed video before audio arrived.
+    source.start(0);
+
     // Wait for remote video
     await new Promise((resolve) => {
       const check = setInterval(() => {
@@ -105,7 +110,6 @@ window.runCapture = async function(config) {
     };
 
     recorder.start(1000);
-    source.start(0);
 
     // Wait for audio to finish
     await new Promise((resolve) => { source.onended = resolve; });
