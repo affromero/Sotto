@@ -96,6 +96,7 @@ beforeEach(() => {
     chunkVideoUrl: null,
     chunkDurationSeconds: null,
     enabledSegmentIds: [],
+    voiceTrackId: null,
     posX: 0.02,
     posY: 0.55,
     width: 0.25,
@@ -216,6 +217,7 @@ describe('processAvatarGeneration', () => {
       chunkVideoUrl: null,
       chunkDurationSeconds: null,
       enabledSegmentIds: [],
+      voiceTrackId: null,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -252,6 +254,7 @@ describe('processAvatarGeneration', () => {
       chunkVideoUrl: null,
       chunkDurationSeconds: null,
       enabledSegmentIds: [],
+      voiceTrackId: null,
       createdAt: new Date(),
       updatedAt: new Date(),
     });

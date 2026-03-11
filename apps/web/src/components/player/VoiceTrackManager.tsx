@@ -8,6 +8,28 @@ import { AudioConfigPanel, type AudioConfig } from '@/components/player/AudioCon
 import type { VoiceTrackSummary } from '@sotto/shared';
 import styles from './VoiceTrackManager.module.css';
 
+const PROVIDER_DISPLAY: Record<string, string> = {
+  elevenlabs: 'ElevenLabs',
+  openai: 'OpenAI',
+  cartesia: 'Cartesia',
+  hume: 'Hume AI',
+  fal: 'Fal',
+  minimax: 'MiniMax',
+  replicate: 'Replicate',
+  kittentts: 'KittenTTS',
+};
+
+function buildVoiceTooltip(voices: VoiceTrackSummary['voices']): string | undefined {
+  if (!voices || voices.length === 0) return undefined;
+  return voices
+    .map((v) => {
+      const provider = v.provider ? (PROVIDER_DISPLAY[v.provider] ?? v.provider) : '';
+      const voice = v.voiceId || 'Auto';
+      return `${v.speaker}: ${voice}${provider ? ` [${provider}]` : ''}`;
+    })
+    .join('\n');
+}
+
 interface VoiceTrackManagerProps {
   podcastId: string;
   voiceTracks: VoiceTrackSummary[];
@@ -248,7 +270,7 @@ export function VoiceTrackManager({
               </h3>
               <div className={styles.proposalList}>
                 {pendingProposals.map(track => (
-                  <div key={track.id} className={styles.proposalCard}>
+                  <div key={track.id} className={styles.proposalCard} title={buildVoiceTooltip(track.voices)}>
                     <div className={styles.proposalInfo}>
                       {track.contributor && (
                         <div className={styles.proposalAuthor}>
@@ -349,7 +371,7 @@ export function VoiceTrackManager({
           ) : (
             <div className={styles.trackList}>
               {regularTracks.map(track => (
-                <div key={track.id} className={styles.trackCard}>
+                <div key={track.id} className={styles.trackCard} title={buildVoiceTooltip(track.voices)}>
                   <div className={styles.trackInfo}>
                     <div className={styles.trackName}>
                       {track.name}
