@@ -26,7 +26,7 @@ let currentRender: string | null = null;
 // Cache the bundled Remotion project
 let bundlePromise: Promise<string> | null = null;
 
-function getBundlePath(): Promise<string> {
+export function getBundlePath(): Promise<string> {
   if (!bundlePromise) {
     const entryPoint = path.resolve(process.cwd(), 'packages/video/src/Root.tsx');
     bundlePromise = bundle({
