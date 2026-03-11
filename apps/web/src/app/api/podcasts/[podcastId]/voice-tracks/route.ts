@@ -232,9 +232,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   const uniqueProviders = [...new Set(resolvedVoiceProviders.map(v => v.providerId))];
   const trackProvider = uniqueProviders.length === 1 ? uniqueProviders[0] : 'mixed';
 
-  // Derive track-level model from resolved voices (use explicit body ttsModel, or first resolved model)
-  const resolvedModels = [...new Set(resolvedVoiceProviders.map(v => v.ttsModel).filter(Boolean))];
-  const trackModel = ttsModel || resolvedModels[0] || null;
+  // Derive track-level model — match from-scratch pattern:
+  // BYOK users: null (worker resolves dynamically with BYOK→platform fallback)
+  // Free/Pro: use configured auto-model (same as selectFreeTierProviders)
+  const trackModel = gate.isByokUser
+    ? (ttsModel || null)
+    : (ttsModel || selected?.ttsModel || autoModel?.ttsModel || null);
 
   // Create voice track, voice assignments, and segments in a transaction
   const voiceTrack = await prisma.$transaction(async (tx) => {

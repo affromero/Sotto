@@ -56,11 +56,13 @@ export function classifyError(errorMessage: string): ByokErrorKind {
 }
 
 /**
- * Check if an error indicates the API key lacks access to the requested model.
- * ElevenLabs returns 404 with "model does not exist or you do not have access".
+ * Check if an error indicates the API key lacks access to the requested resource.
+ * Any 404 from a BYOK key is worth retrying with the platform key — the most
+ * common case is ElevenLabs model access (e.g. eleven_v3), but generic 404s
+ * from other providers should also trigger the fallback.
  */
 export function isModelAccessError(errorMessage: string): boolean {
-  return /\(404\)/.test(errorMessage) && /model/i.test(errorMessage);
+  return /\(404\)/.test(errorMessage);
 }
 
 export function isKeyInvalidationError(kind: ByokErrorKind): boolean {
