@@ -138,6 +138,37 @@
       "transition": { "type": "dissolve" }
     },
     {
+      "title": "Custom Voice — Bring Your Own Voice ID",
+      "narration": "Already have an ElevenLabs voice you love? Paste its ID directly into Sotto. We validate it against your account in seconds and add it to your library — ready to use on any podcast.",
+      "actions": [
+        { "type": "wait", "ms": 500 },
+        { "type": "click", "selector": "[aria-label='Toggle custom voice selection']" },
+        { "type": "wait", "ms": 800 },
+        { "type": "click", "selector": "[aria-label='ElevenLabs voice ID']" },
+        { "type": "type", "selector": "[aria-label='ElevenLabs voice ID']", "text": "WOrdX7PQdxpL0gxOtCs3", "speed": { "min": 40, "max": 80 } },
+        { "type": "wait", "ms": 400 },
+        { "type": "click", "selector": "[aria-label='Add voice by ID']" },
+        { "type": "waitForSelector", "selector": "[class*='badge']", "timeout": 8000 },
+        { "type": "wait", "ms": 2000 }
+      ],
+      "sfx": {
+        "clickSounds": true,
+        "typingSounds": true
+      },
+      "overlays": [
+        {
+          "text": "Bring Your Own Voice",
+          "position": "top-center",
+          "showAtSeconds": 1,
+          "hideAtSeconds": 4,
+          "fontSize": 34,
+          "backgroundColor": "rgba(0,0,0,0.6)",
+          "textColor": "#FFFFFF"
+        }
+      ],
+      "transition": { "type": "dissolve" }
+    },
+    {
       "title": "Audio Generation — ElevenLabs",
       "narration": "Now, choose a voice. Sotto supports six professional TTS providers — each with its own character. Here's ElevenLabs, known for expressive, natural-sounding speech.",
       "actions": [
