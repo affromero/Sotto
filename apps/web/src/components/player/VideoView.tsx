@@ -67,7 +67,7 @@ export function VideoView({
 
   // Single tap = play/pause, double-tap = skip ±15s (YouTube-style)
   const handleVideoAreaClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    if ((e.target as HTMLElement).closest('button, [role="button"], a')) return;
+    if ((e.target as HTMLElement).closest('button, [role="button"], a, [role="tooltip"]')) return;
 
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -204,7 +204,9 @@ export function VideoView({
     }
   }, [isPlaying]);
 
-  const handleSubtitleClick = useCallback(() => {
+  const handleSubtitleClick = useCallback((e: React.MouseEvent) => {
+    // Don't seek when clicking a citation marker
+    if ((e.target as HTMLElement).closest('button, [role="tooltip"], a')) return;
     if (onSegmentClick && activeSegment?.startTime !== null && activeSegment?.startTime !== undefined) {
       onSegmentClick(activeSegment.startTime);
     }
