@@ -1,0 +1,438 @@
+/* ==========================================================================
+   JOURNEY CHAPTER — 3-step sticky scrollytelling
+   ========================================================================== */
+
+.root {
+  padding: 80px var(--spacing-lg);
+  max-width: var(--max-content-width);
+  margin: 0 auto;
+}
+
+/* Header */
+.header {
+  text-align: center;
+  margin-bottom: 64px;
+}
+
+.overline {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--color-primary);
+  margin-bottom: 12px;
+}
+
+.heading {
+  font-family: var(--font-heading);
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 400;
+  color: var(--color-text);
+  line-height: 1.15;
+}
+
+/* ==========================================================================
+   SCROLL CONTAINER — desktop: side-by-side sticky
+   ========================================================================== */
+
+.scrollContainer {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 48px;
+  align-items: start;
+}
+
+/* Left: text steps */
+.stepsColumn {
+  display: flex;
+  flex-direction: column;
+}
+
+.stepTrigger {
+  min-height: 80vh;
+  display: flex;
+  align-items: center;
+  padding: 40px 0;
+}
+
+.step {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  opacity: 0.35;
+  transform: translateY(8px);
+  transition: opacity 0.4s var(--ease-out-expo), transform 0.4s var(--ease-out-expo);
+}
+
+.stepTrigger[data-active] .step {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.stepNum {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: #fff;
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.stepBody {
+  flex: 1;
+}
+
+.stepTitle {
+  font-family: var(--font-heading);
+  font-size: 1.5rem;
+  font-weight: 400;
+  color: var(--color-text);
+  margin-bottom: 8px;
+}
+
+.stepDesc {
+  font-size: 16px;
+  line-height: 1.7;
+  color: var(--color-text-secondary, #6B7280);
+}
+
+/* Right: sticky visual */
+.visualColumn {
+  position: relative;
+}
+
+.visualSticky {
+  position: sticky;
+  top: 0;
+  height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Visuals — only one visible at a time based on active step */
+.visual {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 0.5s var(--ease-out-expo), transform 0.5s var(--ease-out-expo);
+  pointer-events: none;
+}
+
+/* JS sets data-active on stepTrigger elements; CSS activates the matching visual
+   via sibling relationship. We use :has() to check which step is active. */
+
+/* Describe active when step 0 is active */
+.scrollContainer:has(.stepTrigger:nth-child(1)[data-active]) .visualDescribe {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+/* Script active when step 1 is active */
+.scrollContainer:has(.stepTrigger:nth-child(2)[data-active]) .visualScript {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+/* Listen active when step 2 is active */
+.scrollContainer:has(.stepTrigger:nth-child(3)[data-active]) .visualListen {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+/* Default: show first visual if no step is active yet */
+.scrollContainer:not(:has(.stepTrigger[data-active])) .visualDescribe {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+/* ==========================================================================
+   MOCK UI COMPONENTS
+   ========================================================================== */
+
+.mockChat,
+.mockScript,
+.mockPlayer {
+  width: 100%;
+  max-width: 400px;
+  background: var(--color-surface);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+}
+
+.mockHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: rgba(0, 0, 0, 0.03);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.mockDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-primary);
+}
+
+.mockBody {
+  padding: 16px;
+}
+
+/* Chat mock */
+.mockMsg {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.mockMsg:last-child {
+  margin-bottom: 0;
+}
+
+.mockUser {
+  justify-content: flex-end;
+}
+
+.mockBubble {
+  max-width: 80%;
+  padding: 10px 14px;
+  border-radius: 16px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.mockUser .mockBubble {
+  background: var(--color-primary);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+
+.mockBot .mockBubble {
+  background: rgba(0, 0, 0, 0.04);
+  color: var(--color-text);
+  border-bottom-left-radius: 4px;
+}
+
+.mockAvatar {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.mockChips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.chip {
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  border: 1px solid rgba(217, 119, 6, 0.3);
+  background: rgba(217, 119, 6, 0.06);
+  font-size: 13px;
+  color: var(--color-primary);
+}
+
+.chipFaded {
+  opacity: 0.4;
+}
+
+/* Script mock */
+.scriptTurn {
+  margin-bottom: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.scriptTurn:last-of-type {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.scriptSpeaker {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.scriptSpeaker[data-speaker='host'] {
+  color: var(--color-primary);
+}
+
+.scriptSpeaker[data-speaker='expert'] {
+  color: var(--color-accent);
+}
+
+.scriptTurn p {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--color-text);
+}
+
+.scriptActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.scriptBtn {
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary, #6B7280);
+}
+
+.scriptBtnPrimary {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fff;
+}
+
+/* Player mock */
+.playerTitle {
+  font-family: var(--font-heading);
+  font-size: 1.25rem;
+  color: var(--color-text);
+  margin-bottom: 4px;
+}
+
+.playerMeta {
+  font-size: 13px;
+  color: var(--color-text-secondary, #6B7280);
+  margin-bottom: 16px;
+}
+
+.playerWaveform {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 32px;
+  margin-bottom: 12px;
+}
+
+.playerBar {
+  flex: 1;
+  min-width: 2px;
+  background: var(--color-primary);
+  border-radius: 1px;
+  opacity: 0.4;
+  height: calc(8px + sin(var(--i, 0) * 0.5) * 20px);
+}
+
+.playerBar:nth-child(-n+12) {
+  opacity: 0.8;
+}
+
+.playerControls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.playerTime {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--color-text-secondary, #6B7280);
+}
+
+.playerActions {
+  display: flex;
+  gap: 12px;
+}
+
+.playerAction {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+/* ==========================================================================
+   MOBILE — disable sticky, vertical stack
+   ========================================================================== */
+
+@media (max-width: 767px) {
+  .root {
+    padding: 60px var(--spacing-md);
+  }
+
+  .scrollContainer {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .stepsColumn {
+    order: 1;
+  }
+
+  .visualColumn {
+    display: none;
+  }
+
+  .stepTrigger {
+    min-height: auto;
+    padding: 24px 0;
+  }
+
+  .step {
+    opacity: 1;
+    transform: none;
+  }
+
+  .stepTrigger[data-active] .step {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ==========================================================================
+   REDUCED MOTION
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  .step {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .visual {
+    transition: none;
+  }
+}

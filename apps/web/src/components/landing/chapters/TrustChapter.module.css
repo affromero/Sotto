@@ -1,0 +1,180 @@
+/* ==========================================================================
+   TRUST CHAPTER — Verification summary
+   ========================================================================== */
+
+.root {
+  padding: 80px var(--spacing-lg);
+  max-width: var(--max-content-width);
+  margin: 0 auto;
+}
+
+/* Trust strip */
+.strip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px 24px;
+  background: rgba(22, 163, 74, 0.06);
+  border: 1px solid rgba(22, 163, 74, 0.15);
+  border-radius: var(--radius-lg);
+  margin-bottom: 64px;
+}
+
+.shieldIcon {
+  flex-shrink: 0;
+  color: #16A34A;
+}
+
+.stripText {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+/* Content */
+.content {
+  text-align: center;
+}
+
+.header {
+  margin-bottom: 40px;
+}
+
+.overline {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--color-primary);
+  margin-bottom: 12px;
+}
+
+.pillRow {
+  margin-bottom: 16px;
+}
+
+.pill {
+  display: inline-block;
+  padding: 4px 14px;
+  border-radius: var(--radius-full);
+  background: rgba(217, 119, 6, 0.08);
+  border: 1px solid rgba(217, 119, 6, 0.2);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.heading {
+  font-family: var(--font-heading);
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 400;
+  color: var(--color-text);
+  line-height: 1.15;
+  margin-bottom: 16px;
+}
+
+.description {
+  font-size: 18px;
+  line-height: 1.7;
+  color: var(--color-text-secondary, #6B7280);
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+/* Verification card */
+.card {
+  max-width: 600px;
+  margin: 0 auto 32px;
+  background: var(--color-surface);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.domains {
+  padding: 24px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.domain {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.domainDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.domainName {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text);
+  flex: 1;
+}
+
+.domainThreshold {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--color-text-secondary, #6B7280);
+}
+
+.cardCallout {
+  padding: 16px 24px;
+  background: rgba(0, 0, 0, 0.02);
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.cardCallout p {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--color-text);
+  text-align: left;
+}
+
+.cardCallout strong {
+  font-weight: 600;
+}
+
+/* Footer */
+.footer {
+  font-size: 15px;
+  color: var(--color-text-secondary, #6B7280);
+}
+
+.footer a {
+  color: var(--color-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.footer a:hover {
+  color: var(--color-text);
+}
+
+/* Mobile */
+@media (max-width: 767px) {
+  .root {
+    padding: 60px var(--spacing-md);
+  }
+
+  .strip {
+    flex-direction: column;
+    text-align: center;
+    gap: 8px;
+  }
+
+  .domains {
+    grid-template-columns: 1fr;
+  }
+}
