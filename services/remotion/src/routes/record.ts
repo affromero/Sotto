@@ -40,14 +40,21 @@ async function executeRecording(jobId: string, input: RecordRequest): Promise<vo
   try {
     browser = await chromium.launch({
       headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--force-device-scale-factor=2',
+      ],
     });
 
+    // deviceScaleFactor:2 renders at 2× HiDPI — crisp text + UI at no viewport cost
+    const physicalSize = { width: viewport.width * 2, height: viewport.height * 2 };
     const context = await browser.newContext({
       viewport,
+      deviceScaleFactor: 2,
       recordVideo: {
         dir: videoDir,
-        size: viewport,
+        size: physicalSize,
       },
     });
 
