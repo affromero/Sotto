@@ -233,6 +233,69 @@
       "transition": { "type": "fade" }
     },
     {
+      "title": "Music Generation — AI Soundtrack",
+      "narration": "Sotto can also score your podcast. One click generates a custom AI soundtrack — built from your topic, tags, and tone. No music library. No licensing. Just your content, set to music.",
+      "actions": [
+        { "type": "wait", "ms": 500 },
+        { "type": "click", "selector": "button:has-text('Music'), [class*='musicBtn'], [class*='musicGenerator']" },
+        { "type": "waitForSelector", "selector": "[class*='musicModal'], [class*='MusicGenerator'], [role='dialog']", "timeout": 5000 },
+        { "type": "wait", "ms": 1000 },
+        { "type": "click", "selector": "[class*='modelSelect'] [value*='suno'], [class*='modelOption']:has-text('Suno')" },
+        { "type": "wait", "ms": 500 },
+        { "type": "click", "selector": "button:has-text('Generate')" },
+        { "type": "waitForSelector", "selector": "[class*='waveform'], [class*='generating'], [class*='progress']", "timeout": 5000 },
+        { "type": "wait", "ms": 4000 }
+      ],
+      "sfx": {
+        "clickSounds": true,
+        "typingSounds": false
+      },
+      "providerBanner": {
+        "provider": "Suno",
+        "showAtSeconds": 2,
+        "hideAtSeconds": null,
+        "position": "bottom-right"
+      },
+      "overlays": [
+        {
+          "text": "AI-Generated Background Music",
+          "position": "top-center",
+          "showAtSeconds": 1,
+          "hideAtSeconds": 4,
+          "fontSize": 34,
+          "backgroundColor": "rgba(0,0,0,0.6)",
+          "textColor": "#FFFFFF"
+        }
+      ],
+      "transition": { "type": "dissolve" }
+    },
+    {
+      "title": "Music Playback — Live Mix",
+      "narration": "When ready, the track plays under your voice automatically. Adjust the volume, generate variations, pick the one that fits. Your podcast now has a signature sound.",
+      "actions": [
+        { "type": "waitForSelector", "selector": "[class*='generationItem'][class*='ready'], [class*='musicReady']", "timeout": 120000 },
+        { "type": "wait", "ms": 1000 },
+        { "type": "click", "selector": "button:has-text('Select'), [class*='selectMusic']" },
+        { "type": "wait", "ms": 1000 },
+        { "type": "click", "selector": "[class*='closeModal'], [aria-label='Close'], button:has-text('Close')" },
+        { "type": "wait", "ms": 1000 },
+        { "type": "click", "selector": "[class*='playButton']" },
+        { "type": "wait", "ms": 8000 },
+        { "type": "click", "selector": "[class*='playButton']" }
+      ],
+      "sfx": {
+        "clickSounds": true,
+        "typingSounds": false
+      },
+      "providerBanner": {
+        "provider": "Suno",
+        "showAtSeconds": 0,
+        "hideAtSeconds": 5,
+        "position": "bottom-right"
+      },
+      "transition": { "type": "fade" }
+    },
+    {
       "title": "Video Generation Introduction",
       "narration": "But Sotto doesn't stop at audio. Every podcast can become a video — with AI-generated visuals, illustrations, and footage that bring your story to life.",
       "actions": [
