@@ -1,0 +1,30 @@
+/* ==========================================================================
+   SCROLL CHAPTER — Container with scroll-progress CSS custom property
+   ========================================================================== */
+
+.chapter {
+  position: relative;
+  width: 100%;
+  --scroll-progress: 0;
+}
+
+/* Dark variant — hero + convert sections */
+.dark {
+  background: var(--gradient-hero);
+  color: #fff;
+}
+
+/* Alt variant — cream/off-white sections */
+.alt {
+  background: var(--color-background);
+}
+
+/* ==========================================================================
+   REDUCED MOTION
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  .chapter {
+    --scroll-progress: 1;
+  }
+}
