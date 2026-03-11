@@ -69,7 +69,7 @@ export async function processVoiceTrackAudio(job: Job<GenerateVoiceTrackAudioPay
     select: {
       ttsProvider: true,
       ttsModel: true,
-      voices: { select: { speaker: true, voiceId: true, provider: true } },
+      voices: { select: { speaker: true, voiceId: true, provider: true, ttsModel: true } },
       podcast: {
         select: { userId: true, user: { select: { plan: true } } },
       },
@@ -96,13 +96,14 @@ export async function processVoiceTrackAudio(job: Job<GenerateVoiceTrackAudioPay
   const trackVoice = voiceTrack.voices.find(v => v.speaker === speaker);
   const requestedProvider = (trackVoice?.provider || voiceTrack.ttsProvider) as TtsProviderId | null;
 
-  // Don't pass track-level ttsModel — voice tracks have mixed providers, so a
-  // single model (e.g. OpenAI's tts-1-hd) would be invalid for other providers
-  // (e.g. ElevenLabs). Let resolveTtsProvider pick the correct model per provider.
+  // Use per-voice model (not track-level) — voice tracks have mixed providers,
+  // so each speaker's model must match their provider.
+  const requestedModel = trackVoice?.ttsModel ?? undefined;
   const { provider, source, providerId } = await resolveTtsProvider({
     userId,
     podcastId,
     requestedProvider: requestedProvider ?? undefined,
+    requestedModel,
     plan: voiceTrack.podcast.user.plan as 'FREE' | 'PRO',
   });
 
@@ -128,8 +129,8 @@ export async function processVoiceTrackAudio(job: Job<GenerateVoiceTrackAudioPay
     try {
       await prisma.voiceTrackVoice.upsert({
         where: { voiceTrackId_speaker: { voiceTrackId, speaker } },
-        update: { voiceId, provider: providerId },
-        create: { voiceTrackId, speaker, voiceId, provider: providerId },
+        update: { voiceId, provider: providerId, ttsModel: ttsModelId },
+        create: { voiceTrackId, speaker, voiceId, provider: providerId, ttsModel: ttsModelId },
       });
     } catch (err) {
       logger.warn('Failed to persist voice track voice assignment', {
@@ -149,6 +150,7 @@ export async function processVoiceTrackAudio(job: Job<GenerateVoiceTrackAudioPay
     provider,
     providerId,
     source,
+    requestedModel,
     userId,
     podcastId,
     plan: voiceTrack.podcast.user.plan as 'FREE' | 'PRO',
