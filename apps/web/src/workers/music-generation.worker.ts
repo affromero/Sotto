@@ -108,7 +108,7 @@ export async function processMusicGeneration(job: Job<GenerateMusicPayload>): Pr
   const isFirst = existingCount === 0;
 
   // Update MusicGeneration; auto-select + denormalize only if first
-  const txOps = [
+  await prisma.$transaction([
     prisma.musicGeneration.update({
       where: { id: musicGenerationId },
       data: {
@@ -118,16 +118,10 @@ export async function processMusicGeneration(job: Job<GenerateMusicPayload>): Pr
         selected: isFirst,
       },
     }),
-  ];
-  if (isFirst) {
-    txOps.push(
-      prisma.podcast.update({
-        where: { id: podcastId },
-        data: { musicUrl },
-      }),
-    );
-  }
-  await prisma.$transaction(txOps);
+    ...(isFirst
+      ? [prisma.podcast.update({ where: { id: podcastId }, data: { musicUrl } })]
+      : []),
+  ]);
 
   // Log usage for cost tracking
   const service = source === 'byok' ? `${providerId}_byok` : providerId;
