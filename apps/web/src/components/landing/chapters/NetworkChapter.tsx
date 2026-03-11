@@ -37,6 +37,53 @@ const FEATURES = [
         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
       </svg>
     ),
+    featured: true,
+  },
+];
+
+const USE_CASES = [
+  {
+    title: 'Students',
+    description: 'Turn dense research papers into digestible conversations. Study smarter by listening and asking questions in real time.',
+    icon: (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+        <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+      </svg>
+    ),
+  },
+  {
+    title: 'Professionals',
+    description: 'Stay current on industry trends during your commute. Get up to speed on any subject in 10 focused minutes.',
+    icon: (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+        <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+      </svg>
+    ),
+  },
+  {
+    title: 'Educators',
+    description: 'Create engaging supplementary material for your students. Interactive audio that adapts to every learner.',
+    icon: (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+        <circle cx="9" cy="7" r="4" />
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+      </svg>
+    ),
+  },
+  {
+    title: 'Researchers',
+    description: 'Make your work accessible to a wider audience. Transform complex findings into compelling conversations anyone can follow.',
+    icon: (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="10" />
+        <line x1="2" y1="12" x2="22" y2="12" />
+        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+      </svg>
+    ),
   },
 ];
 
@@ -53,11 +100,12 @@ export function NetworkChapter() {
           </p>
         </div>
 
+        {/* Magazine grid — featured card spans 2 rows */}
         <div className={styles.cards}>
           {FEATURES.map((feature, i) => (
             <article
               key={feature.title}
-              className={styles.card}
+              className={`${styles.card} ${feature.featured ? styles.cardFeatured : ''}`}
               data-reveal
               style={{ '--reveal-index': i } as React.CSSProperties}
             >
@@ -66,6 +114,37 @@ export function NetworkChapter() {
               </div>
               <h3 className={styles.cardTitle}>{feature.title}</h3>
               <p className={styles.cardDesc}>{feature.description}</p>
+              {feature.featured && (
+                <div className={styles.featuredMock}>
+                  <div className={styles.mockQ}>
+                    <span className={styles.mockQLabel}>Q:</span>
+                    <span>How accurate is CRISPR currently?</span>
+                  </div>
+                  <div className={styles.mockA}>
+                    <span className={styles.mockALabel}>A:</span>
+                    <span>Recent studies show 90%+ on-target efficiency in human cells...</span>
+                  </div>
+                </div>
+              )}
+            </article>
+          ))}
+        </div>
+
+        {/* Use cases grid */}
+        <div className={styles.useCasesHeader} data-reveal>
+          <h3 className={styles.useCasesTitle}>Built for everyone</h3>
+        </div>
+        <div className={styles.useCases}>
+          {USE_CASES.map((uc, i) => (
+            <article
+              key={uc.title}
+              className={styles.useCase}
+              data-reveal
+              style={{ '--reveal-index': i + 3 } as React.CSSProperties}
+            >
+              <div className={styles.useCaseIcon}>{uc.icon}</div>
+              <h4 className={styles.useCaseTitle}>{uc.title}</h4>
+              <p className={styles.useCaseDesc}>{uc.description}</p>
             </article>
           ))}
         </div>
