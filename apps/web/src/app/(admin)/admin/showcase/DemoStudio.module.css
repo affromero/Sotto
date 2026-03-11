@@ -326,6 +326,37 @@
   cursor: not-allowed;
 }
 
+.cancelBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-xs) var(--spacing-md);
+  background: none;
+  color: var(--color-error, #ef4444);
+  border: 1px solid var(--color-error, #ef4444);
+  border-radius: var(--radius-sm);
+  font: var(--text-body-sm);
+  cursor: pointer;
+  min-height: 36px;
+  transition: background 0.15s ease;
+}
+
+.cancelBtn:hover {
+  background: #fef2f2;
+}
+
+.cancelBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.assetActions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  flex-wrap: wrap;
+}
+
 /* Generating banner */
 
 .generatingBanner {

@@ -445,6 +445,21 @@ export function DemoStudio() {
     }
   }, [selectedProject, loadProject]);
 
+  const cancelCompose = useCallback(async () => {
+    if (!selectedProject) return;
+    try {
+      await fetch(`/api/admin/demo/${selectedProject.id}/compose`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId: composeVideoJobId }),
+      });
+      setComposeVideoJobId(null);
+      await loadProject(selectedProject.id);
+    } catch (err) {
+      setError(`Failed to cancel compose: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }, [selectedProject, composeVideoJobId, loadProject]);
+
   const deleteProject = useCallback(async (id: string) => {
     try {
       const res = await fetch(`/api/admin/demo/${id}`, { method: 'DELETE' });
@@ -678,6 +693,7 @@ export function DemoStudio() {
                     status={scene.voiceoverStatus}
                     url={scene.voiceoverUrl}
                     onGenerate={() => generateAsset(scene.id, 'voiceover')}
+                    onCancel={() => saveScene(scene.id, { voiceoverStatus: 'PENDING' } as Partial<DemoScene>)}
                     mediaType="audio"
                     description={ASSET_DESCRIPTIONS.Voiceover}
                     failedReason={scene.voiceoverStatus === 'FAILED' ? scene.failedReason : null}
@@ -688,6 +704,7 @@ export function DemoStudio() {
                     status={scene.recordingStatus}
                     url={scene.recordingUrl}
                     onGenerate={() => generateAsset(scene.id, 'record')}
+                    onCancel={() => saveScene(scene.id, { recordingStatus: 'PENDING' } as Partial<DemoScene>)}
                     mediaType="video"
                     description={ASSET_DESCRIPTIONS.Recording}
                     failedReason={scene.recordingStatus === 'FAILED' ? scene.failedReason : null}
@@ -701,6 +718,7 @@ export function DemoStudio() {
                       status={scene.visualStatus}
                       url={scene.visualUrl}
                       onGenerate={() => generateAsset(scene.id, 'visual')}
+                      onCancel={() => saveScene(scene.id, { visualStatus: 'PENDING' } as Partial<DemoScene>)}
                       mediaType={scene.visualType === 'ai_video' ? 'video' : 'image'}
                       description={ASSET_DESCRIPTIONS.Visual}
                       failedReason={scene.visualStatus === 'FAILED' ? scene.failedReason : null}
@@ -713,6 +731,7 @@ export function DemoStudio() {
                       status={scene.transitionStatus}
                       url={scene.transitionUrl}
                       onGenerate={() => generateAsset(scene.id, 'transition')}
+                      onCancel={() => saveScene(scene.id, { transitionStatus: 'PENDING' } as Partial<DemoScene>)}
                       mediaType="video"
                       description={ASSET_DESCRIPTIONS.Transition}
                       failedReason={scene.transitionStatus === 'FAILED' ? scene.failedReason : null}
@@ -726,6 +745,7 @@ export function DemoStudio() {
                   <ComposeSceneButton
                     scene={scene}
                     onCompose={() => composeScene(scene.id)}
+                    onCancel={() => saveScene(scene.id, { compositedStatus: 'PENDING' } as Partial<DemoScene>)}
                     onJobComplete={() => loadProject(selectedProject!.id)}
                   />
                   {scene.compositedStatus === 'FAILED' && scene.failedReason && (
@@ -789,6 +809,9 @@ export function DemoStudio() {
                   </p>
                 )}
               </div>
+              <button className={styles.cancelBtn} onClick={cancelCompose}>
+                Cancel
+              </button>
             </div>
           )}
           {selectedProject.videoUrl && (
@@ -852,6 +875,7 @@ function AssetStatus({
   status,
   url,
   onGenerate,
+  onCancel,
   mediaType,
   failedReason,
   onJobComplete,
@@ -863,6 +887,7 @@ function AssetStatus({
   status: string;
   url: string | null;
   onGenerate: () => Promise<string | undefined>;
+  onCancel?: () => Promise<void>;
   mediaType: 'video' | 'audio' | 'image';
   failedReason?: string | null;
   onJobComplete?: () => void;
@@ -872,6 +897,7 @@ function AssetStatus({
 }) {
   const [previewing, setPreviewing] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState(false);
 
   const jobProgress = useJobProgress(jobId, () => {
     setJobId(null);
@@ -893,6 +919,19 @@ function AssetStatus({
     const id = await onGenerate();
     if (id) setJobId(id);
   }, [onGenerate]);
+
+  const handleCancel = useCallback(async () => {
+    setCancelling(true);
+    try {
+      if (jobId) {
+        await fetch(`/api/admin/demo/job-status/${jobId}`, { method: 'DELETE' });
+        setJobId(null);
+      }
+      await onCancel?.();
+    } finally {
+      setCancelling(false);
+    }
+  }, [jobId, onCancel]);
 
   const isGenerating = status === 'GENERATING';
 
@@ -928,14 +967,25 @@ function AssetStatus({
           )}
         </div>
       )}
-      <button
-        className={styles.secondaryBtn}
-        onClick={handleGenerate}
-        disabled={isGenerating || disabled}
-        title={disabled ? disabledReason : undefined}
-      >
-        {status === 'READY' || status === 'FAILED' ? 'Regenerate' : 'Generate'}
-      </button>
+      <div className={styles.assetActions}>
+        <button
+          className={styles.secondaryBtn}
+          onClick={handleGenerate}
+          disabled={isGenerating || disabled}
+          title={disabled ? disabledReason : undefined}
+        >
+          {status === 'READY' || status === 'FAILED' ? 'Regenerate' : 'Generate'}
+        </button>
+        {isGenerating && onCancel && (
+          <button
+            className={styles.cancelBtn}
+            onClick={handleCancel}
+            disabled={cancelling}
+          >
+            {cancelling ? 'Cancelling...' : 'Cancel'}
+          </button>
+        )}
+      </div>
       {disabled && disabledReason && (
         <p className={styles.assetBlockedHint}>{disabledReason}</p>
       )}
@@ -946,13 +996,16 @@ function AssetStatus({
 function ComposeSceneButton({
   scene,
   onCompose,
+  onCancel,
   onJobComplete,
 }: {
   scene: DemoScene;
   onCompose: () => Promise<string | undefined>;
+  onCancel?: () => Promise<void>;
   onJobComplete?: () => void;
 }) {
   const [jobId, setJobId] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState(false);
   const sceneAssetsReady = scene.recordingStatus === 'READY' && scene.voiceoverStatus === 'READY';
 
   const jobProgress = useJobProgress(jobId, () => {
@@ -975,19 +1028,43 @@ function ComposeSceneButton({
     if (id) setJobId(id);
   }, [onCompose]);
 
+  const handleCancel = useCallback(async () => {
+    setCancelling(true);
+    try {
+      if (jobId) {
+        await fetch(`/api/admin/demo/job-status/${jobId}`, { method: 'DELETE' });
+        setJobId(null);
+      }
+      await onCancel?.();
+    } finally {
+      setCancelling(false);
+    }
+  }, [jobId, onCancel]);
+
   const isComposing = scene.compositedStatus === 'GENERATING';
 
   return (
     <>
-      <button
-        className={styles.secondaryBtn}
-        onClick={handleCompose}
-        disabled={!sceneAssetsReady || isComposing}
-      >
-        {isComposing ? 'Composing...'
-          : scene.compositedStatus === 'READY' ? 'Recompose Scene'
-          : 'Compose Scene'}
-      </button>
+      <div className={styles.assetActions}>
+        <button
+          className={styles.secondaryBtn}
+          onClick={handleCompose}
+          disabled={!sceneAssetsReady || isComposing}
+        >
+          {isComposing ? 'Composing...'
+            : scene.compositedStatus === 'READY' ? 'Recompose Scene'
+            : 'Compose Scene'}
+        </button>
+        {isComposing && onCancel && (
+          <button
+            className={styles.cancelBtn}
+            onClick={handleCancel}
+            disabled={cancelling}
+          >
+            {cancelling ? 'Cancelling...' : 'Cancel'}
+          </button>
+        )}
+      </div>
       {isComposing && jobProgress && (
         <JobProgressBar label="Scene Compose" progress={jobProgress.progress} />
       )}
