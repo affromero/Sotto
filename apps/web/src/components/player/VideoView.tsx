@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useMemo, useCallback, useState } from 'react';
-import { Maximize2, Minimize2, Minus, Plus, Subtitles, Play as PlayIcon, Pause } from 'lucide-react';
+import { Maximize2, Minimize2, Minus, Plus, Subtitles, Play as PlayIcon, Pause, RotateCcw, RotateCw } from 'lucide-react';
 import { Player, type PlayerRef } from '@remotion/player';
 import { PodcastVisuals } from '@sotto/video';
 import { DEFAULT_RENDER_CONFIG, DEFAULT_BRANDING } from '@sotto/video';
@@ -51,15 +51,40 @@ export function VideoView({
 }: VideoViewProps) {
   const playerRef = useRef<PlayerRef>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const { isPlaying, play, pause } = usePlayer();
+  const { isPlaying, play, pause, skip } = usePlayer();
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const [expanded, setExpanded] = useState(false);
   const [shapePickerSpeaker, setShapePickerSpeaker] = useState<string | null>(null);
   const [subtitleScale, setSubtitleScale] = useState(1);
   const [subtitlesVisible, setSubtitlesVisible] = useState(true);
+  const [skipRipple, setSkipRipple] = useState<'left' | 'right' | null>(null);
+  const lastTapRef = useRef<{ time: number; side: 'left' | 'right' } | null>(null);
   const SUBTITLE_MIN = 0.6;
   const SUBTITLE_MAX = 1.8;
   const SUBTITLE_STEP = 0.2;
+  const SKIP_SECONDS = 15;
+
+  // YouTube-style double-tap to skip
+  const handleVideoAreaClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    // Ignore clicks on buttons/controls inside the container
+    if ((e.target as HTMLElement).closest('button, [role="button"], a')) return;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const side = x < rect.width / 2 ? 'left' : 'right';
+    const now = Date.now();
+    const lastTap = lastTapRef.current;
+
+    if (lastTap && lastTap.side === side && now - lastTap.time < 400) {
+      // Double-tap detected
+      skip(side === 'right' ? SKIP_SECONDS : -SKIP_SECONDS);
+      setSkipRipple(side);
+      setTimeout(() => setSkipRipple(null), 600);
+      lastTapRef.current = null;
+    } else {
+      lastTapRef.current = { time: now, side };
+    }
+  }, [skip]);
 
   // Track container pixel dimensions for avatar positioning
   useEffect(() => {
@@ -189,7 +214,7 @@ export function VideoView({
 
   return (
     <div className={`${styles.root} ${expanded ? styles.expanded : ''}`} aria-label="Video view">
-      <div className={styles.videoContainer} ref={containerRef}>
+      <div className={styles.videoContainer} ref={containerRef} onClick={handleVideoAreaClick}>
         <button
           className={styles.expandToggle}
           onClick={() => setExpanded((e) => !e)}
@@ -282,15 +307,41 @@ export function VideoView({
             ))}
           </div>
         )}
-        {/* Play/Pause overlay */}
-        <button
-          className={`${styles.playToggle} ${isPlaying ? styles.playToggleHidden : ''}`}
-          onClick={() => (isPlaying ? pause() : play())}
-          aria-label={isPlaying ? 'Pause' : 'Play'}
-          type="button"
-        >
-          {isPlaying ? <Pause size={32} /> : <PlayIcon size={32} />}
-        </button>
+        {/* Play/Pause + Skip overlay */}
+        <div className={`${styles.videoControls} ${isPlaying ? styles.videoControlsHidden : ''}`}>
+          <button
+            className={styles.skipBtn}
+            onClick={() => skip(-SKIP_SECONDS)}
+            aria-label="Rewind 15 seconds"
+            title="Rewind 15s"
+            type="button"
+          >
+            <RotateCcw size={20} />
+          </button>
+          <button
+            className={styles.playToggle}
+            onClick={() => (isPlaying ? pause() : play())}
+            aria-label={isPlaying ? 'Pause' : 'Play'}
+            type="button"
+          >
+            {isPlaying ? <Pause size={32} /> : <PlayIcon size={32} />}
+          </button>
+          <button
+            className={styles.skipBtn}
+            onClick={() => skip(SKIP_SECONDS)}
+            aria-label="Forward 15 seconds"
+            title="Forward 15s"
+            type="button"
+          >
+            <RotateCw size={20} />
+          </button>
+        </div>
+        {/* Double-tap ripple feedback */}
+        {skipRipple && (
+          <div className={`${styles.skipRipple} ${styles[`skipRipple_${skipRipple}`]}`}>
+            <span>{skipRipple === 'left' ? '−15s' : '+15s'}</span>
+          </div>
+        )}
         {/* Subtitle controls */}
         <div className={styles.subtitleControls}>
           <button

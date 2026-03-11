@@ -1,6 +1,7 @@
 .wrapper {
   position: relative;
   display: inline;
+  margin-left: 1px;
 }
 
 .marker {

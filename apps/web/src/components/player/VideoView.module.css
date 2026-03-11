@@ -43,14 +43,31 @@
   background: rgba(0, 0, 0, 0.8);
 }
 
-/* Play/Pause overlay */
+/* Video controls overlay */
 
-.playToggle {
+.videoControls {
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
   z-index: 15;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  transition: opacity 0.3s ease;
+}
+
+.videoControlsHidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.videoControls:hover {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.playToggle {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -64,16 +81,68 @@
   border-radius: 50%;
   color: #F5F5F5;
   cursor: pointer;
-  transition: opacity 0.3s ease, background var(--transition-fast);
+  transition: background var(--transition-fast);
 }
 
 .playToggle:hover {
   background: rgba(0, 0, 0, 0.7);
 }
 
-.playToggleHidden {
-  opacity: 0;
+.skipBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  color: #F5F5F5;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.skipBtn:hover {
+  background: rgba(0, 0, 0, 0.7);
+}
+
+/* Double-tap skip ripple */
+
+.skipRipple {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 40%;
+  z-index: 14;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   pointer-events: none;
+  animation: skipFade 0.6s ease forwards;
+}
+
+.skipRipple span {
+  font-family: var(--font-body);
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  color: #F5F5F5;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+}
+
+.skipRipple_left {
+  left: 0;
+  background: radial-gradient(circle at 30% 50%, rgba(255, 255, 255, 0.15), transparent 70%);
+}
+
+.skipRipple_right {
+  right: 0;
+  background: radial-gradient(circle at 70% 50%, rgba(255, 255, 255, 0.15), transparent 70%);
+}
+
+@keyframes skipFade {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
 }
 
 /* Subtitle controls */
