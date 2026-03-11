@@ -666,25 +666,34 @@ export function DemoStudio() {
                   onSave={(data) => saveScene(scene.id, data)}
                 />
 
-                {/* Asset row: recording, voiceover, visual, transition */}
+                {/* Narration text */}
+                {scene.narration && (
+                  <p className={styles.sceneNarration}>{scene.narration}</p>
+                )}
+
+                {/* Asset row: voiceover first (sets timing), then recording, visual, transition */}
                 <div className={styles.assetRow}>
-                  <AssetStatus
-                    label="Recording"
-                    status={scene.recordingStatus}
-                    url={scene.recordingUrl}
-                    onGenerate={() => generateAsset(scene.id, 'record')}
-                    mediaType="video"
-                    failedReason={scene.recordingStatus === 'FAILED' ? scene.failedReason : null}
-                    onJobComplete={() => loadProject(selectedProject!.id)}
-                  />
                   <AssetStatus
                     label="Voiceover"
                     status={scene.voiceoverStatus}
                     url={scene.voiceoverUrl}
                     onGenerate={() => generateAsset(scene.id, 'voiceover')}
                     mediaType="audio"
+                    description={ASSET_DESCRIPTIONS.Voiceover}
                     failedReason={scene.voiceoverStatus === 'FAILED' ? scene.failedReason : null}
                     onJobComplete={() => loadProject(selectedProject!.id)}
+                  />
+                  <AssetStatus
+                    label="Recording"
+                    status={scene.recordingStatus}
+                    url={scene.recordingUrl}
+                    onGenerate={() => generateAsset(scene.id, 'record')}
+                    mediaType="video"
+                    description={ASSET_DESCRIPTIONS.Recording}
+                    failedReason={scene.recordingStatus === 'FAILED' ? scene.failedReason : null}
+                    onJobComplete={() => loadProject(selectedProject!.id)}
+                    disabled={scene.voiceoverStatus !== 'READY'}
+                    disabledReason="Generate voiceover first — recording speed adapts to match its duration"
                   />
                   {scene.visualType && (
                     <AssetStatus
@@ -693,6 +702,7 @@ export function DemoStudio() {
                       url={scene.visualUrl}
                       onGenerate={() => generateAsset(scene.id, 'visual')}
                       mediaType={scene.visualType === 'ai_video' ? 'video' : 'image'}
+                      description={ASSET_DESCRIPTIONS.Visual}
                       failedReason={scene.visualStatus === 'FAILED' ? scene.failedReason : null}
                       onJobComplete={() => loadProject(selectedProject!.id)}
                     />
@@ -704,6 +714,7 @@ export function DemoStudio() {
                       url={scene.transitionUrl}
                       onGenerate={() => generateAsset(scene.id, 'transition')}
                       mediaType="video"
+                      description={ASSET_DESCRIPTIONS.Transition}
                       failedReason={scene.transitionStatus === 'FAILED' ? scene.failedReason : null}
                       onJobComplete={() => loadProject(selectedProject!.id)}
                     />
@@ -829,6 +840,13 @@ function JobProgressBar({ label, progress }: { label: AssetLabel; progress: numb
   );
 }
 
+const ASSET_DESCRIPTIONS: Record<string, string> = {
+  Voiceover: 'Generates TTS audio from the narration text using the selected voice. This sets the timing — recording speed adapts to match.',
+  Recording: 'Captures a screen recording of the demo actions via Playwright. Playback speed is adjusted to match voiceover duration during composition.',
+  Visual: 'Generates an AI visual (image or video) from the scene prompt. Used as B-roll or overlay in the final composition.',
+  Transition: 'Creates a crossfade transition between this scene and the next using FFmpeg.',
+};
+
 function AssetStatus({
   label,
   status,
@@ -837,6 +855,9 @@ function AssetStatus({
   mediaType,
   failedReason,
   onJobComplete,
+  description,
+  disabled,
+  disabledReason,
 }: {
   label: AssetLabel;
   status: string;
@@ -845,6 +866,9 @@ function AssetStatus({
   mediaType: 'video' | 'audio' | 'image';
   failedReason?: string | null;
   onJobComplete?: () => void;
+  description?: string;
+  disabled?: boolean;
+  disabledReason?: string;
 }) {
   const [previewing, setPreviewing] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
@@ -880,6 +904,9 @@ function AssetStatus({
           {statusBadge(status)}
         </span>
       </div>
+      {description && (
+        <p className={styles.assetDescription}>{description}</p>
+      )}
       {isGenerating && jobProgress && (
         <JobProgressBar label={label} progress={jobProgress.progress} />
       )}
@@ -904,10 +931,14 @@ function AssetStatus({
       <button
         className={styles.secondaryBtn}
         onClick={handleGenerate}
-        disabled={isGenerating}
+        disabled={isGenerating || disabled}
+        title={disabled ? disabledReason : undefined}
       >
         {status === 'READY' || status === 'FAILED' ? 'Regenerate' : 'Generate'}
       </button>
+      {disabled && disabledReason && (
+        <p className={styles.assetBlockedHint}>{disabledReason}</p>
+      )}
     </div>
   );
 }
