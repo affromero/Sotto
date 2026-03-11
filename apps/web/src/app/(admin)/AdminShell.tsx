@@ -37,6 +37,7 @@ import {
   ArrowLeft,
   Menu,
   ChevronDown,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { AccountSwitcher } from '@/components/layout/AccountSwitcher';
 import styles from './AdminShell.module.css';
@@ -105,6 +106,7 @@ const navGroups: NavGroup[] = [
       { href: '/admin/models', label: 'Model Tester', icon: FlaskConical },
       { href: '/admin/health', label: 'System Health', icon: HeartPulse },
       { href: '/admin/queues', label: 'Queues', icon: ListTodo },
+      { href: '/admin/plan-features', label: 'Voice Features', icon: SlidersHorizontal },
       { href: '/admin/showcase', label: 'Showcase', icon: Film },
     ],
   },
