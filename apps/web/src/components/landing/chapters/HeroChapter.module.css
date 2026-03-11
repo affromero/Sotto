@@ -1,18 +1,16 @@
 /* ==========================================================================
-   HERO CHAPTER — asymmetric 2-col grid with atmospheric depth
+   HERO CHAPTER — centered headline with atmospheric depth
    ========================================================================== */
 
 .root {
   position: relative;
   min-height: 100vh;
   min-height: 100dvh;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 48px;
+  display: flex;
+  flex-direction: column;
   align-items: center;
+  justify-content: center;
   padding: 140px var(--spacing-lg) var(--section-pad-y);
-  max-width: var(--max-content-width);
-  margin: 0 auto;
   overflow: hidden;
 }
 
@@ -28,40 +26,33 @@
   z-index: 0;
 }
 
-/* Ambient glow — amber top-left, parallax via scroll-progress */
+/* Ambient glow — amber top-center, parallax via scroll-progress */
 .root::after {
   content: '';
   position: absolute;
-  top: 10%;
-  left: 15%;
-  width: 700px;
-  height: 700px;
+  top: 15%;
+  left: 50%;
+  width: 800px;
+  height: 800px;
   background: radial-gradient(
     ellipse,
     rgba(217, 119, 6, 0.12) 0%,
     rgba(217, 119, 6, 0.03) 40%,
     transparent 70%
   );
+  transform: translateX(-50%) translateY(calc((1 - var(--scroll-progress, 0)) * 30px));
   pointer-events: none;
   z-index: 0;
-  transform: translateY(calc((1 - var(--scroll-progress, 0)) * 30px));
 }
 
-/* Left column — text content */
-.heroLeft {
+/* Content — centered stack */
+.content {
   position: relative;
   z-index: 1;
+  text-align: center;
+  max-width: 720px;
+  width: 100%;
   animation: heroFadeIn 1s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-/* Right column — player */
-.heroRight {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  animation: heroFadeIn 1s cubic-bezier(0.16, 1, 0.3, 1) 0.3s both;
 }
 
 @keyframes heroFadeIn {
@@ -105,7 +96,7 @@
   50% { opacity: 0.4; }
 }
 
-/* Title — dramatic typography */
+/* Title — dramatic typography, gradient emphasis */
 .title {
   font-family: var(--font-heading);
   font-size: clamp(3rem, 6vw + 1rem, 5rem);
@@ -131,26 +122,23 @@
   line-height: 1.7;
   color: rgba(255, 255, 255, 0.6);
   max-width: 520px;
-  margin-bottom: 40px;
+  margin: 0 auto 40px;
   animation: heroFadeIn 0.9s var(--ease-out-expo) 0.3s both;
 }
 
 /* Showcase (EmbedPlayer) */
 .showcase {
-  width: 100%;
-  max-width: 460px;
+  margin-top: 40px;
+  animation: heroFadeIn 0.9s var(--ease-out-expo) 0.5s both;
 }
 
 /* ==========================================================================
-   MOBILE — single column, center text
+   MOBILE
    ========================================================================== */
 
 @media (max-width: 767px) {
   .root {
-    grid-template-columns: 1fr;
-    gap: 40px;
     padding: 100px var(--spacing-md) 60px;
-    text-align: center;
   }
 
   .title {
@@ -160,12 +148,6 @@
 
   .subtitle {
     font-size: 17px;
-    margin-left: auto;
-    margin-right: auto;
-  }
-
-  .heroRight {
-    order: -1;
   }
 }
 
@@ -174,11 +156,11 @@
    ========================================================================== */
 
 @media (prefers-reduced-motion: reduce) {
-  .heroLeft,
-  .heroRight,
+  .content,
   .badge,
   .title,
-  .subtitle {
+  .subtitle,
+  .showcase {
     animation: none;
     opacity: 1;
     transform: none;
