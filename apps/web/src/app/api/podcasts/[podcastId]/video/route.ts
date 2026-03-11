@@ -342,21 +342,20 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
   const { podcastId } = await params;
   const authResult = await authenticateRequest(_request);
 
-  if (!authResult) {
-    return errorResponse('Unauthorized', 401);
-  }
-
   const podcast = await prisma.podcast.findUnique({
     where: { id: podcastId },
-    select: { id: true, userId: true },
+    select: { id: true, userId: true, visibility: true },
   });
 
   if (!podcast) {
     return errorResponse('Podcast not found', 404);
   }
 
+  // Public podcasts: anyone can read video data. Private: owner/admin only.
+  const isPublicPodcast = podcast.visibility === 'PUBLIC';
+  const isOwner = authResult?.userId === podcast.userId;
   const adminId = await requireAdmin();
-  if (podcast.userId !== authResult.userId && !adminId) {
+  if (!isPublicPodcast && !isOwner && !adminId) {
     return errorResponse('Forbidden', 403);
   }
 
