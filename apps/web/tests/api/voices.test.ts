@@ -111,6 +111,18 @@ vi.mock('@/lib/tier-features', () => ({
   }),
 }));
 
+vi.mock('@/lib/plan-feature-config', () => ({
+  getPlanFeatureConfig: vi.fn().mockResolvedValue({
+    freeVoiceCloningEnabled: false,
+    proVoiceCloningEnabled: true,
+    freeVoiceTracksEnabled: false,
+    proVoiceTracksEnabled: true,
+    freeMaxVoiceTracks: 0,
+    proMaxVoiceTracks: 3,
+    voiceMarketplaceEnabled: true,
+  }),
+}));
+
 vi.mock('@/lib/fal-voice-clone', () => ({
   cloneVoiceViaFal: vi.fn().mockResolvedValue({ voiceId: 'fal-voice-1' }),
 }));

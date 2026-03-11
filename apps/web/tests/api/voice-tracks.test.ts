@@ -39,6 +39,18 @@ vi.mock('@/lib/redis', () => ({
   getRedisClient: vi.fn(),
 }));
 
+vi.mock('@/lib/plan-feature-config', () => ({
+  getPlanFeatureConfig: vi.fn().mockResolvedValue({
+    freeVoiceCloningEnabled: false,
+    proVoiceCloningEnabled: true,
+    freeVoiceTracksEnabled: false,
+    proVoiceTracksEnabled: true,
+    freeMaxVoiceTracks: 0,
+    proMaxVoiceTracks: 3,
+    voiceMarketplaceEnabled: true,
+  }),
+}));
+
 vi.mock('@/lib/generation-gate', () => ({
   checkGenerationGate: vi.fn().mockResolvedValue({ allowed: true, reason: 'ok', isProUser: false, isByokUser: true }),
 }));

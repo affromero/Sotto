@@ -8,6 +8,7 @@ import { getByokKey, hasByokKey } from '@/lib/byok';
 import { cloneVoiceSchema, importVoiceSchema, importElevenLabsVoiceSchema } from '@/lib/validations';
 import { LIMITS } from '@/lib/stripe';
 import { getTierFeatures } from '@/lib/tier-features';
+import { getPlanFeatureConfig } from '@/lib/plan-feature-config';
 import { logUsage } from '@/lib/usage-logger';
 import { uploadFile } from '@/lib/r2';
 import { addJob, voiceVerificationQueue, JobType } from '@/lib/queue';
@@ -24,14 +25,15 @@ export async function POST(request: NextRequest) {
   }
 
   // Pro gate — voice cloning requires Pro
-  const [user, isByok] = await Promise.all([
+  const [user, isByok, voiceConfig] = await Promise.all([
     prisma.user.findUniqueOrThrow({
       where: { id: session.user.id },
       select: { plan: true, role: true },
     }),
     hasByokKey(session.user.id),
+    getPlanFeatureConfig(),
   ]);
-  const tierFeatures = getTierFeatures(user.plan as 'FREE' | 'PRO', isByok, user.role);
+  const tierFeatures = getTierFeatures(user.plan as 'FREE' | 'PRO', isByok, user.role, voiceConfig);
   if (!tierFeatures.voiceCloningEnabled) {
     return errorResponse('Voice cloning requires a Pro subscription.', 403);
   }

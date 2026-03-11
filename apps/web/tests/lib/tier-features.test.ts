@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getTierFeatures, getJobPriority, isModelAllowedForUser, type TierFeatures } from '@/lib/tier-features';
+import { getTierFeatures, getJobPriority, isModelAllowedForUser, type TierFeatures, type PlanVoiceConfig } from '@/lib/tier-features';
 
 describe('getTierFeatures', () => {
   describe('FREE + no BYOK', () => {
@@ -184,6 +184,53 @@ describe('getTierFeatures', () => {
       const features = getTierFeatures('FREE', false);
       expect(features.privateAllowed).toBe(false);
     });
+  });
+});
+
+describe('getTierFeatures with voiceConfig overrides', () => {
+  const voiceConfig: PlanVoiceConfig = {
+    freeVoiceCloningEnabled: true,
+    proVoiceCloningEnabled: false,
+    freeVoiceTracksEnabled: true,
+    proVoiceTracksEnabled: false,
+    freeMaxVoiceTracks: 2,
+    proMaxVoiceTracks: 5,
+  };
+
+  it('applies overrides to FREE plan', () => {
+    const features = getTierFeatures('FREE', false, undefined, voiceConfig);
+    expect(features.voiceCloningEnabled).toBe(true);
+    expect(features.voiceTracksEnabled).toBe(true);
+    expect(features.maxVoiceTracks).toBe(2);
+  });
+
+  it('applies overrides to PRO plan', () => {
+    const features = getTierFeatures('PRO', false, undefined, voiceConfig);
+    expect(features.voiceCloningEnabled).toBe(false);
+    expect(features.voiceTracksEnabled).toBe(false);
+    expect(features.maxVoiceTracks).toBe(5);
+  });
+
+  it('BYOK PRO keeps Infinity maxVoiceTracks regardless of config', () => {
+    const features = getTierFeatures('PRO', true, undefined, voiceConfig);
+    expect(features.maxVoiceTracks).toBe(Infinity);
+  });
+
+  it('BYOK FREE uses config maxVoiceTracks', () => {
+    const features = getTierFeatures('FREE', true, undefined, voiceConfig);
+    expect(features.maxVoiceTracks).toBe(2);
+  });
+
+  it('privileged roles ignore voiceConfig', () => {
+    const features = getTierFeatures('FREE', false, 'ADMIN', voiceConfig);
+    expect(features.voiceCloningEnabled).toBe(true);
+    expect(features.maxVoiceTracks).toBe(Infinity);
+  });
+
+  it('returns base features when no voiceConfig provided', () => {
+    const features = getTierFeatures('FREE', false);
+    expect(features.voiceCloningEnabled).toBe(false);
+    expect(features.maxVoiceTracks).toBe(0);
   });
 });
 
