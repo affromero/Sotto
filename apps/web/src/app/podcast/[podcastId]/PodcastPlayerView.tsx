@@ -1010,44 +1010,86 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
             </div>
           )}
           {videoState === 'failed' && (
-            <div className={styles.videoFailed}>
-              <button
-                className={styles.videoDismiss}
-                onClick={dismissVideoError}
-                type="button"
-                aria-label="Dismiss error"
-              >
-                <X size={16} />
-              </button>
-              <p className={styles.videoError}>{videoError?.message || 'Video generation failed.'}</p>
-              <Button
-                variant="secondary"
-                loading={videoLoading}
-                disabled={videoLoading}
-                onClick={async () => {
-                  setVideoLoading(true);
-                  setVideoError(null);
-                  try {
-                    const res = await fetch(`/api/podcasts/${podcast.id}/video`, { method: 'POST' });
-                    if (!res.ok) {
-                      const body = await res.json().catch(() => ({})) as { error?: string };
-                      setVideoError({ message: body.error || 'Retry failed.' });
-                      return;
+            <>
+              <div className={styles.videoFailed}>
+                <button
+                  className={styles.videoDismiss}
+                  onClick={dismissVideoError}
+                  type="button"
+                  aria-label="Dismiss error"
+                >
+                  <X size={16} />
+                </button>
+                <p className={styles.videoError}>{videoError?.message || 'Video generation failed.'}</p>
+              </div>
+              <div className={styles.ownerToolbar}>
+                <button
+                  className={styles.toolbarBtn}
+                  onClick={async () => {
+                    if (!falModels) {
+                      const res = await fetch('/api/fal-models');
+                      if (res.ok) setFalModels(await res.json());
                     }
-                    const data = await res.json() as { videoGenerationId: string; status: string };
-                    setVideoGenerationId(data.videoGenerationId);
-                    setVideoState('generating');
-                  } catch {
-                    setVideoError({ message: 'Network error — could not retry.' });
-                  } finally {
-                    setVideoLoading(false);
-                  }
-                }}
-              >
-                {!videoLoading && <RefreshCw size={16} />}
-                Retry
-              </Button>
-            </div>
+                    setShowVideoEditor(true);
+                  }}
+                  aria-label="Edit Storyboard"
+                  title="Edit the video storyboard to fix the issue"
+                  type="button"
+                >
+                  <Pencil size={14} />
+                  Storyboard
+                </button>
+                <button
+                  className={styles.toolbarBtn}
+                  disabled={videoLoading}
+                  onClick={async () => {
+                    setVideoLoading(true);
+                    setVideoError(null);
+                    try {
+                      const res = await fetch(`/api/podcasts/${podcast.id}/video`, { method: 'POST' });
+                      if (!res.ok) {
+                        const body = await res.json().catch(() => ({})) as { error?: string };
+                        setVideoError({ message: body.error || 'Retry failed.' });
+                        return;
+                      }
+                      const data = await res.json() as { videoGenerationId: string; status: string };
+                      setVideoGenerationId(data.videoGenerationId);
+                      setVideoState('generating');
+                    } catch {
+                      setVideoError({ message: 'Network error — could not retry.' });
+                    } finally {
+                      setVideoLoading(false);
+                    }
+                  }}
+                  aria-label="Retry Video"
+                  title="Retry video generation"
+                  type="button"
+                >
+                  <RefreshCw size={14} />
+                  Retry
+                </button>
+                <button
+                  className={styles.toolbarBtn}
+                  onClick={() => setShowAvatarPicker(true)}
+                  aria-label="Avatars"
+                  title="Change speaker avatars"
+                  type="button"
+                >
+                  <Users size={14} />
+                  Avatars
+                </button>
+                <button
+                  className={styles.toolbarBtn}
+                  onClick={() => setShowMusicModal(true)}
+                  aria-label="Add Music"
+                  title="Add background music to your podcast"
+                  type="button"
+                >
+                  <Music size={14} />
+                  Music
+                </button>
+              </div>
+            </>
           )}
         </section>
       )}
