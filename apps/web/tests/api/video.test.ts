@@ -12,6 +12,7 @@ const mockVideoGenFindUnique = vi.fn();
 const mockVideoGenCreate = vi.fn();
 const mockSegmentVisualCreateMany = vi.fn();
 const mockSegmentVisualDeleteMany = vi.fn();
+const mockSegmentTransitionDeleteMany = vi.fn();
 const mockSegmentVisualFindMany = vi.fn();
 const mockSegmentVisualUpdate = vi.fn();
 const mockSegmentVisualUpdateMany = vi.fn();
@@ -34,6 +35,9 @@ vi.mock('@/lib/prisma', () => ({
       findMany: (...args: unknown[]) => mockSegmentVisualFindMany(...args),
       update: (...args: unknown[]) => mockSegmentVisualUpdate(...args),
       updateMany: (...args: unknown[]) => mockSegmentVisualUpdateMany(...args),
+    },
+    segmentTransition: {
+      deleteMany: (...args: unknown[]) => mockSegmentTransitionDeleteMany(...args),
     },
     $transaction: (...args: unknown[]) => mockTransaction(...args),
   },
@@ -241,6 +245,18 @@ describe('POST /api/podcasts/[id]/video', () => {
     expect(mockCheckVideoGenerationGate).not.toHaveBeenCalled();
   });
 
+  it('allows re-generation when video is STALE', async () => {
+    mockVideoGenFindUnique.mockResolvedValue({ id: 'vg-stale', status: 'STALE', videoUrl: 'https://r2.example.com/old.mp4' });
+    mockVideoGenDelete.mockResolvedValue({});
+    mockSegmentVisualDeleteMany.mockResolvedValue({});
+    mockSegmentTransitionDeleteMany.mockResolvedValue({});
+
+    const res = await POST(createRequest(), routeParams);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.videoGenerationId).toBe('vg-1');
+  });
+
   it('stores pipelineJson on VideoGeneration when pipeline provided', async () => {
     const pipeline = {
       version: 1 as const,
@@ -407,6 +423,28 @@ describe('PATCH /api/podcasts/[id]/video', () => {
 
     const res = await PATCH(createPatchRequest({
       segments: [{ segmentVisualId: 'sv-1', prompt: 'retry prompt' }],
+    }), routeParams);
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.status).toBe('GENERATING_VISUALS');
+  });
+
+  it('allows PATCH when video is STALE', async () => {
+    mockVideoGenFindUnique.mockResolvedValue({ id: 'vg-1', status: 'STALE', videoUrl: 'https://r2.example.com/old.mp4' });
+    mockSegmentVisualFindMany
+      .mockResolvedValueOnce([
+        { id: 'sv-1', segmentId: 'seg-1', visualType: 'AI_ILLUSTRATION', visualMode: 'image', assetUrl: null, prompt: null, metadata: null },
+      ])
+      .mockResolvedValueOnce([
+        { id: 'sv-1', segmentId: 'seg-1', visualType: 'AI_ILLUSTRATION', visualMode: 'image', prompt: 'new prompt', metadata: null },
+      ])
+      .mockResolvedValueOnce([
+        { id: 'sv-1', status: 'pending' },
+      ]);
+
+    const res = await PATCH(createPatchRequest({
+      segments: [{ segmentVisualId: 'sv-1', prompt: 'new prompt' }],
     }), routeParams);
 
     expect(res.status).toBe(200);

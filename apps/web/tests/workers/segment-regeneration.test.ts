@@ -17,6 +17,7 @@ const mockPrismaPodcastFindUniqueOrThrow = vi.fn().mockResolvedValue({
 
 const mockPrismaDiscoveryFindUnique = vi.fn().mockResolvedValue(null);
 const mockPrismaVoiceTrackUpdateMany = vi.fn().mockResolvedValue({ count: 0 });
+const mockPrismaVideoGenerationUpdateMany = vi.fn().mockResolvedValue({ count: 0 });
 const mockPrismaPodcastVoiceUpsert = vi.fn().mockResolvedValue({});
 
 const mockPrismaTransaction = vi.fn(async (callback: (tx: unknown) => Promise<unknown>) => {
@@ -49,6 +50,9 @@ vi.mock('@/lib/prisma', () => {
     },
     voiceTrack: {
       updateMany: (...args: unknown[]) => mockPrismaVoiceTrackUpdateMany(...args),
+    },
+    videoGeneration: {
+      updateMany: (...args: unknown[]) => mockPrismaVideoGenerationUpdateMany(...args),
     },
     podcastVoice: {
       upsert: (...args: unknown[]) => mockPrismaPodcastVoiceUpsert(...args),
@@ -484,6 +488,18 @@ describe('processSegmentRegeneration', () => {
       expect(mockPrismaInteractionUpdate).toHaveBeenCalledWith({
         where: { id: 'interaction-xyz' },
         data: { status: 'INCORPORATED', incorporated: true },
+      });
+    });
+  });
+
+  describe('video generation staleness', () => {
+    it('marks READY video generation as STALE after segment regeneration', async () => {
+      const job = createMockJob(defaultPayload);
+      await processSegmentRegeneration(job);
+
+      expect(mockPrismaVideoGenerationUpdateMany).toHaveBeenCalledWith({
+        where: { podcastId: 'podcast-001', status: 'READY' },
+        data: { status: 'STALE' },
       });
     });
   });
