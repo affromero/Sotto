@@ -24,33 +24,15 @@ export async function HeroChapter() {
             <em>Studio-quality podcast.</em>
           </h1>
 
-          {/* Video demo slot — placeholder until user provides video */}
-          <div className={styles.videoSlot}>
-            <div className={styles.videoPlaceholder}>
-              <svg
-                width="48"
-                height="48"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-                className={styles.playIcon}
-              >
-                <circle cx="12" cy="12" r="10" />
-                <polygon points="10 8 16 12 10 16 10 8" />
-              </svg>
-              <span className={styles.videoLabel}>Demo coming soon</span>
-            </div>
-          </div>
+          <p className={styles.subtitle}>
+            Describe what you want to learn. Sotto writes a fact-checked script,
+            generates studio audio from 7 voice providers, and turns it into video.
+          </p>
 
           <AuthCTA source="hero" />
 
           {showcase && (
             <div className={styles.showcase}>
-              <span className={styles.showcaseLabel}>Listen to a sample podcast</span>
               <EmbedPlayer
                 podcastId={showcase.podcastId}
                 title={showcase.title}
@@ -60,12 +42,6 @@ export async function HeroChapter() {
               />
             </div>
           )}
-        </div>
-
-        <div className={styles.wave} aria-hidden="true">
-          {Array.from({ length: 48 }, (_, i) => (
-            <span key={i} className={styles.bar} style={{ '--i': i } as React.CSSProperties} />
-          ))}
         </div>
       </div>
     </ScrollChapter>

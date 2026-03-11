@@ -1,9 +1,9 @@
 /* ==========================================================================
-   JOURNEY CHAPTER — 3-step sticky scrollytelling
+   JOURNEY CHAPTER — 3-step alternating split layout (Airbnb-style)
    ========================================================================== */
 
 .root {
-  padding: 80px var(--spacing-lg);
+  padding: 120px var(--spacing-lg);
   max-width: var(--max-content-width);
   margin: 0 auto;
 }
@@ -11,7 +11,7 @@
 /* Header */
 .header {
   text-align: center;
-  margin-bottom: 64px;
+  margin-bottom: 80px;
 }
 
 .overline {
@@ -21,59 +21,62 @@
   text-transform: uppercase;
   letter-spacing: 1.5px;
   color: var(--color-primary);
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
 
 .heading {
   font-family: var(--font-heading);
-  font-size: clamp(2rem, 4vw, 3rem);
+  font-size: clamp(2.25rem, 4.5vw, 3.25rem);
   font-weight: 400;
   color: var(--color-text);
   line-height: 1.15;
 }
 
 /* ==========================================================================
-   SCROLL CONTAINER — desktop: side-by-side sticky
+   SPLIT ROWS — text + visual side by side, alternating
    ========================================================================== */
 
-.scrollContainer {
+.split {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 48px;
-  align-items: start;
+  gap: 64px;
+  align-items: center;
+  margin-bottom: 80px;
 }
 
-/* Left: text steps */
-.stepsColumn {
-  display: flex;
-  flex-direction: column;
+.split:last-of-type {
+  margin-bottom: 0;
 }
 
-.stepTrigger {
-  min-height: 80vh;
+.splitReverse {
+  direction: rtl;
+}
+
+.splitReverse > * {
+  direction: ltr;
+}
+
+.splitText {
   display: flex;
   align-items: center;
-  padding: 40px 0;
 }
 
+.splitVisual {
+  display: flex;
+  justify-content: center;
+}
+
+/* Step number + text */
 .step {
   display: flex;
   gap: 20px;
   align-items: flex-start;
-  opacity: 0.35;
-  transform: translateY(8px);
-  transition: opacity 0.4s var(--ease-out-expo), transform 0.4s var(--ease-out-expo);
-}
-
-.stepTrigger[data-active] .step {
-  opacity: 1;
-  transform: translateY(0);
 }
 
 .stepNum {
   flex-shrink: 0;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -81,7 +84,7 @@
   background: var(--color-primary);
   color: #fff;
   font-weight: 700;
-  font-size: 16px;
+  font-size: 17px;
 }
 
 .stepBody {
@@ -90,99 +93,46 @@
 
 .stepTitle {
   font-family: var(--font-heading);
-  font-size: 1.5rem;
+  font-size: 1.625rem;
   font-weight: 400;
   color: var(--color-text);
-  margin-bottom: 8px;
+  margin-bottom: 12px;
 }
 
 .stepDesc {
-  font-size: 16px;
+  font-size: 17px;
   line-height: 1.7;
   color: var(--color-text-secondary, #6B7280);
 }
 
-/* Right: sticky visual */
-.visualColumn {
-  position: relative;
-}
-
-.visualSticky {
-  position: sticky;
-  top: 0;
-  height: 100dvh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* Visuals — only one visible at a time based on active step */
-.visual {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0;
-  transform: translateY(12px);
-  transition: opacity 0.5s var(--ease-out-expo), transform 0.5s var(--ease-out-expo);
-  pointer-events: none;
-}
-
-/* JS sets data-active on stepTrigger elements; CSS activates the matching visual
-   via sibling relationship. We use :has() to check which step is active. */
-
-/* Describe active when step 0 is active */
-.scrollContainer:has(.stepTrigger:nth-child(1)[data-active]) .visualDescribe {
-  opacity: 1;
-  transform: translateY(0);
-  pointer-events: auto;
-}
-
-/* Script active when step 1 is active */
-.scrollContainer:has(.stepTrigger:nth-child(2)[data-active]) .visualScript {
-  opacity: 1;
-  transform: translateY(0);
-  pointer-events: auto;
-}
-
-/* Listen active when step 2 is active */
-.scrollContainer:has(.stepTrigger:nth-child(3)[data-active]) .visualListen {
-  opacity: 1;
-  transform: translateY(0);
-  pointer-events: auto;
-}
-
-/* Default: show first visual if no step is active yet */
-.scrollContainer:not(:has(.stepTrigger[data-active])) .visualDescribe {
-  opacity: 1;
-  transform: translateY(0);
-  pointer-events: auto;
+/* Decorative line (hidden) */
+.stepLine {
+  display: none;
 }
 
 /* ==========================================================================
-   MOCK UI COMPONENTS
+   MOCK UI COMPONENTS — large, rounded, warm depth
    ========================================================================== */
 
 .mockChat,
 .mockScript,
 .mockPlayer {
   width: 100%;
-  max-width: 400px;
+  max-width: 420px;
   background: var(--color-surface);
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: var(--radius-lg);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: var(--radius-2xl);
   overflow: hidden;
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-lg);
 }
 
 .mockHeader {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 12px 16px;
-  background: rgba(0, 0, 0, 0.03);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  gap: 10px;
+  padding: 14px 20px;
+  background: rgba(0, 0, 0, 0.02);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
   font-size: 13px;
   font-weight: 600;
   color: var(--color-text);
@@ -196,14 +146,14 @@
 }
 
 .mockBody {
-  padding: 16px;
+  padding: 20px;
 }
 
 /* Chat mock */
 .mockMsg {
   display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
+  gap: 10px;
+  margin-bottom: 14px;
 }
 
 .mockMsg:last-child {
@@ -216,8 +166,8 @@
 
 .mockBubble {
   max-width: 80%;
-  padding: 10px 14px;
-  border-radius: 16px;
+  padding: 12px 16px;
+  border-radius: 20px;
   font-size: 14px;
   line-height: 1.5;
 }
@@ -225,26 +175,26 @@
 .mockUser .mockBubble {
   background: var(--color-primary);
   color: #fff;
-  border-bottom-right-radius: 4px;
+  border-bottom-right-radius: 6px;
 }
 
 .mockBot .mockBubble {
   background: rgba(0, 0, 0, 0.04);
   color: var(--color-text);
-  border-bottom-left-radius: 4px;
+  border-bottom-left-radius: 6px;
 }
 
 .mockAvatar {
   flex-shrink: 0;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   background: var(--color-primary);
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
 }
 
@@ -252,26 +202,26 @@
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
-  margin-top: 4px;
+  margin-top: 8px;
 }
 
 .chip {
-  padding: 6px 14px;
+  padding: 8px 16px;
   border-radius: var(--radius-full);
-  border: 1px solid rgba(217, 119, 6, 0.3);
-  background: rgba(217, 119, 6, 0.06);
+  border: 1px solid rgba(217, 119, 6, 0.25);
+  background: rgba(217, 119, 6, 0.04);
   font-size: 13px;
   color: var(--color-primary);
 }
 
 .chipFaded {
-  opacity: 0.4;
+  opacity: 0.35;
 }
 
 /* Script mock */
 .scriptTurn {
-  margin-bottom: 14px;
-  padding-bottom: 14px;
+  margin-bottom: 16px;
+  padding-bottom: 16px;
   border-bottom: 1px solid rgba(0, 0, 0, 0.05);
 }
 
@@ -282,11 +232,11 @@
 
 .scriptSpeaker {
   display: inline-block;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
 }
 
 .scriptSpeaker[data-speaker='host'] {
@@ -299,19 +249,19 @@
 
 .scriptTurn p {
   font-size: 14px;
-  line-height: 1.6;
+  line-height: 1.65;
   color: var(--color-text);
 }
 
 .scriptActions {
   display: flex;
   gap: 8px;
-  margin-top: 14px;
+  margin-top: 16px;
 }
 
 .scriptBtn {
-  padding: 6px 14px;
-  border-radius: var(--radius-sm);
+  padding: 8px 16px;
+  border-radius: var(--radius-full);
   border: 1px solid rgba(0, 0, 0, 0.1);
   font-size: 12px;
   font-weight: 600;
@@ -335,28 +285,28 @@
 .playerMeta {
   font-size: 13px;
   color: var(--color-text-secondary, #6B7280);
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 
 .playerWaveform {
   display: flex;
   align-items: flex-end;
   gap: 3px;
-  height: 32px;
-  margin-bottom: 12px;
+  height: 36px;
+  margin-bottom: 16px;
 }
 
 .playerBar {
   flex: 1;
   min-width: 2px;
   background: var(--color-primary);
-  border-radius: 1px;
-  opacity: 0.4;
-  height: calc(8px + sin(var(--i, 0) * 0.5) * 20px);
+  border-radius: 2px;
+  opacity: 0.35;
+  height: calc(8px + sin(var(--i, 0) * 0.5) * 24px);
 }
 
 .playerBar:nth-child(-n+12) {
-  opacity: 0.8;
+  opacity: 0.75;
 }
 
 .playerControls {
@@ -373,51 +323,46 @@
 
 .playerActions {
   display: flex;
-  gap: 12px;
+  gap: 16px;
 }
 
 .playerAction {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--color-primary);
 }
 
 /* ==========================================================================
-   MOBILE — disable sticky, vertical stack
+   MOBILE — single column stack
    ========================================================================== */
 
 @media (max-width: 767px) {
   .root {
-    padding: 60px var(--spacing-md);
+    padding: 80px var(--spacing-md);
   }
 
-  .scrollContainer {
-    display: flex;
-    flex-direction: column;
-    gap: 0;
+  .header {
+    margin-bottom: 48px;
   }
 
-  .stepsColumn {
-    order: 1;
+  .split {
+    grid-template-columns: 1fr;
+    gap: 32px;
+    margin-bottom: 56px;
   }
 
-  .visualColumn {
-    display: none;
+  .splitReverse {
+    direction: ltr;
   }
 
-  .stepTrigger {
-    min-height: auto;
-    padding: 24px 0;
+  .splitVisual {
+    order: -1;
   }
 
-  .step {
-    opacity: 1;
-    transform: none;
-  }
-
-  .stepTrigger[data-active] .step {
-    opacity: 1;
-    transform: none;
+  .mockChat,
+  .mockScript,
+  .mockPlayer {
+    max-width: 100%;
   }
 }
 
@@ -429,10 +374,6 @@
   .step {
     opacity: 1;
     transform: none;
-    transition: none;
-  }
-
-  .visual {
     transition: none;
   }
 }
