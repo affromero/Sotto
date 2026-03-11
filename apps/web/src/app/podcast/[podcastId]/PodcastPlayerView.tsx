@@ -1141,13 +1141,6 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
         </section>
       )}
 
-      {/* References — after player */}
-      {podcast.references.length > 0 && (
-        <section className={styles.referencesSection}>
-          <ReferenceList references={podcast.references} />
-        </section>
-      )}
-
       {/* Post-Listen Rating Prompt */}
       {showRatingPrompt && !hasRated && (
         <PostListenRating
@@ -1436,6 +1429,13 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
           </section>
 
         </>
+      )}
+
+      {/* References — after transcript/video */}
+      {podcast.references.length > 0 && (
+        <section className={styles.referencesSection}>
+          <ReferenceList references={podcast.references} />
+        </section>
       )}
 
       {/* Interrupt Chat (opened from action bar) */}
