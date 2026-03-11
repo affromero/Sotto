@@ -42,12 +42,18 @@ export interface MinimaxExpression {
   emotion?: 'happy' | 'sad' | 'angry' | 'fearful' | 'disgusted' | 'surprised' | 'neutral';
 }
 
+export interface InworldExpression {
+  /** Inworld emotion tag to prepend to text (e.g. "[happy]") */
+  emotionTag?: string;
+}
+
 export interface TtsExpressionParams {
   elevenlabs?: ElevenLabsExpression;
   cartesia?: CartesiaExpression;
   hume?: HumeExpression;
   openai?: OpenAIExpression;
   minimax?: MinimaxExpression;
+  replicate?: InworldExpression;
 }
 
 // ---------------------------------------------------------------------------
@@ -60,6 +66,7 @@ interface DirectionMapping {
   hume: { description: string };
   openai: { instructions: string };
   minimax: MinimaxExpression;
+  replicate: InworldExpression;
 }
 
 /**
@@ -73,6 +80,7 @@ const DIRECTION_MAP: Record<string, DirectionMapping> = {
     hume: { description: 'energetic, enthusiastic, high-energy delivery' },
     openai: { instructions: 'Speak with high energy and enthusiasm, like an excited podcast host.' },
     minimax: { emotion: 'happy' },
+    replicate: { emotionTag: '[happy]' },
   },
   excited: {
     elevenlabs: { audioTagPrefix: '[excited] ', stability: 0.0 },
@@ -80,6 +88,7 @@ const DIRECTION_MAP: Record<string, DirectionMapping> = {
     hume: { description: 'excited, enthusiastic' },
     openai: { instructions: 'Speak with genuine excitement and enthusiasm.' },
     minimax: { emotion: 'happy' },
+    replicate: { emotionTag: '[happy]' },
   },
   thoughtful: {
     elevenlabs: { audioTagPrefix: '[calm] ', stability: 0.5 },
@@ -87,6 +96,7 @@ const DIRECTION_MAP: Record<string, DirectionMapping> = {
     hume: { description: 'thoughtful, measured, reflective' },
     openai: { instructions: 'Speak thoughtfully with a measured, reflective pace.' },
     minimax: { emotion: 'neutral' },
+    replicate: {},
   },
   serious: {
     elevenlabs: { stability: 1.0 },
@@ -94,6 +104,7 @@ const DIRECTION_MAP: Record<string, DirectionMapping> = {
     hume: { description: 'serious, grave, measured' },
     openai: { instructions: 'Speak in a serious, measured tone with gravitas.' },
     minimax: { emotion: 'neutral' },
+    replicate: {},
   },
   playful: {
     elevenlabs: { audioTagPrefix: '[playfully] ', stability: 0.0 },
@@ -101,6 +112,7 @@ const DIRECTION_MAP: Record<string, DirectionMapping> = {
     hume: { description: 'playful, light-hearted, fun' },
     openai: { instructions: 'Speak playfully and light-heartedly, with a smile in your voice.' },
     minimax: { emotion: 'happy' },
+    replicate: { emotionTag: '[happy]' },
   },
   sarcastic: {
     elevenlabs: { audioTagPrefix: '[sarcastic] ', stability: 0.5 },
@@ -108,6 +120,7 @@ const DIRECTION_MAP: Record<string, DirectionMapping> = {
     hume: { description: 'sarcastic, dry, deadpan' },
     openai: { instructions: 'Speak with dry sarcasm and a slightly flat affect.' },
     minimax: { emotion: 'neutral' },
+    replicate: {},
   },
   warm: {
     elevenlabs: { stability: 0.5 },
@@ -115,6 +128,7 @@ const DIRECTION_MAP: Record<string, DirectionMapping> = {
     hume: { description: 'warm, inviting, friendly' },
     openai: { instructions: 'Speak warmly and invitingly, like welcoming a friend.' },
     minimax: { emotion: 'neutral' },
+    replicate: {},
   },
   urgent: {
     elevenlabs: { audioTagPrefix: '[rushed] ', stability: 0.0 },
@@ -122,6 +136,7 @@ const DIRECTION_MAP: Record<string, DirectionMapping> = {
     hume: { description: 'urgent, fast-paced, pressing' },
     openai: { instructions: 'Speak with urgency, slightly faster pace, conveying importance.' },
     minimax: { emotion: 'angry' },
+    replicate: { emotionTag: '[angry]' },
   },
   hesitant: {
     elevenlabs: { audioTagPrefix: '[hesitantly] ', stability: 0.5 },
@@ -129,6 +144,7 @@ const DIRECTION_MAP: Record<string, DirectionMapping> = {
     hume: { description: 'hesitant, uncertain, searching for words' },
     openai: { instructions: 'Speak hesitantly, as if carefully choosing your words.' },
     minimax: { emotion: 'fearful' },
+    replicate: { emotionTag: '[fearful]' },
   },
   confident: {
     elevenlabs: { stability: 1.0 },
@@ -136,6 +152,7 @@ const DIRECTION_MAP: Record<string, DirectionMapping> = {
     hume: { description: 'confident, assured, authoritative' },
     openai: { instructions: 'Speak with confidence and authority.' },
     minimax: { emotion: 'neutral' },
+    replicate: {},
   },
   nostalgic: {
     elevenlabs: { audioTagPrefix: '[calm] ', stability: 0.5 },
@@ -143,6 +160,7 @@ const DIRECTION_MAP: Record<string, DirectionMapping> = {
     hume: { description: 'nostalgic, wistful, reminiscing' },
     openai: { instructions: 'Speak with nostalgia, as if fondly remembering the past.' },
     minimax: { emotion: 'sad' },
+    replicate: { emotionTag: '[sad]' },
   },
   dramatic: {
     elevenlabs: { audioTagPrefix: '[dramatic] ', stability: 0.0 },
@@ -150,6 +168,7 @@ const DIRECTION_MAP: Record<string, DirectionMapping> = {
     hume: { description: 'dramatic, building tension' },
     openai: { instructions: 'Speak dramatically, building tension and suspense.' },
     minimax: { emotion: 'surprised' },
+    replicate: { emotionTag: '[surprised]' },
   },
   calm: {
     elevenlabs: { audioTagPrefix: '[calm] ', stability: 1.0 },
@@ -157,6 +176,7 @@ const DIRECTION_MAP: Record<string, DirectionMapping> = {
     hume: { description: 'calm, serene, measured' },
     openai: { instructions: 'Speak calmly and serenely, with a measured pace.' },
     minimax: { emotion: 'neutral' },
+    replicate: {},
   },
   curious: {
     elevenlabs: { audioTagPrefix: '[curious] ', stability: 0.5 },
@@ -164,6 +184,7 @@ const DIRECTION_MAP: Record<string, DirectionMapping> = {
     hume: { description: 'curious, inquisitive, wondering' },
     openai: { instructions: 'Speak with curiosity and genuine interest, slightly questioning.' },
     minimax: { emotion: 'neutral' },
+    replicate: {},
   },
   laughing: {
     elevenlabs: { audioTagPrefix: '[laughs] ', stability: 0.0 },
@@ -171,6 +192,7 @@ const DIRECTION_MAP: Record<string, DirectionMapping> = {
     hume: { description: 'amused, laughing, light-hearted' },
     openai: { instructions: 'Speak while lightly laughing, amused and cheerful.' },
     minimax: { emotion: 'happy' },
+    replicate: { emotionTag: '[laughing]' },
   },
   whispering: {
     elevenlabs: { audioTagPrefix: '[whispers] ', stability: 0.5 },
@@ -178,6 +200,7 @@ const DIRECTION_MAP: Record<string, DirectionMapping> = {
     hume: { description: 'whispering, hushed, secretive' },
     openai: { instructions: 'Whisper softly, as if sharing a secret.' },
     minimax: { emotion: 'neutral' },
+    replicate: { emotionTag: '[whispering]' },
   },
   frustrated: {
     elevenlabs: { audioTagPrefix: '[frustrated] ', stability: 0.0 },
@@ -185,6 +208,7 @@ const DIRECTION_MAP: Record<string, DirectionMapping> = {
     hume: { description: 'frustrated, exasperated' },
     openai: { instructions: 'Speak with frustration and exasperation.' },
     minimax: { emotion: 'angry' },
+    replicate: { emotionTag: '[angry]' },
   },
   surprised: {
     elevenlabs: { audioTagPrefix: '[gasps] ', stability: 0.0 },
@@ -192,6 +216,7 @@ const DIRECTION_MAP: Record<string, DirectionMapping> = {
     hume: { description: 'surprised, astonished' },
     openai: { instructions: 'Speak with genuine surprise and astonishment.' },
     minimax: { emotion: 'surprised' },
+    replicate: { emotionTag: '[surprised]' },
   },
   sad: {
     elevenlabs: { audioTagPrefix: '[sighs] ', stability: 0.5 },
@@ -199,6 +224,7 @@ const DIRECTION_MAP: Record<string, DirectionMapping> = {
     hume: { description: 'sad, somber, heavy-hearted' },
     openai: { instructions: 'Speak with sadness, a heavy tone, slightly slower.' },
     minimax: { emotion: 'sad' },
+    replicate: { emotionTag: '[sad]' },
   },
   skeptical: {
     elevenlabs: { stability: 0.5 },
@@ -206,6 +232,7 @@ const DIRECTION_MAP: Record<string, DirectionMapping> = {
     hume: { description: 'skeptical, doubtful, questioning' },
     openai: { instructions: 'Speak with skepticism, as if not entirely convinced.' },
     minimax: { emotion: 'neutral' },
+    replicate: {},
   },
 };
 
@@ -298,7 +325,13 @@ export function mapDirectionToExpression(
       }
       break;
     }
-    // fal, replicate, kittentts — no expression support
+    case 'replicate': {
+      if (mapping?.replicate.emotionTag) {
+        params.replicate = mapping.replicate;
+      }
+      break;
+    }
+    // fal, kittentts — no expression support
   }
 
   return params;
