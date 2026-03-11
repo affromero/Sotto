@@ -62,7 +62,7 @@ export function classifyError(errorMessage: string): ByokErrorKind {
  * from other providers should also trigger the fallback.
  */
 export function isModelAccessError(errorMessage: string): boolean {
-  return /\(404\)/.test(errorMessage);
+  return /\b404\b/.test(errorMessage);
 }
 
 export function isKeyInvalidationError(kind: ByokErrorKind): boolean {
