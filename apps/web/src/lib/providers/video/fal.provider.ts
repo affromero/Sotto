@@ -4,7 +4,12 @@
  */
 import { getFalVideoEndpoint, getFalFrameParams, isFalWanModel } from '../fal-endpoints';
 import { logger } from '../../logger';
+import { speedUpVideo } from '../../video-concat';
 import type { VideoProvider } from '../video';
+
+// Fal only accepts these discrete duration values for non-WAN models
+const FAL_MIN_DURATION_S = 4;
+const FAL_MIN_DURATION_STR = '4s';
 
 export class FalVideoProvider implements VideoProvider {
   readonly providerId = 'fal' as const;
@@ -39,10 +44,12 @@ export class FalVideoProvider implements VideoProvider {
     }
 
     // WAN models use num_frames (int) instead of duration (string)
+    // Non-WAN models require one of "4s", "6s", "8s" — always request minimum (4s)
+    // and speed up the result to match the desired duration.
     const isWan = isFalWanModel(this.model);
     const durationBody: Record<string, unknown> = isWan
       ? { num_frames: params.duration ? Math.round(params.duration * 24) : 81, resolution: '480p' }
-      : { duration: params.duration ? String(params.duration) : undefined };
+      : { duration: FAL_MIN_DURATION_STR };
 
     const submitRes = await fetch(url, {
       method: 'POST',
@@ -108,7 +115,13 @@ export class FalVideoProvider implements VideoProvider {
         const videoUrl = result.video?.url;
         if (!videoUrl) throw new Error('Fal returned no video URL');
         const videoRes = await fetch(videoUrl);
-        return Buffer.from(await videoRes.arrayBuffer());
+        const buffer = Buffer.from(await videoRes.arrayBuffer());
+
+        // Speed up to desired duration if shorter than what Fal generated (FAL_MIN_DURATION_S)
+        if (!isWan && params.duration && params.duration < FAL_MIN_DURATION_S) {
+          return speedUpVideo(buffer, params.duration);
+        }
+        return buffer;
       }
 
       if (status.status === 'FAILED') {
