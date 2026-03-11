@@ -136,7 +136,7 @@ export function DemoStudio() {
     setProjects(await res.json());
   }, []);
 
-  const loadProject = useCallback(async (id: string) => {
+  const loadProject = useCallback(async (id: string, navigate = false) => {
     const res = await fetch(`/api/admin/demo/${id}`);
     if (!res.ok) {
       setError(`Failed to load project: ${res.status} ${await res.text()}`);
@@ -144,9 +144,12 @@ export function DemoStudio() {
     }
     const project: DemoProject = await res.json();
     setSelectedProject(project);
-    if (project.status === 'SCRIPT_READY' || project.status === 'DRAFT') setStep('script');
-    else if (project.status === 'READY') setStep('compose');
-    else setStep('script');
+    // Only navigate on initial project selection, not on refresh/polling
+    if (navigate) {
+      if (project.status === 'SCRIPT_READY' || project.status === 'DRAFT') setStep('script');
+      else if (project.status === 'READY') setStep('compose');
+      else setStep('script');
+    }
   }, []);
 
   // Load TTS options for the picker
@@ -194,7 +197,7 @@ export function DemoStudio() {
         }
         const { id } = await res.json();
         await loadProjects();
-        await loadProject(id);
+        await loadProject(id, true);
       } else {
         // Import into existing project
         const res = await fetch(`/api/admin/demo/${selectedProject.id}/import-script`, {
@@ -206,7 +209,7 @@ export function DemoStudio() {
           const data = await res.json();
           throw new Error(data.error || 'Failed to import script');
         }
-        await loadProject(selectedProject.id);
+        await loadProject(selectedProject.id, true);
       }
       setScriptJson('');
     } catch (err) {
@@ -362,8 +365,8 @@ export function DemoStudio() {
                     role="button"
                     tabIndex={0}
                     data-selected={selectedProject?.id === p.id ? 'true' : undefined}
-                    onClick={() => loadProject(p.id)}
-                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') loadProject(p.id); }}
+                    onClick={() => loadProject(p.id, true)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') loadProject(p.id, true); }}
                   >
                     <span className={styles.projectTitle}>{p.title}</span>
                     <span className={styles.projectMeta}>
@@ -687,6 +690,14 @@ function AssetStatus({
   );
 }
 
+interface VoiceOption {
+  id: string;
+  name: string;
+  gender?: string;
+  accent?: string;
+  character?: string;
+}
+
 function TtsPicker({
   scene,
   ttsOptions,
@@ -696,10 +707,38 @@ function TtsPicker({
   ttsOptions: TtsOption[];
   onSave: (data: Partial<DemoScene>) => void;
 }) {
+  const [voices, setVoices] = useState<VoiceOption[]>([]);
+  const [loadingVoices, setLoadingVoices] = useState(false);
+
   // Parse current ttsProvider:ttsModel into the combined id format
   const currentId = scene.ttsProvider && scene.ttsModel
     ? `${scene.ttsProvider}:${scene.ttsModel}`
     : '';
+
+  // Extract the provider portion from the selected option
+  const currentProvider = currentId ? currentId.split(':')[0] : 'elevenlabs';
+
+  // Fetch voices when provider changes
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchVoices() {
+      setLoadingVoices(true);
+      const res = await fetch(`/api/voices?provider=${currentProvider}`);
+      if (!cancelled && res.ok) {
+        const data = await res.json();
+        setVoices((data.poolVoices ?? []).map((v: VoiceOption) => ({
+          id: v.id,
+          name: v.name,
+          gender: v.gender,
+          accent: v.accent,
+          character: v.character,
+        })));
+      }
+      if (!cancelled) setLoadingVoices(false);
+    }
+    fetchVoices();
+    return () => { cancelled = true; };
+  }, [currentProvider]);
 
   return (
     <div className={styles.ttsPicker}>
@@ -709,12 +748,19 @@ function TtsPicker({
         onChange={(e) => {
           const val = e.target.value;
           if (!val) {
-            onSave({ ttsProvider: null, ttsModel: null } as Partial<DemoScene>);
+            onSave({ ttsProvider: null, ttsModel: null, ttsVoiceId: null } as Partial<DemoScene>);
             return;
           }
           const [provider, ...modelParts] = val.split(':');
           const model = modelParts.join(':');
-          onSave({ ttsProvider: provider, ttsModel: model } as Partial<DemoScene>);
+          // Clear voice when switching provider — voice IDs differ per provider
+          const prevProvider = currentId ? currentId.split(':')[0] : '';
+          const clearVoice = provider !== prevProvider;
+          onSave({
+            ttsProvider: provider,
+            ttsModel: model,
+            ...(clearVoice ? { ttsVoiceId: null } : {}),
+          } as Partial<DemoScene>);
         }}
         aria-label="TTS provider and model"
       >
@@ -725,16 +771,22 @@ function TtsPicker({
           </option>
         ))}
       </select>
-      <input
-        className={styles.input}
-        type="text"
+      <select
+        className={styles.select}
         value={scene.ttsVoiceId ?? ''}
-        placeholder="Voice ID (optional)"
         onChange={(e) => {
           onSave({ ttsVoiceId: e.target.value || null } as Partial<DemoScene>);
         }}
-        aria-label="TTS voice ID"
-      />
+        disabled={loadingVoices}
+        aria-label="Voice"
+      >
+        <option value="">{loadingVoices ? 'Loading voices...' : 'Default voice'}</option>
+        {voices.map((v) => (
+          <option key={v.id} value={v.id}>
+            {v.name}{v.gender ? ` (${v.gender})` : ''}{v.character ? ` — ${v.character}` : ''}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }
