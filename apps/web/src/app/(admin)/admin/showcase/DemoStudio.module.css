@@ -607,13 +607,8 @@
 }
 
 .ttsPicker .select {
-  flex: 2;
-  min-width: 200px;
-}
-
-.ttsPicker .input {
   flex: 1;
-  min-width: 140px;
+  min-width: 180px;
 }
 
 /* Compose row */
