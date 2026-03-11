@@ -5,6 +5,7 @@ import { getFreeTierStatus } from '@/lib/generation-gate';
 import { getTierFeatures } from '@/lib/tier-features';
 import { getVideoGenerationStatus } from '@/lib/video-gate';
 import { resolveAudioUrl } from '@/lib/r2';
+import { findByVoiceId } from '@/lib/voice-pool';
 import type { Metadata } from 'next';
 import { PodcastPlayerView } from './PodcastPlayerView';
 import { PodcastJsonLd } from '@/components/player/PodcastJsonLd';
@@ -196,7 +197,7 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
           ttsProvider: true,
           ttsModel: true,
           failureReason: true,
-          voices: { select: { speaker: true, voiceId: true } },
+          voices: { select: { speaker: true, voiceId: true, provider: true } },
           proposalStatus: true,
           proposalMessage: true,
           contributor: {
@@ -256,6 +257,27 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
 
   const visibility = podcast.visibility;
 
+  // Build a voiceId → name map for tooltip enrichment
+  const allVoiceIds = [...new Set(
+    podcast.voiceTracks.flatMap((t) => t.voices.map((v) => v.voiceId)).filter(Boolean)
+  )];
+  const voiceNameMap = new Map<string, string>();
+  if (allVoiceIds.length > 0) {
+    const clones = await prisma.voiceClone.findMany({
+      where: { externalVoiceId: { in: allVoiceIds } },
+      select: { externalVoiceId: true, name: true },
+    });
+    for (const clone of clones) {
+      voiceNameMap.set(clone.externalVoiceId, clone.name);
+    }
+    for (const voiceId of allVoiceIds) {
+      if (!voiceNameMap.has(voiceId)) {
+        const poolEntry = findByVoiceId(voiceId);
+        if (poolEntry) voiceNameMap.set(voiceId, poolEntry.name);
+      }
+    }
+  }
+
   // Resolve audio URLs: presigned for PRIVATE/UNLISTED, public CDN for PUBLIC
   const [resolvedAudioUrl, resolvedSegments, resolvedVersions, resolvedVoiceTracks, resolvedVideoUrl, resolvedMusicUrl] =
     await Promise.all([
@@ -296,7 +318,10 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
           ttsProvider: t.ttsProvider,
           ttsModel: t.ttsModel,
           failureReason: t.failureReason,
-          voices: t.voices,
+          voices: t.voices.map((v) => ({
+            ...v,
+            voiceName: voiceNameMap.get(v.voiceId) ?? null,
+          })),
           contributor: t.contributor,
           proposalStatus: t.proposalStatus,
           proposalMessage: t.proposalMessage,
