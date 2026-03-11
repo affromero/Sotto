@@ -212,6 +212,10 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
     description: 'Composes final demo video from all scene assets',
     stage: 'Video Pipeline',
   },
+  'demo-scene-composition': {
+    description: 'Composes individual demo scenes from visual, voiceover, and recording assets',
+    stage: 'Video Pipeline',
+  },
   'music-generation': {
     description: 'Generates AI background music for podcasts via Suno or ElevenLabs',
     stage: 'Music Pipeline',
