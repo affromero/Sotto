@@ -35,6 +35,7 @@ import { InterruptChatPanel } from '@/components/player/InterruptChatPanel';
 import { ForkAttribution } from '@/components/player/ForkAttribution';
 import { ForkLineage } from '@/components/player/ForkLineage';
 import { ForkGraph } from '@/components/player/ForkGraph';
+import { Modal } from '@/components/ui/Modal';
 import { ForkRemixModal } from '@/components/player/ForkRemixModal';
 import { VoiceRenditionForkModal } from '@/components/player/VoiceRenditionForkModal';
 import { ProposeRenditionButton } from '@/components/player/ProposeRenditionButton';
@@ -311,9 +312,9 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
       .catch(() => {});
   }, [podcast.id, podcast.forkedFrom, podcast.forks.length]);
 
-  // Check existing video generation status on mount
+  // Check existing video generation status on mount (public podcasts: all visitors; private: owner only)
   useEffect(() => {
-    if (!isOwner || liveStatus !== 'READY') return;
+    if (liveStatus !== 'READY') return;
     fetch(`/api/podcasts/${podcast.id}/video`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
@@ -321,18 +322,20 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
         if ((data.status === 'READY' || data.status === 'GENERATING_AVATARS') && data.segmentVisuals?.length > 0) {
           setVideoState('ready');
           setSegmentVisuals(data.segmentVisuals);
-          if (data.avatarOverlays) {
-            setAvatarOverlays(data.avatarOverlays);
-            const hasInProgress = data.avatarOverlays.some(
-              (o: AvatarOverlayData) => ['pending', 'concatenating', 'submitting', 'processing'].includes(o.status)
-            );
-            if (hasInProgress) setAvatarGenerating(true);
+          if (isOwner) {
+            if (data.avatarOverlays) {
+              setAvatarOverlays(data.avatarOverlays);
+              const hasInProgress = data.avatarOverlays.some(
+                (o: AvatarOverlayData) => ['pending', 'concatenating', 'submitting', 'processing'].includes(o.status)
+              );
+              if (hasInProgress) setAvatarGenerating(true);
+            }
+            if (typeof data.avatarsVisible === 'boolean') setAvatarsVisible(data.avatarsVisible);
           }
-          if (typeof data.avatarsVisible === 'boolean') setAvatarsVisible(data.avatarsVisible);
-        } else if (data.status === 'FAILED') {
+        } else if (isOwner && data.status === 'FAILED') {
           setVideoState('failed');
           setVideoError({ message: data.failureReason || 'Video generation failed.' });
-        } else {
+        } else if (isOwner) {
           setVideoState('generating');
           setVideoGenerationId(data.videoGenerationId);
         }
@@ -868,7 +871,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
       {/* Video Section */}
       {isReady && isOwner && (
         <section className={styles.videoSection} aria-label="Video">
-          {videoState === 'idle' && !showPipelineEditor && !showAvatarPicker && (
+          {videoState === 'idle' && (
             <>
               <div className={styles.ownerToolbar}>
                 <button
@@ -876,6 +879,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
                   onClick={() => handleGenerateVideo()}
                   disabled={pipelineLoading || videoLoading || (videoStatus ? videoStatus.dailyRemaining <= 0 && !videoStatus.isByokUser : !isAdmin)}
                   aria-label="Generate Video"
+                  title="Generate a video from your podcast with AI visuals"
                   type="button"
                   data-loading={pipelineLoading || videoLoading ? 'true' : undefined}
                 >
@@ -887,6 +891,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
                   onClick={() => setShowAvatarPicker(true)}
                   disabled={videoStatus ? videoStatus.dailyRemaining <= 0 && !videoStatus.isByokUser : !isAdmin}
                   aria-label="Add Avatars"
+                  title="Add AI-generated speaker avatars to your video"
                   type="button"
                 >
                   <Users size={14} />
@@ -896,6 +901,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
                   className={styles.toolbarBtn}
                   onClick={() => setShowMusicModal(true)}
                   aria-label="Add Music"
+                  title="Add background music to your podcast"
                   type="button"
                 >
                   <Music size={14} />
@@ -951,40 +957,6 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
               )}
             </>
           )}
-          {showAvatarPicker && (
-            <AvatarPicker
-              podcastId={podcast.id}
-              speakers={[...new Set(podcast.segments.map(s => s.speaker))]}
-              segments={podcast.segments}
-              podcastDuration={podcast.duration ?? 0}
-              existingOverlays={avatarOverlays.length > 0 ? avatarOverlays.map((ov) => ({
-                speaker: ov.speaker,
-                avatarId: ov.avatarId,
-                avatarProvider: (ov.avatarProvider ?? 'heygen') as 'heygen' | 'runway',
-                status: ov.status,
-              })) : undefined}
-              onConfigured={({ generationStarted }) => {
-                setShowAvatarPicker(false);
-                if (generationStarted) {
-                  setAvatarGenerating(true);
-                }
-              }}
-              onCancel={() => setShowAvatarPicker(false)}
-            />
-          )}
-          {showPipelineEditor && pipelineData && falModels && (
-            <PipelineEditor
-              podcastId={podcast.id}
-              podcastTitle={podcast.title}
-              pipeline={pipelineData}
-              falModels={falModels}
-              onApprove={handlePipelineApprove}
-              onCancel={() => {
-                setShowPipelineEditor(false);
-                setPipelineData(null);
-              }}
-            />
-          )}
           {videoState === 'generating' && videoGenerationId && (
             <VideoProgress
               podcastId={podcast.id}
@@ -1008,7 +980,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
               onDismiss={dismissVideoError}
             />
           )}
-          {videoState === 'ready' && !showVideoEditor && (
+          {videoState === 'ready' && (
             <div className={styles.ownerToolbar}>
               <button
                 className={styles.toolbarBtn}
@@ -1020,6 +992,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
                   setShowVideoEditor(true);
                 }}
                 aria-label="Edit Storyboard"
+                title="Edit the video storyboard — change visuals, transitions, and timing"
                 type="button"
               >
                 <Pencil size={14} />
@@ -1029,6 +1002,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
                 className={styles.toolbarBtn}
                 onClick={() => setShowAvatarPicker(true)}
                 aria-label={avatarOverlays.length > 0 ? 'Change Avatars' : 'Add Avatars'}
+                title={avatarOverlays.length > 0 ? 'Change the speaker avatars in your video' : 'Add AI-generated speaker avatars to your video'}
                 type="button"
               >
                 <Users size={14} />
@@ -1038,6 +1012,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
                 className={styles.toolbarBtn}
                 onClick={() => setShowMusicModal(true)}
                 aria-label="Add Music"
+                title="Add background music to your podcast"
                 type="button"
               >
                 <Music size={14} />
@@ -1057,21 +1032,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
               )}
             </div>
           )}
-          {showVideoEditor && (videoState === 'ready' || videoState === 'failed') && falModels && (
-            <VideoEditor
-              podcastId={podcast.id}
-              segments={podcast.segments}
-              segmentVisuals={segmentVisuals}
-              falModels={falModels}
-              onRegenerate={(genId) => {
-                setShowVideoEditor(false);
-                setVideoState('generating');
-                setVideoGenerationId(genId);
-              }}
-              onCancel={() => setShowVideoEditor(false)}
-            />
-          )}
-          {videoState === 'failed' && !showVideoEditor && (
+          {videoState === 'failed' && (
             <div className={styles.videoFailed}>
               <button
                 className={styles.videoDismiss}
@@ -1353,82 +1314,85 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
 
       {/* View Toggle + Transcript/Teleprompter */}
       {podcast.segments.length > 0 && (
-        <>
-          <div className={styles.viewToggle} role="tablist" aria-label="Transcript view mode">
-            {segmentVisuals.length > 0 && (
+        <details className={styles.detailsSection}>
+          <summary className={styles.detailsSummary}>
+            <div className={styles.viewToggle} role="tablist" aria-label="Transcript view mode">
+              {segmentVisuals.length > 0 && (
+                <button
+                  className={`${styles.viewToggleBtn} ${viewMode === 'video' ? styles.viewToggleBtnActive : styles.viewToggleBtnHighlight}`}
+                  onClick={(e) => { e.preventDefault(); setViewMode('video'); }}
+                  role="tab"
+                  aria-selected={viewMode === 'video'}
+                  type="button"
+                >
+                  Video
+                </button>
+              )}
               <button
-                className={`${styles.viewToggleBtn} ${viewMode === 'video' ? styles.viewToggleBtnActive : styles.viewToggleBtnHighlight}`}
-                onClick={() => setViewMode('video')}
+                className={`${styles.viewToggleBtn} ${viewMode === 'transcript' ? styles.viewToggleBtnActive : ''}`}
+                onClick={(e) => { e.preventDefault(); setViewMode('transcript'); }}
                 role="tab"
-                aria-selected={viewMode === 'video'}
+                aria-selected={viewMode === 'transcript'}
                 type="button"
               >
-                Video
+                Transcript
               </button>
-            )}
-            <button
-              className={`${styles.viewToggleBtn} ${viewMode === 'transcript' ? styles.viewToggleBtnActive : ''}`}
-              onClick={() => setViewMode('transcript')}
-              role="tab"
-              aria-selected={viewMode === 'transcript'}
-              type="button"
-            >
-              Transcript
-            </button>
-            <button
-              className={`${styles.viewToggleBtn} ${viewMode === 'teleprompter' ? styles.viewToggleBtnActive : ''}`}
-              onClick={() => setViewMode('teleprompter')}
-              role="tab"
-              aria-selected={viewMode === 'teleprompter'}
-              type="button"
-            >
-              Teleprompter
-            </button>
+              <button
+                className={`${styles.viewToggleBtn} ${viewMode === 'teleprompter' ? styles.viewToggleBtnActive : ''}`}
+                onClick={(e) => { e.preventDefault(); setViewMode('teleprompter'); }}
+                role="tab"
+                aria-selected={viewMode === 'teleprompter'}
+                type="button"
+              >
+                Teleprompter
+              </button>
+            </div>
+          </summary>
+
+          <div className={styles.detailsContent}>
+            <section className={styles.transcriptSection}>
+              {viewMode === 'transcript' ? (
+                <TranscriptPanel
+                  segments={podcast.segments}
+                  references={podcast.references}
+                  currentTime={currentTime}
+                  onSegmentClick={handleSegmentClick}
+                  questionCounts={isOwner ? questionCounts : undefined}
+                  podcastId={podcast.id}
+                />
+              ) : viewMode === 'teleprompter' ? (
+                <Teleprompter
+                  segments={podcast.segments}
+                  references={podcast.references}
+                  currentTime={currentTime}
+                  onSegmentClick={handleSegmentClick}
+                />
+              ) : segmentVisuals.length > 0 ? (
+                <VideoView
+                  segments={podcast.segments}
+                  segmentVisuals={segmentVisuals}
+                  references={podcast.references}
+                  currentTime={currentTime}
+                  onSegmentClick={handleSegmentClick}
+                  title={podcast.title}
+                  avatarOverlays={avatarOverlays}
+                  isOwner={isOwner}
+                  avatarsVisible={avatarsVisible}
+                  onAvatarsVisibleChange={async (visible) => {
+                    setAvatarsVisible(visible);
+                    await fetch(`/api/podcasts/${podcast.id}/video`, {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ avatarsVisible: visible }),
+                    });
+                  }}
+                  onAvatarPositionChange={handleAvatarPositionChange}
+                  onMaskShapeChange={handleMaskShapeChange}
+                />
+              ) : null}
+            </section>
           </div>
-
-          <section className={styles.transcriptSection}>
-            {viewMode === 'transcript' ? (
-              <TranscriptPanel
-                segments={podcast.segments}
-                references={podcast.references}
-                currentTime={currentTime}
-                onSegmentClick={handleSegmentClick}
-                questionCounts={isOwner ? questionCounts : undefined}
-                podcastId={podcast.id}
-              />
-            ) : viewMode === 'teleprompter' ? (
-              <Teleprompter
-                segments={podcast.segments}
-                references={podcast.references}
-                currentTime={currentTime}
-                onSegmentClick={handleSegmentClick}
-              />
-            ) : segmentVisuals.length > 0 ? (
-              <VideoView
-                segments={podcast.segments}
-                segmentVisuals={segmentVisuals}
-                references={podcast.references}
-                currentTime={currentTime}
-                onSegmentClick={handleSegmentClick}
-                title={podcast.title}
-                avatarOverlays={avatarOverlays}
-                isOwner={isOwner}
-                avatarsVisible={avatarsVisible}
-                onAvatarsVisibleChange={async (visible) => {
-                  setAvatarsVisible(visible);
-                  await fetch(`/api/podcasts/${podcast.id}/video`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ avatarsVisible: visible }),
-                  });
-                }}
-                onAvatarPositionChange={handleAvatarPositionChange}
-                onMaskShapeChange={handleMaskShapeChange}
-              />
-            ) : null}
-          </section>
-
-        </>
+        </details>
       )}
 
       {/* References — after transcript/video */}
@@ -1518,6 +1482,64 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
           onClose={() => setShowMusicModal(false)}
         />
       )}
+
+      {/* Avatar Picker Modal */}
+      <Modal isOpen={showAvatarPicker} onClose={() => setShowAvatarPicker(false)} title="Speaker Avatars" size="large">
+        <AvatarPicker
+          podcastId={podcast.id}
+          speakers={[...new Set(podcast.segments.map(s => s.speaker))]}
+          segments={podcast.segments}
+          podcastDuration={podcast.duration ?? 0}
+          existingOverlays={avatarOverlays.length > 0 ? avatarOverlays.map((ov) => ({
+            speaker: ov.speaker,
+            avatarId: ov.avatarId,
+            avatarProvider: (ov.avatarProvider ?? 'heygen') as 'heygen' | 'runway',
+            status: ov.status,
+          })) : undefined}
+          onConfigured={({ generationStarted }) => {
+            setShowAvatarPicker(false);
+            if (generationStarted) {
+              setAvatarGenerating(true);
+            }
+          }}
+          onCancel={() => setShowAvatarPicker(false)}
+        />
+      </Modal>
+
+      {/* Pipeline Editor Modal (pre-generation storyboard) */}
+      <Modal isOpen={showPipelineEditor && !!pipelineData && !!falModels} onClose={() => { setShowPipelineEditor(false); setPipelineData(null); }} title="Video Storyboard" size="large">
+        {pipelineData && falModels && (
+          <PipelineEditor
+            podcastId={podcast.id}
+            podcastTitle={podcast.title}
+            pipeline={pipelineData}
+            falModels={falModels}
+            onApprove={handlePipelineApprove}
+            onCancel={() => {
+              setShowPipelineEditor(false);
+              setPipelineData(null);
+            }}
+          />
+        )}
+      </Modal>
+
+      {/* Video Editor Modal (post-generation storyboard) */}
+      <Modal isOpen={showVideoEditor && (videoState === 'ready' || videoState === 'failed') && !!falModels} onClose={() => setShowVideoEditor(false)} title="Edit Storyboard" size="large">
+        {falModels && (
+          <VideoEditor
+            podcastId={podcast.id}
+            segments={podcast.segments}
+            segmentVisuals={segmentVisuals}
+            falModels={falModels}
+            onRegenerate={(genId) => {
+              setShowVideoEditor(false);
+              setVideoState('generating');
+              setVideoGenerationId(genId);
+            }}
+            onCancel={() => setShowVideoEditor(false)}
+          />
+        )}
+      </Modal>
 
       {/* Add to Collection Modal */}
       <AddToCollectionModal
