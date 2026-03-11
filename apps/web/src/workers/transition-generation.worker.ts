@@ -63,7 +63,20 @@ export async function processTransitionGeneration(job: Job<GenerateTransitionPay
     const toFrameUrl = toVisual.firstFrameUrl ?? toVisual.assetUrl;
 
     if (!fromFrameUrl || !toFrameUrl) {
-      throw new Error('Missing frame URLs for transition generation');
+      // Programmatic stills may have failed — skip gracefully, compositor ignores assetUrl-less transitions
+      logger.warn('Skipping transition — missing frame URLs (still rendering may have failed)', {
+        transitionId,
+        fromVisualType: fromVisual.visualType,
+        toVisualType: toVisual.visualType,
+        hasFromFrame: !!fromFrameUrl,
+        hasToFrame: !!toFrameUrl,
+      });
+      await prisma.segmentTransition.update({
+        where: { id: transitionId },
+        data: { status: 'ready' },
+      });
+      await checkAllTransitionsReady(videoGenerationId, podcastId);
+      return;
     }
 
     await job.updateProgress(30);

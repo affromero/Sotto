@@ -2,7 +2,8 @@ import React from 'react';
 import { Composition, registerRoot } from 'remotion';
 import { PodcastVideo } from './compositions/PodcastVideo';
 import { LaunchVideo, computeSceneLayouts } from './compositions/LaunchVideo';
-import type { RenderInput, LaunchVideoInput } from './types';
+import { SegmentStill } from './compositions/SegmentStill';
+import type { RenderInput, LaunchVideoInput, VideoSegment } from './types';
 import { DEFAULT_RENDER_CONFIG, DEFAULT_BRANDING } from './types';
 
 const RemotionRoot: React.FC = () => {
@@ -56,6 +57,28 @@ const RemotionRoot: React.FC = () => {
           const durationInFrames = Math.max(1, totalFrames + fps);
           return { durationInFrames };
         }}
+      />
+      <Composition
+        id="SegmentStill"
+        component={SegmentStill as React.FC}
+        durationInFrames={30 * 5}
+        fps={DEFAULT_RENDER_CONFIG.fps}
+        width={DEFAULT_RENDER_CONFIG.width}
+        height={DEFAULT_RENDER_CONFIG.height}
+        defaultProps={{
+          segment: {
+            segmentId: '',
+            order: 0,
+            speaker: '',
+            text: '',
+            startTime: 0,
+            duration: 5,
+            visualType: 'TEXT_CARD',
+          } satisfies VideoSegment,
+        }}
+        calculateMetadata={({ props }) => ({
+          durationInFrames: Math.max(1, Math.ceil((props.segment.duration ?? 5) * DEFAULT_RENDER_CONFIG.fps)),
+        })}
       />
     </>
   );
