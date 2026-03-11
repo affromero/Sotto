@@ -113,13 +113,15 @@ EXPERT: My pleasure. There's so much more to explore, and I'm excited to see whe
 // Run as standalone script
 const isMainModule = process.argv[1]?.endsWith('setup.ts') || process.argv[1]?.endsWith('setup.js');
 if (isMainModule) {
-  const mock = await createMockServer();
-  const url = await mock.start();
-  console.log(`LLMock server running at ${url}`);
-  console.log('Press Ctrl+C to stop');
+  (async () => {
+    const mock = await createMockServer();
+    const url = await mock.start();
+    console.log(`LLMock server running at ${url}`);
+    console.log('Press Ctrl+C to stop');
 
-  process.on('SIGINT', async () => {
-    await mock.stop();
-    process.exit(0);
-  });
+    process.on('SIGINT', async () => {
+      await mock.stop();
+      process.exit(0);
+    });
+  })();
 }
