@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { Minus, Plus } from 'lucide-react';
 import { parseTextWithCitations } from '@/lib/citation-parser';
 import { findActiveIndex } from '@/lib/segment-utils';
 import { getSpeakerIndex, getUniqueSpeakers } from '@/lib/speaker-colors';
@@ -56,6 +57,11 @@ export function Teleprompter({
   currentTime,
   onSegmentClick,
 }: TeleprompterProps) {
+  const [fontScale, setFontScale] = useState(1);
+  const MIN_SCALE = 0.6;
+  const MAX_SCALE = 2;
+  const STEP = 0.2;
+
   const activeIndex = useMemo(
     () => findActiveIndex(segments, currentTime),
     [segments, currentTime]
@@ -76,7 +82,27 @@ export function Teleprompter({
   const nextSegment = activeIndex < segments.length - 1 ? segments[activeIndex + 1] : null;
 
   return (
-    <div className={styles.root} aria-label="Teleprompter view">
+    <div className={styles.root} aria-label="Teleprompter view" style={{ '--font-scale': fontScale } as React.CSSProperties}>
+      <div className={styles.sizeControls}>
+        <button
+          className={styles.sizeBtn}
+          onClick={() => setFontScale((s) => Math.max(MIN_SCALE, +(s - STEP).toFixed(1)))}
+          disabled={fontScale <= MIN_SCALE}
+          aria-label="Decrease text size"
+          type="button"
+        >
+          <Minus size={16} />
+        </button>
+        <button
+          className={styles.sizeBtn}
+          onClick={() => setFontScale((s) => Math.min(MAX_SCALE, +(s + STEP).toFixed(1)))}
+          disabled={fontScale >= MAX_SCALE}
+          aria-label="Increase text size"
+          type="button"
+        >
+          <Plus size={16} />
+        </button>
+      </div>
       <div className={styles.viewport}>
         {prevSegment && (
           <SegmentBlock
