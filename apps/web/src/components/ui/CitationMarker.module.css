@@ -41,9 +41,7 @@
 }
 
 .tooltip {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
+  position: fixed;
   z-index: var(--z-dropdown);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
@@ -56,11 +54,7 @@
 }
 
 .above {
-  bottom: calc(100% + 8px);
-}
-
-.below {
-  top: calc(100% + 8px);
+  transform: translateY(-100%);
 }
 
 .refItem {
@@ -137,7 +131,9 @@
   .tooltip {
     min-width: 240px;
     max-width: 300px;
-    left: 0;
-    transform: none;
+  }
+
+  .above {
+    transform: translateY(-100%);
   }
 }
