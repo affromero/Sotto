@@ -238,11 +238,10 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     }
 
     // If deleting the selected generation, clear Podcast.musicUrl
-    const updates = [prisma.musicGeneration.delete({ where: { id: gen.id } })];
-    if (gen.selected) {
-      updates.push(prisma.podcast.update({ where: { id: podcastId }, data: { musicUrl: null } }));
-    }
-    await prisma.$transaction(updates);
+    await prisma.$transaction([
+      prisma.musicGeneration.delete({ where: { id: gen.id } }),
+      ...(gen.selected ? [prisma.podcast.update({ where: { id: podcastId }, data: { musicUrl: null } })] : []),
+    ]);
 
     logger.info('Music generation deleted', { podcastId, generationId });
     return NextResponse.json({ success: true });
