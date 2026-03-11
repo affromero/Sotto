@@ -59,7 +59,7 @@ export async function processDemoRecording(job: Job<GenerateDemoRecordingPayload
         actions: scene.actions,
         sessionToken: session.sessionToken,
         appUrl,
-        viewport: { width: 1280, height: 720 },
+        viewport: { width: 1920, height: 1080 },
         gradeVideo: true,
       }),
     });
