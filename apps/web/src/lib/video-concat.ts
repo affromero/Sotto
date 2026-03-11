@@ -56,6 +56,57 @@ export async function extractLastFrame(videoBuffer: Buffer): Promise<Buffer> {
 }
 
 /**
+ * Speed up a video to a target duration using FFmpeg setpts filter.
+ * The source video must be longer than targetDurationSeconds.
+ * Used when a provider enforces a minimum duration (e.g., Fal requires >= 4s).
+ */
+export async function speedUpVideo(videoBuffer: Buffer, targetDurationSeconds: number): Promise<Buffer> {
+  const { execFile } = await import('child_process');
+  const { promisify } = await import('util');
+  const { writeFile, readFile, unlink, mkdtemp } = await import('fs/promises');
+  const { join } = await import('path');
+  const { tmpdir } = await import('os');
+  const execFileAsync = promisify(execFile);
+
+  const tmpDir = await mkdtemp(join(tmpdir(), 'video-speedup-'));
+  const inputPath = join(tmpDir, 'input.mp4');
+  const outputPath = join(tmpDir, 'output.mp4');
+
+  await writeFile(inputPath, videoBuffer);
+
+  try {
+    // Get actual duration via ffprobe
+    const { stdout: durationStr } = await execFileAsync('ffprobe', [
+      '-v', 'quiet',
+      '-show_entries', 'format=duration',
+      '-of', 'csv=p=0',
+      inputPath,
+    ]);
+    const sourceDuration = parseFloat(durationStr.trim());
+    if (isNaN(sourceDuration) || sourceDuration <= 0) {
+      throw new Error(`Could not determine video duration: ${durationStr.trim()}`);
+    }
+
+    const ptsFactor = targetDurationSeconds / sourceDuration;
+    logger.info('Speeding up video', { sourceDuration, targetDurationSeconds, ptsFactor });
+
+    await execFileAsync('ffmpeg', [
+      '-y',
+      '-i', inputPath,
+      '-filter:v', `setpts=${ptsFactor}*PTS`,
+      '-an',
+      outputPath,
+    ]);
+
+    return await readFile(outputPath);
+  } finally {
+    await Promise.allSettled([unlink(inputPath), unlink(outputPath)]);
+    const { rmdir } = await import('fs/promises');
+    await rmdir(tmpDir).catch(() => {});
+  }
+}
+
+/**
  * Concatenate multiple video clip buffers into one using FFmpeg concat demuxer.
  * All clips must have the same codec/resolution for lossless concat.
  */
