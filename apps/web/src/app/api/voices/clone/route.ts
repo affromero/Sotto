@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { cloneVoice, deleteClonedVoice } from '@/lib/elevenlabs';
+import { cloneVoice, deleteClonedVoice, getVoiceById } from '@/lib/elevenlabs';
 import { cloneVoiceViaFal } from '@/lib/fal-voice-clone';
 import { cloneVoiceViaCartesia } from '@/lib/cartesia-voice-clone';
 import { getByokKey, hasByokKey } from '@/lib/byok';
-import { cloneVoiceSchema, importVoiceSchema } from '@/lib/validations';
+import { cloneVoiceSchema, importVoiceSchema, importElevenLabsVoiceSchema } from '@/lib/validations';
 import { LIMITS } from '@/lib/stripe';
 import { getTierFeatures } from '@/lib/tier-features';
 import { logUsage } from '@/lib/usage-logger';
@@ -64,6 +64,57 @@ export async function POST(request: NextRequest) {
         name: importParsed.data.name,
         provider: 'hume',
         externalVoiceId: importParsed.data.externalVoiceId,
+        sourceType: 'IMPORT',
+        verificationStatus: 'ADMIN_VERIFIED',
+      },
+    });
+
+    return NextResponse.json(voiceClone, { status: 201 });
+  }
+
+  // ElevenLabs import flow — validate voice ID, fetch name from EL API
+  if (provider === 'elevenlabs' && sourceType === 'IMPORT') {
+    const externalVoiceId = formData.get('externalVoiceId') as string;
+    const parsed = importElevenLabsVoiceSchema.safeParse({ externalVoiceId, provider });
+    if (!parsed.success) return errorResponse(parsed.error.flatten(), 400);
+
+    const elevenLabsKey = await getByokKey(session.user.id, 'elevenlabs');
+
+    // Try BYOK key first (accesses private voices); fall back to platform key
+    let voiceInfo = elevenLabsKey
+      ? await getVoiceById(parsed.data.externalVoiceId, elevenLabsKey)
+      : await getVoiceById(parsed.data.externalVoiceId);
+
+    // If BYOK was tried and didn't find it, fall back to platform key (voice may be public)
+    if (!voiceInfo && elevenLabsKey) {
+      voiceInfo = await getVoiceById(parsed.data.externalVoiceId);
+    }
+
+    if (!voiceInfo) {
+      const hint = elevenLabsKey
+        ? 'Voice ID not found on ElevenLabs.'
+        : 'Voice ID not found. Add your ElevenLabs API key in Settings to access private voices.';
+      return errorResponse(hint, 404);
+    }
+
+    // Check for duplicate using the unique constraint [userId, provider, externalVoiceId]
+    const existing = await prisma.voiceClone.findUnique({
+      where: {
+        userId_provider_externalVoiceId: {
+          userId: session.user.id,
+          provider: 'elevenlabs',
+          externalVoiceId: parsed.data.externalVoiceId,
+        },
+      },
+    });
+    if (existing) return errorResponse('This voice ID is already in your library.', 409);
+
+    const voiceClone = await prisma.voiceClone.create({
+      data: {
+        userId: session.user.id,
+        name: voiceInfo.name,
+        provider: 'elevenlabs',
+        externalVoiceId: parsed.data.externalVoiceId,
         sourceType: 'IMPORT',
         verificationStatus: 'ADMIN_VERIFIED',
       },
@@ -249,8 +300,11 @@ export async function DELETE(request: NextRequest) {
   if (voiceClone.provider === 'hume') {
     // Imported voice — no external cleanup needed
   } else if (!voiceClone.provider || voiceClone.provider === 'elevenlabs') {
-    const elevenLabsKey = await getByokKey(session.user.id, 'elevenlabs');
-    await deleteClonedVoice(voiceClone.externalVoiceId, elevenLabsKey ?? undefined);
+    if (voiceClone.sourceType !== 'IMPORT') {
+      const elevenLabsKey = await getByokKey(session.user.id, 'elevenlabs');
+      await deleteClonedVoice(voiceClone.externalVoiceId, elevenLabsKey ?? undefined);
+    }
+    // IMPORT = we referenced their voice, not a clone we created — skip external deletion
   } else if (voiceClone.provider === 'cartesia') {
     const cartesiaKey = await getByokKey(session.user.id, 'cartesia') ?? process.env.CARTESIA_API_KEY;
     if (cartesiaKey) {

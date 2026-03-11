@@ -259,6 +259,11 @@ export const importVoiceSchema = z.object({
   provider: z.literal('hume'),
 });
 
+export const importElevenLabsVoiceSchema = z.object({
+  externalVoiceId: z.string().min(1).max(200),
+  provider: z.literal('elevenlabs'),
+});
+
 export const voiceVerifyChallengeSchema = z.object({
   voiceCloneId: z.string().min(1),
 });
