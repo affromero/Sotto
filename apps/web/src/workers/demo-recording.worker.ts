@@ -129,7 +129,7 @@ export async function processDemoRecording(job: Job<GenerateDemoRecordingPayload
     // Update scene
     await prisma.demoScene.update({
       where: { id: sceneId },
-      data: { recordingUrl, recordingStatus: 'READY' },
+      data: { recordingUrl, recordingStatus: 'READY', compositedStatus: 'PENDING' },
     });
 
     // Clean up temporary session

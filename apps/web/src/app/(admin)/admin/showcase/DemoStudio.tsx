@@ -30,6 +30,8 @@ interface DemoScene {
   ttsProvider: string | null;
   ttsModel: string | null;
   ttsVoiceId: string | null;
+  compositedUrl: string | null;
+  compositedStatus: string;
   transitionType: string | null;
   transitionUrl: string | null;
   transitionStatus: string;
@@ -41,6 +43,14 @@ interface DemoScene {
   subtitles: unknown | null;
   actionTimingLog: unknown | null;
   failedReason: string | null;
+}
+
+interface TtsOption {
+  id: string;
+  displayName: string;
+  badge?: string;
+  group: string;
+  hint?: string;
 }
 
 interface DemoProject {
@@ -102,6 +112,7 @@ export function DemoStudio() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [scriptJson, setScriptJson] = useState('');
+  const [ttsOptions, setTtsOptions] = useState<TtsOption[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -132,12 +143,22 @@ export function DemoStudio() {
     }
   }, []);
 
-  useEffect(() => { loadProjects(); }, [loadProjects]);
+  // Load TTS options for the picker
+  const loadTtsOptions = useCallback(async () => {
+    const res = await fetch('/api/tts-options');
+    if (res.ok) {
+      const data = await res.json();
+      setTtsOptions(data.options ?? []);
+    }
+  }, []);
+
+  useEffect(() => { loadProjects(); loadTtsOptions(); }, [loadProjects, loadTtsOptions]);
 
   // Poll for status updates
   useEffect(() => {
     if (!selectedProject) return;
-    if (selectedProject.status === 'DRAFT' || selectedProject.status === 'GENERATING_ASSETS' || selectedProject.status === 'COMPOSING') {
+    const scenesGenerating = selectedProject.scenes?.some((s) => s.compositedStatus === 'GENERATING');
+    if (selectedProject.status === 'DRAFT' || selectedProject.status === 'GENERATING_ASSETS' || selectedProject.status === 'COMPOSING' || scenesGenerating) {
       const interval = setInterval(() => loadProject(selectedProject.id), 3000);
       return () => clearInterval(interval);
     }
@@ -211,6 +232,25 @@ export function DemoStudio() {
     setLoading(false);
   }, [selectedProject, loadProject]);
 
+  const composeScene = useCallback(async (sceneId: string) => {
+    if (!selectedProject) return;
+    await fetch(`/api/admin/demo/${selectedProject.id}/scenes/${sceneId}/compose`, { method: 'POST' });
+    await loadProject(selectedProject.id);
+  }, [selectedProject, loadProject]);
+
+  const composeAllScenes = useCallback(async () => {
+    if (!selectedProject) return;
+    setLoading(true);
+    for (const scene of selectedProject.scenes ?? []) {
+      const ready = scene.recordingStatus === 'READY' && scene.voiceoverStatus === 'READY';
+      if (ready && scene.compositedStatus !== 'READY') {
+        await fetch(`/api/admin/demo/${selectedProject.id}/scenes/${scene.id}/compose`, { method: 'POST' });
+      }
+    }
+    await loadProject(selectedProject.id);
+    setLoading(false);
+  }, [selectedProject, loadProject]);
+
   const composeVideo = useCallback(async () => {
     if (!selectedProject) return;
     setLoading(true);
@@ -230,6 +270,7 @@ export function DemoStudio() {
   const hasScenes = scenes.length > 0;
   const hasRecordings = scenes.some((s) => s.recordingStatus === 'READY');
   const allAssetsReady = scenes.length > 0 && scenes.every((s) => s.recordingStatus === 'READY' && s.voiceoverStatus === 'READY');
+  const allScenesComposed = allAssetsReady && scenes.every((s) => s.compositedStatus === 'READY');
 
   const isUnlocked = (s: Step): boolean => {
     if (s === 'script') return true;
@@ -239,7 +280,7 @@ export function DemoStudio() {
     if (s === 'video') return !!selectedProject.podcastId;
     if (s === 'assets') return hasScenes;
     if (s === 'timing') return hasRecordings;
-    if (s === 'compose') return allAssetsReady;
+    if (s === 'compose') return allScenesComposed;
     return false;
   };
 
@@ -381,60 +422,102 @@ export function DemoStudio() {
         <div className={styles.panel}>
           <div className={styles.sectionHeader}>
             <h2 className={styles.sectionTitle}>Recording &amp; Voiceover</h2>
-            <button
-              className={styles.primaryBtn}
-              onClick={generateAllAssets}
-              disabled={loading}
-            >
-              Generate All
-            </button>
+            <div className={styles.headerActions}>
+              <button
+                className={styles.secondaryBtn}
+                onClick={composeAllScenes}
+                disabled={loading || !allAssetsReady}
+              >
+                Compose All Scenes
+              </button>
+              <button
+                className={styles.primaryBtn}
+                onClick={generateAllAssets}
+                disabled={loading}
+              >
+                Generate All
+              </button>
+            </div>
           </div>
           <div className={styles.assetGrid}>
-            {scenes.map((scene) => (
-              <div key={scene.id} className={styles.assetCard}>
-                <h3 className={styles.assetTitle}>
-                  Scene {scene.order + 1}: {scene.title}
-                </h3>
-                <div className={styles.assetRow}>
-                  <AssetStatus
-                    label="Recording"
-                    status={scene.recordingStatus}
-                    url={scene.recordingUrl}
-                    onGenerate={() => generateAsset(scene.id, 'record')}
-                    mediaType="video"
-                    failedReason={scene.recordingStatus === 'FAILED' ? scene.failedReason : null}
+            {scenes.map((scene) => {
+              const sceneAssetsReady = scene.recordingStatus === 'READY' && scene.voiceoverStatus === 'READY';
+              return (
+                <div key={scene.id} className={styles.assetCard}>
+                  <div className={styles.assetCardHeader}>
+                    <h3 className={styles.assetTitle}>
+                      Scene {scene.order + 1}: {scene.title}
+                    </h3>
+                    <span className={styles.badge} style={{ color: statusColor(scene.compositedStatus) }}>
+                      {scene.compositedStatus === 'READY' ? 'Composed' : statusBadge(scene.compositedStatus)}
+                    </span>
+                  </div>
+
+                  {/* TTS picker */}
+                  <TtsPicker
+                    scene={scene}
+                    ttsOptions={ttsOptions}
+                    onSave={(data) => saveScene(scene.id, data)}
                   />
-                  <AssetStatus
-                    label="Voiceover"
-                    status={scene.voiceoverStatus}
-                    url={scene.voiceoverUrl}
-                    onGenerate={() => generateAsset(scene.id, 'voiceover')}
-                    mediaType="audio"
-                    failedReason={scene.voiceoverStatus === 'FAILED' ? scene.failedReason : null}
-                  />
-                  {scene.visualType && (
+
+                  {/* Asset row: recording, voiceover, visual, transition */}
+                  <div className={styles.assetRow}>
                     <AssetStatus
-                      label="Visual"
-                      status={scene.visualStatus}
-                      url={scene.visualUrl}
-                      onGenerate={() => generateAsset(scene.id, 'visual')}
-                      mediaType={scene.visualType === 'ai_video' ? 'video' : 'image'}
-                      failedReason={scene.visualStatus === 'FAILED' ? scene.failedReason : null}
-                    />
-                  )}
-                  {scene.transitionType && (
-                    <AssetStatus
-                      label="Transition"
-                      status={scene.transitionStatus}
-                      url={scene.transitionUrl}
-                      onGenerate={() => generateAsset(scene.id, 'transition')}
+                      label="Recording"
+                      status={scene.recordingStatus}
+                      url={scene.recordingUrl}
+                      onGenerate={() => generateAsset(scene.id, 'record')}
                       mediaType="video"
-                      failedReason={scene.transitionStatus === 'FAILED' ? scene.failedReason : null}
+                      failedReason={scene.recordingStatus === 'FAILED' ? scene.failedReason : null}
                     />
-                  )}
+                    <AssetStatus
+                      label="Voiceover"
+                      status={scene.voiceoverStatus}
+                      url={scene.voiceoverUrl}
+                      onGenerate={() => generateAsset(scene.id, 'voiceover')}
+                      mediaType="audio"
+                      failedReason={scene.voiceoverStatus === 'FAILED' ? scene.failedReason : null}
+                    />
+                    {scene.visualType && (
+                      <AssetStatus
+                        label="Visual"
+                        status={scene.visualStatus}
+                        url={scene.visualUrl}
+                        onGenerate={() => generateAsset(scene.id, 'visual')}
+                        mediaType={scene.visualType === 'ai_video' ? 'video' : 'image'}
+                        failedReason={scene.visualStatus === 'FAILED' ? scene.failedReason : null}
+                      />
+                    )}
+                    {scene.transitionType && (
+                      <AssetStatus
+                        label="Transition"
+                        status={scene.transitionStatus}
+                        url={scene.transitionUrl}
+                        onGenerate={() => generateAsset(scene.id, 'transition')}
+                        mediaType="video"
+                        failedReason={scene.transitionStatus === 'FAILED' ? scene.failedReason : null}
+                      />
+                    )}
+                  </div>
+
+                  {/* Compose scene row */}
+                  <div className={styles.composeRow}>
+                    <button
+                      className={styles.secondaryBtn}
+                      onClick={() => composeScene(scene.id)}
+                      disabled={!sceneAssetsReady || scene.compositedStatus === 'GENERATING'}
+                    >
+                      {scene.compositedStatus === 'GENERATING' ? 'Composing...'
+                        : scene.compositedStatus === 'READY' ? 'Recompose Scene'
+                        : 'Compose Scene'}
+                    </button>
+                    {scene.compositedUrl && scene.compositedStatus === 'READY' && (
+                      <ScenePreview url={scene.compositedUrl} />
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -466,7 +549,7 @@ export function DemoStudio() {
       {step === 'compose' && selectedProject && (
         <div className={styles.panel}>
           <h2 className={styles.sectionTitle}>Compose &amp; Preview</h2>
-          {allAssetsReady && selectedProject.status !== 'READY' && selectedProject.status !== 'COMPOSING' && (
+          {allScenesComposed && selectedProject.status !== 'READY' && selectedProject.status !== 'COMPOSING' && (
             <button className={styles.primaryBtn} onClick={composeVideo} disabled={loading}>
               {loading ? 'Composing...' : 'Compose Final Video'}
             </button>
@@ -495,9 +578,9 @@ export function DemoStudio() {
               </a>
             </div>
           )}
-          {!selectedProject.videoUrl && selectedProject.status !== 'COMPOSING' && !allAssetsReady && (
+          {!selectedProject.videoUrl && selectedProject.status !== 'COMPOSING' && !allScenesComposed && (
             <p className={styles.emptyText}>
-              All recordings and voiceovers must be READY before composing.
+              All scenes must be composed before creating the final video. Go to Recording step to compose each scene.
             </p>
           )}
         </div>
@@ -560,6 +643,78 @@ function AssetStatus({
       >
         {status === 'READY' || status === 'FAILED' ? 'Regenerate' : 'Generate'}
       </button>
+    </div>
+  );
+}
+
+function TtsPicker({
+  scene,
+  ttsOptions,
+  onSave,
+}: {
+  scene: DemoScene;
+  ttsOptions: TtsOption[];
+  onSave: (data: Partial<DemoScene>) => void;
+}) {
+  // Parse current ttsProvider:ttsModel into the combined id format
+  const currentId = scene.ttsProvider && scene.ttsModel
+    ? `${scene.ttsProvider}:${scene.ttsModel}`
+    : '';
+
+  return (
+    <div className={styles.ttsPicker}>
+      <select
+        className={styles.select}
+        value={currentId}
+        onChange={(e) => {
+          const val = e.target.value;
+          if (!val) {
+            onSave({ ttsProvider: null, ttsModel: null } as Partial<DemoScene>);
+            return;
+          }
+          const [provider, ...modelParts] = val.split(':');
+          const model = modelParts.join(':');
+          onSave({ ttsProvider: provider, ttsModel: model } as Partial<DemoScene>);
+        }}
+        aria-label="TTS provider and model"
+      >
+        <option value="">Default (ElevenLabs)</option>
+        {ttsOptions.map((opt) => (
+          <option key={opt.id} value={opt.id}>
+            {opt.displayName}{opt.badge ? ` — ${opt.badge}` : ''}
+          </option>
+        ))}
+      </select>
+      <input
+        className={styles.input}
+        type="text"
+        value={scene.ttsVoiceId ?? ''}
+        placeholder="Voice ID (optional)"
+        onChange={(e) => {
+          onSave({ ttsVoiceId: e.target.value || null } as Partial<DemoScene>);
+        }}
+        aria-label="TTS voice ID"
+      />
+    </div>
+  );
+}
+
+function ScenePreview({ url }: { url: string }) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className={styles.scenePreview}>
+      <button className={styles.previewBtn} onClick={() => setExpanded(!expanded)}>
+        {expanded ? 'Hide Preview' : 'Preview Composed'}
+      </button>
+      {expanded && (
+        <video
+          src={url}
+          controls
+          preload="metadata"
+          className={styles.scenePreviewVideo}
+        />
+      )}
     </div>
   );
 }

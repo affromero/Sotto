@@ -58,6 +58,7 @@ export enum JobType {
   GENERATE_DEMO_VISUAL = 'generate_demo_visual',
   GENERATE_DEMO_TRANSITION = 'generate_demo_transition',
   COMPOSE_DEMO = 'compose_demo',
+  COMPOSE_DEMO_SCENE = 'compose_demo_scene',
   GENERATE_MUSIC = 'generate_music',
 }
 
@@ -250,6 +251,11 @@ export interface GenerateDemoTransitionPayload {
 
 export interface ComposeDemoPayload {
   projectId: string;
+}
+
+export interface ComposeDemoScenePayload {
+  projectId: string;
+  sceneId: string;
 }
 
 export interface AdminThreadToPodcastPayload {
@@ -913,6 +919,7 @@ export const demoVoiceoverQueue = createQueue('demo-voiceover', { attempts: 2 })
 export const demoVisualQueue = createQueue('demo-visual', { attempts: 2 });
 export const demoTransitionQueue = createQueue('demo-transition', { attempts: 2 });
 export const demoCompositionQueue = createQueue('demo-composition', { attempts: 2 });
+export const demoSceneCompositionQueue = createQueue('demo-scene-composition', { attempts: 2 });
 export const musicGenerationQueue = createQueue('music-generation', { attempts: 3 });
 
 /** All queue names — single source of truth for admin and health endpoints */
@@ -961,5 +968,6 @@ export const ALL_QUEUE_NAMES = [
   'demo-visual',
   'demo-transition',
   'demo-composition',
+  'demo-scene-composition',
   'music-generation',
 ] as const;

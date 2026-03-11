@@ -48,7 +48,7 @@ export async function processDemoVoiceover(job: Job<GenerateDemoVoiceoverPayload
 
     await prisma.demoScene.update({
       where: { id: sceneId },
-      data: { voiceoverUrl, voiceoverStatus: 'READY' },
+      data: { voiceoverUrl, voiceoverStatus: 'READY', compositedStatus: 'PENDING' },
     });
 
     await job.updateProgress(100);
