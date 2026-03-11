@@ -64,7 +64,7 @@ vi.mock('@/lib/usage-logger', () => ({
 }));
 
 vi.mock('@/lib/byok-errors', () => ({
-  isModelAccessError: vi.fn((msg: string) => /\(404\)/.test(msg) && /model/i.test(msg)),
+  isModelAccessError: vi.fn((msg: string) => /\(404\)/.test(msg)),
 }));
 
 const mockResolveTtsProvider = vi.fn();
