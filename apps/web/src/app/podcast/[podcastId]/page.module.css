@@ -14,7 +14,7 @@
 .playerView {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-lg);
+  gap: var(--spacing-sm);
 }
 
 /* Breadcrumb */
@@ -44,6 +44,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-md);
 }
 
 .podcastTitle {
@@ -308,37 +309,36 @@
 .playerSection {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-md);
-  padding: 0 var(--spacing-lg);
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-md);
 }
 
 /* Actions Row */
 
 .actionsRow {
   display: flex;
-  flex-direction: column;
-  gap: var(--spacing-md);
-  padding: var(--spacing-md) 0;
-  border-top: 1px solid var(--color-border);
-  border-bottom: 1px solid var(--color-border);
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-xs) 0;
 }
 
 .statsRow {
   display: flex;
-  gap: var(--spacing-lg);
+  gap: var(--spacing-md);
 }
 
 .stat {
   display: flex;
   align-items: center;
-  gap: var(--spacing-xs);
-  font: var(--text-body-sm);
-  color: var(--color-text-secondary);
+  gap: 3px;
+  font: var(--text-caption);
+  color: var(--color-text-tertiary);
 }
 
 .actionButtons {
   display: flex;
-  gap: var(--spacing-sm);
+  gap: 2px;
   flex-wrap: wrap;
 }
 
@@ -346,46 +346,37 @@
   display: inline-flex;
   align-items: center;
   gap: var(--spacing-xs);
-  padding: var(--spacing-xs) var(--spacing-md);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-full);
-  background: var(--color-surface);
+  padding: var(--spacing-sm) var(--spacing-sm);
+  border: none;
+  border-radius: var(--radius-lg);
+  background: transparent;
   font: var(--text-body-sm);
   font-weight: 500;
-  color: var(--color-text-secondary);
+  color: var(--color-text-tertiary);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: color var(--transition-fast), background var(--transition-fast);
 }
 
 .actionBtn:hover {
-  border-color: var(--color-border-hover);
   color: var(--color-text-primary);
   background: var(--color-surface-hover);
 }
 
 .actionBtnActive {
   color: var(--color-primary);
-  border-color: var(--color-primary);
-  background: var(--color-primary-subtle);
-}
-
-:global([data-theme='dark']) .actionBtnActive {
-  border-color: rgba(217, 119, 6, 0.25);
 }
 
 .actionBtnActive:hover {
   color: var(--color-primary);
-  background: var(--color-primary-light);
+  background: var(--color-primary-subtle);
 }
 
 .actionBtnDanger {
   color: var(--color-error);
-  border-color: var(--color-error-light);
 }
 
 .actionBtnDanger:hover {
   color: var(--color-error);
-  border-color: var(--color-error);
   background: var(--color-error-lighter);
 }
 
@@ -395,7 +386,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--spacing-md);
+  gap: var(--spacing-sm);
+  padding: var(--spacing-xs) 0;
 }
 
 .interruptChat {
@@ -446,23 +438,24 @@
   display: flex;
   align-items: center;
   gap: 0;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-full);
-  padding: 2px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-lg);
+  padding: 0;
   align-self: flex-start;
+  margin-top: var(--spacing-sm);
 }
 
 .viewToggleBtn {
   padding: var(--spacing-xs) var(--spacing-md);
   border: none;
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-lg);
   background: none;
   font: var(--text-body-sm);
   font-weight: 500;
-  color: var(--color-text-secondary);
+  color: var(--color-text-tertiary);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: color var(--transition-fast), background var(--transition-fast);
 }
 
 .viewToggleBtn:hover {
@@ -470,12 +463,17 @@
 }
 
 .viewToggleBtnActive {
-  background: var(--color-primary);
-  color: var(--color-text-inverse);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+:global([data-theme='dark']) .viewToggleBtnActive {
+  background: var(--color-surface-elevated);
 }
 
 .viewToggleBtnActive:hover {
-  color: var(--color-text-inverse);
+  color: var(--color-text-primary);
 }
 
 .viewToggleBtnHighlight {
@@ -490,13 +488,13 @@
 /* Transcript */
 
 .transcriptSection {
-  margin-top: var(--spacing-sm);
+  margin-top: 0;
 }
 
 /* References */
 
 .referencesSection {
-  margin-top: var(--spacing-sm);
+  margin-top: 0;
 }
 
 .questionsSection {
@@ -537,18 +535,18 @@
   border-top: 1px solid var(--color-border);
 }
 
-/* Video Section */
+/* Video Section (Owner Tools) */
 
 .videoSection {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-md);
+  gap: var(--spacing-sm);
 }
 
 .videoIdle {
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
+  gap: var(--spacing-xs);
   flex-wrap: wrap;
 }
 
@@ -654,18 +652,14 @@
   }
 
   .actionBtn {
-    padding: var(--spacing-xs) var(--spacing-sm);
-    font-size: var(--font-size-xs);
+    padding: var(--spacing-xs);
     min-height: 44px;
     min-width: 44px;
+    justify-content: center;
   }
 
   .actionBtn span {
     display: none;
-  }
-
-  .playerSection {
-    padding: 0 var(--spacing-md);
   }
 
   .failedState {
@@ -681,11 +675,5 @@
 @media (min-width: 600px) {
   .main {
     padding: var(--spacing-xl);
-  }
-
-  .actionsRow {
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
   }
 }
