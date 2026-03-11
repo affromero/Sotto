@@ -110,7 +110,7 @@ export function VideoView({
 
   const playableOverlays = useMemo(
     () => (avatarOverlays ?? []).filter(
-      (o) => (o.status === 'ready' && o.videoUrl) || (o.chunkVideoUrl && o.status !== 'failed'),
+      (o) => (o.status === 'ready' && o.videoUrl) || (o.chunkVideoUrl && o.status !== 'failed') || o.status === 'failed',
     ),
     [avatarOverlays],
   );
@@ -259,9 +259,10 @@ export function VideoView({
         {avatarsVisible && containerSize.width > 0 && playableOverlays.map((overlay) => (
           <AvatarOverlay
             key={overlay.id}
-            videoUrl={overlay.videoUrl ?? overlay.chunkVideoUrl!}
+            videoUrl={overlay.status !== 'failed' ? (overlay.videoUrl ?? overlay.chunkVideoUrl!) : ''}
             maxDuration={overlay.videoUrl ? undefined : (overlay.chunkDurationSeconds ?? undefined)}
             streaming={!overlay.videoUrl && !!overlay.chunkVideoUrl}
+            failed={overlay.status === 'failed'}
             speaker={overlay.speaker}
             posX={overlay.posX}
             posY={overlay.posY}
