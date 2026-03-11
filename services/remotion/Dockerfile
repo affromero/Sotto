@@ -7,19 +7,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     fonts-noto-color-emoji \
     fontconfig \
     wget \
+    unzip \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Inter and DM Serif Display fonts for FFmpeg drawtext overlays
+# Install Inter and DM Serif Display fonts for FFmpeg drawtext overlays (best-effort)
 RUN mkdir -p /usr/share/fonts/truetype/inter /usr/share/fonts/truetype/dm-serif \
-    && wget -q -O /tmp/Inter.zip "https://fonts.google.com/download?family=Inter" \
-    && unzip -q /tmp/Inter.zip -d /tmp/inter \
-    && cp /tmp/inter/static/Inter_18pt-Regular.ttf /usr/share/fonts/truetype/inter/Inter-Regular.ttf \
-    && cp /tmp/inter/static/Inter_18pt-Bold.ttf /usr/share/fonts/truetype/inter/Inter-Bold.ttf \
-    && wget -q -O /tmp/DMSerif.zip "https://fonts.google.com/download?family=DM+Serif+Display" \
-    && unzip -q /tmp/DMSerif.zip -d /tmp/dmserif \
-    && cp /tmp/dmserif/DMSerifDisplay-Regular.ttf /usr/share/fonts/truetype/dm-serif/ \
+    && (wget -q -O /tmp/Inter.zip "https://fonts.google.com/download?family=Inter" \
+       && unzip -q /tmp/Inter.zip -d /tmp/inter \
+       && cp /tmp/inter/static/Inter_18pt-Regular.ttf /usr/share/fonts/truetype/inter/Inter-Regular.ttf \
+       && cp /tmp/inter/static/Inter_18pt-Bold.ttf /usr/share/fonts/truetype/inter/Inter-Bold.ttf \
+       || echo "Inter font download skipped") \
+    && (wget -q -O /tmp/DMSerif.zip "https://fonts.google.com/download?family=DM+Serif+Display" \
+       && unzip -q /tmp/DMSerif.zip -d /tmp/dmserif \
+       && cp /tmp/dmserif/DMSerifDisplay-Regular.ttf /usr/share/fonts/truetype/dm-serif/ \
+       || echo "DM Serif font download skipped") \
     && fc-cache -f -v \
-    && rm -rf /tmp/Inter.zip /tmp/inter /tmp/DMSerif.zip /tmp/dmserif
+    && rm -rf /tmp/Inter.zip /tmp/inter /tmp/DMSerif.zip /tmp/dmserif 2>/dev/null; true
 
 # Tell Remotion to use system Chromium
 ENV REMOTION_CHROME_EXECUTABLE=/usr/bin/chromium
