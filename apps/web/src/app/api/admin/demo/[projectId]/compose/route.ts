@@ -36,12 +36,12 @@ export async function POST(_request: NextRequest, { params }: Params) {
     data: { status: 'COMPOSING' },
   });
 
-  await addJob(
+  const job = await addJob(
     demoCompositionQueue,
     JobType.COMPOSE_DEMO,
     { projectId },
     { jobId: `demo-compose-${projectId}-${Date.now()}` },
   );
 
-  return NextResponse.json({ status: 'queued' });
+  return NextResponse.json({ status: 'queued', jobId: job.id });
 }
