@@ -6,6 +6,7 @@ interface VoiceCardProps {
   name: string;
   accent?: string;
   character?: string;
+  badge?: string;
   isSelected: boolean;
   disabled?: boolean;
   onSelect: () => void;
@@ -17,6 +18,7 @@ export function VoiceCard({
   name,
   accent,
   character,
+  badge,
   isSelected,
   disabled = false,
   onSelect,
@@ -101,6 +103,7 @@ export function VoiceCard({
       <div className={styles.avatar}>{name.charAt(0)}</div>
       <div className={styles.info}>
         <div className={styles.name}>{name}</div>
+        {badge && <span className={styles.badge}>{badge}</span>}
         <div className={styles.meta}>
           {accent && <span className={styles.accent}>{accent}</span>}
           {character && <span>{character}</span>}
