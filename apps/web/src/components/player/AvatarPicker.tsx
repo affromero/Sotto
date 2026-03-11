@@ -357,7 +357,7 @@ export function AvatarPicker({ podcastId, speakers, segments, onConfigured, onCa
                       </button>
                     </div>
                     <div className={styles.segmentList}>
-                      {speakerSegs.map((seg, idx) => (
+                      {speakerSegs.map((seg) => (
                         <label key={seg.id} className={styles.segmentItem}>
                           <input
                             type="checkbox"
@@ -365,7 +365,7 @@ export function AvatarPicker({ podcastId, speakers, segments, onConfigured, onCa
                             onChange={() => handleToggleSegment(speaker, seg.id)}
                             className={styles.segmentCheckbox}
                           />
-                          <span className={styles.segmentOrder}>#{idx + 1}</span>
+                          <span className={styles.segmentOrder}>#{seg.order}</span>
                           <span className={styles.segmentText}>
                             {seg.text.length > 60 ? `${seg.text.slice(0, 60)}...` : seg.text}
                           </span>
