@@ -55,12 +55,14 @@ export function ForkModal({ visible, onClose, podcastId, podcastTitle }: ForkMod
           placeholderTextColor={colors.textTertiary}
           multiline
           maxLength={280}
+          testID="fork-angle-input"
         />
 
         <Pressable
           style={[styles.forkButton, forkMutation.isPending && styles.forkButtonDisabled]}
           onPress={() => forkMutation.mutate()}
           disabled={forkMutation.isPending}
+          testID="fork-submit-button"
         >
           {forkMutation.isPending ? (
             <ActivityIndicator size="small" color={colors.textInverse} />

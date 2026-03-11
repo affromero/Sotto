@@ -128,6 +128,7 @@ export default function SettingsScreen() {
                 pressed && styles.rowPressed,
               ]}
               onPress={() => router.push('/settings/api-keys')}
+              testID="settings-api-keys"
             >
               <View style={styles.rowLabelWithStatus}>
                 <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>API Keys</Text>

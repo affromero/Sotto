@@ -172,6 +172,7 @@ export default function FeedScreen() {
         <Pressable
           style={[styles.modeChip, feedMode === 'foryou' && styles.modeChipActive]}
           onPress={() => setFeedMode('foryou')}
+          testID="feed-mode-foryou"
         >
           <Text style={[styles.modeChipText, feedMode === 'foryou' && styles.modeChipTextActive]}>
             For You
@@ -180,6 +181,7 @@ export default function FeedScreen() {
         <Pressable
           style={[styles.modeChip, feedMode === 'activity' && styles.modeChipActive]}
           onPress={() => setFeedMode('activity')}
+          testID="feed-mode-activity"
         >
           <Text style={[styles.modeChipText, feedMode === 'activity' && styles.modeChipTextActive]}>
             Activity
@@ -195,6 +197,7 @@ export default function FeedScreen() {
             {SORT_OPTIONS.map((option) => (
               <Pressable
                 key={option.value}
+                testID={`feed-sort-${option.value}`}
                 style={[
                   styles.sortChip,
                   sort === option.value && styles.sortChipActive,
@@ -221,6 +224,7 @@ export default function FeedScreen() {
     return (
       <View style={globalStyles.screenContainer}>
         <FlatList
+          testID="feed-activity-list"
           data={activityItems}
           keyExtractor={(item) => item.id}
           renderItem={renderActivityItem}
@@ -256,6 +260,7 @@ export default function FeedScreen() {
   return (
     <View style={globalStyles.screenContainer}>
       <FlatList
+        testID="feed-podcast-list"
         data={podcasts}
         renderItem={renderItem}
         keyExtractor={keyExtractor}

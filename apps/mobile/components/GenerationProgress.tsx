@@ -141,7 +141,7 @@ export function GenerationProgress({ status, topic }: GenerationProgressProps) {
   }));
 
   return (
-    <View style={styles.container}>
+    <View style={styles.container} testID="generation-progress">
       <View style={styles.dotsRow}>
         <View style={styles.trackLine} />
         <Animated.View style={[styles.fillLine, fillStyle]} />
