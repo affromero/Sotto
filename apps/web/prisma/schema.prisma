@@ -48,6 +48,7 @@ enum VideoStatus {
   COMPOSING
   READY
   FAILED
+  STALE
 }
 
 enum MusicStatus {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
@@ -219,6 +219,15 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
   const [avatarOverlays, setAvatarOverlays] = useState<AvatarOverlayData[]>([]);
   const [avatarsVisible, setAvatarsVisible] = useState(true);
   const [avatarGenerating, setAvatarGenerating] = useState(false);
+
+  // Filter avatar overlays to match the active audio source (original or voice track)
+  const activeVoiceTrackId = player.activeVoiceTrackId;
+  const filteredAvatarOverlays = useMemo(
+    () => avatarOverlays.filter((o) =>
+      activeVoiceTrackId ? o.voiceTrackId === activeVoiceTrackId : !o.voiceTrackId
+    ),
+    [avatarOverlays, activeVoiceTrackId],
+  );
   const [lineageData, setLineageData] = useState<{
     ancestors: Array<{
       id: string;
@@ -320,7 +329,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (!data?.status) return;
-        if ((data.status === 'READY' || data.status === 'GENERATING_AVATARS') && data.segmentVisuals?.length > 0) {
+        if ((data.status === 'READY' || data.status === 'GENERATING_AVATARS' || data.status === 'STALE') && data.segmentVisuals?.length > 0) {
           setVideoState('ready');
           setSegmentVisuals(data.segmentVisuals);
           if (isOwner) {
@@ -1394,7 +1403,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
                   currentTime={currentTime}
                   onSegmentClick={handleSegmentClick}
                   title={podcast.title}
-                  avatarOverlays={avatarOverlays}
+                  avatarOverlays={filteredAvatarOverlays}
                   isOwner={isOwner}
                   avatarsVisible={avatarsVisible}
                   onAvatarsVisibleChange={async (visible) => {

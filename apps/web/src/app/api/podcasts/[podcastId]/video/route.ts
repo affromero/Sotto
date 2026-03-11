@@ -113,7 +113,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     select: { id: true, status: true, videoUrl: true },
   });
 
-  if (existing && existing.status !== 'FAILED') {
+  if (existing && existing.status !== 'FAILED' && existing.status !== 'STALE') {
     return NextResponse.json({
       videoGenerationId: existing.id,
       status: existing.status,
@@ -121,9 +121,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     });
   }
 
-  // Resume or restart failed generation
-  if (existing?.status === 'FAILED') {
-    if (pipeline) {
+  // Resume or restart failed/stale generation
+  if (existing?.status === 'FAILED' || existing?.status === 'STALE') {
+    if (pipeline || existing.status === 'STALE') {
       // New pipeline provided — start fresh (user changed settings)
       await prisma.segmentTransition.deleteMany({ where: { videoGenerationId: existing.id } });
       await prisma.segmentVisual.deleteMany({ where: { videoGenerationId: existing.id } });
@@ -412,6 +412,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
           avatarProvider: true,
           maskShape: true,
           enabledSegmentIds: true,
+          voiceTrackId: true,
         },
       },
       transitions: {
@@ -602,8 +603,8 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     return errorResponse('No video generation found', 404);
   }
 
-  if (videoGeneration.status !== 'READY' && videoGeneration.status !== 'FAILED') {
-    return errorResponse('Video must be in READY or FAILED status to edit', 400);
+  if (videoGeneration.status !== 'READY' && videoGeneration.status !== 'FAILED' && videoGeneration.status !== 'STALE') {
+    return errorResponse('Video must be in READY, FAILED, or STALE status to edit', 400);
   }
 
   // Look up all referenced segment visuals

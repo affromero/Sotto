@@ -37,7 +37,7 @@ interface AvatarOverlay {
 
 interface VideoStatusResponse {
   videoGenerationId: string;
-  status: 'PENDING' | 'CLASSIFYING' | 'GENERATING_VISUALS' | 'GENERATING_TRANSITIONS' | 'GENERATING_AVATARS' | 'COMPOSING' | 'READY' | 'FAILED';
+  status: 'PENDING' | 'CLASSIFYING' | 'GENERATING_VISUALS' | 'GENERATING_TRANSITIONS' | 'GENERATING_AVATARS' | 'COMPOSING' | 'READY' | 'FAILED' | 'STALE';
   videoUrl: string | null;
   failureReason: string | null;
   segmentVisuals: SegmentVisual[];
