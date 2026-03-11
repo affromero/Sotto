@@ -59,14 +59,14 @@ export function VideoView({
   const [subtitlesVisible, setSubtitlesVisible] = useState(true);
   const [skipRipple, setSkipRipple] = useState<'left' | 'right' | null>(null);
   const lastTapRef = useRef<{ time: number; side: 'left' | 'right' } | null>(null);
+  const singleTapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const SUBTITLE_MIN = 0.6;
   const SUBTITLE_MAX = 1.8;
   const SUBTITLE_STEP = 0.2;
   const SKIP_SECONDS = 15;
 
-  // YouTube-style double-tap to skip
+  // Single tap = play/pause, double-tap = skip ±15s (YouTube-style)
   const handleVideoAreaClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    // Ignore clicks on buttons/controls inside the container
     if ((e.target as HTMLElement).closest('button, [role="button"], a')) return;
 
     const rect = e.currentTarget.getBoundingClientRect();
@@ -76,15 +76,23 @@ export function VideoView({
     const lastTap = lastTapRef.current;
 
     if (lastTap && lastTap.side === side && now - lastTap.time < 400) {
-      // Double-tap detected
+      // Double-tap — skip
+      if (singleTapTimer.current) { clearTimeout(singleTapTimer.current); singleTapTimer.current = null; }
       skip(side === 'right' ? SKIP_SECONDS : -SKIP_SECONDS);
       setSkipRipple(side);
       setTimeout(() => setSkipRipple(null), 600);
       lastTapRef.current = null;
     } else {
+      // First tap — wait to see if it becomes a double-tap
       lastTapRef.current = { time: now, side };
+      if (singleTapTimer.current) clearTimeout(singleTapTimer.current);
+      singleTapTimer.current = setTimeout(() => {
+        // Single tap confirmed — toggle play/pause
+        if (isPlaying) pause(); else play();
+        singleTapTimer.current = null;
+      }, 400);
     }
-  }, [skip]);
+  }, [skip, isPlaying, play, pause]);
 
   // Track container pixel dimensions for avatar positioning
   useEffect(() => {
