@@ -19,8 +19,12 @@ import {
   resolveAiModelAndProvider,
   isValidAiProviderId,
   isValidModelId,
+  getProviderForModel,
+  getCheapestModelForProvider,
+  getAiProviderMeta,
+  type AiProviderId,
 } from '@/lib/providers/ai-registry';
-import { classifyError, type ByokErrorKind } from '@/lib/byok-errors';
+import { classifyError, userMessage, type ByokErrorKind } from '@/lib/byok-errors';
 import { getAiKey } from '@/lib/byok';
 import type { PipelineSegmentNode, PipelineTransition, VisualMode, VideoPipeline } from '@/types/pipeline';
 import { getAllVideoProviderMeta, videoModelSupportsLastFrame } from '@/lib/providers/video-registry';
@@ -33,7 +37,7 @@ const pipelineBodySchema = z.object({
   aiModel: z.string().optional(),
 }).optional();
 
-const LLM_ERROR_KINDS = new Set<ByokErrorKind>(['auth_invalid', 'insufficient_credits', 'rate_limited']);
+const USER_ACTIONABLE_ERROR_KINDS = new Set<ByokErrorKind>(['auth_invalid', 'insufficient_credits']);
 
 const PROGRAMMATIC_TYPES = new Set<VisualTypeString>([
   'DATA_CHART',
@@ -125,6 +129,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   let apiKeyOverride: string | undefined;
 
   if (body?.aiProvider && body?.aiModel) {
+    // Case 1: Both provided — validate and use
     if (!isValidAiProviderId(body.aiProvider)) {
       return errorResponse(`Unknown AI provider: ${body.aiProvider}`, 400);
     }
@@ -133,7 +138,30 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
     aiProvider = body.aiProvider;
     aiModel = body.aiModel;
+  } else if (body?.aiModel) {
+    // Case 2: Model only — resolve provider from registry
+    if (!isValidModelId(body.aiModel)) {
+      return errorResponse(`Unknown AI model: ${body.aiModel}`, 400);
+    }
+    const resolvedProvider = getProviderForModel(body.aiModel);
+    if (!resolvedProvider) {
+      return errorResponse(`No provider found for model: ${body.aiModel}`, 400);
+    }
+    aiModel = body.aiModel;
+    aiProvider = resolvedProvider;
+  } else if (body?.aiProvider) {
+    // Case 3: Provider only — resolve cheapest model
+    if (!isValidAiProviderId(body.aiProvider)) {
+      return errorResponse(`Unknown AI provider: ${body.aiProvider}`, 400);
+    }
+    const resolvedModel = getCheapestModelForProvider(body.aiProvider as AiProviderId);
+    if (!resolvedModel) {
+      return errorResponse(`No models available for provider: ${body.aiProvider}`, 400);
+    }
+    aiProvider = body.aiProvider;
+    aiModel = resolvedModel;
   } else {
+    // Case 4: Neither — auto-resolve from podcast/user config
     const aiKey = await getAiKey(auth.userId);
     const resolved = await resolveAiModelAndProvider({
       podcastAiModel: podcast.aiModel,
@@ -272,12 +300,38 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     logger.error('Failed to create video pipeline', { podcastId, error: message });
 
     const errorKind = classifyError(message);
-    const isLlmError = LLM_ERROR_KINDS.has(errorKind);
+    const isLlmError = USER_ACTIONABLE_ERROR_KINDS.has(errorKind);
 
+    // Log all errors to PipelineEvent for admin observability
+    prisma.pipelineEvent.create({
+      data: {
+        podcastId,
+        stage: 'video-composition',
+        type: 'error',
+        message,
+        metadata: { errorKind, aiProvider, aiModel } as Record<string, string>,
+      },
+    }).catch(() => {});
+
+    if (isLlmError) {
+      // Credit/auth errors — actionable by user, show friendly message
+      let providerDisplayName = aiProvider;
+      try {
+        providerDisplayName = getAiProviderMeta(aiProvider as AiProviderId).displayName;
+      } catch {
+        // Unknown provider — use raw ID
+      }
+      return errorResponse(
+        userMessage(errorKind, providerDisplayName),
+        500,
+        { isLlmError: true, errorKind, currentProvider: aiProvider },
+      );
+    }
+
+    // Everything else — generic message, already logged to PipelineEvent
     return errorResponse(
-      isAdmin ? `Pipeline creation failed: ${message}` : 'Pipeline creation failed. Please try again later.',
+      isAdmin ? `Pipeline creation failed: ${message}` : "Something went wrong. We've been notified.",
       500,
-      isLlmError ? { isLlmError: true, errorKind, currentProvider: aiProvider } : undefined,
     );
   }
 }

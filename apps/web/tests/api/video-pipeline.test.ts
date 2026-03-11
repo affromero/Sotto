@@ -22,12 +22,14 @@ const mockFindUnique = vi.fn();
 
 const mockUserFindUniqueOrThrow = vi.fn();
 const mockUserAiKeyFindMany = vi.fn();
+const mockPipelineEventCreate = vi.fn().mockResolvedValue({});
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     podcast: { findUnique: (...args: unknown[]) => mockFindUnique(...args) },
     user: { findUniqueOrThrow: (...args: unknown[]) => mockUserFindUniqueOrThrow(...args) },
     userAiKey: { findMany: (...args: unknown[]) => mockUserAiKeyFindMany(...args) },
+    pipelineEvent: { create: (...args: unknown[]) => mockPipelineEventCreate(...args) },
   },
 }));
 
@@ -45,6 +47,17 @@ vi.mock('@/lib/auto-model-config', () => ({
 const VALID_PROVIDERS = new Set(['anthropic', 'openai', 'google']);
 const VALID_MODELS = new Set(['claude-haiku-4-5-20251001', 'gpt-5-nano', 'gemini-3.1-flash-lite-preview']);
 
+const MODEL_TO_PROVIDER: Record<string, string> = {
+  'claude-haiku-4-5-20251001': 'anthropic',
+  'gpt-5-nano': 'openai',
+  'gemini-3.1-flash-lite-preview': 'google',
+};
+const PROVIDER_CHEAPEST: Record<string, string> = {
+  anthropic: 'claude-haiku-4-5-20251001',
+  openai: 'gpt-5-nano',
+  google: 'gemini-3.1-flash-lite-preview',
+};
+
 vi.mock('@/lib/providers/ai-registry', () => ({
   resolveAiModelAndProvider: vi.fn().mockResolvedValue({
     model: 'claude-haiku-4-5-20251001',
@@ -52,10 +65,18 @@ vi.mock('@/lib/providers/ai-registry', () => ({
   }),
   isValidAiProviderId: (id: string) => VALID_PROVIDERS.has(id),
   isValidModelId: (id: string) => VALID_MODELS.has(id),
+  getProviderForModel: (id: string) => MODEL_TO_PROVIDER[id] ?? null,
+  getCheapestModelForProvider: (id: string) => PROVIDER_CHEAPEST[id] ?? null,
+  getAiProviderMeta: (id: string) => {
+    const names: Record<string, string> = { anthropic: 'Anthropic (Claude)', openai: 'OpenAI', google: 'Google (Gemini)' };
+    if (!names[id]) throw new Error(`Unknown AI provider: ${id}`);
+    return { displayName: names[id] };
+  },
 }));
 
 vi.mock('@/lib/byok-errors', () => ({
   classifyError: vi.fn().mockReturnValue('unknown'),
+  userMessage: (kind: string, provider: string) => `${kind}: ${provider}`,
 }));
 
 vi.mock('@/lib/api-keys', () => ({
@@ -198,7 +219,7 @@ describe('POST /api/podcasts/[id]/video/pipeline', () => {
     expect(body.code).toBe('daily_limit_reached');
   });
 
-  it('returns isLlmError when classification fails with credit error', async () => {
+  it('returns isLlmError with user message for credit errors', async () => {
     const { classifyError } = await import('@/lib/byok-errors');
     vi.mocked(classifyError).mockReturnValue('insufficient_credits');
     mockRequireAdmin.mockResolvedValue('admin-1');
@@ -209,13 +230,34 @@ describe('POST /api/podcasts/[id]/video/pipeline', () => {
     expect(body.isLlmError).toBe(true);
     expect(body.errorKind).toBe('insufficient_credits');
     expect(body.currentProvider).toBe('anthropic');
+    expect(body.error).toContain('insufficient_credits');
   });
 
-  it('does not set isLlmError for non-LLM errors', async () => {
+  it('returns generic message for non-credit errors and logs PipelineEvent', async () => {
     const { classifyError } = await import('@/lib/byok-errors');
     vi.mocked(classifyError).mockReturnValue('unknown');
-    mockRequireAdmin.mockResolvedValue('admin-1');
+    mockRequireAdmin.mockResolvedValue(null);
     mockClassifySegmentVisuals.mockRejectedValue(new Error('Network timeout'));
+    const res = await POST(createRequest('POST'), routeParams);
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body.isLlmError).toBeUndefined();
+    expect(body.error).toContain("We've been notified");
+    expect(mockPipelineEventCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          podcastId: 'pod-1',
+          stage: 'video-composition',
+          type: 'error',
+        }),
+      }),
+    );
+  });
+
+  it('treats rate_limited as non-user-actionable', async () => {
+    const { classifyError } = await import('@/lib/byok-errors');
+    vi.mocked(classifyError).mockReturnValue('rate_limited');
+    mockClassifySegmentVisuals.mockRejectedValue(new Error('Rate limited'));
     const res = await POST(createRequest('POST'), routeParams);
     expect(res.status).toBe(500);
     const body = await res.json();
@@ -234,6 +276,20 @@ describe('POST /api/podcasts/[id]/video/pipeline', () => {
       'Test Podcast',
       'Testing',
       expect.objectContaining({ provider: 'google', model: 'gemini-3.1-flash-lite-preview' }),
+    );
+  });
+
+  it('resolves provider from model when only aiModel is provided', async () => {
+    const res = await POST(
+      createRequest('POST', { aiModel: 'gpt-5-nano' }),
+      routeParams,
+    );
+    expect(res.status).toBe(200);
+    expect(mockClassifySegmentVisuals).toHaveBeenCalledWith(
+      expect.any(Array),
+      'Test Podcast',
+      'Testing',
+      expect.objectContaining({ provider: 'openai', model: 'gpt-5-nano' }),
     );
   });
 
