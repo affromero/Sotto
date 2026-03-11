@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useMemo, useCallback, useState } from 'react';
-import { Maximize2, Minimize2 } from 'lucide-react';
+import { Maximize2, Minimize2, Minus, Plus, Subtitles } from 'lucide-react';
 import { Player, type PlayerRef } from '@remotion/player';
 import { PodcastVisuals } from '@sotto/video';
 import { DEFAULT_RENDER_CONFIG, DEFAULT_BRANDING } from '@sotto/video';
@@ -55,6 +55,11 @@ export function VideoView({
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const [expanded, setExpanded] = useState(false);
   const [shapePickerSpeaker, setShapePickerSpeaker] = useState<string | null>(null);
+  const [subtitleScale, setSubtitleScale] = useState(1);
+  const [subtitlesVisible, setSubtitlesVisible] = useState(true);
+  const SUBTITLE_MIN = 0.6;
+  const SUBTITLE_MAX = 1.8;
+  const SUBTITLE_STEP = 0.2;
 
   // Track container pixel dimensions for avatar positioning
   useEffect(() => {
@@ -277,9 +282,45 @@ export function VideoView({
             ))}
           </div>
         )}
+        {/* Subtitle controls */}
+        <div className={styles.subtitleControls}>
+          <button
+            className={`${styles.subtitleBtn} ${!subtitlesVisible ? styles.subtitleBtnOff : ''}`}
+            onClick={() => setSubtitlesVisible((v) => !v)}
+            aria-label={subtitlesVisible ? 'Hide subtitles' : 'Show subtitles'}
+            title={subtitlesVisible ? 'Hide subtitles' : 'Show subtitles'}
+            type="button"
+          >
+            <Subtitles size={14} />
+          </button>
+          {subtitlesVisible && (
+            <>
+              <button
+                className={styles.subtitleBtn}
+                onClick={() => setSubtitleScale((s) => Math.max(SUBTITLE_MIN, s - SUBTITLE_STEP))}
+                disabled={subtitleScale <= SUBTITLE_MIN}
+                aria-label="Smaller subtitles"
+                title="Smaller subtitles"
+                type="button"
+              >
+                <Minus size={12} />
+              </button>
+              <button
+                className={styles.subtitleBtn}
+                onClick={() => setSubtitleScale((s) => Math.min(SUBTITLE_MAX, s + SUBTITLE_STEP))}
+                disabled={subtitleScale >= SUBTITLE_MAX}
+                aria-label="Larger subtitles"
+                title="Larger subtitles"
+                type="button"
+              >
+                <Plus size={12} />
+              </button>
+            </>
+          )}
+        </div>
         {/* Subtitle overlay */}
-        {activeSegment && (
-          <div className={styles.subtitleOverlay}>
+        {subtitlesVisible && activeSegment && (
+          <div className={styles.subtitleOverlay} style={{ '--subtitle-scale': subtitleScale } as React.CSSProperties}>
             <div
               className={styles.subtitleBlock}
               data-speaker-index={getSpeakerIndex(activeSegment.speaker, speakers)}

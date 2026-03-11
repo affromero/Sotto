@@ -76,6 +76,49 @@
   pointer-events: none;
 }
 
+/* Subtitle controls */
+
+.subtitleControls {
+  position: absolute;
+  bottom: var(--spacing-sm);
+  right: var(--spacing-sm);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.subtitleBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--radius-sm);
+  color: #F5F5F5;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.subtitleBtn:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.8);
+}
+
+.subtitleBtn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.subtitleBtnOff {
+  color: rgba(255, 255, 255, 0.4);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
 /* Subtitle overlay — movie-style */
 
 .subtitleOverlay {
@@ -125,7 +168,7 @@
 
 .subtitleText {
   font-family: var(--font-body);
-  font-size: var(--font-size-sm);
+  font-size: calc(var(--font-size-sm) * var(--subtitle-scale, 1));
   font-weight: 400;
   color: #F5F5F5;
   line-height: 1.5;
@@ -147,7 +190,7 @@
 
 @media (min-width: 768px) {
   .subtitleText {
-    font-size: var(--font-size-base);
+    font-size: calc(var(--font-size-base) * var(--subtitle-scale, 1));
   }
 
   .subtitleOverlay {
