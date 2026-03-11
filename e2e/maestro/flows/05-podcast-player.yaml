@@ -1,0 +1,48 @@
+appId: fm.sotto.app
+name: Player - Playback Controls
+tags: [player]
+---
+- runFlow: ../helpers/login.yaml
+
+# Navigate to first podcast
+- tapOn:
+    text: "podcast-card-0"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "player-play-pause"
+    timeout: 5000
+
+# Play / Pause
+- tapOn:
+    id: "player-play-pause"
+- tapOn:
+    id: "player-play-pause"
+
+# Skip controls
+- tapOn:
+    id: "player-skip-forward"
+- tapOn:
+    id: "player-skip-back"
+
+# Speed cycling
+- tapOn:
+    id: "player-speed-button"
+- tapOn:
+    id: "player-speed-button"
+
+# Like toggle
+- tapOn:
+    id: "player-like-button"
+- tapOn:
+    id: "player-like-button"
+
+# Save toggle
+- tapOn:
+    id: "player-save-button"
+- tapOn:
+    id: "player-save-button"
+
+# Share
+- tapOn:
+    id: "player-share-button"

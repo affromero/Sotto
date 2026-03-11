@@ -1,0 +1,37 @@
+appId: fm.sotto.app
+name: MiniPlayer - Persistence Across Tabs
+tags: [player]
+---
+- runFlow: ../helpers/login.yaml
+
+# Play a podcast
+- tapOn:
+    text: "podcast-card-0"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "player-play-pause"
+    timeout: 5000
+- tapOn:
+    id: "player-play-pause"
+
+# Navigate back to Feed tab
+- back
+- extendedWaitUntil:
+    visible:
+      id: "feed-podcast-list"
+    timeout: 5000
+
+# MiniPlayer should be visible
+- assertVisible:
+    id: "mini-player"
+- assertVisible:
+    id: "mini-player-play-pause"
+
+# Tap MiniPlayer to return to player
+- tapOn:
+    id: "mini-player"
+- extendedWaitUntil:
+    visible:
+      id: "player-play-pause"
+    timeout: 5000

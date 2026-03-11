@@ -1,0 +1,53 @@
+appId: fm.sotto.app
+name: Create - Full Pipeline (Discovery to Player)
+tags: [create, critical]
+---
+- runFlow: ../helpers/login.yaml
+
+# Step 1: Discovery — tap Create tab, select a chip
+- tapOn:
+    text: "Create"
+- extendedWaitUntil:
+    visible:
+      id: "create-chat-input"
+    timeout: 5000
+- tapOn:
+    id: "create-chip-AI & Technology"
+- extendedWaitUntil:
+    visible:
+      id: "create-ready-card"
+    timeout: 15000
+
+# Step 2: Voice — proceed to voice selection
+- tapOn:
+    id: "create-next-voices-button"
+- extendedWaitUntil:
+    visible:
+      id: "create-generate-script-button"
+    timeout: 5000
+
+# Step 3: Scripting — Script Preview
+- tapOn:
+    id: "create-generate-script-button"
+- extendedWaitUntil:
+    visible:
+      id: "generation-progress"
+    timeout: 5000
+- extendedWaitUntil:
+    visible:
+      id: "script-approve-button"
+    timeout: 60000
+
+# Step 4: Approve — Audio Generation
+- tapOn:
+    id: "script-approve-button"
+- extendedWaitUntil:
+    visible:
+      id: "generation-progress"
+    timeout: 5000
+
+# Step 5: Player loaded
+- extendedWaitUntil:
+    visible:
+      id: "player-play-pause"
+    timeout: 120000
