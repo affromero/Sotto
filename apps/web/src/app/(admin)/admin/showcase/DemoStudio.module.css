@@ -512,6 +512,32 @@
   line-height: 1.4;
 }
 
+.actionsList {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  list-style: decimal;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.actionsItem {
+  font: var(--text-body-xs);
+  color: var(--color-text-secondary);
+  line-height: 1.4;
+}
+
+.actionsType {
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  padding: 0 4px;
+  color: var(--color-primary);
+  white-space: nowrap;
+}
+
 .assetBlockedHint {
   font: var(--text-body-xs);
   color: var(--color-primary);

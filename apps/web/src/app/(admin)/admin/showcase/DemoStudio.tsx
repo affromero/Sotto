@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import styles from './DemoStudio.module.css';
 import { TimingEditor, computeAdjustedDuration, type TimingSegment } from './TimingEditor';
 import { ScriptViewer } from './ScriptViewer';
@@ -706,7 +706,11 @@ export function DemoStudio() {
                     onGenerate={() => generateAsset(scene.id, 'record')}
                     onCancel={() => saveScene(scene.id, { recordingStatus: 'PENDING' } as Partial<DemoScene>)}
                     mediaType="video"
-                    description={ASSET_DESCRIPTIONS.Recording}
+                    description={
+                      scene.actions?.length
+                        ? <ActionsPreview actions={scene.actions} />
+                        : 'Captures a screen recording of the demo actions via Playwright. Playback speed is adjusted to match voiceover duration during composition.'
+                    }
                     failedReason={scene.recordingStatus === 'FAILED' ? scene.failedReason : null}
                     onJobComplete={() => loadProject(selectedProject!.id)}
                     disabled={scene.voiceoverStatus !== 'READY'}
@@ -865,10 +869,55 @@ function JobProgressBar({ label, progress }: { label: AssetLabel; progress: numb
 
 const ASSET_DESCRIPTIONS: Record<string, string> = {
   Voiceover: 'Generates TTS audio from the narration text using the selected voice. This sets the timing — recording speed adapts to match.',
-  Recording: 'Captures a screen recording of the demo actions via Playwright. Playback speed is adjusted to match voiceover duration during composition.',
   Visual: 'Generates an AI visual (image or video) from the scene prompt. Used as B-roll or overlay in the final composition.',
   Transition: 'Creates a crossfade transition between this scene and the next using FFmpeg.',
 };
+
+// ---------------------------------------------------------------------------
+// ActionsPreview — renders scene.actions from the launch JSON in a readable list
+// ---------------------------------------------------------------------------
+
+type SceneAction = {
+  type: string;
+  url?: string;
+  ms?: number;
+  distance?: number;
+  duration?: number;
+  selector?: string;
+  text?: string;
+  name?: string;
+  timeout?: number;
+  [key: string]: unknown;
+};
+
+function formatAction(action: SceneAction): string {
+  switch (action.type) {
+    case 'navigate':   return `Navigate to ${action.url}`;
+    case 'wait':       return `Wait ${action.ms}ms`;
+    case 'scroll':     return `Scroll ${(action.distance ?? 0) > 0 ? '+' : ''}${action.distance}px over ${action.duration}ms`;
+    case 'click':      return `Click: ${action.selector}`;
+    case 'type':       return `Type: "${action.text}"`;
+    case 'hover':      return `Hover: ${action.selector}`;
+    case 'waitForSelector': return `Wait for: ${action.selector}${action.timeout ? ` (${action.timeout}ms)` : ''}`;
+    case 'intercept':  return `Intercept API: ${action.name}`;
+    case 'clearIntercept': return `Clear intercept: ${action.name}`;
+    default:           return action.type;
+  }
+}
+
+function ActionsPreview({ actions }: { actions: unknown[] }) {
+  if (!actions?.length) return null;
+  return (
+    <ol className={styles.actionsList}>
+      {(actions as SceneAction[]).map((a, i) => (
+        <li key={i} className={styles.actionsItem}>
+          <span className={styles.actionsType}>{a.type}</span>
+          {' '}{formatAction(a).replace(/^[^:]+:\s*/, '')}
+        </li>
+      ))}
+    </ol>
+  );
+}
 
 function AssetStatus({
   label,
@@ -891,7 +940,7 @@ function AssetStatus({
   mediaType: 'video' | 'audio' | 'image';
   failedReason?: string | null;
   onJobComplete?: () => void;
-  description?: string;
+  description?: React.ReactNode;
   disabled?: boolean;
   disabledReason?: string;
 }) {
@@ -944,7 +993,7 @@ function AssetStatus({
         </span>
       </div>
       {description && (
-        <p className={styles.assetDescription}>{description}</p>
+        <div className={styles.assetDescription}>{description}</div>
       )}
       {isGenerating && jobProgress && (
         <JobProgressBar label={label} progress={jobProgress.progress} />
