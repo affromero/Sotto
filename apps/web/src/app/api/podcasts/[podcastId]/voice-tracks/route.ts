@@ -12,7 +12,7 @@ import { resolveAutoModel } from '@/lib/auto-model-config';
 import { checkRateLimit } from '@/lib/redis';
 import { checkSuspension } from '@/lib/auth-guards';
 import { getProviderMeta, type TtsProviderId } from '@/lib/providers/tts-registry';
-import { findByVoiceId } from '@/lib/voice-pool';
+import { findByVoiceId, type VoiceMatchMetadata } from '@/lib/voice-pool';
 import type { GenerateVoiceTrackAudioPayload } from '@/lib/queue';
 
 import { errorResponse } from '@/lib/api-response';
@@ -157,6 +157,19 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
   }
 
+  // Fetch discovery metadata for topic-aware voice selection (same as worker + audio-generation)
+  const discovery = await prisma.discovery.findUnique({
+    where: { podcastId },
+    select: { tone: true, audienceLevel: true, audience: true },
+  });
+  const voiceMetadata: VoiceMatchMetadata | undefined = discovery
+    ? {
+        tone: discovery.tone as VoiceMatchMetadata['tone'],
+        audienceLevel: discovery.audienceLevel as VoiceMatchMetadata['audienceLevel'],
+        audience: discovery.audience as VoiceMatchMetadata['audience'],
+      }
+    : undefined;
+
   // Resolve TTS provider per speaker — same priority system as from-scratch generation.
   // Use selectFreeTierProviders() for free users (allocation-based) or resolveAutoModel() for PRO
   // to get the correct provider+model pair, avoiding default model fallbacks that BYOK keys may lack.
@@ -194,9 +207,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           requestedModel: modelForProvider,
           plan,
         });
-        return { speaker: v.speaker, voiceId: v.voiceId, providerId: resolved.providerId, ttsModel: resolved.provider.getModelId() };
+        const voiceId = v.voiceId || resolved.provider.getVoiceId(v.speaker, podcastId, voiceMetadata);
+        return { speaker: v.speaker, voiceId, providerId: resolved.providerId, ttsModel: resolved.provider.getModelId() };
       }
-      return { speaker: v.speaker, voiceId: v.voiceId, providerId: fallback.providerId, ttsModel: fallback.provider.getModelId() };
+      const voiceId = v.voiceId || fallback.provider.getVoiceId(v.speaker, podcastId, voiceMetadata);
+      return { speaker: v.speaker, voiceId, providerId: fallback.providerId, ttsModel: fallback.provider.getModelId() };
     }),
   );
 
