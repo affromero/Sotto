@@ -106,7 +106,7 @@ export default function SettingsScreen() {
           headerTintColor: colors.textPrimary,
         }}
       />
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView contentContainerStyle={styles.scrollContent} testID="settings-scroll">
         {/* Account Section */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.textTertiary }]}>Account</Text>
@@ -117,6 +117,7 @@ export default function SettingsScreen() {
                 pressed && styles.rowPressed,
               ]}
               onPress={() => router.push('/settings/profile')}
+              testID="settings-edit-profile"
             >
               <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>Edit Profile</Text>
               <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
@@ -150,6 +151,7 @@ export default function SettingsScreen() {
                 pressed && styles.rowPressed,
               ]}
               onPress={() => router.push('/settings/notifications')}
+              testID="settings-notifications"
             >
               <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>Notifications</Text>
               <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
@@ -161,6 +163,7 @@ export default function SettingsScreen() {
                 pressed && styles.rowPressed,
               ]}
               onPress={() => router.push('/settings/interests')}
+              testID="settings-interests"
             >
               <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>Interests</Text>
               <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
@@ -172,6 +175,7 @@ export default function SettingsScreen() {
                 pressed && styles.rowPressed,
               ]}
               onPress={() => router.push('/settings/accounts')}
+              testID="settings-connected-accounts"
             >
               <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>Connected Accounts</Text>
               <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
@@ -183,6 +187,7 @@ export default function SettingsScreen() {
                 pressed && styles.rowPressed,
               ]}
               onPress={() => router.push('/settings/voices')}
+              testID="settings-voice-clones"
             >
               <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>Voice Clones</Text>
               <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
@@ -200,6 +205,7 @@ export default function SettingsScreen() {
                 pressed && styles.rowPressed,
               ]}
               onPress={() => router.push('/analytics')}
+              testID="settings-analytics"
             >
               <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>Analytics</Text>
               <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
@@ -211,6 +217,7 @@ export default function SettingsScreen() {
                 pressed && styles.rowPressed,
               ]}
               onPress={() => router.push('/voices')}
+              testID="settings-voice-marketplace"
             >
               <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>Voice Marketplace</Text>
               <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
@@ -222,6 +229,7 @@ export default function SettingsScreen() {
                 pressed && styles.rowPressed,
               ]}
               onPress={() => router.push('/settings/billing')}
+              testID="settings-billing"
             >
               <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>Billing & Plan</Text>
               <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
@@ -233,6 +241,7 @@ export default function SettingsScreen() {
                 pressed && styles.rowPressed,
               ]}
               onPress={() => router.push('/settings/referral')}
+              testID="settings-referral"
             >
               <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>Refer a Friend</Text>
               <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
@@ -256,6 +265,7 @@ export default function SettingsScreen() {
                       scheme === opt && { backgroundColor: colors.primary, borderColor: colors.primary },
                     ]}
                     onPress={() => setScheme(opt)}
+                    testID={`settings-theme-${opt}`}
                   >
                     <Text
                       style={[
@@ -332,6 +342,7 @@ export default function SettingsScreen() {
               pressed && { backgroundColor: colors.errorLighter },
             ]}
             onPress={handleDeleteAccount}
+            testID="settings-delete-account"
           >
             <Text style={[styles.deleteButtonText, { color: colors.error }]}>Delete Account</Text>
           </Pressable>

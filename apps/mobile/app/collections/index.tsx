@@ -65,6 +65,7 @@ export default function CollectionsScreen() {
       <Pressable
         style={styles.card}
         onPress={() => router.push(`/collections/${item.id}`)}
+        testID={`collections-card-${item.id}`}
       >
         <View style={styles.cardHeader}>
           <Text style={styles.cardName} numberOfLines={1}>
@@ -107,6 +108,7 @@ export default function CollectionsScreen() {
               onPress={() => setCreateVisible(true)}
               hitSlop={8}
               style={{ marginRight: spacing.sm }}
+              testID="collections-add-button"
             >
               <Ionicons name="add-circle-outline" size={26} color={colors.primary} />
             </Pressable>
@@ -125,12 +127,14 @@ export default function CollectionsScreen() {
           <Pressable
             style={styles.createButton}
             onPress={() => setCreateVisible(true)}
+            testID="collections-create-button"
           >
             <Text style={styles.createButtonText}>Create Collection</Text>
           </Pressable>
         </View>
       ) : (
         <FlatList
+          testID="collections-list"
           data={collections}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
@@ -148,6 +152,7 @@ export default function CollectionsScreen() {
           placeholderTextColor={colors.textTertiary}
           maxLength={100}
           autoFocus
+          testID="collections-new-name-input"
         />
         <TextInput
           style={[styles.input, styles.descriptionInput]}
@@ -157,6 +162,7 @@ export default function CollectionsScreen() {
           placeholderTextColor={colors.textTertiary}
           multiline
           maxLength={500}
+          testID="collections-new-description-input"
         />
         <Pressable
           style={[
@@ -166,6 +172,7 @@ export default function CollectionsScreen() {
           ]}
           onPress={() => createMutation.mutate()}
           disabled={!newName.trim() || createMutation.isPending}
+          testID="collections-new-save-button"
         >
           {createMutation.isPending ? (
             <ActivityIndicator size="small" color={colors.textInverse} />

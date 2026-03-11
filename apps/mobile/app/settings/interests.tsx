@@ -71,6 +71,7 @@ export default function InterestsScreen() {
                   key={cat.id}
                   style={[styles.chip, isSelected && styles.chipSelected]}
                   onPress={() => toggleCategory(cat.slug)}
+                  testID={`interests-chip-${cat.slug}`}
                 >
                   <Text
                     style={[
@@ -94,6 +95,7 @@ export default function InterestsScreen() {
           ]}
           onPress={() => saveMutation.mutate()}
           disabled={selected.length === 0 || saveMutation.isPending}
+          testID="interests-save-button"
         >
           {saveMutation.isPending ? (
             <ActivityIndicator size="small" color={colors.textInverse} />

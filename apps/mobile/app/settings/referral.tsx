@@ -68,15 +68,15 @@ export default function ReferralScreen() {
         {referralLink ? (
           <View style={styles.linkCard}>
             <Text style={styles.linkLabel}>Your Referral Link</Text>
-            <Text style={styles.linkUrl} selectable>
+            <Text style={styles.linkUrl} selectable testID="referral-link-text">
               {referralLink}
             </Text>
             <View style={styles.linkActions}>
-              <Pressable style={styles.copyButton} onPress={handleCopy}>
+              <Pressable style={styles.copyButton} onPress={handleCopy} testID="referral-copy-button">
                 <Ionicons name="copy-outline" size={18} color={colors.primary} />
                 <Text style={styles.copyButtonText}>Copy</Text>
               </Pressable>
-              <Pressable style={styles.shareButton} onPress={handleShare}>
+              <Pressable style={styles.shareButton} onPress={handleShare} testID="referral-share-button">
                 <Ionicons name="share-outline" size={18} color={colors.textInverse} />
                 <Text style={styles.shareButtonText}>Share</Text>
               </Pressable>

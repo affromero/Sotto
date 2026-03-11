@@ -99,6 +99,7 @@ function IdeaRow({
               pressed && styles.ideaRowPressed,
             ]}
             onPress={onTap}
+            testID={`ideas-item-${idea.id}`}
           >
             <View style={styles.ideaContent}>
               <Text style={styles.ideaQuestion} numberOfLines={2}>
@@ -190,6 +191,7 @@ export default function IdeasScreen() {
         }}
       />
       <FlatList
+        testID="ideas-list"
         data={ideas}
         renderItem={renderItem}
         keyExtractor={keyExtractor}

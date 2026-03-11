@@ -90,6 +90,7 @@ export default function AnalyticsScreen() {
         {PERIODS.map((p) => (
           <Pressable
             key={p.value}
+            testID={`analytics-period-${p.value}`}
             style={[
               styles.periodChip,
               period === p.value && styles.periodChipActive,
@@ -124,7 +125,7 @@ export default function AnalyticsScreen() {
         ) : data ? (
           <>
             {/* Overview stats */}
-            <View style={styles.statsGrid}>
+            <View style={styles.statsGrid} testID="analytics-stats-grid">
               <StatCard
                 icon="play-circle-outline"
                 label="Total Plays"
@@ -150,7 +151,7 @@ export default function AnalyticsScreen() {
 
             {/* Engagement */}
             <Text style={styles.sectionTitle}>Engagement</Text>
-            <View style={styles.engagementCard}>
+            <View style={styles.engagementCard} testID="analytics-engagement-card">
               {[
                 { label: 'Likes', value: data.engagement.likes, icon: 'heart-outline' },
                 { label: 'Saves', value: data.engagement.saves, icon: 'bookmark-outline' },
