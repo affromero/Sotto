@@ -58,6 +58,7 @@ import { GenerationProgress } from '@/components/create/GenerationProgress';
 import { ScriptPreview } from '@/components/player/ScriptPreview';
 import { AudioConfigPanel, type AudioConfig } from '@/components/player/AudioConfigPanel';
 import { MiniPlayer } from '@/components/player/MiniPlayer';
+import { VideoModelPicker } from '@/components/player/VideoModelPicker';
 import { VideoProgress } from '@/components/player/VideoProgress';
 import { VideoView } from '@/components/player/VideoView';
 import { PipelineEditor } from '@/components/player/PipelineEditor';
@@ -206,7 +207,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
     isLlmError?: boolean;
     currentProvider?: string;
   } | null>(null);
-  const [llmProviderOverride, setLlmProviderOverride] = useState<string>('');
+  const [showModelPicker, setShowModelPicker] = useState(false);
   const [videoLoading, setVideoLoading] = useState(false);
   const [pipelineData, setPipelineData] = useState<VideoPipeline | null>(null);
   const [showPipelineEditor, setShowPipelineEditor] = useState(false);
@@ -373,13 +374,12 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
     }
   }, [segmentVisuals.length > 0]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleGenerateVideo = useCallback(async (overrideProvider?: { aiProvider: string; aiModel: string }) => {
+  const handleGenerateVideo = useCallback(async (override?: { aiModel: string }) => {
     setPipelineLoading(true);
     setVideoError(null);
-    setLlmProviderOverride('');
     try {
-      const pipelineOpts: RequestInit = overrideProvider
-        ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(overrideProvider) }
+      const pipelineOpts: RequestInit = override
+        ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(override) }
         : { method: 'POST' };
       const [pipelineRes, modelsRes] = await Promise.all([
         fetch(`/api/podcasts/${podcast.id}/video/pipeline`, pipelineOpts),
@@ -876,8 +876,8 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
               <div className={styles.ownerToolbar}>
                 <button
                   className={styles.toolbarBtn}
-                  onClick={() => handleGenerateVideo()}
-                  disabled={pipelineLoading || videoLoading || (videoStatus ? videoStatus.dailyRemaining <= 0 && !videoStatus.isByokUser : !isAdmin)}
+                  onClick={() => setShowModelPicker(true)}
+                  disabled={showModelPicker || pipelineLoading || videoLoading || (videoStatus ? videoStatus.dailyRemaining <= 0 && !videoStatus.isByokUser : !isAdmin)}
                   aria-label="Generate Video"
                   title="Generate a video from your podcast with AI visuals"
                   type="button"
@@ -913,45 +913,22 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
                   </span>
                 )}
               </div>
+              {showModelPicker && !videoError && (
+                <VideoModelPicker
+                  onGenerate={(override) => { setShowModelPicker(false); handleGenerateVideo(override); }}
+                  onCancel={() => setShowModelPicker(false)}
+                  loading={pipelineLoading}
+                />
+              )}
               {videoError && (
                 <div className={styles.videoErrorBlock}>
                   <p className={styles.videoError}>{videoError.message}</p>
                   {videoError.isLlmError && (
-                    <div className={styles.llmErrorActions}>
-                      <label htmlFor="llm-provider-select" className={styles.llmErrorLabel}>
-                        Try a different AI provider:
-                      </label>
-                      <select
-                        id="llm-provider-select"
-                        className={styles.providerSelect}
-                        value={llmProviderOverride}
-                        onChange={(e) => setLlmProviderOverride(e.target.value)}
-                      >
-                        <option value="">Select provider…</option>
-                        <option value="anthropic" disabled={videoError.currentProvider === 'anthropic'}>Anthropic (Claude)</option>
-                        <option value="openai" disabled={videoError.currentProvider === 'openai'}>OpenAI</option>
-                        <option value="google" disabled={videoError.currentProvider === 'google'}>Google (Gemini)</option>
-                      </select>
-                      <Button
-                        variant="secondary"
-                        disabled={!llmProviderOverride || pipelineLoading}
-                        onClick={() => {
-                          if (!llmProviderOverride) return;
-                          const providerDefaults: Record<string, string> = {
-                            anthropic: 'claude-haiku-4-5-20251001',
-                            openai: 'gpt-5-nano',
-                            google: 'gemini-3.1-flash-lite-preview',
-                          };
-                          handleGenerateVideo({
-                            aiProvider: llmProviderOverride,
-                            aiModel: providerDefaults[llmProviderOverride],
-                          });
-                        }}
-                      >
-                        <RefreshCw size={16} />
-                        Retry
-                      </Button>
-                    </div>
+                    <VideoModelPicker
+                      onGenerate={(override) => { setVideoError(null); handleGenerateVideo(override); }}
+                      onCancel={() => setVideoError(null)}
+                      loading={pipelineLoading}
+                    />
                   )}
                 </div>
               )}
