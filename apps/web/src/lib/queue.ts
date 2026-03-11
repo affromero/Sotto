@@ -316,6 +316,7 @@ export interface GenerateAvatarPayload {
   avatarId: string;
   avatarProvider?: 'heygen' | 'runway';
   isPreset?: boolean;
+  voiceTrackId?: string;
 }
 
 export interface GenerateTransitionPayload {

@@ -5,6 +5,7 @@ import { User, AlertTriangle, Search, ChevronDown, ChevronUp } from 'lucide-reac
 import { estimateAvatarCost, formatAvatarCost } from '@/lib/avatar-cost-estimator';
 import type { UnifiedAvatarData } from '@/types/avatar';
 import type { SegmentData } from '@/types/podcast';
+import type { VoiceTrackSummary } from '@sotto/shared';
 import styles from './AvatarPicker.module.css';
 
 export interface ExistingAvatarOverlay {
@@ -61,6 +62,8 @@ export function AvatarPicker({ podcastId, speakers, segments, onConfigured, onCa
   );
   const [availableProviders, setAvailableProviders] = useState<{ heygen: boolean; runway: boolean }>({ heygen: false, runway: false });
   const [pricing, setPricing] = useState<AvatarPricing>({ costPerMinute: 0, includedOnPlatform: false });
+  const [voiceTracks, setVoiceTracks] = useState<VoiceTrackSummary[]>([]);
+  const [voiceTrackSelections, setVoiceTrackSelections] = useState<Record<string, string>>({});
 
   const overDuration = podcastDuration > MAX_DURATION;
 
@@ -79,6 +82,16 @@ export function AvatarPicker({ podcastId, speakers, segments, onConfigured, onCa
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load avatars'))
       .finally(() => setLoading(false));
   }, [podcastId, activeProvider]);
+
+  // Fetch ready voice tracks for audio source selection
+  useEffect(() => {
+    fetch(`/api/podcasts/${podcastId}/voice-tracks`)
+      .then((res) => (res.ok ? res.json() : []))
+      .then((tracks: VoiceTrackSummary[]) => {
+        setVoiceTracks(tracks.filter((t) => t.status === 'READY'));
+      })
+      .catch(() => {});
+  }, [podcastId]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -139,6 +152,7 @@ export function AvatarPicker({ podcastId, speakers, segments, onConfigured, onCa
         avatarProvider: sel.provider,
         isPreset: sel.isPreset,
         enabledSegmentIds: allEnabled ? undefined : [...enabled],
+        voiceTrackId: voiceTrackSelections[speaker] || undefined,
       };
     });
     if (configured.length === 0) return;
@@ -162,7 +176,7 @@ export function AvatarPicker({ podcastId, speakers, segments, onConfigured, onCa
     } finally {
       setSubmitting(false);
     }
-  }, [selections, podcastId, onConfigured, segmentsBySpeaker, enabledSegments]);
+  }, [selections, podcastId, onConfigured, segmentsBySpeaker, enabledSegments, voiceTrackSelections]);
 
   const selectedCount = Object.keys(selections).length;
   const estimatedCost = useMemo(() => {
@@ -240,6 +254,19 @@ export function AvatarPicker({ podcastId, speakers, segments, onConfigured, onCa
               <User size={14} />
               {speaker}
             </h4>
+            {voiceTracks.length > 0 && (
+              <select
+                className={styles.voiceTrackSelect}
+                value={voiceTrackSelections[speaker] ?? ''}
+                onChange={(e) => setVoiceTrackSelections((prev) => ({ ...prev, [speaker]: e.target.value }))}
+                aria-label={`${speaker} audio source`}
+              >
+                <option value="">Original audio</option>
+                {voiceTracks.map((vt) => (
+                  <option key={vt.id} value={vt.id}>{vt.name}</option>
+                ))}
+              </select>
+            )}
             <div className={styles.avatarGrid}>
               {filtered.map((avatar) => (
                 <button

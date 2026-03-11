@@ -170,12 +170,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           avatarId: avatar.avatarId,
           avatarProvider: avatar.avatarProvider ?? null,
           enabledSegmentIds: avatar.enabledSegmentIds ?? [],
+          voiceTrackId: avatar.voiceTrackId ?? null,
           status: 'pending',
         },
         update: {
           avatarId: avatar.avatarId,
           avatarProvider: avatar.avatarProvider ?? null,
           enabledSegmentIds: avatar.enabledSegmentIds ?? [],
+          voiceTrackId: avatar.voiceTrackId ?? null,
           status: 'pending',
           videoUrl: null,
           concatAudioUrl: null,
@@ -228,6 +230,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         avatarId: overlay.avatarId,
         avatarProvider: (overlay.avatarProvider ?? avatarConfig?.avatarProvider ?? 'heygen') as 'heygen' | 'runway',
         isPreset: avatarConfig?.isPreset,
+        voiceTrackId: overlay.voiceTrackId ?? undefined,
       });
     }
 
