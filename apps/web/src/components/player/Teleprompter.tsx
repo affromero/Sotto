@@ -57,7 +57,7 @@ export function Teleprompter({
   currentTime,
   onSegmentClick,
 }: TeleprompterProps) {
-  const [fontScale, setFontScale] = useState(1);
+  const [fontScale, setFontScale] = useState(0.8);
   const MIN_SCALE = 0.6;
   const MAX_SCALE = 2;
   const STEP = 0.2;
