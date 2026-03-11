@@ -55,7 +55,7 @@ export function VideoView({
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const [expanded, setExpanded] = useState(false);
   const [shapePickerSpeaker, setShapePickerSpeaker] = useState<string | null>(null);
-  const [subtitleScale, setSubtitleScale] = useState(1);
+  const [subtitleScale, setSubtitleScale] = useState(0.8);
   const [subtitlesVisible, setSubtitlesVisible] = useState(true);
   const [skipRipple, setSkipRipple] = useState<'left' | 'right' | null>(null);
   const lastTapRef = useRef<{ time: number; side: 'left' | 'right' } | null>(null);
