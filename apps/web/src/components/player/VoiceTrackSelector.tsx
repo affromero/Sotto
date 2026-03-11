@@ -30,6 +30,17 @@ const PROVIDER_DISPLAY: Record<string, string> = {
   kittentts: 'KittenTTS',
 };
 
+function buildVoiceTooltip(voices: VoiceTrackSummary['voices']): string | undefined {
+  if (!voices || voices.length === 0) return undefined;
+  return voices
+    .map((v) => {
+      const provider = v.provider ? (PROVIDER_DISPLAY[v.provider] ?? v.provider) : '';
+      const voice = v.voiceId || 'Auto';
+      return `${v.speaker}: ${voice}${provider ? ` [${provider}]` : ''}`;
+    })
+    .join('\n');
+}
+
 export function VoiceTrackSelector({
   podcastId,
   podcastAudioUrl,
@@ -122,6 +133,7 @@ export function VoiceTrackSelector({
           key={track.id}
           className={`${styles.pill} ${activeTrackId === track.id ? styles.pillActive : ''} ${track.proposalStatus === 'PENDING' ? styles.pillPending : ''}`}
           onClick={() => handleSelectTrack(track)}
+          title={buildVoiceTooltip(track.voices)}
           type="button"
         >
           <span className={styles.pillName}>{track.name}</span>

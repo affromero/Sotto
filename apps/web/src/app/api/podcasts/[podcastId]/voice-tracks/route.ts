@@ -34,9 +34,7 @@ function buildTrackName(
       ? (findByVoiceId(v.voiceId)?.name ?? v.voiceId)
       : 'Auto';
     const existing = byProvider.get(providerLabel) ?? [];
-    if (!existing.includes(voiceName)) {
-      existing.push(voiceName);
-    }
+    existing.push(voiceName);
     byProvider.set(providerLabel, existing);
   }
 

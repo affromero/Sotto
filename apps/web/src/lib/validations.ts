@@ -882,6 +882,7 @@ export const configureAvatarsSchema = z.object({
     avatarProvider: z.enum(['heygen', 'runway']).optional(),
     isPreset: z.boolean().optional(),
     enabledSegmentIds: z.array(z.string()).optional(),
+    voiceTrackId: z.string().optional(),
   })).min(1).max(4),
 });
 

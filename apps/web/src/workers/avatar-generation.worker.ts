@@ -9,6 +9,55 @@ import { submitAvatarVideo, pollAvatarVideo, isNonRetryableHeyGenError } from '@
 import { isNonRetryableRunwayError } from '@/lib/runway';
 import { concatenateSpeakerAudio } from '@/lib/avatar-audio-concat';
 
+/**
+ * Fetch segments for avatar audio concatenation.
+ * When voiceTrackId is set, reads from VoiceTrackSegment (alternate audio).
+ * Otherwise reads from the main Segment table (default behavior).
+ */
+async function fetchAvatarSegments(opts: {
+  podcastId: string;
+  speaker: string;
+  voiceTrackId?: string;
+  enabledSegmentIds: string[];
+}): Promise<Array<{ id: string; order: number; audioUrl: string | null }>> {
+  if (opts.voiceTrackId) {
+    const vtSegments = await prisma.voiceTrackSegment.findMany({
+      where: {
+        voiceTrackId: opts.voiceTrackId,
+        segment: { podcastId: opts.podcastId, speaker: opts.speaker },
+      },
+      orderBy: { order: 'asc' },
+      select: { id: true, segmentId: true, order: true, audioUrl: true },
+    });
+
+    if (vtSegments.length === 0) {
+      throw new Error(`No voice track segments found for speaker "${opts.speaker}"`);
+    }
+
+    const enabled = opts.enabledSegmentIds;
+    const filtered = enabled.length > 0
+      ? vtSegments.filter((s) => enabled.includes(s.segmentId))
+      : vtSegments;
+
+    return filtered.map((s) => ({ id: s.segmentId, order: s.order, audioUrl: s.audioUrl }));
+  }
+
+  const segments = await prisma.segment.findMany({
+    where: { podcastId: opts.podcastId, speaker: opts.speaker },
+    orderBy: { order: 'asc' },
+    select: { id: true, order: true, audioUrl: true },
+  });
+
+  if (segments.length === 0) {
+    throw new Error(`No segments found for speaker "${opts.speaker}"`);
+  }
+
+  const enabled = opts.enabledSegmentIds;
+  return enabled.length > 0
+    ? segments.filter((s) => enabled.includes(s.id))
+    : segments;
+}
+
 export async function processAvatarGeneration(job: Job<GenerateAvatarPayload>): Promise<void> {
   const provider = job.data.avatarProvider ?? 'heygen';
   if (provider === 'runway') {
@@ -20,7 +69,7 @@ export async function processAvatarGeneration(job: Job<GenerateAvatarPayload>): 
 // ── HeyGen path (existing logic, extracted verbatim) ──
 
 async function processHeyGenAvatar(job: Job<GenerateAvatarPayload>): Promise<void> {
-  const { podcastId, videoGenerationId, avatarOverlayId, speaker, avatarId } = job.data;
+  const { podcastId, videoGenerationId, avatarOverlayId, speaker, avatarId, voiceTrackId } = job.data;
 
   logger.info('Starting HeyGen avatar generation', { podcastId, speaker, avatarId });
 
@@ -70,23 +119,11 @@ async function processHeyGenAvatar(job: Job<GenerateAvatarPayload>): Promise<voi
       });
       await job.updateProgress(10);
 
-      const segments = await prisma.segment.findMany({
-        where: { podcastId, speaker },
-        orderBy: { order: 'asc' },
-        select: { id: true, order: true, audioUrl: true },
+      const segments = await fetchAvatarSegments({
+        podcastId, speaker, voiceTrackId, enabledSegmentIds: overlay.enabledSegmentIds,
       });
 
-      if (segments.length === 0) {
-        throw new Error(`No segments found for speaker "${speaker}"`);
-      }
-
-      // Filter to enabled segments only (empty array = all enabled)
-      const enabled = overlay.enabledSegmentIds;
-      const filteredSegments = enabled.length > 0
-        ? segments.filter((s) => enabled.includes(s.id))
-        : segments;
-
-      const segmentsWithAudio = filteredSegments.filter((s) => s.audioUrl);
+      const segmentsWithAudio = segments.filter((s) => s.audioUrl);
       if (segmentsWithAudio.length === 0) {
         throw new Error(`No audio segments found for speaker "${speaker}"`);
       }
@@ -212,7 +249,7 @@ async function processHeyGenAvatar(job: Job<GenerateAvatarPayload>): Promise<voi
 // ── Runway path (realtime sessions via Playwright) ──
 
 async function processRunwayAvatar(job: Job<GenerateAvatarPayload>): Promise<void> {
-  const { podcastId, videoGenerationId, avatarOverlayId, speaker, avatarId, isPreset } = job.data;
+  const { podcastId, videoGenerationId, avatarOverlayId, speaker, avatarId, isPreset, voiceTrackId } = job.data;
 
   logger.info('Starting Runway avatar generation', { podcastId, speaker, avatarId });
 
@@ -258,23 +295,11 @@ async function processRunwayAvatar(job: Job<GenerateAvatarPayload>): Promise<voi
         data: { status: 'concatenating' },
       });
 
-      const segments = await prisma.segment.findMany({
-        where: { podcastId, speaker },
-        orderBy: { order: 'asc' },
-        select: { id: true, order: true, audioUrl: true },
+      const segments = await fetchAvatarSegments({
+        podcastId, speaker, voiceTrackId, enabledSegmentIds: overlay.enabledSegmentIds,
       });
 
-      if (segments.length === 0) {
-        throw new Error(`No segments found for speaker "${speaker}"`);
-      }
-
-      // Filter to enabled segments only (empty array = all enabled)
-      const enabled = overlay.enabledSegmentIds;
-      const filteredSegments = enabled.length > 0
-        ? segments.filter((s) => enabled.includes(s.id))
-        : segments;
-
-      const segmentsWithAudio = filteredSegments.filter((s) => s.audioUrl);
+      const segmentsWithAudio = segments.filter((s) => s.audioUrl);
       if (segmentsWithAudio.length === 0) {
         throw new Error(`No audio segments found for speaker "${speaker}"`);
       }
