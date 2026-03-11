@@ -20,16 +20,30 @@ const TYPE_LABELS: Record<string, string> = {
 export function CitationMarker({ references }: CitationMarkerProps) {
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState<'above' | 'below'>('above');
+  const [hOffset, setHOffset] = useState(0);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
 
   const label = references.map((r) => r.number).join(',');
 
+  const TOOLTIP_WIDTH = 320; // approx mid-point of min/max width
+
   const updatePosition = useCallback(() => {
     if (!buttonRef.current) return;
     const rect = buttonRef.current.getBoundingClientRect();
-    // If button is in the top 200px of viewport, show tooltip below
     setPosition(rect.top < 200 ? 'below' : 'above');
+
+    // Clamp tooltip horizontally within viewport
+    const centerX = rect.left + rect.width / 2;
+    const halfW = TOOLTIP_WIDTH / 2;
+    const margin = 8;
+    if (centerX - halfW < margin) {
+      setHOffset(margin - (centerX - halfW));
+    } else if (centerX + halfW > window.innerWidth - margin) {
+      setHOffset(window.innerWidth - margin - (centerX + halfW));
+    } else {
+      setHOffset(0);
+    }
   }, []);
 
   const handleToggle = useCallback(() => {
@@ -84,6 +98,7 @@ export function CitationMarker({ references }: CitationMarkerProps) {
         <div
           ref={tooltipRef}
           className={`${styles.tooltip} ${styles[position]}`}
+          style={hOffset ? { transform: `translateX(calc(-50% + ${hOffset}px))` } : undefined}
           role="tooltip"
         >
           {references.map((ref) => (
