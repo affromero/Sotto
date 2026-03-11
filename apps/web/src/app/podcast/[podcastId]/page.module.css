@@ -708,28 +708,6 @@
   width: 100%;
 }
 
-.llmErrorActions {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  flex-wrap: wrap;
-}
-
-.llmErrorLabel {
-  font: var(--text-body-sm);
-  color: var(--color-text-secondary);
-}
-
-.providerSelect {
-  font: var(--text-body-sm);
-  padding: var(--spacing-xs) var(--spacing-sm);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-  min-height: 44px;
-}
-
 /* Mobile fixes — ensure no overflow on 320px */
 
 @media (max-width: 599px) {
