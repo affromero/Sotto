@@ -1,0 +1,248 @@
+/* ==========================================================================
+   SHOWCASE CHAPTER — Video pipeline mock (reversed split)
+   ========================================================================== */
+
+.root {
+  padding: var(--section-pad-y) var(--spacing-lg);
+  max-width: var(--max-content-width);
+  margin: 0 auto;
+}
+
+/* ==========================================================================
+   SPLIT — reversed: visual left, text right
+   ========================================================================== */
+
+.split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 64px;
+  align-items: center;
+}
+
+.splitReverse {
+  direction: rtl;
+}
+
+.splitReverse > * {
+  direction: ltr;
+}
+
+.splitVisual {
+  display: flex;
+  justify-content: center;
+}
+
+.splitText {
+  display: flex;
+  align-items: center;
+}
+
+.textContent {
+  max-width: 480px;
+}
+
+/* Header text */
+.overline {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--color-primary);
+  margin-bottom: 16px;
+}
+
+.heading {
+  font-family: var(--font-heading);
+  font-size: clamp(2.25rem, 4.5vw, 3.25rem);
+  font-weight: 400;
+  color: var(--color-text);
+  line-height: 1.15;
+  margin-bottom: 20px;
+}
+
+.description {
+  font-size: 18px;
+  line-height: 1.7;
+  color: var(--color-text-secondary, #6B7280);
+}
+
+/* ==========================================================================
+   MOCK VIDEO UI — glassmorphism card with segment rows
+   ========================================================================== */
+
+.mockVideo {
+  width: 100%;
+  max-width: 460px;
+  background: var(--color-surface);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-2xl);
+  overflow: hidden;
+  box-shadow: var(--shadow-xl);
+}
+
+.mockHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 20px;
+  background: rgba(0, 0, 0, 0.02);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.mockDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-primary);
+}
+
+.mockBody {
+  padding: 20px;
+}
+
+/* Segment rows */
+.segment {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.segment:last-of-type {
+  border-bottom: none;
+}
+
+.segNum {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.05);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.segLabel {
+  flex: 1;
+  font-size: 14px;
+  color: var(--color-text);
+}
+
+.segBadge {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+/* Badge color variants */
+.badgePurple {
+  background: rgba(139, 92, 246, 0.08);
+  color: #8B5CF6;
+}
+
+.badgeAmber {
+  background: rgba(217, 119, 6, 0.08);
+  color: var(--color-primary);
+}
+
+.badgeNavy {
+  background: rgba(30, 58, 95, 0.08);
+  color: var(--color-accent);
+}
+
+.badgeGreen {
+  background: rgba(22, 163, 74, 0.08);
+  color: #16A34A;
+}
+
+/* Footer with toggle + count */
+.videoFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 16px;
+  margin-top: 4px;
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.toggleTrack {
+  width: 32px;
+  height: 18px;
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  position: relative;
+  display: inline-block;
+}
+
+.toggleKnob {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+}
+
+.videoCount {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* ==========================================================================
+   MOBILE
+   ========================================================================== */
+
+@media (max-width: 767px) {
+  .root {
+    padding: var(--section-pad-y-sm) var(--spacing-md);
+  }
+
+  .split {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+
+  .splitReverse {
+    direction: ltr;
+  }
+
+  .splitVisual {
+    order: -1;
+  }
+
+  .mockVideo {
+    max-width: 100%;
+  }
+
+  .textContent {
+    text-align: center;
+    max-width: 100%;
+  }
+}
