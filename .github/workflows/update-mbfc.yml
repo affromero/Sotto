@@ -1,0 +1,50 @@
+name: Update MBFC Dataset
+
+on:
+  schedule:
+    # Run on the 1st of every month at 6am UTC
+    - cron: '0 6 1 * *'
+  workflow_dispatch: {}
+
+jobs:
+  update-mbfc:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download latest MBFC data
+        run: npm run update-mbfc
+
+      - name: Check for changes
+        id: diff
+        run: |
+          if git diff --quiet apps/web/src/data/mbfc-combined.json; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "MBFC data is already up to date"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            OLD_COUNT=$(git show HEAD:apps/web/src/data/mbfc-combined.json | python3 -c "import sys,json; print(len(json.load(sys.stdin).get('sources',{})))" 2>/dev/null || echo "unknown")
+            NEW_COUNT=$(python3 -c "import json; print(len(json.load(open('apps/web/src/data/mbfc-combined.json')).get('sources',{})))" 2>/dev/null || echo "unknown")
+            echo "old_count=$OLD_COUNT" >> "$GITHUB_OUTPUT"
+            echo "new_count=$NEW_COUNT" >> "$GITHUB_OUTPUT"
+            echo "MBFC data changed: $OLD_COUNT → $NEW_COUNT sources"
+          fi
+
+      - name: Create pull request
+        if: steps.diff.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          commit-message: 'chore: update MBFC media bias dataset'
+          branch: chore/update-mbfc-data
+          title: 'chore: update MBFC media bias dataset'
+          body: |
+            Automated monthly refresh of the [MBFC dataset](https://github.com/drmikecrowe/mbfcext) used for media bias detection.
+
+            **Sources:** ${{ steps.diff.outputs.old_count }} → ${{ steps.diff.outputs.new_count }}
+
+            Run `npm test -- --run tests/lib/media-bias.test.ts` to verify.
+          labels: dependencies
