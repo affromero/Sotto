@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { createVoiceTrackSchema } from '@/lib/validations';
 import { voiceTrackAudioQueue, addJob, JobType } from '@/lib/queue';
 import { getTierFeatures } from '@/lib/tier-features';
+import { getPlanFeatureConfig } from '@/lib/plan-feature-config';
 import { checkGenerationGate } from '@/lib/generation-gate';
 import { computeVoiceCharges } from '@/lib/voice-pricing';
 import { resolveTtsProvider } from '@/lib/providers';
@@ -89,8 +90,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   }
 
   // Check tier features
-  const gate = await checkGenerationGate(userId);
-  const features = getTierFeatures(gate.isProUser ? 'PRO' : 'FREE', gate.isByokUser, session.user.role);
+  const [gate, voiceConfig] = await Promise.all([
+    checkGenerationGate(userId),
+    getPlanFeatureConfig(),
+  ]);
+  const features = getTierFeatures(gate.isProUser ? 'PRO' : 'FREE', gate.isByokUser, session.user.role, voiceConfig);
 
   if (!features.voiceTracksEnabled) {
     return errorResponse('Voice tracks are not available on your plan. Upgrade to Pro or add your own API keys.', 403);

@@ -67,14 +67,43 @@ const PRO_BYOK_FEATURES: TierFeatures = {
   maxVoiceTracks: Infinity,
 };
 
+export interface PlanVoiceConfig {
+  freeVoiceCloningEnabled: boolean;
+  proVoiceCloningEnabled: boolean;
+  freeVoiceTracksEnabled: boolean;
+  proVoiceTracksEnabled: boolean;
+  freeMaxVoiceTracks: number;
+  proMaxVoiceTracks: number;
+}
+
 /**
  * Get feature caps for a user given their plan, BYOK status, and role.
  * Privileged roles (ADMIN, SYSTEM) always get maximum caps.
+ * Pass voiceConfig to apply admin-configured voice feature overrides.
+ * BYOK PRO users always keep unlimited voice tracks regardless of config.
  */
-export function getTierFeatures(plan: 'FREE' | 'PRO', isByok: boolean, role?: string): TierFeatures {
+export function getTierFeatures(
+  plan: 'FREE' | 'PRO',
+  isByok: boolean,
+  role?: string,
+  voiceConfig?: PlanVoiceConfig,
+): TierFeatures {
   if (PRIVILEGED_ROLES.has(role ?? '')) return PRO_BYOK_FEATURES;
-  if (plan === 'PRO') return isByok ? PRO_BYOK_FEATURES : PRO_FEATURES;
-  return isByok ? FREE_BYOK_FEATURES : FREE_FEATURES;
+
+  const isPro = plan === 'PRO';
+  const base = isPro
+    ? (isByok ? PRO_BYOK_FEATURES : PRO_FEATURES)
+    : (isByok ? FREE_BYOK_FEATURES : FREE_FEATURES);
+
+  if (!voiceConfig) return base;
+
+  return {
+    ...base,
+    voiceCloningEnabled: isPro ? voiceConfig.proVoiceCloningEnabled : voiceConfig.freeVoiceCloningEnabled,
+    voiceTracksEnabled: isPro ? voiceConfig.proVoiceTracksEnabled : voiceConfig.freeVoiceTracksEnabled,
+    // BYOK PRO keeps Infinity; all others use config value
+    maxVoiceTracks: isByok && isPro ? Infinity : (isPro ? voiceConfig.proMaxVoiceTracks : voiceConfig.freeMaxVoiceTracks),
+  };
 }
 
 /**

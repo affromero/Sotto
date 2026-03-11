@@ -1787,6 +1787,24 @@ model AutoModelConfig {
   updatedBy               String?
 }
 
+// ============ PLAN FEATURE CONFIG ============
+
+model PlanFeatureConfig {
+  id                      String   @id @default("singleton")
+  // Voice cloning (recording + ElevenLabs import) per plan
+  freeVoiceCloningEnabled Boolean  @default(false)
+  proVoiceCloningEnabled  Boolean  @default(true)
+  // Voice tracks per plan
+  freeVoiceTracksEnabled  Boolean  @default(false)
+  proVoiceTracksEnabled   Boolean  @default(true)
+  freeMaxVoiceTracks      Int      @default(0)
+  proMaxVoiceTracks       Int      @default(3)
+  // Voice marketplace (buying/selling voices globally)
+  voiceMarketplaceEnabled Boolean  @default(true)
+  updatedAt               DateTime @updatedAt
+  updatedBy               String?
+}
+
 model FreeProviderUsage {
   id       String @id @default(cuid())
   userId   String
