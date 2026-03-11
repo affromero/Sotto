@@ -29,12 +29,12 @@ export async function POST(_request: NextRequest, { params }: Params) {
     data: { compositedStatus: 'GENERATING' },
   });
 
-  await addJob(
+  const job = await addJob(
     demoSceneCompositionQueue,
     JobType.COMPOSE_DEMO_SCENE,
     { projectId, sceneId },
     { jobId: `demo-scene-compose-${sceneId}-${Date.now()}` },
   );
 
-  return NextResponse.json({ status: 'queued' });
+  return NextResponse.json({ status: 'queued', jobId: job.id });
 }

@@ -14,12 +14,12 @@ export async function POST(_request: NextRequest, { params }: Params) {
 
   const { projectId, sceneId } = await params;
 
-  await addJob(
+  const job = await addJob(
     demoVoiceoverQueue,
     JobType.GENERATE_DEMO_VOICEOVER,
     { projectId, sceneId },
     { jobId: `demo-voiceover-${sceneId}-${Date.now()}` },
   );
 
-  return NextResponse.json({ status: 'queued' });
+  return NextResponse.json({ status: 'queued', jobId: job.id });
 }
