@@ -515,7 +515,7 @@ function setupQueueEvents(queue: Queue, queueName: string): void {
       const AI_QUEUES = ['script-generation', 'script-verification', 'reference-validation'];
 
       // Handle video pipeline failures separately — podcast is already READY
-      const VIDEO_QUEUES = ['visual-classification', 'visual-generation', 'transition-generation', 'video-composition', 'avatar-generation', 'place-enrichment'];
+      const VIDEO_QUEUES = ['visual-classification', 'visual-generation', 'transition-generation', 'video-composition', 'place-enrichment'];
       if (VIDEO_QUEUES.includes(queueName)) {
         const videoGenerationId = (job?.data as Record<string, unknown>)?.videoGenerationId as string | undefined;
         if (!videoGenerationId) return;
@@ -536,7 +536,7 @@ function setupQueueEvents(queue: Queue, queueName: string): void {
         if (notifQueue) {
           await notifQueue.add('send_notification', {
             userId: podcast.userId,
-            type: 'PODCAST_FAILED',
+            type: 'VIDEO_FAILED',
             title: 'Video Generation Failed',
             message: `Video generation failed: ${args.failedReason || 'Unknown error'}`,
             data: { podcastId },
@@ -577,6 +577,55 @@ function setupQueueEvents(queue: Queue, queueName: string): void {
             sendTelegram(admin.telegramChatId, telegramText, { parse_mode: 'Markdown' }).catch((err: unknown) => {
               logger.warn('Failed to send admin video-failure Telegram', { adminId: admin.id, error: err instanceof Error ? err.message : String(err) });
             });
+          }
+        }
+        return;
+      }
+
+      // Handle avatar failures separately — avatar is optional, video stays intact
+      const AVATAR_QUEUES = ['avatar-generation'];
+      if (AVATAR_QUEUES.includes(queueName)) {
+        // The worker's checkAllAvatarsReady() already handles VideoGeneration status.
+        // We only send a notification here — never touch VideoGeneration or podcast status.
+        const maxAttempts = job?.opts?.attempts ?? 3;
+        const isTerminal = job?.attemptsMade != null && job.attemptsMade >= maxAttempts;
+        if (!isTerminal) return;
+
+        if (notifQueue) {
+          await notifQueue.add('send_notification', {
+            userId: podcast.userId,
+            type: 'AVATAR_FAILED',
+            title: 'Avatar Generation Failed',
+            message: `Avatar generation failed: ${args.failedReason || 'Unknown error'}`,
+            data: { podcastId },
+          });
+        }
+
+        // Notify admins
+        const podcastLabel = podcast.title || podcastId;
+        const adminUsers = await prisma.user.findMany({
+          where: { role: 'ADMIN', id: { not: podcast.userId } },
+          select: { id: true, telegramChatId: true },
+        });
+        for (const admin of adminUsers) {
+          if (notifQueue) {
+            notifQueue.add('send_notification', {
+              userId: admin.id,
+              type: 'PIPELINE_FAILURE',
+              title: 'Avatar Pipeline Failure',
+              message: `[avatar-generation] ${podcastLabel} (by ${ownerLabel}) — ${errorKind}`,
+              data: { podcastId },
+            }).catch(() => {});
+          }
+          if (admin.telegramChatId && isTelegramBotConfigured()) {
+            const telegramText = [
+              `🎭 *Avatar Pipeline Failure*`,
+              `*Podcast:* ${podcastLabel}`,
+              `*Owner:* ${ownerLabel}`,
+              `*Error:* ${errorKind}`,
+              `\`${(args.failedReason || 'Unknown').substring(0, 500)}\``,
+            ].join('\n');
+            sendTelegram(admin.telegramChatId, telegramText, { parse_mode: 'Markdown' }).catch(() => {});
           }
         }
         return;
