@@ -1,5 +1,5 @@
 import { Job } from 'bullmq';
-import { Prisma } from '@prisma/client';
+import { Prisma, VisualType } from '@prisma/client';
 import {
   ClassifyVisualsPayload,
   addJob,
@@ -12,10 +12,15 @@ import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { classifySegmentVisuals } from '@/lib/visual-classifier';
 import { resolveAiModelAndProvider } from '@/lib/providers/ai-registry';
 import { getAiKey } from '@/lib/byok';
+import { uploadFile } from '@/lib/r2';
 import { logUsage } from '@/lib/usage-logger';
 import { logger } from '@/lib/logger';
 
 const EXTERNAL_ASSET_TYPES = new Set(['AI_ILLUSTRATION', 'STOCK_FOOTAGE', 'MAP_OVERLAY']);
+const PROGRAMMATIC_TYPES: VisualType[] = ['TEXT_CARD', 'TIMELINE', 'QUOTE', 'COMPARISON', 'DIAGRAM', 'DATA_CHART'];
+const REMOTION_URL = process.env.REMOTION_URL;
+const STILL_FPS = 30;
+const STILL_CONCURRENCY = 4;
 
 export async function processVisualClassification(job: Job<ClassifyVisualsPayload>): Promise<void> {
   const { podcastId, videoGenerationId, userId } = job.data;
@@ -98,6 +103,68 @@ export async function processVisualClassification(job: Job<ClassifyVisualsPayloa
         })),
       ),
     });
+
+    // Render first/last frame stills for programmatic visuals (for transition generation)
+    if (REMOTION_URL) {
+      const programmaticVisuals = await prisma.segmentVisual.findMany({
+        where: { videoGenerationId, visualType: { in: [...PROGRAMMATIC_TYPES] } },
+        select: { id: true, segmentId: true, visualType: true, prompt: true, metadata: true, subDuration: true },
+      });
+
+      if (programmaticVisuals.length > 0) {
+        const segmentMap = new Map(podcast.segments.map((s) => [s.id, s]));
+
+        // Process in batches to avoid overwhelming the sidecar
+        for (let i = 0; i < programmaticVisuals.length; i += STILL_CONCURRENCY) {
+          const batch = programmaticVisuals.slice(i, i + STILL_CONCURRENCY);
+          await Promise.all(batch.map(async (visual) => {
+            const seg = segmentMap.get(visual.segmentId);
+            if (!seg) return;
+
+            const duration = visual.subDuration ?? seg.duration ?? 5;
+            const durationInFrames = Math.max(1, Math.round(duration * STILL_FPS));
+
+            const videoSegment = {
+              segmentId: seg.id,
+              order: seg.order,
+              speaker: seg.speaker,
+              text: seg.text,
+              startTime: 0,
+              duration,
+              visualType: visual.visualType,
+              prompt: visual.prompt,
+              metadata: visual.metadata as Record<string, unknown>,
+            };
+
+            try {
+              const [firstBuf, lastBuf] = await Promise.all([
+                renderProgrammaticStill(videoSegment, 0, durationInFrames),
+                renderProgrammaticStill(videoSegment, durationInFrames - 1, durationInFrames),
+              ]);
+
+              const [firstFrameUrl, lastFrameUrl] = await Promise.all([
+                uploadFile(`podcasts/${podcastId}/visuals/${visual.id}-first-frame.png`, firstBuf, 'image/png'),
+                uploadFile(`podcasts/${podcastId}/visuals/${visual.id}-last-frame.png`, lastBuf, 'image/png'),
+              ]);
+
+              await prisma.segmentVisual.update({
+                where: { id: visual.id },
+                data: { firstFrameUrl, lastFrameUrl },
+              });
+            } catch (err) {
+              // Best-effort — don't fail classification if stills fail
+              const msg = err instanceof Error ? err.message : String(err);
+              logger.warn('Failed to render programmatic still', { segmentVisualId: visual.id, error: msg });
+            }
+          }));
+        }
+
+        logger.info('Programmatic stills rendered', {
+          videoGenerationId,
+          count: String(programmaticVisuals.length),
+        });
+      }
+    }
 
     // Create SegmentTransition records for classifier-recommended boundaries
     if (transitionRecommendations.length > 0) {
@@ -200,4 +267,21 @@ export async function processVisualClassification(job: Job<ClassifyVisualsPayloa
 
     throw err;
   }
+}
+
+async function renderProgrammaticStill(
+  segment: Record<string, unknown>,
+  frame: number,
+  durationInFrames: number,
+): Promise<Buffer> {
+  const res = await fetch(`${REMOTION_URL}/still`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ segment, frame, durationInFrames }),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => 'unknown');
+    throw new Error(`Still render failed (${res.status}): ${text}`);
+  }
+  return Buffer.from(await res.arrayBuffer());
 }

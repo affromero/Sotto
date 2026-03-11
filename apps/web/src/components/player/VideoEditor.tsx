@@ -3,13 +3,27 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { VideoEditorCard } from './VideoEditorCard';
 import type { EditableSegmentVisual } from './VideoEditorCard';
+import { TransitionConnector } from './TransitionConnector';
 import type { SegmentVisualData } from '@/lib/segment-utils';
 import type { SegmentData } from '@/types/podcast';
-import type { FalModelsResponse } from '@/types/pipeline';
+import type { FalModelsResponse, PipelineTransition } from '@/types/pipeline';
 import type { VisualTypeString } from '@/lib/visual-classifier';
 import type { VisualMode } from '@/types/pipeline';
+import { estimateTransitionCost } from '@/lib/video-cost-estimator';
 import { getSpeakerIndex, getUniqueSpeakers } from '@/lib/speaker-colors';
 import styles from './VideoEditor.module.css';
+
+interface TransitionData {
+  id: string;
+  fromSegmentOrder: number;
+  toSegmentOrder: number;
+  transitionModel: string | null;
+  status: string;
+  enabled: boolean;
+  recommended: boolean;
+  durationSeconds: number;
+  cost: number | null;
+}
 
 interface VideoEditorProps {
   podcastId: string;
@@ -46,6 +60,20 @@ function isDirty(current: EditableSegmentVisual, original: EditableSegmentVisual
   );
 }
 
+function toPipelineTransition(t: TransitionData): PipelineTransition {
+  return {
+    fromSegmentOrder: t.fromSegmentOrder,
+    toSegmentOrder: t.toSegmentOrder,
+    fromSegmentId: '',
+    toSegmentId: '',
+    enabled: t.enabled,
+    recommended: t.recommended,
+    transitionModel: t.transitionModel,
+    durationSeconds: t.durationSeconds,
+    estimatedCost: t.cost ?? 0,
+  };
+}
+
 export function VideoEditor({
   podcastId,
   segments,
@@ -73,12 +101,31 @@ export function VideoEditor({
   const [editedSegments, setEditedSegments] = useState<EditableSegmentVisual[]>(originals);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [transitions, setTransitions] = useState<PipelineTransition[]>([]);
   const cardListRef = useRef<HTMLDivElement>(null);
 
   // Reset when source data changes
   useEffect(() => {
     setEditedSegments(originals);
   }, [originals]);
+
+  // Fetch transitions on mount
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchTransitions() {
+      try {
+        const res = await fetch(`/api/podcasts/${podcastId}/video`);
+        if (!res.ok || cancelled) return;
+        const json = await res.json() as { transitions?: TransitionData[] };
+        if (cancelled || !json.transitions) return;
+        setTransitions(json.transitions.map(toPipelineTransition));
+      } catch {
+        // Best-effort — transitions are optional in the editor
+      }
+    }
+    void fetchTransitions();
+    return () => { cancelled = true; };
+  }, [podcastId]);
 
   const originalMap = useMemo(() => {
     const map = new Map<string, EditableSegmentVisual>();
@@ -121,6 +168,20 @@ export function VideoEditor({
     [originalMap],
   );
 
+  const handleTransitionUpdate = useCallback(
+    (fromOrder: number, toOrder: number, updates: Partial<PipelineTransition>) => {
+      setTransitions((prev) =>
+        prev.map((t) => {
+          if (t.fromSegmentOrder !== fromOrder || t.toSegmentOrder !== toOrder) return t;
+          const updated = { ...t, ...updates };
+          updated.estimatedCost = estimateTransitionCost(updated, falModels.videoModels);
+          return updated;
+        }),
+      );
+    },
+    [falModels.videoModels],
+  );
+
   const toggleExpand = useCallback((segmentVisualId: string) => {
     setExpandedId((prev) => (prev === segmentVisualId ? null : segmentVisualId));
   }, []);
@@ -133,6 +194,8 @@ export function VideoEditor({
       card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
   }, [expandedId]);
+
+  const enabledTransitions = useMemo(() => transitions.filter((t) => t.enabled), [transitions]);
 
   const handleRegenerate = useCallback(async () => {
     if (dirtyCount === 0) return;
@@ -172,29 +235,41 @@ export function VideoEditor({
       <div className={styles.header}>
         <h3 className={styles.title}>Edit Storyboard</h3>
         <span className={styles.headerHint}>
-          {editedSegments.length} scene{editedSegments.length !== 1 ? 's' : ''} — click to edit
+          {editedSegments.length} scene{editedSegments.length !== 1 ? 's' : ''}
+          {enabledTransitions.length > 0 && ` · ${enabledTransitions.length} transition${enabledTransitions.length !== 1 ? 's' : ''}`}
+          {' '}— click to edit
         </span>
       </div>
 
       <div className={styles.cardList} ref={cardListRef} role="list" aria-label="Video storyboard scenes">
-        {editedSegments.map((seg, i) => (
-          <div key={seg.segmentVisualId} role="listitem" data-segment-id={seg.segmentVisualId}>
-            <VideoEditorCard
-              segment={seg}
-              original={originalMap.get(seg.segmentVisualId)!}
-              index={i}
-              speakerIndex={getSpeakerIndex(seg.speaker, allSpeakers)}
-              imageModels={falModels.imageModels}
-              videoModels={falModels.videoModels}
-              hasFalKey={falModels.hasFalKey}
-              isExpanded={expandedId === seg.segmentVisualId}
-              isDirty={dirtyIds.has(seg.segmentVisualId)}
-              onToggleExpand={() => toggleExpand(seg.segmentVisualId)}
-              onUpdate={handleSegmentUpdate}
-              onReset={handleReset}
-            />
-          </div>
-        ))}
+        {editedSegments.map((seg, i) => {
+          const transition = transitions.find((t) => t.fromSegmentOrder === seg.order);
+          return (
+            <div key={seg.segmentVisualId} role="listitem" data-segment-id={seg.segmentVisualId}>
+              <VideoEditorCard
+                segment={seg}
+                original={originalMap.get(seg.segmentVisualId)!}
+                index={i}
+                speakerIndex={getSpeakerIndex(seg.speaker, allSpeakers)}
+                imageModels={falModels.imageModels}
+                videoModels={falModels.videoModels}
+                hasFalKey={falModels.hasFalKey}
+                isExpanded={expandedId === seg.segmentVisualId}
+                isDirty={dirtyIds.has(seg.segmentVisualId)}
+                onToggleExpand={() => toggleExpand(seg.segmentVisualId)}
+                onUpdate={handleSegmentUpdate}
+                onReset={handleReset}
+              />
+              {transition && (
+                <TransitionConnector
+                  transition={transition}
+                  videoModels={falModels.videoModels}
+                  onUpdate={handleTransitionUpdate}
+                />
+              )}
+            </div>
+          );
+        })}
       </div>
 
       <div className={styles.footer}>
