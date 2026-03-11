@@ -430,7 +430,12 @@ export async function executeActions(page: Page, actions: DemoAction[]): Promise
           cursorPos.x = hoverTarget.x;
           cursorPos.y = hoverTarget.y;
         } else {
-          await page.locator(action.selector as string).hover();
+          // Element not visible — try briefly, skip if absent (avoids 30s timeout crashing the recording)
+          try {
+            await page.locator(action.selector as string).hover({ timeout: 3000 });
+          } catch {
+            console.warn(`[hover] selector not found, skipping: ${action.selector as string}`);
+          }
         }
         break;
       }
