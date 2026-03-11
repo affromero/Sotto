@@ -1,5 +1,5 @@
 /* ==========================================================================
-   CONVERT CHAPTER — Pricing + CTA + Footer
+   CONVERT CHAPTER — Pricing + CTA + Footer (Airbnb-style)
    ========================================================================== */
 
 /* ==========================================================================
@@ -8,7 +8,7 @@
 
 .pricing {
   position: relative;
-  padding: 80px var(--spacing-lg);
+  padding: 120px var(--spacing-lg);
   overflow: hidden;
 }
 
@@ -16,11 +16,11 @@
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 600px;
-  height: 600px;
+  width: 700px;
+  height: 700px;
   background: radial-gradient(
     circle,
-    rgba(217, 119, 6, 0.1) 0%,
+    rgba(217, 119, 6, 0.08) 0%,
     transparent 60%
   );
   transform: translate(-50%, -50%);
@@ -36,7 +36,7 @@
 }
 
 .header {
-  margin-bottom: 40px;
+  margin-bottom: 48px;
 }
 
 .overline {
@@ -46,7 +46,7 @@
   text-transform: uppercase;
   letter-spacing: 1.5px;
   color: #f6ad55;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
 
 .headingLight {
@@ -55,14 +55,14 @@
   font-weight: 400;
   color: #fff;
   line-height: 1.1;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 
 .descLight {
   font-size: 18px;
   line-height: 1.7;
-  color: rgba(255, 255, 255, 0.65);
-  max-width: 560px;
+  color: rgba(255, 255, 255, 0.6);
+  max-width: 520px;
   margin: 0 auto;
 }
 
@@ -71,7 +71,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 40px;
+  gap: 48px;
 }
 
 .stat {
@@ -81,20 +81,21 @@
 .statNum {
   display: block;
   font-family: var(--font-heading);
-  font-size: clamp(2rem, 4vw, 3rem);
+  font-size: clamp(2.5rem, 5vw, 3.5rem);
   font-weight: 400;
   color: #fff;
 }
 
 .statLabel {
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.5);
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.45);
+  margin-top: 4px;
 }
 
 .statDivider {
   width: 1px;
-  height: 48px;
-  background: rgba(255, 255, 255, 0.15);
+  height: 56px;
+  background: rgba(255, 255, 255, 0.12);
 }
 
 /* ==========================================================================
@@ -103,7 +104,7 @@
 
 .cta {
   position: relative;
-  padding: 80px var(--spacing-lg);
+  padding: 100px var(--spacing-lg);
   text-align: center;
   overflow: hidden;
 }
@@ -116,7 +117,7 @@
   height: 400px;
   background: radial-gradient(
     ellipse at center bottom,
-    rgba(217, 119, 6, 0.12) 0%,
+    rgba(217, 119, 6, 0.1) 0%,
     transparent 60%
   );
   transform: translateX(-50%);
@@ -135,7 +136,7 @@
   font-size: clamp(2.5rem, 5vw, 4rem);
   font-weight: 400;
   color: #fff;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
   line-height: 1.1;
 }
 
@@ -147,8 +148,8 @@
 .ctaSub {
   font-size: 18px;
   line-height: 1.7;
-  color: rgba(255, 255, 255, 0.6);
-  margin-bottom: 32px;
+  color: rgba(255, 255, 255, 0.55);
+  margin-bottom: 36px;
 }
 
 /* ==========================================================================
@@ -157,7 +158,7 @@
 
 .footer {
   border-top: 1px solid rgba(0, 0, 0, 0.06);
-  padding: 48px var(--spacing-lg) 24px;
+  padding: 56px var(--spacing-lg) 28px;
   background: var(--color-background);
 }
 
@@ -167,7 +168,7 @@
   display: flex;
   justify-content: space-between;
   gap: 48px;
-  margin-bottom: 32px;
+  margin-bottom: 36px;
 }
 
 .footerBrand {
@@ -180,7 +181,7 @@
   font-size: 1.5rem;
   font-weight: 400;
   color: var(--color-text);
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .footerBrand p {
@@ -197,7 +198,7 @@
 .footerCols > div {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
 .footerHeading {
@@ -211,7 +212,7 @@
   font-size: 14px;
   color: var(--color-text-secondary, #6B7280);
   text-decoration: none;
-  transition: color var(--transition-fast);
+  transition: color 0.2s ease;
 }
 
 .footerCols a:hover {
@@ -226,7 +227,7 @@
 .footerBottom {
   max-width: var(--max-content-width);
   margin: 0 auto;
-  padding-top: 24px;
+  padding-top: 28px;
   border-top: 1px solid rgba(0, 0, 0, 0.06);
   font-size: 13px;
   color: var(--color-text-secondary, #6B7280);
@@ -236,25 +237,25 @@
 /* Mobile */
 @media (max-width: 767px) {
   .pricing {
-    padding: 60px var(--spacing-md);
+    padding: 80px var(--spacing-md);
   }
 
   .cta {
-    padding: 60px var(--spacing-md);
+    padding: 80px var(--spacing-md);
   }
 
   .stats {
     flex-direction: column;
-    gap: 24px;
+    gap: 28px;
   }
 
   .statDivider {
-    width: 48px;
+    width: 56px;
     height: 1px;
   }
 
   .footer {
-    padding: 40px var(--spacing-md) 20px;
+    padding: 44px var(--spacing-md) 24px;
   }
 
   .footerInner {
