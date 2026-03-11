@@ -898,9 +898,9 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
                 <button
                   className={styles.toolbarBtn}
                   onClick={() => setShowAvatarPicker(true)}
-                  disabled={videoStatus ? videoStatus.dailyRemaining <= 0 && !videoStatus.isByokUser : !isAdmin}
+                  disabled
                   aria-label="Add Avatars"
-                  title="Add AI-generated speaker avatars to your video"
+                  title="Generate a video first to add avatars"
                   type="button"
                 >
                   <Users size={14} />
@@ -1080,8 +1080,9 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
                 <button
                   className={styles.toolbarBtn}
                   onClick={() => setShowAvatarPicker(true)}
+                  disabled
                   aria-label="Avatars"
-                  title="Change speaker avatars"
+                  title="Retry video generation first to add avatars"
                   type="button"
                 >
                   <Users size={14} />
