@@ -62,7 +62,7 @@
   pointer-events: none;
 }
 
-.videoControls:hover {
+.videoContainer:hover > .videoControlsHidden {
   opacity: 1;
   pointer-events: auto;
 }
