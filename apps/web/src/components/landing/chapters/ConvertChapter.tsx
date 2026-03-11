@@ -48,6 +48,9 @@ export function ConvertChapter() {
             </h2>
             <p className={styles.ctaSub}>{BRAND.subline}</p>
             <AuthCTA source="cta" />
+            <Link href="/create" className={styles.ctaCreate}>
+              or start creating now &rarr;
+            </Link>
           </div>
         </div>
       </ScrollChapter>
