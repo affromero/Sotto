@@ -49,51 +49,63 @@ export async function POST(_request: NextRequest, { params }: Params) {
   });
 
   const now = Date.now();
-  const jobs: Promise<unknown>[] = [];
+  const jobIds: Record<string, Record<string, string>> = {};
+  let totalJobs = 0;
 
   for (const scene of scenes) {
+    const sceneJobs: Record<string, string> = {};
+
     // Queue recording for every scene
-    jobs.push(addJob(
+    const recordJob = await addJob(
       demoRecordingQueue,
       JobType.GENERATE_DEMO_RECORDING,
       { projectId, sceneId: scene.id },
       { jobId: `demo-record-${scene.id}-${now}` },
-    ));
+    );
+    sceneJobs.record = recordJob.id!;
+    totalJobs++;
 
     // Queue voiceover for every scene
-    jobs.push(addJob(
+    const voiceoverJob = await addJob(
       demoVoiceoverQueue,
       JobType.GENERATE_DEMO_VOICEOVER,
       { projectId, sceneId: scene.id },
       { jobId: `demo-voiceover-${scene.id}-${now}` },
-    ));
+    );
+    sceneJobs.voiceover = voiceoverJob.id!;
+    totalJobs++;
 
     // Queue visual only if type is set
     if (scene.visualType) {
-      jobs.push(addJob(
+      const visualJob = await addJob(
         demoVisualQueue,
         JobType.GENERATE_DEMO_VISUAL,
         { projectId, sceneId: scene.id },
         { jobId: `demo-visual-${scene.id}-${now}` },
-      ));
+      );
+      sceneJobs.visual = visualJob.id!;
+      totalJobs++;
     }
 
     // Queue transition only if type is set (not for last scene)
     if (scene.transitionType && scene.order < scenes.length - 1) {
-      jobs.push(addJob(
+      const transitionJob = await addJob(
         demoTransitionQueue,
         JobType.GENERATE_DEMO_TRANSITION,
         { projectId, sceneId: scene.id },
         { jobId: `demo-transition-${scene.id}-${now}` },
-      ));
+      );
+      sceneJobs.transition = transitionJob.id!;
+      totalJobs++;
     }
-  }
 
-  await Promise.all(jobs);
+    jobIds[scene.id] = sceneJobs;
+  }
 
   return NextResponse.json({
     status: 'queued',
-    totalJobs: jobs.length,
+    totalJobs,
     scenes: scenes.length,
+    jobIds,
   });
 }

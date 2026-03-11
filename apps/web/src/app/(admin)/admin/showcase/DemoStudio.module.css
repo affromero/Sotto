@@ -477,6 +477,19 @@
 .badge {
   font-weight: 600;
   font: var(--text-body-xs);
+  color: var(--color-text-secondary);
+}
+
+.badge[data-status='ready'] {
+  color: var(--color-success, #22c55e);
+}
+
+.badge[data-status='generating'] {
+  color: var(--color-primary);
+}
+
+.badge[data-status='failed'] {
+  color: var(--color-error, #ef4444);
 }
 
 .failedReason {
@@ -508,6 +521,42 @@
   max-height: 200px;
   border-radius: var(--radius-sm);
   object-fit: contain;
+}
+
+/* Job progress */
+
+.progressContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.progressTrack {
+  height: 6px;
+  background: var(--color-border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--color-primary);
+  border-radius: 3px;
+  width: calc(var(--progress, 0) * 1%);
+  transition: width 0.4s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progressFill {
+    transition: none;
+  }
+}
+
+.progressText {
+  font: var(--text-body-xs);
+  color: var(--color-text-secondary);
+  display: flex;
+  justify-content: space-between;
 }
 
 /* JSON import zone */
