@@ -81,6 +81,9 @@ export function VoicePicker({ onSelectionChange, maxSpeakers = 2, ttsProvider }:
   const [voiceMap, setVoiceMap] = useState<Record<string, string>>({});
   const [loaded, setLoaded] = useState(false);
   const [speakerCount, setSpeakerCount] = useState(Math.min(2, maxSpeakers));
+  const [customVoiceId, setCustomVoiceId] = useState('');
+  const [addingVoice, setAddingVoice] = useState(false);
+  const [addVoiceError, setAddVoiceError] = useState<string | null>(null);
 
   const activeSpeakers = SPEAKER_PRESETS[speakerCount] ?? SPEAKER_PRESETS[2];
   const prevProviderRef = useRef(ttsProvider);
@@ -145,6 +148,31 @@ export function VoicePicker({ onSelectionChange, maxSpeakers = 2, ttsProvider }:
 
   function handleSelectVoice(speaker: string, voiceId: string) {
     setVoiceMap((prev) => ({ ...prev, [speaker]: voiceId }));
+  }
+
+  async function handleAddVoiceId() {
+    const trimmed = customVoiceId.trim();
+    if (!trimmed) return;
+    setAddingVoice(true);
+    setAddVoiceError(null);
+    try {
+      const fd = new FormData();
+      fd.append('provider', 'elevenlabs');
+      fd.append('sourceType', 'IMPORT');
+      fd.append('externalVoiceId', trimmed);
+      const res = await fetch('/api/voices/clone', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!res.ok) {
+        setAddVoiceError(data.error ?? 'Failed to add voice');
+      } else {
+        setUserClones((prev) => [data, ...prev]);
+        setCustomVoiceId('');
+      }
+    } catch {
+      setAddVoiceError('Network error');
+    } finally {
+      setAddingVoice(false);
+    }
   }
 
   const speakerColors = ['var(--color-speaker-0)', 'var(--color-speaker-1)', 'var(--color-speaker-2)', 'var(--color-speaker-3)'];
@@ -289,6 +317,7 @@ export function VoicePicker({ onSelectionChange, maxSpeakers = 2, ttsProvider }:
                                 name={clone.name}
                                 accent="custom"
                                 character="Cloned voice"
+                                badge={clone.sourceType === 'IMPORT' ? 'Imported' : undefined}
                                 isSelected={selectedVoiceId === clone.externalVoiceId}
                                 onSelect={() => handleSelectVoice(speaker.name, clone.externalVoiceId)}
                               />
@@ -314,6 +343,32 @@ export function VoicePicker({ onSelectionChange, maxSpeakers = 2, ttsProvider }:
                             ))}
                           </div>
                           <div className={styles.separator} />
+                        </>
+                      )}
+                      {(!ttsProvider || ttsProvider === 'elevenlabs') && (
+                        <>
+                          <div className={styles.separator} />
+                          <div className={styles.addVoiceRow}>
+                            <input
+                              className={styles.addVoiceInput}
+                              type="text"
+                              value={customVoiceId}
+                              onChange={(e) => setCustomVoiceId(e.target.value)}
+                              placeholder="Paste an ElevenLabs voice ID…"
+                              aria-label="ElevenLabs voice ID"
+                              onKeyDown={(e) => e.key === 'Enter' && handleAddVoiceId()}
+                            />
+                            <button
+                              type="button"
+                              className={styles.addVoiceButton}
+                              onClick={handleAddVoiceId}
+                              disabled={addingVoice || !customVoiceId.trim()}
+                              aria-label="Add voice by ID"
+                            >
+                              {addingVoice ? <span className={styles.spinnerMini} /> : 'Add'}
+                            </button>
+                          </div>
+                          {addVoiceError && <p className={styles.addVoiceError}>{addVoiceError}</p>}
                         </>
                       )}
                       <div className={styles.voiceGrid}>

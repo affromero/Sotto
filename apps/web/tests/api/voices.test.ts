@@ -15,6 +15,7 @@ const mockVoiceRequestDeleteMany = vi.fn();
 const mockCloneVoice = vi.fn();
 const mockDeleteClonedVoice = vi.fn();
 const mockGenerateSpeech = vi.fn();
+const mockGetVoiceById = vi.fn();
 const mockCheckRateLimit = vi.fn();
 const mockGetVoiceCatalog = vi.fn();
 
@@ -63,6 +64,7 @@ vi.mock('@/lib/elevenlabs', () => ({
   cloneVoice: (...args: unknown[]) => mockCloneVoice(...args),
   deleteClonedVoice: (...args: unknown[]) => mockDeleteClonedVoice(...args),
   generateSpeech: (...args: unknown[]) => mockGenerateSpeech(...args),
+  getVoiceById: (...args: unknown[]) => mockGetVoiceById(...args),
 }));
 
 vi.mock('@/lib/voice-catalog', () => ({
@@ -503,6 +505,68 @@ describe('POST /api/voices/clone', () => {
     expect(body.id).toBe('clone-studio');
     expect(body.sourceType).toBe('RECORD');
   });
+
+  describe('ElevenLabs IMPORT flow', () => {
+    function makeImportRequest(externalVoiceId: string) {
+      const mockFormData = new Map<string, unknown>([
+        ['provider', 'elevenlabs'],
+        ['sourceType', 'IMPORT'],
+        ['externalVoiceId', externalVoiceId],
+      ]);
+      return {
+        formData: async () => ({ get: (key: string) => mockFormData.get(key) }) as any,
+      } as unknown as NextRequest;
+    }
+
+    it('imports a valid voice ID and returns 201 with name from EL API', async () => {
+      mockAuth.mockResolvedValue(mockSession);
+      mockVoiceCloneCount.mockResolvedValue(0);
+      mockGetVoiceById.mockResolvedValue({ name: 'Adam', labels: {} });
+      mockVoiceCloneFindUnique.mockResolvedValue(null);
+      mockVoiceCloneCreate.mockResolvedValue({
+        id: 'import-1',
+        userId: 'user-1',
+        name: 'Adam',
+        externalVoiceId: 'WOrdX7PQdxpL0gxOtCs3',
+        sourceType: 'IMPORT',
+        provider: 'elevenlabs',
+        verificationStatus: 'ADMIN_VERIFIED',
+      });
+
+      const response = await POST_CLONE(makeImportRequest('WOrdX7PQdxpL0gxOtCs3'));
+      const body = await response.json();
+
+      expect(response.status).toBe(201);
+      expect(body.name).toBe('Adam');
+      expect(body.sourceType).toBe('IMPORT');
+      expect(body.verificationStatus).toBe('ADMIN_VERIFIED');
+    });
+
+    it('returns 404 when voice ID does not exist on ElevenLabs', async () => {
+      mockAuth.mockResolvedValue(mockSession);
+      mockVoiceCloneCount.mockResolvedValue(0);
+      mockGetVoiceById.mockResolvedValue(null);
+
+      const response = await POST_CLONE(makeImportRequest('nonexistent-id'));
+      const body = await response.json();
+
+      expect(response.status).toBe(404);
+      expect(body.error).toMatch(/Voice ID not found/);
+    });
+
+    it('returns 409 when voice ID is already in the library', async () => {
+      mockAuth.mockResolvedValue(mockSession);
+      mockVoiceCloneCount.mockResolvedValue(0);
+      mockGetVoiceById.mockResolvedValue({ name: 'Adam', labels: {} });
+      mockVoiceCloneFindUnique.mockResolvedValue({ id: 'existing-1' });
+
+      const response = await POST_CLONE(makeImportRequest('WOrdX7PQdxpL0gxOtCs3'));
+      const body = await response.json();
+
+      expect(response.status).toBe(409);
+      expect(body.error).toMatch(/already in your library/);
+    });
+  });
 });
 
 describe('DELETE /api/voices/clone', () => {
@@ -590,6 +654,29 @@ describe('DELETE /api/voices/clone', () => {
 
     expect(response.status).toBe(200);
     expect(body).toEqual({ success: true });
+  });
+
+  it('does not call ElevenLabs API when deleting an IMPORT voice', async () => {
+    mockAuth.mockResolvedValue(mockSession);
+    mockVoiceCloneFindUnique.mockResolvedValue({
+      id: 'clone-import',
+      userId: 'user-1',
+      name: 'Adam',
+      externalVoiceId: 'WOrdX7PQdxpL0gxOtCs3',
+      sourceType: 'IMPORT',
+      provider: 'elevenlabs',
+    });
+    mockVoiceRequestDeleteMany.mockResolvedValue({ count: 0 });
+    mockVoiceCloneDelete.mockResolvedValue({});
+
+    const request = createRequest('http://localhost:3000/api/voices/clone', {
+      method: 'DELETE',
+      body: JSON.stringify({ voiceCloneId: 'clone-import' }),
+    });
+    const response = await DELETE_CLONE(request);
+
+    expect(response.status).toBe(200);
+    expect(mockDeleteClonedVoice).not.toHaveBeenCalled();
   });
 });
 
