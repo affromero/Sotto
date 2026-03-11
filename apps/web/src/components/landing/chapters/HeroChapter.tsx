@@ -11,7 +11,6 @@ export async function HeroChapter() {
   return (
     <ScrollChapter dark>
       <div className={styles.root}>
-        <div className={styles.glow} aria-hidden="true" />
         <div className={styles.content}>
           <div className={styles.badge}>
             <span className={styles.badgeDot} aria-hidden="true" />

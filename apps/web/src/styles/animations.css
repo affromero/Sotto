@@ -44,6 +44,25 @@
   transform: translateX(0);
 }
 
+/* Variant: fade (opacity only, no transform) */
+[data-reveal="fade"] {
+  opacity: 0;
+  transform: none;
+}
+[data-reveal="fade"][data-visible] {
+  opacity: 1;
+}
+
+/* Variant: pop (scale + translate up) */
+[data-reveal="pop"] {
+  opacity: 0;
+  transform: translateY(32px) scale(0.97);
+}
+[data-reveal="pop"][data-visible] {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
 /* ==========================================================================
    KEYFRAMES
    ========================================================================== */
@@ -80,6 +99,16 @@
   }
 }
 
+@keyframes floatY {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-12px); }
+}
+
+@keyframes waveformPulse {
+  0%, 100% { transform: scaleY(0.3); opacity: 0.4; }
+  50% { transform: scaleY(1); opacity: 0.8; }
+}
+
 /* ==========================================================================
    REDUCED MOTION
    ========================================================================== */
@@ -100,7 +129,11 @@
   [data-reveal="left"],
   [data-reveal="left"][data-visible],
   [data-reveal="right"],
-  [data-reveal="right"][data-visible] {
+  [data-reveal="right"][data-visible],
+  [data-reveal="fade"],
+  [data-reveal="fade"][data-visible],
+  [data-reveal="pop"],
+  [data-reveal="pop"][data-visible] {
     transform: none;
   }
 }
