@@ -1,5 +1,5 @@
 /* ==========================================================================
-   CONVERT CHAPTER — Pricing + CTA + Footer (Airbnb-style)
+   CONVERT CHAPTER — Pricing + CTA + Footer
    ========================================================================== */
 
 /* ==========================================================================
@@ -8,11 +8,25 @@
 
 .pricing {
   position: relative;
-  padding: 120px var(--spacing-lg);
+  padding: var(--section-pad-y) var(--spacing-lg);
   overflow: hidden;
 }
 
-.pricingGlow {
+/* Noise texture overlay */
+.pricing::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: var(--noise-texture);
+  background-repeat: repeat;
+  background-size: 200px 200px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Ambient glow — amber center */
+.pricing::after {
+  content: '';
   position: absolute;
   top: 50%;
   left: 50%;
@@ -25,6 +39,7 @@
   );
   transform: translate(-50%, -50%);
   pointer-events: none;
+  z-index: 0;
 }
 
 .pricingContent {
@@ -99,7 +114,7 @@
 }
 
 /* ==========================================================================
-   CTA
+   CTA — dramatic typography
    ========================================================================== */
 
 .cta {
@@ -109,7 +124,9 @@
   overflow: hidden;
 }
 
-.ctaGlow {
+/* Ambient glow at bottom */
+.cta::after {
+  content: '';
   position: absolute;
   bottom: 0;
   left: 50%;
@@ -133,16 +150,20 @@
 
 .ctaTitle {
   font-family: var(--font-heading);
-  font-size: clamp(2.5rem, 5vw, 4rem);
+  font-size: clamp(3rem, 7vw + 1rem, 6rem);
   font-weight: 400;
   color: #fff;
   margin-bottom: 20px;
-  line-height: 1.1;
+  line-height: 1.05;
+  letter-spacing: -3px;
 }
 
 .ctaTitle em {
   font-style: normal;
-  color: var(--color-primary);
+  background: var(--gradient-warm);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .ctaSub {
@@ -224,6 +245,31 @@
   font-weight: 500;
 }
 
+/* Social icons row */
+.socialRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  max-width: var(--max-content-width);
+  margin: 0 auto 24px;
+}
+
+.socialRow a {
+  color: var(--color-text-tertiary);
+  transition: color var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+}
+
+.socialRow a:hover {
+  color: var(--color-primary);
+}
+
 .footerBottom {
   max-width: var(--max-content-width);
   margin: 0 auto;
@@ -234,14 +280,21 @@
   text-align: center;
 }
 
-/* Mobile */
+/* ==========================================================================
+   MOBILE
+   ========================================================================== */
+
 @media (max-width: 767px) {
   .pricing {
-    padding: 80px var(--spacing-md);
+    padding: var(--section-pad-y-sm) var(--spacing-md);
   }
 
   .cta {
-    padding: 80px var(--spacing-md);
+    padding: var(--section-pad-y-sm) var(--spacing-md);
+  }
+
+  .ctaTitle {
+    letter-spacing: -1px;
   }
 
   .stats {
