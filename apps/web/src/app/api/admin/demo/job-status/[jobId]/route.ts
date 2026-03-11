@@ -29,6 +29,35 @@ function resolveQueue(jobId: string): Queue | null {
   return null;
 }
 
+/** DELETE — Cancel a BullMQ demo job (best-effort: removes if waiting, fails if active) */
+export async function DELETE(_request: NextRequest, { params }: RouteParams) {
+  const adminId = await requireAdmin();
+  if (!adminId) return errorResponse('Forbidden', 403);
+
+  const parsed = paramsSchema.safeParse(await params);
+  if (!parsed.success) return errorResponse('Invalid jobId', 400);
+  const { jobId } = parsed.data;
+
+  const queue = resolveQueue(jobId);
+  if (!queue) return errorResponse('Unknown job type', 400);
+
+  const job = await queue.getJob(jobId);
+  if (!job) return NextResponse.json({ cancelled: true }); // already gone
+
+  try {
+    await job.remove();
+  } catch {
+    // Job is active — force-fail it so the worker result is discarded
+    try {
+      await job.moveToFailed(new Error('Cancelled by user'), '0', true);
+    } catch {
+      // Best effort — job may have already completed
+    }
+  }
+
+  return NextResponse.json({ cancelled: true });
+}
+
 /** GET — Poll BullMQ job progress for a demo queue job */
 export async function GET(_request: NextRequest, { params }: RouteParams) {
   const adminId = await requireAdmin();
