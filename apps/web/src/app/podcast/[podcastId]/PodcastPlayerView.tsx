@@ -24,14 +24,13 @@ import {
   Users,
   X,
   Music,
+  MessageCircleQuestion,
 } from 'lucide-react';
 import { usePlayer } from '@/components/providers/AudioPlayerProvider';
 import { AudioPlayer } from '@/components/player/AudioPlayer';
 import { TranscriptPanel } from '@/components/player/TranscriptPanel';
 import { Teleprompter } from '@/components/player/Teleprompter';
 import { ReferenceList } from '@/components/player/ReferenceList';
-import { InterruptButton } from '@/components/player/InterruptButton';
-import { VoiceQABadge } from '@/components/player/VoiceQABadge';
 import { InterruptChatPanel } from '@/components/player/InterruptChatPanel';
 import { ForkAttribution } from '@/components/player/ForkAttribution';
 import { ForkLineage } from '@/components/player/ForkLineage';
@@ -870,35 +869,44 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
       {isReady && isOwner && (
         <section className={styles.videoSection} aria-label="Video">
           {videoState === 'idle' && !showPipelineEditor && !showAvatarPicker && (
-            <div className={styles.videoIdle}>
-              <Button
-                onClick={() => handleGenerateVideo()}
-                loading={pipelineLoading || videoLoading}
-                disabled={pipelineLoading || videoLoading || (videoStatus ? videoStatus.dailyRemaining <= 0 && !videoStatus.isByokUser : !isAdmin)}
-              >
-                <Video size={16} />
-                Generate Video
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={() => setShowAvatarPicker(true)}
-                disabled={videoStatus ? videoStatus.dailyRemaining <= 0 && !videoStatus.isByokUser : !isAdmin}
-              >
-                <Users size={16} />
-                Add Avatars
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={() => setShowMusicModal(true)}
-              >
-                <Music size={16} />
-                Add Music
-              </Button>
-              {videoStatus && !videoStatus.isByokUser && (
-                <span className={styles.videoQuota}>
-                  Free · {videoStatus.dailyRemaining} of {videoStatus.dailyLimit} remaining today
-                </span>
-              )}
+            <>
+              <div className={styles.ownerToolbar}>
+                <button
+                  className={styles.toolbarBtn}
+                  onClick={() => handleGenerateVideo()}
+                  disabled={pipelineLoading || videoLoading || (videoStatus ? videoStatus.dailyRemaining <= 0 && !videoStatus.isByokUser : !isAdmin)}
+                  aria-label="Generate Video"
+                  title="Generate Video"
+                  type="button"
+                  data-loading={pipelineLoading || videoLoading ? 'true' : undefined}
+                >
+                  <Video size={18} />
+                </button>
+                <button
+                  className={styles.toolbarBtn}
+                  onClick={() => setShowAvatarPicker(true)}
+                  disabled={videoStatus ? videoStatus.dailyRemaining <= 0 && !videoStatus.isByokUser : !isAdmin}
+                  aria-label="Add Avatars"
+                  title="Add Avatars"
+                  type="button"
+                >
+                  <Users size={18} />
+                </button>
+                <button
+                  className={styles.toolbarBtn}
+                  onClick={() => setShowMusicModal(true)}
+                  aria-label="Add Music"
+                  title="Add Music"
+                  type="button"
+                >
+                  <Music size={18} />
+                </button>
+                {videoStatus && !videoStatus.isByokUser && (
+                  <span className={styles.videoQuotaCompact}>
+                    {videoStatus.dailyRemaining}/{videoStatus.dailyLimit}
+                  </span>
+                )}
+              </div>
               {videoError && (
                 <div className={styles.videoErrorBlock}>
                   <p className={styles.videoError}>{videoError.message}</p>
@@ -941,7 +949,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
                   )}
                 </div>
               )}
-            </div>
+            </>
           )}
           {showAvatarPicker && (
             <AvatarPicker
@@ -1001,9 +1009,9 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
             />
           )}
           {videoState === 'ready' && !showVideoEditor && (
-            <div className={styles.videoIdle}>
-              <Button
-                variant="secondary"
+            <div className={styles.ownerToolbar}>
+              <button
+                className={styles.toolbarBtn}
                 onClick={async () => {
                   if (!falModels) {
                     const res = await fetch('/api/fal-models');
@@ -1011,24 +1019,30 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
                   }
                   setShowVideoEditor(true);
                 }}
+                aria-label="Edit Storyboard"
+                title="Edit Storyboard"
+                type="button"
               >
-                <Pencil size={16} />
-                Edit Storyboard
-              </Button>
-              <Button
-                variant="secondary"
+                <Pencil size={18} />
+              </button>
+              <button
+                className={styles.toolbarBtn}
                 onClick={() => setShowAvatarPicker(true)}
+                aria-label={avatarOverlays.length > 0 ? 'Change Avatars' : 'Add Avatars'}
+                title={avatarOverlays.length > 0 ? 'Change Avatars' : 'Add Avatars'}
+                type="button"
               >
-                <Users size={16} />
-                {avatarOverlays.length > 0 ? 'Change Avatars' : 'Add Avatars'}
-              </Button>
-              <Button
-                variant="secondary"
+                <Users size={18} />
+              </button>
+              <button
+                className={styles.toolbarBtn}
                 onClick={() => setShowMusicModal(true)}
+                aria-label="Add Music"
+                title="Add Music"
+                type="button"
               >
-                <Music size={16} />
-                Add Music
-              </Button>
+                <Music size={18} />
+              </button>
               {avatarGenerating && (
                 <div className={styles.avatarGeneratingBadge}>
                   <RefreshCw size={14} className={styles.avatarSpinner} />
@@ -1036,7 +1050,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
                     {(() => {
                       const rw = avatarOverlays.find(o => o.avatarProvider === 'runway' && (o.runwayTotalChunks ?? 0) > 1);
                       if (rw) return `Recording chunk ${rw.runwayChunkIndex ?? 0}/${rw.runwayTotalChunks}`;
-                      return `Generating avatars (${avatarOverlays.filter(o => o.status === 'ready').length}/${avatarOverlays.length})`;
+                      return `Avatars ${avatarOverlays.filter(o => o.status === 'ready').length}/${avatarOverlays.length}`;
                     })()}
                   </span>
                 </div>
@@ -1098,18 +1112,6 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
             </div>
           )}
         </section>
-      )}
-
-      {/* Music Modal */}
-      {isReady && isOwner && (
-        <MusicGenerator
-          podcastId={podcast.id}
-          initialMusicUrl={podcast.musicUrl}
-          onMusicReady={(url, vol) => player?.loadMusic(url, vol)}
-          onMusicRemoved={() => player?.clearMusic()}
-          isOpen={showMusicModal}
-          onClose={() => setShowMusicModal(false)}
-        />
       )}
 
       {/* Post-Listen Rating Prompt */}
@@ -1188,6 +1190,17 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
             <Bookmark size={18} fill={saved ? 'currentColor' : 'none'} />
             <span>{saved ? 'Saved' : 'Save'}</span>
           </button>
+          {isReady && isAuthenticated && (
+            <button
+              className={styles.actionBtn}
+              onClick={handleInterrupt}
+              aria-label="Ask a question"
+              type="button"
+            >
+              <MessageCircleQuestion size={18} />
+              <span>Ask</span>
+            </button>
+          )}
           <ShareMenu
             podcastId={podcast.id}
             podcastTitle={podcast.title}
@@ -1262,7 +1275,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
         </div>
       </div>
 
-      {/* Contributors (from accepted re-voice proposals) */}
+      {/* Collapsible details: Contributors, Version History, Fork Lineage */}
       {(() => {
         const contributorMap = new Map<string, { contributor: NonNullable<(typeof podcast.voiceTracks)[0]['contributor']>; count: number }>();
         for (const t of podcast.voiceTracks) {
@@ -1276,7 +1289,39 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
           }
         }
         const contributors = Array.from(contributorMap.values());
-        return contributors.length > 0 ? <Contributors contributors={contributors} /> : null;
+        const hasVersions = podcast.versions.length > 1;
+        const hasLineage = podcast.forkedFrom || podcast.forks.length > 0;
+        const hasDetails = contributors.length > 0 || hasVersions || hasLineage;
+        if (!hasDetails) return null;
+        return (
+          <details className={styles.detailsSection}>
+            <summary className={styles.detailsSummary}>More details</summary>
+            <div className={styles.detailsContent}>
+              {contributors.length > 0 && <Contributors contributors={contributors} />}
+              {hasVersions && (
+                <VersionHistory versions={podcast.versions} currentVersion={podcast.currentVersion} />
+              )}
+              {hasLineage && (
+                lineageData && lineageData.ancestors.length + lineageData.forks.length >= 3 ? (
+                  <ForkGraph
+                    ancestors={lineageData.ancestors}
+                    current={{
+                      id: podcast.id,
+                      title: podcast.title,
+                      user: { name: podcast.user.name, handle: podcast.user.handle ?? null },
+                    }}
+                    forks={lineageData.forks}
+                  />
+                ) : (
+                  <ForkLineage
+                    ancestors={podcast.forkedFrom ? [podcast.forkedFrom] : []}
+                    forks={podcast.forks}
+                  />
+                )
+              )}
+            </div>
+          </details>
+        );
       })()}
 
       {/* View Toggle + Transcript/Teleprompter */}
@@ -1391,15 +1436,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
         </section>
       )}
 
-      {/* Interrupt */}
-      {isReady && isAuthenticated && (
-        <div className={styles.interruptSection}>
-          <InterruptButton onInterrupt={handleInterrupt} />
-          <VoiceQABadge />
-        </div>
-      )}
-
-      {/* Interrupt Chat */}
+      {/* Interrupt Chat (opened from action bar) */}
       {showInterruptChat && (
         <InterruptChatPanel
           podcastId={podcast.id}
@@ -1431,34 +1468,6 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
         </section>
       )}
 
-      {/* Version History */}
-      {podcast.versions.length > 1 && (
-        <section className={styles.versionSection}>
-          <VersionHistory versions={podcast.versions} currentVersion={podcast.currentVersion} />
-        </section>
-      )}
-
-      {/* Fork Lineage */}
-      {(podcast.forkedFrom || podcast.forks.length > 0) && (
-        <section className={styles.lineageSection}>
-          {lineageData && lineageData.ancestors.length + lineageData.forks.length >= 3 ? (
-            <ForkGraph
-              ancestors={lineageData.ancestors}
-              current={{
-                id: podcast.id,
-                title: podcast.title,
-                user: { name: podcast.user.name, handle: podcast.user.handle ?? null },
-              }}
-              forks={lineageData.forks}
-            />
-          ) : (
-            <ForkLineage
-              ancestors={podcast.forkedFrom ? [podcast.forkedFrom] : []}
-              forks={podcast.forks}
-            />
-          )}
-        </section>
-      )}
 
       {/* Verification mode badge */}
       {podcast.verificationMode === 'relaxed' && (
@@ -1495,6 +1504,18 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
         podcastTitle={podcast.title}
         speakers={[...new Set(podcast.segments.map(s => s.speaker))]}
       />
+
+      {/* Music Modal */}
+      {isReady && isOwner && (
+        <MusicGenerator
+          podcastId={podcast.id}
+          initialMusicUrl={podcast.musicUrl}
+          onMusicReady={(url, vol) => player?.loadMusic(url, vol)}
+          onMusicRemoved={() => player?.clearMusic()}
+          isOpen={showMusicModal}
+          onClose={() => setShowMusicModal(false)}
+        />
+      )}
 
       {/* Add to Collection Modal */}
       <AddToCollectionModal
