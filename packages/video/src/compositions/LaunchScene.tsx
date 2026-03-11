@@ -26,8 +26,41 @@ const SFX_BASE = typeof process !== 'undefined' && process.env.REMOTION_SERVE_UR
   ? `${process.env.REMOTION_SERVE_URL}/assets/sfx`
   : '/assets/sfx';
 
-const CLICK_SFX_URL = `${SFX_BASE}/click.mp3`;
-const KEYSTROKE_SFX_URL = `${SFX_BASE}/keystroke.mp3`;
+const CLICK_SFXS = [
+  `${SFX_BASE}/click-1.mp3`,
+  `${SFX_BASE}/click-2.mp3`,
+  `${SFX_BASE}/click-3.mp3`,
+];
+const KEYSTROKE_SFXS = [
+  `${SFX_BASE}/keystroke-1.mp3`,
+  `${SFX_BASE}/keystroke-2.mp3`,
+  `${SFX_BASE}/keystroke-3.mp3`,
+];
+const SCROLL_SFX_URL = `${SFX_BASE}/scroll.mp3`;
+const ZOOM_SFX_URL = `${SFX_BASE}/zoom.mp3`;
+
+/** Deterministic hash for variant selection — consistent across Remotion renders. */
+function deterministicHash(a: number, b: number = 0): number {
+  return ((a * 2654435761 + b * 1597334677) >>> 0) / 4294967296;
+}
+
+/** Pick a deterministic variant from an array. */
+function pickVariant<T>(variants: T[], eventIndex: number, subIndex: number = 0): T {
+  const idx = Math.floor(deterministicHash(eventIndex, subIndex) * variants.length);
+  return variants[idx];
+}
+
+/** Deterministic volume jitter for natural SFX variation. */
+function jitterVolume(base: number, range: number, eventIndex: number, subIndex: number = 0): number {
+  const t = deterministicHash(eventIndex + 7919, subIndex + 104729);
+  return base - range / 2 + t * range;
+}
+
+/** Deterministic playback rate jitter. */
+function jitterRate(eventIndex: number, subIndex: number = 0): number {
+  const t = deterministicHash(eventIndex + 15731, subIndex + 65537);
+  return 0.95 + t * 0.1; // 0.95 - 1.05
+}
 
 // ---------------------------------------------------------------------------
 // Main LaunchScene component
@@ -196,45 +229,141 @@ const TimingSegmentedVideo: React.FC<{
 };
 
 // ---------------------------------------------------------------------------
-// SFX layer: click sounds, keystroke sounds, ambient, custom cues
+// SFX speed-zone remapping — corrects SFX timestamps for timing segments
+// ---------------------------------------------------------------------------
+
+/**
+ * Remap a raw recording timestamp (ms) to the output frame, accounting for
+ * timing segments (speed zones) and the global scale factor.
+ * Returns null if the timestamp falls in a skipped segment (speed=0).
+ */
+function remapSfxFrame(
+  rawMs: number,
+  timingSegments: TimingSegment[] | undefined,
+  fps: number,
+  totalDurationFrames: number,
+): number | null {
+  if (!timingSegments || timingSegments.length === 0) {
+    return Math.round((rawMs / 1000) * fps);
+  }
+
+  const rawSec = rawMs / 1000;
+
+  // Build layout: which segments are active, their output durations
+  const activeSegments = timingSegments.filter((s) => s.speed > 0);
+  if (activeSegments.length === 0) return null;
+
+  const segmentLayouts = activeSegments.map((seg) => {
+    const inputDuration = seg.end - seg.start;
+    const outputDuration = inputDuration / seg.speed;
+    return { ...seg, outputDurationFrames: Math.ceil(outputDuration * fps) };
+  });
+
+  const rawTotalFrames = segmentLayouts.reduce((sum, s) => sum + s.outputDurationFrames, 0);
+  const scaleFactor = rawTotalFrames > 0 ? totalDurationFrames / rawTotalFrames : 1;
+
+  // Find which segment contains this timestamp
+  let outputFrameOffset = 0;
+  for (const seg of segmentLayouts) {
+    if (rawSec < seg.start) {
+      // Timestamp is before this segment — check if it's in a skipped gap
+      return null;
+    }
+    if (rawSec >= seg.start && rawSec < seg.end) {
+      // Timestamp falls in this segment
+      const elapsed = rawSec - seg.start;
+      const outputElapsed = elapsed / seg.speed;
+      const frameInSegment = Math.round(outputElapsed * fps * scaleFactor);
+      return outputFrameOffset + frameInSegment;
+    }
+    outputFrameOffset += Math.round(seg.outputDurationFrames * scaleFactor);
+  }
+
+  // Past the last segment
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// SFX layer: click variants, accurate keystrokes, scroll/zoom, speed-zone remap
 // ---------------------------------------------------------------------------
 
 const SfxLayer: React.FC<{ scene: LaunchSceneInput; fps: number }> = ({ scene, fps }) => {
-  const { sfxConfig, actionTimingLog } = scene;
+  const { sfxConfig, actionTimingLog, timingSegments } = scene;
+  const { durationInFrames } = useVideoConfig();
   if (!sfxConfig) return null;
 
   const sfxElements: React.ReactElement[] = [];
 
-  // Click sounds from action timing log
+  // Click sounds — variant selection + speed-zone remap
   if (sfxConfig.clickSounds !== false && actionTimingLog) {
     actionTimingLog
       .filter((e) => e.type === 'click')
       .forEach((entry, i) => {
-        const atFrame = Math.round((entry.timestampMs / 1000) * fps);
+        const atFrame = remapSfxFrame(entry.timestampMs, timingSegments, fps, durationInFrames);
+        if (atFrame === null) return;
+        const sfxUrl = pickVariant(CLICK_SFXS, i);
+        const vol = jitterVolume(0.6, 0.2, i);
+        const rate = jitterRate(i);
         sfxElements.push(
           <Sequence key={`click-${i}`} from={atFrame}>
-            <Audio src={CLICK_SFX_URL} volume={0.6} />
+            <Audio src={sfxUrl} volume={vol} playbackRate={rate} />
           </Sequence>,
         );
       });
   }
 
-  // Keystroke sounds from action timing log
+  // Keystroke sounds — actual per-character offsets + speed-zone remap
   if (sfxConfig.typingSounds !== false && actionTimingLog) {
     actionTimingLog
       .filter((e) => e.type === 'type')
       .forEach((entry, ti) => {
-        const charCount = Math.min((entry.meta?.charCount as number) ?? 10, 50);
-        const totalMs = (entry.meta?.estimatedDurationMs as number) ?? charCount * 45;
-        const avgDelayMs = totalMs / charCount;
-        for (let c = 0; c < charCount; c++) {
-          const atFrame = Math.round(((entry.timestampMs + c * avgDelayMs) / 1000) * fps);
+        const offsets = entry.meta?.keystrokeOffsets as number[] | undefined;
+        if (!offsets || offsets.length === 0) return;
+
+        const count = Math.min(offsets.length, 50);
+        for (let c = 0; c < count; c++) {
+          const rawMs = entry.timestampMs + offsets[c];
+          const atFrame = remapSfxFrame(rawMs, timingSegments, fps, durationInFrames);
+          if (atFrame === null) continue;
+          const sfxUrl = pickVariant(KEYSTROKE_SFXS, ti, c);
+          const vol = jitterVolume(0.4, 0.2, ti, c);
+          const rate = jitterRate(ti, c);
           sfxElements.push(
             <Sequence key={`key-${ti}-${c}`} from={atFrame}>
-              <Audio src={KEYSTROKE_SFX_URL} volume={0.4} />
+              <Audio src={sfxUrl} volume={vol} playbackRate={rate} />
             </Sequence>,
           );
         }
+      });
+  }
+
+  // Scroll sounds — speed-zone remap
+  if (actionTimingLog) {
+    actionTimingLog
+      .filter((e) => e.type === 'scroll')
+      .forEach((entry, i) => {
+        const atFrame = remapSfxFrame(entry.timestampMs, timingSegments, fps, durationInFrames);
+        if (atFrame === null) return;
+        sfxElements.push(
+          <Sequence key={`scroll-${i}`} from={atFrame}>
+            <Audio src={SCROLL_SFX_URL} volume={0.3} />
+          </Sequence>,
+        );
+      });
+  }
+
+  // Zoom sounds — speed-zone remap
+  if (actionTimingLog) {
+    actionTimingLog
+      .filter((e) => e.type === 'zoom' || e.type === 'zoomReset')
+      .forEach((entry, i) => {
+        const atFrame = remapSfxFrame(entry.timestampMs, timingSegments, fps, durationInFrames);
+        if (atFrame === null) return;
+        sfxElements.push(
+          <Sequence key={`zoom-${i}`} from={atFrame}>
+            <Audio src={ZOOM_SFX_URL} volume={0.4} />
+          </Sequence>,
+        );
       });
   }
 
