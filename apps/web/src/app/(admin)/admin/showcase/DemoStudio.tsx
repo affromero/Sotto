@@ -221,83 +221,114 @@ export function DemoStudio() {
 
   const saveScene = useCallback(async (sceneId: string, data: Partial<DemoScene>) => {
     if (!selectedProject) return;
-    const res = await fetch(`/api/admin/demo/${selectedProject.id}/scenes/${sceneId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-    if (!res.ok) {
-      setError(`Failed to save scene: ${res.status} ${await res.text()}`);
-      return;
+    try {
+      const res = await fetch(`/api/admin/demo/${selectedProject.id}/scenes/${sceneId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        setError(`Failed to save scene: ${res.status} ${await res.text()}`);
+        return;
+      }
+      await loadProject(selectedProject.id);
+    } catch (err) {
+      setError(`Failed to save scene: ${err instanceof Error ? err.message : String(err)}`);
     }
-    await loadProject(selectedProject.id);
   }, [selectedProject, loadProject]);
 
   const generateAsset = useCallback(async (sceneId: string, assetType: string) => {
     if (!selectedProject) return;
-    const res = await fetch(`/api/admin/demo/${selectedProject.id}/scenes/${sceneId}/${assetType}`, { method: 'POST' });
-    if (!res.ok) {
-      setError(`Failed to generate ${assetType}: ${res.status} ${await res.text()}`);
+    try {
+      const res = await fetch(`/api/admin/demo/${selectedProject.id}/scenes/${sceneId}/${assetType}`, { method: 'POST' });
+      if (!res.ok) {
+        setError(`Failed to generate ${assetType}: ${res.status} ${await res.text()}`);
+      }
+      await loadProject(selectedProject.id);
+    } catch (err) {
+      setError(`Failed to generate ${assetType}: ${err instanceof Error ? err.message : String(err)}`);
     }
-    await loadProject(selectedProject.id);
   }, [selectedProject, loadProject]);
 
   const generateAllAssets = useCallback(async () => {
     if (!selectedProject) return;
     setLoading(true);
-    const res = await fetch(`/api/admin/demo/${selectedProject.id}/generate-assets`, { method: 'POST' });
-    if (!res.ok) {
-      setError(`Failed to generate assets: ${res.status} ${await res.text()}`);
+    try {
+      const res = await fetch(`/api/admin/demo/${selectedProject.id}/generate-assets`, { method: 'POST' });
+      if (!res.ok) {
+        setError(`Failed to generate assets: ${res.status} ${await res.text()}`);
+      }
+      await loadProject(selectedProject.id);
+    } catch (err) {
+      setError(`Failed to generate assets: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setLoading(false);
     }
-    await loadProject(selectedProject.id);
-    setLoading(false);
   }, [selectedProject, loadProject]);
 
   const composeScene = useCallback(async (sceneId: string) => {
     if (!selectedProject) return;
-    const res = await fetch(`/api/admin/demo/${selectedProject.id}/scenes/${sceneId}/compose`, { method: 'POST' });
-    if (!res.ok) {
-      setError(`Failed to compose scene: ${res.status} ${await res.text()}`);
+    try {
+      const res = await fetch(`/api/admin/demo/${selectedProject.id}/scenes/${sceneId}/compose`, { method: 'POST' });
+      if (!res.ok) {
+        setError(`Failed to compose scene: ${res.status} ${await res.text()}`);
+      }
+      await loadProject(selectedProject.id);
+    } catch (err) {
+      setError(`Failed to compose scene: ${err instanceof Error ? err.message : String(err)}`);
     }
-    await loadProject(selectedProject.id);
   }, [selectedProject, loadProject]);
 
   const composeAllScenes = useCallback(async () => {
     if (!selectedProject) return;
     setLoading(true);
-    for (const scene of selectedProject.scenes ?? []) {
-      const ready = scene.recordingStatus === 'READY' && scene.voiceoverStatus === 'READY';
-      if (ready && scene.compositedStatus !== 'READY') {
-        const res = await fetch(`/api/admin/demo/${selectedProject.id}/scenes/${scene.id}/compose`, { method: 'POST' });
-        if (!res.ok) {
-          setError(`Failed to compose scene ${scene.order + 1}: ${res.status} ${await res.text()}`);
+    try {
+      for (const scene of selectedProject.scenes ?? []) {
+        const ready = scene.recordingStatus === 'READY' && scene.voiceoverStatus === 'READY';
+        if (ready && scene.compositedStatus !== 'READY') {
+          const res = await fetch(`/api/admin/demo/${selectedProject.id}/scenes/${scene.id}/compose`, { method: 'POST' });
+          if (!res.ok) {
+            setError(`Failed to compose scene ${scene.order + 1}: ${res.status} ${await res.text()}`);
+          }
         }
       }
+      await loadProject(selectedProject.id);
+    } catch (err) {
+      setError(`Failed to compose scenes: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setLoading(false);
     }
-    await loadProject(selectedProject.id);
-    setLoading(false);
   }, [selectedProject, loadProject]);
 
   const composeVideo = useCallback(async () => {
     if (!selectedProject) return;
     setLoading(true);
-    const res = await fetch(`/api/admin/demo/${selectedProject.id}/compose`, { method: 'POST' });
-    if (!res.ok) {
-      setError(`Failed to compose video: ${res.status} ${await res.text()}`);
+    try {
+      const res = await fetch(`/api/admin/demo/${selectedProject.id}/compose`, { method: 'POST' });
+      if (!res.ok) {
+        setError(`Failed to compose video: ${res.status} ${await res.text()}`);
+      }
+      await loadProject(selectedProject.id);
+      setStep('compose');
+    } catch (err) {
+      setError(`Failed to compose video: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setLoading(false);
     }
-    await loadProject(selectedProject.id);
-    setStep('compose');
-    setLoading(false);
   }, [selectedProject, loadProject]);
 
   const deleteProject = useCallback(async (id: string) => {
-    const res = await fetch(`/api/admin/demo/${id}`, { method: 'DELETE' });
-    if (!res.ok) {
-      setError(`Failed to delete project: ${res.status} ${await res.text()}`);
-      return;
+    try {
+      const res = await fetch(`/api/admin/demo/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        setError(`Failed to delete project: ${res.status} ${await res.text()}`);
+        return;
+      }
+      if (selectedProject?.id === id) setSelectedProject(null);
+      await loadProjects();
+    } catch (err) {
+      setError(`Failed to delete project: ${err instanceof Error ? err.message : String(err)}`);
     }
-    if (selectedProject?.id === id) setSelectedProject(null);
-    await loadProjects();
   }, [selectedProject, loadProjects]);
 
   const scenes = selectedProject?.scenes ?? [];
