@@ -47,19 +47,27 @@ export function VoiceTrackSelector({
 
   const handleSelectOriginal = useCallback(() => {
     const currentTime = player.currentTime;
+    const wasPlaying = player.isPlaying;
     setActiveTrackId(null);
     player.setActiveVoiceTrackId(null);
     player.loadPodcast(podcastId, podcastAudioUrl, podcastTitle);
-    setTimeout(() => player.seek(currentTime), 100);
+    setTimeout(() => {
+      player.seek(currentTime);
+      if (wasPlaying) player.play();
+    }, 100);
   }, [player, podcastId, podcastAudioUrl, podcastTitle]);
 
   const handleSelectTrack = useCallback((track: VoiceTrackSummary) => {
     if (!track.audioUrl) return;
     const currentTime = player.currentTime;
+    const wasPlaying = player.isPlaying;
     setActiveTrackId(track.id);
     player.setActiveVoiceTrackId(track.id);
     player.loadPodcast(podcastId, track.audioUrl, podcastTitle);
-    setTimeout(() => player.seek(currentTime), 100);
+    setTimeout(() => {
+      player.seek(currentTime);
+      if (wasPlaying) player.play();
+    }, 100);
   }, [player, podcastId, podcastTitle]);
 
   const readyTracks = useMemo(
