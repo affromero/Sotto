@@ -876,30 +876,30 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
                   onClick={() => handleGenerateVideo()}
                   disabled={pipelineLoading || videoLoading || (videoStatus ? videoStatus.dailyRemaining <= 0 && !videoStatus.isByokUser : !isAdmin)}
                   aria-label="Generate Video"
-                  title="Generate Video"
                   type="button"
                   data-loading={pipelineLoading || videoLoading ? 'true' : undefined}
                 >
-                  <Video size={18} />
+                  <Video size={14} />
+                  Video
                 </button>
                 <button
                   className={styles.toolbarBtn}
                   onClick={() => setShowAvatarPicker(true)}
                   disabled={videoStatus ? videoStatus.dailyRemaining <= 0 && !videoStatus.isByokUser : !isAdmin}
                   aria-label="Add Avatars"
-                  title="Add Avatars"
                   type="button"
                 >
-                  <Users size={18} />
+                  <Users size={14} />
+                  Avatars
                 </button>
                 <button
                   className={styles.toolbarBtn}
                   onClick={() => setShowMusicModal(true)}
                   aria-label="Add Music"
-                  title="Add Music"
                   type="button"
                 >
-                  <Music size={18} />
+                  <Music size={14} />
+                  Music
                 </button>
                 {videoStatus && !videoStatus.isByokUser && (
                   <span className={styles.videoQuotaCompact}>
@@ -1020,28 +1020,28 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
                   setShowVideoEditor(true);
                 }}
                 aria-label="Edit Storyboard"
-                title="Edit Storyboard"
                 type="button"
               >
-                <Pencil size={18} />
+                <Pencil size={14} />
+                Storyboard
               </button>
               <button
                 className={styles.toolbarBtn}
                 onClick={() => setShowAvatarPicker(true)}
                 aria-label={avatarOverlays.length > 0 ? 'Change Avatars' : 'Add Avatars'}
-                title={avatarOverlays.length > 0 ? 'Change Avatars' : 'Add Avatars'}
                 type="button"
               >
-                <Users size={18} />
+                <Users size={14} />
+                Avatars
               </button>
               <button
                 className={styles.toolbarBtn}
                 onClick={() => setShowMusicModal(true)}
                 aria-label="Add Music"
-                title="Add Music"
                 type="button"
               >
-                <Music size={18} />
+                <Music size={14} />
+                Music
               </button>
               {avatarGenerating && (
                 <div className={styles.avatarGeneratingBadge}>
@@ -1111,6 +1111,40 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
               </Button>
             </div>
           )}
+        </section>
+      )}
+
+      {/* Player — immediately after owner tools */}
+      {isReady && podcast.audioUrl && (
+        <section ref={playerSectionRef} className={styles.playerSection} aria-label="Audio player">
+          <AudioPlayer podcastId={podcast.id} audioUrl={podcast.audioUrl!} podcastTitle={podcast.title} />
+          {(podcast.voiceTracks.length > 0 || isOwner) && (
+            <VoiceTrackSelector
+              podcastId={podcast.id}
+              podcastAudioUrl={podcast.audioUrl!}
+              podcastTitle={podcast.title}
+              voiceTracks={podcast.voiceTracks}
+              defaultVoiceTrackId={podcast.defaultVoiceTrackId}
+              isOwner={isOwner}
+              speakers={[...new Set(podcast.segments.map(s => s.speaker))]}
+            />
+          )}
+          {isOwner && podcast.isVoiceOnlyFork && podcast.forkedFrom && isReady &&
+            podcast.voiceTracks.some(t => t.status === 'READY') && (
+            <ProposeRenditionButton
+              podcastId={podcast.id}
+              voiceTrackId={podcast.voiceTracks.find(t => t.status === 'READY')!.id}
+              originalPodcastId={podcast.forkedFrom.id}
+              originalTitle={podcast.forkedFrom.title}
+            />
+          )}
+        </section>
+      )}
+
+      {/* References — after player */}
+      {podcast.references.length > 0 && (
+        <section className={styles.referencesSection}>
+          <ReferenceList references={podcast.references} />
         </section>
       )}
 
@@ -1401,39 +1435,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
             ) : null}
           </section>
 
-          {podcast.references.length > 0 && (
-            <section className={styles.referencesSection}>
-              <ReferenceList references={podcast.references} />
-            </section>
-          )}
         </>
-      )}
-
-      {/* Player */}
-      {isReady && podcast.audioUrl && (
-        <section ref={playerSectionRef} className={styles.playerSection} aria-label="Audio player">
-          <AudioPlayer podcastId={podcast.id} audioUrl={podcast.audioUrl!} podcastTitle={podcast.title} />
-          {(podcast.voiceTracks.length > 0 || isOwner) && (
-            <VoiceTrackSelector
-              podcastId={podcast.id}
-              podcastAudioUrl={podcast.audioUrl!}
-              podcastTitle={podcast.title}
-              voiceTracks={podcast.voiceTracks}
-              defaultVoiceTrackId={podcast.defaultVoiceTrackId}
-              isOwner={isOwner}
-              speakers={[...new Set(podcast.segments.map(s => s.speaker))]}
-            />
-          )}
-          {isOwner && podcast.isVoiceOnlyFork && podcast.forkedFrom && isReady &&
-            podcast.voiceTracks.some(t => t.status === 'READY') && (
-            <ProposeRenditionButton
-              podcastId={podcast.id}
-              voiceTrackId={podcast.voiceTracks.find(t => t.status === 'READY')!.id}
-              originalPodcastId={podcast.forkedFrom.id}
-              originalTitle={podcast.forkedFrom.title}
-            />
-          )}
-        </section>
       )}
 
       {/* Interrupt Chat (opened from action bar) */}

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useMemo, useCallback, useState } from 'react';
-import { Maximize2, Minimize2 } from 'lucide-react';
+import { Maximize2, Minimize2, Play as PlayIcon, Pause } from 'lucide-react';
 import { Player, type PlayerRef } from '@remotion/player';
 import { PodcastVisuals } from '@sotto/video';
 import { DEFAULT_RENDER_CONFIG, DEFAULT_BRANDING } from '@sotto/video';
@@ -51,7 +51,7 @@ export function VideoView({
 }: VideoViewProps) {
   const playerRef = useRef<PlayerRef>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const { isPlaying } = usePlayer();
+  const { isPlaying, play, pause } = usePlayer();
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const [expanded, setExpanded] = useState(false);
   const [shapePickerSpeaker, setShapePickerSpeaker] = useState<string | null>(null);
@@ -277,35 +277,44 @@ export function VideoView({
             ))}
           </div>
         )}
-      </div>
-
-      {activeSegment && (
-        <div className={styles.subtitle}>
-          <div
-            className={styles.subtitleBlock}
-            data-speaker-index={getSpeakerIndex(activeSegment.speaker, speakers)}
-            onClick={handleSubtitleClick}
-            role="button"
-            tabIndex={0}
-            onKeyDown={handleSubtitleKeyDown}
-          >
-            <span
-              className={styles.speaker}
+        {/* Play/Pause overlay */}
+        <button
+          className={`${styles.playToggle} ${isPlaying ? styles.playToggleHidden : ''}`}
+          onClick={() => (isPlaying ? pause() : play())}
+          aria-label={isPlaying ? 'Pause' : 'Play'}
+          type="button"
+        >
+          {isPlaying ? <Pause size={32} /> : <PlayIcon size={32} />}
+        </button>
+        {/* Subtitle overlay */}
+        {activeSegment && (
+          <div className={styles.subtitleOverlay}>
+            <div
+              className={styles.subtitleBlock}
               data-speaker-index={getSpeakerIndex(activeSegment.speaker, speakers)}
+              onClick={handleSubtitleClick}
+              role="button"
+              tabIndex={0}
+              onKeyDown={handleSubtitleKeyDown}
             >
-              {activeSegment.speaker}
-            </span>
-            <p className={styles.text}>
-              {parseTextWithCitations(activeSegment.text, references)}
-            </p>
+              <span
+                className={styles.speakerTag}
+                data-speaker-index={getSpeakerIndex(activeSegment.speaker, speakers)}
+              >
+                {activeSegment.speaker}
+              </span>
+              <p className={styles.subtitleText}>
+                {parseTextWithCitations(activeSegment.text, references)}
+              </p>
+            </div>
+            {photographer && (
+              <p className={styles.attribution}>
+                {photographer} / Pexels
+              </p>
+            )}
           </div>
-          {photographer && (
-            <p className={styles.attribution}>
-              Video: {photographer} / Pexels
-            </p>
-          )}
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
