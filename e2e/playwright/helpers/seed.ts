@@ -24,7 +24,6 @@ export async function seedTestUser() {
       handle: 'e2e-test',
       role: 'USER',
       plan: 'FREE',
-      isOnboarded: true,
     },
   });
 
