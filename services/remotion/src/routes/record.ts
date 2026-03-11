@@ -16,6 +16,7 @@ export const recordRouter = Router();
 interface RecordRequest {
   actions: Array<{ type: string; [key: string]: unknown }>;
   sessionToken: string;
+  cookieName?: string;
   appUrl: string;
   viewport?: { width: number; height: number };
   gradeVideo?: boolean;
@@ -59,11 +60,16 @@ async function executeRecording(jobId: string, input: RecordRequest): Promise<vo
       deviceScaleFactor: 2,
     });
 
+    const isSecure = input.appUrl.startsWith('https://');
+    const cookieName = input.cookieName ?? (isSecure ? '__Secure-authjs.session-token' : 'authjs.session-token');
     await context.addCookies([{
-      name: 'next-auth.session-token',
+      name: cookieName,
       value: input.sessionToken,
       domain: new URL(input.appUrl).hostname,
       path: '/',
+      secure: isSecure,
+      httpOnly: true,
+      sameSite: 'Lax',
     }]);
 
     const page = await context.newPage();
