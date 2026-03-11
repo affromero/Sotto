@@ -290,10 +290,11 @@ export async function DELETE(request: NextRequest) {
       const deletePromises: Promise<void>[] = [];
 
       // Delete all files under each podcast prefix (segments, audio, PDFs, versions)
+      // force: true — account deletion is the one legitimate bulk-delete scenario
       for (const p of podcasts) {
         const keys = await listFiles(`podcasts/${p.id}/`);
         for (const key of keys) {
-          deletePromises.push(deleteFile(key));
+          deletePromises.push(deleteFile(key, { force: true }));
         }
         if (p.importedAudioKey) {
           deletePromises.push(deleteFile(p.importedAudioKey));

@@ -419,6 +419,38 @@ describe('r2.ts', () => {
       await expect(deleteFile('test/file.mp3')).rejects.toThrow('Access denied');
     });
 
+    it('blocks deletion of segment audio files without force flag', async () => {
+      await expect(
+        deleteFile('podcasts/abc123/segments/seg456.mp3')
+      ).rejects.toThrow('Refusing to delete protected file');
+    });
+
+    it('blocks deletion of podcast audio files without force flag', async () => {
+      await expect(
+        deleteFile('podcasts/abc123/audio.mp3')
+      ).rejects.toThrow('Refusing to delete protected file');
+    });
+
+    it('allows deletion of segment audio with force flag', async () => {
+      mockSend.mockResolvedValue({});
+
+      await deleteFile('podcasts/abc123/segments/seg456.mp3', { force: true });
+
+      expect(mockSend).toHaveBeenCalledTimes(1);
+      expect(DeleteObjectCommand).toHaveBeenCalledWith({
+        Bucket: 'test-bucket',
+        Key: 'podcasts/abc123/segments/seg456.mp3',
+      });
+    });
+
+    it('allows deletion of non-protected paths without force flag', async () => {
+      mockSend.mockResolvedValue({});
+
+      await deleteFile('podcasts/abc123/visuals/vis789.png');
+
+      expect(mockSend).toHaveBeenCalledTimes(1);
+    });
+
   });
 
   describe('extractR2Key', () => {

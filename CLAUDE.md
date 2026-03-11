@@ -101,6 +101,7 @@ content-extraction → script-generation → script-verification (≤3 loops) �
 - Hardcode model names or provider IDs — always resolve from DB config (`AutoModelConfig`), env vars, or user settings. Never write fallback chains that pick providers by key availability — use `resolveSttProvider()`, `resolveTtsProvider()`, or `resolveAutoModel()` instead
 - Reuse the same 2 voices for every podcast
 - Do heavy processing in API routes
+- Create admin endpoints or scripts that bulk-delete R2 files — segment audio and podcast audio are protected in `deleteFile()` (see `r2.ts`). Never bypass this guard. Never create "storage cleanup" endpoints that iterate and delete files by pattern.
 
 ## Frontend Quality
 

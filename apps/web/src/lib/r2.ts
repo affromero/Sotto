@@ -193,14 +193,35 @@ export async function downloadToFile(urlOrKey: string, destPath: string): Promis
 }
 
 /**
- * Delete a file from R2
+ * Protected path patterns — these files must never be bulk-deleted.
+ * Segment audio is needed by avatar generation, voice tracks, and future features.
+ * Podcast audio is the final stitched output — irreplaceable without re-generation.
  */
-export async function deleteFile(urlOrKey: string): Promise<void> {
+const PROTECTED_PATH_PATTERNS = [
+  /^podcasts\/[^/]+\/segments\/[^/]+\.mp3$/,  // segment audio
+  /^podcasts\/[^/]+\/audio\.mp3$/,             // final podcast audio
+];
+
+/**
+ * Delete a file from R2.
+ *
+ * Protected paths (segment audio, podcast audio) require `{ force: true }`.
+ * This prevents accidental bulk deletion — the storage-cleanup incident of 2026-02.
+ */
+export async function deleteFile(urlOrKey: string, opts?: { force?: boolean }): Promise<void> {
   if (!s3Client) {
     throw new Error('R2 storage not configured');
   }
 
   const key = extractR2Key(urlOrKey);
+
+  if (!opts?.force && PROTECTED_PATH_PATTERNS.some((p) => p.test(key))) {
+    throw new Error(
+      `Refusing to delete protected file: ${key}. ` +
+      'Segment and podcast audio files must not be deleted. ' +
+      'Pass { force: true } only if you are certain this is intentional.'
+    );
+  }
 
   await s3Client.send(
     new DeleteObjectCommand({ Bucket: R2_BUCKET_NAME, Key: key })
