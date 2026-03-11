@@ -1,0 +1,38 @@
+appId: fm.sotto.app
+name: User Profile - View and Follow
+tags: [social, profile]
+---
+- runFlow: ../helpers/login.yaml
+
+# Search for the other test user
+- tapOn:
+    text: "Search"
+- tapOn:
+    id: "search-input"
+- inputText: "e2e-other"
+- tapOn:
+    id: "search-mode-people"
+
+# Wait for results and tap on user
+- extendedWaitUntil:
+    visible:
+      text: "E2E Other User"
+    timeout: 5000
+- tapOn:
+    text: "E2E Other User"
+
+# Verify profile loaded
+- extendedWaitUntil:
+    visible:
+      id: "user-profile-follow-button"
+    timeout: 5000
+- assertVisible:
+    id: "user-profile-name"
+
+# Follow the user
+- tapOn:
+    id: "user-profile-follow-button"
+
+# Unfollow the user (toggle back)
+- tapOn:
+    id: "user-profile-follow-button"

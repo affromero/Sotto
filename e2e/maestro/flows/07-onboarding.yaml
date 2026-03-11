@@ -1,0 +1,38 @@
+appId: fm.sotto.app
+name: Onboarding - New User Flow
+tags: [onboarding]
+---
+# Assumes a fresh user state (no prior login)
+- extendedWaitUntil:
+    visible:
+      id: "onboarding-name-input"
+    timeout: 10000
+
+# Step 1: Enter name
+- tapOn:
+    id: "onboarding-name-input"
+- inputText: "Test User"
+- tapOn:
+    id: "onboarding-name-continue"
+
+# Step 2: Select interests
+- extendedWaitUntil:
+    visible:
+      id: "onboarding-interests-continue"
+    timeout: 5000
+- tapOn:
+    id: "onboarding-interests-continue"
+
+# Step 3: Done — go to feed
+- extendedWaitUntil:
+    visible:
+      id: "onboarding-done-button"
+    timeout: 5000
+- tapOn:
+    id: "onboarding-done-button"
+
+# Verify we land on the feed
+- extendedWaitUntil:
+    visible:
+      id: "feed-podcast-list"
+    timeout: 10000

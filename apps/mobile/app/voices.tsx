@@ -70,7 +70,7 @@ export default function VoiceMarketplaceScreen() {
     ({ item }: { item: BrowseVoice }) => {
       const isFree = !item.priceInCents || item.priceInCents === 0;
       return (
-        <View style={styles.card}>
+        <View style={styles.card} testID={`voice-marketplace-card-${item.id}`}>
           <View style={styles.cardRow}>
             <Avatar uri={item.owner.image} name={item.owner.name} size={44} />
             <View style={styles.cardInfo}>
@@ -124,9 +124,10 @@ export default function VoiceMarketplaceScreen() {
           onChangeText={setSearch}
           placeholder="Search voices..."
           placeholderTextColor={colors.textTertiary}
+          testID="voice-marketplace-search-input"
         />
         {search.length > 0 && (
-          <Pressable onPress={() => setSearch('')} hitSlop={8}>
+          <Pressable onPress={() => setSearch('')} hitSlop={8} testID="voice-marketplace-search-clear">
             <Ionicons name="close-circle" size={18} color={colors.textTertiary} />
           </Pressable>
         )}
@@ -136,6 +137,7 @@ export default function VoiceMarketplaceScreen() {
         {(['most_requested', 'recent'] as Sort[]).map((s) => (
           <Pressable
             key={s}
+            testID={`voice-marketplace-sort-${s}`}
             style={[styles.sortChip, sort === s && styles.sortChipActive]}
             onPress={() => setSort(s)}
           >
@@ -157,6 +159,7 @@ export default function VoiceMarketplaceScreen() {
         </View>
       ) : (
         <FlatList
+          testID="voice-marketplace-list"
           data={voices}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}

@@ -43,7 +43,9 @@
     "mobile:android:build": "npm run android:build --workspace=@sotto/mobile",
     "mobile:android:build:preview": "npm run android:build:preview --workspace=@sotto/mobile",
     "mobile:android:build:production": "npm run android:build:production --workspace=@sotto/mobile",
-    "mobile:android:submit": "npm run android:submit --workspace=@sotto/mobile"
+    "mobile:android:submit": "npm run android:submit --workspace=@sotto/mobile",
+    "test:e2e:web": "npx playwright test --config e2e/playwright/playwright.config.ts",
+    "test:e2e:mobile": "bash e2e/maestro/run.sh"
   },
   "lint-staged": {
     "*.{ts,tsx}": [
@@ -57,6 +59,8 @@
     ]
   },
   "devDependencies": {
+    "@copilotkit/llmock": "^1.1.1",
+    "@playwright/test": "^1.58.2",
     "@types/geoip-lite": "^1.4.4",
     "lint-staged": "^16.2.7",
     "next-auth": "^5.0.0-beta.30",

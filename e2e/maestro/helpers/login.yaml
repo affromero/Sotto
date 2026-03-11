@@ -1,0 +1,11 @@
+appId: fm.sotto.app
+---
+- tapOn:
+    id: "login-email-input"
+- inputText: "test-e2e@sotto.fm"
+- tapOn:
+    id: "login-sign-in-button"
+- extendedWaitUntil:
+    visible:
+      id: "feed-podcast-list"
+    timeout: 10000

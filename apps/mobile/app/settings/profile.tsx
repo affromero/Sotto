@@ -105,6 +105,7 @@ export default function ProfileEditScreen() {
           placeholder="Your name"
           placeholderTextColor={colors.textTertiary}
           maxLength={50}
+          testID="profile-edit-name-input"
         />
 
         <Text style={styles.label}>Handle</Text>
@@ -118,8 +119,9 @@ export default function ProfileEditScreen() {
             maxLength={30}
             autoCapitalize="none"
             autoCorrect={false}
+            testID="profile-edit-handle-input"
           />
-          <Pressable style={styles.checkButton} onPress={handleCheckHandle}>
+          <Pressable style={styles.checkButton} onPress={handleCheckHandle} testID="profile-edit-check-handle">
             <Text style={styles.checkButtonText}>Check</Text>
           </Pressable>
         </View>
@@ -133,12 +135,14 @@ export default function ProfileEditScreen() {
           placeholderTextColor={colors.textTertiary}
           multiline
           maxLength={200}
+          testID="profile-edit-bio-input"
         />
 
         <Pressable
           style={[styles.saveButton, saveMutation.isPending && styles.saveButtonDisabled]}
           onPress={() => saveMutation.mutate()}
           disabled={saveMutation.isPending}
+          testID="profile-edit-save-button"
         >
           {saveMutation.isPending ? (
             <ActivityIndicator size="small" color={colors.textInverse} />

@@ -124,6 +124,7 @@ export default function PodcastEditScreen() {
           placeholder="Podcast title"
           placeholderTextColor={colors.textTertiary}
           maxLength={200}
+          testID="podcast-edit-title-input"
         />
 
         <Text style={styles.label}>Topic</Text>
@@ -135,6 +136,7 @@ export default function PodcastEditScreen() {
           placeholderTextColor={colors.textTertiary}
           multiline
           maxLength={5000}
+          testID="podcast-edit-topic-input"
         />
 
         <Text style={styles.label}>Visibility</Text>
@@ -147,6 +149,7 @@ export default function PodcastEditScreen() {
                 visibility === opt.value && styles.visibilityChipActive,
               ]}
               onPress={() => setVisibility(opt.value)}
+              testID={`podcast-edit-visibility-${opt.value.toLowerCase()}`}
             >
               <Ionicons
                 name={opt.icon as keyof typeof Ionicons.glyphMap}
@@ -176,6 +179,7 @@ export default function PodcastEditScreen() {
           ]}
           onPress={() => saveMutation.mutate()}
           disabled={saveMutation.isPending}
+          testID="podcast-edit-save-button"
         >
           {saveMutation.isPending ? (
             <ActivityIndicator size="small" color={colors.textInverse} />
@@ -188,6 +192,7 @@ export default function PodcastEditScreen() {
           style={styles.deleteButton}
           onPress={handleDelete}
           disabled={deleteMutation.isPending}
+          testID="podcast-edit-delete-button"
         >
           <Ionicons name="trash-outline" size={18} color={colors.error} />
           <Text style={styles.deleteButtonText}>Delete Podcast</Text>

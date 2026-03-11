@@ -108,6 +108,7 @@ export default function CollectionDetailScreen() {
           <Pressable
             style={styles.removeButton}
             onPress={() => removeMutation.mutate(item.id)}
+            testID={`collection-detail-remove-${item.id}`}
           >
             <Ionicons name="close-circle-outline" size={18} color={colors.error} />
             <Text style={styles.removeButtonText}>Remove</Text>
@@ -130,7 +131,7 @@ export default function CollectionDetailScreen() {
   const listHeader = (
     <View style={styles.header}>
       <View style={styles.headerTop}>
-        <Text style={styles.headerName}>{collection.name}</Text>
+        <Text style={styles.headerName} testID="collection-detail-name">{collection.name}</Text>
         <Ionicons
           name={collection.isPublic ? 'globe-outline' : 'lock-closed-outline'}
           size={18}
@@ -157,6 +158,7 @@ export default function CollectionDetailScreen() {
             ]}
             onPress={() => followMutation.mutate()}
             disabled={followMutation.isPending}
+            testID="collection-detail-follow-button"
           >
             <Ionicons
               name={collection.isFollowing ? 'checkmark' : 'add'}
@@ -174,7 +176,7 @@ export default function CollectionDetailScreen() {
           </Pressable>
         )}
         {collection.isOwner && (
-          <Pressable style={styles.deleteCollectionButton} onPress={handleDelete}>
+          <Pressable style={styles.deleteCollectionButton} onPress={handleDelete} testID="collection-detail-delete-button">
             <Ionicons name="trash-outline" size={18} color={colors.error} />
           </Pressable>
         )}
@@ -186,6 +188,7 @@ export default function CollectionDetailScreen() {
     <View style={styles.container}>
       <Stack.Screen options={{ title: collection.name }} />
       <FlatList
+        testID="collection-detail-list"
         data={collection.items}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}

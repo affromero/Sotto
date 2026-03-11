@@ -34,6 +34,7 @@ export function MiniPlayer() {
       onPress={() => router.push(`/podcast/${currentPodcast.id}`)}
       accessibilityLabel={`Now playing: ${currentPodcast.title}`}
       accessibilityRole="button"
+      testID="mini-player"
     >
       {/* Progress bar */}
       <View style={styles.progressTrack}>
@@ -68,6 +69,7 @@ export function MiniPlayer() {
           accessibilityLabel={isPlaying ? 'Pause' : 'Play'}
           accessibilityRole="button"
           hitSlop={8}
+          testID="mini-player-play-pause"
         >
           <Ionicons
             name={isPlaying ? 'pause' : 'play'}

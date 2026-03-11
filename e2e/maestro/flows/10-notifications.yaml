@@ -1,0 +1,21 @@
+appId: fm.sotto.app
+name: Notifications - View and Mark Read
+tags: [notifications]
+---
+- runFlow: ../helpers/login.yaml
+
+# Navigate to notifications tab
+- tapOn:
+    text: "Notifications"
+- extendedWaitUntil:
+    visible:
+      id: "notifications-list"
+    timeout: 5000
+
+# Verify notifications are visible
+- assertVisible:
+    text: "Your podcast is ready"
+
+# Mark all as read
+- tapOn:
+    id: "notifications-mark-all-read"

@@ -48,6 +48,7 @@ function FeedCard({
     <AnimatedPressable
       style={styles.feedCard}
       onPress={onPress}
+      testID={`podcast-card-${podcast.id}`}
     >
       <LinearGradient
         colors={gradient.colors}
@@ -148,6 +149,7 @@ function CompactCard({
       style={styles.compactCard}
       accessibilityLabel={`${podcast.title} by ${podcast.user?.name ?? 'Unknown'}`}
       accessibilityRole="button"
+      testID={`podcast-card-${podcast.id}`}
     >
       <View style={styles.compactContent}>
         <Text style={styles.compactTitle} numberOfLines={2}>

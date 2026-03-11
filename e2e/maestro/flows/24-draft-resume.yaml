@@ -1,0 +1,21 @@
+appId: fm.sotto.app
+name: Create - Resume Saved Draft
+tags: [create, draft]
+---
+- runFlow: ../helpers/login.yaml
+
+# Navigate to create tab
+- tapOn:
+    text: "Create"
+- extendedWaitUntil:
+    visible:
+      id: "create-chat-input"
+    timeout: 5000
+
+# Look for draft section and tap on the saved draft
+- tapOn:
+    text: "Draft Podcast"
+- extendedWaitUntil:
+    visible:
+      id: "create-chat-input"
+    timeout: 5000

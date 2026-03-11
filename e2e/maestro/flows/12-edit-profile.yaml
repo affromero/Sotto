@@ -1,0 +1,35 @@
+appId: fm.sotto.app
+name: Settings - Edit Profile
+tags: [settings, profile]
+---
+- runFlow: ../helpers/login.yaml
+
+# Navigate to settings > edit profile
+- tapOn:
+    text: "Profile"
+- tapOn:
+    id: "profile-settings-button"
+- tapOn:
+    id: "settings-edit-profile"
+- extendedWaitUntil:
+    visible:
+      id: "profile-edit-name-input"
+    timeout: 3000
+
+# Edit name
+- clearText:
+    id: "profile-edit-name-input"
+- tapOn:
+    id: "profile-edit-name-input"
+- inputText: "Updated E2E Name"
+
+# Edit bio
+- clearText:
+    id: "profile-edit-bio-input"
+- tapOn:
+    id: "profile-edit-bio-input"
+- inputText: "Updated bio for E2E testing"
+
+# Save
+- tapOn:
+    id: "profile-edit-save-button"

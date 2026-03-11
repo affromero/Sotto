@@ -1,0 +1,29 @@
+appId: fm.sotto.app
+name: Player - Teleprompter Toggle
+tags: [player, teleprompter]
+---
+- runFlow: ../helpers/login.yaml
+
+# Navigate to first podcast
+- extendedWaitUntil:
+    visible:
+      id: "feed-podcast-list"
+    timeout: 5000
+- tapOn:
+    text: "E2E Test Podcast"
+- extendedWaitUntil:
+    visible:
+      id: "player-play-pause"
+    timeout: 5000
+
+# Toggle teleprompter on
+- tapOn:
+    id: "player-teleprompter-toggle"
+
+# Toggle teleprompter off
+- tapOn:
+    id: "player-teleprompter-toggle"
+
+# Verify player is still functional
+- assertVisible:
+    id: "player-play-pause"
