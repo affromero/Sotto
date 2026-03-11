@@ -1,0 +1,27 @@
+appId: fm.sotto.app
+name: Saved Ideas - Browse and Create from Idea
+tags: [ideas, library]
+---
+- runFlow: ../helpers/login.yaml
+
+# Navigate to ideas/library (accessible from profile)
+- tapOn:
+    text: "Profile"
+- tapOn:
+    text: "Saved Ideas"
+- extendedWaitUntil:
+    visible:
+      id: "ideas-list"
+    timeout: 5000
+
+# Verify seeded ideas are visible
+- assertVisible:
+    text: "AI could write music"
+
+# Tap on an idea to navigate to create
+- tapOn:
+    text: "AI could write music"
+- extendedWaitUntil:
+    visible:
+      id: "create-chat-input"
+    timeout: 5000

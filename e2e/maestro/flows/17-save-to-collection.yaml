@@ -1,0 +1,25 @@
+appId: fm.sotto.app
+name: Save - Toggle Save on Podcast
+tags: [player, save]
+---
+- runFlow: ../helpers/login.yaml
+
+# Navigate to first podcast
+- extendedWaitUntil:
+    visible:
+      id: "feed-podcast-list"
+    timeout: 5000
+- tapOn:
+    text: "E2E Test Podcast"
+- extendedWaitUntil:
+    visible:
+      id: "player-save-button"
+    timeout: 5000
+
+# Toggle save on
+- tapOn:
+    id: "player-save-button"
+
+# Toggle save off
+- tapOn:
+    id: "player-save-button"
