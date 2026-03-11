@@ -16,6 +16,7 @@ import {
   CARTESIA_VOICE_POOL,
   HUME_VOICE_POOL,
   FAL_VOICE_POOL,
+  INWORLD_VOICE_POOL,
   MINIMAX_VOICE_POOL,
   type ProviderVoice,
 } from './providers/tts-voices';
@@ -230,8 +231,10 @@ export async function getVoiceCatalog(
       return OPENAI_VOICES;
 
     case 'fal':
-    case 'replicate':
       return providerVoiceToCatalog(FAL_VOICE_POOL);
+
+    case 'replicate':
+      return providerVoiceToCatalog(INWORLD_VOICE_POOL);
 
     case 'minimax':
       return providerVoiceToCatalog(MINIMAX_VOICE_POOL);

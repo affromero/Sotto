@@ -1,17 +1,32 @@
 /**
- * Replicate TTS provider — Qwen3-TTS via Replicate's hosted API.
- * No expression/emotion controls — relies on text content for prosody.
+ * Replicate TTS provider — supports Inworld TTS 1.5 (Max/Mini) and Qwen3-TTS.
  *
- * @tts-research-date 2026-02-27 — Qwen3-TTS has no explicit emotion API
+ * Inworld models support emotion markup ([happy], [sad], etc.) and use `voice_id`.
+ * Qwen3-TTS uses `voice` with no expression support.
+ *
+ * @tts-research-date 2026-03-11 — Inworld TTS 1.5 Max/Mini added
  */
 import { logger } from '../../logger';
 import type { TtsProvider, SpeechParams } from '../tts';
 import { getProviderMeta, type TtsProviderId } from '../tts-registry';
-import { FAL_VOICE_POOL, selectVoicePairFromPool } from '../tts-voices';
+import { FAL_VOICE_POOL, INWORLD_VOICE_POOL, selectVoicePairFromPool } from '../tts-voices';
+import { mapDirectionToExpression } from '../../tts-expression-mapper';
+import type { VoiceMatchMetadata } from '../../voice-pool';
 
 // HOST/GUEST → host voice slot; EXPERT/SKEPTIC → expert slot.
 const SPEAKER_VOICE_HOST_SET = new Set(['HOST', 'GUEST']);
-import type { VoiceMatchMetadata } from '../../voice-pool';
+
+/** Replicate model path lookup — model ID → owner/model-name on Replicate */
+const MODEL_PATHS: Record<string, string> = {
+  'inworld-tts-1.5-max': 'inworld/tts-1.5-max',
+  'inworld-tts-1.5-mini': 'inworld/tts-1.5-mini',
+  'qwen3-tts': 'qwen/qwen3-tts',
+};
+
+/** Inworld models have a 2000-char limit and different input schema */
+function isInworldModel(model: string): boolean {
+  return model.startsWith('inworld-');
+}
 
 interface ReplicatePrediction {
   id: string;
@@ -31,16 +46,35 @@ export class ReplicateProvider implements TtsProvider {
   }
 
   async generateSpeech(params: SpeechParams): Promise<Buffer> {
-    const response = await fetch('https://api.replicate.com/v1/models/qwen/qwen3-tts/predictions', {
+    const modelPath = MODEL_PATHS[this.model] ?? MODEL_PATHS['inworld-tts-1.5-max'];
+    const inworld = isInworldModel(this.model);
+
+    let text = params.text;
+
+    // Inworld: enforce 2000-char limit + prepend emotion tag from expression mapper
+    if (inworld) {
+      const expression = mapDirectionToExpression(params.direction, params.speaker, 'replicate');
+      if (expression.replicate?.emotionTag) {
+        text = `${expression.replicate.emotionTag}${text}`;
+      }
+      if (text.length > 2000) {
+        text = text.slice(0, 2000);
+      }
+    }
+
+    // Inworld uses `voice_id`, Qwen3 uses `voice`
+    const input: Record<string, unknown> = inworld
+      ? { text, voice_id: params.voiceId, audio_format: 'mp3' }
+      : { text, voice: params.voiceId };
+
+    const response = await fetch(`https://api.replicate.com/v1/models/${modelPath}/predictions`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${this.apiKey}`,
         'Content-Type': 'application/json',
         Prefer: 'wait',
       },
-      body: JSON.stringify({
-        input: { text: params.text, voice: params.voiceId },
-      }),
+      body: JSON.stringify({ input }),
     });
 
     if (!response.ok) {
@@ -67,7 +101,9 @@ export class ReplicateProvider implements TtsProvider {
       throw new Error(`Failed to download Replicate audio: ${audioResponse.status}`);
     }
 
-    logger.info('Replicate speech generated', { voiceId: params.voiceId, chars: params.text.length });
+    logger.info('Replicate speech generated', {
+      model: this.model, voiceId: params.voiceId, chars: params.text.length,
+    });
     const arrayBuffer = await audioResponse.arrayBuffer();
     return Buffer.from(arrayBuffer);
   }
@@ -93,11 +129,12 @@ export class ReplicateProvider implements TtsProvider {
   }
 
   getVoiceId(speaker: string, podcastId?: string, metadata?: VoiceMatchMetadata): string {
+    const pool = isInworldModel(this.model) ? INWORLD_VOICE_POOL : FAL_VOICE_POOL;
     const isHostVoice = SPEAKER_VOICE_HOST_SET.has(speaker.toUpperCase());
     if (!podcastId) {
-      return isHostVoice ? FAL_VOICE_POOL[0].id : FAL_VOICE_POOL[1].id;
+      return isHostVoice ? pool[0].id : pool[1].id;
     }
-    const pair = selectVoicePairFromPool(FAL_VOICE_POOL, podcastId, metadata);
+    const pair = selectVoicePairFromPool(pool, podcastId, metadata);
     return isHostVoice ? pair.host.id : pair.expert.id;
   }
 
