@@ -65,13 +65,15 @@ export function CitationMarker({ references }: CitationMarkerProps) {
   }, [open]);
 
   return (
-    <span className={styles.wrapper}>
+    <span
+      className={styles.wrapper}
+      onMouseEnter={() => { updatePosition(); setOpen(true); }}
+      onMouseLeave={() => setOpen(false)}
+    >
       <button
         ref={buttonRef}
         className={styles.marker}
         onClick={handleToggle}
-        onMouseEnter={() => { updatePosition(); setOpen(true); }}
-        onMouseLeave={() => setOpen(false)}
         aria-expanded={open}
         aria-label={`Citation ${label}`}
         type="button"
