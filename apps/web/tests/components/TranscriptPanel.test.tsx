@@ -151,7 +151,11 @@ describe('TranscriptPanel', () => {
   it('handles empty segments array', () => {
     render(<TranscriptPanel segments={[]} currentTime={0} />);
     expect(screen.getByRole('heading', { name: 'Transcript' })).toBeInTheDocument();
-    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    // Only the two text-size control buttons should exist — no segment rows
+    const buttons = screen.getAllByRole('button');
+    expect(buttons).toHaveLength(2);
+    expect(screen.getByLabelText('Decrease text size')).toBeInTheDocument();
+    expect(screen.getByLabelText('Increase text size')).toBeInTheDocument();
   });
 
   describe('scroll-follow', () => {
