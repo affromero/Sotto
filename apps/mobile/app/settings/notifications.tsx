@@ -101,6 +101,7 @@ export default function NotificationPrefsScreen() {
                       true: colors.primary,
                     }}
                     thumbColor={colors.surface}
+                    testID={`notif-pref-${key}`}
                   />
                 </View>
                 {index < arr.length - 1 && <View style={styles.separator} />}

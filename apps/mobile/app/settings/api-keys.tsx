@@ -105,7 +105,7 @@ function ProviderRow({
     : styles.statusDotInactive;
 
   return (
-    <View style={styles.providerRow}>
+    <View style={styles.providerRow} testID={`api-keys-provider-${providerId}`}>
       <View style={styles.providerHeader}>
         <View style={styles.providerInfoCol}>
           <View style={styles.providerNameRow}>
@@ -122,6 +122,7 @@ function ProviderRow({
               <Pressable
                 onPress={() => setExpanded(!expanded)}
                 style={styles.updateButton}
+                testID={`api-keys-update-${providerId}`}
               >
                 <Text style={styles.updateButtonText}>
                   {expanded ? 'Cancel' : 'Update'}
@@ -132,6 +133,7 @@ function ProviderRow({
               onPress={handleRemove}
               style={styles.removeButton}
               disabled={removeMutation.isPending}
+              testID={`api-keys-remove-${providerId}`}
             >
               {removeMutation.isPending ? (
                 <ActivityIndicator size="small" color={colors.error} />
@@ -144,6 +146,7 @@ function ProviderRow({
           <Pressable
             onPress={() => setExpanded(!expanded)}
             style={styles.addButton}
+            testID={`api-keys-add-${providerId}`}
           >
             <Text style={styles.addButtonText}>
               {expanded ? 'Cancel' : 'Add Key'}
@@ -163,6 +166,7 @@ function ProviderRow({
             secureTextEntry
             autoCapitalize="none"
             autoCorrect={false}
+            testID={`api-keys-input-${providerId}`}
           />
           {error !== '' && (
             <Text style={styles.errorText}>{error}</Text>
@@ -174,6 +178,7 @@ function ProviderRow({
             ]}
             onPress={() => saveMutation.mutate()}
             disabled={!apiKey.trim() || saveMutation.isPending}
+            testID={`api-keys-save-${providerId}`}
           >
             {saveMutation.isPending ? (
               <ActivityIndicator size="small" color={colors.textInverse} />
@@ -227,7 +232,7 @@ export default function ApiKeysScreen() {
           headerTintColor: colors.textPrimary,
         }}
       />
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView contentContainerStyle={styles.scrollContent} testID="api-keys-scroll">
         {isLoading ? (
           <View style={styles.centered}>
             <ActivityIndicator size="large" color={colors.primary} />

@@ -1,0 +1,24 @@
+appId: fm.sotto.app
+name: Search - Podcasts and People
+tags: [search]
+---
+- runFlow: ../helpers/login.yaml
+
+# Navigate to Search tab
+- tapOn:
+    text: "Search"
+
+# Type a search query
+- tapOn:
+    id: "search-input"
+- inputText: "artificial intelligence"
+- extendedWaitUntil:
+    visible:
+      id: "search-mode-podcasts"
+    timeout: 3000
+
+# Switch between segments
+- tapOn:
+    id: "search-mode-people"
+- tapOn:
+    id: "search-mode-podcasts"

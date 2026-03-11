@@ -72,14 +72,14 @@ export default function BillingScreen() {
         ) : data ? (
           <>
             {/* Current Plan */}
-            <View style={styles.planCard}>
+            <View style={styles.planCard} testID="billing-plan-card">
               <View style={styles.planBadge}>
                 <Ionicons
                   name={isPro ? 'diamond' : 'leaf-outline'}
                   size={24}
                   color={isPro ? colors.primary : colors.textSecondary}
                 />
-                <Text style={styles.planName}>{isPro ? 'Pro' : 'Free'}</Text>
+                <Text style={styles.planName} testID="billing-plan-name">{isPro ? 'Pro' : 'Free'}</Text>
               </View>
               <Text style={styles.planDescription}>
                 {isPro
@@ -90,7 +90,7 @@ export default function BillingScreen() {
 
             {/* Limits */}
             <Text style={styles.sectionTitle}>Your Limits</Text>
-            <View style={styles.limitsCard}>
+            <View style={styles.limitsCard} testID="billing-limits-card">
               {[
                 {
                   label: 'Max Duration',
@@ -140,11 +140,11 @@ export default function BillingScreen() {
 
             {/* Actions */}
             {isPro ? (
-              <Pressable style={styles.manageButton} onPress={handleManage}>
+              <Pressable style={styles.manageButton} onPress={handleManage} testID="billing-manage-button">
                 <Text style={styles.manageButtonText}>Manage Subscription</Text>
               </Pressable>
             ) : (
-              <Pressable style={styles.upgradeButton} onPress={handleUpgrade}>
+              <Pressable style={styles.upgradeButton} onPress={handleUpgrade} testID="billing-upgrade-button">
                 <Ionicons name="diamond" size={18} color={colors.textInverse} />
                 <Text style={styles.upgradeButtonText}>Upgrade to Pro</Text>
               </Pressable>

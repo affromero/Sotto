@@ -1,0 +1,13 @@
+appId: fm.sotto.app
+name: Auth - Login and Verify Feed
+tags: [auth, critical]
+---
+- extendedWaitUntil:
+    visible:
+      id: "login-email-input"
+    timeout: 10000
+- runFlow: ../helpers/login.yaml
+- assertVisible:
+    id: "feed-mode-foryou"
+- assertVisible:
+    id: "feed-podcast-list"

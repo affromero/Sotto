@@ -114,6 +114,7 @@ export default function SearchScreen() {
             returnKeyType="search"
             autoCapitalize="none"
             autoCorrect={false}
+            testID="search-input"
           />
           {query.length > 0 && (
             <Pressable onPress={() => setQuery('')} hitSlop={8}>
@@ -153,6 +154,7 @@ export default function SearchScreen() {
         <Pressable
           style={[styles.segment, mode === 'podcasts' && styles.segmentActive]}
           onPress={() => setMode('podcasts')}
+          testID="search-mode-podcasts"
         >
           <Text
             style={[
@@ -166,6 +168,7 @@ export default function SearchScreen() {
         <Pressable
           style={[styles.segment, mode === 'people' && styles.segmentActive]}
           onPress={() => setMode('people')}
+          testID="search-mode-people"
         >
           <Text
             style={[

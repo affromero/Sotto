@@ -90,7 +90,7 @@ export default function VoiceManagementScreen() {
     ({ item }: { item: VoiceClone }) => {
       const status = getStatusIcon(item.verificationStatus);
       return (
-        <View style={styles.card}>
+        <View style={styles.card} testID={`voice-clone-${item.id}`}>
           <View style={styles.cardHeader}>
             <View style={styles.cardLeft}>
               <Ionicons name="mic" size={20} color={colors.primary} />
@@ -107,7 +107,7 @@ export default function VoiceManagementScreen() {
                 </View>
               </View>
             </View>
-            <Pressable onPress={() => handleDelete(item)} hitSlop={8}>
+            <Pressable onPress={() => handleDelete(item)} hitSlop={8} testID={`voice-clone-delete-${item.id}`}>
               <Ionicons name="trash-outline" size={20} color={colors.error} />
             </Pressable>
           </View>
@@ -127,6 +127,7 @@ export default function VoiceManagementScreen() {
         </View>
       ) : (
         <FlatList
+          testID="voices-clone-list"
           data={clones}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}

@@ -523,6 +523,7 @@ export default function CreateScreen() {
                   {GREETING.chips.map((chip) => (
                     <Pressable
                       key={chip}
+                      testID={`create-chip-${chip}`}
                       style={({ pressed }) => [
                         styles.chip,
                         pressed && styles.chipPressed,
@@ -540,6 +541,7 @@ export default function CreateScreen() {
                       pressed && styles.inspireMeButtonPressed,
                     ]}
                     onPress={() => setShowInspire(true)}
+                    testID="create-inspire-button"
                   >
                     <Ionicons name="sparkles" size={16} color={colors.primary} />
                     <Text style={styles.inspireMeButtonText}>Inspire me</Text>
@@ -583,7 +585,7 @@ export default function CreateScreen() {
 
               {isReady && !isDiscovering ? (
                 <View style={styles.readyContainer}>
-                  <View style={styles.readyCard}>
+                  <View style={styles.readyCard} testID="create-ready-card">
                     <Text style={styles.readyTitle}>Ready to create</Text>
                     <Text style={styles.readySubtitle}>
                       {metadata?.topic ?? 'Your podcast'}
@@ -599,6 +601,7 @@ export default function CreateScreen() {
                           ? () => router.push('/settings/api-keys')
                           : handleNextToVoice
                       }
+                      testID="create-next-voices-button"
                     >
                       <Text style={styles.createButtonText}>
                         {missingKeys
@@ -645,6 +648,7 @@ export default function CreateScreen() {
               editable={!isDiscovering}
               multiline
               maxLength={1000}
+              testID="create-chat-input"
             />
             <Pressable
               style={({ pressed }) => [
@@ -655,6 +659,7 @@ export default function CreateScreen() {
               ]}
               onPress={handleSend}
               disabled={!inputText.trim() || isDiscovering}
+              testID="create-send-button"
             >
               <Ionicons name="arrow-up" size={20} color={colors.textInverse} />
             </Pressable>
@@ -702,7 +707,7 @@ export default function CreateScreen() {
         </ScrollView>
 
         <View style={styles.voiceFooter}>
-          <Pressable style={styles.backButton} onPress={handleBack}>
+          <Pressable style={styles.backButton} onPress={handleBack} testID="create-voice-back-button">
             <Text style={styles.backButtonText}>Back</Text>
           </Pressable>
           <Pressable
@@ -713,6 +718,7 @@ export default function CreateScreen() {
             ]}
             onPress={handleGenerateScript}
             disabled={createMutation.isPending}
+            testID="create-generate-script-button"
           >
             {createMutation.isPending ? (
               <ActivityIndicator size="small" color={colors.textInverse} />

@@ -315,7 +315,7 @@ class GoogleProvider implements AIProvider {
     const { default: OpenAI } = await import('openai');
     return new OpenAI({
       apiKey,
-      baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/',
+      baseURL: process.env.GOOGLE_AI_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta/openai/',
     });
   }
 

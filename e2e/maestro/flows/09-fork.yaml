@@ -1,0 +1,38 @@
+appId: fm.sotto.app
+name: Fork - Create Remix from Podcast
+tags: [fork, critical]
+---
+- runFlow: ../helpers/login.yaml
+
+# Navigate to first podcast in feed
+- extendedWaitUntil:
+    visible:
+      id: "feed-podcast-list"
+    timeout: 5000
+- tapOn:
+    text: "E2E Test Podcast"
+- extendedWaitUntil:
+    visible:
+      id: "player-fork-button"
+    timeout: 5000
+
+# Open fork modal
+- tapOn:
+    id: "player-fork-button"
+- extendedWaitUntil:
+    visible:
+      id: "fork-angle-input"
+    timeout: 3000
+
+# Enter fork angle and submit
+- tapOn:
+    id: "fork-angle-input"
+- inputText: "My unique take on this topic"
+- tapOn:
+    id: "fork-submit-button"
+
+# Wait for generation to start
+- extendedWaitUntil:
+    visible:
+      id: "generation-progress"
+    timeout: 10000
