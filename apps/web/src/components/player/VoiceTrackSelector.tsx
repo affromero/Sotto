@@ -35,7 +35,7 @@ function buildVoiceTooltip(voices: VoiceTrackSummary['voices']): string | undefi
   return voices
     .map((v) => {
       const provider = v.provider ? (PROVIDER_DISPLAY[v.provider] ?? v.provider) : '';
-      const voice = v.voiceId || 'Auto';
+      const voice = v.voiceName || v.voiceId || 'Auto';
       return `${v.speaker}: ${voice}${provider ? ` [${provider}]` : ''}`;
     })
     .join('\n');
