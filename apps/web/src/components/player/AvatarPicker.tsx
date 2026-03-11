@@ -165,7 +165,18 @@ export function AvatarPicker({ podcastId, speakers, segments, onConfigured, onCa
   }, [selections, podcastId, onConfigured, segmentsBySpeaker, enabledSegments]);
 
   const selectedCount = Object.keys(selections).length;
-  const estimatedCost = estimateAvatarCost(podcastDuration, selectedCount, pricing.costPerMinute);
+  const estimatedCost = useMemo(() => {
+    let total = 0;
+    for (const speaker of Object.keys(selections)) {
+      const speakerSegs = segmentsBySpeaker[speaker] ?? [];
+      const enabled = enabledSegments[speaker];
+      // No custom enablement → all segments for this speaker
+      const activeSegs = !enabled ? speakerSegs : speakerSegs.filter((s) => enabled.has(s.id));
+      const duration = activeSegs.reduce((sum, s) => sum + (s.duration ?? 0), 0);
+      total += estimateAvatarCost(duration, 1, pricing.costPerMinute);
+    }
+    return total;
+  }, [selections, segmentsBySpeaker, enabledSegments, pricing.costPerMinute]);
 
   // Check if any selection uses Runway
   const hasRunwaySelection = Object.values(selections).some((s) => s.provider === 'runway');
