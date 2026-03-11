@@ -92,13 +92,118 @@ function statusBadge(status: string): string {
   }
 }
 
-function statusColor(status: string): string {
-  switch (status) {
-    case 'READY': return 'var(--color-success, #22c55e)';
-    case 'GENERATING': return 'var(--color-primary)';
-    case 'FAILED': return 'var(--color-error, #ef4444)';
-    default: return 'var(--color-text-secondary)';
+
+// ---------------------------------------------------------------------------
+// Progress step text — mapped to actual worker breakpoints
+// ---------------------------------------------------------------------------
+
+type AssetLabel = 'Recording' | 'Voiceover' | 'Visual' | 'Transition' | 'Scene Compose' | 'Final Compose';
+
+const PROGRESS_STEPS: Record<AssetLabel, { threshold: number; text: string }[]> = {
+  Recording: [
+    { threshold: 0, text: 'Queuing...' },
+    { threshold: 10, text: 'Starting Remotion...' },
+    { threshold: 20, text: 'Recording in progress...' },
+    { threshold: 70, text: 'Downloading output...' },
+    { threshold: 80, text: 'Uploading to storage...' },
+  ],
+  Voiceover: [
+    { threshold: 0, text: 'Queuing...' },
+    { threshold: 10, text: 'Resolving TTS provider...' },
+    { threshold: 30, text: 'Generating speech...' },
+    { threshold: 70, text: 'Uploading audio...' },
+  ],
+  Visual: [
+    { threshold: 0, text: 'Queuing...' },
+    { threshold: 10, text: 'Preparing prompt...' },
+    { threshold: 20, text: 'Generating with AI...' },
+    { threshold: 80, text: 'Uploading visual...' },
+  ],
+  Transition: [
+    { threshold: 0, text: 'Queuing...' },
+    { threshold: 10, text: 'Preparing...' },
+    { threshold: 40, text: 'Downloading clips...' },
+    { threshold: 70, text: 'Crossfading with FFmpeg...' },
+  ],
+  'Scene Compose': [
+    { threshold: 0, text: 'Queuing...' },
+    { threshold: 5, text: 'Probing durations...' },
+    { threshold: 15, text: 'Rendering with Remotion...' },
+    { threshold: 70, text: 'Downloading render...' },
+    { threshold: 75, text: 'Uploading...' },
+    { threshold: 85, text: 'Saving metadata...' },
+  ],
+  'Final Compose': [
+    { threshold: 0, text: 'Queuing...' },
+    { threshold: 5, text: 'Probing scene durations...' },
+    { threshold: 8, text: 'Building composition...' },
+    { threshold: 10, text: 'Rendering final video...' },
+    { threshold: 65, text: 'Downloading render...' },
+    { threshold: 70, text: 'Uploading video...' },
+    { threshold: 80, text: 'Saving metadata...' },
+  ],
+};
+
+function getProgressText(label: AssetLabel, progress: number): string {
+  const steps = PROGRESS_STEPS[label];
+  let text = steps[0].text;
+  for (const step of steps) {
+    if (progress >= step.threshold) text = step.text;
   }
+  return text;
+}
+
+// ---------------------------------------------------------------------------
+// useJobProgress — polls BullMQ job status
+// ---------------------------------------------------------------------------
+
+interface JobProgress {
+  state: string;
+  progress: number;
+  failedReason: string | null;
+}
+
+function useJobProgress(jobId: string | null, onComplete?: () => void): JobProgress | null {
+  const [data, setData] = useState<JobProgress | null>(null);
+  const onCompleteRef = useRef(onComplete);
+  useEffect(() => { onCompleteRef.current = onComplete; });
+
+  useEffect(() => {
+    if (!jobId) {
+      // Reset data on next microtask to avoid synchronous setState in effect
+      const id = requestAnimationFrame(() => setData(null));
+      return () => cancelAnimationFrame(id);
+    }
+
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/admin/demo/job-status/${jobId}`);
+        if (cancelled) return;
+        if (!res.ok) {
+          setData(null);
+          return;
+        }
+        const result: JobProgress = await res.json();
+        setData(result);
+        if (result.state === 'completed' || result.state === 'failed') {
+          onCompleteRef.current?.();
+          return;
+        }
+      } catch {
+        if (cancelled) return;
+        setData(null);
+        return;
+      }
+      if (!cancelled) {
+        timerId = window.setTimeout(poll, 1500);
+      }
+    };
+    let timerId = window.setTimeout(poll, 300);
+    return () => { cancelled = true; clearTimeout(timerId); };
+  }, [jobId]);
+
+  return data;
 }
 
 // ---------------------------------------------------------------------------
@@ -247,16 +352,20 @@ export function DemoStudio() {
     }
   }, [selectedProject, loadProject]);
 
-  const generateAsset = useCallback(async (sceneId: string, assetType: string) => {
-    if (!selectedProject) return;
+  const generateAsset = useCallback(async (sceneId: string, assetType: string): Promise<string | undefined> => {
+    if (!selectedProject) return undefined;
     try {
       const res = await fetch(`/api/admin/demo/${selectedProject.id}/scenes/${sceneId}/${assetType}`, { method: 'POST' });
       if (!res.ok) {
         setError(`Failed to generate ${assetType}: ${res.status} ${await res.text()}`);
+        return undefined;
       }
+      const data = await res.json();
       await loadProject(selectedProject.id);
+      return data.jobId as string | undefined;
     } catch (err) {
       setError(`Failed to generate ${assetType}: ${err instanceof Error ? err.message : String(err)}`);
+      return undefined;
     }
   }, [selectedProject, loadProject]);
 
@@ -276,16 +385,20 @@ export function DemoStudio() {
     }
   }, [selectedProject, loadProject]);
 
-  const composeScene = useCallback(async (sceneId: string) => {
-    if (!selectedProject) return;
+  const composeScene = useCallback(async (sceneId: string): Promise<string | undefined> => {
+    if (!selectedProject) return undefined;
     try {
       const res = await fetch(`/api/admin/demo/${selectedProject.id}/scenes/${sceneId}/compose`, { method: 'POST' });
       if (!res.ok) {
         setError(`Failed to compose scene: ${res.status} ${await res.text()}`);
+        return undefined;
       }
+      const data = await res.json();
       await loadProject(selectedProject.id);
+      return data.jobId as string | undefined;
     } catch (err) {
       setError(`Failed to compose scene: ${err instanceof Error ? err.message : String(err)}`);
+      return undefined;
     }
   }, [selectedProject, loadProject]);
 
@@ -310,6 +423,8 @@ export function DemoStudio() {
     }
   }, [selectedProject, loadProject]);
 
+  const [composeVideoJobId, setComposeVideoJobId] = useState<string | null>(null);
+
   const composeVideo = useCallback(async () => {
     if (!selectedProject) return;
     setLoading(true);
@@ -317,7 +432,10 @@ export function DemoStudio() {
       const res = await fetch(`/api/admin/demo/${selectedProject.id}/compose`, { method: 'POST' });
       if (!res.ok) {
         setError(`Failed to compose video: ${res.status} ${await res.text()}`);
+        return;
       }
+      const data = await res.json();
+      if (data.jobId) setComposeVideoJobId(data.jobId);
       await loadProject(selectedProject.id);
       setStep('compose');
     } catch (err) {
@@ -358,6 +476,18 @@ export function DemoStudio() {
     if (s === 'compose') return allScenesComposed;
     return false;
   };
+
+  const composeVideoProgress = useJobProgress(composeVideoJobId, () => {
+    setComposeVideoJobId(null);
+    if (selectedProject) loadProject(selectedProject.id);
+  });
+
+  // Clear compose job when project finishes
+  useEffect(() => {
+    if (selectedProject?.status === 'READY' || selectedProject?.status === 'FAILED') {
+      setComposeVideoJobId(null);
+    }
+  }, [selectedProject?.status]);
 
   const totalAdjustedDuration = scenes.reduce((sum, s) => {
     if (s.timingSegments && s.timingSegments.length > 0) {
@@ -518,87 +648,84 @@ export function DemoStudio() {
             </div>
           </div>
           <div className={styles.assetGrid}>
-            {scenes.map((scene) => {
-              const sceneAssetsReady = scene.recordingStatus === 'READY' && scene.voiceoverStatus === 'READY';
-              return (
-                <div key={scene.id} className={styles.assetCard}>
-                  <div className={styles.assetCardHeader}>
-                    <h3 className={styles.assetTitle}>
-                      Scene {scene.order + 1}: {scene.title}
-                    </h3>
-                    <span className={styles.badge} style={{ color: statusColor(scene.compositedStatus) }}>
-                      {scene.compositedStatus === 'READY' ? 'Composed' : statusBadge(scene.compositedStatus)}
-                    </span>
-                  </div>
-
-                  {/* TTS picker */}
-                  <TtsPicker
-                    scene={scene}
-                    ttsOptions={ttsOptions}
-                    onSave={(data) => saveScene(scene.id, data)}
-                  />
-
-                  {/* Asset row: recording, voiceover, visual, transition */}
-                  <div className={styles.assetRow}>
-                    <AssetStatus
-                      label="Recording"
-                      status={scene.recordingStatus}
-                      url={scene.recordingUrl}
-                      onGenerate={() => generateAsset(scene.id, 'record')}
-                      mediaType="video"
-                      failedReason={scene.recordingStatus === 'FAILED' ? scene.failedReason : null}
-                    />
-                    <AssetStatus
-                      label="Voiceover"
-                      status={scene.voiceoverStatus}
-                      url={scene.voiceoverUrl}
-                      onGenerate={() => generateAsset(scene.id, 'voiceover')}
-                      mediaType="audio"
-                      failedReason={scene.voiceoverStatus === 'FAILED' ? scene.failedReason : null}
-                    />
-                    {scene.visualType && (
-                      <AssetStatus
-                        label="Visual"
-                        status={scene.visualStatus}
-                        url={scene.visualUrl}
-                        onGenerate={() => generateAsset(scene.id, 'visual')}
-                        mediaType={scene.visualType === 'ai_video' ? 'video' : 'image'}
-                        failedReason={scene.visualStatus === 'FAILED' ? scene.failedReason : null}
-                      />
-                    )}
-                    {scene.transitionType && (
-                      <AssetStatus
-                        label="Transition"
-                        status={scene.transitionStatus}
-                        url={scene.transitionUrl}
-                        onGenerate={() => generateAsset(scene.id, 'transition')}
-                        mediaType="video"
-                        failedReason={scene.transitionStatus === 'FAILED' ? scene.failedReason : null}
-                      />
-                    )}
-                  </div>
-
-                  {/* Compose scene row */}
-                  <div className={styles.composeRow}>
-                    <button
-                      className={styles.secondaryBtn}
-                      onClick={() => composeScene(scene.id)}
-                      disabled={!sceneAssetsReady || scene.compositedStatus === 'GENERATING'}
-                    >
-                      {scene.compositedStatus === 'GENERATING' ? 'Composing...'
-                        : scene.compositedStatus === 'READY' ? 'Recompose Scene'
-                        : 'Compose Scene'}
-                    </button>
-                    {scene.compositedStatus === 'FAILED' && scene.failedReason && (
-                      <p className={styles.failedReason}>{scene.failedReason}</p>
-                    )}
-                    {scene.compositedUrl && scene.compositedStatus === 'READY' && (
-                      <ScenePreview url={scene.compositedUrl} />
-                    )}
-                  </div>
+            {scenes.map((scene) => (
+              <div key={scene.id} className={styles.assetCard}>
+                <div className={styles.assetCardHeader}>
+                  <h3 className={styles.assetTitle}>
+                    Scene {scene.order + 1}: {scene.title}
+                  </h3>
+                  <span className={styles.badge} data-status={scene.compositedStatus.toLowerCase()}>
+                    {scene.compositedStatus === 'READY' ? 'Composed' : statusBadge(scene.compositedStatus)}
+                  </span>
                 </div>
-              );
-            })}
+
+                {/* TTS picker */}
+                <TtsPicker
+                  scene={scene}
+                  ttsOptions={ttsOptions}
+                  onSave={(data) => saveScene(scene.id, data)}
+                />
+
+                {/* Asset row: recording, voiceover, visual, transition */}
+                <div className={styles.assetRow}>
+                  <AssetStatus
+                    label="Recording"
+                    status={scene.recordingStatus}
+                    url={scene.recordingUrl}
+                    onGenerate={() => generateAsset(scene.id, 'record')}
+                    mediaType="video"
+                    failedReason={scene.recordingStatus === 'FAILED' ? scene.failedReason : null}
+                    onJobComplete={() => loadProject(selectedProject!.id)}
+                  />
+                  <AssetStatus
+                    label="Voiceover"
+                    status={scene.voiceoverStatus}
+                    url={scene.voiceoverUrl}
+                    onGenerate={() => generateAsset(scene.id, 'voiceover')}
+                    mediaType="audio"
+                    failedReason={scene.voiceoverStatus === 'FAILED' ? scene.failedReason : null}
+                    onJobComplete={() => loadProject(selectedProject!.id)}
+                  />
+                  {scene.visualType && (
+                    <AssetStatus
+                      label="Visual"
+                      status={scene.visualStatus}
+                      url={scene.visualUrl}
+                      onGenerate={() => generateAsset(scene.id, 'visual')}
+                      mediaType={scene.visualType === 'ai_video' ? 'video' : 'image'}
+                      failedReason={scene.visualStatus === 'FAILED' ? scene.failedReason : null}
+                      onJobComplete={() => loadProject(selectedProject!.id)}
+                    />
+                  )}
+                  {scene.transitionType && (
+                    <AssetStatus
+                      label="Transition"
+                      status={scene.transitionStatus}
+                      url={scene.transitionUrl}
+                      onGenerate={() => generateAsset(scene.id, 'transition')}
+                      mediaType="video"
+                      failedReason={scene.transitionStatus === 'FAILED' ? scene.failedReason : null}
+                      onJobComplete={() => loadProject(selectedProject!.id)}
+                    />
+                  )}
+                </div>
+
+                {/* Compose scene row */}
+                <div className={styles.composeRow}>
+                  <ComposeSceneButton
+                    scene={scene}
+                    onCompose={() => composeScene(scene.id)}
+                    onJobComplete={() => loadProject(selectedProject!.id)}
+                  />
+                  {scene.compositedStatus === 'FAILED' && scene.failedReason && (
+                    <p className={styles.failedReason}>{scene.failedReason}</p>
+                  )}
+                  {scene.compositedUrl && scene.compositedStatus === 'READY' && (
+                    <ScenePreview url={scene.compositedUrl} />
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -638,11 +765,18 @@ export function DemoStudio() {
           {selectedProject.status === 'COMPOSING' && (
             <div className={styles.generatingBanner}>
               <span className={styles.spinner} />
-              <div>
+              <div style={{ flex: 1 }}>
                 <strong>Composing final video...</strong>
-                <p className={styles.emptyText}>
-                  SFX mixing, text overlays, avatar PiP, background music, and warm amber grading.
-                </p>
+                {composeVideoProgress ? (
+                  <JobProgressBar
+                    label="Final Compose"
+                    progress={composeVideoProgress.progress}
+                  />
+                ) : (
+                  <p className={styles.emptyText}>
+                    SFX mixing, text overlays, avatar PiP, background music, and warm amber grading.
+                  </p>
+                )}
               </div>
             </div>
           )}
@@ -677,6 +811,24 @@ export function DemoStudio() {
 // Sub-components (kept in same file — small, tightly coupled)
 // ---------------------------------------------------------------------------
 
+function JobProgressBar({ label, progress }: { label: AssetLabel; progress: number }) {
+  const pct = Math.min(100, Math.max(0, Math.round(progress)));
+  return (
+    <div className={styles.progressContainer}>
+      <div className={styles.progressTrack}>
+        <div
+          className={styles.progressFill}
+          style={{ '--progress': pct } as React.CSSProperties}
+        />
+      </div>
+      <div className={styles.progressText}>
+        <span>{getProgressText(label, pct)}</span>
+        <span>{pct}%</span>
+      </div>
+    </div>
+  );
+}
+
 function AssetStatus({
   label,
   status,
@@ -684,24 +836,53 @@ function AssetStatus({
   onGenerate,
   mediaType,
   failedReason,
+  onJobComplete,
 }: {
-  label: string;
+  label: AssetLabel;
   status: string;
   url: string | null;
-  onGenerate: () => void;
+  onGenerate: () => Promise<string | undefined>;
   mediaType: 'video' | 'audio' | 'image';
   failedReason?: string | null;
+  onJobComplete?: () => void;
 }) {
   const [previewing, setPreviewing] = useState(false);
+  const [jobId, setJobId] = useState<string | null>(null);
+
+  const jobProgress = useJobProgress(jobId, () => {
+    setJobId(null);
+    onJobComplete?.();
+  });
+
+  // Clear job tracking when asset finishes via DB status
+  const prevStatusRef = useRef(status);
+  useEffect(() => {
+    const prev = prevStatusRef.current;
+    prevStatusRef.current = status;
+    if (prev !== status && (status === 'READY' || status === 'FAILED')) {
+      const id = requestAnimationFrame(() => setJobId(null));
+      return () => cancelAnimationFrame(id);
+    }
+  }, [status]);
+
+  const handleGenerate = useCallback(async () => {
+    const id = await onGenerate();
+    if (id) setJobId(id);
+  }, [onGenerate]);
+
+  const isGenerating = status === 'GENERATING';
 
   return (
     <div className={styles.assetItem}>
       <div className={styles.assetLabel}>
         <span>{label}</span>
-        <span className={styles.badge} style={{ color: statusColor(status) }}>
+        <span className={styles.badge} data-status={status.toLowerCase()}>
           {statusBadge(status)}
         </span>
       </div>
+      {isGenerating && jobProgress && (
+        <JobProgressBar label={label} progress={jobProgress.progress} />
+      )}
       {status === 'FAILED' && failedReason && (
         <p className={styles.failedReason}>{failedReason}</p>
       )}
@@ -722,12 +903,64 @@ function AssetStatus({
       )}
       <button
         className={styles.secondaryBtn}
-        onClick={onGenerate}
-        disabled={status === 'GENERATING'}
+        onClick={handleGenerate}
+        disabled={isGenerating}
       >
         {status === 'READY' || status === 'FAILED' ? 'Regenerate' : 'Generate'}
       </button>
     </div>
+  );
+}
+
+function ComposeSceneButton({
+  scene,
+  onCompose,
+  onJobComplete,
+}: {
+  scene: DemoScene;
+  onCompose: () => Promise<string | undefined>;
+  onJobComplete?: () => void;
+}) {
+  const [jobId, setJobId] = useState<string | null>(null);
+  const sceneAssetsReady = scene.recordingStatus === 'READY' && scene.voiceoverStatus === 'READY';
+
+  const jobProgress = useJobProgress(jobId, () => {
+    setJobId(null);
+    onJobComplete?.();
+  });
+
+  const prevCompStatusRef = useRef(scene.compositedStatus);
+  useEffect(() => {
+    const prev = prevCompStatusRef.current;
+    prevCompStatusRef.current = scene.compositedStatus;
+    if (prev !== scene.compositedStatus && (scene.compositedStatus === 'READY' || scene.compositedStatus === 'FAILED')) {
+      const id = requestAnimationFrame(() => setJobId(null));
+      return () => cancelAnimationFrame(id);
+    }
+  }, [scene.compositedStatus]);
+
+  const handleCompose = useCallback(async () => {
+    const id = await onCompose();
+    if (id) setJobId(id);
+  }, [onCompose]);
+
+  const isComposing = scene.compositedStatus === 'GENERATING';
+
+  return (
+    <>
+      <button
+        className={styles.secondaryBtn}
+        onClick={handleCompose}
+        disabled={!sceneAssetsReady || isComposing}
+      >
+        {isComposing ? 'Composing...'
+          : scene.compositedStatus === 'READY' ? 'Recompose Scene'
+          : 'Compose Scene'}
+      </button>
+      {isComposing && jobProgress && (
+        <JobProgressBar label="Scene Compose" progress={jobProgress.progress} />
+      )}
+    </>
   );
 }
 
