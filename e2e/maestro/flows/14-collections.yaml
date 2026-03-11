@@ -1,0 +1,36 @@
+appId: fm.sotto.app
+name: Collections - Create and Browse
+tags: [collections]
+---
+- runFlow: ../helpers/login.yaml
+
+# Navigate to profile tab where collections are accessible
+- tapOn:
+    text: "Profile"
+
+# Look for collections link/button
+- tapOn:
+    text: "Collections"
+- extendedWaitUntil:
+    visible:
+      id: "collections-list"
+    timeout: 5000
+
+# Create a new collection
+- tapOn:
+    id: "collections-add-button"
+- extendedWaitUntil:
+    visible:
+      id: "collections-new-name-input"
+    timeout: 3000
+- tapOn:
+    id: "collections-new-name-input"
+- inputText: "Maestro Test Collection"
+- tapOn:
+    id: "collections-new-save-button"
+
+# Wait for collection to appear in list
+- extendedWaitUntil:
+    visible:
+      text: "Maestro Test Collection"
+    timeout: 5000

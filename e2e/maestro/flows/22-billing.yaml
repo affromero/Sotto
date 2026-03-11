@@ -1,0 +1,25 @@
+appId: fm.sotto.app
+name: Billing - Plan Display
+tags: [billing, settings]
+---
+- runFlow: ../helpers/login.yaml
+
+# Navigate to billing via settings
+- tapOn:
+    text: "Profile"
+- tapOn:
+    id: "profile-settings-button"
+- tapOn:
+    id: "settings-billing"
+- extendedWaitUntil:
+    visible:
+      id: "billing-plan-card"
+    timeout: 5000
+
+# Verify billing sections
+- assertVisible:
+    id: "billing-plan-name"
+- assertVisible:
+    id: "billing-limits-card"
+- assertVisible:
+    id: "billing-upgrade-button"

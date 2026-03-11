@@ -1,0 +1,60 @@
+appId: fm.sotto.app
+name: Settings - Navigate All Sub-screens
+tags: [settings]
+---
+- runFlow: ../helpers/login.yaml
+
+# Open settings from profile tab
+- tapOn:
+    text: "Profile"
+- tapOn:
+    id: "profile-settings-button"
+- extendedWaitUntil:
+    visible:
+      id: "settings-scroll"
+    timeout: 3000
+
+# Navigate to Edit Profile and back
+- tapOn:
+    id: "settings-edit-profile"
+- extendedWaitUntil:
+    visible:
+      id: "profile-edit-name-input"
+    timeout: 3000
+- back
+
+# Navigate to Notifications and back
+- tapOn:
+    id: "settings-notifications"
+- extendedWaitUntil:
+    visible:
+      text: "Notifications"
+    timeout: 3000
+- back
+
+# Navigate to Interests and back
+- tapOn:
+    id: "settings-interests"
+- extendedWaitUntil:
+    visible:
+      id: "interests-save-button"
+    timeout: 3000
+- back
+
+# Navigate to Billing and back
+- tapOn:
+    id: "settings-billing"
+- extendedWaitUntil:
+    visible:
+      id: "billing-plan-card"
+    timeout: 3000
+- back
+
+# Navigate to Referral and back
+- tapOn:
+    id: "settings-referral"
+- extendedWaitUntil:
+    visible:
+      id: "referral-copy-button"
+    timeout: 3000
+- back
