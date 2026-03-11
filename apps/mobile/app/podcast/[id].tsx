@@ -425,6 +425,7 @@ export default function PodcastScreen() {
           }}
           accessibilityRole="adjustable"
           accessibilityLabel={`Playback progress: ${formatTime(position)} of ${formatTime(totalDuration)}`}
+          testID="player-progress-bar"
         >
           <View style={styles.progressTrack}>
             <View
@@ -453,6 +454,7 @@ export default function PodcastScreen() {
             style={styles.skipButton}
             accessibilityLabel="Skip backward 15 seconds"
             accessibilityRole="button"
+            testID="player-skip-back"
           >
             <Ionicons name="play-back" size={24} color={colors.primary} />
           </Pressable>
@@ -463,6 +465,7 @@ export default function PodcastScreen() {
               style={styles.playButton}
               accessibilityLabel={isPlaying ? 'Pause' : 'Play'}
               accessibilityRole="button"
+              testID="player-play-pause"
             >
               <Ionicons name={isPlaying ? 'pause' : 'play'} size={28} color={colors.textInverse} style={!isPlaying && styles.playIconOffset} />
             </Pressable>
@@ -473,6 +476,7 @@ export default function PodcastScreen() {
             style={styles.skipButton}
             accessibilityLabel="Skip forward 15 seconds"
             accessibilityRole="button"
+            testID="player-skip-forward"
           >
             <Ionicons name="play-forward" size={24} color={colors.primary} />
           </Pressable>
@@ -485,6 +489,7 @@ export default function PodcastScreen() {
             style={styles.speedButton}
             accessibilityLabel={`Playback speed: ${PLAYBACK_SPEEDS[speedIndex]}x`}
             accessibilityRole="button"
+            testID="player-speed-button"
           >
             <Text style={styles.speedText}>
               {PLAYBACK_SPEEDS[speedIndex]}x
@@ -503,6 +508,7 @@ export default function PodcastScreen() {
               style={styles.actionIcon}
               accessibilityLabel={podcast.isLiked ? 'Unlike podcast' : 'Like podcast'}
               accessibilityRole="button"
+              testID="player-like-button"
             >
               <Animated.View style={likeAnimatedStyle}>
                 <Ionicons
@@ -527,6 +533,7 @@ export default function PodcastScreen() {
               accessibilityLabel={podcast.isSaved ? 'Unsave podcast' : 'Save podcast'}
               accessibilityHint="Long press to add to collection"
               accessibilityRole="button"
+              testID="player-save-button"
             >
               <Animated.View style={saveAnimatedStyle}>
                 <Ionicons
@@ -543,6 +550,7 @@ export default function PodcastScreen() {
               style={styles.actionIcon}
               accessibilityLabel="Share podcast"
               accessibilityRole="button"
+              testID="player-share-button"
             >
               <Ionicons name="share-outline" size={22} color={colors.textSecondary} />
             </Pressable>
@@ -552,6 +560,7 @@ export default function PodcastScreen() {
               style={styles.actionIcon}
               accessibilityLabel="Fork podcast"
               accessibilityRole="button"
+              testID="player-fork-button"
             >
               <Ionicons name="git-branch-outline" size={22} color={colors.textSecondary} />
               {isOwner && podcast.forks.length > 0 && (
@@ -615,6 +624,7 @@ export default function PodcastScreen() {
           ]}
           accessibilityLabel={`Teleprompter: ${teleprompterEnabled ? 'on' : 'off'}`}
           accessibilityRole="switch"
+          testID="player-teleprompter-toggle"
         >
           <Text
             style={[
@@ -730,6 +740,7 @@ export default function PodcastScreen() {
           style={styles.askButtonInner}
           accessibilityLabel="Ask a question about this podcast"
           accessibilityRole="button"
+          testID="player-question-button"
         >
           <Text style={styles.askButtonText}>Ask a Question</Text>
         </Pressable>
@@ -758,6 +769,7 @@ export default function PodcastScreen() {
               maxLength={500}
               autoFocus
               accessibilityLabel="Question input"
+              testID="player-question-input"
             />
             <View style={styles.modalActions}>
               <Pressable
@@ -768,6 +780,7 @@ export default function PodcastScreen() {
                 style={styles.cancelButton}
                 accessibilityLabel="Cancel"
                 accessibilityRole="button"
+                testID="player-question-cancel"
               >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </Pressable>
@@ -781,6 +794,7 @@ export default function PodcastScreen() {
                 disabled={!questionText.trim() || interactMutation.isPending}
                 accessibilityLabel="Submit question"
                 accessibilityRole="button"
+                testID="player-question-submit"
               >
                 {interactMutation.isPending ? (
                   <ActivityIndicator size="small" color={colors.textInverse} />

@@ -205,6 +205,7 @@ export default function ProfileScreen() {
           style={styles.settingsButton}
           onPress={handleSettingsPress}
           hitSlop={8}
+          testID="profile-settings-button"
         >
           <Ionicons name="settings-outline" size={22} color={colors.textSecondary} />
         </Pressable>
@@ -276,6 +277,7 @@ export default function ProfileScreen() {
   return (
     <View style={globalStyles.screenContainer}>
       <FlatList
+        testID="profile-podcast-list"
         data={podcasts}
         renderItem={renderPodcastItem}
         keyExtractor={keyExtractor}
@@ -327,6 +329,7 @@ export default function ProfileScreen() {
                 pressed && styles.logoutButtonPressed,
               ]}
               onPress={handleLogout}
+              testID="profile-logout-button"
             >
               <Text style={styles.logoutButtonText}>Log Out</Text>
             </Pressable>

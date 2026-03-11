@@ -109,6 +109,7 @@ export default function OnboardingScreen() {
             placeholderTextColor={colors.textTertiary}
             maxLength={50}
             autoFocus
+            testID="onboarding-name-input"
           />
 
           <Pressable
@@ -119,6 +120,7 @@ export default function OnboardingScreen() {
             ]}
             onPress={() => nameMutation.mutate()}
             disabled={!name.trim() || nameMutation.isPending}
+            testID="onboarding-name-continue"
           >
             {nameMutation.isPending ? (
               <ActivityIndicator size="small" color={colors.textInverse} />
@@ -152,6 +154,7 @@ export default function OnboardingScreen() {
                     return (
                       <Pressable
                         key={tag.id}
+                        testID={`onboarding-tag-${tag.id}`}
                         style={[
                           styles.chip,
                           isSelected && styles.chipSelected,
@@ -181,6 +184,7 @@ export default function OnboardingScreen() {
             ]}
             onPress={() => interestsMutation.mutate()}
             disabled={interestsMutation.isPending}
+            testID="onboarding-interests-continue"
           >
             {interestsMutation.isPending ? (
               <ActivityIndicator size="small" color={colors.textInverse} />
@@ -205,7 +209,7 @@ export default function OnboardingScreen() {
       <Text style={styles.doneSubheading}>
         Start exploring podcasts or create your first one.
       </Text>
-      <Pressable style={styles.primaryButton} onPress={handleFinish}>
+      <Pressable style={styles.primaryButton} onPress={handleFinish} testID="onboarding-done-button">
         <Text style={styles.primaryButtonText}>Let's Go</Text>
       </Pressable>
     </View>

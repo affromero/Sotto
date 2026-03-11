@@ -150,7 +150,7 @@ export function ScriptPreview({ podcastId, onApprove, onRegenerate, onEdit }: Sc
       />
 
       <View style={styles.footer}>
-        <Pressable style={styles.secondaryButton} onPress={handleRegenerate}>
+        <Pressable style={styles.secondaryButton} onPress={handleRegenerate} testID="script-regenerate-button">
           <Text style={styles.secondaryButtonText}>Regenerate</Text>
         </Pressable>
         {onEdit && data?.turns && (
@@ -158,7 +158,7 @@ export function ScriptPreview({ podcastId, onApprove, onRegenerate, onEdit }: Sc
             <Text style={styles.secondaryButtonText}>Edit</Text>
           </Pressable>
         )}
-        <Pressable style={styles.primaryButton} onPress={onApprove}>
+        <Pressable style={styles.primaryButton} onPress={onApprove} testID="script-approve-button">
           <Text style={styles.primaryButtonText}>Generate Audio</Text>
         </Pressable>
       </View>

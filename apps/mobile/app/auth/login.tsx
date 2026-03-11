@@ -270,11 +270,12 @@ export default function LoginScreen() {
                 returnKeyType="done"
                 onSubmitEditing={handleDevSignIn}
                 accessibilityLabel="Email address"
+                testID="login-email-input"
               />
             </View>
 
             {errorMessage !== '' && (
-              <View style={styles.errorContainer}>
+              <View style={styles.errorContainer} testID="login-error-message">
                 <Text style={styles.errorText}>{errorMessage}</Text>
               </View>
             )}
@@ -288,6 +289,7 @@ export default function LoginScreen() {
               disabled={loading}
               accessibilityLabel="Sign in"
               accessibilityRole="button"
+              testID="login-sign-in-button"
             >
               {loading ? (
                 <ActivityIndicator size="small" color={colors.textInverse} />
@@ -300,7 +302,7 @@ export default function LoginScreen() {
           /* Production: OAuth buttons */
           <View style={styles.formSection}>
             {errorMessage !== '' && (
-              <View style={styles.errorContainer}>
+              <View style={styles.errorContainer} testID="login-error-message">
                 <Text style={styles.errorText}>{errorMessage}</Text>
               </View>
             )}
@@ -312,6 +314,7 @@ export default function LoginScreen() {
                 disabled={loading}
                 accessibilityLabel="Sign in with Apple"
                 accessibilityRole="button"
+                testID="login-apple-button"
               >
                 <Text style={[styles.oauthButtonText, styles.oauthButtonTextApple]}>
                   Sign in with Apple
@@ -326,6 +329,7 @@ export default function LoginScreen() {
                 disabled={loading}
                 accessibilityLabel="Sign in with Google"
                 accessibilityRole="button"
+                testID="login-google-button"
               >
                 <Text style={styles.oauthButtonText}>
                   Sign in with Google
@@ -340,6 +344,7 @@ export default function LoginScreen() {
                 disabled={loading}
                 accessibilityLabel="Sign in with GitHub"
                 accessibilityRole="button"
+                testID="login-github-button"
               >
                 <Text style={[styles.oauthButtonText, styles.oauthButtonTextApple]}>
                   Sign in with GitHub
