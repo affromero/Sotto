@@ -9,11 +9,27 @@ import { seedTestUser } from '../helpers/seed';
  *
  * The JWT is generated using the same NEXTAUTH_SECRET the dev server uses.
  */
-export const test = base.extend<{ authedContext: BrowserContext }>({
-  authedContext: async ({ browser }, use) => {
-    // Seed user and get session token
-    const { sessionToken } = await seedTestUser();
 
+// Store seed data at module level so it's shared across fixtures
+let seedData: Awaited<ReturnType<typeof seedTestUser>> | null = null;
+
+async function getSeedData() {
+  if (!seedData) {
+    seedData = await seedTestUser();
+  }
+  return seedData;
+}
+
+export const test = base.extend<{
+  authedContext: BrowserContext;
+  seedData: Awaited<ReturnType<typeof seedTestUser>>;
+}>({
+  seedData: async ({}, use) => {
+    const data = await getSeedData();
+    await use(data);
+  },
+  authedContext: async ({ browser }, use) => {
+    const { sessionToken } = await getSeedData();
     const context = await browser.newContext();
     await context.addCookies([
       {
@@ -25,7 +41,6 @@ export const test = base.extend<{ authedContext: BrowserContext }>({
         sameSite: 'Lax',
       },
     ]);
-
     await use(context);
     await context.close();
   },

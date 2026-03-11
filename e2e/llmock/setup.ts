@@ -104,6 +104,60 @@ EXPERT: My pleasure. There's so much more to explore, and I'm excited to see whe
     }
   );
 
+  // Fork / remix — generates a remixed podcast script
+  mock.on(
+    {
+      predicate: (req) => {
+        const systemMsg = req.messages.find((m) => m.role === 'system');
+        const systemText = typeof systemMsg?.content === 'string' ? systemMsg.content : '';
+        return systemText.includes('fork') || systemText.includes('remix') || systemText.includes('Fork');
+      },
+    },
+    {
+      content: `HOST: Welcome to this remix where we take a fresh look at an existing conversation. [1]
+
+EXPERT: I love how we're building on what came before while adding a completely new perspective. [2]
+
+HOST: Let's dive into what makes this angle unique.
+
+EXPERT: The key difference here is that we're approaching it from a practical standpoint rather than theoretical.
+
+HOST: Fascinating. Thanks for this fresh take!
+
+[REFERENCES]
+[1] Original Podcast. (2025). "E2E Test Podcast." Sotto.
+[2] Remix Analysis. (2025). "Building on Ideas." Internal.
+[/REFERENCES]`,
+    }
+  );
+
+  // Script editing / revision — returns a revised script
+  mock.on(
+    {
+      predicate: (req) => {
+        const systemMsg = req.messages.find((m) => m.role === 'system');
+        const systemText = typeof systemMsg?.content === 'string' ? systemMsg.content : '';
+        return systemText.includes('revised') || systemText.includes('edit') || systemText.includes('regenerat');
+      },
+    },
+    {
+      content: `HOST: Welcome back to our revised episode with some exciting updates. [1]
+
+EXPERT: Thanks for having me again. We've refined our discussion based on new insights. [2]
+
+HOST: What's changed since our last conversation?
+
+EXPERT: We now have stronger evidence supporting our initial claims, plus some surprising new developments.
+
+HOST: That's wonderful. Thank you for the update!
+
+[REFERENCES]
+[1] Updated Research. (2025). "New Findings." Nature, 615, 78-85.
+[2] Expert Review. (2025). "Revised Analysis." Science, 382, 201-208.
+[/REFERENCES]`,
+    }
+  );
+
   // Fallback for unmatched requests
   mock.on({ predicate: () => true }, { content: 'Mock response — no specific fixture matched this request.' });
 
