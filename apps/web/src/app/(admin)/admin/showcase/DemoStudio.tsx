@@ -920,11 +920,11 @@ function AssetStatus({
       )}
       {previewing && url && (
         <div className={styles.previewInline}>
-          {mediaType === 'video' && <video src={url} controls className={styles.previewMedia} />}
-          {mediaType === 'audio' && <audio src={url} controls className={styles.previewMedia} />}
+          {mediaType === 'video' && <video key={url} src={url} controls className={styles.previewMedia} />}
+          {mediaType === 'audio' && <audio key={url} src={url} controls className={styles.previewMedia} />}
           {mediaType === 'image' && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={url} alt={label} className={styles.previewMedia} />
+            <img key={url} src={url} alt={label} className={styles.previewMedia} />
           )}
         </div>
       )}
