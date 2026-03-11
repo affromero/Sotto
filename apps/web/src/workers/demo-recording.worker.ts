@@ -1,5 +1,6 @@
 import { Job } from 'bullmq';
 import { Prisma } from '@prisma/client';
+import { encode } from '@auth/core/jwt';
 import type { GenerateDemoRecordingPayload } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { uploadFile } from '@/lib/r2';
@@ -35,21 +36,35 @@ export async function processDemoRecording(job: Job<GenerateDemoRecordingPayload
   });
 
   try {
-    // Create a session token for the admin user
     const project = await prisma.demoProject.findUniqueOrThrow({
       where: { id: projectId },
       select: { userId: true },
     });
 
-    const session = await prisma.session.create({
-      data: {
-        userId: project.userId,
-        sessionToken: `demo-record-${sceneId}-${Date.now()}`,
-        expires: new Date(Date.now() + 30 * 60 * 1000), // 30 min
-      },
+    const user = await prisma.user.findUniqueOrThrow({
+      where: { id: project.userId },
+      select: { id: true, name: true, email: true, image: true, role: true },
     });
 
     const appUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+    const isSecure = appUrl.startsWith('https://');
+    const cookieName = isSecure ? '__Secure-authjs.session-token' : 'authjs.session-token';
+    const secret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
+    if (!secret) throw new Error('AUTH_SECRET is not set');
+
+    const maxAge = 30 * 60; // 30 minutes
+    const sessionToken = await encode({
+      token: {
+        sub: user.id,
+        name: user.name,
+        email: user.email,
+        picture: user.image,
+        role: user.role,
+      },
+      secret,
+      maxAge,
+      salt: cookieName,
+    });
 
     // POST to Remotion sidecar /record
     const recordResponse = await fetch(`${REMOTION_URL}/record`, {
@@ -57,7 +72,8 @@ export async function processDemoRecording(job: Job<GenerateDemoRecordingPayload
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         actions: scene.actions,
-        sessionToken: session.sessionToken,
+        sessionToken,
+        cookieName,
         appUrl,
         viewport: { width: 1920, height: 1080 },
         gradeVideo: true,
@@ -131,9 +147,6 @@ export async function processDemoRecording(job: Job<GenerateDemoRecordingPayload
       where: { id: sceneId },
       data: { recordingUrl, recordingStatus: 'READY', compositedStatus: 'PENDING' },
     });
-
-    // Clean up temporary session
-    await prisma.session.delete({ where: { sessionToken: session.sessionToken } }).catch(() => {});
 
     await job.updateProgress(100);
     logger.info('Demo recording complete', { projectId, sceneId });
