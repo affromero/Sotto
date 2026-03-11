@@ -2,11 +2,14 @@ import { BRAND } from '@sotto/shared';
 import { ScrollChapter } from '../ScrollChapter';
 import { AuthCTA } from '../AuthCTA';
 import { EmbedPlayer } from '@/components/player/EmbedPlayer';
-import { getShowcasePodcast } from '@/lib/showcase';
+import type { ShowcasePodcast } from '@/lib/showcase';
 import styles from './HeroChapter.module.css';
 
-export async function HeroChapter() {
-  const showcase = await getShowcasePodcast();
+interface HeroChapterProps {
+  showcase: ShowcasePodcast | null;
+}
+
+export function HeroChapter({ showcase }: HeroChapterProps) {
 
   return (
     <ScrollChapter dark>

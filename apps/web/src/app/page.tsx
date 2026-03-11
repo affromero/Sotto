@@ -9,9 +9,12 @@ import { NetworkChapter } from '@/components/landing/chapters/NetworkChapter';
 import { ShowcaseChapter } from '@/components/landing/chapters/ShowcaseChapter';
 import { BotChapter } from '@/components/landing/chapters/BotChapter';
 import { ConvertChapter } from '@/components/landing/chapters/ConvertChapter';
+import { getShowcasePodcast } from '@/lib/showcase';
 import styles from './page.module.css';
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  const showcase = await getShowcasePodcast();
+
   return (
     <WaitlistProvider>
       <LandingShell>
@@ -19,7 +22,7 @@ export default function LandingPage() {
         <LandingNav />
 
         <div className={styles.chapters}>
-          <HeroChapter />
+          <HeroChapter showcase={showcase} />
           <JourneyChapter />
           <ShowcaseChapter />
           <TrustChapter />
