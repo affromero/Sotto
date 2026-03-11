@@ -28,7 +28,7 @@
   z-index: 0;
 }
 
-/* Ambient glow — amber top-left */
+/* Ambient glow — amber top-left, parallax via scroll-progress */
 .root::after {
   content: '';
   position: absolute;
@@ -44,6 +44,7 @@
   );
   pointer-events: none;
   z-index: 0;
+  transform: translateY(calc((1 - var(--scroll-progress, 0)) * 30px));
 }
 
 /* Left column — text content */

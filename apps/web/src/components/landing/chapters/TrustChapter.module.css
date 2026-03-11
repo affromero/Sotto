@@ -130,6 +130,8 @@
   border-radius: var(--radius-2xl);
   overflow: hidden;
   box-shadow: var(--shadow-xl);
+  transform: scale(calc(0.97 + var(--scroll-progress, 0) * 0.03));
+  transition: transform 0.1s linear;
 }
 
 .domains {
@@ -257,6 +259,11 @@
 
 @media (prefers-reduced-motion: reduce) {
   .progressFill {
+    transition: none;
+  }
+
+  .card {
+    transform: none;
     transition: none;
   }
 }

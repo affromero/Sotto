@@ -156,6 +156,8 @@
   border-radius: var(--radius-2xl);
   overflow: hidden;
   box-shadow: var(--shadow-xl);
+  transform: translateY(calc((1 - var(--scroll-progress, 0)) * 15px));
+  transition: transform 0.1s linear;
 }
 
 .mockHeader {
@@ -505,6 +507,13 @@
 @media (prefers-reduced-motion: reduce) {
   .step {
     opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .mockChat,
+  .mockScript,
+  .mockPlayer {
     transform: none;
     transition: none;
   }
