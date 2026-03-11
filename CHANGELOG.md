@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.14.2] - 2026-03-11
+
+### Added
+- Inworld TTS 1.5 Max/Mini models via Replicate provider
+- Avatar lip sync can now use voice track as audio source
+
+### Fixed
+- Landing page hero streamed in after "Three steps" section due to async Server Component
+- Voice track naming preserves duplicate provider names with hover tooltip
+- Avatar price estimate recalculates when individual segments are toggled
+
 ## [0.14.0] - 2026-03-11
 
 ### Added
