@@ -255,12 +255,16 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     supportsVoiceCloning: false,
     supportsStreaming: false,
     maxSegmentChars: 5000,
-    defaultModel: 'qwen3-tts',
-    models: [{ id: 'qwen3-tts', displayName: 'Qwen3 TTS', tier: 'premium' }],
-    supportsAudioTags: false,
+    defaultModel: 'inworld-tts-1.5-max',
+    models: [
+      { id: 'inworld-tts-1.5-max', displayName: 'Inworld TTS 1.5 Max', tier: 'premium' },
+      { id: 'inworld-tts-1.5-mini', displayName: 'Inworld TTS 1.5 Mini', tier: 'standard' },
+      { id: 'qwen3-tts', displayName: 'Qwen3 TTS', tier: 'standard' },
+    ],
+    supportsAudioTags: true,
     docsUrl: null,
     qualityTier: 'premium',
-    platformCostPerKChar: 0,
+    platformCostPerKChar: 0.01,
     auth: {
       fields: [{ key: 'apiKey', label: 'API Token', placeholder: 'r8_xxxxxxxxxxxx' }],
       validate: async (creds) => {
