@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useMemo, useCallback, useState } from 'react';
+import { Maximize2, Minimize2 } from 'lucide-react';
 import { Player, type PlayerRef } from '@remotion/player';
 import { PodcastVisuals } from '@sotto/video';
 import { DEFAULT_RENDER_CONFIG, DEFAULT_BRANDING } from '@sotto/video';
@@ -52,6 +53,7 @@ export function VideoView({
   const containerRef = useRef<HTMLDivElement>(null);
   const { isPlaying } = usePlayer();
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
+  const [expanded, setExpanded] = useState(false);
   const [shapePickerSpeaker, setShapePickerSpeaker] = useState<string | null>(null);
 
   // Track container pixel dimensions for avatar positioning
@@ -181,8 +183,17 @@ export function VideoView({
   );
 
   return (
-    <div className={styles.root} aria-label="Video view">
+    <div className={`${styles.root} ${expanded ? styles.expanded : ''}`} aria-label="Video view">
       <div className={styles.videoContainer} ref={containerRef}>
+        <button
+          className={styles.expandToggle}
+          onClick={() => setExpanded((e) => !e)}
+          aria-label={expanded ? 'Collapse video' : 'Expand video'}
+          title={expanded ? 'Collapse' : 'Expand'}
+          type="button"
+        >
+          {expanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+        </button>
         <Player
           ref={playerRef}
           component={PodcastVisuals as React.FC}

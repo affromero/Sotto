@@ -11,6 +11,37 @@
   overflow: hidden;
 }
 
+.expanded {
+  margin-left: calc(-50vw + 50%);
+  margin-right: calc(-50vw + 50%);
+  border-radius: 0;
+}
+
+.expandToggle {
+  position: absolute;
+  top: var(--spacing-sm);
+  left: var(--spacing-sm);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--radius-md);
+  color: #F5F5F5;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.expandToggle:hover {
+  background: rgba(0, 0, 0, 0.8);
+}
+
 .video {
   width: 100%;
   height: 100%;
