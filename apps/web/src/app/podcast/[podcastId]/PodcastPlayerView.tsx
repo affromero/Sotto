@@ -23,6 +23,7 @@ import {
   Video,
   Users,
   X,
+  Music,
 } from 'lucide-react';
 import { usePlayer } from '@/components/providers/AudioPlayerProvider';
 import { AudioPlayer } from '@/components/player/AudioPlayer';
@@ -213,6 +214,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
   const [pipelineLoading, setPipelineLoading] = useState(false);
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   const [showVideoEditor, setShowVideoEditor] = useState(false);
+  const [showMusicModal, setShowMusicModal] = useState(false);
   const [avatarOverlays, setAvatarOverlays] = useState<AvatarOverlayData[]>([]);
   const [avatarsVisible, setAvatarsVisible] = useState(true);
   const [avatarGenerating, setAvatarGenerating] = useState(false);
@@ -912,6 +914,13 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
                 <Users size={16} />
                 Add Avatars
               </Button>
+              <Button
+                variant="secondary"
+                onClick={() => setShowMusicModal(true)}
+              >
+                <Music size={16} />
+                Add Music
+              </Button>
               {videoStatus && !videoStatus.isByokUser && (
                 <span className={styles.videoQuota}>
                   Free · {videoStatus.dailyRemaining} of {videoStatus.dailyLimit} remaining today
@@ -1040,6 +1049,13 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
                 <Users size={16} />
                 {avatarOverlays.length > 0 ? 'Change Avatars' : 'Add Avatars'}
               </Button>
+              <Button
+                variant="secondary"
+                onClick={() => setShowMusicModal(true)}
+              >
+                <Music size={16} />
+                Add Music
+              </Button>
               {avatarGenerating && (
                 <div className={styles.avatarGeneratingBadge}>
                   <RefreshCw size={14} className={styles.avatarSpinner} />
@@ -1111,16 +1127,16 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
         </section>
       )}
 
-      {/* Music Section */}
+      {/* Music Modal */}
       {isReady && isOwner && (
-        <section aria-label="Background Music">
-          <MusicGenerator
-            podcastId={podcast.id}
-            initialMusicUrl={podcast.musicUrl}
-            onMusicReady={(url, vol) => player?.loadMusic(url, vol)}
-            onMusicRemoved={() => player?.clearMusic()}
-          />
-        </section>
+        <MusicGenerator
+          podcastId={podcast.id}
+          initialMusicUrl={podcast.musicUrl}
+          onMusicReady={(url, vol) => player?.loadMusic(url, vol)}
+          onMusicRemoved={() => player?.clearMusic()}
+          isOpen={showMusicModal}
+          onClose={() => setShowMusicModal(false)}
+        />
       )}
 
       {/* Post-Listen Rating Prompt */}

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { Modal } from '@/components/ui/Modal';
 import styles from './MusicGenerator.module.css';
 
 interface ModelOption {
@@ -23,21 +24,18 @@ interface MusicGenerationItem {
   createdAt: string;
 }
 
+interface ProviderGroup {
+  provider: string;
+  models: ModelOption[];
+}
+
 interface MusicGeneratorProps {
   podcastId: string;
   initialMusicUrl: string | null;
   onMusicReady: (musicUrl: string, volume: number) => void;
   onMusicRemoved: () => void;
-}
-
-function MusicNoteIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M9 18V5l12-2v13" />
-      <circle cx="6" cy="18" r="3" />
-      <circle cx="18" cy="16" r="3" />
-    </svg>
-  );
+  isOpen: boolean;
+  onClose: () => void;
 }
 
 function WaveformIcon() {
@@ -51,17 +49,17 @@ function WaveformIcon() {
   );
 }
 
-function PlayIcon() {
+function PlayIcon({ size = 12 }: { size?: number }) {
   return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
       <path d="M8 5v14l11-7z" />
     </svg>
   );
 }
 
-function PauseIcon() {
+function PauseIcon({ size = 12 }: { size?: number }) {
   return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
       <rect x="6" y="4" width="4" height="16" />
       <rect x="14" y="4" width="4" height="16" />
     </svg>
@@ -76,15 +74,40 @@ function CheckIcon() {
   );
 }
 
-function formatCost(cost: number): string {
-  return `$${cost.toFixed(2)}`;
+function TrashIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="3 6 5 6 21 6" />
+      <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+    </svg>
+  );
 }
 
-function formatModelLabel(model: ModelOption): string {
-  return `${model.label} (${model.provider}) — ${formatCost(model.costPerTrack)}/track`;
+/** Strip version prefix to get a short display name: "Suno V5" → "V5" */
+function shortModelName(label: string, provider: string): string {
+  const stripped = label.replace(new RegExp(`^${provider}\\s*`, 'i'), '').trim();
+  return stripped || label;
 }
 
-export function MusicGenerator({ podcastId, onMusicReady, onMusicRemoved }: MusicGeneratorProps) {
+/** Group flat model list by provider */
+function groupByProvider(models: ModelOption[]): ProviderGroup[] {
+  const map = new Map<string, ModelOption[]>();
+  for (const m of models) {
+    const list = map.get(m.provider) || [];
+    list.push(m);
+    map.set(m.provider, list);
+  }
+  return Array.from(map.entries()).map(([provider, models]) => ({ provider, models }));
+}
+
+/** Find the recommended (most expensive = highest quality) model per provider */
+function isRecommended(model: ModelOption, group: ProviderGroup): boolean {
+  if (group.models.length <= 1) return false;
+  const maxCost = Math.max(...group.models.map((m) => m.costPerTrack));
+  return model.costPerTrack === maxCost;
+}
+
+export function MusicGenerator({ podcastId, onMusicReady, onMusicRemoved, isOpen, onClose }: MusicGeneratorProps) {
   const [generations, setGenerations] = useState<MusicGenerationItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -95,6 +118,7 @@ export function MusicGenerator({ podcastId, onMusicReady, onMusicRemoved }: Musi
 
   const hasInProgress = generations.some((g) => g.status === 'PENDING' || g.status === 'GENERATING');
   const selectedGen = generations.find((g) => g.selected);
+  const providerGroups = groupByProvider(availableModels);
 
   // Notify parent when selected generation changes
   useEffect(() => {
@@ -191,7 +215,6 @@ export function MusicGenerator({ podcastId, onMusicReady, onMusicRemoved }: Musi
           stopPreview();
         }
         await poll();
-        // If deleted the selected one, notify parent
         const deleted = generations.find((g) => g.id === generationId);
         if (deleted?.selected) {
           onMusicRemoved();
@@ -239,6 +262,11 @@ export function MusicGenerator({ podcastId, onMusicReady, onMusicRemoved }: Musi
     setPreviewingId(null);
   };
 
+  // Stop preview when modal closes
+  useEffect(() => {
+    if (!isOpen) stopPreview();
+  }, [isOpen]);
+
   // Cleanup audio on unmount
   useEffect(() => {
     return () => {
@@ -249,145 +277,165 @@ export function MusicGenerator({ podcastId, onMusicReady, onMusicRemoved }: Musi
     };
   }, []);
 
-  // ── No provider ─────────────────────────────────────────────
-  if (!availableModels.length && !generations.length) {
-    return (
-      <div className={styles.container}>
-        <span className={styles.label}>
-          <span className={styles.musicIcon}><MusicNoteIcon /></span>
-          Background Music
-        </span>
-        <span className={styles.divider} />
-        <p className={styles.noProviders}>
-          Add a <a href="/settings">Suno or ElevenLabs key</a> to generate music.
-        </p>
-      </div>
-    );
-  }
-
   return (
-    <div className={styles.root}>
-      {/* ── Header + Generate controls ──────────────────────────── */}
-      <div className={styles.container}>
-        <span className={styles.label}>
-          <span className={styles.musicIcon}><MusicNoteIcon /></span>
-          Background Music
-        </span>
-        <span className={styles.divider} />
-
-        {availableModels.length > 0 && (
-          <>
-            <select
-              className={styles.modelSelect}
-              value={selectedModel}
-              onChange={(e) => setSelectedModel(e.target.value)}
-              disabled={loading || hasInProgress}
-              aria-label="Select music model and see price per track"
-            >
-              {availableModels.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {formatModelLabel(m)}
-                </option>
-              ))}
-            </select>
-            <button
-              className={styles.generateButton}
-              onClick={handleGenerate}
-              disabled={loading || hasInProgress}
-              aria-label="Generate background music"
-            >
-              {hasInProgress ? 'Generating...' : loading ? 'Starting...' : 'Generate'}
-            </button>
-          </>
+    <Modal isOpen={isOpen} onClose={onClose} title="Background Music" size="medium">
+      <div className={styles.modalContent}>
+        {/* ── No provider state ──────────────────────────────────── */}
+        {!availableModels.length && !generations.length && (
+          <p className={styles.noProviders}>
+            Add a <a href="/settings">Suno or ElevenLabs key</a> in Settings to generate background music.
+          </p>
         )}
 
-        {generations.length > 1 && (
-          <div className={styles.actions}>
-            <button
-              className={styles.removeAction}
-              onClick={handleDeleteAll}
-              disabled={loading}
-              aria-label="Remove all music generations"
-            >
-              Remove All
-            </button>
+        {/* ── Model selector — grouped by provider ───────────────── */}
+        {providerGroups.length > 0 && (
+          <div className={styles.providerGroups}>
+            {providerGroups.map((group) => (
+              <div key={group.provider} className={styles.providerSection}>
+                <span className={styles.providerName}>{group.provider}</span>
+                <div className={styles.modelGrid}>
+                  {group.models.map((m) => {
+                    const active = selectedModel === m.id;
+                    const recommended = isRecommended(m, group);
+                    return (
+                      <button
+                        key={m.id}
+                        className={`${styles.modelCard} ${active ? styles.modelCardActive : ''}`}
+                        onClick={() => setSelectedModel(m.id)}
+                        disabled={loading || hasInProgress}
+                        aria-pressed={active}
+                        aria-label={`Select ${m.label}`}
+                      >
+                        <span className={styles.modelName}>
+                          {shortModelName(m.label, m.provider)}
+                        </span>
+                        {recommended && (
+                          <span className={styles.recommendedBadge}>Best</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* ── Generate CTA ───────────────────────────────────────── */}
+        {availableModels.length > 0 && (
+          <button
+            className={styles.generateButton}
+            onClick={handleGenerate}
+            disabled={loading || hasInProgress || !selectedModel}
+            aria-label="Generate background music"
+          >
+            {hasInProgress ? (
+              <>
+                <WaveformIcon />
+                Generating...
+              </>
+            ) : loading ? (
+              'Starting...'
+            ) : (
+              'Generate Track'
+            )}
+          </button>
+        )}
+
+        {error && <p className={styles.error}>{error}</p>}
+
+        {/* ── Generations list ────────────────────────────────────── */}
+        {generations.length > 0 && (
+          <div className={styles.generationsSection}>
+            <div className={styles.generationsHeader}>
+              <span className={styles.generationsTitle}>
+                {generations.length === 1 ? '1 track' : `${generations.length} tracks`}
+              </span>
+              {generations.length > 1 && (
+                <button
+                  className={styles.removeAllButton}
+                  onClick={handleDeleteAll}
+                  disabled={loading}
+                  aria-label="Remove all music generations"
+                >
+                  Remove all
+                </button>
+              )}
+            </div>
+            <ul className={styles.generationList} aria-label="Music generations">
+              {generations.map((gen) => (
+                <li
+                  key={gen.id}
+                  className={`${styles.generationItem} ${gen.selected ? styles.generationItemActive : ''}`}
+                >
+                  {/* Left: status + model */}
+                  <div className={styles.genInfo}>
+                    {gen.status === 'READY' && gen.selected && (
+                      <span className={styles.activeDot} aria-hidden="true" />
+                    )}
+                    {(gen.status === 'PENDING' || gen.status === 'GENERATING') && (
+                      <WaveformIcon />
+                    )}
+                    {gen.status === 'FAILED' && (
+                      <span className={styles.failedDot} aria-hidden="true" />
+                    )}
+                    {gen.status === 'READY' && !gen.selected && (
+                      <span className={styles.readyDot} aria-hidden="true" />
+                    )}
+                    <span className={styles.genLabel}>
+                      {gen.model || 'Default'}
+                    </span>
+                    {gen.status === 'READY' && gen.selected && (
+                      <span className={styles.activeTag}>Active</span>
+                    )}
+                    {(gen.status === 'PENDING' || gen.status === 'GENERATING') && (
+                      <span className={styles.generatingTag}>Generating</span>
+                    )}
+                    {gen.status === 'FAILED' && (
+                      <span className={styles.failedTag}>Failed</span>
+                    )}
+                  </div>
+
+                  {/* Right: actions */}
+                  <div className={styles.genActions}>
+                    {gen.status === 'READY' && gen.musicUrl && (
+                      <button
+                        className={`${styles.actionButton} ${previewingId === gen.id ? styles.actionButtonPlaying : ''}`}
+                        onClick={() => togglePreview(gen)}
+                        aria-label={previewingId === gen.id ? 'Stop preview' : 'Preview music'}
+                      >
+                        {previewingId === gen.id ? <PauseIcon /> : <PlayIcon />}
+                      </button>
+                    )}
+                    {gen.status === 'READY' && !gen.selected && (
+                      <button
+                        className={`${styles.actionButton} ${styles.actionButtonUse}`}
+                        onClick={() => handleSelect(gen.id)}
+                        disabled={loading}
+                        aria-label="Use this music"
+                      >
+                        <CheckIcon />
+                      </button>
+                    )}
+                    <button
+                      className={`${styles.actionButton} ${styles.actionButtonDelete}`}
+                      onClick={() => handleDelete(gen.id)}
+                      disabled={loading || gen.status === 'PENDING' || gen.status === 'GENERATING'}
+                      aria-label="Delete this music generation"
+                    >
+                      <TrashIcon />
+                    </button>
+                  </div>
+
+                  {gen.status === 'FAILED' && gen.failureReason && (
+                    <p className={styles.failureReason}>{gen.failureReason}</p>
+                  )}
+                </li>
+              ))}
+            </ul>
           </div>
         )}
       </div>
-
-      {error && <p className={styles.error}>{error}</p>}
-
-      {/* ── Generations list ────────────────────────────────────── */}
-      {generations.length > 0 && (
-        <ul className={styles.generationList} aria-label="Music generations">
-          {generations.map((gen) => (
-            <li key={gen.id} className={`${styles.generationItem} ${gen.selected ? styles.generationItemSelected : ''}`}>
-              {/* Status indicator */}
-              {gen.status === 'READY' && gen.selected && (
-                <span className={styles.readyIndicator} aria-label="Active">
-                  <span className={styles.readyDot} />
-                  Active
-                </span>
-              )}
-              {gen.status === 'READY' && !gen.selected && (
-                <span className={styles.candidateLabel}>Ready</span>
-              )}
-              {(gen.status === 'PENDING' || gen.status === 'GENERATING') && (
-                <span className={styles.generating}>
-                  <WaveformIcon />
-                  <span>Generating...</span>
-                </span>
-              )}
-              {gen.status === 'FAILED' && (
-                <span className={styles.failedLabel}>Failed</span>
-              )}
-
-              {/* Model info */}
-              <span className={styles.genModel}>
-                {gen.model || 'Default'}
-              </span>
-
-              {/* Actions */}
-              <div className={styles.genActions}>
-                {gen.status === 'READY' && gen.musicUrl && (
-                  <button
-                    className={styles.previewButton}
-                    onClick={() => togglePreview(gen)}
-                    aria-label={previewingId === gen.id ? 'Stop preview' : 'Preview music'}
-                  >
-                    {previewingId === gen.id ? <PauseIcon /> : <PlayIcon />}
-                    {previewingId === gen.id ? 'Stop' : 'Preview'}
-                  </button>
-                )}
-                {gen.status === 'READY' && !gen.selected && (
-                  <button
-                    className={styles.selectButton}
-                    onClick={() => handleSelect(gen.id)}
-                    disabled={loading}
-                    aria-label="Use this music"
-                  >
-                    <CheckIcon />
-                    Use
-                  </button>
-                )}
-                <button
-                  className={styles.deleteButton}
-                  onClick={() => handleDelete(gen.id)}
-                  disabled={loading || gen.status === 'PENDING' || gen.status === 'GENERATING'}
-                  aria-label="Delete this music generation"
-                >
-                  &times;
-                </button>
-              </div>
-
-              {/* Failure reason */}
-              {gen.status === 'FAILED' && gen.failureReason && (
-                <p className={styles.failureReason}>{gen.failureReason}</p>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
+    </Modal>
   );
 }
