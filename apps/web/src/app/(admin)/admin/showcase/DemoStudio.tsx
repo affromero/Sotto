@@ -129,27 +129,35 @@ export function DemoStudio() {
 
   const loadProjects = useCallback(async () => {
     const res = await fetch('/api/admin/demo');
-    if (res.ok) setProjects(await res.json());
+    if (!res.ok) {
+      setError(`Failed to load projects: ${res.status} ${await res.text()}`);
+      return;
+    }
+    setProjects(await res.json());
   }, []);
 
   const loadProject = useCallback(async (id: string) => {
     const res = await fetch(`/api/admin/demo/${id}`);
-    if (res.ok) {
-      const project: DemoProject = await res.json();
-      setSelectedProject(project);
-      if (project.status === 'SCRIPT_READY' || project.status === 'DRAFT') setStep('script');
-      else if (project.status === 'READY') setStep('compose');
-      else setStep('script');
+    if (!res.ok) {
+      setError(`Failed to load project: ${res.status} ${await res.text()}`);
+      return;
     }
+    const project: DemoProject = await res.json();
+    setSelectedProject(project);
+    if (project.status === 'SCRIPT_READY' || project.status === 'DRAFT') setStep('script');
+    else if (project.status === 'READY') setStep('compose');
+    else setStep('script');
   }, []);
 
   // Load TTS options for the picker
   const loadTtsOptions = useCallback(async () => {
     const res = await fetch('/api/tts-options');
-    if (res.ok) {
-      const data = await res.json();
-      setTtsOptions(data.options ?? []);
+    if (!res.ok) {
+      setError(`Failed to load TTS options: ${res.status} ${await res.text()}`);
+      return;
     }
+    const data = await res.json();
+    setTtsOptions(data.options ?? []);
   }, []);
 
   useEffect(() => { loadProjects(); loadTtsOptions(); }, [loadProjects, loadTtsOptions]);
@@ -215,26 +223,39 @@ export function DemoStudio() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
-    if (res.ok) await loadProject(selectedProject.id);
+    if (!res.ok) {
+      setError(`Failed to save scene: ${res.status} ${await res.text()}`);
+      return;
+    }
+    await loadProject(selectedProject.id);
   }, [selectedProject, loadProject]);
 
   const generateAsset = useCallback(async (sceneId: string, assetType: string) => {
     if (!selectedProject) return;
-    await fetch(`/api/admin/demo/${selectedProject.id}/scenes/${sceneId}/${assetType}`, { method: 'POST' });
+    const res = await fetch(`/api/admin/demo/${selectedProject.id}/scenes/${sceneId}/${assetType}`, { method: 'POST' });
+    if (!res.ok) {
+      setError(`Failed to generate ${assetType}: ${res.status} ${await res.text()}`);
+    }
     await loadProject(selectedProject.id);
   }, [selectedProject, loadProject]);
 
   const generateAllAssets = useCallback(async () => {
     if (!selectedProject) return;
     setLoading(true);
-    await fetch(`/api/admin/demo/${selectedProject.id}/generate-assets`, { method: 'POST' });
+    const res = await fetch(`/api/admin/demo/${selectedProject.id}/generate-assets`, { method: 'POST' });
+    if (!res.ok) {
+      setError(`Failed to generate assets: ${res.status} ${await res.text()}`);
+    }
     await loadProject(selectedProject.id);
     setLoading(false);
   }, [selectedProject, loadProject]);
 
   const composeScene = useCallback(async (sceneId: string) => {
     if (!selectedProject) return;
-    await fetch(`/api/admin/demo/${selectedProject.id}/scenes/${sceneId}/compose`, { method: 'POST' });
+    const res = await fetch(`/api/admin/demo/${selectedProject.id}/scenes/${sceneId}/compose`, { method: 'POST' });
+    if (!res.ok) {
+      setError(`Failed to compose scene: ${res.status} ${await res.text()}`);
+    }
     await loadProject(selectedProject.id);
   }, [selectedProject, loadProject]);
 
@@ -244,7 +265,10 @@ export function DemoStudio() {
     for (const scene of selectedProject.scenes ?? []) {
       const ready = scene.recordingStatus === 'READY' && scene.voiceoverStatus === 'READY';
       if (ready && scene.compositedStatus !== 'READY') {
-        await fetch(`/api/admin/demo/${selectedProject.id}/scenes/${scene.id}/compose`, { method: 'POST' });
+        const res = await fetch(`/api/admin/demo/${selectedProject.id}/scenes/${scene.id}/compose`, { method: 'POST' });
+        if (!res.ok) {
+          setError(`Failed to compose scene ${scene.order + 1}: ${res.status} ${await res.text()}`);
+        }
       }
     }
     await loadProject(selectedProject.id);
@@ -254,14 +278,21 @@ export function DemoStudio() {
   const composeVideo = useCallback(async () => {
     if (!selectedProject) return;
     setLoading(true);
-    await fetch(`/api/admin/demo/${selectedProject.id}/compose`, { method: 'POST' });
+    const res = await fetch(`/api/admin/demo/${selectedProject.id}/compose`, { method: 'POST' });
+    if (!res.ok) {
+      setError(`Failed to compose video: ${res.status} ${await res.text()}`);
+    }
     await loadProject(selectedProject.id);
     setStep('compose');
     setLoading(false);
   }, [selectedProject, loadProject]);
 
   const deleteProject = useCallback(async (id: string) => {
-    await fetch(`/api/admin/demo/${id}`, { method: 'DELETE' });
+    const res = await fetch(`/api/admin/demo/${id}`, { method: 'DELETE' });
+    if (!res.ok) {
+      setError(`Failed to delete project: ${res.status} ${await res.text()}`);
+      return;
+    }
     if (selectedProject?.id === id) setSelectedProject(null);
     await loadProjects();
   }, [selectedProject, loadProjects]);
@@ -311,6 +342,9 @@ export function DemoStudio() {
       </nav>
 
       {error && <div className={styles.errorBanner}>{error}</div>}
+      {selectedProject?.status === 'FAILED' && selectedProject.failedReason && (
+        <div className={styles.errorBanner}>Project failed: {selectedProject.failedReason}</div>
+      )}
 
       {/* Step 1: Script — project list + JSON import + scene viewer */}
       {step === 'script' && (
@@ -511,6 +545,9 @@ export function DemoStudio() {
                         : scene.compositedStatus === 'READY' ? 'Recompose Scene'
                         : 'Compose Scene'}
                     </button>
+                    {scene.compositedStatus === 'FAILED' && scene.failedReason && (
+                      <p className={styles.failedReason}>{scene.failedReason}</p>
+                    )}
                     {scene.compositedUrl && scene.compositedStatus === 'READY' && (
                       <ScenePreview url={scene.compositedUrl} />
                     )}
@@ -578,7 +615,10 @@ export function DemoStudio() {
               </a>
             </div>
           )}
-          {!selectedProject.videoUrl && selectedProject.status !== 'COMPOSING' && !allScenesComposed && (
+          {selectedProject.status === 'FAILED' && selectedProject.failedReason && (
+            <div className={styles.errorBanner}>{selectedProject.failedReason}</div>
+          )}
+          {!selectedProject.videoUrl && selectedProject.status !== 'COMPOSING' && selectedProject.status !== 'FAILED' && !allScenesComposed && (
             <p className={styles.emptyText}>
               All scenes must be composed before creating the final video. Go to Recording step to compose each scene.
             </p>
