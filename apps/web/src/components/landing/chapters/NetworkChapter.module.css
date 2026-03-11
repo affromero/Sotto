@@ -1,9 +1,9 @@
 /* ==========================================================================
-   NETWORK CHAPTER — Social features + providers (Airbnb-style)
+   NETWORK CHAPTER — Magazine grid + UseCases (Airbnb-style)
    ========================================================================== */
 
 .root {
-  padding: 120px var(--spacing-lg);
+  padding: var(--section-pad-y) var(--spacing-lg);
   max-width: var(--max-content-width);
   margin: 0 auto;
 }
@@ -41,10 +41,14 @@
   margin: 0 auto;
 }
 
-/* Feature cards */
+/* ==========================================================================
+   MAGAZINE GRID — featured card spans 2 rows
+   ========================================================================== */
+
 .cards {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: auto auto;
   gap: 24px;
   margin-bottom: 80px;
 }
@@ -55,12 +59,24 @@
   border: 1px solid rgba(0, 0, 0, 0.05);
   border-radius: var(--radius-2xl);
   box-shadow: var(--shadow-md);
-  transition: box-shadow 0.3s ease, transform 0.3s ease;
+  transition: transform var(--transition-base), box-shadow var(--transition-base);
 }
 
 .card:hover {
   box-shadow: var(--shadow-lg);
   transform: translateY(-4px);
+}
+
+/* Featured card — spans 2 rows, glassmorphism */
+.cardFeatured {
+  grid-row: 1 / 3;
+  grid-column: 2;
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-xl);
+  display: flex;
+  flex-direction: column;
 }
 
 .cardIcon {
@@ -94,15 +110,133 @@
   color: var(--color-text-secondary, #6B7280);
 }
 
+/* Featured card mock Q&A */
+.featuredMock {
+  margin-top: 24px;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.03);
+  border-radius: var(--radius-xl);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+}
+
+.mockQ,
+.mockA {
+  display: flex;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--color-text);
+}
+
+.mockQLabel {
+  font-weight: 700;
+  color: var(--color-primary);
+  flex-shrink: 0;
+}
+
+.mockALabel {
+  font-weight: 700;
+  color: var(--color-accent);
+  flex-shrink: 0;
+}
+
+/* ==========================================================================
+   USE CASES — 2×2 grid
+   ========================================================================== */
+
+.useCasesHeader {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.useCasesTitle {
+  font-family: var(--font-heading);
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  font-weight: 400;
+  color: var(--color-text);
+}
+
+.useCases {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-bottom: 80px;
+}
+
+.useCase {
+  position: relative;
+  padding: 32px 24px;
+  background: var(--color-surface);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--transition-base), box-shadow var(--transition-base);
+  overflow: hidden;
+}
+
+.useCase::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 60px;
+  height: 60px;
+  background: var(--gradient-amber-spot);
+  border-radius: 0 0 var(--radius-2xl) 0;
+  opacity: 0;
+  transition: opacity var(--transition-base);
+}
+
+.useCase:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+}
+
+.useCase:hover::before {
+  opacity: 1;
+}
+
+.useCaseIcon {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-lg);
+  background: rgba(217, 119, 6, 0.06);
+  color: var(--color-primary);
+  margin-bottom: 16px;
+}
+
+.useCaseTitle {
+  font-family: var(--font-heading);
+  font-size: 1.125rem;
+  font-weight: 400;
+  color: var(--color-text);
+  margin-bottom: 8px;
+}
+
+.useCaseDesc {
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--color-text-secondary, #6B7280);
+}
+
 /* Providers marquee */
 .providers {
   padding-top: 16px;
 }
 
-/* Mobile */
+/* ==========================================================================
+   MOBILE
+   ========================================================================== */
+
 @media (max-width: 767px) {
   .root {
-    padding: 80px var(--spacing-md);
+    padding: var(--section-pad-y-sm) var(--spacing-md);
   }
 
   .cards {
@@ -111,8 +245,19 @@
     margin-bottom: 56px;
   }
 
+  .cardFeatured {
+    grid-row: auto;
+    grid-column: auto;
+  }
+
   .card {
     padding: 28px 24px;
+  }
+
+  .useCases {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    margin-bottom: 56px;
   }
 }
 
@@ -121,15 +266,18 @@
     grid-template-columns: 1fr 1fr;
   }
 
-  .card:nth-child(3) {
-    grid-column: 1 / -1;
-    max-width: 50%;
-    margin: 0 auto;
+  .useCases {
+    grid-template-columns: 1fr 1fr;
   }
 }
 
+/* ==========================================================================
+   REDUCED MOTION
+   ========================================================================== */
+
 @media (prefers-reduced-motion: reduce) {
-  .card:hover {
+  .card:hover,
+  .useCase:hover {
     transform: none;
   }
 }
