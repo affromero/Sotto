@@ -1,0 +1,135 @@
+/* ==========================================================================
+   NETWORK CHAPTER — Social features + providers
+   ========================================================================== */
+
+.root {
+  padding: 80px var(--spacing-lg);
+  max-width: var(--max-content-width);
+  margin: 0 auto;
+}
+
+/* Header */
+.header {
+  text-align: center;
+  margin-bottom: 48px;
+}
+
+.overline {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--color-primary);
+  margin-bottom: 12px;
+}
+
+.heading {
+  font-family: var(--font-heading);
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 400;
+  color: var(--color-text);
+  line-height: 1.15;
+  margin-bottom: 16px;
+}
+
+.description {
+  font-size: 18px;
+  line-height: 1.7;
+  color: var(--color-text-secondary, #6B7280);
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+/* Feature cards */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  margin-bottom: 64px;
+}
+
+.card {
+  padding: 32px 24px;
+  background: var(--color-surface);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.cardIcon {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: rgba(217, 119, 6, 0.08);
+  color: var(--color-primary);
+  margin-bottom: 16px;
+}
+
+.cardIconNavy {
+  background: rgba(30, 58, 95, 0.08);
+  color: var(--color-accent);
+}
+
+.cardTitle {
+  font-family: var(--font-heading);
+  font-size: 1.25rem;
+  font-weight: 400;
+  color: var(--color-text);
+  margin-bottom: 8px;
+}
+
+.cardDesc {
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--color-text-secondary, #6B7280);
+}
+
+/* Providers marquee */
+.providers {
+  padding-top: 16px;
+}
+
+/* Mobile */
+@media (max-width: 767px) {
+  .root {
+    padding: 60px var(--spacing-md);
+  }
+
+  .cards {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .card {
+    padding: 24px 20px;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .cards {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  /* Third card spans full width */
+  .card:nth-child(3) {
+    grid-column: 1 / -1;
+    max-width: 50%;
+    margin: 0 auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card:hover {
+    transform: none;
+  }
+}
