@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Minus, Plus } from 'lucide-react';
 import { parseTextWithCitations } from '@/lib/citation-parser';
 import { useScrollFollow, isScrollable } from '@/lib/hooks/useScrollFollow';
 import { getSpeakerIndex, getUniqueSpeakers } from '@/lib/speaker-colors';
@@ -32,6 +33,11 @@ export function TranscriptPanel({
   questionCounts,
   podcastId,
 }: TranscriptPanelProps) {
+  const [fontScale, setFontScale] = useState(1);
+  const MIN_SCALE = 0.6;
+  const MAX_SCALE = 2;
+  const STEP = 0.2;
+
   const activeRef = useRef<HTMLDivElement>(null);
   const { scrollContainerRef, isFollowing, reengage } = useScrollFollow();
   const speakers = useMemo(() => getUniqueSpeakers(segments), [segments]);
@@ -46,8 +52,30 @@ export function TranscriptPanel({
   const hasRefs = references.length > 0;
 
   return (
-    <div className={styles.panel}>
-      <h3 className={styles.heading}>Transcript</h3>
+    <div className={styles.panel} style={{ '--font-scale': fontScale } as React.CSSProperties}>
+      <div className={styles.headingRow}>
+        <h3 className={styles.heading}>Transcript</h3>
+        <div className={styles.sizeControls}>
+          <button
+            className={styles.sizeBtn}
+            onClick={() => setFontScale((s) => Math.max(MIN_SCALE, +(s - STEP).toFixed(1)))}
+            disabled={fontScale <= MIN_SCALE}
+            aria-label="Decrease text size"
+            type="button"
+          >
+            <Minus size={14} />
+          </button>
+          <button
+            className={styles.sizeBtn}
+            onClick={() => setFontScale((s) => Math.min(MAX_SCALE, +(s + STEP).toFixed(1)))}
+            disabled={fontScale >= MAX_SCALE}
+            aria-label="Increase text size"
+            type="button"
+          >
+            <Plus size={14} />
+          </button>
+        </div>
+      </div>
       <div ref={scrollContainerRef as React.RefObject<HTMLDivElement>} className={styles.segments}>
         {segments.map((segment) => {
           const active = isCurrentSegment(segment, currentTime);

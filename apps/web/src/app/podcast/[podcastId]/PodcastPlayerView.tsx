@@ -1279,54 +1279,6 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
         return contributors.length > 0 ? <Contributors contributors={contributors} /> : null;
       })()}
 
-      {/* Interrupt */}
-      {isReady && isAuthenticated && (
-        <div className={styles.interruptSection}>
-          <InterruptButton onInterrupt={handleInterrupt} />
-          <VoiceQABadge />
-        </div>
-      )}
-
-      {/* Interrupt Chat */}
-      {showInterruptChat && (
-        <InterruptChatPanel
-          podcastId={podcast.id}
-          isOwner={isOwner}
-          podcastSource={podcast.source}
-          currentTime={currentTime}
-          existingInteractions={podcast.interactions}
-          onClose={() => setShowInterruptChat(false)}
-          onQuestionAnswered={() => setQuestionsRefreshTrigger((n) => n + 1)}
-        />
-      )}
-
-      {/* Player */}
-      {isReady && podcast.audioUrl && (
-        <section ref={playerSectionRef} className={styles.playerSection} aria-label="Audio player">
-          <AudioPlayer podcastId={podcast.id} audioUrl={podcast.audioUrl!} podcastTitle={podcast.title} />
-          {(podcast.voiceTracks.length > 0 || isOwner) && (
-            <VoiceTrackSelector
-              podcastId={podcast.id}
-              podcastAudioUrl={podcast.audioUrl!}
-              podcastTitle={podcast.title}
-              voiceTracks={podcast.voiceTracks}
-              defaultVoiceTrackId={podcast.defaultVoiceTrackId}
-              isOwner={isOwner}
-              speakers={[...new Set(podcast.segments.map(s => s.speaker))]}
-            />
-          )}
-          {isOwner && podcast.isVoiceOnlyFork && podcast.forkedFrom && isReady &&
-            podcast.voiceTracks.some(t => t.status === 'READY') && (
-            <ProposeRenditionButton
-              podcastId={podcast.id}
-              voiceTrackId={podcast.voiceTracks.find(t => t.status === 'READY')!.id}
-              originalPodcastId={podcast.forkedFrom.id}
-              originalTitle={podcast.forkedFrom.title}
-            />
-          )}
-        </section>
-      )}
-
       {/* View Toggle + Transcript/Teleprompter */}
       {podcast.segments.length > 0 && (
         <>
@@ -1410,6 +1362,54 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
             </section>
           )}
         </>
+      )}
+
+      {/* Player */}
+      {isReady && podcast.audioUrl && (
+        <section ref={playerSectionRef} className={styles.playerSection} aria-label="Audio player">
+          <AudioPlayer podcastId={podcast.id} audioUrl={podcast.audioUrl!} podcastTitle={podcast.title} />
+          {(podcast.voiceTracks.length > 0 || isOwner) && (
+            <VoiceTrackSelector
+              podcastId={podcast.id}
+              podcastAudioUrl={podcast.audioUrl!}
+              podcastTitle={podcast.title}
+              voiceTracks={podcast.voiceTracks}
+              defaultVoiceTrackId={podcast.defaultVoiceTrackId}
+              isOwner={isOwner}
+              speakers={[...new Set(podcast.segments.map(s => s.speaker))]}
+            />
+          )}
+          {isOwner && podcast.isVoiceOnlyFork && podcast.forkedFrom && isReady &&
+            podcast.voiceTracks.some(t => t.status === 'READY') && (
+            <ProposeRenditionButton
+              podcastId={podcast.id}
+              voiceTrackId={podcast.voiceTracks.find(t => t.status === 'READY')!.id}
+              originalPodcastId={podcast.forkedFrom.id}
+              originalTitle={podcast.forkedFrom.title}
+            />
+          )}
+        </section>
+      )}
+
+      {/* Interrupt */}
+      {isReady && isAuthenticated && (
+        <div className={styles.interruptSection}>
+          <InterruptButton onInterrupt={handleInterrupt} />
+          <VoiceQABadge />
+        </div>
+      )}
+
+      {/* Interrupt Chat */}
+      {showInterruptChat && (
+        <InterruptChatPanel
+          podcastId={podcast.id}
+          isOwner={isOwner}
+          podcastSource={podcast.source}
+          currentTime={currentTime}
+          existingInteractions={podcast.interactions}
+          onClose={() => setShowInterruptChat(false)}
+          onQuestionAnswered={() => setQuestionsRefreshTrigger((n) => n + 1)}
+        />
       )}
 
       {/* Community Questions */}
