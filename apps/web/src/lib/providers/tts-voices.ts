@@ -79,6 +79,18 @@ export const FAL_VOICE_POOL: ProviderVoice[] = [
 ];
 
 // ---------------------------------------------------------------------------
+// Inworld TTS 1.5 voices — 4 preset voices (2 male, 2 female)
+// Used by Replicate Inworld models (tts-1.5-max, tts-1.5-mini)
+// ---------------------------------------------------------------------------
+
+export const INWORLD_VOICE_POOL: ProviderVoice[] = [
+  { id: 'Ashley', name: 'Ashley', gender: 'female', character: 'warm narrator' },
+  { id: 'Dennis', name: 'Dennis', gender: 'male', character: 'polished professional' },
+  { id: 'Alex', name: 'Alex', gender: 'male', character: 'energetic presenter' },
+  { id: 'Darlene', name: 'Darlene', gender: 'female', character: 'soothing storyteller' },
+];
+
+// ---------------------------------------------------------------------------
 // MiniMax Speech-02 HD voices — 12 curated from 17 presets (6 male, 6 female)
 // ---------------------------------------------------------------------------
 

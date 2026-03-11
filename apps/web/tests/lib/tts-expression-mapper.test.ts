@@ -97,6 +97,43 @@ describe('tts-expression-mapper', () => {
     });
   });
 
+  describe('Replicate (Inworld)', () => {
+    it('maps energetic to [happy] emotion tag', () => {
+      const result = mapDirectionToExpression('energetic', 'HOST', 'replicate');
+      expect(result.replicate?.emotionTag).toBe('[happy]');
+    });
+
+    it('maps sad to [sad] emotion tag', () => {
+      const result = mapDirectionToExpression('sad', 'HOST', 'replicate');
+      expect(result.replicate?.emotionTag).toBe('[sad]');
+    });
+
+    it('maps surprised to [surprised] emotion tag', () => {
+      const result = mapDirectionToExpression('surprised', 'HOST', 'replicate');
+      expect(result.replicate?.emotionTag).toBe('[surprised]');
+    });
+
+    it('maps laughing to [laughing] emotion tag', () => {
+      const result = mapDirectionToExpression('laughing', 'HOST', 'replicate');
+      expect(result.replicate?.emotionTag).toBe('[laughing]');
+    });
+
+    it('maps whispering to [whispering] emotion tag', () => {
+      const result = mapDirectionToExpression('whispering', 'HOST', 'replicate');
+      expect(result.replicate?.emotionTag).toBe('[whispering]');
+    });
+
+    it('returns empty for directions without Inworld mapping', () => {
+      const result = mapDirectionToExpression('thoughtful', 'HOST', 'replicate');
+      expect(result.replicate).toBeUndefined();
+    });
+
+    it('returns empty for no direction', () => {
+      const result = mapDirectionToExpression(undefined, 'HOST', 'replicate');
+      expect(result.replicate).toBeUndefined();
+    });
+  });
+
   describe('providers without expression support', () => {
     it('returns empty params for fal', () => {
       const result = mapDirectionToExpression('energetic', 'HOST', 'fal');

@@ -41,11 +41,14 @@ describe('getVoiceCatalog', () => {
       expect(catalog[0]).toMatchObject({ id: 'Vivian', name: 'Vivian' });
     });
 
-    it('returns same voices for replicate as fal', async () => {
-      const fal = await getVoiceCatalog('fal');
-      const replicate = await getVoiceCatalog('replicate');
+    it('returns Inworld voices for replicate', async () => {
+      const catalog = await getVoiceCatalog('replicate');
 
-      expect(fal).toEqual(replicate);
+      expect(catalog.length).toBe(4);
+      expect(catalog[0]).toMatchObject({ id: 'Ashley', name: 'Ashley' });
+      expect(catalog.find((v) => v.id === 'Dennis')).toBeDefined();
+      expect(catalog.find((v) => v.id === 'Alex')).toBeDefined();
+      expect(catalog.find((v) => v.id === 'Darlene')).toBeDefined();
     });
 
     it('returns static MiniMax voices', async () => {
