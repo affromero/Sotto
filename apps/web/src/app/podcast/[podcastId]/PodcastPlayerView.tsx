@@ -1314,7 +1314,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
 
       {/* View Toggle + Transcript/Teleprompter */}
       {podcast.segments.length > 0 && (
-        <details className={styles.detailsSection}>
+        <details className={styles.detailsSection} open={segmentVisuals.length > 0 || undefined}>
           <summary className={styles.detailsSummary}>
             <div className={styles.viewToggle} role="tablist" aria-label="Transcript view mode">
               {segmentVisuals.length > 0 && (
