@@ -136,10 +136,16 @@ export function GenerationProgress({ status, progress, error, topic }: Generatio
           )}
 
           {isActive && VERIFICATION_STAGES.has(status) && (
-            <span className={styles.verifyBadge}>
+            <a
+              href="https://github.com/SottoFM/reference-verification-standard"
+              target="_blank"
+              rel="noopener noreferrer"
+              className={styles.verifyBadge}
+              aria-label="We don't ship hallucinations — view the open verification standard on GitHub"
+            >
               <ShieldCheck size={14} strokeWidth={2} aria-hidden="true" />
               We don&apos;t ship hallucinations
-            </span>
+            </a>
           )}
         </div>
       )}
