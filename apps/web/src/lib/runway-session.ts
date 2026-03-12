@@ -148,6 +148,14 @@ export async function recordRunwaySession(config: RunwayRecordingConfig): Promis
     args: [
       '--autoplay-policy=no-user-gesture-required',
       '--use-fake-ui-for-media-stream',
+      // Prevent Chromium from throttling the AudioContext in headless mode.
+      // Without these flags, Chrome suspends audio graph processing after ~1s
+      // (no visible window, no audio output device), causing the MediaStreamDestination
+      // to deliver silence to LiveKit. Runway then generates idle animation instead of
+      // lip-synced video for the remainder of the recording.
+      '--disable-background-timer-throttling',
+      '--disable-renderer-backgrounding',
+      '--disable-backgrounding-occluded-windows',
     ],
   });
 
