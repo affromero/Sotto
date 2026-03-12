@@ -243,43 +243,6 @@
   border-radius: var(--radius-xl);
 }
 
-.scriptReadyText {
-  font: var(--text-body-sm);
-  color: var(--color-text-secondary);
-  text-align: center;
-}
-
-.regenerateFeedback {
-  width: 100%;
-  padding: var(--spacing-sm);
-  font: var(--text-body-sm);
-  color: var(--color-text-primary);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  resize: vertical;
-  min-height: 60px;
-  max-height: 160px;
-  outline: none;
-  transition: border-color var(--transition-fast);
-  line-height: 1.5;
-}
-
-.regenerateFeedback:focus {
-  border-color: var(--color-primary);
-}
-
-.regenerateFeedback::placeholder {
-  color: var(--color-text-tertiary);
-}
-
-.scriptReadyActions {
-  display: flex;
-  gap: var(--spacing-sm);
-  justify-content: center;
-  flex-wrap: wrap;
-}
-
 .processingSpinner {
   width: 32px;
   height: 32px;
