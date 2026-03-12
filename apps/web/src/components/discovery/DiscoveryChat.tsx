@@ -5,6 +5,7 @@ import type { DiscoveryMessage } from '@/types/discovery';
 import type { DiscoveryMetadata } from '@/types/discovery';
 import { useDiscovery } from '@/lib/hooks/useDiscovery';
 import { SuggestionChips } from './SuggestionChips';
+import { DiscoveryParamsCard } from './DiscoveryParamsCard';
 import { LanguageBanner } from './LanguageBanner';
 import { LlmModelDropdown } from '@/components/create/LlmModelDropdown';
 import styles from './DiscoveryChat.module.css';
@@ -32,7 +33,7 @@ const GREETING: DiscoveryMessage = {
 };
 
 export function DiscoveryChat({ podcastId, onComplete, initialTopic, aiModel, onAiModelChange, initialDraftId, initialMessages, onDraftCreated, maxDuration }: DiscoveryChatProps) {
-  const { messages, metadata, isLoading, sendMessage, draftId, detectedLanguage } = useDiscovery(initialDraftId, initialMessages, maxDuration);
+  const { messages, metadata, isLoading, sendMessage, draftId, detectedLanguage, updateMetadata } = useDiscovery(initialDraftId, initialMessages, maxDuration);
   const prevDraftIdRef = useRef<string | null>(initialDraftId ?? null);
   const [inputValue, setInputValue] = useState('');
   const [languageBannerDismissed, setLanguageBannerDismissed] = useState(false);
@@ -152,12 +153,23 @@ export function DiscoveryChat({ podcastId, onComplete, initialTopic, aiModel, on
                 </div>
               </div>
 
-              {/* Chips after assistant messages */}
-              {!isUser && message.chips.length > 0 && isLastAssistant && (
+              {/* Chips — only when not yet ready */}
+              {!isUser && message.chips.length > 0 && isLastAssistant && !metadata?.ready && (
                 <div className={styles.chipsRow}>
                   <SuggestionChips
                     chips={message.chips}
                     onSelect={handleChipSelect}
+                    disabled={isLoading}
+                  />
+                </div>
+              )}
+
+              {/* Params card — shown when metadata is ready */}
+              {!isUser && isLastAssistant && metadata?.ready && (
+                <div className={styles.paramsRow}>
+                  <DiscoveryParamsCard
+                    metadata={metadata}
+                    onUpdate={updateMetadata}
                     disabled={isLoading}
                   />
                 </div>
