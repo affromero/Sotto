@@ -303,7 +303,7 @@ describe('POST /api/podcasts/[podcastId]/script/approve', () => {
       expect(assignOrder).toBeLessThan(segmentOrder);
     });
 
-    it('skips assignVoicesForPodcast when custom voices provided', async () => {
+    it('still runs auto voice assignment after saving explicit custom voices', async () => {
       mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
       mockPodcastFindUnique.mockResolvedValue({ userId: 'user-1', status: 'SCRIPT_READY' });
       mockScriptFindUnique.mockResolvedValue({ turns: defaultTurns });
@@ -318,7 +318,15 @@ describe('POST /api/podcasts/[podcastId]/script/approve', () => {
       );
 
       expect(response.status).toBe(200);
-      expect(mockAssignVoicesForPodcast).not.toHaveBeenCalled();
+      expect(mockAssignVoicesForPodcast).toHaveBeenCalledWith(
+        'pod-1',
+        expect.arrayContaining([
+          expect.objectContaining({ name: 'HOST' }),
+          expect.objectContaining({ name: 'EXPERT' }),
+        ]),
+        'elevenlabs',
+        undefined,
+      );
     });
 
     it('filters out voices with null voiceId', async () => {
@@ -339,6 +347,47 @@ describe('POST /api/podcasts/[podcastId]/script/approve', () => {
       expect(mockPodcastVoiceCreateMany).toHaveBeenCalledWith({
         data: [{ podcastId: 'pod-1', speaker: 'HOST', voiceId: 'voice-abc', provider: 'elevenlabs' }],
       });
+      expect(mockAssignVoicesForPodcast).toHaveBeenCalledWith(
+        'pod-1',
+        expect.arrayContaining([
+          expect.objectContaining({ name: 'HOST' }),
+          expect.objectContaining({ name: 'EXPERT' }),
+        ]),
+        'elevenlabs',
+        undefined,
+      );
+    });
+
+    it('treats all-auto voice placeholders as needing auto assignment', async () => {
+      mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+      mockPodcastFindUnique.mockResolvedValue({ userId: 'user-1', status: 'SCRIPT_READY' });
+      mockScriptFindUnique.mockResolvedValue({
+        turns: [
+          { speaker: 'ALICE', text: 'Intro' },
+          { speaker: 'BOB', text: 'Response' },
+        ],
+      });
+
+      const response = await POST(
+        createRequest({
+          ttsProvider: 'elevenlabs',
+          voices: [
+            { speaker: 'ALICE', voiceId: null },
+            { speaker: 'BOB', voiceId: null },
+          ],
+        }),
+        await createParams('pod-1')
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockPodcastVoiceDeleteMany).toHaveBeenCalledWith({ where: { podcastId: 'pod-1' } });
+      expect(mockPodcastVoiceCreateMany).not.toHaveBeenCalled();
+      expect(mockAssignVoicesForPodcast).toHaveBeenCalledWith(
+        'pod-1',
+        [{ name: 'ALICE' }, { name: 'BOB' }],
+        'elevenlabs',
+        undefined,
+      );
     });
   });
 });

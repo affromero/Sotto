@@ -7,7 +7,6 @@ import { getProviderMeta, type TtsProviderId } from '@/lib/providers/tts-registr
 import { logUsage } from '@/lib/usage-logger';
 import { getByokKey } from '@/lib/byok';
 import { createTtsProviderAsync } from '@/lib/providers/tts';
-import { prisma } from '@/lib/prisma';
 import { errorResponse } from '@/lib/api-response';
 export async function POST(request: NextRequest) {
   const session = await auth();
@@ -49,17 +48,9 @@ export async function POST(request: NextRequest) {
       const ttsProvider = await createTtsProviderAsync(ttsProviderId, apiKey);
       audioBuffer = await ttsProvider.generateSpeech({ text, voiceId });
     } else {
-      // Default: ElevenLabs — use BYOK key; platform key only for admins without BYOK
-      const [elByokKey, user] = await Promise.all([
-        getByokKey(session.user.id, 'elevenlabs'),
-        prisma.user.findUniqueOrThrow({ where: { id: session.user.id }, select: { role: true } }),
-      ]);
-      const isAdmin = user.role === 'ADMIN' || user.role === 'SYSTEM';
-      const apiKey = elByokKey ?? (isAdmin ? undefined : null);
-      if (apiKey === null) {
-        return errorResponse('Add your ElevenLabs API key in Settings to preview voices.', 400);
-      }
-      audioBuffer = await generateSpeech({ text, voiceId, apiKeyOverride: apiKey ?? undefined });
+      // Default: ElevenLabs — use BYOK when available, otherwise fall back to platform preview.
+      const elByokKey = await getByokKey(session.user.id, 'elevenlabs');
+      audioBuffer = await generateSpeech({ text, voiceId, apiKeyOverride: elByokKey ?? undefined });
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : '';
