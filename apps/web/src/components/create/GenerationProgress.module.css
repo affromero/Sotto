@@ -200,6 +200,12 @@
   letter-spacing: 0.01em;
   margin-top: var(--spacing-xs);
   animation: fadeSlideIn 0.5s ease-out;
+  text-decoration: none;
+  transition: background 0.2s ease;
+}
+
+.verifyBadge:hover {
+  background: rgba(30, 58, 95, 0.14);
 }
 
 /* ============================================ */
