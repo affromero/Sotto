@@ -18,7 +18,7 @@ services:
     environment:
       NODE_ENV: production
       DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL}
-      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      REDIS_URL: ${REDIS_URL:?Set REDIS_URL}
       WORKER_PROFILE: heavy
     command: ['node', '--max-old-space-size=2560', '--import', 'tsx', 'src/workers/index.ts']
     networks:
@@ -43,7 +43,7 @@ services:
     environment:
       NODE_ENV: production
       DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL}
-      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      REDIS_URL: ${REDIS_URL:?Set REDIS_URL}
       WORKER_PROFILE: pipeline
     command: ['node', '--max-old-space-size=768', '--import', 'tsx', 'src/workers/index.ts']
     networks:
@@ -68,7 +68,7 @@ services:
     environment:
       NODE_ENV: production
       DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL}
-      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      REDIS_URL: ${REDIS_URL:?Set REDIS_URL}
       WORKER_PROFILE: light
     command: ['node', '--max-old-space-size=512', '--import', 'tsx', 'src/workers/index.ts']
     networks:

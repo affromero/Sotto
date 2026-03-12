@@ -4,128 +4,6 @@
 # Usage: docker compose -f docker-compose.infra.yml up -d
 
 services:
-  postgres:
-    image: pgvector/pgvector:pg16
-    container_name: sotto-prod-postgres
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 2g
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-sotto}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
-      POSTGRES_DB: ${POSTGRES_DB:-sotto}
-    volumes:
-      - sotto_postgres_data:/var/lib/postgresql/data
-    command:
-      - postgres
-      - -c
-      - shared_buffers=512MB
-      - -c
-      - effective_cache_size=1536MB
-      - -c
-      - work_mem=8MB
-      - -c
-      - maintenance_work_mem=128MB
-      - -c
-      - max_connections=50
-      - -c
-      - wal_buffers=16MB
-      - -c
-      - checkpoint_completion_target=0.9
-      - -c
-      - random_page_cost=1.1
-      - -c
-      - effective_io_concurrency=200
-      - -c
-      - log_min_duration_statement=1000
-      - -c
-      - log_lock_waits=on
-    healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-sotto}']
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      sotto-network:
-        aliases:
-          - postgres
-    logging:
-      driver: json-file
-      options:
-        max-size: '10m'
-        max-file: '3'
-
-  pgbouncer:
-    image: edoburu/pgbouncer:v1.23.1-p3
-    container_name: sotto-prod-pgbouncer
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 128m
-    environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-sotto}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-sotto}
-      POOL_MODE: transaction
-      DEFAULT_POOL_SIZE: 20
-      MAX_CLIENT_CONN: 200
-      MAX_DB_CONNECTIONS: 25
-      RESERVE_POOL_SIZE: 5
-      RESERVE_POOL_TIMEOUT: 3
-      SERVER_IDLE_TIMEOUT: 300
-      AUTH_TYPE: plain
-    depends_on:
-      postgres:
-        condition: service_healthy
-    healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -h 127.0.0.1 -p 5432 -U ${POSTGRES_USER:-sotto}']
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      sotto-network:
-        aliases:
-          - pgbouncer
-    logging:
-      driver: json-file
-      options:
-        max-size: '10m'
-        max-file: '3'
-
-  redis:
-    image: redis:7-alpine
-    container_name: sotto-prod-redis
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 1g
-    command: >-
-      redis-server
-      --appendonly yes
-      --maxmemory 768mb
-      --maxmemory-policy noeviction
-      --requirepass ${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}
-      --maxclients 2000
-      --tcp-keepalive 60
-    volumes:
-      - sotto_redis_data:/data
-    healthcheck:
-      test: ['CMD', 'redis-cli', '-a', '${REDIS_PASSWORD}', '--no-auth-warning', 'ping']
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      sotto-network:
-        aliases:
-          - redis
-    logging:
-      driver: json-file
-      options:
-        max-size: '10m'
-        max-file: '3'
-
   kittentts:
     build:
       context: ./services/kittentts
@@ -215,10 +93,6 @@ services:
       options:
         max-size: '20m'
         max-file: '3'
-
-volumes:
-  sotto_postgres_data:
-  sotto_redis_data:
 
 networks:
   sotto-network:
