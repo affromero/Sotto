@@ -345,6 +345,9 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
         } else if (isOwner && data.status === 'FAILED') {
           setVideoState('failed');
           setVideoError({ message: data.failureReason || 'Video generation failed.' });
+          if (data.segmentVisuals?.length > 0) {
+            setSegmentVisuals(data.segmentVisuals);
+          }
         } else if (isOwner) {
           setVideoState('generating');
           setVideoGenerationId(data.videoGenerationId);
@@ -1035,9 +1038,14 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
                 <button
                   className={styles.toolbarBtn}
                   onClick={async () => {
-                    if (!falModels) {
-                      const res = await fetch('/api/fal-models');
-                      if (res.ok) setFalModels(await res.json());
+                    const [falRes, visualRes] = await Promise.all([
+                      !falModels ? fetch('/api/fal-models') : Promise.resolve(null),
+                      segmentVisuals.length === 0 ? fetch(`/api/podcasts/${podcast.id}/video`) : Promise.resolve(null),
+                    ]);
+                    if (falRes?.ok) setFalModels(await falRes.json());
+                    if (visualRes?.ok) {
+                      const d = await visualRes.json() as { segmentVisuals?: SegmentVisualData[] };
+                      if (d.segmentVisuals?.length) setSegmentVisuals(d.segmentVisuals);
                     }
                     setShowVideoEditor(true);
                   }}
