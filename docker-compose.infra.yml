@@ -107,7 +107,7 @@ services:
       --maxmemory 768mb
       --maxmemory-policy noeviction
       --requirepass ${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}
-      --maxclients 500
+      --maxclients 2000
       --tcp-keepalive 60
     volumes:
       - sotto_redis_data:/data
