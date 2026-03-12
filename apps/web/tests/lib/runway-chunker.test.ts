@@ -10,6 +10,7 @@ vi.mock('util', async (importOriginal) => {
   const actual = await importOriginal<typeof import('util')>();
   return {
     ...actual,
+    default: { ...actual, promisify: () => mockExecFileAsync },
     promisify: () => mockExecFileAsync,
   };
 });

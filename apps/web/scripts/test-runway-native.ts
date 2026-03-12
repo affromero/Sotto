@@ -33,8 +33,8 @@ async function waitForFfiAndInstallDebug(): Promise<() => number> {
       const records = (batch?.records as Record<string, unknown>[]) ?? [];
       for (const rec of records) {
         const level = rec.level as number; // 0=ERROR,1=WARN,2=INFO,3=DEBUG,4=TRACE
-        if (level <= 1) { // ERROR and WARN only to avoid noise
-          const levelStr = level === 0 ? 'ERROR' : 'WARN';
+        if (level <= 3) { // ERROR, WARN, INFO, DEBUG — full codec negotiation logs
+          const levelStr = level === 0 ? 'ERROR' : level === 1 ? 'WARN' : level === 2 ? 'INFO' : 'DEBUG';
           process.stdout.write(`\n[FFI:${levelStr}] ${rec.message}\n`);
         }
       }
@@ -86,6 +86,8 @@ async function main() {
     console.log('Room:', credentials.roomName);
 
     console.log('Recording session with native @livekit/rtc-node...');
+    // Enable room event logging from livekit-rtc-node internals
+    process.env.LIVEKIT_DEBUG_LOG_ROOM_EVENTS = '1';
     // Start recording + debug listener concurrently; debug polls until FfiClient is ready
     const [result, debugFn] = await Promise.all([
       recordRunwaySession({
