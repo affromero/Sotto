@@ -96,6 +96,11 @@
   padding-left: 44px; /* 32px avatar + 12px gap */
 }
 
+/* Params card row — same indentation as chips */
+.paramsRow {
+  padding-left: 44px; /* 32px avatar + 12px gap — mirrors .chipsRow */
+}
+
 /* ============================================ */
 /* TYPING INDICATOR                              */
 /* ============================================ */
@@ -293,6 +298,10 @@
   }
 
   .chipsRow {
+    padding-left: var(--spacing-sm);
+  }
+
+  .paramsRow {
     padding-left: var(--spacing-sm);
   }
 
