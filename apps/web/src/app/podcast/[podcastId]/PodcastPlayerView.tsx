@@ -16,7 +16,6 @@ import {
   RefreshCw,
   ListMusic,
   Trash2,
-  Check,
   Flag,
   BarChart2,
   Shield,
@@ -55,7 +54,7 @@ import { SottoBadge } from '@/components/ui/SottoBadge';
 import { MetadataBadges } from '@/components/ui/MetadataBadges';
 import { Button } from '@/components/ui/Button';
 import { GenerationProgress } from '@/components/create/GenerationProgress';
-import { ScriptPreview } from '@/components/player/ScriptPreview';
+import { ScriptEditor } from '@/components/create/ScriptEditor';
 import { AudioConfigPanel, type AudioConfig } from '@/components/player/AudioConfigPanel';
 import { MiniPlayer } from '@/components/player/MiniPlayer';
 import { VideoModelPicker } from '@/components/player/VideoModelPicker';
@@ -68,7 +67,6 @@ import { AvatarPicker } from '@/components/player/AvatarPicker';
 import type { AvatarOverlayData } from '@/types/avatar';
 import type { AvatarMaskShape } from '@/components/player/AvatarOverlay';
 import type { PodcastDetail } from '@/types/podcast';
-import type { ReferenceData } from '@/types/reference';
 import type { VideoPipeline, FalModelsResponse } from '@/types/pipeline';
 import type { PodcastStatus } from '@prisma/client';
 import type { SegmentVisualData } from '@/lib/segment-utils';
@@ -185,11 +183,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showReport, setShowReport] = useState(false);
-  const [approving, setApproving] = useState(false);
-  const [regenerating, setRegenerating] = useState(false);
-  const [regenerateFeedback, setRegenerateFeedback] = useState('');
   const [scriptTurns, setScriptTurns] = useState<Array<{ speaker: string; text: string }> | null>(null);
-  const [scriptRefs, setScriptRefs] = useState<ReferenceData[]>([]);
   const [audioConfig, setAudioConfig] = useState<AudioConfig>({ voices: [] });
   const playerSectionRef = useRef<HTMLElement>(null);
   const [showRatingPrompt, setShowRatingPrompt] = useState(false);
@@ -285,7 +279,6 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data?.turns) setScriptTurns(data.turns);
-        if (data?.references) setScriptRefs(data.references);
       })
       .catch(() => {});
   }, [needsScript, isOwner, podcast.id]);
@@ -560,58 +553,6 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
     }
   }, [podcast.id, router]);
 
-  const handleApproveScript = useCallback(async () => {
-    setApproving(true);
-    try {
-      const body: Record<string, unknown> = {};
-      // Extract provider from first voice with an explicit provider
-      const firstVoiceProvider = audioConfig.voices.find(v => v.provider)?.provider;
-      if (firstVoiceProvider) {
-        const [provider, ...modelParts] = firstVoiceProvider.split(':');
-        body.ttsProvider = provider;
-        if (modelParts.length) body.ttsModel = modelParts.join(':');
-      }
-      if (audioConfig.voices.length > 0) {
-        body.voices = audioConfig.voices;
-      }
-      const response = await fetch(`/api/podcasts/${podcast.id}/script/approve`, {
-        method: 'POST',
-        ...(Object.keys(body).length > 0
-          ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
-          : {}),
-      });
-      if (response.ok) {
-        setLiveStatus('GENERATING_AUDIO');
-      }
-    } catch {
-      // ignore
-    } finally {
-      setApproving(false);
-    }
-  }, [podcast.id, audioConfig]);
-
-  const handleRegenerateScript = useCallback(async () => {
-    setRegenerating(true);
-    try {
-      const feedbackText = regenerateFeedback.trim();
-      const response = await fetch(`/api/podcasts/${podcast.id}/script/regenerate`, {
-        method: 'POST',
-        ...(feedbackText ? {
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ feedback: feedbackText }),
-        } : {}),
-      });
-      if (response.ok) {
-        setLiveStatus('SCRIPTING');
-        setRegenerateFeedback('');
-      }
-    } catch {
-      // ignore
-    } finally {
-      setRegenerating(false);
-    }
-  }, [podcast.id, regenerateFeedback]);
-
   const handleExportPdf = useCallback(async () => {
     if (!isAuthenticated) return;
 
@@ -846,37 +787,28 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
       {isScriptReady && isOwner && (
         <div className={styles.scriptReadyState}>
           <GenerationProgress status={liveStatus} topic={podcast.topic} />
-          <p className={styles.scriptReadyText}>
-            Your script is ready for review. Approve to start audio generation, or regenerate for a fresh script.
-          </p>
           {scriptTurns && scriptTurns.length > 0 && (
-            <>
-              <ScriptPreview turns={scriptTurns} references={scriptRefs} podcastId={podcast.id} />
-              <AudioConfigPanel
-                speakers={[...new Set(scriptTurns.map((t) => t.speaker))]}
-                onConfigChange={setAudioConfig}
-              />
-            </>
+            <AudioConfigPanel
+              speakers={[...new Set(scriptTurns.map((t) => t.speaker))]}
+              onConfigChange={setAudioConfig}
+            />
           )}
-          <textarea
-            className={styles.regenerateFeedback}
-            value={regenerateFeedback}
-            onChange={(e) => setRegenerateFeedback(e.target.value)}
-            placeholder="Optional: describe what you'd like changed before regenerating..."
-            rows={3}
-            maxLength={5000}
-            aria-label="Feedback for script regeneration"
+          <ScriptEditor
+            podcastId={podcast.id}
+            onApprove={() => setLiveStatus('GENERATING_AUDIO')}
+            onRegenerate={() => setLiveStatus('SCRIPTING')}
+            getApproveBody={() => {
+              const body: Record<string, unknown> = {};
+              const firstVoiceProvider = audioConfig.voices.find((v) => v.provider)?.provider;
+              if (firstVoiceProvider) {
+                const [provider, ...modelParts] = firstVoiceProvider.split(':');
+                body.ttsProvider = provider;
+                if (modelParts.length) body.ttsModel = modelParts.join(':');
+              }
+              if (audioConfig.voices.length > 0) body.voices = audioConfig.voices;
+              return body;
+            }}
           />
-          <div className={styles.scriptReadyActions}>
-            <Button onClick={handleApproveScript} loading={approving} disabled={approving || regenerating}>
-              <Check size={16} />
-              {approving ? 'Approving...' : 'Approve & Generate Audio'}
-            </Button>
-            <Button variant="secondary" onClick={handleRegenerateScript} loading={regenerating} disabled={approving || regenerating}>
-              <RefreshCw size={16} />
-              {regenerating ? 'Regenerating...' : (regenerateFeedback.trim() ? 'Regenerate with Notes' : 'Regenerate Script')}
-            </Button>
-          </div>
         </div>
       )}
 
