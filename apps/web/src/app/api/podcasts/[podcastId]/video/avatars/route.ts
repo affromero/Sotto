@@ -167,15 +167,19 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         create: {
           videoGenerationId: videoGeneration.id,
           speaker: avatar.speaker,
-          avatarId: avatar.avatarId,
+          avatarId: avatar.avatarId ?? '',
           avatarProvider: avatar.avatarProvider ?? null,
+          avatarImageUrl: avatar.avatarImageUrl ?? null,
+          avatarModelId: avatar.avatarModelId ?? null,
           enabledSegmentIds: avatar.enabledSegmentIds ?? [],
           voiceTrackId: avatar.voiceTrackId ?? null,
           status: 'pending',
         },
         update: {
-          avatarId: avatar.avatarId,
+          avatarId: avatar.avatarId ?? '',
           avatarProvider: avatar.avatarProvider ?? null,
+          avatarImageUrl: avatar.avatarImageUrl ?? null,
+          avatarModelId: avatar.avatarModelId ?? null,
           enabledSegmentIds: avatar.enabledSegmentIds ?? [],
           voiceTrackId: avatar.voiceTrackId ?? null,
           status: 'pending',
@@ -185,6 +189,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           runwaySessionId: null,
           runwayChunkIndex: null,
           runwayTotalChunks: null,
+          falRequestId: null,
+          falChunkIndex: null,
+          falTotalChunks: null,
           maskShape: null,
           failureReason: null,
         },
@@ -222,13 +229,16 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     for (const overlay of overlays) {
       const avatarConfig = parsed.data.avatars.find((a) => a.speaker === overlay.speaker);
+      const resolvedProvider = overlay.avatarProvider ?? avatarConfig?.avatarProvider ?? 'heygen';
       await addJob(avatarGenerationQueue, JobType.GENERATE_AVATAR, {
         podcastId,
         videoGenerationId: videoGeneration.id,
         avatarOverlayId: overlay.id,
         speaker: overlay.speaker,
         avatarId: overlay.avatarId,
-        avatarProvider: (overlay.avatarProvider ?? avatarConfig?.avatarProvider ?? 'heygen') as 'heygen' | 'runway',
+        avatarProvider: resolvedProvider as 'heygen' | 'runway' | 'fal',
+        avatarImageUrl: overlay.avatarImageUrl ?? avatarConfig?.avatarImageUrl ?? undefined,
+        avatarModelId: overlay.avatarModelId ?? avatarConfig?.avatarModelId ?? undefined,
         isPreset: avatarConfig?.isPreset,
         voiceTrackId: overlay.voiceTrackId ?? undefined,
       });

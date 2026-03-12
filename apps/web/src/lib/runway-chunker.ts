@@ -24,10 +24,12 @@ export async function splitAudioIntoChunks(params: {
   audioPath: string;
   totalDuration: number;
   tmpDir: string;
+  chunkTargetSeconds?: number;
 }): Promise<AudioChunk[]> {
   const { audioPath, totalDuration, tmpDir } = params;
+  const chunkTarget = params.chunkTargetSeconds ?? RUNWAY_CHUNK_TARGET_SECONDS;
 
-  if (totalDuration <= RUNWAY_CHUNK_TARGET_SECONDS) {
+  if (totalDuration <= chunkTarget) {
     return [{
       index: 0,
       inputPath: audioPath,
@@ -43,7 +45,7 @@ export async function splitAudioIntoChunks(params: {
 
   while (offset < totalDuration) {
     const remaining = totalDuration - offset;
-    const chunkDuration = Math.min(RUNWAY_CHUNK_TARGET_SECONDS, remaining);
+    const chunkDuration = Math.min(chunkTarget, remaining);
     const chunkAudioPath = join(tmpDir, `chunk-audio-${idx}.mp3`);
 
     await execFileAsync('ffmpeg', [
