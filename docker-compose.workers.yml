@@ -1,0 +1,85 @@
+# Worker services — managed separately from app (no blue-green needed).
+# BullMQ queues are durable in Redis; jobs survive worker restart.
+#
+# Usage: docker compose -f docker-compose.workers.yml up -d
+
+services:
+  workers-heavy:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile.workers
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 3g
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-sotto}:${POSTGRES_PASSWORD}@pgbouncer:5432/${POSTGRES_DB:-sotto}?schema=public&pgbouncer=true&connection_limit=5&pool_timeout=10
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      WORKER_PROFILE: heavy
+    command: ['node', '--max-old-space-size=2560', '--import', 'tsx', 'src/workers/index.ts']
+    networks:
+      - sotto-network
+    logging:
+      driver: json-file
+      options:
+        max-size: '50m'
+        max-file: '5'
+
+  workers-pipeline:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile.workers
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-sotto}:${POSTGRES_PASSWORD}@pgbouncer:5432/${POSTGRES_DB:-sotto}?schema=public&pgbouncer=true&connection_limit=5&pool_timeout=10
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      WORKER_PROFILE: pipeline
+    command: ['node', '--max-old-space-size=768', '--import', 'tsx', 'src/workers/index.ts']
+    networks:
+      - sotto-network
+    logging:
+      driver: json-file
+      options:
+        max-size: '50m'
+        max-file: '5'
+
+  workers-light:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile.workers
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 768m
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-sotto}:${POSTGRES_PASSWORD}@pgbouncer:5432/${POSTGRES_DB:-sotto}?schema=public&pgbouncer=true&connection_limit=5&pool_timeout=10
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      WORKER_PROFILE: light
+    command: ['node', '--max-old-space-size=512', '--import', 'tsx', 'src/workers/index.ts']
+    networks:
+      - sotto-network
+    logging:
+      driver: json-file
+      options:
+        max-size: '20m'
+        max-file: '3'
+
+networks:
+  sotto-network:
+    external: true
+    name: sotto-network

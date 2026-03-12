@@ -10,7 +10,11 @@ on:
         type: choice
         options:
           - web
-          - workers
+          - workers-heavy
+          - workers-pipeline
+          - workers-light
+          - workers-all
+          - infra
           - all
       lines:
         description: 'Number of log lines'
@@ -32,15 +36,37 @@ jobs:
           SERVICE="${{ inputs.service }}"
           LINES="${{ inputs.lines }}"
 
-          if [ "$SERVICE" = "all" ]; then
-            SVC_ARG=""
-          else
-            SVC_ARG="$SERVICE"
-          fi
-
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/key sotto@${{ secrets.SERVER_IP }} \
-            "cd ~/sotto && docker compose -f docker-compose.prod.yml logs --tail=${LINES} --timestamps ${SVC_ARG} 2>&1" \
-            > logs.txt 2>&1 || true
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/key sotto@${{ secrets.SERVER_IP }} "
+            cd ~/sotto
+            case '$SERVICE' in
+              web)
+                # Fetch from whichever blue/green slot is active
+                ACTIVE=\$(cat ~/.sotto-deploy-slot 2>/dev/null || echo blue)
+                docker compose -f docker-compose.app.yml -p sotto-\${ACTIVE} logs --tail=${LINES} --timestamps web 2>&1
+                ;;
+              workers-heavy)
+                docker compose -f docker-compose.workers.yml logs --tail=${LINES} --timestamps workers-heavy 2>&1
+                ;;
+              workers-pipeline)
+                docker compose -f docker-compose.workers.yml logs --tail=${LINES} --timestamps workers-pipeline 2>&1
+                ;;
+              workers-light)
+                docker compose -f docker-compose.workers.yml logs --tail=${LINES} --timestamps workers-light 2>&1
+                ;;
+              workers-all)
+                docker compose -f docker-compose.workers.yml logs --tail=${LINES} --timestamps 2>&1
+                ;;
+              infra)
+                docker compose -f docker-compose.infra.yml logs --tail=${LINES} --timestamps 2>&1
+                ;;
+              all)
+                ACTIVE=\$(cat ~/.sotto-deploy-slot 2>/dev/null || echo blue)
+                docker compose -f docker-compose.infra.yml logs --tail=${LINES} --timestamps 2>&1
+                docker compose -f docker-compose.app.yml -p sotto-\${ACTIVE} logs --tail=${LINES} --timestamps 2>&1
+                docker compose -f docker-compose.workers.yml logs --tail=${LINES} --timestamps 2>&1
+                ;;
+            esac
+          " > logs.txt 2>&1 || true
 
           rm -f ~/.ssh/key
 

@@ -10,8 +10,8 @@ set -euo pipefail
 SLOT_FILE="$HOME/.sotto-deploy-slot"
 COMPOSE_INFRA="docker-compose.infra.yml"
 COMPOSE_APP="docker-compose.app.yml"
+COMPOSE_WORKERS="docker-compose.workers.yml"
 HEALTH_TIMEOUT=120  # seconds to wait for new slot to become healthy
-DRAIN_TIMEOUT=60    # seconds for old slot to drain BullMQ jobs
 
 # --- Slot resolution ---
 
@@ -92,6 +92,19 @@ for i in $(seq 1 30); do
   fi
   if [ "$i" -eq 30 ]; then
     echo "ERROR: Redis not ready after 30s"
+    exit 1
+  fi
+  sleep 1
+done
+
+echo "Waiting for pgbouncer..."
+for i in $(seq 1 30); do
+  if docker compose -f "$COMPOSE_INFRA" exec -T pgbouncer pg_isready -h 127.0.0.1 -p 5432 -U "${POSTGRES_USER:-sotto}" >/dev/null 2>&1; then
+    echo "PgBouncer ready"
+    break
+  fi
+  if [ "$i" -eq 30 ]; then
+    echo "ERROR: PgBouncer not ready after 30s"
     exit 1
   fi
   sleep 1
@@ -182,11 +195,21 @@ else
   echo "Maps health check skipped (no response — may not have /api/health)"
 fi
 
+# --- Build and restart workers ---
+# Workers are stateless BullMQ consumers; jobs are durable in Redis.
+# No drain needed — restart immediately with new code.
+
+echo ""
+echo "=== Building and restarting workers ==="
+docker compose -f "$COMPOSE_WORKERS" build
+docker compose -f "$COMPOSE_WORKERS" up -d --force-recreate
+
 # --- Stop old slot ---
+# Workers are already out of app compose — no job drain needed here.
 
 if [ "$OLD_SLOT" != "none" ]; then
   echo ""
-  echo "=== Stopping old $OLD_SLOT slot (${DRAIN_TIMEOUT}s drain) ==="
+  echo "=== Stopping old $OLD_SLOT slot ==="
 
   # Determine old slot ports for env
   if [ "$OLD_SLOT" = "blue" ]; then
@@ -197,7 +220,7 @@ if [ "$OLD_SLOT" != "none" ]; then
     export MAPS_PORT=3012
   fi
 
-  docker compose -f "$COMPOSE_APP" -p "sotto-${OLD_SLOT}" down --timeout "$DRAIN_TIMEOUT"
+  docker compose -f "$COMPOSE_APP" -p "sotto-${OLD_SLOT}" down --timeout 10
 fi
 
 # --- Save state ---
