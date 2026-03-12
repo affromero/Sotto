@@ -360,6 +360,51 @@ describe('useDiscovery', () => {
     });
   });
 
+  describe('updateMetadata', () => {
+    it('patches metadata fields without triggering an API call', async () => {
+      const chunks = [
+        'data: {"type":"metadata","metadata":{"topic":"AI","depth":"standard","audienceLevel":"intermediate","audience":"general","focusAreas":[],"tone":"casual","durationTarget":10,"ready":true}}\n',
+        'data: [DONE]\n',
+      ];
+
+      vi.mocked(fetch).mockResolvedValue({
+        ok: true,
+        body: new MockReadableStream(chunks),
+      } as unknown as Response);
+
+      const { result } = renderHook(() => useDiscovery());
+
+      await act(async () => {
+        await result.current.sendMessage('AI');
+      });
+
+      await waitFor(() => {
+        expect(result.current.metadata).not.toBeNull();
+      });
+
+      const callCountBefore = vi.mocked(fetch).mock.calls.length;
+
+      act(() => {
+        result.current.updateMetadata({ depth: 'deep_dive' });
+      });
+
+      expect(result.current.metadata?.depth).toBe('deep_dive');
+      expect(vi.mocked(fetch).mock.calls.length).toBe(callCountBefore);
+    });
+
+    it('is a no-op when metadata is null', () => {
+      const { result } = renderHook(() => useDiscovery());
+
+      expect(result.current.metadata).toBeNull();
+
+      act(() => {
+        result.current.updateMetadata({ depth: 'eli5' });
+      });
+
+      expect(result.current.metadata).toBeNull();
+    });
+  });
+
   describe('reset', () => {
     it('clears all messages', async () => {
       const chunks = ['data: {"type":"content","content":"Response"}\n', 'data: [DONE]\n'];
