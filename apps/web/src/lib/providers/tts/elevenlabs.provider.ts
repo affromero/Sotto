@@ -4,11 +4,12 @@
  *
  * Expression support:
  *   - v3 audio tags: 1,450+ inline tags ([laughs], [excited], [sarcastic], etc.)
- *   - stability: 0.0 Creative (most expressive), 0.5 Natural, 1.0 Robust
+ *   - stability: 0.0 Creative (most expressive), 0.5 Natural, 1.0 Robust (disables tag responsiveness)
  *   - style: keep at 0.0 per ElevenLabs recommendation (reduces latency)
- *   - Audio tags affect ~4-5 words after the tag before delivery normalizes
+ *   - sustainedDelivery: re-injects the audio tag before every sentence so the
+ *     delivery style persists across the whole segment, not just the opening words
  *
- * @tts-research-date 2026-02-27 — v3 audio tags, voice_settings, SSML, prosody context
+ * @tts-research-date 2026-03-12 — inline tag injection, context params, output quality
  */
 import type { TtsProvider, SpeechParams, SfxParams } from '../tts';
 import { getProviderMeta, type TtsProviderId } from '../tts-registry';
@@ -18,6 +19,16 @@ import { mapDirectionToExpression } from '../../tts-expression-mapper';
 // Speakers that use the "host" voice slot; all others use "expert" slot.
 // HOST/GUEST are at even indices (0, 2); EXPERT/SKEPTIC at odd (1, 3).
 const SPEAKER_VOICE_HOST_SET = new Set(['HOST', 'GUEST']);
+
+/**
+ * Re-injects an audio tag before every sentence so a sustained delivery style
+ * (e.g. "[excited]") persists across the whole segment, not just the first words.
+ * Splits on sentence-ending punctuation followed by whitespace + capital letter.
+ */
+function injectTagAtSentenceBoundaries(text: string, tag: string): string {
+  const parts = text.split(/(?<=[.!?]) +(?=[A-Z])/);
+  return parts.length > 1 ? parts.map((s) => tag + s).join(' ') : tag + text;
+}
 
 export class ElevenLabsProvider implements TtsProvider {
   readonly providerId: TtsProviderId = 'elevenlabs';
@@ -46,8 +57,14 @@ export class ElevenLabsProvider implements TtsProvider {
     const expression = mapDirectionToExpression(params.direction, params.speaker, 'elevenlabs');
     const elExpr = expression.elevenlabs;
 
-    // Prepend audio tag if the mapper provided one (e.g. "[excited] ")
-    const text = elExpr?.audioTagPrefix ? elExpr.audioTagPrefix + params.text : params.text;
+    // Apply audio tag: re-inject before every sentence for sustained delivery styles,
+    // or prepend once for one-shot sound events (laughs, gasps, sighs).
+    const prefix = elExpr?.audioTagPrefix;
+    const text = prefix
+      ? elExpr.sustainedDelivery
+        ? injectTagAtSentenceBoundaries(params.text, prefix)
+        : prefix + params.text
+      : params.text;
 
     return el.generateSpeech({
       text,
