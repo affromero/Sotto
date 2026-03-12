@@ -129,7 +129,7 @@ const DIRECTION_MAP: Record<string, DirectionMapping> = {
     replicate: {},
   },
   warm: {
-    elevenlabs: { stability: 0.5 },
+    elevenlabs: { audioTagPrefix: '[warmly] ', stability: 0.5, sustainedDelivery: true },
     cartesia: { emotion: 'affectionate' },
     hume: { description: 'warm, inviting, friendly' },
     openai: { instructions: 'Speak warmly and invitingly, like welcoming a friend.' },
@@ -198,6 +198,24 @@ const DIRECTION_MAP: Record<string, DirectionMapping> = {
     cartesia: { emotion: 'happy' },
     hume: { description: 'amused, laughing, light-hearted' },
     openai: { instructions: 'Speak while lightly laughing, amused and cheerful.' },
+    minimax: { emotion: 'happy' },
+    replicate: { emotionTag: '[laughing]' },
+  },
+  chuckling: {
+    // One-shot sound event — light chuckling at the start of the turn
+    elevenlabs: { audioTagPrefix: '[chuckles] ', stability: 0.0 },
+    cartesia: { emotion: 'happy' },
+    hume: { description: 'lightly chuckling, gently amused' },
+    openai: { instructions: 'Speak while lightly chuckling, softly amused.' },
+    minimax: { emotion: 'happy' },
+    replicate: { emotionTag: '[laughing]' },
+  },
+  giggling: {
+    // One-shot sound event — giggly, playful laughter at the start of the turn
+    elevenlabs: { audioTagPrefix: '[giggles] ', stability: 0.0 },
+    cartesia: { emotion: 'happy' },
+    hume: { description: 'giggling, light and playful' },
+    openai: { instructions: 'Speak while giggling, light and playful.' },
     minimax: { emotion: 'happy' },
     replicate: { emotionTag: '[laughing]' },
   },
@@ -351,4 +369,50 @@ export function mapDirectionToExpression(
  */
 export function getSupportedDirections(): string[] {
   return Object.keys(DIRECTION_MAP);
+}
+
+// ---------------------------------------------------------------------------
+// Inline audio tag conversion — provider-specific handling
+// ---------------------------------------------------------------------------
+
+/**
+ * Convert provider-agnostic inline audio tags embedded in script text
+ * (e.g. [laughs], [pause], [excited]) to the native format for each provider.
+ * Must be called before sending text to any TTS API.
+ *
+ * Provider support matrix:
+ *   ElevenLabs v3  — all audio tags native; pass through unchanged
+ *   Hume Octave    — [pause] and [long pause] native; strip everything else
+ *   Cartesia Sonic — [laughter] native; [pause] → SSML break; strip rest
+ *   OpenAI / rest  — no tag support; pauses → punctuation; strip all tags
+ */
+export function convertInlineAudioTags(text: string, providerId: TtsProviderId): string {
+  switch (providerId) {
+    case 'elevenlabs':
+      return text;
+
+    case 'hume':
+      // Only [pause] and [long pause] are native Hume markers; strip everything else
+      return text.replace(/\[(?!(?:long )?pause\])([^\]]+)\]/gi, '');
+
+    case 'cartesia': {
+      // [laughter] is the native Cartesia transcript marker
+      // [pause] / [short pause] → SSML break 0.5s; [long pause] → 1.5s
+      const laughRe =
+        /\[(?:laughs?|chuckles?|giggles?|starts laughing|laughing|laughs harder|wheezing|cracking up|stifling laughter|laughing hysterically|with genuine belly laugh)\]/gi;
+      return text
+        .replace(laughRe, '[laughter]')
+        .replace(/\[long pause\]/gi, '<break time="1.5s"/>')
+        .replace(/\[(?:pause|short pause)\]/gi, '<break time="0.5s"/>')
+        .replace(/\[([^\]]+)\]/g, '');
+    }
+
+    default:
+      // openai, minimax, fal, replicate, kittentts — no audio tag support
+      // Approximate pauses with punctuation; strip all remaining expression tags
+      return text
+        .replace(/\[long pause\]/gi, '... ')
+        .replace(/\[(?:pause|short pause)\]/gi, ', ')
+        .replace(/\[([^\]]+)\]/g, '');
+  }
 }

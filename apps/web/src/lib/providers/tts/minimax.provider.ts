@@ -9,7 +9,7 @@ import { logger } from '../../logger';
 import type { TtsProvider, SpeechParams } from '../tts';
 import type { TtsProviderId } from '../tts-registry';
 import { MINIMAX_VOICE_POOL, selectVoicePairFromPool } from '../tts-voices';
-import { mapDirectionToExpression } from '../../tts-expression-mapper';
+import { mapDirectionToExpression, convertInlineAudioTags } from '../../tts-expression-mapper';
 
 // HOST/GUEST → host voice slot; EXPERT/SKEPTIC → expert slot.
 const SPEAKER_VOICE_HOST_SET = new Set(['HOST', 'GUEST']);
@@ -38,7 +38,7 @@ export class MinimaxProvider implements TtsProvider {
     const endpoint = MODEL_ENDPOINTS[this.model] ?? MODEL_ENDPOINTS['speech-02-hd'];
 
     const body: Record<string, unknown> = {
-      text: params.text,
+      text: convertInlineAudioTags(params.text, 'minimax'),
       voice_id: params.voiceId,
       sample_rate: 32000,
       format: 'mp3',
