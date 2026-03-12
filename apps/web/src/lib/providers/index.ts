@@ -40,7 +40,6 @@ export { createAIProvider } from './ai';
 export {
   createTtsProvider,
   createPremiumTtsProvider,
-  createTtsProviderWithFallback,
   createTtsProviderAsync,
   resolveTtsProvider,
 } from './tts';

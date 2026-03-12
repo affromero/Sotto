@@ -9,7 +9,6 @@
  * R2 upload, stitching queue — those stay in each worker.
  */
 import type { TtsProvider } from '@/lib/providers/tts';
-import { resolveTtsProvider } from '@/lib/providers/tts';
 import { getProviderMeta, type TtsProviderId } from '@/lib/providers/tts-registry';
 import { getElevenLabsConcurrencyLimit } from '@/lib/elevenlabs';
 import { getCartesiaConcurrencyLimit, updateCartesiaConcurrencyFromError } from '@/lib/providers/tts/cartesia.provider';
@@ -19,7 +18,6 @@ import { getByokKey } from '@/lib/byok';
 import { cleanTextForTts } from '@/lib/tts-text-cleaner';
 import { getAudioDuration } from '@/lib/audio-stitcher';
 import { estimateDurationFromText } from '@/lib/duration';
-import { isModelAccessError } from '@/lib/byok-errors';
 import { logUsage } from '@/lib/usage-logger';
 import { logger } from '@/lib/logger';
 import * as path from 'path';
@@ -67,7 +65,6 @@ export interface TtsGenerationParams {
   userId: string;
   podcastId: string;
 
-  /** For BYOK 404 fallback retry via resolveTtsProvider({ skipByok: true }). */
   requestedModel?: string | null;
   plan: 'FREE' | 'PRO';
 
@@ -104,7 +101,7 @@ export async function generateTtsAudio(params: TtsGenerationParams): Promise<Tts
     text, voiceId, speaker, previousText, nextText, direction,
     provider, providerId, source,
     userId, podcastId,
-    requestedModel, plan,
+    requestedModel: _requestedModel, plan: _plan,
     usageCategory, extraMetadata,
     isAborted,
   } = params;
@@ -154,49 +151,26 @@ export async function generateTtsAudio(params: TtsGenerationParams): Promise<Tts
 
   let audioBuffer: Buffer;
   let semaphoreReleased = false;
-  let effectiveSource = source;
+  const effectiveSource = source;
   try {
     audioBuffer = await provider.generateSpeech(speechParams);
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
+    await semaphore.release(semaphoreKey);
+    semaphoreReleased = true;
 
-    // 5. BYOK model-access 404 → retry with platform key
-    if (source === 'byok' && isModelAccessError(errMsg)) {
-      logger.warn('BYOK key lacks model access, retrying with platform key', {
-        providerId, podcastId, error: errMsg,
-      });
-      try {
-        const platformResolved = await resolveTtsProvider({
-          userId, podcastId,
-          requestedProvider: providerId,
-          requestedModel: requestedModel,
-          plan,
-          skipByok: true,
-        });
-        audioBuffer = await platformResolved.provider.generateSpeech(speechParams);
-        effectiveSource = 'platform';
-      } catch {
-        await semaphore.release(semaphoreKey);
-        semaphoreReleased = true;
-        throw err;
+    // 5. On 429, update cached concurrency limit
+    if (resolvedApiKey && /\(429\)/.test(errMsg)) {
+      if (providerId === 'cartesia') {
+        await updateCartesiaConcurrencyFromError(resolvedApiKey, errMsg);
+      } else if (providerId === 'hume') {
+        await updateHumeConcurrencyFromError(resolvedApiKey, errMsg);
       }
-    } else {
-      await semaphore.release(semaphoreKey);
-      semaphoreReleased = true;
-
-      // 6. On 429, update cached concurrency limit
-      if (resolvedApiKey && /\(429\)/.test(errMsg)) {
-        if (providerId === 'cartesia') {
-          await updateCartesiaConcurrencyFromError(resolvedApiKey, errMsg);
-        } else if (providerId === 'hume') {
-          await updateHumeConcurrencyFromError(resolvedApiKey, errMsg);
-        }
-        logger.warn('TTS 429 — concurrency limit cached, BullMQ will retry', { providerId, podcastId });
-      }
-      throw err;
+      logger.warn('TTS 429 — concurrency limit cached, BullMQ will retry', { providerId, podcastId });
     }
+    throw err;
   } finally {
-    // 7. Release semaphore
+    // 6. Release semaphore
     if (!semaphoreReleased) {
       await semaphore.release(semaphoreKey);
     }
