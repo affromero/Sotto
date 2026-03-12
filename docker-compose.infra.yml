@@ -58,7 +58,7 @@ services:
         max-file: '3'
 
   pgbouncer:
-    image: edoburu/pgbouncer:1.22.0
+    image: edoburu/pgbouncer:v1.23.1-p3
     container_name: sotto-prod-pgbouncer
     restart: unless-stopped
     deploy:
