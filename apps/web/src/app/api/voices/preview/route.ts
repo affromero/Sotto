@@ -7,7 +7,7 @@ import { getProviderMeta, type TtsProviderId } from '@/lib/providers/tts-registr
 import { logUsage } from '@/lib/usage-logger';
 import { getByokKey } from '@/lib/byok';
 import { createTtsProviderAsync } from '@/lib/providers/tts';
-
+import { prisma } from '@/lib/prisma';
 import { errorResponse } from '@/lib/api-response';
 export async function POST(request: NextRequest) {
   const session = await auth();
@@ -32,24 +32,39 @@ export async function POST(request: NextRequest) {
   let audioBuffer: Buffer;
   const providerName: TtsProviderId = (provider || 'elevenlabs') as TtsProviderId;
 
-  if (provider && provider !== 'elevenlabs') {
-    // Multi-provider preview: use BYOK key or platform key
-    const ttsProviderId = provider as TtsProviderId;
-    const byokKey = await getByokKey(session.user.id, ttsProviderId);
-    const platformKey = provider === 'hume' ? process.env.HUME_API_KEY
-      : provider === 'cartesia' ? process.env.CARTESIA_API_KEY
-      : undefined;
-    const apiKey = byokKey || platformKey;
+  try {
+    if (provider && provider !== 'elevenlabs') {
+      // Multi-provider preview: use BYOK key or platform key
+      const ttsProviderId = provider as TtsProviderId;
+      const byokKey = await getByokKey(session.user.id, ttsProviderId);
+      const platformKey = provider === 'hume' ? process.env.HUME_API_KEY
+        : provider === 'cartesia' ? process.env.CARTESIA_API_KEY
+        : undefined;
+      const apiKey = byokKey || platformKey;
 
-    if (!apiKey) {
-      return errorResponse(`No ${provider} API key available`, 400);
+      if (!apiKey) {
+        return errorResponse(`No ${provider} API key available`, 400);
+      }
+
+      const ttsProvider = await createTtsProviderAsync(ttsProviderId, apiKey);
+      audioBuffer = await ttsProvider.generateSpeech({ text, voiceId });
+    } else {
+      // Default: ElevenLabs — use BYOK key; platform key only for admins without BYOK
+      const [elByokKey, user] = await Promise.all([
+        getByokKey(session.user.id, 'elevenlabs'),
+        prisma.user.findUniqueOrThrow({ where: { id: session.user.id }, select: { role: true } }),
+      ]);
+      const isAdmin = user.role === 'ADMIN' || user.role === 'SYSTEM';
+      const apiKey = elByokKey ?? (isAdmin ? undefined : null);
+      if (apiKey === null) {
+        return errorResponse('Add your ElevenLabs API key in Settings to preview voices.', 400);
+      }
+      audioBuffer = await generateSpeech({ text, voiceId, apiKeyOverride: apiKey ?? undefined });
     }
-
-    const ttsProvider = await createTtsProviderAsync(ttsProviderId, apiKey);
-    audioBuffer = await ttsProvider.generateSpeech({ text, voiceId });
-  } else {
-    // Default: ElevenLabs
-    audioBuffer = await generateSpeech({ text, voiceId });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : '';
+    const isInvalidId = msg.includes('422') || msg.toLowerCase().includes('pattern') || msg.toLowerCase().includes('invalid_uid');
+    return errorResponse(isInvalidId ? 'Invalid voice ID format.' : 'Failed to generate preview.', 400);
   }
 
   const meta = getProviderMeta(providerName);
