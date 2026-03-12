@@ -2,12 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { createVoiceRequestSchema } from '@/lib/validations';
-
+import { getPlanFeatureConfig } from '@/lib/plan-feature-config';
 import { errorResponse } from '@/lib/api-response';
+
 export async function POST(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
     return errorResponse('Unauthorized', 401);
+  }
+
+  const voiceConfig = await getPlanFeatureConfig();
+  if (!voiceConfig.voiceMarketplaceEnabled) {
+    return errorResponse('Voice marketplace is currently unavailable.', 503);
   }
 
   const body = await request.json();

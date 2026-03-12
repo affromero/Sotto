@@ -12,6 +12,18 @@ vi.mock('@/lib/auth', () => ({
   auth: (...args: unknown[]) => mockAuth(...args),
 }));
 
+vi.mock('@/lib/plan-feature-config', () => ({
+  getPlanFeatureConfig: vi.fn().mockResolvedValue({
+    freeVoiceCloningEnabled: false,
+    proVoiceCloningEnabled: true,
+    freeVoiceTracksEnabled: false,
+    proVoiceTracksEnabled: true,
+    freeMaxVoiceTracks: 0,
+    proMaxVoiceTracks: 3,
+    voiceMarketplaceEnabled: true,
+  }),
+}));
+
 vi.mock('@/lib/prisma', () => {
   const _mockPrisma = {
     voiceClone: {
