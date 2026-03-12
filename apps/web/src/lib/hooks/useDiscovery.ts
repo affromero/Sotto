@@ -23,6 +23,7 @@ interface UseDiscoveryReturn {
   detectedLanguage: string | null;
   sendMessage: (content: string, podcastId?: string, isChipBased?: boolean, model?: string) => Promise<void>;
   reset: () => void;
+  updateMetadata: (patch: Partial<DiscoveryMetadata>) => void;
 }
 
 const initialState: DiscoveryState = {
@@ -459,6 +460,13 @@ export function useDiscovery(
     [track]
   );
 
+  const updateMetadata = useCallback((patch: Partial<DiscoveryMetadata>) => {
+    setState(prev => ({
+      ...prev,
+      metadata: prev.metadata ? { ...prev.metadata, ...patch } : null,
+    }));
+  }, []);
+
   const reset = useCallback(() => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -480,5 +488,6 @@ export function useDiscovery(
     detectedLanguage,
     sendMessage,
     reset,
+    updateMetadata,
   };
 }
