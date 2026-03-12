@@ -238,6 +238,43 @@ export async function tryIncrementAvatarGeneration(
 }
 
 /**
+ * Get avatar generation status for display purposes.
+ */
+export async function getAvatarGenerationStatus(userId: string): Promise<{
+  dailyUsed: number;
+  dailyLimit: number;
+  dailyRemaining: number;
+  resetInSeconds?: number;
+  isByokUser: boolean;
+  isProUser: boolean;
+}> {
+  const [hasByok, config, user, dailyData] = await Promise.all([
+    hasImageByokKey(userId),
+    getAutoModelConfig(),
+    prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { role: true, plan: true },
+    }),
+    getAvatarDailyCount(userId),
+  ]);
+
+  const isProUser = user.plan === 'PRO';
+  const isPrivileged = user.role === 'ADMIN' || user.role === 'SYSTEM';
+  const dailyLimit = isProUser ? config.dailyVideoLimitPro : config.dailyVideoLimit;
+
+  return {
+    dailyUsed: dailyData.count,
+    dailyLimit,
+    dailyRemaining: hasByok || isPrivileged
+      ? Infinity
+      : Math.max(0, dailyLimit - dailyData.count),
+    ...(dailyData.ttl > 0 && { resetInSeconds: dailyData.ttl }),
+    isByokUser: hasByok || isPrivileged,
+    isProUser,
+  };
+}
+
+/**
  * Get video generation status for display purposes.
  */
 export async function getVideoGenerationStatus(userId: string): Promise<{

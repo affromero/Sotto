@@ -3,7 +3,8 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getFreeTierStatus } from '@/lib/generation-gate';
 import { getTierFeatures } from '@/lib/tier-features';
-import { getVideoGenerationStatus } from '@/lib/video-gate';
+import { getVideoGenerationStatus, getAvatarGenerationStatus } from '@/lib/video-gate';
+import { getMusicGenerationStatus } from '@/lib/music-gate';
 import { resolveAudioUrl } from '@/lib/r2';
 import { findByVoiceId } from '@/lib/voice-pool';
 import type { Metadata } from 'next';
@@ -245,14 +246,20 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
   const isAdmin = session?.user?.role === 'ADMIN';
   let canMakePrivate: boolean | undefined;
   let videoStatus: { dailyUsed: number; dailyLimit: number; dailyRemaining: number; resetInSeconds?: number; isByokUser: boolean; isProUser: boolean } | undefined;
+  let avatarStatus: { dailyUsed: number; dailyLimit: number; dailyRemaining: number; resetInSeconds?: number; isByokUser: boolean; isProUser: boolean } | undefined;
+  let musicStatus: { dailyUsed: number; dailyLimit: number; dailyRemaining: number; resetInSeconds?: number; isByokUser: boolean; isProUser: boolean } | undefined;
   if (isOwner && userId) {
-    const [freeTier, vidStatus] = await Promise.all([
+    const [freeTier, vidStatus, avStatus, musStatus] = await Promise.all([
       getFreeTierStatus(userId),
       getVideoGenerationStatus(userId),
+      getAvatarGenerationStatus(userId),
+      getMusicGenerationStatus(userId),
     ]);
     const plan = freeTier.isProUser ? 'PRO' as const : 'FREE' as const;
     canMakePrivate = getTierFeatures(plan, freeTier.isByokUser, session?.user?.role as string | undefined).privateAllowed;
     videoStatus = vidStatus;
+    avatarStatus = avStatus;
+    musicStatus = musStatus;
   }
 
   const visibility = podcast.visibility;
@@ -419,7 +426,7 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
         />
       )}
       <div className={styles.container}>
-        <PodcastPlayerView podcast={podcastData} isOwner={isOwner} isAdmin={isAdmin} isAuthenticated={!!userId} currentUserId={userId} canMakePrivate={canMakePrivate} videoStatus={videoStatus} />
+        <PodcastPlayerView podcast={podcastData} isOwner={isOwner} isAdmin={isAdmin} isAuthenticated={!!userId} currentUserId={userId} canMakePrivate={canMakePrivate} videoStatus={videoStatus} avatarStatus={avatarStatus} musicStatus={musicStatus} />
         {!userId && podcast.visibility === 'PUBLIC' && (
           <JoinCTA creatorHandle={podcast.user.handle} creatorName={podcast.user.name} />
         )}
