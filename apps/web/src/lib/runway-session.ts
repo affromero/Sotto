@@ -1,42 +1,25 @@
-import { spawn } from 'child_process';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
-import {
-  Room,
-  RoomEvent,
-  RemoteVideoTrack,
-  VideoStream,
-  AudioSource,
-  AudioFrame,
-  LocalAudioTrack,
-  VideoBufferType,
-  TrackPublishOptions,
-  TrackSource,
-} from '@livekit/rtc-node';
+import { readFile, writeFile } from 'fs/promises';
+import { chromium } from 'playwright';
 import type { RunwaySessionCredentials } from './runway';
 import { logger } from './logger';
 
 const execFileAsync = promisify(execFile);
 
-const SAMPLE_RATE = 48_000;
-const CHANNELS = 1;
-const SAMPLES_PER_FRAME = 960; // 20ms at 48kHz
-const BYTES_PER_FRAME = SAMPLES_PER_FRAME * 2; // int16 = 2 bytes per sample
-
-type RawFrame = {
-  data: Uint8Array;
-  width: number;
-  height: number;
-  timestampUs: bigint;
-};
+// livekit-client v2 UMD bundle — used inside headless Chrome to connect to LiveKit.
+// Using browser WebRTC avoids the H264 decode failure in @livekit/rtc-node's
+// Darwin arm64 binary (compiled without FFmpeg H264 or VideoToolbox activation).
+const LIVEKIT_CLIENT_CDN =
+  'https://cdn.jsdelivr.net/npm/livekit-client@2.10.0/dist/livekit-client.umd.min.js';
 
 export interface RunwayRecordingConfig {
   credentials: RunwaySessionCredentials;
   audioFilePath: string;
   outputVideoPath: string;
   onProgress?: (pct: number) => void;
-  /** @internal override timer delays in tests to avoid real wait times */
-  _delayMs?: { trailing?: number; drain?: number; videoSubscribe?: number };
+  /** @internal override timer delays in tests */
+  _delayMs?: { trailing?: number };
 }
 
 export interface RunwayRecordingResult {
@@ -56,277 +39,257 @@ async function getAudioDuration(audioPath: string): Promise<number> {
   return parseFloat(stdout.trim());
 }
 
-async function decodeToPCM(audioPath: string): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
-    const proc = spawn('ffmpeg', [
-      '-i', audioPath,
-      '-f', 's16le',
-      '-ar', `${SAMPLE_RATE}`,
-      '-ac', `${CHANNELS}`,
-      'pipe:1',
-    ]);
-    const chunks: Buffer[] = [];
-    proc.stdout.on('data', (d: Buffer) => chunks.push(d));
-    proc.stderr.on('data', () => { /* suppress ffmpeg noise */ });
-    proc.on('close', (code) => {
-      if (code !== 0) reject(new Error(`FFmpeg PCM decode failed with exit code ${code}`));
-      else resolve(Buffer.concat(chunks));
-    });
-    proc.on('error', reject);
-  });
-}
-
-function encodeFramesToWebm(
-  frames: RawFrame[],
-  width: number,
-  height: number,
-  fps: number,
-  outputPath: string,
-): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const proc = spawn('ffmpeg', [
-      '-y',
-      '-f', 'rawvideo',
-      '-pix_fmt', 'yuv420p',
-      '-s', `${width}x${height}`,
-      '-r', `${fps}`,
-      '-i', 'pipe:0',
-      '-c:v', 'libvpx-vp9',
-      '-b:v', '4M',
-      '-auto-alt-ref', '0',
-      '-an',
-      outputPath,
-    ]);
-
-    proc.stdin.on('error', () => { /* ignore broken pipe on early exit */ });
-    proc.stderr.on('data', () => { /* suppress ffmpeg noise */ });
-    proc.on('error', reject);
-    proc.on('close', (code) => {
-      if (code === 0) resolve();
-      else reject(new Error(`FFmpeg VP9 encode failed (exit ${code})`));
-    });
-
-    for (const frame of frames) {
-      proc.stdin.write(frame.data);
-    }
-    proc.stdin.end();
-  });
-}
-
 /**
- * Record a Runway realtime session using native Node.js WebRTC via @livekit/rtc-node.
+ * Record a Runway realtime session using headless Chrome via Playwright.
  *
- * Connects directly to the LiveKit room as a native participant — no browser involved.
- * Publishes PCM audio frames, collects raw I420 video frames from the avatar, then
- * encodes them to VP9 WebM via FFmpeg. This approach avoids the fundamental limitation
- * of captureStream() in headless Chromium, which does not capture WebRTC video tracks.
+ * Why Playwright instead of @livekit/rtc-node:
+ *   The livekit-ffi Darwin arm64 binary was compiled without FFmpeg H264 support
+ *   and without VideoToolbox activation, so every incoming H264 RTP packet fails to
+ *   decode ("FFmpeg H.264 decoder not found", "Failed to initialize decoder"), resulting
+ *   in 0 video frames. Headless Chrome has native H264 decode (VideoToolbox on macOS,
+ *   software codec via system libraries on Linux), so the browser approach produces a
+ *   working VP9 WebM reliably across platforms.
+ *
+ * Approach:
+ *   1. Load livekit-client browser SDK from CDN into headless Chrome
+ *   2. Connect to the LiveKit room as a browser participant
+ *   3. Subscribe to the avatar's H264 video track (Chrome decodes it natively)
+ *   4. Build a synthetic microphone from the audio file via AudioContext
+ *   5. Publish the synthetic audio track so Runway generates lip-synced video
+ *   6. Record the decoded video stream with MediaRecorder (VP9/VP8 WebM)
+ *   7. Stream encoded chunks back to Node.js via page.exposeFunction
+ *   8. Write the concatenated chunks to outputVideoPath
  */
 export async function recordRunwaySession(config: RunwayRecordingConfig): Promise<RunwayRecordingResult> {
   const { credentials, audioFilePath, outputVideoPath, onProgress, _delayMs } = config;
   const trailingMs = _delayMs?.trailing ?? 2000;
-  const drainMs = _delayMs?.drain ?? 5000;
-  const videoSubscribeMs = _delayMs?.videoSubscribe ?? 10_000;
 
   // Step 1: get audio duration
   const durationSeconds = await getAudioDuration(audioFilePath);
   onProgress?.(5);
 
-  // Step 2: decode audio to raw PCM (s16le, 48kHz, mono)
-  const pcmData = await decodeToPCM(audioFilePath);
+  // Step 2: read audio as base64 data URL for browser consumption
+  const audioBuffer = await readFile(audioFilePath);
+  const audioDataUrl = `data:audio/mpeg;base64,${audioBuffer.toString('base64')}`;
   onProgress?.(10);
 
-  const room = new Room();
-  const collectedFrames: RawFrame[] = [];
-  let videoWidth = 0;
-  let videoHeight = 0;
-
-  let videoResolve!: () => void;
-  let videoReject!: (err: unknown) => void;
-  const videoCollectPromise = new Promise<void>((res, rej) => {
-    videoResolve = res;
-    videoReject = rej;
+  logger.info('Launching headless Chrome for Runway recording', {
+    audioFilePath,
+    outputVideoPath,
+    durationSeconds,
   });
 
-  // videoStreamReady resolves as soon as the video TrackSubscribed handler runs
-  // synchronously far enough to create the VideoStream (before the first await
-  // inside the reader loop). We await this BEFORE the audio loop to guarantee the
-  // VideoStream is collecting when the avatar starts generating lip-synced video.
-  let videoStreamReadyResolve!: () => void;
-  const videoStreamReady = new Promise<void>((res) => {
-    videoStreamReadyResolve = res;
+  // Step 3: launch headless Chrome
+  const browser = await chromium.launch({
+    headless: true,
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--autoplay-policy=no-user-gesture-required',
+    ],
   });
 
-  let collecting = false;
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
 
-  // Step 3: register TrackSubscribed handler — creates VideoStream once the avatar's
-  // video track is ready.
-  //
-  // Strategy: connect with autoSubscribe: true so the Rust native SDK handles the
-  // subscription immediately (same codepath used by browser clients). We then await
-  // videoStreamReady BEFORE the audio loop, while the ffiEventLock queue is still
-  // empty, ensuring TrackSubscribed fires quickly.
-  //
-  // Prior failures:
-  //   - autoSubscribe: true alone: TrackSubscribed fires LATE in JS (ffiEventLock
-  //     is saturated by captureFrame audio events) → VideoStream created AFTER all
-  //     avatar video frames are already sent.
-  //   - autoSubscribe: false + manual setSubscribed in TrackPublished: Runway server
-  //     closes the idle video stream (no audio flowing yet) → immediate EOS with 0 frames.
-  room.on(RoomEvent.TrackSubscribed, async (track) => {
-    const isVideo = track instanceof RemoteVideoTrack;
-    logger.info('Runway track subscribed', {
-      isVideo,
-      streamState: isVideo ? track.stream_state : undefined,
-      muted: isVideo ? track.muted : undefined,
-      trackHandle: isVideo ? track.ffi_handle?.handle?.toString() : undefined,
-    });
-    if (!(track instanceof RemoteVideoTrack) || collecting) return;
-    collecting = true;
-
-    // Resolve videoStreamReady synchronously before the first await so the caller
-    // knows the VideoStream is wired up and ready to collect frames.
-    videoStreamReadyResolve();
-
-    const stream = new VideoStream(track);
-    const reader = stream.getReader();
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) {
-          logger.info('Runway VideoStream EOS', { framesCollected: collectedFrames.length });
-          if (collectedFrames.length > 0) videoResolve();
-          break;
-        }
-
-        const { frame, timestampUs } = value as { frame: { type: number; data: Uint8Array; width: number; height: number; convert: (t: number) => { data: Uint8Array; width: number; height: number } }; timestampUs: bigint };
-
-        // Convert to I420 if needed (ffmpeg rawvideo expects yuv420p)
-        const i420 = frame.type === VideoBufferType.I420
-          ? frame
-          : frame.convert(VideoBufferType.I420);
-
-        videoWidth = i420.width;
-        videoHeight = i420.height;
-        collectedFrames.push({
-          data: new Uint8Array(i420.data),
-          width: i420.width,
-          height: i420.height,
-          timestampUs,
-        });
-      }
-    } catch (err) {
-      videoReject(err);
-    }
+  page.on('console', (msg) => {
+    const type = msg.type();
+    if (type === 'error') logger.error('Runway browser error', { text: msg.text() });
+    else if (type === 'warning') logger.warn('Runway browser warning', { text: msg.text() });
+    else logger.debug('Runway browser log', { text: msg.text() });
   });
 
-  room.on(RoomEvent.TrackUnsubscribed, (track) => {
-    if (track instanceof RemoteVideoTrack) {
-      logger.info('Runway video track unsubscribed', { framesCollected: collectedFrames.length });
-    }
+  // Step 4: collect video chunks from the browser
+  const chunkBuffers: Buffer[] = [];
+  await page.exposeFunction('onVideoChunk', (base64: string) => {
+    chunkBuffers.push(Buffer.from(base64, 'base64'));
   });
 
-  // Step 4: connect to LiveKit room with autoSubscribe: true
-  await room.connect(credentials.url, credentials.token, { autoSubscribe: true, dynacast: false });
+  await page.exposeFunction('reportProgress', (pct: number) => {
+    onProgress?.(pct);
+  });
+
+  // Step 5: load livekit-client from CDN
+  await page.goto('about:blank');
+  await page.addScriptTag({ url: LIVEKIT_CLIENT_CDN });
+  await page.waitForFunction(() => !!(window as unknown as Record<string, unknown>).LivekitClient);
   onProgress?.(15);
 
-  // Step 4.5: wait for TrackSubscribed (video) BEFORE the audio loop.
-  // With autoSubscribe: true, Rust subscribes natively during connect; the JS
-  // TrackSubscribed event fires quickly since ffiEventLock is empty at this point.
-  await Promise.race([
-    videoStreamReady,
-    new Promise<void>((_, rej) =>
-      setTimeout(
-        () => rej(new Error('Runway video track not subscribed within timeout')),
-        videoSubscribeMs,
-      ),
-    ),
-  ]);
-  logger.info('Runway VideoStream ready — starting audio');
+  // Step 6: run the full recording session inside the browser
+  const result = await page.evaluate(
+    async (params) => {
+      const win = window as unknown as Record<string, unknown>;
+      const report = win.reportProgress as (pct: number) => void;
+      const LK = win.LivekitClient as Record<string, unknown>;
+      const Room = LK.Room as new () => Record<string, unknown>;
+      const RoomEvent = LK.RoomEvent as Record<string, string>;
+      const Track = LK.Track as Record<string, Record<string, string>>;
+      const LocalAudioTrack = LK.LocalAudioTrack as new (
+        track: MediaStreamTrack,
+        constraints?: unknown,
+        userProvidedTrack?: boolean,
+      ) => Record<string, unknown>;
 
-  // Step 5: publish audio track — must use SOURCE_MICROPHONE so Runway recognises it as speech
-  const audioSource = new AudioSource(SAMPLE_RATE, CHANNELS);
-  const audioTrack = LocalAudioTrack.createAudioTrack('runway-audio', audioSource);
-  const publishOpts = new TrackPublishOptions();
-  publishOpts.source = TrackSource.SOURCE_MICROPHONE;
-  await room.localParticipant!.publishTrack(audioTrack, publishOpts);
-  onProgress?.(20);
+      const { credentials, audioDataUrl, durationSeconds, trailingMs } = params;
 
-  // Step 6: push PCM frames to AudioSource
-  const totalAudioFrames = Math.ceil(pcmData.length / BYTES_PER_FRAME);
-  for (let i = 0; i < totalAudioFrames; i++) {
-    const start = i * BYTES_PER_FRAME;
-    const end = Math.min(start + BYTES_PER_FRAME, pcmData.length);
-    const slice = pcmData.subarray(start, end);
+      const room = new Room();
 
-    // Pad last frame to full frame size
-    const padded =
-      slice.length < BYTES_PER_FRAME
-        ? Buffer.concat([slice, Buffer.alloc(BYTES_PER_FRAME - slice.length)])
-        : slice;
+      // 6a. Subscribe to video → start MediaRecorder
+      let width = 1088;
+      let height = 704;
 
-    await audioSource.captureFrame(
-      new AudioFrame(
-        new Int16Array(padded.buffer, padded.byteOffset, SAMPLES_PER_FRAME),
-        SAMPLE_RATE,
-        CHANNELS,
-        SAMPLES_PER_FRAME,
-      ),
-    );
+      const videoReadyPromise = new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(
+          () => reject(new Error('Video track not subscribed within 15s')),
+          15_000,
+        );
 
-    const pct = Math.round(20 + (i / totalAudioFrames) * 50);
-    onProgress?.(pct);
+        (room as Record<string, (event: string, cb: (...args: unknown[]) => void) => void>).on(
+          RoomEvent.TrackSubscribed,
+          (...args: unknown[]) => {
+            const track = args[0] as Record<string, unknown>;
+            const pub = args[1] as Record<string, unknown>;
+            const kind = track.kind as string;
+            if (kind !== Track.Kind.Video) return;
+            clearTimeout(timeout);
+
+            width = (pub.dimensions as Record<string, number> | undefined)?.width ?? 1088;
+            height = (pub.dimensions as Record<string, number> | undefined)?.height ?? 704;
+
+            const mediaStreamTrack = track.mediaStreamTrack as MediaStreamTrack;
+            const stream = new MediaStream([mediaStreamTrack]);
+
+            const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+              ? 'video/webm;codecs=vp9'
+              : MediaRecorder.isTypeSupported('video/webm;codecs=vp8')
+                ? 'video/webm;codecs=vp8'
+                : 'video/webm';
+
+            const recorder = new MediaRecorder(stream, { mimeType });
+            win.__recorder = recorder;
+
+            recorder.ondataavailable = (e: BlobEvent) => {
+              if (e.data.size > 0) {
+                const reader = new FileReader();
+                reader.onload = () => {
+                  const base64 = (reader.result as string).split(',')[1];
+                  (win.onVideoChunk as (b: string) => void)(base64);
+                };
+                reader.readAsDataURL(e.data);
+              }
+            };
+
+            recorder.start(200);
+            resolve();
+          },
+        );
+      });
+
+      // 6b. Connect to LiveKit room
+      await (
+        room as Record<
+          string,
+          (url: string, token: string, opts: Record<string, unknown>) => Promise<void>
+        >
+      ).connect(credentials.url, credentials.token, {
+        autoSubscribe: true,
+        dynacast: false,
+      });
+      report(20);
+
+      // 6c. Wait for video track
+      await videoReadyPromise;
+      report(25);
+
+      // 6d. Build synthetic audio from data URL via AudioContext
+      const audioCtx = new AudioContext({ sampleRate: 48000 });
+      await audioCtx.resume();
+
+      const fetchResp = await fetch(audioDataUrl);
+      const audioArrayBuffer = await fetchResp.arrayBuffer();
+      const audioBufferNode = await audioCtx.decodeAudioData(audioArrayBuffer);
+
+      const bufferSource = audioCtx.createBufferSource();
+      bufferSource.buffer = audioBufferNode;
+      const dest = audioCtx.createMediaStreamDestination();
+      bufferSource.connect(dest);
+
+      // 6e. Publish audio track as microphone so Runway generates lip-synced video
+      const audioMediaTrack = dest.stream.getAudioTracks()[0];
+      const localAudioTrack = new LocalAudioTrack(audioMediaTrack, undefined, false);
+      await (
+        room as Record<
+          string,
+          Record<
+            string,
+            (track: unknown, opts: Record<string, unknown>) => Promise<void>
+          >
+        >
+      ).localParticipant.publishTrack(localAudioTrack, {
+        source: Track.Source.Microphone,
+      });
+      report(30);
+
+      // 6f. Play audio and wait for it to finish
+      const audioPlayDone = new Promise<void>((resolve) => {
+        bufferSource.onended = () => resolve();
+      });
+      bufferSource.start();
+
+      const progressInterval = setInterval(() => {
+        const elapsed = (audioCtx.currentTime / durationSeconds) * 50;
+        report(Math.round(30 + elapsed));
+      }, 500);
+
+      await audioPlayDone;
+      clearInterval(progressInterval);
+      report(80);
+
+      // 6g. Trailing frames then stop recording
+      await new Promise((r) => setTimeout(r, trailingMs));
+
+      const recorder = win.__recorder as MediaRecorder;
+      if (recorder && recorder.state !== 'inactive') {
+        await new Promise<void>((resolve) => {
+          recorder.onstop = () => resolve();
+          recorder.stop();
+        });
+      }
+
+      // 6h. Disconnect
+      await (room as Record<string, () => Promise<void>>).disconnect();
+
+      return { width, height, error: null as string | null };
+    },
+    { credentials, audioDataUrl, durationSeconds, trailingMs },
+  );
+
+  await browser.close();
+
+  if (result.error) {
+    throw new Error(result.error);
   }
 
-  // Step 7: wait for audio playout to complete, then allow 2s trailing frames
-  await audioSource.waitForPlayout();
-  onProgress?.(72);
-  await new Promise((r) => setTimeout(r, trailingMs));
-
-  // Step 8: disconnect and drain video frames
-  await room.disconnect();
-
-  // Give VideoStream reader up to drainMs to finish draining after disconnect
-  await Promise.race([
-    videoCollectPromise,
-    new Promise<void>((r) => setTimeout(r, drainMs)),
-  ]);
-  onProgress?.(80);
-
-  if (collectedFrames.length === 0) {
-    throw new Error('No video frames received from Runway session');
+  if (chunkBuffers.length === 0) {
+    throw new Error('No video chunks received from Runway browser session');
   }
 
-  // Step 9: calculate fps from timestamps
-  const fps =
-    collectedFrames.length > 1
-      ? Math.max(
-          1,
-          Math.round(
-            (collectedFrames.length - 1) /
-              (Number(
-                collectedFrames[collectedFrames.length - 1]!.timestampUs -
-                  collectedFrames[0]!.timestampUs,
-              ) /
-                1_000_000),
-          ),
-        )
-      : 25;
-
-  logger.info('Runway frames collected', {
-    frames: collectedFrames.length,
-    fps,
-    width: videoWidth,
-    height: videoHeight,
+  logger.info('Runway browser session complete', {
+    chunks: chunkBuffers.length,
+    width: result.width,
+    height: result.height,
   });
 
-  // Step 10: encode I420 frames → VP9 WebM via FFmpeg
-  await encodeFramesToWebm(collectedFrames, videoWidth, videoHeight, fps, outputVideoPath);
+  // Step 7: write concatenated WebM chunks to output
+  const videoData = Buffer.concat(chunkBuffers);
+  await writeFile(outputVideoPath, videoData);
   onProgress?.(95);
 
   return {
     videoPath: outputVideoPath,
     durationSeconds,
-    width: videoWidth,
-    height: videoHeight,
+    width: result.width,
+    height: result.height,
   };
 }
