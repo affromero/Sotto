@@ -28,7 +28,7 @@ services:
       - .env
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://${POSTGRES_USER:-sotto}:${POSTGRES_PASSWORD}@pgbouncer:5432/${POSTGRES_DB:-sotto}?schema=public&pgbouncer=true&connection_limit=5&pool_timeout=10
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
     healthcheck:
       test:
