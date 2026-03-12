@@ -314,7 +314,9 @@ export interface GenerateAvatarPayload {
   avatarOverlayId: string;
   speaker: string;
   avatarId: string;
-  avatarProvider?: 'heygen' | 'runway';
+  avatarProvider?: 'heygen' | 'runway' | 'fal';
+  avatarImageUrl?: string;
+  avatarModelId?: string;
   isPreset?: boolean;
   voiceTrackId?: string;
 }

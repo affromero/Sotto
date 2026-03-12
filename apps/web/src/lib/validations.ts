@@ -883,8 +883,10 @@ export const redeemInvitationSchema = z.object({
 export const configureAvatarsSchema = z.object({
   avatars: z.array(z.object({
     speaker: z.string().min(1).max(50),
-    avatarId: z.string().min(1),
-    avatarProvider: z.enum(['heygen', 'runway']).optional(),
+    avatarId: z.string().min(1).optional(),
+    avatarProvider: z.enum(['heygen', 'runway', 'fal']).optional(),
+    avatarImageUrl: z.string().url().optional(),
+    avatarModelId: z.string().optional(),
     isPreset: z.boolean().optional(),
     enabledSegmentIds: z.array(z.string()).optional(),
     voiceTrackId: z.string().optional(),
