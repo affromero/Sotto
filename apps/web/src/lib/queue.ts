@@ -1,4 +1,4 @@
-import { ConnectionOptions, Queue, Worker, Job, QueueEvents } from 'bullmq';
+import { ConnectionOptions, Queue, Worker, Job } from 'bullmq';
 import { createRedisConnection, getSharedQueueRedisClient } from './redis';
 import { logger } from './logger';
 import { prismaUnfiltered as prisma } from './prisma';
@@ -421,7 +421,6 @@ const QUEUE_DEFINITIONS: Record<string, QueueDefinition> = {
 };
 
 const queueInstances = new Map<string, Queue>();
-const queueEventsInstances = new Map<string, QueueEvents>();
 const queueReferences = new Map<string, Queue>();
 
 function getQueueDefinition(name: string, config?: QueueDefinition): QueueDefinition {
@@ -461,478 +460,467 @@ export function createQueue(
   return queue;
 }
 
-function setupQueueEvents(queueName: string): void {
-  if (queueEventsInstances.has(queueName)) {
-    return;
+function logJobCompleted(queueName: string, job: Job<unknown>): void {
+  const jobId = String(job.id);
+  if (!jobId.startsWith('repeat:')) {
+    logger.debug(`Job completed in ${queueName}:`, { jobId });
   }
+}
 
-  const queue = createQueue(queueName);
-  const events = new QueueEvents(queueName, {
-    connection: createRedisConnection(`events:${queueName}`) as unknown as ConnectionOptions,
+function logWorkerError(queueName: string, err: Error): void {
+  logger.error(`Worker error for ${queueName}:`, { error: err.message });
+}
+
+function logWorkerJobFailure(queueName: string, job: Job<unknown> | undefined, err: Error): void {
+  logger.error(`Worker job failed for ${queueName}:`, {
+    jobId: job?.id,
+    error: err.message,
   });
-  queueEventsInstances.set(queueName, events);
+}
 
-  events.on('completed', (args) => {
-    // Suppress noisy repeating poll jobs (telegram-bot, twitter-mentions, twitter-trend-poll)
-    const isRepeat = args.jobId.startsWith('repeat:');
-    if (!isRepeat) {
-      logger.debug(`Job completed in ${queueName}:`, { jobId: args.jobId });
+async function handleWorkerFailure(
+  queueName: string,
+  job: Job<unknown> | undefined,
+  failedReason: string
+): Promise<void> {
+  const jobId = job?.id != null ? String(job.id) : undefined;
+
+  try {
+    const podcastId = (job?.data as Record<string, unknown> | undefined)?.podcastId as string | undefined;
+    if (!podcastId) {
+      return;
     }
-  });
 
-  events.on('failed', async (args) => {
-    logger.error(`Job failed in ${queueName}:`, {
-      jobId: args.jobId,
-      failedReason: args.failedReason,
-    });
-
-    // Centralized failure handler: classify error, invalidate BYOK keys, notify user
-    try {
-      const job = await queue.getJob(args.jobId);
-      const podcastId = (job?.data as Record<string, unknown>)?.podcastId as string | undefined;
-      if (!podcastId) return;
-
-      // Log every failure (including retries) as a PipelineEvent
-      await prisma.pipelineEvent.create({
-        data: {
-          podcastId,
-          stage: queueName,
-          type: job?.attemptsMade != null && job.attemptsMade < (job.opts?.attempts ?? 3) ? 'retry' : 'error',
-          message: args.failedReason || 'Unknown failure',
-          metadata: {
-            jobId: args.jobId,
-            attemptNumber: job?.attemptsMade,
-            maxAttempts: job?.opts?.attempts,
-            segmentId: (job?.data as Record<string, unknown>)?.segmentId as string | undefined,
-            errorKind: classifyError(args.failedReason || ''),
-          },
+    await prisma.pipelineEvent.create({
+      data: {
+        podcastId,
+        stage: queueName,
+        type: job?.attemptsMade != null && job.attemptsMade < (job.opts?.attempts ?? 3) ? 'retry' : 'error',
+        message: failedReason || 'Unknown failure',
+        metadata: {
+          jobId,
+          attemptNumber: job?.attemptsMade,
+          maxAttempts: job?.opts?.attempts,
+          segmentId: (job?.data as Record<string, unknown> | undefined)?.segmentId as string | undefined,
+          errorKind: classifyError(failedReason || ''),
         },
-      }).catch(err => logger.error('Failed to write PipelineEvent', {
-        jobId: args.jobId,
-        error: err instanceof Error ? err.message : String(err),
-      }));
+      },
+    }).catch(err => logger.error('Failed to write PipelineEvent', {
+      jobId,
+      error: err instanceof Error ? err.message : String(err),
+    }));
 
-      // Voice track jobs: handle separately — the podcast is already READY
-      const VOICE_TRACK_QUEUES = ['voice-track-audio', 'voice-track-stitching'];
-      if (VOICE_TRACK_QUEUES.includes(queueName)) {
-        const voiceTrackId = (job?.data as Record<string, unknown>)?.voiceTrackId as string | undefined;
-        if (!voiceTrackId) return;
-
-        const errorKind = classifyError(args.failedReason || '');
-        const failureReason = userMessage(errorKind, 'the provider');
-
-        const voiceTrack = await prisma.voiceTrack.findUnique({
-          where: { id: voiceTrackId },
-          select: { podcastId: true, name: true },
-        });
-        if (!voiceTrack) return;
-
-        await prisma.voiceTrack.update({
-          where: { id: voiceTrackId },
-          data: { status: 'FAILED', failureReason },
-        });
-
-        if (isKeyInvalidationError(errorKind)) {
-          const podcast = await prisma.podcast.findUnique({
-            where: { id: voiceTrack.podcastId },
-            select: { userId: true, ttsProvider: true },
-          });
-          if (podcast?.ttsProvider) {
-            await markTtsKeyInvalid(podcast.userId, podcast.ttsProvider as TtsProviderId);
-          }
-        }
-
-        const notifQueue = createQueue('notifications');
-        if (notifQueue) {
-          const podcast = await prisma.podcast.findUnique({
-            where: { id: voiceTrack.podcastId },
-            select: { userId: true },
-          });
-          if (podcast) {
-            await notifQueue.add('send_notification', {
-              userId: podcast.userId,
-              type: 'VOICE_TRACK_FAILED',
-              title: 'Voice Track Failed',
-              message: `Voice track "${voiceTrack.name}" failed: ${failureReason}`,
-              data: { podcastId: voiceTrack.podcastId, voiceTrackId },
-            });
-          }
-        }
+    const VOICE_TRACK_QUEUES = ['voice-track-audio', 'voice-track-stitching'];
+    if (VOICE_TRACK_QUEUES.includes(queueName)) {
+      const voiceTrackId = (job?.data as Record<string, unknown> | undefined)?.voiceTrackId as string | undefined;
+      if (!voiceTrackId) {
         return;
       }
 
-      const podcast = await prisma.podcast.findUnique({
-        where: { id: podcastId },
-        select: {
-          status: true, userId: true, title: true, ttsProvider: true,
-          source: true, sourceTweetId: true,
-          user: { select: { name: true, email: true, telegramEnabled: true, telegramChatId: true } },
-        },
+      const errorKind = classifyError(failedReason || '');
+      const failureReason = userMessage(errorKind, 'the provider');
+
+      const voiceTrack = await prisma.voiceTrack.findUnique({
+        where: { id: voiceTrackId },
+        select: { podcastId: true, name: true },
       });
-      if (!podcast) return;
-
-      const errorKind = classifyError(args.failedReason || '');
-      const notifQueue = createQueue('notifications');
-      const ownerLabel = podcast.user?.name || podcast.user?.email || podcast.userId;
-
-      const TTS_QUEUES = ['audio-generation', 'segment-regeneration', 'voice-track-audio'];
-      const AI_QUEUES = ['script-generation', 'script-verification', 'reference-validation'];
-
-      // Handle video pipeline failures separately — podcast is already READY
-      const VIDEO_QUEUES = ['visual-classification', 'visual-generation', 'transition-generation', 'video-composition', 'place-enrichment'];
-      if (VIDEO_QUEUES.includes(queueName)) {
-        const videoGenerationId = (job?.data as Record<string, unknown>)?.videoGenerationId as string | undefined;
-        if (!videoGenerationId) return;
-
-        const maxAttempts = job?.opts?.attempts ?? 3;
-        const isTerminal = job?.attemptsMade != null && job.attemptsMade >= maxAttempts;
-        if (!isTerminal) return;
-
-        const descriptive = `[${queueName}] ${args.failedReason || 'Unknown error'}`;
-        await prisma.videoGeneration.update({
-          where: { id: videoGenerationId },
-          data: { status: 'FAILED', failureReason: descriptive },
-        }).catch((err: unknown) => {
-          logger.error('Failed to mark VideoGeneration FAILED', { videoGenerationId, error: err instanceof Error ? err.message : String(err) });
-        });
-
-        // Notify user
-        if (notifQueue) {
-          await notifQueue.add('send_notification', {
-            userId: podcast.userId,
-            type: 'VIDEO_FAILED',
-            title: 'Video Generation Failed',
-            message: `Video generation failed: ${args.failedReason || 'Unknown error'}`,
-            data: { podcastId },
-          });
-        }
-
-        // Notify admins
-        const podcastLabel = podcast.title || podcastId;
-        const adminUsers = await prisma.user.findMany({
-          where: { role: 'ADMIN', id: { not: podcast.userId } },
-          select: { id: true, telegramChatId: true },
-        });
-        const adminMsg = `[${queueName}] ${podcastLabel} (by ${ownerLabel}) — ${errorKind}`;
-        for (const admin of adminUsers) {
-          if (notifQueue) {
-            notifQueue.add('send_notification', {
-              userId: admin.id,
-              type: 'PIPELINE_FAILURE',
-              title: 'Video Pipeline Failure',
-              message: adminMsg,
-              data: { podcastId },
-            }).catch((err: unknown) => {
-              logger.warn('Failed to queue admin video-failure notification', { adminId: admin.id, error: err instanceof Error ? err.message : String(err) });
-            });
-          }
-          if (admin.telegramChatId && isTelegramBotConfigured()) {
-            const errorId = `verr_${Array.from(crypto.getRandomValues(new Uint8Array(6)))
-              .map(b => b.toString(16).padStart(2, '0')).join('')}`;
-            const telegramText = [
-              `🎬 *Video Pipeline Failure*`,
-              `*Queue:* ${queueName}`,
-              `*Podcast:* ${podcastLabel}`,
-              `*Owner:* ${ownerLabel}`,
-              `*Error:* ${errorKind}`,
-              `*Ref:* \`${errorId}\``,
-              `\`${(args.failedReason || 'Unknown').substring(0, 500)}\``,
-            ].join('\n');
-            sendTelegram(admin.telegramChatId, telegramText, { parse_mode: 'Markdown' }).catch((err: unknown) => {
-              logger.warn('Failed to send admin video-failure Telegram', { adminId: admin.id, error: err instanceof Error ? err.message : String(err) });
-            });
-          }
-        }
+      if (!voiceTrack) {
         return;
       }
 
-      // Handle avatar failures separately — avatar is optional, video stays intact
-      const AVATAR_QUEUES = ['avatar-generation'];
-      if (AVATAR_QUEUES.includes(queueName)) {
-        // The worker's checkAllAvatarsReady() already handles VideoGeneration status.
-        // We only send a notification here — never touch VideoGeneration or podcast status.
-        const maxAttempts = job?.opts?.attempts ?? 3;
-        const isTerminal = job?.attemptsMade != null && job.attemptsMade >= maxAttempts;
-        if (!isTerminal) return;
-
-        if (notifQueue) {
-          await notifQueue.add('send_notification', {
-            userId: podcast.userId,
-            type: 'AVATAR_FAILED',
-            title: 'Avatar Generation Failed',
-            message: `Avatar generation failed: ${args.failedReason || 'Unknown error'}`,
-            data: { podcastId },
-          });
-        }
-
-        // Notify admins
-        const podcastLabel = podcast.title || podcastId;
-        const adminUsers = await prisma.user.findMany({
-          where: { role: 'ADMIN', id: { not: podcast.userId } },
-          select: { id: true, telegramChatId: true },
-        });
-        for (const admin of adminUsers) {
-          if (notifQueue) {
-            notifQueue.add('send_notification', {
-              userId: admin.id,
-              type: 'PIPELINE_FAILURE',
-              title: 'Avatar Pipeline Failure',
-              message: `[avatar-generation] ${podcastLabel} (by ${ownerLabel}) — ${errorKind}`,
-              data: { podcastId },
-            }).catch(() => {});
-          }
-          if (admin.telegramChatId && isTelegramBotConfigured()) {
-            const telegramText = [
-              `🎭 *Avatar Pipeline Failure*`,
-              `*Podcast:* ${podcastLabel}`,
-              `*Owner:* ${ownerLabel}`,
-              `*Error:* ${errorKind}`,
-              `\`${(args.failedReason || 'Unknown').substring(0, 500)}\``,
-            ].join('\n');
-            sendTelegram(admin.telegramChatId, telegramText, { parse_mode: 'Markdown' }).catch(() => {});
-          }
-        }
-        return;
-      }
-
-      // Handle music generation failures — podcast is already READY
-      const MUSIC_QUEUES = ['music-generation'];
-      if (MUSIC_QUEUES.includes(queueName)) {
-        const musicGenerationId = (job?.data as Record<string, unknown>)?.musicGenerationId as string | undefined;
-        if (!musicGenerationId) return;
-
-        const maxAttempts = job?.opts?.attempts ?? 3;
-        const isTerminal = job?.attemptsMade != null && job.attemptsMade >= maxAttempts;
-        if (!isTerminal) return;
-
-        const descriptive = `[${queueName}] ${args.failedReason || 'Unknown error'}`;
-        await prisma.musicGeneration.update({
-          where: { id: musicGenerationId },
-          data: { status: 'FAILED', failureReason: descriptive },
-        }).catch((err: unknown) => {
-          logger.error('Failed to mark MusicGeneration FAILED', { musicGenerationId, error: err instanceof Error ? err.message : String(err) });
-        });
-
-        // Notify user
-        if (notifQueue) {
-          await notifQueue.add('send_notification', {
-            userId: podcast.userId,
-            type: 'MUSIC_FAILED',
-            title: 'Music Generation Failed',
-            message: `Background music generation failed: ${args.failedReason || 'Unknown error'}`,
-            data: { podcastId },
-          });
-        }
-        return;
-      }
-
-      // Handle interaction failures separately — podcast is already READY
-      if (queueName === 'interactions') {
-        if (isKeyInvalidationError(errorKind)) {
-          const aiKey = await prisma.userAiKey.findFirst({
-            where: { userId: podcast.userId, isValid: true },
-          });
-          if (aiKey) {
-            await markAiKeyInvalid(podcast.userId, aiKey.provider as AiProviderId);
-            if (notifQueue) {
-              await notifQueue.add('send_notification', {
-                userId: podcast.userId,
-                type: 'KEY_INVALID',
-                title: 'API Key Invalid',
-                message: userMessage(errorKind, aiKey.provider),
-                data: { podcastId },
-              });
-            }
-          }
-        }
-        return;
-      }
-
-      // Skip already-terminal states
-      if (podcast.status === 'READY' || podcast.status === 'FAILED' || podcast.status === 'SCRIPT_READY' || podcast.status === 'DRAFT') return;
-
-      // Only notify + mark failed on terminal failures (all retries exhausted).
-      // Non-terminal retries are logged as PipelineEvents above but don't alert.
-      const maxAttempts = job?.opts?.attempts ?? 3;
-      const isTerminal = job?.attemptsMade != null && job.attemptsMade >= maxAttempts;
-      if (!isTerminal) return;
-
-      // Determine provider label and attempt key invalidation
-      let failureReason = userMessage(errorKind, 'the provider');
+      await prisma.voiceTrack.update({
+        where: { id: voiceTrackId },
+        data: { status: 'FAILED', failureReason },
+      });
 
       if (isKeyInvalidationError(errorKind)) {
-        if (TTS_QUEUES.includes(queueName) && podcast.ttsProvider) {
-          // BYOK TTS key was used (ttsProvider is set)
+        const podcast = await prisma.podcast.findUnique({
+          where: { id: voiceTrack.podcastId },
+          select: { userId: true, ttsProvider: true },
+        });
+        if (podcast?.ttsProvider) {
           await markTtsKeyInvalid(podcast.userId, podcast.ttsProvider as TtsProviderId);
-          failureReason = userMessage(errorKind, podcast.ttsProvider);
-          // Clear locked provider so retry can auto-resolve or user can pick a different one
-          await prisma.podcast.update({
-            where: { id: podcastId },
-            data: { ttsProvider: null, ttsModel: null },
-          });
-          if (notifQueue) {
-            await notifQueue.add('send_notification', {
-              userId: podcast.userId,
-              type: 'KEY_INVALID',
-              title: 'API Key Invalid',
-              message: failureReason,
-              data: { podcastId },
-            });
-          }
-        } else if (AI_QUEUES.includes(queueName)) {
-          const aiKey = await prisma.userAiKey.findFirst({
-            where: { userId: podcast.userId, isValid: true },
-          });
-          if (aiKey) {
-            await markAiKeyInvalid(podcast.userId, aiKey.provider as AiProviderId);
-            failureReason = userMessage(errorKind, aiKey.provider);
-            if (notifQueue) {
-              await notifQueue.add('send_notification', {
-                userId: podcast.userId,
-                type: 'KEY_INVALID',
-                title: 'API Key Invalid',
-                message: failureReason,
-                data: { podcastId },
-              });
-            }
-          }
-        } else if (queueName === 'audio-import') {
-          // STT key: elevenlabs uses TTS key store; all others use AI key store
-          const sttProvider = ((job?.data as Record<string, unknown>)?.sttProvider ?? 'openai') as SttProviderId;
-          if (sttProvider === 'elevenlabs') {
-            await markTtsKeyInvalid(podcast.userId, 'elevenlabs');
-            failureReason = userMessage(errorKind, 'ElevenLabs');
-          } else {
-            await markAiKeyInvalid(podcast.userId, sttProvider as AiProviderId);
-            failureReason = userMessage(errorKind, sttProvider);
-          }
-          if (notifQueue) {
-            await notifQueue.add('send_notification', {
-              userId: podcast.userId,
-              type: 'KEY_INVALID',
-              title: 'API Key Invalid',
-              message: failureReason,
-              data: { podcastId },
-            });
-          }
         }
       }
 
-      const errorId = `err_${Array.from(crypto.getRandomValues(new Uint8Array(6)))
-        .map(b => b.toString(16).padStart(2, '0')).join('')}`;
+      const notifQueue = createQueue('notifications');
+      if (notifQueue) {
+        const podcast = await prisma.podcast.findUnique({
+          where: { id: voiceTrack.podcastId },
+          select: { userId: true },
+        });
+        if (podcast) {
+          await notifQueue.add('send_notification', {
+            userId: podcast.userId,
+            type: 'VOICE_TRACK_FAILED',
+            title: 'Voice Track Failed',
+            message: `Voice track "${voiceTrack.name}" failed: ${failureReason}`,
+            data: { podcastId: voiceTrack.podcastId, voiceTrackId },
+          });
+        }
+      }
+      return;
+    }
 
-      const didTransition = await markPodcastFailed(podcastId, {
-        failureReason,
-        technicalError: args.failedReason ?? undefined,
-        errorId,
-      });
+    const podcast = await prisma.podcast.findUnique({
+      where: { id: podcastId },
+      select: {
+        status: true, userId: true, title: true, ttsProvider: true,
+        source: true, sourceTweetId: true,
+        user: { select: { name: true, email: true, telegramEnabled: true, telegramChatId: true } },
+      },
+    });
+    if (!podcast) {
+      return;
+    }
 
-      // Only send notifications if this is the first failure (deduplication)
-      if (!didTransition) {
-        logger.info('Podcast already failed, skipping duplicate notifications', { podcastId });
+    const errorKind = classifyError(failedReason || '');
+    const notifQueue = createQueue('notifications');
+    const ownerLabel = podcast.user?.name || podcast.user?.email || podcast.userId;
+
+    const TTS_QUEUES = ['audio-generation', 'segment-regeneration', 'voice-track-audio'];
+    const AI_QUEUES = ['script-generation', 'script-verification', 'reference-validation'];
+
+    const VIDEO_QUEUES = ['visual-classification', 'visual-generation', 'transition-generation', 'video-composition', 'place-enrichment'];
+    if (VIDEO_QUEUES.includes(queueName)) {
+      const videoGenerationId = (job?.data as Record<string, unknown> | undefined)?.videoGenerationId as string | undefined;
+      if (!videoGenerationId) {
         return;
       }
 
-      // Queue a podcast failure notification
+      const maxAttempts = job?.opts?.attempts ?? 3;
+      const isTerminal = job?.attemptsMade != null && job.attemptsMade >= maxAttempts;
+      if (!isTerminal) {
+        return;
+      }
+
+      const descriptive = `[${queueName}] ${failedReason || 'Unknown error'}`;
+      await prisma.videoGeneration.update({
+        where: { id: videoGenerationId },
+        data: { status: 'FAILED', failureReason: descriptive },
+      }).catch((err: unknown) => {
+        logger.error('Failed to mark VideoGeneration FAILED', { videoGenerationId, error: err instanceof Error ? err.message : String(err) });
+      });
+
       if (notifQueue) {
         await notifQueue.add('send_notification', {
           userId: podcast.userId,
-          type: 'PODCAST_FAILED',
-          title: 'Generation Failed',
-          message: `${failureReason} (ref: ${errorId})`,
+          type: 'VIDEO_FAILED',
+          title: 'Video Generation Failed',
+          message: `Video generation failed: ${failedReason || 'Unknown error'}`,
           data: { podcastId },
         });
       }
 
-      // Notify admins (skip the podcast owner — they already got PODCAST_FAILED above)
       const podcastLabel = podcast.title || podcastId;
-      const techError = args.failedReason || 'Unknown error';
       const adminUsers = await prisma.user.findMany({
         where: { role: 'ADMIN', id: { not: podcast.userId } },
         select: { id: true, telegramChatId: true },
       });
-      const adminMessage = `[${queueName}] ${podcastLabel} (by ${ownerLabel}) — ${errorKind}`;
+      const adminMsg = `[${queueName}] ${podcastLabel} (by ${ownerLabel}) — ${errorKind}`;
       for (const admin of adminUsers) {
-        // In-app notification (bell)
         if (notifQueue) {
           notifQueue.add('send_notification', {
             userId: admin.id,
             type: 'PIPELINE_FAILURE',
-            title: 'Pipeline Failure',
-            message: adminMessage,
+            title: 'Video Pipeline Failure',
+            message: adminMsg,
             data: { podcastId },
           }).catch((err: unknown) => {
-            logger.warn('Failed to queue admin pipeline-failure notification', { adminId: admin.id, error: err instanceof Error ? err.message : String(err) });
+            logger.warn('Failed to queue admin video-failure notification', { adminId: admin.id, error: err instanceof Error ? err.message : String(err) });
           });
         }
-        // Telegram alert
         if (admin.telegramChatId && isTelegramBotConfigured()) {
+          const errorId = `verr_${Array.from(crypto.getRandomValues(new Uint8Array(6)))
+            .map(b => b.toString(16).padStart(2, '0')).join('')}`;
           const telegramText = [
-            `🚨 *Pipeline Failure*`,
+            `🎬 *Video Pipeline Failure*`,
             `*Queue:* ${queueName}`,
             `*Podcast:* ${podcastLabel}`,
             `*Owner:* ${ownerLabel}`,
             `*Error:* ${errorKind}`,
             `*Ref:* \`${errorId}\``,
-            `\`${techError.substring(0, 500)}\``,
+            `\`${(failedReason || 'Unknown').substring(0, 500)}\``,
           ].join('\n');
           sendTelegram(admin.telegramChatId, telegramText, { parse_mode: 'Markdown' }).catch((err: unknown) => {
-            logger.warn('Failed to send admin pipeline-failure Telegram', { adminId: admin.id, error: err instanceof Error ? err.message : String(err) });
+            logger.warn('Failed to send admin video-failure Telegram', { adminId: admin.id, error: err instanceof Error ? err.message : String(err) });
           });
         }
       }
+      return;
+    }
 
-      // Queue Twitter failure reply for Twitter-sourced podcasts
-      if (podcast.source === 'TWITTER' && podcast.sourceTweetId) {
-        const twitterReplyQ = createQueue('twitter-reply');
-        if (twitterReplyQ) {
-          const mention = await prisma.tweetMention.findFirst({
-            where: { podcastId, status: { in: ['GENERATING', 'READY'] } },
-            select: { id: true, tweetId: true },
-          }).catch(() => null);
-          if (mention) {
-            await twitterReplyQ.add('reply_twitter', {
-              podcastId,
-              tweetMentionId: mention.id,
-              originalTweetId: mention.tweetId,
-            }, { jobId: `twitter-fail-${podcastId}-${Date.now()}` }).catch(() => {});
+    const AVATAR_QUEUES = ['avatar-generation'];
+    if (AVATAR_QUEUES.includes(queueName)) {
+      const maxAttempts = job?.opts?.attempts ?? 3;
+      const isTerminal = job?.attemptsMade != null && job.attemptsMade >= maxAttempts;
+      if (!isTerminal) {
+        return;
+      }
+
+      if (notifQueue) {
+        await notifQueue.add('send_notification', {
+          userId: podcast.userId,
+          type: 'AVATAR_FAILED',
+          title: 'Avatar Generation Failed',
+          message: `Avatar generation failed: ${failedReason || 'Unknown error'}`,
+          data: { podcastId },
+        });
+      }
+
+      const podcastLabel = podcast.title || podcastId;
+      const adminUsers = await prisma.user.findMany({
+        where: { role: 'ADMIN', id: { not: podcast.userId } },
+        select: { id: true, telegramChatId: true },
+      });
+      for (const admin of adminUsers) {
+        if (notifQueue) {
+          notifQueue.add('send_notification', {
+            userId: admin.id,
+            type: 'PIPELINE_FAILURE',
+            title: 'Avatar Pipeline Failure',
+            message: `[avatar-generation] ${podcastLabel} (by ${ownerLabel}) — ${errorKind}`,
+            data: { podcastId },
+          }).catch(() => {});
+        }
+        if (admin.telegramChatId && isTelegramBotConfigured()) {
+          const telegramText = [
+            `🎭 *Avatar Pipeline Failure*`,
+            `*Podcast:* ${podcastLabel}`,
+            `*Owner:* ${ownerLabel}`,
+            `*Error:* ${errorKind}`,
+            `\`${(failedReason || 'Unknown').substring(0, 500)}\``,
+          ].join('\n');
+          sendTelegram(admin.telegramChatId, telegramText, { parse_mode: 'Markdown' }).catch(() => {});
+        }
+      }
+      return;
+    }
+
+    const MUSIC_QUEUES = ['music-generation'];
+    if (MUSIC_QUEUES.includes(queueName)) {
+      const musicGenerationId = (job?.data as Record<string, unknown> | undefined)?.musicGenerationId as string | undefined;
+      if (!musicGenerationId) {
+        return;
+      }
+
+      const maxAttempts = job?.opts?.attempts ?? 3;
+      const isTerminal = job?.attemptsMade != null && job.attemptsMade >= maxAttempts;
+      if (!isTerminal) {
+        return;
+      }
+
+      const descriptive = `[${queueName}] ${failedReason || 'Unknown error'}`;
+      await prisma.musicGeneration.update({
+        where: { id: musicGenerationId },
+        data: { status: 'FAILED', failureReason: descriptive },
+      }).catch((err: unknown) => {
+        logger.error('Failed to mark MusicGeneration FAILED', { musicGenerationId, error: err instanceof Error ? err.message : String(err) });
+      });
+
+      if (notifQueue) {
+        await notifQueue.add('send_notification', {
+          userId: podcast.userId,
+          type: 'MUSIC_FAILED',
+          title: 'Music Generation Failed',
+          message: `Background music generation failed: ${failedReason || 'Unknown error'}`,
+          data: { podcastId },
+        });
+      }
+      return;
+    }
+
+    if (queueName === 'interactions') {
+      if (isKeyInvalidationError(errorKind)) {
+        const aiKey = await prisma.userAiKey.findFirst({
+          where: { userId: podcast.userId, isValid: true },
+        });
+        if (aiKey) {
+          await markAiKeyInvalid(podcast.userId, aiKey.provider as AiProviderId);
+          if (notifQueue) {
+            await notifQueue.add('send_notification', {
+              userId: podcast.userId,
+              type: 'KEY_INVALID',
+              title: 'API Key Invalid',
+              message: userMessage(errorKind, aiKey.provider),
+              data: { podcastId },
+            });
           }
         }
       }
+      return;
+    }
 
-      // Queue Telegram failure reply for users with Telegram enabled
-      if (podcast.user?.telegramEnabled && podcast.user?.telegramChatId) {
-        const telegramReplyQ = createQueue('telegram-reply');
-        if (telegramReplyQ) {
-          const tgMsg = await prisma.telegramMessage.findFirst({
-            where: { podcastId, status: { in: ['GENERATING', 'READY'] } },
-            select: { id: true, chatId: true },
-          }).catch(() => null);
-          await telegramReplyQ.add('reply_telegram', {
-            podcastId,
-            telegramMessageId: tgMsg?.id,
-            chatId: tgMsg?.chatId ?? podcast.user.telegramChatId,
-          }, { jobId: `telegram-fail-${podcastId}-${Date.now()}` }).catch(() => {});
+    if (podcast.status === 'READY' || podcast.status === 'FAILED' || podcast.status === 'SCRIPT_READY' || podcast.status === 'DRAFT') {
+      return;
+    }
+
+    const maxAttempts = job?.opts?.attempts ?? 3;
+    const isTerminal = job?.attemptsMade != null && job.attemptsMade >= maxAttempts;
+    if (!isTerminal) {
+      return;
+    }
+
+    let failureReason = userMessage(errorKind, 'the provider');
+
+    if (isKeyInvalidationError(errorKind)) {
+      if (TTS_QUEUES.includes(queueName) && podcast.ttsProvider) {
+        await markTtsKeyInvalid(podcast.userId, podcast.ttsProvider as TtsProviderId);
+        failureReason = userMessage(errorKind, podcast.ttsProvider);
+        await prisma.podcast.update({
+          where: { id: podcastId },
+          data: { ttsProvider: null, ttsModel: null },
+        });
+        if (notifQueue) {
+          await notifQueue.add('send_notification', {
+            userId: podcast.userId,
+            type: 'KEY_INVALID',
+            title: 'API Key Invalid',
+            message: failureReason,
+            data: { podcastId },
+          });
+        }
+      } else if (AI_QUEUES.includes(queueName)) {
+        const aiKey = await prisma.userAiKey.findFirst({
+          where: { userId: podcast.userId, isValid: true },
+        });
+        if (aiKey) {
+          await markAiKeyInvalid(podcast.userId, aiKey.provider as AiProviderId);
+          failureReason = userMessage(errorKind, aiKey.provider);
+          if (notifQueue) {
+            await notifQueue.add('send_notification', {
+              userId: podcast.userId,
+              type: 'KEY_INVALID',
+              title: 'API Key Invalid',
+              message: failureReason,
+              data: { podcastId },
+            });
+          }
+        }
+      } else if (queueName === 'audio-import') {
+        const sttProvider = ((job?.data as Record<string, unknown> | undefined)?.sttProvider ?? 'openai') as SttProviderId;
+        if (sttProvider === 'elevenlabs') {
+          await markTtsKeyInvalid(podcast.userId, 'elevenlabs');
+          failureReason = userMessage(errorKind, 'ElevenLabs');
+        } else {
+          await markAiKeyInvalid(podcast.userId, sttProvider as AiProviderId);
+          failureReason = userMessage(errorKind, sttProvider);
+        }
+        if (notifQueue) {
+          await notifQueue.add('send_notification', {
+            userId: podcast.userId,
+            type: 'KEY_INVALID',
+            title: 'API Key Invalid',
+            message: failureReason,
+            data: { podcastId },
+          });
         }
       }
+    }
 
-      logger.info('Marked podcast as FAILED after generation failure', {
+    const errorId = `err_${Array.from(crypto.getRandomValues(new Uint8Array(6)))
+      .map(b => b.toString(16).padStart(2, '0')).join('')}`;
+
+    const didTransition = await markPodcastFailed(podcastId, {
+      failureReason,
+      technicalError: failedReason || undefined,
+      errorId,
+    });
+
+    if (!didTransition) {
+      logger.info('Podcast already failed, skipping duplicate notifications', { podcastId });
+      return;
+    }
+
+    if (notifQueue) {
+      await notifQueue.add('send_notification', {
         userId: podcast.userId,
-        podcastId,
-        errorKind,
-        failureReason,
-      });
-    } catch (err) {
-      logger.error('Failed to process failure handler', {
-        jobId: args.jobId,
-        error: err instanceof Error ? err.message : String(err),
+        type: 'PODCAST_FAILED',
+        title: 'Generation Failed',
+        message: `${failureReason} (ref: ${errorId})`,
+        data: { podcastId },
       });
     }
-  });
 
-  events.on('error', (err) => {
-    logger.error(`Queue ${queueName} error:`, { error: err.message });
-  });
+    const podcastLabel = podcast.title || podcastId;
+    const techError = failedReason || 'Unknown error';
+    const adminUsers = await prisma.user.findMany({
+      where: { role: 'ADMIN', id: { not: podcast.userId } },
+      select: { id: true, telegramChatId: true },
+    });
+    const adminMessage = `[${queueName}] ${podcastLabel} (by ${ownerLabel}) — ${errorKind}`;
+    for (const admin of adminUsers) {
+      if (notifQueue) {
+        notifQueue.add('send_notification', {
+          userId: admin.id,
+          type: 'PIPELINE_FAILURE',
+          title: 'Pipeline Failure',
+          message: adminMessage,
+          data: { podcastId },
+        }).catch((err: unknown) => {
+          logger.warn('Failed to queue admin pipeline-failure notification', { adminId: admin.id, error: err instanceof Error ? err.message : String(err) });
+        });
+      }
+      if (admin.telegramChatId && isTelegramBotConfigured()) {
+        const telegramText = [
+          `🚨 *Pipeline Failure*`,
+          `*Queue:* ${queueName}`,
+          `*Podcast:* ${podcastLabel}`,
+          `*Owner:* ${ownerLabel}`,
+          `*Error:* ${errorKind}`,
+          `*Ref:* \`${errorId}\``,
+          `\`${techError.substring(0, 500)}\``,
+        ].join('\n');
+        sendTelegram(admin.telegramChatId, telegramText, { parse_mode: 'Markdown' }).catch((err: unknown) => {
+          logger.warn('Failed to send admin pipeline-failure Telegram', { adminId: admin.id, error: err instanceof Error ? err.message : String(err) });
+        });
+      }
+    }
+
+    if (podcast.source === 'TWITTER' && podcast.sourceTweetId) {
+      const twitterReplyQ = createQueue('twitter-reply');
+      if (twitterReplyQ) {
+        const mention = await prisma.tweetMention.findFirst({
+          where: { podcastId, status: { in: ['GENERATING', 'READY'] } },
+          select: { id: true, tweetId: true },
+        }).catch(() => null);
+        if (mention) {
+          await twitterReplyQ.add('reply_twitter', {
+            podcastId,
+            tweetMentionId: mention.id,
+            originalTweetId: mention.tweetId,
+          }, { jobId: `twitter-fail-${podcastId}-${Date.now()}` }).catch(() => {});
+        }
+      }
+    }
+
+    if (podcast.user?.telegramEnabled && podcast.user?.telegramChatId) {
+      const telegramReplyQ = createQueue('telegram-reply');
+      if (telegramReplyQ) {
+        const tgMsg = await prisma.telegramMessage.findFirst({
+          where: { podcastId, status: { in: ['GENERATING', 'READY'] } },
+          select: { id: true, chatId: true },
+        }).catch(() => null);
+        await telegramReplyQ.add('reply_telegram', {
+          podcastId,
+          telegramMessageId: tgMsg?.id,
+          chatId: tgMsg?.chatId ?? podcast.user.telegramChatId,
+        }, { jobId: `telegram-fail-${podcastId}-${Date.now()}` }).catch(() => {});
+      }
+    }
+
+    logger.info('Marked podcast as FAILED after generation failure', {
+      userId: podcast.userId,
+      podcastId,
+      errorKind,
+      failureReason,
+    });
+  } catch (err) {
+    logger.error('Failed to process failure handler', {
+      jobId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
 }
 
 function createQueueReference(name: string): Queue {
@@ -995,10 +983,6 @@ export function createWorker<T>(
   config?: { concurrency?: number; lockDuration?: number }
 ): Worker<T> {
   const queueDefinition = getQueueDefinition(queueName);
-  if (!queueDefinition.skipEvents) {
-    setupQueueEvents(queueName);
-  }
-
   const connection = createRedisConnection(`worker:${queueName}`) as unknown as ConnectionOptions;
 
   const worker = new Worker<T>(queueName, processor, {
@@ -1008,12 +992,18 @@ export function createWorker<T>(
   });
 
   worker.on('ready', () => logger.info(`Worker ready for ${queueName}`));
-  worker.on('error', (err) =>
-    logger.error(`Worker error for ${queueName}:`, { error: err.message })
-  );
-  worker.on('failed', (job, err) =>
-    logger.error(`Worker job failed for ${queueName}:`, { jobId: job?.id, error: err.message })
-  );
+  worker.on('error', (err) => logWorkerError(queueName, err));
+  worker.on('completed', (job) => {
+    if (!queueDefinition.skipEvents) {
+      logJobCompleted(queueName, job as Job<unknown>);
+    }
+  });
+  worker.on('failed', (job, err) => {
+    logWorkerJobFailure(queueName, job as Job<unknown> | undefined, err);
+    if (!queueDefinition.skipEvents) {
+      void handleWorkerFailure(queueName, job as Job<unknown> | undefined, err.message);
+    }
+  });
 
   return worker;
 }
