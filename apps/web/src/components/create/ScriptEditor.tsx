@@ -39,6 +39,7 @@ interface ScriptEditorProps {
   podcastId: string;
   onApprove: () => void;
   onRegenerate: () => void;
+  getApproveBody?: () => Record<string, unknown>;
 }
 
 interface TurnState extends ScriptTurn {
@@ -50,7 +51,7 @@ function nextTurnId(): string {
   return `turn-${++turnIdCounter}`;
 }
 
-export function ScriptEditor({ podcastId, onApprove, onRegenerate }: ScriptEditorProps) {
+export function ScriptEditor({ podcastId, onApprove, onRegenerate, getApproveBody }: ScriptEditorProps) {
   const [turns, setTurns] = useState<TurnState[]>([]);
   const [references, setReferences] = useState<ReferenceData[]>([]);
   const [, setVersion] = useState(0);
@@ -299,8 +300,12 @@ export function ScriptEditor({ podcastId, onApprove, onRegenerate }: ScriptEdito
         setDirty(false);
       }
 
+      const extraBody = getApproveBody ? getApproveBody() : {};
       const res = await fetch(`/api/podcasts/${podcastId}/script/approve`, {
         method: 'POST',
+        ...(Object.keys(extraBody).length > 0
+          ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(extraBody) }
+          : {}),
       });
       if (!res.ok) throw new Error('Failed to approve script');
       onApprove();
@@ -308,7 +313,7 @@ export function ScriptEditor({ podcastId, onApprove, onRegenerate }: ScriptEdito
       setError(err instanceof Error ? err.message : 'Failed to approve');
       setApproving(false);
     }
-  }, [dirty, turns, podcastId, onApprove]);
+  }, [dirty, turns, podcastId, onApprove, getApproveBody]);
 
   // Regenerate (with optional feedback)
   const handleRegenerate = useCallback(async (withFeedback = false) => {
@@ -674,6 +679,7 @@ export function ScriptEditor({ podcastId, onApprove, onRegenerate }: ScriptEdito
                           className={styles.turnActionBtn}
                           onClick={() => startEdit(index)}
                           aria-label="Edit turn"
+                          title="Edit turn"
                         >
                           <Pencil size={14} />
                         </button>
@@ -684,6 +690,7 @@ export function ScriptEditor({ podcastId, onApprove, onRegenerate }: ScriptEdito
                           className={`${styles.turnActionBtn} ${styles.turnActionBtnDanger}`}
                           onClick={() => setDeletingIndex(index)}
                           aria-label="Delete turn"
+                          title="Delete turn"
                         >
                           <Trash2 size={14} />
                         </button>
@@ -693,6 +700,7 @@ export function ScriptEditor({ podcastId, onApprove, onRegenerate }: ScriptEdito
                         className={`${styles.turnActionBtn} ${turnComments[index]?.trim() ? styles.turnActionBtnActive : ''}`}
                         onClick={() => setCommentingIndex(commentingIndex === index ? null : index)}
                         aria-label={turnComments[index]?.trim() ? 'Edit comment' : 'Add comment'}
+                        title={turnComments[index]?.trim() ? 'Edit comment' : 'Add comment'}
                       >
                         <MessageSquare size={14} />
                         {turnComments[index]?.trim() && (
