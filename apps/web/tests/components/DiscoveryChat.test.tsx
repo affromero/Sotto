@@ -7,6 +7,7 @@ import type { DiscoveryMetadata } from '@/types/discovery';
 // Mock useDiscovery hook
 const mockSendMessage = vi.fn();
 const mockReset = vi.fn();
+const mockUpdateMetadata = vi.fn();
 
 let hookState = {
   messages: [] as Array<{
@@ -23,6 +24,7 @@ let hookState = {
   detectedLanguage: null as string | null,
   sendMessage: mockSendMessage,
   reset: mockReset,
+  updateMetadata: mockUpdateMetadata,
 };
 
 vi.mock('@/lib/hooks/useDiscovery', () => ({
@@ -69,6 +71,7 @@ describe('DiscoveryChat', () => {
       detectedLanguage: null,
       sendMessage: mockSendMessage,
       reset: mockReset,
+      updateMetadata: mockUpdateMetadata,
     };
   });
 
@@ -330,5 +333,88 @@ describe('DiscoveryChat', () => {
     await user.click(screen.getByText('Keep English'));
 
     expect(screen.queryByRole('status', { name: 'Language suggestion' })).not.toBeInTheDocument();
+  });
+
+  it('renders DiscoveryParamsCard instead of SuggestionChips when metadata.ready is true', () => {
+    hookState.messages = [
+      {
+        id: 'user-1',
+        role: 'user',
+        content: 'Tell me about quantum computing',
+        chips: [],
+        createdAt: '2026-02-09T10:00:00Z',
+      },
+      {
+        id: 'assistant-1',
+        role: 'assistant',
+        content: 'Great topic!',
+        chips: ['angle A', 'angle B'],
+        createdAt: '2026-02-09T10:00:01Z',
+      },
+    ];
+    hookState.metadata = mockMetadata; // ready: true
+
+    render(<DiscoveryChat onComplete={vi.fn()} />);
+
+    // Params card chip groups should be visible
+    expect(screen.getByRole('group', { name: 'Depth' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Tone' })).toBeInTheDocument();
+
+    // Focus-pivot chips from the agent should NOT render (metadata is ready)
+    expect(screen.queryByText('angle A')).not.toBeInTheDocument();
+  });
+
+  it('renders SuggestionChips (not DiscoveryParamsCard) when metadata.ready is false', () => {
+    hookState.messages = [
+      {
+        id: 'user-1',
+        role: 'user',
+        content: 'Tell me about space',
+        chips: [],
+        createdAt: '2026-02-09T10:00:00Z',
+      },
+      {
+        id: 'assistant-1',
+        role: 'assistant',
+        content: 'What angle interests you?',
+        chips: ['Black holes', 'Mars missions'],
+        createdAt: '2026-02-09T10:00:01Z',
+      },
+    ];
+    hookState.metadata = { ...mockMetadata, ready: false };
+
+    render(<DiscoveryChat onComplete={vi.fn()} />);
+
+    expect(screen.getByText('Black holes')).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Depth' })).not.toBeInTheDocument();
+  });
+
+  it('calls updateMetadata when a chip inside DiscoveryParamsCard is clicked', async () => {
+    const user = userEvent.setup();
+
+    hookState.messages = [
+      {
+        id: 'user-1',
+        role: 'user',
+        content: 'Tell me about AI',
+        chips: [],
+        createdAt: '2026-02-09T10:00:00Z',
+      },
+      {
+        id: 'assistant-1',
+        role: 'assistant',
+        content: 'Here are your params.',
+        chips: [],
+        createdAt: '2026-02-09T10:00:01Z',
+      },
+    ];
+    hookState.metadata = { ...mockMetadata, depth: 'standard' };
+
+    render(<DiscoveryChat onComplete={vi.fn()} />);
+
+    await user.click(screen.getByRole('button', { name: 'Depth: ELI5' }));
+
+    expect(mockUpdateMetadata).toHaveBeenCalledWith({ depth: 'eli5' });
+    expect(mockSendMessage).not.toHaveBeenCalled();
   });
 });
