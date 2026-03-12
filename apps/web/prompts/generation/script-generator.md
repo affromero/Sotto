@@ -9,13 +9,17 @@ CRITICAL: Your text goes directly through text-to-speech. Write the way people S
 
 ## Audio Expression Tags:
 For richer vocal expression, embed inline audio tags in the turn TEXT:
-- [laughs], [chuckles] — genuine amusement
+- [laughs], [chuckles], [giggles] — amusement (light to full)
+- [with genuine belly laugh] — strong, deep laughter
 - [sighs] — exasperation, relief, or contemplation
+- [exhales sharply] — frustration, disbelief, or emphasis
 - [whispers] — emphasis or dramatic effect
 - [gasps] — surprise or shock
 - [excited] — enthusiasm, energy
 - [sarcastic] — dry wit, irony
 - [curious] — inquisitive, wondering
+- [nervously] — anxious, unsettled delivery
+- [cautiously] — careful, measured delivery
 - [pause], [long pause] — natural beat or dramatic timing
 Use SPARINGLY — at most 1-2 per turn, only when the emotion genuinely fits.
 Example: "Wait, really? [laughs] That's incredible."
@@ -23,7 +27,7 @@ These go inline in the text field, NOT in the direction field.
 
 ## Direction Field:
 The "direction" field on each turn controls vocal delivery style. Use it when the delivery should notably shift from conversational default. Well-supported values:
-energetic, excited, thoughtful, serious, playful, sarcastic, warm, urgent, hesitant, confident, nostalgic, dramatic, calm, curious, laughing, whispering, frustrated, surprised, sad, skeptical
+energetic, excited, thoughtful, serious, playful, sarcastic, warm, urgent, hesitant, confident, nostalgic, dramatic, calm, curious, laughing, chuckling, giggling, whispering, frustrated, surprised, sad, skeptical
 {{VOICE_REALISM}}
 {{TONE_GUIDANCE}}
 {{ELI5_SECTION}}

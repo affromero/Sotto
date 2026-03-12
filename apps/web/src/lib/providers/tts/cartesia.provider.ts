@@ -15,7 +15,7 @@ import { logger } from '../../logger';
 import type { TtsProvider, SpeechParams } from '../tts';
 import type { TtsProviderId } from '../tts-registry';
 import { CARTESIA_VOICE_POOL, selectVoicePairFromPool } from '../tts-voices';
-import { mapDirectionToExpression } from '../../tts-expression-mapper';
+import { mapDirectionToExpression, convertInlineAudioTags } from '../../tts-expression-mapper';
 
 const CARTESIA_API_VERSION = '2025-04-16';
 
@@ -41,7 +41,7 @@ export class CartesiaProvider implements TtsProvider {
     const emotion = expression.cartesia?.emotion;
 
     const body: Record<string, unknown> = {
-      transcript: params.text,
+      transcript: convertInlineAudioTags(params.text, 'cartesia'),
       model_id: this.model,
       voice: { mode: 'id', id: params.voiceId },
       output_format: {
