@@ -2,11 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { voiceBrowseQuerySchema } from '@/lib/validations';
-
+import { getPlanFeatureConfig } from '@/lib/plan-feature-config';
 import { errorResponse } from '@/lib/api-response';
+
 export async function GET(request: NextRequest) {
-  const session = await auth();
+  const [session, voiceConfig] = await Promise.all([auth(), getPlanFeatureConfig()]);
   const currentUserId = session?.user?.id ?? null;
+
+  if (!voiceConfig.voiceMarketplaceEnabled) {
+    return errorResponse('Voice marketplace is currently unavailable.', 503);
+  }
 
   const params = Object.fromEntries(request.nextUrl.searchParams);
   const parsed = voiceBrowseQuerySchema.safeParse(params);
