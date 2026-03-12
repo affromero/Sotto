@@ -1,4 +1,3 @@
-import { logger } from '../logger';
 import {
   VOICE_POOL,
   selectVoicePair,
@@ -86,65 +85,6 @@ async function importKittenTts() {
 }
 
 // ---------------------------------------------------------------------------
-// Fallback TTS provider — tries primary, then falls back on failure
-// ---------------------------------------------------------------------------
-
-class FallbackTtsProvider implements TtsProvider {
-  readonly providerId: TtsProviderId;
-
-  constructor(
-    private primary: TtsProvider,
-    private fallback: TtsProvider,
-    private primaryName: string,
-    private fallbackName: string
-  ) {
-    this.providerId = primary.providerId;
-  }
-
-  async generateSpeech(params: SpeechParams): Promise<Buffer> {
-    try {
-      return await this.primary.generateSpeech(params);
-    } catch (err) {
-      logger.warn(`${this.primaryName} TTS failed, falling back to ${this.fallbackName}`, {
-        error: err instanceof Error ? err.message : String(err),
-        voiceId: params.voiceId,
-      });
-
-      const entry = findByVoiceId(params.voiceId);
-      const fallbackVoiceId = entry
-        ? resolveVoiceId(entry, this.fallbackName as 'elevenlabs' | 'openai' | 'kittentts')
-        : params.voiceId;
-
-      return this.fallback.generateSpeech({ ...params, voiceId: fallbackVoiceId });
-    }
-  }
-
-  async generateSoundEffect(params: SfxParams): Promise<Buffer> {
-    if (this.primary.generateSoundEffect) {
-      try {
-        return await this.primary.generateSoundEffect(params);
-      } catch (err) {
-        logger.warn(`${this.primaryName} SFX failed`, {
-          error: err instanceof Error ? err.message : String(err),
-        });
-      }
-    }
-    if (this.fallback.generateSoundEffect) {
-      return this.fallback.generateSoundEffect(params);
-    }
-    throw new Error('No SFX provider available');
-  }
-
-  getVoiceId(speaker: string, podcastId?: string, metadata?: VoiceMatchMetadata): string {
-    return this.primary.getVoiceId(speaker, podcastId, metadata);
-  }
-
-  getModelId(): string {
-    return this.primary.getModelId();
-  }
-}
-
-// ---------------------------------------------------------------------------
 // Factory functions
 // ---------------------------------------------------------------------------
 
@@ -174,9 +114,7 @@ export function createTtsProvider(type?: string, byokApiKey?: string, model?: st
       return new KittenTtsProvider();
     }
     default:
-      logger.warn(`Unknown TTS_PROVIDER "${providerType}", falling back to openai`);
-      const { OpenAITtsProvider: Fallback } = require('./tts/openai.provider');
-      return new Fallback(byokApiKey, model);
+      throw new Error(`Unknown TTS_PROVIDER "${providerType}"`);
   }
 }
 
@@ -238,18 +176,6 @@ export async function createTtsProviderAsync(
 export function createPremiumTtsProvider(byokApiKey?: string, model?: string): TtsProvider {
   const { ElevenLabsProvider } = require('./tts/elevenlabs.provider');
   return new ElevenLabsProvider(byokApiKey, model);
-}
-
-/**
- * Create a TTS provider with automatic fallback.
- * Primary: ElevenLabs (or user's BYOK key), Fallback: OpenAI TTS.
- */
-export function createTtsProviderWithFallback(byokApiKey?: string): TtsProvider {
-  const { ElevenLabsProvider } = require('./tts/elevenlabs.provider');
-  const { OpenAITtsProvider } = require('./tts/openai.provider');
-  const primary = new ElevenLabsProvider(byokApiKey);
-  const fallback = new OpenAITtsProvider();
-  return new FallbackTtsProvider(primary, fallback, 'elevenlabs', 'openai');
 }
 
 // ---------------------------------------------------------------------------
@@ -368,17 +294,7 @@ export async function resolveTtsProvider(context: {
     }
   }
 
-  // Platform path: prefer KittenTTS (zero-cost CPU sidecar) for all non-BYOK users
-  if (process.env.KITTENTTS_URL) {
-    const { KittenTtsProvider } = require('./tts/kittentts.provider');
-    return {
-      provider: new KittenTtsProvider(),
-      source: 'platform',
-      providerId: 'kittentts' as TtsProviderId,
-    };
-  }
-
-  // Fallback: auto model config for the user's plan tier
+  // Platform path: auto model config for the user's plan tier
   const autoConfig = await resolveAutoModel(context.plan ?? 'FREE');
   return {
     provider: createTtsProvider(autoConfig.ttsProvider as TtsProviderId, undefined, autoConfig.ttsModel),
