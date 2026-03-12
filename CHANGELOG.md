@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.15.0] - 2026-03-12
+
+### Added
+- One-shot discovery UX: agent now infers all podcast parameters (depth, audience, level, tone, focus, verification mode) from the first user message and shows them pre-selected in a compact params card — one click to generate instead of 5–7 sequential questions
+- `DiscoveryParamsCard` component: inline chip-group rows for adjusting inferred params locally without triggering a new API call
+- `updateMetadata` on `useDiscovery` hook: lets the UI patch individual params without a round-trip
+
+### Changed
+- PgBouncer connection pooling added to production infrastructure; worker profiles split into dedicated queues for better resource isolation
+
 ## [0.14.2] - 2026-03-11
 
 ### Added
