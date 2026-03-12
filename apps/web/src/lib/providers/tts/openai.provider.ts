@@ -16,7 +16,7 @@
 import type { TtsProvider, SpeechParams } from '../tts';
 import type { TtsProviderId } from '../tts-registry';
 import { selectVoicePair, resolveVoiceId, findByVoiceId, type VoiceMatchMetadata } from '../../voice-pool';
-import { mapDirectionToExpression } from '../../tts-expression-mapper';
+import { mapDirectionToExpression, convertInlineAudioTags } from '../../tts-expression-mapper';
 
 /** All voices available across OpenAI TTS models */
 const OPENAI_VOICES = [
@@ -68,7 +68,7 @@ export class OpenAITtsProvider implements TtsProvider {
     const createParams: Record<string, unknown> = {
       model: this.model,
       voice,
-      input: params.text,
+      input: convertInlineAudioTags(params.text, 'openai'),
       response_format: 'mp3',
     };
 

@@ -9,10 +9,10 @@ describe('tts-expression-mapper', () => {
       expect(result.elevenlabs?.stability).toBe(0.0);
     });
 
-    it('maps serious to Robust stability with no tag', () => {
+    it('maps serious to Natural stability with no tag', () => {
       const result = mapDirectionToExpression('serious', 'EXPERT', 'elevenlabs');
       expect(result.elevenlabs?.audioTagPrefix).toBeUndefined();
-      expect(result.elevenlabs?.stability).toBe(1.0);
+      expect(result.elevenlabs?.stability).toBe(0.5);
     });
 
     it('maps sarcastic to [sarcastic] tag', () => {
