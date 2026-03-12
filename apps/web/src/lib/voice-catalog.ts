@@ -104,26 +104,33 @@ async function fetchElevenLabsCatalog(apiKey: string): Promise<CatalogVoice[]> {
 }
 
 async function fetchCartesiaCatalog(apiKey: string): Promise<CatalogVoice[]> {
-  const response = await fetch('https://api.cartesia.ai/voices', {
-    headers: {
-      'X-API-Key': apiKey,
-      'Cartesia-Version': '2025-04-16',
-    },
-  });
+  const voices: CatalogVoice[] = [];
+  let cursor: string | undefined;
 
-  if (!response.ok) {
-    throw new Error(`Cartesia voices API error (${response.status})`);
-  }
+  do {
+    const url = new URL('https://api.cartesia.ai/voices');
+    url.searchParams.set('limit', '100');
+    if (cursor) url.searchParams.set('starting_after', cursor);
 
-  const voices = await response.json();
-  return voices.map((v: Record<string, string>) => ({
-    id: v.id,
-    name: v.name,
-    gender: v.gender,
-    age: v.age,
-    accent: v.accent,
-    description: v.description,
-  }));
+    const response = await fetch(url.toString(), {
+      headers: {
+        'X-API-Key': apiKey,
+        'Cartesia-Version': '2025-04-16',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Cartesia voices API error (${response.status})`);
+    }
+
+    const page = await response.json() as { data: Record<string, string>[]; next_page?: string; has_more: boolean };
+    for (const v of page.data) {
+      voices.push({ id: v.id, name: v.name, gender: v.gender, description: v.description });
+    }
+    cursor = page.has_more ? page.next_page : undefined;
+  } while (cursor);
+
+  return voices;
 }
 
 async function fetchHumeCatalog(apiKey: string): Promise<CatalogVoice[]> {

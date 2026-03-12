@@ -544,13 +544,14 @@ export function createSttProvider(provider?: SttProviderId, apiKey?: string, mod
       return new DeepgramProvider(apiKey, model);
     case 'assemblyai':
       return new AssemblyAIProvider(apiKey, model);
-    case 'openai':
-    default: {
+    case 'openai': {
       const config = model
         ? { ...OPENAI_WHISPER_CONFIG, model }
         : OPENAI_WHISPER_CONFIG;
       return new OpenAIWhisperProvider(apiKey, config);
     }
+    default:
+      throw new Error(`Unknown STT provider: "${target}"`);
   }
 }
 

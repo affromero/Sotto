@@ -174,7 +174,7 @@ describe('getVoiceCatalog', () => {
 
       vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve(apiVoices),
+        json: () => Promise.resolve({ data: apiVoices, has_more: false }),
       } as Response);
 
       const catalog = await getVoiceCatalog('cartesia', 'test-key');

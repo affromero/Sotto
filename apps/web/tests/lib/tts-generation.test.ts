@@ -239,46 +239,16 @@ describe('generateTtsAudio', () => {
     );
   });
 
-  describe('BYOK 404 fallback', () => {
-    it('retries with platform key on BYOK model-access 404', async () => {
-      const platformSpeech = vi.fn().mockResolvedValue(Buffer.from('platform-audio'));
-      mockResolveTtsProvider.mockResolvedValue({
-        provider: {
-          generateSpeech: (...args: unknown[]) => platformSpeech(...args),
-          getVoiceId: vi.fn(),
-          getModelId: () => 'eleven_v3',
-          providerId: 'elevenlabs',
-        },
-        source: 'platform',
-        providerId: 'elevenlabs',
-      });
+  it('throws on BYOK model-access 404 — no retry', async () => {
+    mockGenerateSpeech.mockRejectedValue(
+      new Error('ElevenLabs API error (404): The model does not exist')
+    );
 
-      // First call fails with model-access 404
-      mockGenerateSpeech.mockRejectedValue(
-        new Error('ElevenLabs API error (404): The model does not exist')
-      );
+    await expect(
+      generateTtsAudio(defaultParams({ source: 'byok' }))
+    ).rejects.toThrow('(404)');
 
-      const result = await generateTtsAudio(defaultParams({ source: 'byok' }));
-
-      expect(result).not.toBeNull();
-      expect(result!.audioBuffer).toEqual(Buffer.from('platform-audio'));
-      expect(result!.service).toBe('elevenlabs'); // effectiveSource changed to platform
-      expect(mockResolveTtsProvider).toHaveBeenCalledWith(
-        expect.objectContaining({ skipByok: true })
-      );
-    });
-
-    it('does not retry for non-BYOK source', async () => {
-      mockGenerateSpeech.mockRejectedValue(
-        new Error('ElevenLabs API error (404): The model does not exist')
-      );
-
-      await expect(
-        generateTtsAudio(defaultParams({ source: 'platform' }))
-      ).rejects.toThrow('(404)');
-
-      expect(mockResolveTtsProvider).not.toHaveBeenCalled();
-    });
+    expect(mockResolveTtsProvider).not.toHaveBeenCalled();
   });
 
   describe('429 error handling', () => {
