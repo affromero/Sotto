@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.15.1] - 2026-03-12
+
+### Added
+- Verification badge on script preview links to the open verification standard doc
+
+### Fixed
+- Script review page now shows the full interactive editor (edit/delete/comment/flag per turn) when returning to a SCRIPT_READY podcast, instead of the read-only teleprompter view; voice/TTS provider selections are preserved through approval
+- Action icon tooltips added to Edit, Delete, and Comment buttons in the script editor for discoverability
+
 ## [0.15.0] - 2026-03-12
 
 ### Added
