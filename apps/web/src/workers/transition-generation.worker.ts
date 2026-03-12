@@ -58,9 +58,12 @@ export async function processTransitionGeneration(job: Job<GenerateTransitionPay
       throw new Error('Missing segment visuals for transition');
     }
 
-    // Use lastFrameUrl if available; fall back to assetUrl (for image-only segments)
-    const fromFrameUrl = fromVisual.lastFrameUrl ?? fromVisual.assetUrl;
-    const toFrameUrl = toVisual.firstFrameUrl ?? toVisual.assetUrl;
+    // Use lastFrameUrl/firstFrameUrl if available; fall back to assetUrl ONLY for image assets.
+    // Video assets (mp4 — stock footage, AI video) have no extractable frame URL here,
+    // so treat them the same as null to trigger the graceful skip below.
+    const isVideo = (url: string | null) => url?.endsWith('.mp4') ?? false;
+    const fromFrameUrl = fromVisual.lastFrameUrl ?? (isVideo(fromVisual.assetUrl) ? null : fromVisual.assetUrl);
+    const toFrameUrl = toVisual.firstFrameUrl ?? (isVideo(toVisual.assetUrl) ? null : toVisual.assetUrl);
 
     if (!fromFrameUrl || !toFrameUrl) {
       // Programmatic stills may have failed — skip gracefully, compositor ignores assetUrl-less transitions
