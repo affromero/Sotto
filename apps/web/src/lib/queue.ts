@@ -1,5 +1,5 @@
 import { ConnectionOptions, Queue, Worker, Job, QueueEvents } from 'bullmq';
-import { createRedisConnection } from './redis';
+import { createRedisConnection, getSharedQueueRedisClient } from './redis';
 import { logger } from './logger';
 import { prismaUnfiltered as prisma } from './prisma';
 import { markPodcastFailed } from './pipeline-resume';
@@ -360,6 +360,10 @@ interface QueueConfig {
   removeOnFail?: boolean | { age: number };
 }
 
+interface QueueDefinition extends QueueConfig {
+  skipEvents?: boolean;
+}
+
 const DEFAULT_QUEUE_OPTIONS: QueueConfig = {
   attempts: 3,
   backoff: { type: 'exponential', delay: 2000 },
@@ -367,24 +371,82 @@ const DEFAULT_QUEUE_OPTIONS: QueueConfig = {
   removeOnFail: { age: 604800 },
 };
 
+const QUEUE_DEFINITIONS: Record<string, QueueDefinition> = {
+  'content-extraction': { attempts: 3 },
+  'script-generation': { attempts: 3 },
+  'script-verification': { attempts: 2 },
+  'reference-validation': { attempts: 2 },
+  'audio-generation': { attempts: 3 },
+  'audio-stitching': { attempts: 2 },
+  interactions: { attempts: 3 },
+  'segment-regeneration': { attempts: 2 },
+  notifications: { attempts: 5, skipEvents: true },
+  'pdf-generation': { attempts: 2, skipEvents: true },
+  'twitter-mentions': { attempts: 1, skipEvents: true },
+  'twitter-reply': { attempts: 3, skipEvents: true },
+  'event-ingestion': { attempts: 2, removeOnComplete: { age: 3600, count: 500 }, skipEvents: true },
+  'audio-import': { attempts: 2 },
+  'feature-computation': { attempts: 2, skipEvents: true },
+  'data-export': { attempts: 2, skipEvents: true },
+  'key-validation': { attempts: 1, skipEvents: true },
+  'telegram-bot': { attempts: 1, skipEvents: true },
+  'telegram-reply': { attempts: 3, skipEvents: true },
+  'twitter-auto-tweet': { attempts: 3, skipEvents: true },
+  'twitter-trend-poll': { attempts: 1, skipEvents: true },
+  'admin-thread-to-podcast': { attempts: 2, skipEvents: true },
+  'content-moderation': { attempts: 2, skipEvents: true },
+  'email-digest': { attempts: 2, skipEvents: true },
+  announcements: { attempts: 2, skipEvents: true },
+  'voice-verification': { attempts: 2, skipEvents: true },
+  'voice-track-audio': { attempts: 3 },
+  'voice-track-stitching': { attempts: 2 },
+  'draft-cleanup': { attempts: 1, skipEvents: true },
+  'r2-usage': { attempts: 2, skipEvents: true },
+  'pricing-fetch': { attempts: 2, skipEvents: true },
+  'visual-classification': { attempts: 2 },
+  'visual-generation': { attempts: 3 },
+  'transition-generation': { attempts: 3 },
+  'video-composition': { attempts: 2 },
+  'avatar-generation': { attempts: 2 },
+  'place-enrichment': { attempts: 2 },
+  'news-ingest': { attempts: 2, skipEvents: true },
+  'demo-script': { attempts: 2 },
+  'demo-recording': { attempts: 2 },
+  'demo-voiceover': { attempts: 2 },
+  'demo-visual': { attempts: 2 },
+  'demo-transition': { attempts: 2 },
+  'demo-composition': { attempts: 2 },
+  'demo-scene-composition': { attempts: 2 },
+  'music-generation': { attempts: 3 },
+};
+
 const queueInstances = new Map<string, Queue>();
+const queueEventsInstances = new Map<string, QueueEvents>();
+const queueReferences = new Map<string, Queue>();
+
+function getQueueDefinition(name: string, config?: QueueDefinition): QueueDefinition {
+  return {
+    ...DEFAULT_QUEUE_OPTIONS,
+    ...(QUEUE_DEFINITIONS[name] ?? {}),
+    ...config,
+  };
+}
 
 /**
  * Create or get existing job queue
  */
 export function createQueue(
   name: string,
-  config?: Partial<QueueConfig> & { skipEvents?: boolean }
+  config?: QueueDefinition
 ): Queue {
   if (queueInstances.has(name)) {
     return queueInstances.get(name)!;
   }
 
-  const connection = createRedisConnection(`queue:${name}`) as unknown as ConnectionOptions;
-  const mergedConfig = { ...DEFAULT_QUEUE_OPTIONS, ...config };
+  const mergedConfig = getQueueDefinition(name, config);
 
   const queue = new Queue(name, {
-    connection,
+    connection: getSharedQueueRedisClient() as unknown as ConnectionOptions,
     defaultJobOptions: {
       attempts: mergedConfig.attempts,
       backoff: mergedConfig.backoff,
@@ -393,20 +455,22 @@ export function createQueue(
     },
   });
 
-  if (!config?.skipEvents) {
-    setupQueueEvents(queue, name);
-  }
-
   queueInstances.set(name, queue);
 
   logger.info(`Queue '${name}' created`);
   return queue;
 }
 
-function setupQueueEvents(queue: Queue, queueName: string): void {
+function setupQueueEvents(queueName: string): void {
+  if (queueEventsInstances.has(queueName)) {
+    return;
+  }
+
+  const queue = createQueue(queueName);
   const events = new QueueEvents(queueName, {
     connection: createRedisConnection(`events:${queueName}`) as unknown as ConnectionOptions,
   });
+  queueEventsInstances.set(queueName, events);
 
   events.on('completed', (args) => {
     // Suppress noisy repeating poll jobs (telegram-bot, twitter-mentions, twitter-trend-poll)
@@ -478,7 +542,7 @@ function setupQueueEvents(queue: Queue, queueName: string): void {
           }
         }
 
-        const notifQueue = queueInstances.get('notifications');
+        const notifQueue = createQueue('notifications');
         if (notifQueue) {
           const podcast = await prisma.podcast.findUnique({
             where: { id: voiceTrack.podcastId },
@@ -508,7 +572,7 @@ function setupQueueEvents(queue: Queue, queueName: string): void {
       if (!podcast) return;
 
       const errorKind = classifyError(args.failedReason || '');
-      const notifQueue = queueInstances.get('notifications');
+      const notifQueue = createQueue('notifications');
       const ownerLabel = podcast.user?.name || podcast.user?.email || podcast.userId;
 
       const TTS_QUEUES = ['audio-generation', 'segment-regeneration', 'voice-track-audio'];
@@ -820,7 +884,7 @@ function setupQueueEvents(queue: Queue, queueName: string): void {
 
       // Queue Twitter failure reply for Twitter-sourced podcasts
       if (podcast.source === 'TWITTER' && podcast.sourceTweetId) {
-        const twitterReplyQ = queueInstances.get('twitter-reply');
+        const twitterReplyQ = createQueue('twitter-reply');
         if (twitterReplyQ) {
           const mention = await prisma.tweetMention.findFirst({
             where: { podcastId, status: { in: ['GENERATING', 'READY'] } },
@@ -838,7 +902,7 @@ function setupQueueEvents(queue: Queue, queueName: string): void {
 
       // Queue Telegram failure reply for users with Telegram enabled
       if (podcast.user?.telegramEnabled && podcast.user?.telegramChatId) {
-        const telegramReplyQ = queueInstances.get('telegram-reply');
+        const telegramReplyQ = createQueue('telegram-reply');
         if (telegramReplyQ) {
           const tgMsg = await prisma.telegramMessage.findFirst({
             where: { podcastId, status: { in: ['GENERATING', 'READY'] } },
@@ -871,6 +935,37 @@ function setupQueueEvents(queue: Queue, queueName: string): void {
   });
 }
 
+function createQueueReference(name: string): Queue {
+  if (queueReferences.has(name)) {
+    return queueReferences.get(name)!;
+  }
+
+  const reference = new Proxy({} as Queue, {
+    get(_target, prop) {
+      const queue = createQueue(name);
+      const value = Reflect.get(queue as object, prop);
+      return typeof value === 'function' ? value.bind(queue) : value;
+    },
+    set(_target, prop, value) {
+      const queue = createQueue(name);
+      Reflect.set(queue as object, prop, value);
+      return true;
+    },
+    has(_target, prop) {
+      return prop in createQueue(name);
+    },
+    ownKeys() {
+      return Reflect.ownKeys(createQueue(name) as object);
+    },
+    getOwnPropertyDescriptor(_target, prop) {
+      return Object.getOwnPropertyDescriptor(createQueue(name) as object, prop);
+    },
+  }) as Queue;
+
+  queueReferences.set(name, reference);
+  return reference;
+}
+
 /**
  * Add job to queue
  */
@@ -899,6 +994,11 @@ export function createWorker<T>(
   processor: (job: Job<T>) => Promise<unknown>,
   config?: { concurrency?: number; lockDuration?: number }
 ): Worker<T> {
+  const queueDefinition = getQueueDefinition(queueName);
+  if (!queueDefinition.skipEvents) {
+    setupQueueEvents(queueName);
+  }
+
   const connection = createRedisConnection(`worker:${queueName}`) as unknown as ConnectionOptions;
 
   const worker = new Worker<T>(queueName, processor, {
@@ -921,103 +1021,52 @@ export function createWorker<T>(
 /**
  * Predefined queues
  */
-export const contentExtractionQueue = createQueue('content-extraction', { attempts: 3 });
-export const scriptGenerationQueue = createQueue('script-generation', { attempts: 3 });
-export const audioGenerationQueue = createQueue('audio-generation', { attempts: 3 });
-export const audioStitchingQueue = createQueue('audio-stitching', { attempts: 2 });
-export const interactionQueue = createQueue('interactions', { attempts: 3 });
-export const segmentRegenerationQueue = createQueue('segment-regeneration', { attempts: 2 });
-export const notificationQueue = createQueue('notifications', { attempts: 5, skipEvents: true });
-export const referenceValidationQueue = createQueue('reference-validation', { attempts: 2 });
-export const pdfGenerationQueue = createQueue('pdf-generation', { attempts: 2, skipEvents: true });
-export const scriptVerificationQueue = createQueue('script-verification', { attempts: 2 });
-export const twitterMentionsQueue = createQueue('twitter-mentions', { attempts: 1, skipEvents: true });
-export const twitterReplyQueue = createQueue('twitter-reply', { attempts: 3, skipEvents: true });
-export const eventIngestionQueue = createQueue('event-ingestion', {
-  attempts: 2,
-  removeOnComplete: { age: 3600, count: 500 },
-  skipEvents: true,
-});
-export const audioImportQueue = createQueue('audio-import', { attempts: 2 });
-export const featureComputationQueue = createQueue('feature-computation', { attempts: 2, skipEvents: true });
-export const dataExportQueue = createQueue('data-export', { attempts: 2, skipEvents: true });
-export const keyValidationQueue = createQueue('key-validation', { attempts: 1, skipEvents: true });
-export const telegramBotQueue = createQueue('telegram-bot', { attempts: 1, skipEvents: true });
-export const telegramReplyQueue = createQueue('telegram-reply', { attempts: 3, skipEvents: true });
-export const twitterAutoTweetQueue = createQueue('twitter-auto-tweet', { attempts: 3, skipEvents: true });
-export const twitterTrendPollQueue = createQueue('twitter-trend-poll', { attempts: 1, skipEvents: true });
-export const adminThreadToPodcastQueue = createQueue('admin-thread-to-podcast', { attempts: 2, skipEvents: true });
-export const contentModerationQueue = createQueue('content-moderation', { attempts: 2, skipEvents: true });
-export const emailDigestQueue = createQueue('email-digest', { attempts: 2, skipEvents: true });
-export const announcementQueue = createQueue('announcements', { attempts: 2, skipEvents: true });
-export const voiceVerificationQueue = createQueue('voice-verification', { attempts: 2, skipEvents: true });
-export const voiceTrackAudioQueue = createQueue('voice-track-audio', { attempts: 3 });
-export const voiceTrackStitchingQueue = createQueue('voice-track-stitching', { attempts: 2 });
-export const draftCleanupQueue = createQueue('draft-cleanup', { attempts: 1, skipEvents: true });
-export const r2UsageQueue = createQueue('r2-usage', { attempts: 2, skipEvents: true });
-export const pricingFetchQueue = createQueue('pricing-fetch', { attempts: 2, skipEvents: true });
-export const visualClassificationQueue = createQueue('visual-classification', { attempts: 2 });
-export const visualGenerationQueue = createQueue('visual-generation', { attempts: 3 });
-export const transitionGenerationQueue = createQueue('transition-generation', { attempts: 3 });
-export const videoCompositionQueue = createQueue('video-composition', { attempts: 2 });
-export const avatarGenerationQueue = createQueue('avatar-generation', { attempts: 2 });
-export const placeEnrichmentQueue = createQueue('place-enrichment', { attempts: 2 });
-export const newsIngestQueue = createQueue('news-ingest', { attempts: 2, skipEvents: true });
-export const demoScriptQueue = createQueue('demo-script', { attempts: 2 });
-export const demoRecordingQueue = createQueue('demo-recording', { attempts: 2 });
-export const demoVoiceoverQueue = createQueue('demo-voiceover', { attempts: 2 });
-export const demoVisualQueue = createQueue('demo-visual', { attempts: 2 });
-export const demoTransitionQueue = createQueue('demo-transition', { attempts: 2 });
-export const demoCompositionQueue = createQueue('demo-composition', { attempts: 2 });
-export const demoSceneCompositionQueue = createQueue('demo-scene-composition', { attempts: 2 });
-export const musicGenerationQueue = createQueue('music-generation', { attempts: 3 });
+export const contentExtractionQueue = createQueueReference('content-extraction');
+export const scriptGenerationQueue = createQueueReference('script-generation');
+export const audioGenerationQueue = createQueueReference('audio-generation');
+export const audioStitchingQueue = createQueueReference('audio-stitching');
+export const interactionQueue = createQueueReference('interactions');
+export const segmentRegenerationQueue = createQueueReference('segment-regeneration');
+export const notificationQueue = createQueueReference('notifications');
+export const referenceValidationQueue = createQueueReference('reference-validation');
+export const pdfGenerationQueue = createQueueReference('pdf-generation');
+export const scriptVerificationQueue = createQueueReference('script-verification');
+export const twitterMentionsQueue = createQueueReference('twitter-mentions');
+export const twitterReplyQueue = createQueueReference('twitter-reply');
+export const eventIngestionQueue = createQueueReference('event-ingestion');
+export const audioImportQueue = createQueueReference('audio-import');
+export const featureComputationQueue = createQueueReference('feature-computation');
+export const dataExportQueue = createQueueReference('data-export');
+export const keyValidationQueue = createQueueReference('key-validation');
+export const telegramBotQueue = createQueueReference('telegram-bot');
+export const telegramReplyQueue = createQueueReference('telegram-reply');
+export const twitterAutoTweetQueue = createQueueReference('twitter-auto-tweet');
+export const twitterTrendPollQueue = createQueueReference('twitter-trend-poll');
+export const adminThreadToPodcastQueue = createQueueReference('admin-thread-to-podcast');
+export const contentModerationQueue = createQueueReference('content-moderation');
+export const emailDigestQueue = createQueueReference('email-digest');
+export const announcementQueue = createQueueReference('announcements');
+export const voiceVerificationQueue = createQueueReference('voice-verification');
+export const voiceTrackAudioQueue = createQueueReference('voice-track-audio');
+export const voiceTrackStitchingQueue = createQueueReference('voice-track-stitching');
+export const draftCleanupQueue = createQueueReference('draft-cleanup');
+export const r2UsageQueue = createQueueReference('r2-usage');
+export const pricingFetchQueue = createQueueReference('pricing-fetch');
+export const visualClassificationQueue = createQueueReference('visual-classification');
+export const visualGenerationQueue = createQueueReference('visual-generation');
+export const transitionGenerationQueue = createQueueReference('transition-generation');
+export const videoCompositionQueue = createQueueReference('video-composition');
+export const avatarGenerationQueue = createQueueReference('avatar-generation');
+export const placeEnrichmentQueue = createQueueReference('place-enrichment');
+export const newsIngestQueue = createQueueReference('news-ingest');
+export const demoScriptQueue = createQueueReference('demo-script');
+export const demoRecordingQueue = createQueueReference('demo-recording');
+export const demoVoiceoverQueue = createQueueReference('demo-voiceover');
+export const demoVisualQueue = createQueueReference('demo-visual');
+export const demoTransitionQueue = createQueueReference('demo-transition');
+export const demoCompositionQueue = createQueueReference('demo-composition');
+export const demoSceneCompositionQueue = createQueueReference('demo-scene-composition');
+export const musicGenerationQueue = createQueueReference('music-generation');
 
 /** All queue names — single source of truth for admin and health endpoints */
-export const ALL_QUEUE_NAMES = [
-  'content-extraction',
-  'script-generation',
-  'script-verification',
-  'reference-validation',
-  'audio-generation',
-  'audio-stitching',
-  'interactions',
-  'segment-regeneration',
-  'notifications',
-  'pdf-generation',
-  'twitter-mentions',
-  'twitter-reply',
-  'event-ingestion',
-  'audio-import',
-  'feature-computation',
-  'data-export',
-  'key-validation',
-  'telegram-bot',
-  'telegram-reply',
-  'twitter-auto-tweet',
-  'twitter-trend-poll',
-  'admin-thread-to-podcast',
-  'content-moderation',
-  'email-digest',
-  'announcements',
-  'voice-verification',
-  'voice-track-audio',
-  'voice-track-stitching',
-  'draft-cleanup',
-  'r2-usage',
-  'pricing-fetch',
-  'visual-classification',
-  'visual-generation',
-  'transition-generation',
-  'video-composition',
-  'avatar-generation',
-  'place-enrichment',
-  'news-ingest',
-  'demo-script',
-  'demo-recording',
-  'demo-voiceover',
-  'demo-visual',
-  'demo-transition',
-  'demo-composition',
-  'demo-scene-composition',
-  'music-generation',
-] as const;
+export const ALL_QUEUE_NAMES = Object.freeze(Object.keys(QUEUE_DEFINITIONS));

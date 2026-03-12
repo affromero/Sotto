@@ -60,12 +60,20 @@ export function createRedisConnection(name?: string): Redis {
 
 // Singleton for general-purpose operations
 let generalRedisClient: Redis | null = null;
+let sharedQueueRedisClient: Redis | null = null;
 
 export function getRedisClient(): Redis {
   if (!generalRedisClient) {
     generalRedisClient = createRedisConnection('general');
   }
   return generalRedisClient;
+}
+
+export function getSharedQueueRedisClient(): Redis {
+  if (!sharedQueueRedisClient) {
+    sharedQueueRedisClient = createRedisConnection('queue-shared');
+  }
+  return sharedQueueRedisClient;
 }
 
 /**
@@ -218,5 +226,9 @@ export async function closeRedis(): Promise<void> {
   if (generalRedisClient) {
     await generalRedisClient.quit();
     generalRedisClient = null;
+  }
+  if (sharedQueueRedisClient) {
+    await sharedQueueRedisClient.quit();
+    sharedQueueRedisClient = null;
   }
 }

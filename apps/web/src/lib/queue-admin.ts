@@ -1,6 +1,6 @@
 import { ConnectionOptions, Queue } from 'bullmq';
 import { ALL_QUEUE_NAMES } from './queue';
-import { createRedisConnection } from './redis';
+import { getSharedQueueRedisClient } from './redis';
 
 const adminQueues = new Map<string, Queue>();
 
@@ -10,7 +10,9 @@ export function getAdminQueue(name: string): Queue {
   }
   let queue = adminQueues.get(name);
   if (!queue) {
-    queue = new Queue(name, { connection: createRedisConnection() as ConnectionOptions });
+    queue = new Queue(name, {
+      connection: getSharedQueueRedisClient() as ConnectionOptions,
+    });
     adminQueues.set(name, queue);
   }
   return queue;
