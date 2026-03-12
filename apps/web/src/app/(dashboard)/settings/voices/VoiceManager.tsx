@@ -73,11 +73,15 @@ export function VoiceManager() {
   const [editingPrice, setEditingPrice] = useState<string | null>(null);
   const [priceDraft, setPriceDraft] = useState('');
   const [savingPrice, setSavingPrice] = useState(false);
-  const [inputTab, setInputTab] = useState<'upload' | 'record'>('upload');
+  const [inputTab, setInputTab] = useState<'upload' | 'record' | 'import'>('upload');
   const [cloneProvider, setCloneProvider] = useState<'elevenlabs' | 'cartesia' | 'hume'>('elevenlabs');
   const [humeVoiceId, setHumeVoiceId] = useState('');
   const [humeName, setHumeName] = useState('');
   const [importingHume, setImportingHume] = useState(false);
+  const [elImportVoiceId, setElImportVoiceId] = useState('');
+  const [importingEl, setImportingEl] = useState(false);
+  const [previewText, setPreviewText] = useState('Hello! This is a quick preview of this voice on Sotto.');
+  const [previewing, setPreviewing] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const recorder = useAudioRecorder({ maxSeconds: 60, minSeconds: 5 });
@@ -386,6 +390,59 @@ export function VoiceManager() {
       setError(err instanceof Error ? err.message : 'Failed to import voice');
     } finally {
       setImportingHume(false);
+    }
+  }
+
+  async function handleImportElevenLabs(e: React.FormEvent) {
+    e.preventDefault();
+    const trimmed = elImportVoiceId.trim();
+    if (!trimmed) return;
+    setImportingEl(true);
+    setError(null);
+    try {
+      const fd = new FormData();
+      fd.append('provider', 'elevenlabs');
+      fd.append('sourceType', 'IMPORT');
+      fd.append('externalVoiceId', trimmed);
+      const res = await fetch('/api/voices/clone', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to import voice');
+      setElImportVoiceId('');
+      await fetchVoices();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to import voice');
+    } finally {
+      setImportingEl(false);
+    }
+  }
+
+  async function handlePreviewById(voiceId: string) {
+    const trimmedId = voiceId.trim();
+    const trimmedText = previewText.trim();
+    if (!trimmedId || !trimmedText) return;
+    setPreviewing(true);
+    setError(null);
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    try {
+      const res = await fetch('/api/voices/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ voiceId: trimmedId, text: trimmedText }),
+      });
+      if (!res.ok) throw new Error('Preview failed');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      audioRef.current = audio;
+      audio.onended = () => { setPreviewing(false); URL.revokeObjectURL(url); };
+      audio.onerror = () => { setPreviewing(false); URL.revokeObjectURL(url); };
+      await audio.play();
+    } catch (err) {
+      setPreviewing(false);
+      setError(err instanceof Error ? err.message : 'Preview failed');
     }
   }
 
@@ -1001,23 +1058,25 @@ export function VoiceManager() {
             </button>
           </form>
         ) : (
-        <form onSubmit={handleClone} className={styles.uploadForm}>
-          <div className={styles.formGroup}>
-            <label htmlFor="voice-name" className={styles.label}>
-              Voice Name
-            </label>
-            <input
-              id="voice-name"
-              type="text"
-              className={styles.nameInput}
-              value={cloneName}
-              onChange={(e) => setCloneName(e.target.value)}
-              placeholder="My Voice"
-              required
-              disabled={cloning}
-              maxLength={100}
-            />
-          </div>
+        <form onSubmit={inputTab === 'import' ? handleImportElevenLabs : handleClone} className={styles.uploadForm}>
+          {inputTab !== 'import' && (
+            <div className={styles.formGroup}>
+              <label htmlFor="voice-name" className={styles.label}>
+                Voice Name
+              </label>
+              <input
+                id="voice-name"
+                type="text"
+                className={styles.nameInput}
+                value={cloneName}
+                onChange={(e) => setCloneName(e.target.value)}
+                placeholder="My Voice"
+                required
+                disabled={cloning}
+                maxLength={100}
+              />
+            </div>
+          )}
 
           <div className={styles.inputTabs} role="tablist">
             <button
@@ -1040,9 +1099,68 @@ export function VoiceManager() {
             >
               Record Mic
             </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={inputTab === 'import'}
+              className={`${styles.inputTab} ${inputTab === 'import' ? styles.inputTabActive : ''}`}
+              onClick={() => setInputTab('import')}
+              disabled={cloning}
+            >
+              Voice ID
+            </button>
           </div>
 
-          {inputTab === 'upload' ? (
+          {inputTab === 'import' ? (
+            <div className={styles.importIdSection}>
+              <div className={styles.formGroup}>
+                <label htmlFor="el-voice-id" className={styles.label}>
+                  ElevenLabs Voice ID
+                </label>
+                <input
+                  id="el-voice-id"
+                  type="text"
+                  className={styles.nameInput}
+                  value={elImportVoiceId}
+                  onChange={(e) => setElImportVoiceId(e.target.value)}
+                  placeholder="e.g. pNInz6obpgDQGcFmaJgB"
+                  required
+                  disabled={importingEl}
+                  maxLength={200}
+                />
+                <p className={styles.hint}>
+                  Paste any ElevenLabs voice ID. The name is fetched automatically.
+                </p>
+              </div>
+
+              <div className={styles.formGroup}>
+                <label htmlFor="preview-text" className={styles.label}>
+                  Preview text
+                </label>
+                <div className={styles.previewRow}>
+                  <input
+                    id="preview-text"
+                    type="text"
+                    className={styles.nameInput}
+                    value={previewText}
+                    onChange={(e) => setPreviewText(e.target.value)}
+                    placeholder="Type something to hear this voice…"
+                    maxLength={300}
+                    disabled={previewing}
+                  />
+                  <button
+                    type="button"
+                    className={styles.previewButton}
+                    onClick={() => handlePreviewById(elImportVoiceId)}
+                    disabled={previewing || !elImportVoiceId.trim() || !previewText.trim()}
+                    aria-label="Preview voice"
+                  >
+                    {previewing ? <span className={styles.spinnerSmall} /> : '▶'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : inputTab === 'upload' ? (
             <div className={styles.formGroup}>
               <label htmlFor="voice-file" className={styles.label}>
                 Audio Sample
@@ -1123,16 +1241,19 @@ export function VoiceManager() {
             type="submit"
             className={styles.cloneButton}
             disabled={
-              cloning ||
-              !cloneName.trim() ||
-              (inputTab === 'upload' ? !cloneFile : !recorder.recordedBlob)
+              inputTab === 'import'
+                ? importingEl || !elImportVoiceId.trim()
+                : cloning || !cloneName.trim() || (inputTab === 'upload' ? !cloneFile : !recorder.recordedBlob)
             }
           >
-            {cloning ? (
-              <>
-                <span className={styles.spinnerSmall} />
-                Cloning...
-              </>
+            {inputTab === 'import' ? (
+              importingEl ? (
+                <><span className={styles.spinnerSmall} /> Importing…</>
+              ) : (
+                'Import Voice'
+              )
+            ) : cloning ? (
+              <><span className={styles.spinnerSmall} /> Cloning…</>
             ) : (
               'Clone Voice'
             )}
