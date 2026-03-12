@@ -117,6 +117,13 @@ export const FAL_VIDEO_MODEL_IDS = new Set(Object.keys(VIDEO_ENDPOINTS));
 const AVATAR_ENDPOINTS: Record<string, string> = {
   'fal-heygen-avatar4-i2v': 'fal-ai/heygen/avatar4/image-to-video',
   'fal-heygen-avatar4-twin': 'fal-ai/heygen/avatar4/digital-twin',
+  'fal-veed-fabric-1.0': 'veed/fabric-1.0',
+  'fal-kling-avatar-v2-pro': 'fal-ai/kling-video/ai-avatar/v2/pro',
+};
+
+export const LIP_SYNC_CONFIG: Record<string, { maxAudioSeconds: number; outputFormat: string }> = {
+  'fal-veed-fabric-1.0': { maxAudioSeconds: 300, outputFormat: 'mp4' },
+  'fal-kling-avatar-v2-pro': { maxAudioSeconds: 60, outputFormat: 'mp4' },
 };
 
 export function getFalAvatarEndpoint(modelId: string): string | null {
