@@ -909,6 +909,15 @@ export const generateMusicSchema = z.object({
   model: z.string().max(100).optional(),
 });
 
+export const avatarImageUploadSchema = z.object({
+  name: z.string().min(1).max(100),
+});
+
+export const avatarImageGenerateSchema = z.object({
+  name: z.string().min(1).max(100),
+  prompt: z.string().min(1).max(1000),
+});
+
 export const updateMusicVolumeSchema = z.object({
   volume: z.number().min(0).max(1),
 });
