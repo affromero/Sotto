@@ -71,58 +71,102 @@ import { processMusicGeneration } from './music-generation.worker';
 import { isR2MonitoringConfigured } from '@/lib/cloudflare-r2-usage';
 import { startPricingRefreshInterval } from '@/lib/pricing';
 
-logger.info('Starting Sotto workers...');
+const WORKER_PROFILE = process.env.WORKER_PROFILE || 'all';
 
-// Create all workers with appropriate concurrency
+const HEAVY_WORKERS = new Set([
+  'audio-generation',
+  'voice-track-audio',
+  'visual-generation',
+  'transition-generation',
+  'avatar-generation',
+  'video-composition',
+  'audio-stitching',
+  'music-generation',
+  'demo-voiceover',
+  'demo-visual',
+  'demo-recording',
+  'demo-transition',
+  'demo-composition',
+  'demo-scene-composition',
+]);
+
+const PIPELINE_WORKERS = new Set([
+  'content-extraction',
+  'script-generation',
+  'script-verification',
+  'reference-validation',
+  'audio-import',
+  'interactions',
+  'segment-regeneration',
+  'visual-classification',
+  'place-enrichment',
+  'content-moderation',
+  'demo-script',
+  'voice-track-stitching',
+]);
+
+function shouldRun(name: string): boolean {
+  if (WORKER_PROFILE === 'all') return true;
+  if (WORKER_PROFILE === 'heavy') return HEAVY_WORKERS.has(name);
+  if (WORKER_PROFILE === 'pipeline') return PIPELINE_WORKERS.has(name);
+  if (WORKER_PROFILE === 'light') return !HEAVY_WORKERS.has(name) && !PIPELINE_WORKERS.has(name);
+  return true;
+}
+
+logger.info('Starting Sotto workers...', { profile: WORKER_PROFILE });
+
+// Create workers filtered by WORKER_PROFILE
 const workers = [
-  createWorker('content-extraction', processContentExtraction, { concurrency: 2 }),
-  createWorker('script-generation', processScriptGeneration, { concurrency: 2 }),
-  createWorker('script-verification', processScriptVerification, { concurrency: 2 }),
-  createWorker('reference-validation', processReferenceValidation, { concurrency: 2 }),
-  createWorker('audio-generation', processAudioGeneration, { concurrency: 15 }),
-  createWorker('audio-stitching', processAudioStitching, { concurrency: 1 }),
-  createWorker('interactions', processInteraction, { concurrency: 3 }),
-  createWorker('segment-regeneration', processSegmentRegeneration, { concurrency: 2 }),
-  createWorker('notifications', processNotification, { concurrency: 5 }),
-  createWorker('pdf-generation', processPdfGeneration, { concurrency: 2 }),
-  createWorker('twitter-mentions', processTwitterMentions, { concurrency: 1 }),
-  createWorker('twitter-reply', processTwitterReply, { concurrency: 2 }),
-  createWorker('event-ingestion', processEventIngestion, { concurrency: 5 }),
-  createWorker('feature-computation', processFeatureComputation, { concurrency: 2 }),
-  createWorker('data-export', processDataExport, { concurrency: 1 }),
-  createWorker('audio-import', processAudioImport, { concurrency: 2 }),
-  createWorker('key-validation', processKeyValidation, { concurrency: 1 }),
-  createWorker('telegram-bot', processTelegramUpdates, { concurrency: 1, lockDuration: 10000 }),
-  createWorker('telegram-reply', processTelegramReply, { concurrency: 2 }),
-  createWorker('twitter-auto-tweet', processAutoTweet, { concurrency: 1 }),
-  createWorker('twitter-trend-poll', processTrendPoll, { concurrency: 1 }),
-  createWorker('admin-thread-to-podcast', processAdminThreadToPodcast, { concurrency: 1 }),
-  createWorker('content-moderation', processContentModeration, { concurrency: 3 }),
-  createWorker('email-digest', processEmailDigest, { concurrency: 1 }),
-  createWorker('announcements', processAnnouncement, { concurrency: 1 }),
-  createWorker('voice-verification', processVoiceVerification, { concurrency: 2 }),
-  createWorker('voice-track-audio', processVoiceTrackAudio, { concurrency: 10 }),
-  createWorker('voice-track-stitching', processVoiceTrackStitching, { concurrency: 1 }),
-  createWorker('draft-cleanup', processDraftCleanup, { concurrency: 1 }),
-  createWorker('r2-usage', processR2Usage, { concurrency: 1 }),
-  createWorker('pricing-fetch', processPricingFetch, { concurrency: 1 }),
-  createWorker('visual-classification', processVisualClassification, { concurrency: 2 }),
-  createWorker('visual-generation', processVisualGeneration, { concurrency: 5 }),
-  createWorker('video-composition', processVideoComposition, { concurrency: 1, lockDuration: 600000 }),
-  createWorker('avatar-generation', processAvatarGeneration, { concurrency: 2, lockDuration: 1200000 }),
-  createWorker('place-enrichment', processPlaceEnrichment, { concurrency: 3 }),
-  createWorker('transition-generation', processTransitionGeneration, { concurrency: 3, lockDuration: 600000 }),
-  createWorker('news-ingest', processNewsIngest, { concurrency: 1 }),
-  createWorker('demo-script', processDemoScriptGeneration, { concurrency: 2 }),
-  createWorker('demo-recording', processDemoRecording, { concurrency: 1, lockDuration: 600000 }),
-  createWorker('demo-voiceover', processDemoVoiceover, { concurrency: 5 }),
-  createWorker('demo-visual', processDemoVisual, { concurrency: 3 }),
-  createWorker('demo-transition', processDemoTransition, { concurrency: 2 }),
-  createWorker('demo-composition', processDemoComposition, { concurrency: 1, lockDuration: 900000 }),
-  createWorker('demo-scene-composition', processDemoSceneComposition, { concurrency: 2, lockDuration: 600000 }),
-  createWorker('music-generation', processMusicGeneration, { concurrency: 2, lockDuration: 600000 }),
-];
+  shouldRun('content-extraction') && createWorker('content-extraction', processContentExtraction, { concurrency: 2 }),
+  shouldRun('script-generation') && createWorker('script-generation', processScriptGeneration, { concurrency: 2 }),
+  shouldRun('script-verification') && createWorker('script-verification', processScriptVerification, { concurrency: 2 }),
+  shouldRun('reference-validation') && createWorker('reference-validation', processReferenceValidation, { concurrency: 2 }),
+  shouldRun('audio-generation') && createWorker('audio-generation', processAudioGeneration, { concurrency: 15 }),
+  shouldRun('audio-stitching') && createWorker('audio-stitching', processAudioStitching, { concurrency: 1 }),
+  shouldRun('interactions') && createWorker('interactions', processInteraction, { concurrency: 3 }),
+  shouldRun('segment-regeneration') && createWorker('segment-regeneration', processSegmentRegeneration, { concurrency: 2 }),
+  shouldRun('notifications') && createWorker('notifications', processNotification, { concurrency: 5 }),
+  shouldRun('pdf-generation') && createWorker('pdf-generation', processPdfGeneration, { concurrency: 2 }),
+  shouldRun('twitter-mentions') && createWorker('twitter-mentions', processTwitterMentions, { concurrency: 1 }),
+  shouldRun('twitter-reply') && createWorker('twitter-reply', processTwitterReply, { concurrency: 2 }),
+  shouldRun('event-ingestion') && createWorker('event-ingestion', processEventIngestion, { concurrency: 5 }),
+  shouldRun('feature-computation') && createWorker('feature-computation', processFeatureComputation, { concurrency: 2 }),
+  shouldRun('data-export') && createWorker('data-export', processDataExport, { concurrency: 1 }),
+  shouldRun('audio-import') && createWorker('audio-import', processAudioImport, { concurrency: 2 }),
+  shouldRun('key-validation') && createWorker('key-validation', processKeyValidation, { concurrency: 1 }),
+  shouldRun('telegram-bot') && createWorker('telegram-bot', processTelegramUpdates, { concurrency: 1, lockDuration: 10000 }),
+  shouldRun('telegram-reply') && createWorker('telegram-reply', processTelegramReply, { concurrency: 2 }),
+  shouldRun('twitter-auto-tweet') && createWorker('twitter-auto-tweet', processAutoTweet, { concurrency: 1 }),
+  shouldRun('twitter-trend-poll') && createWorker('twitter-trend-poll', processTrendPoll, { concurrency: 1 }),
+  shouldRun('admin-thread-to-podcast') && createWorker('admin-thread-to-podcast', processAdminThreadToPodcast, { concurrency: 1 }),
+  shouldRun('content-moderation') && createWorker('content-moderation', processContentModeration, { concurrency: 3 }),
+  shouldRun('email-digest') && createWorker('email-digest', processEmailDigest, { concurrency: 1 }),
+  shouldRun('announcements') && createWorker('announcements', processAnnouncement, { concurrency: 1 }),
+  shouldRun('voice-verification') && createWorker('voice-verification', processVoiceVerification, { concurrency: 2 }),
+  shouldRun('voice-track-audio') && createWorker('voice-track-audio', processVoiceTrackAudio, { concurrency: 10 }),
+  shouldRun('voice-track-stitching') && createWorker('voice-track-stitching', processVoiceTrackStitching, { concurrency: 1 }),
+  shouldRun('draft-cleanup') && createWorker('draft-cleanup', processDraftCleanup, { concurrency: 1 }),
+  shouldRun('r2-usage') && createWorker('r2-usage', processR2Usage, { concurrency: 1 }),
+  shouldRun('pricing-fetch') && createWorker('pricing-fetch', processPricingFetch, { concurrency: 1 }),
+  shouldRun('visual-classification') && createWorker('visual-classification', processVisualClassification, { concurrency: 2 }),
+  shouldRun('visual-generation') && createWorker('visual-generation', processVisualGeneration, { concurrency: 5 }),
+  shouldRun('video-composition') && createWorker('video-composition', processVideoComposition, { concurrency: 1, lockDuration: 600000 }),
+  shouldRun('avatar-generation') && createWorker('avatar-generation', processAvatarGeneration, { concurrency: 2, lockDuration: 1200000 }),
+  shouldRun('place-enrichment') && createWorker('place-enrichment', processPlaceEnrichment, { concurrency: 3 }),
+  shouldRun('transition-generation') && createWorker('transition-generation', processTransitionGeneration, { concurrency: 3, lockDuration: 600000 }),
+  shouldRun('news-ingest') && createWorker('news-ingest', processNewsIngest, { concurrency: 1 }),
+  shouldRun('demo-script') && createWorker('demo-script', processDemoScriptGeneration, { concurrency: 2 }),
+  shouldRun('demo-recording') && createWorker('demo-recording', processDemoRecording, { concurrency: 1, lockDuration: 600000 }),
+  shouldRun('demo-voiceover') && createWorker('demo-voiceover', processDemoVoiceover, { concurrency: 5 }),
+  shouldRun('demo-visual') && createWorker('demo-visual', processDemoVisual, { concurrency: 3 }),
+  shouldRun('demo-transition') && createWorker('demo-transition', processDemoTransition, { concurrency: 2 }),
+  shouldRun('demo-composition') && createWorker('demo-composition', processDemoComposition, { concurrency: 1, lockDuration: 900000 }),
+  shouldRun('demo-scene-composition') && createWorker('demo-scene-composition', processDemoSceneComposition, { concurrency: 2, lockDuration: 600000 }),
+  shouldRun('music-generation') && createWorker('music-generation', processMusicGeneration, { concurrency: 2, lockDuration: 600000 }),
+].filter(Boolean) as ReturnType<typeof createWorker>[];
 
+// Cron jobs and webhooks run only on light (or all) profile to prevent duplicate repeat registrations
+if (WORKER_PROFILE === 'all' || WORKER_PROFILE === 'light') {
 // Set up Twitter mentions polling if credentials are configured
 if (isTwitterConfigured()) {
   const pollInterval = parseInt(process.env.TWITTER_POLL_INTERVAL_MS || '60000', 10);
@@ -224,8 +268,9 @@ newsIngestQueue
 
 // Start in-memory pricing refresh interval (picks up DB changes every 5 min)
 startPricingRefreshInterval();
+} // end WORKER_PROFILE === 'all' || 'light'
 
-logger.info(`${workers.length} workers started`);
+logger.info(`${workers.length} workers started`, { profile: WORKER_PROFILE });
 
 // Graceful shutdown
 async function shutdown() {
