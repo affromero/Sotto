@@ -97,14 +97,18 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   });
   const resolvedProvider = (resolvedPodcast.ttsProvider ?? 'elevenlabs') as TtsProviderId;
 
-  // Write custom voice selections if provided
+  // Write explicit custom voice selections if provided; auto-assigned speakers are filled below.
   if (bodyVoices && bodyVoices.length > 0) {
     await prisma.podcastVoice.deleteMany({ where: { podcastId } });
-    await prisma.podcastVoice.createMany({
-      data: bodyVoices
-        .filter((v) => v.voiceId)
-        .map((v) => ({ podcastId, speaker: v.speaker, voiceId: v.voiceId!, provider: resolvedProvider })),
-    });
+    const explicitVoices = bodyVoices
+      .filter((v) => typeof v.voiceId === 'string' && v.voiceId.trim().length > 0)
+      .map((v) => ({ podcastId, speaker: v.speaker, voiceId: v.voiceId!.trim(), provider: resolvedProvider }));
+
+    if (explicitVoices.length > 0) {
+      await prisma.podcastVoice.createMany({
+        data: explicitVoices,
+      });
+    }
   }
 
   const [script, discovery] = await Promise.all([
@@ -117,22 +121,19 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
   const turns = script.turns as ScriptTurn[];
 
-  // Assign voices for multi-speaker podcasts (skip if user provided custom voices)
-  if (!bodyVoices || bodyVoices.length === 0) {
-    // Derive speakers from discovery or script turns
-    const discoverySpeakers = discovery?.speakers as Array<{ name: string; description?: string }> | null;
-    const speakers = discoverySpeakers && discoverySpeakers.length > 0
-      ? discoverySpeakers
-      : [...new Set(turns.map((t) => t.speaker))].map((name) => ({ name }));
+  // Derive speakers from discovery or script turns
+  const discoverySpeakers = discovery?.speakers as Array<{ name: string; description?: string }> | null;
+  const speakers = discoverySpeakers && discoverySpeakers.length > 0
+    ? discoverySpeakers
+    : [...new Set(turns.map((t) => t.speaker))].map((name) => ({ name }));
 
-    // Resolve API key for catalog fetch
-    let ttsApiKey: string | undefined;
-    if (gate.isByokUser) {
-      ttsApiKey = (await getByokKey(userId, resolvedProvider)) ?? undefined;
-    }
-
-    await assignVoicesForPodcast(podcastId, speakers, resolvedProvider, ttsApiKey);
+  // Resolve API key for catalog fetch
+  let ttsApiKey: string | undefined;
+  if (gate.isByokUser) {
+    ttsApiKey = (await getByokKey(userId, resolvedProvider)) ?? undefined;
   }
+
+  await assignVoicesForPodcast(podcastId, speakers, resolvedProvider, ttsApiKey);
 
   // Convert TTS tags before creating segments
   const turnData = turns.map((t) => ({ speaker: t.speaker, text: t.text, direction: t.direction }));

@@ -197,12 +197,12 @@ export function VideoEditor({
 
   const enabledTransitions = useMemo(() => transitions.filter((t) => t.enabled), [transitions]);
 
-  const handleRegenerate = useCallback(async () => {
-    if (dirtyCount === 0) return;
+  const submitRegeneration = useCallback(async (segmentIds: Set<string>) => {
+    if (segmentIds.size === 0) return;
     setSubmitting(true);
 
     const changedSegments = editedSegments
-      .filter((seg) => dirtyIds.has(seg.segmentVisualId))
+      .filter((seg) => segmentIds.has(seg.segmentVisualId))
       .map((seg) => ({
         segmentVisualId: seg.segmentVisualId,
         visualType: seg.visualType,
@@ -228,7 +228,16 @@ export function VideoEditor({
     } catch {
       setSubmitting(false);
     }
-  }, [podcastId, editedSegments, dirtyIds, dirtyCount, onRegenerate]);
+  }, [podcastId, editedSegments, onRegenerate]);
+
+  const handleRegenerate = useCallback(async () => {
+    if (dirtyCount === 0) return;
+    await submitRegeneration(dirtyIds);
+  }, [dirtyCount, dirtyIds, submitRegeneration]);
+
+  const handleRegenerateAll = useCallback(async () => {
+    await submitRegeneration(new Set(editedSegments.map((seg) => seg.segmentVisualId)));
+  }, [editedSegments, submitRegeneration]);
 
   return (
     <div className={styles.root}>
@@ -291,6 +300,14 @@ export function VideoEditor({
             disabled={submitting}
           >
             Cancel
+          </button>
+          <button
+            className={styles.regenerateAllBtn}
+            onClick={handleRegenerateAll}
+            type="button"
+            disabled={editedSegments.length === 0 || submitting}
+          >
+            {submitting ? 'Submitting...' : 'Regenerate Everything'}
           </button>
           <button
             className={styles.regenerateBtn}

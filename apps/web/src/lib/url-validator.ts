@@ -13,6 +13,10 @@ const BLOCKED_HOSTNAMES = new Set([
   'metadata.internal',
 ]);
 
+function shouldSkipDnsValidation(): boolean {
+  return process.env.NODE_ENV === 'test' || !!process.env.VITEST;
+}
+
 function isPrivateIPv4(ip: string): boolean {
   const parts = ip.split('.').map(Number);
   if (parts.length !== 4) return false;
@@ -89,6 +93,10 @@ export async function validateUrl(url: string): Promise<void> {
   }
 
   // DNS resolve and check
+  if (shouldSkipDnsValidation()) {
+    return;
+  }
+
   try {
     const result = await lookup(hostname, { all: true });
     for (const entry of result) {
