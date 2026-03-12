@@ -16,7 +16,7 @@ import { logger } from '../../logger';
 import type { TtsProvider, SpeechParams } from '../tts';
 import type { TtsProviderId } from '../tts-registry';
 import { HUME_VOICE_POOL, selectVoicePairFromPool } from '../tts-voices';
-import { mapDirectionToExpression } from '../../tts-expression-mapper';
+import { mapDirectionToExpression, convertInlineAudioTags } from '../../tts-expression-mapper';
 
 // HOST/GUEST → host voice slot; EXPERT/SKEPTIC → expert slot.
 const SPEAKER_VOICE_HOST_SET = new Set(['HOST', 'GUEST']);
@@ -45,7 +45,7 @@ export class HumeProvider implements TtsProvider {
     const description = expression.hume?.description;
 
     const utterance: Record<string, unknown> = {
-      text: params.text,
+      text: convertInlineAudioTags(params.text, 'hume'),
       voice: { id: params.voiceId },
       speed: 1,
       trailing_silence: 0.3,

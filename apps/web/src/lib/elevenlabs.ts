@@ -103,31 +103,25 @@ export async function generateSpeech(params: {
   }
 
   const modelId = params.modelId || getProviderMeta('elevenlabs').defaultModel;
-  const supportsContext = !modelId.startsWith('eleven_v3');
 
-  const rawStability = params.stability ?? 0.45;
-  // eleven_v3 only accepts discrete stability values: 0.0 (Creative), 0.5 (Natural), 1.0 (Robust)
-  const stability = supportsContext
-    ? rawStability
-    : ([0.0, 0.5, 1.0] as const).reduce((a, b) =>
-        Math.abs(b - rawStability) < Math.abs(a - rawStability) ? b : a,
-      );
+  const stability = params.stability ?? 0.5;
 
   const body: Record<string, unknown> = {
     text: params.text,
     model_id: modelId,
     voice_settings: {
       stability,
-      similarity_boost: params.similarityBoost ?? 0.75,
+      similarity_boost: params.similarityBoost ?? 0.85,
       // style 0.0 per ElevenLabs recommendation — higher values add latency and instability
       style: params.style ?? 0.0,
+      use_speaker_boost: true,
     },
   };
-  if (supportsContext && params.previousText) body.previous_text = params.previousText;
-  if (supportsContext && params.nextText) body.next_text = params.nextText;
+  if (params.previousText) body.previous_text = params.previousText;
+  if (params.nextText) body.next_text = params.nextText;
 
   const response = await fetch(
-    `${ELEVENLABS_BASE_URL}/text-to-speech/${params.voiceId}?output_format=mp3_44100_128`,
+    `${ELEVENLABS_BASE_URL}/text-to-speech/${params.voiceId}?output_format=mp3_44100_192`,
     {
       method: 'POST',
       headers: {

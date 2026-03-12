@@ -230,10 +230,10 @@ describe('elevenlabs', () => {
       await generateSpeech({ text: 'Test', voiceId: 'voice-123' });
 
       const url = mockFetch.mock.calls[0][0];
-      expect(url).toContain('output_format=mp3_44100_128');
+      expect(url).toContain('output_format=mp3_44100_192');
     });
 
-    it('does not include use_speaker_boost in request body', async () => {
+    it('includes use_speaker_boost: true in request body', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
         arrayBuffer: async () => Buffer.from('audio').buffer,
@@ -242,10 +242,10 @@ describe('elevenlabs', () => {
       await generateSpeech({ text: 'Test', voiceId: 'voice-123' });
 
       const body = JSON.parse(mockFetch.mock.calls[0][1].body);
-      expect(body.voice_settings).not.toHaveProperty('use_speaker_boost');
+      expect(body.voice_settings.use_speaker_boost).toBe(true);
     });
 
-    it('passes previous_text and next_text for non-v3 models', async () => {
+    it('passes previous_text and next_text for all models', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
         arrayBuffer: async () => Buffer.from('audio').buffer,
@@ -264,7 +264,7 @@ describe('elevenlabs', () => {
       expect(body.next_text).toBe('Next segment text');
     });
 
-    it('skips previous_text and next_text for eleven_v3 model', async () => {
+    it('passes previous_text and next_text for eleven_v3 model', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
         arrayBuffer: async () => Buffer.from('audio').buffer,
@@ -279,11 +279,11 @@ describe('elevenlabs', () => {
       });
 
       const body = JSON.parse(mockFetch.mock.calls[0][1].body);
-      expect(body).not.toHaveProperty('previous_text');
-      expect(body).not.toHaveProperty('next_text');
+      expect(body.previous_text).toBe('Previous segment text');
+      expect(body.next_text).toBe('Next segment text');
     });
 
-    it('skips previous_text and next_text for eleven_v3 variants', async () => {
+    it('passes previous_text and next_text for eleven_v3 variants', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
         arrayBuffer: async () => Buffer.from('audio').buffer,
@@ -298,8 +298,8 @@ describe('elevenlabs', () => {
       });
 
       const body = JSON.parse(mockFetch.mock.calls[0][1].body);
-      expect(body).not.toHaveProperty('previous_text');
-      expect(body).not.toHaveProperty('next_text');
+      expect(body.previous_text).toBe('Previous segment text');
+      expect(body.next_text).toBe('Next segment text');
     });
 
     it('omits previous_text and next_text when not provided', async () => {

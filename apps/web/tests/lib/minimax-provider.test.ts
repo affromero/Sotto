@@ -49,6 +49,7 @@ vi.mock('@/lib/auto-model-config', () => ({
 
 vi.mock('@/lib/tts-expression-mapper', () => ({
   mapDirectionToExpression: vi.fn().mockReturnValue({}),
+  convertInlineAudioTags: vi.fn().mockImplementation((text: string) => text),
 }));
 
 import { MinimaxProvider } from '@/lib/providers/tts/minimax.provider';
