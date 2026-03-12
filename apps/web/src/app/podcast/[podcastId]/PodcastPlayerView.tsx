@@ -24,6 +24,7 @@ import {
   X,
   Music,
   MessageCircleQuestion,
+  Check,
 } from 'lucide-react';
 import { usePlayer } from '@/components/providers/AudioPlayerProvider';
 import { AudioPlayer } from '@/components/player/AudioPlayer';
@@ -213,6 +214,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
   const [avatarOverlays, setAvatarOverlays] = useState<AvatarOverlayData[]>([]);
   const [avatarsVisible, setAvatarsVisible] = useState(true);
   const [avatarGenerating, setAvatarGenerating] = useState(false);
+  const [avatarDone, setAvatarDone] = useState(false);
 
   // Filter avatar overlays to match the active audio source (original or voice track)
   const activeVoiceTrackId = player.activeVoiceTrackId;
@@ -362,7 +364,14 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
           const allDone = data.avatarOverlays.every(
             (o: AvatarOverlayData) => o.status === 'ready' || o.status === 'failed'
           );
-          if (allDone) setAvatarGenerating(false);
+          if (allDone) {
+            setAvatarGenerating(false);
+            const anyReady = data.avatarOverlays.some((o: AvatarOverlayData) => o.status === 'ready');
+            if (anyReady) {
+              setAvatarDone(true);
+              setTimeout(() => setAvatarDone(false), 3000);
+            }
+          }
         }
       } catch { /* ignore */ }
     };
@@ -922,12 +931,32 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
               <button
                 className={styles.toolbarBtn}
                 onClick={() => setShowAvatarPicker(true)}
-                aria-label={avatarOverlays.length > 0 ? 'Change Avatars' : 'Add Avatars'}
-                title={avatarOverlays.length > 0 ? 'Change the speaker avatars in your video' : 'Add AI-generated speaker avatars to your video'}
+                aria-label={avatarGenerating ? 'Generating avatars' : avatarDone ? 'Avatars ready' : avatarOverlays.length > 0 ? 'Change Avatars' : 'Add Avatars'}
+                title={avatarGenerating ? 'Generating avatars...' : avatarOverlays.length > 0 ? 'Change the speaker avatars' : 'Add AI-generated speaker avatars'}
                 type="button"
+                data-loading={avatarGenerating ? 'true' : undefined}
+                data-done={avatarDone ? 'true' : undefined}
               >
-                <Users size={14} />
-                Avatars
+                {avatarDone ? (
+                  <>
+                    <Check size={14} />
+                    Ready!
+                  </>
+                ) : avatarGenerating ? (
+                  <>
+                    <RefreshCw size={14} />
+                    {(() => {
+                      const rw = avatarOverlays.find(o => o.avatarProvider === 'runway' && (o.runwayTotalChunks ?? 0) > 1);
+                      if (rw) return `Chunk ${rw.runwayChunkIndex ?? 0}/${rw.runwayTotalChunks}`;
+                      return `${avatarOverlays.filter(o => o.status === 'ready').length}/${avatarOverlays.length}`;
+                    })()}
+                  </>
+                ) : (
+                  <>
+                    <Users size={14} />
+                    Avatars
+                  </>
+                )}
               </button>
               <button
                 className={styles.toolbarBtn}
@@ -939,18 +968,6 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
                 <Music size={14} />
                 Music
               </button>
-              {avatarGenerating && (
-                <div className={styles.avatarGeneratingBadge}>
-                  <RefreshCw size={14} className={styles.avatarSpinner} />
-                  <span>
-                    {(() => {
-                      const rw = avatarOverlays.find(o => o.avatarProvider === 'runway' && (o.runwayTotalChunks ?? 0) > 1);
-                      if (rw) return `Recording chunk ${rw.runwayChunkIndex ?? 0}/${rw.runwayTotalChunks}`;
-                      return `Avatars ${avatarOverlays.filter(o => o.status === 'ready').length}/${avatarOverlays.length}`;
-                    })()}
-                  </span>
-                </div>
-              )}
             </div>
           )}
           {videoState === 'failed' && (
