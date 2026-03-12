@@ -195,6 +195,12 @@ else
   echo "Maps health check skipped (no response — may not have /api/health)"
 fi
 
+# --- Post-deploy smoke check ---
+
+echo ""
+echo "=== Post-deploy smoke check ==="
+BASE_URL="http://127.0.0.1:${NEW_WEB_PORT}" bash scripts/smoke-prod.sh
+
 # --- Build and restart workers ---
 # Workers are stateless BullMQ consumers; jobs are durable in Redis.
 # No drain needed — restart immediately with new code.
