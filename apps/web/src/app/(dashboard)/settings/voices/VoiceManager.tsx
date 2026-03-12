@@ -432,7 +432,10 @@ export function VoiceManager() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ voiceId: trimmedId, text: trimmedText }),
       });
-      if (!res.ok) throw new Error('Preview failed');
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Preview failed');
+      }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);

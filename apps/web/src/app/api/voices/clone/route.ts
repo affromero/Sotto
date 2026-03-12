@@ -82,14 +82,21 @@ export async function POST(request: NextRequest) {
 
     const elevenLabsKey = await getByokKey(session.user.id, 'elevenlabs');
 
-    // Try BYOK key first (accesses private voices); fall back to platform key
-    let voiceInfo = elevenLabsKey
-      ? await getVoiceById(parsed.data.externalVoiceId, elevenLabsKey)
-      : await getVoiceById(parsed.data.externalVoiceId);
+    let voiceInfo: { name: string; labels: Record<string, string> } | null = null;
+    try {
+      // Try BYOK key first (accesses private voices); fall back to platform key
+      voiceInfo = elevenLabsKey
+        ? await getVoiceById(parsed.data.externalVoiceId, elevenLabsKey)
+        : await getVoiceById(parsed.data.externalVoiceId);
 
-    // If BYOK was tried and didn't find it, fall back to platform key (voice may be public)
-    if (!voiceInfo && elevenLabsKey) {
-      voiceInfo = await getVoiceById(parsed.data.externalVoiceId);
+      // If BYOK was tried and didn't find it, fall back to platform key (voice may be public)
+      if (!voiceInfo && elevenLabsKey) {
+        voiceInfo = await getVoiceById(parsed.data.externalVoiceId);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '';
+      const isInvalidId = msg.includes('422') || msg.toLowerCase().includes('pattern') || msg.toLowerCase().includes('invalid');
+      return errorResponse(isInvalidId ? 'Invalid ElevenLabs voice ID format.' : 'Failed to look up voice ID.', 400);
     }
 
     if (!voiceInfo) {
