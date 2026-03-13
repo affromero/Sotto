@@ -1,149 +1,203 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-const { mockExecFileAsync, mockWriteFile, mockReadFileSync } = vi.hoisted(() => ({
-  mockExecFileAsync: vi.fn(),
-  mockWriteFile: vi.fn(),
-  mockReadFileSync: vi.fn().mockReturnValue('/* mock livekit-client.umd.js */'),
-}));
+// --- Hoisted mocks ---
+
+const {
+  mockExecFileAsync,
+  mockReadFile,
+  mockWriteFile,
+  mockLaunch,
+  mockNewContext,
+  mockNewPage,
+  mockPageExposeFunction,
+  mockPageOn,
+  mockPageGoto,
+  mockPageAddScriptTag,
+  mockPageWaitForFunction,
+  mockPageEvaluate,
+  mockBrowserClose,
+} = vi.hoisted(() => {
+  const mockPageExposeFunction = vi.fn();
+  const mockPageOn = vi.fn();
+  const mockPageGoto = vi.fn();
+  const mockPageAddScriptTag = vi.fn();
+  const mockPageWaitForFunction = vi.fn();
+  const mockPageEvaluate = vi.fn();
+  const mockBrowserClose = vi.fn();
+  const mockNewPage = vi.fn();
+  const mockNewContext = vi.fn();
+  const mockLaunch = vi.fn();
+
+  return {
+    mockExecFileAsync: vi.fn(),
+    mockReadFile: vi.fn(),
+    mockWriteFile: vi.fn(),
+    mockLaunch,
+    mockNewContext,
+    mockNewPage,
+    mockPageExposeFunction,
+    mockPageOn,
+    mockPageGoto,
+    mockPageAddScriptTag,
+    mockPageWaitForFunction,
+    mockPageEvaluate,
+    mockBrowserClose,
+  };
+});
+
+// --- Module mocks ---
 
 vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
-vi.mock('util', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('util')>();
-  return {
-    ...actual,
-    promisify: () => mockExecFileAsync,
-  };
-});
+vi.mock('util', () => ({
+  default: { promisify: () => mockExecFileAsync },
+  promisify: () => mockExecFileAsync,
+}));
 
-vi.mock('fs/promises', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('fs/promises')>();
-  return {
-    ...actual,
-    default: { ...actual, writeFile: (...args: unknown[]) => mockWriteFile(...args) },
+vi.mock('child_process', () => ({
+  default: { execFile: vi.fn() },
+  execFile: vi.fn(),
+}));
+
+vi.mock('fs/promises', () => ({
+  default: {
+    readFile: (...args: unknown[]) => mockReadFile(...args),
     writeFile: (...args: unknown[]) => mockWriteFile(...args),
-  };
-});
+  },
+  readFile: (...args: unknown[]) => mockReadFile(...args),
+  writeFile: (...args: unknown[]) => mockWriteFile(...args),
+}));
 
-vi.mock('fs', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('fs')>();
-  return {
-    ...actual,
-    default: { ...actual, readFileSync: mockReadFileSync },
-    readFileSync: mockReadFileSync,
-  };
-});
-
-// Playwright mock — use factory functions to avoid hoisting issues
-vi.mock('playwright', () => {
-  const page = {
-    setContent: vi.fn().mockResolvedValue(undefined),
-    evaluate: vi.fn(),
-    close: vi.fn().mockResolvedValue(undefined),
-  };
-  const browser = {
-    newPage: vi.fn().mockResolvedValue(page),
-    close: vi.fn().mockResolvedValue(undefined),
-    __page: page,
-  };
-  return {
-    chromium: {
-      launch: vi.fn().mockResolvedValue(browser),
-      __browser: browser,
-    },
-  };
-});
+vi.mock('playwright', () => ({
+  chromium: {
+    launch: (...args: unknown[]) => mockLaunch(...args),
+  },
+}));
 
 import { recordRunwaySession } from '@/lib/runway-session';
-import { chromium } from 'playwright';
 
-function getMockBrowser() {
-  return (chromium as unknown as { __browser: { newPage: ReturnType<typeof vi.fn>; close: ReturnType<typeof vi.fn>; __page: { evaluate: ReturnType<typeof vi.fn>; setContent: ReturnType<typeof vi.fn> } } }).__browser;
-}
+const baseCredentials = { url: 'wss://demo.livekit.cloud', token: 'lk-token', roomName: 'room-1' };
+const fakeAudioBuffer = Buffer.from('fake-audio-data');
+const fakeChunkBase64 = Buffer.from('fake-video-chunk').toString('base64');
 
 beforeEach(() => {
-  vi.clearAllMocks();
-  mockReadFileSync.mockReturnValue('/* mock livekit-client.umd.js */');
+  vi.resetAllMocks();
+
+  // ffprobe: 10s duration
+  mockExecFileAsync.mockResolvedValue({ stdout: '10.0\n', stderr: '' });
+
+  // fs/promises
+  mockReadFile.mockResolvedValue(fakeAudioBuffer);
   mockWriteFile.mockResolvedValue(undefined);
 
-  // Default: ffprobe returns duration, ffmpeg returns WAV buffer
-  mockExecFileAsync.mockImplementation((_cmd: string, args: string[]) => {
-    if (args && args.includes('-show_entries')) {
-      return Promise.resolve({ stdout: '60.0\n', stderr: '' });
+  // Build mock page
+  mockPageOn.mockReturnValue(undefined);
+  mockPageExposeFunction.mockImplementation(async (name: string, fn: (arg: string) => void) => {
+    if (name === 'onVideoChunk') {
+      // Deliver one fake video chunk immediately so chunkBuffers is non-empty
+      fn(fakeChunkBase64);
     }
-    return Promise.resolve({ stdout: Buffer.from('fake-wav-data'), stderr: '' });
   });
+  mockPageGoto.mockResolvedValue(undefined);
+  mockPageAddScriptTag.mockResolvedValue(undefined);
+  mockPageWaitForFunction.mockResolvedValue(undefined);
+  mockPageEvaluate.mockResolvedValue({ width: 1088, height: 704, error: null });
+
+  // Wire up browser chain: launch → context → page
+  const fakePage = {
+    on: (...args: unknown[]) => mockPageOn(...args),
+    exposeFunction: (...args: unknown[]) => mockPageExposeFunction(...args),
+    goto: (...args: unknown[]) => mockPageGoto(...args),
+    addScriptTag: (...args: unknown[]) => mockPageAddScriptTag(...args),
+    waitForFunction: (...args: unknown[]) => mockPageWaitForFunction(...args),
+    evaluate: (...args: unknown[]) => mockPageEvaluate(...args),
+  };
+  mockNewPage.mockResolvedValue(fakePage);
+  mockNewContext.mockResolvedValue({ newPage: mockNewPage });
+  mockBrowserClose.mockResolvedValue(undefined);
+  mockLaunch.mockResolvedValue({ newContext: mockNewContext, close: mockBrowserClose });
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 describe('recordRunwaySession', () => {
-  it('launches browser, sets content, and starts capture', async () => {
-    const browser = getMockBrowser();
-    const page = browser.__page;
+  it('launches headless Chrome, runs browser session, and writes output', async () => {
     const onProgress = vi.fn();
-
-    page.evaluate
-      .mockResolvedValueOnce(undefined)
-      .mockResolvedValueOnce({
-        recordingDone: true,
-        error: null,
-        videoBase64: Buffer.from('fake-video').toString('base64'),
-      });
-
     const result = await recordRunwaySession({
-      credentials: {
-        url: 'wss://demo.livekit.cloud',
-        token: 'lk-token',
-        roomName: 'room-1',
-      },
+      credentials: baseCredentials,
       audioFilePath: '/tmp/speaker.mp3',
       outputVideoPath: '/tmp/output.webm',
       onProgress,
+      _delayMs: { trailing: 0 },
     });
 
     expect(result.videoPath).toBe('/tmp/output.webm');
-    expect(result.durationSeconds).toBe(60.0);
+    expect(result.durationSeconds).toBe(10.0);
     expect(result.width).toBe(1088);
     expect(result.height).toBe(704);
 
-    expect(onProgress).toHaveBeenCalledWith(10);
-    expect(onProgress).toHaveBeenCalledWith(20);
-
+    expect(mockLaunch).toHaveBeenCalledWith(
+      expect.objectContaining({ headless: true }),
+    );
+    expect(mockPageEvaluate).toHaveBeenCalledTimes(1);
     expect(mockWriteFile).toHaveBeenCalledWith(
       '/tmp/output.webm',
       expect.any(Buffer),
     );
+    expect(mockBrowserClose).toHaveBeenCalled();
+    expect(onProgress).toHaveBeenCalledWith(5);
+    expect(onProgress).toHaveBeenCalledWith(10);
+    expect(onProgress).toHaveBeenCalledWith(95);
   });
 
-  it('throws on capture error from page', async () => {
-    const page = getMockBrowser().__page;
+  it('throws when browser session returns no video chunks', async () => {
+    // exposeFunction for onVideoChunk does NOT call callback → chunkBuffers stays empty
+    mockPageExposeFunction.mockResolvedValue(undefined);
 
-    page.evaluate
-      .mockResolvedValueOnce(undefined)
-      .mockResolvedValueOnce({
-        recordingDone: false,
-        error: 'LiveKit connection failed',
-        videoBase64: null,
-      });
-
-    await expect(recordRunwaySession({
-      credentials: { url: 'wss://demo.livekit.cloud', token: 'lk-token', roomName: 'room-1' },
-      audioFilePath: '/tmp/speaker.mp3',
-      outputVideoPath: '/tmp/output.webm',
-    })).rejects.toThrow('Runway capture error: LiveKit connection failed');
+    await expect(
+      recordRunwaySession({
+        credentials: baseCredentials,
+        audioFilePath: '/tmp/speaker.mp3',
+        outputVideoPath: '/tmp/output.webm',
+        _delayMs: { trailing: 0 },
+      }),
+    ).rejects.toThrow('No video chunks received from Runway browser session');
   });
 
-  it('closes browser in finally block even on error', async () => {
-    const browser = getMockBrowser();
-    browser.__page.evaluate.mockRejectedValueOnce(new Error('page crashed'));
+  it('throws when browser session returns an error', async () => {
+    mockPageEvaluate.mockResolvedValue({
+      width: 0,
+      height: 0,
+      error: 'Video track not subscribed within 15s',
+    });
 
-    await expect(recordRunwaySession({
-      credentials: { url: 'wss://demo.livekit.cloud', token: 'lk-token', roomName: 'room-1' },
+    await expect(
+      recordRunwaySession({
+        credentials: baseCredentials,
+        audioFilePath: '/tmp/speaker.mp3',
+        outputVideoPath: '/tmp/output.webm',
+        _delayMs: { trailing: 0 },
+      }),
+    ).rejects.toThrow('Video track not subscribed within 15s');
+  });
+
+  it('reads audio file and passes it as base64 data URL to browser', async () => {
+    await recordRunwaySession({
+      credentials: baseCredentials,
       audioFilePath: '/tmp/speaker.mp3',
       outputVideoPath: '/tmp/output.webm',
-    })).rejects.toThrow();
+      _delayMs: { trailing: 0 },
+    });
 
-    expect(browser.close).toHaveBeenCalled();
+    expect(mockReadFile).toHaveBeenCalledWith('/tmp/speaker.mp3');
+
+    const params = mockPageEvaluate.mock.calls[0][1] as Record<string, unknown>;
+    const expectedDataUrl = `data:audio/mpeg;base64,${fakeAudioBuffer.toString('base64')}`;
+    expect(params.audioDataUrl).toBe(expectedDataUrl);
+    expect(params.credentials).toEqual(baseCredentials);
   });
 });
