@@ -20,6 +20,8 @@ services:
       DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL}
       REDIS_URL: ${REDIS_URL:?Set REDIS_URL}
       WORKER_PROFILE: heavy
+      WORKER_QUEUES: ${WORKER_QUEUES_HEAVY:-}
+      WORKER_EXCLUDE_QUEUES: ${WORKER_EXCLUDE_QUEUES_HEAVY:-}
     command: ['node', '--max-old-space-size=2560', '--import', 'tsx', 'src/workers/index.ts']
     networks:
       - sotto-network
@@ -45,6 +47,8 @@ services:
       DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL}
       REDIS_URL: ${REDIS_URL:?Set REDIS_URL}
       WORKER_PROFILE: pipeline
+      WORKER_QUEUES: ${WORKER_QUEUES_PIPELINE:-}
+      WORKER_EXCLUDE_QUEUES: ${WORKER_EXCLUDE_QUEUES_PIPELINE:-}
     command: ['node', '--max-old-space-size=768', '--import', 'tsx', 'src/workers/index.ts']
     networks:
       - sotto-network
@@ -70,6 +74,8 @@ services:
       DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL}
       REDIS_URL: ${REDIS_URL:?Set REDIS_URL}
       WORKER_PROFILE: light
+      WORKER_QUEUES: ${WORKER_QUEUES_LIGHT:-}
+      WORKER_EXCLUDE_QUEUES: ${WORKER_EXCLUDE_QUEUES_LIGHT:-}
     command: ['node', '--max-old-space-size=512', '--import', 'tsx', 'src/workers/index.ts']
     networks:
       - sotto-network
