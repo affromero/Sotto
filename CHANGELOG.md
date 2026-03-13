@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.16.2] - 2026-03-13
+
+### Added
+- **Video pipeline test bench**: Admin page at `/admin/video-tests` for testing pipeline components in isolation — visual classifier, place resolver, map image generation, AI illustration, and stock footage search
+
 ## [0.16.0] - 2026-03-13
 
 ### Added
