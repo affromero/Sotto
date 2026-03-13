@@ -60,6 +60,7 @@ export enum JobType {
   COMPOSE_DEMO = 'compose_demo',
   COMPOSE_DEMO_SCENE = 'compose_demo_scene',
   GENERATE_MUSIC = 'generate_music',
+  LIP_SYNC_TEST = 'lip_sync_test',
 }
 
 /**
@@ -963,6 +964,14 @@ export const visualGenerationQueue = createQueue('visual-generation', { attempts
 export const transitionGenerationQueue = createQueue('transition-generation', { attempts: 3 });
 export const videoCompositionQueue = createQueue('video-composition', { attempts: 2 });
 export const avatarGenerationQueue = createQueue('avatar-generation', { attempts: 2 });
+
+export interface LipSyncTestPayload {
+  userId: string;
+  audioUrl: string;
+  avatarImageUrl: string;
+  avatarModelId: string;
+}
+export const lipSyncTestQueue = createQueue('lip-sync-test', { attempts: 1 });
 export const placeEnrichmentQueue = createQueue('place-enrichment', { attempts: 2 });
 export const newsIngestQueue = createQueue('news-ingest', { attempts: 2, skipEvents: true });
 export const demoScriptQueue = createQueue('demo-script', { attempts: 2 });
@@ -1022,4 +1031,5 @@ export const ALL_QUEUE_NAMES = [
   'demo-composition',
   'demo-scene-composition',
   'music-generation',
+  'lip-sync-test',
 ] as const;

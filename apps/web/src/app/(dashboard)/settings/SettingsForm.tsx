@@ -18,6 +18,7 @@ import type { MusicProviderClientMeta } from '@/lib/providers/music-registry';
 import { TtsProviderCards } from '@/components/settings/TtsProviderCards';
 import { AiProviderCards } from '@/components/settings/AiProviderCards';
 import { MusicProviderCards } from '@/components/settings/MusicProviderCards';
+import { LipSyncTester } from '@/components/settings/LipSyncTester';
 import { ThemeSelector } from '@/components/settings/ThemeSelector';
 import { usePushSubscription } from '@/lib/hooks/usePushSubscription';
 import styles from './page.module.css';
@@ -916,6 +917,15 @@ export function SettingsForm({
           Keys are encrypted with AES-256-GCM.
         </p>
         <MusicProviderCards initialConfigured={configuredMusicProviders} providerMeta={musicProviderMeta} />
+      </section>
+
+      {/* Lip-Sync Tester */}
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>Avatar Lip-Sync</h2>
+        <p className={styles.sectionDesc}>
+          Test lip-sync models by generating audio from text, selecting an avatar image, and generating a lip-synced video.
+        </p>
+        <LipSyncTester />
       </section>
 
       {/* Reset Recommendations */}
