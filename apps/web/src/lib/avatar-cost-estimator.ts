@@ -24,18 +24,29 @@ function mapAvatarModel(m: AvatarModelPricing): AvatarModelInfo {
   };
 }
 
-const LOCAL_AVATAR_PRICING: AvatarModelInfo[] = [
-  { modelId: 'fal-veed-fabric-1.0', displayName: 'VEED Fabric 1.0', costPerMinute: 4.80, avatarType: 'lip-sync', maxDuration: 300 },
-  { modelId: 'fal-kling-avatar-v2-pro', displayName: 'Kling Avatar v2 Pro', costPerMinute: 0.168, avatarType: 'lip-sync', maxDuration: 60 },
-];
+/** Maps registry model IDs to pricetoken model IDs where they differ. */
+const PRICETOKEN_AVATAR_MAP: Record<string, string> = {
+  'fal-veed-fabric-1.0': 'fal-veed-fabric-1-480p',
+  'fal-kling-avatar-v2-pro': 'fal-kling-lipsync-t2v',
+};
+
+function mapPricetokenToRegistry(pricetokenId: string, knownIds: Set<string>): string | null {
+  if (knownIds.has(pricetokenId)) return pricetokenId;
+  for (const [registryId, ptId] of Object.entries(PRICETOKEN_AVATAR_MAP)) {
+    if (ptId === pricetokenId && knownIds.has(registryId)) return registryId;
+  }
+  return null;
+}
 
 function staticAvatarModels(): AvatarModelInfo[] {
   const knownIds = getAllAvatarModelIds();
-  const fromPricetoken = STATIC_AVATAR_PRICING
-    .filter((m) => knownIds.has(m.modelId))
-    .map(mapAvatarModel);
-  const localFiltered = LOCAL_AVATAR_PRICING.filter((m) => knownIds.has(m.modelId));
-  return [...fromPricetoken, ...localFiltered];
+  return STATIC_AVATAR_PRICING
+    .map((m) => {
+      const registryId = mapPricetokenToRegistry(m.modelId, knownIds);
+      if (!registryId) return null;
+      return { ...mapAvatarModel(m), modelId: registryId };
+    })
+    .filter((m): m is AvatarModelInfo => m !== null);
 }
 
 /** Fetch avatar models from all providers with live pricing from pricetoken. */
@@ -55,8 +66,12 @@ export async function fetchAvatarModels(): Promise<AvatarModelInfo[]> {
     ]);
     const all = [...heygenModels, ...falModels, ...runwayModels];
     const models = all
-      .filter((m) => knownIds.has(m.modelId))
-      .map(mapAvatarModel);
+      .map((m) => {
+        const registryId = mapPricetokenToRegistry(m.modelId, knownIds);
+        if (!registryId) return null;
+        return { ...mapAvatarModel(m), modelId: registryId };
+      })
+      .filter((m): m is AvatarModelInfo => m !== null);
 
     if (models.length > 0) {
       avatarCache = { data: models, expiresAt: now + CACHE_TTL_MS };
