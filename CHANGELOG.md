@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.17.0] - 2026-03-13
+
+### Added
+- **Expanded admin model tester**: Test page now covers 7 provider categories — AI, TTS, STT, Image, Video, Avatar, and Music — with image preview for image/avatar tests and key validation for all providers
+- **Avatar daily limits**: Independent `dailyAvatarLimit` / `dailyAvatarLimitPro` fields in AutoModelConfig, decoupled from video limits
+- **Historical map enrichment**: Place enrichment searches David Rumsey Map Collection for historical maps; MapSlide composition crossfades between historical and modern views
+- **Remotion-rendered video previews**: Video test bench renders still frames via Remotion sidecar for visual verification
+
+### Fixed
+- Avatar generation gate now uses avatar-specific daily limits instead of falling back to video limits
+- Maps submodule updated to initial release with place resolver and map components
+
 ## [0.16.2] - 2026-03-13
 
 ### Added
