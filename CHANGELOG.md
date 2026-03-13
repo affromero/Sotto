@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.18.0] - 2026-03-13
+
+### Added
+- **Video clip previews in test bench**: All VideoTestBench previews now render short looping MP4 clips instead of static still frames, fixing blank previews for animated compositions (DATA_CHART, MAP_OVERLAY)
+- **Remotion `/clip` endpoint**: New sidecar route renders short MP4 clips via `renderMedia` with CRF 28 and concurrency limiter (max 3 simultaneous renders)
+- **Video generation in model test panel**: Model tester generates real videos via provider APIs
+
+### Changed
+- Stock footage preview now uses the actual Pexels video URL instead of the thumbnail image
+- Removed frame strip / historical crossfade preview from map section (redundant — video clips show the full animation)
+
 ## [0.17.0] - 2026-03-13
 
 ### Added
