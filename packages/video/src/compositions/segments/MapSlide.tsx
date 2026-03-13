@@ -1,6 +1,13 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { AbsoluteFill, Img, useCurrentFrame, useVideoConfig, interpolate } from 'remotion';
 import type { VideoSegment } from '../../types';
+
+interface AntiqueMapResult {
+  title: string;
+  date: string;
+  thumbnailUrl: string;
+  viewUrl: string;
+}
 
 interface MapSlideProps {
   segment: VideoSegment;
@@ -9,6 +16,8 @@ interface MapSlideProps {
 export const MapSlide: React.FC<MapSlideProps> = ({ segment }) => {
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
+  const [historicalImgError, setHistoricalImgError] = useState(false);
+
   const metadata = segment.metadata as {
     places?: Array<{
       name: string;
@@ -17,21 +26,60 @@ export const MapSlide: React.FC<MapSlideProps> = ({ segment }) => {
       historicalContext?: Array<{ periodName: string }>;
     }>;
     preset?: string;
+    historicalMaps?: AntiqueMapResult[];
   } | undefined;
+
   const place = metadata?.places?.[0];
   const placeName = place?.name ?? '';
   const subtitle = place?.historicalContext?.[0]?.periodName ?? place?.modernRegion ?? '';
   const isHighConfidence = (place?.confidence ?? 1) >= 0.7;
+
+  const historicalMap = metadata?.historicalMaps?.[0];
+  const hasHistorical = !!historicalMap && !historicalImgError;
+
+  // Crossfade timeline (as frame counts)
+  const crossfadeStart = Math.floor(durationInFrames * 0.4);
+  const crossfadeEnd = Math.floor(durationInFrames * 0.6);
 
   // Ken Burns: slow zoom in over the duration
   const scale = interpolate(frame, [0, durationInFrames], [1, 1.08], {
     extrapolateRight: 'clamp',
   });
 
+  // Historical map: separate Ken Burns starting from crossfade midpoint
+  const historicalScale = interpolate(
+    frame,
+    [crossfadeStart, durationInFrames],
+    [1, 1.08],
+    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
+  );
+
   // Fade in
   const opacity = interpolate(frame, [0, Math.min(fps * 0.5, durationInFrames)], [0, 1], {
     extrapolateRight: 'clamp',
   });
+
+  // Crossfade: modern fades out, historical fades in during 40-60% of duration
+  const modernOpacity = hasHistorical
+    ? interpolate(frame, [crossfadeStart, crossfadeEnd], [1, 0], {
+        extrapolateLeft: 'clamp',
+        extrapolateRight: 'clamp',
+      })
+    : 1;
+
+  const historicalOpacity = hasHistorical
+    ? interpolate(frame, [crossfadeStart, crossfadeEnd], [0, 1], {
+        extrapolateLeft: 'clamp',
+        extrapolateRight: 'clamp',
+      })
+    : 0;
+
+  // Annotation: show place name for modern portion, switch to historical map title/date after crossfade
+  const isHistoricalPhase = hasHistorical && frame >= crossfadeEnd;
+  const annotationTitle = isHistoricalPhase ? historicalMap!.title : placeName;
+  const annotationSubtitle = isHistoricalPhase
+    ? historicalMap!.date
+    : subtitle;
 
   // Annotation fade-in (delayed)
   const annotationOpacity = interpolate(
@@ -43,12 +91,26 @@ export const MapSlide: React.FC<MapSlideProps> = ({ segment }) => {
 
   return (
     <AbsoluteFill style={{ backgroundColor: '#1a1a2e' }}>
+      {/* Modern map layer */}
       {segment.assetUrl && (
-        <AbsoluteFill style={{ opacity, transform: `scale(${scale})` }}>
+        <AbsoluteFill style={{ opacity: opacity * modernOpacity, transform: `scale(${scale})` }}>
           <Img src={segment.assetUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         </AbsoluteFill>
       )}
-      {placeName && (
+
+      {/* Historical map layer (crossfaded on top) */}
+      {hasHistorical && (
+        <AbsoluteFill style={{ opacity: opacity * historicalOpacity, transform: `scale(${historicalScale})` }}>
+          <Img
+            src={historicalMap!.thumbnailUrl}
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            onError={() => setHistoricalImgError(true)}
+          />
+        </AbsoluteFill>
+      )}
+
+      {/* Annotation label */}
+      {annotationTitle && (
         <div
           style={{
             position: 'absolute',
@@ -63,11 +125,11 @@ export const MapSlide: React.FC<MapSlideProps> = ({ segment }) => {
           }}
         >
           <div style={{ fontFamily: 'DM Serif Display, serif', fontSize: 28 }}>
-            {placeName}
+            {annotationTitle}
           </div>
-          {subtitle && (
+          {annotationSubtitle && (
             <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 16, color: '#9CA3AF', marginTop: 4 }}>
-              {subtitle}
+              {annotationSubtitle}
             </div>
           )}
         </div>
