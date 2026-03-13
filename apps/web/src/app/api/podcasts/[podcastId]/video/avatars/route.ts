@@ -12,7 +12,7 @@ import { getAutoModelConfig } from '@/lib/auto-model-config';
 import { deleteFile, extractR2Key } from '@/lib/r2';
 import { addJob, JobType, avatarGenerationQueue } from '@/lib/queue';
 import { logger } from '@/lib/logger';
-import { createRedisConnection } from '@/lib/redis';
+import { cache } from '@/lib/redis';
 
 type RouteParams = { params: Promise<{ podcastId: string }> };
 
@@ -69,14 +69,13 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
   const pricingMeta = { costPerMinute, includedOnPlatform };
 
-  // Check Redis cache
-  const redis = createRedisConnection('avatar-cache');
+  // Check Redis cache (uses module-level singleton — no new connections)
   const cacheKey = `avatars:${provider}:${podcastId}`;
   try {
-    const cached = await redis.get(cacheKey);
+    const cached = await cache.get(cacheKey);
     if (cached) {
       return NextResponse.json({
-        avatars: JSON.parse(cached),
+        avatars: cached,
         providers: {
           heygen: !!process.env.HEYGEN_API_KEY,
           runway: !!process.env.RUNWAY_API_KEY,
@@ -94,7 +93,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     // Cache for 1 hour
     try {
-      await redis.set(cacheKey, JSON.stringify(avatars), 'EX', 3600);
+      await cache.set(cacheKey, avatars, 3600);
     } catch {
       // Non-critical cache write failure
     }
