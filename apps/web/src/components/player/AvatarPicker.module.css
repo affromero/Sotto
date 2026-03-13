@@ -274,6 +274,30 @@
   cursor: not-allowed;
 }
 
+.falModelRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 24px 0;
+}
+
+.falModelLabel {
+  font-size: 12px;
+  color: #999;
+  white-space: nowrap;
+}
+
+.falModelSelect {
+  flex: 1;
+  padding: 6px 10px;
+  background: #2a2a2a;
+  color: #ccc;
+  border: 1px solid #444;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
 .providerTabs {
   display: flex;
   gap: 4px;
@@ -301,6 +325,26 @@
   border-color: #d97706;
   color: #d97706;
   background: #332a1a;
+}
+
+.providerTabDisabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.providerTabDisabled:hover {
+  color: #999;
+  border-color: #444;
+}
+
+.notReadyBadge {
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: #dc2626;
+  color: white;
+  margin-left: 4px;
+  font-weight: 600;
 }
 
 .providerBadge {

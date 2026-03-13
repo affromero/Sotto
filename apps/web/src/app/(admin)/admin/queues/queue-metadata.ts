@@ -220,4 +220,8 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
     description: 'Generates AI background music for podcasts via Suno or ElevenLabs',
     stage: 'Music Pipeline',
   },
+  'lip-sync-test': {
+    description: 'Tests lip-sync models with a short audio clip and avatar image via fal.ai',
+    stage: 'Video Pipeline',
+  },
 };

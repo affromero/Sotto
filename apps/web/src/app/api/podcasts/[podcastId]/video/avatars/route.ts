@@ -6,6 +6,7 @@ import { errorResponse } from '@/lib/api-response';
 import { checkAvatarGenerationGate, tryIncrementAvatarGeneration } from '@/lib/video-gate';
 import { configureAvatarsSchema } from '@/lib/validations';
 import { listUnifiedAvatars } from '@/lib/providers/avatar';
+import type { AvatarProviderId } from '@/lib/providers/avatar-registry';
 import { fetchAvatarModels } from '@/lib/avatar-cost-estimator';
 import { getAutoModelConfig } from '@/lib/auto-model-config';
 import { deleteFile, extractR2Key } from '@/lib/r2';
@@ -34,9 +35,14 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     return errorResponse(message, gate.reason === 'daily_limit_reached' ? 429 : 403, { code: gate.reason });
   }
 
-  const provider = (request.nextUrl.searchParams.get('provider') ?? 'heygen') as 'heygen' | 'runway';
+  const provider = (request.nextUrl.searchParams.get('provider') ?? 'heygen') as AvatarProviderId;
 
-  const apiKey = provider === 'runway' ? process.env.RUNWAY_API_KEY : process.env.HEYGEN_API_KEY;
+  const apiKeyMap: Record<AvatarProviderId, string | undefined> = {
+    heygen: process.env.HEYGEN_API_KEY,
+    runway: process.env.RUNWAY_API_KEY,
+    fal: process.env.FAL_KEY,
+  };
+  const apiKey = apiKeyMap[provider];
   if (!apiKey) return errorResponse('Avatar generation is not configured', 503);
 
   // Fetch pricing + config in parallel with avatar list
@@ -74,6 +80,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         providers: {
           heygen: !!process.env.HEYGEN_API_KEY,
           runway: !!process.env.RUNWAY_API_KEY,
+          fal: !!process.env.FAL_KEY,
         },
         pricing: pricingMeta,
       });
@@ -83,7 +90,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   }
 
   try {
-    const avatars = await listUnifiedAvatars(apiKey, provider);
+    const avatars = await listUnifiedAvatars(apiKey, provider, authResult.userId);
 
     // Cache for 1 hour
     try {
@@ -167,15 +174,19 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         create: {
           videoGenerationId: videoGeneration.id,
           speaker: avatar.speaker,
-          avatarId: avatar.avatarId,
+          avatarId: avatar.avatarId ?? '',
           avatarProvider: avatar.avatarProvider ?? null,
+          avatarImageUrl: avatar.avatarImageUrl ?? null,
+          avatarModelId: avatar.avatarModelId ?? null,
           enabledSegmentIds: avatar.enabledSegmentIds ?? [],
           voiceTrackId: avatar.voiceTrackId ?? null,
           status: 'pending',
         },
         update: {
-          avatarId: avatar.avatarId,
+          avatarId: avatar.avatarId ?? '',
           avatarProvider: avatar.avatarProvider ?? null,
+          avatarImageUrl: avatar.avatarImageUrl ?? null,
+          avatarModelId: avatar.avatarModelId ?? null,
           enabledSegmentIds: avatar.enabledSegmentIds ?? [],
           voiceTrackId: avatar.voiceTrackId ?? null,
           status: 'pending',
@@ -185,6 +196,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           runwaySessionId: null,
           runwayChunkIndex: null,
           runwayTotalChunks: null,
+          falRequestId: null,
+          falChunkIndex: null,
+          falTotalChunks: null,
           maskShape: null,
           failureReason: null,
         },
@@ -222,13 +236,16 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     for (const overlay of overlays) {
       const avatarConfig = parsed.data.avatars.find((a) => a.speaker === overlay.speaker);
+      const resolvedProvider = overlay.avatarProvider ?? avatarConfig?.avatarProvider ?? 'heygen';
       await addJob(avatarGenerationQueue, JobType.GENERATE_AVATAR, {
         podcastId,
         videoGenerationId: videoGeneration.id,
         avatarOverlayId: overlay.id,
         speaker: overlay.speaker,
         avatarId: overlay.avatarId,
-        avatarProvider: (overlay.avatarProvider ?? avatarConfig?.avatarProvider ?? 'heygen') as 'heygen' | 'runway',
+        avatarProvider: resolvedProvider as 'heygen' | 'runway' | 'fal',
+        avatarImageUrl: overlay.avatarImageUrl ?? avatarConfig?.avatarImageUrl ?? undefined,
+        avatarModelId: overlay.avatarModelId ?? avatarConfig?.avatarModelId ?? undefined,
         isPreset: avatarConfig?.isPreset,
         voiceTrackId: overlay.voiceTrackId ?? undefined,
       });
