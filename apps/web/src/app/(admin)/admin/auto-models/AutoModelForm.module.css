@@ -87,7 +87,7 @@
   cursor: not-allowed;
 }
 
-/* Included Models Editor */
+/* Unified Model Editor */
 
 .defaultsHint {
   font: var(--text-body-sm);
@@ -149,7 +149,7 @@
   letter-spacing: 0.05em;
 }
 
-.checkboxHeader {
+.tierHeader {
   font: var(--text-body-xs, 0.75rem/1 Inter, sans-serif);
   font-weight: 600;
   color: var(--color-text-tertiary);
@@ -191,29 +191,52 @@
   font-variant-numeric: tabular-nums;
 }
 
-.defaultBadge {
-  font: var(--text-body-xs, 0.75rem/1 Inter, sans-serif);
-  color: var(--color-primary);
-  background: var(--color-primary-subtle);
-  padding: 2px 6px;
-  border-radius: var(--radius-sm);
-  white-space: nowrap;
-}
+/* Tri-state toggle */
 
-.checkboxCell {
+.triToggleCell {
   display: flex;
   justify-content: center;
   align-items: center;
-  cursor: pointer;
   min-height: 44px;
   min-width: 44px;
 }
 
-.checkbox {
-  width: 18px;
-  height: 18px;
+.triToggle {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--color-border);
+  background: transparent;
   cursor: pointer;
-  accent-color: var(--color-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  color: transparent;
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+
+.triToggle:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.triToggleEnabled {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: white;
+}
+
+.triToggleDefault {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: white;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .triToggle {
+    transition: none;
+  }
 }
 
 .clearButton {
