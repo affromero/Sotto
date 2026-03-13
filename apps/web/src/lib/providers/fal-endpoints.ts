@@ -123,7 +123,7 @@ const AVATAR_ENDPOINTS: Record<string, string> = {
 
 export const LIP_SYNC_CONFIG: Record<string, { maxAudioSeconds: number; outputFormat: string; defaultPrompt?: string }> = {
   'fal-veed-fabric-1.0': { maxAudioSeconds: 300, outputFormat: 'mp4' },
-  'fal-kling-avatar-v2-pro': { maxAudioSeconds: 60, outputFormat: 'mp4', defaultPrompt: '.' },
+  'fal-kling-avatar-v2-pro': { maxAudioSeconds: 60, outputFormat: 'mp4', defaultPrompt: 'A person speaking to camera' },
 };
 
 export function getFalAvatarEndpoint(modelId: string): string | null {
