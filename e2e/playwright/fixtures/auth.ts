@@ -1,4 +1,4 @@
-import { test as base, type BrowserContext } from '@playwright/test';
+import { test as base, type BrowserContext, type APIRequestContext } from '@playwright/test';
 import { seedTestUser } from '../helpers/seed';
 
 /**
@@ -22,6 +22,7 @@ async function getSeedData() {
 
 export const test = base.extend<{
   authedContext: BrowserContext;
+  authedRequest: APIRequestContext;
   seedData: Awaited<ReturnType<typeof seedTestUser>>;
 }>({
   seedData: async ({}, use) => {
@@ -43,6 +44,17 @@ export const test = base.extend<{
     ]);
     await use(context);
     await context.close();
+  },
+  authedRequest: async ({ playwright }, use) => {
+    const { sessionToken } = await getSeedData();
+    const context = await playwright.request.newContext({
+      baseURL: 'http://localhost:3000',
+      extraHTTPHeaders: {
+        Cookie: `authjs.session-token=${sessionToken}`,
+      },
+    });
+    await use(context);
+    await context.dispose();
   },
 });
 
