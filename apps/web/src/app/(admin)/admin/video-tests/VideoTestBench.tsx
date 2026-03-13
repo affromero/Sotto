@@ -84,6 +84,7 @@ function PreviewButton({
             loop
             muted
             playsInline
+            controls
             className={styles.videoPreview}
           />
           {preview.latencyMs !== undefined && (
@@ -469,6 +470,7 @@ function ClassifierSection({
                         loop
                         muted
                         playsInline
+                        controls
                         className={styles.previewAllVideo}
                       />
                     ) : seg.error ? (
@@ -1128,15 +1130,16 @@ export function VideoTestBench({ envAvailability, mapPresets, imageModels, aiPro
 
   const previewStockFootage = useCallback(async () => {
     const stockResult = results['stock-footage'];
-    const stock = stockResult.data?.result as { url: string; photographer: string } | null | undefined;
+    const stock = stockResult.data?.result as { url: string; thumbnailUrl: string; photographer: string } | null | undefined;
     if (!stock) return;
 
     setPreviews((prev) => ({ ...prev, 'stock-footage': { loading: true } }));
     try {
+      // Use thumbnailUrl (image) instead of url (video) — ImageSlide uses Remotion Img which only loads images
       const result = await renderClip({
         visualType: 'STOCK_FOOTAGE',
         text: 'Stock Footage',
-        assetUrl: stock.url,
+        assetUrl: stock.thumbnailUrl,
         metadata: { photographer: stock.photographer },
       });
       setPreviews((prev) => ({ ...prev, 'stock-footage': { loading: false, ...result } }));

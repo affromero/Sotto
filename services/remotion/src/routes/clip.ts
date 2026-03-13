@@ -5,14 +5,33 @@ import path from 'path';
 import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import type { VideoSegment } from '@sotto/video';
-import { DEFAULT_RENDER_CONFIG } from '@sotto/video';
 import { getBundlePath } from './render';
 
 export const clipRouter = Router();
 
+/** Directory for temp assets extracted from base64 data URIs. */
+export const TMP_ASSETS_DIR = path.join(os.tmpdir(), 'sotto-tmp-assets');
+fs.mkdirSync(TMP_ASSETS_DIR, { recursive: true });
+
 /** Simple concurrency limiter — max 3 clip renders at a time. */
 let activeClips = 0;
 const MAX_CONCURRENT_CLIPS = 3;
+
+/**
+ * Extract base64 data URI to a temp file and return a local HTTP URL.
+ * renderMedia serializes inputProps to each frame worker; data URIs >200KB
+ * cause blank renders. Writing to disk and serving via Express avoids this.
+ */
+function extractDataUri(dataUri: string, port: number): { localUrl: string; filePath: string } {
+  const matches = dataUri.match(/^data:([^;]+);base64,(.+)$/);
+  if (!matches) throw new Error('Invalid data URI');
+  const mime = matches[1];
+  const ext = mime.includes('png') ? '.png' : mime.includes('jpeg') || mime.includes('jpg') ? '.jpg' : '.bin';
+  const fileName = `${uuidv4()}${ext}`;
+  const filePath = path.join(TMP_ASSETS_DIR, fileName);
+  fs.writeFileSync(filePath, Buffer.from(matches[2], 'base64'));
+  return { localUrl: `http://localhost:${port}/tmp-assets/${fileName}`, filePath };
+}
 
 /**
  * POST /clip — render a short MP4 clip of a programmatic composition.
@@ -41,10 +60,19 @@ clipRouter.post('/', async (req, res) => {
 
   activeClips++;
   const outputPath = path.join(os.tmpdir(), `sotto-clip-${uuidv4()}.mp4`);
+  let tmpAssetPath: string | undefined;
 
   try {
     // Set segment.duration so calculateMetadata computes correct durationInFrames
     segment.duration = durationSeconds;
+
+    // Extract base64 data URIs to temp files to avoid >200KB inputProps limit
+    const port = parseInt(process.env.PORT ?? '3100', 10);
+    if (segment.assetUrl?.startsWith('data:')) {
+      const extracted = extractDataUri(segment.assetUrl, port);
+      segment.assetUrl = extracted.localUrl;
+      tmpAssetPath = extracted.filePath;
+    }
 
     const serveUrl = await getBundlePath();
 
@@ -78,5 +106,9 @@ clipRouter.post('/', async (req, res) => {
     res.status(500).json({ error: message });
   } finally {
     activeClips--;
+    // Clean up extracted asset
+    if (tmpAssetPath) {
+      try { fs.unlinkSync(tmpAssetPath); } catch { /* ignore */ }
+    }
   }
 });
