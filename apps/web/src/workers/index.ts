@@ -72,6 +72,7 @@ import { isR2MonitoringConfigured } from '@/lib/cloudflare-r2-usage';
 import { startPricingRefreshInterval } from '@/lib/pricing';
 
 const WORKER_PROFILE = process.env.WORKER_PROFILE || 'all';
+const WORKER_PRESET = process.env.WORKER_PRESET || 'full';
 const WORKER_QUEUE_FILTER = new Set(
   (process.env.WORKER_QUEUES || '')
     .split(',')
@@ -117,9 +118,21 @@ const PIPELINE_WORKERS = new Set([
   'voice-track-stitching',
 ]);
 
-function shouldRun(name: string): boolean {
-  if (WORKER_QUEUE_FILTER.size > 0 && !WORKER_QUEUE_FILTER.has(name)) return false;
-  if (WORKER_QUEUE_EXCLUDE_FILTER.has(name)) return false;
+const CORE_WORKERS = new Set([
+  'audio-generation',
+  'audio-stitching',
+  'content-extraction',
+  'script-generation',
+  'script-verification',
+  'reference-validation',
+  'interactions',
+  'segment-regeneration',
+  'audio-import',
+  'notifications',
+]);
+let hasWarnedOnUnknownPreset = false;
+
+function matchesProfile(name: string): boolean {
   if (WORKER_PROFILE === 'all') return true;
   if (WORKER_PROFILE === 'heavy') return HEAVY_WORKERS.has(name);
   if (WORKER_PROFILE === 'pipeline') return PIPELINE_WORKERS.has(name);
@@ -127,8 +140,26 @@ function shouldRun(name: string): boolean {
   return true;
 }
 
+function matchesPreset(name: string): boolean {
+  if (WORKER_PRESET === 'full') return true;
+  if (WORKER_PRESET === 'core') return CORE_WORKERS.has(name);
+  if (!hasWarnedOnUnknownPreset) {
+    logger.warn('Unknown worker preset, defaulting to full queue set', { preset: WORKER_PRESET });
+    hasWarnedOnUnknownPreset = true;
+  }
+  return true;
+}
+
+function shouldRun(name: string): boolean {
+  if (!matchesProfile(name)) return false;
+  if (WORKER_QUEUE_EXCLUDE_FILTER.has(name)) return false;
+  if (WORKER_QUEUE_FILTER.size > 0) return WORKER_QUEUE_FILTER.has(name);
+  return matchesPreset(name);
+}
+
 logger.info('Starting Sotto workers...', {
   profile: WORKER_PROFILE,
+  preset: WORKER_PRESET,
   includeQueues: WORKER_QUEUE_FILTER.size > 0 ? Array.from(WORKER_QUEUE_FILTER) : 'all',
   excludeQueues: WORKER_QUEUE_EXCLUDE_FILTER.size > 0 ? Array.from(WORKER_QUEUE_EXCLUDE_FILTER) : [],
 });
