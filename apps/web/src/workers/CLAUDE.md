@@ -84,7 +84,7 @@ Video pipeline (post-READY, PRO/admin only):
 
 ## Centralized Failure Handler
 
-`queue.ts` includes a centralized `setupQueueEvents()` handler that:
+`queue.ts`'s `createWorker()` wires a centralized `'failed'` event handler on every Worker that:
 
 1. Catches all terminal job failures across all queues
 2. Calls `markPodcastFailed(podcastId)` which records `failedAtStatus` (the status the podcast was in when it failed) and sets status to `FAILED`

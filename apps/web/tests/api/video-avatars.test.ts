@@ -78,10 +78,10 @@ vi.mock('@/lib/r2', () => ({
 }));
 
 vi.mock('@/lib/redis', () => ({
-  createRedisConnection: () => ({
+  cache: {
     get: (...args: unknown[]) => mockRedisGet(...args),
     set: (...args: unknown[]) => mockRedisSet(...args),
-  }),
+  },
 }));
 
 vi.mock('@/lib/validations', async () => {
@@ -137,7 +137,7 @@ describe('GET /api/podcasts/[podcastId]/video/avatars', () => {
     const { GET } = await import('@/app/api/podcasts/[podcastId]/video/avatars/route');
     mockCheckAvatarGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', dailyUsed: 0, dailyLimit: 1, dailyRemaining: 1, isByokUser: false, isProUser: false });
     const cached = [{ id: 'av-1', name: 'Test', provider: 'heygen' }];
-    mockRedisGet.mockResolvedValue(JSON.stringify(cached));
+    mockRedisGet.mockResolvedValue(cached);
 
     const res = await GET(makeGet('http://localhost/api/podcasts/pod-1/video/avatars'), routeParams);
     expect(res.status).toBe(200);
