@@ -60,6 +60,7 @@ export enum JobType {
   COMPOSE_DEMO = 'compose_demo',
   COMPOSE_DEMO_SCENE = 'compose_demo_scene',
   GENERATE_MUSIC = 'generate_music',
+  LIP_SYNC_TEST = 'lip_sync_test',
 }
 
 /**
@@ -314,7 +315,9 @@ export interface GenerateAvatarPayload {
   avatarOverlayId: string;
   speaker: string;
   avatarId: string;
-  avatarProvider?: 'heygen' | 'runway';
+  avatarProvider?: 'heygen' | 'runway' | 'fal';
+  avatarImageUrl?: string;
+  avatarModelId?: string;
   isPreset?: boolean;
   voiceTrackId?: string;
 }
@@ -418,6 +421,7 @@ const QUEUE_DEFINITIONS: Record<string, QueueDefinition> = {
   'demo-composition': { attempts: 2 },
   'demo-scene-composition': { attempts: 2 },
   'music-generation': { attempts: 3 },
+  'lip-sync-test': { attempts: 1 },
 };
 
 const queueInstances = new Map<string, Queue>();
@@ -1047,6 +1051,13 @@ export const visualGenerationQueue = createQueueReference('visual-generation');
 export const transitionGenerationQueue = createQueueReference('transition-generation');
 export const videoCompositionQueue = createQueueReference('video-composition');
 export const avatarGenerationQueue = createQueueReference('avatar-generation');
+export interface LipSyncTestPayload {
+  userId: string;
+  audioUrl: string;
+  avatarImageUrl: string;
+  avatarModelId: string;
+}
+export const lipSyncTestQueue = createQueueReference('lip-sync-test');
 export const placeEnrichmentQueue = createQueueReference('place-enrichment');
 export const newsIngestQueue = createQueueReference('news-ingest');
 export const demoScriptQueue = createQueueReference('demo-script');

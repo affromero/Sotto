@@ -883,8 +883,10 @@ export const redeemInvitationSchema = z.object({
 export const configureAvatarsSchema = z.object({
   avatars: z.array(z.object({
     speaker: z.string().min(1).max(50),
-    avatarId: z.string().min(1),
-    avatarProvider: z.enum(['heygen', 'runway']).optional(),
+    avatarId: z.string().min(1).optional(),
+    avatarProvider: z.enum(['heygen', 'runway', 'fal']).optional(),
+    avatarImageUrl: z.string().url().optional(),
+    avatarModelId: z.string().optional(),
     isPreset: z.boolean().optional(),
     enabledSegmentIds: z.array(z.string()).optional(),
     voiceTrackId: z.string().optional(),
@@ -907,6 +909,15 @@ export const updateAvatarPositionsSchema = z.object({
  */
 export const generateMusicSchema = z.object({
   model: z.string().max(100).optional(),
+});
+
+export const avatarImageUploadSchema = z.object({
+  name: z.string().min(1).max(100),
+});
+
+export const avatarImageGenerateSchema = z.object({
+  name: z.string().min(1).max(100),
+  prompt: z.string().min(1).max(1000),
 });
 
 export const updateMusicVolumeSchema = z.object({

@@ -208,6 +208,9 @@ model User {
   // Demo projects (admin video studio)
   demoProjects DemoProject[]
 
+  // Avatar images (lip-sync)
+  avatarImages AvatarImage[]
+
   @@index([role])
   @@index([handle])
   @@index([referredById])
@@ -2267,6 +2270,11 @@ model AvatarOverlay {
   failureReason     String?  @db.Text
   durationSeconds   Float?
   avatarProvider    String?
+  avatarImageUrl    String?
+  avatarModelId     String?
+  falRequestId      String?
+  falChunkIndex     Int?
+  falTotalChunks    Int?
   maskShape         String?
   runwaySessionId      String?
   runwayChunkIndex     Int?
@@ -2288,6 +2296,26 @@ model AvatarOverlay {
   @@unique([videoGenerationId, speaker])
   @@index([videoGenerationId])
   @@index([voiceTrackId])
+}
+
+enum AvatarImageSource {
+  UPLOAD
+  GENERATED
+  DEFAULT
+}
+
+model AvatarImage {
+  id         String            @id @default(cuid())
+  userId     String
+  user       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name       String
+  imageUrl   String
+  sourceType AvatarImageSource
+  prompt     String?           @db.Text
+  createdAt  DateTime          @default(now())
+
+  @@unique([userId, name])
+  @@index([userId])
 }
 
 // ============ NEWS INGESTION ============

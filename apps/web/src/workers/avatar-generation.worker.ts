@@ -60,6 +60,9 @@ async function fetchAvatarSegments(opts: {
 
 export async function processAvatarGeneration(job: Job<GenerateAvatarPayload>): Promise<void> {
   const provider = job.data.avatarProvider ?? 'heygen';
+  if (provider === 'fal') {
+    return processFalLipSync(job);
+  }
   if (provider === 'runway') {
     return processRunwayAvatar(job);
   }
@@ -239,6 +242,236 @@ async function processHeyGenAvatar(job: Job<GenerateAvatarPayload>): Promise<voi
       logger.error('Non-retryable HeyGen error, stopping retries', { message, avatarOverlayId });
       throw new UnrecoverableError(message);
     }
+
+    throw err;
+  } finally {
+    await rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
+// ── Fal lip-sync path (VEED Fabric / Kling Avatar) ──
+
+async function processFalLipSync(job: Job<GenerateAvatarPayload>): Promise<void> {
+  const { podcastId, videoGenerationId, avatarOverlayId, speaker, voiceTrackId, avatarImageUrl, avatarModelId } = job.data;
+
+  logger.info('Starting Fal lip-sync avatar generation', { podcastId, speaker, avatarModelId });
+
+  const overlay = await prisma.avatarOverlay.findUnique({
+    where: { id: avatarOverlayId },
+  });
+
+  if (!overlay) {
+    logger.warn('AvatarOverlay not found, skipping', { avatarOverlayId });
+    return;
+  }
+
+  if (overlay.videoUrl) {
+    logger.info('Avatar overlay already has video, skipping', { avatarOverlayId });
+    await checkAllAvatarsReady(videoGenerationId, podcastId);
+    return;
+  }
+
+  const apiKey = process.env.FAL_KEY;
+  if (!apiKey) {
+    throw new Error('FAL_KEY is not configured');
+  }
+
+  if (!avatarImageUrl) {
+    throw new Error('avatarImageUrl is required for fal lip-sync');
+  }
+
+  const modelId = avatarModelId ?? 'fal-veed-fabric-1.0';
+
+  const { mkdtemp, readFile, rm } = await import('fs/promises');
+  const { join } = await import('path');
+  const { tmpdir } = await import('os');
+
+  const tmpDir = await mkdtemp(join(tmpdir(), 'fal-lipsync-'));
+
+  try {
+    let concatAudioUrl: string;
+    let durationSeconds: number;
+
+    // Checkpoint 1: Concat speaker audio → R2
+    if (overlay.concatAudioUrl && overlay.durationSeconds) {
+      logger.info('Concat audio already exists, skipping concat', { avatarOverlayId });
+      concatAudioUrl = overlay.concatAudioUrl;
+      durationSeconds = overlay.durationSeconds;
+      await job.updateProgress(10);
+    } else {
+      await prisma.avatarOverlay.update({
+        where: { id: avatarOverlayId },
+        data: { status: 'concatenating' },
+      });
+
+      const segments = await fetchAvatarSegments({
+        podcastId, speaker, voiceTrackId, enabledSegmentIds: overlay.enabledSegmentIds,
+      });
+
+      const segmentsWithAudio = segments.filter((s) => s.audioUrl);
+      if (segmentsWithAudio.length === 0) {
+        throw new Error(`No audio segments found for speaker "${speaker}"`);
+      }
+
+      const concatOutputPath = join(tmpDir, `${speaker}-concat.mp3`);
+      const concatResult = await concatenateSpeakerAudio({
+        segments: segmentsWithAudio.map((s) => ({ audioUrl: s.audioUrl!, order: s.order })),
+        outputPath: concatOutputPath,
+      });
+      durationSeconds = concatResult.durationSeconds;
+
+      const concatAudioBuffer = await readFile(concatOutputPath);
+      const concatAudioKey = `podcasts/${podcastId}/avatars/${speaker}-audio.mp3`;
+      concatAudioUrl = await uploadFile(concatAudioKey, concatAudioBuffer, 'audio/mpeg');
+
+      await prisma.avatarOverlay.update({
+        where: { id: avatarOverlayId },
+        data: { concatAudioUrl, durationSeconds, status: 'processing' },
+      });
+
+      await job.updateProgress(10);
+    }
+
+    // Checkpoint 2: Determine chunking based on model limits
+    const { LIP_SYNC_CONFIG } = await import('@/lib/providers/fal-endpoints');
+    const lipSyncConfig = LIP_SYNC_CONFIG[modelId];
+    const maxAudioSeconds = lipSyncConfig?.maxAudioSeconds ?? 300;
+
+    const { submitFalLipSync, pollFalLipSync } = await import('@/lib/fal-lip-sync');
+
+    if (durationSeconds <= maxAudioSeconds) {
+      // Single submission — no chunking needed
+      await prisma.avatarOverlay.update({
+        where: { id: avatarOverlayId },
+        data: { falTotalChunks: 1, avatarModelId: modelId, avatarImageUrl },
+      });
+
+      const { statusUrl, resultUrl } = await submitFalLipSync({
+        modelId,
+        imageUrl: avatarImageUrl,
+        audioUrl: concatAudioUrl,
+        apiKey,
+      });
+
+      await job.updateProgress(30);
+
+      const timeoutMs = durationSeconds * 3000 + 120_000;
+      const result = await pollFalLipSync(statusUrl, resultUrl, apiKey, timeoutMs);
+
+      await job.updateProgress(80);
+
+      // Download and upload to R2
+      const videoRes = await fetch(result.videoUrl);
+      if (!videoRes.ok) throw new Error(`Failed to download fal lip-sync video: ${videoRes.status}`);
+      const videoBuffer = Buffer.from(await videoRes.arrayBuffer());
+      const videoKey = `podcasts/${podcastId}/avatars/${speaker}-avatar.mp4`;
+      const videoUrl = await uploadFile(videoKey, videoBuffer, 'video/mp4');
+
+      await prisma.avatarOverlay.update({
+        where: { id: avatarOverlayId },
+        data: { videoUrl, status: 'ready', durationSeconds, falChunkIndex: 1 },
+      });
+    } else {
+      // Multi-chunk: split audio and process each chunk
+      const { splitAudioIntoChunks, concatenateVideoChunks } = await import('@/lib/runway-chunker');
+
+      const localAudioPath = join(tmpDir, 'concat-audio.mp3');
+      const audioRes = await fetch(concatAudioUrl);
+      if (!audioRes.ok) throw new Error(`Failed to download concat audio: ${audioRes.status}`);
+      const { writeFile } = await import('fs/promises');
+      await writeFile(localAudioPath, Buffer.from(await audioRes.arrayBuffer()));
+
+      const chunks = await splitAudioIntoChunks({
+        audioPath: localAudioPath,
+        totalDuration: durationSeconds,
+        tmpDir,
+        chunkTargetSeconds: Math.floor(maxAudioSeconds * 0.9),
+      });
+
+      await prisma.avatarOverlay.update({
+        where: { id: avatarOverlayId },
+        data: { falTotalChunks: chunks.length, avatarModelId: modelId, avatarImageUrl },
+      });
+
+      await job.updateProgress(15);
+
+      const startChunkIndex = overlay.falChunkIndex ?? 0;
+
+      for (let i = startChunkIndex; i < chunks.length; i++) {
+        const chunk = chunks[i];
+
+        // Upload chunk audio to R2 for fal to access
+        const chunkAudioBuffer = await readFile(chunk.inputPath);
+        const chunkAudioKey = `podcasts/${podcastId}/avatars/${speaker}-chunk-audio-${i}.mp3`;
+        const chunkAudioUrl = await uploadFile(chunkAudioKey, chunkAudioBuffer, 'audio/mpeg');
+
+        const { statusUrl, resultUrl } = await submitFalLipSync({
+          modelId,
+          imageUrl: avatarImageUrl,
+          audioUrl: chunkAudioUrl,
+          apiKey,
+        });
+
+        const timeoutMs = chunk.durationSeconds * 3000 + 120_000;
+        const result = await pollFalLipSync(statusUrl, resultUrl, apiKey, timeoutMs);
+
+        // Download chunk video to tmpDir
+        const chunkVideoRes = await fetch(result.videoUrl);
+        if (!chunkVideoRes.ok) throw new Error(`Failed to download fal chunk video ${i}: ${chunkVideoRes.status}`);
+        // Override outputPath extension to mp4 for fal
+        chunk.outputPath = chunk.outputPath.replace(/\.webm$/, '.mp4');
+        await writeFile(chunk.outputPath, Buffer.from(await chunkVideoRes.arrayBuffer()));
+
+        await prisma.avatarOverlay.update({
+          where: { id: avatarOverlayId },
+          data: { falChunkIndex: i + 1 },
+        });
+
+        const chunkProgress = 15 + ((i + 1) / chunks.length) * 55;
+        await job.updateProgress(Math.round(chunkProgress));
+      }
+
+      await job.updateProgress(75);
+
+      // Concatenate video chunks
+      const finalVideoPath = join(tmpDir, 'final.mp4');
+      await concatenateVideoChunks({ chunks, outputPath: finalVideoPath });
+
+      await job.updateProgress(85);
+
+      const finalBuffer = await readFile(finalVideoPath);
+      const videoKey = `podcasts/${podcastId}/avatars/${speaker}-avatar.mp4`;
+      const videoUrl = await uploadFile(videoKey, finalBuffer, 'video/mp4');
+
+      await prisma.avatarOverlay.update({
+        where: { id: avatarOverlayId },
+        data: { videoUrl, status: 'ready', durationSeconds },
+      });
+    }
+
+    logUsage({
+      service: 'fal',
+      category: 'avatar_generation',
+      totalCost: (durationSeconds / 60) * (LIP_SYNC_CONFIG[modelId]?.maxAudioSeconds === 60 ? 0.168 : 4.80),
+      podcastId,
+      durationMs: Math.round(durationSeconds * 1000),
+      metadata: { speaker, modelId, durationSeconds },
+    });
+
+    await job.updateProgress(95);
+
+    await checkAllAvatarsReady(videoGenerationId, podcastId);
+
+    await job.updateProgress(100);
+    logger.info('Fal lip-sync avatar generation complete', { podcastId, speaker, avatarOverlayId });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    await prisma.avatarOverlay.update({
+      where: { id: avatarOverlayId },
+      data: { status: 'failed', failureReason: message },
+    });
+
+    await checkAllAvatarsReady(videoGenerationId, podcastId);
 
     throw err;
   } finally {

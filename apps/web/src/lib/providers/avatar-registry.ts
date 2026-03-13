@@ -22,6 +22,8 @@ export interface AvatarProviderMeta {
   models: AvatarModelOption[];
   /** Env var name for the platform API key. */
   platformKeyEnv: string;
+  disabled?: boolean;
+  disabledReason?: string;
   auth: {
     validate: (credentials: Record<string, string>) => Promise<boolean>;
   };
@@ -74,6 +76,8 @@ const AVATAR_PROVIDERS: Record<AvatarProviderId, AvatarProviderMeta> = {
       { id: 'runway-characters', displayName: 'Runway Characters (GWM-1 Avatars)', tier: 'premium' },
     ],
     platformKeyEnv: 'RUNWAY_API_KEY',
+    disabled: true,
+    disabledReason: 'Conversational AI only — audio-driven lip sync not available via API',
     auth: {
       validate: async (creds) => {
         try {
@@ -93,12 +97,14 @@ const AVATAR_PROVIDERS: Record<AvatarProviderId, AvatarProviderMeta> = {
 
   fal: {
     id: 'fal',
-    displayName: 'Fal (HeyGen)',
+    displayName: 'Fal',
     getApiKeyUrl: 'https://fal.ai/dashboard/keys',
-    defaultModel: 'fal-heygen-avatar4-i2v',
+    defaultModel: 'fal-veed-fabric-1.0',
     models: [
       { id: 'fal-heygen-avatar4-i2v', displayName: 'HeyGen Avatar4 (Image-to-Video)', tier: 'premium' },
       { id: 'fal-heygen-avatar4-twin', displayName: 'HeyGen Avatar4 (Digital Twin)', tier: 'premium' },
+      { id: 'fal-veed-fabric-1.0', displayName: 'VEED Fabric 1.0 (Lip Sync)', tier: 'standard' },
+      { id: 'fal-kling-avatar-v2-pro', displayName: 'Kling Avatar v2 Pro (Lip Sync)', tier: 'premium' },
     ],
     platformKeyEnv: 'FAL_KEY',
     auth: {

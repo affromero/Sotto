@@ -24,11 +24,18 @@ function mapAvatarModel(m: AvatarModelPricing): AvatarModelInfo {
   };
 }
 
+const LOCAL_AVATAR_PRICING: AvatarModelInfo[] = [
+  { modelId: 'fal-veed-fabric-1.0', displayName: 'VEED Fabric 1.0', costPerMinute: 4.80, avatarType: 'lip-sync', maxDuration: 300 },
+  { modelId: 'fal-kling-avatar-v2-pro', displayName: 'Kling Avatar v2 Pro', costPerMinute: 0.168, avatarType: 'lip-sync', maxDuration: 60 },
+];
+
 function staticAvatarModels(): AvatarModelInfo[] {
   const knownIds = getAllAvatarModelIds();
-  return STATIC_AVATAR_PRICING
+  const fromPricetoken = STATIC_AVATAR_PRICING
     .filter((m) => knownIds.has(m.modelId))
     .map(mapAvatarModel);
+  const localFiltered = LOCAL_AVATAR_PRICING.filter((m) => knownIds.has(m.modelId));
+  return [...fromPricetoken, ...localFiltered];
 }
 
 /** Fetch avatar models from all providers with live pricing from pricetoken. */

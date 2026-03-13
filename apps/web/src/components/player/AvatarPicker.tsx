@@ -11,7 +11,7 @@ import styles from './AvatarPicker.module.css';
 export interface ExistingAvatarOverlay {
   speaker: string;
   avatarId: string;
-  avatarProvider: 'heygen' | 'runway';
+  avatarProvider: 'heygen' | 'runway' | 'fal';
   status: string;
   isPreset?: boolean;
 }
@@ -31,8 +31,9 @@ const VISIBLE_COUNT = 12;
 
 interface AvatarSelection {
   avatarId: string;
-  provider: 'heygen' | 'runway';
+  provider: 'heygen' | 'runway' | 'fal';
   isPreset: boolean;
+  imageUrl?: string;
 }
 
 interface AvatarPricing {
@@ -55,12 +56,14 @@ export function AvatarPicker({ podcastId, speakers, segments, onConfigured, onCa
   const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [falModelId, setFalModelId] = useState('fal-veed-fabric-1.0');
   // Per-speaker segment enablement: empty = all enabled (default)
   const [enabledSegments, setEnabledSegments] = useState<Record<string, Set<string>>>({});
-  const [activeProvider, setActiveProvider] = useState<'heygen' | 'runway'>(
-    existingOverlays?.some((ov) => ov.avatarProvider === 'runway') ? 'runway' : 'heygen',
+  const [activeProvider, setActiveProvider] = useState<'heygen' | 'runway' | 'fal'>(
+    existingOverlays?.some((ov) => ov.avatarProvider === 'fal') ? 'fal'
+      : existingOverlays?.some((ov) => ov.avatarProvider === 'runway') ? 'runway' : 'heygen',
   );
-  const [availableProviders, setAvailableProviders] = useState<{ heygen: boolean; runway: boolean }>({ heygen: false, runway: false });
+  const [availableProviders, setAvailableProviders] = useState<{ heygen: boolean; runway: boolean; fal: boolean }>({ heygen: false, runway: false, fal: false });
   const [pricing, setPricing] = useState<AvatarPricing>({ costPerMinute: 0, includedOnPlatform: false });
   const [voiceTracks, setVoiceTracks] = useState<VoiceTrackSummary[]>([]);
   const [voiceTrackSelections, setVoiceTrackSelections] = useState<Record<string, string>>({});
@@ -72,7 +75,7 @@ export function AvatarPicker({ podcastId, speakers, segments, onConfigured, onCa
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error('Failed to load avatars'))))
       .then((data: {
         avatars: UnifiedAvatarData[];
-        providers: { heygen: boolean; runway: boolean };
+        providers: { heygen: boolean; runway: boolean; fal: boolean };
         pricing?: AvatarPricing;
       }) => {
         setAvatars(data.avatars);
@@ -115,7 +118,7 @@ export function AvatarPicker({ podcastId, speakers, segments, onConfigured, onCa
         delete next[speaker];
         return next;
       }
-      return { ...prev, [speaker]: { avatarId: avatar.id, provider: avatar.provider, isPreset: avatar.isPreset } };
+      return { ...prev, [speaker]: { avatarId: avatar.id, provider: avatar.provider, isPreset: avatar.isPreset, imageUrl: avatar.imageUrl } };
     });
   }, []);
 
@@ -148,8 +151,10 @@ export function AvatarPicker({ podcastId, speakers, segments, onConfigured, onCa
       const allEnabled = !enabled || enabled.size === speakerSegs.length;
       return {
         speaker,
-        avatarId: sel.avatarId,
+        avatarId: sel.avatarId || undefined,
         avatarProvider: sel.provider,
+        avatarImageUrl: sel.imageUrl || undefined,
+        avatarModelId: sel.provider === 'fal' ? falModelId : undefined,
         isPreset: sel.isPreset,
         enabledSegmentIds: allEnabled ? undefined : [...enabled],
         voiceTrackId: voiceTrackSelections[speaker] || undefined,
@@ -192,9 +197,6 @@ export function AvatarPicker({ podcastId, speakers, segments, onConfigured, onCa
     return total;
   }, [selections, segmentsBySpeaker, enabledSegments, pricing.costPerMinute]);
 
-  // Check if any selection uses Runway
-  const hasRunwaySelection = Object.values(selections).some((s) => s.provider === 'runway');
-
   if (loading) {
     return (
       <div className={styles.root}>
@@ -217,22 +219,46 @@ export function AvatarPicker({ podcastId, speakers, segments, onConfigured, onCa
 
       {error && <p className={styles.error}>{error}</p>}
 
-      {availableProviders.runway && (
-        <div className={styles.providerTabs}>
+      <div className={styles.providerTabs}>
+        <button
+          className={`${styles.providerTab} ${activeProvider === 'heygen' ? styles.providerTabActive : ''}`}
+          onClick={() => { setActiveProvider('heygen'); setLoading(true); }}
+          type="button"
+        >
+          HeyGen
+        </button>
+        {availableProviders.fal && (
           <button
-            className={`${styles.providerTab} ${activeProvider === 'heygen' ? styles.providerTabActive : ''}`}
-            onClick={() => { setActiveProvider('heygen'); setLoading(true); }}
+            className={`${styles.providerTab} ${activeProvider === 'fal' ? styles.providerTabActive : ''}`}
+            onClick={() => { setActiveProvider('fal'); setLoading(true); }}
             type="button"
           >
-            HeyGen
+            Fal Lip-Sync
           </button>
+        )}
+        {availableProviders.runway && (
           <button
-            className={`${styles.providerTab} ${activeProvider === 'runway' ? styles.providerTabActive : ''}`}
-            onClick={() => { setActiveProvider('runway'); setLoading(true); }}
+            className={`${styles.providerTab} ${styles.providerTabDisabled}`}
             type="button"
+            disabled
+            title="Conversational AI only — audio-driven lip sync not available via API"
           >
-            Runway
+            Runway <span className={styles.notReadyBadge}>Not Ready</span>
           </button>
+        )}
+      </div>
+
+      {activeProvider === 'fal' && (
+        <div className={styles.falModelRow}>
+          <label className={styles.falModelLabel}>Lip-sync model</label>
+          <select
+            className={styles.falModelSelect}
+            value={falModelId}
+            onChange={(e) => setFalModelId(e.target.value)}
+          >
+            <option value="fal-veed-fabric-1.0">VEED Fabric 1.0 — $4.80/min, up to 5min</option>
+            <option value="fal-kling-avatar-v2-pro">Kling Avatar v2 Pro — $0.17/min, up to 1min</option>
+          </select>
         </div>
       )}
 
@@ -305,22 +331,18 @@ export function AvatarPicker({ podcastId, speakers, segments, onConfigured, onCa
         ))}
       </div>
 
-      <p className={styles.browseLink}>
-        Browse all avatars at{' '}
-        {activeProvider === 'runway' ? (
-          <a href="https://dev.runwayml.com" target="_blank" rel="noopener noreferrer">
-            dev.runwayml.com
-          </a>
-        ) : (
+      {activeProvider !== 'fal' && (
+        <p className={styles.browseLink}>
+          Browse all avatars at{' '}
           <a href="https://www.heygen.com/avatars" target="_blank" rel="noopener noreferrer">
             heygen.com/avatars
           </a>
-        )}
-      </p>
+        </p>
+      )}
 
-      {hasRunwaySelection && (
+      {activeProvider === 'fal' && avatars.length === 0 && (
         <p className={styles.runwayNotice}>
-          Runway avatars render in real-time (~{Math.ceil(podcastDuration / 60)} min)
+          Upload avatar images in Settings &rarr; Avatar Lip-Sync to get started.
         </p>
       )}
 

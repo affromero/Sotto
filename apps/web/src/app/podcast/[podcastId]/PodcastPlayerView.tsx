@@ -1479,7 +1479,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
           existingOverlays={avatarOverlays.length > 0 ? avatarOverlays.map((ov) => ({
             speaker: ov.speaker,
             avatarId: ov.avatarId,
-            avatarProvider: (ov.avatarProvider ?? 'heygen') as 'heygen' | 'runway',
+            avatarProvider: (ov.avatarProvider ?? 'heygen') as 'heygen' | 'runway' | 'fal',
             status: ov.status,
           })) : undefined}
           onConfigured={({ generationStarted }) => {
