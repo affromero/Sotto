@@ -107,7 +107,7 @@ export async function seedTestUser() {
   // SCRIPT_READY podcast for script approve/regenerate tests
   const scriptReadyPodcast = await prisma.podcast.upsert({
     where: { id: 'e2e-script-ready' },
-    update: {},
+    update: { status: 'SCRIPT_READY' },
     create: {
       id: 'e2e-script-ready',
       title: 'E2E Script Ready Podcast',
