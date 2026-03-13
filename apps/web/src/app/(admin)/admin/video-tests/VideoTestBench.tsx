@@ -1085,18 +1085,25 @@ export function VideoTestBench({ envAvailability, mapPresets, imageModels, aiPro
 
   const previewMapImage = useCallback(async (preset: string) => {
     const mapResult = results['map-image'];
-    const mapImageBase64 = mapResult.data?.imageBase64 as string | undefined;
     const resolvedPlace = mapResult.data?.resolvedPlace as { name: string } | undefined;
-    if (!mapImageBase64 || !resolvedPlace) return;
+    if (!resolvedPlace) return;
 
     setPreviews((prev) => ({ ...prev, 'map-image': { loading: true } }));
     try {
+      // Generate zoom frames (globe → city) for the resolved place
+      const zfRes = await fetch('/api/admin/test-video-pipeline', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'map-image', place: resolvedPlace.name, preset, width: 1280, height: 720, zoomFrames: true }),
+      });
+      const zfData = await zfRes.json();
+      if (!zfData.success) throw new Error(zfData.error ?? 'Zoom frames generation failed');
+
       const result = await renderClip({
         visualType: 'MAP_OVERLAY',
         text: resolvedPlace.name,
-        assetUrl: mapImageBase64,
-        metadata: { places: [resolvedPlace], preset },
-      });
+        metadata: { places: [resolvedPlace], preset, zoomFrames: zfData.zoomFrames },
+      }, 5);
       setPreviews((prev) => ({ ...prev, 'map-image': { loading: false, ...result } }));
     } catch (err) {
       setPreviews((prev) => ({
@@ -1158,22 +1165,21 @@ export function VideoTestBench({ envAvailability, mapPresets, imageModels, aiPro
 
     setPreviews((prev) => ({ ...prev, 'resolve-place': { loading: true } }));
     try {
-      // Step 1: Generate map image
-      const mapRes = await fetch('/api/admin/test-video-pipeline', {
+      // Step 1: Generate zoom frames (globe → city)
+      const zfRes = await fetch('/api/admin/test-video-pipeline', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'map-image', place: place.name, preset: 'vintage', width: 1280, height: 720 }),
+        body: JSON.stringify({ type: 'map-image', place: place.name, preset: 'vintage', width: 1280, height: 720, zoomFrames: true }),
       });
-      const mapData = await mapRes.json();
-      if (!mapData.success) throw new Error(mapData.error ?? 'Map generation failed');
+      const zfData = await zfRes.json();
+      if (!zfData.success) throw new Error(zfData.error ?? 'Zoom frames generation failed');
 
       // Step 2: Render through Remotion
       const result = await renderClip({
         visualType: 'MAP_OVERLAY',
         text: place.name,
-        assetUrl: mapData.imageBase64,
-        metadata: { places: [place], preset: 'vintage' },
-      });
+        metadata: { places: [place], preset: 'vintage', zoomFrames: zfData.zoomFrames },
+      }, 5);
       setPreviews((prev) => ({ ...prev, 'resolve-place': { loading: false, ...result } }));
     } catch (err) {
       setPreviews((prev) => ({
@@ -1257,18 +1263,17 @@ export function VideoTestBench({ envAvailability, mapPresets, imageModels, aiPro
             segmentInput.assetUrl = stockData.result.thumbnailUrl;
           }
         } else if (sv.visualType === 'MAP_OVERLAY' && envAvailability.mapbox) {
-          // Extract place name from prompt or text
+          // Extract place name from prompt or text — generate zoom frames for globe-to-location animation
           const placeName = sv.prompt ?? text.slice(0, 50);
           const mapRes = await fetch('/api/admin/test-video-pipeline', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ type: 'map-image', place: placeName, preset: 'vintage', width: 1280, height: 720 }),
+            body: JSON.stringify({ type: 'map-image', place: placeName, preset: 'vintage', width: 1280, height: 720, zoomFrames: true }),
           });
           const mapData = await mapRes.json();
-          if (mapData.success) {
-            segmentInput.assetUrl = mapData.imageBase64;
+          if (mapData.success && mapData.zoomFrames) {
             if (mapData.resolvedPlace) {
-              segmentInput.metadata = { places: [mapData.resolvedPlace], preset: 'vintage' };
+              segmentInput.metadata = { places: [mapData.resolvedPlace], preset: 'vintage', zoomFrames: mapData.zoomFrames };
             }
           }
         }

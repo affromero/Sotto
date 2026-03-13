@@ -6,7 +6,7 @@ import { classifySegmentVisuals } from '@/lib/visual-classifier';
 import type { SegmentInput } from '@/lib/visual-classifier';
 import { PlaceResolver } from '@sotto/maps/server';
 import type { MapPresetId } from '@sotto/maps/server';
-import { generateMapImage } from '@/lib/map-image';
+import { generateMapImage, generateMapZoomFrames } from '@/lib/map-image';
 import { FalImageProvider } from '@/lib/providers/image/fal.provider';
 import { getImageProviderMeta } from '@/lib/providers/image-registry';
 import { searchStockVideo } from '@/lib/stock-footage';
@@ -32,6 +32,7 @@ const mapImageSchema = z.object({
   preset: z.enum(['vintage', 'satellite', 'parchment', 'cinematic', 'dark', 'terrain']),
   width: z.number().int().min(100).max(2560).optional(),
   height: z.number().int().min(100).max(2560).optional(),
+  zoomFrames: z.boolean().optional(),
 });
 
 const aiIllustrationSchema = z.object({
@@ -199,9 +200,26 @@ export async function POST(request: NextRequest) {
         });
       }
 
+      const w = data.width ?? 800;
+      const h = data.height ?? 600;
+
+      if (data.zoomFrames) {
+        const frames = await withTimeout(
+          generateMapZoomFrames(resolved, data.preset as MapPresetId, w, h),
+          60_000,
+        );
+        return NextResponse.json({
+          success: true,
+          latencyMs: Date.now() - start,
+          zoomFrames: frames,
+          resolvedPlace: resolved,
+          preset: data.preset,
+        });
+      }
+
       const imageBuffer = await withTimeout(
-        generateMapImage(resolved, data.preset as MapPresetId, data.width ?? 800, data.height ?? 600),
-        30_000
+        generateMapImage(resolved, data.preset as MapPresetId, w, h),
+        30_000,
       );
 
       return NextResponse.json({

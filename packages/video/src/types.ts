@@ -72,6 +72,12 @@ export interface RenderInput extends VisualsInput {
   avatarOverlays?: AvatarOverlayInput[];
 }
 
+/** A single zoom-level frame for globe-to-location zoom animations in MapSlide. */
+export interface MapZoomFrame {
+  zoom: number;
+  assetUrl: string;
+}
+
 export const DEFAULT_RENDER_CONFIG: RenderConfig = {
   width: 1280,
   height: 720,
