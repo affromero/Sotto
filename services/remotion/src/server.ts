@@ -2,6 +2,7 @@ import express from 'express';
 import path from 'path';
 import { renderRouter, preWarmBundle } from './routes/render';
 import { stillRouter } from './routes/still';
+import { clipRouter } from './routes/clip';
 import { recordRouter } from './routes/record';
 import { stitchRouter } from './routes/stitch';
 import { probeRouter } from './routes/probe';
@@ -17,6 +18,7 @@ app.use('/assets/sfx', express.static(path.resolve(__dirname, '../assets/sfx')))
 // Mount route modules
 app.use('/render', renderRouter);
 app.use('/still', stillRouter);
+app.use('/clip', clipRouter);
 app.use('/record', recordRouter);
 app.use('/stitch', stitchRouter);
 app.use('/probe', probeRouter);
