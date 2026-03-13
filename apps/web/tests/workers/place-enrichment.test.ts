@@ -5,6 +5,7 @@ const {
   mockAddJob,
   mockResolve,
   mockResolveHistorical,
+  mockFindHistoricalMaps,
 } = vi.hoisted(() => ({
   mockPrisma: {
     segmentVisual: { findUniqueOrThrow: vi.fn(), update: vi.fn() },
@@ -12,6 +13,7 @@ const {
   mockAddJob: vi.fn(),
   mockResolve: vi.fn(),
   mockResolveHistorical: vi.fn(),
+  mockFindHistoricalMaps: vi.fn(),
 }));
 
 vi.mock('@/lib/prisma', () => ({ prismaUnfiltered: mockPrisma }));
@@ -25,6 +27,7 @@ vi.mock('@sotto/maps/server', () => ({
     resolve(...args: unknown[]) { return mockResolve(...args); }
     resolveHistorical(...args: unknown[]) { return mockResolveHistorical(...args); }
   },
+  findHistoricalMaps: (...args: unknown[]) => mockFindHistoricalMaps(...args),
 }));
 vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
@@ -158,5 +161,66 @@ describe('place-enrichment worker', () => {
       'generate_visual',
       expect.objectContaining({ segmentVisualId: 'sv-1', visualType: 'MAP_OVERLAY' }),
     );
+  });
+
+  it('searches Rumsey historical maps when yearHint is present and stores results', async () => {
+    const rumseyResults = [
+      { title: 'Constantinople 1422', date: '1422', thumbnailUrl: 'https://rumsey.example/thumb.jpg', viewUrl: 'https://rumsey.example/view' },
+    ];
+    mockResolveHistorical.mockResolvedValue(mockPlace);
+    mockFindHistoricalMaps.mockResolvedValue(rumseyResults);
+    mockPrisma.segmentVisual.findUniqueOrThrow.mockResolvedValue({
+      visualType: 'MAP_OVERLAY',
+      prompt: 'Constantinople map',
+      metadata: { places: [{ name: 'Constantinople', yearHint: 1200 }], preset: 'vintage' },
+    });
+
+    await processPlaceEnrichment(makeJob(baseData));
+
+    expect(mockFindHistoricalMaps).toHaveBeenCalledWith('Constantinople', 3);
+    expect(mockPrisma.segmentVisual.update).toHaveBeenCalledWith({
+      where: { id: 'sv-1' },
+      data: {
+        metadata: expect.objectContaining({
+          historicalMaps: rumseyResults,
+        }),
+      },
+    });
+  });
+
+  it('completes enrichment when Rumsey API fails', async () => {
+    mockResolveHistorical.mockResolvedValue(mockPlace);
+    mockFindHistoricalMaps.mockRejectedValue(new Error('Rumsey API down'));
+    mockPrisma.segmentVisual.findUniqueOrThrow.mockResolvedValue({
+      visualType: 'MAP_OVERLAY',
+      prompt: 'Constantinople map',
+      metadata: { places: [{ name: 'Constantinople', yearHint: 1200 }], preset: 'vintage' },
+    });
+
+    await processPlaceEnrichment(makeJob(baseData));
+
+    // Should still complete — no historicalMaps in metadata
+    expect(mockPrisma.segmentVisual.update).toHaveBeenCalledWith({
+      where: { id: 'sv-1' },
+      data: {
+        metadata: expect.not.objectContaining({ historicalMaps: expect.anything() }),
+      },
+    });
+    expect(mockAddJob).toHaveBeenCalled();
+  });
+
+  it('does not search Rumsey when no yearHint and no historical context', async () => {
+    const placeWithoutHistory = { ...mockPlace, name: 'Paris', historicalContext: [] };
+    mockResolve.mockResolvedValue(placeWithoutHistory);
+    mockPrisma.segmentVisual.findUniqueOrThrow.mockResolvedValue({
+      visualType: 'MAP_OVERLAY',
+      prompt: 'Paris map',
+      metadata: { places: [{ name: 'Paris' }], preset: 'satellite' },
+    });
+
+    const data = { ...baseData, places: [{ name: 'Paris' }] };
+    await processPlaceEnrichment(makeJob(data));
+
+    expect(mockFindHistoricalMaps).not.toHaveBeenCalled();
   });
 });
