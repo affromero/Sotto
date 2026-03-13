@@ -34,6 +34,13 @@ export const MapSlide: React.FC<MapSlideProps> = ({ segment }) => {
   const subtitle = place?.historicalContext?.[0]?.periodName ?? place?.modernRegion ?? '';
   const isHighConfidence = (place?.confidence ?? 1) >= 0.7;
 
+  // Apply CSS filter for vintage/parchment presets (sepia tones on the base map tile)
+  const presetFilter = metadata?.preset === 'vintage'
+    ? 'sepia(0.5) saturate(0.8) contrast(0.9)'
+    : metadata?.preset === 'parchment'
+      ? 'sepia(0.6) saturate(0.7)'
+      : undefined;
+
   const historicalMap = metadata?.historicalMaps?.[0];
   const hasHistorical = !!historicalMap && !historicalImgError;
 
@@ -94,7 +101,7 @@ export const MapSlide: React.FC<MapSlideProps> = ({ segment }) => {
       {/* Modern map layer */}
       {segment.assetUrl && (
         <AbsoluteFill style={{ opacity: opacity * modernOpacity, transform: `scale(${scale})` }}>
-          <Img src={segment.assetUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <Img src={segment.assetUrl} style={{ width: '100%', height: '100%', objectFit: 'cover', filter: presetFilter }} />
         </AbsoluteFill>
       )}
 
