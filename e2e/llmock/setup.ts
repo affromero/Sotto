@@ -158,6 +158,24 @@ HOST: That's wonderful. Thank you for the update!
     }
   );
 
+  // Incorporate — generates a segment incorporating a Q&A answer
+  mock.on(
+    {
+      predicate: (req) => {
+        const systemMsg = req.messages.find((m) => m.role === 'system');
+        const systemText = typeof systemMsg?.content === 'string' ? systemMsg.content : '';
+        return systemText.includes('incorporat');
+      },
+    },
+    {
+      content: `HOST: That's a great question from one of our listeners. Let me address it directly.
+
+EXPERT: Absolutely. The answer ties back to what we discussed earlier about pattern recognition. When you apply these principles consistently, the results speak for themselves. It's one of those insights that seems obvious in hindsight but takes real understanding to appreciate fully.
+
+HOST: Wonderful addition to the conversation. Let's continue.`,
+    }
+  );
+
   // Fallback for unmatched requests
   mock.on({ predicate: () => true }, { content: 'Mock response — no specific fixture matched this request.' });
 

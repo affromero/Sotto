@@ -7,16 +7,16 @@ const TEST_USER_EMAIL = 'test-e2e@sotto.fm';
 const TEST_USER_NAME = 'E2E Test User';
 
 /**
- * Seeds a test user and a ready podcast for E2E tests.
+ * Seeds a test user and all related data for E2E tests.
  * Returns a NextAuth-compatible session token.
  *
  * Idempotent — safe to call multiple times.
  */
 export async function seedTestUser() {
-  // Upsert the test user
+  // Upsert the test user (reset onboarding so tests can re-run)
   const user = await prisma.user.upsert({
     where: { email: TEST_USER_EMAIL },
-    update: {},
+    update: { hasCompletedOnboarding: false },
     create: {
       id: `e2e-user-${randomUUID().slice(0, 8)}`,
       email: TEST_USER_EMAIL,
@@ -43,22 +43,20 @@ export async function seedTestUser() {
   });
 
   // Seed a ready podcast for player tests
-  let testPodcast = await prisma.podcast.findFirst({
-    where: { userId: user.id, status: 'READY' },
+  const testPodcast = await prisma.podcast.upsert({
+    where: { id: 'e2e-podcast' },
+    update: {},
+    create: {
+      id: 'e2e-podcast',
+      title: 'E2E Test Podcast',
+      topic: 'Testing',
+      status: 'READY',
+      audioUrl: 'https://sotto.fm/test-audio.mp3',
+      duration: 300,
+      visibility: 'PUBLIC',
+      userId: user.id,
+    },
   });
-  if (!testPodcast) {
-    testPodcast = await prisma.podcast.create({
-      data: {
-        title: 'E2E Test Podcast',
-        topic: 'Testing',
-        status: 'READY',
-        audioUrl: 'https://sotto.fm/test-audio.mp3',
-        duration: 300,
-        visibility: 'PUBLIC',
-        userId: user.id,
-      },
-    });
-  }
 
   // Second user for follow/profile tests
   const otherUser = await prisma.user.upsert({
@@ -75,20 +73,182 @@ export async function seedTestUser() {
   });
 
   // Other user's podcast for fork tests
-  const otherPodcast = await prisma.podcast.findFirst({ where: { userId: otherUser.id, status: 'READY' } });
-  if (!otherPodcast) {
-    await prisma.podcast.create({
-      data: {
-        title: 'E2E Other Podcast',
-        topic: 'Forkable Content',
-        status: 'READY',
-        audioUrl: 'https://sotto.fm/test-audio-other.mp3',
-        duration: 240,
-        visibility: 'PUBLIC',
-        userId: otherUser.id,
-      },
-    });
-  }
+  const otherPodcast = await prisma.podcast.upsert({
+    where: { id: 'e2e-other-podcast' },
+    update: {},
+    create: {
+      id: 'e2e-other-podcast',
+      title: 'E2E Other Podcast',
+      topic: 'Forkable Content',
+      status: 'READY',
+      audioUrl: 'https://sotto.fm/test-audio-other.mp3',
+      duration: 240,
+      visibility: 'PUBLIC',
+      userId: otherUser.id,
+    },
+  });
+
+  // Third podcast (otherUser) for fork-voice source
+  const otherPodcast2 = await prisma.podcast.upsert({
+    where: { id: 'e2e-other-podcast-2' },
+    update: {},
+    create: {
+      id: 'e2e-other-podcast-2',
+      title: 'E2E Fork Voice Source',
+      topic: 'Voice fork testing',
+      status: 'READY',
+      audioUrl: 'https://sotto.fm/test-audio-fork.mp3',
+      duration: 180,
+      visibility: 'PUBLIC',
+      userId: otherUser.id,
+    },
+  });
+
+  // SCRIPT_READY podcast for script approve/regenerate tests
+  const scriptReadyPodcast = await prisma.podcast.upsert({
+    where: { id: 'e2e-script-ready' },
+    update: {},
+    create: {
+      id: 'e2e-script-ready',
+      title: 'E2E Script Ready Podcast',
+      topic: 'Script workflow testing',
+      status: 'SCRIPT_READY',
+      visibility: 'PRIVATE',
+      userId: user.id,
+    },
+  });
+
+  // Script for testPodcast
+  const scriptTurns = [
+    { speaker: 'HOST', text: 'Welcome to our test podcast about testing.' },
+    { speaker: 'EXPERT', text: 'Thanks for having me. Testing is crucial for quality software.' },
+  ];
+  await prisma.script.upsert({
+    where: { podcastId: testPodcast.id },
+    update: {},
+    create: {
+      podcastId: testPodcast.id,
+      turns: scriptTurns,
+      markdown: scriptTurns.map((t) => `**${t.speaker}**: ${t.text}`).join('\n\n'),
+      version: 1,
+    },
+  });
+
+  // Script for scriptReadyPodcast
+  const scriptReadyTurns = [
+    { speaker: 'HOST', text: 'This script is ready for approval.' },
+    { speaker: 'EXPERT', text: 'The verification process has completed successfully.' },
+  ];
+  await prisma.script.upsert({
+    where: { podcastId: scriptReadyPodcast.id },
+    update: {},
+    create: {
+      podcastId: scriptReadyPodcast.id,
+      turns: scriptReadyTurns,
+      markdown: scriptReadyTurns.map((t) => `**${t.speaker}**: ${t.text}`).join('\n\n'),
+      version: 1,
+    },
+  });
+
+  // Interaction (ANSWERED, PUBLIC) on testPodcast
+  const interaction = await prisma.interaction.upsert({
+    where: { id: 'e2e-interaction' },
+    update: {},
+    create: {
+      id: 'e2e-interaction',
+      podcastId: testPodcast.id,
+      userId: user.id,
+      status: 'ANSWERED',
+      question: 'What makes testing so important?',
+      timestamp: 30.0,
+      answer: 'Testing ensures software quality and catches bugs early.',
+      visibility: 'PUBLIC',
+    },
+  });
+
+  // Comment on testPodcast
+  const comment = await prisma.comment.upsert({
+    where: { id: 'e2e-comment' },
+    update: {},
+    create: {
+      id: 'e2e-comment',
+      content: 'Great episode about testing!',
+      userId: otherUser.id,
+      podcastId: testPodcast.id,
+    },
+  });
+
+  // PodcastFeature for testPodcast (non-zero values for quality route)
+  await prisma.podcastFeature.upsert({
+    where: { podcastId: testPodcast.id },
+    update: {},
+    create: {
+      podcastId: testPodcast.id,
+      avgCompletionRate: 0.75,
+      medianCompletionRate: 0.8,
+      totalUniqueListeners: 10,
+      totalListenMinutes: 50.0,
+      likeToListenRatio: 0.3,
+      segmentCount: 2,
+      durationSeconds: 300,
+    },
+  });
+
+  // Follow (otherUser → user)
+  await prisma.follow.upsert({
+    where: { followerId_followingId: { followerId: otherUser.id, followingId: user.id } },
+    update: {},
+    create: {
+      followerId: otherUser.id,
+      followingId: user.id,
+    },
+  });
+
+  // Like (otherUser → testPodcast)
+  await prisma.like.upsert({
+    where: { userId_podcastId: { userId: otherUser.id, podcastId: testPodcast.id } },
+    update: {},
+    create: {
+      userId: otherUser.id,
+      podcastId: testPodcast.id,
+    },
+  });
+
+  // Save (user → otherPodcast)
+  await prisma.save.upsert({
+    where: { userId_podcastId: { userId: user.id, podcastId: otherPodcast.id } },
+    update: {},
+    create: {
+      userId: user.id,
+      podcastId: otherPodcast.id,
+    },
+  });
+
+  // Sub-tag under 'technology'
+  const techTag = await prisma.tag.findUnique({ where: { slug: 'technology' } });
+  const subTag = await prisma.tag.upsert({
+    where: { slug: 'e2e-subtag' },
+    update: {},
+    create: {
+      name: 'AI Ethics',
+      slug: 'e2e-subtag',
+      parentId: techTag?.id,
+    },
+  });
+
+  // VoiceTrack (READY) on testPodcast
+  const voiceTrack = await prisma.voiceTrack.upsert({
+    where: { id: 'e2e-voice-track' },
+    update: {},
+    create: {
+      id: 'e2e-voice-track',
+      podcastId: testPodcast.id,
+      name: 'E2E Voice Track',
+      status: 'READY',
+      audioUrl: 'https://sotto.fm/test-voice-track.mp3',
+      duration: 300,
+    },
+  });
 
   // Collection owned by test user
   const collection = await prisma.collection.upsert({
@@ -211,7 +371,35 @@ export async function seedTestUser() {
     },
   });
 
-  return { user, otherUser, sessionToken, testPodcast, collection, ideas, notifications, draft };
+  // Fresh invite code for redeem API tests (delete + recreate each run)
+  const freshInviteCode = `e2e-invite-fresh-${Date.now()}`;
+  await prisma.invitationLink.create({
+    data: {
+      code: freshInviteCode,
+      createdBy: user.id,
+      enabled: true,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    },
+  });
+
+  return {
+    user,
+    otherUser,
+    sessionToken,
+    testPodcast,
+    otherPodcast,
+    otherPodcast2,
+    scriptReadyPodcast,
+    interaction,
+    comment,
+    voiceTrack,
+    subTag,
+    collection,
+    ideas,
+    notifications,
+    draft,
+    freshInviteCode,
+  };
 }
 
 // Run as standalone script for CI seeding
