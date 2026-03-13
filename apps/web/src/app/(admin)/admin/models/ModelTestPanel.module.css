@@ -317,3 +317,25 @@
   opacity: 0.45;
   cursor: not-allowed;
 }
+
+/* ── Test result image ── */
+
+.testImage {
+  max-width: 128px;
+  border-radius: 4px;
+}
+
+/* ── Disabled provider badge ── */
+
+.disabledBadge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font: var(--text-caption);
+  font-weight: 600;
+  background: #f3f4f6;
+  color: #9ca3af;
+  vertical-align: middle;
+  cursor: help;
+}
