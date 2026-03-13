@@ -29,7 +29,8 @@
 | `/connect/telegram` | `connect/telegram/page.tsx` | Yes | Link Telegram account |
 | `/pitch` | `pitch/page.tsx` | Password | Investor pitch deck |
 | Static pages | `about`, `pricing`, `support`, `join`, `changelog`, `developers`, `privacy`, `terms`, `feedback`, `banned` | No | Public info pages |
-| `/admin/*` | `(admin)/admin/*.tsx` | ADMIN | 19 admin pages (overview, users, podcasts, revenue, costs, pricing, storage, engagement, playback, pipeline, retention, waitlist, analytics, moderation, handles, twitter, inspire, ratings, quality, announcements, auto-models, models) |
+| `/admin/*` | `(admin)/admin/*.tsx` | ADMIN | 20 admin pages (overview, users, podcasts, revenue, costs, pricing, storage, engagement, playback, pipeline, retention, waitlist, analytics, moderation, handles, twitter, inspire, ratings, quality, announcements, auto-models, models, video-tests) |
+| `/admin/video-tests` | `(admin)/admin/video-tests/page.tsx` | ADMIN | Video pipeline test bench: classify visuals, resolve places, generate map images, AI illustrations, stock footage search |
 | `/admin/storage/[podcastId]` | `(admin)/admin/storage/[podcastId]/page.tsx` | ADMIN | Per-podcast data inspector: 19 sections (provider info, R2 files, script, references, segments, Q&A, discovery, tags, engagement, ratings, API costs, pipeline, ML features, voice assignments, voice tracks, segment voice map, TTS providers, completeness) |
 | `not-found` / `error` | `not-found.tsx` / `error.tsx` | No | 404 + error boundary |
 | `sitemap.xml` | `sitemap.ts` | No | Dynamic sitemap |
@@ -133,7 +134,8 @@
 | `/api/invite/redeem` | POST | No | Redeem invitation code (upserts waitlist as APPROVED) |
 | `/api/admin/waitlist` | PATCH | ADMIN | Approve/reject waitlist entries |
 | `/api/admin/invitations` | GET/POST/PATCH | ADMIN | Generate, list, toggle invitation links |
-| `/api/admin/*` | Various | ADMIN | Admin endpoints (users, podcasts, auto-models, costs, model-pricing, ratings, handles, announcements, twitter, moderation, reports, claims, test-model, traffic-report) |
+| `/api/admin/test-video-pipeline` | POST | ADMIN | Video pipeline test bench: classify visuals, resolve places, generate map images, AI illustrations, stock footage search |
+| `/api/admin/*` | Various | ADMIN | Admin endpoints (users, podcasts, auto-models, costs, model-pricing, ratings, handles, announcements, twitter, moderation, reports, claims, test-model, test-video-pipeline, traffic-report) |
 | `/api/admin/kittentts/health` | GET | ADMIN | Proxy to `KITTENTTS_URL/health`; returns `{ configured, status, model?, latencyMs }` |
 
 ## Route Groups

@@ -34,6 +34,7 @@ import {
   Scale,
   Receipt,
   Film,
+  Clapperboard,
   ArrowLeft,
   Menu,
   ChevronDown,
@@ -108,6 +109,7 @@ const navGroups: NavGroup[] = [
       { href: '/admin/queues', label: 'Queues', icon: ListTodo },
       { href: '/admin/plan-features', label: 'Voice Features', icon: SlidersHorizontal },
       { href: '/admin/showcase', label: 'Showcase', icon: Film },
+      { href: '/admin/video-tests', label: 'Video Tests', icon: Clapperboard },
     ],
   },
   {
