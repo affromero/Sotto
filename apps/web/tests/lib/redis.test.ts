@@ -9,6 +9,7 @@ const { MockRedis } = vi.hoisted(() => {
       setex: vi.fn(),
       del: vi.fn(),
       keys: vi.fn(),
+      scan: vi.fn(),
       zremrangebyscore: vi.fn(),
       zcard: vi.fn(),
       zrange: vi.fn(),
@@ -162,18 +163,35 @@ describe('redis.ts', () => {
   });
 
   describe('cache.deletePattern', () => {
-    it('deletes all keys matching pattern', async () => {
+    it('deletes all keys matching pattern using SCAN', async () => {
       const { cache: cacheReimport, getRedisClient: getRedisClientReimport } =
         await import('@/lib/redis');
       const client = getRedisClientReimport();
 
-      (client.keys as Mock).mockResolvedValue(['user:1', 'user:2', 'user:3']);
+      (client.scan as Mock)
+        .mockResolvedValueOnce(['0', ['user:1', 'user:2', 'user:3']]);
       (client.del as Mock).mockResolvedValue(3);
 
       await cacheReimport.deletePattern('user:*');
 
-      expect(client.keys).toHaveBeenCalledWith('user:*');
+      expect(client.scan).toHaveBeenCalledWith('0', 'MATCH', 'user:*', 'COUNT', 100);
       expect(client.del).toHaveBeenCalledWith('user:1', 'user:2', 'user:3');
+    });
+
+    it('handles multi-page SCAN results', async () => {
+      const { cache: cacheReimport, getRedisClient: getRedisClientReimport } =
+        await import('@/lib/redis');
+      const client = getRedisClientReimport();
+
+      (client.scan as Mock)
+        .mockResolvedValueOnce(['42', ['user:1']])
+        .mockResolvedValueOnce(['0', ['user:2']]);
+      (client.del as Mock).mockResolvedValue(1);
+
+      await cacheReimport.deletePattern('user:*');
+
+      expect(client.scan).toHaveBeenCalledTimes(2);
+      expect(client.del).toHaveBeenCalledTimes(2);
     });
 
     it('does not call del when no keys match', async () => {
@@ -181,11 +199,11 @@ describe('redis.ts', () => {
         await import('@/lib/redis');
       const client = getRedisClientReimport();
 
-      (client.keys as Mock).mockResolvedValue([]);
+      (client.scan as Mock).mockResolvedValueOnce(['0', []]);
 
       await cacheReimport.deletePattern('nonexistent:*');
 
-      expect(client.keys).toHaveBeenCalledWith('nonexistent:*');
+      expect(client.scan).toHaveBeenCalledWith('0', 'MATCH', 'nonexistent:*', 'COUNT', 100);
       expect(client.del).not.toHaveBeenCalled();
     });
   });
