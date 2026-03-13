@@ -24,15 +24,9 @@ interface TestResult {
 
 interface PreviewState {
   loading: boolean;
-  imageBase64?: string;
+  videoBase64?: string;
   latencyMs?: number;
   error?: string;
-}
-
-interface FrameStripState {
-  loading: boolean;
-  frames: Array<{ frame: number; imageBase64?: string; error?: string }>;
-  latencyMs?: number;
 }
 
 type TestType = 'classify' | 'resolve-place' | 'map-image' | 'ai-illustration' | 'stock-footage';
@@ -43,18 +37,18 @@ function pick<T>(arr: T[]): T {
 
 // ── Shared preview helper ──
 
-async function renderStill(
+async function renderClip(
   segment: Record<string, unknown>,
-  frame?: number,
-): Promise<{ imageBase64: string; latencyMs: number }> {
+  durationSeconds?: number,
+): Promise<{ videoBase64: string; latencyMs: number }> {
   const res = await fetch('/api/admin/test-video-pipeline', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ type: 'render-still', segment, frame }),
+    body: JSON.stringify({ type: 'render-clip', segment, durationSeconds }),
   });
   const data = await res.json();
   if (!data.success) throw new Error(data.error ?? 'Render failed');
-  return { imageBase64: data.imageBase64, latencyMs: data.latencyMs };
+  return { videoBase64: data.videoBase64, latencyMs: data.latencyMs };
 }
 
 // ── Preview Button Component ──
@@ -77,50 +71,27 @@ function PreviewButton({
         disabled={preview?.loading}
       >
         <Eye size={14} aria-hidden="true" />
-        {preview?.loading ? 'Rendering…' : (label ?? 'Preview as Video Frame')}
+        {preview?.loading ? 'Rendering…' : (label ?? 'Preview as Video Clip')}
       </button>
       {preview?.error && (
         <span className={styles.errorText}>{preview.error}</span>
       )}
-      {preview?.imageBase64 && (
+      {preview?.videoBase64 && (
         <div className={styles.remotionPreview}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={preview.imageBase64} alt="Remotion rendered frame" className={styles.imagePreview} />
+          <video
+            src={preview.videoBase64}
+            autoPlay
+            loop
+            muted
+            playsInline
+            className={styles.videoPreview}
+          />
           {preview.latencyMs !== undefined && (
             <span className={styles.latencyBadge}>Rendered in {preview.latencyMs}ms via Remotion</span>
           )}
         </div>
       )}
     </>
-  );
-}
-
-// ── Frame Strip Component (for map crossfade) ──
-
-function FrameStrip({ strip }: { strip: FrameStripState }) {
-  if (!strip.frames.some((f) => f.imageBase64)) return null;
-
-  return (
-    <div className={styles.frameStrip}>
-      {strip.frames.map((f) => (
-        <div key={f.frame} className={styles.frameStripItem}>
-          {f.imageBase64 ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={f.imageBase64} alt={`Frame ${f.frame}`} className={styles.frameStripImage} />
-          ) : f.error ? (
-            <span className={styles.errorText}>{f.error}</span>
-          ) : (
-            <span className={styles.spinner} />
-          )}
-          <span className={styles.frameStripLabel}>
-            {f.frame === 0 ? 'Modern' : f.frame > 100 ? 'Historical' : 'Crossfade'}
-          </span>
-        </div>
-      ))}
-      {strip.latencyMs !== undefined && (
-        <span className={styles.latencyBadge}>Total: {strip.latencyMs}ms</span>
-      )}
-    </div>
   );
 }
 
@@ -491,12 +462,14 @@ function ClassifierSection({
               <div className={styles.previewAllStrip}>
                 {previewAllState.segments.map((seg) => (
                   <div key={seg.index} className={styles.previewAllItem}>
-                    {seg.imageBase64 ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={seg.imageBase64}
-                        alt={`Segment ${seg.index} preview`}
-                        className={styles.previewAllImage}
+                    {seg.videoBase64 ? (
+                      <video
+                        src={seg.videoBase64}
+                        autoPlay
+                        loop
+                        muted
+                        playsInline
+                        className={styles.previewAllVideo}
                       />
                     ) : seg.error ? (
                       <div className={styles.previewAllPlaceholder}>
@@ -666,8 +639,6 @@ function MapImageSection({
   mapPresets,
   preview,
   onPreview,
-  frameStrip,
-  onFrameStrip,
 }: {
   result: TestResult;
   onTest: (body: Record<string, unknown>) => void;
@@ -675,8 +646,6 @@ function MapImageSection({
   mapPresets: MapPresetId[];
   preview: PreviewState | undefined;
   onPreview: () => void;
-  frameStrip: FrameStripState | undefined;
-  onFrameStrip: () => void;
 }) {
   const [place, setPlace] = useState('');
   const [preset, setPreset] = useState<MapPresetId>('vintage');
@@ -798,19 +767,7 @@ function MapImageSection({
 
           <div className={styles.buttonRow} style={{ marginTop: 'var(--spacing-sm)' }}>
             <PreviewButton preview={preview} onPreview={onPreview} />
-            {resolvedPlace?.historicalContext && resolvedPlace.historicalContext.length > 0 && (
-              <button
-                type="button"
-                className={styles.previewButton}
-                onClick={onFrameStrip}
-                disabled={frameStrip?.loading}
-              >
-                <Eye size={14} aria-hidden="true" />
-                {frameStrip?.loading ? 'Rendering crossfade…' : 'Preview Historical Crossfade'}
-              </button>
-            )}
           </div>
-          {frameStrip && <FrameStrip strip={frameStrip} />}
         </div>
       )}
     </SectionShell>
@@ -1041,9 +998,6 @@ function StockFootageSection({
               <div className={styles.buttonRow} style={{ marginTop: 'var(--spacing-sm)' }}>
                 <PreviewButton preview={preview} onPreview={onPreview} />
               </div>
-              <p className={styles.previewNote}>
-                Still preview uses the thumbnail image. Actual video uses the full clip.
-              </p>
             </>
           ) : (
             <span className={styles.errorText}>No results found for this query</span>
@@ -1060,7 +1014,7 @@ interface PreviewAllSegment {
   index: number;
   visualType: string;
   text: string;
-  imageBase64?: string;
+  videoBase64?: string;
   error?: string;
 }
 
@@ -1090,7 +1044,6 @@ export function VideoTestBench({ envAvailability, mapPresets, imageModels, aiPro
     'stock-footage': { status: 'idle' },
   });
   const [previews, setPreviews] = useState<Record<string, PreviewState>>({});
-  const [mapFrameStrip, setMapFrameStrip] = useState<FrameStripState>();
   const [previewAll, setPreviewAll] = useState<PreviewAllState>(INITIAL_PREVIEW_ALL);
   const [segmentsText, setSegmentsText] = useState('');
 
@@ -1130,16 +1083,16 @@ export function VideoTestBench({ envAvailability, mapPresets, imageModels, aiPro
 
   const previewMapImage = useCallback(async () => {
     const mapResult = results['map-image'];
-    const imageBase64 = mapResult.data?.imageBase64 as string | undefined;
+    const mapImageBase64 = mapResult.data?.imageBase64 as string | undefined;
     const resolvedPlace = mapResult.data?.resolvedPlace as { name: string } | undefined;
-    if (!imageBase64 || !resolvedPlace) return;
+    if (!mapImageBase64 || !resolvedPlace) return;
 
     setPreviews((prev) => ({ ...prev, 'map-image': { loading: true } }));
     try {
-      const result = await renderStill({
+      const result = await renderClip({
         visualType: 'MAP_OVERLAY',
         text: resolvedPlace.name,
-        assetUrl: imageBase64,
+        assetUrl: mapImageBase64,
         metadata: { places: [resolvedPlace] },
       });
       setPreviews((prev) => ({ ...prev, 'map-image': { loading: false, ...result } }));
@@ -1151,68 +1104,17 @@ export function VideoTestBench({ envAvailability, mapPresets, imageModels, aiPro
     }
   }, [results]);
 
-  const previewMapFrameStrip = useCallback(async () => {
-    const mapResult = results['map-image'];
-    const imageBase64 = mapResult.data?.imageBase64 as string | undefined;
-    const resolvedPlace = mapResult.data?.resolvedPlace as { name: string } | undefined;
-    if (!imageBase64 || !resolvedPlace) return;
-
-    const duration = 10;
-    const fps = 30;
-    const totalFrames = duration * fps;
-    const framePoints = [
-      { frame: 0, label: 'Modern' },
-      { frame: Math.floor(totalFrames * 0.5), label: 'Crossfade' },
-      { frame: Math.floor(totalFrames * 0.8), label: 'Historical' },
-    ];
-
-    setMapFrameStrip({
-      loading: true,
-      frames: framePoints.map((f) => ({ frame: f.frame })),
-    });
-
-    const start = Date.now();
-    const segment = {
-      visualType: 'MAP_OVERLAY',
-      text: resolvedPlace.name,
-      assetUrl: imageBase64,
-      metadata: { places: [resolvedPlace] },
-      duration,
-    };
-
-    for (const fp of framePoints) {
-      try {
-        const result = await renderStill(segment, fp.frame);
-        setMapFrameStrip((prev) => prev ? {
-          ...prev,
-          frames: prev.frames.map((f) =>
-            f.frame === fp.frame ? { ...f, imageBase64: result.imageBase64 } : f,
-          ),
-        } : prev);
-      } catch (err) {
-        setMapFrameStrip((prev) => prev ? {
-          ...prev,
-          frames: prev.frames.map((f) =>
-            f.frame === fp.frame ? { ...f, error: err instanceof Error ? err.message : 'Failed' } : f,
-          ),
-        } : prev);
-      }
-    }
-
-    setMapFrameStrip((prev) => prev ? { ...prev, loading: false, latencyMs: Date.now() - start } : prev);
-  }, [results]);
-
   const previewAiIllustration = useCallback(async () => {
     const aiResult = results['ai-illustration'];
-    const imageBase64 = aiResult.data?.imageBase64 as string | undefined;
-    if (!imageBase64) return;
+    const aiImageBase64 = aiResult.data?.imageBase64 as string | undefined;
+    if (!aiImageBase64) return;
 
     setPreviews((prev) => ({ ...prev, 'ai-illustration': { loading: true } }));
     try {
-      const result = await renderStill({
+      const result = await renderClip({
         visualType: 'AI_ILLUSTRATION',
         text: 'AI Illustration',
-        assetUrl: imageBase64,
+        assetUrl: aiImageBase64,
         prompt: 'test',
       });
       setPreviews((prev) => ({ ...prev, 'ai-illustration': { loading: false, ...result } }));
@@ -1226,15 +1128,15 @@ export function VideoTestBench({ envAvailability, mapPresets, imageModels, aiPro
 
   const previewStockFootage = useCallback(async () => {
     const stockResult = results['stock-footage'];
-    const stock = stockResult.data?.result as { thumbnailUrl: string; photographer: string } | null | undefined;
+    const stock = stockResult.data?.result as { url: string; photographer: string } | null | undefined;
     if (!stock) return;
 
     setPreviews((prev) => ({ ...prev, 'stock-footage': { loading: true } }));
     try {
-      const result = await renderStill({
+      const result = await renderClip({
         visualType: 'STOCK_FOOTAGE',
         text: 'Stock Footage',
-        assetUrl: stock.thumbnailUrl,
+        assetUrl: stock.url,
         metadata: { photographer: stock.photographer },
       });
       setPreviews((prev) => ({ ...prev, 'stock-footage': { loading: false, ...result } }));
@@ -1263,7 +1165,7 @@ export function VideoTestBench({ envAvailability, mapPresets, imageModels, aiPro
       if (!mapData.success) throw new Error(mapData.error ?? 'Map generation failed');
 
       // Step 2: Render through Remotion
-      const result = await renderStill({
+      const result = await renderClip({
         visualType: 'MAP_OVERLAY',
         text: place.name,
         assetUrl: mapData.imageBase64,
@@ -1372,12 +1274,12 @@ export function VideoTestBench({ envAvailability, mapPresets, imageModels, aiPro
           throw new Error('Remotion unreachable');
         }
 
-        const result = await renderStill(segmentInput);
+        const result = await renderClip(segmentInput);
         setPreviewAll((prev) => ({
           ...prev,
           completed: ++completed,
           segments: prev.segments.map((s) =>
-            s.index === segIdx ? { ...s, imageBase64: result.imageBase64 } : s,
+            s.index === segIdx ? { ...s, videoBase64: result.videoBase64 } : s,
           ),
         }));
       } catch (err) {
@@ -1441,8 +1343,6 @@ export function VideoTestBench({ envAvailability, mapPresets, imageModels, aiPro
         mapPresets={mapPresets}
         preview={previews['map-image']}
         onPreview={previewMapImage}
-        frameStrip={mapFrameStrip}
-        onFrameStrip={previewMapFrameStrip}
       />
       <AIIllustrationSection
         result={results['ai-illustration']}
