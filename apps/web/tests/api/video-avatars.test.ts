@@ -178,7 +178,7 @@ describe('GET /api/podcasts/[podcastId]/video/avatars', () => {
     const data = await res.json();
     expect(data.avatars[0].provider).toBe('runway');
     expect(data.pricing.costPerMinute).toBe(0.2);
-    expect(mockListUnifiedAvatars).toHaveBeenCalledWith('test-runway-key', 'runway');
+    expect(mockListUnifiedAvatars).toHaveBeenCalledWith('test-runway-key', 'runway', 'user-1');
   });
 
   it('rejects unauthorized requests', async () => {
