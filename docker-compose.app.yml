@@ -28,6 +28,7 @@ services:
       - .env
     environment:
       NODE_ENV: production
+      HOSTNAME: '0.0.0.0'
       DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL}
       REDIS_URL: ${REDIS_URL:?Set REDIS_URL}
     healthcheck:
@@ -60,6 +61,7 @@ services:
       - .env
     environment:
       NODE_ENV: production
+      HOSTNAME: '0.0.0.0'
     ports:
       - '127.0.0.1:${MAPS_PORT:?Set MAPS_PORT}:3002'
     healthcheck:
