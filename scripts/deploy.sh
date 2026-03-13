@@ -56,7 +56,13 @@ echo ""
 echo "=== Downloading secrets from Doppler ==="
 doppler secrets download --no-file --format env > .env
 chmod 600 .env
+set -a
 source .env
+if [ -f .env.workers.local ]; then
+  echo "Loading worker overrides from .env.workers.local"
+  source .env.workers.local
+fi
+set +a
 
 # --- Caddy config ---
 
@@ -167,6 +173,7 @@ BASE_URL="http://127.0.0.1:${NEW_WEB_PORT}" bash scripts/smoke-prod.sh
 
 echo ""
 echo "=== Building and restarting workers ==="
+echo "Worker presets: heavy=${WORKER_PRESET_HEAVY:-full} pipeline=${WORKER_PRESET_PIPELINE:-full} light=${WORKER_PRESET_LIGHT:-full}"
 docker compose -f "$COMPOSE_WORKERS" build
 docker compose -f "$COMPOSE_WORKERS" up -d --force-recreate
 
