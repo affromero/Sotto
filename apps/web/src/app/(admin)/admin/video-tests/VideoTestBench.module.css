@@ -107,6 +107,13 @@
   padding: var(--spacing-md);
 }
 
+.sectionDescription {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--spacing-md) 0;
+  line-height: 1.5;
+}
+
 .disabledSection {
   padding: var(--spacing-md);
   text-align: center;
@@ -207,8 +214,11 @@
   cursor: not-allowed;
 }
 
-.sampleButton {
+.randomizeButton {
   appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 8px 16px;
   background: transparent;
   color: var(--color-text-secondary);
@@ -221,7 +231,7 @@
   white-space: nowrap;
 }
 
-.sampleButton:hover {
+.randomizeButton:hover {
   border-color: var(--color-primary);
   color: var(--color-primary);
 }
