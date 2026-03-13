@@ -23,6 +23,7 @@ import { processAnnouncement } from './announcement.worker';
 import { isTwitterConfigured } from '@/lib/twitter';
 import { isTelegramBotConfigured, setWebhook, deleteWebhook } from '@/lib/telegram';
 import { logger } from '@/lib/logger';
+import { closeRedis } from '@/lib/redis';
 import { processContentExtraction } from './content-extraction.worker';
 import { processScriptGeneration } from './script-generation.worker';
 import { processReferenceValidation } from './reference-validation.worker';
@@ -339,6 +340,7 @@ logger.info(`${workers.length} workers started`, { profile: WORKER_PROFILE });
 async function shutdown() {
   logger.info('Shutting down workers...');
   await Promise.all(workers.map((w) => w.close()));
+  await closeRedis();
   logger.info('All workers stopped');
   process.exit(0);
 }
