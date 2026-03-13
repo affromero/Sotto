@@ -10,6 +10,10 @@ interface ModelTestPanelProps {
   aiProviders: TestableProvider[];
   ttsProviders: TestableProvider[];
   sttProviders: TestableProvider[];
+  imageProviders: TestableProvider[];
+  videoProviders: TestableProvider[];
+  avatarProviders: TestableProvider[];
+  musicProviders: TestableProvider[];
   kittenConfigured: boolean;
 }
 
@@ -20,6 +24,8 @@ interface TestResult {
   latencyMs?: number;
   response?: string;
   audioData?: string;
+  imageData?: string;
+  avatarCount?: number;
   transcript?: string;
   ttsSource?: string;
   error?: string;
@@ -34,6 +40,8 @@ interface TestResponse {
   latencyMs: number;
   response?: string;
   audioData?: string;
+  imageData?: string;
+  avatarCount?: number;
   transcript?: string;
   ttsSource?: string;
   error?: string;
@@ -87,6 +95,25 @@ function ResultCell({ provider, result }: { provider: TestableProvider; result: 
           )}
         </span>
       );
+    }
+    if (provider.category === 'image' && result.imageData) {
+      return <img src={result.imageData} alt="Generated test image" className={styles.testImage} />;
+    }
+    if (provider.category === 'avatar') {
+      if (result.imageData) {
+        return (
+          <span className={styles.responseText}>
+            <img src={result.imageData} alt="Generated test" className={styles.testImage} />
+            {result.response && <span> {result.response}</span>}
+          </span>
+        );
+      }
+      if (result.avatarCount !== undefined) {
+        return <span className={styles.responseText}>{result.avatarCount} avatars available</span>;
+      }
+    }
+    if (result.response) {
+      return <span className={styles.responseText}>{result.response}</span>;
     }
   }
   return null;
@@ -166,7 +193,14 @@ function Section({ label, providers, results, onTest, onTestAll }: SectionProps)
                 const isRunning = result.status === 'running';
                 return (
                   <tr key={key} className={styles.row}>
-                    <td className={styles.td}>{p.providerName}</td>
+                    <td className={styles.td}>
+                      {p.providerName}
+                      {p.disabled && (
+                        <span className={styles.disabledBadge} title={p.disabledReason}>
+                          Disabled
+                        </span>
+                      )}
+                    </td>
                     <td className={styles.tdMono}>{p.modelId}</td>
                     <td className={styles.td}>
                       <span className={`${styles.tier} ${styles[`tier_${p.tier.replace('-', '_')}`]}`}>
@@ -206,7 +240,16 @@ function Section({ label, providers, results, onTest, onTestAll }: SectionProps)
   );
 }
 
-export function ModelTestPanel({ aiProviders, ttsProviders, sttProviders, kittenConfigured }: ModelTestPanelProps) {
+export function ModelTestPanel({
+  aiProviders,
+  ttsProviders,
+  sttProviders,
+  imageProviders,
+  videoProviders,
+  avatarProviders,
+  musicProviders,
+  kittenConfigured,
+}: ModelTestPanelProps) {
   const [results, setResults] = useState<Record<string, TestResult>>({});
 
   const setResult = useCallback((key: string, result: TestResult) => {
@@ -224,6 +267,8 @@ export function ModelTestPanel({ aiProviders, ttsProviders, sttProviders, kitten
           latencyMs: data.latencyMs,
           response: data.response,
           audioData: data.audioData,
+          imageData: data.imageData,
+          avatarCount: data.avatarCount,
           transcript: data.transcript,
           ttsSource: data.ttsSource,
           error: data.error,
@@ -252,6 +297,8 @@ export function ModelTestPanel({ aiProviders, ttsProviders, sttProviders, kitten
               latencyMs: data.latencyMs,
               response: data.response,
               audioData: data.audioData,
+              imageData: data.imageData,
+              avatarCount: data.avatarCount,
               transcript: data.transcript,
               ttsSource: data.ttsSource,
               error: data.error,
@@ -288,6 +335,34 @@ export function ModelTestPanel({ aiProviders, ttsProviders, sttProviders, kitten
       <Section
         label="STT (Speech-to-Text)"
         providers={sttProviders}
+        results={results}
+        onTest={runSingle}
+        onTestAll={runAll}
+      />
+      <Section
+        label="Image"
+        providers={imageProviders}
+        results={results}
+        onTest={runSingle}
+        onTestAll={runAll}
+      />
+      <Section
+        label="Video"
+        providers={videoProviders}
+        results={results}
+        onTest={runSingle}
+        onTestAll={runAll}
+      />
+      <Section
+        label="Avatar"
+        providers={avatarProviders}
+        results={results}
+        onTest={runSingle}
+        onTestAll={runAll}
+      />
+      <Section
+        label="Music"
+        providers={musicProviders}
         results={results}
         onTest={runSingle}
         onTestAll={runAll}

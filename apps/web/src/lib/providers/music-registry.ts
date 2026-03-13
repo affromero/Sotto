@@ -20,6 +20,9 @@ export interface MusicProviderMeta {
   models: MusicModelOption[];
   /** Env var name for the platform API key. */
   platformKeyEnv: string;
+  auth: {
+    validate: (credentials: Record<string, string>) => Promise<boolean>;
+  };
 }
 
 const MUSIC_PROVIDERS: Record<MusicProviderId, MusicProviderMeta> = {
@@ -36,6 +39,18 @@ const MUSIC_PROVIDERS: Record<MusicProviderId, MusicProviderMeta> = {
       { id: 'suno-v5', displayName: 'Suno V5', costPerTrack: 0.10 },
     ],
     platformKeyEnv: 'SUNO_API_KEY',
+    auth: {
+      validate: async (creds) => {
+        try {
+          const res = await fetch('https://api.sunoapi.org/api/v1/generate/get-credits', {
+            headers: { Authorization: `Bearer ${creds.apiKey}` },
+          });
+          return res.ok;
+        } catch {
+          return false;
+        }
+      },
+    },
   },
 
   elevenlabs: {
@@ -47,6 +62,18 @@ const MUSIC_PROVIDERS: Record<MusicProviderId, MusicProviderMeta> = {
       { id: 'eleven-music-v1', displayName: 'ElevenLabs Music', costPerTrack: 0.10 },
     ],
     platformKeyEnv: 'ELEVENLABS_API_KEY',
+    auth: {
+      validate: async (creds) => {
+        try {
+          const res = await fetch('https://api.elevenlabs.io/v1/user', {
+            headers: { 'xi-api-key': creds.apiKey },
+          });
+          return res.ok;
+        } catch {
+          return false;
+        }
+      },
+    },
   },
 };
 
