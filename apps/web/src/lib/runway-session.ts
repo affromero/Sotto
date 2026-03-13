@@ -1,20 +1,25 @@
-import { chromium } from 'playwright';
-import { readFileSync } from 'fs';
-import { writeFile } from 'fs/promises';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { readFile, writeFile } from 'fs/promises';
+import { chromium } from 'playwright';
 import type { RunwaySessionCredentials } from './runway';
 import { logger } from './logger';
 
 const execFileAsync = promisify(execFile);
+
+// livekit-client v2 UMD bundle — used inside headless Chrome to connect to LiveKit.
+// Using browser WebRTC avoids the H264 decode failure in @livekit/rtc-node's
+// Darwin arm64 binary (compiled without FFmpeg H264 or VideoToolbox activation).
+const LIVEKIT_CLIENT_CDN =
+  'https://cdn.jsdelivr.net/npm/livekit-client@2.10.0/dist/livekit-client.umd.min.js';
 
 export interface RunwayRecordingConfig {
   credentials: RunwaySessionCredentials;
   audioFilePath: string;
   outputVideoPath: string;
   onProgress?: (pct: number) => void;
+  /** @internal override timer delays in tests */
+  _delayMs?: { trailing?: number };
 }
 
 export interface RunwayRecordingResult {
@@ -24,205 +29,267 @@ export interface RunwayRecordingResult {
   height: number;
 }
 
-/** Convert audio file to base64 WAV (48kHz mono) for browser playback. */
-async function audioToBase64Wav(audioPath: string): Promise<{ base64: string; durationSeconds: number }> {
-  const { stdout: durationStr } = await execFileAsync('ffprobe', [
-    '-v', 'quiet', '-show_entries', 'format=duration',
-    '-of', 'default=noprint_wrappers=1:nokey=1', audioPath,
+async function getAudioDuration(audioPath: string): Promise<number> {
+  const { stdout } = await execFileAsync('ffprobe', [
+    '-v', 'quiet',
+    '-show_entries', 'format=duration',
+    '-of', 'default=noprint_wrappers=1:nokey=1',
+    audioPath,
   ]);
-  const durationSeconds = parseFloat(durationStr.trim());
-
-  const { stdout } = await execFileAsync('ffmpeg', [
-    '-i', audioPath, '-f', 'wav', '-ar', '48000', '-ac', '1', 'pipe:1',
-  ], { encoding: 'buffer', maxBuffer: 100 * 1024 * 1024 });
-
-  return { base64: (stdout as unknown as Buffer).toString('base64'), durationSeconds };
-}
-
-function buildCapturePage(livekitJs: string): string {
-  return `<!DOCTYPE html>
-<html><head><meta charset="utf-8"></head>
-<body>
-<video id="remoteVideo" autoplay muted playsinline style="width:1088px;height:704px;background:#000"></video>
-<script>${livekitJs}</script>
-<script>
-window.__captureState = { connected: false, recordingDone: false, error: null, videoBase64: null };
-
-window.runCapture = async function(config) {
-  try {
-    const room = new LivekitClient.Room({ adaptiveStream: false, dynacast: false });
-
-    room.on(LivekitClient.RoomEvent.TrackSubscribed, (track) => {
-      if (track.kind === LivekitClient.Track.Kind.Video) {
-        const el = document.getElementById('remoteVideo');
-        track.attach(el);
-      }
-    });
-
-    await room.connect(config.url, config.token);
-    window.__captureState.connected = true;
-
-    // Decode audio and publish
-    const audioBytes = Uint8Array.from(atob(config.audioBase64), c => c.charCodeAt(0));
-    const audioCtx = new AudioContext({ sampleRate: 48000 });
-    await audioCtx.resume(); // Headless Chromium starts AudioContext suspended — must resume before playback
-    const audioBuffer = await audioCtx.decodeAudioData(audioBytes.buffer);
-
-    const source = audioCtx.createBufferSource();
-    source.buffer = audioBuffer;
-    const dest = audioCtx.createMediaStreamDestination();
-    source.connect(dest);
-
-    const audioTrack = new LivekitClient.LocalAudioTrack(dest.stream.getAudioTracks()[0]);
-    await room.localParticipant.publishTrack(audioTrack);
-
-    // Start audio immediately so Runway receives it from the moment the track is published.
-    // Previously source.start(0) was called after recorder.start(), meaning Runway processed
-    // a silent track and generated idle/mouth-closed video before audio arrived.
-    source.start(0);
-
-    // Wait for remote video
-    await new Promise((resolve) => {
-      const check = setInterval(() => {
-        const el = document.getElementById('remoteVideo');
-        if (el && el.videoWidth > 0) { clearInterval(check); resolve(); }
-      }, 100);
-    });
-
-    // Start recording
-    const videoEl = document.getElementById('remoteVideo');
-    const stream = videoEl.captureStream(30);
-    const recorder = new MediaRecorder(stream, {
-      mimeType: 'video/webm;codecs=vp9',
-      videoBitsPerSecond: 4000000,
-    });
-    const chunks = [];
-    recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
-
-    recorder.onstop = async () => {
-      const blob = new Blob(chunks, { type: 'video/webm' });
-      const reader = new FileReader();
-      reader.onload = () => {
-        window.__captureState.videoBase64 = reader.result.split(',')[1];
-        window.__captureState.recordingDone = true;
-      };
-      reader.readAsDataURL(blob);
-    };
-
-    recorder.start(1000);
-
-    // Wait for audio to finish
-    await new Promise((resolve) => { source.onended = resolve; });
-
-    // Small buffer for any trailing video frames
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    recorder.stop();
-
-    // Disconnect
-    room.disconnect();
-  } catch (err) {
-    window.__captureState.error = err.message || String(err);
-  }
-};
-</script>
-</body></html>`;
+  return parseFloat(stdout.trim());
 }
 
 /**
- * Record a Runway realtime session via headless Chromium.
- * Connects to LiveKit, publishes audio, captures avatar video via MediaRecorder.
+ * Record a Runway realtime session using headless Chrome via Playwright.
+ *
+ * Why Playwright instead of @livekit/rtc-node:
+ *   The livekit-ffi Darwin arm64 binary was compiled without FFmpeg H264 support
+ *   and without VideoToolbox activation, so every incoming H264 RTP packet fails to
+ *   decode ("FFmpeg H.264 decoder not found", "Failed to initialize decoder"), resulting
+ *   in 0 video frames. Headless Chrome has native H264 decode (VideoToolbox on macOS,
+ *   software codec via system libraries on Linux), so the browser approach produces a
+ *   working VP9 WebM reliably across platforms.
+ *
+ * Approach:
+ *   1. Load livekit-client browser SDK from CDN into headless Chrome
+ *   2. Connect to the LiveKit room as a browser participant
+ *   3. Subscribe to the avatar's H264 video track (Chrome decodes it natively)
+ *   4. Build a synthetic microphone from the audio file via AudioContext
+ *   5. Publish the synthetic audio track so Runway generates lip-synced video
+ *   6. Record the decoded video stream with MediaRecorder (VP9/VP8 WebM)
+ *   7. Stream encoded chunks back to Node.js via page.exposeFunction
+ *   8. Write the concatenated chunks to outputVideoPath
  */
 export async function recordRunwaySession(config: RunwayRecordingConfig): Promise<RunwayRecordingResult> {
-  const { credentials, audioFilePath, outputVideoPath, onProgress } = config;
+  const { credentials, audioFilePath, outputVideoPath, onProgress, _delayMs } = config;
+  const trailingMs = _delayMs?.trailing ?? 2000;
 
-  // Convert audio to base64 WAV
-  const { base64: audioBase64, durationSeconds } = await audioToBase64Wav(audioFilePath);
+  // Step 1: get audio duration
+  const durationSeconds = await getAudioDuration(audioFilePath);
+  onProgress?.(5);
+
+  // Step 2: read audio as base64 data URL for browser consumption
+  const audioBuffer = await readFile(audioFilePath);
+  const audioDataUrl = `data:audio/mpeg;base64,${audioBuffer.toString('base64')}`;
   onProgress?.(10);
 
-  // Load vendored livekit-client
-  const currentDir = dirname(fileURLToPath(import.meta.url));
-  const livekitJs = readFileSync(join(currentDir, 'vendor', 'livekit-client.umd.js'), 'utf-8');
+  logger.info('Launching headless Chrome for Runway recording', {
+    audioFilePath,
+    outputVideoPath,
+    durationSeconds,
+  });
 
+  // Step 3: launch headless Chrome
   const browser = await chromium.launch({
     headless: true,
     args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
       '--autoplay-policy=no-user-gesture-required',
-      '--use-fake-ui-for-media-stream',
-      // Prevent Chromium from throttling the AudioContext in headless mode.
-      // Without these flags, Chrome suspends audio graph processing after ~1s
-      // (no visible window, no audio output device), causing the MediaStreamDestination
-      // to deliver silence to LiveKit. Runway then generates idle animation instead of
-      // lip-synced video for the remainder of the recording.
-      '--disable-background-timer-throttling',
-      '--disable-renderer-backgrounding',
-      '--disable-backgrounding-occluded-windows',
     ],
   });
 
-  try {
-    const page = await browser.newPage();
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
 
-    const html = buildCapturePage(livekitJs);
-    await page.setContent(html, { waitUntil: 'domcontentloaded' });
-    onProgress?.(20);
+  page.on('console', (msg) => {
+    const type = msg.type();
+    if (type === 'error') logger.error('Runway browser error', { text: msg.text() });
+    else if (type === 'warning') logger.warn('Runway browser warning', { text: msg.text() });
+    else logger.debug('Runway browser log', { text: msg.text() });
+  });
 
-    // Start capture
-    await page.evaluate(
-      (cfg: { url: string; token: string; roomName: string; audioBase64: string }) => {
-        (window as unknown as { runCapture: (c: typeof cfg) => void }).runCapture(cfg);
-      },
-      {
-        url: credentials.url,
-        token: credentials.token,
-        roomName: credentials.roomName,
-        audioBase64,
-      },
-    );
+  // Step 4: collect video chunks from the browser
+  const chunkBuffers: Buffer[] = [];
+  await page.exposeFunction('onVideoChunk', (base64: string) => {
+    chunkBuffers.push(Buffer.from(base64, 'base64'));
+  });
 
-    // Poll for completion
-    const timeoutMs = (durationSeconds + 30) * 1000;
-    const startTime = Date.now();
+  await page.exposeFunction('reportProgress', (pct: number) => {
+    onProgress?.(pct);
+  });
 
-    while (Date.now() - startTime < timeoutMs) {
-      const state = await page.evaluate(() =>
-        (window as unknown as { __captureState: { recordingDone: boolean; error: string | null; videoBase64: string | null } }).__captureState,
-      );
+  // Step 5: load livekit-client from CDN
+  await page.goto('about:blank');
+  await page.addScriptTag({ url: LIVEKIT_CLIENT_CDN });
+  await page.waitForFunction(() => !!(window as unknown as Record<string, unknown>).LivekitClient);
+  onProgress?.(15);
 
-      if (state.error) {
-        throw new Error(`Runway capture error: ${state.error}`);
-      }
+  // Step 6: run the full recording session inside the browser
+  const result = await page.evaluate(
+    async (params) => {
+      const win = window as unknown as Record<string, unknown>;
+      const report = win.reportProgress as (pct: number) => void;
+      const LK = win.LivekitClient as Record<string, unknown>;
+      const Room = LK.Room as new () => Record<string, unknown>;
+      const RoomEvent = LK.RoomEvent as Record<string, string>;
+      const Track = LK.Track as Record<string, Record<string, string>>;
+      const LocalAudioTrack = LK.LocalAudioTrack as new (
+        track: MediaStreamTrack,
+        constraints?: unknown,
+        userProvidedTrack?: boolean,
+      ) => Record<string, unknown>;
 
-      if (state.recordingDone && state.videoBase64) {
-        onProgress?.(80);
+      const { credentials, audioDataUrl, durationSeconds, trailingMs } = params;
 
-        // Write video to file
-        const videoBuffer = Buffer.from(state.videoBase64, 'base64');
-        await writeFile(outputVideoPath, videoBuffer);
+      const room = new Room();
 
-        onProgress?.(90);
+      // 6a. Subscribe to video → start MediaRecorder
+      let width = 1088;
+      let height = 704;
 
-        return {
-          videoPath: outputVideoPath,
-          durationSeconds,
-          width: 1088,
-          height: 704,
-        };
-      }
+      const videoReadyPromise = new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(
+          () => reject(new Error('Video track not subscribed within 15s')),
+          15_000,
+        );
 
-      // Report progress based on elapsed time
-      const elapsed = (Date.now() - startTime) / 1000;
-      const pct = Math.min(75, 20 + (elapsed / durationSeconds) * 55);
-      onProgress?.(Math.round(pct));
+        (room as Record<string, (event: string, cb: (...args: unknown[]) => void) => void>).on(
+          RoomEvent.TrackSubscribed,
+          (...args: unknown[]) => {
+            const track = args[0] as Record<string, unknown>;
+            const pub = args[1] as Record<string, unknown>;
+            const kind = track.kind as string;
+            if (kind !== Track.Kind.Video) return;
+            clearTimeout(timeout);
 
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-    }
+            width = (pub.dimensions as Record<string, number> | undefined)?.width ?? 1088;
+            height = (pub.dimensions as Record<string, number> | undefined)?.height ?? 704;
 
-    throw new Error(`Runway recording timed out after ${Math.round(timeoutMs / 1000)}s`);
-  } finally {
-    await browser.close().catch((err: unknown) => {
-      logger.warn('Failed to close Playwright browser', {
-        error: err instanceof Error ? err.message : String(err),
+            const mediaStreamTrack = track.mediaStreamTrack as MediaStreamTrack;
+            const stream = new MediaStream([mediaStreamTrack]);
+
+            const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+              ? 'video/webm;codecs=vp9'
+              : MediaRecorder.isTypeSupported('video/webm;codecs=vp8')
+                ? 'video/webm;codecs=vp8'
+                : 'video/webm';
+
+            const recorder = new MediaRecorder(stream, { mimeType });
+            win.__recorder = recorder;
+
+            recorder.ondataavailable = (e: BlobEvent) => {
+              if (e.data.size > 0) {
+                const reader = new FileReader();
+                reader.onload = () => {
+                  const base64 = (reader.result as string).split(',')[1];
+                  (win.onVideoChunk as (b: string) => void)(base64);
+                };
+                reader.readAsDataURL(e.data);
+              }
+            };
+
+            recorder.start(200);
+            resolve();
+          },
+        );
       });
-    });
+
+      // 6b. Connect to LiveKit room
+      await (
+        room as Record<
+          string,
+          (url: string, token: string, opts: Record<string, unknown>) => Promise<void>
+        >
+      ).connect(credentials.url, credentials.token, {
+        autoSubscribe: true,
+        dynacast: false,
+      });
+      report(20);
+
+      // 6c. Wait for video track
+      await videoReadyPromise;
+      report(25);
+
+      // 6d. Build synthetic audio from data URL via AudioContext
+      const audioCtx = new AudioContext({ sampleRate: 48000 });
+      await audioCtx.resume();
+
+      const fetchResp = await fetch(audioDataUrl);
+      const audioArrayBuffer = await fetchResp.arrayBuffer();
+      const audioBufferNode = await audioCtx.decodeAudioData(audioArrayBuffer);
+
+      const bufferSource = audioCtx.createBufferSource();
+      bufferSource.buffer = audioBufferNode;
+      const dest = audioCtx.createMediaStreamDestination();
+      bufferSource.connect(dest);
+
+      // 6e. Publish audio track as microphone so Runway generates lip-synced video
+      const audioMediaTrack = dest.stream.getAudioTracks()[0];
+      const localAudioTrack = new LocalAudioTrack(audioMediaTrack, undefined, false);
+      await (
+        room as Record<
+          string,
+          Record<
+            string,
+            (track: unknown, opts: Record<string, unknown>) => Promise<void>
+          >
+        >
+      ).localParticipant.publishTrack(localAudioTrack, {
+        source: Track.Source.Microphone,
+      });
+      report(30);
+
+      // 6f. Play audio and wait for it to finish
+      const audioPlayDone = new Promise<void>((resolve) => {
+        bufferSource.onended = () => resolve();
+      });
+      bufferSource.start();
+
+      const progressInterval = setInterval(() => {
+        const elapsed = (audioCtx.currentTime / durationSeconds) * 50;
+        report(Math.round(30 + elapsed));
+      }, 500);
+
+      await audioPlayDone;
+      clearInterval(progressInterval);
+      report(80);
+
+      // 6g. Trailing frames then stop recording
+      await new Promise((r) => setTimeout(r, trailingMs));
+
+      const recorder = win.__recorder as MediaRecorder;
+      if (recorder && recorder.state !== 'inactive') {
+        await new Promise<void>((resolve) => {
+          recorder.onstop = () => resolve();
+          recorder.stop();
+        });
+      }
+
+      // 6h. Disconnect
+      await (room as Record<string, () => Promise<void>>).disconnect();
+
+      return { width, height, error: null as string | null };
+    },
+    { credentials, audioDataUrl, durationSeconds, trailingMs },
+  );
+
+  await browser.close();
+
+  if (result.error) {
+    throw new Error(result.error);
   }
+
+  if (chunkBuffers.length === 0) {
+    throw new Error('No video chunks received from Runway browser session');
+  }
+
+  logger.info('Runway browser session complete', {
+    chunks: chunkBuffers.length,
+    width: result.width,
+    height: result.height,
+  });
+
+  // Step 7: write concatenated WebM chunks to output
+  const videoData = Buffer.concat(chunkBuffers);
+  await writeFile(outputVideoPath, videoData);
+  onProgress?.(95);
+
+  return {
+    videoPath: outputVideoPath,
+    durationSeconds,
+    width: result.width,
+    height: result.height,
+  };
 }

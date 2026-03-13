@@ -767,6 +767,7 @@ describe('POST /api/voices/preview', () => {
 
   it('successfully generates voice preview audio', async () => {
     mockAuth.mockResolvedValue(mockSession);
+    mockUserFindUniqueOrThrow.mockResolvedValue({ role: 'ADMIN' });
     mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 9 });
     mockUserFindUniqueOrThrow.mockResolvedValue({ role: 'ADMIN' });
     const mockAudioBuffer = Buffer.from('fake-audio-data');
