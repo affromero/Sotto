@@ -14,6 +14,31 @@ export interface FalLipSyncResult {
   durationSeconds: number;
 }
 
+/**
+ * Parse Fal's FastAPI 422 validation errors into a human-readable string.
+ * Input: raw response text (may be JSON with `detail` array or plain text).
+ * Output: "field_name: error message" or the raw text if unparseable.
+ */
+function parseFalValidationError(text: string): string {
+  try {
+    const json = JSON.parse(text) as {
+      detail?: Array<{ loc?: (string | number)[]; msg?: string; type?: string }> | string;
+    };
+    if (Array.isArray(json.detail)) {
+      return json.detail
+        .map((d) => {
+          const field = d.loc?.filter((l) => l !== 'body').join('.') || 'unknown';
+          return `${field}: ${d.msg || 'validation error'}`;
+        })
+        .join('; ');
+    }
+    if (typeof json.detail === 'string') return json.detail;
+  } catch {
+    // Not JSON — return raw text
+  }
+  return text;
+}
+
 export async function submitFalLipSync(params: FalLipSyncParams): Promise<{ requestId: string; statusUrl: string; resultUrl: string }> {
   const { modelId, imageUrl, audioUrl, apiKey, prompt } = params;
 
@@ -41,7 +66,9 @@ export async function submitFalLipSync(params: FalLipSyncParams): Promise<{ requ
 
   if (!res.ok) {
     const text = await res.text().catch(() => 'unknown');
-    throw new Error(`Fal lip-sync submission failed (${res.status}): ${text}`);
+    // Parse FastAPI 422 validation errors to extract the failing field
+    const detail = parseFalValidationError(text);
+    throw new Error(`Fal lip-sync submission failed (${res.status}): ${detail}`);
   }
 
   const data = (await res.json()) as {
@@ -105,7 +132,8 @@ export async function pollFalLipSync(
     }
 
     if (status.status === 'FAILED') {
-      throw new Error(`Fal lip-sync generation failed: ${status.error || 'unknown'}`);
+      const errorDetail = typeof status.error === 'string' ? status.error : JSON.stringify(status.error ?? 'unknown');
+      throw new Error(`Fal lip-sync generation failed: ${errorDetail}`);
     }
   }
 
