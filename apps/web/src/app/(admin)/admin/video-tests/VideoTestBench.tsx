@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, Shuffle } from 'lucide-react';
 import type { EnvAvailability, ImageModelInfo } from './page';
 import type { MapPresetId } from '@sotto/maps/server';
 import styles from './VideoTestBench.module.css';
@@ -23,6 +23,10 @@ interface TestResult {
 
 type TestType = 'classify' | 'resolve-place' | 'map-image' | 'ai-illustration' | 'stock-footage';
 
+function pick<T>(arr: T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
 function StatusDot({ status }: { status: TestStatus }) {
   if (status === 'idle') return <span className={styles.dotIdle} aria-label="Idle">●</span>;
   if (status === 'running') return <span className={styles.spinner} aria-label="Running" />;
@@ -32,13 +36,14 @@ function StatusDot({ status }: { status: TestStatus }) {
 
 interface SectionShellProps {
   label: string;
+  description: string;
   result: TestResult;
   disabled?: boolean;
   disabledMessage?: React.ReactNode;
   children: React.ReactNode;
 }
 
-function SectionShell({ label, result, disabled, disabledMessage, children }: SectionShellProps) {
+function SectionShell({ label, description, result, disabled, disabledMessage, children }: SectionShellProps) {
   const [open, setOpen] = useState(true);
 
   return (
@@ -67,6 +72,7 @@ function SectionShell({ label, result, disabled, disabledMessage, children }: Se
           </div>
         ) : (
           <div className={styles.sectionBody}>
+            <p className={styles.sectionDescription}>{description}</p>
             {children}
           </div>
         )
@@ -74,6 +80,100 @@ function SectionShell({ label, result, disabled, disabledMessage, children }: Se
     </div>
   );
 }
+
+// ── Random data pools ──
+
+const CLASSIFIER_SAMPLES = [
+  {
+    title: 'The Fall of Constantinople',
+    topic: 'History',
+    segments: [
+      'Constantinople had been the capital of the Byzantine Empire for over a thousand years, a city of immense wealth and cultural significance.',
+      'Sultan Mehmed II assembled an army of over 80,000 soldiers and a fleet of more than 120 ships to besiege the city.',
+      'The massive walls of Constantinople, which had repelled invaders for centuries, were finally breached by Ottoman cannons on May 29, 1453.',
+      'The fall marked the end of the Roman Empire and shifted the balance of power in the Mediterranean world.',
+    ],
+  },
+  {
+    title: 'How CRISPR Changed Medicine',
+    topic: 'Science',
+    segments: [
+      'CRISPR-Cas9 was discovered in bacteria as a natural defense mechanism against viral infections.',
+      'Jennifer Doudna and Emmanuelle Charpentier demonstrated that CRISPR could be programmed to cut any DNA sequence.',
+      'The first clinical trial using CRISPR to treat sickle cell disease showed remarkable results in patients.',
+      'Ethical debates continue about the use of gene editing in human embryos and designer babies.',
+    ],
+  },
+  {
+    title: 'The Rise of Electric Vehicles',
+    topic: 'Technology',
+    segments: [
+      'Electric cars were actually invented before gasoline cars, with the first crude electric carriage built in the 1830s.',
+      'Tesla Motors revolutionized the industry by proving that electric vehicles could be desirable luxury products.',
+      'China has become the world leader in EV adoption, with over 60% of global electric vehicle sales.',
+      'The biggest challenge remaining is battery technology — energy density, charging speed, and rare earth mineral sourcing.',
+    ],
+  },
+  {
+    title: 'Deep Sea Mysteries',
+    topic: 'Nature',
+    segments: [
+      'More than 80% of the ocean floor remains unmapped and unexplored by humans.',
+      'The Mariana Trench reaches nearly 11 kilometers deep, with pressures over 1,000 times atmospheric pressure at sea level.',
+      'Bioluminescent creatures in the deep ocean produce their own light through chemical reactions.',
+      'Giant squid were considered mythological until a live specimen was finally photographed in 2004.',
+    ],
+  },
+  {
+    title: 'The Economics of Coffee',
+    topic: 'Business',
+    segments: [
+      'Coffee is the second most traded commodity in the world after crude oil, supporting over 125 million people.',
+      'A single cup of specialty coffee that costs $5 in New York often pays the farmer less than 10 cents.',
+      'Climate change is threatening coffee production, with some projections showing 50% less suitable land by 2050.',
+      'The third wave coffee movement has transformed coffee from a commodity into an artisanal experience.',
+    ],
+  },
+];
+
+const PLACE_SAMPLES = [
+  { query: 'Constantinople', yearHint: '1453' },
+  { query: 'Pompeii', yearHint: '79' },
+  { query: 'Machu Picchu', yearHint: '1450' },
+  { query: 'Alexandria', yearHint: '300' },
+  { query: 'Angkor Wat', yearHint: '1150' },
+  { query: 'Tenochtitlan', yearHint: '1500' },
+  { query: 'Carthage', yearHint: '-200' },
+  { query: 'Kyoto', yearHint: '1600' },
+  { query: 'Timbuktu', yearHint: '1350' },
+  { query: 'Babylon', yearHint: '-600' },
+];
+
+const MAP_PLACES = [
+  'Rome', 'Tokyo', 'Cairo', 'Petra', 'Athens',
+  'Cusco', 'Samarkand', 'Jerusalem', 'Istanbul', 'Varanasi',
+  'Great Wall of China', 'Stonehenge', 'Chichen Itza', 'Ephesus',
+];
+
+const ILLUSTRATION_PROMPTS = [
+  'A medieval scholar studying ancient manuscripts by candlelight in a monastery library',
+  'A bustling ancient Roman marketplace with merchants selling spices and silk',
+  'A dramatic volcanic eruption seen from a nearby village at sunset',
+  'A deep sea exploration scene with a submarine surrounded by bioluminescent creatures',
+  'An aerial view of terraced rice paddies in Southeast Asia during golden hour',
+  'A futuristic cityscape with flying vehicles and vertical gardens on skyscrapers',
+  'A Viking longship navigating through icy fjords under the northern lights',
+  'An ancient Egyptian workshop where artisans are painting hieroglyphs on papyrus',
+  'A coffee plantation in the Ethiopian highlands with workers harvesting cherries',
+  'A cross-section diagram of the ocean showing different depth zones and creatures',
+];
+
+const STOCK_QUERIES = [
+  'ocean waves', 'city skyline timelapse', 'forest aerial', 'cooking fire',
+  'space stars', 'mountain sunrise', 'underwater coral reef', 'busy street market',
+  'northern lights', 'rain on window', 'desert sand dunes', 'lightning storm',
+  'autumn leaves falling', 'science laboratory', 'ancient ruins',
+];
 
 // ── Classifier Section ──
 
@@ -90,15 +190,11 @@ function ClassifierSection({
   const [topic, setTopic] = useState('');
   const [segmentsText, setSegmentsText] = useState('');
 
-  function fillSample() {
-    setTitle('The Fall of Constantinople');
-    setTopic('History');
-    setSegmentsText(
-      'Constantinople had been the capital of the Byzantine Empire for over a thousand years, a city of immense wealth and cultural significance.\n' +
-      'Sultan Mehmed II assembled an army of over 80,000 soldiers and a fleet of more than 120 ships to besiege the city.\n' +
-      'The massive walls of Constantinople, which had repelled invaders for centuries, were finally breached by Ottoman cannons on May 29, 1453.\n' +
-      'The fall marked the end of the Roman Empire and shifted the balance of power in the Mediterranean world.'
-    );
+  function fillRandom() {
+    const sample = pick(CLASSIFIER_SAMPLES);
+    setTitle(sample.title);
+    setTopic(sample.topic);
+    setSegmentsText(sample.segments.join('\n'));
   }
 
   function handleTest() {
@@ -121,7 +217,7 @@ function ClassifierSection({
   return (
     <SectionShell
       label="Visual Classifier"
-
+      description="Tests the AI that decides which visual type each podcast segment gets (map, illustration, stock footage, text card, etc). Feed it a title, topic, and segment texts to see what visuals it picks."
       result={result}
       disabled={disabled}
       disabledMessage={<>Requires <code>ANTHROPIC_API_KEY</code></>}
@@ -165,10 +261,11 @@ function ClassifierSection({
           onClick={handleTest}
           disabled={result.status === 'running' || !title || !topic || !segmentsText.trim()}
         >
-          {result.status === 'running' ? 'Classifying…' : 'Classify'}
+          {result.status === 'running' ? 'Analyzing…' : 'Run Classification'}
         </button>
-        <button type="button" className={styles.sampleButton} onClick={fillSample}>
-          Sample Data
+        <button type="button" className={styles.randomizeButton} onClick={fillRandom}>
+          <Shuffle size={14} aria-hidden="true" />
+          Randomize
         </button>
       </div>
 
@@ -239,9 +336,10 @@ function PlaceResolverSection({
   const [query, setQuery] = useState('');
   const [yearHint, setYearHint] = useState('');
 
-  function fillSample() {
-    setQuery('Constantinople');
-    setYearHint('1453');
+  function fillRandom() {
+    const sample = pick(PLACE_SAMPLES);
+    setQuery(sample.query);
+    setYearHint(sample.yearHint);
   }
 
   function handleTest() {
@@ -261,7 +359,11 @@ function PlaceResolverSection({
   } | null | undefined;
 
   return (
-    <SectionShell label="Place Resolver" result={result}>
+    <SectionShell
+      label="Place Resolver"
+      description="Tests geographic lookup — converts a place name (optionally with a historical year) into coordinates and metadata. Used to position map overlays in videos."
+      result={result}
+    >
       <div className={styles.formGrid}>
         <div className={styles.formGridRow}>
           <div>
@@ -292,10 +394,11 @@ function PlaceResolverSection({
           onClick={handleTest}
           disabled={result.status === 'running' || !query}
         >
-          {result.status === 'running' ? 'Resolving…' : 'Resolve'}
+          {result.status === 'running' ? 'Resolving…' : 'Resolve Place'}
         </button>
-        <button type="button" className={styles.sampleButton} onClick={fillSample}>
-          Sample Data
+        <button type="button" className={styles.randomizeButton} onClick={fillRandom}>
+          <Shuffle size={14} aria-hidden="true" />
+          Randomize
         </button>
       </div>
 
@@ -359,6 +462,11 @@ function MapImageSection({
   const [width, setWidth] = useState('800');
   const [height, setHeight] = useState('600');
 
+  function fillRandom() {
+    setPlace(pick(MAP_PLACES));
+    setPreset(pick(mapPresets));
+  }
+
   function handleTest() {
     if (!place) return;
     onTest({
@@ -376,6 +484,7 @@ function MapImageSection({
   return (
     <SectionShell
       label="Map Image"
+      description="Generates a styled map image for a place. Resolves the place name to coordinates, then renders using the selected visual preset (vintage, satellite, etc)."
       result={result}
       disabled={disabled}
       disabledMessage={<>Requires <code>MAPBOX_ACCESS_TOKEN</code></>}
@@ -434,6 +543,10 @@ function MapImageSection({
         >
           {result.status === 'running' ? 'Generating…' : 'Generate Map'}
         </button>
+        <button type="button" className={styles.randomizeButton} onClick={fillRandom}>
+          <Shuffle size={14} aria-hidden="true" />
+          Randomize
+        </button>
       </div>
 
       {result.status === 'fail' && result.error && (
@@ -485,6 +598,10 @@ function AIIllustrationSection({
     best: imageModels.filter((m) => m.tier === 'best'),
   };
 
+  function fillRandom() {
+    setPrompt(pick(ILLUSTRATION_PROMPTS));
+  }
+
   function handleTest() {
     if (!prompt) return;
     const body: Record<string, unknown> = { type: 'ai-illustration', prompt };
@@ -498,6 +615,7 @@ function AIIllustrationSection({
   return (
     <SectionShell
       label="AI Illustration"
+      description="Generates an AI image from a text prompt using Fal. Choose a model tier (standard is fastest, best is highest quality) to test different providers."
       result={result}
       disabled={disabled}
       disabledMessage={<>Requires <code>FAL_KEY</code></>}
@@ -540,6 +658,10 @@ function AIIllustrationSection({
         >
           {result.status === 'running' ? 'Generating…' : 'Generate Image'}
         </button>
+        <button type="button" className={styles.randomizeButton} onClick={fillRandom}>
+          <Shuffle size={14} aria-hidden="true" />
+          Randomize
+        </button>
       </div>
 
       {result.status === 'fail' && result.error && (
@@ -580,6 +702,10 @@ function StockFootageSection({
 }) {
   const [query, setQuery] = useState('');
 
+  function fillRandom() {
+    setQuery(pick(STOCK_QUERIES));
+  }
+
   function handleTest() {
     if (!query) return;
     onTest({ type: 'stock-footage', query });
@@ -597,6 +723,7 @@ function StockFootageSection({
   return (
     <SectionShell
       label="Stock Footage"
+      description="Searches Pexels for royalty-free video clips matching a query. Returns the top result with thumbnail, duration, and source link."
       result={result}
       disabled={disabled}
       disabledMessage={<>Requires <code>PEXELS_API_KEY</code></>}
@@ -619,7 +746,11 @@ function StockFootageSection({
           onClick={handleTest}
           disabled={result.status === 'running' || !query}
         >
-          {result.status === 'running' ? 'Searching…' : 'Search'}
+          {result.status === 'running' ? 'Searching…' : 'Search Videos'}
+        </button>
+        <button type="button" className={styles.randomizeButton} onClick={fillRandom}>
+          <Shuffle size={14} aria-hidden="true" />
+          Randomize
         </button>
       </div>
 
