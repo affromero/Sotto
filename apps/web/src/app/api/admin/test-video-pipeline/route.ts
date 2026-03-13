@@ -125,7 +125,7 @@ export async function POST(request: NextRequest) {
 
       const result = await withTimeout(
         classifySegmentVisuals(segmentInputs, data.title, data.topic),
-        30_000
+        60_000
       );
 
       return NextResponse.json({
