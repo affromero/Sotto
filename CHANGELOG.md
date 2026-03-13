@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.16.0] - 2026-03-13
+
+### Added
+- **Avatar lip-sync pipeline**: VEED Fabric 1.0 + Kling Avatar v2 Pro via Fal, with avatar image registry, generation worker, and settings tester
+- **Tri-state admin auto-models**: Unified model editor with off/enabled/default toggles replaces separate dropdowns + checkboxes
+- **Daily quota counters**: Video, avatar, and music toolbar buttons show remaining daily quota
+- **Runway browser recording**: Replaced @livekit/rtc-node with Playwright headless browser recording for Runway sessions
+- **Worker queue allowlists**: Support filtering which queues a worker instance processes, with core preset overrides
+- **ElevenLabs voice quality**: Sustained emotional delivery + per-provider inline audio tag conversion
+- **Toolbar loading states**: Loading glow animation + in-place avatar progress + done flash feedback
+
+### Fixed
+- **Redis connection leaks**: Close singletons on shutdown, replace KEYS with SCAN, lazy-load BullMQ queues, reduce per-worker connections
+- **Music settings not persisting**: Added missing music fields to auto-models Zod schema
+- **Avatar route Redis leak**: Replaced per-request createRedisConnection with cache singleton
+- **Runway silent audio**: Added anti-throttling flags + await TrackSubscribed before audio loop
+- **Auto voice flow stability**: Stabilized automatic voice selection flows
+
+### Changed
+- Bumped pricetoken to 0.13.3 — maps avatar model IDs to pricetoken IDs instead of hardcoded prices
+- Admin auto-models page reduced from ~14 sections to 7 unified modality sections
+
 ## [0.15.1] - 2026-03-12
 
 ### Added
