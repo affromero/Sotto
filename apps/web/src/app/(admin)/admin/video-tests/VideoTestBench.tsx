@@ -647,7 +647,7 @@ function MapImageSection({
   disabled: boolean;
   mapPresets: MapPresetId[];
   preview: PreviewState | undefined;
-  onPreview: () => void;
+  onPreview: (preset: string) => void;
 }) {
   const [place, setPlace] = useState('');
   const [preset, setPreset] = useState<MapPresetId>('vintage');
@@ -768,7 +768,7 @@ function MapImageSection({
           <img src={imageBase64} alt="Generated map" className={styles.imagePreview} />
 
           <div className={styles.buttonRow} style={{ marginTop: 'var(--spacing-sm)' }}>
-            <PreviewButton preview={preview} onPreview={onPreview} />
+            <PreviewButton preview={preview} onPreview={() => onPreview(preset)} />
           </div>
         </div>
       )}
@@ -1083,7 +1083,7 @@ export function VideoTestBench({ envAvailability, mapPresets, imageModels, aiPro
 
   // ── Per-section preview handlers ──
 
-  const previewMapImage = useCallback(async () => {
+  const previewMapImage = useCallback(async (preset: string) => {
     const mapResult = results['map-image'];
     const mapImageBase64 = mapResult.data?.imageBase64 as string | undefined;
     const resolvedPlace = mapResult.data?.resolvedPlace as { name: string } | undefined;
@@ -1095,7 +1095,7 @@ export function VideoTestBench({ envAvailability, mapPresets, imageModels, aiPro
         visualType: 'MAP_OVERLAY',
         text: resolvedPlace.name,
         assetUrl: mapImageBase64,
-        metadata: { places: [resolvedPlace] },
+        metadata: { places: [resolvedPlace], preset },
       });
       setPreviews((prev) => ({ ...prev, 'map-image': { loading: false, ...result } }));
     } catch (err) {
@@ -1172,7 +1172,7 @@ export function VideoTestBench({ envAvailability, mapPresets, imageModels, aiPro
         visualType: 'MAP_OVERLAY',
         text: place.name,
         assetUrl: mapData.imageBase64,
-        metadata: { places: [place] },
+        metadata: { places: [place], preset: 'vintage' },
       });
       setPreviews((prev) => ({ ...prev, 'resolve-place': { loading: false, ...result } }));
     } catch (err) {
@@ -1268,7 +1268,7 @@ export function VideoTestBench({ envAvailability, mapPresets, imageModels, aiPro
           if (mapData.success) {
             segmentInput.assetUrl = mapData.imageBase64;
             if (mapData.resolvedPlace) {
-              segmentInput.metadata = { places: [mapData.resolvedPlace] };
+              segmentInput.metadata = { places: [mapData.resolvedPlace], preset: 'vintage' };
             }
           }
         }
