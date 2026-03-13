@@ -12,11 +12,15 @@ export interface AvatarOverlayData {
   height: number;
   durationSeconds: number | null;
   avatarProvider?: string | null;
+  avatarImageUrl?: string | null;
+  avatarModelId?: string | null;
   maskShape?: string | null;
   chunkVideoUrl?: string | null;
   chunkDurationSeconds?: number | null;
   runwayChunkIndex?: number | null;
   runwayTotalChunks?: number | null;
+  falChunkIndex?: number | null;
+  falTotalChunks?: number | null;
   enabledSegmentIds?: string[];
   voiceTrackId?: string | null;
 }
@@ -34,7 +38,8 @@ export interface UnifiedAvatarData {
   id: string;
   name: string;
   previewImageUrl: string;
-  provider: 'heygen' | 'runway';
+  imageUrl?: string;
+  provider: 'heygen' | 'runway' | 'fal';
   isPreset: boolean;
   premium: boolean;
 }

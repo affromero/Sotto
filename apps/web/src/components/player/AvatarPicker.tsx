@@ -11,7 +11,7 @@ import styles from './AvatarPicker.module.css';
 export interface ExistingAvatarOverlay {
   speaker: string;
   avatarId: string;
-  avatarProvider: 'heygen' | 'runway';
+  avatarProvider: 'heygen' | 'runway' | 'fal';
   status: string;
   isPreset?: boolean;
 }
@@ -31,7 +31,7 @@ const VISIBLE_COUNT = 12;
 
 interface AvatarSelection {
   avatarId: string;
-  provider: 'heygen' | 'runway';
+  provider: 'heygen' | 'runway' | 'fal';
   isPreset: boolean;
 }
 
@@ -57,10 +57,11 @@ export function AvatarPicker({ podcastId, speakers, segments, onConfigured, onCa
   const [showAdvanced, setShowAdvanced] = useState(false);
   // Per-speaker segment enablement: empty = all enabled (default)
   const [enabledSegments, setEnabledSegments] = useState<Record<string, Set<string>>>({});
-  const [activeProvider, setActiveProvider] = useState<'heygen' | 'runway'>(
-    existingOverlays?.some((ov) => ov.avatarProvider === 'runway') ? 'runway' : 'heygen',
+  const [activeProvider, setActiveProvider] = useState<'heygen' | 'runway' | 'fal'>(
+    existingOverlays?.some((ov) => ov.avatarProvider === 'fal') ? 'fal'
+      : existingOverlays?.some((ov) => ov.avatarProvider === 'runway') ? 'runway' : 'heygen',
   );
-  const [availableProviders, setAvailableProviders] = useState<{ heygen: boolean; runway: boolean }>({ heygen: false, runway: false });
+  const [availableProviders, setAvailableProviders] = useState<{ heygen: boolean; runway: boolean; fal: boolean }>({ heygen: false, runway: false, fal: false });
   const [pricing, setPricing] = useState<AvatarPricing>({ costPerMinute: 0, includedOnPlatform: false });
   const [voiceTracks, setVoiceTracks] = useState<VoiceTrackSummary[]>([]);
   const [voiceTrackSelections, setVoiceTrackSelections] = useState<Record<string, string>>({});
@@ -72,7 +73,7 @@ export function AvatarPicker({ podcastId, speakers, segments, onConfigured, onCa
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error('Failed to load avatars'))))
       .then((data: {
         avatars: UnifiedAvatarData[];
-        providers: { heygen: boolean; runway: boolean };
+        providers: { heygen: boolean; runway: boolean; fal: boolean };
         pricing?: AvatarPricing;
       }) => {
         setAvatars(data.avatars);
