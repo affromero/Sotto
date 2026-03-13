@@ -633,7 +633,9 @@ export async function POST(request: NextRequest) {
 
           try {
             // Submit lip-sync
-            const { statusUrl, resultUrl } = await submitFalLipSync({ modelId: model, imageUrl, audioUrl, apiKey });
+            const { LIP_SYNC_CONFIG } = await import('@/lib/providers/fal-endpoints');
+            const prompt = LIP_SYNC_CONFIG[model]?.defaultPrompt;
+            const { statusUrl, resultUrl } = await submitFalLipSync({ modelId: model, imageUrl, audioUrl, apiKey, prompt });
 
             // Poll for result
             const lipSyncResult = await pollFalLipSync(statusUrl, resultUrl, apiKey, 150_000);

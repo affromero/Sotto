@@ -6,6 +6,7 @@ export interface FalLipSyncParams {
   imageUrl: string;
   audioUrl: string;
   apiKey: string;
+  prompt?: string;
 }
 
 export interface FalLipSyncResult {
@@ -14,7 +15,7 @@ export interface FalLipSyncResult {
 }
 
 export async function submitFalLipSync(params: FalLipSyncParams): Promise<{ requestId: string; statusUrl: string; resultUrl: string }> {
-  const { modelId, imageUrl, audioUrl, apiKey } = params;
+  const { modelId, imageUrl, audioUrl, apiKey, prompt } = params;
 
   const endpoint = getFalAvatarEndpoint(modelId);
   if (!endpoint) throw new Error(`No Fal avatar endpoint for model: ${modelId}`);
@@ -23,16 +24,19 @@ export async function submitFalLipSync(params: FalLipSyncParams): Promise<{ requ
 
   logger.info('Submitting fal lip-sync job', { modelId, endpoint });
 
+  const body: Record<string, string> = {
+    image_url: imageUrl,
+    audio_url: audioUrl,
+  };
+  if (prompt) body.prompt = prompt;
+
   const res = await fetch(url, {
     method: 'POST',
     headers: {
       Authorization: `Key ${apiKey}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      image_url: imageUrl,
-      audio_url: audioUrl,
-    }),
+    body: JSON.stringify(body),
   });
 
   if (!res.ok) {

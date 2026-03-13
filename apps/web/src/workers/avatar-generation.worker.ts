@@ -336,6 +336,7 @@ async function processFalLipSync(job: Job<GenerateAvatarPayload>): Promise<void>
     const { LIP_SYNC_CONFIG } = await import('@/lib/providers/fal-endpoints');
     const lipSyncConfig = LIP_SYNC_CONFIG[modelId];
     const maxAudioSeconds = lipSyncConfig?.maxAudioSeconds ?? 300;
+    const defaultPrompt = lipSyncConfig?.defaultPrompt;
 
     const { submitFalLipSync, pollFalLipSync } = await import('@/lib/fal-lip-sync');
 
@@ -351,6 +352,7 @@ async function processFalLipSync(job: Job<GenerateAvatarPayload>): Promise<void>
         imageUrl: avatarImageUrl,
         audioUrl: concatAudioUrl,
         apiKey,
+        prompt: defaultPrompt,
       });
 
       await job.updateProgress(30);
@@ -410,6 +412,7 @@ async function processFalLipSync(job: Job<GenerateAvatarPayload>): Promise<void>
           imageUrl: avatarImageUrl,
           audioUrl: chunkAudioUrl,
           apiKey,
+          prompt: defaultPrompt,
         });
 
         const timeoutMs = chunk.durationSeconds * 3000 + 120_000;
