@@ -45,12 +45,28 @@ const stockFootageSchema = z.object({
   query: z.string().min(1),
 });
 
+const renderStillSchema = z.object({
+  type: z.literal('render-still'),
+  segment: z.object({
+    visualType: z.string(),
+    text: z.string().min(1),
+    prompt: z.string().optional(),
+    assetUrl: z.string().optional(),
+    assetType: z.string().optional(),
+    metadata: z.record(z.unknown()).optional(),
+    order: z.number().optional(),
+    duration: z.number().optional(),
+  }),
+  frame: z.number().optional(),
+});
+
 const requestSchema = z.discriminatedUnion('type', [
   classifySchema,
   resolvePlaceSchema,
   mapImageSchema,
   aiIllustrationSchema,
   stockFootageSchema,
+  renderStillSchema,
 ]);
 
 function classifyError(error: Error): string {
@@ -214,6 +230,66 @@ export async function POST(request: NextRequest) {
         success: true,
         latencyMs: Date.now() - start,
         result,
+      });
+    }
+
+    if (data.type === 'render-still') {
+      const remotionUrl = process.env.REMOTION_URL;
+      if (!remotionUrl) {
+        return NextResponse.json({
+          success: false,
+          latencyMs: Date.now() - start,
+          error: 'REMOTION_URL not configured',
+        });
+      }
+
+      const duration = data.segment.duration ?? 10;
+      const fps = 30;
+      const segment = {
+        segmentId: crypto.randomUUID(),
+        order: data.segment.order ?? 0,
+        speaker: 'host',
+        text: data.segment.text,
+        startTime: 0,
+        duration,
+        visualType: data.segment.visualType,
+        prompt: data.segment.prompt,
+        assetUrl: data.segment.assetUrl,
+        assetType: data.segment.assetType,
+        metadata: data.segment.metadata,
+      };
+
+      const durationInFrames = Math.round(duration * fps);
+      const res = await withTimeout(
+        fetch(`${remotionUrl}/still`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            segment,
+            frame: data.frame ?? 0,
+            durationInFrames,
+          }),
+        }),
+        30_000,
+      );
+
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({ error: res.statusText }));
+        return NextResponse.json({
+          success: false,
+          latencyMs: Date.now() - start,
+          error: (errBody as { error?: string }).error ?? 'Remotion render failed',
+        });
+      }
+
+      const buffer = Buffer.from(await res.arrayBuffer());
+      const imageBase64 = `data:image/png;base64,${buffer.toString('base64')}`;
+
+      return NextResponse.json({
+        success: true,
+        latencyMs: Date.now() - start,
+        imageBase64,
+        segment,
       });
     }
 
