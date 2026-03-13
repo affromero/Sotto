@@ -17,9 +17,14 @@ import {
   FAL_VOICE_POOL,
   MINIMAX_VOICE_POOL,
 } from '@/lib/providers/tts-voices';
+import { FalImageProvider } from '@/lib/providers/image/fal.provider';
+import { getVideoProviderMeta, type VideoProviderId } from '@/lib/providers/video-registry';
+import { getAvatarProviderMeta, type AvatarProviderId } from '@/lib/providers/avatar-registry';
+import { getMusicProviderMeta, type MusicProviderId } from '@/lib/providers/music-registry';
+import { listAvatars } from '@/lib/heygen';
 
 const requestSchema = z.object({
-  type: z.enum(['ai', 'tts', 'stt']),
+  type: z.enum(['ai', 'tts', 'stt', 'image', 'video', 'avatar', 'music']),
   provider: z.string().min(1),
   model: z.string().min(1),
   keySource: z.enum(['platform', 'byok']).default('platform'),
@@ -179,6 +184,23 @@ async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
       setTimeout(() => reject(new Error('timeout')), ms)
     ),
   ]);
+}
+
+/** Resolve API key for image/video/avatar/music providers (BYOK from UserTtsKey or platform env). */
+async function resolveProviderKey(
+  adminId: string,
+  provider: string,
+  keySource: string,
+  platformEnvVar: string
+): Promise<{ apiKey: string | undefined; error?: string }> {
+  if (keySource === 'byok') {
+    const key = await getByokKey(adminId, provider);
+    if (!key) return { apiKey: undefined, error: 'BYOK key not found for this provider' };
+    return { apiKey: key };
+  }
+  const apiKey = process.env[platformEnvVar];
+  if (!apiKey) return { apiKey: undefined, error: `Platform key not configured (${platformEnvVar})` };
+  return { apiKey };
 }
 
 export async function POST(request: NextRequest) {
@@ -364,6 +386,109 @@ export async function POST(request: NextRequest) {
         latencyMs: Date.now() - start,
         transcript: result.text || '(empty transcript)',
         ttsSource,
+      });
+    }
+
+    if (type === 'image') {
+      const { apiKey, error } = await resolveProviderKey(adminId, 'fal', keySource, 'FAL_KEY');
+      if (!apiKey) {
+        return NextResponse.json({ success: false, latencyMs: Date.now() - start, error });
+      }
+
+      const imageProvider = new FalImageProvider(apiKey, model);
+      const imageBuffer = await withTimeout(
+        imageProvider.generateImage({
+          prompt: 'A warm golden podcast microphone, studio lighting',
+          width: 256,
+          height: 256,
+        }),
+        60_000
+      );
+      const base64 = imageBuffer.toString('base64');
+      return NextResponse.json({
+        success: true,
+        latencyMs: Date.now() - start,
+        imageData: `data:image/png;base64,${base64}`,
+      });
+    }
+
+    if (type === 'video') {
+      const meta = getVideoProviderMeta(provider as VideoProviderId);
+      const { apiKey, error } = await resolveProviderKey(adminId, provider, keySource, meta.platformKeyEnv);
+      if (!apiKey) {
+        return NextResponse.json({ success: false, latencyMs: Date.now() - start, error });
+      }
+
+      const valid = await withTimeout(meta.auth.validate({ apiKey }), 10_000);
+      return NextResponse.json({
+        success: valid,
+        latencyMs: Date.now() - start,
+        response: valid ? 'API key valid' : 'API key invalid',
+        error: valid ? undefined : 'API key validation failed',
+      });
+    }
+
+    if (type === 'avatar') {
+      const meta = getAvatarProviderMeta(provider as AvatarProviderId);
+      const { apiKey, error } = await resolveProviderKey(adminId, provider, keySource, meta.platformKeyEnv);
+      if (!apiKey) {
+        return NextResponse.json({ success: false, latencyMs: Date.now() - start, error });
+      }
+
+      // HeyGen: list avatars to verify key + show count
+      if (provider === 'heygen') {
+        const avatars = await withTimeout(listAvatars(apiKey), 15_000);
+        return NextResponse.json({
+          success: true,
+          latencyMs: Date.now() - start,
+          response: `${avatars.length} avatars available`,
+          avatarCount: avatars.length,
+        });
+      }
+
+      // Fal: generate a small test image to verify key + show visual output
+      if (provider === 'fal') {
+        const imageProvider = new FalImageProvider(apiKey, 'fal-flux-1-schnell');
+        const imageBuffer = await withTimeout(
+          imageProvider.generateImage({
+            prompt: 'A warm golden podcast microphone, studio lighting',
+            width: 256,
+            height: 256,
+          }),
+          60_000
+        );
+        const base64 = imageBuffer.toString('base64');
+        return NextResponse.json({
+          success: true,
+          latencyMs: Date.now() - start,
+          imageData: `data:image/png;base64,${base64}`,
+          response: 'Fal key valid',
+        });
+      }
+
+      // Runway and others: auth validation only
+      const valid = await withTimeout(meta.auth.validate({ apiKey }), 10_000);
+      return NextResponse.json({
+        success: valid,
+        latencyMs: Date.now() - start,
+        response: valid ? 'API key valid' : 'API key invalid',
+        error: valid ? undefined : 'API key validation failed',
+      });
+    }
+
+    if (type === 'music') {
+      const meta = getMusicProviderMeta(provider as MusicProviderId);
+      const { apiKey, error } = await resolveProviderKey(adminId, provider, keySource, meta.platformKeyEnv);
+      if (!apiKey) {
+        return NextResponse.json({ success: false, latencyMs: Date.now() - start, error });
+      }
+
+      const valid = await withTimeout(meta.auth.validate({ apiKey }), 10_000);
+      return NextResponse.json({
+        success: valid,
+        latencyMs: Date.now() - start,
+        response: valid ? 'API key valid' : 'API key invalid',
+        error: valid ? undefined : 'API key validation failed',
       });
     }
 
