@@ -47,6 +47,10 @@ Production workers are currently stable because they are running a reduced "core
 
 This is the current safe operating mode.
 
+### 6. Avatar route Redis connection leak
+
+`GET /api/podcasts/[podcastId]/video/avatars` was calling `createRedisConnection('avatar-cache')` on every request, creating a new ioredis TCP connection that was never closed. Under traffic, this silently exhausted Redis client slots. Fixed by switching to the `cache` singleton helper that reuses the module-level `getRedisClient()` connection.
+
 ## What Is Still Not Solved
 
 ### 1. Redis Cloud client ceiling for the full queue set
@@ -89,10 +93,6 @@ BullMQ expects:
 `noeviction`
 
 This should be corrected before launch to avoid queue correctness issues under memory pressure.
-
-### 5. Avatar route Redis connection leak
-
-`GET /api/podcasts/[podcastId]/video/avatars` was calling `createRedisConnection('avatar-cache')` on every request, creating a new ioredis TCP connection that is never closed. Under traffic, this silently exhausts Redis client slots. Fixed by switching to the `cache` singleton helper that reuses the module-level `getRedisClient()` connection.
 
 ### 4. Monitoring and alerting gap
 
