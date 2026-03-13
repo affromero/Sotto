@@ -1784,6 +1784,8 @@ model AutoModelConfig {
   dailyVideoLimitPro      Int      @default(2)
   dailyMusicLimit         Int      @default(1)
   dailyMusicLimitPro      Int      @default(3)
+  dailyAvatarLimit        Int      @default(1)
+  dailyAvatarLimitPro     Int      @default(1)
   aiAllocations           Json     @default("[]")
   ttsAllocations          Json     @default("[]")
   updatedAt               DateTime @updatedAt

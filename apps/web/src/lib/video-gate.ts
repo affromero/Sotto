@@ -172,7 +172,7 @@ export async function checkAvatarGenerationGate(userId: string): Promise<VideoGa
 
   const isProUser = user.plan === 'PRO';
   const isPrivileged = user.role === 'ADMIN' || user.role === 'SYSTEM';
-  const dailyLimit = isProUser ? config.dailyVideoLimitPro : config.dailyVideoLimit;
+  const dailyLimit = isProUser ? config.dailyAvatarLimitPro : config.dailyAvatarLimit;
 
   const baseResult: VideoGateResult = {
     allowed: false,
@@ -260,7 +260,7 @@ export async function getAvatarGenerationStatus(userId: string): Promise<{
 
   const isProUser = user.plan === 'PRO';
   const isPrivileged = user.role === 'ADMIN' || user.role === 'SYSTEM';
-  const dailyLimit = isProUser ? config.dailyVideoLimitPro : config.dailyVideoLimit;
+  const dailyLimit = isProUser ? config.dailyAvatarLimitPro : config.dailyAvatarLimit;
 
   return {
     dailyUsed: dailyData.count,

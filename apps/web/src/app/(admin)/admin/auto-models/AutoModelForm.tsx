@@ -71,6 +71,8 @@ interface AutoModelFormProps {
     dailyVideoLimitPro: number;
     dailyMusicLimit: number;
     dailyMusicLimitPro: number;
+    dailyAvatarLimit: number;
+    dailyAvatarLimitPro: number;
   };
   aiProviders: ProviderOption[];
   ttsProviders: ProviderOption[];
@@ -439,6 +441,8 @@ export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttPro
   const [dailyVideoLimitPro, setDailyVideoLimitPro] = useState(initialConfig.dailyVideoLimitPro);
   const [dailyMusicLimit, setDailyMusicLimit] = useState(initialConfig.dailyMusicLimit);
   const [dailyMusicLimitPro, setDailyMusicLimitPro] = useState(initialConfig.dailyMusicLimitPro);
+  const [dailyAvatarLimit, setDailyAvatarLimit] = useState(initialConfig.dailyAvatarLimit);
+  const [dailyAvatarLimitPro, setDailyAvatarLimitPro] = useState(initialConfig.dailyAvatarLimitPro);
 
   const setToArray = (s: Set<string>) => s.size > 0 ? [...s] : null;
 
@@ -505,6 +509,8 @@ export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttPro
           dailyVideoLimitPro,
           dailyMusicLimit,
           dailyMusicLimitPro,
+          dailyAvatarLimit,
+          dailyAvatarLimitPro,
         }),
       });
 
@@ -664,6 +670,24 @@ export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttPro
             min={0}
             value={dailyMusicLimitPro}
             onChange={(e) => setDailyMusicLimitPro(parseInt(e.target.value, 10) || 0)}
+          />
+
+          <label className={styles.dailyLimitsLabel} htmlFor="dailyAvatarLimit">Avatars</label>
+          <input
+            id="dailyAvatarLimit"
+            type="number"
+            className={styles.select}
+            min={0}
+            value={dailyAvatarLimit}
+            onChange={(e) => setDailyAvatarLimit(parseInt(e.target.value, 10) || 0)}
+          />
+          <input
+            id="dailyAvatarLimitPro"
+            type="number"
+            className={styles.select}
+            min={0}
+            value={dailyAvatarLimitPro}
+            onChange={(e) => setDailyAvatarLimitPro(parseInt(e.target.value, 10) || 0)}
           />
         </div>
       </fieldset>
