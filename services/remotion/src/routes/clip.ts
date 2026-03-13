@@ -60,7 +60,7 @@ clipRouter.post('/', async (req, res) => {
 
   activeClips++;
   const outputPath = path.join(os.tmpdir(), `sotto-clip-${uuidv4()}.mp4`);
-  let tmpAssetPath: string | undefined;
+  const tmpAssetPaths: string[] = [];
 
   try {
     // Set segment.duration so calculateMetadata computes correct durationInFrames
@@ -71,7 +71,20 @@ clipRouter.post('/', async (req, res) => {
     if (segment.assetUrl?.startsWith('data:')) {
       const extracted = extractDataUri(segment.assetUrl, port);
       segment.assetUrl = extracted.localUrl;
-      tmpAssetPath = extracted.filePath;
+      tmpAssetPaths.push(extracted.filePath);
+    }
+
+    // Extract base64 URIs from zoomFrames metadata (globe-to-location zoom)
+    const zoomFrames = (segment.metadata as Record<string, unknown> | undefined)?.zoomFrames as
+      Array<{ zoom: number; assetUrl: string }> | undefined;
+    if (zoomFrames) {
+      for (const zf of zoomFrames) {
+        if (zf.assetUrl?.startsWith('data:')) {
+          const extracted = extractDataUri(zf.assetUrl, port);
+          zf.assetUrl = extracted.localUrl;
+          tmpAssetPaths.push(extracted.filePath);
+        }
+      }
     }
 
     const serveUrl = await getBundlePath();
@@ -106,9 +119,9 @@ clipRouter.post('/', async (req, res) => {
     res.status(500).json({ error: message });
   } finally {
     activeClips--;
-    // Clean up extracted asset
-    if (tmpAssetPath) {
-      try { fs.unlinkSync(tmpAssetPath); } catch { /* ignore */ }
+    // Clean up extracted assets
+    for (const p of tmpAssetPaths) {
+      try { fs.unlinkSync(p); } catch { /* ignore */ }
     }
   }
 });
