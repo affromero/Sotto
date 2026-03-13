@@ -122,6 +122,43 @@ export async function checkMusicGenerationGate(userId: string): Promise<MusicGat
 }
 
 /**
+ * Get music generation status for display purposes.
+ */
+export async function getMusicGenerationStatus(userId: string): Promise<{
+  dailyUsed: number;
+  dailyLimit: number;
+  dailyRemaining: number;
+  resetInSeconds?: number;
+  isByokUser: boolean;
+  isProUser: boolean;
+}> {
+  const [hasByok, config, user, dailyData] = await Promise.all([
+    hasMusicByokKey(userId),
+    getAutoModelConfig(),
+    prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { role: true, plan: true },
+    }),
+    getMusicDailyCount(userId),
+  ]);
+
+  const isProUser = user.plan === 'PRO';
+  const isPrivileged = user.role === 'ADMIN' || user.role === 'SYSTEM';
+  const dailyLimit = isProUser ? config.dailyMusicLimitPro : config.dailyMusicLimit;
+
+  return {
+    dailyUsed: dailyData.count,
+    dailyLimit,
+    dailyRemaining: hasByok || isPrivileged
+      ? Infinity
+      : Math.max(0, dailyLimit - dailyData.count),
+    ...(dailyData.ttl > 0 && { resetInSeconds: dailyData.ttl }),
+    isByokUser: hasByok || isPrivileged,
+    isProUser,
+  };
+}
+
+/**
  * Atomically increment the daily music Redis counter.
  * Returns true if the increment succeeded (user was under limit).
  * Returns false if already at limit (TOCTOU-safe).
