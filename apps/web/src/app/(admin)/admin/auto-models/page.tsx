@@ -2,7 +2,8 @@ import { getAutoModelConfig } from '@/lib/auto-model-config';
 import { getAllAiProviderMeta } from '@/lib/providers/ai-registry';
 import { getAllProviderMeta } from '@/lib/providers/tts-registry';
 import { getAllSttProviderMeta } from '@/lib/providers/stt-registry';
-import { getAllImageProviderMeta } from '@/lib/providers/image-registry';
+import { getAllImageProviderMeta, getImageModelCost } from '@/lib/providers/image-registry';
+import { fetchAvatarModels } from '@/lib/avatar-cost-estimator';
 import { getAllVideoProviderMeta } from '@/lib/providers/video-registry';
 import { getAllAvatarProviderMeta } from '@/lib/providers/avatar-registry';
 import { getAllMusicProviderMeta } from '@/lib/providers/music-registry';
@@ -67,14 +68,30 @@ export default async function AutoModelsPage() {
     })),
   }));
 
+  const avatarPricing = await fetchAvatarModels();
+  const avatarPriceMap = new Map(avatarPricing.map((m) => [m.modelId, m]));
+  const imgSurcharge = getImageModelCost(config.proImageModel) * 1; // 1 MP portrait
+  const LIP_SYNC_IMG_MODELS = new Set(['fal-veed-fabric-1.0', 'fal-kling-avatar-v2-pro']);
+
   const avatarProviders = getAllAvatarProviderMeta().map((p) => ({
     id: p.id,
     displayName: p.displayName,
-    models: p.models.map((m) => ({
-      id: m.id,
-      displayName: m.displayName,
-      tier: m.tier,
-    })),
+    models: p.models.map((m) => {
+      const pricing = avatarPriceMap.get(m.id);
+      let price: string | undefined;
+      if (pricing) {
+        const base = `$${pricing.costPerMinute}/min`;
+        price = LIP_SYNC_IMG_MODELS.has(m.id) && imgSurcharge > 0
+          ? `${base} (+$${imgSurcharge}/img)`
+          : base;
+      }
+      return {
+        id: m.id,
+        displayName: m.displayName,
+        tier: m.tier,
+        price,
+      };
+    }),
   }));
 
   const musicProviders = getAllMusicProviderMeta().map((p) => ({
