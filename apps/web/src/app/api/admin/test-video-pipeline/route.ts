@@ -16,6 +16,8 @@ const classifySchema = z.object({
   title: z.string().min(1),
   topic: z.string().min(1),
   segments: z.array(z.string().min(1)).min(1),
+  provider: z.string().optional(),
+  model: z.string().optional(),
 });
 
 const resolvePlaceSchema = z.object({
@@ -124,7 +126,10 @@ export async function POST(request: NextRequest) {
       }));
 
       const result = await withTimeout(
-        classifySegmentVisuals(segmentInputs, data.title, data.topic),
+        classifySegmentVisuals(segmentInputs, data.title, data.topic, {
+          provider: data.provider,
+          model: data.model,
+        }),
         60_000
       );
 

@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { ChevronDown, Shuffle } from 'lucide-react';
-import type { EnvAvailability, ImageModelInfo } from './page';
+import type { EnvAvailability, ImageModelInfo, AiProviderInfo } from './page';
 import type { MapPresetId } from '@sotto/maps/server';
 import styles from './VideoTestBench.module.css';
 
@@ -10,6 +10,7 @@ interface VideoTestBenchProps {
   envAvailability: EnvAvailability;
   mapPresets: MapPresetId[];
   imageModels: ImageModelInfo[];
+  aiProviders: AiProviderInfo[];
 }
 
 type TestStatus = 'idle' | 'running' | 'pass' | 'fail';
@@ -181,14 +182,21 @@ function ClassifierSection({
   result,
   onTest,
   disabled,
+  aiProviders,
 }: {
   result: TestResult;
   onTest: (body: Record<string, unknown>) => void;
   disabled: boolean;
+  aiProviders: AiProviderInfo[];
 }) {
   const [title, setTitle] = useState('');
   const [topic, setTopic] = useState('');
   const [segmentsText, setSegmentsText] = useState('');
+  const [provider, setProvider] = useState('');
+  const [model, setModel] = useState('');
+
+  const selectedProvider = aiProviders.find((p) => p.id === provider);
+  const availableModels = selectedProvider?.models ?? [];
 
   function fillRandom() {
     const sample = pick(CLASSIFIER_SAMPLES);
@@ -200,7 +208,10 @@ function ClassifierSection({
   function handleTest() {
     const segments = segmentsText.split('\n').map((s) => s.trim()).filter(Boolean);
     if (!title || !topic || segments.length === 0) return;
-    onTest({ type: 'classify', title, topic, segments });
+    const body: Record<string, unknown> = { type: 'classify', title, topic, segments };
+    if (provider) body.provider = provider;
+    if (model) body.model = model;
+    onTest(body);
   }
 
   const classifications = result.data?.result as Array<{
@@ -213,6 +224,8 @@ function ClassifierSection({
       durationFraction: number;
     }>;
   }> | undefined;
+  const usedModel = result.data?.model as string | undefined;
+  const tokens = result.data?.tokens as { input: number; output: number } | undefined;
 
   return (
     <SectionShell
@@ -220,7 +233,7 @@ function ClassifierSection({
       description="Tests the AI that decides which visual type each podcast segment gets (map, illustration, stock footage, text card, etc). Feed it a title, topic, and segment texts to see what visuals it picks."
       result={result}
       disabled={disabled}
-      disabledMessage={<>Requires <code>ANTHROPIC_API_KEY</code></>}
+      disabledMessage={<>Requires at least one AI provider key (e.g. <code>ANTHROPIC_API_KEY</code>)</>}
     >
       <div className={styles.formGrid}>
         <div className={styles.formGridRow}>
@@ -253,6 +266,35 @@ function ClassifierSection({
             rows={4}
           />
         </div>
+        <div className={styles.formGridRow}>
+          <div>
+            <label className={styles.fieldLabel}>AI Provider</label>
+            <select
+              className={styles.fieldSelect}
+              value={provider}
+              onChange={(e) => { setProvider(e.target.value); setModel(''); }}
+            >
+              <option value="">Default</option>
+              {aiProviders.map((p) => (
+                <option key={p.id} value={p.id}>{p.displayName}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className={styles.fieldLabel}>Model</label>
+            <select
+              className={styles.fieldSelect}
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              disabled={!provider}
+            >
+              <option value="">Default</option>
+              {availableModels.map((m) => (
+                <option key={m.id} value={m.id}>{m.displayName}</option>
+              ))}
+            </select>
+          </div>
+        </div>
       </div>
       <div className={styles.buttonRow}>
         <button
@@ -281,6 +323,12 @@ function ClassifierSection({
             <span className={styles.resultLabel}>Classification Results</span>
             {result.latencyMs !== undefined && (
               <span className={styles.latencyBadge}>{result.latencyMs}ms</span>
+            )}
+            {usedModel && (
+              <span className={styles.latencyBadge}>{usedModel}</span>
+            )}
+            {tokens && (
+              <span className={styles.latencyBadge}>{tokens.input + tokens.output} tokens</span>
             )}
           </div>
           <div className={styles.tableWrapper}>
@@ -796,7 +844,7 @@ function StockFootageSection({
 
 // ── Main Component ──
 
-export function VideoTestBench({ envAvailability, mapPresets, imageModels }: VideoTestBenchProps) {
+export function VideoTestBench({ envAvailability, mapPresets, imageModels, aiProviders }: VideoTestBenchProps) {
   const [results, setResults] = useState<Record<TestType, TestResult>>({
     'classify': { status: 'idle' },
     'resolve-place': { status: 'idle' },
@@ -842,7 +890,8 @@ export function VideoTestBench({ envAvailability, mapPresets, imageModels }: Vid
       <ClassifierSection
         result={results['classify']}
         onTest={runTest}
-        disabled={!envAvailability.anthropic}
+        disabled={aiProviders.length === 0}
+        aiProviders={aiProviders}
       />
       <PlaceResolverSection
         result={results['resolve-place']}

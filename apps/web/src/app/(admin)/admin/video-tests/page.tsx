@@ -1,6 +1,7 @@
 import { PRESET_IDS } from '@sotto/maps/server';
 import { getAllImageProviderMeta } from '@/lib/providers/image-registry';
 import type { ImageModelOption } from '@/lib/providers/image-registry';
+import { getAllAiProviderMeta } from '@/lib/providers/ai-registry';
 import { VideoTestBench } from './VideoTestBench';
 import styles from './page.module.css';
 
@@ -8,6 +9,12 @@ export interface ImageModelInfo {
   id: string;
   displayName: string;
   tier: ImageModelOption['tier'];
+}
+
+export interface AiProviderInfo {
+  id: string;
+  displayName: string;
+  models: { id: string; displayName: string; tier: string }[];
 }
 
 export interface EnvAvailability {
@@ -35,6 +42,18 @@ export default function AdminVideoTestsPage() {
     }))
   );
 
+  const aiProviders: AiProviderInfo[] = getAllAiProviderMeta()
+    .filter((p) => p.platformEnvKey && !!process.env[p.platformEnvKey])
+    .map((p) => ({
+      id: p.id,
+      displayName: p.displayName,
+      models: p.models.map((m) => ({
+        id: m.id,
+        displayName: m.displayName,
+        tier: m.tier,
+      })),
+    }));
+
   return (
     <div className={styles.container}>
       <div className={styles.header}>
@@ -48,6 +67,7 @@ export default function AdminVideoTestsPage() {
         envAvailability={envAvailability}
         mapPresets={mapPresets}
         imageModels={imageModels}
+        aiProviders={aiProviders}
       />
     </div>
   );
