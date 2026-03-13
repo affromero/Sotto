@@ -60,6 +60,21 @@ const renderStillSchema = z.object({
   frame: z.number().optional(),
 });
 
+const renderClipSchema = z.object({
+  type: z.literal('render-clip'),
+  segment: z.object({
+    visualType: z.string(),
+    text: z.string().min(1),
+    prompt: z.string().optional(),
+    assetUrl: z.string().optional(),
+    assetType: z.string().optional(),
+    metadata: z.record(z.unknown()).optional(),
+    order: z.number().optional(),
+    duration: z.number().optional(),
+  }),
+  durationSeconds: z.number().min(1).max(10).optional(),
+});
+
 const requestSchema = z.discriminatedUnion('type', [
   classifySchema,
   resolvePlaceSchema,
@@ -67,6 +82,7 @@ const requestSchema = z.discriminatedUnion('type', [
   aiIllustrationSchema,
   stockFootageSchema,
   renderStillSchema,
+  renderClipSchema,
 ]);
 
 function classifyError(error: Error): string {
@@ -289,6 +305,60 @@ export async function POST(request: NextRequest) {
         success: true,
         latencyMs: Date.now() - start,
         imageBase64,
+        segment,
+      });
+    }
+
+    if (data.type === 'render-clip') {
+      const remotionUrl = process.env.REMOTION_URL;
+      if (!remotionUrl) {
+        return NextResponse.json({
+          success: false,
+          latencyMs: Date.now() - start,
+          error: 'REMOTION_URL not configured',
+        });
+      }
+
+      const durationSeconds = data.durationSeconds ?? 3;
+      const segment = {
+        segmentId: crypto.randomUUID(),
+        order: data.segment.order ?? 0,
+        speaker: 'host',
+        text: data.segment.text,
+        startTime: 0,
+        duration: durationSeconds,
+        visualType: data.segment.visualType,
+        prompt: data.segment.prompt,
+        assetUrl: data.segment.assetUrl,
+        assetType: data.segment.assetType,
+        metadata: data.segment.metadata,
+      };
+
+      const res = await withTimeout(
+        fetch(`${remotionUrl}/clip`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ segment, durationSeconds }),
+        }),
+        90_000,
+      );
+
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({ error: res.statusText }));
+        return NextResponse.json({
+          success: false,
+          latencyMs: Date.now() - start,
+          error: (errBody as { error?: string }).error ?? 'Remotion clip render failed',
+        });
+      }
+
+      const buffer = Buffer.from(await res.arrayBuffer());
+      const videoBase64 = `data:video/mp4;base64,${buffer.toString('base64')}`;
+
+      return NextResponse.json({
+        success: true,
+        latencyMs: Date.now() - start,
+        videoBase64,
         segment,
       });
     }
