@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import styles from './AutoModelForm.module.css';
 
 interface ModelOption {
@@ -81,298 +81,195 @@ interface AutoModelFormProps {
   musicProviders: ProviderOption[];
 }
 
-function usePlanState(initial: PlanConfig, providers: { ai: ProviderOption[]; tts: ProviderOption[]; stt: ProviderOption[] }) {
-  const [aiProvider, setAiProvider] = useState(initial.aiProvider);
-  const [aiModel, setAiModel] = useState(initial.aiModel);
-  const [ttsProvider, setTtsProvider] = useState(initial.ttsProvider);
-  const [ttsModel, setTtsModel] = useState(initial.ttsModel);
-  const [sttProvider, setSttProvider] = useState(initial.sttProvider);
-  const [sttModel, setSttModel] = useState(initial.sttModel);
+// --- Tri-state hook ---
 
-  const aiModels = providers.ai.find((p) => p.id === aiProvider)?.models ?? [];
-  const ttsModels = providers.tts.find((p) => p.id === ttsProvider)?.models ?? [];
-  const sttModels = providers.stt.find((p) => p.id === sttProvider)?.models ?? [];
+type TriState = 'off' | 'enabled' | 'default';
 
-  const handleAiProviderChange = (newProvider: string) => {
-    setAiProvider(newProvider);
-    const provider = providers.ai.find((p) => p.id === newProvider);
-    if (provider && provider.models.length > 0) {
-      setAiModel(provider.models[0].id);
-    }
-  };
-
-  const handleTtsProviderChange = (newProvider: string) => {
-    setTtsProvider(newProvider);
-    const provider = providers.tts.find((p) => p.id === newProvider);
-    if (provider && provider.models.length > 0) {
-      setTtsModel(provider.models[0].id);
-    }
-  };
-
-  const handleSttProviderChange = (newProvider: string) => {
-    setSttProvider(newProvider);
-    const provider = providers.stt.find((p) => p.id === newProvider);
-    if (provider && provider.models.length > 0) {
-      setSttModel(provider.models[0].id);
-    }
-  };
-
-  return {
-    aiProvider, aiModel, setAiModel, aiModels, handleAiProviderChange,
-    ttsProvider, ttsModel, setTtsModel, ttsModels, handleTtsProviderChange,
-    sttProvider, sttModel, setSttModel, sttModels, handleSttProviderChange,
-    toData: () => ({ aiProvider, aiModel, ttsProvider, ttsModel, sttProvider, sttModel }),
-  };
-}
-
-/** Reusable hook for a single provider + model pair. */
-function useProviderModelState(
-  initialProvider: string,
-  initialModel: string,
-  providers: ProviderOption[],
-) {
-  const [provider, setProvider] = useState(initialProvider);
-  const [model, setModel] = useState(initialModel);
-  const models = providers.find((p) => p.id === provider)?.models ?? [];
-
-  const handleProviderChange = (newProvider: string) => {
-    setProvider(newProvider);
-    const p = providers.find((pp) => pp.id === newProvider);
-    if (p && p.models.length > 0) setModel(p.models[0].id);
-  };
-
-  return { provider, model, setModel, models, handleProviderChange };
-}
-
-function PlanSection({
-  label,
-  state,
-  aiProviders,
-  ttsProviders,
-  sttProviders,
-}: {
-  label: string;
-  state: ReturnType<typeof usePlanState>;
-  aiProviders: ProviderOption[];
-  ttsProviders: ProviderOption[];
-  sttProviders: ProviderOption[];
-}) {
-  const prefix = label.toLowerCase();
-
-  return (
-    <fieldset className={styles.section}>
-      <legend className={styles.sectionTitle}>{label} Tier</legend>
-
-      <div className={styles.field}>
-        <label className={styles.label} htmlFor={`${prefix}-aiProvider`}>AI Provider</label>
-        <select
-          id={`${prefix}-aiProvider`}
-          className={styles.select}
-          value={state.aiProvider}
-          onChange={(e) => state.handleAiProviderChange(e.target.value)}
-        >
-          {aiProviders.map((p) => (
-            <option key={p.id} value={p.id}>{p.displayName}</option>
-          ))}
-        </select>
-      </div>
-
-      <div className={styles.field}>
-        <label className={styles.label} htmlFor={`${prefix}-aiModel`}>AI Model</label>
-        <select
-          id={`${prefix}-aiModel`}
-          className={styles.select}
-          value={state.aiModel}
-          onChange={(e) => state.setAiModel(e.target.value)}
-        >
-          {state.aiModels.map((m) => (
-            <option key={m.id} value={m.id}>{m.displayName} ({m.tier})</option>
-          ))}
-        </select>
-      </div>
-
-      <div className={styles.field}>
-        <label className={styles.label} htmlFor={`${prefix}-ttsProvider`}>TTS Provider</label>
-        <select
-          id={`${prefix}-ttsProvider`}
-          className={styles.select}
-          value={state.ttsProvider}
-          onChange={(e) => state.handleTtsProviderChange(e.target.value)}
-        >
-          {ttsProviders.map((p) => (
-            <option key={p.id} value={p.id}>{p.displayName}</option>
-          ))}
-        </select>
-      </div>
-
-      <div className={styles.field}>
-        <label className={styles.label} htmlFor={`${prefix}-ttsModel`}>TTS Model</label>
-        <select
-          id={`${prefix}-ttsModel`}
-          className={styles.select}
-          value={state.ttsModel}
-          onChange={(e) => state.setTtsModel(e.target.value)}
-        >
-          {state.ttsModels.map((m) => (
-            <option key={m.id} value={m.id}>{m.displayName} ({m.tier})</option>
-          ))}
-        </select>
-      </div>
-
-      <div className={styles.field}>
-        <label className={styles.label} htmlFor={`${prefix}-sttProvider`}>STT Provider</label>
-        <select
-          id={`${prefix}-sttProvider`}
-          className={styles.select}
-          value={state.sttProvider}
-          onChange={(e) => state.handleSttProviderChange(e.target.value)}
-        >
-          {sttProviders.map((p) => (
-            <option key={p.id} value={p.id}>{p.displayName}</option>
-          ))}
-        </select>
-      </div>
-
-      <div className={styles.field}>
-        <label className={styles.label} htmlFor={`${prefix}-sttModel`}>STT Model</label>
-        <select
-          id={`${prefix}-sttModel`}
-          className={styles.select}
-          value={state.sttModel}
-          onChange={(e) => state.setSttModel(e.target.value)}
-        >
-          {state.sttModels.map((m) => (
-            <option key={m.id} value={m.id}>{m.displayName} ({m.tier})</option>
-          ))}
-        </select>
-      </div>
-    </fieldset>
-  );
-}
-
-/** Reusable provider + model selector for a modality (image, video, avatar). */
-function ModalityTierSection({
-  title,
-  description,
-  freeState,
-  proState,
-  providers,
-}: {
-  title: string;
-  description: string;
-  freeState: ReturnType<typeof useProviderModelState>;
-  proState: ReturnType<typeof useProviderModelState>;
+interface ModalityStateConfig {
+  initialFreeDefault: { provider: string; model: string };
+  initialProDefault: { provider: string; model: string };
+  initialFreeIncluded: string[] | null;
+  initialProIncluded: string[] | null;
   providers: ProviderOption[];
-}) {
-  const slug = title.toLowerCase().replace(/\s+/g, '-');
-
-  return (
-    <fieldset className={styles.section}>
-      <legend className={styles.sectionTitle}>{title}</legend>
-      <p className={styles.platformDescription}>{description}</p>
-
-      <div className={styles.field}>
-        <label className={styles.label} htmlFor={`${slug}-free-provider`}>Free Provider</label>
-        <select
-          id={`${slug}-free-provider`}
-          className={styles.select}
-          value={freeState.provider}
-          onChange={(e) => freeState.handleProviderChange(e.target.value)}
-        >
-          {providers.map((p) => (
-            <option key={p.id} value={p.id}>{p.displayName}</option>
-          ))}
-        </select>
-      </div>
-
-      <div className={styles.field}>
-        <label className={styles.label} htmlFor={`${slug}-free-model`}>Free Model</label>
-        <select
-          id={`${slug}-free-model`}
-          className={styles.select}
-          value={freeState.model}
-          onChange={(e) => freeState.setModel(e.target.value)}
-        >
-          {freeState.models.map((m) => (
-            <option key={m.id} value={m.id}>{m.displayName} ({m.tier})</option>
-          ))}
-        </select>
-      </div>
-
-      <div className={styles.field}>
-        <label className={styles.label} htmlFor={`${slug}-pro-provider`}>Pro Provider</label>
-        <select
-          id={`${slug}-pro-provider`}
-          className={styles.select}
-          value={proState.provider}
-          onChange={(e) => proState.handleProviderChange(e.target.value)}
-        >
-          {providers.map((p) => (
-            <option key={p.id} value={p.id}>{p.displayName}</option>
-          ))}
-        </select>
-      </div>
-
-      <div className={styles.field}>
-        <label className={styles.label} htmlFor={`${slug}-pro-model`}>Pro Model</label>
-        <select
-          id={`${slug}-pro-model`}
-          className={styles.select}
-          value={proState.model}
-          onChange={(e) => proState.setModel(e.target.value)}
-        >
-          {proState.models.map((m) => (
-            <option key={m.id} value={m.id}>{m.displayName} ({m.tier})</option>
-          ))}
-        </select>
-      </div>
-    </fieldset>
-  );
+  compositeIds: boolean;
 }
 
-function IncludedModelsEditor({
-  title,
-  description,
-  providers,
-  freeIncluded,
-  proIncluded,
-  freeDefault,
-  proDefault,
-  compositeIds,
-  onFreeChange,
-  onProChange,
-  onClear,
-}: {
-  title: string;
-  description: string;
-  providers: ProviderOption[];
-  freeIncluded: Set<string>;
-  proIncluded: Set<string>;
-  freeDefault: string;
-  proDefault: string;
-  compositeIds?: boolean;
-  onFreeChange: (modelId: string, checked: boolean) => void;
-  onProChange: (modelId: string, checked: boolean) => void;
-  onClear: () => void;
-}) {
+function toKey(provider: string, model: string, composite: boolean): string {
+  return composite ? `${provider}:${model}` : model;
+}
+
+function parseKey(key: string, composite: boolean, providers: ProviderOption[]): { provider: string; model: string } {
+  if (composite) {
+    const idx = key.indexOf(':');
+    return { provider: key.slice(0, idx), model: key.slice(idx + 1) };
+  }
+  for (const p of providers) {
+    if (p.models.some(m => m.id === key)) return { provider: p.id, model: key };
+  }
+  return { provider: providers[0]?.id ?? '', model: key };
+}
+
+function firstModelKey(providers: ProviderOption[], composite: boolean): string {
+  for (const p of providers) {
+    if (p.models.length > 0) return toKey(p.id, p.models[0].id, composite);
+  }
+  return '';
+}
+
+function useModalityState(config: ModalityStateConfig) {
+  const { providers, compositeIds } = config;
+
+  const initFreeKey = toKey(config.initialFreeDefault.provider, config.initialFreeDefault.model, compositeIds);
+  const initProKey = toKey(config.initialProDefault.provider, config.initialProDefault.model, compositeIds);
+
+  const [freeDefaultKey, setFreeDefaultKey] = useState(initFreeKey);
+  const [proDefaultKey, setProDefaultKey] = useState(initProKey);
+  const [freeIncluded, setFreeIncluded] = useState<Set<string>>(
+    () => new Set(config.initialFreeIncluded ?? [])
+  );
+  const [proIncluded, setProIncluded] = useState<Set<string>>(
+    () => new Set(config.initialProIncluded ?? [])
+  );
+
+  const getState = useCallback((tier: 'free' | 'pro', key: string): TriState => {
+    const defaultKey = tier === 'free' ? freeDefaultKey : proDefaultKey;
+    const included = tier === 'free' ? freeIncluded : proIncluded;
+    if (key === defaultKey) return 'default';
+    if (included.has(key)) return 'enabled';
+    return 'off';
+  }, [freeDefaultKey, proDefaultKey, freeIncluded, proIncluded]);
+
+  const findFirstEnabled = useCallback((tier: 'free' | 'pro', excludeKey: string): string | null => {
+    const included = tier === 'free' ? freeIncluded : proIncluded;
+    for (const p of providers) {
+      for (const m of p.models) {
+        const k = toKey(p.id, m.id, compositeIds);
+        if (k !== excludeKey && included.has(k)) return k;
+      }
+    }
+    return null;
+  }, [freeIncluded, proIncluded, providers, compositeIds]);
+
+  const cycle = useCallback((tier: 'free' | 'pro', key: string) => {
+    const setDefault = tier === 'free' ? setFreeDefaultKey : setProDefaultKey;
+    const setIncluded = tier === 'free' ? setFreeIncluded : setProIncluded;
+    const defaultKey = tier === 'free' ? freeDefaultKey : proDefaultKey;
+    const included = tier === 'free' ? freeIncluded : proIncluded;
+
+    let current: TriState;
+    if (key === defaultKey) current = 'default';
+    else if (included.has(key)) current = 'enabled';
+    else current = 'off';
+
+    if (current === 'off') {
+      // off → enabled
+      setIncluded(prev => {
+        const next = new Set(prev);
+        next.add(key);
+        return next;
+      });
+    } else if (current === 'enabled') {
+      // enabled → default (previous default stays in included)
+      const prevDefault = defaultKey;
+      setDefault(key);
+      setIncluded(prev => {
+        const next = new Set(prev);
+        next.add(key);
+        if (prevDefault && prevDefault !== key) next.add(prevDefault);
+        return next;
+      });
+    } else {
+      // default → off: remove from included, pick fallback
+      const fallback = findFirstEnabled(tier, key) ?? firstModelKey(providers, compositeIds);
+      setDefault(fallback);
+      setIncluded(prev => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
+    }
+  }, [freeDefaultKey, proDefaultKey, freeIncluded, proIncluded, findFirstEnabled, providers, compositeIds]);
+
+  const clear = useCallback(() => {
+    setFreeDefaultKey(initFreeKey);
+    setProDefaultKey(initProKey);
+    setFreeIncluded(new Set());
+    setProIncluded(new Set());
+  }, [initFreeKey, initProKey]);
+
   const hasOverrides = freeIncluded.size > 0 || proIncluded.size > 0;
 
+  return {
+    getState,
+    cycle,
+    freeDefault: parseKey(freeDefaultKey, compositeIds, providers),
+    proDefault: parseKey(proDefaultKey, compositeIds, providers),
+    freeIncluded,
+    proIncluded,
+    clear,
+    hasOverrides,
+    providers,
+    compositeIds,
+  };
+}
+
+type ModalityState = ReturnType<typeof useModalityState>;
+
+// --- Tri-state toggle icon SVGs ---
+
+function CheckIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+      <path d="M3 7l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function StarIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+      <path d="M7 1l1.76 3.57L13 5.24l-3 2.92.71 4.13L7 10.27 3.29 12.29 4 8.16 1 5.24l4.24-.67L7 1z" fill="currentColor" />
+    </svg>
+  );
+}
+
+// --- Unified Model Editor ---
+
+function UnifiedModelEditor({
+  title,
+  description,
+  state,
+}: {
+  title: string;
+  description: string;
+  state: ModalityState;
+}) {
+  const { providers, compositeIds } = state;
+
   const modelKey = (providerId: string, modelId: string) =>
-    compositeIds ? `${providerId}:${modelId}` : modelId;
+    toKey(providerId, modelId, compositeIds);
+
+  const ariaLabel = (modelName: string, tier: string, triState: TriState): string => {
+    switch (triState) {
+      case 'off': return `${modelName} ${tier} tier: off. Click to enable.`;
+      case 'enabled': return `${modelName} ${tier} tier: enabled. Click to set as default.`;
+      case 'default': return `${modelName} ${tier} tier: default. Click to disable.`;
+    }
+  };
 
   return (
     <fieldset className={styles.section}>
       <legend className={styles.sectionTitle}>{title}</legend>
       <p className={styles.platformDescription}>{description}</p>
 
-      {!hasOverrides && (
+      {!state.hasOverrides && (
         <p className={styles.defaultsHint}>
           Using defaults — only the auto model per tier is shown to users.
         </p>
       )}
 
       <div className={styles.providerCards}>
-        {providers.filter((p) => p.models.length > 0).map((provider) => (
+        {providers.filter(p => p.models.length > 0).map(provider => (
           <div key={provider.id} className={styles.providerCard}>
             <div className={styles.providerCardHeader}>
               <span className={styles.providerCardName}>{provider.displayName}</span>
@@ -384,14 +281,14 @@ function IncludedModelsEditor({
             <div className={styles.providerCardBody}>
               <div className={styles.providerCardColumns}>
                 <span className={styles.modelNameHeader}>Model</span>
-                <span className={styles.checkboxHeader}>Free</span>
-                <span className={styles.checkboxHeader}>Pro</span>
+                <span className={styles.tierHeader}>Free</span>
+                <span className={styles.tierHeader}>Pro</span>
               </div>
 
-              {provider.models.map((model) => {
+              {provider.models.map(model => {
                 const key = modelKey(provider.id, model.id);
-                const isFreeDefault = key === freeDefault;
-                const isProDefault = key === proDefault;
+                const freeState = state.getState('free', key);
+                const proState = state.getState('pro', key);
 
                 return (
                   <div key={key} className={styles.modelRow}>
@@ -401,28 +298,35 @@ function IncludedModelsEditor({
                       {model.price && (
                         <span className={styles.modelPrice}>{model.price}</span>
                       )}
-                      {(isFreeDefault || isProDefault) && (
-                        <span className={styles.defaultBadge}>
-                          {isFreeDefault && isProDefault ? 'default' : isFreeDefault ? 'free default' : 'pro default'}
-                        </span>
-                      )}
                     </span>
-                    <label className={styles.checkboxCell}>
-                      <input
-                        type="checkbox"
-                        className={styles.checkbox}
-                        checked={freeIncluded.has(key)}
-                        onChange={(e) => onFreeChange(key, e.target.checked)}
-                      />
-                    </label>
-                    <label className={styles.checkboxCell}>
-                      <input
-                        type="checkbox"
-                        className={styles.checkbox}
-                        checked={proIncluded.has(key)}
-                        onChange={(e) => onProChange(key, e.target.checked)}
-                      />
-                    </label>
+                    <div className={styles.triToggleCell}>
+                      <button
+                        type="button"
+                        className={`${styles.triToggle} ${
+                          freeState === 'enabled' ? styles.triToggleEnabled :
+                          freeState === 'default' ? styles.triToggleDefault : ''
+                        }`}
+                        aria-label={ariaLabel(model.displayName, 'free', freeState)}
+                        onClick={() => state.cycle('free', key)}
+                      >
+                        {freeState === 'enabled' && <CheckIcon />}
+                        {freeState === 'default' && <StarIcon />}
+                      </button>
+                    </div>
+                    <div className={styles.triToggleCell}>
+                      <button
+                        type="button"
+                        className={`${styles.triToggle} ${
+                          proState === 'enabled' ? styles.triToggleEnabled :
+                          proState === 'default' ? styles.triToggleDefault : ''
+                        }`}
+                        aria-label={ariaLabel(model.displayName, 'pro', proState)}
+                        onClick={() => state.cycle('pro', key)}
+                      >
+                        {proState === 'enabled' && <CheckIcon />}
+                        {proState === 'default' && <StarIcon />}
+                      </button>
+                    </div>
                   </div>
                 );
               })}
@@ -431,11 +335,11 @@ function IncludedModelsEditor({
         ))}
       </div>
 
-      {hasOverrides && (
+      {state.hasOverrides && (
         <button
           type="button"
           className={styles.clearButton}
-          onClick={onClear}
+          onClick={state.clear}
         >
           Clear overrides (use defaults)
         </button>
@@ -444,62 +348,89 @@ function IncludedModelsEditor({
   );
 }
 
+// --- Main form ---
+
 export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttProviders, imageProviders, videoProviders, avatarProviders, musicProviders }: AutoModelFormProps) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const providers = { ai: aiProviders, tts: ttsProviders, stt: sttProviders };
-  const freeState = usePlanState(initialConfig.free, providers);
-  const proState = usePlanState(initialConfig.pro, providers);
+  // 7 modality states
+  const aiState = useModalityState({
+    initialFreeDefault: { provider: initialConfig.free.aiProvider, model: initialConfig.free.aiModel },
+    initialProDefault: { provider: initialConfig.pro.aiProvider, model: initialConfig.pro.aiModel },
+    initialFreeIncluded: initialConfig.freeIncludedModels,
+    initialProIncluded: initialConfig.proIncludedModels,
+    providers: aiProviders,
+    compositeIds: false,
+  });
 
-  // AI included models state
-  const [freeIncluded, setFreeIncluded] = useState<Set<string>>(
-    new Set(initialConfig.freeIncludedModels ?? [])
-  );
-  const [proIncluded, setProIncluded] = useState<Set<string>>(
-    new Set(initialConfig.proIncludedModels ?? [])
-  );
+  const ttsState = useModalityState({
+    initialFreeDefault: { provider: initialConfig.free.ttsProvider, model: initialConfig.free.ttsModel },
+    initialProDefault: { provider: initialConfig.pro.ttsProvider, model: initialConfig.pro.ttsModel },
+    initialFreeIncluded: initialConfig.freeIncludedTtsModels,
+    initialProIncluded: initialConfig.proIncludedTtsModels,
+    providers: ttsProviders,
+    compositeIds: true,
+  });
 
-  // TTS included models state
-  const [freeIncludedTts, setFreeIncludedTts] = useState<Set<string>>(
-    new Set(initialConfig.freeIncludedTtsModels ?? [])
-  );
-  const [proIncludedTts, setProIncludedTts] = useState<Set<string>>(
-    new Set(initialConfig.proIncludedTtsModels ?? [])
-  );
+  const sttState = useModalityState({
+    initialFreeDefault: { provider: initialConfig.free.sttProvider, model: initialConfig.free.sttModel },
+    initialProDefault: { provider: initialConfig.pro.sttProvider, model: initialConfig.pro.sttModel },
+    initialFreeIncluded: initialConfig.freeIncludedSttModels,
+    initialProIncluded: initialConfig.proIncludedSttModels,
+    providers: sttProviders,
+    compositeIds: true,
+  });
 
-  // STT included models state
-  const [freeIncludedStt, setFreeIncludedStt] = useState<Set<string>>(
-    new Set(initialConfig.freeIncludedSttModels ?? [])
-  );
-  const [proIncludedStt, setProIncludedStt] = useState<Set<string>>(
-    new Set(initialConfig.proIncludedSttModels ?? [])
-  );
+  const imageState = useModalityState({
+    initialFreeDefault: { provider: initialConfig.freeImageProvider, model: initialConfig.freeImageModel },
+    initialProDefault: { provider: initialConfig.proImageProvider, model: initialConfig.proImageModel },
+    initialFreeIncluded: initialConfig.freeIncludedImageModels,
+    initialProIncluded: initialConfig.proIncludedImageModels,
+    providers: imageProviders,
+    compositeIds: true,
+  });
 
-  // Image provider/model state (free + pro)
-  const freeImage = useProviderModelState(initialConfig.freeImageProvider, initialConfig.freeImageModel, imageProviders);
-  const proImage = useProviderModelState(initialConfig.proImageProvider, initialConfig.proImageModel, imageProviders);
-  const [freeIncludedImage, setFreeIncludedImage] = useState<Set<string>>(new Set(initialConfig.freeIncludedImageModels ?? []));
-  const [proIncludedImage, setProIncludedImage] = useState<Set<string>>(new Set(initialConfig.proIncludedImageModels ?? []));
+  const videoState = useModalityState({
+    initialFreeDefault: { provider: initialConfig.freeVideoProvider, model: initialConfig.freeVideoModel },
+    initialProDefault: { provider: initialConfig.proVideoProvider, model: initialConfig.proVideoModel },
+    initialFreeIncluded: initialConfig.freeIncludedVideoModels,
+    initialProIncluded: initialConfig.proIncludedVideoModels,
+    providers: videoProviders,
+    compositeIds: true,
+  });
 
-  // Video provider/model state (free + pro)
-  const freeVideo = useProviderModelState(initialConfig.freeVideoProvider, initialConfig.freeVideoModel, videoProviders);
-  const proVideo = useProviderModelState(initialConfig.proVideoProvider, initialConfig.proVideoModel, videoProviders);
-  const [freeIncludedVideo, setFreeIncludedVideo] = useState<Set<string>>(new Set(initialConfig.freeIncludedVideoModels ?? []));
-  const [proIncludedVideo, setProIncludedVideo] = useState<Set<string>>(new Set(initialConfig.proIncludedVideoModels ?? []));
+  const avatarState = useModalityState({
+    initialFreeDefault: { provider: initialConfig.freeAvatarProvider, model: initialConfig.freeAvatarModel },
+    initialProDefault: { provider: initialConfig.proAvatarProvider, model: initialConfig.proAvatarModel },
+    initialFreeIncluded: initialConfig.freeIncludedAvatarModels,
+    initialProIncluded: initialConfig.proIncludedAvatarModels,
+    providers: avatarProviders,
+    compositeIds: true,
+  });
 
-  // Avatar provider/model state (free + pro)
-  const freeAvatar = useProviderModelState(initialConfig.freeAvatarProvider, initialConfig.freeAvatarModel, avatarProviders);
-  const proAvatar = useProviderModelState(initialConfig.proAvatarProvider, initialConfig.proAvatarModel, avatarProviders);
-  const [freeIncludedAvatar, setFreeIncludedAvatar] = useState<Set<string>>(new Set(initialConfig.freeIncludedAvatarModels ?? []));
-  const [proIncludedAvatar, setProIncludedAvatar] = useState<Set<string>>(new Set(initialConfig.proIncludedAvatarModels ?? []));
+  const musicState = useModalityState({
+    initialFreeDefault: { provider: initialConfig.freeMusicProvider, model: initialConfig.freeMusicModel },
+    initialProDefault: { provider: initialConfig.proMusicProvider, model: initialConfig.proMusicModel },
+    initialFreeIncluded: initialConfig.freeIncludedMusicModels,
+    initialProIncluded: initialConfig.proIncludedMusicModels,
+    providers: musicProviders,
+    compositeIds: true,
+  });
 
-  // Music provider/model state (free + pro)
-  const freeMusic = useProviderModelState(initialConfig.freeMusicProvider, initialConfig.freeMusicModel, musicProviders);
-  const proMusic = useProviderModelState(initialConfig.proMusicProvider, initialConfig.proMusicModel, musicProviders);
-  const [freeIncludedMusic, setFreeIncludedMusic] = useState<Set<string>>(new Set(initialConfig.freeIncludedMusicModels ?? []));
-  const [proIncludedMusic, setProIncludedMusic] = useState<Set<string>>(new Set(initialConfig.proIncludedMusicModels ?? []));
+  // Platform AI (stays as dropdown — not a modality toggle)
+  const [platformAiProvider, setPlatformAiProvider] = useState(initialConfig.platform.aiProvider);
+  const [platformAiModel, setPlatformAiModel] = useState(initialConfig.platform.aiModel);
+  const platformAiModels = aiProviders.find(p => p.id === platformAiProvider)?.models ?? [];
+
+  const handlePlatformAiProviderChange = (newProvider: string) => {
+    setPlatformAiProvider(newProvider);
+    const provider = aiProviders.find(p => p.id === newProvider);
+    if (provider && provider.models.length > 0) {
+      setPlatformAiModel(provider.models[0].id);
+    }
+  };
 
   // Daily limits
   const [dailyGenerationLimit, setDailyGenerationLimit] = useState(initialConfig.dailyGenerationLimit);
@@ -508,58 +439,6 @@ export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttPro
   const [dailyVideoLimitPro, setDailyVideoLimitPro] = useState(initialConfig.dailyVideoLimitPro);
   const [dailyMusicLimit, setDailyMusicLimit] = useState(initialConfig.dailyMusicLimit);
   const [dailyMusicLimitPro, setDailyMusicLimitPro] = useState(initialConfig.dailyMusicLimitPro);
-
-  // Platform AI
-  const [platformAiProvider, setPlatformAiProvider] = useState(initialConfig.platform.aiProvider);
-  const [platformAiModel, setPlatformAiModel] = useState(initialConfig.platform.aiModel);
-  const platformAiModels = aiProviders.find((p) => p.id === platformAiProvider)?.models ?? [];
-
-  const handlePlatformAiProviderChange = (newProvider: string) => {
-    setPlatformAiProvider(newProvider);
-    const provider = aiProviders.find((p) => p.id === newProvider);
-    if (provider && provider.models.length > 0) {
-      setPlatformAiModel(provider.models[0].id);
-    }
-  };
-
-  // Generic included model handlers
-  function makeIncludedHandlers(
-    setFree: React.Dispatch<React.SetStateAction<Set<string>>>,
-    setPro: React.Dispatch<React.SetStateAction<Set<string>>>
-  ) {
-    const onFreeChange = (modelId: string, checked: boolean) => {
-      setFree((prev) => {
-        const next = new Set(prev);
-        if (checked) next.add(modelId);
-        else next.delete(modelId);
-        return next;
-      });
-    };
-
-    const onProChange = (modelId: string, checked: boolean) => {
-      setPro((prev) => {
-        const next = new Set(prev);
-        if (checked) next.add(modelId);
-        else next.delete(modelId);
-        return next;
-      });
-    };
-
-    const onClear = () => {
-      setFree(new Set());
-      setPro(new Set());
-    };
-
-    return { onFreeChange, onProChange, onClear };
-  }
-
-  const aiHandlers = makeIncludedHandlers(setFreeIncluded, setProIncluded);
-  const ttsHandlers = makeIncludedHandlers(setFreeIncludedTts, setProIncludedTts);
-  const sttHandlers = makeIncludedHandlers(setFreeIncludedStt, setProIncludedStt);
-  const imageHandlers = makeIncludedHandlers(setFreeIncludedImage, setProIncludedImage);
-  const videoHandlers = makeIncludedHandlers(setFreeIncludedVideo, setProIncludedVideo);
-  const avatarHandlers = makeIncludedHandlers(setFreeIncludedAvatar, setProIncludedAvatar);
-  const musicHandlers = makeIncludedHandlers(setFreeIncludedMusic, setProIncludedMusic);
 
   const setToArray = (s: Set<string>) => s.size > 0 ? [...s] : null;
 
@@ -573,44 +452,53 @@ export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttPro
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          free: freeState.toData(),
-          pro: proState.toData(),
+          free: {
+            aiProvider: aiState.freeDefault.provider,
+            aiModel: aiState.freeDefault.model,
+            ttsProvider: ttsState.freeDefault.provider,
+            ttsModel: ttsState.freeDefault.model,
+            sttProvider: sttState.freeDefault.provider,
+            sttModel: sttState.freeDefault.model,
+          },
+          pro: {
+            aiProvider: aiState.proDefault.provider,
+            aiModel: aiState.proDefault.model,
+            ttsProvider: ttsState.proDefault.provider,
+            ttsModel: ttsState.proDefault.model,
+            sttProvider: sttState.proDefault.provider,
+            sttModel: sttState.proDefault.model,
+          },
           platform: { aiProvider: platformAiProvider, aiModel: platformAiModel },
-          freeIncludedModels: setToArray(freeIncluded),
-          proIncludedModels: setToArray(proIncluded),
-          freeIncludedTtsModels: setToArray(freeIncludedTts),
-          proIncludedTtsModels: setToArray(proIncludedTts),
-          freeIncludedSttModels: setToArray(freeIncludedStt),
-          proIncludedSttModels: setToArray(proIncludedStt),
-          // Image
-          freeImageProvider: freeImage.provider,
-          freeImageModel: freeImage.model,
-          proImageProvider: proImage.provider,
-          proImageModel: proImage.model,
-          freeIncludedImageModels: setToArray(freeIncludedImage),
-          proIncludedImageModels: setToArray(proIncludedImage),
-          // Video
-          freeVideoProvider: freeVideo.provider,
-          freeVideoModel: freeVideo.model,
-          proVideoProvider: proVideo.provider,
-          proVideoModel: proVideo.model,
-          freeIncludedVideoModels: setToArray(freeIncludedVideo),
-          proIncludedVideoModels: setToArray(proIncludedVideo),
-          // Avatar
-          freeAvatarProvider: freeAvatar.provider,
-          freeAvatarModel: freeAvatar.model,
-          proAvatarProvider: proAvatar.provider,
-          proAvatarModel: proAvatar.model,
-          freeIncludedAvatarModels: setToArray(freeIncludedAvatar),
-          proIncludedAvatarModels: setToArray(proIncludedAvatar),
-          // Music
-          freeMusicProvider: freeMusic.provider,
-          freeMusicModel: freeMusic.model,
-          proMusicProvider: proMusic.provider,
-          proMusicModel: proMusic.model,
-          freeIncludedMusicModels: setToArray(freeIncludedMusic),
-          proIncludedMusicModels: setToArray(proIncludedMusic),
-          // Daily limits
+          freeIncludedModels: setToArray(aiState.freeIncluded),
+          proIncludedModels: setToArray(aiState.proIncluded),
+          freeIncludedTtsModels: setToArray(ttsState.freeIncluded),
+          proIncludedTtsModels: setToArray(ttsState.proIncluded),
+          freeIncludedSttModels: setToArray(sttState.freeIncluded),
+          proIncludedSttModels: setToArray(sttState.proIncluded),
+          freeImageProvider: imageState.freeDefault.provider,
+          freeImageModel: imageState.freeDefault.model,
+          proImageProvider: imageState.proDefault.provider,
+          proImageModel: imageState.proDefault.model,
+          freeIncludedImageModels: setToArray(imageState.freeIncluded),
+          proIncludedImageModels: setToArray(imageState.proIncluded),
+          freeVideoProvider: videoState.freeDefault.provider,
+          freeVideoModel: videoState.freeDefault.model,
+          proVideoProvider: videoState.proDefault.provider,
+          proVideoModel: videoState.proDefault.model,
+          freeIncludedVideoModels: setToArray(videoState.freeIncluded),
+          proIncludedVideoModels: setToArray(videoState.proIncluded),
+          freeAvatarProvider: avatarState.freeDefault.provider,
+          freeAvatarModel: avatarState.freeDefault.model,
+          proAvatarProvider: avatarState.proDefault.provider,
+          proAvatarModel: avatarState.proDefault.model,
+          freeIncludedAvatarModels: setToArray(avatarState.freeIncluded),
+          proIncludedAvatarModels: setToArray(avatarState.proIncluded),
+          freeMusicProvider: musicState.freeDefault.provider,
+          freeMusicModel: musicState.freeDefault.model,
+          proMusicProvider: musicState.proDefault.provider,
+          proMusicModel: musicState.proDefault.model,
+          freeIncludedMusicModels: setToArray(musicState.freeIncluded),
+          proIncludedMusicModels: setToArray(musicState.proIncluded),
           dailyGenerationLimit,
           dailyGenerationLimitPro,
           dailyVideoLimit,
@@ -636,149 +524,46 @@ export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttPro
 
   return (
     <div className={styles.form}>
-      <PlanSection
-        label="Free"
-        state={freeState}
-        aiProviders={aiProviders}
-        ttsProviders={ttsProviders}
-        sttProviders={sttProviders}
+      <UnifiedModelEditor
+        title="AI Models"
+        description="Control which AI models appear in the picker for non-BYOK users. Star = default for the tier."
+        state={aiState}
       />
 
-      <PlanSection
-        label="Pro"
-        state={proState}
-        aiProviders={aiProviders}
-        ttsProviders={ttsProviders}
-        sttProviders={sttProviders}
+      <UnifiedModelEditor
+        title="TTS Models"
+        description="Control which TTS models are available to non-BYOK users."
+        state={ttsState}
       />
 
-      <IncludedModelsEditor
-        title="Included AI Models"
-        description="Control which AI models appear in the picker for non-BYOK users. Free models are always included in the Pro tier."
-        providers={aiProviders}
-        freeIncluded={freeIncluded}
-        proIncluded={proIncluded}
-        freeDefault={freeState.aiModel}
-        proDefault={proState.aiModel}
-        onFreeChange={aiHandlers.onFreeChange}
-        onProChange={aiHandlers.onProChange}
-        onClear={aiHandlers.onClear}
+      <UnifiedModelEditor
+        title="STT Models"
+        description="Control which STT models are available to non-BYOK users."
+        state={sttState}
       />
 
-      <IncludedModelsEditor
-        title="Included TTS Models"
-        description="Control which TTS models are available to non-BYOK users. Free models are always included in the Pro tier."
-        providers={ttsProviders}
-        freeIncluded={freeIncludedTts}
-        proIncluded={proIncludedTts}
-        freeDefault={`${freeState.ttsProvider}:${freeState.ttsModel}`}
-        proDefault={`${proState.ttsProvider}:${proState.ttsModel}`}
-        compositeIds
-        onFreeChange={ttsHandlers.onFreeChange}
-        onProChange={ttsHandlers.onProChange}
-        onClear={ttsHandlers.onClear}
-      />
-
-      <IncludedModelsEditor
-        title="Included STT Models"
-        description="Control which STT models are available to non-BYOK users. Free models are always included in the Pro tier."
-        providers={sttProviders}
-        freeIncluded={freeIncludedStt}
-        proIncluded={proIncludedStt}
-        freeDefault={`${freeState.sttProvider}:${freeState.sttModel}`}
-        proDefault={`${proState.sttProvider}:${proState.sttModel}`}
-        compositeIds
-        onFreeChange={sttHandlers.onFreeChange}
-        onProChange={sttHandlers.onProChange}
-        onClear={sttHandlers.onClear}
-      />
-
-      <ModalityTierSection
-        title="Image Generation"
-        description="Still image provider and model for video visuals (AI illustrations)."
-        freeState={freeImage}
-        proState={proImage}
-        providers={imageProviders}
-      />
-
-      <IncludedModelsEditor
-        title="Included Image Models"
+      <UnifiedModelEditor
+        title="Image Models"
         description="Control which image models are available for video generation."
-        providers={imageProviders}
-        freeIncluded={freeIncludedImage}
-        proIncluded={proIncludedImage}
-        freeDefault={`${freeImage.provider}:${freeImage.model}`}
-        proDefault={`${proImage.provider}:${proImage.model}`}
-        compositeIds
-        onFreeChange={imageHandlers.onFreeChange}
-        onProChange={imageHandlers.onProChange}
-        onClear={imageHandlers.onClear}
+        state={imageState}
       />
 
-      <ModalityTierSection
-        title="Video Generation"
-        description="Text-to-video provider and model for animated video segments."
-        freeState={freeVideo}
-        proState={proVideo}
-        providers={videoProviders}
-      />
-
-      <IncludedModelsEditor
-        title="Included Video Models"
+      <UnifiedModelEditor
+        title="Video Models"
         description="Control which video models are available for text-to-video generation."
-        providers={videoProviders}
-        freeIncluded={freeIncludedVideo}
-        proIncluded={proIncludedVideo}
-        freeDefault={`${freeVideo.provider}:${freeVideo.model}`}
-        proDefault={`${proVideo.provider}:${proVideo.model}`}
-        compositeIds
-        onFreeChange={videoHandlers.onFreeChange}
-        onProChange={videoHandlers.onProChange}
-        onClear={videoHandlers.onClear}
+        state={videoState}
       />
 
-      <ModalityTierSection
-        title="Avatar Generation"
-        description="Lip-sync avatar overlay provider and engine for video podcasts."
-        freeState={freeAvatar}
-        proState={proAvatar}
-        providers={avatarProviders}
-      />
-
-      <IncludedModelsEditor
-        title="Included Avatar Models"
+      <UnifiedModelEditor
+        title="Avatar Models"
         description="Control which avatar engines are available for lip-sync overlays."
-        providers={avatarProviders}
-        freeIncluded={freeIncludedAvatar}
-        proIncluded={proIncludedAvatar}
-        freeDefault={`${freeAvatar.provider}:${freeAvatar.model}`}
-        proDefault={`${proAvatar.provider}:${proAvatar.model}`}
-        compositeIds
-        onFreeChange={avatarHandlers.onFreeChange}
-        onProChange={avatarHandlers.onProChange}
-        onClear={avatarHandlers.onClear}
+        state={avatarState}
       />
 
-      <ModalityTierSection
-        title="Music Generation"
-        description="AI-generated background music provider and model for podcasts."
-        freeState={freeMusic}
-        proState={proMusic}
-        providers={musicProviders}
-      />
-
-      <IncludedModelsEditor
-        title="Included Music Models"
+      <UnifiedModelEditor
+        title="Music Models"
         description="Control which music models are available for background music generation."
-        providers={musicProviders}
-        freeIncluded={freeIncludedMusic}
-        proIncluded={proIncludedMusic}
-        freeDefault={`${freeMusic.provider}:${freeMusic.model}`}
-        proDefault={`${proMusic.provider}:${proMusic.model}`}
-        compositeIds
-        onFreeChange={musicHandlers.onFreeChange}
-        onProChange={musicHandlers.onProChange}
-        onClear={musicHandlers.onClear}
+        state={musicState}
       />
 
       <fieldset className={styles.section}>
