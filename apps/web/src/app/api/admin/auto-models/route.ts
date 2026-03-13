@@ -64,6 +64,13 @@ const updateSchema = z.object({
   proAvatarModel: z.string().min(1).optional(),
   freeIncludedAvatarModels: includedModelsField,
   proIncludedAvatarModels: includedModelsField,
+  // Music
+  freeMusicProvider: z.string().min(1).optional(),
+  freeMusicModel: z.string().min(1).optional(),
+  proMusicProvider: z.string().min(1).optional(),
+  proMusicModel: z.string().min(1).optional(),
+  freeIncludedMusicModels: includedModelsField,
+  proIncludedMusicModels: includedModelsField,
   // Daily limits & allocations
   dailyGenerationLimit: z.number().int().min(0).optional(),
   dailyGenerationLimitPro: z.number().int().min(0).optional(),
