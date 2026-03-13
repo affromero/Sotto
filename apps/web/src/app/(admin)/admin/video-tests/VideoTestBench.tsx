@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { ChevronDown, Shuffle } from 'lucide-react';
+import { ChevronDown, Shuffle, Eye } from 'lucide-react';
 import type { EnvAvailability, ImageModelInfo, AiProviderInfo } from './page';
 import type { MapPresetId } from '@sotto/maps/server';
 import styles from './VideoTestBench.module.css';
@@ -22,10 +22,106 @@ interface TestResult {
   data?: Record<string, unknown>;
 }
 
+interface PreviewState {
+  loading: boolean;
+  imageBase64?: string;
+  latencyMs?: number;
+  error?: string;
+}
+
+interface FrameStripState {
+  loading: boolean;
+  frames: Array<{ frame: number; imageBase64?: string; error?: string }>;
+  latencyMs?: number;
+}
+
 type TestType = 'classify' | 'resolve-place' | 'map-image' | 'ai-illustration' | 'stock-footage';
 
 function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
+}
+
+// ── Shared preview helper ──
+
+async function renderStill(
+  segment: Record<string, unknown>,
+  frame?: number,
+): Promise<{ imageBase64: string; latencyMs: number }> {
+  const res = await fetch('/api/admin/test-video-pipeline', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'render-still', segment, frame }),
+  });
+  const data = await res.json();
+  if (!data.success) throw new Error(data.error ?? 'Render failed');
+  return { imageBase64: data.imageBase64, latencyMs: data.latencyMs };
+}
+
+// ── Preview Button Component ──
+
+function PreviewButton({
+  preview,
+  onPreview,
+  label,
+}: {
+  preview: PreviewState | undefined;
+  onPreview: () => void;
+  label?: string;
+}) {
+  return (
+    <>
+      <button
+        type="button"
+        className={styles.previewButton}
+        onClick={onPreview}
+        disabled={preview?.loading}
+      >
+        <Eye size={14} aria-hidden="true" />
+        {preview?.loading ? 'Rendering…' : (label ?? 'Preview as Video Frame')}
+      </button>
+      {preview?.error && (
+        <span className={styles.errorText}>{preview.error}</span>
+      )}
+      {preview?.imageBase64 && (
+        <div className={styles.remotionPreview}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={preview.imageBase64} alt="Remotion rendered frame" className={styles.imagePreview} />
+          {preview.latencyMs !== undefined && (
+            <span className={styles.latencyBadge}>Rendered in {preview.latencyMs}ms via Remotion</span>
+          )}
+        </div>
+      )}
+    </>
+  );
+}
+
+// ── Frame Strip Component (for map crossfade) ──
+
+function FrameStrip({ strip }: { strip: FrameStripState }) {
+  if (!strip.frames.some((f) => f.imageBase64)) return null;
+
+  return (
+    <div className={styles.frameStrip}>
+      {strip.frames.map((f) => (
+        <div key={f.frame} className={styles.frameStripItem}>
+          {f.imageBase64 ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={f.imageBase64} alt={`Frame ${f.frame}`} className={styles.frameStripImage} />
+          ) : f.error ? (
+            <span className={styles.errorText}>{f.error}</span>
+          ) : (
+            <span className={styles.spinner} />
+          )}
+          <span className={styles.frameStripLabel}>
+            {f.frame === 0 ? 'Modern' : f.frame > 100 ? 'Historical' : 'Crossfade'}
+          </span>
+        </div>
+      ))}
+      {strip.latencyMs !== undefined && (
+        <span className={styles.latencyBadge}>Total: {strip.latencyMs}ms</span>
+      )}
+    </div>
+  );
 }
 
 function StatusDot({ status }: { status: TestStatus }) {
@@ -183,15 +279,22 @@ function ClassifierSection({
   onTest,
   disabled,
   aiProviders,
+  segmentsText,
+  onSegmentsTextChange,
+  onPreviewAll,
+  previewAllState,
 }: {
   result: TestResult;
   onTest: (body: Record<string, unknown>) => void;
   disabled: boolean;
   aiProviders: AiProviderInfo[];
+  segmentsText: string;
+  onSegmentsTextChange: (text: string) => void;
+  onPreviewAll: () => void;
+  previewAllState: PreviewAllState;
 }) {
   const [title, setTitle] = useState('');
   const [topic, setTopic] = useState('');
-  const [segmentsText, setSegmentsText] = useState('');
   const [provider, setProvider] = useState('');
   const [model, setModel] = useState('');
 
@@ -202,7 +305,7 @@ function ClassifierSection({
     const sample = pick(CLASSIFIER_SAMPLES);
     setTitle(sample.title);
     setTopic(sample.topic);
-    setSegmentsText(sample.segments.join('\n'));
+    onSegmentsTextChange(sample.segments.join('\n'));
   }
 
   function handleTest() {
@@ -222,6 +325,7 @@ function ClassifierSection({
       visualType: string;
       prompt: string | null;
       durationFraction: number;
+      metadata?: Record<string, unknown>;
     }>;
   }> | undefined;
   const usedModel = result.data?.model as string | undefined;
@@ -261,7 +365,7 @@ function ClassifierSection({
           <textarea
             className={styles.fieldTextarea}
             value={segmentsText}
-            onChange={(e) => setSegmentsText(e.target.value)}
+            onChange={(e) => onSegmentsTextChange(e.target.value)}
             placeholder="Enter segment text, one per line..."
             rows={4}
           />
@@ -366,6 +470,54 @@ function ClassifierSection({
               </tbody>
             </table>
           </div>
+
+          {/* Preview All Segments */}
+          <div className={styles.previewAllSection}>
+            <button
+              type="button"
+              className={styles.testButton}
+              onClick={onPreviewAll}
+              disabled={previewAllState.loading}
+            >
+              <Eye size={14} aria-hidden="true" />
+              {previewAllState.loading
+                ? `Rendering ${previewAllState.completed}/${previewAllState.total} segments…`
+                : 'Preview All Segments'}
+            </button>
+            {previewAllState.error && (
+              <span className={styles.errorText}>{previewAllState.error}</span>
+            )}
+            {previewAllState.segments.length > 0 && (
+              <div className={styles.previewAllStrip}>
+                {previewAllState.segments.map((seg) => (
+                  <div key={seg.index} className={styles.previewAllItem}>
+                    {seg.imageBase64 ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={seg.imageBase64}
+                        alt={`Segment ${seg.index} preview`}
+                        className={styles.previewAllImage}
+                      />
+                    ) : seg.error ? (
+                      <div className={styles.previewAllPlaceholder}>
+                        <span className={styles.errorText}>{seg.error}</span>
+                      </div>
+                    ) : (
+                      <div className={styles.previewAllPlaceholder}>
+                        <span className={styles.spinner} />
+                      </div>
+                    )}
+                    <div className={styles.previewAllMeta}>
+                      <span className={styles.visualTypeBadge}>{seg.visualType}</span>
+                      <span className={styles.previewAllText}>
+                        {seg.text.slice(0, 50)}{seg.text.length > 50 ? '…' : ''}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </SectionShell>
@@ -377,9 +529,13 @@ function ClassifierSection({
 function PlaceResolverSection({
   result,
   onTest,
+  preview,
+  onPreview,
 }: {
   result: TestResult;
   onTest: (body: Record<string, unknown>) => void;
+  preview: PreviewState | undefined;
+  onPreview: () => void;
 }) {
   const [query, setQuery] = useState('');
   const [yearHint, setYearHint] = useState('');
@@ -465,24 +621,33 @@ function PlaceResolverSection({
             )}
           </div>
           {place ? (
-            <div className={styles.metadataGrid}>
-              <span className={styles.metadataLabel}>Name</span>
-              <span className={styles.metadataValue}>{place.name}</span>
-              <span className={styles.metadataLabel}>Coordinates</span>
-              <span className={styles.metadataValue}>[{place.coordinates[0]}, {place.coordinates[1]}]</span>
-              <span className={styles.metadataLabel}>Region</span>
-              <span className={styles.metadataValue}>{place.modernRegion}</span>
-              <span className={styles.metadataLabel}>Source</span>
-              <span className={styles.metadataValue}>{place.source}</span>
-              <span className={styles.metadataLabel}>Confidence</span>
-              <span className={styles.metadataValue}>{(place.confidence * 100).toFixed(0)}%</span>
-              {place.aliases && place.aliases.length > 0 && (
-                <>
-                  <span className={styles.metadataLabel}>Aliases</span>
-                  <span className={styles.metadataValue}>{place.aliases.join(', ')}</span>
-                </>
-              )}
-            </div>
+            <>
+              <div className={styles.metadataGrid}>
+                <span className={styles.metadataLabel}>Name</span>
+                <span className={styles.metadataValue}>{place.name}</span>
+                <span className={styles.metadataLabel}>Coordinates</span>
+                <span className={styles.metadataValue}>[{place.coordinates[0]}, {place.coordinates[1]}]</span>
+                <span className={styles.metadataLabel}>Region</span>
+                <span className={styles.metadataValue}>{place.modernRegion}</span>
+                <span className={styles.metadataLabel}>Source</span>
+                <span className={styles.metadataValue}>{place.source}</span>
+                <span className={styles.metadataLabel}>Confidence</span>
+                <span className={styles.metadataValue}>{(place.confidence * 100).toFixed(0)}%</span>
+                {place.aliases && place.aliases.length > 0 && (
+                  <>
+                    <span className={styles.metadataLabel}>Aliases</span>
+                    <span className={styles.metadataValue}>{place.aliases.join(', ')}</span>
+                  </>
+                )}
+              </div>
+              <div className={styles.buttonRow} style={{ marginTop: 'var(--spacing-sm)' }}>
+                <PreviewButton
+                  preview={preview}
+                  onPreview={onPreview}
+                  label="Preview as Map"
+                />
+              </div>
+            </>
           ) : (
             <span className={styles.errorText}>No place found for this query</span>
           )}
@@ -499,11 +664,19 @@ function MapImageSection({
   onTest,
   disabled,
   mapPresets,
+  preview,
+  onPreview,
+  frameStrip,
+  onFrameStrip,
 }: {
   result: TestResult;
   onTest: (body: Record<string, unknown>) => void;
   disabled: boolean;
   mapPresets: MapPresetId[];
+  preview: PreviewState | undefined;
+  onPreview: () => void;
+  frameStrip: FrameStripState | undefined;
+  onFrameStrip: () => void;
 }) {
   const [place, setPlace] = useState('');
   const [preset, setPreset] = useState<MapPresetId>('vintage');
@@ -527,7 +700,11 @@ function MapImageSection({
   }
 
   const imageBase64 = result.data?.imageBase64 as string | undefined;
-  const resolvedPlace = result.data?.resolvedPlace as { name: string; coordinates: [number, number] } | undefined;
+  const resolvedPlace = result.data?.resolvedPlace as {
+    name: string;
+    coordinates: [number, number];
+    historicalContext?: Array<{ periodName: string }>;
+  } | undefined;
 
   return (
     <SectionShell
@@ -618,6 +795,22 @@ function MapImageSection({
           </div>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={imageBase64} alt="Generated map" className={styles.imagePreview} />
+
+          <div className={styles.buttonRow} style={{ marginTop: 'var(--spacing-sm)' }}>
+            <PreviewButton preview={preview} onPreview={onPreview} />
+            {resolvedPlace?.historicalContext && resolvedPlace.historicalContext.length > 0 && (
+              <button
+                type="button"
+                className={styles.previewButton}
+                onClick={onFrameStrip}
+                disabled={frameStrip?.loading}
+              >
+                <Eye size={14} aria-hidden="true" />
+                {frameStrip?.loading ? 'Rendering crossfade…' : 'Preview Historical Crossfade'}
+              </button>
+            )}
+          </div>
+          {frameStrip && <FrameStrip strip={frameStrip} />}
         </div>
       )}
     </SectionShell>
@@ -631,11 +824,15 @@ function AIIllustrationSection({
   onTest,
   disabled,
   imageModels,
+  preview,
+  onPreview,
 }: {
   result: TestResult;
   onTest: (body: Record<string, unknown>) => void;
   disabled: boolean;
   imageModels: ImageModelInfo[];
+  preview: PreviewState | undefined;
+  onPreview: () => void;
 }) {
   const [prompt, setPrompt] = useState('');
   const [model, setModel] = useState('');
@@ -731,6 +928,9 @@ function AIIllustrationSection({
           </div>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={imageBase64} alt="AI generated illustration" className={styles.imagePreview} />
+          <div className={styles.buttonRow} style={{ marginTop: 'var(--spacing-sm)' }}>
+            <PreviewButton preview={preview} onPreview={onPreview} />
+          </div>
         </div>
       )}
     </SectionShell>
@@ -743,10 +943,14 @@ function StockFootageSection({
   result,
   onTest,
   disabled,
+  preview,
+  onPreview,
 }: {
   result: TestResult;
   onTest: (body: Record<string, unknown>) => void;
   disabled: boolean;
+  preview: PreviewState | undefined;
+  onPreview: () => void;
 }) {
   const [query, setQuery] = useState('');
 
@@ -817,22 +1021,30 @@ function StockFootageSection({
             )}
           </div>
           {stockResult ? (
-            <div className={styles.stockResult}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={stockResult.thumbnailUrl} alt="Video thumbnail" className={styles.stockThumbnail} />
-              <div className={styles.stockMeta}>
-                <span><strong>Duration:</strong> {stockResult.duration}s</span>
-                <span><strong>Photographer:</strong> {stockResult.photographer}</span>
-                <a
-                  href={stockResult.pexelsVideoUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={styles.stockLink}
-                >
-                  View on Pexels
-                </a>
+            <>
+              <div className={styles.stockResult}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={stockResult.thumbnailUrl} alt="Video thumbnail" className={styles.stockThumbnail} />
+                <div className={styles.stockMeta}>
+                  <span><strong>Duration:</strong> {stockResult.duration}s</span>
+                  <span><strong>Photographer:</strong> {stockResult.photographer}</span>
+                  <a
+                    href={stockResult.pexelsVideoUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={styles.stockLink}
+                  >
+                    View on Pexels
+                  </a>
+                </div>
               </div>
-            </div>
+              <div className={styles.buttonRow} style={{ marginTop: 'var(--spacing-sm)' }}>
+                <PreviewButton preview={preview} onPreview={onPreview} />
+              </div>
+              <p className={styles.previewNote}>
+                Still preview uses the thumbnail image. Actual video uses the full clip.
+              </p>
+            </>
           ) : (
             <span className={styles.errorText}>No results found for this query</span>
           )}
@@ -841,6 +1053,31 @@ function StockFootageSection({
     </SectionShell>
   );
 }
+
+// ── Preview All State ──
+
+interface PreviewAllSegment {
+  index: number;
+  visualType: string;
+  text: string;
+  imageBase64?: string;
+  error?: string;
+}
+
+interface PreviewAllState {
+  loading: boolean;
+  total: number;
+  completed: number;
+  error?: string;
+  segments: PreviewAllSegment[];
+}
+
+const INITIAL_PREVIEW_ALL: PreviewAllState = {
+  loading: false,
+  total: 0,
+  completed: 0,
+  segments: [],
+};
 
 // ── Main Component ──
 
@@ -852,6 +1089,10 @@ export function VideoTestBench({ envAvailability, mapPresets, imageModels, aiPro
     'ai-illustration': { status: 'idle' },
     'stock-footage': { status: 'idle' },
   });
+  const [previews, setPreviews] = useState<Record<string, PreviewState>>({});
+  const [mapFrameStrip, setMapFrameStrip] = useState<FrameStripState>();
+  const [previewAll, setPreviewAll] = useState<PreviewAllState>(INITIAL_PREVIEW_ALL);
+  const [segmentsText, setSegmentsText] = useState('');
 
   const runTest = useCallback(async (body: Record<string, unknown>) => {
     const testType = body.type as TestType;
@@ -885,6 +1126,296 @@ export function VideoTestBench({ envAvailability, mapPresets, imageModels, aiPro
     }
   }, []);
 
+  // ── Per-section preview handlers ──
+
+  const previewMapImage = useCallback(async () => {
+    const mapResult = results['map-image'];
+    const imageBase64 = mapResult.data?.imageBase64 as string | undefined;
+    const resolvedPlace = mapResult.data?.resolvedPlace as { name: string } | undefined;
+    if (!imageBase64 || !resolvedPlace) return;
+
+    setPreviews((prev) => ({ ...prev, 'map-image': { loading: true } }));
+    try {
+      const result = await renderStill({
+        visualType: 'MAP_OVERLAY',
+        text: resolvedPlace.name,
+        assetUrl: imageBase64,
+        metadata: { places: [resolvedPlace] },
+      });
+      setPreviews((prev) => ({ ...prev, 'map-image': { loading: false, ...result } }));
+    } catch (err) {
+      setPreviews((prev) => ({
+        ...prev,
+        'map-image': { loading: false, error: err instanceof Error ? err.message : 'Preview failed' },
+      }));
+    }
+  }, [results]);
+
+  const previewMapFrameStrip = useCallback(async () => {
+    const mapResult = results['map-image'];
+    const imageBase64 = mapResult.data?.imageBase64 as string | undefined;
+    const resolvedPlace = mapResult.data?.resolvedPlace as { name: string } | undefined;
+    if (!imageBase64 || !resolvedPlace) return;
+
+    const duration = 10;
+    const fps = 30;
+    const totalFrames = duration * fps;
+    const framePoints = [
+      { frame: 0, label: 'Modern' },
+      { frame: Math.floor(totalFrames * 0.5), label: 'Crossfade' },
+      { frame: Math.floor(totalFrames * 0.8), label: 'Historical' },
+    ];
+
+    setMapFrameStrip({
+      loading: true,
+      frames: framePoints.map((f) => ({ frame: f.frame })),
+    });
+
+    const start = Date.now();
+    const segment = {
+      visualType: 'MAP_OVERLAY',
+      text: resolvedPlace.name,
+      assetUrl: imageBase64,
+      metadata: { places: [resolvedPlace] },
+      duration,
+    };
+
+    for (const fp of framePoints) {
+      try {
+        const result = await renderStill(segment, fp.frame);
+        setMapFrameStrip((prev) => prev ? {
+          ...prev,
+          frames: prev.frames.map((f) =>
+            f.frame === fp.frame ? { ...f, imageBase64: result.imageBase64 } : f,
+          ),
+        } : prev);
+      } catch (err) {
+        setMapFrameStrip((prev) => prev ? {
+          ...prev,
+          frames: prev.frames.map((f) =>
+            f.frame === fp.frame ? { ...f, error: err instanceof Error ? err.message : 'Failed' } : f,
+          ),
+        } : prev);
+      }
+    }
+
+    setMapFrameStrip((prev) => prev ? { ...prev, loading: false, latencyMs: Date.now() - start } : prev);
+  }, [results]);
+
+  const previewAiIllustration = useCallback(async () => {
+    const aiResult = results['ai-illustration'];
+    const imageBase64 = aiResult.data?.imageBase64 as string | undefined;
+    if (!imageBase64) return;
+
+    setPreviews((prev) => ({ ...prev, 'ai-illustration': { loading: true } }));
+    try {
+      const result = await renderStill({
+        visualType: 'AI_ILLUSTRATION',
+        text: 'AI Illustration',
+        assetUrl: imageBase64,
+        prompt: 'test',
+      });
+      setPreviews((prev) => ({ ...prev, 'ai-illustration': { loading: false, ...result } }));
+    } catch (err) {
+      setPreviews((prev) => ({
+        ...prev,
+        'ai-illustration': { loading: false, error: err instanceof Error ? err.message : 'Preview failed' },
+      }));
+    }
+  }, [results]);
+
+  const previewStockFootage = useCallback(async () => {
+    const stockResult = results['stock-footage'];
+    const stock = stockResult.data?.result as { thumbnailUrl: string; photographer: string } | null | undefined;
+    if (!stock) return;
+
+    setPreviews((prev) => ({ ...prev, 'stock-footage': { loading: true } }));
+    try {
+      const result = await renderStill({
+        visualType: 'STOCK_FOOTAGE',
+        text: 'Stock Footage',
+        assetUrl: stock.thumbnailUrl,
+        metadata: { photographer: stock.photographer },
+      });
+      setPreviews((prev) => ({ ...prev, 'stock-footage': { loading: false, ...result } }));
+    } catch (err) {
+      setPreviews((prev) => ({
+        ...prev,
+        'stock-footage': { loading: false, error: err instanceof Error ? err.message : 'Preview failed' },
+      }));
+    }
+  }, [results]);
+
+  const previewPlaceAsMap = useCallback(async () => {
+    const placeResult = results['resolve-place'];
+    const place = placeResult.data?.result as { name: string; coordinates: [number, number] } | null | undefined;
+    if (!place) return;
+
+    setPreviews((prev) => ({ ...prev, 'resolve-place': { loading: true } }));
+    try {
+      // Step 1: Generate map image
+      const mapRes = await fetch('/api/admin/test-video-pipeline', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'map-image', place: place.name, preset: 'vintage', width: 1280, height: 720 }),
+      });
+      const mapData = await mapRes.json();
+      if (!mapData.success) throw new Error(mapData.error ?? 'Map generation failed');
+
+      // Step 2: Render through Remotion
+      const result = await renderStill({
+        visualType: 'MAP_OVERLAY',
+        text: place.name,
+        assetUrl: mapData.imageBase64,
+        metadata: { places: [place] },
+      });
+      setPreviews((prev) => ({ ...prev, 'resolve-place': { loading: false, ...result } }));
+    } catch (err) {
+      setPreviews((prev) => ({
+        ...prev,
+        'resolve-place': { loading: false, error: err instanceof Error ? err.message : 'Preview failed' },
+      }));
+    }
+  }, [results]);
+
+  // ── Preview All handler (Phase 5) ──
+
+  const handlePreviewAll = useCallback(async () => {
+    const classifyResult = results['classify'];
+    const classifications = classifyResult.data?.result as Array<{
+      segmentId: string;
+      order: number;
+      subVisuals: Array<{
+        subOrder: number;
+        visualType: string;
+        prompt: string | null;
+        metadata?: Record<string, unknown>;
+      }>;
+    }> | undefined;
+    if (!classifications) return;
+
+    const segments = segmentsText.split('\n').map((s) => s.trim()).filter(Boolean);
+    const previewSegments: PreviewAllSegment[] = classifications.map((seg, i) => {
+      const sv = seg.subVisuals[0];
+      return {
+        index: i,
+        visualType: sv?.visualType ?? 'TEXT_CARD',
+        text: segments[i] ?? `Segment ${i}`,
+      };
+    });
+
+    setPreviewAll({
+      loading: true,
+      total: previewSegments.length,
+      completed: 0,
+      segments: previewSegments,
+    });
+
+    // Process with concurrency limit of 3
+    const queue = [...classifications.entries()];
+    let completed = 0;
+    let remotionError = false;
+
+    async function processOne(segIdx: number, seg: NonNullable<typeof classifications>[number]) {
+      const sv = seg.subVisuals[0];
+      if (!sv) return;
+
+      const text = segments[segIdx] ?? `Segment ${segIdx}`;
+      const segmentInput: Record<string, unknown> = {
+        visualType: sv.visualType,
+        text,
+        duration: 10,
+      };
+
+      try {
+        // Programmatic types (TEXT_CARD, QUOTE, DATA_CHART, etc.) render from metadata alone
+        if (sv.prompt) segmentInput.prompt = sv.prompt;
+        if (sv.metadata) segmentInput.metadata = sv.metadata;
+
+        // Types needing external assets — generate them first
+        if (sv.visualType === 'AI_ILLUSTRATION' && sv.prompt && envAvailability.fal) {
+          const imgRes = await fetch('/api/admin/test-video-pipeline', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: 'ai-illustration', prompt: sv.prompt }),
+          });
+          const imgData = await imgRes.json();
+          if (imgData.success) segmentInput.assetUrl = imgData.imageBase64;
+        } else if (sv.visualType === 'STOCK_FOOTAGE' && sv.prompt && envAvailability.pexels) {
+          const stockRes = await fetch('/api/admin/test-video-pipeline', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: 'stock-footage', query: sv.prompt }),
+          });
+          const stockData = await stockRes.json();
+          if (stockData.success && stockData.result?.thumbnailUrl) {
+            segmentInput.assetUrl = stockData.result.thumbnailUrl;
+          }
+        } else if (sv.visualType === 'MAP_OVERLAY' && envAvailability.mapbox) {
+          // Extract place name from prompt or text
+          const placeName = sv.prompt ?? text.slice(0, 50);
+          const mapRes = await fetch('/api/admin/test-video-pipeline', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: 'map-image', place: placeName, preset: 'vintage', width: 1280, height: 720 }),
+          });
+          const mapData = await mapRes.json();
+          if (mapData.success) {
+            segmentInput.assetUrl = mapData.imageBase64;
+            if (mapData.resolvedPlace) {
+              segmentInput.metadata = { places: [mapData.resolvedPlace] };
+            }
+          }
+        }
+
+        if (remotionError) {
+          throw new Error('Remotion unreachable');
+        }
+
+        const result = await renderStill(segmentInput);
+        setPreviewAll((prev) => ({
+          ...prev,
+          completed: ++completed,
+          segments: prev.segments.map((s) =>
+            s.index === segIdx ? { ...s, imageBase64: result.imageBase64 } : s,
+          ),
+        }));
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Failed';
+        if (msg.includes('REMOTION_URL') || msg.includes('ECONNREFUSED') || msg.includes('fetch failed')) {
+          remotionError = true;
+        }
+        setPreviewAll((prev) => ({
+          ...prev,
+          completed: ++completed,
+          segments: prev.segments.map((s) =>
+            s.index === segIdx ? { ...s, error: msg } : s,
+          ),
+          ...(remotionError ? { error: 'Remotion sidecar unreachable' } : {}),
+        }));
+      }
+    }
+
+    // Concurrency-limited execution (3 at a time)
+    const pending: Promise<void>[] = [];
+    for (const [idx, seg] of queue) {
+      const p = processOne(idx, seg);
+      pending.push(p);
+      if (pending.length >= 3) {
+        await Promise.race(pending);
+        // Remove settled promises
+        for (let i = pending.length - 1; i >= 0; i--) {
+          const status = await Promise.race([pending[i].then(() => 'done'), Promise.resolve('pending')]);
+          if (status === 'done') pending.splice(i, 1);
+        }
+      }
+      if (remotionError) break;
+    }
+    await Promise.allSettled(pending);
+
+    setPreviewAll((prev) => ({ ...prev, loading: false }));
+  }, [results, segmentsText, envAvailability]);
+
   return (
     <div className={styles.panel}>
       <ClassifierSection
@@ -892,27 +1423,41 @@ export function VideoTestBench({ envAvailability, mapPresets, imageModels, aiPro
         onTest={runTest}
         disabled={aiProviders.length === 0}
         aiProviders={aiProviders}
+        segmentsText={segmentsText}
+        onSegmentsTextChange={setSegmentsText}
+        onPreviewAll={handlePreviewAll}
+        previewAllState={previewAll}
       />
       <PlaceResolverSection
         result={results['resolve-place']}
         onTest={runTest}
+        preview={previews['resolve-place']}
+        onPreview={previewPlaceAsMap}
       />
       <MapImageSection
         result={results['map-image']}
         onTest={runTest}
         disabled={!envAvailability.mapbox}
         mapPresets={mapPresets}
+        preview={previews['map-image']}
+        onPreview={previewMapImage}
+        frameStrip={mapFrameStrip}
+        onFrameStrip={previewMapFrameStrip}
       />
       <AIIllustrationSection
         result={results['ai-illustration']}
         onTest={runTest}
         disabled={!envAvailability.fal}
         imageModels={imageModels}
+        preview={previews['ai-illustration']}
+        onPreview={previewAiIllustration}
       />
       <StockFootageSection
         result={results['stock-footage']}
         onTest={runTest}
         disabled={!envAvailability.pexels}
+        preview={previews['stock-footage']}
+        onPreview={previewStockFootage}
       />
     </div>
   );
