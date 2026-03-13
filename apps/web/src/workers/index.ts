@@ -72,6 +72,18 @@ import { isR2MonitoringConfigured } from '@/lib/cloudflare-r2-usage';
 import { startPricingRefreshInterval } from '@/lib/pricing';
 
 const WORKER_PROFILE = process.env.WORKER_PROFILE || 'all';
+const WORKER_QUEUE_FILTER = new Set(
+  (process.env.WORKER_QUEUES || '')
+    .split(',')
+    .map((queue) => queue.trim())
+    .filter(Boolean)
+);
+const WORKER_QUEUE_EXCLUDE_FILTER = new Set(
+  (process.env.WORKER_EXCLUDE_QUEUES || '')
+    .split(',')
+    .map((queue) => queue.trim())
+    .filter(Boolean)
+);
 
 const HEAVY_WORKERS = new Set([
   'audio-generation',
@@ -106,6 +118,8 @@ const PIPELINE_WORKERS = new Set([
 ]);
 
 function shouldRun(name: string): boolean {
+  if (WORKER_QUEUE_FILTER.size > 0 && !WORKER_QUEUE_FILTER.has(name)) return false;
+  if (WORKER_QUEUE_EXCLUDE_FILTER.has(name)) return false;
   if (WORKER_PROFILE === 'all') return true;
   if (WORKER_PROFILE === 'heavy') return HEAVY_WORKERS.has(name);
   if (WORKER_PROFILE === 'pipeline') return PIPELINE_WORKERS.has(name);
@@ -113,7 +127,11 @@ function shouldRun(name: string): boolean {
   return true;
 }
 
-logger.info('Starting Sotto workers...', { profile: WORKER_PROFILE });
+logger.info('Starting Sotto workers...', {
+  profile: WORKER_PROFILE,
+  includeQueues: WORKER_QUEUE_FILTER.size > 0 ? Array.from(WORKER_QUEUE_FILTER) : 'all',
+  excludeQueues: WORKER_QUEUE_EXCLUDE_FILTER.size > 0 ? Array.from(WORKER_QUEUE_EXCLUDE_FILTER) : [],
+});
 
 // Create workers filtered by WORKER_PROFILE
 const workers = [
