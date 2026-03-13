@@ -78,6 +78,8 @@ const updateSchema = z.object({
   dailyVideoLimitPro: z.number().int().min(0).optional(),
   dailyMusicLimit: z.number().int().min(0).optional(),
   dailyMusicLimitPro: z.number().int().min(0).optional(),
+  dailyAvatarLimit: z.number().int().min(0).optional(),
+  dailyAvatarLimitPro: z.number().int().min(0).optional(),
   aiAllocations: z.array(z.object({
     provider: z.string().min(1),
     model: z.string().min(1),

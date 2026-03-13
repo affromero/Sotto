@@ -84,6 +84,8 @@ export interface AutoModelConfigData {
   dailyVideoLimitPro: number;
   dailyMusicLimit: number;
   dailyMusicLimitPro: number;
+  dailyAvatarLimit: number;
+  dailyAvatarLimitPro: number;
   aiAllocations: ProviderAllocation[];
   ttsAllocations: ProviderAllocation[];
 }
@@ -128,6 +130,8 @@ const SEEDS = {
   dailyVideoLimitPro: 2,
   dailyMusicLimit: 1,
   dailyMusicLimitPro: 3,
+  dailyAvatarLimit: 1,
+  dailyAvatarLimitPro: 1,
 };
 
 /**
@@ -268,6 +272,8 @@ export async function getAutoModelConfig(): Promise<AutoModelConfigData> {
     dailyVideoLimitPro: row.dailyVideoLimitPro,
     dailyMusicLimit: row.dailyMusicLimit,
     dailyMusicLimitPro: row.dailyMusicLimitPro,
+    dailyAvatarLimit: row.dailyAvatarLimit,
+    dailyAvatarLimitPro: row.dailyAvatarLimitPro,
     aiAllocations: parseAllocations(row.aiAllocations),
     ttsAllocations: parseAllocations(row.ttsAllocations),
   };
@@ -322,6 +328,8 @@ export async function setAutoModelConfig(
     dailyVideoLimitPro?: number;
     dailyMusicLimit?: number;
     dailyMusicLimitPro?: number;
+    dailyAvatarLimit?: number;
+    dailyAvatarLimitPro?: number;
     aiAllocations?: ProviderAllocation[];
     ttsAllocations?: ProviderAllocation[];
   },
@@ -415,6 +423,8 @@ export async function setAutoModelConfig(
   if (data.dailyVideoLimitPro !== undefined) update.dailyVideoLimitPro = data.dailyVideoLimitPro;
   if (data.dailyMusicLimit !== undefined) update.dailyMusicLimit = data.dailyMusicLimit;
   if (data.dailyMusicLimitPro !== undefined) update.dailyMusicLimitPro = data.dailyMusicLimitPro;
+  if (data.dailyAvatarLimit !== undefined) update.dailyAvatarLimit = data.dailyAvatarLimit;
+  if (data.dailyAvatarLimitPro !== undefined) update.dailyAvatarLimitPro = data.dailyAvatarLimitPro;
   if (data.aiAllocations !== undefined) update.aiAllocations = data.aiAllocations;
   if (data.ttsAllocations !== undefined) update.ttsAllocations = data.ttsAllocations;
 
