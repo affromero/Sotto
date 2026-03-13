@@ -20,3 +20,7 @@
 2026-03-09 * "Hetzner" "VPS Regular Performance upgrade — March 2026 (28.65 EUR)"
   Expenses:Infrastructure:Compute:Hetzner        32.95 USD
   Liabilities:AccountsPayable:Hetzner           -32.95 USD
+
+2026-03-13 * "Redis" "Redis Cloud — March 2026"
+  Expenses:Software:Other                      5.00 USD
+  Assets:Current:Cash:Bank                    -5.00 USD
