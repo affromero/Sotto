@@ -354,6 +354,16 @@
   object-fit: contain;
 }
 
+/* ── Video preview ── */
+
+.videoPreview {
+  max-width: 100%;
+  max-height: 400px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  object-fit: contain;
+}
+
 /* ── Place metadata ── */
 
 .metadataGrid {
@@ -454,45 +464,6 @@
   gap: var(--spacing-xs);
 }
 
-.previewNote {
-  font: var(--text-caption);
-  color: var(--color-text-secondary);
-  margin: 4px 0 0;
-  font-style: italic;
-}
-
-/* ── Frame strip (map crossfade) ── */
-
-.frameStrip {
-  display: flex;
-  gap: var(--spacing-sm);
-  overflow-x: auto;
-  padding: var(--spacing-sm) 0;
-  align-items: flex-end;
-  -webkit-overflow-scrolling: touch;
-}
-
-.frameStripItem {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  flex-shrink: 0;
-}
-
-.frameStripImage {
-  width: 320px;
-  height: 180px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--color-border);
-  object-fit: cover;
-}
-
-.frameStripLabel {
-  font: var(--text-caption);
-  font-weight: 600;
-  color: var(--color-text-secondary);
-}
 
 /* ── Preview All (Phase 5) ── */
 
@@ -519,6 +490,14 @@
 }
 
 .previewAllImage {
+  width: 320px;
+  height: 180px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  object-fit: cover;
+}
+
+.previewAllVideo {
   width: 320px;
   height: 180px;
   border-radius: var(--radius-md);
