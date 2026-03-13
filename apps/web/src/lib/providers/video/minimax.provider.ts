@@ -8,7 +8,7 @@ import type { VideoProvider } from '../video';
 const MINIMAX_API_BASE = 'https://api.minimax.io/v1';
 
 /** Map pricetoken model IDs to MiniMax API model names. */
-const MODEL_MAP: Record<string, { apiModel: string; resolution: string; requiresFirstFrame?: boolean; validDurations?: number[] }> = {
+export const MINIMAX_MODEL_MAP: Record<string, { apiModel: string; resolution: string; requiresFirstFrame?: boolean; validDurations?: number[] }> = {
   'minimax-hailuo02-512p': { apiModel: 'MiniMax-Hailuo-02', resolution: '512P', requiresFirstFrame: true, validDurations: [6, 10] },
   'minimax-hailuo02-768p': { apiModel: 'MiniMax-Hailuo-02', resolution: '768P', validDurations: [6, 10] },
   'minimax-hailuo02-pro-1080p': { apiModel: 'MiniMax-Hailuo-02', resolution: '1080P', validDurations: [6, 10] },
@@ -53,7 +53,7 @@ export class MiniMaxVideoProvider implements VideoProvider {
   }
 
   async generateVideo(params: { prompt: string; duration?: number; firstFrameImage?: string; lastFrameImage?: string }): Promise<Buffer> {
-    const mapping = MODEL_MAP[this.model];
+    const mapping = MINIMAX_MODEL_MAP[this.model];
     if (!mapping) throw new Error(`Unknown MiniMax video model: ${this.model}`);
 
     if (mapping.requiresFirstFrame && !params.firstFrameImage) {

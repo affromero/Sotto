@@ -25,6 +25,7 @@ interface TestResult {
   response?: string;
   audioData?: string;
   imageData?: string;
+  videoUrl?: string;
   avatarCount?: number;
   transcript?: string;
   ttsSource?: string;
@@ -41,6 +42,7 @@ interface TestResponse {
   response?: string;
   audioData?: string;
   imageData?: string;
+  videoUrl?: string;
   avatarCount?: number;
   transcript?: string;
   ttsSource?: string;
@@ -99,7 +101,18 @@ function ResultCell({ provider, result }: { provider: TestableProvider; result: 
     if (provider.category === 'image' && result.imageData) {
       return <img src={result.imageData} alt="Generated test image" className={styles.testImage} />;
     }
+    if (provider.category === 'video' && result.videoUrl) {
+      return <video controls src={result.videoUrl} className={styles.testVideo} />;
+    }
     if (provider.category === 'avatar') {
+      if (result.videoUrl) {
+        return (
+          <span className={styles.responseText}>
+            <video controls src={result.videoUrl} className={styles.testVideo} />
+            {result.response && <span> {result.response}</span>}
+          </span>
+        );
+      }
       if (result.imageData) {
         return (
           <span className={styles.responseText}>
@@ -268,6 +281,7 @@ export function ModelTestPanel({
           response: data.response,
           audioData: data.audioData,
           imageData: data.imageData,
+          videoUrl: data.videoUrl,
           avatarCount: data.avatarCount,
           transcript: data.transcript,
           ttsSource: data.ttsSource,
@@ -298,6 +312,7 @@ export function ModelTestPanel({
               response: data.response,
               audioData: data.audioData,
               imageData: data.imageData,
+              videoUrl: data.videoUrl,
               avatarCount: data.avatarCount,
               transcript: data.transcript,
               ttsSource: data.ttsSource,
