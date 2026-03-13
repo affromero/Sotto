@@ -64,7 +64,7 @@ vi.mock('@/lib/providers/fal-endpoints', () => ({
   getFalAvatarEndpoint: vi.fn(() => 'fal-ai/kling-video/ai-avatar/v2/pro'),
   LIP_SYNC_CONFIG: {
     'fal-veed-fabric-1.0': { maxAudioSeconds: 300, outputFormat: 'mp4' },
-    'fal-kling-avatar-v2-pro': { maxAudioSeconds: 60, outputFormat: 'mp4', defaultPrompt: '.' },
+    'fal-kling-avatar-v2-pro': { maxAudioSeconds: 60, outputFormat: 'mp4', defaultPrompt: 'A person speaking to camera' },
   },
 }));
 vi.mock('@/lib/providers/video-registry', () => ({
