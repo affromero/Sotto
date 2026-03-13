@@ -186,7 +186,7 @@ const workers = [
 // Cron jobs and webhooks run only on light (or all) profile to prevent duplicate repeat registrations
 if (WORKER_PROFILE === 'all' || WORKER_PROFILE === 'light') {
 // Set up Twitter mentions polling if credentials are configured
-if (isTwitterConfigured()) {
+if (shouldRun('twitter-mentions') && isTwitterConfigured()) {
   const pollInterval = parseInt(process.env.TWITTER_POLL_INTERVAL_MS || '60000', 10);
   twitterMentionsQueue
     .add(JobType.POLL_TWITTER_MENTIONS, {}, { repeat: { every: pollInterval } })
@@ -194,12 +194,12 @@ if (isTwitterConfigured()) {
       logger.info('Twitter mentions polling scheduled', { intervalMs: String(pollInterval) })
     )
     .catch((err) => logger.error('Failed to schedule Twitter polling', { error: err.message }));
-} else {
+} else if (shouldRun('twitter-mentions')) {
   logger.info('Twitter integration not configured — polling disabled');
 }
 
 // Set up Telegram bot: webhook (production) or polling (dev)
-if (isTelegramBotConfigured()) {
+if (shouldRun('telegram-bot') && isTelegramBotConfigured()) {
   const webhookUrl = process.env.TELEGRAM_WEBHOOK_URL;
   const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
 
@@ -221,12 +221,12 @@ if (isTelegramBotConfigured()) {
       .then(() => logger.info('Telegram bot polling scheduled (dev mode)'))
       .catch((err) => logger.error('Failed to set up Telegram polling', { error: err.message }));
   }
-} else {
+} else if (shouldRun('telegram-bot')) {
   logger.info('Telegram bot not configured — disabled');
 }
 
 // Set up Twitter trend polling if credentials are configured
-if (isTwitterConfigured()) {
+if (shouldRun('twitter-trend-poll') && isTwitterConfigured()) {
   const trendInterval = parseInt(process.env.TWITTER_TREND_POLL_INTERVAL_MS || '7200000', 10);
   twitterTrendPollQueue
     .add(JobType.POLL_TWITTER_TRENDS, {}, { repeat: { every: trendInterval } })
@@ -234,55 +234,67 @@ if (isTwitterConfigured()) {
       logger.info('Twitter trend polling scheduled', { intervalMs: String(trendInterval) })
     )
     .catch((err) => logger.error('Failed to schedule trend polling', { error: err.message }));
-} else {
+} else if (shouldRun('twitter-trend-poll')) {
   logger.info('Twitter integration not configured — trend polling disabled');
 }
 
 // Schedule weekly email digest (Sunday 10:00 UTC)
-emailDigestQueue
-  .add(JobType.SEND_EMAIL_DIGEST, {}, { repeat: { pattern: '0 10 * * 0' } })
-  .then(() => logger.info('Weekly email digest scheduled', { schedule: 'Sunday 10:00 UTC' }))
-  .catch((err) => logger.error('Failed to schedule email digest', { error: err.message }));
+if (shouldRun('email-digest')) {
+  emailDigestQueue
+    .add(JobType.SEND_EMAIL_DIGEST, {}, { repeat: { pattern: '0 10 * * 0' } })
+    .then(() => logger.info('Weekly email digest scheduled', { schedule: 'Sunday 10:00 UTC' }))
+    .catch((err) => logger.error('Failed to schedule email digest', { error: err.message }));
+}
 
 // Schedule cleanup every 15 minutes (stale drafts + stuck video generations)
-draftCleanupQueue
-  .add(JobType.CLEANUP_DRAFTS, {}, { repeat: { every: 15 * 60 * 1000 } })
-  .then(() => logger.info('Cleanup scheduled', { intervalMs: '900000' }))
-  .catch((err) => logger.error('Failed to schedule cleanup', { error: err.message }));
+if (shouldRun('draft-cleanup')) {
+  draftCleanupQueue
+    .add(JobType.CLEANUP_DRAFTS, {}, { repeat: { every: 15 * 60 * 1000 } })
+    .then(() => logger.info('Cleanup scheduled', { intervalMs: '900000' }))
+    .catch((err) => logger.error('Failed to schedule cleanup', { error: err.message }));
+}
 
 // Schedule BYOK key re-validation every 24 hours
-keyValidationQueue
-  .add(JobType.VALIDATE_KEYS, {}, { repeat: { every: 24 * 60 * 60 * 1000 } })
-  .then(() => logger.info('BYOK key validation scheduled', { intervalMs: '86400000' }))
-  .catch((err) => logger.error('Failed to schedule key validation', { error: err.message }));
+if (shouldRun('key-validation')) {
+  keyValidationQueue
+    .add(JobType.VALIDATE_KEYS, {}, { repeat: { every: 24 * 60 * 60 * 1000 } })
+    .then(() => logger.info('BYOK key validation scheduled', { intervalMs: '86400000' }))
+    .catch((err) => logger.error('Failed to schedule key validation', { error: err.message }));
+}
 
 // Schedule daily R2 usage collection if Cloudflare API token is configured
-if (isR2MonitoringConfigured()) {
+if (shouldRun('r2-usage') && isR2MonitoringConfigured()) {
   r2UsageQueue
     .add(JobType.COLLECT_R2_USAGE, {}, { repeat: { every: 86400000 } })
     .then(() => logger.info('R2 usage monitoring scheduled', { intervalMs: '86400000' }))
     .catch((err) => logger.error('Failed to schedule R2 usage monitoring', { error: err.message }));
-} else {
+} else if (shouldRun('r2-usage')) {
   logger.info('R2 monitoring not configured — usage collection disabled');
 }
 
 // Schedule daily pricing fetch (every 24 hours)
-pricingFetchQueue
-  .add(JobType.FETCH_PRICING, {}, { repeat: { every: 86400000 } })
-  .then(() => logger.info('Pricing fetch scheduled', { intervalMs: '86400000' }))
-  .catch((err) => logger.error('Failed to schedule pricing fetch', { error: err.message }));
+if (shouldRun('pricing-fetch')) {
+  pricingFetchQueue
+    .add(JobType.FETCH_PRICING, {}, { repeat: { every: 86400000 } })
+    .then(() => logger.info('Pricing fetch scheduled', { intervalMs: '86400000' }))
+    .catch((err) => logger.error('Failed to schedule pricing fetch', { error: err.message }));
+}
 
 // Schedule daily ML feature computation catch-up (every 24 hours)
-featureComputationQueue
-  .add(JobType.COMPUTE_FEATURES, { scope: 'all' }, { repeat: { every: 86400000 } })
-  .then(() => logger.info('Feature computation catch-up scheduled', { intervalMs: '86400000' }))
-  .catch((err) => logger.error('Failed to schedule feature computation', { error: err.message }));
+if (shouldRun('feature-computation')) {
+  featureComputationQueue
+    .add(JobType.COMPUTE_FEATURES, { scope: 'all' }, { repeat: { every: 86400000 } })
+    .then(() => logger.info('Feature computation catch-up scheduled', { intervalMs: '86400000' }))
+    .catch((err) => logger.error('Failed to schedule feature computation', { error: err.message }));
+}
 
 // Schedule news ingestion every 30 minutes
-newsIngestQueue
-  .add(JobType.INGEST_NEWS, {}, { repeat: { every: 30 * 60 * 1000 } })
-  .then(() => logger.info('News ingestion scheduled', { intervalMs: '1800000' }))
-  .catch((err) => logger.error('Failed to schedule news ingestion', { error: err.message }));
+if (shouldRun('news-ingest')) {
+  newsIngestQueue
+    .add(JobType.INGEST_NEWS, {}, { repeat: { every: 30 * 60 * 1000 } })
+    .then(() => logger.info('News ingestion scheduled', { intervalMs: '1800000' }))
+    .catch((err) => logger.error('Failed to schedule news ingestion', { error: err.message }));
+}
 
 // Start in-memory pricing refresh interval (picks up DB changes every 5 min)
 startPricingRefreshInterval();
