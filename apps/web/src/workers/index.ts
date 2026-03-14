@@ -17,6 +17,7 @@ import {
   pricingFetchQueue,
   featureComputationQueue,
   newsIngestQueue,
+  briefingSchedulerQueue,
   JobType,
 } from '@/lib/queue';
 import { processAnnouncement } from './announcement.worker';
@@ -72,6 +73,7 @@ import { processMusicGeneration } from './music-generation.worker';
 import { processLipSyncTest } from './lip-sync-test.worker';
 import { processWaveformGeneration } from './waveform-generation.worker';
 import { processQuizGeneration } from './quiz-generation.worker';
+import { processBriefingScheduler } from './briefing-scheduler.worker';
 import { isR2MonitoringConfigured } from '@/lib/cloudflare-r2-usage';
 import { startPricingRefreshInterval } from '@/lib/pricing';
 
@@ -219,6 +221,7 @@ const workers = [
   shouldRun('lip-sync-test') && createWorker('lip-sync-test', processLipSyncTest, { concurrency: 2, lockDuration: 300000 }),
   shouldRun('waveform-generation') && createWorker('waveform-generation', processWaveformGeneration, { concurrency: 2 }),
   shouldRun('quiz-generation') && createWorker('quiz-generation', processQuizGeneration, { concurrency: 2 }),
+  shouldRun('briefing-scheduler') && createWorker('briefing-scheduler', processBriefingScheduler, { concurrency: 1 }),
 ].filter(Boolean) as ReturnType<typeof createWorker>[];
 
 // Cron jobs and webhooks run only on light (or all) profile to prevent duplicate repeat registrations
@@ -332,6 +335,12 @@ if (shouldRun('news-ingest')) {
     .add(JobType.INGEST_NEWS, {}, { repeat: { every: 30 * 60 * 1000 } })
     .then(() => logger.info('News ingestion scheduled', { intervalMs: '1800000' }))
     .catch((err) => logger.error('Failed to schedule news ingestion', { error: err.message }));
+
+  // Daily briefing scheduler (every 15 minutes)
+  briefingSchedulerQueue
+    .add(JobType.SCHEDULE_BRIEFINGS, {}, { repeat: { every: 15 * 60 * 1000 } })
+    .then(() => logger.info('Briefing scheduler started', { intervalMs: '900000' }))
+    .catch((err) => logger.error('Failed to schedule briefings', { error: err.message }));
 }
 
 // Start in-memory pricing refresh interval (picks up DB changes every 5 min)
