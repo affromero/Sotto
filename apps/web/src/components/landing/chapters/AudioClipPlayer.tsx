@@ -3,6 +3,13 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
 import styles from './AudioClipPlayer.module.css';
 
+interface VoiceTrackOption {
+  name: string;
+  provider: string;
+  model: string;
+  audioUrl: string;
+}
+
 interface AudioClipPlayerProps {
   title: string;
   voiceCount: number;
@@ -12,6 +19,7 @@ interface AudioClipPlayerProps {
   endTime: number;
   totalDuration: number;
   podcastId: string;
+  voiceTracks?: VoiceTrackOption[];
 }
 
 function formatTime(seconds: number): string {
@@ -35,11 +43,14 @@ export function AudioClipPlayer({
   endTime,
   totalDuration,
   podcastId,
+  voiceTracks = [],
 }: AudioClipPlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
+  const [activeTrackIndex, setActiveTrackIndex] = useState(-1); // -1 = original
 
+  const activeUrl = activeTrackIndex >= 0 ? voiceTracks[activeTrackIndex].audioUrl : audioUrl;
   const clipDuration = endTime - startTime;
   const progress = clipDuration > 0 ? Math.min(currentTime / clipDuration, 1) : 0;
 
@@ -56,6 +67,16 @@ export function AudioClipPlayer({
       setIsPlaying(true);
     }
   }, [isPlaying, startTime]);
+
+  const handleTrackSwitch = useCallback((index: number) => {
+    const audio = audioRef.current;
+    if (audio && isPlaying) {
+      audio.pause();
+    }
+    setActiveTrackIndex(index);
+    setIsPlaying(false);
+    setCurrentTime(0);
+  }, [isPlaying]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -99,6 +120,30 @@ export function AudioClipPlayer({
         <div className={styles.playerMeta}>
           {formatDurationMinutes(totalDuration)} &middot; {voiceCount} voices &middot; {sourceCount} sources
         </div>
+
+        {voiceTracks.length > 0 && (
+          <div className={styles.trackSwitcher}>
+            <button
+              type="button"
+              className={`${styles.trackBtn} ${activeTrackIndex === -1 ? styles.trackBtnActive : ''}`}
+              onClick={() => handleTrackSwitch(-1)}
+            >
+              Original
+            </button>
+            {voiceTracks.map((track, i) => (
+              <button
+                key={i}
+                type="button"
+                className={`${styles.trackBtn} ${activeTrackIndex === i ? styles.trackBtnActive : ''}`}
+                onClick={() => handleTrackSwitch(i)}
+                title={`${track.provider} / ${track.model}`}
+              >
+                {track.name}
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className={styles.playerPlayRow}>
           <button
             className={`${styles.playButton} ${isPlaying ? styles.playButtonActive : ''}`}
@@ -149,7 +194,7 @@ export function AudioClipPlayer({
         </div>
       </div>
       {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-      <audio ref={audioRef} src={audioUrl} preload="metadata" />
+      <audio ref={audioRef} src={activeUrl} preload="metadata" />
     </div>
   );
 }

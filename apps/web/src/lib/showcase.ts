@@ -22,6 +22,7 @@ export interface LandingShowcaseData {
 
   // JourneyChapter Step 3 — Audio clip
   audioClip: { url: string; start: number; end: number; totalDuration: number };
+  voiceTracks: { name: string; provider: string; model: string; audioUrl: string }[];
   voiceCount: number;
   sourceCount: number;
 
@@ -150,6 +151,16 @@ export async function getLandingShowcaseData(): Promise<LandingShowcaseData | nu
         segments: {
           select: { speaker: true },
         },
+        voiceTracks: {
+          where: { status: 'READY', audioUrl: { not: null } },
+          orderBy: { createdAt: 'asc' },
+          select: {
+            name: true,
+            ttsProvider: true,
+            ttsModel: true,
+            audioUrl: true,
+          },
+        },
         videoGeneration: {
           select: {
             videoUrl: true,
@@ -216,6 +227,16 @@ export async function getLandingShowcaseData(): Promise<LandingShowcaseData | nu
       totalDuration: podcast.duration ?? 0,
     };
 
+    // Voice tracks — alternative renditions of the same podcast
+    const voiceTracks = podcast.voiceTracks
+      .filter((vt): vt is typeof vt & { audioUrl: string } => !!vt.audioUrl)
+      .map((vt) => ({
+        name: vt.name,
+        provider: vt.ttsProvider ?? 'Unknown',
+        model: vt.ttsModel ?? 'default',
+        audioUrl: vt.audioUrl,
+      }));
+
     // Voice count — distinct speakers
     const voiceCount = new Set(podcast.segments.map((s) => s.speaker)).size || 2;
     const sourceCount = podcast.references.length;
@@ -250,6 +271,7 @@ export async function getLandingShowcaseData(): Promise<LandingShowcaseData | nu
       scriptTurns,
       references,
       audioClip,
+      voiceTracks,
       voiceCount,
       sourceCount,
       videoSegments,

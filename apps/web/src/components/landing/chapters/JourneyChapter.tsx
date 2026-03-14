@@ -209,6 +209,7 @@ export function JourneyChapter({ showcase }: JourneyChapterProps) {
                   endTime={showcase.audioClip.end}
                   totalDuration={showcase.audioClip.totalDuration}
                   podcastId={showcase.podcast.podcastId}
+                  voiceTracks={showcase.voiceTracks}
                 />
               ) : (
                 <div className={styles.mockPlayer}>
