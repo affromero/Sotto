@@ -150,6 +150,7 @@ vi.mock('@/lib/logger', () => ({
 
 vi.mock('@/lib/tts-text-cleaner', () => ({
   cleanTextForTts: vi.fn((text: string) => text),
+  splitTextForTts: vi.fn((text: string) => [text]),
 }));
 
 // ---- Import under test ----
