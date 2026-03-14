@@ -168,21 +168,32 @@ export async function generateTtsAudio(params: TtsGenerationParams): Promise<Tts
     } else {
       // Multi-chunk: generate each with context bridging for voice continuity
       const chunkBuffers: Buffer[] = [];
+      const skipTextContext = meta.modelsWithoutTextContext.includes(
+        provider.getModelId(),
+      );
+      const continuityIds: string[] = [];
+
       for (let i = 0; i < chunks.length; i++) {
         const isFirst = i === 0;
         const isLast = i === chunks.length - 1;
 
         // Bridge context: first chunk uses the original previousText, last uses
-        // originalText nextText, inner chunks use adjacent chunk text for continuity
-        const chunkPrev = isFirst ? previousText : chunks[i - 1].slice(-500);
-        const chunkNext = isLast ? nextText : chunks[i + 1].slice(0, 500);
+        // original nextText, inner chunks use adjacent chunk text for continuity.
+        // Skip text context for models that don't support it (e.g. eleven_v3).
+        const chunkPrev = skipTextContext ? undefined : (isFirst ? previousText : chunks[i - 1].slice(-500));
+        const chunkNext = skipTextContext ? undefined : (isLast ? nextText : chunks[i + 1].slice(0, 500));
 
         const speechParams = {
           text: chunks[i], voiceId, direction, speaker,
           previousText: chunkPrev,
           nextText: chunkNext,
+          continuityIds: continuityIds.length > 0 ? continuityIds.slice(-3) : undefined,
         };
         chunkBuffers.push(await provider.generateSpeech(speechParams));
+
+        // Collect continuity ID for next chunk (if provider supports it)
+        const contId = provider.getLastContinuityId?.();
+        if (contId) continuityIds.push(contId);
       }
 
       // Concatenate chunk audio via FFmpeg (lossless concat demuxer)
