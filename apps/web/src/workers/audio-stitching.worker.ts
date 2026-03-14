@@ -11,6 +11,7 @@ import {
   twitterAutoTweetQueue,
   visualClassificationQueue,
   waveformGenerationQueue,
+  quizGenerationQueue,
 } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { markPodcastFailed } from '@/lib/pipeline-resume';
@@ -389,6 +390,9 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
       podcastId,
       userId: podcast.userId,
     });
+
+    // 10c4. Generate post-listen quiz
+    await addJob(quizGenerationQueue, JobType.GENERATE_QUIZ, { podcastId }).catch(() => {});
 
     // 10d. If this podcast has a pending trend auto-tweet, queue it
     const pendingAutoTweet = await prisma.twitterAutoTweet.findFirst({
