@@ -15,7 +15,7 @@ import { getCartesiaConcurrencyLimit, updateCartesiaConcurrencyFromError } from 
 import { getHumeConcurrencyLimit, updateHumeConcurrencyFromError } from '@/lib/providers/tts/hume.provider';
 import { semaphore } from '@/lib/redis';
 import { getByokKey } from '@/lib/byok';
-import { cleanTextForTts } from '@/lib/tts-text-cleaner';
+import { cleanTextForTts, splitTextForTts } from '@/lib/tts-text-cleaner';
 import { getAudioDuration } from '@/lib/audio-stitcher';
 import { estimateDurationFromText } from '@/lib/duration';
 import { logUsage } from '@/lib/usage-logger';
@@ -145,15 +145,49 @@ export async function generateTtsAudio(params: TtsGenerationParams): Promise<Tts
     throw new Error(`Timed out waiting for TTS semaphore (${providerId}, limit ${concurrencyLimit})`);
   }
 
-  // 4. Clean text and call TTS
+  // 4. Clean text and split into chunks if it exceeds provider char limit
   const ttsText = cleanTextForTts(text);
-  const speechParams = { text: ttsText, voiceId, previousText, nextText, direction, speaker };
+  const meta = getProviderMeta(providerId);
+  const chunks = splitTextForTts(ttsText, meta.maxSegmentChars);
+
+  if (chunks.length > 1) {
+    logger.info('Text exceeds provider limit, splitting into chunks', {
+      podcastId, providerId, originalLength: ttsText.length,
+      maxSegmentChars: meta.maxSegmentChars, chunkCount: chunks.length,
+    });
+  }
 
   let audioBuffer: Buffer;
   let semaphoreReleased = false;
   const effectiveSource = source;
   try {
-    audioBuffer = await provider.generateSpeech(speechParams);
+    if (chunks.length === 1) {
+      // Fast path — single chunk, no splitting needed
+      const speechParams = { text: ttsText, voiceId, previousText, nextText, direction, speaker };
+      audioBuffer = await provider.generateSpeech(speechParams);
+    } else {
+      // Multi-chunk: generate each with context bridging for voice continuity
+      const chunkBuffers: Buffer[] = [];
+      for (let i = 0; i < chunks.length; i++) {
+        const isFirst = i === 0;
+        const isLast = i === chunks.length - 1;
+
+        // Bridge context: first chunk uses the original previousText, last uses
+        // originalText nextText, inner chunks use adjacent chunk text for continuity
+        const chunkPrev = isFirst ? previousText : chunks[i - 1].slice(-500);
+        const chunkNext = isLast ? nextText : chunks[i + 1].slice(0, 500);
+
+        const speechParams = {
+          text: chunks[i], voiceId, direction, speaker,
+          previousText: chunkPrev,
+          nextText: chunkNext,
+        };
+        chunkBuffers.push(await provider.generateSpeech(speechParams));
+      }
+
+      // Concatenate chunk audio via FFmpeg (lossless concat demuxer)
+      audioBuffer = await concatAudioBuffers(chunkBuffers);
+    }
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
     await semaphore.release(semaphoreKey);
@@ -197,7 +231,6 @@ export async function generateTtsAudio(params: TtsGenerationParams): Promise<Tts
 
   // 9. Log TTS cost
   const charCount = text.length;
-  const meta = getProviderMeta(providerId);
   const totalCost = (charCount / 1000) * meta.platformCostPerKChar;
 
   logUsage({
@@ -212,4 +245,56 @@ export async function generateTtsAudio(params: TtsGenerationParams): Promise<Tts
   });
 
   return { audioBuffer, segmentDuration, service, durationMs };
+}
+
+// ---------------------------------------------------------------------------
+// FFmpeg concat for multi-chunk TTS audio
+// ---------------------------------------------------------------------------
+
+/**
+ * Concatenate multiple audio buffers using FFmpeg's concat demuxer.
+ * Each buffer is written to a temp file, concatenated losslessly, and cleaned up.
+ */
+async function concatAudioBuffers(buffers: Buffer[]): Promise<Buffer> {
+  if (buffers.length === 1) return buffers[0];
+
+  const { execFile } = await import('child_process');
+  const { promisify } = await import('util');
+  const { readFile } = await import('fs/promises');
+  const execFileAsync = promisify(execFile);
+
+  const tmpDir = os.tmpdir();
+  const id = crypto.randomUUID();
+  const chunkPaths: string[] = [];
+  const concatListPath = path.join(tmpDir, `sotto-concat-${id}.txt`);
+  const outputPath = path.join(tmpDir, `sotto-concat-${id}.mp3`);
+
+  try {
+    // Write each chunk to a temp file
+    for (let i = 0; i < buffers.length; i++) {
+      const chunkPath = path.join(tmpDir, `sotto-chunk-${id}-${i}.mp3`);
+      await writeFile(chunkPath, buffers[i]);
+      chunkPaths.push(chunkPath);
+    }
+
+    // Write concat demuxer list
+    const listContent = chunkPaths.map((p) => `file '${p}'`).join('\n');
+    await writeFile(concatListPath, listContent);
+
+    // Concatenate — re-encode to ensure consistent format across chunks
+    await execFileAsync('ffmpeg', [
+      '-y', '-f', 'concat', '-safe', '0',
+      '-i', concatListPath,
+      '-c:a', 'libmp3lame', '-b:a', '128k', '-ar', '44100', '-ac', '1',
+      outputPath,
+    ]);
+
+    return await readFile(outputPath);
+  } finally {
+    // Clean up all temp files
+    const cleanups = [...chunkPaths, concatListPath, outputPath].map(
+      (p) => rm(p, { force: true }).catch(() => {}),
+    );
+    await Promise.all(cleanups);
+  }
 }
