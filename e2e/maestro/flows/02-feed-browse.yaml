@@ -32,7 +32,6 @@ tags: [feed, critical]
     id: "feed-podcast-list"
     direction: DOWN
 
-# Tap first podcast card to open player
+# Tap seeded podcast card to open player
 - tapOn:
-    id: "podcast-card-0"
-    optional: true
+    id: "podcast-card-${E2E_PODCAST_ID}"
