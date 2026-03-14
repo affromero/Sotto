@@ -4,10 +4,9 @@ tags: [interrupt, critical]
 ---
 - runFlow: ../helpers/login.yaml
 
-# Navigate to first podcast and start playing
+# Navigate to seeded podcast and start playing
 - tapOn:
-    text: "podcast-card-0"
-    optional: true
+    id: "podcast-card-${E2E_PODCAST_ID}"
 - extendedWaitUntil:
     visible:
       id: "player-play-pause"
