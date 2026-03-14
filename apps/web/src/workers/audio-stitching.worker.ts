@@ -356,11 +356,14 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
     await job.updateProgress(95);
 
     // 10. Send notification
+    const isBriefing = podcast.source === 'BRIEFING';
     await addJob(notificationQueue, JobType.SEND_NOTIFICATION, {
       userId: podcast.userId,
-      type: 'PODCAST_READY',
-      title: 'Your podcast is ready!',
-      message: `"${podcast.title}" is ready to play.`,
+      type: isBriefing ? 'BRIEFING_READY' : 'PODCAST_READY',
+      title: isBriefing ? 'Your daily briefing is ready' : 'Your podcast is ready!',
+      message: isBriefing
+        ? `Your morning briefing "${podcast.title}" is ready to play.`
+        : `"${podcast.title}" is ready to play.`,
       data: { podcastId },
     });
 
