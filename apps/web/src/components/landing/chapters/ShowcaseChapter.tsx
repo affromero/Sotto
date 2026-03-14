@@ -1,12 +1,20 @@
+import type { LandingShowcaseData } from '@/lib/showcase';
 import { ScrollChapter } from '../ScrollChapter';
+import { VideoClipPlayer } from './VideoClipPlayer';
 import styles from './ShowcaseChapter.module.css';
 
-const SEGMENTS = [
+interface ShowcaseChapterProps {
+  showcase: LandingShowcaseData | null;
+}
+
+const DEFAULT_SEGMENTS = [
   { num: 1, label: 'CRISPR molecular scissors', type: 'AI Illustration', colorClass: 'purple' },
   { num: 2, label: 'Gene therapy success rates', type: 'Data Chart', colorClass: 'amber' },
   { num: 3, label: 'Laboratory research setting', type: 'Stock Footage', colorClass: 'navy' },
   { num: 4, label: 'Key milestones in gene editing', type: 'Timeline', colorClass: 'green' },
 ] as const;
+
+const COLOR_CYCLE = ['purple', 'amber', 'navy', 'green'] as const;
 
 const COLOR_MAP = {
   purple: styles.badgePurple,
@@ -15,7 +23,16 @@ const COLOR_MAP = {
   green: styles.badgeGreen,
 } as Record<string, string>;
 
-export function ShowcaseChapter() {
+export function ShowcaseChapter({ showcase }: ShowcaseChapterProps) {
+  const segments = showcase && showcase.videoSegments.length > 0
+    ? showcase.videoSegments.map((seg, i) => ({
+        num: seg.order,
+        label: seg.label,
+        type: seg.type,
+        colorClass: COLOR_CYCLE[i % COLOR_CYCLE.length],
+      }))
+    : DEFAULT_SEGMENTS;
+
   return (
     <ScrollChapter id="video">
       <div className={styles.root}>
@@ -27,7 +44,7 @@ export function ShowcaseChapter() {
                 <span>Video Pipeline</span>
               </div>
               <div className={styles.mockBody}>
-                {SEGMENTS.map((seg) => (
+                {segments.map((seg) => (
                   <div key={seg.num} className={styles.segment}>
                     <span className={styles.segNum}>{seg.num}</span>
                     <span className={styles.segLabel}>{seg.label}</span>
@@ -47,6 +64,13 @@ export function ShowcaseChapter() {
                 </div>
               </div>
             </div>
+            {showcase?.videoClip && (
+              <VideoClipPlayer
+                videoUrl={showcase.videoClip.url}
+                startTime={showcase.videoClip.start}
+                endTime={showcase.videoClip.end}
+              />
+            )}
           </div>
           <div className={styles.splitText}>
             <div className={styles.textContent}>

@@ -1,7 +1,18 @@
+import type { LandingShowcaseData } from '@/lib/showcase';
 import { ScrollChapter } from '../ScrollChapter';
+import { ScriptEditorMock } from './ScriptEditorMock';
+import { AudioClipPlayer } from './AudioClipPlayer';
 import styles from './JourneyChapter.module.css';
 
-export function JourneyChapter() {
+interface JourneyChapterProps {
+  showcase: LandingShowcaseData | null;
+}
+
+export function JourneyChapter({ showcase }: JourneyChapterProps) {
+  const chat = showcase?.chatMessages;
+  const lastMsg = chat?.[chat.length - 1];
+  const lastMsgChips = lastMsg?.role === 'assistant' ? lastMsg.chips : undefined;
+
   return (
     <ScrollChapter id="features" alt>
       <div className={styles.root}>
@@ -32,39 +43,74 @@ export function JourneyChapter() {
                   <span>Sotto Discovery</span>
                 </div>
                 <div className={styles.mockBody}>
-                  <div className={`${styles.mockMsg} ${styles.mockUser}`}>
-                    <div className={styles.mockBubble}>
-                      I want to understand how CRISPR gene editing works
-                    </div>
-                  </div>
-                  <div className={`${styles.mockMsg} ${styles.mockBot}`}>
-                    <div className={styles.mockAvatar}>S</div>
-                    <div className={styles.mockBubble}>
-                      Fascinating topic! To tailor this for you &mdash; what&apos;s your
-                      background in biology?
-                    </div>
-                  </div>
-                  <div className={`${styles.mockMsg} ${styles.mockUser}`}>
-                    <div className={styles.mockBubble}>
-                      Complete beginner, but I love science docs
-                    </div>
-                  </div>
-                  <div className={`${styles.mockMsg} ${styles.mockBot}`}>
-                    <div className={styles.mockAvatar}>S</div>
-                    <div className={styles.mockBubble}>
-                      Perfect. I&apos;ll use everyday analogies and build up
-                      from the basics.
-                    </div>
-                  </div>
-                  <div className={styles.typingIndicator} aria-hidden="true">
-                    <span />
-                    <span />
-                    <span />
-                  </div>
-                  <div className={styles.mockChips}>
-                    <span className={styles.chip}>Complete beginner</span>
-                    <span className={`${styles.chip} ${styles.chipFaded}`}>Some college bio</span>
-                  </div>
+                  {chat && chat.length > 0 ? (
+                    <>
+                      {chat.map((msg, i) => (
+                        <div
+                          key={i}
+                          className={`${styles.mockMsg} ${msg.role === 'user' ? styles.mockUser : styles.mockBot}`}
+                        >
+                          {msg.role === 'assistant' && (
+                            <div className={styles.mockAvatar}>S</div>
+                          )}
+                          <div className={styles.mockBubble}>{msg.content}</div>
+                        </div>
+                      ))}
+                      <div className={styles.typingIndicator} aria-hidden="true">
+                        <span />
+                        <span />
+                        <span />
+                      </div>
+                      {lastMsgChips && lastMsgChips.length > 0 && (
+                        <div className={styles.mockChips}>
+                          {lastMsgChips.map((chip, i) => (
+                            <span
+                              key={i}
+                              className={`${styles.chip} ${i > 0 ? styles.chipFaded : ''}`}
+                            >
+                              {chip}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <div className={`${styles.mockMsg} ${styles.mockUser}`}>
+                        <div className={styles.mockBubble}>
+                          I want to understand how CRISPR gene editing works
+                        </div>
+                      </div>
+                      <div className={`${styles.mockMsg} ${styles.mockBot}`}>
+                        <div className={styles.mockAvatar}>S</div>
+                        <div className={styles.mockBubble}>
+                          Fascinating topic! To tailor this for you &mdash; what&apos;s your
+                          background in biology?
+                        </div>
+                      </div>
+                      <div className={`${styles.mockMsg} ${styles.mockUser}`}>
+                        <div className={styles.mockBubble}>
+                          Complete beginner, but I love science docs
+                        </div>
+                      </div>
+                      <div className={`${styles.mockMsg} ${styles.mockBot}`}>
+                        <div className={styles.mockAvatar}>S</div>
+                        <div className={styles.mockBubble}>
+                          Perfect. I&apos;ll use everyday analogies and build up
+                          from the basics.
+                        </div>
+                      </div>
+                      <div className={styles.typingIndicator} aria-hidden="true">
+                        <span />
+                        <span />
+                        <span />
+                      </div>
+                      <div className={styles.mockChips}>
+                        <span className={styles.chip}>Complete beginner</span>
+                        <span className={`${styles.chip} ${styles.chipFaded}`}>Some college bio</span>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -86,48 +132,55 @@ export function JourneyChapter() {
               </div>
             </div>
             <div className={styles.splitVisual}>
-              <div className={styles.mockScript}>
-                <div className={styles.mockHeader}>
-                  <div className={styles.mockDot} aria-hidden="true" />
-                  <span>Script Editor</span>
-                </div>
-                <div className={styles.mockBody}>
-                  <div className={styles.scriptTurn}>
-                    <div className={styles.scriptLineRow}>
-                      <span className={styles.lineNum}>1</span>
-                      <div className={styles.scriptContent}>
-                        <span className={styles.scriptSpeaker} data-speaker="host">Host</span>
-                        <p>
-                          Today we&apos;re diving into one of the most revolutionary technologies
-                          of our time &mdash; CRISPR gene editing.{' '}
-                          <sup className={styles.citation}>[1]</sup>
-                        </p>
+              {showcase && showcase.scriptTurns.length > 0 ? (
+                <ScriptEditorMock
+                  turns={showcase.scriptTurns}
+                  references={showcase.references}
+                />
+              ) : (
+                <div className={styles.mockScript}>
+                  <div className={styles.mockHeader}>
+                    <div className={styles.mockDot} aria-hidden="true" />
+                    <span>Script Editor</span>
+                  </div>
+                  <div className={styles.mockBody}>
+                    <div className={styles.scriptTurn}>
+                      <div className={styles.scriptLineRow}>
+                        <span className={styles.lineNum}>1</span>
+                        <div className={styles.scriptContent}>
+                          <span className={styles.scriptSpeaker} data-speaker="host">Host</span>
+                          <p>
+                            Today we&apos;re diving into one of the most revolutionary technologies
+                            of our time &mdash; CRISPR gene editing.{' '}
+                            <sup className={styles.citation}>[1]</sup>
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div className={styles.scriptTurn}>
-                    <div className={styles.scriptLineRow}>
-                      <span className={styles.lineNum}>2</span>
-                      <div className={styles.scriptContent}>
-                        <span className={styles.scriptSpeaker} data-speaker="expert">Expert</span>
-                        <p>
-                          Think of CRISPR as molecular scissors that can cut DNA at precisely
-                          the right spot. It&apos;s based on a natural defense system that
-                          bacteria use.{' '}
-                          <sup className={styles.citation}>[2]</sup>
-                        </p>
+                    <div className={styles.scriptTurn}>
+                      <div className={styles.scriptLineRow}>
+                        <span className={styles.lineNum}>2</span>
+                        <div className={styles.scriptContent}>
+                          <span className={styles.scriptSpeaker} data-speaker="expert">Expert</span>
+                          <p>
+                            Think of CRISPR as molecular scissors that can cut DNA at precisely
+                            the right spot. It&apos;s based on a natural defense system that
+                            bacteria use.{' '}
+                            <sup className={styles.citation}>[2]</sup>
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div className={styles.scriptActions}>
-                    <span className={styles.scriptBtn}>Edit</span>
-                    <span className={styles.scriptBtn}>Regenerate</span>
-                    <span className={`${styles.scriptBtn} ${styles.scriptBtnPrimary}`}>
-                      Generate Audio
-                    </span>
+                    <div className={styles.scriptActions}>
+                      <span className={styles.scriptBtn}>Edit</span>
+                      <span className={styles.scriptBtn}>Regenerate</span>
+                      <span className={`${styles.scriptBtn} ${styles.scriptBtnPrimary}`}>
+                        Generate Audio
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
 
@@ -146,36 +199,50 @@ export function JourneyChapter() {
               </div>
             </div>
             <div className={styles.splitVisual}>
-              <div className={styles.mockPlayer}>
-                <div className={styles.mockHeader}>
-                  <div className={styles.mockDot} aria-hidden="true" />
-                  <span>Now Playing</span>
-                </div>
-                <div className={styles.mockBody}>
-                  <div className={styles.playerTitle}>CRISPR Gene Editing Explained</div>
-                  <div className={styles.playerMeta}>10 min &middot; 2 voices &middot; 8 sources</div>
-                  <div className={styles.playerPlayRow}>
-                    <button className={styles.playButton} aria-label="Play">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                        <path d="M8 5v14l11-7z" />
-                      </svg>
-                    </button>
-                    <div className={styles.playerWaveform}>
-                      {Array.from({ length: 32 }, (_, i) => (
-                        <span key={i} className={styles.playerBar} style={{ '--i': i } as React.CSSProperties} />
-                      ))}
+              {showcase ? (
+                <AudioClipPlayer
+                  title={showcase.podcast.title}
+                  voiceCount={showcase.voiceCount}
+                  sourceCount={showcase.sourceCount}
+                  audioUrl={showcase.audioClip.url}
+                  startTime={showcase.audioClip.start}
+                  endTime={showcase.audioClip.end}
+                  totalDuration={showcase.audioClip.totalDuration}
+                  podcastId={showcase.podcast.podcastId}
+                  voiceTracks={showcase.voiceTracks}
+                />
+              ) : (
+                <div className={styles.mockPlayer}>
+                  <div className={styles.mockHeader}>
+                    <div className={styles.mockDot} aria-hidden="true" />
+                    <span>Now Playing</span>
+                  </div>
+                  <div className={styles.mockBody}>
+                    <div className={styles.playerTitle}>CRISPR Gene Editing Explained</div>
+                    <div className={styles.playerMeta}>10 min &middot; 2 voices &middot; 8 sources</div>
+                    <div className={styles.playerPlayRow}>
+                      <button className={styles.playButton} aria-label="Play">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                          <path d="M8 5v14l11-7z" />
+                        </svg>
+                      </button>
+                      <div className={styles.playerWaveform}>
+                        {Array.from({ length: 32 }, (_, i) => (
+                          <span key={i} className={styles.playerBar} style={{ '--i': i } as React.CSSProperties} />
+                        ))}
+                      </div>
+                    </div>
+                    <div className={styles.playerControls}>
+                      <span className={styles.playerTime}>3:42 / 10:15</span>
+                      <div className={styles.playerActions}>
+                        <span className={styles.playerAction}>Fork</span>
+                        <span className={styles.playerAction}>Video</span>
+                        <span className={styles.playerAction}>Share</span>
+                      </div>
                     </div>
                   </div>
-                  <div className={styles.playerControls}>
-                    <span className={styles.playerTime}>3:42 / 10:15</span>
-                    <div className={styles.playerActions}>
-                      <span className={styles.playerAction}>Fork</span>
-                      <span className={styles.playerAction}>Video</span>
-                      <span className={styles.playerAction}>Share</span>
-                    </div>
-                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         </div>

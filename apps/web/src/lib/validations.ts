@@ -668,6 +668,22 @@ export const manualTweetSchema = z.object({
 });
 
 /**
+ * Landing showcase config update validation (admin)
+ */
+export const landingShowcaseUpdateSchema = z.object({
+  podcastId: z.string().min(1),
+  scriptTurnStart: z.number().int().min(0).optional(),
+  scriptTurnCount: z.number().int().min(1).max(10).optional(),
+  audioClipStart: z.number().min(0).optional(),
+  audioClipEnd: z.number().min(0).nullable().optional(),
+  videoClipStart: z.number().min(0).optional(),
+  videoClipEnd: z.number().min(0).nullable().optional(),
+  twitterHandle: z.string().min(1).max(50).optional(),
+  twitterName: z.string().min(1).max(100).optional(),
+  telegramTopic: z.string().max(200).nullable().optional(),
+}).strict();
+
+/**
  * Thread-to-podcast validation (admin)
  */
 export const threadToPodcastSchema = z.object({
