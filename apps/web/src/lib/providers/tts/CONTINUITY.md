@@ -11,7 +11,7 @@ When text exceeds a provider's character limit, we split into chunks and generat
 
 | Provider | Mechanism | How It Works | Model Restrictions |
 |----------|-----------|-------------|-------------------|
-| **ElevenLabs** | `previous_request_ids` | Pass `request-id` headers from prior chunks (max 3). Response header: `request-id`. | Works on all models including `eleven_v3`. |
+| **ElevenLabs** | `previous_request_ids` | Pass `request-id` headers from prior chunks (max 3). Response header: `request-id`. | **NOT supported on `eleven_v3`** (API returns 400). Works on v2 models. |
 | **ElevenLabs** | `previous_text` / `next_text` | Pass surrounding text as strings for context. | **NOT supported on `eleven_v3`** (API returns 400). Works on `eleven_multilingual_v2`, `eleven_flash_v2_5`, `eleven_turbo_v2`. |
 | **Cartesia** | `context_id` + `continue` | WebSocket-only. Share a `context_id` across messages, set `continue: true` for intermediate chunks, `false` for last. All fields except `transcript`/`continue`/`duration` must stay the same. | Works on all Sonic models. REST API does not support this — only WebSocket. |
 | **Hume AI** | `previous_generation_id` | Pass `generation_id` from the prior chunk's response. Maintains voice, tone, pacing, and phonetic consistency (e.g., "bow" rhymes correctly based on prior context). Can also send multiple `utterances` in a single request. | Works on Octave v1. |
@@ -27,7 +27,7 @@ When text exceeds a provider's character limit, we split into chunks and generat
 
 | Provider | Status | Mechanism |
 |----------|--------|-----------|
-| **ElevenLabs** | Implemented | `previous_request_ids` for `eleven_v3`; `previous_text`/`next_text` for older models. Controlled via `modelsWithoutTextContext` in registry. |
+| **ElevenLabs** | Implemented | `eleven_v3` has no continuity support (both `previous_text`/`next_text` and `previous_request_ids` rejected). v2 models use `previous_text`/`next_text`. Controlled via `modelsWithoutTextContext` in registry. |
 | **Hume AI** | Implemented | `previous_generation_id` passed between chunks via `continuityIds` / `getLastContinuityId()`. |
 | **Cartesia** | Not feasible | Requires WebSocket migration (REST API has no continuity). |
 | **OpenAI** | N/A | No continuity mechanism available. |
