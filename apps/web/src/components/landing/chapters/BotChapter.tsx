@@ -1,5 +1,10 @@
+import type { LandingShowcaseData } from '@/lib/showcase';
 import { ScrollChapter } from '../ScrollChapter';
 import styles from './BotChapter.module.css';
+
+interface BotChapterProps {
+  showcase: LandingShowcaseData | null;
+}
 
 const CHECK = (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
@@ -7,7 +12,8 @@ const CHECK = (
   </svg>
 );
 
-export function BotChapter() {
+export function BotChapter({ showcase }: BotChapterProps) {
+  void showcase; // Phase 5 will use this
   return (
     <ScrollChapter dark>
       <div className={styles.root}>

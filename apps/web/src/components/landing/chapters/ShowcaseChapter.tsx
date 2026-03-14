@@ -1,5 +1,10 @@
+import type { LandingShowcaseData } from '@/lib/showcase';
 import { ScrollChapter } from '../ScrollChapter';
 import styles from './ShowcaseChapter.module.css';
+
+interface ShowcaseChapterProps {
+  showcase: LandingShowcaseData | null;
+}
 
 const SEGMENTS = [
   { num: 1, label: 'CRISPR molecular scissors', type: 'AI Illustration', colorClass: 'purple' },
@@ -15,7 +20,8 @@ const COLOR_MAP = {
   green: styles.badgeGreen,
 } as Record<string, string>;
 
-export function ShowcaseChapter() {
+export function ShowcaseChapter({ showcase }: ShowcaseChapterProps) {
+  void showcase; // Phase 4 will use this
   return (
     <ScrollChapter id="video">
       <div className={styles.root}>
