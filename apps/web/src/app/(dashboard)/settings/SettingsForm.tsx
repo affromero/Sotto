@@ -171,7 +171,7 @@ export function SettingsForm({
   const [pushNotifications, setPushNotifications] = useState(initialPushNotifications);
   const [briefingEnabled, setBriefingEnabled] = useState(initialBriefingEnabled);
   const [briefingTime, setBriefingTime] = useState(initialBriefingTime ?? '08:00');
-  const [briefingTimezone, setBriefingTimezone] = useState(initialBriefingTimezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone);
+  const briefingTimezone = initialBriefingTimezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
   const [briefingDays, setBriefingDays] = useState(initialBriefingDays);
   const [briefingVisibility, setBriefingVisibility] = useState(initialBriefingVisibility);
   const [quizEnabled, setQuizEnabled] = useState(initialQuizEnabled);
