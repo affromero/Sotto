@@ -112,6 +112,58 @@ export function LandingShowcaseDashboard() {
     }
   }, [form]);
 
+  const handleReset = useCallback(async () => {
+    if (!confirm('Reset to hardcoded landing page? The config will be deleted.')) return;
+    setSaving(true);
+    setMessage('');
+    try {
+      const res = await fetch('/api/admin/landing-showcase', { method: 'DELETE' });
+      if (res.ok) {
+        setConfig(null);
+        setForm({
+          podcastId: '',
+          scriptTurnStart: 0,
+          scriptTurnCount: 2,
+          audioClipStart: 0,
+          audioClipEnd: null,
+          videoClipStart: 0,
+          videoClipEnd: null,
+          twitterHandle: 'andres',
+          twitterName: 'Andres',
+          telegramTopic: null,
+        });
+        setSelectedTitle('');
+        setMessage('Reset to defaults — landing page now shows hardcoded content');
+      }
+    } finally {
+      setSaving(false);
+    }
+  }, []);
+
+  const [bootstrapping, setBootstrapping] = useState(false);
+
+  const handleBootstrap = useCallback(async () => {
+    if (!confirm('Create a new CRISPR showcase podcast and start the generation pipeline? This will also set it as the active showcase.')) return;
+    setBootstrapping(true);
+    setMessage('');
+    try {
+      const res = await fetch('/api/admin/landing-showcase/bootstrap', { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        setForm((f) => ({ ...f, podcastId: data.id }));
+        setSelectedTitle('CRISPR Gene Editing Explained');
+        setConfig({ ...form, podcastId: data.id });
+        setMessage(`Pipeline started (podcast ${data.id}). Landing page will go live when podcast reaches READY.`);
+      } else {
+        setMessage(`Error: ${JSON.stringify(data)}`);
+      }
+    } catch (e) {
+      setMessage(`Error: ${e instanceof Error ? e.message : 'Unknown error'}`);
+    } finally {
+      setBootstrapping(false);
+    }
+  }, [form]);
+
   if (loading) {
     return <div className={styles.loading}>Loading configuration...</div>;
   }
@@ -296,7 +348,7 @@ export function LandingShowcaseDashboard() {
         </label>
       </section>
 
-      {/* Save */}
+      {/* Actions */}
       <div className={styles.actions}>
         <button
           type="button"
@@ -306,6 +358,26 @@ export function LandingShowcaseDashboard() {
         >
           {saving ? 'Saving...' : 'Save Configuration'}
         </button>
+        {config && (
+          <button
+            type="button"
+            className={styles.resetBtn}
+            onClick={handleReset}
+            disabled={saving}
+          >
+            Reset to Defaults
+          </button>
+        )}
+        {!config && (
+          <button
+            type="button"
+            className={styles.bootstrapBtn}
+            onClick={handleBootstrap}
+            disabled={bootstrapping}
+          >
+            {bootstrapping ? 'Creating...' : 'Bootstrap Showcase Podcast'}
+          </button>
+        )}
         {message && <span className={styles.message}>{message}</span>}
       </div>
     </div>
