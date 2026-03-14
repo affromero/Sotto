@@ -33,6 +33,8 @@ export interface TtsProviderMeta {
   docsUrl: string | null;
   qualityTier: 'standard' | 'premium' | 'ultra';
   platformCostPerKChar: number;
+  /** Models that do NOT support `previous_text`/`next_text` context params. */
+  modelsWithoutTextContext: string[];
   auth: {
     fields: TtsProviderAuthField[];
     validate: (credentials: Record<string, string>) => Promise<boolean>;
@@ -59,6 +61,7 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     docsUrl: 'https://elevenlabs.io/docs/speech-synthesis/audio-tags',
     qualityTier: 'premium',
     platformCostPerKChar: 0.17,
+    modelsWithoutTextContext: ['eleven_v3'],
     auth: {
       fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'xi-xxxxxxxxxxxxxxxxxxxx' }],
       validate: async (creds) => {
@@ -92,6 +95,7 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     docsUrl: null,
     qualityTier: 'standard',
     platformCostPerKChar: 0.015,
+    modelsWithoutTextContext: [],
     auth: {
       fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'sk-...' }],
       validate: async (creds) => {
@@ -125,6 +129,7 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     docsUrl: 'https://docs.cartesia.ai/build-with-cartesia/text-to-speech/sonic-formatting',
     qualityTier: 'premium',
     platformCostPerKChar: 0.04,
+    modelsWithoutTextContext: [],
     auth: {
       fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'sk_car_...' }],
       validate: async (creds) => {
@@ -159,6 +164,7 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     docsUrl: 'https://dev.hume.ai/docs/text-to-speech/text-to-speech-guide',
     qualityTier: 'ultra',
     platformCostPerKChar: 0.25,
+    modelsWithoutTextContext: [],
     auth: {
       fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'Your Hume AI API key' }],
       validate: async (creds) => {
@@ -200,6 +206,7 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     docsUrl: null,
     qualityTier: 'premium',
     platformCostPerKChar: 0,
+    modelsWithoutTextContext: [],
     auth: {
       fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'fal_sk_...' }],
       validate: async (creds) => {
@@ -232,6 +239,7 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     docsUrl: null,
     qualityTier: 'premium',
     platformCostPerKChar: 0.10,
+    modelsWithoutTextContext: [],
     auth: {
       fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'Your FAL API key' }],
       validate: async (creds) => {
@@ -265,6 +273,7 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     docsUrl: null,
     qualityTier: 'premium',
     platformCostPerKChar: 0.01,
+    modelsWithoutTextContext: [],
     auth: {
       fields: [{ key: 'apiKey', label: 'API Token', placeholder: 'r8_xxxxxxxxxxxx' }],
       validate: async (creds) => {
@@ -296,6 +305,7 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     docsUrl: null,
     qualityTier: 'standard',
     platformCostPerKChar: 0,
+    modelsWithoutTextContext: [],
     auth: {
       fields: [],
       validate: async () => true,

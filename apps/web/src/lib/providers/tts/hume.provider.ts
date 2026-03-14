@@ -26,6 +26,7 @@ interface HumeTtsResponse {
   generations: Array<{
     audio: string; // base64
     duration: number;
+    generation_id?: string;
   }>;
 }
 
@@ -33,6 +34,7 @@ export class HumeProvider implements TtsProvider {
   readonly providerId: TtsProviderId = 'hume';
   private apiKey: string;
   private model: string;
+  private lastGenerationId: string | null = null;
 
   constructor(apiKey: string, model?: string) {
     this.apiKey = apiKey;
@@ -54,6 +56,11 @@ export class HumeProvider implements TtsProvider {
     // Add description for acting instructions (Octave's core differentiator)
     if (description) {
       utterance.description = description;
+    }
+
+    // Cross-chunk continuity via previous_generation_id
+    if (params.continuityIds?.[0]) {
+      utterance.previous_generation_id = params.continuityIds[0];
     }
 
     const response = await fetch('https://api.hume.ai/v0/tts', {
@@ -78,12 +85,18 @@ export class HumeProvider implements TtsProvider {
       throw new Error('Hume AI returned no audio data');
     }
 
+    this.lastGenerationId = data.generations[0].generation_id ?? null;
+
     logger.info('Hume AI speech generated', {
       voiceId: params.voiceId,
       chars: params.text.length,
       description: description ?? 'none',
     });
     return Buffer.from(data.generations[0].audio, 'base64');
+  }
+
+  getLastContinuityId(): string | null {
+    return this.lastGenerationId;
   }
 
   getVoiceId(speaker: string, podcastId?: string, metadata?: VoiceMatchMetadata): string {

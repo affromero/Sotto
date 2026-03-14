@@ -65,6 +65,7 @@ vi.mock('@/lib/providers/tts-registry', () => ({
     displayName: 'ElevenLabs',
     platformCostPerKChar: 0.3,
     maxSegmentChars: 5000,
+    modelsWithoutTextContext: ['eleven_v3'],
   }),
 }));
 
@@ -335,7 +336,57 @@ describe('generateTtsAudio', () => {
   });
 
   describe('multi-chunk generation', () => {
-    it('splits long text and calls generateSpeech per chunk with context bridging', async () => {
+    it('skips text context for v3 model and passes continuityIds between chunks', async () => {
+      const chunk1 = 'First chunk of text.';
+      const chunk2 = 'Second chunk of text.';
+      (splitTextForTts as ReturnType<typeof vi.fn>).mockReturnValue([chunk1, chunk2]);
+
+      // Provider returns continuity IDs via getLastContinuityId
+      let callCount = 0;
+      const mockGetLastContinuityId = vi.fn(() => {
+        callCount++;
+        return `req-${callCount}`;
+      });
+
+      mockGenerateSpeech
+        .mockResolvedValueOnce(Buffer.from('audio-chunk-1'))
+        .mockResolvedValueOnce(Buffer.from('audio-chunk-2'));
+
+      const result = await generateTtsAudio(defaultParams({
+        text: `${chunk1} ${chunk2}`,
+        previousText: 'Before segment.',
+        nextText: 'After segment.',
+        provider: {
+          generateSpeech: (...args: unknown[]) => mockGenerateSpeech(...args),
+          getVoiceId: vi.fn().mockReturnValue('voice-1'),
+          getModelId: () => 'eleven_v3',
+          getLastContinuityId: mockGetLastContinuityId,
+          providerId: 'elevenlabs' as TtsProviderId,
+        },
+      }));
+
+      expect(result).not.toBeNull();
+      expect(mockGenerateSpeech).toHaveBeenCalledTimes(2);
+
+      // eleven_v3 is in modelsWithoutTextContext — text context should be undefined
+      expect(mockGenerateSpeech).toHaveBeenNthCalledWith(1, expect.objectContaining({
+        text: chunk1,
+        previousText: undefined,
+        nextText: undefined,
+      }));
+
+      // Second chunk gets continuityIds from the first chunk
+      expect(mockGenerateSpeech).toHaveBeenNthCalledWith(2, expect.objectContaining({
+        text: chunk2,
+        previousText: undefined,
+        nextText: undefined,
+        continuityIds: ['req-1'],
+      }));
+
+      expect(result!.audioBuffer).toEqual(Buffer.from('concatenated-audio'));
+    });
+
+    it('passes text context for non-v3 models', async () => {
       const chunk1 = 'First chunk of text.';
       const chunk2 = 'Second chunk of text.';
       (splitTextForTts as ReturnType<typeof vi.fn>).mockReturnValue([chunk1, chunk2]);
@@ -348,27 +399,30 @@ describe('generateTtsAudio', () => {
         text: `${chunk1} ${chunk2}`,
         previousText: 'Before segment.',
         nextText: 'After segment.',
+        provider: {
+          generateSpeech: (...args: unknown[]) => mockGenerateSpeech(...args),
+          getVoiceId: vi.fn().mockReturnValue('voice-1'),
+          getModelId: () => 'eleven_turbo_v2',
+          providerId: 'elevenlabs' as TtsProviderId,
+        },
       }));
 
       expect(result).not.toBeNull();
-      // Two generateSpeech calls — one per chunk
       expect(mockGenerateSpeech).toHaveBeenCalledTimes(2);
 
-      // First chunk: uses original previousText, next chunk text as nextText
+      // Non-v3 model keeps text context bridging
       expect(mockGenerateSpeech).toHaveBeenNthCalledWith(1, expect.objectContaining({
         text: chunk1,
         previousText: 'Before segment.',
         nextText: chunk2.slice(0, 500),
       }));
 
-      // Second chunk: uses previous chunk tail as previousText, original nextText
       expect(mockGenerateSpeech).toHaveBeenNthCalledWith(2, expect.objectContaining({
         text: chunk2,
         previousText: chunk1.slice(-500),
         nextText: 'After segment.',
       }));
 
-      // Returns concatenated buffer from FFmpeg
       expect(result!.audioBuffer).toEqual(Buffer.from('concatenated-audio'));
     });
 

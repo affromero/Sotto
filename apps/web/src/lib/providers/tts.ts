@@ -21,6 +21,8 @@ export interface SpeechParams {
   apiKeyOverride?: string;
   previousText?: string;
   nextText?: string;
+  /** Cross-chunk continuity IDs from previous generateSpeech() calls (max 3). */
+  continuityIds?: string[];
   /** Delivery direction from the script (e.g. "energetic", "thoughtful", "sarcastic") */
   direction?: string;
   /** Speaker role (e.g. "HOST", "EXPERT") — used by some providers for baseline expression */
@@ -37,6 +39,8 @@ export interface TtsProvider {
   generateSoundEffect?(params: SfxParams): Promise<Buffer>;
   getVoiceId(speaker: string, podcastId?: string, metadata?: VoiceMatchMetadata): string;
   getModelId(): string;
+  /** Return the continuity ID from the last generateSpeech() call, if the provider supports it. */
+  getLastContinuityId?(): string | null;
   readonly providerId: TtsProviderId;
 }
 
