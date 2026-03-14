@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { BookmarkX } from 'lucide-react';
+import { BookmarkX, Bookmark } from 'lucide-react';
 import { PodcastCard } from '@/components/feed/PodcastCard';
 import type { PodcastSummary } from '@/types/podcast';
 import styles from './SavedTab.module.css';
@@ -30,8 +30,10 @@ export function SavedTab({ podcasts: initialPodcasts }: SavedTabProps) {
   if (podcasts.length === 0) {
     return (
       <div className={styles.emptyState}>
+        <Bookmark size={48} className={styles.emptyIcon} aria-hidden="true" />
+        <h3 className={styles.emptyTitle}>No saved podcasts</h3>
         <p className={styles.emptyText}>
-          No saved podcasts yet. Save podcasts from any podcast page.
+          Save podcasts from any podcast page to find them here.
         </p>
         <Link href="/feed" className={styles.emptyLink}>
           Discover podcasts

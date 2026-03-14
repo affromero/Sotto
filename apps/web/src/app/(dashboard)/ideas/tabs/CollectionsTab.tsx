@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, FolderOpen } from 'lucide-react';
 import { CollectionCard } from '@/components/collections/CollectionCard';
 import { Button } from '@/components/ui/Button';
 import styles from './CollectionsTab.module.css';
@@ -55,11 +55,13 @@ export function CollectionsTab({ collections: initialCollections }: CollectionsT
   if (collections.length === 0 && !showForm) {
     return (
       <div className={styles.emptyState}>
+        <FolderOpen size={48} className={styles.emptyIcon} aria-hidden="true" />
+        <h3 className={styles.emptyTitle}>No collections yet</h3>
         <p className={styles.emptyText}>
-          No collections yet. Create one to organize podcasts.
+          Create a collection to organize your favorite podcasts.
         </p>
         <button type="button" className={styles.emptyLink} onClick={() => setShowForm(true)}>
-          Create Collection
+          Create a collection
         </button>
       </div>
     );

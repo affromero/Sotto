@@ -201,7 +201,7 @@ export function InterruptChatPanel({
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
             placeholder="Ask anything about what you just heard..."
-            disabled={false}
+            disabled={state !== 'idle'}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -252,7 +252,10 @@ export function InterruptChatPanel({
       )}
 
       {state === 'incorporating' && (
-        <p className={styles.statusMessage}>Updating podcast with this explanation...</p>
+        <div className={styles.spinnerWrap}>
+          <Spinner />
+          <p className={styles.statusMessage}>Updating podcast with this explanation...</p>
+        </div>
       )}
 
       {state === 'incorporated' && (

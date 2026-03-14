@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Trash2, Sparkles } from 'lucide-react';
+import { Trash2, Sparkles, Lightbulb } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import styles from './IdeasTab.module.css';
 
@@ -89,8 +89,10 @@ export function IdeasTab({ ideas: initialIdeas, podcastIdeas: initialPodcastIdea
   if (totalCount === 0) {
     return (
       <div className={styles.emptyState}>
+        <Lightbulb size={48} className={styles.emptyIcon} aria-hidden="true" />
+        <h3 className={styles.emptyTitle}>No ideas saved yet</h3>
         <p className={styles.emptyText}>
-          No saved ideas yet. Tap the bookmark icon on quiz questions or browse Inspire Me to save
+          Tap the bookmark icon on quiz questions or browse Inspire Me to save
           podcast ideas. You can also send any topic or URL to @SottoFMBot on Telegram.
         </p>
         <Link href="/create" className={styles.emptyLink}>
