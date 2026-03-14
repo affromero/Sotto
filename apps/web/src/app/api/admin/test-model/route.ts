@@ -10,6 +10,7 @@ import type { AiProviderId } from '@/lib/providers/ai-registry';
 import { getAiKey, getByokKey } from '@/lib/byok';
 import { logUsage } from '@/lib/usage-logger';
 import { errorResponse } from '@/lib/api-response';
+import { logger } from '@/lib/logger';
 import { BRAND } from '@sotto/shared';
 import {
   CARTESIA_VOICE_POOL,
@@ -231,6 +232,7 @@ export async function POST(request: NextRequest) {
   const body = await request.json();
   const parsed = requestSchema.safeParse(body);
   if (!parsed.success) {
+    logger.warn('test-model validation failed', { body, issues: parsed.error.issues });
     return errorResponse(parsed.error.flatten(), 400);
   }
 
@@ -635,6 +637,7 @@ export async function POST(request: NextRequest) {
             // Submit lip-sync
             const { LIP_SYNC_CONFIG } = await import('@/lib/providers/fal-endpoints');
             const prompt = LIP_SYNC_CONFIG[model]?.defaultPrompt;
+            logger.info('Avatar test: submitting lip-sync', { model, imageUrl, audioUrl, prompt });
             const { statusUrl, resultUrl } = await submitFalLipSync({ modelId: model, imageUrl, audioUrl, apiKey, prompt });
 
             // Poll for result
