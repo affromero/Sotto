@@ -11,8 +11,15 @@ tags: [podcast, edit]
     visible:
       id: "profile-podcast-list"
     timeout: 5000
+
+# Scroll to seeded podcast in profile list
+- scrollUntilVisible:
+    element:
+      id: "podcast-card-${E2E_PODCAST_ID}"
+    direction: DOWN
+    timeout: 10000
 - tapOn:
-    text: "E2E Test Podcast"
+    id: "podcast-card-${E2E_PODCAST_ID}"
 - extendedWaitUntil:
     visible:
       id: "player-play-pause"
@@ -20,7 +27,7 @@ tags: [podcast, edit]
 
 # Tap edit button (owner should see it)
 - tapOn:
-    text: "Edit"
+    id: "player-edit-button"
 - extendedWaitUntil:
     visible:
       id: "podcast-edit-title-input"
@@ -40,3 +47,6 @@ tags: [podcast, edit]
 # Save changes
 - tapOn:
     id: "podcast-edit-save-button"
+
+# Terminal assertion: save acknowledged (Alert dialog)
+- takeScreenshot: podcast-edited

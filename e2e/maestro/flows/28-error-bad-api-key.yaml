@@ -8,7 +8,7 @@ tags: [error]
 - tapOn:
     text: "Profile"
 - tapOn:
-    id: "settings-button"
+    id: "profile-settings-button"
 - extendedWaitUntil:
     visible:
       id: "settings-api-keys"
@@ -16,21 +16,30 @@ tags: [error]
 - tapOn:
     id: "settings-api-keys"
 
+# Add Anthropic key to expand the input form
+- extendedWaitUntil:
+    visible:
+      id: "api-keys-provider-anthropic"
+    timeout: 5000
+- tapOn:
+    id: "api-keys-add-anthropic"
+
 # Enter an invalid API key
 - extendedWaitUntil:
     visible:
-      id: "api-key-input-anthropic"
-    timeout: 5000
+      id: "api-keys-input-anthropic"
+    timeout: 3000
 - tapOn:
-    id: "api-key-input-anthropic"
+    id: "api-keys-input-anthropic"
 - inputText: "sk-invalid-key-12345"
 - tapOn:
-    id: "api-key-save-button"
+    id: "api-keys-save-anthropic"
 
 # Verify error feedback
 - extendedWaitUntil:
     visible:
-      id: "api-key-error"
+      id: "api-keys-error-anthropic"
     timeout: 10000
 - assertVisible:
-    id: "api-key-error"
+    id: "api-keys-error-anthropic"
+- takeScreenshot: bad-api-key-error

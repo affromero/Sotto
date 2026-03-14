@@ -9,7 +9,7 @@ tags: [error]
     timeout: 10000
 - tapOn:
     id: "login-email-input"
-- inputText: "test-empty@sotto.fm"
+- inputText: "${E2E_EMPTY_EMAIL}"
 - tapOn:
     id: "login-sign-in-button"
 
@@ -20,3 +20,4 @@ tags: [error]
     timeout: 10000
 - assertVisible:
     id: "feed-empty-state"
+- takeScreenshot: empty-feed

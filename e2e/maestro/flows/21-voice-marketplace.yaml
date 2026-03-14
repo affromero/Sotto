@@ -21,8 +21,23 @@ tags: [voices, marketplace]
     id: "voice-marketplace-search-input"
 - inputText: "deep voice"
 
-# Change sort order
+# Assert search results load
+- extendedWaitUntil:
+    visible:
+      id: "voice-marketplace-list"
+    timeout: 5000
+
+# Clear and change sort order
 - tapOn:
     id: "voice-marketplace-search-clear"
 - tapOn:
     id: "voice-marketplace-sort-recent"
+
+# Terminal assertion: marketplace list visible after sort
+- extendedWaitUntil:
+    visible:
+      id: "voice-marketplace-list"
+    timeout: 5000
+- assertVisible:
+    id: "voice-marketplace-list"
+- takeScreenshot: voice-marketplace

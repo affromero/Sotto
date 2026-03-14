@@ -51,3 +51,8 @@ tags: [player, smoke]
 # Share
 - tapOn:
     id: "player-share-button"
+
+# Terminal assertion: player still functional
+- assertVisible:
+    id: "player-play-pause"
+- takeScreenshot: player-controls

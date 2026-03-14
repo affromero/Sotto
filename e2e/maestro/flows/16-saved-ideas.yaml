@@ -8,7 +8,7 @@ tags: [ideas, library]
 - tapOn:
     text: "Profile"
 - tapOn:
-    text: "Saved Ideas"
+    id: "profile-saved-ideas-link"
 - extendedWaitUntil:
     visible:
       id: "ideas-list"
@@ -21,7 +21,12 @@ tags: [ideas, library]
 # Tap on an idea to navigate to create
 - tapOn:
     text: "AI could write music"
+
+# Terminal assertion: create screen loaded
 - extendedWaitUntil:
     visible:
       id: "create-chat-input"
     timeout: 5000
+- assertVisible:
+    id: "create-chat-input"
+- takeScreenshot: idea-to-create

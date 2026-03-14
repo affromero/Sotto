@@ -9,17 +9,17 @@ tags: [social, profile]
     text: "Search"
 - tapOn:
     id: "search-input"
-- inputText: "e2e-other"
+- inputText: "${E2E_OTHER_USER_HANDLE}"
 - tapOn:
     id: "search-mode-people"
 
 # Wait for results and tap on user
 - extendedWaitUntil:
     visible:
-      text: "E2E Other User"
+      text: "${E2E_OTHER_USER_NAME}"
     timeout: 5000
 - tapOn:
-    text: "E2E Other User"
+    text: "${E2E_OTHER_USER_NAME}"
 
 # Verify profile loaded
 - extendedWaitUntil:
@@ -36,3 +36,8 @@ tags: [social, profile]
 # Unfollow the user (toggle back)
 - tapOn:
     id: "user-profile-follow-button"
+
+# Terminal assertion: follow button still visible
+- assertVisible:
+    id: "user-profile-follow-button"
+- takeScreenshot: user-profile

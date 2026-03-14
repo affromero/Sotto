@@ -35,7 +35,12 @@ tags: [player, smoke]
 # Tap MiniPlayer to return to player
 - tapOn:
     id: "mini-player"
+
+# Terminal assertion: player visible
 - extendedWaitUntil:
     visible:
       id: "player-play-pause"
     timeout: 5000
+- assertVisible:
+    id: "player-play-pause"
+- takeScreenshot: mini-player-return

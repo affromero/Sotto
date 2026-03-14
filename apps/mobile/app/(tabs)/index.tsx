@@ -298,6 +298,7 @@ export default function FeedScreen() {
             <EmptyState
               title="No podcasts yet"
               subtitle="Be the first to create one"
+              testID="feed-empty-state"
             />
           )
         }

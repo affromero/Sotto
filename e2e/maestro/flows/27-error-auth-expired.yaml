@@ -20,3 +20,4 @@ tags: [error]
     timeout: 10000
 - assertVisible:
     id: "login-email-input"
+- takeScreenshot: session-expired

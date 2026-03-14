@@ -4,13 +4,18 @@ tags: [player, save]
 ---
 - runFlow: ../helpers/login.yaml
 
-# Navigate to first podcast
+# Scroll to seeded podcast in feed
 - extendedWaitUntil:
     visible:
       id: "feed-podcast-list"
     timeout: 5000
+- scrollUntilVisible:
+    element:
+      id: "podcast-card-${E2E_PODCAST_ID}"
+    direction: DOWN
+    timeout: 10000
 - tapOn:
-    text: "E2E Test Podcast"
+    id: "podcast-card-${E2E_PODCAST_ID}"
 - extendedWaitUntil:
     visible:
       id: "player-save-button"
@@ -23,3 +28,8 @@ tags: [player, save]
 # Toggle save off
 - tapOn:
     id: "player-save-button"
+
+# Terminal assertion: save button still visible
+- assertVisible:
+    id: "player-save-button"
+- takeScreenshot: save-toggled
