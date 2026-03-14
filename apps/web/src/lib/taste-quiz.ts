@@ -162,10 +162,12 @@ export interface InspireContext {
   validSlugs: Set<string>;
   priorQuestionIds: Set<string>;
   autoModel: PlanModelConfig;
+  /** Pre-resolved provider info — avoids 3× redundant DB lookups across generators. */
+  resolvedProvider: { provider: string; source: string; apiKey?: string; model?: string } | null;
 }
 
 export async function loadInspireContext(userId: string, opts?: { model?: string; plan?: 'FREE' | 'PRO' }): Promise<InspireContext> {
-  const [categories, priorAnswers, autoFreeConfig] = await Promise.all([
+  const [categories, priorAnswers, autoFreeConfig, userRecord, aiKeyResult] = await Promise.all([
     prisma.tag.findMany({
       where: { parentId: null },
       select: {
@@ -184,6 +186,8 @@ export async function loadInspireContext(userId: string, opts?: { model?: string
       take: 200,
     }),
     resolveAutoModel(opts?.plan ?? 'FREE'),
+    prisma.user.findUnique({ where: { id: userId }, select: { plan: true } }),
+    getAiKey(userId).catch(() => null),
   ]);
 
   const validSlugs = new Set<string>();
@@ -204,11 +208,23 @@ export async function loadInspireContext(userId: string, opts?: { model?: string
     ? { ...autoFreeConfig, aiModel: opts.model }
     : autoFreeConfig;
 
+  // Resolve AI provider once for all sections
+  const plan = userRecord?.plan as 'FREE' | 'PRO' | undefined;
+  const resolvedProvider = await resolveAiModelAndProvider({ aiKey: aiKeyResult, plan }).then(
+    ({ model: m, provider }) => ({
+      provider,
+      source: aiKeyResult ? 'byok' as const : 'platform' as const,
+      apiKey: aiKeyResult?.apiKey,
+      model: m,
+    })
+  ).catch(() => null);
+
   return {
     taxonomyLines,
     validSlugs,
     priorQuestionIds: new Set(priorAnswers.map((a) => a.questionId)),
     autoModel: resolvedAutoModel,
+    resolvedProvider,
   };
 }
 
@@ -398,14 +414,8 @@ Also explore topics ADJACENT to their interests — things they haven't explicit
   });
 
   try {
-    const userRecord = await prisma.user.findUnique({ where: { id: userId }, select: { plan: true } });
-    const plan = userRecord?.plan as 'FREE' | 'PRO' | undefined;
-    const aiKey = await getAiKey(userId).catch(() => null);
-    const resolved = await resolveAiModelAndProvider({ aiKey, plan }).then(
-      ({ model: m, provider }) => ({ provider, source: aiKey ? 'byok' as const : 'platform' as const, apiKey: aiKey?.apiKey, model: m })
-    ).catch(() => null);
-    const { providerType, apiKey, model: resolvedModel } = resolveInspireProvider(resolved, ctx.autoModel, model);
-    logger.info('Inspire forYou provider resolved', { provider: providerType, model: resolvedModel, source: resolved?.source ?? 'auto' });
+    const { providerType, apiKey, model: resolvedModel } = resolveInspireProvider(ctx.resolvedProvider, ctx.autoModel, model);
+    logger.info('Inspire forYou provider resolved', { provider: providerType, model: resolvedModel, source: ctx.resolvedProvider?.source ?? 'auto' });
     const llmStart = Date.now();
 
     const ai = createAIProvider(providerType);
@@ -476,14 +486,8 @@ export async function generateCuriosityQuestions(
   });
 
   try {
-    const userRecord = await prisma.user.findUnique({ where: { id: userId }, select: { plan: true } });
-    const plan = userRecord?.plan as 'FREE' | 'PRO' | undefined;
-    const aiKey = await getAiKey(userId).catch(() => null);
-    const resolved = await resolveAiModelAndProvider({ aiKey, plan }).then(
-      ({ model: m, provider }) => ({ provider, source: aiKey ? 'byok' as const : 'platform' as const, apiKey: aiKey?.apiKey, model: m })
-    ).catch(() => null);
-    const { providerType, apiKey, model: resolvedModel } = resolveInspireProvider(resolved, ctx.autoModel, model);
-    logger.info('Inspire curiosity provider resolved', { provider: providerType, model: resolvedModel, source: resolved?.source ?? 'auto' });
+    const { providerType, apiKey, model: resolvedModel } = resolveInspireProvider(ctx.resolvedProvider, ctx.autoModel, model);
+    logger.info('Inspire curiosity provider resolved', { provider: providerType, model: resolvedModel, source: ctx.resolvedProvider?.source ?? 'auto' });
     const llmStart = Date.now();
 
     const ai = createAIProvider(providerType);
@@ -597,14 +601,8 @@ export async function generateNewsQuestions(
       });
 
   try {
-    const userRecord = await prisma.user.findUnique({ where: { id: userId }, select: { plan: true } });
-    const plan = userRecord?.plan as 'FREE' | 'PRO' | undefined;
-    const aiKey = await getAiKey(userId).catch(() => null);
-    const resolved = await resolveAiModelAndProvider({ aiKey, plan }).then(
-      ({ model: m, provider }) => ({ provider, source: aiKey ? 'byok' as const : 'platform' as const, apiKey: aiKey?.apiKey, model: m })
-    ).catch(() => null);
-    const { providerType, apiKey, model: resolvedModel } = resolveInspireProvider(resolved, ctx.autoModel, model);
-    logger.info('Inspire news provider resolved', { provider: providerType, model: resolvedModel, source: resolved?.source ?? 'auto' });
+    const { providerType, apiKey, model: resolvedModel } = resolveInspireProvider(ctx.resolvedProvider, ctx.autoModel, model);
+    logger.info('Inspire news provider resolved', { provider: providerType, model: resolvedModel, source: ctx.resolvedProvider?.source ?? 'auto' });
     const llmStart = Date.now();
 
     const ai = createAIProvider(providerType);
