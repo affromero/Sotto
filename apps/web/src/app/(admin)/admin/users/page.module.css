@@ -207,8 +207,8 @@
 }
 
 .badgeSTARTER {
-  background: #dbeafe;
-  color: #3b82f6;
+  background: var(--color-info-light);
+  color: var(--color-info);
 }
 
 .badgeSTUDIO {
@@ -217,8 +217,8 @@
 }
 
 .badgeBYOK {
-  background: #dbeafe;
-  color: #2563eb;
+  background: var(--color-info-light);
+  color: var(--color-info);
 }
 
 /* Tier Cell */
@@ -234,7 +234,7 @@
   width: 8px;
   height: 8px;
   border-radius: var(--radius-full);
-  background: #22c55e;
+  background: var(--color-success);
   display: inline-block;
   flex-shrink: 0;
 }
@@ -244,7 +244,7 @@
 }
 
 .subDotPastDue {
-  background: #f59e0b;
+  background: var(--color-warning);
 }
 
 /* Limit Cell */
@@ -305,25 +305,25 @@
 }
 
 .modBtnWarn {
-  color: #d97706;
-  border-color: #d97706;
+  color: var(--color-primary);
+  border-color: var(--color-primary);
 }
 
 .modBtnWarn:hover:not(:disabled) {
-  background: #fffbeb;
-  color: #b45309;
-  border-color: #b45309;
+  background: var(--color-primary-lighter);
+  color: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
 }
 
 .modBtnDanger {
-  color: #dc2626;
-  border-color: #dc2626;
+  color: var(--color-error);
+  border-color: var(--color-error);
 }
 
 .modBtnDanger:hover:not(:disabled) {
-  background: #fef2f2;
-  color: #b91c1c;
-  border-color: #b91c1c;
+  background: var(--color-error-lighter);
+  color: var(--color-error-hover);
+  border-color: var(--color-error-hover);
 }
 
 .statusBadge {
@@ -337,11 +337,11 @@
 }
 
 .statusBanned {
-  background: #fef2f2;
-  color: #dc2626;
+  background: var(--color-error-lighter);
+  color: var(--color-error);
 }
 
 .statusSuspended {
-  background: #fffbeb;
-  color: #d97706;
+  background: var(--color-primary-lighter);
+  color: var(--color-primary);
 }
