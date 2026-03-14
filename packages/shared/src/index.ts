@@ -18,6 +18,7 @@ export type {
   ProposalStatus,
   FeedbackType,
   FeedbackStatus,
+  QuizStatus,
 } from './types/enums';
 
 // Types

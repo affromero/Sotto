@@ -50,6 +50,7 @@ import { VersionHistory } from '@/components/player/VersionHistory';
 import { CommunityQuestions } from '@/components/player/CommunityQuestions';
 import { CommentSection } from '@/components/player/CommentSection';
 import { PostListenRating } from '@/components/player/PostListenRating';
+import { PostListenQuiz } from '@/components/player/PostListenQuiz';
 import { Badge } from '@/components/ui/Badge';
 import { SottoBadge } from '@/components/ui/SottoBadge';
 import { MetadataBadges } from '@/components/ui/MetadataBadges';
@@ -93,6 +94,7 @@ interface PodcastPlayerViewProps {
   videoStatus?: VideoGenerationStatus;
   avatarStatus?: VideoGenerationStatus;
   musicStatus?: VideoGenerationStatus;
+  hasQuiz?: boolean;
 }
 
 type ViewMode = 'transcript' | 'teleprompter' | 'video';
@@ -163,7 +165,7 @@ function PlayerBridge({
   return null;
 }
 
-export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, currentUserId, canMakePrivate, videoStatus, avatarStatus, musicStatus }: PodcastPlayerViewProps) {
+export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, currentUserId, canMakePrivate, videoStatus, avatarStatus, musicStatus, hasQuiz }: PodcastPlayerViewProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const player = usePlayer();
@@ -191,6 +193,8 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
   const playerSectionRef = useRef<HTMLElement>(null);
   const [showRatingPrompt, setShowRatingPrompt] = useState(false);
   const [hasRated, setHasRated] = useState(false);
+  const [showQuizPrompt, setShowQuizPrompt] = useState(false);
+  const [quizCompleted, setQuizCompleted] = useState(false);
   const completionPercentRef = useRef(0);
   const [questionCounts, setQuestionCounts] = useState<Map<number, number>>(new Map());
   const [questionsRefreshTrigger, setQuestionsRefreshTrigger] = useState(0);
@@ -1122,6 +1126,20 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
           onDismiss={() => {
             setShowRatingPrompt(false);
             setHasRated(true);
+            if (hasQuiz && !quizCompleted) {
+              setShowQuizPrompt(true);
+            }
+          }}
+        />
+      )}
+
+      {/* Post-Listen Quiz */}
+      {showQuizPrompt && !quizCompleted && (
+        <PostListenQuiz
+          podcastId={podcast.id}
+          onDismiss={() => {
+            setShowQuizPrompt(false);
+            setQuizCompleted(true);
           }}
         />
       )}
