@@ -4,6 +4,7 @@ import { NextRequest } from 'next/server';
 const mockAuthenticateRequest = vi.fn();
 const mockCheckRateLimit = vi.fn();
 const mockCacheGet = vi.fn();
+const mockCacheGetWithTtl = vi.fn();
 const mockCacheSet = vi.fn();
 const mockCountersIncrement = vi.fn();
 const mockGenerateForYou = vi.fn();
@@ -20,8 +21,10 @@ vi.mock('@/lib/redis', () => ({
   checkRateLimit: (...args: unknown[]) => mockCheckRateLimit(...args),
   cache: {
     get: (...args: unknown[]) => mockCacheGet(...args),
+    getWithTtl: (...args: unknown[]) => mockCacheGetWithTtl(...args),
     set: (...args: unknown[]) => mockCacheSet(...args),
   },
+  inspireFailures: { push: vi.fn().mockResolvedValue(undefined) },
   counters: {
     increment: (...args: unknown[]) => mockCountersIncrement(...args),
   },
@@ -111,6 +114,7 @@ describe('GET /api/inspire/all', () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-123' });
     mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 9, resetAt: 0 });
     mockCacheGet.mockResolvedValue(null); // cache miss by default
+    mockCacheGetWithTtl.mockResolvedValue({ value: null, ttl: -1 }); // cache miss by default
     mockCacheSet.mockResolvedValue(undefined);
     mockCountersIncrement.mockResolvedValue(undefined);
     mockGenerateForYou.mockResolvedValue(mockForYou);
@@ -128,12 +132,12 @@ describe('GET /api/inspire/all', () => {
 
   it('returns all cached sections as JSON when all hit', async () => {
     const cachedTrending = [{ id: 'pod-1', title: 'Top Pod' }];
-    // Return cached values for all 4
-    mockCacheGet
-      .mockResolvedValueOnce(mockForYou) // forYou
-      .mockResolvedValueOnce(cachedTrending) // trending
-      .mockResolvedValueOnce(mockNews) // news
-      .mockResolvedValueOnce(mockCuriosity); // curiosity
+    // Return cached values for all 4 (fresh TTL = 1700 means <5 min old)
+    mockCacheGetWithTtl
+      .mockResolvedValueOnce({ value: mockForYou, ttl: 1700 }) // forYou
+      .mockResolvedValueOnce({ value: cachedTrending, ttl: 1700 }) // trending
+      .mockResolvedValueOnce({ value: mockNews, ttl: 1700 }) // news
+      .mockResolvedValueOnce({ value: mockCuriosity, ttl: 1700 }); // curiosity
 
     const res = await GET(createRequest());
     const body = await res.json();
