@@ -91,7 +91,7 @@ export async function processQuizGeneration(job: Job<GenerateQuizPayload>): Prom
     await job.updateProgress(70);
 
     // Parse response
-    const text = response.text.trim();
+    const text = response.content.trim();
     const jsonStr = text.startsWith('[') ? text : text.match(/\[[\s\S]*\]/)?.[0];
     if (!jsonStr) {
       throw new Error('Failed to extract JSON array from LLM response');
