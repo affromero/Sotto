@@ -141,10 +141,10 @@
   align-items: center;
   gap: 0.25rem;
   padding: 0.375rem 0.75rem;
-  border: 1px solid #10B981;
+  border: 1px solid var(--color-success);
   border-radius: 0.5rem;
-  background: #D1FAE5;
-  color: #065F46;
+  background: var(--color-success-light);
+  color: var(--color-success-hover);
   font-size: 0.8125rem;
   font-weight: 500;
   cursor: pointer;
@@ -153,8 +153,8 @@
 }
 
 .acceptBtn:hover {
-  background: #10B981;
-  color: white;
+  background: var(--color-success);
+  color: var(--color-text-inverse);
 }
 
 .rejectBtn {
@@ -174,8 +174,8 @@
 }
 
 .rejectBtn:hover {
-  border-color: #EF4444;
-  color: #EF4444;
+  border-color: var(--color-error);
+  color: var(--color-error);
 }
 
 .rejectForm {
@@ -263,28 +263,28 @@
 }
 
 .statusReady {
-  background: #D1FAE5;
-  color: #065F46;
+  background: var(--color-success-light);
+  color: var(--color-success-hover);
 }
 
 .statusGenerating {
-  background: #FEF3C7;
-  color: #92400E;
+  background: var(--color-warning-light);
+  color: var(--color-primary-active);
 }
 
 .statusStale {
-  background: #FEF3C7;
-  color: #92400E;
+  background: var(--color-warning-light);
+  color: var(--color-primary-active);
 }
 
 .statusFailed {
-  background: #FEE2E2;
-  color: #991B1B;
+  background: var(--color-error-light);
+  color: var(--color-error-hover);
 }
 
 .failureReason {
   font-size: 0.75rem;
-  color: #991B1B;
+  color: var(--color-error-hover);
   margin-top: 0.25rem;
 }
 
@@ -318,8 +318,8 @@
 }
 
 .deleteBtn:hover {
-  border-color: #EF4444;
-  color: #EF4444;
+  border-color: var(--color-error);
+  color: var(--color-error);
 }
 
 /* Add section */
@@ -394,9 +394,9 @@
 
 .error {
   padding: 0.75rem 1rem;
-  background: #FEE2E2;
+  background: var(--color-error-light);
   border-radius: 0.5rem;
-  color: #991B1B;
+  color: var(--color-error-hover);
   font-size: 0.875rem;
   margin-bottom: 1rem;
 }

@@ -51,14 +51,21 @@
 .closeBtn {
   background: none;
   border: none;
-  font-size: 24px;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-lg);
   color: var(--color-text-tertiary);
   cursor: pointer;
-  padding: var(--spacing-xs);
-  line-height: 1;
+  transition: background var(--transition-fast), color var(--transition-fast);
 }
 
-.closeBtn:hover { color: var(--color-text-primary); }
+.closeBtn:hover {
+  color: var(--color-text-primary);
+  background: var(--color-surface-hover);
+}
 
 .body {
   padding: var(--spacing-lg);

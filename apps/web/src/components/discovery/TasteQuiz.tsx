@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { CircleCheckBig } from 'lucide-react';
 import type { TasteQuestion, TasteAnswer } from '@sotto/shared';
 import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
@@ -148,7 +149,7 @@ export function TasteQuiz({
 
     return (
       <div className={styles.done}>
-        <div className={styles.doneIcon}>&#10003;</div>
+        <div className={styles.doneIcon}><CircleCheckBig size={28} /></div>
         <h3 className={styles.doneTitle}>Nice taste!</h3>
         <p className={styles.doneSummary}>
           {yesCount} yes, {noCount} no, {answers.length - yesCount - noCount} skipped

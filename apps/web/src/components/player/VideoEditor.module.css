@@ -3,7 +3,7 @@
 .root {
   width: 100%;
   background: #1a1a1a;
-  border-radius: var(--radius-xl, 16px);
+  border-radius: var(--radius-xl);
   overflow: hidden;
   border: 1px solid #333;
   display: flex;
@@ -27,13 +27,13 @@
   margin: 0;
   font-size: 18px;
   font-weight: 600;
-  color: #e0e0e0;
+  color: var(--color-text-primary);
   font-family: var(--font-heading, 'DM Serif Display', serif);
 }
 
 .headerHint {
   font-size: 13px;
-  color: #888;
+  color: var(--color-text-secondary);
 }
 
 /* Scrollable card list */
@@ -58,7 +58,7 @@
 
 .cardList::-webkit-scrollbar-thumb {
   background: #444;
-  border-radius: var(--radius-full, 9999px);
+  border-radius: var(--radius-full);
 }
 
 /* Sticky footer */
@@ -77,7 +77,7 @@
 .footerSummary {
   margin: 0;
   font-size: 14px;
-  color: #aaa;
+  color: var(--color-text-secondary);
   font-variant-numeric: tabular-nums;
 }
 
@@ -98,7 +98,7 @@
   background: transparent;
   color: #d6d3d1;
   border: 1px solid #57534e;
-  border-radius: var(--radius-md, 8px);
+  border-radius: var(--radius-md);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -107,13 +107,13 @@
 }
 
 .regenerateAllBtn:hover {
-  color: #fff;
+  color: var(--color-text-inverse);
   border-color: #a16207;
   background: rgba(217, 119, 6, 0.12);
 }
 
 .regenerateAllBtn:focus-visible {
-  outline: 2px solid var(--color-primary, #d97706);
+  outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
 
@@ -124,10 +124,10 @@
 
 .regenerateBtn {
   padding: 12px 24px;
-  background: var(--color-primary, #d97706);
-  color: #fff;
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
   border: none;
-  border-radius: var(--radius-md, 8px);
+  border-radius: var(--radius-md);
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
@@ -136,11 +136,11 @@
 }
 
 .regenerateBtn:hover {
-  background: var(--color-primary-hover, #b45309);
+  background: var(--color-primary-hover);
 }
 
 .regenerateBtn:focus-visible {
-  outline: 2px solid #fff;
+  outline: 2px solid var(--color-text-inverse);
   outline-offset: 2px;
 }
 
@@ -152,9 +152,9 @@
 .cancelBtn {
   padding: 12px 20px;
   background: transparent;
-  color: #888;
+  color: var(--color-text-secondary);
   border: 1px solid #444;
-  border-radius: var(--radius-md, 8px);
+  border-radius: var(--radius-md);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -163,12 +163,12 @@
 }
 
 .cancelBtn:hover {
-  color: #ccc;
+  color: var(--color-text-secondary);
   border-color: #666;
 }
 
 .cancelBtn:focus-visible {
-  outline: 2px solid var(--color-primary, #d97706);
+  outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
 

@@ -147,3 +147,18 @@
 .upgradeButtonPrimary:hover {
   opacity: 0.9;
 }
+
+/* Saving state */
+.savingState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-lg);
+  padding: var(--spacing-3xl) var(--spacing-lg);
+  animation: fadeIn 0.4s var(--ease-out-expo);
+}
+
+.savingText {
+  font: var(--text-body);
+  color: var(--color-text-secondary);
+}

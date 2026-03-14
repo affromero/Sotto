@@ -36,7 +36,7 @@
 .description {
   font-size: 18px;
   line-height: 1.7;
-  color: var(--color-text-secondary, #6B7280);
+  color: var(--color-text-secondary);
   max-width: 560px;
   margin: 0 auto;
 }
@@ -107,7 +107,7 @@
 .cardDesc {
   font-size: 15px;
   line-height: 1.7;
-  color: var(--color-text-secondary, #6B7280);
+  color: var(--color-text-secondary);
 }
 
 /* Featured card mock Q&A */
@@ -222,7 +222,7 @@
 .useCaseDesc {
   font-size: 14px;
   line-height: 1.65;
-  color: var(--color-text-secondary, #6B7280);
+  color: var(--color-text-secondary);
 }
 
 /* Providers marquee */

@@ -32,16 +32,16 @@
 /* Not configured banner */
 .notConfigured {
   padding: var(--spacing-xl);
-  background: #fef3c7;
-  border: 1px solid #f59e0b;
+  background: var(--color-warning-light);
+  border: 1px solid var(--color-warning);
   border-radius: var(--radius-lg);
-  color: #92400e;
+  color: var(--color-primary-active);
 }
 
 .notConfigured h2 {
   margin: 0 0 var(--spacing-sm);
   font: var(--text-heading-sm);
-  color: #78350f;
+  color: var(--color-primary-active);
 }
 
 .notConfigured p {
@@ -63,11 +63,11 @@
   align-items: center;
   gap: var(--spacing-md);
   padding: var(--spacing-md) var(--spacing-lg);
-  background: #fef3c7;
-  border: 1px solid #f59e0b;
+  background: var(--color-warning-light);
+  border: 1px solid var(--color-warning);
   border-radius: var(--radius-lg);
   font: var(--text-body);
-  color: #92400e;
+  color: var(--color-primary-active);
 }
 
 .alertDanger {
@@ -75,11 +75,11 @@
   align-items: center;
   gap: var(--spacing-md);
   padding: var(--spacing-md) var(--spacing-lg);
-  background: #fee2e2;
-  border: 1px solid #ef4444;
+  background: var(--color-error-light);
+  border: 1px solid var(--color-error);
   border-radius: var(--radius-lg);
   font: var(--text-body);
-  color: #991b1b;
+  color: var(--color-error-hover);
 }
 
 /* Chart header: title + legend side by side */
@@ -133,8 +133,8 @@
   transform: translateX(-50%);
   margin-bottom: 6px;
   padding: 6px 10px;
-  background: #111;
-  color: #fff;
+  background: var(--color-text-primary);
+  color: var(--color-text-inverse);
   font-size: 12px;
   font-weight: 600;
   border-radius: var(--radius-sm);
@@ -172,17 +172,17 @@
 
 /* Score badges */
 .scoreGreen {
-  color: #16a34a;
+  color: var(--color-success);
   font-weight: 700;
 }
 
 .scoreAmber {
-  color: #d97706;
+  color: var(--color-primary);
   font-weight: 700;
 }
 
 .scoreRed {
-  color: #dc2626;
+  color: var(--color-error);
   font-weight: 700;
 }
 

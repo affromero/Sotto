@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { X } from 'lucide-react';
 import styles from './Toast.module.css';
 
 interface ToastProps {
@@ -25,7 +26,7 @@ export function Toast({ message, type = 'info', duration = 4000, onClose }: Toas
     <div className={`${styles.toast} ${styles[type]} ${visible ? styles.visible : styles.hidden}`}>
       <span>{message}</span>
       <button className={styles.close} onClick={onClose} aria-label="Close notification">
-        ×
+        <X size={14} />
       </button>
     </div>
   );

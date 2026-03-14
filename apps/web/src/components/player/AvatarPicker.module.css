@@ -1,7 +1,7 @@
 .root {
   width: 100%;
   background: #1a1a1a;
-  border-radius: var(--radius-xl, 16px);
+  border-radius: var(--radius-xl);
   overflow: hidden;
   border: 1px solid #333;
   display: flex;
@@ -12,7 +12,7 @@
 .loading {
   padding: 40px 24px;
   text-align: center;
-  color: #888;
+  color: var(--color-text-secondary);
   font-size: 14px;
 }
 
@@ -30,7 +30,7 @@
   margin: 0;
   font-size: 18px;
   font-weight: 600;
-  color: #e0e0e0;
+  color: var(--color-text-primary);
   font-family: var(--font-heading, 'DM Serif Display', serif);
 }
 
@@ -38,13 +38,13 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  color: #f59e0b;
+  color: var(--color-warning);
   font-size: 13px;
 }
 
 .error {
   padding: 12px 24px;
-  color: #ef4444;
+  color: var(--color-error);
   font-size: 13px;
   margin: 0;
 }
@@ -58,7 +58,7 @@
 }
 
 .searchIcon {
-  color: #666;
+  color: var(--color-text-tertiary);
   flex-shrink: 0;
 }
 
@@ -66,20 +66,20 @@
   flex: 1;
   background: #2a2a2a;
   border: 1px solid #444;
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   padding: 8px 12px;
-  color: #e0e0e0;
+  color: var(--color-text-primary);
   font-size: 13px;
   outline: none;
   transition: border-color 0.15s;
 }
 
 .searchInput::placeholder {
-  color: #666;
+  color: var(--color-text-tertiary);
 }
 
 .searchInput:focus {
-  border-color: #d97706;
+  border-color: var(--color-primary);
 }
 
 .speakerColumns {
@@ -109,7 +109,7 @@
   margin: 0 0 12px;
   font-size: 14px;
   font-weight: 600;
-  color: #ccc;
+  color: var(--color-text-secondary);
 }
 
 .voiceTrackSelect {
@@ -117,16 +117,16 @@
   padding: 6px 8px;
   margin-bottom: 12px;
   background: #2a2a2a;
-  color: #e0e0e0;
+  color: var(--color-text-primary);
   border: 1px solid #444;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   font-size: 12px;
   cursor: pointer;
 }
 
 .voiceTrackSelect:focus {
   outline: none;
-  border-color: #D97706;
+  border-color: var(--color-primary);
 }
 
 .avatarGrid {
@@ -143,7 +143,7 @@
   padding: 10px 6px;
   background: #2a2a2a;
   border: 2px solid transparent;
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
 }
@@ -158,7 +158,7 @@
 }
 
 .avatarCardSelected {
-  border-color: #d97706;
+  border-color: var(--color-primary);
   background: #332a1a;
 }
 
@@ -175,12 +175,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #888;
+  color: var(--color-text-secondary);
 }
 
 .avatarName {
   font-size: 11px;
-  color: #aaa;
+  color: var(--color-text-secondary);
   text-align: center;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -191,7 +191,7 @@
 .noResults {
   padding: 16px 0;
   text-align: center;
-  color: #666;
+  color: var(--color-text-tertiary);
   font-size: 13px;
   margin: 0;
 }
@@ -200,13 +200,13 @@
   padding: 0 24px 4px;
   margin: 0;
   font-size: 12px;
-  color: #666;
+  color: var(--color-text-tertiary);
   text-align: center;
   flex-shrink: 0;
 }
 
 .browseLink a {
-  color: #d97706;
+  color: var(--color-primary);
   text-decoration: none;
 }
 
@@ -227,11 +227,11 @@
 .costEstimate {
   margin: 0;
   font-size: 13px;
-  color: #aaa;
+  color: var(--color-text-secondary);
 }
 
 .costLabel {
-  color: #22c55e;
+  color: var(--color-success);
   font-weight: 600;
 }
 
@@ -244,8 +244,8 @@
   padding: 8px 16px;
   background: transparent;
   border: 1px solid #555;
-  border-radius: 8px;
-  color: #ccc;
+  border-radius: var(--radius-lg);
+  color: var(--color-text-secondary);
   cursor: pointer;
   font-size: 13px;
 }
@@ -256,17 +256,17 @@
 
 .submitBtn {
   padding: 8px 20px;
-  background: #d97706;
+  background: var(--color-primary);
   border: none;
-  border-radius: 8px;
-  color: #fff;
+  border-radius: var(--radius-lg);
+  color: var(--color-text-inverse);
   cursor: pointer;
   font-size: 13px;
   font-weight: 600;
 }
 
 .submitBtn:hover {
-  background: #b45309;
+  background: var(--color-primary-hover);
 }
 
 .submitBtn:disabled {
@@ -283,7 +283,7 @@
 
 .falModelLabel {
   font-size: 12px;
-  color: #999;
+  color: var(--color-text-tertiary);
   white-space: nowrap;
 }
 
@@ -291,9 +291,9 @@
   flex: 1;
   padding: 6px 10px;
   background: #2a2a2a;
-  color: #ccc;
+  color: var(--color-text-secondary);
   border: 1px solid #444;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   font-size: 12px;
   cursor: pointer;
 }
@@ -309,21 +309,21 @@
   padding: 6px 16px;
   background: #2a2a2a;
   border: 1px solid #444;
-  border-radius: 8px;
-  color: #aaa;
+  border-radius: var(--radius-lg);
+  color: var(--color-text-secondary);
   cursor: pointer;
   font-size: 13px;
   transition: border-color 0.15s, color 0.15s;
 }
 
 .providerTab:hover {
-  color: #e0e0e0;
+  color: var(--color-text-primary);
   border-color: #666;
 }
 
 .providerTabActive {
-  border-color: #d97706;
-  color: #d97706;
+  border-color: var(--color-primary);
+  color: var(--color-primary);
   background: #332a1a;
 }
 
@@ -333,16 +333,16 @@
 }
 
 .providerTabDisabled:hover {
-  color: #999;
+  color: var(--color-text-tertiary);
   border-color: #444;
 }
 
 .notReadyBadge {
   font-size: 9px;
   padding: 1px 5px;
-  border-radius: 4px;
-  background: #dc2626;
-  color: white;
+  border-radius: var(--radius-sm);
+  background: var(--color-error);
+  color: var(--color-text-inverse);
   margin-left: 4px;
   font-weight: 600;
 }
@@ -350,8 +350,8 @@
 .providerBadge {
   font-size: 9px;
   padding: 1px 5px;
-  border-radius: 4px;
-  background: #1e3a5f;
+  border-radius: var(--radius-sm);
+  background: var(--color-accent);
   color: #93c5fd;
   font-weight: 600;
   text-transform: uppercase;
@@ -371,14 +371,14 @@
   gap: 6px;
   background: none;
   border: none;
-  color: #888;
+  color: var(--color-text-secondary);
   font-size: 12px;
   cursor: pointer;
   padding: 4px 0;
 }
 
 .advancedToggle:hover {
-  color: #ccc;
+  color: var(--color-text-secondary);
 }
 
 .segmentToggles {
@@ -388,7 +388,7 @@
 .advancedHint {
   margin: 0 0 10px;
   font-size: 11px;
-  color: #777;
+  color: var(--color-text-tertiary);
 }
 
 .segmentSpeakerGroup {
@@ -405,20 +405,20 @@
 .segmentSpeakerName {
   font-size: 12px;
   font-weight: 600;
-  color: #ccc;
+  color: var(--color-text-secondary);
 }
 
 .segmentToggleAll {
   background: none;
   border: none;
-  color: #d97706;
+  color: var(--color-primary);
   font-size: 11px;
   cursor: pointer;
   padding: 2px 0;
 }
 
 .segmentToggleAll:hover {
-  color: #f59e0b;
+  color: var(--color-warning);
 }
 
 .segmentList {
@@ -434,10 +434,10 @@
   align-items: center;
   gap: 8px;
   padding: 4px 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   font-size: 12px;
-  color: #bbb;
+  color: var(--color-text-secondary);
   transition: background 0.1s;
 }
 
@@ -446,12 +446,12 @@
 }
 
 .segmentCheckbox {
-  accent-color: #d97706;
+  accent-color: var(--color-primary);
   flex-shrink: 0;
 }
 
 .segmentOrder {
-  color: #888;
+  color: var(--color-text-secondary);
   font-weight: 600;
   font-size: 11px;
   min-width: 24px;
@@ -465,7 +465,7 @@
 }
 
 .segmentDuration {
-  color: #666;
+  color: var(--color-text-tertiary);
   font-size: 11px;
   flex-shrink: 0;
 }

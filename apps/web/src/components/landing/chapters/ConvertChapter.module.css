@@ -60,7 +60,7 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 1.5px;
-  color: #f6ad55;
+  color: var(--color-primary);
   margin-bottom: 16px;
 }
 
@@ -68,7 +68,7 @@
   font-family: var(--font-heading);
   font-size: clamp(2.5rem, 5vw, 3.5rem);
   font-weight: 400;
-  color: #fff;
+  color: var(--color-text-inverse);
   line-height: 1.1;
   margin-bottom: 24px;
 }
@@ -98,7 +98,7 @@
   font-family: var(--font-heading);
   font-size: clamp(2.5rem, 5vw, 3.5rem);
   font-weight: 400;
-  color: #fff;
+  color: var(--color-text-inverse);
 }
 
 .statLabel {
@@ -152,7 +152,7 @@
   font-family: var(--font-heading);
   font-size: clamp(3rem, 7vw + 1rem, 6rem);
   font-weight: 400;
-  color: #fff;
+  color: var(--color-text-inverse);
   margin-bottom: 20px;
   line-height: 1.05;
   letter-spacing: -3px;
@@ -220,7 +220,7 @@
 
 .footerBrand p {
   font-size: 14px;
-  color: var(--color-text-secondary, #6B7280);
+  color: var(--color-text-secondary);
   line-height: 1.6;
 }
 
@@ -244,7 +244,7 @@
 
 .footerCols a {
   font-size: 14px;
-  color: var(--color-text-secondary, #6B7280);
+  color: var(--color-text-secondary);
   text-decoration: none;
   transition: color 0.2s ease;
 }
@@ -289,7 +289,7 @@
   padding-top: 28px;
   border-top: 1px solid rgba(0, 0, 0, 0.06);
   font-size: 13px;
-  color: var(--color-text-secondary, #6B7280);
+  color: var(--color-text-secondary);
   text-align: center;
 }
 
