@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.21.4] - 2026-03-15
+
+### Added
+- Interactive landing page showcase — all chapter content (chat, script, audio, video, bot mocks) driven from a single admin-configurable podcast
+- ScriptEditorMock component with real citation hover tooltips via CitationMarker
+- AudioClipPlayer with HTML5 audio playback, progress bar, and voice track switcher (swap TTS provider/model on the spot)
+- VideoClipPlayer for ShowcaseChapter video clip playback
+- Admin panel at /admin/landing — podcast picker, script/audio/video clip range controls, bot overrides
+- Bootstrap Showcase button — creates a CRISPR podcast as @sotto and kicks off the generation pipeline
+- Reset to Defaults button — instantly reverts landing page to hardcoded content
+- LandingShowcase singleton Prisma model for admin config
+
+### Fixed
+- Quiz generation worker using response.text instead of response.content
+- Briefing voice assignment using wrong ID field
+- SettingsForm test missing briefing and quiz props
+
 ## [0.21.3] - 2026-03-14
 
 ### Added
