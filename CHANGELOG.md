@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.21.3] - 2026-03-14
+
+### Added
+- Quiz stats badge on podcast page showing completion rate and score
+- Daily Briefings and Comprehension Quizzes sections on landing page
+
 ## [0.21.2] - 2026-03-14
 
 ### Added
