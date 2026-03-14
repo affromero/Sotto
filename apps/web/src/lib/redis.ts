@@ -86,6 +86,21 @@ export const cache = {
     return value ? JSON.parse(value) : null;
   },
 
+  async getWithTtl<T>(key: string): Promise<{ value: T | null; ttl: number }> {
+    const client = getRedisClient();
+    const pipeline = client.pipeline();
+    pipeline.get(key);
+    pipeline.ttl(key);
+    const results = await pipeline.exec();
+    if (!results) return { value: null, ttl: -1 };
+    const rawValue = results[0]?.[1] as string | null;
+    const ttl = (results[1]?.[1] as number) ?? -1;
+    return {
+      value: rawValue ? JSON.parse(rawValue) : null,
+      ttl: ttl > 0 ? ttl : -1,
+    };
+  },
+
   async set(key: string, value: unknown, ttlSeconds?: number): Promise<void> {
     const client = getRedisClient();
     const serialized = JSON.stringify(value);

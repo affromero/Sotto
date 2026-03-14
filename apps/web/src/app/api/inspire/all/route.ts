@@ -37,11 +37,13 @@ function sanitizeTopic(raw: string): string {
 }
 
 // Cache TTLs in seconds
+// Hard TTL: how long data stays in Redis. Soft TTL: after this, serve stale + regen in background.
+const SOFT_TTL = 300; // 5 min
 const CACHE_TTL = {
-  forYou: 120, // 2 min
-  news: 120, // 2 min
-  trending: 120, // 2 min (global)
-  curiosity: 120, // 2 min
+  forYou: 1800, // 30 min
+  news: 1800, // 30 min
+  trending: 1800, // 30 min (global)
+  curiosity: 1800, // 30 min
 } as const;
 
 type Section = 'forYou' | 'trending' | 'news' | 'curiosity';
@@ -184,14 +186,19 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // Full fetch — check cache for all 4 sections in parallel
+  // Full fetch — check cache for all 4 sections in parallel (with TTL for staleness detection)
   // nonEmpty() treats cached [] as a cache miss so stale empties trigger regeneration
-  const [cachedForYou, cachedTrending, cachedNews, cachedCuriosity] = await Promise.all([
-    cache.get<TasteQuestion[]>(cacheKey('forYou', userId, topicHint)).then(nonEmpty),
-    cache.get<PodcastSummary[]>(cacheKey('trending', userId)).then(nonEmpty),
-    cache.get<TasteQuestion[]>(cacheKey('news', userId, topicHint, newsTimeRange)).then(nonEmpty),
-    cache.get<TasteQuestion[]>(cacheKey('curiosity', userId, topicHint)).then(nonEmpty),
+  const [forYouResult, trendingResult, newsResult, curiosityResult] = await Promise.all([
+    cache.getWithTtl<TasteQuestion[]>(cacheKey('forYou', userId, topicHint)),
+    cache.getWithTtl<PodcastSummary[]>(cacheKey('trending', userId)),
+    cache.getWithTtl<TasteQuestion[]>(cacheKey('news', userId, topicHint, newsTimeRange)),
+    cache.getWithTtl<TasteQuestion[]>(cacheKey('curiosity', userId, topicHint)),
   ]);
+
+  const cachedForYou = nonEmpty(forYouResult.value);
+  const cachedTrending = nonEmpty(trendingResult.value);
+  const cachedNews = nonEmpty(newsResult.value);
+  const cachedCuriosity = nonEmpty(curiosityResult.value);
 
   const allCached = cachedForYou !== null && cachedTrending !== null && cachedNews !== null && cachedCuriosity !== null;
 
@@ -202,8 +209,22 @@ export async function GET(request: NextRequest) {
   trackCacheMetric('curiosity', cachedCuriosity !== null);
 
   // All cached — return immediately, skip rate limit
+  // If any section is stale (past soft TTL), fire background regeneration
   if (allCached) {
-    logger.debug('Inspire: all sections cached, returning immediately');
+    const staleSections: Section[] = [];
+    const ttlThreshold = CACHE_TTL.forYou - SOFT_TTL; // remaining TTL below this = stale
+    if (forYouResult.ttl >= 0 && forYouResult.ttl < ttlThreshold) staleSections.push('forYou');
+    if (trendingResult.ttl >= 0 && trendingResult.ttl < ttlThreshold) staleSections.push('trending');
+    if (newsResult.ttl >= 0 && newsResult.ttl < ttlThreshold) staleSections.push('news');
+    if (curiosityResult.ttl >= 0 && curiosityResult.ttl < ttlThreshold) staleSections.push('curiosity');
+
+    if (staleSections.length > 0) {
+      logger.debug('Inspire: serving stale cache, regenerating in background', { staleSections });
+      regenInBackground(userId, staleSections, topicHint, newsTimeRange, model);
+    } else {
+      logger.debug('Inspire: all sections fresh, returning immediately');
+    }
+
     return new Response(JSON.stringify({
       forYou: cachedForYou,
       trending: cachedTrending,
@@ -326,5 +347,59 @@ export async function GET(request: NextRequest) {
       'Cache-Control': 'no-cache',
       Connection: 'keep-alive',
     },
+  });
+}
+
+/**
+ * Fire-and-forget background regeneration for stale cache sections.
+ * Called when all sections are cached but some are past the soft TTL.
+ * Safe on persistent VPS — the Node.js event loop keeps processing after response is sent.
+ */
+function regenInBackground(
+  userId: string,
+  sections: Section[],
+  topicHint: string | undefined,
+  newsTimeRange: NewsTimeRange,
+  model: string | undefined
+): void {
+  (async () => {
+    const ctx = await loadInspireContext(userId, { model });
+    await Promise.allSettled(
+      sections.map(async (section) => {
+        switch (section) {
+          case 'forYou': {
+            const data = await generateForYouQuestions(userId, 6, topicHint, ctx, model);
+            if (data.length === 0) trackEmptyResult('forYou');
+            await cacheIfNonEmpty(cacheKey('forYou', userId, topicHint), data, CACHE_TTL.forYou);
+            break;
+          }
+          case 'news': {
+            const data = await generateNewsQuestions(userId, 6, [], newsTimeRange, topicHint, ctx, model);
+            if (data.length === 0) trackEmptyResult('news');
+            await cacheIfNonEmpty(cacheKey('news', userId, topicHint, newsTimeRange), data, CACHE_TTL.news);
+            break;
+          }
+          case 'curiosity': {
+            const data = await generateCuriosityQuestions(userId, 6, topicHint, ctx, model);
+            if (data.length === 0) trackEmptyResult('curiosity');
+            await cacheIfNonEmpty(cacheKey('curiosity', userId, topicHint), data, CACHE_TTL.curiosity);
+            break;
+          }
+          case 'trending': {
+            const trendingRaw = await getTrending().catch((err) => {
+              logger.warn('Background regen: trending fetch failed', { error: (err as Error).message });
+              return [];
+            });
+            const data = mapTrendingToPodcastSummary(trendingRaw);
+            if (data.length === 0) trackEmptyResult('trending');
+            await cacheIfNonEmpty(cacheKey('trending', userId), data, CACHE_TTL.trending);
+            break;
+          }
+        }
+      })
+    );
+    logger.debug('Inspire: background regeneration complete', { sections });
+  })().catch((err) => {
+    logger.warn('Inspire: background regeneration failed', { error: (err as Error).message });
   });
 }
