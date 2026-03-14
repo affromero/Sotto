@@ -15,7 +15,6 @@ import {
 } from '@/lib/script-updater';
 import { createSegmentsAndQueueAudio } from '@/lib/segment-creator';
 import { convertTurnsForProvider } from '@/lib/tts-tag-converter';
-import { markPodcastFailed } from '@/lib/pipeline-resume';
 import { MIN_REFERENCE_COUNTS } from '@/lib/script-verifier';
 import { getAiKey, getByokKey, hasByokKey } from '@/lib/byok';
 import { getTierFeatures } from '@/lib/tier-features';
@@ -75,23 +74,24 @@ export async function processReferenceValidation(
   const requiredRefCount = MIN_REFERENCE_COUNTS[effectiveDepth] ?? 5;
 
   if (references.length === 0) {
-    // Gate: fail if references are required but none exist
+    // Gate: pause as draft if references are required but none exist
     if (!isShowcase && requiredRefCount > 0) {
-      logger.error('No references found — minimum required', {
+      logger.warn('No references found — pausing at SCRIPT_READY for user action', {
         podcastId,
         required: String(requiredRefCount),
         depth,
       });
 
-      await markPodcastFailed(podcastId,
-        `No references could be found — ${requiredRefCount} required for ${depth} depth. The podcast's factual claims could not be adequately sourced.`
-      );
+      await prisma.podcast.update({
+        where: { id: podcastId },
+        data: { status: 'SCRIPT_READY' },
+      });
 
       await addJob(notificationQueue, JobType.SEND_NOTIFICATION, {
         userId,
-        type: 'PODCAST_FAILED',
-        title: 'Generation failed',
-        message: 'Not enough references could be verified. Try again with a more specific topic or provide source URLs.',
+        type: 'SCRIPT_READY',
+        title: 'Script needs references',
+        message: 'Your podcast doesn\'t have enough verified references. Add source URLs, explore a different angle, or delete it.',
         data: { podcastId },
       });
       return;
@@ -288,10 +288,10 @@ export async function processReferenceValidation(
 
   await job.updateProgress(75);
 
-  // Gate: fail if remaining references are below minimum for depth
+  // Gate: pause as draft if remaining references are below minimum for depth
   const remainingRefCount = references.length - removedNumbers.size;
   if (!isShowcase && remainingRefCount < requiredRefCount) {
-    logger.error('References below minimum after validation', {
+    logger.warn('References below minimum after validation — pausing at SCRIPT_READY', {
       podcastId,
       remaining: String(remainingRefCount),
       required: String(requiredRefCount),
@@ -299,15 +299,16 @@ export async function processReferenceValidation(
       removed: String(removedNumbers.size),
     });
 
-    await markPodcastFailed(podcastId,
-      `Only ${remainingRefCount} reference(s) could be verified — ${requiredRefCount} required for ${depth} depth. The podcast's factual claims could not be adequately sourced.`
-    );
+    await prisma.podcast.update({
+      where: { id: podcastId },
+      data: { status: 'SCRIPT_READY' },
+    });
 
     await addJob(notificationQueue, JobType.SEND_NOTIFICATION, {
       userId,
-      type: 'PODCAST_FAILED',
-      title: 'Generation failed',
-      message: 'Not enough references could be verified. Try again with a more specific topic or provide source URLs.',
+      type: 'SCRIPT_READY',
+      title: 'Script needs more references',
+      message: `Only ${remainingRefCount} of ${requiredRefCount} required references could be verified. Add source URLs, explore a different angle, or delete it.`,
       data: { podcastId },
     });
     return;

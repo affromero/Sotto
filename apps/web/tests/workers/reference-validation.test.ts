@@ -157,9 +157,8 @@ vi.mock('@/lib/pipeline-events', () => ({
   logPipelineStageComplete: vi.fn().mockResolvedValue(undefined),
 }));
 
-const mockMarkPodcastFailed = vi.fn().mockResolvedValue(true);
 vi.mock('@/lib/pipeline-resume', () => ({
-  markPodcastFailed: (...args: unknown[]) => mockMarkPodcastFailed(...args),
+  markPodcastFailed: vi.fn(),
 }));
 
 vi.mock('@/lib/script-verifier', () => ({
@@ -821,14 +820,14 @@ describe('processReferenceValidation', () => {
       );
     });
 
-    it('fails podcast via markPodcastFailed when all references are removed', async () => {
+    it('pauses at SCRIPT_READY when all references are removed', async () => {
       const job = createMockJob(defaultPayload);
       await processReferenceValidation(job);
 
-      expect(mockMarkPodcastFailed).toHaveBeenCalledWith(
-        'podcast-001',
-        expect.stringContaining('reference(s) could be verified')
-      );
+      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
+        where: { id: 'podcast-001' },
+        data: { status: 'SCRIPT_READY' },
+      });
     });
 
     it('does not continue to audio generation when all references are removed', async () => {
@@ -842,7 +841,7 @@ describe('processReferenceValidation', () => {
       );
     });
 
-    it('sends PODCAST_FAILED notification when all references are removed', async () => {
+    it('sends SCRIPT_READY notification when all references are removed', async () => {
       const job = createMockJob(defaultPayload);
       await processReferenceValidation(job);
 
@@ -851,7 +850,8 @@ describe('processReferenceValidation', () => {
         'send_notification',
         expect.objectContaining({
           userId: 'user-001',
-          type: 'PODCAST_FAILED',
+          type: 'SCRIPT_READY',
+          title: expect.stringContaining('references'),
         })
       );
     });
@@ -1035,7 +1035,7 @@ describe('processReferenceValidation', () => {
   });
 
   describe('minimum reference gate', () => {
-    it('fails podcast when remaining references drop below minimum for depth', async () => {
+    it('pauses at SCRIPT_READY when remaining references drop below minimum for depth', async () => {
       // 5 refs, 4 removed → 1 remaining < 5 required
       mockPrismaReferenceFindMany.mockResolvedValue(
         Array.from({ length: 5 }, (_, i) => ({
@@ -1056,10 +1056,10 @@ describe('processReferenceValidation', () => {
       const job = createMockJob(defaultPayload);
       await processReferenceValidation(job);
 
-      expect(mockMarkPodcastFailed).toHaveBeenCalledWith(
-        'podcast-001',
-        expect.stringContaining('1 reference(s) could be verified')
-      );
+      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
+        where: { id: 'podcast-001' },
+        data: { status: 'SCRIPT_READY' },
+      });
       expect(mockAddJob).not.toHaveBeenCalledWith(
         expect.anything(), 'generate_audio', expect.anything()
       );
@@ -1087,7 +1087,9 @@ describe('processReferenceValidation', () => {
       const job = createMockJob(defaultPayload);
       await processReferenceValidation(job);
 
-      expect(mockMarkPodcastFailed).not.toHaveBeenCalled();
+      expect(mockPrismaPodcastUpdate).not.toHaveBeenCalledWith(
+        expect.objectContaining({ data: { status: 'SCRIPT_READY' } })
+      );
     });
 
     it('uses eli5 thresholds for relaxed verificationMode', async () => {
@@ -1115,11 +1117,13 @@ describe('processReferenceValidation', () => {
       const job = createMockJob(defaultPayload);
       await processReferenceValidation(job);
 
-      expect(mockMarkPodcastFailed).not.toHaveBeenCalled();
+      expect(mockPrismaPodcastUpdate).not.toHaveBeenCalledWith(
+        expect.objectContaining({ data: { status: 'SCRIPT_READY' } })
+      );
     });
 
     it('skips gate for showcase verificationMode', async () => {
-      // showcase + 0 remaining refs → should NOT fail
+      // showcase + 0 remaining refs → should NOT pause
       mockPrismaPodcastFindUnique.mockResolvedValue({
         topic: 'Showcase Topic',
         source: 'TWITTER',
@@ -1138,24 +1142,27 @@ describe('processReferenceValidation', () => {
       const job = createMockJob(defaultPayload);
       await processReferenceValidation(job);
 
-      expect(mockMarkPodcastFailed).not.toHaveBeenCalled();
+      // Showcase should proceed to audio, not pause at SCRIPT_READY due to gate
+      expect(mockAddJob).toHaveBeenCalledWith(
+        expect.anything(), 'generate_audio', expect.anything()
+      );
     });
 
-    it('fails podcast when references.length === 0 and not showcase', async () => {
+    it('pauses at SCRIPT_READY when references.length === 0 and not showcase', async () => {
       // Early-exit path: 0 refs, standard depth → gate fires
       mockPrismaReferenceFindMany.mockResolvedValue([]);
 
       const job = createMockJob(defaultPayload);
       await processReferenceValidation(job);
 
-      expect(mockMarkPodcastFailed).toHaveBeenCalledWith(
-        'podcast-001',
-        expect.stringContaining('No references could be found')
-      );
+      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
+        where: { id: 'podcast-001' },
+        data: { status: 'SCRIPT_READY' },
+      });
       expect(mockAddJob).toHaveBeenCalledWith(
         { name: 'notifications' },
         'send_notification',
-        expect.objectContaining({ type: 'PODCAST_FAILED' })
+        expect.objectContaining({ type: 'SCRIPT_READY' })
       );
     });
   });
