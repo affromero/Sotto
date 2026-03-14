@@ -69,6 +69,12 @@ interface SettingsFormProps {
   isTwitterProviderAvailable: boolean;
   initialEmailNotifications: boolean;
   initialPushNotifications: boolean;
+  initialBriefingEnabled: boolean;
+  initialBriefingTime: string | null;
+  initialBriefingTimezone: string | null;
+  initialBriefingDays: number;
+  initialBriefingVisibility: string;
+  initialQuizEnabled: boolean;
   quizAnswerCount: number;
   referredUsers: Array<{ name: string | null; handle: string | null; image: string | null; joinedAt: string; verified: boolean }>;
   referralBonus: number;
@@ -107,6 +113,12 @@ export function SettingsForm({
   initialPreferredTtsModel,
   initialEmailNotifications,
   initialPushNotifications,
+  initialBriefingEnabled,
+  initialBriefingTime,
+  initialBriefingTimezone,
+  initialBriefingDays,
+  initialBriefingVisibility,
+  initialQuizEnabled,
   isTwitterProviderAvailable,
   quizAnswerCount,
   referredUsers,
@@ -157,6 +169,12 @@ export function SettingsForm({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [emailNotifications, setEmailNotifications] = useState(initialEmailNotifications);
   const [pushNotifications, setPushNotifications] = useState(initialPushNotifications);
+  const [briefingEnabled, setBriefingEnabled] = useState(initialBriefingEnabled);
+  const [briefingTime, setBriefingTime] = useState(initialBriefingTime ?? '08:00');
+  const [briefingTimezone, setBriefingTimezone] = useState(initialBriefingTimezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone);
+  const [briefingDays, setBriefingDays] = useState(initialBriefingDays);
+  const [briefingVisibility, setBriefingVisibility] = useState(initialBriefingVisibility);
+  const [quizEnabled, setQuizEnabled] = useState(initialQuizEnabled);
   const { pushState, subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } = usePushSubscription();
 
   const [avatarUrl, setAvatarUrl] = useState(image);
@@ -702,6 +720,142 @@ export function SettingsForm({
                 }
               }}
               aria-label="Toggle push notifications"
+            />
+          </label>
+        </div>
+      </section>
+
+      {/* Daily Briefing Section */}
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>Daily Briefing</h2>
+        <div className={styles.toggleList}>
+          <label className={styles.toggleRow}>
+            <div className={styles.toggleInfo}>
+              <span className={styles.toggleLabel}>Enable Daily Briefing</span>
+              <span className={styles.toggleDescription}>
+                Get a personalized morning podcast based on your interests
+              </span>
+            </div>
+            <input
+              type="checkbox"
+              className={styles.toggle}
+              checked={briefingEnabled}
+              onChange={async (e) => {
+                const checked = e.target.checked;
+                setBriefingEnabled(checked);
+                await fetch('/api/users/me', {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    briefingEnabled: checked,
+                    ...(checked && !initialBriefingTimezone && { briefingTimezone: briefingTimezone }),
+                    ...(checked && !initialBriefingTime && { briefingTime: briefingTime }),
+                  }),
+                });
+              }}
+              aria-label="Toggle daily briefing"
+            />
+          </label>
+          {briefingEnabled && (
+            <>
+              <div className={styles.toggleRow}>
+                <div className={styles.toggleInfo}>
+                  <span className={styles.toggleLabel}>Delivery Time</span>
+                  <span className={styles.toggleDescription}>When to generate your briefing</span>
+                </div>
+                <input
+                  type="time"
+                  className={styles.toggle}
+                  value={briefingTime}
+                  onChange={async (e) => {
+                    const val = e.target.value;
+                    setBriefingTime(val);
+                    await fetch('/api/users/me', {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ briefingTime: val }),
+                    });
+                  }}
+                  aria-label="Briefing delivery time"
+                />
+              </div>
+              <div className={styles.toggleRow}>
+                <div className={styles.toggleInfo}>
+                  <span className={styles.toggleLabel}>Days</span>
+                  <span className={styles.toggleDescription}>
+                    {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, i) => {
+                      const bit = i === 6 ? 64 : (1 << i);
+                      return (
+                        <button
+                          key={day}
+                          type="button"
+                          className={styles.dayChip}
+                          data-active={(briefingDays & bit) !== 0 || undefined}
+                          onClick={async () => {
+                            const newDays = briefingDays ^ bit;
+                            setBriefingDays(newDays);
+                            await fetch('/api/users/me', {
+                              method: 'PATCH',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ briefingDays: newDays }),
+                            });
+                          }}
+                          aria-label={`Toggle ${day}`}
+                        >
+                          {day}
+                        </button>
+                      );
+                    })}
+                  </span>
+                </div>
+              </div>
+              <label className={styles.toggleRow}>
+                <div className={styles.toggleInfo}>
+                  <span className={styles.toggleLabel}>Visibility</span>
+                  <span className={styles.toggleDescription}>Who can see your briefings</span>
+                </div>
+                <select
+                  className={styles.toggle}
+                  value={briefingVisibility}
+                  onChange={async (e) => {
+                    const val = e.target.value;
+                    setBriefingVisibility(val);
+                    await fetch('/api/users/me', {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ briefingVisibility: val }),
+                    });
+                  }}
+                  aria-label="Briefing visibility"
+                >
+                  <option value="PRIVATE">Private</option>
+                  <option value="UNLISTED">Unlisted</option>
+                  <option value="PUBLIC">Public</option>
+                </select>
+              </label>
+            </>
+          )}
+          <label className={styles.toggleRow}>
+            <div className={styles.toggleInfo}>
+              <span className={styles.toggleLabel}>Post-Listen Quizzes</span>
+              <span className={styles.toggleDescription}>
+                Show comprehension quizzes after finishing a podcast
+              </span>
+            </div>
+            <input
+              type="checkbox"
+              className={styles.toggle}
+              checked={quizEnabled}
+              onChange={async (e) => {
+                const checked = e.target.checked;
+                setQuizEnabled(checked);
+                await fetch('/api/users/me', {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ quizEnabled: checked }),
+                });
+              }}
+              aria-label="Toggle post-listen quizzes"
             />
           </label>
         </div>
