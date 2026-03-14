@@ -25,6 +25,7 @@ export const PODCAST_PUBLIC_SELECT = {
   commentCount: true,
   pdfUrl: true,
   isHumanContent: true,
+  lowReferences: true,
   sourcePlatform: true,
   source: true,
   slug: true,
