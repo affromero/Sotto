@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.21.1] - 2026-03-14
+
+### Added
+- Content-aware video scene splitting — monologue podcasts now produce one sub-visual per distinct idea with no upper cap, instead of being capped at 2-4
+
+### Fixed
+- ElevenLabs eleven_v3 rejecting `previous_request_ids` — skip all continuity params for that model
+- Video classifier text truncation removed — full segment text now sent for accurate visual classification
+- Duration fallback uses `estimateDurationFromText()` instead of hardcoded 5s when DB duration is null
+
 ## [0.21.0] - 2026-03-14
 
 ### Added
