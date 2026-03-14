@@ -36,3 +36,4 @@ tags: [fork, critical]
     visible:
       id: "generation-progress"
     timeout: 10000
+- takeScreenshot: fork-generation-started

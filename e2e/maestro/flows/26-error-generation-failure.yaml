@@ -1,0 +1,22 @@
+appId: fm.sotto.app
+name: Error - Generation Failure UI
+tags: [error]
+---
+- runFlow: ../helpers/login.yaml
+
+# Navigate to seeded FAILED-status podcast
+- scrollUntilVisible:
+    element:
+      id: "podcast-card-e2e-failed-podcast"
+    direction: DOWN
+    timeout: 10000
+- tapOn:
+    id: "podcast-card-e2e-failed-podcast"
+
+# Verify error UI and retry button
+- extendedWaitUntil:
+    visible:
+      id: "generation-error"
+    timeout: 5000
+- assertVisible:
+    id: "generation-retry-button"

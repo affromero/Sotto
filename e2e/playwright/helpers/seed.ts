@@ -345,6 +345,34 @@ export async function seedTestUser() {
     });
   }
 
+  // FAILED podcast for error-state E2E tests
+  const failedPodcast = await prisma.podcast.upsert({
+    where: { id: 'e2e-failed-podcast' },
+    update: { status: 'FAILED' },
+    create: {
+      id: 'e2e-failed-podcast',
+      title: 'E2E Failed Podcast',
+      topic: 'Generation failure testing',
+      status: 'FAILED',
+      visibility: 'PUBLIC',
+      userId: user.id,
+    },
+  });
+
+  // Empty-feed user (no follows, no content) for empty-state E2E tests
+  const emptyUser = await prisma.user.upsert({
+    where: { email: 'test-empty@sotto.fm' },
+    update: {},
+    create: {
+      id: `e2e-empty-${randomUUID().slice(0, 8)}`,
+      email: 'test-empty@sotto.fm',
+      name: 'E2E Empty User',
+      handle: 'e2e-empty',
+      role: 'USER',
+      plan: 'FREE',
+    },
+  });
+
   // Draft podcast
   const draft = await prisma.podcast.upsert({
     where: { id: 'e2e-draft' },
@@ -397,6 +425,8 @@ export async function seedTestUser() {
     collection,
     ideas,
     notifications,
+    failedPodcast,
+    emptyUser,
     draft,
     freshInviteCode,
   };

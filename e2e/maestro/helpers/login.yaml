@@ -2,7 +2,7 @@ appId: fm.sotto.app
 ---
 - tapOn:
     id: "login-email-input"
-- inputText: "test-e2e@sotto.fm"
+- inputText: "${TEST_EMAIL}"
 - tapOn:
     id: "login-sign-in-button"
 - extendedWaitUntil:
