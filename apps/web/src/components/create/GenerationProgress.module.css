@@ -26,40 +26,54 @@
   width: 56px;
   height: 56px;
   border-radius: var(--radius-full);
-  background: var(--color-primary);
+  background: radial-gradient(
+    circle at 40% 35%,
+    #FBBF24 0%,
+    #D97706 45%,
+    #B45309 100%
+  );
+  box-shadow:
+    inset 0 0 12px rgba(251, 191, 36, 0.4),
+    0 0 20px rgba(217, 119, 6, 0.25),
+    0 0 40px rgba(30, 58, 95, 0.12);
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--color-text-inverse);
   position: relative;
   z-index: 2;
-  transition: background 0.4s ease, transform 0.4s ease;
+  transition: background 0.4s ease, transform 0.4s ease, box-shadow 0.4s ease;
+  /* border-radius animated intentionally — element is small (44–64px),
+     paint cost is negligible. No compositable alternative without SVG. */
+  will-change: transform;
 }
 
 .orbActive {
-  animation: breathe 3s ease-in-out infinite;
+  animation:
+    blobMorph 8s ease-in-out infinite,
+    breathe 4s ease-in-out infinite;
 }
 
-/* Expanding pulse rings */
+/* Expanding pulse rings — sound waves losing energy as they propagate */
 .ring {
   position: absolute;
   inset: 0;
   border-radius: var(--radius-full);
-  border: 2px solid var(--color-primary);
+  border: 1.5px solid var(--color-primary);
   opacity: 0;
   z-index: 1;
 }
 
 .ring1 {
-  animation: ripple 3s ease-out infinite;
+  animation: ripple 4s ease-out infinite;
 }
 
 .ring2 {
-  animation: ripple 3s ease-out 1s infinite;
+  animation: ripple 4s ease-out 1.3s infinite;
 }
 
 .ring3 {
-  animation: ripple 3s ease-out 2s infinite;
+  animation: ripple 4s ease-out 2.6s infinite;
 }
 
 /* Orb inner content: spinner */
@@ -75,9 +89,20 @@
   line-height: 1;
 }
 
-/* State variants */
+/* State variants — snap to circle, swap gradient */
 .orbError .orb {
-  background: var(--color-error);
+  border-radius: var(--radius-full);
+  background: radial-gradient(
+    circle at 40% 35%,
+    #FCA5A5 0%,
+    #EF4444 45%,
+    #B91C1C 100%
+  );
+  box-shadow:
+    inset 0 0 12px rgba(252, 165, 165, 0.4),
+    0 0 20px rgba(239, 68, 68, 0.25),
+    0 0 40px rgba(185, 28, 28, 0.12);
+  animation: none;
 }
 
 .orbError .ring {
@@ -85,14 +110,64 @@
 }
 
 .orbPaused .orb {
-  background: var(--color-primary);
+  border-radius: var(--radius-full);
   animation: none;
 }
 
 .orbDone .orb {
-  background: var(--color-success);
+  border-radius: var(--radius-full);
+  background: radial-gradient(
+    circle at 40% 35%,
+    #6EE7B7 0%,
+    #10B981 45%,
+    #047857 100%
+  );
+  box-shadow:
+    inset 0 0 12px rgba(110, 231, 183, 0.4),
+    0 0 20px rgba(16, 185, 129, 0.25),
+    0 0 40px rgba(4, 120, 87, 0.12);
   animation: none;
   transform: scale(1.05);
+}
+
+/* Dark mode — warmer/lighter gradient for contrast on dark backgrounds */
+:global([data-theme='dark']) .orb {
+  background: radial-gradient(
+    circle at 40% 35%,
+    #F6AD55 0%,
+    #E8890F 45%,
+    #C46A0A 100%
+  );
+  box-shadow:
+    inset 0 0 12px rgba(246, 173, 85, 0.4),
+    0 0 20px rgba(232, 137, 15, 0.3),
+    0 0 40px rgba(91, 138, 189, 0.12);
+}
+
+:global([data-theme='dark']) .orbError .orb {
+  background: radial-gradient(
+    circle at 40% 35%,
+    #FCA5A5 0%,
+    #F87171 45%,
+    #DC2626 100%
+  );
+  box-shadow:
+    inset 0 0 12px rgba(252, 165, 165, 0.4),
+    0 0 20px rgba(248, 113, 113, 0.3),
+    0 0 40px rgba(220, 38, 38, 0.12);
+}
+
+:global([data-theme='dark']) .orbDone .orb {
+  background: radial-gradient(
+    circle at 40% 35%,
+    #6EE7B7 0%,
+    #34D399 45%,
+    #059669 100%
+  );
+  box-shadow:
+    inset 0 0 12px rgba(110, 231, 183, 0.4),
+    0 0 20px rgba(52, 211, 153, 0.3),
+    0 0 40px rgba(5, 150, 105, 0.12);
 }
 
 /* ============================================ */
@@ -297,6 +372,14 @@
 /* ANIMATIONS                                   */
 /* ============================================ */
 
+@keyframes blobMorph {
+  0%   { border-radius: 60% 40% 55% 45% / 45% 55% 40% 60%; }
+  25%  { border-radius: 45% 55% 40% 60% / 55% 45% 60% 40%; }
+  50%  { border-radius: 55% 45% 60% 40% / 40% 60% 45% 55%; }
+  75%  { border-radius: 40% 60% 45% 55% / 60% 40% 55% 45%; }
+  100% { border-radius: 60% 40% 55% 45% / 45% 55% 40% 60%; }
+}
+
 @keyframes breathe {
   0%, 100% {
     transform: scale(1);
@@ -308,21 +391,14 @@
 
 @keyframes ripple {
   0% {
-    transform: scale(0.7);
-    opacity: 0.5;
+    transform: scale(0.8);
+    opacity: 0.4;
+    border-width: 2px;
   }
   100% {
-    transform: scale(1.8);
+    transform: scale(2.2);
     opacity: 0;
-  }
-}
-
-@keyframes barBounce {
-  0%, 100% {
-    height: 6px;
-  }
-  50% {
-    height: 20px;
+    border-width: 0.5px;
   }
 }
 
@@ -416,12 +492,15 @@
   .ring1,
   .ring2,
   .ring3,
-  .orbBar,
   .dot_current {
     animation: none;
   }
 
-  .orb,
+  .orb {
+    border-radius: var(--radius-full);
+    transition: none;
+  }
+
   .dot {
     transition: none;
   }
@@ -430,9 +509,13 @@
     transition: none;
   }
 
-  /* Static indicator for reduced motion */
+  /* Static glow ring instead of animation */
   .orbActive {
-    box-shadow: 0 0 0 4px rgba(217, 119, 6, 0.3);
+    animation: none;
+    box-shadow:
+      inset 0 0 12px rgba(251, 191, 36, 0.4),
+      0 0 20px rgba(217, 119, 6, 0.25),
+      0 0 0 4px rgba(217, 119, 6, 0.3);
   }
 
   .waveBar {
