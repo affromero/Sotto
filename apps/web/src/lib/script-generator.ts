@@ -361,6 +361,7 @@ export async function generateScript(params: {
   provider?: string;
   webSearchEnabled?: boolean;
   mode?: 'standard' | 'demo';
+  source?: string;
 }): Promise<{
   turns: ScriptTurn[];
   soundCues: SoundCue[];
@@ -386,26 +387,37 @@ export async function generateScript(params: {
     ? loadPrompt('generation/eli5-section.md')
     : '';
 
-  const systemPrompt = loadAndRender('generation/script-generator.md', {
-    SPEAKER_COUNT: String(speakerCount),
-    SPEAKER_SECTION: speakerSection,
-    VOICE_DELIVERY_GUIDELINES: voiceDeliveryGuidelines,
-    VOICE_REALISM: VOICE_REALISM_INSTRUCTIONS,
-    TONE_GUIDANCE: TONE_GUIDANCE_MAIN[params.tone] || '',
-    ELI5_SECTION: eli5Section,
-    AUDIENCE: params.audience || 'general',
-    AUDIENCE_GUIDANCE: getAudienceGuidance(params.audience),
-    DURATION_TARGET: String(params.durationTarget),
-    WORD_COUNT_MIN: String(wordCountBounds(params.durationTarget).min),
-    WORD_COUNT_MAX: String(wordCountBounds(params.durationTarget).max),
-    WORD_COUNT_IDEAL: String(minutesToWords(params.durationTarget)),
-    AUDIENCE_LEVEL: params.audienceLevel,
-    FOCUS_AREAS: params.focusAreas.join(', '),
-    HOST_SPEAKER: speakers[0].name,
-    EXPERT_SPEAKER: speakers.length > 1 ? speakers[1].name : speakers[0].name,
-    BIAS_GUIDANCE: renderBiasGuidance(params.sourceMetadata),
-    CONTENT_SAFETY: CONTENT_SAFETY_INSTRUCTIONS,
-  });
+  // Use briefing-specific prompt for BRIEFING source
+  const systemPrompt = params.source === 'BRIEFING'
+    ? loadAndRender('generation/briefing-script.md', {
+        VOICE_REALISM: VOICE_REALISM_INSTRUCTIONS,
+        CONTENT_SAFETY: CONTENT_SAFETY_INSTRUCTIONS,
+        DURATION_TARGET: String(params.durationTarget),
+        WORD_COUNT_MIN: String(wordCountBounds(params.durationTarget).min),
+        WORD_COUNT_MAX: String(wordCountBounds(params.durationTarget).max),
+        WORD_COUNT_IDEAL: String(minutesToWords(params.durationTarget)),
+        SOURCE_ARTICLES: params.sourceContent || '',
+      })
+    : loadAndRender('generation/script-generator.md', {
+        SPEAKER_COUNT: String(speakerCount),
+        SPEAKER_SECTION: speakerSection,
+        VOICE_DELIVERY_GUIDELINES: voiceDeliveryGuidelines,
+        VOICE_REALISM: VOICE_REALISM_INSTRUCTIONS,
+        TONE_GUIDANCE: TONE_GUIDANCE_MAIN[params.tone] || '',
+        ELI5_SECTION: eli5Section,
+        AUDIENCE: params.audience || 'general',
+        AUDIENCE_GUIDANCE: getAudienceGuidance(params.audience),
+        DURATION_TARGET: String(params.durationTarget),
+        WORD_COUNT_MIN: String(wordCountBounds(params.durationTarget).min),
+        WORD_COUNT_MAX: String(wordCountBounds(params.durationTarget).max),
+        WORD_COUNT_IDEAL: String(minutesToWords(params.durationTarget)),
+        AUDIENCE_LEVEL: params.audienceLevel,
+        FOCUS_AREAS: params.focusAreas.join(', '),
+        HOST_SPEAKER: speakers[0].name,
+        EXPERT_SPEAKER: speakers.length > 1 ? speakers[1].name : speakers[0].name,
+        BIAS_GUIDANCE: renderBiasGuidance(params.sourceMetadata),
+        CONTENT_SAFETY: CONTENT_SAFETY_INSTRUCTIONS,
+      });
 
   const userMessage = params.sourceContent
     ? `Topic: ${params.topic}\nDepth: ${params.depth}\n\n${formatSourceBlock(params.sourceContent, params.sourceMetadata)}`

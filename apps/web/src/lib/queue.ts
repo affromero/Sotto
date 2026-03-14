@@ -63,6 +63,7 @@ export enum JobType {
   LIP_SYNC_TEST = 'lip_sync_test',
   GENERATE_WAVEFORM = 'generate_waveform',
   GENERATE_QUIZ = 'generate_quiz',
+  SCHEDULE_BRIEFINGS = 'schedule_briefings',
 }
 
 /**
@@ -364,6 +365,8 @@ export interface GenerateQuizPayload {
   podcastId: string;
 }
 
+export interface ScheduleBriefingsPayload {}
+
 /**
  * Queue configuration
  */
@@ -435,6 +438,7 @@ const QUEUE_DEFINITIONS: Record<string, QueueDefinition> = {
   'lip-sync-test': { attempts: 1 },
   'waveform-generation': { attempts: 2, skipEvents: true },
   'quiz-generation': { attempts: 2, skipEvents: true },
+  'briefing-scheduler': { attempts: 1, skipEvents: true },
 };
 
 const queueInstances = new Map<string, Queue>();
@@ -1083,6 +1087,7 @@ export const demoSceneCompositionQueue = createQueueReference('demo-scene-compos
 export const musicGenerationQueue = createQueueReference('music-generation');
 export const waveformGenerationQueue = createQueueReference('waveform-generation');
 export const quizGenerationQueue = createQueueReference('quiz-generation');
+export const briefingSchedulerQueue = createQueueReference('briefing-scheduler');
 
 /** All queue names — single source of truth for admin and health endpoints */
 export const ALL_QUEUE_NAMES = Object.freeze(Object.keys(QUEUE_DEFINITIONS));
