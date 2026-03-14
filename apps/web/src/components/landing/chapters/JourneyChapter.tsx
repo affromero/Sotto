@@ -1,7 +1,13 @@
+import type { LandingShowcaseData } from '@/lib/showcase';
 import { ScrollChapter } from '../ScrollChapter';
 import styles from './JourneyChapter.module.css';
 
-export function JourneyChapter() {
+interface JourneyChapterProps {
+  showcase: LandingShowcaseData | null;
+}
+
+export function JourneyChapter({ showcase }: JourneyChapterProps) {
+  void showcase; // Phase 3 will use this
   return (
     <ScrollChapter id="features" alt>
       <div className={styles.root}>
