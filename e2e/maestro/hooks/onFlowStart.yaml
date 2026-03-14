@@ -1,0 +1,5 @@
+appId: fm.sotto.app
+---
+- clearState: fm.sotto.app
+- launchApp
+- waitForAnimationToEnd
