@@ -48,6 +48,12 @@ const defaultProps = {
   referralBonus: 0,
   initialEmailNotifications: true,
   initialPushNotifications: true,
+  initialBriefingEnabled: false,
+  initialBriefingTime: null,
+  initialBriefingTimezone: null,
+  initialBriefingDays: 5,
+  initialBriefingVisibility: 'PUBLIC',
+  initialQuizEnabled: false,
 };
 
 describe('SettingsForm', () => {
