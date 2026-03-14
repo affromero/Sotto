@@ -50,9 +50,10 @@ describe('FeedGrid', () => {
   });
 
   it('displays custom empty message', () => {
-    render(<FeedGrid emptyMessage="Nothing here yet">{undefined}</FeedGrid>);
+    render(<FeedGrid emptyMessage="Try a different search">{undefined}</FeedGrid>);
 
     expect(screen.getByText('Nothing here yet')).toBeInTheDocument();
+    expect(screen.getByText('Try a different search')).toBeInTheDocument();
   });
 
   it('shows empty state for empty array children', () => {
