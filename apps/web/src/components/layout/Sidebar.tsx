@@ -67,7 +67,7 @@ export function Sidebar({ currentPath, isOpen = false, onClose, hasPodcasts = fa
 
   return (
     <div className={isOpen ? styles.sidebarOpen : undefined}>
-      {isOpen && <div className={styles.overlay} onClick={onClose} aria-hidden="true" />}
+      <div className={styles.overlay} onClick={onClose} aria-hidden="true" />
       <aside className={styles.sidebar} aria-label="Main navigation">
         <div className={styles.brand}>
           <Link href="/" className={styles.logo}>

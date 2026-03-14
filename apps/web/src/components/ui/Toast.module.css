@@ -34,13 +34,25 @@
   border: none;
   color: inherit;
   cursor: pointer;
-  font-size: 18px;
-  padding: 0;
-  line-height: 1;
+  width: 44px;
+  height: 44px;
+  padding: var(--spacing-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
   opacity: 0.7;
+  transition: opacity var(--transition-fast), background var(--transition-fast);
 }
 
-.close:hover { opacity: 1; }
+.close:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.08);
+}
+
+:global([data-theme='dark']) .close:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
 
 /* Toast container — positioned by ToastProvider */
 .container {
