@@ -122,10 +122,8 @@ export async function generateSpeech(params: {
   };
 
   if (skipTextContext) {
-    // Models like eleven_v3 reject previous_text/next_text — use request ID stitching instead
-    if (params.previousRequestIds?.length) {
-      body.previous_request_ids = params.previousRequestIds.slice(-3);
-    }
+    // eleven_v3 rejects both previous_text/next_text AND previous_request_ids.
+    // No cross-chunk continuity is available — chunks are generated independently.
   } else {
     if (params.previousText) body.previous_text = params.previousText;
     if (params.nextText) body.next_text = params.nextText;

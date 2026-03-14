@@ -271,7 +271,7 @@ describe('elevenlabs', () => {
       expect(body).not.toHaveProperty('previous_request_ids');
     });
 
-    it('skips previous_text/next_text for eleven_v3 and uses previous_request_ids', async () => {
+    it('skips all continuity params for eleven_v3 (no text context, no request IDs)', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
         arrayBuffer: async () => Buffer.from('audio').buffer,
@@ -290,7 +290,7 @@ describe('elevenlabs', () => {
       const body = JSON.parse(mockFetch.mock.calls[0][1].body);
       expect(body).not.toHaveProperty('previous_text');
       expect(body).not.toHaveProperty('next_text');
-      expect(body.previous_request_ids).toEqual(['req-prev-1', 'req-prev-2']);
+      expect(body).not.toHaveProperty('previous_request_ids');
     });
 
     it('passes previous_text and next_text for eleven_v3 variants (not in blocklist)', async () => {
