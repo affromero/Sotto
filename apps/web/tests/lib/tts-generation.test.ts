@@ -32,6 +32,7 @@ vi.mock('@/lib/providers/tts/hume.provider', () => ({
 
 vi.mock('@/lib/tts-text-cleaner', () => ({
   cleanTextForTts: vi.fn((text: string) => text),
+  splitTextForTts: vi.fn((text: string) => [text]),
 }));
 
 const mockGetAudioDuration = vi.fn().mockResolvedValue(5.0);
@@ -43,7 +44,15 @@ vi.mock('@/lib/audio-stitcher', () => ({
 vi.mock('fs/promises', () => {
   const writeFile = vi.fn().mockResolvedValue(undefined);
   const rm = vi.fn().mockResolvedValue(undefined);
-  return { default: { writeFile, rm }, writeFile, rm };
+  const readFile = vi.fn().mockResolvedValue(Buffer.from('concatenated-audio'));
+  return { default: { writeFile, rm, readFile }, writeFile, rm, readFile };
+});
+
+vi.mock('child_process', () => {
+  const execFile = vi.fn((_cmd: string, _args: string[], cb: (err: null, stdout: string, stderr: string) => void) => {
+    cb(null, '', '');
+  });
+  return { default: { execFile }, execFile };
 });
 
 vi.mock('@/lib/duration', () => ({
@@ -55,6 +64,7 @@ vi.mock('@/lib/providers/tts-registry', () => ({
     id: 'elevenlabs',
     displayName: 'ElevenLabs',
     platformCostPerKChar: 0.3,
+    maxSegmentChars: 5000,
   }),
 }));
 
@@ -78,6 +88,7 @@ vi.mock('@/lib/logger', () => ({
 
 // ---- Import under test ----
 import { generateTtsAudio, getPlatformTtsKey, type TtsGenerationParams } from '@/lib/tts-generation';
+import { splitTextForTts } from '@/lib/tts-text-cleaner';
 import { getElevenLabsConcurrencyLimit } from '@/lib/elevenlabs';
 import { getCartesiaConcurrencyLimit, updateCartesiaConcurrencyFromError } from '@/lib/providers/tts/cartesia.provider';
 import { updateHumeConcurrencyFromError } from '@/lib/providers/tts/hume.provider';
@@ -320,6 +331,56 @@ describe('generateTtsAudio', () => {
       await expect(generateTtsAudio(defaultParams())).rejects.toThrow('TTS failed');
 
       expect(mockSemaphoreRelease).toHaveBeenCalled();
+    });
+  });
+
+  describe('multi-chunk generation', () => {
+    it('splits long text and calls generateSpeech per chunk with context bridging', async () => {
+      const chunk1 = 'First chunk of text.';
+      const chunk2 = 'Second chunk of text.';
+      (splitTextForTts as ReturnType<typeof vi.fn>).mockReturnValue([chunk1, chunk2]);
+
+      mockGenerateSpeech
+        .mockResolvedValueOnce(Buffer.from('audio-chunk-1'))
+        .mockResolvedValueOnce(Buffer.from('audio-chunk-2'));
+
+      const result = await generateTtsAudio(defaultParams({
+        text: `${chunk1} ${chunk2}`,
+        previousText: 'Before segment.',
+        nextText: 'After segment.',
+      }));
+
+      expect(result).not.toBeNull();
+      // Two generateSpeech calls — one per chunk
+      expect(mockGenerateSpeech).toHaveBeenCalledTimes(2);
+
+      // First chunk: uses original previousText, next chunk text as nextText
+      expect(mockGenerateSpeech).toHaveBeenNthCalledWith(1, expect.objectContaining({
+        text: chunk1,
+        previousText: 'Before segment.',
+        nextText: chunk2.slice(0, 500),
+      }));
+
+      // Second chunk: uses previous chunk tail as previousText, original nextText
+      expect(mockGenerateSpeech).toHaveBeenNthCalledWith(2, expect.objectContaining({
+        text: chunk2,
+        previousText: chunk1.slice(-500),
+        nextText: 'After segment.',
+      }));
+
+      // Returns concatenated buffer from FFmpeg
+      expect(result!.audioBuffer).toEqual(Buffer.from('concatenated-audio'));
+    });
+
+    it('single chunk takes fast path without FFmpeg concat', async () => {
+      (splitTextForTts as ReturnType<typeof vi.fn>).mockReturnValue(['Single chunk.']);
+      mockGenerateSpeech.mockResolvedValue(Buffer.from('single-audio'));
+
+      const result = await generateTtsAudio(defaultParams({ text: 'Single chunk.' }));
+
+      expect(result).not.toBeNull();
+      expect(mockGenerateSpeech).toHaveBeenCalledTimes(1);
+      expect(result!.audioBuffer).toEqual(Buffer.from('single-audio'));
     });
   });
 });
