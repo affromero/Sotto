@@ -374,8 +374,8 @@ export async function generateForYouQuestions(
     ? `The user is interested in: ${interestNames.join(', ')}.
 
 Your job is to COMBINE these interests in unexpected, creative ways. Examples:
-- If they like "AI" and "History" → "What if ancient civilizations had artificial intelligence?"
-- If they like "Psychology" and "Sports" → "Ever wonder what mental tricks Olympic athletes use to overcome fear?"
+- If they like "AI" and "History" → "Ancient Rome had concrete that healed itself — and we're only now figuring out AI that can do the same"
+- If they like "Psychology" and "Sports" → "Olympic athletes don't just train their bodies — the mental tricks they use to override fear are straight out of military psychology"
 
 Also explore topics ADJACENT to their interests — things they haven't explicitly said but would likely enjoy based on their taste profile.`
     : `The user has no stated interests yet. Generate broadly appealing, curiosity-driven questions across diverse topics. Aim for surprise and delight — topics that make someone think "I never knew I wanted to learn about that."`;
