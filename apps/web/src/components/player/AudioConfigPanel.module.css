@@ -9,10 +9,10 @@
   align-items: center;
   gap: var(--spacing-sm);
   padding: var(--spacing-sm) var(--spacing-md);
-  background: var(--color-error-bg, #fef2f2);
+  background: var(--color-error-lighter);
   border-radius: var(--radius-md);
   font-size: 0.8125rem;
-  color: var(--color-error, #dc2626);
+  color: var(--color-error);
 }
 
 .speakerList {

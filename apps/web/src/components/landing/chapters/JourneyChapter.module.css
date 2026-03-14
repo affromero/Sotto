@@ -117,7 +117,7 @@
   justify-content: center;
   border-radius: 50%;
   background: var(--color-primary);
-  color: #fff;
+  color: var(--color-text-inverse);
   font-weight: 700;
   font-size: 17px;
 }
@@ -137,7 +137,7 @@
 .stepDesc {
   font-size: 17px;
   line-height: 1.7;
-  color: var(--color-text-secondary, #6B7280);
+  color: var(--color-text-secondary);
 }
 
 /* ==========================================================================
@@ -211,7 +211,7 @@
 
 .mockUser .mockBubble {
   background: var(--color-primary);
-  color: #fff;
+  color: var(--color-text-inverse);
   border-bottom-right-radius: 6px;
 }
 
@@ -227,7 +227,7 @@
   height: 32px;
   border-radius: 50%;
   background: var(--color-primary);
-  color: #fff;
+  color: var(--color-text-inverse);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -362,13 +362,13 @@
   border: 1px solid rgba(0, 0, 0, 0.1);
   font-size: 12px;
   font-weight: 600;
-  color: var(--color-text-secondary, #6B7280);
+  color: var(--color-text-secondary);
 }
 
 .scriptBtnPrimary {
   background: var(--color-primary);
   border-color: var(--color-primary);
-  color: #fff;
+  color: var(--color-text-inverse);
 }
 
 /* ==========================================================================
@@ -384,7 +384,7 @@
 
 .playerMeta {
   font-size: 13px;
-  color: var(--color-text-secondary, #6B7280);
+  color: var(--color-text-secondary);
   margin-bottom: 20px;
 }
 
@@ -402,7 +402,7 @@
   border-radius: 50%;
   border: none;
   background: var(--color-primary);
-  color: #fff;
+  color: var(--color-text-inverse);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -442,7 +442,7 @@
 .playerTime {
   font-size: 12px;
   font-family: var(--font-mono);
-  color: var(--color-text-secondary, #6B7280);
+  color: var(--color-text-secondary);
 }
 
 .playerActions {

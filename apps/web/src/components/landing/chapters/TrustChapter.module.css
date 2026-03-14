@@ -28,7 +28,7 @@
 
 .shieldIcon {
   flex-shrink: 0;
-  color: #16A34A;
+  color: var(--color-success);
 }
 
 .stripText {
@@ -98,13 +98,13 @@
 .description {
   font-size: 18px;
   line-height: 1.7;
-  color: var(--color-text-secondary, #6B7280);
+  color: var(--color-text-secondary);
   margin-bottom: 32px;
 }
 
 .footer {
   font-size: 15px;
-  color: var(--color-text-secondary, #6B7280);
+  color: var(--color-text-secondary);
 }
 
 .footer a {
@@ -158,10 +158,10 @@
 }
 
 /* Domain dot color classes */
-.dotAcademic { background: #1E3A5F; }
-.dotNews { background: #D97706; }
-.dotGovernment { background: #16A34A; }
-.dotGeneral { background: #6B7280; }
+.dotAcademic { background: var(--color-accent); }
+.dotNews { background: var(--color-primary); }
+.dotGovernment { background: var(--color-success); }
+.dotGeneral { background: var(--color-text-secondary); }
 
 .domainName {
   font-size: 15px;
@@ -172,7 +172,7 @@
 .domainThreshold {
   font-size: 12px;
   font-family: var(--font-mono);
-  color: var(--color-text-secondary, #6B7280);
+  color: var(--color-text-secondary);
   text-align: right;
 }
 

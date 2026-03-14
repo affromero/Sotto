@@ -64,7 +64,7 @@
 .description {
   font-size: 18px;
   line-height: 1.7;
-  color: var(--color-text-secondary, #6B7280);
+  color: var(--color-text-secondary);
 }
 
 /* ==========================================================================
@@ -167,7 +167,7 @@
 
 .badgeGreen {
   background: rgba(22, 163, 74, 0.08);
-  color: #16A34A;
+  color: var(--color-success);
 }
 
 /* Footer with toggle + count */
@@ -204,7 +204,7 @@
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--color-text-inverse);
 }
 
 .videoCount {
