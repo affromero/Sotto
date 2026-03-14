@@ -353,11 +353,18 @@ export default function PodcastScreen() {
 
   if (error || !podcast) {
     return (
-      <View style={styles.centered}>
+      <View style={styles.centered} testID="generation-error">
         <Stack.Screen options={{ headerShown: false }} />
         <Text style={styles.errorIcon}>!</Text>
         <Text style={styles.errorText}>Failed to load podcast</Text>
         <Text style={styles.errorSubtext}>Please check your connection and try again.</Text>
+        <Pressable
+          style={styles.retryButton}
+          onPress={() => queryClient.invalidateQueries({ queryKey: ['podcast', id] })}
+          testID="generation-retry-button"
+        >
+          <Text style={styles.retryButtonText}>Try Again</Text>
+        </Pressable>
       </View>
     );
   }
@@ -596,6 +603,7 @@ export default function PodcastScreen() {
                 style={styles.actionIcon}
                 accessibilityLabel="Edit podcast"
                 accessibilityRole="button"
+                testID="player-edit-button"
               >
                 <Ionicons name="create-outline" size={22} color={colors.textSecondary} />
               </Pressable>
@@ -880,6 +888,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textSecondary,
     textAlign: 'center',
+  },
+  retryButton: {
+    marginTop: spacing.lg,
+    paddingVertical: spacing.sm + 4,
+    paddingHorizontal: spacing.xl,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.primary,
+  },
+  retryButtonText: {
+    fontFamily: typography.fontBody,
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.textInverse,
   },
 
   // Header

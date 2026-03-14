@@ -250,6 +250,7 @@ export default function ProfileScreen() {
           pressed && styles.savedIdeasRowPressed,
         ]}
         onPress={() => router.push('/ideas')}
+        testID="profile-saved-ideas-link"
       >
         <Ionicons name="bookmark-outline" size={20} color={colors.primary} style={styles.savedIdeasIcon} />
         <Text style={styles.savedIdeasLabel}>Saved Ideas</Text>
@@ -262,6 +263,7 @@ export default function ProfileScreen() {
           pressed && styles.savedIdeasRowPressed,
         ]}
         onPress={() => router.push('/collections')}
+        testID="profile-collections-link"
       >
         <Ionicons name="albums-outline" size={20} color={colors.primary} style={styles.savedIdeasIcon} />
         <Text style={styles.savedIdeasLabel}>Collections</Text>

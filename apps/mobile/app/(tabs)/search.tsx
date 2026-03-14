@@ -193,6 +193,7 @@ export default function SearchScreen() {
         </View>
       ) : mode === 'podcasts' ? (
         <FlatList
+          testID="search-results-list"
           data={podcasts}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
@@ -216,6 +217,7 @@ export default function SearchScreen() {
         />
       ) : (
         <FlatList
+          testID="search-results-list"
           data={people}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (

@@ -8,9 +8,9 @@ tags: [collections]
 - tapOn:
     text: "Profile"
 
-# Look for collections link/button
+# Tap collections link
 - tapOn:
-    text: "Collections"
+    id: "profile-collections-link"
 - extendedWaitUntil:
     visible:
       id: "collections-list"
@@ -30,8 +30,9 @@ tags: [collections]
 - tapOn:
     id: "collections-new-save-button"
 
-# Wait for collection to appear in list
+# Terminal assertion: collection list visible
 - extendedWaitUntil:
     visible:
       id: "collections-list"
     timeout: 5000
+- takeScreenshot: collection-created

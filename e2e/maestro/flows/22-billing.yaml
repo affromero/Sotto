@@ -23,3 +23,4 @@ tags: [billing, settings]
     id: "billing-limits-card"
 - assertVisible:
     id: "billing-upgrade-button"
+- takeScreenshot: billing-screen

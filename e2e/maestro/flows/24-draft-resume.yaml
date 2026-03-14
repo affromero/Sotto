@@ -14,8 +14,13 @@ tags: [create, draft]
 
 # Look for draft section and tap on the saved draft
 - tapOn:
-    text: "Draft Podcast"
+    text: "${E2E_DRAFT_NAME}"
+
+# Terminal assertion: create screen loaded with draft context
 - extendedWaitUntil:
     visible:
       id: "create-chat-input"
     timeout: 5000
+- assertVisible:
+    id: "create-chat-input"
+- takeScreenshot: draft-resumed
