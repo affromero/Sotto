@@ -31,15 +31,21 @@ tags: [create, script, smoke]
 # Generate script
 - tapOn:
     id: "create-generate-script-button"
-- extendedWaitUntil:
-    visible:
-      id: "script-approve-button"
-    timeout: 60000
+- retry:
+    maxRetries: 2
+    commands:
+      - extendedWaitUntil:
+          visible:
+            id: "script-approve-button"
+          timeout: 30000
 
 # Regenerate script instead of approving
 - tapOn:
     id: "script-regenerate-button"
-- extendedWaitUntil:
-    visible:
-      id: "script-approve-button"
-    timeout: 60000
+- retry:
+    maxRetries: 2
+    commands:
+      - extendedWaitUntil:
+          visible:
+            id: "script-approve-button"
+          timeout: 30000

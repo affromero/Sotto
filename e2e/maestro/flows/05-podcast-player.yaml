@@ -4,13 +4,19 @@ tags: [player, smoke]
 ---
 - runFlow: ../helpers/login.yaml
 
-# Navigate to seeded podcast
+# Scroll to and tap seeded podcast
+- scrollUntilVisible:
+    element:
+      id: "podcast-card-${E2E_PODCAST_ID}"
+    direction: DOWN
+    timeout: 10000
 - tapOn:
     id: "podcast-card-${E2E_PODCAST_ID}"
 - extendedWaitUntil:
     visible:
       id: "player-play-pause"
     timeout: 5000
+- assertWithAI: "An audio player with playback controls is visible"
 
 # Play / Pause
 - tapOn:

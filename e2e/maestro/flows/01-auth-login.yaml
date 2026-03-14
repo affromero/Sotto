@@ -11,3 +11,5 @@ tags: [auth, critical]
     id: "feed-mode-foryou"
 - assertVisible:
     id: "feed-podcast-list"
+- takeScreenshot: after-login
+- assertWithAI: "A podcast feed with at least one podcast card is visible"

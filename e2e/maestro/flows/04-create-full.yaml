@@ -33,10 +33,15 @@ tags: [create, critical]
     visible:
       id: "generation-progress"
     timeout: 5000
-- extendedWaitUntil:
-    visible:
-      id: "script-approve-button"
-    timeout: 60000
+- retry:
+    maxRetries: 2
+    commands:
+      - extendedWaitUntil:
+          visible:
+            id: "script-approve-button"
+          timeout: 30000
+- takeScreenshot: script-preview
+- assertWithAI: "A podcast script with speaker turns is displayed"
 
 # Step 4: Approve — Audio Generation
 - tapOn:

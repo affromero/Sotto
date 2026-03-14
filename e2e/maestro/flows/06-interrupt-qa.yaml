@@ -4,7 +4,12 @@ tags: [interrupt, critical]
 ---
 - runFlow: ../helpers/login.yaml
 
-# Navigate to seeded podcast and start playing
+# Scroll to and tap seeded podcast
+- scrollUntilVisible:
+    element:
+      id: "podcast-card-${E2E_PODCAST_ID}"
+    direction: DOWN
+    timeout: 10000
 - tapOn:
     id: "podcast-card-${E2E_PODCAST_ID}"
 - extendedWaitUntil:
