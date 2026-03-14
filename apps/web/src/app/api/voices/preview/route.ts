@@ -50,7 +50,8 @@ export async function POST(request: NextRequest) {
     } else {
       // Default: ElevenLabs — use BYOK when available, otherwise fall back to platform preview.
       const elByokKey = await getByokKey(session.user.id, 'elevenlabs');
-      audioBuffer = await generateSpeech({ text, voiceId, apiKeyOverride: elByokKey ?? undefined });
+      const result = await generateSpeech({ text, voiceId, apiKeyOverride: elByokKey ?? undefined });
+      audioBuffer = result.audio;
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : '';

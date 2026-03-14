@@ -96,13 +96,16 @@ export async function generateSpeech(params: {
   apiKeyOverride?: string;
   previousText?: string;
   nextText?: string;
-}): Promise<Buffer> {
+  previousRequestIds?: string[];
+}): Promise<{ audio: Buffer; requestId: string | null }> {
   const apiKey = params.apiKeyOverride || getApiKey();
   if (!apiKey) {
     throw new Error('ElevenLabs API key not configured — set ELEVENLABS_API_KEY');
   }
 
-  const modelId = params.modelId || getProviderMeta('elevenlabs').defaultModel;
+  const meta = getProviderMeta('elevenlabs');
+  const modelId = params.modelId || meta.defaultModel;
+  const skipTextContext = meta.modelsWithoutTextContext.includes(modelId);
 
   const stability = params.stability ?? 0.5;
 
@@ -117,8 +120,16 @@ export async function generateSpeech(params: {
       use_speaker_boost: true,
     },
   };
-  if (params.previousText) body.previous_text = params.previousText;
-  if (params.nextText) body.next_text = params.nextText;
+
+  if (skipTextContext) {
+    // Models like eleven_v3 reject previous_text/next_text — use request ID stitching instead
+    if (params.previousRequestIds?.length) {
+      body.previous_request_ids = params.previousRequestIds.slice(-3);
+    }
+  } else {
+    if (params.previousText) body.previous_text = params.previousText;
+    if (params.nextText) body.next_text = params.nextText;
+  }
 
   const response = await fetch(
     `${ELEVENLABS_BASE_URL}/text-to-speech/${params.voiceId}?output_format=mp3_44100_192`,
@@ -139,7 +150,10 @@ export async function generateSpeech(params: {
   }
 
   const arrayBuffer = await response.arrayBuffer();
-  return Buffer.from(arrayBuffer);
+  return {
+    audio: Buffer.from(arrayBuffer),
+    requestId: response.headers.get('request-id'),
+  };
 }
 
 // ---------------------------------------------------------------------------

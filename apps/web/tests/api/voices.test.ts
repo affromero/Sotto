@@ -771,7 +771,7 @@ describe('POST /api/voices/preview', () => {
     mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 9 });
     mockUserFindUniqueOrThrow.mockResolvedValue({ role: 'ADMIN' });
     const mockAudioBuffer = Buffer.from('fake-audio-data');
-    mockGenerateSpeech.mockResolvedValue(mockAudioBuffer);
+    mockGenerateSpeech.mockResolvedValue({ audio: mockAudioBuffer, requestId: 'req-1' });
 
     const request = createRequest('http://localhost:3000/api/voices/preview', {
       method: 'POST',

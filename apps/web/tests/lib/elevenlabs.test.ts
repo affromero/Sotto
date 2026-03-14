@@ -159,12 +159,13 @@ describe('elevenlabs', () => {
   });
 
   describe('generateSpeech', () => {
-    it('calls ElevenLabs TTS API with correct parameters', async () => {
+    it('calls ElevenLabs TTS API and returns audio with requestId', async () => {
       const mockAudioBuffer = Buffer.from('audio data');
 
       mockFetch.mockResolvedValue({
         ok: true,
         arrayBuffer: async () => mockAudioBuffer.buffer,
+        headers: { get: (name: string) => name === 'request-id' ? 'req-abc123' : null },
       });
 
       const result = await generateSpeech({
@@ -188,7 +189,8 @@ describe('elevenlabs', () => {
         text: 'Hello world',
       });
 
-      expect(result).toBeInstanceOf(Buffer);
+      expect(result.audio).toBeInstanceOf(Buffer);
+      expect(result.requestId).toBe('req-abc123');
     });
 
     it('uses custom voice settings when provided', async () => {
@@ -197,6 +199,7 @@ describe('elevenlabs', () => {
       mockFetch.mockResolvedValue({
         ok: true,
         arrayBuffer: async () => mockAudioBuffer.buffer,
+        headers: { get: () => null },
       });
 
       await generateSpeech({
@@ -225,6 +228,7 @@ describe('elevenlabs', () => {
       mockFetch.mockResolvedValue({
         ok: true,
         arrayBuffer: async () => Buffer.from('audio').buffer,
+        headers: { get: () => null },
       });
 
       await generateSpeech({ text: 'Test', voiceId: 'voice-123' });
@@ -237,6 +241,7 @@ describe('elevenlabs', () => {
       mockFetch.mockResolvedValue({
         ok: true,
         arrayBuffer: async () => Buffer.from('audio').buffer,
+        headers: { get: () => null },
       });
 
       await generateSpeech({ text: 'Test', voiceId: 'voice-123' });
@@ -245,10 +250,11 @@ describe('elevenlabs', () => {
       expect(body.voice_settings.use_speaker_boost).toBe(true);
     });
 
-    it('passes previous_text and next_text for all models', async () => {
+    it('passes previous_text and next_text for non-v3 models', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
         arrayBuffer: async () => Buffer.from('audio').buffer,
+        headers: { get: () => null },
       });
 
       await generateSpeech({
@@ -262,12 +268,14 @@ describe('elevenlabs', () => {
       const body = JSON.parse(mockFetch.mock.calls[0][1].body);
       expect(body.previous_text).toBe('Previous segment text');
       expect(body.next_text).toBe('Next segment text');
+      expect(body).not.toHaveProperty('previous_request_ids');
     });
 
-    it('passes previous_text and next_text for eleven_v3 model', async () => {
+    it('skips previous_text/next_text for eleven_v3 and uses previous_request_ids', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
         arrayBuffer: async () => Buffer.from('audio').buffer,
+        headers: { get: (name: string) => name === 'request-id' ? 'req-1' : null },
       });
 
       await generateSpeech({
@@ -276,17 +284,20 @@ describe('elevenlabs', () => {
         modelId: 'eleven_v3',
         previousText: 'Previous segment text',
         nextText: 'Next segment text',
+        previousRequestIds: ['req-prev-1', 'req-prev-2'],
       });
 
       const body = JSON.parse(mockFetch.mock.calls[0][1].body);
-      expect(body.previous_text).toBe('Previous segment text');
-      expect(body.next_text).toBe('Next segment text');
+      expect(body).not.toHaveProperty('previous_text');
+      expect(body).not.toHaveProperty('next_text');
+      expect(body.previous_request_ids).toEqual(['req-prev-1', 'req-prev-2']);
     });
 
-    it('passes previous_text and next_text for eleven_v3 variants', async () => {
+    it('passes previous_text and next_text for eleven_v3 variants (not in blocklist)', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
         arrayBuffer: async () => Buffer.from('audio').buffer,
+        headers: { get: () => null },
       });
 
       await generateSpeech({
@@ -306,6 +317,7 @@ describe('elevenlabs', () => {
       mockFetch.mockResolvedValue({
         ok: true,
         arrayBuffer: async () => Buffer.from('audio').buffer,
+        headers: { get: () => null },
       });
 
       await generateSpeech({ text: 'Test', voiceId: 'voice-123' });
