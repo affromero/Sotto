@@ -33,6 +33,13 @@ body {
 /* ============================================ */
 
 :root {
+  /* Breakpoints (use in @media — cannot be CSS vars):
+     sm:  480px   — large phones
+     md:  768px   — tablets
+     lg:  1024px  — desktops
+     xl:  1280px  — wide screens
+     Mobile-first: always use min-width */
+
   /* Colors - Primary (Golden Amber) */
   --color-primary: #D97706;
   --color-primary-hover: #B45309;
@@ -58,6 +65,7 @@ body {
 
   /* Colors - Text */
   --color-text-primary: #1A1A1A;
+  --color-text: var(--color-text-primary);
   --color-text-secondary: #6B7280;
   --color-text-tertiary: #9CA3AF;
   --color-text-inverse: #FFFFFF;
@@ -103,6 +111,14 @@ body {
   --color-teal-light: rgba(13, 148, 136, 0.08);
   --color-teal-subtle: rgba(13, 148, 136, 0.04);
 
+  /* Colors - Rose & Pink (dashboard stats) */
+  --color-rose: #F43F5E;
+  --color-rose-light: #FFE4E6;
+  --color-rose-lighter: #FFF1F2;
+  --color-pink: #EC4899;
+  --color-pink-light: #FCE7F3;
+  --color-pink-lighter: #FDF2F8;
+
   /* Typography - Fonts */
   --font-heading: 'DM Serif Display', Georgia, 'Times New Roman', serif;
   --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -119,6 +135,7 @@ body {
   --text-body-sm: 400 14px/1.5 var(--font-body);
   --text-caption: 500 12px/1.4 var(--font-body);
   --text-overline: 600 11px/1.4 var(--font-body);
+  --text-heading-sm: var(--text-h4);
 
   /* Font Sizes — fluid clamp() for large sizes, fixed for small */
   --font-size-xs: 11px;
@@ -234,6 +251,7 @@ body {
 
   /* Text */
   --color-text-primary: #F0EDE8;
+  --color-text: var(--color-text-primary);
   --color-text-secondary: #A09B93;
   --color-text-tertiary: #6B6660;
   --color-text-inverse: #1A1917;
@@ -289,6 +307,14 @@ body {
   --color-teal-hover: #5EEAD4;
   --color-teal-light: rgba(45, 212, 191, 0.12);
   --color-teal-subtle: rgba(45, 212, 191, 0.06);
+
+  /* Rose & Pink (dark) */
+  --color-rose: #FB7185;
+  --color-rose-light: #3D1A22;
+  --color-rose-lighter: #2D1820;
+  --color-pink: #F472B6;
+  --color-pink-light: #3D1A30;
+  --color-pink-lighter: #2D1828;
 
   /* Shadows — stronger for dark backgrounds, warm amber tint */
   --shadow-xs: 0 1px 1px 0 rgba(0, 0, 0, 0.15);

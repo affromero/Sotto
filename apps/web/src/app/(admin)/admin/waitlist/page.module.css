@@ -70,7 +70,7 @@
 
 .filterTabActive {
   color: var(--color-primary);
-  background: rgba(217, 119, 6, 0.08);
+  background: var(--color-primary-subtle);
   font-weight: 600;
 }
 
@@ -83,7 +83,7 @@
 }
 
 .filterTabActive .filterCount {
-  background: rgba(217, 119, 6, 0.15);
+  background: var(--color-primary-light);
   color: var(--color-primary);
 }
 
@@ -155,8 +155,8 @@
   border-radius: var(--radius-md);
   font: var(--text-caption);
   font-weight: 600;
-  background: #fef3c7;
-  color: #92400e;
+  background: var(--color-warning-light);
+  color: var(--color-primary-active);
 }
 
 .statusApproved {
@@ -165,8 +165,8 @@
   border-radius: var(--radius-md);
   font: var(--text-caption);
   font-weight: 600;
-  background: #d1fae5;
-  color: #065f46;
+  background: var(--color-success-light);
+  color: var(--color-success-hover);
 }
 
 .statusRejected {
@@ -175,8 +175,8 @@
   border-radius: var(--radius-md);
   font: var(--text-caption);
   font-weight: 600;
-  background: #fee2e2;
-  color: #991b1b;
+  background: var(--color-error-light);
+  color: var(--color-error-hover);
 }
 
 /* Action Buttons */
@@ -190,8 +190,8 @@
   padding: 4px 12px;
   font: var(--text-caption);
   font-weight: 600;
-  background: #065f46;
-  color: white;
+  background: var(--color-success-hover);
+  color: var(--color-text-inverse);
   border: none;
   border-radius: var(--radius-sm);
   cursor: pointer;
@@ -199,7 +199,7 @@
 }
 
 .approveBtn:hover:not(:disabled) {
-  background: #047857;
+  background: var(--color-success);
 }
 
 .approveBtn:disabled {
@@ -220,9 +220,9 @@
 }
 
 .rejectBtn:hover:not(:disabled) {
-  background: #fee2e2;
-  color: #991b1b;
-  border-color: #fecaca;
+  background: var(--color-error-light);
+  color: var(--color-error-hover);
+  border-color: var(--color-error-light);
 }
 
 .rejectBtn:disabled {
@@ -243,9 +243,9 @@
 }
 
 .removeBtn:hover:not(:disabled) {
-  background: #fee2e2;
-  color: #991b1b;
-  border-color: #fecaca;
+  background: var(--color-error-light);
+  color: var(--color-error-hover);
+  border-color: var(--color-error-light);
 }
 
 .removeBtn:disabled {
@@ -328,7 +328,7 @@
 }
 
 .copyBtn:hover {
-  background: rgba(217, 119, 6, 0.08);
+  background: var(--color-primary-subtle);
 }
 
 /* Invitation Status Badges */
@@ -339,8 +339,8 @@
   border-radius: var(--radius-md);
   font: var(--text-caption);
   font-weight: 600;
-  background: #d1fae5;
-  color: #065f46;
+  background: var(--color-success-light);
+  color: var(--color-success-hover);
 }
 
 .invStatusUsed {
@@ -359,8 +359,8 @@
   border-radius: var(--radius-md);
   font: var(--text-caption);
   font-weight: 600;
-  background: #fef3c7;
-  color: #92400e;
+  background: var(--color-warning-light);
+  color: var(--color-primary-active);
 }
 
 .invStatusDisabled {
@@ -369,6 +369,6 @@
   border-radius: var(--radius-md);
   font: var(--text-caption);
   font-weight: 600;
-  background: #fee2e2;
-  color: #991b1b;
+  background: var(--color-error-light);
+  color: var(--color-error-hover);
 }

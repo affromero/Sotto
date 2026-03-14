@@ -135,7 +135,7 @@
 }
 
 .error {
-  color: var(--color-error, #dc2626);
+  color: var(--color-error);
   font-size: 0.8125rem;
 }
 

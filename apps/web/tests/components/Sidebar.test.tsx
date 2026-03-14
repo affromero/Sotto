@@ -93,10 +93,11 @@ describe('Sidebar', () => {
     expect(overlay).toBeInTheDocument();
   });
 
-  it('does not render overlay when closed', () => {
+  it('overlay is hidden when closed', () => {
     const { container } = render(<Sidebar currentPath="/dashboard" isOpen={false} />);
     const overlay = container.querySelector('[class*="overlay"]');
-    expect(overlay).not.toBeInTheDocument();
+    expect(overlay).toBeInTheDocument();
+    expect(overlay).toHaveStyle({ pointerEvents: 'none' });
   });
 
   it('calls onClose when overlay is clicked', async () => {

@@ -172,12 +172,12 @@
 /* Voice-only fork variant */
 .voiceForkItem {
   border-style: dashed;
-  border-color: #D97706;
-  background: #FFFBEB;
+  border-color: var(--color-primary);
+  background: var(--color-primary-lighter);
 }
 
 .voiceForkItem:hover {
-  border-color: #B45309;
+  border-color: var(--color-primary-hover);
 }
 
 .voiceBadge {
@@ -186,8 +186,8 @@
   gap: 0.25rem;
   padding: 0.125rem 0.5rem;
   border-radius: var(--radius-full);
-  background: #FEF3C7;
-  color: #92400E;
+  background: var(--color-primary-light);
+  color: var(--color-primary-active);
   font-size: var(--font-size-xs);
   font-weight: 600;
   flex-shrink: 0;

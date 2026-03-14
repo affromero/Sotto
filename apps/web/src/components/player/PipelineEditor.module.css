@@ -3,7 +3,7 @@
 .root {
   width: 100%;
   background: #1a1a1a;
-  border-radius: var(--radius-xl, 16px);
+  border-radius: var(--radius-xl);
   overflow: hidden;
   border: 1px solid #333;
   display: flex;
@@ -27,7 +27,7 @@
   margin: 0;
   font-size: 18px;
   font-weight: 600;
-  color: #e0e0e0;
+  color: var(--color-text-primary);
   font-family: var(--font-heading, 'DM Serif Display', serif);
 }
 
@@ -53,7 +53,7 @@
 
 .cardList::-webkit-scrollbar-thumb {
   background: #444;
-  border-radius: var(--radius-full, 9999px);
+  border-radius: var(--radius-full);
 }
 
 /* Sticky footer */
@@ -72,12 +72,12 @@
 .approvalSummary {
   margin: 0;
   font-size: 14px;
-  color: #aaa;
+  color: var(--color-text-secondary);
   font-variant-numeric: tabular-nums;
 }
 
 .costLabel {
-  color: #22c55e;
+  color: var(--color-success);
   font-weight: 600;
 }
 
@@ -92,10 +92,10 @@
 
 .approveBtn {
   padding: 12px 24px;
-  background: var(--color-primary, #d97706);
-  color: #fff;
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
   border: none;
-  border-radius: var(--radius-md, 8px);
+  border-radius: var(--radius-md);
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
@@ -104,20 +104,20 @@
 }
 
 .approveBtn:hover {
-  background: var(--color-primary-hover, #b45309);
+  background: var(--color-primary-hover);
 }
 
 .approveBtn:focus-visible {
-  outline: 2px solid #fff;
+  outline: 2px solid var(--color-text-inverse);
   outline-offset: 2px;
 }
 
 .cancelBtn {
   padding: 12px 20px;
   background: transparent;
-  color: #888;
+  color: var(--color-text-secondary);
   border: 1px solid #444;
-  border-radius: var(--radius-md, 8px);
+  border-radius: var(--radius-md);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -126,12 +126,12 @@
 }
 
 .cancelBtn:hover {
-  color: #ccc;
+  color: var(--color-text-secondary);
   border-color: #666;
 }
 
 .cancelBtn:focus-visible {
-  outline: 2px solid var(--color-primary, #d97706);
+  outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
 

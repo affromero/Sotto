@@ -7,6 +7,7 @@ import { FollowButton } from '@/components/profile/FollowButton';
 import { profileUrl } from '@/lib/urls';
 import styles from './UserSearchGrid.module.css';
 
+
 export interface UserDiscoveryResult {
   id: string;
   name: string | null;
@@ -166,7 +167,11 @@ export function UserSearchGrid({
             <path d="M18 48c0-7.7 6.3-14 14-14s14 6.3 14 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
           </svg>
         </div>
+        <h3 className={styles.emptyTitle}>No people found</h3>
         <p className={styles.emptyMessage}>{emptyMessage}</p>
+        <Link href="/feed" className={styles.emptyCta}>
+          Discover podcasts instead
+        </Link>
       </div>
     );
   }

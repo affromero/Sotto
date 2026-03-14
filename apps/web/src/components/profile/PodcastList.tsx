@@ -1,5 +1,7 @@
 'use client';
 
+import Link from 'next/link';
+import { Mic } from 'lucide-react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { podcastUrl } from '@/lib/urls';
 import { PodcastSummary } from '@/types/podcast';
@@ -66,7 +68,12 @@ export function PodcastList({
   if (podcasts.length === 0) {
     return (
       <div className={styles.empty}>
+        <Mic size={48} className={styles.emptyIcon} aria-hidden="true" />
+        <h3 className={styles.emptyTitle}>No podcasts yet</h3>
         <p className={styles.emptyText}>{emptyMessage}</p>
+        <Link href="/create" className={styles.emptyLink}>
+          Create your first
+        </Link>
       </div>
     );
   }

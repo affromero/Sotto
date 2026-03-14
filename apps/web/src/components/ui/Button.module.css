@@ -40,6 +40,11 @@
 }
 .secondary:hover:not(:disabled) {
   background: var(--color-primary-subtle);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(217, 119, 6, 0.15);
+}
+.secondary:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
 }
 
 .ghost {
@@ -49,6 +54,10 @@
 .ghost:hover:not(:disabled) {
   background: var(--color-surface-hover);
   color: var(--color-text-primary);
+  transform: translateY(-1px);
+}
+.ghost:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
 }
 
 .danger {
@@ -57,6 +66,11 @@
 }
 .danger:hover:not(:disabled) {
   background: var(--color-error-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.25);
+}
+.danger:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
 }
 
 /* Sizes */
