@@ -149,12 +149,12 @@ export default function OnboardingScreen() {
               <View key={cat.id} style={styles.categoryBlock}>
                 <Text style={styles.categoryName}>{cat.name}</Text>
                 <View style={styles.chipGrid}>
-                  {children.map((tag) => {
+                  {children.map((tag, tagIndex) => {
                     const isSelected = selectedTagIds.includes(tag.id);
                     return (
                       <Pressable
                         key={tag.id}
-                        testID={`onboarding-tag-${tag.id}`}
+                        testID={`onboarding-interest-chip-${tagIndex}`}
                         style={[
                           styles.chip,
                           isSelected && styles.chipSelected,

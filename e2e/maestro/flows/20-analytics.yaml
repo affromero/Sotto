@@ -24,6 +24,7 @@ tags: [analytics]
 - tapOn:
     id: "analytics-period-all"
 
-# Verify engagement section
+# Terminal assertion: engagement section visible
 - assertVisible:
     id: "analytics-engagement-card"
+- takeScreenshot: analytics-screen

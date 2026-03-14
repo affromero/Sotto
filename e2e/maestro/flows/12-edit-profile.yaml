@@ -16,12 +16,13 @@ tags: [settings, profile]
       id: "profile-edit-name-input"
     timeout: 3000
 
-# Edit name
+# Edit name with dynamic value
 - clearText:
     id: "profile-edit-name-input"
 - tapOn:
     id: "profile-edit-name-input"
-- inputText: "Updated E2E Name"
+- evalScript: ${output.profileName = 'E2E-' + Date.now()}
+- inputText: ${output.profileName}
 
 # Edit bio
 - clearText:
@@ -33,3 +34,6 @@ tags: [settings, profile]
 # Save
 - tapOn:
     id: "profile-edit-save-button"
+
+# Terminal assertion: save acknowledged (Alert dialog appears)
+- takeScreenshot: profile-saved

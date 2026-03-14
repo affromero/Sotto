@@ -169,7 +169,7 @@ function ProviderRow({
             testID={`api-keys-input-${providerId}`}
           />
           {error !== '' && (
-            <Text style={styles.errorText}>{error}</Text>
+            <Text style={styles.errorText} testID={`api-keys-error-${providerId}`}>{error}</Text>
           )}
           <Pressable
             style={[
