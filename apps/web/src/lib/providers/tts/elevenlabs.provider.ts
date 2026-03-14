@@ -35,6 +35,7 @@ export class ElevenLabsProvider implements TtsProvider {
   private clientPromise: Promise<typeof import('../../elevenlabs')> | null = null;
   private byokApiKey: string | undefined;
   private model: string;
+  private lastRequestId: string | null = null;
 
   constructor(byokApiKey?: string, model?: string) {
     this.byokApiKey = byokApiKey;
@@ -52,6 +53,8 @@ export class ElevenLabsProvider implements TtsProvider {
     const el = await this.getClient();
     const apiKeyOverride = params.apiKeyOverride || this.byokApiKey;
     const modelId = params.modelId ?? this.model;
+    const meta = getProviderMeta('elevenlabs');
+    const skipTextContext = meta.modelsWithoutTextContext.includes(modelId);
 
     // Map direction to ElevenLabs expression params
     const expression = mapDirectionToExpression(params.direction, params.speaker, 'elevenlabs');
@@ -66,18 +69,26 @@ export class ElevenLabsProvider implements TtsProvider {
         : prefix + params.text
       : params.text;
 
-    return el.generateSpeech({
+    const { audio, requestId } = await el.generateSpeech({
       text,
       voiceId: params.voiceId,
       modelId,
       apiKeyOverride,
-      previousText: params.previousText,
-      nextText: params.nextText,
+      previousText: skipTextContext ? undefined : params.previousText,
+      nextText: skipTextContext ? undefined : params.nextText,
+      previousRequestIds: params.continuityIds?.slice(-3),
       stability: elExpr?.stability ?? params.stability,
       similarityBoost: params.similarityBoost,
       // style: 0.0 per ElevenLabs recommendation — higher values add latency and instability
       style: 0.0,
     });
+
+    this.lastRequestId = requestId;
+    return audio;
+  }
+
+  getLastContinuityId(): string | null {
+    return this.lastRequestId;
   }
 
   async generateSoundEffect(params: SfxParams): Promise<Buffer> {
