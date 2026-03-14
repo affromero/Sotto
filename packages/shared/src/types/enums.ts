@@ -22,7 +22,7 @@ export type PodcastStatus =
 
 export type PodcastVisibility = 'PUBLIC' | 'UNLISTED' | 'PRIVATE';
 
-export type PodcastSource = 'WEB' | 'TWITTER' | 'TELEGRAM' | 'API' | 'IMPORT' | 'ADMIN';
+export type PodcastSource = 'WEB' | 'TWITTER' | 'TELEGRAM' | 'API' | 'IMPORT' | 'ADMIN' | 'BRIEFING';
 
 export type Speaker = string;
 
@@ -90,7 +90,8 @@ export type NotificationType =
   | 'MUSIC_READY'
   | 'MUSIC_FAILED'
   | 'PIPELINE_FAILURE'
-  | 'REFERRAL_SIGNUP';
+  | 'REFERRAL_SIGNUP'
+  | 'BRIEFING_READY';
 
 export type ReportReason =
   | 'HARASSMENT'
@@ -170,3 +171,5 @@ export type MusicStatus =
   | 'GENERATING'
   | 'READY'
   | 'FAILED';
+
+export type QuizStatus = 'GENERATING' | 'READY' | 'FAILED';
