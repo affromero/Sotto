@@ -1,0 +1,156 @@
+import { Job } from 'bullmq';
+import type { GenerateQuizPayload } from '@/lib/queue';
+import { prismaUnfiltered as prisma } from '@/lib/prisma';
+import { createAIProvider } from '@/lib/providers/ai';
+import { resolveAiModelAndProvider } from '@/lib/providers/ai-registry';
+import { loadAndRender } from '@/lib/prompt-loader';
+import { logUsage } from '@/lib/usage-logger';
+import { logger } from '@/lib/logger';
+
+interface QuizQuestionData {
+  question: string;
+  options: string[];
+  correctIndex: number;
+  explanation: string;
+  turnIndex?: number;
+}
+
+export async function processQuizGeneration(job: Job<GenerateQuizPayload>): Promise<void> {
+  const { podcastId } = job.data;
+  await job.updateProgress(10);
+
+  // Guard: skip if quiz already exists and is READY
+  const existing = await prisma.podcastQuiz.findUnique({
+    where: { podcastId },
+    select: { status: true },
+  });
+  if (existing?.status === 'READY') {
+    logger.info('Quiz already exists for podcast, skipping', { podcastId });
+    await job.updateProgress(100);
+    return;
+  }
+
+  // Load script
+  const script = await prisma.script.findUnique({
+    where: { podcastId },
+    select: { turns: true, context: true },
+  });
+  if (!script) {
+    logger.warn('No script found for quiz generation, skipping', { podcastId });
+    await job.updateProgress(100);
+    return;
+  }
+
+  const turns = script.turns as Array<{ speaker: string; text: string }>;
+  if (turns.length < 5) {
+    logger.info('Script too short for quiz generation', { podcastId, turnCount: turns.length });
+    await job.updateProgress(100);
+    return;
+  }
+
+  // Delete existing quiz if re-generating (e.g. podcast was re-generated)
+  if (existing) {
+    await prisma.podcastQuiz.delete({ where: { podcastId } });
+  }
+
+  // Create quiz record
+  const quiz = await prisma.podcastQuiz.create({
+    data: { podcastId, status: 'GENERATING' },
+  });
+
+  await job.updateProgress(30);
+
+  try {
+    // Resolve cheapest AI model (platform operation, Haiku-tier)
+    const { model, provider } = await resolveAiModelAndProvider({ plan: 'FREE' });
+
+    const questionCount = turns.length < 10 ? 3 : turns.length < 20 ? 4 : 5;
+    const mediumCount = questionCount - 2; // 1 easy + N medium + 1 hard
+
+    const scriptTurns = turns
+      .map((t, i) => `[${i}] ${t.speaker}: ${t.text}`)
+      .join('\n');
+
+    const prompt = loadAndRender('quiz/generate-quiz.md', {
+      QUESTION_COUNT: String(questionCount),
+      MEDIUM_COUNT: String(mediumCount),
+      SCRIPT_TURNS: scriptTurns,
+      SCRIPT_CONTEXT: (script.context as string) || 'No additional context available.',
+    });
+
+    await job.updateProgress(50);
+
+    // Call LLM
+    const ai = createAIProvider(provider);
+    const response = await ai.generateResponse(
+      'You are a quiz generation assistant. Return only valid JSON.',
+      [{ role: 'user', content: prompt }],
+      { model },
+    );
+
+    await job.updateProgress(70);
+
+    // Parse response
+    const text = response.text.trim();
+    const jsonStr = text.startsWith('[') ? text : text.match(/\[[\s\S]*\]/)?.[0];
+    if (!jsonStr) {
+      throw new Error('Failed to extract JSON array from LLM response');
+    }
+    const questions: QuizQuestionData[] = JSON.parse(jsonStr);
+
+    if (!Array.isArray(questions) || questions.length === 0) {
+      throw new Error('LLM returned empty or invalid questions array');
+    }
+
+    // Create questions
+    await prisma.$transaction(
+      questions.map((q, i) =>
+        prisma.quizQuestion.create({
+          data: {
+            quizId: quiz.id,
+            order: i,
+            question: q.question,
+            options: q.options,
+            correctIndex: q.correctIndex,
+            explanation: q.explanation,
+            turnIndex: q.turnIndex ?? null,
+          },
+        }),
+      ),
+    );
+
+    // Mark quiz as READY
+    await prisma.podcastQuiz.update({
+      where: { id: quiz.id },
+      data: { status: 'READY', model, provider },
+    });
+
+    await logUsage({
+      service: provider,
+      model: response.model,
+      category: 'quiz-generation',
+      inputTokens: response.inputTokens,
+      outputTokens: response.outputTokens,
+      podcastId,
+    });
+
+    logger.info('Quiz generated successfully', {
+      podcastId,
+      quizId: quiz.id,
+      questionCount: questions.length,
+    });
+  } catch (error) {
+    logger.error('Quiz generation failed', {
+      podcastId,
+      quizId: quiz.id,
+      error: error instanceof Error ? error.message : String(error),
+    });
+
+    await prisma.podcastQuiz.update({
+      where: { id: quiz.id },
+      data: { status: 'FAILED' },
+    });
+  }
+
+  await job.updateProgress(100);
+}

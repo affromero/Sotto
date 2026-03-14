@@ -1,5 +1,5 @@
 import { Job } from 'bullmq';
-import { ImportAudioPayload, notificationQueue, featureComputationQueue, waveformGenerationQueue, addJob, JobType } from '@/lib/queue';
+import { ImportAudioPayload, notificationQueue, featureComputationQueue, waveformGenerationQueue, quizGenerationQueue, addJob, JobType } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { markPodcastFailed } from '@/lib/pipeline-resume';
 import { downloadToFile, uploadPodcastAudio, deleteFile } from '@/lib/r2';
@@ -80,6 +80,8 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
         podcastId,
         userId,
       });
+
+      await addJob(quizGenerationQueue, JobType.GENERATE_QUIZ, { podcastId }).catch(() => {});
 
       await job.updateProgress(100);
       return;
@@ -483,6 +485,9 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
       podcastId,
       userId,
     });
+
+    // Generate post-listen quiz
+    await addJob(quizGenerationQueue, JobType.GENERATE_QUIZ, { podcastId }).catch(() => {});
 
     // Consume free-tier quota on successful import (not at creation time)
     const importUser = await prisma.user.findUniqueOrThrow({
