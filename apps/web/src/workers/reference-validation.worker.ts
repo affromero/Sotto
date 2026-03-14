@@ -15,6 +15,8 @@ import {
 } from '@/lib/script-updater';
 import { createSegmentsAndQueueAudio } from '@/lib/segment-creator';
 import { convertTurnsForProvider } from '@/lib/tts-tag-converter';
+import { markPodcastFailed } from '@/lib/pipeline-resume';
+import { MIN_REFERENCE_COUNTS } from '@/lib/script-verifier';
 import { getAiKey, getByokKey, hasByokKey } from '@/lib/byok';
 import { getTierFeatures } from '@/lib/tier-features';
 import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
@@ -35,7 +37,7 @@ export async function processReferenceValidation(
   const aiKey = useAdminCredits ? null : await getAiKey(userId);
 
   // Load references and script
-  const [references, script, podcast, userPlanRecord] = await Promise.all([
+  const [references, script, podcast, userPlanRecord, discovery] = await Promise.all([
     prisma.reference.findMany({
       where: { podcastId },
       orderBy: { number: 'asc' },
@@ -45,9 +47,13 @@ export async function processReferenceValidation(
     }),
     prisma.podcast.findUnique({
       where: { id: podcastId },
-      select: { topic: true, aiModel: true },
+      select: { topic: true, aiModel: true, source: true, verificationMode: true },
     }),
     prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { plan: true } }),
+    prisma.discovery.findUnique({
+      where: { podcastId },
+      select: { depth: true },
+    }),
   ]);
 
   // Model + provider resolved together — prevents sending e.g. gpt-5-mini to Anthropic
@@ -62,7 +68,35 @@ export async function processReferenceValidation(
     throw new Error(`Script not found for podcast ${podcastId}`);
   }
 
+  // Compute minimum reference requirement for this podcast
+  const depth = discovery?.depth || 'standard';
+  const isShowcase = podcast?.verificationMode === 'showcase';
+  const effectiveDepth = podcast?.verificationMode === 'relaxed' ? 'eli5' : depth;
+  const requiredRefCount = MIN_REFERENCE_COUNTS[effectiveDepth] ?? 5;
+
   if (references.length === 0) {
+    // Gate: fail if references are required but none exist
+    if (!isShowcase && requiredRefCount > 0) {
+      logger.error('No references found — minimum required', {
+        podcastId,
+        required: String(requiredRefCount),
+        depth,
+      });
+
+      await markPodcastFailed(podcastId,
+        `No references could be found — ${requiredRefCount} required for ${depth} depth. The podcast's factual claims could not be adequately sourced.`
+      );
+
+      await addJob(notificationQueue, JobType.SEND_NOTIFICATION, {
+        userId,
+        type: 'PODCAST_FAILED',
+        title: 'Generation failed',
+        message: 'Not enough references could be verified. Try again with a more specific topic or provide source URLs.',
+        data: { podcastId },
+      });
+      return;
+    }
+
     logger.info('No references to validate, proceeding to audio generation', { podcastId });
     // Select TTS provider at auto-approve time (deferred from pipeline start)
     const isByokEarly = useAdminCredits ? true : await hasByokKey(userId);
@@ -254,14 +288,35 @@ export async function processReferenceValidation(
 
   await job.updateProgress(75);
 
+  // Gate: fail if remaining references are below minimum for depth
+  const remainingRefCount = references.length - removedNumbers.size;
+  if (!isShowcase && remainingRefCount < requiredRefCount) {
+    logger.error('References below minimum after validation', {
+      podcastId,
+      remaining: String(remainingRefCount),
+      required: String(requiredRefCount),
+      depth,
+      removed: String(removedNumbers.size),
+    });
+
+    await markPodcastFailed(podcastId,
+      `Only ${remainingRefCount} reference(s) could be verified — ${requiredRefCount} required for ${depth} depth. The podcast's factual claims could not be adequately sourced.`
+    );
+
+    await addJob(notificationQueue, JobType.SEND_NOTIFICATION, {
+      userId,
+      type: 'PODCAST_FAILED',
+      title: 'Generation failed',
+      message: 'Not enough references could be verified. Try again with a more specific topic or provide source URLs.',
+      data: { podcastId },
+    });
+    return;
+  }
+
   await job.updateProgress(80);
 
   // Check source + tier to decide whether to pause for review
-  const [podcastRecord, isByok, userRecord] = await Promise.all([
-    prisma.podcast.findUniqueOrThrow({
-      where: { id: podcastId },
-      select: { source: true },
-    }),
+  const [isByok, userRecord] = await Promise.all([
     useAdminCredits ? Promise.resolve(true) : hasByokKey(userId),
     prisma.user.findUniqueOrThrow({
       where: { id: userId },
@@ -271,7 +326,7 @@ export async function processReferenceValidation(
   const tierFeatures = getTierFeatures(userRecord.plan as 'FREE' | 'PRO', isByok, userRecord.role);
 
   // Non-WEB/IMPORT sources always auto-approve; for WEB/IMPORT, check tier
-  const isWebOrImport = podcastRecord.source === 'WEB' || podcastRecord.source === 'IMPORT';
+  const isWebOrImport = podcast?.source === 'WEB' || podcast?.source === 'IMPORT';
   const shouldAutoApprove = tierFeatures.autoApproveScript || !isWebOrImport;
 
   if (!shouldAutoApprove) {
