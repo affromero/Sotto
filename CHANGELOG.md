@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.21.2] - 2026-03-14
+
+### Added
+- Daily briefings: schema, scheduler, config, prompt, settings UI, API endpoints, and BRIEFING_READY notification (Phases 1-6)
+- Post-listen quizzes: schema, quiz generation worker, pipeline triggers, API routes, and PostListenQuiz UI component (Phases 1-3)
+- "Limited Sources" badge on feed cards and podcast detail page for podcasts with insufficient verified references
+- Minimum reference count gate in reference-validation worker — enforces per-depth minimums (10 deep_dive, 5 standard, 3 eli5)
+
+### Changed
+- Insufficient references now pause at SCRIPT_READY instead of failing — users can add source URLs, explore a different angle, accept as-is, or delete
+- Notification data includes `insufficientRefs`, `verified`, and `required` counts for frontend display
+
+### Fixed
+- Podcasts with zero verified references no longer silently reach READY status
+
 ## [0.21.1] - 2026-03-14
 
 ### Added
