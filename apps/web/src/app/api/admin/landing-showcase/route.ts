@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth-guards';
+import { prisma } from '@/lib/prisma';
 import { getLandingShowcaseConfig, setLandingShowcaseConfig } from '@/lib/landing-showcase';
 import { landingShowcaseUpdateSchema } from '@/lib/validations';
 import { errorResponse } from '@/lib/api-response';
@@ -29,4 +30,14 @@ export async function PATCH(request: NextRequest) {
   await setLandingShowcaseConfig(parsed.data, adminId);
   const updated = await getLandingShowcaseConfig();
   return NextResponse.json({ config: updated });
+}
+
+export async function DELETE() {
+  const adminId = await requireAdmin();
+  if (!adminId) {
+    return errorResponse('Forbidden', 403);
+  }
+
+  await prisma.landingShowcase.deleteMany({ where: { id: 'singleton' } });
+  return NextResponse.json({ config: null });
 }
