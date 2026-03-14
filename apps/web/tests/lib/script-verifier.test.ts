@@ -732,6 +732,15 @@ describe('reference quality enforcement', () => {
     expect(result.feedback).toBeNull();
   });
 
+  it('assessReferenceQuality returns countPassed=false for 0 references', () => {
+    const result = assessReferenceQuality([], 'standard');
+    expect(result.countPassed).toBe(false);
+    expect(result.totalCount).toBe(0);
+    expect(result.requiredCount).toBe(5);
+    expect(result.qualityScore).toBe(0);
+    expect(result.feedback).toContain('at least 5');
+  });
+
   it('quality score is higher for PAPER-heavy sets', () => {
     const paperRefs = makePaperRefs(5);
     const webRefs = Array.from({ length: 5 }, (_, i) => makeRef(i + 1, 'WEB'));

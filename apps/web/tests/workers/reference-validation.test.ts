@@ -10,8 +10,11 @@ const mockPrismaScriptFindUnique = vi.fn().mockResolvedValue({
   markdown: '',
 });
 const mockPrismaScriptUpdate = vi.fn().mockResolvedValue({});
+const mockPrismaDiscoveryFindUnique = vi.fn().mockResolvedValue({ depth: 'standard' });
 const mockPrismaPodcastFindUnique = vi.fn().mockResolvedValue({
   topic: 'Quantum Computing',
+  source: 'TWITTER',
+  verificationMode: 'standard',
 });
 const mockPrismaPodcastFindUniqueOrThrow = vi.fn().mockResolvedValue({
   source: 'TWITTER',
@@ -37,6 +40,9 @@ vi.mock('@/lib/prisma', () => {
     },
     segment: {
       create: (...args: unknown[]) => mockPrismaSegmentCreate(...args),
+    },
+    discovery: {
+      findUnique: (...args: unknown[]) => mockPrismaDiscoveryFindUnique(...args),
     },
     user: {
       findUniqueOrThrow: vi.fn().mockResolvedValue({ plan: 'PRO', role: 'USER' }),
@@ -151,6 +157,19 @@ vi.mock('@/lib/pipeline-events', () => ({
   logPipelineStageComplete: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock('@/lib/pipeline-resume', () => ({
+  markPodcastFailed: vi.fn(),
+}));
+
+vi.mock('@/lib/script-verifier', () => ({
+  MIN_REFERENCE_COUNTS: {
+    deep_dive: 10,
+    standard: 5,
+    quick_overview: 3,
+    eli5: 3,
+  },
+}));
+
 vi.mock('@/lib/logger', () => ({
   logger: {
     info: vi.fn(),
@@ -185,50 +204,50 @@ describe('processReferenceValidation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    // Default: single reference, script with turns
-    mockPrismaReferenceFindMany.mockResolvedValue([
-      {
-        id: 'ref-001',
-        number: 1,
-        title: 'Introduction to Quantum Computing',
-        authors: ['John Doe', 'Jane Smith'],
+    // Default: 5 references (meets standard depth minimum), script with turns
+    mockPrismaReferenceFindMany.mockResolvedValue(
+      Array.from({ length: 5 }, (_, i) => ({
+        id: `ref-00${i + 1}`,
+        number: i + 1,
+        title: `Paper ${String.fromCharCode(65 + i)}`,
+        authors: ['Author'],
         year: 2023,
-        url: 'https://example.com/paper',
-        doi: '10.1234/qc.2023.001',
+        url: `https://example.com/paper-${i + 1}`,
+        doi: i === 0 ? '10.1234/qc.2023.001' : null,
         type: 'article',
-      },
-    ]);
+      }))
+    );
 
     mockPrismaScriptFindUnique.mockResolvedValue({
       turns: [
         { speaker: 'HOST', text: 'Welcome to the show! [1]' },
         { speaker: 'EXPERT', text: 'Thanks for having me!' },
       ],
-      markdown: '# Transcript\n\n[1] Introduction to Quantum Computing',
+      markdown: '# Transcript\n\n[1] Paper A',
     });
 
     mockPrismaPodcastFindUnique.mockResolvedValue({
       topic: 'Quantum Computing Basics',
+      source: 'TWITTER',
+      verificationMode: 'standard',
     });
 
     mockRunReferenceVerification.mockResolvedValue({
-      results: new Map([
-        [
-          'ref-001',
+      results: new Map(
+        Array.from({ length: 5 }, (_, i) => [
+          `ref-00${i + 1}`,
           {
             domain: 'ACADEMIC',
-            verdict: { status: 'VERIFIED', confidence: 0.85 },
+            verdict: { status: 'VERIFIED' as const, confidence: 0.85 },
             score: 0.85,
             checks: [
               { layer: 'url', passed: true, confidence: 0.6, detail: 'URL returned 200' },
-              { layer: 'doi', passed: true, confidence: 0.95, detail: 'DOI verified: title similarity 100%' },
-              { layer: 'title_search', passed: true, confidence: 0.9, detail: 'Title matched in OpenAlex (similarity 95%)' },
-              { layer: 'ai', passed: true, confidence: 0.85, detail: 'AI: REAL — Reference appears legitimate' },
+              { layer: 'ai', passed: true, confidence: 0.85, detail: 'AI: REAL' },
             ],
-            logOddsContributions: { doi: 1.5, title_search: 0.8, url: 0.2, ai: 0.6 },
+            logOddsContributions: { url: 0.2, ai: 0.6 },
           },
-        ],
-      ]),
+        ])
+      ),
       rejectedRefIds: new Set<string>(),
     });
 
@@ -248,9 +267,14 @@ describe('processReferenceValidation', () => {
     });
   });
 
-  describe('no references to validate', () => {
+  describe('no references to validate (showcase mode — gate exempt)', () => {
     beforeEach(() => {
       mockPrismaReferenceFindMany.mockResolvedValue([]);
+      mockPrismaPodcastFindUnique.mockResolvedValue({
+        topic: 'Quantum Computing Basics',
+        source: 'TWITTER',
+        verificationMode: 'showcase',
+      });
     });
 
     it('creates segments from script turns when no references exist', async () => {
@@ -320,7 +344,7 @@ describe('processReferenceValidation', () => {
         expect.arrayContaining([
           expect.objectContaining({
             id: 'ref-001',
-            title: 'Introduction to Quantum Computing',
+            title: 'Paper A',
           }),
         ]),
         expect.arrayContaining([
@@ -581,7 +605,7 @@ describe('processReferenceValidation', () => {
         where: { id: 'ref-001' },
         data: expect.objectContaining({
           verificationStatus: 'REPLACED',
-          originalTitle: 'Introduction to Quantum Computing',
+          originalTitle: 'Paper A',
           title: 'Corrected Title',
           authors: ['Corrected Author'],
           year: 2024,
@@ -602,12 +626,10 @@ describe('processReferenceValidation', () => {
           verificationDetails: expect.objectContaining({
             checks: expect.arrayContaining([
               expect.objectContaining({ layer: 'url' }),
-              expect.objectContaining({ layer: 'doi' }),
-              expect.objectContaining({ layer: 'title_search' }),
               expect.objectContaining({ layer: 'ai' }),
             ]),
             posterior: 0.85,
-            logOddsContributions: { doi: 1.5, title_search: 0.8, url: 0.2, ai: 0.6 },
+            logOddsContributions: { url: 0.2, ai: 0.6 },
             verifiedAt: expect.any(String),
           }),
         }),
@@ -798,25 +820,39 @@ describe('processReferenceValidation', () => {
       );
     });
 
-    it('does not set podcast status to FAILED when all references are removed', async () => {
+    it('pauses at SCRIPT_READY when all references are removed', async () => {
       const job = createMockJob(defaultPayload);
       await processReferenceValidation(job);
 
-      expect(mockPrismaPodcastUpdate).not.toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({ status: 'FAILED' }),
-        })
+      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
+        where: { id: 'podcast-001' },
+        data: { status: 'SCRIPT_READY', lowReferences: true },
+      });
+    });
+
+    it('does not continue to audio generation when all references are removed', async () => {
+      const job = createMockJob(defaultPayload);
+      await processReferenceValidation(job);
+
+      expect(mockAddJob).not.toHaveBeenCalledWith(
+        expect.anything(),
+        'generate_audio',
+        expect.anything()
       );
     });
 
-    it('continues pipeline to audio generation when all references are removed', async () => {
+    it('sends SCRIPT_READY notification when all references are removed', async () => {
       const job = createMockJob(defaultPayload);
       await processReferenceValidation(job);
 
       expect(mockAddJob).toHaveBeenCalledWith(
-        expect.anything(),
-        'generate_audio',
-        expect.anything()
+        { name: 'notifications' },
+        'send_notification',
+        expect.objectContaining({
+          userId: 'user-001',
+          type: 'SCRIPT_READY',
+          title: expect.stringContaining('references'),
+        })
       );
     });
   });
@@ -878,8 +914,13 @@ describe('processReferenceValidation', () => {
 
   describe('auto-select TTS provider at auto-approve', () => {
     beforeEach(() => {
-      // Set up for auto-approve path: TWITTER source, non-WEB
+      // Set up for auto-approve path: TWITTER source, showcase (bypass gate for 0-refs tests)
       mockPrismaReferenceFindMany.mockResolvedValue([]);
+      mockPrismaPodcastFindUnique.mockResolvedValue({
+        topic: 'Quantum Computing Basics',
+        source: 'TWITTER',
+        verificationMode: 'showcase',
+      });
       mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({ source: 'TWITTER' });
     });
 
@@ -914,16 +955,17 @@ describe('processReferenceValidation', () => {
     });
 
     it('calls selectFreeTierProviders for free-tier at full-validation auto-approve', async () => {
-      // Has references → goes through full validation path
-      mockPrismaReferenceFindMany.mockResolvedValue([
-        { id: 'ref-001', number: 1, title: 'Paper', authors: [], year: 2023, url: 'https://example.com', doi: null, type: 'article' },
-      ]);
+      // Has 5 references → passes gate, goes through full validation path
+      mockPrismaReferenceFindMany.mockResolvedValue(
+        Array.from({ length: 5 }, (_, i) => ({ id: `ref-00${i + 1}`, number: i + 1, title: 'Paper', authors: [], year: 2023, url: 'https://example.com', doi: null, type: 'article' }))
+      );
       mockRunReferenceVerification.mockResolvedValue({
-        results: new Map([
-          ['ref-001', { domain: 'GENERAL', verdict: { status: 'VERIFIED', confidence: 0.8 }, score: 0.8, checks: [], logOddsContributions: {} }],
-        ]),
+        results: new Map(
+          Array.from({ length: 5 }, (_, i) => [`ref-00${i + 1}`, { domain: 'GENERAL', verdict: { status: 'VERIFIED' as const, confidence: 0.8 }, score: 0.8, checks: [], logOddsContributions: {} }])
+        ),
         rejectedRefIds: new Set<string>(),
       });
+      mockPrismaPodcastFindUnique.mockResolvedValue({ topic: 'Test', source: 'TWITTER', verificationMode: 'standard' });
       // TWITTER auto-approves + non-BYOK
       mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({ source: 'TWITTER' });
       const { hasByokKey } = await import('@/lib/byok');
@@ -943,15 +985,16 @@ describe('processReferenceValidation', () => {
     });
 
     it('skips selectFreeTierProviders for BYOK at full-validation auto-approve', async () => {
-      mockPrismaReferenceFindMany.mockResolvedValue([
-        { id: 'ref-001', number: 1, title: 'Paper', authors: [], year: 2023, url: 'https://example.com', doi: null, type: 'article' },
-      ]);
+      mockPrismaReferenceFindMany.mockResolvedValue(
+        Array.from({ length: 5 }, (_, i) => ({ id: `ref-00${i + 1}`, number: i + 1, title: 'Paper', authors: [], year: 2023, url: 'https://example.com', doi: null, type: 'article' }))
+      );
       mockRunReferenceVerification.mockResolvedValue({
-        results: new Map([
-          ['ref-001', { domain: 'GENERAL', verdict: { status: 'VERIFIED', confidence: 0.8 }, score: 0.8, checks: [], logOddsContributions: {} }],
-        ]),
+        results: new Map(
+          Array.from({ length: 5 }, (_, i) => [`ref-00${i + 1}`, { domain: 'GENERAL', verdict: { status: 'VERIFIED' as const, confidence: 0.8 }, score: 0.8, checks: [], logOddsContributions: {} }])
+        ),
         rejectedRefIds: new Set<string>(),
       });
+      mockPrismaPodcastFindUnique.mockResolvedValue({ topic: 'Test', source: 'TWITTER', verificationMode: 'standard' });
       mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({ source: 'TWITTER' });
       const { hasByokKey } = await import('@/lib/byok');
       (hasByokKey as ReturnType<typeof vi.fn>).mockResolvedValue(true);
@@ -988,6 +1031,139 @@ describe('processReferenceValidation', () => {
       const job = createMockJob(defaultPayload);
 
       await expect(processReferenceValidation(job)).rejects.toThrow('Segment creation failed');
+    });
+  });
+
+  describe('minimum reference gate', () => {
+    it('pauses at SCRIPT_READY when remaining references drop below minimum for depth', async () => {
+      // 5 refs, 4 removed → 1 remaining < 5 required
+      mockPrismaReferenceFindMany.mockResolvedValue(
+        Array.from({ length: 5 }, (_, i) => ({
+          id: `ref-00${i + 1}`, number: i + 1, title: `Paper ${i + 1}`, authors: [], year: 2023,
+          url: `https://example.com/${i + 1}`, doi: null, type: 'article',
+        }))
+      );
+      const resultsMap = new Map<string, { domain: string; verdict: { status: string; confidence: number }; score: number; checks: never[]; logOddsContributions: Record<string, never> }>();
+      resultsMap.set('ref-001', { domain: 'GENERAL', verdict: { status: 'VERIFIED', confidence: 0.8 }, score: 0.8, checks: [], logOddsContributions: {} });
+      for (let i = 2; i <= 5; i++) {
+        resultsMap.set(`ref-00${i}`, { domain: 'GENERAL', verdict: { status: 'REMOVED', confidence: 0 }, score: 0, checks: [], logOddsContributions: {} });
+      }
+      mockRunReferenceVerification.mockResolvedValue({
+        results: resultsMap,
+        rejectedRefIds: new Set<string>(),
+      });
+
+      const job = createMockJob(defaultPayload);
+      await processReferenceValidation(job);
+
+      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
+        where: { id: 'podcast-001' },
+        data: { status: 'SCRIPT_READY', lowReferences: true },
+      });
+      expect(mockAddJob).not.toHaveBeenCalledWith(
+        expect.anything(), 'generate_audio', expect.anything()
+      );
+    });
+
+    it('continues when remaining references meet minimum', async () => {
+      // 7 refs, 2 removed → 5 remaining >= 5 required
+      mockPrismaReferenceFindMany.mockResolvedValue(
+        Array.from({ length: 7 }, (_, i) => ({
+          id: `ref-00${i + 1}`, number: i + 1, title: `Paper ${i + 1}`, authors: [], year: 2023,
+          url: `https://example.com/${i + 1}`, doi: null, type: 'article',
+        }))
+      );
+      const resultsMap = new Map<string, { domain: string; verdict: { status: string; confidence: number }; score: number; checks: never[]; logOddsContributions: Record<string, never> }>();
+      for (let i = 0; i < 5; i++) {
+        resultsMap.set(`ref-00${i + 1}`, { domain: 'GENERAL', verdict: { status: 'VERIFIED', confidence: 0.8 }, score: 0.8, checks: [], logOddsContributions: {} });
+      }
+      resultsMap.set('ref-006', { domain: 'GENERAL', verdict: { status: 'REMOVED', confidence: 0 }, score: 0, checks: [], logOddsContributions: {} });
+      resultsMap.set('ref-007', { domain: 'GENERAL', verdict: { status: 'REMOVED', confidence: 0 }, score: 0, checks: [], logOddsContributions: {} });
+      mockRunReferenceVerification.mockResolvedValue({
+        results: resultsMap,
+        rejectedRefIds: new Set<string>(),
+      });
+
+      const job = createMockJob(defaultPayload);
+      await processReferenceValidation(job);
+
+      expect(mockPrismaPodcastUpdate).not.toHaveBeenCalledWith(
+        expect.objectContaining({ data: { status: 'SCRIPT_READY' } })
+      );
+    });
+
+    it('uses eli5 thresholds for relaxed verificationMode', async () => {
+      // relaxed → eli5 depth → requires 3. 3 refs, 0 removed → passes
+      mockPrismaPodcastFindUnique.mockResolvedValue({
+        topic: 'Fun Topic',
+        source: 'TWITTER',
+        verificationMode: 'relaxed',
+      });
+      mockPrismaReferenceFindMany.mockResolvedValue(
+        Array.from({ length: 3 }, (_, i) => ({
+          id: `ref-00${i + 1}`, number: i + 1, title: `Paper ${i + 1}`, authors: [], year: 2023,
+          url: `https://example.com/${i + 1}`, doi: null, type: 'article',
+        }))
+      );
+      mockRunReferenceVerification.mockResolvedValue({
+        results: new Map(
+          Array.from({ length: 3 }, (_, i) => [`ref-00${i + 1}`, {
+            domain: 'GENERAL', verdict: { status: 'VERIFIED' as const, confidence: 0.8 }, score: 0.8, checks: [], logOddsContributions: {},
+          }])
+        ),
+        rejectedRefIds: new Set<string>(),
+      });
+
+      const job = createMockJob(defaultPayload);
+      await processReferenceValidation(job);
+
+      expect(mockPrismaPodcastUpdate).not.toHaveBeenCalledWith(
+        expect.objectContaining({ data: { status: 'SCRIPT_READY' } })
+      );
+    });
+
+    it('skips gate for showcase verificationMode', async () => {
+      // showcase + 0 remaining refs → should NOT pause
+      mockPrismaPodcastFindUnique.mockResolvedValue({
+        topic: 'Showcase Topic',
+        source: 'TWITTER',
+        verificationMode: 'showcase',
+      });
+      mockPrismaReferenceFindMany.mockResolvedValue([
+        { id: 'ref-001', number: 1, title: 'Paper', authors: [], year: 2023, url: 'https://example.com', doi: null, type: 'article' },
+      ]);
+      mockRunReferenceVerification.mockResolvedValue({
+        results: new Map([
+          ['ref-001', { domain: 'GENERAL', verdict: { status: 'REMOVED', confidence: 0 }, score: 0, checks: [], logOddsContributions: {} }],
+        ]),
+        rejectedRefIds: new Set<string>(),
+      });
+
+      const job = createMockJob(defaultPayload);
+      await processReferenceValidation(job);
+
+      // Showcase should proceed to audio, not pause at SCRIPT_READY due to gate
+      expect(mockAddJob).toHaveBeenCalledWith(
+        expect.anything(), 'generate_audio', expect.anything()
+      );
+    });
+
+    it('pauses at SCRIPT_READY when references.length === 0 and not showcase', async () => {
+      // Early-exit path: 0 refs, standard depth → gate fires
+      mockPrismaReferenceFindMany.mockResolvedValue([]);
+
+      const job = createMockJob(defaultPayload);
+      await processReferenceValidation(job);
+
+      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
+        where: { id: 'podcast-001' },
+        data: { status: 'SCRIPT_READY', lowReferences: true },
+      });
+      expect(mockAddJob).toHaveBeenCalledWith(
+        { name: 'notifications' },
+        'send_notification',
+        expect.objectContaining({ type: 'SCRIPT_READY' })
+      );
     });
   });
 });
