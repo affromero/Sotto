@@ -226,10 +226,15 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
     notFound();
   }
 
-  // Check if quiz is available
-  const hasQuiz = await prisma.podcastQuiz.count({
-    where: { podcastId: podcast.id, status: 'READY' },
-  }).then((c) => c > 0);
+  // Check if quiz is available + get stats
+  const quizData = await prisma.podcastQuiz.findUnique({
+    where: { podcastId: podcast.id },
+    select: { status: true, attemptCount: true, avgScore: true },
+  });
+  const hasQuiz = quizData?.status === 'READY';
+  const quizStats = hasQuiz && quizData.attemptCount > 0
+    ? { attemptCount: quizData.attemptCount, avgScore: quizData.avgScore }
+    : undefined;
 
   // Check if current user has liked/saved
   let isLiked = false;
@@ -432,7 +437,7 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
         />
       )}
       <div className={styles.container}>
-        <PodcastPlayerView podcast={podcastData} isOwner={isOwner} isAdmin={isAdmin} isAuthenticated={!!userId} currentUserId={userId} canMakePrivate={canMakePrivate} videoStatus={videoStatus} avatarStatus={avatarStatus} musicStatus={musicStatus} hasQuiz={hasQuiz} />
+        <PodcastPlayerView podcast={podcastData} isOwner={isOwner} isAdmin={isAdmin} isAuthenticated={!!userId} currentUserId={userId} canMakePrivate={canMakePrivate} videoStatus={videoStatus} avatarStatus={avatarStatus} musicStatus={musicStatus} hasQuiz={hasQuiz} quizStats={quizStats} />
         {!userId && podcast.visibility === 'PUBLIC' && (
           <JoinCTA creatorHandle={podcast.user.handle} creatorName={podcast.user.name} />
         )}
