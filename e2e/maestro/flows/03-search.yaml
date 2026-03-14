@@ -1,6 +1,6 @@
 appId: fm.sotto.app
 name: Search - Podcasts and People
-tags: [search]
+tags: [search, smoke]
 ---
 - runFlow: ../helpers/login.yaml
 
