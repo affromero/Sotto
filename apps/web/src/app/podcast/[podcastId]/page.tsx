@@ -355,6 +355,7 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
     createdAt: podcast.createdAt.toISOString(),
     source: podcast.source,
     isHumanContent: podcast.isHumanContent,
+    lowReferences: podcast.lowReferences,
     sourcePlatform: podcast.sourcePlatform,
     aiProvider: podcast.aiProvider,
     aiModel: podcast.aiModel,

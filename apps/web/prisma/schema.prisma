@@ -366,6 +366,7 @@ model Podcast {
   originalFormat      String?
   transcriptProvided  Boolean @default(false)
   isHumanContent      Boolean @default(false)
+  lowReferences       Boolean @default(false)
   sourcePlatform      String?  // e.g. "notebooklm", "spotify", "apple_podcasts", "youtube"
 
   // AI-suggested metadata (for imports where user provided their own)

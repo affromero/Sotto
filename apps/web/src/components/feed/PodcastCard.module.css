@@ -83,6 +83,23 @@
   text-transform: uppercase;
 }
 
+.limitedSourcesBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px var(--space-2);
+  font: var(--text-caption);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.85);
+  white-space: nowrap;
+  flex-shrink: 0;
+  background: rgba(234, 179, 8, 0.35);
+  border-radius: var(--radius-full);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
 /* ── Cover content (title + topic) ─────────── */
 
 .coverContent {

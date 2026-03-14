@@ -84,7 +84,7 @@ export async function processReferenceValidation(
 
       await prisma.podcast.update({
         where: { id: podcastId },
-        data: { status: 'SCRIPT_READY' },
+        data: { status: 'SCRIPT_READY', lowReferences: true },
       });
 
       await addJob(notificationQueue, JobType.SEND_NOTIFICATION, {
@@ -301,7 +301,7 @@ export async function processReferenceValidation(
 
     await prisma.podcast.update({
       where: { id: podcastId },
-      data: { status: 'SCRIPT_READY' },
+      data: { status: 'SCRIPT_READY', lowReferences: true },
     });
 
     await addJob(notificationQueue, JobType.SEND_NOTIFICATION, {
