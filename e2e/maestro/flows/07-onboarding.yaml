@@ -1,6 +1,6 @@
 appId: fm.sotto.app
 name: Onboarding - New User Flow
-tags: [onboarding]
+tags: [onboarding, smoke]
 ---
 # Assumes a fresh user state (no prior login)
 - extendedWaitUntil:
