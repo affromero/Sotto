@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.21.0] - 2026-03-14
+
+### Added
+- Waveform generation worker for audio visualization peak extraction
+- Provider-agnostic TTS chunk continuity via `continuityIds` and `getLastContinuityId()` on TtsProvider interface
+- ElevenLabs request stitching (`previous_request_ids`) for eleven_v3 model
+- Hume AI cross-chunk continuity via `previous_generation_id`
+- `modelsWithoutTextContext` registry field to declare model-level text context restrictions
+- TTS continuity reference documentation (`CONTINUITY.md`)
+
+### Fixed
+- ElevenLabs eleven_v3 returning 400 error when chunked text sent `previous_text`/`next_text` (production blocker)
+
+### Changed
+- Hardened all 28 Maestro E2E flows with testIDs, scrollUntilVisible, terminal assertions, and screenshots
+
 ## [0.20.0] - 2026-03-14
 
 ### Added
