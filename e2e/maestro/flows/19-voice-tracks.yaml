@@ -4,13 +4,18 @@ tags: [player, teleprompter]
 ---
 - runFlow: ../helpers/login.yaml
 
-# Navigate to first podcast
+# Scroll to seeded podcast in feed
 - extendedWaitUntil:
     visible:
       id: "feed-podcast-list"
     timeout: 5000
+- scrollUntilVisible:
+    element:
+      id: "podcast-card-${E2E_PODCAST_ID}"
+    direction: DOWN
+    timeout: 10000
 - tapOn:
-    text: "E2E Test Podcast"
+    id: "podcast-card-${E2E_PODCAST_ID}"
 - extendedWaitUntil:
     visible:
       id: "player-play-pause"
@@ -24,6 +29,7 @@ tags: [player, teleprompter]
 - tapOn:
     id: "player-teleprompter-toggle"
 
-# Verify player is still functional
+# Terminal assertion: player still functional
 - assertVisible:
     id: "player-play-pause"
+- takeScreenshot: teleprompter-toggled

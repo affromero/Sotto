@@ -22,3 +22,8 @@ tags: [search, smoke]
     id: "search-mode-people"
 - tapOn:
     id: "search-mode-podcasts"
+
+# Terminal assertion: search results visible
+- assertVisible:
+    id: "search-results-list"
+- takeScreenshot: search-results

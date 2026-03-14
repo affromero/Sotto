@@ -83,11 +83,12 @@ export function DraftsList({ onResume }: Props) {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {drafts.map((draft) => (
+        {drafts.map((draft, index) => (
           <Pressable
             key={draft.id}
             style={styles.card}
             onPress={() => onResume(draft.id)}
+            testID={`draft-item-${index}`}
           >
             <View style={styles.cardHeader}>
               <Ionicons name="document-text-outline" size={18} color={colors.primary} />

@@ -21,3 +21,4 @@ tags: [settings, api-keys]
     text: "Anthropic"
 - assertVisible:
     text: "OpenAI"
+- takeScreenshot: api-keys-screen

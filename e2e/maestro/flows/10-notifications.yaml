@@ -19,3 +19,12 @@ tags: [notifications]
 # Mark all as read
 - tapOn:
     id: "notifications-mark-all-read"
+
+# Terminal assertion: notifications list still visible after mark read
+- extendedWaitUntil:
+    visible:
+      id: "notifications-list"
+    timeout: 3000
+- assertVisible:
+    id: "notifications-list"
+- takeScreenshot: notifications-read

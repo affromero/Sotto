@@ -8,11 +8,12 @@ interface EmptyStateProps {
   iconName?: keyof typeof Ionicons.glyphMap;
   title: string;
   subtitle?: string;
+  testID?: string;
 }
 
-export function EmptyState({ icon, iconName, title, subtitle }: EmptyStateProps) {
+export function EmptyState({ icon, iconName, title, subtitle, testID }: EmptyStateProps) {
   return (
-    <Animated.View entering={FadeIn.duration(500)} style={styles.container}>
+    <Animated.View entering={FadeIn.duration(500)} style={styles.container} testID={testID}>
       {iconName ? (
         <Ionicons name={iconName} size={48} color={colors.textTertiary} style={styles.iconSpacing} />
       ) : icon ? (

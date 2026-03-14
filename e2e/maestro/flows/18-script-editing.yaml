@@ -49,3 +49,8 @@ tags: [create, script, smoke]
           visible:
             id: "script-approve-button"
           timeout: 30000
+
+# Terminal assertion: script approve button visible after regeneration
+- assertVisible:
+    id: "script-approve-button"
+- takeScreenshot: script-regenerated

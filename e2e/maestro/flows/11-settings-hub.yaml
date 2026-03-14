@@ -58,3 +58,8 @@ tags: [settings]
       id: "referral-copy-button"
     timeout: 3000
 - back
+
+# Terminal assertion: back at settings hub
+- assertVisible:
+    id: "settings-scroll"
+- takeScreenshot: settings-hub

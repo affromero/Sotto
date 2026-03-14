@@ -15,11 +15,13 @@ tags: [onboarding, smoke]
 - tapOn:
     id: "onboarding-name-continue"
 
-# Step 2: Select interests
+# Step 2: Select interests (pick first chip)
 - extendedWaitUntil:
     visible:
       id: "onboarding-interests-continue"
     timeout: 5000
+- tapOn:
+    id: "onboarding-interest-chip-0"
 - tapOn:
     id: "onboarding-interests-continue"
 
@@ -31,8 +33,11 @@ tags: [onboarding, smoke]
 - tapOn:
     id: "onboarding-done-button"
 
-# Verify we land on the feed
+# Terminal assertion: landed on feed
 - extendedWaitUntil:
     visible:
       id: "feed-podcast-list"
     timeout: 10000
+- assertVisible:
+    id: "feed-podcast-list"
+- takeScreenshot: post-onboarding
