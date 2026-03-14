@@ -45,6 +45,7 @@ BullMQ workers that process async jobs. Each worker runs in a separate thread wi
 | `demo-visual`               | `demo-visual`               | 3      | DemoScene visualType + visualPrompt → fal FLUX (image), fal video, or Mapbox (map)                            | Uploads visual to R2, sets DemoScene.visualUrl + visualStatus=READY                      |
 | `demo-transition`           | `demo-transition`           | 2      | Adjacent scene recordings → FFmpeg xfade crossfade clip                                                        | Uploads transition to R2, sets DemoScene.transitionUrl + transitionStatus=READY           |
 | `demo-composition`          | `demo-composition`          | 1      | All scene assets ready → Remotion sidecar /stitch → download + composite + grade → final MP4                  | Uploads final video to R2, sets DemoProject.videoUrl + status=READY                      |
+| `waveform-generation`       | `waveform-generation`       | 2      | Podcast audioUrl → FFmpeg astats (waveform peaks JSON) + showspectrumpic (spectrogram PNG) → R2 upload        | Sets Podcast.waveformUrl + spectrogramUrl                                                |
 
 ## Pipeline Flow
 

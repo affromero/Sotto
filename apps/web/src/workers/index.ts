@@ -70,6 +70,7 @@ import { processDemoComposition } from './demo-composition.worker';
 import { processDemoSceneComposition } from './demo-scene-composition.worker';
 import { processMusicGeneration } from './music-generation.worker';
 import { processLipSyncTest } from './lip-sync-test.worker';
+import { processWaveformGeneration } from './waveform-generation.worker';
 import { isR2MonitoringConfigured } from '@/lib/cloudflare-r2-usage';
 import { startPricingRefreshInterval } from '@/lib/pricing';
 
@@ -215,6 +216,7 @@ const workers = [
   shouldRun('demo-scene-composition') && createWorker('demo-scene-composition', processDemoSceneComposition, { concurrency: 2, lockDuration: 600000 }),
   shouldRun('music-generation') && createWorker('music-generation', processMusicGeneration, { concurrency: 2, lockDuration: 600000 }),
   shouldRun('lip-sync-test') && createWorker('lip-sync-test', processLipSyncTest, { concurrency: 2, lockDuration: 300000 }),
+  shouldRun('waveform-generation') && createWorker('waveform-generation', processWaveformGeneration, { concurrency: 2 }),
 ].filter(Boolean) as ReturnType<typeof createWorker>[];
 
 // Cron jobs and webhooks run only on light (or all) profile to prevent duplicate repeat registrations

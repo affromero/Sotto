@@ -98,6 +98,7 @@ vi.mock('@/lib/queue', () => ({
     REPLY_TWITTER: 'reply_twitter',
     REPLY_TELEGRAM: 'reply_telegram',
     AUTO_TWEET: 'AUTO_TWEET',
+    GENERATE_WAVEFORM: 'generate_waveform',
   },
   notificationQueue: { name: 'notifications' },
   pdfGenerationQueue: { name: 'pdf-generation' },
@@ -105,6 +106,7 @@ vi.mock('@/lib/queue', () => ({
   twitterReplyQueue: { name: 'twitter-reply' },
   telegramReplyQueue: { name: 'telegram-reply' },
   twitterAutoTweetQueue: { name: 'twitter-auto-tweet' },
+  waveformGenerationQueue: { name: 'waveform-generation' },
 }));
 
 const mockGenerateSoundEffect = vi.fn().mockResolvedValue(Buffer.from('sfx-audio'));
@@ -642,6 +644,17 @@ describe('processAudioStitching', () => {
       );
     });
 
+    it('enqueues waveform generation after successful stitching', async () => {
+      const job = createMockJob(defaultPayload);
+      await processAudioStitching(job);
+
+      expect(mockAddJob).toHaveBeenCalledWith(
+        { name: 'waveform-generation' },
+        'generate_waveform',
+        { podcastId: 'podcast-001', userId: 'user-1' }
+      );
+    });
+
     it('does not enqueue feature computation when duration exceeds limit', async () => {
       mockStitchWithEffects.mockResolvedValue({ duration: 2100 });
       const job = createMockJob(defaultPayload);
@@ -707,7 +720,7 @@ describe('processAudioStitching', () => {
       await processAudioStitching(job);
 
       expect(mockPrismaTweetMentionFindFirst).not.toHaveBeenCalled();
-      expect(mockAddJob).toHaveBeenCalledTimes(3); // notification + transcript + feature computation
+      expect(mockAddJob).toHaveBeenCalledTimes(4); // notification + transcript + feature computation + waveform
     });
 
     it('does not queue Twitter reply when mention is not found', async () => {

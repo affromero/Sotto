@@ -191,9 +191,10 @@ vi.mock('@/lib/generation-gate', () => ({
 const mockAddJob = vi.fn().mockResolvedValue({ id: 'job-1' });
 vi.mock('@/lib/queue', () => ({
   addJob: (...args: unknown[]) => mockAddJob(...args),
-  JobType: { SEND_NOTIFICATION: 'send_notification', COMPUTE_FEATURES: 'compute_features' },
+  JobType: { SEND_NOTIFICATION: 'send_notification', COMPUTE_FEATURES: 'compute_features', GENERATE_WAVEFORM: 'generate_waveform' },
   notificationQueue: { name: 'notifications' },
   featureComputationQueue: { name: 'feature-computation' },
+  waveformGenerationQueue: { name: 'waveform-generation' },
 }));
 
 vi.mock('@/lib/logger', () => ({
@@ -552,6 +553,17 @@ describe('processAudioImport', () => {
         { name: 'notifications' },
         'send_notification',
         expect.objectContaining({ userId: 'user-001', type: 'PODCAST_READY' })
+      );
+    });
+
+    it('queues waveform generation on completion', async () => {
+      const job = createMockJob(defaultPayload);
+      await processAudioImport(job);
+
+      expect(mockAddJob).toHaveBeenCalledWith(
+        { name: 'waveform-generation' },
+        'generate_waveform',
+        { podcastId: 'podcast-001', userId: 'user-001' }
       );
     });
 
