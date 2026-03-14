@@ -344,6 +344,64 @@
 }
 
 /* ==========================================================================
+   LINK STYLES — real destinations for interactive showcase
+   ========================================================================== */
+
+.extLink {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: rgba(255, 255, 255, 0.3);
+  text-underline-offset: 2px;
+}
+
+.extLink:hover {
+  text-decoration-color: currentColor;
+}
+
+.twHandleLink {
+  color: inherit;
+  text-decoration: none;
+}
+
+.twHandleLink:hover {
+  text-decoration: underline;
+}
+
+a.twMention {
+  text-decoration: none;
+}
+
+a.twMention:hover {
+  text-decoration: underline;
+}
+
+a.twCard {
+  text-decoration: none;
+  cursor: pointer;
+}
+
+a.twCard:hover {
+  border-color: #546576;
+}
+
+.tgBotLink {
+  color: inherit;
+  text-decoration: none;
+}
+
+.tgBotLink:hover {
+  text-decoration: underline;
+}
+
+a.tgKeyUrl {
+  text-decoration: none;
+}
+
+a.tgKeyUrl:hover {
+  background: rgba(106, 179, 243, 0.1);
+}
+
+/* ==========================================================================
    MOBILE
    ========================================================================== */
 
