@@ -224,4 +224,8 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
     description: 'Tests lip-sync models with a short audio clip and avatar image via fal.ai',
     stage: 'Video Pipeline',
   },
+  'waveform-generation': {
+    description: 'Generates waveform peaks JSON and spectrogram PNG from podcast audio',
+    stage: 'Audio Pipeline',
+  },
 };
