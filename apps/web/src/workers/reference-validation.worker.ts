@@ -92,7 +92,7 @@ export async function processReferenceValidation(
         type: 'SCRIPT_READY',
         title: 'Script needs references',
         message: 'Your podcast doesn\'t have enough verified references. Add source URLs, explore a different angle, or delete it.',
-        data: { podcastId },
+        data: { podcastId, insufficientRefs: true, verified: 0, required: requiredRefCount },
       });
       return;
     }
@@ -309,7 +309,7 @@ export async function processReferenceValidation(
       type: 'SCRIPT_READY',
       title: 'Script needs more references',
       message: `Only ${remainingRefCount} of ${requiredRefCount} required references could be verified. Add source URLs, explore a different angle, or delete it.`,
-      data: { podcastId },
+      data: { podcastId, insufficientRefs: true, verified: remainingRefCount, required: requiredRefCount },
     });
     return;
   }
