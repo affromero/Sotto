@@ -29,6 +29,7 @@ import { getAiKey } from '@/lib/byok';
 import type { PipelineSegmentNode, PipelineTransition, VisualMode, VideoPipeline } from '@/types/pipeline';
 import { getAllVideoProviderMeta, videoModelSupportsLastFrame } from '@/lib/providers/video-registry';
 import { logger } from '@/lib/logger';
+import { estimateDurationFromText } from '@/lib/duration';
 
 type RouteParams = { params: Promise<{ podcastId: string }> };
 
@@ -110,7 +111,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     order: s.order,
     speaker: s.speaker,
     text: s.text,
-    duration: s.duration ?? 5,
+    duration: s.duration ?? estimateDurationFromText(s.text),
   }));
 
   // Parse optional body for AI provider override
