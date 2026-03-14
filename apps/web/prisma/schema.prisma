@@ -353,6 +353,10 @@ model Podcast {
   // Video generation
   videoUrl String?
 
+  // Waveform visualization
+  waveformUrl     String?
+  spectrogramUrl  String?
+
   // Background music
   musicUrl          String?
   musicVolume       Float     @default(0.15)

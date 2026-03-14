@@ -10,6 +10,7 @@ import {
   telegramReplyQueue,
   twitterAutoTweetQueue,
   visualClassificationQueue,
+  waveformGenerationQueue,
 } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { markPodcastFailed } from '@/lib/pipeline-resume';
@@ -381,6 +382,12 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
     await addJob(featureComputationQueue, JobType.COMPUTE_FEATURES, {
       scope: 'podcast' as const,
       targetId: podcastId,
+    });
+
+    // 10c3. Generate waveform visualization data
+    await addJob(waveformGenerationQueue, JobType.GENERATE_WAVEFORM, {
+      podcastId,
+      userId: podcast.userId,
     });
 
     // 10d. If this podcast has a pending trend auto-tweet, queue it

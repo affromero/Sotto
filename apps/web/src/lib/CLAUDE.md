@@ -31,6 +31,7 @@ All shared business logic and external service integrations live here.
 | `citation-parser.tsx` | Parse `[N]` citation markers in text → React CitationMarker components | React |
 | `pdf-generator.ts` | Generate academic-style PDF transcripts with references via pdfmake | pdfmake |
 | `audio-stitcher.ts` | FFmpeg segment concatenation + crossfades + SFX overlay (`adelay`, `duration=first`) + loudness normalization. `SfxInsert` includes `delayMs` for positioning. `skipSfx` flag bypasses SFX on re-stitch. | FFmpeg (CLI) |
+| `waveform-extractor.ts` | FFmpeg-based waveform peak extraction (astats RMS → normalized 0-1 array) and spectrogram PNG generation (showspectrumpic) | FFmpeg (CLI) |
 | `byok.ts` | Multi-provider BYOK key management: encrypt/decrypt (AES-256-GCM), store/retrieve via `UserTtsKey` + `UserAiKey` models, validate keys per provider | Uses `prisma.ts` |
 | `byok-errors.ts` | BYOK job failure classifier: `classifyError()` → `auth_invalid`, `insufficient_credits`, `rate_limited`, `provider_error`; `isKeyInvalidationError()`, `userMessage()` | Pure utility |
 | `content-parser.ts` | Thin re-export wrapper (deprecated) — delegates to `extractors/` | — |
