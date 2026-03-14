@@ -826,7 +826,7 @@ describe('processReferenceValidation', () => {
 
       expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
         where: { id: 'podcast-001' },
-        data: { status: 'SCRIPT_READY' },
+        data: { status: 'SCRIPT_READY', lowReferences: true },
       });
     });
 
@@ -1058,7 +1058,7 @@ describe('processReferenceValidation', () => {
 
       expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
         where: { id: 'podcast-001' },
-        data: { status: 'SCRIPT_READY' },
+        data: { status: 'SCRIPT_READY', lowReferences: true },
       });
       expect(mockAddJob).not.toHaveBeenCalledWith(
         expect.anything(), 'generate_audio', expect.anything()
@@ -1157,7 +1157,7 @@ describe('processReferenceValidation', () => {
 
       expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
         where: { id: 'podcast-001' },
-        data: { status: 'SCRIPT_READY' },
+        data: { status: 'SCRIPT_READY', lowReferences: true },
       });
       expect(mockAddJob).toHaveBeenCalledWith(
         { name: 'notifications' },

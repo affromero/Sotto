@@ -16,6 +16,7 @@ export interface PodcastSummary {
   createdAt: string;
   source: PodcastSource;
   isHumanContent: boolean;
+  lowReferences?: boolean;
   sourcePlatform?: string | null;
   aiProvider?: string | null;
   aiModel?: string | null;

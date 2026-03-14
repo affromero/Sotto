@@ -21,6 +21,7 @@ export interface RecommendedPodcast {
   playCount: number;
   likeCount: number;
   forkCount: number;
+  lowReferences?: boolean;
   createdAt: string;
   user: { id: string; name: string | null; image: string | null; handle?: string | null; role?: string };
   tags: Array<{ id: string; name: string; slug: string }>;
@@ -97,6 +98,7 @@ export async function getDailyPicks(
       playCount: true,
       likeCount: true,
       forkCount: true,
+      lowReferences: true,
       createdAt: true,
       userId: true,
       user: { select: { id: true, name: true, image: true } },
@@ -290,6 +292,7 @@ export async function searchPodcasts(
       playCount: true,
       likeCount: true,
       forkCount: true,
+      lowReferences: true,
       createdAt: true,
       user: { select: { id: true, name: true, image: true, handle: true, role: true, plan: true } },
       tags: { include: { tag: { select: { id: true, name: true, slug: true } } } },
@@ -404,6 +407,7 @@ export async function getTrending(): Promise<RecommendedPodcast[]> {
         playCount: true,
         likeCount: true,
         forkCount: true,
+        lowReferences: true,
         createdAt: true,
         user: { select: { id: true, name: true, image: true, handle: true, role: true, plan: true } },
         tags: { include: { tag: { select: { id: true, name: true, slug: true } } } },
@@ -452,6 +456,7 @@ export async function getTrending(): Promise<RecommendedPodcast[]> {
       playCount: true,
       likeCount: true,
       forkCount: true,
+      lowReferences: true,
       createdAt: true,
       user: { select: { id: true, name: true, image: true, handle: true, role: true, plan: true } },
       tags: { include: { tag: { select: { id: true, name: true, slug: true } } } },

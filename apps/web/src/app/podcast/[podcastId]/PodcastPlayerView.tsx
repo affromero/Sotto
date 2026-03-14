@@ -25,6 +25,7 @@ import {
   Music,
   MessageCircleQuestion,
   Check,
+  AlertTriangle,
 } from 'lucide-react';
 import { usePlayer } from '@/components/providers/AudioPlayerProvider';
 import { AudioPlayer } from '@/components/player/AudioPlayer';
@@ -1455,6 +1456,13 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
             <line x1="12" y1="16" x2="12.01" y2="16" />
           </svg>
           Lightly verified
+        </div>
+      )}
+
+      {podcast.lowReferences && (
+        <div className={styles.limitedSourcesBadge} aria-label="Limited Sources" title="This podcast has fewer verified references than recommended. Information may be less thoroughly sourced.">
+          <AlertTriangle size={14} aria-hidden="true" />
+          Limited Sources
         </div>
       )}
 
