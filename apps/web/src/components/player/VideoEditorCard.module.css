@@ -4,13 +4,13 @@
   width: 100%;
   background: #252525;
   border: 1px solid #333;
-  border-radius: var(--radius-lg, 12px);
+  border-radius: var(--radius-lg);
   overflow: hidden;
   transition: border-color 0.15s ease;
 }
 
 .cardExpanded {
-  border-left: 3px solid var(--color-primary, #d97706);
+  border-left: 3px solid var(--color-primary);
 }
 
 .cardDirty {
@@ -35,16 +35,16 @@
 }
 
 .cardHeader:focus-visible {
-  outline: 2px solid var(--color-primary, #d97706);
+  outline: 2px solid var(--color-primary);
   outline-offset: -2px;
-  border-radius: var(--radius-lg, 12px);
+  border-radius: var(--radius-lg);
 }
 
 .thumbnail {
   position: relative;
   width: 80px;
   height: 45px;
-  border-radius: var(--radius-sm, 4px);
+  border-radius: var(--radius-sm);
   overflow: hidden;
   background: #1a1a1a;
   flex-shrink: 0;
@@ -62,7 +62,7 @@
   width: 100%;
   height: 100%;
   gap: 2px;
-  color: #666;
+  color: var(--color-text-tertiary);
 }
 
 .thumbnailLabel {
@@ -88,14 +88,14 @@
 .sceneNumber {
   font-size: 13px;
   font-weight: 600;
-  color: #888;
+  color: var(--color-text-secondary);
   white-space: nowrap;
 }
 
 .speakerBadge {
   display: inline-block;
   padding: 2px 8px;
-  border-radius: var(--radius-sm, 4px);
+  border-radius: var(--radius-sm);
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
@@ -122,11 +122,11 @@
 
 .visualTypeBadge {
   padding: 2px 10px;
-  border-radius: var(--radius-full, 9999px);
+  border-radius: var(--radius-full);
   font-size: 11px;
   font-weight: 600;
   background: rgba(217, 119, 6, 0.12);
-  color: var(--color-primary, #d97706);
+  color: var(--color-primary);
   white-space: nowrap;
 }
 
@@ -141,7 +141,7 @@
 .textPreview {
   margin: 0;
   font-size: 13px;
-  color: #999;
+  color: var(--color-text-tertiary);
   line-height: 1.4;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -161,13 +161,13 @@
   font-size: 13px;
   font-family: var(--font-mono, monospace);
   font-variant-numeric: tabular-nums;
-  color: #888;
+  color: var(--color-text-secondary);
   white-space: nowrap;
 }
 
 .chevron {
   flex-shrink: 0;
-  color: #666;
+  color: var(--color-text-tertiary);
   transition: transform 0.2s ease;
 }
 
@@ -182,7 +182,7 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
-  border-top: 1px solid #333;
+  border-top: 1px solid var(--color-border);
   animation: slideDown 0.2s ease;
 }
 
@@ -201,7 +201,7 @@
   display: block;
   font-size: 12px;
   font-weight: 600;
-  color: #888;
+  color: var(--color-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   margin-bottom: 6px;
@@ -217,11 +217,11 @@
 
 .typePill {
   padding: 8px 14px;
-  border-radius: var(--radius-full, 9999px);
+  border-radius: var(--radius-full);
   font-size: 13px;
   font-weight: 500;
   background: #2a2a2a;
-  color: #aaa;
+  color: var(--color-text-secondary);
   border: 1px solid #444;
   cursor: pointer;
   min-height: 44px;
@@ -232,25 +232,25 @@
 
 .typePill:hover {
   background: #333;
-  color: #ddd;
+  color: var(--color-text-primary);
   border-color: #555;
 }
 
 .typePill:focus-visible {
-  outline: 2px solid var(--color-primary, #d97706);
+  outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
 
 .typePillActive {
-  background: var(--color-primary, #d97706);
-  color: #fff;
-  border-color: var(--color-primary, #d97706);
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  border-color: var(--color-primary);
 }
 
 .typePillActive:hover {
-  background: var(--color-primary-hover, #b45309);
-  border-color: var(--color-primary-hover, #b45309);
-  color: #fff;
+  background: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
+  color: var(--color-text-inverse);
 }
 
 /* Mode toggle */
@@ -258,7 +258,7 @@
 .modeToggle {
   display: flex;
   gap: 0;
-  border-radius: var(--radius-md, 8px);
+  border-radius: var(--radius-md);
   overflow: hidden;
   border: 1px solid #444;
 }
@@ -268,7 +268,7 @@
   padding: 8px 14px;
   background: #2a2a2a;
   border: none;
-  color: #aaa;
+  color: var(--color-text-secondary);
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
@@ -282,22 +282,22 @@
 
 .modeBtn:hover {
   background: #333;
-  color: #ddd;
+  color: var(--color-text-primary);
 }
 
 .modeBtn:focus-visible {
-  outline: 2px solid var(--color-primary, #d97706);
+  outline: 2px solid var(--color-primary);
   outline-offset: -2px;
 }
 
 .modeBtnActive {
-  background: var(--color-primary, #d97706);
-  color: #fff;
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
 }
 
 .modeBtnActive:hover {
-  background: var(--color-primary-hover, #b45309);
-  color: #fff;
+  background: var(--color-primary-hover);
+  color: var(--color-text-inverse);
 }
 
 /* Model select + prompt */
@@ -307,8 +307,8 @@
   padding: 8px 12px;
   background: #1a1a1a;
   border: 1px solid #444;
-  border-radius: var(--radius-md, 8px);
-  color: #e0e0e0;
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
   font-size: 14px;
   cursor: pointer;
   appearance: auto;
@@ -317,7 +317,7 @@
 
 .select:focus {
   outline: none;
-  border-color: var(--color-primary, #d97706);
+  border-color: var(--color-primary);
 }
 
 .prompt {
@@ -325,8 +325,8 @@
   padding: 8px 12px;
   background: #1a1a1a;
   border: 1px solid #444;
-  border-radius: var(--radius-md, 8px);
-  color: #e0e0e0;
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
   font-size: 14px;
   line-height: 1.5;
   resize: vertical;
@@ -336,7 +336,7 @@
 
 .prompt:focus {
   outline: none;
-  border-color: var(--color-primary, #d97706);
+  border-color: var(--color-primary);
 }
 
 /* Footer */
@@ -352,8 +352,8 @@
   padding: 6px 12px;
   background: none;
   border: 1px solid #444;
-  border-radius: var(--radius-md, 8px);
-  color: #888;
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
   font-size: 12px;
   cursor: pointer;
   min-height: 36px;
@@ -364,12 +364,12 @@
 }
 
 .resetBtn:hover {
-  color: #ccc;
+  color: var(--color-text-secondary);
   border-color: #666;
 }
 
 .resetBtn:focus-visible {
-  outline: 2px solid var(--color-primary, #d97706);
+  outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
 

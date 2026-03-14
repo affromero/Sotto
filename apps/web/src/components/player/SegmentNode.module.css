@@ -4,13 +4,13 @@
   width: 100%;
   background: #252525;
   border: 1px solid #333;
-  border-radius: var(--radius-lg, 12px);
+  border-radius: var(--radius-lg);
   overflow: hidden;
   transition: border-color 0.15s ease;
 }
 
 .cardExpanded {
-  border-left: 3px solid var(--color-primary, #d97706);
+  border-left: 3px solid var(--color-primary);
 }
 
 /* Layer 1: Always-visible header row */
@@ -31,15 +31,15 @@
 }
 
 .cardHeader:focus-visible {
-  outline: 2px solid var(--color-primary, #d97706);
+  outline: 2px solid var(--color-primary);
   outline-offset: -2px;
-  border-radius: var(--radius-lg, 12px);
+  border-radius: var(--radius-lg);
 }
 
 .sceneNumber {
   font-size: 14px;
   font-weight: 600;
-  color: #888;
+  color: var(--color-text-secondary);
   white-space: nowrap;
   min-width: 60px;
   flex-shrink: 0;
@@ -48,7 +48,7 @@
 .speakerBadge {
   display: inline-block;
   padding: 4px 10px;
-  border-radius: var(--radius-sm, 4px);
+  border-radius: var(--radius-sm);
   font-size: 13px;
   font-weight: 600;
   text-transform: uppercase;
@@ -79,7 +79,7 @@
   min-width: 0;
   margin: 0;
   font-size: 15px;
-  color: #ccc;
+  color: var(--color-text-secondary);
   line-height: 1.5;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -93,11 +93,11 @@
   align-items: center;
   gap: 6px;
   padding: 4px 12px;
-  border-radius: var(--radius-full, 9999px);
+  border-radius: var(--radius-full);
   font-size: 12px;
   font-weight: 600;
   background: rgba(217, 119, 6, 0.12);
-  color: var(--color-primary, #d97706);
+  color: var(--color-primary);
   white-space: nowrap;
   flex-shrink: 0;
 }
@@ -116,14 +116,14 @@
   font-size: 14px;
   font-family: var(--font-mono, monospace);
   font-variant-numeric: tabular-nums;
-  color: #888;
+  color: var(--color-text-secondary);
   white-space: nowrap;
   flex-shrink: 0;
 }
 
 .chevron {
   flex-shrink: 0;
-  color: #666;
+  color: var(--color-text-tertiary);
   transition: transform 0.2s ease;
 }
 
@@ -138,7 +138,7 @@
   display: flex;
   flex-direction: column;
   gap: 20px;
-  border-top: 1px solid #333;
+  border-top: 1px solid var(--color-border);
   animation: slideDown 0.2s ease;
 }
 
@@ -157,7 +157,7 @@
   display: block;
   font-size: 13px;
   font-weight: 600;
-  color: #888;
+  color: var(--color-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   margin-bottom: 8px;
@@ -173,11 +173,11 @@
 
 .typePill {
   padding: 10px 16px;
-  border-radius: var(--radius-full, 9999px);
+  border-radius: var(--radius-full);
   font-size: 14px;
   font-weight: 500;
   background: #2a2a2a;
-  color: #aaa;
+  color: var(--color-text-secondary);
   border: 1px solid #444;
   cursor: pointer;
   min-height: 44px;
@@ -188,25 +188,25 @@
 
 .typePill:hover {
   background: #333;
-  color: #ddd;
+  color: var(--color-text-primary);
   border-color: #555;
 }
 
 .typePill:focus-visible {
-  outline: 2px solid var(--color-primary, #d97706);
+  outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
 
 .typePillActive {
-  background: var(--color-primary, #d97706);
-  color: #fff;
-  border-color: var(--color-primary, #d97706);
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  border-color: var(--color-primary);
 }
 
 .typePillActive:hover {
-  background: var(--color-primary-hover, #b45309);
-  border-color: var(--color-primary-hover, #b45309);
-  color: #fff;
+  background: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
+  color: var(--color-text-inverse);
 }
 
 /* Image / Video toggle */
@@ -214,7 +214,7 @@
 .modeToggle {
   display: flex;
   gap: 0;
-  border-radius: var(--radius-md, 8px);
+  border-radius: var(--radius-md);
   overflow: hidden;
   border: 1px solid #444;
 }
@@ -224,7 +224,7 @@
   padding: 10px 16px;
   background: #2a2a2a;
   border: none;
-  color: #aaa;
+  color: var(--color-text-secondary);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -238,22 +238,22 @@
 
 .modeBtn:hover {
   background: #333;
-  color: #ddd;
+  color: var(--color-text-primary);
 }
 
 .modeBtn:focus-visible {
-  outline: 2px solid var(--color-primary, #d97706);
+  outline: 2px solid var(--color-primary);
   outline-offset: -2px;
 }
 
 .modeBtnActive {
-  background: var(--color-primary, #d97706);
-  color: #fff;
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
 }
 
 .modeBtnActive:hover {
-  background: var(--color-primary-hover, #b45309);
-  color: #fff;
+  background: var(--color-primary-hover);
+  color: var(--color-text-inverse);
 }
 
 /* Read-only prompt preview */
@@ -262,7 +262,7 @@
   margin: 0;
   font-size: 14px;
   font-style: italic;
-  color: #aaa;
+  color: var(--color-text-secondary);
   line-height: 1.5;
 }
 
@@ -279,18 +279,18 @@
   font-size: 14px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  color: #4ade80;
+  color: var(--color-success);
 }
 
 .videoDurationHint {
   font-weight: 400;
   font-size: 12px;
-  color: #9ca3af;
+  color: var(--color-text-tertiary);
 }
 
 .noKeyHint {
   font-size: 12px;
-  color: var(--color-primary, #d97706);
+  color: var(--color-primary);
 }
 
 .advancedToggle {
@@ -298,8 +298,8 @@
   padding: 6px 12px;
   background: none;
   border: 1px solid #444;
-  border-radius: var(--radius-md, 8px);
-  color: #888;
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
   font-size: 13px;
   cursor: pointer;
   min-height: 36px;
@@ -307,12 +307,12 @@
 }
 
 .advancedToggle:hover {
-  color: #ccc;
+  color: var(--color-text-secondary);
   border-color: #666;
 }
 
 .advancedToggle:focus-visible {
-  outline: 2px solid var(--color-primary, #d97706);
+  outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
 
@@ -323,7 +323,7 @@
   flex-direction: column;
   gap: 16px;
   padding-top: 16px;
-  border-top: 1px solid #333;
+  border-top: 1px solid var(--color-border);
 }
 
 .select {
@@ -331,8 +331,8 @@
   padding: 10px 12px;
   background: #1a1a1a;
   border: 1px solid #444;
-  border-radius: var(--radius-md, 8px);
-  color: #e0e0e0;
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
   font-size: 16px;
   cursor: pointer;
   appearance: auto;
@@ -341,7 +341,7 @@
 
 .select:focus {
   outline: none;
-  border-color: var(--color-primary, #d97706);
+  border-color: var(--color-primary);
 }
 
 .prompt {
@@ -349,8 +349,8 @@
   padding: 10px 12px;
   background: #1a1a1a;
   border: 1px solid #444;
-  border-radius: var(--radius-md, 8px);
-  color: #e0e0e0;
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
   font-size: 16px;
   line-height: 1.5;
   resize: vertical;
@@ -360,7 +360,7 @@
 
 .prompt:focus {
   outline: none;
-  border-color: var(--color-primary, #d97706);
+  border-color: var(--color-primary);
 }
 
 /* Mobile */
