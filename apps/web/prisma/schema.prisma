@@ -425,6 +425,7 @@ model Podcast {
   duplicateMatches    DuplicateMatch[]   @relation("DuplicateMatch")
   quiz                PodcastQuiz?
   briefingLogs        BriefingLog[]
+  landingShowcase     LandingShowcase?
 
   @@unique([userId, slug])
   @@index([userId])
@@ -1903,6 +1904,37 @@ model TwitterAutoTweet {
   @@index([podcastId])
   @@index([status])
   @@index([createdAt])
+}
+
+// ============ LANDING SHOWCASE CONFIG (Admin Dashboard) ============
+
+model LandingShowcase {
+  id              String   @id @default("singleton")
+  podcastId       String   @unique
+
+  // JourneyChapter Step 2 — Script excerpt range
+  scriptTurnStart Int      @default(0)
+  scriptTurnCount Int      @default(2)
+
+  // JourneyChapter Step 3 — Audio clip range (seconds)
+  audioClipStart  Float    @default(0)
+  audioClipEnd    Float?   // null = 30s from start
+
+  // ShowcaseChapter — Video clip range (seconds)
+  videoClipStart  Float    @default(0)
+  videoClipEnd    Float?
+
+  // BotChapter — Twitter/Telegram overrides
+  twitterHandle   String   @default("andres")
+  twitterName     String   @default("Andres")
+  telegramTopic   String?  // null = derive from podcast topic
+
+  updatedAt       DateTime @updatedAt
+  updatedBy       String?
+
+  podcast         Podcast  @relation(fields: [podcastId], references: [id])
+
+  @@index([podcastId])
 }
 
 // ============ REPORTS ============

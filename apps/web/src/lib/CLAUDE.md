@@ -62,6 +62,8 @@ All shared business logic and external service integrations live here.
 | `rss.ts` | `generateCreatorRssFeed(userId)`: RSS 2.0 XML with iTunes namespace for user's public podcasts | Uses `prisma.ts` |
 | `auto-model-config.ts` | `getAutoModelConfig()` / `setAutoModelConfig()` for per-plan "Auto" model resolution + daily limits + provider allocations; `resolveAutoModel(plan)` returns AI/TTS/STT config for FREE or PRO | Uses `prisma.ts` |
 | `twitter-config.ts` | `getTwitterConfig()` reads singleton TwitterConfig row (auto-tweet thresholds, trend polling, template); `setTwitterConfig()` for admin updates | Uses `prisma.ts` |
+| `landing-showcase.ts` | `getLandingShowcaseConfig()` reads singleton LandingShowcase row; `setLandingShowcaseConfig()` for admin updates. Follows twitter-config singleton pattern | Uses `prisma.ts` |
+| `showcase.ts` | `getShowcasePodcast()` for HeroChapter embed; `getLandingShowcaseData()` fetches full showcase data (chat, script, refs, audio/video clips, bot overrides) for all landing chapters | Uses `prisma.ts`, `landing-showcase.ts` |
 | `twitter-auto-tweet.ts` | `checkAutoTweetThreshold(podcastId)` — fire-and-forget after like/fork/play; `manualTweet(podcastId)` — admin-triggered tweet | Uses `prisma.ts`, `twitter-config.ts`, `queue.ts` |
 | `generation-gate.ts` | `checkGenerationGate(userId)`: BYOK check + free tier counter; `tryIncrementFreeGeneration()`: atomic SQL increment; `getFreeTierStatus()` for display | Uses `prisma.ts`, `byok.ts` |
 | `pricing.ts` | AI model pricing table + cost lookup: `getAiCost()`, `getAiPricing()`, `getCheapestModel()`, `refreshPricingFromDb()`, `getAllCurrentPricing()`, `startPricingRefreshInterval()` — centralized pricing with dynamic DB refresh | Pure utility + `pricing-fetcher.ts` |

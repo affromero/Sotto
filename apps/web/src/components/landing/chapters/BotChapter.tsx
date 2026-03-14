@@ -1,5 +1,10 @@
+import type { LandingShowcaseData } from '@/lib/showcase';
 import { ScrollChapter } from '../ScrollChapter';
 import styles from './BotChapter.module.css';
+
+interface BotChapterProps {
+  showcase: LandingShowcaseData | null;
+}
 
 const CHECK = (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
@@ -7,7 +12,16 @@ const CHECK = (
   </svg>
 );
 
-export function BotChapter() {
+export function BotChapter({ showcase }: BotChapterProps) {
+  const bot = showcase?.bot;
+  const twHandle = bot?.twitterHandle ?? 'andres';
+  const twName = bot?.twitterName ?? 'Andres';
+  const twInitial = twName.charAt(0).toUpperCase();
+  const podcastTitle = bot?.podcastTitle ?? 'The Psychology of Decision-Making';
+  const podcastDuration = bot?.podcastDuration ?? '10 min';
+  const podcastUrl = bot?.podcastUrl;
+  const tgTopic = bot?.telegramTopic ?? 'quantum computing';
+
   return (
     <ScrollChapter dark>
       <div className={styles.root}>
@@ -15,7 +29,8 @@ export function BotChapter() {
           <span className={styles.overline}>Generate from anywhere</span>
           <h2 className={styles.heading}>Tweet it. Message it. Done.</h2>
           <p className={styles.description}>
-            Tag <strong>@sottofm</strong> on X or message <strong>@SottoFMBot</strong> on
+            Tag <strong><a href="https://x.com/sottofm" className={styles.extLink}>@sottofm</a></strong> on X or message{' '}
+            <strong><a href="https://t.me/SottoFMBot" className={styles.extLink}>@SottoFMBot</a></strong> on
             Telegram &mdash; your podcast generates automatically and you get a link when
             it&apos;s ready.
           </p>
@@ -35,17 +50,17 @@ export function BotChapter() {
               {/* User tweet */}
               <div className={styles.twPost}>
                 <div className={styles.twLeft}>
-                  <div className={styles.twAvatar}>A</div>
+                  <div className={styles.twAvatar}>{twInitial}</div>
                   <div className={styles.twThread} />
                 </div>
                 <div className={styles.twBody}>
                   <div className={styles.twHeader}>
-                    <span className={styles.twName}>Andres</span>
-                    <span>@andres &middot; 2m</span>
+                    <span className={styles.twName}>{twName}</span>
+                    <span>@{twHandle} &middot; 2m</span>
                   </div>
                   <div className={styles.twText}>
-                    <span className={styles.twMention}>@sottofm</span> make a podcast about the
-                    psychology of decision-making
+                    <a href="https://x.com/sottofm" className={styles.twMention}>@sottofm</a> make a podcast about{' '}
+                    {podcastTitle.toLowerCase()}
                   </div>
                 </div>
               </div>
@@ -58,22 +73,38 @@ export function BotChapter() {
                 <div className={styles.twBody}>
                   <div className={styles.twHeader}>
                     <span className={styles.twName}>Sotto</span>
-                    <span>@sottofm &middot; 8m</span>
+                    <span><a href="https://x.com/sottofm" className={styles.twHandleLink}>@sottofm</a> &middot; 8m</span>
                   </div>
                   <div className={styles.twText}>Your podcast is ready! Listen now:</div>
-                  <div className={styles.twCard}>
-                    <div className={styles.twCardVisual}>
-                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" aria-hidden="true">
-                        <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
-                        <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z" />
-                      </svg>
+                  {podcastUrl ? (
+                    <a href={podcastUrl} className={styles.twCard}>
+                      <div className={styles.twCardVisual}>
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" aria-hidden="true">
+                          <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
+                          <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z" />
+                        </svg>
+                      </div>
+                      <div className={styles.twCardInfo}>
+                        <span>sotto.fm</span>
+                        <span>{podcastTitle}</span>
+                        <span>{podcastDuration} &middot; 2 voices</span>
+                      </div>
+                    </a>
+                  ) : (
+                    <div className={styles.twCard}>
+                      <div className={styles.twCardVisual}>
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" aria-hidden="true">
+                          <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
+                          <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z" />
+                        </svg>
+                      </div>
+                      <div className={styles.twCardInfo}>
+                        <span>sotto.fm</span>
+                        <span>{podcastTitle}</span>
+                        <span>{podcastDuration} &middot; 2 voices</span>
+                      </div>
                     </div>
-                    <div className={styles.twCardInfo}>
-                      <span>sotto.fm</span>
-                      <span>The Psychology of Decision-Making</span>
-                      <span>10 min &middot; 2 voices</span>
-                    </div>
-                  </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -96,47 +127,41 @@ export function BotChapter() {
 
             <div className={styles.tgMock}>
               <div className={styles.tgRow}>
-                <div className={styles.tgBotName}>SottoFM</div>
+                <div className={styles.tgBotName}>
+                  <a href="https://t.me/SottoFMBot" className={styles.tgBotLink}>SottoFM</a>
+                </div>
                 <div className={`${styles.tgBubble} ${styles.tgBubbleBot}`}>
-                  What aspect of quantum computing interests you?
+                  What aspect of {tgTopic} interests you?
                 </div>
               </div>
 
               <div className={styles.tgKeyboard}>
-                <span className={styles.tgKey}>Quantum Basics</span>
-                <span className={`${styles.tgKey} ${styles.tgKeySelected}`}>Quantum Computing</span>
-                <span className={styles.tgKey}>Cryptography</span>
+                <span className={styles.tgKey}>Basics</span>
+                <span className={`${styles.tgKey} ${styles.tgKeySelected}`}>Deep Dive</span>
+                <span className={styles.tgKey}>News</span>
               </div>
 
               <div className={`${styles.tgRow} ${styles.tgRowUser}`}>
                 <div className={`${styles.tgBubble} ${styles.tgBubbleUser}`}>
-                  Quantum Computing
+                  Deep Dive
                 </div>
               </div>
 
               <div className={styles.tgRow}>
-                <div className={styles.tgBotName}>SottoFM</div>
+                <div className={styles.tgBotName}>
+                  <a href="https://t.me/SottoFMBot" className={styles.tgBotLink}>SottoFM</a>
+                </div>
                 <div className={`${styles.tgBubble} ${styles.tgBubbleBot}`}>
-                  {'Ready to generate your podcast!\n\nTopic: Quantum Computing\nDepth: standard \u00b7 Tone: casual'}
+                  Your podcast is ready! &quot;{podcastTitle}&quot; ({podcastDuration})
                 </div>
               </div>
 
               <div className={styles.tgKeyboard}>
-                <span className={`${styles.tgKey} ${styles.tgKeyAccent}`}>
-                  ▶ Generate Podcast
-                </span>
-                <span className={styles.tgKey}>Edit Settings</span>
-              </div>
-
-              <div className={styles.tgRow}>
-                <div className={styles.tgBotName}>SottoFM</div>
-                <div className={`${styles.tgBubble} ${styles.tgBubbleBot}`}>
-                  Your podcast is ready! &quot;Quantum Computing Explained&quot; (12 min)
-                </div>
-              </div>
-
-              <div className={styles.tgKeyboard}>
-                <span className={styles.tgKeyUrl}>Listen Now &#8599;</span>
+                {podcastUrl ? (
+                  <a href={podcastUrl} className={styles.tgKeyUrl}>Listen Now &#8599;</a>
+                ) : (
+                  <span className={styles.tgKeyUrl}>Listen Now &#8599;</span>
+                )}
               </div>
             </div>
 

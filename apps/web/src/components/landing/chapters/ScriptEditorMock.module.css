@@ -1,0 +1,126 @@
+/* ScriptEditorMock — reuses JourneyChapter patterns for the interactive script viewer */
+
+.mockScript {
+  width: 100%;
+  max-width: 440px;
+  background: var(--color-surface);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-2xl);
+  overflow: hidden;
+  box-shadow: var(--shadow-xl);
+  transform: translateY(calc((1 - var(--scroll-progress, 0)) * 15px));
+  transition: transform 0.1s linear;
+}
+
+.mockHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 20px;
+  background: rgba(0, 0, 0, 0.02);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.mockDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-primary);
+}
+
+.mockBody {
+  padding: 20px;
+}
+
+.scriptTurn {
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.scriptTurn:last-of-type {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.scriptLineRow {
+  display: flex;
+  gap: 12px;
+}
+
+.lineNum {
+  flex-shrink: 0;
+  width: 20px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+  text-align: right;
+  padding-top: 2px;
+  user-select: none;
+}
+
+.scriptContent {
+  flex: 1;
+}
+
+.scriptSpeaker {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+.scriptSpeaker[data-speaker='host'] {
+  color: var(--color-primary);
+}
+
+.scriptSpeaker[data-speaker='expert'] {
+  color: var(--color-accent);
+}
+
+.scriptTurn p {
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--color-text);
+}
+
+.scriptActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.scriptBtn {
+  padding: 8px 16px;
+  border-radius: var(--radius-full);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.scriptBtnPrimary {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-text-inverse);
+}
+
+@media (max-width: 767px) {
+  .mockScript {
+    max-width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mockScript {
+    transform: none;
+    transition: none;
+  }
+}
