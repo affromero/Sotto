@@ -121,16 +121,11 @@
   width: 32px;
   height: 32px;
   border-radius: var(--radius-md);
-  background: var(--color-border);
-  animation: shimmer 1.5s ease-in-out infinite;
 }
 
 .skeletonCount {
   width: 16px;
   height: 12px;
-  border-radius: var(--radius-sm);
-  background: var(--color-border);
-  animation: shimmer 1.5s ease-in-out infinite;
   animation-delay: 0.1s;
 }
 
@@ -144,38 +139,44 @@
 .skeletonHeader {
   width: 40%;
   height: 14px;
-  border-radius: var(--radius-sm);
-  background: var(--color-border);
-  animation: shimmer 1.5s ease-in-out infinite;
   animation-delay: 0.2s;
 }
 
 .skeletonLine {
   width: 100%;
   height: 14px;
-  border-radius: var(--radius-sm);
-  background: var(--color-border);
-  animation: shimmer 1.5s ease-in-out infinite;
   animation-delay: 0.3s;
 }
 
 .skeletonLineShort {
   width: 70%;
   height: 14px;
-  border-radius: var(--radius-sm);
-  background: var(--color-border);
-  animation: shimmer 1.5s ease-in-out infinite;
   animation-delay: 0.4s;
 }
 
+.skeletonCircle,
+.skeletonCount,
+.skeletonHeader,
+.skeletonLine,
+.skeletonLineShort {
+  background: linear-gradient(
+    90deg,
+    var(--color-border) 25%,
+    var(--color-surface-hover) 50%,
+    var(--color-border) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: var(--radius-sm);
+}
+
+.skeletonCircle {
+  border-radius: var(--radius-md);
+}
+
 @keyframes shimmer {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.4;
-  }
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 
 /* Pagination */
