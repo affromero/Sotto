@@ -112,9 +112,12 @@ VISUAL TYPES:
 
 SUB-VISUAL RULES:
 1. Each segment can have ONE or MORE sub-visuals that divide it into visual portions.
-2. Segments under 15 seconds: use a single sub-visual.
-3. Segments 15-30 seconds: consider 2 sub-visuals if the content naturally shifts topic or tone.
-4. Segments over 30 seconds: use 2-4 sub-visuals to keep the video visually dynamic.
+2. Segments under 20 seconds: use a single sub-visual.
+3. Segments 20-45 seconds: use 1-2 sub-visuals. Split only if the content shifts to a clearly different idea or topic.
+4. Segments over 45 seconds: identify each distinct idea, argument, or topic in the text.
+   Create one sub-visual per idea. A quick stat mention (one sentence) = short durationFraction.
+   A deep explanation (several sentences) = longer durationFraction. Scale proportionally to text
+   devoted to each idea. No upper cap — a 3-minute monologue covering 8 ideas = 8 sub-visuals.
 5. Sub-visual startOffsetFraction and durationFraction values must sum to exactly 1.0 for each segment.
 6. Each sub-visual's startOffsetFraction must equal the sum of all preceding sub-visuals' durationFraction values.
 7. Ensure visual variety — avoid the same visual type in consecutive sub-visuals within a segment.
@@ -184,7 +187,7 @@ export async function classifySegmentVisuals(
   opts?: { provider?: string; model?: string; apiKeyOverride?: string },
 ): Promise<{ classifications: ClassifiedSegment[]; transitionRecommendations: TransitionRecommendation[]; inputTokens: number; outputTokens: number; model: string }> {
   const segmentList = segments
-    .map((s) => `[${s.order}] ${s.speaker}: ${s.text.slice(0, 500)}${s.text.length > 500 ? '...' : ''} (${s.duration.toFixed(1)}s)`)
+    .map((s) => `[${s.order}] ${s.speaker}: ${s.text} (${s.duration.toFixed(1)}s)`)
     .join('\n');
 
   const userMessage = `Podcast: "${podcastTitle}"

@@ -15,6 +15,7 @@ import { getAiKey } from '@/lib/byok';
 import { uploadFile } from '@/lib/r2';
 import { logUsage } from '@/lib/usage-logger';
 import { logger } from '@/lib/logger';
+import { estimateDurationFromText } from '@/lib/duration';
 
 const EXTERNAL_ASSET_TYPES = new Set(['AI_ILLUSTRATION', 'STOCK_FOOTAGE', 'MAP_OVERLAY']);
 const PROGRAMMATIC_TYPES: VisualType[] = ['TEXT_CARD', 'TIMELINE', 'QUOTE', 'COMPARISON', 'DIAGRAM', 'DATA_CHART'];
@@ -67,7 +68,7 @@ export async function processVisualClassification(job: Job<ClassifyVisualsPayloa
       order: s.order,
       speaker: s.speaker,
       text: s.text,
-      duration: s.duration ?? 5,
+      duration: s.duration ?? estimateDurationFromText(s.text),
     }));
 
     await job.updateProgress(30);
