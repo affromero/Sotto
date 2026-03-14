@@ -62,6 +62,8 @@ export enum JobType {
   GENERATE_MUSIC = 'generate_music',
   LIP_SYNC_TEST = 'lip_sync_test',
   GENERATE_WAVEFORM = 'generate_waveform',
+  GENERATE_QUIZ = 'generate_quiz',
+  SCHEDULE_BRIEFINGS = 'schedule_briefings',
 }
 
 /**
@@ -359,6 +361,12 @@ export interface GenerateWaveformPayload {
   userId: string;
 }
 
+export interface GenerateQuizPayload {
+  podcastId: string;
+}
+
+export interface ScheduleBriefingsPayload {}
+
 /**
  * Queue configuration
  */
@@ -429,6 +437,8 @@ const QUEUE_DEFINITIONS: Record<string, QueueDefinition> = {
   'music-generation': { attempts: 3 },
   'lip-sync-test': { attempts: 1 },
   'waveform-generation': { attempts: 2, skipEvents: true },
+  'quiz-generation': { attempts: 2, skipEvents: true },
+  'briefing-scheduler': { attempts: 1, skipEvents: true },
 };
 
 const queueInstances = new Map<string, Queue>();
@@ -1076,6 +1086,8 @@ export const demoCompositionQueue = createQueueReference('demo-composition');
 export const demoSceneCompositionQueue = createQueueReference('demo-scene-composition');
 export const musicGenerationQueue = createQueueReference('music-generation');
 export const waveformGenerationQueue = createQueueReference('waveform-generation');
+export const quizGenerationQueue = createQueueReference('quiz-generation');
+export const briefingSchedulerQueue = createQueueReference('briefing-scheduler');
 
 /** All queue names — single source of truth for admin and health endpoints */
 export const ALL_QUEUE_NAMES = Object.freeze(Object.keys(QUEUE_DEFINITIONS));

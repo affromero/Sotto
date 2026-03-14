@@ -28,6 +28,12 @@ const updateUserSchema = z
     preferredAiModel: z.string().nullable().optional(),
     emailNotifications: z.boolean().optional(),
     pushNotifications: z.boolean().optional(),
+    briefingEnabled: z.boolean().optional(),
+    briefingTime: z.string().regex(/^\d{2}:\d{2}$/).nullable().optional(),
+    briefingTimezone: z.string().max(50).nullable().optional(),
+    briefingDays: z.number().int().min(0).max(127).optional(),
+    briefingVisibility: z.enum(['PUBLIC', 'UNLISTED', 'PRIVATE']).optional(),
+    quizEnabled: z.boolean().optional(),
     interests: z.array(z.string()).max(20).optional(),
     customTags: z.array(customTagSchema).max(10).optional(),
   })

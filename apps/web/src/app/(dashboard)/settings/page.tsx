@@ -39,6 +39,12 @@ export default async function SettingsPage() {
         preferredTtsModel: true,
         emailNotifications: true,
         pushNotifications: true,
+        briefingEnabled: true,
+        briefingTime: true,
+        briefingTimezone: true,
+        briefingDays: true,
+        briefingVisibility: true,
+        quizEnabled: true,
       },
     }),
     prisma.account.findMany({
@@ -131,6 +137,12 @@ export default async function SettingsPage() {
         isTwitterProviderAvailable={isTwitterProviderAvailable}
         initialEmailNotifications={user.emailNotifications}
         initialPushNotifications={user.pushNotifications}
+        initialBriefingEnabled={user.briefingEnabled}
+        initialBriefingTime={user.briefingTime}
+        initialBriefingTimezone={user.briefingTimezone}
+        initialBriefingDays={user.briefingDays}
+        initialBriefingVisibility={user.briefingVisibility}
+        initialQuizEnabled={user.quizEnabled}
         quizAnswerCount={quizAnswerCount}
         referredUsers={referredUsers.map((u) => ({ name: u.name, handle: u.handle, image: u.image, joinedAt: u.createdAt.toISOString(), verified: u.referralVerified }))}
         referralBonus={getReferralBonus(activeReferralCount)}
