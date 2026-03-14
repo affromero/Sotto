@@ -1,6 +1,6 @@
 appId: fm.sotto.app
 name: Create - Script Regeneration
-tags: [create, script]
+tags: [create, script, smoke]
 ---
 - runFlow: ../helpers/login.yaml
 

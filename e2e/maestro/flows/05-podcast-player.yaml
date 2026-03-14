@@ -1,6 +1,6 @@
 appId: fm.sotto.app
 name: Player - Playback Controls
-tags: [player]
+tags: [player, smoke]
 ---
 - runFlow: ../helpers/login.yaml
 

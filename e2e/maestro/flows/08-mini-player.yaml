@@ -1,6 +1,6 @@
 appId: fm.sotto.app
 name: MiniPlayer - Persistence Across Tabs
-tags: [player]
+tags: [player, smoke]
 ---
 - runFlow: ../helpers/login.yaml
 
