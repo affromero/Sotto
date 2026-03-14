@@ -1,5 +1,5 @@
 import { Job } from 'bullmq';
-import { ImportAudioPayload, notificationQueue, featureComputationQueue, addJob, JobType } from '@/lib/queue';
+import { ImportAudioPayload, notificationQueue, featureComputationQueue, waveformGenerationQueue, addJob, JobType } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { markPodcastFailed } from '@/lib/pipeline-resume';
 import { downloadToFile, uploadPodcastAudio, deleteFile } from '@/lib/r2';
@@ -74,6 +74,11 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
       await addJob(featureComputationQueue, JobType.COMPUTE_FEATURES, {
         scope: 'podcast' as const,
         targetId: podcastId,
+      });
+
+      await addJob(waveformGenerationQueue, JobType.GENERATE_WAVEFORM, {
+        podcastId,
+        userId,
       });
 
       await job.updateProgress(100);
@@ -471,6 +476,12 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
     await addJob(featureComputationQueue, JobType.COMPUTE_FEATURES, {
       scope: 'podcast' as const,
       targetId: podcastId,
+    });
+
+    // Generate waveform visualization data
+    await addJob(waveformGenerationQueue, JobType.GENERATE_WAVEFORM, {
+      podcastId,
+      userId,
     });
 
     // Consume free-tier quota on successful import (not at creation time)
