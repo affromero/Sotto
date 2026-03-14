@@ -46,6 +46,8 @@ BullMQ workers that process async jobs. Each worker runs in a separate thread wi
 | `demo-transition`           | `demo-transition`           | 2      | Adjacent scene recordings → FFmpeg xfade crossfade clip                                                        | Uploads transition to R2, sets DemoScene.transitionUrl + transitionStatus=READY           |
 | `demo-composition`          | `demo-composition`          | 1      | All scene assets ready → Remotion sidecar /stitch → download + composite + grade → final MP4                  | Uploads final video to R2, sets DemoProject.videoUrl + status=READY                      |
 | `waveform-generation`       | `waveform-generation`       | 2      | Podcast audioUrl → FFmpeg astats (waveform peaks JSON) + showspectrumpic (spectrogram PNG) → R2 upload        | Sets Podcast.waveformUrl + spectrogramUrl                                                |
+| `quiz-generation`           | `quiz-generation`           | 2      | Podcast script → LLM generates 3-5 MCQ → PodcastQuiz + QuizQuestion records                                  | Creates PodcastQuiz (status READY), fire-and-forget from audio-stitching + audio-import  |
+| `briefing-scheduler`        | `briefing-scheduler`        | 1      | Cron (every 15min) → find eligible users by time+timezone+interests → create BRIEFING podcast per user        | Creates Podcast (source=BRIEFING) + BriefingLog, kicks off pipeline via content-extraction |
 
 ## Pipeline Flow
 
@@ -64,6 +66,8 @@ telegram-bot (webhook in prod, 5s polling in dev) → routes Telegram updates �
 telegram-reply (on completion) → sends "Listen Now" notification to any user with telegramEnabled + telegramChatId
 email-digest (cron, Sunday 10:00 UTC) → queries new podcasts + stats → sends weekly digest to subscribed waitlist emails
 news-ingest (repeatable, every 30min) → fetches all RSS feeds → upserts IngestedArticle → prunes old articles
+briefing-scheduler (repeatable, every 15min) → finds eligible users → creates BRIEFING podcast → kicks off pipeline
+quiz-generation (fire-and-forget, post-READY) → generates MCQ from script → creates PodcastQuiz
 
 Script review (at SCRIPT_READY):
   User edits script → PATCH /api/podcasts/[id]/script (save edits)

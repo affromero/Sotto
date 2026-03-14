@@ -69,6 +69,8 @@
 | `/api/podcasts/[id]/rating` | GET/POST | Yes | Podcast rating (creator + listener) |
 | `/api/podcasts/[id]/claims` | POST/GET | Yes | Flag/list inaccurate claims |
 | `/api/podcasts/[id]/video` | POST/GET/DELETE | Yes | Video generation: trigger (accepts optional pipeline JSON), poll status, delete |
+| `/api/podcasts/[id]/quiz` | GET | Mixed | Podcast quiz (strips answers pre-submit) |
+| `/api/podcasts/[id]/quiz/submit` | POST | Yes | Submit quiz answers, compute score, update aggregates |
 | `/api/podcasts/[id]/video/pipeline` | POST/PATCH | Yes | Pipeline editor API: POST classifies segments + returns pipeline JSON; PATCH validates + recalculates costs |
 | `/api/fal-models` | GET | Yes | Available Fal image/video models with live pricetoken pricing |
 | `/api/podcasts/[id]/export` | POST/GET | Yes | PDF export |
@@ -85,7 +87,8 @@
 | `/api/users/[id]/collections` | GET | No | User collections |
 | `/api/users/[id]/activity` | GET | No | User activity |
 | `/api/users/handle/[handle]/rss` | GET | No | RSS by handle |
-| `/api/users/me` | GET/PATCH | Yes | Current user |
+| `/api/users/me` | GET/PATCH | Yes | Current user (includes briefing + quiz fields) |
+| `/api/users/me/quiz-stats` | GET | Yes | Learning stats: total quizzes, avg score, recent attempts |
 | `/api/users/me/avatar` | POST | Yes | Upload avatar |
 | `/api/users/me/twitter` | GET/PATCH/DELETE | Yes | Twitter settings |
 | `/api/users/discover` | GET | Opt | Search users |
@@ -135,6 +138,7 @@
 | `/api/admin/waitlist` | PATCH | ADMIN | Approve/reject waitlist entries |
 | `/api/admin/invitations` | GET/POST/PATCH | ADMIN | Generate, list, toggle invitation links |
 | `/api/admin/test-video-pipeline` | POST | ADMIN | Video pipeline test bench: classify visuals, resolve places, generate map images, AI illustrations, stock footage search |
+| `/api/admin/briefing-config` | GET/PATCH | ADMIN | Briefing scheduler config (singleton) |
 | `/api/admin/*` | Various | ADMIN | Admin endpoints (users, podcasts, auto-models, costs, model-pricing, ratings, handles, announcements, twitter, moderation, reports, claims, test-model, test-video-pipeline, traffic-report) |
 | `/api/admin/kittentts/health` | GET | ADMIN | Proxy to `KITTENTTS_URL/health`; returns `{ configured, status, model?, latencyMs }` |
 

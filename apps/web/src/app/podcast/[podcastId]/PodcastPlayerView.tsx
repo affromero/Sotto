@@ -96,6 +96,7 @@ interface PodcastPlayerViewProps {
   avatarStatus?: VideoGenerationStatus;
   musicStatus?: VideoGenerationStatus;
   hasQuiz?: boolean;
+  quizStats?: { attemptCount: number; avgScore: number };
 }
 
 type ViewMode = 'transcript' | 'teleprompter' | 'video';
@@ -166,7 +167,7 @@ function PlayerBridge({
   return null;
 }
 
-export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, currentUserId, canMakePrivate, videoStatus, avatarStatus, musicStatus, hasQuiz }: PodcastPlayerViewProps) {
+export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, currentUserId, canMakePrivate, videoStatus, avatarStatus, musicStatus, hasQuiz, quizStats }: PodcastPlayerViewProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const player = usePlayer();
@@ -1143,6 +1144,15 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
             setQuizCompleted(true);
           }}
         />
+      )}
+
+      {/* Quiz Stats Badge */}
+      {quizStats && quizStats.attemptCount > 0 && (
+        <div className={styles.badgeSection}>
+          <span className={styles.verificationBadge}>
+            {Math.round(quizStats.avgScore)}% avg quiz score ({quizStats.attemptCount} {quizStats.attemptCount === 1 ? 'attempt' : 'attempts'})
+          </span>
+        </div>
       )}
 
       {/* Stats & Actions */}
