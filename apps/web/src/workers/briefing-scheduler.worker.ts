@@ -176,8 +176,8 @@ export async function processBriefingScheduler(job: Job<ScheduleBriefingsPayload
           voices: {
             createMany: {
               data: [
-                { speaker: 'Host', voiceId: voicePair.host, provider: voicePair.provider },
-                { speaker: 'Expert', voiceId: voicePair.expert, provider: voicePair.provider },
+                { speaker: 'Host', voiceId: voicePair.host.id, provider: config.defaultTtsProvider ?? 'elevenlabs' },
+                { speaker: 'Expert', voiceId: voicePair.expert.id, provider: config.defaultTtsProvider ?? 'elevenlabs' },
               ],
             },
           },
