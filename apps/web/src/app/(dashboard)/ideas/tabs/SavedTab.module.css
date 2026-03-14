@@ -53,7 +53,18 @@
   background: var(--color-surface);
   border: 1px dashed var(--color-border);
   border-radius: var(--radius-xl);
-  gap: var(--spacing-lg);
+  gap: var(--spacing-md);
+  animation: fadeIn 0.4s var(--ease-out-expo);
+}
+
+.emptyIcon {
+  color: var(--color-primary);
+  opacity: 0.6;
+}
+
+.emptyTitle {
+  font: var(--text-h4);
+  color: var(--color-text-primary);
 }
 
 .emptyText {

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { X } from 'lucide-react';
+import { X, ListMusic } from 'lucide-react';
 import styles from './QueueTab.module.css';
 
 interface QueuePodcast {
@@ -49,11 +49,13 @@ export function QueueTab({ items: initialItems }: QueueTabProps) {
   if (items.length === 0) {
     return (
       <div className={styles.emptyState}>
+        <ListMusic size={48} className={styles.emptyIcon} aria-hidden="true" />
+        <h3 className={styles.emptyTitle}>Your queue is empty</h3>
         <p className={styles.emptyText}>
-          Your queue is empty. Add podcasts from any podcast page.
+          Add podcasts from any podcast page to listen later.
         </p>
         <Link href="/feed" className={styles.emptyLink}>
-          Discover podcasts
+          Browse the feed
         </Link>
       </div>
     );

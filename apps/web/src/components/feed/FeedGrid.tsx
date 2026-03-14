@@ -52,6 +52,7 @@ export function FeedGrid({ children, loading = false, emptyMessage = 'No podcast
             <path d="M26 24L40 32L26 40V24Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
           </svg>
         </div>
+        <h3 className={styles.emptyTitle}>Nothing here yet</h3>
         <p className={styles.emptyMessage}>{emptyMessage}</p>
       </div>
     );

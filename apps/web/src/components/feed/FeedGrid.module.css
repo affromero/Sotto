@@ -28,12 +28,20 @@
   justify-content: center;
   padding: var(--space-16) var(--space-6);
   text-align: center;
+  gap: var(--spacing-md);
+  animation: fadeIn 0.4s var(--ease-out-expo);
 }
 
 .emptyIcon {
-  color: var(--color-text-tertiary);
-  margin-bottom: var(--space-4);
-  opacity: 0.5;
+  color: var(--color-primary);
+  margin-bottom: 0;
+  opacity: 0.6;
+}
+
+.emptyTitle {
+  font: var(--text-h4);
+  color: var(--color-text-primary);
+  margin: 0;
 }
 
 .emptyMessage {

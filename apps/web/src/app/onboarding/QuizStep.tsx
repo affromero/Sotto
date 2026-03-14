@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { TasteQuestion, TasteAnswer } from '@sotto/shared';
 import { TasteQuiz } from '@/components/discovery/TasteQuiz';
+import { SottoSpinner } from '@/components/ui/SottoSpinner';
 import styles from './page.module.css';
 
 interface QuizStepProps {
@@ -54,8 +55,9 @@ export function QuizStep({ initialQuestions }: QuizStepProps) {
 
   if (saving) {
     return (
-      <div className={styles.actions}>
-        <p>Setting up your feed...</p>
+      <div className={styles.savingState}>
+        <SottoSpinner size="large" />
+        <p className={styles.savingText}>Setting up your feed...</p>
       </div>
     );
   }
