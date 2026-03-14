@@ -1,7 +1,11 @@
 flows:
   - "flows/**"
 executionOrder:
-  continueOnFailure: false
+  continueOnFailure: true
+onFlowStart:
+  file: hooks/onFlowStart.yaml
+onFlowComplete:
+  file: hooks/onFlowComplete.yaml
 env:
   TEST_EMAIL: "test-e2e@sotto.fm"
   E2E_PODCAST_ID: "e2e-podcast"
