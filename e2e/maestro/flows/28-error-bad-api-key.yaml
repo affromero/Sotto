@@ -1,0 +1,36 @@
+appId: fm.sotto.app
+name: Error - Invalid BYOK API Key
+tags: [error]
+---
+- runFlow: ../helpers/login.yaml
+
+# Navigate to Settings → API Keys
+- tapOn:
+    text: "Profile"
+- tapOn:
+    id: "settings-button"
+- extendedWaitUntil:
+    visible:
+      id: "settings-api-keys"
+    timeout: 5000
+- tapOn:
+    id: "settings-api-keys"
+
+# Enter an invalid API key
+- extendedWaitUntil:
+    visible:
+      id: "api-key-input-anthropic"
+    timeout: 5000
+- tapOn:
+    id: "api-key-input-anthropic"
+- inputText: "sk-invalid-key-12345"
+- tapOn:
+    id: "api-key-save-button"
+
+# Verify error feedback
+- extendedWaitUntil:
+    visible:
+      id: "api-key-error"
+    timeout: 10000
+- assertVisible:
+    id: "api-key-error"
