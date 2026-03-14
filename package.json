@@ -45,7 +45,9 @@
     "mobile:android:build:production": "npm run android:build:production --workspace=@sotto/mobile",
     "mobile:android:submit": "npm run android:submit --workspace=@sotto/mobile",
     "test:e2e:web": "npx playwright test --config e2e/playwright/playwright.config.ts",
-    "test:e2e:mobile": "bash e2e/maestro/run.sh"
+    "test:e2e:mobile": "bash e2e/maestro/run.sh",
+    "test:e2e:mobile:critical": "bash e2e/maestro/run.sh --tags critical",
+    "test:e2e:mobile:skip-backend": "bash e2e/maestro/run.sh --skip-backend"
   },
   "lint-staged": {
     "*.{ts,tsx}": [
