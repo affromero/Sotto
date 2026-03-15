@@ -63,15 +63,44 @@
 }
 
 .segment {
+  position: relative;
   padding: var(--spacing-md);
   border-radius: var(--radius-lg);
   cursor: pointer;
-  transition: background var(--transition-fast);
+  transition: background var(--transition-fast), transform var(--transition-fast);
   border-left: 3px solid transparent;
 }
 
 .segment:hover {
   background: var(--color-surface-hover);
+  transform: translateX(2px);
+}
+
+/* Speaker-colored left border on hover */
+.segment[data-speaker-index="0"]:hover { border-left-color: var(--color-speaker-0); }
+.segment[data-speaker-index="1"]:hover { border-left-color: var(--color-speaker-1); }
+.segment[data-speaker-index="2"]:hover { border-left-color: var(--color-speaker-2); }
+.segment[data-speaker-index="3"]:hover { border-left-color: var(--color-speaker-3); }
+
+/* Timestamp tooltip on hover */
+.segment[data-timestamp]::after {
+  content: attr(data-timestamp);
+  position: absolute;
+  right: var(--spacing-md);
+  top: var(--spacing-md);
+  font: var(--text-caption);
+  font-family: var(--font-mono);
+  color: var(--color-text-tertiary);
+  opacity: 0;
+  transform: translateX(4px);
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+  pointer-events: none;
+}
+
+.segment[data-timestamp]:hover::after,
+.segment[data-timestamp]:focus::after {
+  opacity: 1;
+  transform: translateX(0);
 }
 
 .active {
@@ -123,6 +152,15 @@
 
 @media (prefers-reduced-motion: reduce) {
   .active { animation: none; }
+
+  .segment:hover {
+    transform: none;
+  }
+
+  .segment[data-timestamp]::after {
+    transition: none;
+    transform: none;
+  }
 }
 
 @media (max-width: 768px) {

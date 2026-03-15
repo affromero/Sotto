@@ -31,6 +31,18 @@
 }
 
 /* ==========================================================================
+   SCROLL-DRIVEN ANIMATIONS (progressive enhancement, Chromium 115+)
+   Falls back to IntersectionObserver-driven --scroll-progress JS in other browsers.
+   ========================================================================== */
+
+@supports (animation-timeline: view()) {
+  .chapter {
+    view-timeline-name: --chapter;
+    view-timeline-axis: block;
+  }
+}
+
+/* ==========================================================================
    REDUCED MOTION
    ========================================================================== */
 

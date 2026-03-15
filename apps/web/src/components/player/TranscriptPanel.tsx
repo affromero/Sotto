@@ -25,6 +25,12 @@ function isCurrentSegment(segment: SegmentData, currentTime: number): boolean {
   return currentTime >= segment.startTime && currentTime < segment.startTime + segment.duration;
 }
 
+function formatTimestamp(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
 export function TranscriptPanel({
   segments,
   references = [],
@@ -86,6 +92,8 @@ export function TranscriptPanel({
               key={segment.id}
               ref={active ? activeRef : undefined}
               className={`${styles.segment} ${active ? styles.active : ''}`}
+              data-speaker-index={idx}
+              data-timestamp={segment.startTime !== null ? formatTimestamp(segment.startTime) : undefined}
               onClick={() => {
                 if (segment.startTime !== null) {
                   reengage();
