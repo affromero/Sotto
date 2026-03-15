@@ -10,7 +10,26 @@
   width: 100%;
   max-width: 400px;
   text-align: center;
+  animation: authEnter 400ms var(--ease-out-expo) both;
 }
+
+@keyframes authEnter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .container {
+    animation: none;
+  }
+}
+
 .title {
   font: var(--text-h1);
   margin-bottom: var(--spacing-sm);
@@ -47,6 +66,11 @@
 .providerBtn:hover {
   border-color: var(--color-border-hover);
   background: var(--color-surface-hover);
+  transform: translateY(-1px);
+}
+
+.providerBtn:active {
+  transform: translateY(0) scale(0.98);
 }
 /* Email magic link form */
 
@@ -74,6 +98,7 @@
 .emailInput:focus {
   outline: none;
   border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-subtle);
 }
 
 .emailSubmitBtn {
@@ -85,11 +110,16 @@
   font-size: var(--font-size-base);
   font-weight: 600;
   cursor: pointer;
-  transition: background var(--transition-fast);
+  transition: background var(--transition-fast), transform var(--transition-fast);
 }
 
 .emailSubmitBtn:hover:not(:disabled) {
   background: var(--color-primary-hover);
+  transform: translateY(-1px);
+}
+
+.emailSubmitBtn:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
 }
 
 .emailSubmitBtn:disabled {
@@ -111,6 +141,20 @@
   background: var(--color-success-lighter);
   border-radius: var(--radius-lg);
   margin: 0;
+  animation: authEnter 300ms var(--ease-out-expo) both;
+}
+
+/* Spinner for submit button loading state */
+.spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  vertical-align: middle;
+  margin-right: var(--spacing-xs);
 }
 
 .emailSentMsg strong {
@@ -144,4 +188,13 @@
   margin-top: var(--spacing-lg);
   font: var(--text-body-sm);
   color: var(--color-text-secondary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .providerBtn:hover,
+  .providerBtn:active,
+  .emailSubmitBtn:hover,
+  .emailSubmitBtn:active {
+    transform: none;
+  }
 }
