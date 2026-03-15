@@ -126,12 +126,6 @@
   animation: heroFadeIn 0.9s var(--ease-out-expo) 0.3s both;
 }
 
-/* Showcase (EmbedPlayer) */
-.showcase {
-  margin-top: 40px;
-  animation: heroFadeIn 0.9s var(--ease-out-expo) 0.5s both;
-}
-
 /* ==========================================================================
    MOBILE
    ========================================================================== */
@@ -159,8 +153,7 @@
   .content,
   .badge,
   .title,
-  .subtitle,
-  .showcase {
+  .subtitle {
     animation: none;
     opacity: 1;
     transform: none;

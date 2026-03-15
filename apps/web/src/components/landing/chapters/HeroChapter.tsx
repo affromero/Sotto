@@ -1,16 +1,9 @@
 import { BRAND } from '@sotto/shared';
 import { ScrollChapter } from '../ScrollChapter';
 import { AuthCTA } from '../AuthCTA';
-import { EmbedPlayer } from '@/components/player/EmbedPlayer';
-import type { ShowcasePodcast } from '@/lib/showcase';
 import styles from './HeroChapter.module.css';
 
-interface HeroChapterProps {
-  showcase: ShowcasePodcast | null;
-}
-
-export function HeroChapter({ showcase }: HeroChapterProps) {
-
+export function HeroChapter() {
   return (
     <ScrollChapter dark>
       <div className={styles.root}>
@@ -32,18 +25,6 @@ export function HeroChapter({ showcase }: HeroChapterProps) {
           </p>
 
           <AuthCTA source="hero" />
-
-          {showcase && (
-            <div className={styles.showcase}>
-              <EmbedPlayer
-                podcastId={showcase.podcastId}
-                title={showcase.title}
-                creatorName={showcase.creatorName}
-                audioUrl={showcase.audioUrl}
-                duration={showcase.duration}
-              />
-            </div>
-          )}
         </div>
       </div>
     </ScrollChapter>
