@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { User, AlertTriangle, Search, ChevronDown, ChevronUp } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { User, Search, ChevronDown, ChevronUp } from 'lucide-react';
 import { estimateAvatarCost, formatAvatarCost } from '@/lib/avatar-cost-estimator';
 import type { UnifiedAvatarData } from '@/types/avatar';
 import type { SegmentData } from '@/types/podcast';
@@ -22,11 +22,9 @@ interface AvatarPickerProps {
   segments: SegmentData[];
   onConfigured: (data: { videoGenerationId: string; generationStarted: boolean }) => void;
   onCancel: () => void;
-  podcastDuration: number;
   existingOverlays?: ExistingAvatarOverlay[];
 }
 
-const MAX_DURATION = 600;
 const VISIBLE_COUNT = 12;
 
 interface AvatarSelection {
@@ -41,7 +39,14 @@ interface AvatarPricing {
   includedOnPlatform: boolean;
 }
 
-export function AvatarPicker({ podcastId, speakers, segments, onConfigured, onCancel, podcastDuration, existingOverlays }: AvatarPickerProps) {
+interface AvatarModelOption {
+  modelId: string;
+  displayName: string;
+  costPerMinute: number;
+  maxDuration: number | null;
+}
+
+export function AvatarPicker({ podcastId, speakers, segments, onConfigured, onCancel, existingOverlays }: AvatarPickerProps) {
   const [avatars, setAvatars] = useState<UnifiedAvatarData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -56,31 +61,50 @@ export function AvatarPicker({ podcastId, speakers, segments, onConfigured, onCa
   const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [falModelId, setFalModelId] = useState('fal-veed-fabric-1.0');
+  const [falModelId, setFalModelId] = useState('');
   // Per-speaker segment enablement: empty = all enabled (default)
   const [enabledSegments, setEnabledSegments] = useState<Record<string, Set<string>>>({});
-  const [activeProvider, setActiveProvider] = useState<'heygen' | 'runway' | 'fal'>(
+  const [activeProvider, setActiveProvider] = useState<'heygen' | 'runway' | 'fal' | null>(
     existingOverlays?.some((ov) => ov.avatarProvider === 'fal') ? 'fal'
-      : existingOverlays?.some((ov) => ov.avatarProvider === 'runway') ? 'runway' : 'heygen',
+      : existingOverlays?.some((ov) => ov.avatarProvider === 'runway') ? 'runway'
+        : existingOverlays?.some((ov) => ov.avatarProvider === 'heygen') ? 'heygen' : null,
   );
   const [availableProviders, setAvailableProviders] = useState<{ heygen: boolean; runway: boolean; fal: boolean }>({ heygen: false, runway: false, fal: false });
   const [pricing, setPricing] = useState<AvatarPricing>({ costPerMinute: 0, includedOnPlatform: false });
+  const [providerModels, setProviderModels] = useState<AvatarModelOption[]>([]);
   const [voiceTracks, setVoiceTracks] = useState<VoiceTrackSummary[]>([]);
   const [voiceTrackSelections, setVoiceTrackSelections] = useState<Record<string, string>>({});
-
-  const overDuration = podcastDuration > MAX_DURATION;
+  // Track whether the initial default provider has been resolved from the API
+  const defaultResolvedRef = useRef(!!activeProvider);
+  const falModelIdRef = useRef(falModelId);
+  falModelIdRef.current = falModelId;
 
   useEffect(() => {
-    fetch(`/api/podcasts/${podcastId}/video/avatars?provider=${activeProvider}`)
+    const providerParam = activeProvider ? `&provider=${activeProvider}` : '';
+    fetch(`/api/podcasts/${podcastId}/video/avatars?_=1${providerParam}`)
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error('Failed to load avatars'))))
       .then((data: {
         avatars: UnifiedAvatarData[];
         providers: { heygen: boolean; runway: boolean; fal: boolean };
+        defaultProvider?: 'heygen' | 'runway' | 'fal';
+        defaultModel?: string;
+        models?: AvatarModelOption[];
         pricing?: AvatarPricing;
       }) => {
         setAvatars(data.avatars);
         setAvailableProviders(data.providers);
         if (data.pricing) setPricing(data.pricing);
+        if (data.models) setProviderModels(data.models);
+        // On first load, set provider and model from config defaults
+        if (!defaultResolvedRef.current && data.defaultProvider) {
+          setActiveProvider(data.defaultProvider);
+          defaultResolvedRef.current = true;
+          if (data.defaultModel) setFalModelId(data.defaultModel);
+        }
+        // Set fal model default from config if not yet set
+        if (!falModelIdRef.current && data.defaultModel) {
+          setFalModelId(data.defaultModel);
+        }
       })
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load avatars'))
       .finally(() => setLoading(false));
@@ -154,7 +178,7 @@ export function AvatarPicker({ podcastId, speakers, segments, onConfigured, onCa
         avatarId: sel.avatarId || undefined,
         avatarProvider: sel.provider,
         avatarImageUrl: sel.imageUrl || undefined,
-        avatarModelId: sel.provider === 'fal' ? falModelId : undefined,
+        avatarModelId: sel.provider === 'fal' && falModelId ? falModelId : undefined,
         isPreset: sel.isPreset,
         enabledSegmentIds: allEnabled ? undefined : [...enabled],
         voiceTrackId: voiceTrackSelections[speaker] || undefined,
@@ -181,7 +205,7 @@ export function AvatarPicker({ podcastId, speakers, segments, onConfigured, onCa
     } finally {
       setSubmitting(false);
     }
-  }, [selections, podcastId, onConfigured, segmentsBySpeaker, enabledSegments, voiceTrackSelections]);
+  }, [selections, podcastId, onConfigured, segmentsBySpeaker, enabledSegments, falModelId, voiceTrackSelections]);
 
   const selectedCount = Object.keys(selections).length;
   const estimatedCost = useMemo(() => {
@@ -209,24 +233,20 @@ export function AvatarPicker({ podcastId, speakers, segments, onConfigured, onCa
     <div className={styles.root}>
       <div className={styles.header}>
         <h3 className={styles.title}>Choose Avatars</h3>
-        {overDuration && (
-          <div className={styles.warning}>
-            <AlertTriangle size={14} />
-            <span>Podcast exceeds {MAX_DURATION / 60}-minute avatar limit</span>
-          </div>
-        )}
       </div>
 
       {error && <p className={styles.error}>{error}</p>}
 
       <div className={styles.providerTabs}>
-        <button
-          className={`${styles.providerTab} ${activeProvider === 'heygen' ? styles.providerTabActive : ''}`}
-          onClick={() => { setActiveProvider('heygen'); setLoading(true); }}
-          type="button"
-        >
-          HeyGen
-        </button>
+        {availableProviders.heygen && (
+          <button
+            className={`${styles.providerTab} ${activeProvider === 'heygen' ? styles.providerTabActive : ''}`}
+            onClick={() => { setActiveProvider('heygen'); setLoading(true); }}
+            type="button"
+          >
+            HeyGen
+          </button>
+        )}
         {availableProviders.fal && (
           <button
             className={`${styles.providerTab} ${activeProvider === 'fal' ? styles.providerTabActive : ''}`}
@@ -248,7 +268,7 @@ export function AvatarPicker({ podcastId, speakers, segments, onConfigured, onCa
         )}
       </div>
 
-      {activeProvider === 'fal' && (
+      {activeProvider === 'fal' && providerModels.length > 1 && (
         <div className={styles.falModelRow}>
           <label className={styles.falModelLabel}>Lip-sync model</label>
           <select
@@ -256,8 +276,12 @@ export function AvatarPicker({ podcastId, speakers, segments, onConfigured, onCa
             value={falModelId}
             onChange={(e) => setFalModelId(e.target.value)}
           >
-            <option value="fal-veed-fabric-1.0">VEED Fabric 1.0 — $4.80/min, up to 5min</option>
-            <option value="fal-kling-avatar-v2-pro">Kling Avatar v2 Pro — $0.17/min, up to 1min</option>
+            {providerModels.map((m) => (
+              <option key={m.modelId} value={m.modelId}>
+                {m.displayName} — ${m.costPerMinute.toFixed(2)}/min
+                {m.maxDuration ? `, up to ${Math.round(m.maxDuration / 60)}min` : ''}
+              </option>
+            ))}
           </select>
         </div>
       )}
@@ -301,7 +325,6 @@ export function AvatarPicker({ podcastId, speakers, segments, onConfigured, onCa
                   onClick={() => handleSelect(speaker, avatar)}
                   type="button"
                   aria-pressed={selections[speaker]?.avatarId === avatar.id}
-                  disabled={overDuration}
                 >
                   {avatar.previewImageUrl ? (
                     <img
@@ -331,7 +354,7 @@ export function AvatarPicker({ podcastId, speakers, segments, onConfigured, onCa
         ))}
       </div>
 
-      {activeProvider !== 'fal' && (
+      {activeProvider === 'heygen' && (
         <p className={styles.browseLink}>
           Browse all avatars at{' '}
           <a href="https://www.heygen.com/avatars" target="_blank" rel="noopener noreferrer">
@@ -428,7 +451,7 @@ export function AvatarPicker({ podcastId, speakers, segments, onConfigured, onCa
           <button
             className={styles.submitBtn}
             onClick={handleSubmit}
-            disabled={selectedCount === 0 || submitting || overDuration}
+            disabled={selectedCount === 0 || submitting}
             type="button"
           >
             {submitting ? 'Configuring...' : existingOverlays?.length ? 'Update Avatars' : 'Add Avatars'}
