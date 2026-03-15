@@ -1580,7 +1580,6 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
           podcastId={podcast.id}
           speakers={[...new Set(podcast.segments.map(s => s.speaker))]}
           segments={podcast.segments}
-          podcastDuration={podcast.duration ?? 0}
           existingOverlays={avatarOverlays.length > 0 ? avatarOverlays.map((ov) => ({
             speaker: ov.speaker,
             avatarId: ov.avatarId,
