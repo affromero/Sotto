@@ -294,10 +294,11 @@ export function FeedClient({ initialPodcasts, trendingPodcasts, tags, isAuthenti
 
       {activeTab === 'discover' ? (
         <div
+          key="discover"
           id="feed-discover-panel"
           role="tabpanel"
           aria-labelledby={isAuthenticated ? 'feed-discover-tab' : undefined}
-          className={styles.discoverPanel}
+          className={`${styles.tabPanel} ${styles.discoverPanel}`}
         >
           <div className={styles.filters}>
             <div className={styles.searchRow}>
@@ -441,9 +442,11 @@ export function FeedClient({ initialPodcasts, trendingPodcasts, tags, isAuthenti
         </div>
       ) : (
         <div
+          key="activity"
           id="feed-activity-panel"
           role="tabpanel"
           aria-labelledby="feed-activity-tab"
+          className={styles.tabPanel}
         >
           <ActivityFeed />
         </div>

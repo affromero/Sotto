@@ -65,6 +65,29 @@
   gap: var(--spacing-md);
 }
 
+/* ── Tab panel entrance ──────────────────── */
+
+.tabPanel {
+  animation: fadeSlideUp 250ms var(--ease-out-expo) both;
+}
+
+@keyframes fadeSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tabPanel {
+    animation: none;
+  }
+}
+
 /* ── Discover tab panel ──────────────────── */
 
 .discoverPanel {

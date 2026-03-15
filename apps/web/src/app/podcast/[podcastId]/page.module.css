@@ -317,7 +317,7 @@
   font-weight: 500;
   color: var(--color-text-tertiary);
   cursor: pointer;
-  transition: color var(--transition-fast), background var(--transition-fast);
+  transition: color var(--transition-fast), background var(--transition-fast), transform var(--transition-fast);
 }
 
 .actionBtn:hover {
@@ -325,13 +325,24 @@
   background: var(--color-surface-hover);
 }
 
+.actionBtn:active {
+  transform: scale(0.95);
+}
+
 .actionBtnActive {
   color: var(--color-primary);
+  animation: actionPop 300ms var(--ease-out-back);
 }
 
 .actionBtnActive:hover {
   color: var(--color-primary);
   background: var(--color-primary-subtle);
+}
+
+@keyframes actionPop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.15); }
+  100% { transform: scale(1); }
 }
 
 .actionBtnDanger {
@@ -579,6 +590,14 @@
 
 @media (prefers-reduced-motion: reduce) {
   .toolbarBtn[data-loading='true']::before {
+    animation: none;
+  }
+
+  .actionBtn:active {
+    transform: none;
+  }
+
+  .actionBtnActive {
     animation: none;
   }
 }

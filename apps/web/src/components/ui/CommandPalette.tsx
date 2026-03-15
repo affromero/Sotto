@@ -38,6 +38,7 @@ const NAV_ITEMS = [
 
 export function CommandPalette() {
   const [open, setOpen] = useState(false);
+  const [closing, setClosing] = useState(false);
   const [search, setSearch] = useState('');
   const [results, setResults] = useState<PodcastResult[]>([]);
   const router = useRouter();
@@ -46,17 +47,36 @@ export function CommandPalette() {
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const userRole = (session?.user as { role?: string } | undefined)?.role;
 
+  // Animated close: set closing state, wait for animation, then unmount
+  const handleOpenChange = useCallback((nextOpen: boolean) => {
+    if (!nextOpen && open) {
+      setClosing(true);
+      const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      setTimeout(() => {
+        setOpen(false);
+        setClosing(false);
+        setSearch('');
+      }, prefersReduced ? 0 : 200);
+    } else {
+      setOpen(nextOpen);
+    }
+  }, [open]);
+
   // Keyboard shortcut
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
-        setOpen((prev) => !prev);
+        if (open) {
+          handleOpenChange(false);
+        } else {
+          setOpen(true);
+        }
       }
     };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, []);
+  }, [open, handleOpenChange]);
 
   // Live podcast search
   useEffect(() => {
@@ -84,32 +104,31 @@ export function CommandPalette() {
 
   const navigate = useCallback(
     (href: string) => {
-      setOpen(false);
-      setSearch('');
+      handleOpenChange(false);
       router.push(href);
     },
-    [router]
+    [router, handleOpenChange]
   );
 
   const toggleTheme = useCallback(() => {
     setTheme(resolvedTheme === 'dark' ? 'light' : 'dark');
-    setOpen(false);
-  }, [resolvedTheme, setTheme]);
+    handleOpenChange(false);
+  }, [resolvedTheme, setTheme, handleOpenChange]);
 
   const signOut = useCallback(() => {
-    setOpen(false);
+    handleOpenChange(false);
     router.push('/auth/signout');
-  }, [router]);
+  }, [router, handleOpenChange]);
 
   const isAdmin = userRole === 'ADMIN';
 
   return (
     <Command.Dialog
       open={open}
-      onOpenChange={setOpen}
+      onOpenChange={handleOpenChange}
       label="Command palette"
-      className={styles.dialog}
-      overlayClassName={styles.overlay}
+      className={`${styles.dialog} ${closing ? styles.dialogClosing : ''}`}
+      overlayClassName={`${styles.overlay} ${closing ? styles.overlayClosing : ''}`}
     >
       <Command.Input
         value={search}

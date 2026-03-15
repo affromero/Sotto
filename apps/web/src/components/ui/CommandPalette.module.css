@@ -105,6 +105,32 @@
   color: var(--color-text-tertiary);
 }
 
+/* Exit animations */
+.overlayClosing {
+  animation: fadeOut 200ms ease forwards;
+}
+
+.dialogClosing {
+  animation: slideOut 200ms ease forwards;
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes slideOut {
+  from { opacity: 1; transform: translateX(-50%) translateY(0); }
+  to { opacity: 0; transform: translateX(-50%) translateY(-8px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overlayClosing,
+  .dialogClosing {
+    animation: none;
+  }
+}
+
 @media (max-width: 599px) {
   .dialog {
     top: var(--spacing-md);
