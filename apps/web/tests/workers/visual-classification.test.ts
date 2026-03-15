@@ -11,7 +11,8 @@ const {
   mockPrisma: {
     videoGeneration: { update: vi.fn() },
     podcast: { findUniqueOrThrow: vi.fn() },
-    segmentVisual: { createMany: vi.fn(), findMany: vi.fn(), count: vi.fn() },
+    segment: { findMany: vi.fn() },
+    segmentVisual: { createMany: vi.fn(), findMany: vi.fn(), count: vi.fn(), update: vi.fn() },
     segmentTransition: { createMany: vi.fn() },
     user: { findUniqueOrThrow: vi.fn() },
   },
@@ -67,14 +68,16 @@ describe('visual-classification worker', () => {
 
   it('classifies segments with sub-visuals and queues external asset jobs', async () => {
     mockPrisma.segmentVisual.count.mockResolvedValue(1); // 1 pending (AI_ILLUSTRATION)
+    const segments = [
+      { id: 'seg-1', order: 0, speaker: 'Host', text: 'Hello', startTime: 0, duration: 5 },
+      { id: 'seg-2', order: 1, speaker: 'Expert', text: 'Data shows...', startTime: 5, duration: 8 },
+    ];
     mockPrisma.podcast.findUniqueOrThrow.mockResolvedValue({
       title: 'Test Podcast',
       topic: 'Test topic',
-      segments: [
-        { id: 'seg-1', order: 0, speaker: 'Host', text: 'Hello', startTime: 0, duration: 5 },
-        { id: 'seg-2', order: 1, speaker: 'Expert', text: 'Data shows...', startTime: 5, duration: 8 },
-      ],
+      segments,
     });
+    mockPrisma.segment.findMany.mockResolvedValue(segments);
 
     mockClassify.mockResolvedValue({
       classifications: [
@@ -119,13 +122,15 @@ describe('visual-classification worker', () => {
 
   it('creates multiple SegmentVisual records for multi-sub-visual segments', async () => {
     mockPrisma.segmentVisual.count.mockResolvedValue(1); // MAP_OVERLAY is pending
+    const segments = [
+      { id: 'seg-1', order: 0, speaker: 'Host', text: 'The Silk Road stretched from Xi\'an to Constantinople...', startTime: 0, duration: 30 },
+    ];
     mockPrisma.podcast.findUniqueOrThrow.mockResolvedValue({
       title: 'Geography Podcast',
       topic: 'World places',
-      segments: [
-        { id: 'seg-1', order: 0, speaker: 'Host', text: 'The Silk Road stretched from Xi\'an to Constantinople...', startTime: 0, duration: 30 },
-      ],
+      segments,
     });
+    mockPrisma.segment.findMany.mockResolvedValue(segments);
 
     mockClassify.mockResolvedValue({
       classifications: [
@@ -162,13 +167,15 @@ describe('visual-classification worker', () => {
 
   it('routes MAP_OVERLAY sub-visuals to place-enrichment queue', async () => {
     mockPrisma.segmentVisual.count.mockResolvedValue(1); // MAP_OVERLAY is pending
+    const segments = [
+      { id: 'seg-1', order: 0, speaker: 'Host', text: 'Rome was founded...', startTime: 0, duration: 5 },
+    ];
     mockPrisma.podcast.findUniqueOrThrow.mockResolvedValue({
       title: 'Ancient Rome',
       topic: 'History',
-      segments: [
-        { id: 'seg-1', order: 0, speaker: 'Host', text: 'Rome was founded...', startTime: 0, duration: 5 },
-      ],
+      segments,
     });
+    mockPrisma.segment.findMany.mockResolvedValue(segments);
 
     mockClassify.mockResolvedValue({
       classifications: [
@@ -217,13 +224,15 @@ describe('visual-classification worker', () => {
   });
 
   it('skips to composition when all sub-visuals are programmatic', async () => {
+    const segments = [
+      { id: 'seg-1', order: 0, speaker: 'Host', text: 'Hello', startTime: 0, duration: 5 },
+    ];
     mockPrisma.podcast.findUniqueOrThrow.mockResolvedValue({
       title: 'Test',
       topic: 'Test',
-      segments: [
-        { id: 'seg-1', order: 0, speaker: 'Host', text: 'Hello', startTime: 0, duration: 5 },
-      ],
+      segments,
     });
+    mockPrisma.segment.findMany.mockResolvedValue(segments);
 
     mockClassify.mockResolvedValue({
       classifications: [
