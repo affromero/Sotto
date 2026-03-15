@@ -10,6 +10,7 @@ interface VideoModelPickerProps {
   onGenerate: (override?: { aiModel: string }) => void;
   onCancel: () => void;
   loading: boolean;
+  activeVoiceTrackName?: string;
 }
 
 const AUTO_OPTION: ModelOption = {
@@ -18,7 +19,7 @@ const AUTO_OPTION: ModelOption = {
   hint: 'Sotto picks the best model',
 };
 
-export function VideoModelPicker({ onGenerate, onCancel, loading }: VideoModelPickerProps) {
+export function VideoModelPicker({ onGenerate, onCancel, loading, activeVoiceTrackName }: VideoModelPickerProps) {
   const [models, setModels] = useState<ModelOption[]>([AUTO_OPTION]);
   const [selected, setSelected] = useState<string | undefined>('__auto__');
 
@@ -54,6 +55,11 @@ export function VideoModelPicker({ onGenerate, onCancel, loading }: VideoModelPi
 
   return (
     <div className={styles.root}>
+      {activeVoiceTrackName && (
+        <p className={styles.trackNote}>
+          Generating video for: <strong>{activeVoiceTrackName}</strong>
+        </p>
+      )}
       <ModelDropdown
         label="AI Model"
         options={models}
