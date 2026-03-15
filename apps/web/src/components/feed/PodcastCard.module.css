@@ -9,8 +9,8 @@
 }
 
 .card:hover {
-  box-shadow: var(--shadow-xl);
-  transform: translateY(-6px);
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-3px);
 }
 
 .cardLink {

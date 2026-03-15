@@ -13,7 +13,7 @@
 }
 
 .banner:hover {
-  background: rgba(217, 119, 6, 0.08);
+  background: var(--color-primary-subtle);
 }
 
 .forkIcon {

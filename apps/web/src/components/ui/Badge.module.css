@@ -50,13 +50,13 @@
 }
 
 .system {
-  background: linear-gradient(135deg, rgba(217, 119, 6, 0.15), rgba(217, 119, 6, 0.08));
+  background: linear-gradient(135deg, rgba(217, 119, 6, 0.15), var(--color-primary-subtle));
   color: var(--color-primary);
   border: 1px solid rgba(217, 119, 6, 0.25);
 }
 
 .earlyAccess {
-  background: rgba(217, 119, 6, 0.08);
+  background: var(--color-primary-subtle);
   color: var(--color-primary);
   border: 1px solid rgba(217, 119, 6, 0.15);
 }
