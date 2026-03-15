@@ -315,6 +315,14 @@
   padding: var(--space-3);
 }
 
+.miniGradientCover::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0.1) 60%, transparent 100%);
+  pointer-events: none;
+}
+
 .miniGradientFailed {
   background: linear-gradient(
     var(--cover-angle, 145deg),
@@ -327,13 +335,16 @@
   position: absolute;
   top: var(--space-2);
   right: var(--space-3);
+  z-index: 1;
 }
 
 .miniGradientTitle {
+  position: relative;
+  z-index: 1;
   font: var(--text-body-sm);
   font-weight: 600;
   color: var(--color-text-inverse);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
   margin: 0;
   display: -webkit-box;
   -webkit-line-clamp: 2;
