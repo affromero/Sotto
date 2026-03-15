@@ -1,0 +1,73 @@
+appId: fm.sotto.app
+tags:
+  - navigation
+  - smoke
+---
+# Tab Navigation — Cycle through all 5 tabs, verify each renders without crashing
+
+- runFlow: ../helpers/login.yaml
+
+# Feed tab (already here after login)
+- extendedWaitUntil:
+    visible:
+      id: "feed-podcast-list"
+    timeout: 5000
+
+# Search tab
+- tapOn:
+    text: "Search"
+- extendedWaitUntil:
+    visible:
+      id: "search-input"
+    timeout: 3000
+- assertVisible:
+    id: "search-input"
+
+# Create tab
+- tapOn:
+    text: "Create"
+- extendedWaitUntil:
+    visible:
+      id: "create-chat-input"
+    timeout: 5000
+- assertVisible:
+    id: "create-chat-input"
+
+# Notifications tab
+- tapOn:
+    text: "Notifications"
+- extendedWaitUntil:
+    visible:
+      id: "notifications-list"
+    timeout: 5000
+- assertVisible:
+    id: "notifications-list"
+
+# Profile tab
+- tapOn:
+    text: "Profile"
+- extendedWaitUntil:
+    visible:
+      id: "profile-podcast-list"
+    timeout: 5000
+- assertVisible:
+    id: "profile-podcast-list"
+
+# Rapid cycle back through all tabs
+- tapOn:
+    text: "Notifications"
+- wait: 500
+- tapOn:
+    text: "Create"
+- wait: 500
+- tapOn:
+    text: "Search"
+- wait: 500
+- tapOn:
+    text: "Feed"
+- extendedWaitUntil:
+    visible:
+      id: "feed-podcast-list"
+    timeout: 3000
+
+- takeScreenshot: tab-navigation-complete

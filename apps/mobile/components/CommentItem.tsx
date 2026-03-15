@@ -35,7 +35,7 @@ export function CommentItem({
   const isOwn = currentUserId === comment.user.id;
 
   return (
-    <View style={[styles.container, depth > 0 && styles.nested]}>
+    <View style={[styles.container, depth > 0 && styles.nested]} testID={`comment-item-${comment.id}`}>
       <View style={styles.row}>
         <Avatar uri={comment.user.image} name={comment.user.name} size={32} />
         <View style={styles.content}>
@@ -49,6 +49,7 @@ export function CommentItem({
               onPress={() => onReply(comment.id)}
               hitSlop={8}
               style={styles.actionButton}
+              testID={`comment-reply-${comment.id}`}
               accessibilityLabel="Reply"
               accessibilityRole="button"
             >
@@ -60,6 +61,7 @@ export function CommentItem({
                 onPress={() => onDelete(comment.id)}
                 hitSlop={8}
                 style={styles.actionButton}
+                testID={`comment-delete-${comment.id}`}
                 accessibilityLabel="Delete comment"
                 accessibilityRole="button"
               >

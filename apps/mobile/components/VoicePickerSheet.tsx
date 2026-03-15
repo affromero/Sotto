@@ -144,6 +144,7 @@ export function VoicePickerSheet({
                 ]}
                 onPress={() => handleSpeakerCountChange(count)}
                 disabled={locked}
+                testID={`voice-format-${label.toLowerCase()}`}
                 accessibilityRole="button"
                 accessibilityLabel={`${label}${locked ? ' (PRO)' : ''}`}
                 accessibilityState={{ selected: active, disabled: locked }}
@@ -170,6 +171,7 @@ export function VoicePickerSheet({
       <Pressable
         style={[styles.autoCard, !isCustom && styles.autoCardSelected]}
         onPress={() => setIsCustom(false)}
+        testID="voice-auto-assign"
         accessibilityRole="button"
         accessibilityLabel="Auto-assign voices"
         accessibilityState={{ selected: !isCustom }}
@@ -188,6 +190,7 @@ export function VoicePickerSheet({
           onValueChange={setIsCustom}
           trackColor={{ false: colors.border, true: colors.primary }}
           thumbColor={colors.surface}
+          testID="voice-custom-toggle"
         />
       </View>
 
@@ -223,6 +226,7 @@ export function VoicePickerSheet({
                     onPress={() =>
                       handleVoiceSelect(speaker.name, voice.id)
                     }
+                    testID={`voice-card-${speaker.name.toLowerCase()}-${voice.id}`}
                     accessibilityRole="button"
                     accessibilityState={{ selected }}
                   >

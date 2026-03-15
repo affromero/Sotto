@@ -85,7 +85,7 @@ export function CommentSection({ podcastId, commentCount }: CommentSectionProps)
   const comments = data?.comments ?? [];
 
   return (
-    <View style={styles.container}>
+    <View style={styles.container} testID="comments-section">
       <View style={styles.header}>
         <Text style={styles.title}>Comments</Text>
         <Text style={styles.count}>{commentCount}</Text>
@@ -129,6 +129,7 @@ export function CommentSection({ podcastId, commentCount }: CommentSectionProps)
             placeholder="Add a comment..."
             placeholderTextColor={colors.textTertiary}
             maxLength={500}
+            testID="comment-input"
           />
           <Pressable
             onPress={() => addMutation.mutate()}
@@ -138,6 +139,7 @@ export function CommentSection({ podcastId, commentCount }: CommentSectionProps)
               (!newComment.trim() || addMutation.isPending) &&
                 styles.sendButtonDisabled,
             ]}
+            testID="comment-send-button"
             accessibilityLabel="Send comment"
             accessibilityRole="button"
           >
