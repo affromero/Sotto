@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { requireAdmin } from '@/lib/auth-guards';
 import { prisma } from '@/lib/prisma';
 import { getLandingShowcaseConfig, setLandingShowcaseConfig } from '@/lib/landing-showcase';
@@ -28,6 +29,7 @@ export async function PATCH(request: NextRequest) {
   }
 
   await setLandingShowcaseConfig(parsed.data, adminId);
+  revalidatePath('/');
   const updated = await getLandingShowcaseConfig();
   return NextResponse.json({ config: updated });
 }
@@ -39,5 +41,6 @@ export async function DELETE() {
   }
 
   await prisma.landingShowcase.deleteMany({ where: { id: 'singleton' } });
+  revalidatePath('/');
   return NextResponse.json({ config: null });
 }

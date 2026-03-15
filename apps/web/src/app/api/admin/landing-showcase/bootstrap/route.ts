@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { requireAdmin } from '@/lib/auth-guards';
 import { prisma } from '@/lib/prisma';
 import { generatePodcastSlug } from '@/lib/slugify';
@@ -86,6 +87,7 @@ export async function POST() {
 
   // Pre-set this podcast as the landing showcase config
   await setLandingShowcaseConfig({ podcastId: podcast.id }, adminId);
+  revalidatePath('/');
 
   return NextResponse.json({
     id: podcast.id,
