@@ -179,6 +179,11 @@ export async function getLandingShowcaseData(): Promise<LandingShowcaseData | nu
 
     if (!podcast?.audioUrl) return null;
 
+    // Completeness guard: fall back to hardcoded if critical data is missing
+    const discoveryMessages = podcast.discovery?.messages ?? [];
+    const scriptTurnsRaw = (podcast.script?.turns ?? []) as Array<{ speaker: string; text: string }>;
+    if (discoveryMessages.length === 0 || scriptTurnsRaw.length === 0) return null;
+
     const showcasePodcast: ShowcasePodcast = {
       podcastId: podcast.id,
       title: podcast.title,
@@ -188,7 +193,7 @@ export async function getLandingShowcaseData(): Promise<LandingShowcaseData | nu
     };
 
     // Chat messages — first 4 user/assistant messages
-    const chatMessages = (podcast.discovery?.messages ?? []).map((m) => {
+    const chatMessages = discoveryMessages.map((m) => {
       const chips = m.chips as Array<{ label: string; value: string }> | null;
       return {
         role: m.role as 'user' | 'assistant',
@@ -198,8 +203,7 @@ export async function getLandingShowcaseData(): Promise<LandingShowcaseData | nu
     });
 
     // Script turns — slice by config range
-    const allTurns = (podcast.script?.turns ?? []) as Array<{ speaker: string; text: string }>;
-    const scriptTurns = allTurns.slice(
+    const scriptTurns = scriptTurnsRaw.slice(
       config.scriptTurnStart,
       config.scriptTurnStart + config.scriptTurnCount
     );
