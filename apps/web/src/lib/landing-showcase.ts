@@ -1,4 +1,5 @@
 import { prisma } from './prisma';
+import { logger } from './logger';
 
 export interface LandingShowcaseConfig {
   podcastId: string;
@@ -32,7 +33,10 @@ export async function getLandingShowcaseConfig(): Promise<LandingShowcaseConfig 
       twitterName: row.twitterName,
       telegramTopic: row.telegramTopic,
     };
-  } catch {
+  } catch (err) {
+    logger.warn('Failed to read landing showcase config', {
+      error: err instanceof Error ? err.message : String(err),
+    });
     return null;
   }
 }
