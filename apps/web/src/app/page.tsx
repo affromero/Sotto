@@ -12,6 +12,8 @@ import { ConvertChapter } from '@/components/landing/chapters/ConvertChapter';
 import { getLandingShowcaseData } from '@/lib/showcase';
 import styles from './page.module.css';
 
+export const dynamic = 'force-dynamic';
+
 export default async function LandingPage() {
   const showcaseData = await getLandingShowcaseData();
 
