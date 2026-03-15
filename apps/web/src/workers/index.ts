@@ -92,75 +92,25 @@ const WORKER_QUEUE_EXCLUDE_FILTER = new Set(
     .filter(Boolean)
 );
 
-const HEAVY_WORKERS = new Set([
-  'audio-generation',
-  'voice-track-audio',
-  'visual-generation',
-  'transition-generation',
-  'avatar-generation',
-  'video-composition',
-  'audio-stitching',
-  'music-generation',
-  'demo-voiceover',
-  'demo-visual',
-  'demo-recording',
-  'demo-transition',
-  'demo-composition',
-  'demo-scene-composition',
-]);
+import {
+  shouldRun as shouldRunRouting,
+  EXPERIMENTAL_WORKERS,
+} from './worker-routing';
 
-const PIPELINE_WORKERS = new Set([
-  'content-extraction',
-  'script-generation',
-  'script-verification',
-  'reference-validation',
-  'audio-import',
-  'interactions',
-  'segment-regeneration',
-  'visual-classification',
-  'place-enrichment',
-  'content-moderation',
-  'demo-script',
-  'voice-track-stitching',
-]);
-
-const CORE_WORKERS = new Set([
-  'audio-generation',
-  'audio-stitching',
-  'content-extraction',
-  'script-generation',
-  'script-verification',
-  'reference-validation',
-  'interactions',
-  'segment-regeneration',
-  'audio-import',
-  'notifications',
-]);
 let hasWarnedOnUnknownPreset = false;
 
-function matchesProfile(name: string): boolean {
-  if (WORKER_PROFILE === 'all') return true;
-  if (WORKER_PROFILE === 'heavy') return HEAVY_WORKERS.has(name);
-  if (WORKER_PROFILE === 'pipeline') return PIPELINE_WORKERS.has(name);
-  if (WORKER_PROFILE === 'light') return !HEAVY_WORKERS.has(name) && !PIPELINE_WORKERS.has(name);
-  return true;
-}
-
-function matchesPreset(name: string): boolean {
-  if (WORKER_PRESET === 'full') return true;
-  if (WORKER_PRESET === 'core') return CORE_WORKERS.has(name);
-  if (!hasWarnedOnUnknownPreset) {
+function shouldRun(name: string): boolean {
+  // Warn once on unknown preset (side effect kept out of pure module)
+  if (WORKER_PRESET !== 'full' && WORKER_PRESET !== 'core' && !hasWarnedOnUnknownPreset) {
     logger.warn('Unknown worker preset, defaulting to full queue set', { preset: WORKER_PRESET });
     hasWarnedOnUnknownPreset = true;
   }
-  return true;
-}
-
-function shouldRun(name: string): boolean {
-  if (!matchesProfile(name)) return false;
-  if (WORKER_QUEUE_EXCLUDE_FILTER.has(name)) return false;
-  if (WORKER_QUEUE_FILTER.size > 0) return WORKER_QUEUE_FILTER.has(name);
-  return matchesPreset(name);
+  return shouldRunRouting(name, {
+    profile: WORKER_PROFILE,
+    preset: WORKER_PRESET,
+    includeFilter: WORKER_QUEUE_FILTER,
+    excludeFilter: WORKER_QUEUE_EXCLUDE_FILTER,
+  });
 }
 
 logger.info('Starting Sotto workers...', {
@@ -168,6 +118,7 @@ logger.info('Starting Sotto workers...', {
   preset: WORKER_PRESET,
   includeQueues: WORKER_QUEUE_FILTER.size > 0 ? Array.from(WORKER_QUEUE_FILTER) : 'all',
   excludeQueues: WORKER_QUEUE_EXCLUDE_FILTER.size > 0 ? Array.from(WORKER_QUEUE_EXCLUDE_FILTER) : [],
+  ...(WORKER_PRESET === 'core' && { experimentalExcluded: Array.from(EXPERIMENTAL_WORKERS) }),
 });
 
 // Create workers filtered by WORKER_PROFILE
