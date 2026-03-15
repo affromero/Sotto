@@ -23,6 +23,7 @@ export interface LandingShowcaseData {
 
   // JourneyChapter Step 3 — Audio clip
   audioClip: { url: string; start: number; end: number; totalDuration: number };
+  originalTrackName: string;
   voiceTracks: { name: string; provider: string; model: string; audioUrl: string }[];
   voiceCount: number;
   sourceCount: number;
@@ -121,6 +122,7 @@ export async function getLandingShowcaseData(): Promise<LandingShowcaseData | nu
         topic: true,
         audioUrl: true,
         duration: true,
+        ttsProvider: true,
         user: { select: { name: true, handle: true } },
         discovery: {
           select: {
@@ -252,8 +254,17 @@ export async function getLandingShowcaseData(): Promise<LandingShowcaseData | nu
       }));
 
     // Voice count — distinct speakers
-    const voiceCount = new Set(podcast.segments.map((s) => s.speaker)).size || 2;
+    const speakers = [...new Set(podcast.segments.map((s) => s.speaker))];
+    const voiceCount = speakers.length || 2;
     const sourceCount = podcast.references.length;
+
+    // Original track label — "Speaker1 + Speaker2 [Provider]"
+    const providerLabel = podcast.ttsProvider
+      ? podcast.ttsProvider.charAt(0).toUpperCase() + podcast.ttsProvider.slice(1)
+      : 'Sotto';
+    const originalTrackName = speakers.length > 0
+      ? `${speakers.join(' + ')} [${providerLabel}]`
+      : providerLabel;
 
     // Video segments
     const videoSegments = (podcast.videoGeneration?.visuals ?? []).map((v) => ({
@@ -285,6 +296,7 @@ export async function getLandingShowcaseData(): Promise<LandingShowcaseData | nu
       scriptTurns,
       references,
       audioClip,
+      originalTrackName,
       voiceTracks,
       voiceCount,
       sourceCount,
