@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.21.7] - 2026-03-15
+
+### Changed
+- Removed duplicated embed player from hero section — audio experience now lives solely in the journey chapter
+
 ## [0.21.6] - 2026-03-15
 
 ### Fixed
