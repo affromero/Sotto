@@ -5,9 +5,10 @@ interface PillGroupProps {
   options: Array<{ value: string; label: string }>;
   selected: string;
   onChange: (value: string) => void;
+  testIDPrefix?: string;
 }
 
-export function PillGroup({ options, selected, onChange }: PillGroupProps) {
+export function PillGroup({ options, selected, onChange, testIDPrefix }: PillGroupProps) {
   return (
     <ScrollView
       horizontal
@@ -20,6 +21,7 @@ export function PillGroup({ options, selected, onChange }: PillGroupProps) {
           <Pressable
             key={option.value}
             onPress={() => onChange(option.value)}
+            testID={testIDPrefix ? `${testIDPrefix}-${option.value}` : undefined}
             style={({ pressed }) => [
               styles.pill,
               active ? styles.pillActive : styles.pillInactive,
