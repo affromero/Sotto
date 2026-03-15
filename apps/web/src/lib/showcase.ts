@@ -157,6 +157,9 @@ export async function getLandingShowcaseData(): Promise<LandingShowcaseData | nu
         segments: {
           select: { speaker: true, ttsVoiceId: true },
         },
+        podcastVoices: {
+          select: { speaker: true, voiceId: true },
+        },
         voiceTracks: {
           where: { status: 'READY', audioUrl: { not: null } },
           orderBy: { createdAt: 'asc' },
@@ -259,24 +262,35 @@ export async function getLandingShowcaseData(): Promise<LandingShowcaseData | nu
     const voiceCount = speakers.length || 2;
     const sourceCount = podcast.references.length;
 
-    // Original track label — "VoiceName1 + VoiceName2 [Provider]"
+    // Original track label — "Original · VoiceName1 + VoiceName2 [Provider]"
     const providerLabel = podcast.ttsProvider
       ? podcast.ttsProvider.charAt(0).toUpperCase() + podcast.ttsProvider.slice(1)
       : 'Sotto';
-    // Resolve voice names from voiceIds, deduped and ordered by first appearance
+    // Resolve voice names from PodcastVoice records (authoritative), then segment ttsVoiceId, then speakers
     const voiceNames: string[] = [];
     const seenVoiceIds = new Set<string>();
-    for (const seg of podcast.segments) {
-      if (seg.ttsVoiceId && !seenVoiceIds.has(seg.ttsVoiceId)) {
-        seenVoiceIds.add(seg.ttsVoiceId);
-        const entry = findByVoiceId(seg.ttsVoiceId);
-        if (entry) voiceNames.push(entry.name);
+    for (const pv of podcast.podcastVoices) {
+      if (pv.voiceId && !seenVoiceIds.has(pv.voiceId)) {
+        seenVoiceIds.add(pv.voiceId);
+        const entry = findByVoiceId(pv.voiceId);
+        voiceNames.push(entry?.name ?? pv.voiceId);
+      }
+    }
+    // Fallback to segment ttsVoiceId if no PodcastVoice records
+    if (voiceNames.length === 0) {
+      for (const seg of podcast.segments) {
+        if (seg.ttsVoiceId && !seenVoiceIds.has(seg.ttsVoiceId)) {
+          seenVoiceIds.add(seg.ttsVoiceId);
+          const entry = findByVoiceId(seg.ttsVoiceId);
+          if (entry) voiceNames.push(entry.name);
+        }
       }
     }
     const displayNames = voiceNames.length > 0 ? voiceNames : speakers;
-    const originalTrackName = displayNames.length > 0
+    const voiceSuffix = displayNames.length > 0
       ? `${displayNames.join(' + ')} [${providerLabel}]`
       : providerLabel;
+    const originalTrackName = voiceSuffix;
 
     // Video segments
     const videoSegments = (podcast.videoGeneration?.visuals ?? []).map((v) => ({
