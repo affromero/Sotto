@@ -16,7 +16,11 @@ import { searchStockVideo, downloadStockAsset } from '@/lib/stock-footage';
 import { uploadFile } from '@/lib/r2';
 import { logUsage } from '@/lib/usage-logger';
 import { extractLastFrame, concatenateVideoClips } from '@/lib/video-concat';
+import { generateHeraMotionGraphic } from '@/lib/hera';
+import { buildHeraPrompt } from '@/lib/hera-prompt-builder';
 import { logger } from '@/lib/logger';
+
+const PROGRAMMATIC_TYPES = new Set(['DATA_CHART', 'QUOTE', 'COMPARISON', 'TIMELINE', 'DIAGRAM', 'TEXT_CARD']);
 
 async function generateAiImage(
   podcastId: string,
@@ -297,6 +301,62 @@ export async function processVisualGeneration(job: Job<GenerateVisualPayload>): 
           },
         });
       }
+    } else if (PROGRAMMATIC_TYPES.has(visualType)) {
+      // Hera motion — programmatic types only reach here when motionProvider='hera'
+      const sv = await prisma.segmentVisual.findUnique({
+        where: { id: segmentVisualId },
+        select: { subDuration: true, metadata: true, firstFrameUrl: true, motionProvider: true, segmentId: true },
+      });
+
+      if (sv?.motionProvider !== 'hera') {
+        // Guard: shouldn't be here without Hera — mark ready for Remotion fallback
+        await prisma.segmentVisual.update({
+          where: { id: segmentVisualId },
+          data: { status: 'ready', motionProvider: 'remotion' },
+        });
+        await checkAllReady(videoGenerationId, podcastId);
+        await job.updateProgress(100);
+        return;
+      }
+
+      // Fetch segment text and duration
+      const segment = sv.segmentId
+        ? await prisma.segment.findUnique({ where: { id: sv.segmentId }, select: { text: true, duration: true } })
+        : null;
+      const segmentText = segment?.text ?? '';
+      const duration = sv.subDuration ?? segment?.duration ?? 5;
+      const clampedDuration = Math.max(1, Math.min(60, Math.round(duration)));
+
+      const heraPrompt = buildHeraPrompt({
+        visualType,
+        metadata: sv.metadata as Record<string, unknown> | null,
+        segmentText,
+      });
+
+      const buffer = await generateHeraMotionGraphic({
+        prompt: heraPrompt,
+        durationSeconds: clampedDuration,
+        referenceImageUrl: sv.firstFrameUrl ?? undefined,
+        podcastId,
+      });
+
+      if (!buffer) {
+        // Hera failed — fallback to Remotion (mark ready, no asset)
+        logger.warn('Hera generation failed, falling back to Remotion', { segmentVisualId, visualType });
+        await prisma.segmentVisual.update({
+          where: { id: segmentVisualId },
+          data: { status: 'ready', motionProvider: 'remotion' },
+        });
+        await checkAllReady(videoGenerationId, podcastId);
+        await job.updateProgress(100);
+        return;
+      }
+
+      assetBuffer = buffer;
+      assetType = 'video/mp4';
+      assetExt = 'mp4';
+      service = 'hera';
+      totalCost = 0;
     } else {
       // Should not reach here — programmatic types are marked ready in classification
       logger.warn('Unexpected visual type in generation worker', { visualType, segmentVisualId });

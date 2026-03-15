@@ -86,7 +86,7 @@ export const PodcastVisuals: React.FC<VisualsInput> = ({
                 {segment.subVisuals.map((sv) => {
                   const subFromFrame = Math.round(sv.startOffset * fps);
                   const subDurationFrames = Math.round(sv.duration * fps);
-                  const SubComponent = resolveSegmentComponent(sv.visualType);
+                  const SubComponent = resolveSegmentComponent(sv.visualType, sv.assetUrl, sv.assetType);
 
                   // Build a synthetic VideoSegment for the sub-visual component
                   const subSegment: VideoSegment = {
@@ -122,7 +122,7 @@ export const PodcastVisuals: React.FC<VisualsInput> = ({
           }
 
           // Single visual (backward compat) — existing code path
-          const SegmentComponent = resolveSegmentComponent(segment.visualType);
+          const SegmentComponent = resolveSegmentComponent(segment.visualType, segment.assetUrl, segment.assetType);
 
           return (
             <Sequence

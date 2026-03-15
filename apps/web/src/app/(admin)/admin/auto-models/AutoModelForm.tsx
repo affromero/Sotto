@@ -73,6 +73,8 @@ interface AutoModelFormProps {
     dailyMusicLimitPro: number;
     dailyAvatarLimit: number;
     dailyAvatarLimitPro: number;
+    freeMotionProvider: string;
+    proMotionProvider: string;
   };
   aiProviders: ProviderOption[];
   ttsProviders: ProviderOption[];
@@ -444,6 +446,10 @@ export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttPro
   const [dailyAvatarLimit, setDailyAvatarLimit] = useState(initialConfig.dailyAvatarLimit);
   const [dailyAvatarLimitPro, setDailyAvatarLimitPro] = useState(initialConfig.dailyAvatarLimitPro);
 
+  // Motion provider (simple select — only 2 fixed options)
+  const [freeMotionProvider, setFreeMotionProvider] = useState(initialConfig.freeMotionProvider);
+  const [proMotionProvider, setProMotionProvider] = useState(initialConfig.proMotionProvider);
+
   const setToArray = (s: Set<string>) => s.size > 0 ? [...s] : null;
 
   const handleSave = async () => {
@@ -511,6 +517,8 @@ export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttPro
           dailyMusicLimitPro,
           dailyAvatarLimit,
           dailyAvatarLimitPro,
+          freeMotionProvider,
+          proMotionProvider,
         }),
       });
 
@@ -571,6 +579,39 @@ export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttPro
         description="Control which music models are available for background music generation."
         state={musicState}
       />
+
+      <fieldset className={styles.section}>
+        <legend className={styles.sectionTitle}>Motion Graphics</legend>
+        <p className={styles.platformDescription}>
+          Rendering engine for programmatic visual types (charts, quotes, timelines, etc.). Remotion renders React components server-side. Hera generates AI-animated motion graphics.
+        </p>
+
+        <div className={styles.dailyLimitsGrid}>
+          <span className={styles.dailyLimitsHeader} />
+          <span className={styles.dailyLimitsHeader}>Free</span>
+          <span className={styles.dailyLimitsHeader}>Pro</span>
+
+          <label className={styles.dailyLimitsLabel} htmlFor="freeMotionProvider">Provider</label>
+          <select
+            id="freeMotionProvider"
+            className={styles.select}
+            value={freeMotionProvider}
+            onChange={(e) => setFreeMotionProvider(e.target.value)}
+          >
+            <option value="remotion">Remotion (React)</option>
+            <option value="hera">Hera (AI Motion)</option>
+          </select>
+          <select
+            id="proMotionProvider"
+            className={styles.select}
+            value={proMotionProvider}
+            onChange={(e) => setProMotionProvider(e.target.value)}
+          >
+            <option value="remotion">Remotion (React)</option>
+            <option value="hera">Hera (AI Motion)</option>
+          </select>
+        </div>
+      </fieldset>
 
       <fieldset className={styles.section}>
         <legend className={styles.sectionTitle}>Platform Operations</legend>

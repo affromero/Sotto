@@ -11,6 +11,7 @@ import {
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { classifySegmentVisuals } from '@/lib/visual-classifier';
 import { resolveAiModelAndProvider } from '@/lib/providers/ai-registry';
+import { resolveMotionProvider } from '@/lib/auto-model-config';
 import { getAiKey } from '@/lib/byok';
 import { uploadFile } from '@/lib/r2';
 import { logUsage } from '@/lib/usage-logger';
@@ -63,6 +64,8 @@ export async function processVisualClassification(job: Job<ClassifyVisualsPayloa
       throw new Error('No segments found for podcast');
     }
 
+    const motionProvider = await resolveMotionProvider(user.plan as 'FREE' | 'PRO');
+
     const segmentInputs = podcast.segments.map((s) => ({
       segmentId: s.id,
       order: s.order,
@@ -87,21 +90,31 @@ export async function processVisualClassification(job: Job<ClassifyVisualsPayloa
     const segmentDurationMap = new Map(segmentInputs.map((s) => [s.segmentId, s.duration]));
 
     // Create SegmentVisual records — N per segment (one per sub-visual)
+    const PROGRAMMATIC_SET = new Set(PROGRAMMATIC_TYPES.map(String));
     await prisma.segmentVisual.createMany({
       data: classifications.flatMap((c) =>
-        c.subVisuals.map((sv) => ({
-          videoGenerationId,
-          segmentId: c.segmentId,
-          order: c.order,
-          subOrder: sv.subOrder,
-          startOffset: sv.startOffsetFraction * (segmentDurationMap.get(c.segmentId) ?? 5),
-          subDuration: sv.durationFraction * (segmentDurationMap.get(c.segmentId) ?? 5),
-          visualType: sv.visualType,
-          prompt: sv.prompt,
-          endStatePrompt: sv.endStatePrompt,
-          metadata: sv.metadata ? (sv.metadata as unknown as Prisma.InputJsonValue) : Prisma.JsonNull,
-          status: EXTERNAL_ASSET_TYPES.has(sv.visualType) ? 'pending' : 'ready',
-        })),
+        c.subVisuals.map((sv) => {
+          const isProgrammatic = PROGRAMMATIC_SET.has(sv.visualType);
+          const isExternal = EXTERNAL_ASSET_TYPES.has(sv.visualType);
+          // Hera-routed programmatic types need generation (pending); plain Remotion ones are ready immediately
+          const status = isExternal
+            ? 'pending'
+            : (isProgrammatic && motionProvider === 'hera' ? 'pending' : 'ready');
+          return {
+            videoGenerationId,
+            segmentId: c.segmentId,
+            order: c.order,
+            subOrder: sv.subOrder,
+            startOffset: sv.startOffsetFraction * (segmentDurationMap.get(c.segmentId) ?? 5),
+            subDuration: sv.durationFraction * (segmentDurationMap.get(c.segmentId) ?? 5),
+            visualType: sv.visualType,
+            prompt: sv.prompt,
+            endStatePrompt: sv.endStatePrompt,
+            metadata: sv.metadata ? (sv.metadata as unknown as Prisma.InputJsonValue) : Prisma.JsonNull,
+            motionProvider: isProgrammatic ? motionProvider : null,
+            status,
+          };
+        }),
       ),
     });
 
@@ -195,21 +208,18 @@ export async function processVisualClassification(job: Job<ClassifyVisualsPayloa
       data: { status: 'GENERATING_VISUALS' },
     });
 
-    // Queue jobs for sub-visuals needing external assets
-    const hasExternals = classifications.some((c) =>
-      c.subVisuals.some((sv) => EXTERNAL_ASSET_TYPES.has(sv.visualType)),
-    );
+    // Queue jobs for sub-visuals needing generation (external assets + Hera-routed programmatic)
+    const pendingCount = await prisma.segmentVisual.count({
+      where: { videoGenerationId, status: 'pending' },
+    });
 
-    if (hasExternals) {
-      // Look up the created SegmentVisual records for their IDs
+    if (pendingCount > 0) {
       const visuals = await prisma.segmentVisual.findMany({
-        where: { videoGenerationId },
+        where: { videoGenerationId, status: 'pending' },
         select: { id: true, segmentId: true, subOrder: true, visualType: true, prompt: true, metadata: true },
       });
 
       for (const visual of visuals) {
-        if (!EXTERNAL_ASSET_TYPES.has(visual.visualType)) continue;
-
         if (visual.visualType === 'MAP_OVERLAY') {
           const meta = (visual.metadata as Record<string, unknown>) ?? {};
           const places = (meta.places as Array<{ name: string; yearHint?: number }>) ?? [];
@@ -231,7 +241,7 @@ export async function processVisualClassification(job: Job<ClassifyVisualsPayloa
         }
       }
     } else {
-      // All sub-visuals are programmatic — skip straight to composition
+      // All sub-visuals are programmatic (Remotion) — skip straight to composition
       await addJob(videoCompositionQueue, JobType.COMPOSE_VIDEO, {
         podcastId,
         videoGenerationId,
@@ -255,7 +265,8 @@ export async function processVisualClassification(job: Job<ClassifyVisualsPayloa
       podcastId,
       videoGenerationId,
       totalSegments: String(classifications.length),
-      hasExternalAssets: String(hasExternals),
+      pendingVisuals: String(pendingCount),
+      motionProvider,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
