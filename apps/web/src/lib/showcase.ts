@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { getLandingShowcaseConfig } from '@/lib/landing-showcase';
 import { logger } from '@/lib/logger';
+import { findByVoiceId } from '@/lib/voice-pool';
 import type { ReferenceData } from '@/types/reference';
 
 export interface ShowcasePodcast {
@@ -154,7 +155,7 @@ export async function getLandingShowcaseData(): Promise<LandingShowcaseData | nu
           },
         },
         segments: {
-          select: { speaker: true },
+          select: { speaker: true, ttsVoiceId: true },
         },
         voiceTracks: {
           where: { status: 'READY', audioUrl: { not: null } },
@@ -258,12 +259,23 @@ export async function getLandingShowcaseData(): Promise<LandingShowcaseData | nu
     const voiceCount = speakers.length || 2;
     const sourceCount = podcast.references.length;
 
-    // Original track label — "Speaker1 + Speaker2 [Provider]"
+    // Original track label — "VoiceName1 + VoiceName2 [Provider]"
     const providerLabel = podcast.ttsProvider
       ? podcast.ttsProvider.charAt(0).toUpperCase() + podcast.ttsProvider.slice(1)
       : 'Sotto';
-    const originalTrackName = speakers.length > 0
-      ? `${speakers.join(' + ')} [${providerLabel}]`
+    // Resolve voice names from voiceIds, deduped and ordered by first appearance
+    const voiceNames: string[] = [];
+    const seenVoiceIds = new Set<string>();
+    for (const seg of podcast.segments) {
+      if (seg.ttsVoiceId && !seenVoiceIds.has(seg.ttsVoiceId)) {
+        seenVoiceIds.add(seg.ttsVoiceId);
+        const entry = findByVoiceId(seg.ttsVoiceId);
+        if (entry) voiceNames.push(entry.name);
+      }
+    }
+    const displayNames = voiceNames.length > 0 ? voiceNames : speakers;
+    const originalTrackName = displayNames.length > 0
+      ? `${displayNames.join(' + ')} [${providerLabel}]`
       : providerLabel;
 
     // Video segments
