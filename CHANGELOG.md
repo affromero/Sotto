@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.23.2] - 2026-03-15
+
+### Fixed
+- Video pipeline editor timeout on large podcasts — moved LLM classification to async BullMQ worker with Redis result store, replacing synchronous API call that was killed by Cloudflare's 100s origin timeout
+- Redis eviction policy corrected from `volatile-lru` to `noeviction` to prevent BullMQ job loss under memory pressure
+
 ## [0.23.0] - 2026-03-15
 
 ### Added
