@@ -128,6 +128,24 @@
   color: var(--color-text-secondary);
 }
 
+/* Ambient glow — opacity-only, no box-shadow animation */
+.miniPlayer::before {
+  content: '';
+  position: absolute;
+  top: -8px;
+  left: 10%;
+  right: 10%;
+  height: 8px;
+  background: radial-gradient(ellipse at center, var(--color-primary), transparent 70%);
+  opacity: 0;
+  transition: opacity 500ms var(--ease-out-expo);
+  pointer-events: none;
+}
+
+.playing::before {
+  opacity: 0.2;
+}
+
 @keyframes slideUp {
   from { transform: translateY(100%); }
   to { transform: translateY(0); }
@@ -150,6 +168,10 @@
 @media (prefers-reduced-motion: reduce) {
   .miniPlayer {
     animation: none;
+  }
+
+  .miniPlayer::before {
+    display: none;
   }
 
   .playButton:hover,
