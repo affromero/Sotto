@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.21.6] - 2026-03-15
+
+### Fixed
+- Landing page now re-renders immediately after admin saves or resets showcase config (added `revalidatePath('/')` to all admin showcase API routes)
+- Landing page falls back to hardcoded content when showcase podcast is missing discovery chat or script data, preventing half-populated chapters
+- Resolved all pre-existing test failures across web and mobile test suites
+
+### Added
+- iOS CI workflow with Maestro E2E tests on self-hosted macOS runner
+- 15 Maestro flows for thorough mobile E2E coverage
+- testIDs on comment, draft, voice, and pill mobile components
+
 ## [0.21.4] - 2026-03-15
 
 ### Added
