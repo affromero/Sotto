@@ -216,6 +216,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
   const [showPipelineEditor, setShowPipelineEditor] = useState(false);
   const [falModels, setFalModels] = useState<FalModelsResponse | null>(null);
   const [pipelineLoading, setPipelineLoading] = useState(false);
+  const [classificationId, setClassificationId] = useState<string | null>(null);
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   const [showVideoEditor, setShowVideoEditor] = useState(false);
   const [showMusicModal, setShowMusicModal] = useState(false);
@@ -414,23 +415,66 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
           isLlmError: err.isLlmError,
           currentProvider: err.currentProvider,
         });
+        setPipelineLoading(false);
         return;
       }
       if (!modelsRes.ok) {
         setVideoError({ message: 'Failed to load available models.' });
+        setPipelineLoading(false);
         return;
       }
-      const pipeline: VideoPipeline = await pipelineRes.json();
+      const data = await pipelineRes.json();
       const models: FalModelsResponse = await modelsRes.json();
-      setPipelineData(pipeline);
       setFalModels(models);
-      setShowPipelineEditor(true);
+      // POST now returns { classificationId, status: 'classifying' } — start polling
+      setClassificationId(data.classificationId);
     } catch {
       setVideoError({ message: 'Failed to create pipeline.' });
-    } finally {
       setPipelineLoading(false);
     }
   }, [podcast.id]);
+
+  // Poll for pipeline classification result
+  useEffect(() => {
+    if (!classificationId || !pipelineLoading) return;
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const res = await fetch(
+          `/api/podcasts/${podcast.id}/video/pipeline?classificationId=${classificationId}`,
+        );
+        if (cancelled) return;
+        if (!res.ok) {
+          if (!cancelled) setTimeout(poll, 5000);
+          return;
+        }
+        const data = await res.json();
+        if (data.status === 'ready') {
+          setPipelineData(data.pipeline);
+          setShowPipelineEditor(true);
+          setPipelineLoading(false);
+          setClassificationId(null);
+          return;
+        }
+        if (data.status === 'failed') {
+          setVideoError({
+            message: data.error || 'Classification failed.',
+            isLlmError: data.isLlmError,
+            currentProvider: data.currentProvider,
+          });
+          setPipelineLoading(false);
+          setClassificationId(null);
+          return;
+        }
+        // Still classifying — poll again
+        if (!cancelled) setTimeout(poll, 3000);
+      } catch {
+        if (!cancelled) setTimeout(poll, 5000);
+      }
+    };
+    const timer = setTimeout(poll, 2000);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [classificationId, pipelineLoading, podcast.id]);
 
   const handlePipelineApprove = useCallback(
     async (pipeline: VideoPipeline) => {
