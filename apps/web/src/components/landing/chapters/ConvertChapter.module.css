@@ -34,7 +34,7 @@
   height: 700px;
   background: radial-gradient(
     circle,
-    rgba(217, 119, 6, 0.08) 0%,
+    var(--color-primary-subtle) 0%,
     transparent 60%
   );
   transform: translate(-50%, -50%);
@@ -55,13 +55,7 @@
 }
 
 .overline {
-  display: block;
-  font-size: 13px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 1.5px;
-  color: var(--color-primary);
-  margin-bottom: 16px;
+  composes: overline from './shared.module.css';
 }
 
 .headingLight {
@@ -119,7 +113,7 @@
 
 .cta {
   position: relative;
-  padding: 100px var(--spacing-lg);
+  padding: var(--section-pad-y) var(--spacing-lg);
   text-align: center;
   overflow: hidden;
 }

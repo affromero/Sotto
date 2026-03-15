@@ -382,7 +382,7 @@
 .actionButtonPlaying {
   color: var(--color-primary);
   border-color: rgba(217, 119, 6, 0.3);
-  background: rgba(217, 119, 6, 0.08);
+  background: var(--color-primary-subtle);
 }
 
 .actionButtonUse:hover:not(:disabled) {
