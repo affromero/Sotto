@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { getLandingShowcaseConfig } from '@/lib/landing-showcase';
+import { logger } from '@/lib/logger';
 import type { ReferenceData } from '@/types/reference';
 
 export interface ShowcasePodcast {
@@ -95,8 +96,10 @@ export async function getShowcasePodcast(): Promise<ShowcasePodcast | null> {
       audioUrl: podcast.audioUrl,
       duration: podcast.duration,
     };
-  } catch {
-    // DB unavailable at build time — gracefully skip
+  } catch (err) {
+    logger.warn('Failed to fetch showcase podcast', {
+      error: err instanceof Error ? err.message : String(err),
+    });
     return null;
   }
 }
@@ -182,7 +185,14 @@ export async function getLandingShowcaseData(): Promise<LandingShowcaseData | nu
     // Completeness guard: fall back to hardcoded if critical data is missing
     const discoveryMessages = podcast.discovery?.messages ?? [];
     const scriptTurnsRaw = (podcast.script?.turns ?? []) as Array<{ speaker: string; text: string }>;
-    if (discoveryMessages.length === 0 || scriptTurnsRaw.length === 0) return null;
+    if (discoveryMessages.length === 0 || scriptTurnsRaw.length === 0) {
+      logger.warn('Landing showcase podcast missing critical data', {
+        podcastId: config.podcastId,
+        hasDiscovery: discoveryMessages.length > 0,
+        hasScript: scriptTurnsRaw.length > 0,
+      });
+      return null;
+    }
 
     const showcasePodcast: ShowcasePodcast = {
       podcastId: podcast.id,
@@ -282,7 +292,10 @@ export async function getLandingShowcaseData(): Promise<LandingShowcaseData | nu
       videoClip,
       bot,
     };
-  } catch {
+  } catch (err) {
+    logger.warn('Failed to fetch landing showcase data', {
+      error: err instanceof Error ? err.message : String(err),
+    });
     return null;
   }
 }
