@@ -77,9 +77,9 @@ export function ShowcaseChapter({ showcase }: ShowcaseChapterProps) {
               <span className={styles.overline}>Video generation</span>
               <h2 className={styles.heading}>Turn podcasts into video</h2>
               <p className={styles.description}>
-                Every segment gets a visual &mdash; AI illustrations, data charts,
-                stock footage, or timeline graphics. Add avatar presenters or keep
-                it clean. 9 visual types, fully automatic.
+                Every segment gets a visual &mdash; AI illustrations, maps,
+                data charts, stock footage, timelines, diagrams, and more.
+                Add avatar presenters or keep it clean. 9 visual types, fully automatic.
               </p>
             </div>
           </div>
