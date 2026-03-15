@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.21.9] - 2026-03-15
+
+### Fixed
+- Landing page showcase no longer reverts to hardcoded fallback after deploys or transient DB errors — page now uses `force-dynamic` rendering and logs all showcase fetch failures
+
+### Changed
+- Landing page CSS polish: deduplicated `.overline` styles, tamed hover lift, added press feedback and focus-visible states, ambient warm glow animation, text-wrap balance
+
 ## [0.21.8] - 2026-03-15
 
 ### Fixed
