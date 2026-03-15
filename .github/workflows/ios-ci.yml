@@ -104,21 +104,24 @@ jobs:
         run: npx tsx e2e/llmock/setup.ts &
 
       - name: Start Next.js backend
-        run: npm run dev:web &
+        working-directory: apps/web
+        run: npx next dev &
 
       - name: Wait for services
         run: |
           echo "Waiting for LLMock (port 4100)..."
           for i in $(seq 1 30); do
-            curl -sf http://localhost:4100/health > /dev/null 2>&1 && break
+            lsof -i :4100 -sTCP:LISTEN > /dev/null 2>&1 && break
             sleep 1
           done
+          lsof -i :4100 -sTCP:LISTEN > /dev/null 2>&1 || { echo "LLMock failed to start"; exit 1; }
 
           echo "Waiting for Next.js (port 3000)..."
           for i in $(seq 1 120); do
-            curl -sf http://localhost:3000 > /dev/null 2>&1 && break
+            lsof -i :3000 -sTCP:LISTEN > /dev/null 2>&1 && break
             sleep 1
           done
+          lsof -i :3000 -sTCP:LISTEN > /dev/null 2>&1 || { echo "Next.js failed to start"; exit 1; }
 
       - name: Seed test data
         run: npx tsx e2e/playwright/helpers/seed.ts
