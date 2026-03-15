@@ -17,7 +17,7 @@ import { getAiProviderMeta, type AiProviderId } from '@/lib/providers/ai-registr
 import { logUsage } from '@/lib/usage-logger';
 import { cache } from '@/lib/redis';
 import { logger } from '@/lib/logger';
-import { estimateDurationFromText } from '@/lib/duration';
+import { resolveSegmentTiming } from '@/lib/segment-timing';
 import type { PipelineSegmentNode, PipelineTransition, VisualMode, VideoPipeline } from '@/types/pipeline';
 
 const REDIS_KEY_PREFIX = 'pipeline-classification:';
@@ -40,31 +40,26 @@ function visualModeForType(visualType: VisualTypeString): VisualMode {
 }
 
 export async function processPipelineClassification(job: Job<ClassifyPipelinePayload>): Promise<void> {
-  const { classificationId, podcastId, userId, aiProvider, aiModel, apiKeyOverride, tier } = job.data;
+  const { classificationId, podcastId, userId, aiProvider, aiModel, apiKeyOverride, tier, voiceTrackId } = job.data;
   const redisKey = `${REDIS_KEY_PREFIX}${classificationId}`;
 
   logger.info('Starting pipeline classification', { classificationId, podcastId });
 
   try {
-    const podcast = await prisma.podcast.findUniqueOrThrow({
-      where: { id: podcastId },
-      select: {
-        id: true,
-        title: true,
-        topic: true,
-        segments: {
-          orderBy: { order: 'asc' as const },
-          select: { id: true, order: true, speaker: true, text: true, duration: true },
-        },
-      },
-    });
+    const [podcast, segmentTimings] = await Promise.all([
+      prisma.podcast.findUniqueOrThrow({
+        where: { id: podcastId },
+        select: { id: true, title: true, topic: true },
+      }),
+      resolveSegmentTiming(podcastId, voiceTrackId),
+    ]);
 
-    const segmentInputs = podcast.segments.map((s) => ({
-      segmentId: s.id,
+    const segmentInputs = segmentTimings.map((s) => ({
+      segmentId: s.segmentId,
       order: s.order,
       speaker: s.speaker,
       text: s.text,
-      duration: s.duration ?? estimateDurationFromText(s.text),
+      duration: s.duration,
     }));
 
     await job.updateProgress(20);

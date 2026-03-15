@@ -167,8 +167,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return errorResponse(`Invalid request: ${parsed.error.issues[0].message}`, 400);
   }
 
-  const videoGeneration = await prisma.videoGeneration.findUnique({
-    where: { podcastId },
+  const avatarVoiceTrackId: string | null = parsed.data.voiceTrackId ?? null;
+  const videoGeneration = await prisma.videoGeneration.findFirst({
+    where: { podcastId, voiceTrackId: avatarVoiceTrackId },
     select: { id: true, status: true },
   });
 
@@ -305,8 +306,10 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     return errorResponse('Forbidden', 403);
   }
 
-  const videoGeneration = await prisma.videoGeneration.findUnique({
-    where: { podcastId },
+  const delUrl = new URL(request.url);
+  const delVoiceTrackId = delUrl.searchParams.get('voiceTrackId');
+  const videoGeneration = await prisma.videoGeneration.findFirst({
+    where: { podcastId, voiceTrackId: delVoiceTrackId ?? null },
     select: {
       id: true,
       avatarOverlays: { select: { id: true, videoUrl: true, concatAudioUrl: true, chunkVideoUrl: true } },

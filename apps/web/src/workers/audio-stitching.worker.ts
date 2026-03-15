@@ -446,7 +446,7 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
               logger.info('Skipped auto video generation: daily limit reached', { podcastId });
             }
           }
-          const existing = await prisma.videoGeneration.findUnique({ where: { podcastId } });
+          const existing = await prisma.videoGeneration.findFirst({ where: { podcastId, voiceTrackId: null } });
           if (videoLimitOk && !existing) {
             const videoGen = await prisma.videoGeneration.create({
               data: {
