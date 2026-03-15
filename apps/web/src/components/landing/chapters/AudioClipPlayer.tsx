@@ -10,6 +10,12 @@ interface VoiceTrackOption {
   audioUrl: string;
 }
 
+interface VideoClip {
+  url: string;
+  start: number;
+  end: number;
+}
+
 interface AudioClipPlayerProps {
   title: string;
   voiceCount: number;
@@ -21,6 +27,7 @@ interface AudioClipPlayerProps {
   totalDuration: number;
   podcastId: string;
   voiceTracks?: VoiceTrackOption[];
+  videoClip?: VideoClip | null;
 }
 
 function formatTime(seconds: number): string {
@@ -46,6 +53,7 @@ export function AudioClipPlayer({
   totalDuration,
   podcastId,
   voiceTracks = [],
+  videoClip,
 }: AudioClipPlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const pendingResumeRef = useRef<{ elapsed: number; play: boolean } | null>(null);
@@ -218,6 +226,25 @@ export function AudioClipPlayer({
             </a>
           </div>
         </div>
+
+        {videoClip && (
+          <a href={`/podcast/${podcastId}?tab=video`} className={styles.videoPreview}>
+            {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+            <video
+              src={`${videoClip.url}#t=${videoClip.start}`}
+              preload="metadata"
+              className={styles.videoThumb}
+              playsInline
+              muted
+            />
+            <div className={styles.videoPreviewOverlay}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+              <span>Watch video</span>
+            </div>
+          </a>
+        )}
       </div>
       {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
       <audio ref={audioRef} src={activeUrl} preload="metadata" />
