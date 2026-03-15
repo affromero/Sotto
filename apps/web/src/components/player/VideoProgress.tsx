@@ -129,13 +129,14 @@ function stageIndex(status: string): number {
 }
 
 function FilmstripThumbnail({ visual }: { visual: SegmentVisual }) {
+  const [imgError, setImgError] = useState(false);
   const Icon = VISUAL_TYPE_ICONS[visual.visualType] || Type;
   const label = VISUAL_TYPE_LABELS[visual.visualType] || visual.visualType;
   const isProgrammatic = PROGRAMMATIC_TYPES.has(visual.visualType);
   const isReady = visual.status === 'ready';
   const isGenerating = visual.status === 'generating';
   const isFailed = visual.status === 'failed';
-  const showImage = isReady && visual.assetUrl && !isProgrammatic;
+  const showImage = isReady && visual.assetUrl && !isProgrammatic && !imgError;
 
   const statusClass = isFailed ? styles.thumbFailed
     : isGenerating ? styles.thumbGenerating
@@ -155,6 +156,7 @@ function FilmstripThumbnail({ visual }: { visual: SegmentVisual }) {
           className={styles.thumbImage}
           fill
           sizes="120px"
+          onError={() => setImgError(true)}
         />
       ) : (
         <div className={styles.thumbPlaceholder}>
@@ -317,7 +319,7 @@ export function VideoProgress({ podcastId, videoGenerationId, onComplete, onFail
         {isComposing ? (
           <div className={styles.progressFillIndeterminate} />
         ) : (
-          <div className={styles.progressFill} style={{ width: `${progressPercent}%` }} />
+          <div className={`${styles.progressFill} ${progressPercent > 0 && progressPercent < 100 ? styles.progressFillActive : ''}`} style={{ width: `${progressPercent}%` }} />
         )}
       </div>
 

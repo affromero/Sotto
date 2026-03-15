@@ -42,6 +42,28 @@
   transition: width 400ms ease;
 }
 
+.progressFillActive {
+  position: relative;
+  overflow: hidden;
+}
+
+.progressFillActive::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  animation: shimmer 2s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% { opacity: 0; transform: translateX(-100%); }
+  50% { opacity: 1; transform: translateX(50%); }
+  100% { opacity: 0; transform: translateX(100%); }
+}
+
 .progressBarIndeterminate {
   position: relative;
 }
@@ -63,6 +85,11 @@
 @media (prefers-reduced-motion: reduce) {
   .progressFill {
     transition: none;
+  }
+
+  .progressFillActive::after {
+    animation: none;
+    display: none;
   }
 
   .progressFillIndeterminate {
