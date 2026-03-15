@@ -29,10 +29,10 @@ export function BotChapter({ showcase }: BotChapterProps) {
           <span className={styles.overline}>Generate from anywhere</span>
           <h2 className={styles.heading}>Tweet it. Message it. Done.</h2>
           <p className={styles.description}>
-            Tag <strong><a href="https://x.com/sottofm" className={styles.extLink}>@sottofm</a></strong> on X or message{' '}
+            Tag <strong><a href="https://x.com/sottofm" className={styles.extLink}>@sottofm</a></strong> on X to generate a podcast instantly, or message{' '}
             <strong><a href="https://t.me/SottoFMBot" className={styles.extLink}>@SottoFMBot</a></strong> on
-            Telegram &mdash; your podcast generates automatically and you get a link when
-            it&apos;s ready.
+            Telegram to save ideas for later &mdash; come back and turn them into
+            podcasts whenever you&apos;re ready.
           </p>
         </div>
 
@@ -126,24 +126,24 @@ export function BotChapter({ showcase }: BotChapterProps) {
             </span>
 
             <div className={styles.tgMock}>
+              <div className={`${styles.tgRow} ${styles.tgRowUser}`}>
+                <div className={`${styles.tgBubble} ${styles.tgBubbleUser}`}>
+                  I want a deep dive on {tgTopic}
+                </div>
+              </div>
+
               <div className={styles.tgRow}>
                 <div className={styles.tgBotName}>
                   <a href="https://t.me/SottoFMBot" className={styles.tgBotLink}>SottoFM</a>
                 </div>
                 <div className={`${styles.tgBubble} ${styles.tgBubbleBot}`}>
-                  What aspect of {tgTopic} interests you?
+                  Saved! You can turn this into a podcast anytime from your dashboard.
                 </div>
-              </div>
-
-              <div className={styles.tgKeyboard}>
-                <span className={styles.tgKey}>Basics</span>
-                <span className={`${styles.tgKey} ${styles.tgKeySelected}`}>Deep Dive</span>
-                <span className={styles.tgKey}>News</span>
               </div>
 
               <div className={`${styles.tgRow} ${styles.tgRowUser}`}>
                 <div className={`${styles.tgBubble} ${styles.tgBubbleUser}`}>
-                  Deep Dive
+                  Also save &quot;history of jazz&quot;
                 </div>
               </div>
 
@@ -152,23 +152,15 @@ export function BotChapter({ showcase }: BotChapterProps) {
                   <a href="https://t.me/SottoFMBot" className={styles.tgBotLink}>SottoFM</a>
                 </div>
                 <div className={`${styles.tgBubble} ${styles.tgBubbleBot}`}>
-                  Your podcast is ready! &quot;{podcastTitle}&quot; ({podcastDuration})
+                  Saved! You now have 2 ideas waiting.
                 </div>
-              </div>
-
-              <div className={styles.tgKeyboard}>
-                {podcastUrl ? (
-                  <a href={podcastUrl} className={styles.tgKeyUrl}>Listen Now &#8599;</a>
-                ) : (
-                  <span className={styles.tgKeyUrl}>Listen Now &#8599;</span>
-                )}
               </div>
             </div>
 
             <div className={styles.features}>
-              <div className={styles.feature}>{CHECK} Multi-turn discovery conversation</div>
-              <div className={styles.feature}>{CHECK} Tap chips or type free text</div>
-              <div className={styles.feature}>{CHECK} Get notified when your podcast is ready</div>
+              <div className={styles.feature}>{CHECK} Save ideas on the go</div>
+              <div className={styles.feature}>{CHECK} Build a backlog of topics</div>
+              <div className={styles.feature}>{CHECK} Turn any idea into a podcast from your dashboard</div>
             </div>
           </div>
         </div>
