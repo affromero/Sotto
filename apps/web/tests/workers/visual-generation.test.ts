@@ -55,6 +55,12 @@ vi.mock('@/lib/video-cost-estimator', () => ({
   fetchAllVideoModels: (...args: unknown[]) => mockFetchAllVideoModels(...args),
 }));
 vi.mock('@/lib/usage-logger', () => ({ logUsage: vi.fn() }));
+vi.mock('@/lib/hera', () => ({
+  generateHeraMotionGraphic: vi.fn().mockResolvedValue(null),
+}));
+vi.mock('@/lib/hera-prompt-builder', () => ({
+  buildHeraPrompt: vi.fn().mockReturnValue('mock hera prompt'),
+}));
 vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));

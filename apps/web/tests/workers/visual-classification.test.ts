@@ -6,11 +6,12 @@ const {
   mockAddJob,
   mockGetAiKey,
   mockResolveAiModel,
+  mockResolveMotionProvider,
 } = vi.hoisted(() => ({
   mockPrisma: {
     videoGeneration: { update: vi.fn() },
     podcast: { findUniqueOrThrow: vi.fn() },
-    segmentVisual: { createMany: vi.fn(), findMany: vi.fn() },
+    segmentVisual: { createMany: vi.fn(), findMany: vi.fn(), count: vi.fn() },
     segmentTransition: { createMany: vi.fn() },
     user: { findUniqueOrThrow: vi.fn() },
   },
@@ -18,6 +19,7 @@ const {
   mockAddJob: vi.fn(),
   mockGetAiKey: vi.fn(),
   mockResolveAiModel: vi.fn(),
+  mockResolveMotionProvider: vi.fn(),
 }));
 
 vi.mock('@/lib/prisma', () => ({ prismaUnfiltered: mockPrisma }));
@@ -38,6 +40,9 @@ vi.mock('@/lib/byok', () => ({
 vi.mock('@/lib/providers/ai-registry', () => ({
   resolveAiModelAndProvider: (...args: unknown[]) => mockResolveAiModel(...args),
 }));
+vi.mock('@/lib/auto-model-config', () => ({
+  resolveMotionProvider: (...args: unknown[]) => mockResolveMotionProvider(...args),
+}));
 vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
@@ -53,12 +58,15 @@ beforeEach(() => {
   mockGetAiKey.mockResolvedValue(null);
   mockPrisma.user.findUniqueOrThrow.mockResolvedValue({ plan: 'FREE' });
   mockResolveAiModel.mockResolvedValue({ model: 'claude-haiku-4-5-20251001', provider: 'anthropic' });
+  mockResolveMotionProvider.mockResolvedValue('remotion');
+  mockPrisma.segmentVisual.count.mockResolvedValue(0);
 });
 
 describe('visual-classification worker', () => {
   const baseData = { podcastId: 'pod-1', videoGenerationId: 'vg-1', userId: 'user-1' };
 
   it('classifies segments with sub-visuals and queues external asset jobs', async () => {
+    mockPrisma.segmentVisual.count.mockResolvedValue(1); // 1 pending (AI_ILLUSTRATION)
     mockPrisma.podcast.findUniqueOrThrow.mockResolvedValue({
       title: 'Test Podcast',
       topic: 'Test topic',
@@ -85,9 +93,9 @@ describe('visual-classification worker', () => {
       model: 'claude-haiku-4-5-20251001',
     });
 
+    // findMany now queries only pending visuals — return only the external one
     mockPrisma.segmentVisual.findMany.mockResolvedValue([
       { id: 'sv-1', segmentId: 'seg-1', subOrder: 0, visualType: 'AI_ILLUSTRATION', prompt: 'editorial style', metadata: null },
-      { id: 'sv-2', segmentId: 'seg-2', subOrder: 0, visualType: 'DATA_CHART', prompt: null, metadata: { chartType: 'bar' } },
     ]);
 
     await processVisualClassification(makeJob(baseData));
@@ -95,8 +103,8 @@ describe('visual-classification worker', () => {
     // Should create segment visuals with subOrder/startOffset/subDuration
     expect(mockPrisma.segmentVisual.createMany).toHaveBeenCalledWith({
       data: expect.arrayContaining([
-        expect.objectContaining({ segmentId: 'seg-1', visualType: 'AI_ILLUSTRATION', status: 'pending', subOrder: 0, startOffset: 0, subDuration: 5, endStatePrompt: 'scene after narration' }),
-        expect.objectContaining({ segmentId: 'seg-2', visualType: 'DATA_CHART', status: 'ready', subOrder: 0, startOffset: 0, subDuration: 8, endStatePrompt: null }),
+        expect.objectContaining({ segmentId: 'seg-1', visualType: 'AI_ILLUSTRATION', status: 'pending', subOrder: 0, startOffset: 0, subDuration: 5, endStatePrompt: 'scene after narration', motionProvider: null }),
+        expect.objectContaining({ segmentId: 'seg-2', visualType: 'DATA_CHART', status: 'ready', subOrder: 0, startOffset: 0, subDuration: 8, endStatePrompt: null, motionProvider: 'remotion' }),
       ]),
     });
 
@@ -110,6 +118,7 @@ describe('visual-classification worker', () => {
   });
 
   it('creates multiple SegmentVisual records for multi-sub-visual segments', async () => {
+    mockPrisma.segmentVisual.count.mockResolvedValue(1); // MAP_OVERLAY is pending
     mockPrisma.podcast.findUniqueOrThrow.mockResolvedValue({
       title: 'Geography Podcast',
       topic: 'World places',
@@ -134,8 +143,8 @@ describe('visual-classification worker', () => {
       model: 'claude-haiku-4-5-20251001',
     });
 
+    // findMany queries only pending visuals — MAP_OVERLAY is pending, TEXT_CARD is ready
     mockPrisma.segmentVisual.findMany.mockResolvedValue([
-      { id: 'sv-1', segmentId: 'seg-1', subOrder: 0, visualType: 'TEXT_CARD', prompt: null, metadata: { headline: 'The Silk Road' } },
       { id: 'sv-2', segmentId: 'seg-1', subOrder: 1, visualType: 'MAP_OVERLAY', prompt: 'Silk Road trade route', metadata: { places: [{ name: "Xi'an" }, { name: 'Constantinople' }], preset: 'vintage' } },
     ]);
 
@@ -144,14 +153,15 @@ describe('visual-classification worker', () => {
     // Should create 2 records for the single segment
     expect(mockPrisma.segmentVisual.createMany).toHaveBeenCalledWith({
       data: expect.arrayContaining([
-        expect.objectContaining({ segmentId: 'seg-1', subOrder: 0, visualType: 'TEXT_CARD', startOffset: 0, subDuration: 12, status: 'ready' }),
-        expect.objectContaining({ segmentId: 'seg-1', subOrder: 1, visualType: 'MAP_OVERLAY', startOffset: 12, subDuration: 18, status: 'pending' }),
+        expect.objectContaining({ segmentId: 'seg-1', subOrder: 0, visualType: 'TEXT_CARD', startOffset: 0, subDuration: 12, status: 'ready', motionProvider: 'remotion' }),
+        expect.objectContaining({ segmentId: 'seg-1', subOrder: 1, visualType: 'MAP_OVERLAY', startOffset: 12, subDuration: 18, status: 'pending', motionProvider: null }),
       ]),
     });
     expect(mockPrisma.segmentVisual.createMany.mock.calls[0][0].data).toHaveLength(2);
   });
 
   it('routes MAP_OVERLAY sub-visuals to place-enrichment queue', async () => {
+    mockPrisma.segmentVisual.count.mockResolvedValue(1); // MAP_OVERLAY is pending
     mockPrisma.podcast.findUniqueOrThrow.mockResolvedValue({
       title: 'Ancient Rome',
       topic: 'History',

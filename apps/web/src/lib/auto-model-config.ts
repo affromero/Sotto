@@ -77,6 +77,9 @@ export interface AutoModelConfigData {
   proMusicModel: string;
   freeIncludedMusicModels: string[] | null;
   proIncludedMusicModels: string[] | null;
+  // Motion (programmatic visual rendering)
+  freeMotionProvider: string;
+  proMotionProvider: string;
   // Daily limits & allocations (migrated from FreeTierConfig)
   dailyGenerationLimit: number;
   dailyGenerationLimitPro: number;
@@ -124,6 +127,8 @@ const SEEDS = {
   freeMusicModel: 'suno-v5',
   proMusicProvider: 'suno',
   proMusicModel: 'suno-v5',
+  freeMotionProvider: 'remotion',
+  proMotionProvider: 'remotion',
   dailyGenerationLimit: 1,
   dailyGenerationLimitPro: 5,
   dailyVideoLimit: 1,
@@ -265,6 +270,9 @@ export async function getAutoModelConfig(): Promise<AutoModelConfigData> {
     proMusicModel: row.proMusicModel,
     freeIncludedMusicModels: includedModelsSchema.parse(row.freeIncludedMusicModels),
     proIncludedMusicModels: includedModelsSchema.parse(row.proIncludedMusicModels),
+    // Motion
+    freeMotionProvider: row.freeMotionProvider,
+    proMotionProvider: row.proMotionProvider,
     // Daily limits & allocations
     dailyGenerationLimit: row.dailyGenerationLimit,
     dailyGenerationLimitPro: row.dailyGenerationLimitPro,
@@ -321,6 +329,9 @@ export async function setAutoModelConfig(
     proMusicModel?: string;
     freeIncludedMusicModels?: string[] | null;
     proIncludedMusicModels?: string[] | null;
+    // Motion
+    freeMotionProvider?: string;
+    proMotionProvider?: string;
     // Daily limits & allocations
     dailyGenerationLimit?: number;
     dailyGenerationLimitPro?: number;
@@ -415,6 +426,10 @@ export async function setAutoModelConfig(
   if (data.proMusicModel) update.proMusicModel = data.proMusicModel;
   if (data.freeIncludedMusicModels !== undefined) update.freeIncludedMusicModels = data.freeIncludedMusicModels;
   if (data.proIncludedMusicModels !== undefined) update.proIncludedMusicModels = data.proIncludedMusicModels;
+
+  // Motion
+  if (data.freeMotionProvider) update.freeMotionProvider = data.freeMotionProvider;
+  if (data.proMotionProvider) update.proMotionProvider = data.proMotionProvider;
 
   // Daily limits & allocations
   if (data.dailyGenerationLimit !== undefined) update.dailyGenerationLimit = data.dailyGenerationLimit;
@@ -552,4 +567,14 @@ export async function resolveMusicModel(plan: 'FREE' | 'PRO' = 'PRO'): Promise<{
   return plan === 'FREE'
     ? { musicProvider: config.freeMusicProvider, musicModel: config.freeMusicModel }
     : { musicProvider: config.proMusicProvider, musicModel: config.proMusicModel };
+}
+
+/**
+ * Resolve the motion provider for programmatic visual rendering.
+ * Returns 'hera' only when explicitly configured; defaults to 'remotion'.
+ */
+export async function resolveMotionProvider(plan: 'FREE' | 'PRO' = 'PRO'): Promise<'remotion' | 'hera'> {
+  const config = await getAutoModelConfig();
+  const value = plan === 'FREE' ? config.freeMotionProvider : config.proMotionProvider;
+  return value === 'hera' ? 'hera' : 'remotion';
 }

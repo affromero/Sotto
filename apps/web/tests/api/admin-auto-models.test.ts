@@ -409,6 +409,37 @@ describe('PATCH /api/admin/auto-models', () => {
     );
   });
 
+  it('accepts motion provider config in PATCH', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
+
+    const response = await PATCH(
+      createPatchRequest({
+        freeMotionProvider: 'remotion',
+        proMotionProvider: 'hera',
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockSetAutoModelConfig).toHaveBeenCalledWith(
+      {
+        freeMotionProvider: 'remotion',
+        proMotionProvider: 'hera',
+      },
+      'admin-1'
+    );
+  });
+
+  it('rejects invalid motion provider value', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
+
+    const response = await PATCH(
+      createPatchRequest({ proMotionProvider: 'invalid' })
+    );
+
+    expect(response.status).toBe(400);
+    expect(mockSetAutoModelConfig).not.toHaveBeenCalled();
+  });
+
   it('accepts avatar model config in PATCH', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
 

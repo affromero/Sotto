@@ -1799,6 +1799,9 @@ model AutoModelConfig {
   proMusicProvider         String   @default("suno")
   proMusicModel            String   @default("suno-v5")
   freeIncludedMusicModels  Json?
+  // Motion (programmatic visual rendering)
+  freeMotionProvider       String   @default("remotion")
+  proMotionProvider        String   @default("remotion")
   proIncludedMusicModels   Json?
   // Daily limits (migrated from FreeTierConfig)
   dailyGenerationLimit     Int      @default(1)
@@ -2298,6 +2301,7 @@ model SegmentVisual {
   lastFrameUrl      String?
   assetUrl          String? // R2 URL of generated image/video
   assetType         String? // 'image/png' | 'video/mp4'
+  motionProvider    String? // 'remotion' | 'hera' — which motion provider rendered this visual
   status            String     @default("pending") // pending | generating | ready | failed
   failureReason     String?    @db.Text
   createdAt         DateTime   @default(now())
