@@ -16,7 +16,7 @@ import { getAiKey } from '@/lib/byok';
 import { uploadFile } from '@/lib/r2';
 import { logUsage } from '@/lib/usage-logger';
 import { logger } from '@/lib/logger';
-import { estimateDurationFromText } from '@/lib/duration';
+import { resolveSegmentTiming } from '@/lib/segment-timing';
 
 const EXTERNAL_ASSET_TYPES = new Set(['AI_ILLUSTRATION', 'STOCK_FOOTAGE', 'MAP_OVERLAY']);
 const PROGRAMMATIC_TYPES: VisualType[] = ['TEXT_CARD', 'TIMELINE', 'QUOTE', 'COMPARISON', 'DIAGRAM', 'DATA_CHART'];
@@ -25,7 +25,7 @@ const STILL_FPS = 30;
 const STILL_CONCURRENCY = 4;
 
 export async function processVisualClassification(job: Job<ClassifyVisualsPayload>): Promise<void> {
-  const { podcastId, videoGenerationId, userId } = job.data;
+  const { podcastId, videoGenerationId, userId, voiceTrackId } = job.data;
 
   logger.info('Starting visual classification', { podcastId, videoGenerationId });
   await job.updateProgress(10);
@@ -37,8 +37,8 @@ export async function processVisualClassification(job: Job<ClassifyVisualsPayloa
   });
 
   try {
-    // Fetch podcast with segments + resolve AI model
-    const [podcast, aiKey, user] = await Promise.all([
+    // Fetch podcast metadata + resolve AI model + segment timing
+    const [podcast, aiKey, user, segmentTimings] = await Promise.all([
       prisma.podcast.findUniqueOrThrow({
         where: { id: podcastId },
         select: {
@@ -53,6 +53,7 @@ export async function processVisualClassification(job: Job<ClassifyVisualsPayloa
       }),
       getAiKey(userId),
       prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { plan: true } }),
+      resolveSegmentTiming(podcastId, voiceTrackId),
     ]);
     const { model: aiModel, provider: aiProvider } = await resolveAiModelAndProvider({
       podcastAiModel: podcast.aiModel,
@@ -60,18 +61,18 @@ export async function processVisualClassification(job: Job<ClassifyVisualsPayloa
       plan: user.plan as 'FREE' | 'PRO',
     });
 
-    if (podcast.segments.length === 0) {
+    if (segmentTimings.length === 0) {
       throw new Error('No segments found for podcast');
     }
 
     const motionProvider = await resolveMotionProvider(user.plan as 'FREE' | 'PRO');
 
-    const segmentInputs = podcast.segments.map((s) => ({
-      segmentId: s.id,
+    const segmentInputs = segmentTimings.map((s) => ({
+      segmentId: s.segmentId,
       order: s.order,
       speaker: s.speaker,
       text: s.text,
-      duration: s.duration ?? estimateDurationFromText(s.text),
+      duration: s.duration,
     }));
 
     await job.updateProgress(30);
