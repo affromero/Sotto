@@ -1,4 +1,4 @@
-/* TrendingSection — Trending podcast grid */
+/* TrendingSection — Trending podcast carousel */
 
 .root {
   width: 100%;
@@ -32,20 +32,86 @@
   text-decoration: underline;
 }
 
-.grid {
-  display: grid;
-  grid-template-columns: 1fr;
+/* Carousel — horizontal scroll-snap */
+.carousel {
+  display: flex;
   gap: var(--space-4);
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  outline: none;
+}
+
+.carousel::-webkit-scrollbar {
+  display: none;
+}
+
+.slide {
+  flex: 0 0 100%;
+  scroll-snap-align: start;
+  min-width: 0;
 }
 
 @media (min-width: 768px) {
-  .grid {
-    grid-template-columns: repeat(2, 1fr);
+  .slide {
+    flex: 0 0 calc(50% - var(--space-4) / 2);
   }
 }
 
 @media (min-width: 1024px) {
-  .grid {
-    grid-template-columns: repeat(3, 1fr);
+  .slide {
+    flex: 0 0 calc(33.333% - var(--space-4) * 2 / 3);
+  }
+}
+
+/* Dot indicators */
+.dots {
+  display: flex;
+  justify-content: center;
+  gap: var(--spacing-xs);
+  margin-top: var(--space-4);
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  border: none;
+  background: var(--color-border);
+  cursor: pointer;
+  padding: 0;
+  transition: background 250ms var(--ease-out-expo), transform 250ms var(--ease-out-expo);
+  /* Ensure accessible touch target via padding around the dot */
+  box-sizing: content-box;
+  outline-offset: 4px;
+}
+
+.dot:hover {
+  background: var(--color-text-tertiary);
+}
+
+.dotActive {
+  background: var(--color-primary);
+  transform: scale(1.25);
+}
+
+/* Hide dots on desktop when all slides visible */
+@media (min-width: 1024px) {
+  .dots {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .carousel {
+    scroll-behavior: auto;
+  }
+
+  .dot,
+  .dotActive {
+    transition: none;
+    transform: none;
   }
 }
