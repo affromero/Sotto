@@ -99,6 +99,7 @@ vi.mock('@/lib/queue', () => ({
     REPLY_TELEGRAM: 'reply_telegram',
     AUTO_TWEET: 'AUTO_TWEET',
     GENERATE_WAVEFORM: 'generate_waveform',
+    GENERATE_QUIZ: 'generate_quiz',
   },
   notificationQueue: { name: 'notifications' },
   pdfGenerationQueue: { name: 'pdf-generation' },
@@ -107,6 +108,7 @@ vi.mock('@/lib/queue', () => ({
   telegramReplyQueue: { name: 'telegram-reply' },
   twitterAutoTweetQueue: { name: 'twitter-auto-tweet' },
   waveformGenerationQueue: { name: 'waveform-generation' },
+  quizGenerationQueue: { name: 'quiz-generation' },
 }));
 
 const mockGenerateSoundEffect = vi.fn().mockResolvedValue(Buffer.from('sfx-audio'));
@@ -720,7 +722,7 @@ describe('processAudioStitching', () => {
       await processAudioStitching(job);
 
       expect(mockPrismaTweetMentionFindFirst).not.toHaveBeenCalled();
-      expect(mockAddJob).toHaveBeenCalledTimes(4); // notification + transcript + feature computation + waveform
+      expect(mockAddJob).toHaveBeenCalledTimes(5); // notification + transcript + feature computation + waveform + quiz
     });
 
     it('does not queue Twitter reply when mention is not found', async () => {

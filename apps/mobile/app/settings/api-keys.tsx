@@ -41,7 +41,6 @@ function ProviderRow({
   isValid,
   isConfigured,
   qualityTier,
-  hasUserId,
   endpoint,
   onMutated,
 }: {

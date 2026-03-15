@@ -228,4 +228,12 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
     description: 'Generates waveform peaks JSON and spectrogram PNG from podcast audio',
     stage: 'Audio Pipeline',
   },
+  'quiz-generation': {
+    description: 'Generates post-listen quiz questions from podcast script',
+    stage: 'Content Pipeline',
+  },
+  'briefing-scheduler': {
+    description: 'Schedules and generates daily briefing podcasts for subscribers',
+    stage: 'Content Pipeline',
+  },
 };

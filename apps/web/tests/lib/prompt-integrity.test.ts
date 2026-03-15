@@ -67,6 +67,8 @@ const EXPECTED_FILES = [
   'audio/voice-assigner.md',
   'audio/tts-tag-converter.md',
   'demo/walkthrough.md',
+  'generation/briefing-script.md',
+  'quiz/generate-quiz.md',
 ];
 
 // ── Variable contracts: template → expected placeholder names ──
@@ -128,6 +130,13 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
   'demo/walkthrough.md': [
     'APP_SELECTORS', 'DURATION_TARGET', 'FEATURES',
     'INTERCEPTOR_CATALOG', 'PRODUCT_CONTEXT', 'VOICE_COMPARISON',
+  ].sort(),
+  'generation/briefing-script.md': [
+    'CONTENT_SAFETY', 'DURATION_TARGET', 'SOURCE_ARTICLES',
+    'VOICE_REALISM', 'WORD_COUNT_IDEAL', 'WORD_COUNT_MAX', 'WORD_COUNT_MIN',
+  ].sort(),
+  'quiz/generate-quiz.md': [
+    'MEDIUM_COUNT', 'QUESTION_COUNT', 'SCRIPT_CONTEXT', 'SCRIPT_TURNS',
   ].sort(),
 };
 
