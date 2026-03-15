@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.21.10] - 2026-03-15
+
+### Added
+- Landing page audio player now shows the TTS provider name (e.g. "Will + Aria [ElevenLabs]") instead of generic "Original" label
+- Track switching continues playback from the same position instead of stopping
+
 ## [0.21.9] - 2026-03-15
 
 ### Fixed
