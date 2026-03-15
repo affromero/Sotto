@@ -36,10 +36,10 @@
 .cardList {
   flex: 1;
   overflow-y: auto;
-  padding: 16px 20px;
+  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 0;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -147,8 +147,8 @@
   }
 
   .cardList {
-    padding: 12px;
-    gap: 10px;
+    padding: 0;
+    gap: 0;
   }
 
   .footer {
