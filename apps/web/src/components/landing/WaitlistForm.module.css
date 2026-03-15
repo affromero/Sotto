@@ -114,6 +114,10 @@
   border-color: rgba(88, 101, 242, 0.5);
 }
 
+.discord:active {
+  transform: scale(0.98);
+}
+
 .submit {
   flex: 1;
   height: 48px;
@@ -137,6 +141,15 @@
   transform: translateY(-1px);
 }
 
+.submit:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+}
+
+.submit:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.8);
+  outline-offset: 2px;
+}
+
 .submit:disabled {
   opacity: 0.7;
   cursor: not-allowed;
@@ -146,6 +159,14 @@
   color: #ef4444;
   font-size: 13px;
   margin: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .submit:hover:not(:disabled),
+  .submit:active:not(:disabled),
+  .discord:active {
+    transform: none;
+  }
 }
 
 @media (max-width: 600px) {
