@@ -28,6 +28,20 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Ambient warm glow — subtle asymmetric spot at top-left */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(ellipse at 20% 0%, rgba(217, 119, 6, 0.02), transparent 50%);
+  pointer-events: none;
+  z-index: -1;
+}
+
+[data-theme='dark'] body::before {
+  background: radial-gradient(ellipse at 20% 0%, rgba(232, 137, 15, 0.03), transparent 50%);
+}
+
 /* ============================================ */
 /* DESIGN SYSTEM: "Warm Intimacy"               */
 /* ============================================ */
