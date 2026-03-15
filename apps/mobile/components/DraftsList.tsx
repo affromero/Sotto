@@ -95,6 +95,7 @@ export function DraftsList({ onResume }: Props) {
               <Pressable
                 onPress={() => handleDelete(draft.id)}
                 hitSlop={8}
+                testID={`draft-delete-${index}`}
               >
                 <Ionicons name="close" size={16} color={colors.textTertiary} />
               </Pressable>

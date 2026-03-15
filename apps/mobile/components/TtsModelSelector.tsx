@@ -87,6 +87,7 @@ export function TtsModelSelector({ ttsProvider, ttsModel, onChange }: TtsModelSe
       <Pressable
         style={styles.trigger}
         onPress={() => setSheetOpen(true)}
+        testID="tts-model-trigger"
         accessibilityRole="button"
         accessibilityLabel={`TTS Voice: ${selectedLabel}`}
       >

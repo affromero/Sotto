@@ -21,6 +21,7 @@ export function VisibilityPicker({ value, onChange }: VisibilityPickerProps) {
         options={options}
         selected={value}
         onChange={(val) => onChange(val as 'PUBLIC' | 'UNLISTED' | 'PRIVATE')}
+        testIDPrefix="visibility"
       />
     </View>
   );
