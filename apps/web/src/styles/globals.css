@@ -462,6 +462,51 @@ a:hover {
 }
 
 /* ============================================ */
+/* VIEW TRANSITIONS                              */
+/* ============================================ */
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 200ms;
+  animation-timing-function: var(--ease-out-expo);
+}
+
+::view-transition-old(root) {
+  animation-name: fadeIn;
+  animation-direction: reverse;
+}
+
+::view-transition-new(root) {
+  animation-name: fadeIn;
+}
+
+/* Persistent elements stay put across navigations */
+::view-transition-old(topbar),
+::view-transition-new(topbar),
+::view-transition-old(miniplayer),
+::view-transition-new(miniplayer) {
+  animation: none;
+}
+
+/* Reduced motion: disable all global keyframe animations */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation-duration: 0s !important;
+  }
+}
+
+/* ============================================ */
 /* MOBILE-FIRST RESPONSIVE                       */
 /* ============================================ */
 

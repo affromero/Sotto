@@ -8,6 +8,7 @@ const nextConfig = {
   poweredByHeader: false,
   experimental: {
     proxyClientMaxBodySize: '150mb',
+    viewTransition: true,
   },
   transpilePackages: ['next-auth', '@auth/prisma-adapter', '@auth/core', '@sotto/shared', '@sottofm/verification-standard', '@sotto/maps'],
   turbopack: {

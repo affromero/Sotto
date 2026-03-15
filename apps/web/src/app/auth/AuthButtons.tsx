@@ -131,7 +131,7 @@ export function AuthButtons({ callbackUrl = '/dashboard' }: AuthButtonsProps) {
                 className={styles.emailSubmitBtn}
                 disabled={emailSending}
               >
-                {emailSending ? 'Sending...' : 'Send magic link'}
+                {emailSending ? <><span className={styles.spinner} /> Sending...</> : 'Send magic link'}
               </button>
               {emailError && <p className={styles.emailError}>{emailError}</p>}
             </form>

@@ -59,6 +59,25 @@ export function LandingNav() {
           </button>
         </div>
       </div>
+      <div className={`${styles.mobileMenu} ${menuOpen ? styles.mobileMenuOpen : ''}`} aria-hidden={!menuOpen}>
+        <Link href="/create" className={styles.mobileLink} onClick={() => setMenuOpen(false)}>
+          Create
+        </Link>
+        <Link href="/feed" className={styles.mobileLink} onClick={() => setMenuOpen(false)}>
+          Explore Feed
+        </Link>
+        {mounted && !authLoading && (
+          isAuthenticated ? (
+            <Link href="/dashboard" className={styles.mobileLink} onClick={() => setMenuOpen(false)}>
+              Dashboard
+            </Link>
+          ) : (
+            <Link href="/auth/login" className={styles.mobileLink} onClick={() => setMenuOpen(false)}>
+              Sign In
+            </Link>
+          )
+        )}
+      </div>
     </nav>
   );
 }

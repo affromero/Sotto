@@ -9,6 +9,7 @@
   border-top: 1px solid var(--color-border);
   z-index: var(--z-player);
   animation: slideUp 300ms var(--ease-out-expo);
+  view-transition-name: miniplayer;
 }
 
 .progressLine {
