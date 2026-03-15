@@ -89,7 +89,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       status: true,
       title: true,
       topic: true,
-      aiModel: true,
       segments: {
         orderBy: { order: 'asc' },
         select: { id: true, order: true, speaker: true, text: true, duration: true },
@@ -120,7 +119,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   // Resolve user plan for model defaults
   const user = await prisma.user.findUniqueOrThrow({
     where: { id: auth.userId },
-    select: { plan: true },
+    select: { plan: true, preferredAiModel: true },
   });
   const tier = user.plan as 'FREE' | 'PRO';
 
@@ -162,10 +161,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     aiProvider = body.aiProvider;
     aiModel = resolvedModel;
   } else {
-    // Case 4: Neither — auto-resolve from podcast/user config
+    // Case 4: Neither — auto-resolve from user's preferred model / BYOK key
     const aiKey = await getAiKey(auth.userId);
     const resolved = await resolveAiModelAndProvider({
-      podcastAiModel: podcast.aiModel,
+      podcastAiModel: user.preferredAiModel,
       aiKey,
       plan: tier,
     });
