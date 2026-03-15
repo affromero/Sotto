@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { SearchBar } from '@/components/feed/SearchBar';
 import { TagFilter } from '@/components/feed/TagFilter';
@@ -263,6 +263,27 @@ export function FeedClient({ initialPodcasts, trendingPodcasts, tags, isAuthenti
   const showSuggested = isAuthenticated && currentUserId && isDefaultView && searchMode === 'podcasts';
   const isPeopleMode = searchMode === 'people';
 
+  // Infinite scroll: trigger load more when sentinel enters viewport
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const canLoadMore = isPeopleMode ? (userHasMore && !userLoading) : (hasMore && !loading);
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && canLoadMore) {
+          handleLoadMore();
+        }
+      },
+      { rootMargin: '200px' }
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [canLoadMore, handleLoadMore]);
+
   return (
     <div className={styles.feedContent}>
       {isAuthenticated && (
@@ -426,17 +447,12 @@ export function FeedClient({ initialPodcasts, trendingPodcasts, tags, isAuthenti
             </section>
           )}
 
-          {((isPeopleMode && userHasMore && userResults.length > 0) ||
-            (!isPeopleMode && hasMore && podcasts.length > 0)) && (
-            <div className={styles.loadMoreRow}>
-              <button
-                className={styles.loadMoreBtn}
-                onClick={handleLoadMore}
-                disabled={isPeopleMode ? userLoading : loading}
-                type="button"
-              >
-                {(isPeopleMode ? userLoading : loading) ? 'Loading...' : 'Load More'}
-              </button>
+          {/* Infinite scroll sentinel */}
+          {((isPeopleMode && userHasMore) || (!isPeopleMode && hasMore)) && (
+            <div ref={sentinelRef} className={styles.loadMoreRow} aria-hidden="true">
+              {(isPeopleMode ? userLoading : loading) && (
+                <span className={styles.loadMoreSpinner} />
+              )}
             </div>
           )}
         </div>

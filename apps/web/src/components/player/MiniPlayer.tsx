@@ -18,7 +18,7 @@ export function MiniPlayer({ podcastTitle, onExpand, onClose }: MiniPlayerProps)
   const progress = player.duration > 0 ? (player.currentTime / player.duration) * 100 : 0;
 
   return (
-    <div className={styles.miniPlayer}>
+    <div className={`${styles.miniPlayer} ${player.isPlaying ? styles.playing : ''}`}>
       <div className={styles.progressLine} style={{ width: `${progress}%` }} />
 
       <div className={styles.content}>

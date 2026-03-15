@@ -154,6 +154,24 @@
   color: var(--color-primary);
 }
 
+/* Status state entrance — shared animation for all status blocks */
+.failedState,
+.processingState,
+.scriptReadyState {
+  animation: statusEnter 350ms var(--ease-out-expo) both;
+}
+
+@keyframes statusEnter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* Failed State */
 
 .failedState {
@@ -598,6 +616,12 @@
   }
 
   .actionBtnActive {
+    animation: none;
+  }
+
+  .failedState,
+  .processingState,
+  .scriptReadyState {
     animation: none;
   }
 }
