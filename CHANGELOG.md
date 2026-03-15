@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.23.0] - 2026-03-15
+
+### Added
+- Hera AI motion graphics integration — optional provider for programmatic visual types (charts, quotes, timelines, comparisons, diagrams, text cards) with admin per-tier control and automatic Remotion fallback on failure
+- Motion Graphics section in admin auto-models panel with per-tier (Free/Pro) provider selects
+- Hera added to landing page Video provider marquee
+
+### Fixed
+- Landing player now resolves voice names from PodcastVoice records instead of showing speaker roles
+
 ## [0.22.0] - 2026-03-15
 
 ### Added
