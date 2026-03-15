@@ -9,12 +9,11 @@ import { NetworkChapter } from '@/components/landing/chapters/NetworkChapter';
 import { ShowcaseChapter } from '@/components/landing/chapters/ShowcaseChapter';
 import { BotChapter } from '@/components/landing/chapters/BotChapter';
 import { ConvertChapter } from '@/components/landing/chapters/ConvertChapter';
-import { getShowcasePodcast, getLandingShowcaseData } from '@/lib/showcase';
+import { getLandingShowcaseData } from '@/lib/showcase';
 import styles from './page.module.css';
 
 export default async function LandingPage() {
   const showcaseData = await getLandingShowcaseData();
-  const showcase = showcaseData?.podcast ?? await getShowcasePodcast();
 
   return (
     <WaitlistProvider>
@@ -23,7 +22,7 @@ export default async function LandingPage() {
         <LandingNav />
 
         <div className={styles.chapters}>
-          <HeroChapter showcase={showcase} />
+          <HeroChapter />
           <JourneyChapter showcase={showcaseData} />
           <ShowcaseChapter showcase={showcaseData} />
           <TrustChapter />
