@@ -1923,7 +1923,9 @@ model LandingShowcase {
   audioClipStart  Float    @default(0)
   audioClipEnd    Float?   // null = 30s from start
 
-  // ShowcaseChapter — Video clip range (seconds)
+  // ShowcaseChapter — Video segment range + clip range (seconds)
+  videoSegmentStart Int    @default(0)
+  videoSegmentCount Int    @default(4)
   videoClipStart  Float    @default(0)
   videoClipEnd    Float?
 

@@ -200,6 +200,42 @@
   text-decoration: underline;
 }
 
+/* Video preview thumbnail */
+.videoPreview {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 8px 10px;
+  background: rgba(0, 0, 0, 0.03);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: var(--radius-lg);
+  text-decoration: none;
+  transition: opacity 0.15s ease;
+}
+
+.videoPreview:hover {
+  opacity: 0.85;
+}
+
+.videoThumb {
+  width: 64px;
+  height: 36px;
+  object-fit: cover;
+  border-radius: var(--radius-md);
+  background: #000;
+  flex-shrink: 0;
+}
+
+.videoPreviewOverlay {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
 @media (max-width: 767px) {
   .mockPlayer {
     max-width: 100%;
