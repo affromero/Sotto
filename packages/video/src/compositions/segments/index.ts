@@ -22,9 +22,17 @@ const SEGMENT_MAP: Record<VisualTypeValue, React.FC<{ segment: VideoSegment }>> 
   [VisualType.MAP_OVERLAY]: React.memo(MapSlide),
 };
 
+const VIDEO_ASSET_TYPES = new Set(['video/mp4', 'video/webm']);
+
 export function resolveSegmentComponent(
   visualType: string,
+  assetUrl?: string | null,
+  assetType?: string | null,
 ): React.FC<{ segment: VideoSegment }> {
+  // Pre-rendered video (e.g. Hera motion graphic) takes priority
+  if (assetUrl && assetType && VIDEO_ASSET_TYPES.has(assetType)) {
+    return ImageSlide;
+  }
   return SEGMENT_MAP[visualType as VisualTypeValue] ?? TextCard;
 }
 
