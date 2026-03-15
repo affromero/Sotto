@@ -26,7 +26,6 @@ import { videoModelSupportsLastFrame } from '@/lib/providers/video-registry';
 import { logger } from '@/lib/logger';
 import { addJob, pipelineClassificationQueue, JobType } from '@/lib/queue';
 import { cache } from '@/lib/redis';
-import { estimateDurationFromText } from '@/lib/duration';
 
 type RouteParams = { params: Promise<{ podcastId: string }> };
 
@@ -73,8 +72,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       userId: true,
       status: true,
       segments: {
-        orderBy: { order: 'asc' },
-        select: { id: true, duration: true, text: true },
+        select: { id: true },
       },
     },
   });
