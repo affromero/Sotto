@@ -7,6 +7,7 @@ import { checkAvatarGenerationGate, tryIncrementAvatarGeneration } from '@/lib/v
 import { configureAvatarsSchema } from '@/lib/validations';
 import { listUnifiedAvatars } from '@/lib/providers/avatar';
 import type { AvatarProviderId } from '@/lib/providers/avatar-registry';
+import { getAvatarModelProvider } from '@/lib/providers/avatar-registry';
 import { fetchAvatarModels } from '@/lib/avatar-cost-estimator';
 import { getAutoModelConfig } from '@/lib/auto-model-config';
 import { deleteFile, extractR2Key } from '@/lib/r2';
@@ -16,11 +17,10 @@ import { cache } from '@/lib/redis';
 
 type RouteParams = { params: Promise<{ podcastId: string }> };
 
-const MAX_AVATAR_DURATION_SECONDS = 600;
-
 /**
  * GET — List available avatars (Redis-cached, 1hr TTL).
- * Accepts ?provider=heygen|runway (defaults to heygen).
+ * Accepts ?provider=heygen|runway|fal.
+ * Provider defaults to the user's configured avatar provider from auto model config.
  */
 export async function GET(request: NextRequest, { params }: RouteParams) {
   const { podcastId } = await params;
@@ -35,38 +35,59 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     return errorResponse(message, gate.reason === 'daily_limit_reached' ? 429 : 403, { code: gate.reason });
   }
 
-  const provider = (request.nextUrl.searchParams.get('provider') ?? 'heygen') as AvatarProviderId;
-
-  const apiKeyMap: Record<AvatarProviderId, string | undefined> = {
-    heygen: process.env.HEYGEN_API_KEY,
-    runway: process.env.RUNWAY_API_KEY,
-    fal: process.env.FAL_KEY,
-  };
-  const apiKey = apiKeyMap[provider];
-  if (!apiKey) return errorResponse('Avatar generation is not configured', 503);
-
-  // Fetch pricing + config in parallel with avatar list
+  // Fetch config first to determine defaults
   const [avatarModels, config] = await Promise.all([
     fetchAvatarModels().catch(() => []),
     getAutoModelConfig(),
   ]);
 
   // Determine the default avatar model and included list for this user's plan
-  const avatarModel = gate.isProUser ? config.proAvatarModel : config.freeAvatarModel;
-  const includedModels = (gate.isProUser ? config.proIncludedAvatarModels : config.freeIncludedAvatarModels) ?? [];
+  const defaultAvatarModel = gate.isProUser ? config.proAvatarModel : config.freeAvatarModel;
+  const defaultAvatarProvider = (gate.isProUser ? config.proAvatarProvider : config.freeAvatarProvider) as AvatarProviderId;
+  const includedModels = (gate.isProUser ? config.proIncludedAvatarModels : config.freeIncludedAvatarModels) ?? [defaultAvatarModel];
 
-  // Find cost per minute — use the configured model only if it matches the active provider,
-  // otherwise fall back to any model from the active provider
-  let matchedModel = avatarModels.find((m) => m.modelId === avatarModel && m.modelId.startsWith(provider));
-  if (!matchedModel) {
-    matchedModel = avatarModels.find((m) => m.modelId.startsWith(provider));
-  }
-  if (!matchedModel) {
-    return errorResponse(`No pricing found for ${provider} avatar model`, 503);
-  }
-  const costPerMinute = matchedModel.costPerMinute;
-  const includedOnPlatform = includedModels.includes(matchedModel.modelId);
+  // Derive available providers from config: a provider is available if it has an API key
+  // AND at least one of its models is in the included list (or is the default)
+  const apiKeyMap: Record<AvatarProviderId, string | undefined> = {
+    heygen: process.env.HEYGEN_API_KEY,
+    runway: process.env.RUNWAY_API_KEY,
+    fal: process.env.FAL_KEY,
+  };
 
+  const allRelevantModels = [defaultAvatarModel, ...includedModels];
+  const providerHasModels = (pid: AvatarProviderId) =>
+    allRelevantModels.some((modelId) => getAvatarModelProvider(modelId) === pid);
+
+  const availableProviders = {
+    heygen: !!apiKeyMap.heygen && providerHasModels('heygen'),
+    runway: !!apiKeyMap.runway && providerHasModels('runway'),
+    fal: !!apiKeyMap.fal && providerHasModels('fal'),
+  };
+
+  // Use requested provider if available, otherwise fall back to the configured default
+  const requestedProvider = request.nextUrl.searchParams.get('provider') as AvatarProviderId | null;
+  const provider: AvatarProviderId = (requestedProvider && availableProviders[requestedProvider])
+    ? requestedProvider
+    : defaultAvatarProvider;
+
+  const apiKey = apiKeyMap[provider];
+  if (!apiKey) return errorResponse('Avatar generation is not configured', 503);
+
+  // Filter avatar models for the active provider — only those in the included list
+  const providerModels = avatarModels
+    .filter((m) => getAvatarModelProvider(m.modelId) === provider)
+    .filter((m) => includedModels.includes(m.modelId) || m.modelId === defaultAvatarModel);
+
+  // Find cost per minute from the configured default or first available model
+  let matchedModel = providerModels.find((m) => m.modelId === defaultAvatarModel);
+  if (!matchedModel) matchedModel = providerModels[0];
+  if (!matchedModel) {
+    // Fall back to any model from the provider for pricing
+    matchedModel = avatarModels.find((m) => getAvatarModelProvider(m.modelId) === provider);
+  }
+
+  const costPerMinute = matchedModel?.costPerMinute ?? 0;
+  const includedOnPlatform = matchedModel ? includedModels.includes(matchedModel.modelId) : false;
   const pricingMeta = { costPerMinute, includedOnPlatform };
 
   // Check Redis cache (uses module-level singleton — no new connections)
@@ -76,11 +97,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     if (cached) {
       return NextResponse.json({
         avatars: cached,
-        providers: {
-          heygen: !!process.env.HEYGEN_API_KEY,
-          runway: !!process.env.RUNWAY_API_KEY,
-          fal: !!process.env.FAL_KEY,
-        },
+        providers: availableProviders,
+        defaultProvider: defaultAvatarProvider,
+        defaultModel: defaultAvatarModel,
+        models: providerModels,
         pricing: pricingMeta,
       });
     }
@@ -100,10 +120,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     return NextResponse.json({
       avatars,
-      providers: {
-        heygen: !!process.env.HEYGEN_API_KEY,
-        runway: !!process.env.RUNWAY_API_KEY,
-      },
+      providers: availableProviders,
+      defaultProvider: defaultAvatarProvider,
+      defaultModel: defaultAvatarModel,
+      models: providerModels,
       pricing: pricingMeta,
     });
   } catch (err) {
@@ -127,7 +147,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
   const podcast = await prisma.podcast.findUnique({
     where: { id: podcastId },
-    select: { id: true, userId: true, status: true, duration: true },
+    select: { id: true, userId: true, status: true },
   });
 
   if (!podcast) return errorResponse('Podcast not found', 404);
@@ -139,10 +159,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
   if (podcast.status !== 'READY') {
     return errorResponse('Podcast must be READY to configure avatars', 400);
-  }
-
-  if (podcast.duration && podcast.duration > MAX_AVATAR_DURATION_SECONDS) {
-    return errorResponse(`Podcast too long for avatars (max ${MAX_AVATAR_DURATION_SECONDS / 60} minutes)`, 400);
   }
 
   const body = await request.json();
