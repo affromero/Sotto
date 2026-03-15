@@ -108,8 +108,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   }
 
   // Idempotency: return existing generation if in progress
-  const existing = await prisma.videoGeneration.findUnique({
-    where: { podcastId },
+  const existing = await prisma.videoGeneration.findFirst({
+    where: { podcastId, voiceTrackId: null },
     select: { id: true, status: true, videoUrl: true },
   });
 
@@ -359,8 +359,8 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     return errorResponse('Forbidden', 403);
   }
 
-  const videoGeneration = await prisma.videoGeneration.findUnique({
-    where: { podcastId },
+  const videoGeneration = await prisma.videoGeneration.findFirst({
+    where: { podcastId, voiceTrackId: null },
     select: {
       id: true,
       status: true,
@@ -478,8 +478,8 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
     return errorResponse('Forbidden', 403);
   }
 
-  const videoGeneration = await prisma.videoGeneration.findUnique({
-    where: { podcastId },
+  const videoGeneration = await prisma.videoGeneration.findFirst({
+    where: { podcastId, voiceTrackId: null },
     select: {
       id: true,
       videoUrl: true,
@@ -577,8 +577,8 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
   // Handle avatarsVisible toggle (simple boolean update)
   if (body && typeof body.avatarsVisible === 'boolean' && !body.segments) {
-    const vg = await prisma.videoGeneration.findUnique({
-      where: { podcastId },
+    const vg = await prisma.videoGeneration.findFirst({
+      where: { podcastId, voiceTrackId: null },
       select: { id: true },
     });
     if (!vg) return errorResponse('No video generation found', 404);
@@ -594,8 +594,8 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     return errorResponse('Invalid request body', 400, { details: parsed.error.flatten() });
   }
 
-  const videoGeneration = await prisma.videoGeneration.findUnique({
-    where: { podcastId },
+  const videoGeneration = await prisma.videoGeneration.findFirst({
+    where: { podcastId, voiceTrackId: null },
     select: { id: true, status: true, videoUrl: true },
   });
 
