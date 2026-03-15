@@ -1,0 +1,158 @@
+name: iOS CI + Maestro E2E
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/mobile/**'
+      - 'packages/shared/**'
+      - 'e2e/maestro/**'
+      - 'e2e/llmock/**'
+  workflow_dispatch:
+
+concurrency:
+  group: ios-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ios-maestro:
+    name: Build & Maestro E2E
+    runs-on: [self-hosted, macOS]
+    timeout-minutes: 45
+
+    env:
+      # Mock env vars — matches e2e-web.yml pattern, no Doppler needed
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/sotto_test?schema=public
+      REDIS_URL: redis://localhost:6379
+      NEXTAUTH_SECRET: e2e-test-secret-minimum-32-characters-long
+      AUTH_SECRET: e2e-test-secret-minimum-32-characters-long
+      NEXTAUTH_URL: http://localhost:3000
+      BYOK_ENCRYPTION_KEY: e2e-test-encryption-key-must-be-32-hex-chars
+      ANTHROPIC_BASE_URL: http://localhost:4100
+      ANTHROPIC_API_KEY: sk-mock
+      OPENAI_BASE_URL: http://localhost:4100
+      GOOGLE_AI_BASE_URL: http://localhost:4100
+      SKIP_DB_SYNC: '1'
+      AI_PROVIDER: anthropic
+      EXPO_PUBLIC_API_URL: http://localhost:3000/api
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          ssh-key: ${{ secrets.SUBMODULE_SSH_KEY }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      # --- Database setup ---
+      - name: Start Docker services
+        run: docker compose up -d postgres redis
+
+      - name: Wait for Postgres
+        run: |
+          for i in $(seq 1 30); do
+            pg_isready -h localhost -p 5432 && exit 0
+            sleep 1
+          done
+          echo "Postgres failed to start" && exit 1
+
+      - name: Generate Prisma client
+        run: npx prisma generate --schema=apps/web/prisma/schema.prisma
+
+      - name: Push schema to test DB
+        run: npx prisma db push --schema=apps/web/prisma/schema.prisma --skip-generate
+
+      # --- iOS build ---
+      - name: Expo prebuild
+        working-directory: apps/mobile
+        run: npx expo prebuild --platform ios --clean
+
+      - name: Install CocoaPods
+        working-directory: apps/mobile/ios
+        run: pod install
+
+      - name: Build for simulator
+        working-directory: apps/mobile
+        run: |
+          xcodebuild \
+            -workspace ios/Sotto.xcworkspace \
+            -scheme Sotto \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            -derivedDataPath build/ \
+            build \
+            | xcpretty || true
+
+      # --- Simulator setup ---
+      - name: Boot simulator
+        run: |
+          xcrun simctl shutdown all 2>/dev/null || true
+          xcrun simctl boot "iPhone 16" 2>/dev/null || xcrun simctl boot "iPhone 15" 2>/dev/null
+
+      - name: Install app on simulator
+        working-directory: apps/mobile
+        run: xcrun simctl install booted build/Build/Products/Debug-iphonesimulator/Sotto.app
+
+      # --- Backend services ---
+      - name: Start LLMock
+        run: npx tsx e2e/llmock/setup.ts &
+
+      - name: Start Next.js backend
+        run: npm run dev:web &
+
+      - name: Wait for services
+        run: |
+          echo "Waiting for LLMock (port 4100)..."
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:4100/health > /dev/null 2>&1 && break
+            sleep 1
+          done
+
+          echo "Waiting for Next.js (port 3000)..."
+          for i in $(seq 1 120); do
+            curl -sf http://localhost:3000 > /dev/null 2>&1 && break
+            sleep 1
+          done
+
+      - name: Seed test data
+        run: npx tsx e2e/playwright/helpers/seed.ts
+
+      # --- Maestro E2E ---
+      - name: Run Maestro E2E tests
+        run: |
+          ~/.maestro/bin/maestro test \
+            e2e/maestro/flows/ \
+            --format junit \
+            --output maestro-results.xml
+
+      # --- Artifacts & cleanup ---
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maestro-results
+          path: maestro-results.xml
+          retention-days: 7
+
+      - name: Upload Maestro screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maestro-screenshots
+          path: ~/.maestro/tests/**/*.png
+          retention-days: 7
+
+      - name: Cleanup
+        if: always()
+        run: |
+          # Kill background processes (LLMock, Next.js)
+          pkill -f "e2e/llmock/setup.ts" 2>/dev/null || true
+          pkill -f "next dev" 2>/dev/null || true
+          # Shutdown simulator
+          xcrun simctl shutdown all 2>/dev/null || true
