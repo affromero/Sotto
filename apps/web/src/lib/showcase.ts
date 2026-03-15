@@ -157,7 +157,7 @@ export async function getLandingShowcaseData(): Promise<LandingShowcaseData | nu
         segments: {
           select: { speaker: true, ttsVoiceId: true },
         },
-        podcastVoices: {
+        voices: {
           select: { speaker: true, voiceId: true },
         },
         voiceTracks: {
@@ -269,7 +269,7 @@ export async function getLandingShowcaseData(): Promise<LandingShowcaseData | nu
     // Resolve voice names from PodcastVoice records (authoritative), then segment ttsVoiceId, then speakers
     const voiceNames: string[] = [];
     const seenVoiceIds = new Set<string>();
-    for (const pv of podcast.podcastVoices) {
+    for (const pv of podcast.voices) {
       if (pv.voiceId && !seenVoiceIds.has(pv.voiceId)) {
         seenVoiceIds.add(pv.voiceId);
         const entry = findByVoiceId(pv.voiceId);
