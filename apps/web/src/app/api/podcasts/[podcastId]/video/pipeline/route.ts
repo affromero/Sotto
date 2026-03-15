@@ -32,6 +32,7 @@ type RouteParams = { params: Promise<{ podcastId: string }> };
 const pipelineBodySchema = z.object({
   aiProvider: z.string().optional(),
   aiModel: z.string().optional(),
+  voiceTrackId: z.string().optional(),
 }).optional();
 
 const classificationIdSchema = z.string().uuid();
@@ -153,6 +154,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     aiModel,
     apiKeyOverride,
     tier,
+    voiceTrackId: body?.voiceTrackId,
   });
 
   logger.info('Pipeline classification queued', { classificationId, podcastId });
