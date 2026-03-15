@@ -108,6 +108,7 @@ const navGroups: NavGroup[] = [
       { href: '/admin/health', label: 'System Health', icon: HeartPulse },
       { href: '/admin/queues', label: 'Queues', icon: ListTodo },
       { href: '/admin/plan-features', label: 'Voice Features', icon: SlidersHorizontal },
+      { href: '/admin/landing', label: 'Landing', icon: Globe },
       { href: '/admin/showcase', label: 'Showcase', icon: Film },
       { href: '/admin/video-tests', label: 'Video Tests', icon: Clapperboard },
     ],
