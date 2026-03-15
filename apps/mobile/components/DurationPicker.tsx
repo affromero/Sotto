@@ -20,6 +20,7 @@ export function DurationPicker({ value, onChange, max = 40 }: DurationPickerProp
         options={options}
         selected={String(value)}
         onChange={(val) => onChange(Number(val))}
+        testIDPrefix="duration"
       />
     </View>
   );

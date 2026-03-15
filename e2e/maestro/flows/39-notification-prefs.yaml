@@ -1,0 +1,33 @@
+appId: fm.sotto.app
+tags:
+  - settings
+  - notifications
+---
+# Notification Preferences — Navigate to notification settings, toggle a preference
+
+- runFlow: ../helpers/login.yaml
+
+# Navigate to settings → notifications
+- tapOn:
+    text: "Profile"
+- tapOn:
+    id: "profile-settings-button"
+- extendedWaitUntil:
+    visible:
+      id: "settings-scroll"
+    timeout: 3000
+- tapOn:
+    id: "settings-notifications"
+- extendedWaitUntil:
+    visible:
+      text: "Notifications"
+    timeout: 3000
+
+# Toggle first notification preference twice (on → off → on)
+- tapOn:
+    id: "notif-pref-likes"
+- wait: 500
+- tapOn:
+    id: "notif-pref-likes"
+
+- takeScreenshot: notification-prefs

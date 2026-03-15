@@ -1,0 +1,36 @@
+appId: fm.sotto.app
+tags:
+  - profile
+---
+# Profile Podcasts — Verify own podcast list, tap a podcast to open player
+
+- runFlow: ../helpers/login.yaml
+
+# Go to profile tab
+- tapOn:
+    text: "Profile"
+- extendedWaitUntil:
+    visible:
+      id: "profile-podcast-list"
+    timeout: 5000
+- assertVisible:
+    id: "profile-podcast-list"
+
+# Verify our seeded podcast is listed
+- scrollUntilVisible:
+    element:
+      id: "podcast-card-${E2E_PODCAST_ID}"
+    direction: DOWN
+    timeout: 10000
+- tapOn:
+    id: "podcast-card-${E2E_PODCAST_ID}"
+
+# Verify player opens
+- extendedWaitUntil:
+    visible:
+      id: "player-play-pause"
+    timeout: 5000
+- assertVisible:
+    id: "player-play-pause"
+
+- takeScreenshot: profile-podcast-opened

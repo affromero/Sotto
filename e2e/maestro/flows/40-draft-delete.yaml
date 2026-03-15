@@ -1,0 +1,36 @@
+appId: fm.sotto.app
+tags:
+  - create
+  - draft
+---
+# Draft Delete — Navigate to create tab, find draft, delete it via X button
+
+- runFlow: ../helpers/login.yaml
+
+# Go to create tab
+- tapOn:
+    text: "Create"
+- extendedWaitUntil:
+    visible:
+      id: "create-chat-input"
+    timeout: 5000
+
+# Verify drafts are visible (seeded draft)
+- extendedWaitUntil:
+    visible:
+      text: "${E2E_DRAFT_NAME}"
+    timeout: 5000
+
+# Tap the delete X on the first draft
+- tapOn:
+    id: "draft-delete-0"
+
+# Cancel the confirmation alert to avoid actually deleting
+- tapOn:
+    text: "Cancel"
+
+# Verify draft is still visible
+- assertVisible:
+    text: "${E2E_DRAFT_NAME}"
+
+- takeScreenshot: draft-delete-guard
