@@ -4,7 +4,8 @@ import { NextRequest } from 'next/server';
 const mockAuthenticateRequest = vi.fn();
 const mockRequireAdmin = vi.fn();
 const mockCheckVideoGenerationGate = vi.fn();
-const mockClassifySegmentVisuals = vi.fn();
+const mockAddJob = vi.fn().mockResolvedValue({});
+const mockCacheGet = vi.fn();
 
 const mockPodcast = {
   id: 'pod-1',
@@ -19,17 +20,14 @@ const mockPodcast = {
 };
 
 const mockFindUnique = vi.fn();
-
 const mockUserFindUniqueOrThrow = vi.fn();
 const mockUserAiKeyFindMany = vi.fn();
-const mockPipelineEventCreate = vi.fn().mockResolvedValue({});
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     podcast: { findUnique: (...args: unknown[]) => mockFindUnique(...args) },
     user: { findUniqueOrThrow: (...args: unknown[]) => mockUserFindUniqueOrThrow(...args) },
     userAiKey: { findMany: (...args: unknown[]) => mockUserAiKeyFindMany(...args) },
-    pipelineEvent: { create: (...args: unknown[]) => mockPipelineEventCreate(...args) },
   },
 }));
 
@@ -74,11 +72,6 @@ vi.mock('@/lib/providers/ai-registry', () => ({
   },
 }));
 
-vi.mock('@/lib/byok-errors', () => ({
-  classifyError: vi.fn().mockReturnValue('unknown'),
-  userMessage: (kind: string, provider: string) => `${kind}: ${provider}`,
-}));
-
 vi.mock('@/lib/api-keys', () => ({
   authenticateRequest: (...args: unknown[]) => mockAuthenticateRequest(...args),
 }));
@@ -91,8 +84,16 @@ vi.mock('@/lib/video-gate', () => ({
   checkVideoGenerationGate: (...args: unknown[]) => mockCheckVideoGenerationGate(...args),
 }));
 
-vi.mock('@/lib/visual-classifier', () => ({
-  classifySegmentVisuals: (...args: unknown[]) => mockClassifySegmentVisuals(...args),
+vi.mock('@/lib/queue', () => ({
+  addJob: (...args: unknown[]) => mockAddJob(...args),
+  pipelineClassificationQueue: {},
+  JobType: { CLASSIFY_PIPELINE: 'classify_pipeline' },
+}));
+
+vi.mock('@/lib/redis', () => ({
+  cache: {
+    get: (...args: unknown[]) => mockCacheGet(...args),
+  },
 }));
 
 vi.mock('pricetoken', () => ({
@@ -145,10 +146,10 @@ vi.mock('@/lib/api-response', () => ({
   },
 }));
 
-import { POST, PATCH } from '@/app/api/podcasts/[podcastId]/video/pipeline/route';
+import { POST, GET, PATCH } from '@/app/api/podcasts/[podcastId]/video/pipeline/route';
 
-function createRequest(method: string, body?: unknown): NextRequest {
-  return new NextRequest(new URL('http://localhost:3000/api/podcasts/pod-1/video/pipeline'), {
+function createRequest(method: string, body?: unknown, url?: string): NextRequest {
+  return new NextRequest(new URL(url ?? 'http://localhost:3000/api/podcasts/pod-1/video/pipeline'), {
     method,
     body: body ? JSON.stringify(body) : undefined,
     headers: body ? { 'Content-Type': 'application/json' } : {},
@@ -164,33 +165,29 @@ describe('POST /api/podcasts/[id]/video/pipeline', () => {
     mockRequireAdmin.mockResolvedValue(null);
     mockCheckVideoGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', dailyUsed: 0, dailyLimit: 1, dailyRemaining: 1, isByokUser: false, isProUser: false });
     mockFindUnique.mockResolvedValue(mockPodcast);
-    mockUserFindUniqueOrThrow.mockResolvedValue({ plan: 'FREE' });
+    mockUserFindUniqueOrThrow.mockResolvedValue({ plan: 'FREE', preferredAiModel: null });
     mockUserAiKeyFindMany.mockResolvedValue([]);
-    mockClassifySegmentVisuals.mockResolvedValue({
-      classifications: [
-        { segmentId: 'seg-1', order: 0, subVisuals: [{ subOrder: 0, startOffsetFraction: 0, durationFraction: 1, visualType: 'AI_ILLUSTRATION', prompt: 'A test image', metadata: null, endStatePrompt: null }] },
-        { segmentId: 'seg-2', order: 1, subVisuals: [{ subOrder: 0, startOffsetFraction: 0, durationFraction: 1, visualType: 'QUOTE', prompt: null, metadata: { text: 'Indeed' }, endStatePrompt: null }] },
-      ],
-      transitionRecommendations: [],
-      inputTokens: 100,
-      outputTokens: 50,
-      model: 'claude-haiku-4-5-20251001',
-    });
   });
 
-  it('returns pipeline JSON with classified segments', async () => {
+  it('queues classification job and returns classificationId', async () => {
     const res = await POST(createRequest('POST'), routeParams);
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.version).toBe(3);
-    expect(body.segments).toHaveLength(2);
-    expect(body.segments[0].visualType).toBe('AI_ILLUSTRATION');
-    expect(body.segments[0].visualMode).toBe('image');
-    expect(body.segments[1].visualType).toBe('QUOTE');
-    expect(body.segments[1].visualMode).toBe('programmatic');
-    expect(typeof body.totalEstimatedCost).toBe('number');
-    expect(typeof body.defaultImageModel).toBe('string');
-    expect(typeof body.defaultVideoModel).toBe('string');
+    expect(body.status).toBe('classifying');
+    expect(body.classificationId).toBeDefined();
+    expect(typeof body.classificationId).toBe('string');
+    expect(mockAddJob).toHaveBeenCalledWith(
+      expect.anything(),
+      'classify_pipeline',
+      expect.objectContaining({
+        classificationId: body.classificationId,
+        podcastId: 'pod-1',
+        userId: 'user-1',
+        aiProvider: 'anthropic',
+        aiModel: 'claude-haiku-4-5-20251001',
+        tier: 'FREE',
+      }),
+    );
   });
 
   it('requires auth', async () => {
@@ -219,63 +216,20 @@ describe('POST /api/podcasts/[id]/video/pipeline', () => {
     expect(body.code).toBe('daily_limit_reached');
   });
 
-  it('returns isLlmError with user message for credit errors', async () => {
-    const { classifyError } = await import('@/lib/byok-errors');
-    vi.mocked(classifyError).mockReturnValue('insufficient_credits');
-    mockRequireAdmin.mockResolvedValue('admin-1');
-    mockClassifySegmentVisuals.mockRejectedValue(new Error('Your credit balance is too low to access the Anthropic API'));
-    const res = await POST(createRequest('POST'), routeParams);
-    expect(res.status).toBe(500);
-    const body = await res.json();
-    expect(body.isLlmError).toBe(true);
-    expect(body.errorKind).toBe('insufficient_credits');
-    expect(body.currentProvider).toBe('anthropic');
-    expect(body.error).toContain('insufficient_credits');
-  });
-
-  it('returns generic message for non-credit errors and logs PipelineEvent', async () => {
-    const { classifyError } = await import('@/lib/byok-errors');
-    vi.mocked(classifyError).mockReturnValue('unknown');
-    mockRequireAdmin.mockResolvedValue(null);
-    mockClassifySegmentVisuals.mockRejectedValue(new Error('Network timeout'));
-    const res = await POST(createRequest('POST'), routeParams);
-    expect(res.status).toBe(500);
-    const body = await res.json();
-    expect(body.isLlmError).toBeUndefined();
-    expect(body.error).toContain("We've been notified");
-    expect(mockPipelineEventCreate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          podcastId: 'pod-1',
-          stage: 'video-composition',
-          type: 'error',
-        }),
-      }),
-    );
-  });
-
-  it('treats rate_limited as non-user-actionable', async () => {
-    const { classifyError } = await import('@/lib/byok-errors');
-    vi.mocked(classifyError).mockReturnValue('rate_limited');
-    mockClassifySegmentVisuals.mockRejectedValue(new Error('Rate limited'));
-    const res = await POST(createRequest('POST'), routeParams);
-    expect(res.status).toBe(500);
-    const body = await res.json();
-    expect(body.isLlmError).toBeUndefined();
-  });
-
-  it('accepts aiProvider/aiModel override in POST body', async () => {
+  it('passes aiProvider/aiModel override to job payload', async () => {
     mockRequireAdmin.mockResolvedValue('admin-1');
     const res = await POST(
       createRequest('POST', { aiProvider: 'google', aiModel: 'gemini-3.1-flash-lite-preview' }),
       routeParams,
     );
     expect(res.status).toBe(200);
-    expect(mockClassifySegmentVisuals).toHaveBeenCalledWith(
-      expect.any(Array),
-      'Test Podcast',
-      'Testing',
-      expect.objectContaining({ provider: 'google', model: 'gemini-3.1-flash-lite-preview' }),
+    expect(mockAddJob).toHaveBeenCalledWith(
+      expect.anything(),
+      'classify_pipeline',
+      expect.objectContaining({
+        aiProvider: 'google',
+        aiModel: 'gemini-3.1-flash-lite-preview',
+      }),
     );
   });
 
@@ -285,11 +239,13 @@ describe('POST /api/podcasts/[id]/video/pipeline', () => {
       routeParams,
     );
     expect(res.status).toBe(200);
-    expect(mockClassifySegmentVisuals).toHaveBeenCalledWith(
-      expect.any(Array),
-      'Test Podcast',
-      'Testing',
-      expect.objectContaining({ provider: 'openai', model: 'gpt-5-nano' }),
+    expect(mockAddJob).toHaveBeenCalledWith(
+      expect.anything(),
+      'classify_pipeline',
+      expect.objectContaining({
+        aiProvider: 'openai',
+        aiModel: 'gpt-5-nano',
+      }),
     );
   });
 
@@ -313,6 +269,86 @@ describe('POST /api/podcasts/[id]/video/pipeline', () => {
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.error).toContain('Unknown AI model');
+  });
+});
+
+describe('GET /api/podcasts/[id]/video/pipeline', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockRequireAdmin.mockResolvedValue(null);
+    mockFindUnique.mockResolvedValue({ userId: 'user-1' });
+  });
+
+  it('returns classifying when Redis key does not exist', async () => {
+    mockCacheGet.mockResolvedValue(null);
+    const res = await GET(
+      createRequest('GET', undefined, 'http://localhost:3000/api/podcasts/pod-1/video/pipeline?classificationId=550e8400-e29b-41d4-a716-446655440000'),
+      routeParams,
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.status).toBe('classifying');
+  });
+
+  it('returns ready pipeline from Redis', async () => {
+    const mockPipeline = { version: 3, segments: [], transitions: [], totalEstimatedCost: 0 };
+    mockCacheGet.mockResolvedValue({ status: 'ready', pipeline: mockPipeline });
+    const res = await GET(
+      createRequest('GET', undefined, 'http://localhost:3000/api/podcasts/pod-1/video/pipeline?classificationId=550e8400-e29b-41d4-a716-446655440000'),
+      routeParams,
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.status).toBe('ready');
+    expect(body.pipeline).toEqual(mockPipeline);
+  });
+
+  it('returns failed status from Redis', async () => {
+    mockCacheGet.mockResolvedValue({ status: 'failed', error: 'LLM error', isLlmError: true, currentProvider: 'anthropic' });
+    const res = await GET(
+      createRequest('GET', undefined, 'http://localhost:3000/api/podcasts/pod-1/video/pipeline?classificationId=550e8400-e29b-41d4-a716-446655440000'),
+      routeParams,
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.status).toBe('failed');
+    expect(body.error).toBe('LLM error');
+    expect(body.isLlmError).toBe(true);
+  });
+
+  it('requires auth', async () => {
+    mockAuthenticateRequest.mockResolvedValue(null);
+    const res = await GET(
+      createRequest('GET', undefined, 'http://localhost:3000/api/podcasts/pod-1/video/pipeline?classificationId=550e8400-e29b-41d4-a716-446655440000'),
+      routeParams,
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it('rejects missing classificationId', async () => {
+    const res = await GET(
+      createRequest('GET', undefined, 'http://localhost:3000/api/podcasts/pod-1/video/pipeline'),
+      routeParams,
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects non-UUID classificationId', async () => {
+    const res = await GET(
+      createRequest('GET', undefined, 'http://localhost:3000/api/podcasts/pod-1/video/pipeline?classificationId=not-a-uuid'),
+      routeParams,
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it('requires podcast ownership', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'other-user' });
+    const res = await GET(
+      createRequest('GET', undefined, 'http://localhost:3000/api/podcasts/pod-1/video/pipeline?classificationId=550e8400-e29b-41d4-a716-446655440000'),
+      routeParams,
+    );
+    expect(res.status).toBe(403);
   });
 });
 

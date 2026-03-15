@@ -236,4 +236,8 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
     description: 'Schedules and generates daily briefing podcasts for subscribers',
     stage: 'Content Pipeline',
   },
+  'pipeline-classification': {
+    description: 'Classifies segment visuals via LLM and builds pipeline JSON for the video editor',
+    stage: 'Video Pipeline',
+  },
 };
