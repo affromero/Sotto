@@ -12,6 +12,7 @@ const {
     podcast: { findUnique: vi.fn(), update: vi.fn() },
     videoGeneration: { update: vi.fn() },
     segment: { findMany: vi.fn() },
+    segmentVisual: { findMany: vi.fn() },
     avatarOverlay: { findMany: vi.fn().mockResolvedValue([]) },
     segmentTransition: { findMany: vi.fn().mockResolvedValue([]) },
   },
@@ -64,28 +65,13 @@ describe('video-composition worker', () => {
   };
 
   const segments = [
-    {
-      id: 'seg-1',
-      order: 0,
-      speaker: 'Host',
-      text: 'Hello',
-      startTime: 0,
-      duration: 5,
-      ttsProvider: 'elevenlabs',
-      ttsModel: 'eleven_turbo_v2_5',
-      segmentVisuals: [{ visualType: 'AI_ILLUSTRATION', prompt: 'editorial', metadata: null, assetUrl: 'https://cdn.example.com/vis.png', assetType: 'image/png', subOrder: 0, startOffset: 0, subDuration: 5 }],
-    },
-    {
-      id: 'seg-2',
-      order: 1,
-      speaker: 'Expert',
-      text: 'Data shows...',
-      startTime: 5,
-      duration: 8,
-      ttsProvider: null,
-      ttsModel: null,
-      segmentVisuals: [{ visualType: 'TEXT_CARD', prompt: null, metadata: { headline: 'Stats' }, assetUrl: null, assetType: null, subOrder: 0, startOffset: 0, subDuration: 8 }],
-    },
+    { id: 'seg-1', order: 0, speaker: 'Host', text: 'Hello', startTime: 0, duration: 5 },
+    { id: 'seg-2', order: 1, speaker: 'Expert', text: 'Data shows...', startTime: 5, duration: 8 },
+  ];
+
+  const segmentVisuals = [
+    { segmentId: 'seg-1', visualType: 'AI_ILLUSTRATION', prompt: 'editorial', metadata: null, assetUrl: 'https://cdn.example.com/vis.png', assetType: 'image/png', subOrder: 0, startOffset: 0, subDuration: 5 },
+    { segmentId: 'seg-2', visualType: 'TEXT_CARD', prompt: null, metadata: { headline: 'Stats' }, assetUrl: null, assetType: null, subOrder: 0, startOffset: 0, subDuration: 8 },
   ];
 
   it('skips if podcast was deleted', async () => {
@@ -100,12 +86,13 @@ describe('video-composition worker', () => {
   it('throws if podcast has no audio URL', async () => {
     mockPrisma.podcast.findUnique.mockResolvedValue({ ...podcast, audioUrl: null });
 
-    await expect(processVideoComposition(makeJob(baseData))).rejects.toThrow('no audio URL');
+    await expect(processVideoComposition(makeJob(baseData))).rejects.toThrow('No audio URL available');
   });
 
   it('renders video end-to-end and uploads to R2', async () => {
     mockPrisma.podcast.findUnique.mockResolvedValue(podcast);
     mockPrisma.segment.findMany.mockResolvedValue(segments);
+    mockPrisma.segmentVisual.findMany.mockResolvedValue(segmentVisuals);
 
     mockFetch
       // Render request
@@ -160,6 +147,7 @@ describe('video-composition worker', () => {
   it('throws on Remotion render failure', async () => {
     mockPrisma.podcast.findUnique.mockResolvedValue(podcast);
     mockPrisma.segment.findMany.mockResolvedValue(segments);
+    mockPrisma.segmentVisual.findMany.mockResolvedValue(segmentVisuals);
 
     mockFetch
       .mockResolvedValueOnce({
@@ -178,9 +166,10 @@ describe('video-composition worker', () => {
     await assertion;
   });
 
-  it('includes ttsProvider and ttsModel in render payload', async () => {
+  it('includes segment timing in render payload', async () => {
     mockPrisma.podcast.findUnique.mockResolvedValue(podcast);
     mockPrisma.segment.findMany.mockResolvedValue(segments);
+    mockPrisma.segmentVisual.findMany.mockResolvedValue(segmentVisuals);
 
     mockFetch
       .mockResolvedValueOnce({
@@ -202,15 +191,16 @@ describe('video-composition worker', () => {
 
     const renderCall = mockFetch.mock.calls[0];
     const body = JSON.parse(renderCall[1].body);
-    expect(body.segments[0].ttsProvider).toBe('elevenlabs');
-    expect(body.segments[0].ttsModel).toBe('eleven_turbo_v2_5');
-    expect(body.segments[1].ttsProvider).toBeUndefined();
-    expect(body.segments[1].ttsModel).toBeUndefined();
+    expect(body.segments[0].startTime).toBe(0);
+    expect(body.segments[0].duration).toBe(5);
+    expect(body.segments[1].startTime).toBe(5);
+    expect(body.segments[1].duration).toBe(8);
   });
 
   it('throws on 429 from Remotion sidecar', async () => {
     mockPrisma.podcast.findUnique.mockResolvedValue(podcast);
     mockPrisma.segment.findMany.mockResolvedValue(segments);
+    mockPrisma.segmentVisual.findMany.mockResolvedValue(segmentVisuals);
 
     mockFetch.mockResolvedValueOnce({
       ok: false,

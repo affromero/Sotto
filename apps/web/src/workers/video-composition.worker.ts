@@ -4,6 +4,7 @@ import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { uploadFile } from '@/lib/r2';
 import { logger } from '@/lib/logger';
 import { RenderStatus } from '@sotto/video';
+import { resolveSegmentTiming } from '@/lib/segment-timing';
 
 if (!process.env.REMOTION_URL) {
   throw new Error('REMOTION_URL is not set — video composition worker cannot start');
@@ -14,9 +15,9 @@ const POLL_INTERVAL_MS = 5000;
 const RENDER_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 
 export async function processVideoComposition(job: Job<ComposeVideoPayload>): Promise<void> {
-  const { podcastId, videoGenerationId } = job.data;
+  const { podcastId, videoGenerationId, voiceTrackId } = job.data;
 
-  logger.info('Starting video composition', { podcastId, videoGenerationId });
+  logger.info('Starting video composition', { podcastId, videoGenerationId, voiceTrackId });
   await job.updateProgress(10);
 
   // Check podcast still exists
@@ -30,8 +31,23 @@ export async function processVideoComposition(job: Job<ComposeVideoPayload>): Pr
     return;
   }
 
-  if (!podcast.audioUrl) {
-    throw new Error('Podcast has no audio URL');
+  // Resolve audio URL: use voice track's audio when voiceTrackId is set
+  let audioUrl = podcast.audioUrl;
+  let audioDuration = podcast.duration;
+  if (voiceTrackId) {
+    const voiceTrack = await prisma.voiceTrack.findUnique({
+      where: { id: voiceTrackId },
+      select: { audioUrl: true, duration: true },
+    });
+    if (!voiceTrack?.audioUrl) {
+      throw new Error('Voice track has no audio URL');
+    }
+    audioUrl = voiceTrack.audioUrl;
+    audioDuration = voiceTrack.duration ?? podcast.duration;
+  }
+
+  if (!audioUrl) {
+    throw new Error('No audio URL available');
   }
 
   try {
@@ -41,57 +57,47 @@ export async function processVideoComposition(job: Job<ComposeVideoPayload>): Pr
       data: { status: 'COMPOSING' },
     });
 
-    // Fetch segments with timing and visuals
-    const segments = await prisma.segment.findMany({
-      where: { podcastId },
-      orderBy: { order: 'asc' },
+    // Fetch segment timing (voice-track-aware) + visuals
+    const segmentTimings = await resolveSegmentTiming(podcastId, voiceTrackId);
+    const segmentVisualsBySegment = new Map<string, Array<{
+      visualType: string; prompt: string | null; metadata: unknown;
+      assetUrl: string | null; assetType: string | null;
+      subOrder: number; startOffset: number; subDuration: number | null;
+    }>>();
+
+    const visuals = await prisma.segmentVisual.findMany({
+      where: { videoGenerationId },
+      orderBy: [{ order: 'asc' }, { subOrder: 'asc' }],
       select: {
-        id: true,
-        order: true,
-        speaker: true,
-        text: true,
-        startTime: true,
-        duration: true,
-        ttsProvider: true,
-        ttsModel: true,
-        segmentVisuals: {
-          where: { videoGenerationId },
-          orderBy: [{ order: 'asc' }, { subOrder: 'asc' }],
-          select: {
-            visualType: true,
-            prompt: true,
-            metadata: true,
-            assetUrl: true,
-            assetType: true,
-            subOrder: true,
-            startOffset: true,
-            subDuration: true,
-          },
-        },
+        segmentId: true, visualType: true, prompt: true, metadata: true,
+        assetUrl: true, assetType: true, subOrder: true, startOffset: true, subDuration: true,
       },
     });
+    for (const v of visuals) {
+      const arr = segmentVisualsBySegment.get(v.segmentId) ?? [];
+      arr.push(v);
+      segmentVisualsBySegment.set(v.segmentId, arr);
+    }
 
-    const renderSegments = segments.map((s) => {
-      const visuals = s.segmentVisuals;
-      const first = visuals[0];
-      const segDuration = s.duration ?? 5;
+    const renderSegments = segmentTimings.map((s) => {
+      const segVisuals = segmentVisualsBySegment.get(s.segmentId) ?? [];
+      const first = segVisuals[0];
+      const segDuration = s.duration;
 
       const base = {
-        segmentId: s.id,
+        segmentId: s.segmentId,
         order: s.order,
         speaker: s.speaker,
         text: s.text,
-        startTime: s.startTime ?? 0,
+        startTime: s.startTime,
         duration: segDuration,
         visualType: first?.visualType ?? 'TEXT_CARD',
         prompt: first?.prompt ?? undefined,
         metadata: (first?.metadata as Record<string, unknown>) ?? undefined,
         assetUrl: first?.assetUrl ?? undefined,
         assetType: first?.assetType ?? undefined,
-        ttsProvider: s.ttsProvider ?? undefined,
-        ttsModel: s.ttsModel ?? undefined,
-        subVisuals: visuals.length > 1
-          ? visuals.map((v) => ({
+        subVisuals: segVisuals.length > 1
+          ? segVisuals.map((v) => ({
             subOrder: v.subOrder,
             startOffset: v.startOffset,
             duration: v.subDuration ?? segDuration,
@@ -147,7 +153,7 @@ export async function processVideoComposition(job: Job<ComposeVideoPayload>): Pr
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        audioUrl: podcast.audioUrl,
+        audioUrl,
         segments: renderSegments,
         config: {
           width: 1280,
@@ -234,25 +240,30 @@ export async function processVideoComposition(job: Job<ComposeVideoPayload>): Pr
 
     await job.updateProgress(90);
 
-    // Upload to R2
-    const r2Key = `podcasts/${podcastId}/video.mp4`;
+    // Upload to R2 — different key per voice track
+    const r2Key = voiceTrackId
+      ? `podcasts/${podcastId}/video-${voiceTrackId}.mp4`
+      : `podcasts/${podcastId}/video.mp4`;
     const videoUrl = await uploadFile(r2Key, videoBuffer, 'video/mp4');
 
-    // Update VideoGeneration and Podcast
+    // Update VideoGeneration
     await prisma.videoGeneration.update({
       where: { id: videoGenerationId },
       data: {
         status: 'READY',
         videoUrl,
         fileSize: videoBuffer.length,
-        duration: podcast.duration,
+        duration: audioDuration,
       },
     });
 
-    await prisma.podcast.update({
-      where: { id: podcastId },
-      data: { videoUrl },
-    });
+    // Only update Podcast.videoUrl for original-audio generation
+    if (!voiceTrackId) {
+      await prisma.podcast.update({
+        where: { id: podcastId },
+        data: { videoUrl },
+      });
+    }
 
     // Queue notification
     await addJob(notificationQueue, JobType.SEND_NOTIFICATION, {
