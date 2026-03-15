@@ -15,13 +15,7 @@
 }
 
 .overline {
-  display: block;
-  font-size: 13px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 1.5px;
-  color: var(--color-primary);
-  margin-bottom: 16px;
+  composes: overline from './shared.module.css';
 }
 
 .heading {
