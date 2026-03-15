@@ -12,12 +12,16 @@ export async function GET(request: NextRequest) {
   const auth = await authenticateRequest(request);
   if (!auth) return errorResponse('Unauthorized', 401);
 
-  const [imageModels, videoModels, hasFalKey, hasMiniMaxKey] = await Promise.all([
+  const [imageModels, videoModels, userHasFalKey, userHasMiniMaxKey] = await Promise.all([
     fetchFalImageModels(),
     fetchAllVideoModels(),
     hasByokKey(auth.userId, 'fal'),
     hasByokKey(auth.userId, 'minimax'),
   ]);
+
+  // Platform keys count — users don't need BYOK if the platform provides them
+  const hasFalKey = userHasFalKey || !!process.env.FAL_KEY;
+  const hasMiniMaxKey = userHasMiniMaxKey || !!process.env.MINIMAX_API_KEY;
 
   return NextResponse.json({
     imageModels: imageModels.map((m) => ({
