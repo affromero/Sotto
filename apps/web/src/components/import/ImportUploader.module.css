@@ -614,7 +614,7 @@
   align-items: flex-start;
   gap: var(--spacing-sm);
   padding: var(--spacing-sm) var(--spacing-md);
-  background: rgba(217, 119, 6, 0.08);
+  background: var(--color-primary-subtle);
   border-left: 3px solid var(--color-primary);
   border-radius: var(--radius-md);
   margin-top: var(--spacing-xs);
