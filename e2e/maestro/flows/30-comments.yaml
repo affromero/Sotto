@@ -1,0 +1,51 @@
+appId: fm.sotto.app
+tags:
+  - social
+  - comments
+---
+# Comments — View comments section, post a comment, reply to a comment
+
+- runFlow: ../helpers/login.yaml
+
+# Open a podcast
+- extendedWaitUntil:
+    visible:
+      id: "feed-podcast-list"
+    timeout: 5000
+- scrollUntilVisible:
+    element:
+      id: "podcast-card-${E2E_PODCAST_ID}"
+    direction: DOWN
+    timeout: 10000
+- tapOn:
+    id: "podcast-card-${E2E_PODCAST_ID}"
+- extendedWaitUntil:
+    visible:
+      id: "player-play-pause"
+    timeout: 5000
+
+# Scroll down to comments section
+- scrollUntilVisible:
+    element:
+      id: "comments-section"
+    direction: DOWN
+    timeout: 10000
+- assertVisible:
+    id: "comments-section"
+
+# Post a new comment
+- tapOn:
+    id: "comment-input"
+- inputText: "E2E test comment from Maestro"
+- tapOn:
+    id: "comment-send-button"
+
+# Wait for comment to appear
+- extendedWaitUntil:
+    visible:
+      text: "E2E test comment from Maestro"
+    timeout: 10000
+- assertVisible:
+    text: "E2E test comment from Maestro"
+
+- takeScreenshot: comment-posted
