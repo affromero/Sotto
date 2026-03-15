@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.22.0] - 2026-03-15
+
+### Added
+- Cross-page view transitions via Next.js experimental API — TopBar and MiniPlayer persist across route changes
+- Trending podcast carousel with auto-advance (6s), scroll-snap, dot indicators, keyboard navigation, and full ARIA support
+- Ambient player glow on MiniPlayer that activates during playback
+- Interactive transcript hover: speaker-colored left border, timestamp tooltip via CSS `::after`
+- Infinite scroll on feed — replaces Load More button with IntersectionObserver sentinel
+- Landing page mobile menu — burger button now opens an animated dropdown (was non-functional)
+- CommandPalette exit animation (slideOut + fadeOut before unmount)
+- Profile page entrance animation, avatar hover glow, and scale effect
+- Auth page entrance animation, provider button press states, email focus ring, and loading spinner
+
+### Fixed
+- Landing player now shows voice names instead of speaker roles in the original track label
+- Video pipeline classification now uses the user's preferred AI model instead of hardcoded default
+
+### Changed
+- Global reduced-motion safety net: all animations, transitions, and scroll behavior disabled for motion-sensitive users
+- Feed tab switching now animates content on panel mount
+- Podcast page action buttons (Like/Save/Fork) have press feedback and pop animation on active state
+- Podcast status sections (processing/failed/script-ready) animate in instead of appearing instantly
+- Progressive enhancement: `@supports (animation-timeline: view())` for scroll-driven animations in Chromium, falls back to IntersectionObserver in Firefox/Safari
+
 ## [0.21.10] - 2026-03-15
 
 ### Added
