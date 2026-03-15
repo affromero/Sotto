@@ -34,7 +34,7 @@
   height: 700px;
   background: radial-gradient(
     circle,
-    rgba(217, 119, 6, 0.08) 0%,
+    var(--color-primary-subtle) 0%,
     transparent 60%
   );
   transform: translate(-50%, -50%);

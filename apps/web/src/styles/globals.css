@@ -356,6 +356,12 @@ h2, .h2 { font: var(--text-h2); color: var(--color-text-primary); }
 h3, .h3 { font: var(--text-h3); color: var(--color-text-primary); }
 h4, .h4 { font: var(--text-h4); color: var(--color-text-primary); }
 
+h1, .h1,
+h2, .h2,
+h3, .h3 {
+  text-wrap: balance;
+}
+
 a {
   color: var(--color-primary);
   text-decoration: none;

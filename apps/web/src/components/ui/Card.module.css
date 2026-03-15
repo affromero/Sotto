@@ -1,7 +1,9 @@
 .card {
   background: var(--color-surface);
   border-radius: var(--radius-xl);
-  transition: all var(--transition-fast);
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
 }
 
 .default {
@@ -9,6 +11,7 @@
 }
 
 .elevated {
+  background: var(--color-surface-elevated);
   box-shadow: var(--shadow-md);
 }
 
@@ -41,5 +44,8 @@
   border-color: var(--color-border-hover);
   box-shadow: var(--shadow-lg);
   transform: translateY(-2px);
-  transition: all 350ms var(--ease-out-expo);
+  transition:
+    border-color 350ms var(--ease-out-expo),
+    box-shadow 350ms var(--ease-out-expo),
+    transform 350ms var(--ease-out-expo);
 }
