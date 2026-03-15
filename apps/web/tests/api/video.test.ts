@@ -8,7 +8,7 @@ const mockTryIncrementVideoGeneration = vi.fn();
 const mockAddJob = vi.fn();
 
 const mockPodcastFindUnique = vi.fn();
-const mockVideoGenFindUnique = vi.fn();
+const mockVideoGenFindFirst = vi.fn();
 const mockVideoGenCreate = vi.fn();
 const mockSegmentVisualCreateMany = vi.fn();
 const mockSegmentVisualDeleteMany = vi.fn();
@@ -24,7 +24,7 @@ vi.mock('@/lib/prisma', () => ({
   prisma: {
     podcast: { findUnique: (...args: unknown[]) => mockPodcastFindUnique(...args) },
     videoGeneration: {
-      findUnique: (...args: unknown[]) => mockVideoGenFindUnique(...args),
+      findFirst: (...args: unknown[]) => mockVideoGenFindFirst(...args),
       create: (...args: unknown[]) => mockVideoGenCreate(...args),
       update: (...args: unknown[]) => mockVideoGenUpdate(...args),
       delete: (...args: unknown[]) => mockVideoGenDelete(...args),
@@ -112,7 +112,7 @@ describe('POST /api/podcasts/[id]/video', () => {
     mockCheckVideoGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', dailyUsed: 0, dailyLimit: 1, dailyRemaining: 1, isByokUser: false, isProUser: false });
     mockTryIncrementVideoGeneration.mockResolvedValue(true);
     mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'user-1', status: 'READY' });
-    mockVideoGenFindUnique.mockResolvedValue(null);
+    mockVideoGenFindFirst.mockResolvedValue(null);
     mockVideoGenCreate.mockResolvedValue({ id: 'vg-1', podcastId: 'pod-1', status: 'PENDING' });
     mockSegmentVisualCreateMany.mockResolvedValue({ count: 2 });
     mockSegmentVisualFindMany.mockResolvedValue([
@@ -246,7 +246,7 @@ describe('POST /api/podcasts/[id]/video', () => {
   });
 
   it('allows re-generation when video is STALE', async () => {
-    mockVideoGenFindUnique.mockResolvedValue({ id: 'vg-stale', status: 'STALE', videoUrl: 'https://r2.example.com/old.mp4' });
+    mockVideoGenFindFirst.mockResolvedValue({ id: 'vg-stale', status: 'STALE', videoUrl: 'https://r2.example.com/old.mp4' });
     mockVideoGenDelete.mockResolvedValue({});
     mockSegmentVisualDeleteMany.mockResolvedValue({});
     mockSegmentTransitionDeleteMany.mockResolvedValue({});
@@ -301,7 +301,7 @@ describe('PATCH /api/podcasts/[id]/video', () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockRequireAdmin.mockResolvedValue(null);
     mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'user-1' });
-    mockVideoGenFindUnique.mockResolvedValue({ id: 'vg-1', status: 'READY', videoUrl: null });
+    mockVideoGenFindFirst.mockResolvedValue({ id: 'vg-1', status: 'READY', videoUrl: null });
     mockSegmentVisualFindMany.mockResolvedValue([
       { id: 'sv-1', segmentId: 'seg-1', visualType: 'AI_ILLUSTRATION', visualMode: 'image', prompt: 'old prompt', metadata: null, assetUrl: 'https://r2.example.com/old.png' },
     ]);
@@ -330,7 +330,7 @@ describe('PATCH /api/podcasts/[id]/video', () => {
   });
 
   it('rejects when video is not READY or FAILED', async () => {
-    mockVideoGenFindUnique.mockResolvedValue({ id: 'vg-1', status: 'GENERATING_VISUALS', videoUrl: null });
+    mockVideoGenFindFirst.mockResolvedValue({ id: 'vg-1', status: 'GENERATING_VISUALS', videoUrl: null });
     const res = await PATCH(createPatchRequest({ segments: [{ segmentVisualId: 'sv-1' }] }), routeParams);
     expect(res.status).toBe(400);
   });
@@ -409,7 +409,7 @@ describe('PATCH /api/podcasts/[id]/video', () => {
   });
 
   it('allows PATCH when video is FAILED', async () => {
-    mockVideoGenFindUnique.mockResolvedValue({ id: 'vg-1', status: 'FAILED', videoUrl: null });
+    mockVideoGenFindFirst.mockResolvedValue({ id: 'vg-1', status: 'FAILED', videoUrl: null });
     mockSegmentVisualFindMany
       .mockResolvedValueOnce([
         { id: 'sv-1', segmentId: 'seg-1', visualType: 'AI_ILLUSTRATION', visualMode: 'image', assetUrl: null, prompt: null, metadata: null },
@@ -431,7 +431,7 @@ describe('PATCH /api/podcasts/[id]/video', () => {
   });
 
   it('allows PATCH when video is STALE', async () => {
-    mockVideoGenFindUnique.mockResolvedValue({ id: 'vg-1', status: 'STALE', videoUrl: 'https://r2.example.com/old.mp4' });
+    mockVideoGenFindFirst.mockResolvedValue({ id: 'vg-1', status: 'STALE', videoUrl: 'https://r2.example.com/old.mp4' });
     mockSegmentVisualFindMany
       .mockResolvedValueOnce([
         { id: 'sv-1', segmentId: 'seg-1', visualType: 'AI_ILLUSTRATION', visualMode: 'image', assetUrl: null, prompt: null, metadata: null },

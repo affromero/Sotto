@@ -7,6 +7,8 @@ export interface LandingShowcaseConfig {
   scriptTurnCount: number;
   audioClipStart: number;
   audioClipEnd: number | null;
+  videoSegmentStart: number;
+  videoSegmentCount: number;
   videoClipStart: number;
   videoClipEnd: number | null;
   twitterHandle: string;
@@ -27,6 +29,8 @@ export async function getLandingShowcaseConfig(): Promise<LandingShowcaseConfig 
       scriptTurnCount: row.scriptTurnCount,
       audioClipStart: row.audioClipStart,
       audioClipEnd: row.audioClipEnd,
+      videoSegmentStart: row.videoSegmentStart,
+      videoSegmentCount: row.videoSegmentCount,
       videoClipStart: row.videoClipStart,
       videoClipEnd: row.videoClipEnd,
       twitterHandle: row.twitterHandle,
@@ -53,6 +57,8 @@ export async function setLandingShowcaseConfig(
       ...(data.scriptTurnCount !== undefined && { scriptTurnCount: data.scriptTurnCount }),
       ...(data.audioClipStart !== undefined && { audioClipStart: data.audioClipStart }),
       ...(data.audioClipEnd !== undefined && { audioClipEnd: data.audioClipEnd }),
+      ...(data.videoSegmentStart !== undefined && { videoSegmentStart: data.videoSegmentStart }),
+      ...(data.videoSegmentCount !== undefined && { videoSegmentCount: data.videoSegmentCount }),
       ...(data.videoClipStart !== undefined && { videoClipStart: data.videoClipStart }),
       ...(data.videoClipEnd !== undefined && { videoClipEnd: data.videoClipEnd }),
       ...(data.twitterHandle !== undefined && { twitterHandle: data.twitterHandle }),
@@ -67,6 +73,8 @@ export async function setLandingShowcaseConfig(
       scriptTurnCount: data.scriptTurnCount ?? 2,
       audioClipStart: data.audioClipStart ?? 0,
       audioClipEnd: data.audioClipEnd ?? null,
+      videoSegmentStart: data.videoSegmentStart ?? 0,
+      videoSegmentCount: data.videoSegmentCount ?? 4,
       videoClipStart: data.videoClipStart ?? 0,
       videoClipEnd: data.videoClipEnd ?? null,
       twitterHandle: data.twitterHandle ?? 'andres',

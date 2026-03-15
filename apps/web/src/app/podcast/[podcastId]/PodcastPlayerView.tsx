@@ -326,10 +326,16 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
       .catch(() => {});
   }, [podcast.id, podcast.forkedFrom, podcast.forks.length]);
 
-  // Check existing video generation status on mount (public podcasts: all visitors; private: owner only)
+  // Check existing video generation status on mount / track switch
   useEffect(() => {
     if (liveStatus !== 'READY') return;
-    fetch(`/api/podcasts/${podcast.id}/video`)
+    // Reset video state while fetching for the new track
+    setVideoState('idle');
+    setSegmentVisuals([]);
+    setVideoGenerationId(null);
+    setVideoError(null);
+    const vtParam = activeVoiceTrackId ? `?voiceTrackId=${activeVoiceTrackId}` : '';
+    fetch(`/api/podcasts/${podcast.id}/video${vtParam}`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (!data?.status) return;
@@ -358,7 +364,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
         }
       })
       .catch(() => {});
-  }, [isOwner, liveStatus, podcast.id]);
+  }, [isOwner, liveStatus, podcast.id, activeVoiceTrackId]);
 
   // Poll avatar overlay status while avatars are generating (independent of video state)
   useEffect(() => {
@@ -401,8 +407,10 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
     setPipelineLoading(true);
     setVideoError(null);
     try {
-      const pipelineOpts: RequestInit = override
-        ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(override) }
+      const pipelineBody = { ...override, ...(activeVoiceTrackId && { voiceTrackId: activeVoiceTrackId }) };
+      const hasBody = Object.keys(pipelineBody).length > 0;
+      const pipelineOpts: RequestInit = hasBody
+        ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(pipelineBody) }
         : { method: 'POST' };
       const [pipelineRes, modelsRes] = await Promise.all([
         fetch(`/api/podcasts/${podcast.id}/video/pipeline`, pipelineOpts),
@@ -432,7 +440,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
       setVideoError({ message: 'Failed to create pipeline.' });
       setPipelineLoading(false);
     }
-  }, [podcast.id]);
+  }, [podcast.id, activeVoiceTrackId]);
 
   // Poll for pipeline classification result
   useEffect(() => {
@@ -485,7 +493,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
         const res = await fetch(`/api/podcasts/${podcast.id}/video`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ pipeline }),
+          body: JSON.stringify({ pipeline, ...(activeVoiceTrackId && { voiceTrackId: activeVoiceTrackId }) }),
         });
         if (!res.ok) throw new Error('Failed to start video generation');
         const data = await res.json();
@@ -932,6 +940,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
                   onGenerate={(override) => { setShowModelPicker(false); handleGenerateVideo(override); }}
                   onCancel={() => setShowModelPicker(false)}
                   loading={pipelineLoading}
+                  activeVoiceTrackName={activeVoiceTrackId ? podcast.voiceTracks.find(t => t.id === activeVoiceTrackId)?.name : undefined}
                 />
               )}
               {videoError && (
@@ -942,6 +951,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
                       onGenerate={(override) => { setVideoError(null); handleGenerateVideo(override); }}
                       onCancel={() => setVideoError(null)}
                       loading={pipelineLoading}
+                      activeVoiceTrackName={activeVoiceTrackId ? podcast.voiceTracks.find(t => t.id === activeVoiceTrackId)?.name : undefined}
                     />
                   )}
                 </div>
@@ -952,6 +962,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
             <VideoProgress
               podcastId={podcast.id}
               videoGenerationId={videoGenerationId}
+              voiceTrackId={activeVoiceTrackId}
               onComplete={(visuals) => {
                 setVideoState('ready');
                 setSegmentVisuals(visuals);

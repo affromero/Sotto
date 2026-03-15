@@ -9,7 +9,7 @@ const mockListAvatars = vi.fn();
 const mockDeleteFile = vi.fn();
 
 const mockPodcastFindUnique = vi.fn();
-const mockVideoGenFindUnique = vi.fn();
+const mockVideoGenFindFirst = vi.fn();
 const mockVideoGenUpdate = vi.fn();
 const mockAvatarOverlayUpsert = vi.fn();
 const mockAvatarOverlayDeleteMany = vi.fn();
@@ -33,7 +33,7 @@ vi.mock('@/lib/prisma', () => ({
   prisma: {
     podcast: { findUnique: (...args: unknown[]) => mockPodcastFindUnique(...args) },
     videoGeneration: {
-      findUnique: (...args: unknown[]) => mockVideoGenFindUnique(...args),
+      findFirst: (...args: unknown[]) => mockVideoGenFindFirst(...args),
       update: (...args: unknown[]) => mockVideoGenUpdate(...args),
     },
     avatarOverlay: {
@@ -124,9 +124,7 @@ beforeEach(() => {
     { modelId: 'runway-characters', displayName: 'Runway Characters', costPerMinute: 0.2, avatarType: 'standard', maxDuration: null },
   ]);
   mockGetAutoModelConfig.mockResolvedValue({
-    freeAvatarProvider: 'heygen',
     freeAvatarModel: 'heygen-avatar-standard',
-    proAvatarProvider: 'heygen',
     proAvatarModel: 'heygen-avatar-standard',
     freeIncludedAvatarModels: null,
     proIncludedAvatarModels: null,
@@ -166,17 +164,9 @@ describe('GET /api/podcasts/[podcastId]/video/avatars', () => {
     expect(data.avatars[0].id).toBe('av-1');
   });
 
-  it('fetches Runway avatars when provider=runway and runway models are configured', async () => {
+  it('fetches Runway avatars when provider=runway', async () => {
     const { GET } = await import('@/app/api/podcasts/[podcastId]/video/avatars/route');
     process.env.RUNWAY_API_KEY = 'test-runway-key';
-    mockGetAutoModelConfig.mockResolvedValue({
-      freeAvatarProvider: 'heygen',
-      freeAvatarModel: 'heygen-avatar-standard',
-      proAvatarProvider: 'heygen',
-      proAvatarModel: 'heygen-avatar-standard',
-      freeIncludedAvatarModels: ['heygen-avatar-standard', 'runway-characters'],
-      proIncludedAvatarModels: ['heygen-avatar-standard', 'runway-characters'],
-    });
     mockCheckAvatarGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', dailyUsed: 0, dailyLimit: 1, dailyRemaining: 1, isByokUser: false, isProUser: false });
     mockRedisGet.mockResolvedValue(null);
     mockListUnifiedAvatars.mockResolvedValue([
@@ -191,24 +181,6 @@ describe('GET /api/podcasts/[podcastId]/video/avatars', () => {
     expect(mockListUnifiedAvatars).toHaveBeenCalledWith('test-runway-key', 'runway', 'user-1');
   });
 
-  it('falls back to default provider when requested provider has no configured models', async () => {
-    const { GET } = await import('@/app/api/podcasts/[podcastId]/video/avatars/route');
-    process.env.RUNWAY_API_KEY = 'test-runway-key';
-    // Config only has heygen models — no runway
-    mockCheckAvatarGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', dailyUsed: 0, dailyLimit: 1, dailyRemaining: 1, isByokUser: false, isProUser: false });
-    mockRedisGet.mockResolvedValue(null);
-    mockListUnifiedAvatars.mockResolvedValue([
-      { id: 'av-1', name: 'Standard', provider: 'heygen', isPreset: false, premium: false, previewImageUrl: '' },
-    ]);
-
-    const res = await GET(makeGet('http://localhost/api/podcasts/pod-1/video/avatars?provider=runway'), routeParams);
-    expect(res.status).toBe(200);
-    const data = await res.json();
-    // Should fall back to heygen since runway has no models configured
-    expect(data.providers.runway).toBe(false);
-    expect(mockListUnifiedAvatars).toHaveBeenCalledWith('test-heygen-key', 'heygen', 'user-1');
-  });
-
   it('rejects unauthorized requests', async () => {
     const { GET } = await import('@/app/api/podcasts/[podcastId]/video/avatars/route');
     mockAuthenticateRequest.mockResolvedValue(null);
@@ -221,8 +193,8 @@ describe('GET /api/podcasts/[podcastId]/video/avatars', () => {
 describe('POST /api/podcasts/[podcastId]/video/avatars', () => {
   it('creates avatar overlays and auto-starts generation when video is READY', async () => {
     const { POST } = await import('@/app/api/podcasts/[podcastId]/video/avatars/route');
-    mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'user-1', status: 'READY' });
-    mockVideoGenFindUnique.mockResolvedValue({ id: 'vg-1', status: 'READY' });
+    mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'user-1', status: 'READY', duration: 300 });
+    mockVideoGenFindFirst.mockResolvedValue({ id: 'vg-1', status: 'READY' });
     mockVideoGenUpdate.mockResolvedValue({});
     mockCheckAvatarGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', dailyUsed: 0, dailyLimit: 1, dailyRemaining: 1, isByokUser: true, isProUser: false });
     mockAvatarOverlayUpsert.mockImplementation(({ create }: { create: Record<string, unknown> }) => ({
@@ -256,8 +228,8 @@ describe('POST /api/podcasts/[podcastId]/video/avatars', () => {
 
   it('creates overlays without auto-start when video is still generating', async () => {
     const { POST } = await import('@/app/api/podcasts/[podcastId]/video/avatars/route');
-    mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'user-1', status: 'READY' });
-    mockVideoGenFindUnique.mockResolvedValue({ id: 'vg-1', status: 'GENERATING_VISUALS' });
+    mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'user-1', status: 'READY', duration: 300 });
+    mockVideoGenFindFirst.mockResolvedValue({ id: 'vg-1', status: 'GENERATING_VISUALS' });
     mockAvatarOverlayUpsert.mockImplementation(({ create }: { create: Record<string, unknown> }) => ({
       id: `overlay-${create.speaker}`,
       ...create,
@@ -275,9 +247,23 @@ describe('POST /api/podcasts/[podcastId]/video/avatars', () => {
     expect(mockAddJob).not.toHaveBeenCalled();
   });
 
+  it('rejects podcasts exceeding 600s duration', async () => {
+    const { POST } = await import('@/app/api/podcasts/[podcastId]/video/avatars/route');
+    mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'user-1', status: 'READY', duration: 700 });
+
+    const res = await POST(
+      makeJson('http://localhost/api/podcasts/pod-1/video/avatars', 'POST', { avatars: [{ speaker: 'Host', avatarId: 'av-1' }] }),
+      routeParams,
+    );
+
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.error).toMatch(/too long/i);
+  });
+
   it('rejects when podcast is not READY', async () => {
     const { POST } = await import('@/app/api/podcasts/[podcastId]/video/avatars/route');
-    mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'user-1', status: 'GENERATING_AUDIO' });
+    mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'user-1', status: 'GENERATING_AUDIO', duration: 300 });
 
     const res = await POST(
       makeJson('http://localhost/api/podcasts/pod-1/video/avatars', 'POST', { avatars: [{ speaker: 'Host', avatarId: 'av-1' }] }),
@@ -289,8 +275,8 @@ describe('POST /api/podcasts/[podcastId]/video/avatars', () => {
 
   it('passes avatarProvider and isPreset through overlay and job', async () => {
     const { POST } = await import('@/app/api/podcasts/[podcastId]/video/avatars/route');
-    mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'user-1', status: 'READY' });
-    mockVideoGenFindUnique.mockResolvedValue({ id: 'vg-1', status: 'READY' });
+    mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'user-1', status: 'READY', duration: 300 });
+    mockVideoGenFindFirst.mockResolvedValue({ id: 'vg-1', status: 'READY' });
     mockVideoGenUpdate.mockResolvedValue({});
     mockCheckAvatarGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', dailyUsed: 0, dailyLimit: 1, dailyRemaining: 1, isByokUser: true, isProUser: false });
     mockAvatarOverlayUpsert.mockImplementation(({ create }: { create: Record<string, unknown> }) => ({
@@ -328,8 +314,8 @@ describe('POST /api/podcasts/[podcastId]/video/avatars', () => {
 
   it('rejects invalid avatarProvider value', async () => {
     const { POST } = await import('@/app/api/podcasts/[podcastId]/video/avatars/route');
-    mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'user-1', status: 'READY' });
-    mockVideoGenFindUnique.mockResolvedValue({ id: 'vg-1', status: 'READY' });
+    mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'user-1', status: 'READY', duration: 300 });
+    mockVideoGenFindFirst.mockResolvedValue({ id: 'vg-1', status: 'READY' });
 
     const res = await POST(
       makeJson('http://localhost/api/podcasts/pod-1/video/avatars', 'POST', {
@@ -346,7 +332,7 @@ describe('DELETE /api/podcasts/[podcastId]/video/avatars', () => {
   it('deletes overlays and R2 assets', async () => {
     const { DELETE } = await import('@/app/api/podcasts/[podcastId]/video/avatars/route');
     mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'user-1' });
-    mockVideoGenFindUnique.mockResolvedValue({
+    mockVideoGenFindFirst.mockResolvedValue({
       id: 'vg-1',
       avatarOverlays: [
         { id: 'o-1', videoUrl: 'r2://avatar.webm', concatAudioUrl: 'r2://concat.mp3' },
@@ -370,7 +356,7 @@ describe('PATCH /api/podcasts/[podcastId]/video/avatars/positions', () => {
   it('updates avatar positions', async () => {
     const { PATCH } = await import('@/app/api/podcasts/[podcastId]/video/avatars/positions/route');
     mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'user-1' });
-    mockVideoGenFindUnique.mockResolvedValue({ id: 'vg-1' });
+    mockVideoGenFindFirst.mockResolvedValue({ id: 'vg-1' });
     mockAvatarOverlayUpdateMany.mockResolvedValue({ count: 1 });
 
     const res = await PATCH(
@@ -392,7 +378,7 @@ describe('PATCH /api/podcasts/[podcastId]/video/avatars/positions', () => {
   it('rejects invalid position values', async () => {
     const { PATCH } = await import('@/app/api/podcasts/[podcastId]/video/avatars/positions/route');
     mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'user-1' });
-    mockVideoGenFindUnique.mockResolvedValue({ id: 'vg-1' });
+    mockVideoGenFindFirst.mockResolvedValue({ id: 'vg-1' });
 
     const res = await PATCH(
       makeJson('http://localhost/api/podcasts/pod-1/video/avatars/positions', 'PATCH', {

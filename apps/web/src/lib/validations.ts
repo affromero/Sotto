@@ -789,6 +789,7 @@ export const pipelineTransitionSchema = z.object({
 export const generateVideoSchema = z
   .object({
     imageModel: z.string().optional(),
+    voiceTrackId: z.string().optional(),
     pipeline: z
       .object({
         version: z.union([z.literal(1), z.literal(2), z.literal(3)]),
@@ -899,6 +900,7 @@ export const redeemInvitationSchema = z.object({
 });
 
 export const configureAvatarsSchema = z.object({
+  voiceTrackId: z.string().optional(),
   avatars: z.array(z.object({
     speaker: z.string().min(1).max(50),
     avatarId: z.string().min(1).optional(),
@@ -912,6 +914,7 @@ export const configureAvatarsSchema = z.object({
 });
 
 export const updateAvatarPositionsSchema = z.object({
+  voiceTrackId: z.string().optional(),
   positions: z.array(z.object({
     speaker: z.string().min(1),
     posX: z.number().min(0).max(1).optional(),

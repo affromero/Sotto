@@ -290,6 +290,7 @@ export interface ClassifyVisualsPayload {
   podcastId: string;
   videoGenerationId: string;
   userId: string;
+  voiceTrackId?: string;
 }
 
 export interface GenerateVisualPayload {
@@ -299,11 +300,13 @@ export interface GenerateVisualPayload {
   visualType: string;
   prompt: string;
   metadata: Record<string, unknown>;
+  voiceTrackId?: string;
 }
 
 export interface ComposeVideoPayload {
   podcastId: string;
   videoGenerationId: string;
+  voiceTrackId?: string;
 }
 
 export interface PlaceEnrichmentPayload {
@@ -376,6 +379,7 @@ export interface ClassifyPipelinePayload {
   aiModel: string;
   apiKeyOverride?: string;
   tier: 'FREE' | 'PRO';
+  voiceTrackId?: string;
 }
 
 /**
