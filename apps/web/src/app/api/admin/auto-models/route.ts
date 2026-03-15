@@ -71,6 +71,9 @@ const updateSchema = z.object({
   proMusicModel: z.string().min(1).optional(),
   freeIncludedMusicModels: includedModelsField,
   proIncludedMusicModels: includedModelsField,
+  // Motion
+  freeMotionProvider: z.enum(['remotion', 'hera']).optional(),
+  proMotionProvider: z.enum(['remotion', 'hera']).optional(),
   // Daily limits & allocations
   dailyGenerationLimit: z.number().int().min(0).optional(),
   dailyGenerationLimitPro: z.number().int().min(0).optional(),

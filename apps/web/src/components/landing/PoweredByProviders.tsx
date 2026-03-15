@@ -38,6 +38,7 @@ const VIDEO_PROVIDERS: ProviderEntry[] = [
   { name: 'Kling', brand: '#10B981' },
   { name: 'Wan', brand: '#EC4899' },
   { name: 'Hailuo', brand: '#06B6D4' },
+  { name: 'Hera', brand: '#6366F1' },
 ];
 
 const AVATAR_PROVIDERS: ProviderEntry[] = [
