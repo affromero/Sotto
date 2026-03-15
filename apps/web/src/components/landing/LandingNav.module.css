@@ -194,29 +194,48 @@
    RESPONSIVE
    ========================================================================== */
 
+/* Mobile dropdown menu */
+.mobileMenu {
+  display: none;
+}
+
+.mobileLink {
+  display: block;
+  padding: 12px var(--spacing-lg);
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  text-decoration: none;
+  transition: background var(--transition-fast);
+}
+
+.mobileLink:hover {
+  background: var(--color-surface-hover);
+}
+
 @media (max-width: 768px) {
-  .navLinks {
-    display: none;
+  .mobileMenu {
+    display: flex;
+    flex-direction: column;
     position: absolute;
     top: 100%;
     left: 0;
     right: 0;
-    flex-direction: column;
     background: var(--color-surface);
-    padding: 12px var(--spacing-lg) 20px;
     border-bottom: 1px solid var(--color-border);
     box-shadow: var(--shadow-lg);
-    gap: 4px;
+    padding: var(--spacing-xs) 0;
+    transform: scaleY(0);
+    transform-origin: top;
+    opacity: 0;
+    pointer-events: none;
+    transition: transform 250ms var(--ease-out-expo), opacity 200ms var(--ease-out-expo);
   }
 
-  .navLinksOpen {
-    display: flex;
-  }
-
-  .navLinks a {
-    color: var(--color-text-primary);
-    padding: 10px 0;
-    font-size: 15px;
+  .mobileMenuOpen {
+    transform: scaleY(1);
+    opacity: 1;
+    pointer-events: auto;
   }
 
   .navSign,
@@ -227,8 +246,10 @@
   .burger {
     display: flex;
   }
+}
 
-  .navSolid .navLinks {
-    background: var(--color-surface);
+@media (prefers-reduced-motion: reduce) {
+  .mobileMenu {
+    transition: none;
   }
 }
