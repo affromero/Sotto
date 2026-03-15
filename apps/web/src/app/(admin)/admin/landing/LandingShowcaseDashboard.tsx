@@ -9,6 +9,8 @@ interface Config {
   scriptTurnCount: number;
   audioClipStart: number;
   audioClipEnd: number | null;
+  videoSegmentStart: number;
+  videoSegmentCount: number;
   videoClipStart: number;
   videoClipEnd: number | null;
   twitterHandle: string;
@@ -42,6 +44,8 @@ export function LandingShowcaseDashboard() {
     scriptTurnCount: 2,
     audioClipStart: 0,
     audioClipEnd: null,
+    videoSegmentStart: 0,
+    videoSegmentCount: 4,
     videoClipStart: 0,
     videoClipEnd: null,
     twitterHandle: 'andres',
@@ -126,6 +130,8 @@ export function LandingShowcaseDashboard() {
           scriptTurnCount: 2,
           audioClipStart: 0,
           audioClipEnd: null,
+          videoSegmentStart: 0,
+          videoSegmentCount: 4,
           videoClipStart: 0,
           videoClipEnd: null,
           twitterHandle: 'andres',
@@ -277,12 +283,35 @@ export function LandingShowcaseDashboard() {
         </div>
       </section>
 
-      {/* Video Clip */}
+      {/* Video Segments + Clip */}
       <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Video Clip (Showcase)</h2>
+        <h2 className={styles.sectionTitle}>Video (Showcase)</h2>
         <div className={styles.row}>
           <label className={styles.field}>
-            <span className={styles.fieldLabel}>Start (seconds)</span>
+            <span className={styles.fieldLabel}>Segment start</span>
+            <input
+              type="number"
+              min={0}
+              value={form.videoSegmentStart}
+              onChange={(e) => setForm((f) => ({ ...f, videoSegmentStart: parseInt(e.target.value) || 0 }))}
+              className={styles.inputSmall}
+            />
+          </label>
+          <label className={styles.field}>
+            <span className={styles.fieldLabel}>Segment count</span>
+            <input
+              type="number"
+              min={1}
+              max={50}
+              value={form.videoSegmentCount}
+              onChange={(e) => setForm((f) => ({ ...f, videoSegmentCount: parseInt(e.target.value) || 4 }))}
+              className={styles.inputSmall}
+            />
+          </label>
+        </div>
+        <div className={styles.row}>
+          <label className={styles.field}>
+            <span className={styles.fieldLabel}>Clip start (seconds)</span>
             <input
               type="number"
               min={0}

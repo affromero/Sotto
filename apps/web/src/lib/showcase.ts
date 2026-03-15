@@ -292,12 +292,15 @@ export async function getLandingShowcaseData(): Promise<LandingShowcaseData | nu
       : providerLabel;
     const originalTrackName = voiceSuffix;
 
-    // Video segments
-    const videoSegments = (podcast.videoGeneration?.visuals ?? []).map((v) => ({
-      order: v.order,
-      label: v.prompt ? v.prompt.split('.')[0] : `Segment ${v.order}`,
-      type: VISUAL_TYPE_LABELS[v.visualType] ?? v.visualType,
-    }));
+    // Video segments — slice by config range
+    const allVisuals = podcast.videoGeneration?.visuals ?? [];
+    const videoSegments = allVisuals
+      .slice(config.videoSegmentStart, config.videoSegmentStart + config.videoSegmentCount)
+      .map((v) => ({
+        order: v.order,
+        label: v.prompt ? v.prompt.split('.')[0] : `Segment ${v.order}`,
+        type: VISUAL_TYPE_LABELS[v.visualType] ?? v.visualType,
+      }));
 
     // Video clip
     const videoUrl = podcast.videoGeneration?.videoUrl;
