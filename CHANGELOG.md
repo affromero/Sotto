@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.21.8] - 2026-03-15
+
+### Fixed
+- Worker `core` preset now uses a denylist (`EXPERIMENTAL_WORKERS`) instead of an allowlist (`CORE_WORKERS`) — new production workers run by default, fixing 27 stuck `voice-track-audio` jobs and unblocking `visual-generation`, `transition-generation`, and `video-composition` on heavy containers
+
 ## [0.21.7] - 2026-03-15
 
 ### Changed
