@@ -15,6 +15,7 @@ interface AudioClipPlayerProps {
   voiceCount: number;
   sourceCount: number;
   audioUrl: string;
+  originalTrackName: string;
   startTime: number;
   endTime: number;
   totalDuration: number;
@@ -39,6 +40,7 @@ export function AudioClipPlayer({
   voiceCount,
   sourceCount,
   audioUrl,
+  originalTrackName,
   startTime,
   endTime,
   totalDuration,
@@ -46,6 +48,7 @@ export function AudioClipPlayer({
   voiceTracks = [],
 }: AudioClipPlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
+  const pendingResumeRef = useRef<{ elapsed: number; play: boolean } | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [activeTrackIndex, setActiveTrackIndex] = useState(-1); // -1 = original
@@ -69,14 +72,37 @@ export function AudioClipPlayer({
   }, [isPlaying, startTime]);
 
   const handleTrackSwitch = useCallback((index: number) => {
+    if (index === activeTrackIndex) return;
     const audio = audioRef.current;
-    if (audio && isPlaying) {
-      audio.pause();
-    }
+    const elapsed = audio ? audio.currentTime - startTime : 0;
+    if (audio) audio.pause();
+    pendingResumeRef.current = { elapsed: Math.max(0, elapsed), play: isPlaying };
     setActiveTrackIndex(index);
-    setIsPlaying(false);
-    setCurrentTime(0);
-  }, [isPlaying]);
+  }, [isPlaying, startTime, activeTrackIndex]);
+
+  // When src changes, load and resume from saved position
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const onCanPlay = () => {
+      const pending = pendingResumeRef.current;
+      if (!pending) return;
+      pendingResumeRef.current = null;
+      audio.currentTime = startTime + pending.elapsed;
+      if (pending.play) {
+        audio.play();
+        setIsPlaying(true);
+      }
+    };
+
+    audio.addEventListener('canplay', onCanPlay, { once: true });
+    audio.load();
+
+    return () => {
+      audio.removeEventListener('canplay', onCanPlay);
+    };
+  }, [activeUrl, startTime]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -128,7 +154,7 @@ export function AudioClipPlayer({
               className={`${styles.trackBtn} ${activeTrackIndex === -1 ? styles.trackBtnActive : ''}`}
               onClick={() => handleTrackSwitch(-1)}
             >
-              Original
+              {originalTrackName}
             </button>
             {voiceTracks.map((track, i) => (
               <button

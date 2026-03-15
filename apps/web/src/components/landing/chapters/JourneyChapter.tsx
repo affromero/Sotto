@@ -205,6 +205,7 @@ export function JourneyChapter({ showcase }: JourneyChapterProps) {
                   voiceCount={showcase.voiceCount}
                   sourceCount={showcase.sourceCount}
                   audioUrl={showcase.audioClip.url}
+                  originalTrackName={showcase.originalTrackName}
                   startTime={showcase.audioClip.start}
                   endTime={showcase.audioClip.end}
                   totalDuration={showcase.audioClip.totalDuration}
