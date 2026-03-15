@@ -1,0 +1,37 @@
+appId: fm.sotto.app
+tags:
+  - feed
+---
+# Pull to Refresh — Swipe down on feed to trigger refresh
+
+- runFlow: ../helpers/login.yaml
+
+# Verify feed is loaded
+- extendedWaitUntil:
+    visible:
+      id: "feed-podcast-list"
+    timeout: 5000
+
+# Pull to refresh by swiping down
+- swipe:
+    direction: DOWN
+    duration: 500
+
+# Wait for feed to settle after refresh
+- extendedWaitUntil:
+    visible:
+      id: "feed-podcast-list"
+    timeout: 10000
+- assertVisible:
+    id: "feed-podcast-list"
+
+# Verify podcast card still visible after refresh
+- scrollUntilVisible:
+    element:
+      id: "podcast-card-${E2E_PODCAST_ID}"
+    direction: DOWN
+    timeout: 10000
+- assertVisible:
+    id: "podcast-card-${E2E_PODCAST_ID}"
+
+- takeScreenshot: feed-refreshed
