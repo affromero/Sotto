@@ -17,6 +17,8 @@ import { cache } from '@/lib/redis';
 
 type RouteParams = { params: Promise<{ podcastId: string }> };
 
+const MAX_AVATAR_DURATION_SECONDS = 600;
+
 /**
  * GET — List available avatars (Redis-cached, 1hr TTL).
  * Accepts ?provider=heygen|runway|fal.
@@ -147,7 +149,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
   const podcast = await prisma.podcast.findUnique({
     where: { id: podcastId },
-    select: { id: true, userId: true, status: true },
+    select: { id: true, userId: true, status: true, duration: true },
   });
 
   if (!podcast) return errorResponse('Podcast not found', 404);
@@ -159,6 +161,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
   if (podcast.status !== 'READY') {
     return errorResponse('Podcast must be READY to configure avatars', 400);
+  }
+
+  if (podcast.duration && podcast.duration > MAX_AVATAR_DURATION_SECONDS) {
+    return errorResponse(`Podcast too long for avatars (max ${MAX_AVATAR_DURATION_SECONDS / 60} minutes)`, 400);
   }
 
   const body = await request.json();
