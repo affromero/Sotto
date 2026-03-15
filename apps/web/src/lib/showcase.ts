@@ -170,7 +170,9 @@ export async function getLandingShowcaseData(): Promise<LandingShowcaseData | nu
             audioUrl: true,
           },
         },
-        videoGeneration: {
+        videoGenerations: {
+          where: { voiceTrackId: null },
+          take: 1,
           select: {
             videoUrl: true,
             visuals: {
@@ -293,7 +295,7 @@ export async function getLandingShowcaseData(): Promise<LandingShowcaseData | nu
     const originalTrackName = voiceSuffix;
 
     // Video segments — slice by config range
-    const allVisuals = podcast.videoGeneration?.visuals ?? [];
+    const allVisuals = podcast.videoGenerations[0]?.visuals ?? [];
     const videoSegments = allVisuals
       .slice(config.videoSegmentStart, config.videoSegmentStart + config.videoSegmentCount)
       .map((v) => ({
@@ -303,7 +305,7 @@ export async function getLandingShowcaseData(): Promise<LandingShowcaseData | nu
       }));
 
     // Video clip
-    const videoUrl = podcast.videoGeneration?.videoUrl;
+    const videoUrl = podcast.videoGenerations[0]?.videoUrl;
     const videoClipEnd = config.videoClipEnd ?? config.videoClipStart + 30;
     const videoClip = videoUrl
       ? { url: videoUrl, start: config.videoClipStart, end: videoClipEnd }

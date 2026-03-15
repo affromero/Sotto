@@ -418,7 +418,7 @@ model Podcast {
   voiceTracks         VoiceTrack[]
   voiceTrackProposals VoiceTrack[]       @relation("VoiceTrackProposals")
   defaultVoiceTrackId String?
-  videoGeneration     VideoGeneration?
+  videoGenerations    VideoGeneration[]
   musicGenerations    MusicGeneration[]
   audioFingerprint    AudioFingerprint?
   duplicateSource     DuplicateMatch[]   @relation("DuplicateSource")
@@ -2088,6 +2088,7 @@ model VoiceTrack {
   voices              VoiceTrackVoice[]
   segments            VoiceTrackSegment[]
   avatarOverlays      AvatarOverlay[]
+  videoGenerations    VideoGeneration[]
 
   @@index([podcastId])
   @@index([status])
@@ -2207,7 +2208,8 @@ model ModelPricingSnapshot {
 
 model VideoGeneration {
   id             String      @id @default(cuid())
-  podcastId      String      @unique
+  podcastId      String
+  voiceTrackId   String?
   status         VideoStatus @default(PENDING)
   videoUrl       String?
   duration       Int? // seconds
@@ -2225,10 +2227,12 @@ model VideoGeneration {
   updatedAt      DateTime    @updatedAt
 
   podcast        Podcast             @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+  voiceTrack     VoiceTrack?         @relation(fields: [voiceTrackId], references: [id], onDelete: Cascade)
   visuals        SegmentVisual[]
   avatarOverlays AvatarOverlay[]
   transitions    SegmentTransition[]
 
+  @@unique([podcastId, voiceTrackId])
   @@index([podcastId])
 }
 
