@@ -347,6 +347,17 @@
   font-weight: 600;
 }
 
+.currentBadge {
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: var(--radius-sm);
+  background: rgba(22, 163, 74, 0.1);
+  color: var(--color-success);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
 .providerBadge {
   font-size: 9px;
   padding: 1px 5px;
