@@ -26,6 +26,9 @@ export async function POST(request: NextRequest) {
     if (!session?.user?.id) {
       return errorResponse('Unauthorized', 401);
     }
+    if (session.user.role !== 'ADMIN') {
+      return errorResponse('Forbidden', 403);
+    }
 
     const body = await request.json();
     const parsed = submitSchema.safeParse(body);
@@ -68,6 +71,9 @@ export async function GET(request: NextRequest) {
     if (!session?.user?.id) {
       return errorResponse('Unauthorized', 401);
     }
+    if (session.user.role !== 'ADMIN') {
+      return errorResponse('Forbidden', 403);
+    }
 
     const jobId = request.nextUrl.searchParams.get('jobId');
     if (!jobId) {
@@ -77,11 +83,6 @@ export async function GET(request: NextRequest) {
     const job = await lipSyncTestQueue.getJob(jobId);
     if (!job) {
       return errorResponse('Job not found', 404);
-    }
-
-    // Verify ownership
-    if (job.data.userId !== session.user.id) {
-      return errorResponse('Not found', 404);
     }
 
     const state = await job.getState();
