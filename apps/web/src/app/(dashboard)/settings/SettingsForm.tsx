@@ -18,7 +18,7 @@ import type { MusicProviderClientMeta } from '@/lib/providers/music-registry';
 import { TtsProviderCards } from '@/components/settings/TtsProviderCards';
 import { AiProviderCards } from '@/components/settings/AiProviderCards';
 import { MusicProviderCards } from '@/components/settings/MusicProviderCards';
-import { LipSyncTester } from '@/components/settings/LipSyncTester';
+import { AvatarImageManager } from '@/components/settings/AvatarImageManager';
 import { ThemeSelector } from '@/components/settings/ThemeSelector';
 import { usePushSubscription } from '@/lib/hooks/usePushSubscription';
 import styles from './page.module.css';
@@ -78,7 +78,6 @@ interface SettingsFormProps {
   quizAnswerCount: number;
   referredUsers: Array<{ name: string | null; handle: string | null; image: string | null; joinedAt: string; verified: boolean }>;
   referralBonus: number;
-  avatarModels: Array<{ id: string; name: string; tier: 'standard' | 'premium'; costPerMinute: number | null }>;
 }
 
 const providerLabels: Record<string, string> = {
@@ -124,7 +123,6 @@ export function SettingsForm({
   quizAnswerCount,
   referredUsers,
   referralBonus,
-  avatarModels,
 }: SettingsFormProps) {
   const [name, setName] = useState(initialName);
   const [bio, setBio] = useState(initialBio);
@@ -1075,13 +1073,13 @@ export function SettingsForm({
         <MusicProviderCards initialConfigured={configuredMusicProviders} providerMeta={musicProviderMeta} />
       </section>
 
-      {/* Lip-Sync Tester */}
-      <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Avatar Lip-Sync</h2>
+      {/* Avatar Images */}
+      <section className={styles.section} id="avatar-images">
+        <h2 className={styles.sectionTitle}>Avatar Images</h2>
         <p className={styles.sectionDesc}>
-          Test lip-sync models by generating audio from text, selecting an avatar image, and generating a lip-synced video.
+          Manage portrait images for lip-sync models that require a user-provided image.
         </p>
-        <LipSyncTester models={avatarModels} />
+        <AvatarImageManager />
       </section>
 
       {/* Reset Recommendations */}
