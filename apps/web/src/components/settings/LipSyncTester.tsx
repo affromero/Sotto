@@ -111,7 +111,9 @@ export function LipSyncTester() {
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (!data?.models?.length) return;
-        const priceMap = new Map(data.models.map((m: AvatarModel) => [m.id, m.costPerMinute]));
+        const priceMap = new Map<string, number | null>(
+          data.models.map((m: { id: string; costPerMinute: number | null }) => [m.id, m.costPerMinute])
+        );
         setModels((prev) =>
           prev.map((m) => ({ ...m, costPerMinute: priceMap.get(m.id) ?? m.costPerMinute }))
         );
