@@ -25,8 +25,8 @@ export async function POST(request: NextRequest) {
       return errorResponse('Invalid request', 400);
     }
 
-    const limited = await checkRateLimit(`lip-sync-test:${session.user.id}`, 3, 60);
-    if (limited) {
+    const rateLimit = await checkRateLimit(`lip-sync-test:${session.user.id}`, 3, 60);
+    if (!rateLimit.allowed) {
       return errorResponse('Rate limit exceeded (3 tests per minute)', 429);
     }
 
