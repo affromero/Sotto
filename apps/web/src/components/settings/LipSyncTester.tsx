@@ -11,10 +11,17 @@ const CACHE_TTL_MS = 15 * 60 * 1000;
 interface AvatarModel {
   id: string;
   name: string;
-  tier: 'standard' | 'premium' | 'translation';
-  provider: string;
+  tier: 'standard' | 'premium';
   costPerMinute: number | null;
 }
+
+// Mirrors avatar-registry.ts — static so the dropdown is instant
+const AVATAR_MODELS: AvatarModel[] = [
+  { id: 'fal-heygen-avatar4-i2v', name: 'HeyGen Avatar4 (Image-to-Video)', tier: 'premium', costPerMinute: null },
+  { id: 'fal-heygen-avatar4-twin', name: 'HeyGen Avatar4 (Digital Twin)', tier: 'premium', costPerMinute: null },
+  { id: 'fal-veed-fabric-1.0', name: 'VEED Fabric 1.0 (Lip Sync)', tier: 'standard', costPerMinute: null },
+  { id: 'fal-kling-avatar-v2-pro', name: 'Kling Avatar v2 Pro (Lip Sync)', tier: 'premium', costPerMinute: null },
+];
 
 interface CacheData {
   audioDataUrl: string | null;
@@ -73,8 +80,8 @@ export function LipSyncTester() {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [avatarImageUrl, setAvatarImageUrl] = useState('');
   const [imagePrompt, setImagePrompt] = useState('');
-  const [models, setModels] = useState<AvatarModel[]>([]);
-  const [selectedModel, setSelectedModel] = useState('');
+  const [models, setModels] = useState<AvatarModel[]>(AVATAR_MODELS);
+  const [selectedModel, setSelectedModel] = useState(AVATAR_MODELS[0].id);
   const [error, setError] = useState<string | null>(null);
   const [generatingImage, setGeneratingImage] = useState(false);
   const audioDataUrlRef = useRef<string | null>(null);
@@ -98,16 +105,16 @@ export function LipSyncTester() {
     }
   }, []);
 
-  // Fetch models
+  // Enrich with live pricing (best-effort)
   useEffect(() => {
     fetch('/api/avatar-models')
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        if (data?.models?.length) {
-          setModels(data.models);
-          // Only set default model if none restored from cache
-          setSelectedModel((prev) => prev || data.models[0].id);
-        }
+        if (!data?.models?.length) return;
+        const priceMap = new Map(data.models.map((m: AvatarModel) => [m.id, m.costPerMinute]));
+        setModels((prev) =>
+          prev.map((m) => ({ ...m, costPerMinute: priceMap.get(m.id) ?? m.costPerMinute }))
+        );
       })
       .catch(() => {});
   }, []);
@@ -325,9 +332,8 @@ export function LipSyncTester() {
             className={styles.select}
             value={selectedModel}
             onChange={(e) => setSelectedModel(e.target.value)}
-            disabled={isGenerating || models.length === 0}
+            disabled={isGenerating}
           >
-            {models.length === 0 && <option value="">Loading models…</option>}
             {models.map((m) => (
               <option key={m.id} value={m.id}>
                 {m.name}{formatPrice(m.costPerMinute)}{m.tier === 'premium' ? ' ★' : ''}
