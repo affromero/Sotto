@@ -1,5 +1,6 @@
 import type { Job } from 'bullmq';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
+import { markPodcastFailed } from '@/lib/pipeline-resume';
 import { logger } from '@/lib/logger';
 
 const STALE_VIDEO_THRESHOLD_MS = 20 * 60 * 1000; // 20 minutes
@@ -53,5 +54,34 @@ export async function processDraftCleanup(_job: Job): Promise<void> {
 
   if (staleAvatars.count > 0) {
     logger.warn('Marked stale avatar overlays as failed', { count: String(staleAvatars.count) });
+  }
+
+  // Reap podcasts stuck in active pipeline states for >2 hours
+  const STALE_PIPELINE_THRESHOLD_MS = 2 * 60 * 60 * 1000;
+  const stalePipelineThreshold = new Date(Date.now() - STALE_PIPELINE_THRESHOLD_MS);
+
+  const stalePipelines = await prisma.podcast.findMany({
+    where: {
+      status: {
+        in: [
+          'EXTRACTING', 'SCRIPTING', 'VERIFYING_SCRIPT',
+          'VALIDATING_REFERENCES', 'GENERATING_AUDIO', 'STITCHING',
+          'UPDATING', 'IMPORTING', 'TRANSCRIBING',
+        ],
+      },
+      updatedAt: { lt: stalePipelineThreshold },
+    },
+    select: { id: true, status: true },
+  });
+
+  for (const podcast of stalePipelines) {
+    await markPodcastFailed(podcast.id, {
+      failureReason: 'Generation timed out. Please try again.',
+      technicalError: `Orphan reaper: stuck in ${podcast.status} for >2h`,
+    });
+  }
+
+  if (stalePipelines.length > 0) {
+    logger.warn('Reaped stale pipeline podcasts', { count: String(stalePipelines.length) });
   }
 }
