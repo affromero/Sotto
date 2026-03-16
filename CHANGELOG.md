@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.25.0] - 2026-03-16
+
+### Added
+- Orphan pipeline reaper — draft-cleanup worker detects podcasts stuck in active pipeline states for >2 hours and marks them FAILED with user-friendly retry message
+- Per-user monthly budget enforcement — `spentMonthCents` / `budgetMonthCents` fields on User model, inline spend tracking in usage-logger, generation gate blocks when budget exceeded with automatic monthly reset
+
+### Fixed
+- Double-stitch race condition — audio-generation worker now uses CAS (compare-and-swap) `updateMany` and stable BullMQ jobIds (`stitch-{podcastId}`) so concurrent segment completions can't create duplicate PodcastVersion records
+- TOCTOU on `/generate` endpoint — all status transitions (fresh start, resume, import) use CAS `updateMany` to prevent concurrent requests from double-queuing pipeline jobs
+- `markPodcastFailed` race — uses CAS on current status so concurrent workers can't double-mark a podcast as FAILED
+- Stable jobIds across entire pipeline (`extract-`, `script-`, `verify-`, `validate-`, `audio-`, `stitch-`, `import-`) replacing `Date.now()`-based IDs, enabling BullMQ deduplication
+
 ## [0.23.2] - 2026-03-15
 
 ### Fixed
