@@ -5,6 +5,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const mockPodcastFindUnique = vi.fn();
 const mockPodcastFindUniqueOrThrow = vi.fn();
 const mockPodcastUpdate = vi.fn().mockResolvedValue({});
+const mockPodcastUpdateMany = vi.fn().mockResolvedValue({ count: 1 });
 const mockDiscoveryFindUnique = vi.fn();
 const mockScriptFindUnique = vi.fn();
 const mockReferenceFindMany = vi.fn();
@@ -16,6 +17,7 @@ vi.mock('@/lib/prisma', () => {
       findUnique: (...args: unknown[]) => mockPodcastFindUnique(...args),
       findUniqueOrThrow: (...args: unknown[]) => mockPodcastFindUniqueOrThrow(...args),
       update: (...args: unknown[]) => mockPodcastUpdate(...args),
+      updateMany: (...args: unknown[]) => mockPodcastUpdateMany(...args),
     },
     discovery: {
       findUnique: (...args: unknown[]) => mockDiscoveryFindUnique(...args),
@@ -52,14 +54,13 @@ describe('markPodcastFailed', () => {
     vi.clearAllMocks();
   });
 
-  it('records failedAtStatus and sets status to FAILED', async () => {
+  it('records failedAtStatus and sets status to FAILED via CAS', async () => {
     mockPodcastFindUnique.mockResolvedValue({ status: 'GENERATING_AUDIO' });
-    mockPodcastUpdate.mockResolvedValue({});
 
     await markPodcastFailed('podcast-001');
 
-    expect(mockPodcastUpdate).toHaveBeenCalledWith({
-      where: { id: 'podcast-001' },
+    expect(mockPodcastUpdateMany).toHaveBeenCalledWith({
+      where: { id: 'podcast-001', status: 'GENERATING_AUDIO' },
       data: {
         status: 'FAILED',
         failedAtStatus: 'GENERATING_AUDIO',
@@ -76,7 +77,7 @@ describe('markPodcastFailed', () => {
 
     await markPodcastFailed('podcast-001');
 
-    expect(mockPodcastUpdate).not.toHaveBeenCalled();
+    expect(mockPodcastUpdateMany).not.toHaveBeenCalled();
   });
 
   it('skips if podcast is READY', async () => {
@@ -84,7 +85,7 @@ describe('markPodcastFailed', () => {
 
     await markPodcastFailed('podcast-001');
 
-    expect(mockPodcastUpdate).not.toHaveBeenCalled();
+    expect(mockPodcastUpdateMany).not.toHaveBeenCalled();
   });
 
   it('skips if podcast is SCRIPT_READY', async () => {
@@ -92,7 +93,7 @@ describe('markPodcastFailed', () => {
 
     await markPodcastFailed('podcast-001');
 
-    expect(mockPodcastUpdate).not.toHaveBeenCalled();
+    expect(mockPodcastUpdateMany).not.toHaveBeenCalled();
   });
 
   it('skips if podcast not found', async () => {
@@ -100,20 +101,29 @@ describe('markPodcastFailed', () => {
 
     await markPodcastFailed('nonexistent');
 
-    expect(mockPodcastUpdate).not.toHaveBeenCalled();
+    expect(mockPodcastUpdateMany).not.toHaveBeenCalled();
+  });
+
+  it('returns false when CAS loses (status changed between read and write)', async () => {
+    mockPodcastFindUnique.mockResolvedValue({ status: 'GENERATING_AUDIO' });
+    mockPodcastUpdateMany.mockResolvedValue({ count: 0 });
+
+    const result = await markPodcastFailed('podcast-001');
+
+    expect(result).toBe(false);
+    expect(mockPodcastUpdateMany).toHaveBeenCalled();
   });
 
   it('persists errorId when provided', async () => {
     mockPodcastFindUnique.mockResolvedValue({ status: 'GENERATING_AUDIO' });
-    mockPodcastUpdate.mockResolvedValue({});
 
     await markPodcastFailed('podcast-003', {
       failureReason: 'TTS provider error',
       errorId: 'err_abc123def456',
     });
 
-    expect(mockPodcastUpdate).toHaveBeenCalledWith({
-      where: { id: 'podcast-003' },
+    expect(mockPodcastUpdateMany).toHaveBeenCalledWith({
+      where: { id: 'podcast-003', status: 'GENERATING_AUDIO' },
       data: {
         status: 'FAILED',
         failedAtStatus: 'GENERATING_AUDIO',
@@ -127,12 +137,11 @@ describe('markPodcastFailed', () => {
 
   it('sets errorId to null when not provided', async () => {
     mockPodcastFindUnique.mockResolvedValue({ status: 'SCRIPTING' });
-    mockPodcastUpdate.mockResolvedValue({});
 
     await markPodcastFailed('podcast-004', { failureReason: 'Script error' });
 
-    expect(mockPodcastUpdate).toHaveBeenCalledWith({
-      where: { id: 'podcast-004' },
+    expect(mockPodcastUpdateMany).toHaveBeenCalledWith({
+      where: { id: 'podcast-004', status: 'SCRIPTING' },
       data: expect.objectContaining({
         errorId: null,
       }),
@@ -141,12 +150,11 @@ describe('markPodcastFailed', () => {
 
   it('records STITCHING as failedAtStatus when failing during stitching', async () => {
     mockPodcastFindUnique.mockResolvedValue({ status: 'STITCHING' });
-    mockPodcastUpdate.mockResolvedValue({});
 
     await markPodcastFailed('podcast-002');
 
-    expect(mockPodcastUpdate).toHaveBeenCalledWith({
-      where: { id: 'podcast-002' },
+    expect(mockPodcastUpdateMany).toHaveBeenCalledWith({
+      where: { id: 'podcast-002', status: 'STITCHING' },
       data: {
         status: 'FAILED',
         failedAtStatus: 'STITCHING',

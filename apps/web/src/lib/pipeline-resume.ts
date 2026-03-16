@@ -43,8 +43,9 @@ export async function markPodcastFailed(
     return false;
   }
 
-  await prisma.podcast.update({
-    where: { id: podcastId },
+  // CAS status transition — prevents concurrent workers from double-marking
+  const cas = await prisma.podcast.updateMany({
+    where: { id: podcastId, status: podcast.status },
     data: {
       status: 'FAILED',
       failedAtStatus: podcast.status,
@@ -54,6 +55,11 @@ export async function markPodcastFailed(
       failedAt: new Date(),
     },
   });
+
+  if (cas.count === 0) {
+    logger.info('markPodcastFailed: status already changed, skipping', { podcastId });
+    return false;
+  }
 
   // Cancel any authorized voice payments for this podcast
   await cancelPodcastPayments(podcastId).catch((err) => {
