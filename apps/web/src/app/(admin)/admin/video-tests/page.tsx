@@ -2,6 +2,8 @@ import { PRESET_IDS } from '@sotto/maps/server';
 import { getAllImageProviderMeta } from '@/lib/providers/image-registry';
 import type { ImageModelOption } from '@/lib/providers/image-registry';
 import { getAllAiProviderMeta } from '@/lib/providers/ai-registry';
+import { getAllAvatarProviderMeta } from '@/lib/providers/avatar-registry';
+import { fetchAvatarModels } from '@/lib/avatar-cost-estimator';
 import { VideoTestBench } from './VideoTestBench';
 import styles from './page.module.css';
 
@@ -17,6 +19,13 @@ export interface AiProviderInfo {
   models: { id: string; displayName: string; tier: string }[];
 }
 
+export interface AvatarModelInfo {
+  id: string;
+  name: string;
+  tier: 'standard' | 'premium';
+  costPerMinute: number | null;
+}
+
 export interface EnvAvailability {
   anthropic: boolean;
   mapbox: boolean;
@@ -24,7 +33,7 @@ export interface EnvAvailability {
   pexels: boolean;
 }
 
-export default function AdminVideoTestsPage() {
+export default async function AdminVideoTestsPage() {
   const envAvailability: EnvAvailability = {
     anthropic: !!process.env.ANTHROPIC_API_KEY,
     mapbox: !!process.env.MAPBOX_ACCESS_TOKEN,
@@ -54,6 +63,20 @@ export default function AdminVideoTestsPage() {
       })),
     }));
 
+  // Avatar models with live pricing — admin sees all (no tier filter)
+  const avatarPricing = await fetchAvatarModels().catch(() => []);
+  const avatarPricingMap = new Map(avatarPricing.map((m) => [m.modelId, m.costPerMinute]));
+  const avatarModels: AvatarModelInfo[] = getAllAvatarProviderMeta()
+    .filter((p) => !p.disabled)
+    .flatMap((provider) =>
+      provider.models.map((m) => ({
+        id: m.id,
+        name: m.displayName,
+        tier: m.tier as 'standard' | 'premium',
+        costPerMinute: avatarPricingMap.get(m.id) ?? null,
+      }))
+    );
+
   return (
     <div className={styles.container}>
       <div className={styles.header}>
@@ -68,6 +91,7 @@ export default function AdminVideoTestsPage() {
         mapPresets={mapPresets}
         imageModels={imageModels}
         aiProviders={aiProviders}
+        avatarModels={avatarModels}
       />
     </div>
   );

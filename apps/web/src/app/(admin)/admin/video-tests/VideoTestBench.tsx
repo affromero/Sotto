@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { ChevronDown, Shuffle, Eye } from 'lucide-react';
-import type { EnvAvailability, ImageModelInfo, AiProviderInfo } from './page';
+import type { EnvAvailability, ImageModelInfo, AiProviderInfo, AvatarModelInfo } from './page';
 import type { MapPresetId } from '@sotto/maps/server';
 import styles from './VideoTestBench.module.css';
 
@@ -11,6 +11,7 @@ interface VideoTestBenchProps {
   mapPresets: MapPresetId[];
   imageModels: ImageModelInfo[];
   aiProviders: AiProviderInfo[];
+  avatarModels: AvatarModelInfo[];
 }
 
 type TestStatus = 'idle' | 'running' | 'pass' | 'fail';
@@ -29,7 +30,7 @@ interface PreviewState {
   error?: string;
 }
 
-type TestType = 'classify' | 'resolve-place' | 'map-image' | 'ai-illustration' | 'stock-footage';
+type TestType = 'classify' | 'resolve-place' | 'map-image' | 'ai-illustration' | 'stock-footage' | 'lip-sync';
 
 function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
@@ -1010,6 +1011,310 @@ function StockFootageSection({
   );
 }
 
+// ── Lip-Sync Section ──
+
+const DEFAULT_LIP_SYNC_PROMPT = 'Welcome to Sotto. Let me tell you something fascinating today.';
+const DEFAULT_VOICE_ID = '21m00Tcm4TlvDq8ikWAM'; // Rachel — stable ElevenLabs voice
+const LIP_SYNC_CACHE_KEY = 'lip-sync-admin-cache';
+const LIP_SYNC_CACHE_TTL_MS = 15 * 60 * 1000;
+
+interface LipSyncCache {
+  audioDataUrl: string | null;
+  avatarImageUrl: string;
+  videoUrl: string | null;
+  textPrompt: string;
+  imagePrompt: string;
+  selectedModel: string;
+  expiresAt: number;
+}
+
+function loadLipSyncCache(): LipSyncCache | null {
+  try {
+    const raw = localStorage.getItem(LIP_SYNC_CACHE_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw) as LipSyncCache;
+    if (Date.now() > data.expiresAt) {
+      localStorage.removeItem(LIP_SYNC_CACHE_KEY);
+      return null;
+    }
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+function saveLipSyncCache(data: Omit<LipSyncCache, 'expiresAt'>) {
+  try {
+    localStorage.setItem(LIP_SYNC_CACHE_KEY, JSON.stringify({ ...data, expiresAt: Date.now() + LIP_SYNC_CACHE_TTL_MS }));
+  } catch {
+    // localStorage full or unavailable
+  }
+}
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+function formatPrice(costPerMinute: number | null): string {
+  if (costPerMinute === null) return '';
+  return ` — $${costPerMinute.toFixed(2)}/min`;
+}
+
+type LipSyncStage = 'idle' | 'generating-audio' | 'audio-ready' | 'generating-video' | 'video-ready' | 'error';
+
+function LipSyncSection({
+  models,
+  disabled,
+}: {
+  models: AvatarModelInfo[];
+  disabled: boolean;
+}) {
+  const [stage, setStage] = useState<LipSyncStage>('idle');
+  const [textPrompt, setTextPrompt] = useState(DEFAULT_LIP_SYNC_PROMPT);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [avatarImageUrl, setAvatarImageUrl] = useState('');
+  const [imagePrompt, setImagePrompt] = useState('');
+  const [selectedModel, setSelectedModel] = useState(models[0]?.id ?? '');
+  const [error, setError] = useState<string | null>(null);
+  const [generatingImage, setGeneratingImage] = useState(false);
+  const [progress, setProgress] = useState<number>(0);
+  const audioDataUrlRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const cached = loadLipSyncCache();
+    if (cached) {
+      if (cached.audioDataUrl) { setAudioUrl(cached.audioDataUrl); audioDataUrlRef.current = cached.audioDataUrl; }
+      if (cached.avatarImageUrl) setAvatarImageUrl(cached.avatarImageUrl);
+      if (cached.videoUrl) setVideoUrl(cached.videoUrl);
+      if (cached.textPrompt) setTextPrompt(cached.textPrompt);
+      if (cached.imagePrompt) setImagePrompt(cached.imagePrompt);
+      if (cached.selectedModel) setSelectedModel(cached.selectedModel);
+      if (cached.videoUrl) setStage('video-ready');
+      else if (cached.audioDataUrl) setStage('audio-ready');
+    }
+  }, []);
+
+  const generateAudio = useCallback(async () => {
+    setStage('generating-audio');
+    setError(null);
+    setVideoUrl(null);
+    try {
+      const res = await fetch('/api/voices/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ voiceId: DEFAULT_VOICE_ID, text: textPrompt }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(typeof data.error === 'string' ? data.error : `Audio generation failed (${res.status})`);
+      }
+      const blob = await res.blob();
+      const dataUrl = await blobToDataUrl(blob);
+      audioDataUrlRef.current = dataUrl;
+      setAudioUrl(dataUrl);
+      setStage('audio-ready');
+      saveLipSyncCache({ audioDataUrl: dataUrl, avatarImageUrl, videoUrl: null, textPrompt, imagePrompt, selectedModel });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Audio generation failed');
+      setStage('error');
+    }
+  }, [textPrompt, avatarImageUrl, imagePrompt, selectedModel]);
+
+  const generateImage = useCallback(async () => {
+    if (!imagePrompt.trim()) return;
+    setGeneratingImage(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/avatar-images/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: `test-${Date.now()}`, prompt: imagePrompt }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(typeof data.error === 'string' ? data.error : `Image generation failed (${res.status})`);
+      }
+      const data = await res.json();
+      setAvatarImageUrl(data.imageUrl);
+      saveLipSyncCache({ audioDataUrl: audioDataUrlRef.current, avatarImageUrl: data.imageUrl, videoUrl, textPrompt, imagePrompt, selectedModel });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Image generation failed');
+    } finally {
+      setGeneratingImage(false);
+    }
+  }, [imagePrompt, videoUrl, textPrompt, selectedModel]);
+
+  const generateVideo = useCallback(async () => {
+    if (!audioUrl || !avatarImageUrl) return;
+    setStage('generating-video');
+    setError(null);
+    setVideoUrl(null);
+    setProgress(0);
+    try {
+      const submitRes = await fetch('/api/avatar-test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ audioUrl, avatarImageUrl, avatarModelId: selectedModel }),
+      });
+      if (!submitRes.ok) {
+        const data = await submitRes.json().catch(() => ({}));
+        throw new Error(typeof data.error === 'string' ? data.error : `Failed to queue test (${submitRes.status})`);
+      }
+      const { jobId } = await submitRes.json();
+      for (let i = 0; i < 100; i++) {
+        await new Promise((r) => setTimeout(r, 3000));
+        const pollRes = await fetch(`/api/avatar-test?jobId=${jobId}`);
+        if (!pollRes.ok) continue;
+        const status = await pollRes.json();
+        if (typeof status.progress === 'number') setProgress(status.progress);
+        if (status.status === 'completed' && status.videoUrl) {
+          setProgress(100);
+          setVideoUrl(status.videoUrl);
+          setStage('video-ready');
+          saveLipSyncCache({ audioDataUrl: audioDataUrlRef.current, avatarImageUrl, videoUrl: status.videoUrl, textPrompt, imagePrompt, selectedModel });
+          return;
+        }
+        if (status.status === 'failed') {
+          throw new Error(typeof status.error === 'string' ? status.error : 'Lip-sync generation failed');
+        }
+      }
+      throw new Error('Lip-sync generation timed out');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Video generation failed');
+      setStage('error');
+    }
+  }, [audioUrl, avatarImageUrl, selectedModel, textPrompt, imagePrompt]);
+
+  const isGenerating = stage === 'generating-audio' || stage === 'generating-video';
+
+  // Use a dummy TestResult for SectionShell — lip-sync doesn't use the test runner
+  const dummyResult: TestResult = { status: videoUrl ? 'pass' : error ? 'fail' : 'idle' };
+
+  return (
+    <SectionShell
+      label="Lip-Sync"
+      description="Test avatar lip-sync models: generate audio from text, select an avatar image, then generate a lip-synced video."
+      result={dummyResult}
+      disabled={disabled}
+      disabledMessage={<>Requires <code>FAL_KEY</code></>}
+    >
+      <div className={styles.formGrid}>
+        <div>
+          <label className={styles.fieldLabel}>Text prompt</label>
+          <input
+            className={styles.fieldInput}
+            value={textPrompt}
+            onChange={(e) => setTextPrompt(e.target.value)}
+            placeholder="Enter text to convert to speech..."
+            disabled={isGenerating}
+          />
+        </div>
+      </div>
+
+      <div className={styles.buttonRow}>
+        <button
+          type="button"
+          className={styles.testButton}
+          onClick={generateAudio}
+          disabled={!textPrompt.trim() || isGenerating}
+        >
+          {stage === 'generating-audio' ? 'Generating Audio…' : 'Generate Audio'}
+        </button>
+      </div>
+
+      {audioUrl && (
+        <audio className={styles.lipSyncAudio} controls src={audioUrl} />
+      )}
+
+      <div className={styles.formGrid}>
+        <div>
+          <label className={styles.fieldLabel}>Avatar image URL</label>
+          <input
+            className={styles.fieldInput}
+            value={avatarImageUrl}
+            onChange={(e) => setAvatarImageUrl(e.target.value)}
+            placeholder="Paste an image URL or generate one below..."
+            disabled={isGenerating}
+          />
+        </div>
+        <div>
+          <label className={styles.fieldLabel}>Or generate from prompt</label>
+          <div className={styles.buttonRow}>
+            <input
+              className={styles.fieldInput}
+              value={imagePrompt}
+              onChange={(e) => setImagePrompt(e.target.value)}
+              placeholder="Professional portrait, female, warm smile..."
+              disabled={isGenerating || generatingImage}
+              style={{ flex: 1 }}
+            />
+            <button
+              type="button"
+              className={styles.randomizeButton}
+              onClick={generateImage}
+              disabled={!imagePrompt.trim() || isGenerating || generatingImage}
+            >
+              {generatingImage ? 'Generating…' : 'Generate'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {avatarImageUrl && (
+        <img src={avatarImageUrl} alt="Avatar preview" className={styles.lipSyncAvatarPreview} />
+      )}
+
+      <div className={styles.formGrid}>
+        <div>
+          <label className={styles.fieldLabel}>Lip-sync model</label>
+          <select
+            className={styles.fieldInput}
+            value={selectedModel}
+            onChange={(e) => setSelectedModel(e.target.value)}
+            disabled={isGenerating}
+          >
+            {models.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name}{formatPrice(m.costPerMinute)}{m.tier === 'premium' ? ' ★' : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div className={styles.buttonRow}>
+        <button
+          type="button"
+          className={styles.testButton}
+          onClick={generateVideo}
+          disabled={!audioUrl || !avatarImageUrl || !selectedModel || isGenerating}
+        >
+          {stage === 'generating-video' ? 'Generating Video…' : 'Generate Video'}
+        </button>
+      </div>
+
+      {stage === 'generating-video' && (
+        <div className={styles.lipSyncStatus}>
+          <span className={styles.lipSyncSpinner} />
+          Processing lip-sync…{progress > 0 ? ` ${progress}%` : ''}
+        </div>
+      )}
+
+      {videoUrl && (
+        <video className={styles.lipSyncVideo} controls src={videoUrl} autoPlay loop />
+      )}
+
+      {error && <span className={styles.errorText}>{error}</span>}
+    </SectionShell>
+  );
+}
+
 // ── Preview All State ──
 
 interface PreviewAllSegment {
@@ -1037,13 +1342,14 @@ const INITIAL_PREVIEW_ALL: PreviewAllState = {
 
 // ── Main Component ──
 
-export function VideoTestBench({ envAvailability, mapPresets, imageModels, aiProviders }: VideoTestBenchProps) {
+export function VideoTestBench({ envAvailability, mapPresets, imageModels, aiProviders, avatarModels }: VideoTestBenchProps) {
   const [results, setResults] = useState<Record<TestType, TestResult>>({
     'classify': { status: 'idle' },
     'resolve-place': { status: 'idle' },
     'map-image': { status: 'idle' },
     'ai-illustration': { status: 'idle' },
     'stock-footage': { status: 'idle' },
+    'lip-sync': { status: 'idle' },
   });
   const [previews, setPreviews] = useState<Record<string, PreviewState>>({});
   const [previewAll, setPreviewAll] = useState<PreviewAllState>(INITIAL_PREVIEW_ALL);
@@ -1366,6 +1672,10 @@ export function VideoTestBench({ envAvailability, mapPresets, imageModels, aiPro
         disabled={!envAvailability.pexels}
         preview={previews['stock-footage']}
         onPreview={previewStockFootage}
+      />
+      <LipSyncSection
+        models={avatarModels}
+        disabled={!envAvailability.fal}
       />
     </div>
   );
