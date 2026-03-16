@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.26.0] - 2026-03-17
+
+### Added
+- Consent-based avatar image system — verified users upload their own portrait with explicit consent acknowledgment, admin kill switches for uploads and AI generation, shareable toggle per image, and avatar image sharing between users (request/approve/deny/revoke flow)
+- Identity chapter on landing page — "Your Face. Your Voice. Your Podcast." section highlighting verified voice cloning + avatar images with pipeline loop visualization (Chat → Script → Your Voice → Your Face → Publish)
+- Admin avatar controls in plan features panel — toggles for user uploads and AI generation, both with admin bypass
+
+### Fixed
+- Avatar generation no longer restricted by podcast duration limit
+
+### Changed
+- Avatar AI generation restricted to admin-only (was available to all users)
+- Upload API requires verification + consent acknowledgment (was unrestricted)
+- Plan features admin page renamed from "Voice Features" to "Plan Features" to reflect broader scope
+
 ## [0.25.4] - 2026-03-16
 
 ### Added
