@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.25.4] - 2026-03-16
+
+### Added
+- Avatar Image Manager in user settings — upload, generate from prompt, and delete portrait images for lip-sync models (10-image limit, anchored at `/settings#avatar-images`)
+- Lip-Sync section in admin video-tests page — ported from user settings, follows SectionShell pattern with full audio generation, image input, model selection, and video polling
+- Image-required model labels in AvatarPicker — VEED and Kling models show "This model uses your uploaded portrait image" note, empty state links to settings
+- Right-click to set default model in admin auto-models panel
+- LocalStorage cache (15min TTL) for lip-sync admin test bench state
+
+### Fixed
+- Avatar model dropdown in LipSyncTester now uses API pricing as source of truth instead of hardcoded fallback
+- Avatar models passed as server-side props instead of redundant client API fetch
+- `provider:` prefix stripped from `proIncludedAvatarModels` before registry matching
+- Data URL audio uploaded to R2 before sending to Fal (was failing with raw base64)
+
+### Changed
+- `/api/avatar-test` POST and GET now require ADMIN role (returns 403 for non-admins)
+- LipSyncTester removed from user settings — replaced by AvatarImageManager gallery
+
 ## [0.25.0] - 2026-03-16
 
 ### Added
