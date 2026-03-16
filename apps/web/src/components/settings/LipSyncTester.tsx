@@ -15,12 +15,12 @@ interface AvatarModel {
   costPerMinute: number | null;
 }
 
-// Mirrors avatar-registry.ts — static so the dropdown is instant
+// Fallback models with static pricing from pricetoken — used until API responds
 const AVATAR_MODELS: AvatarModel[] = [
-  { id: 'fal-heygen-avatar4-i2v', name: 'HeyGen Avatar4 (Image-to-Video)', tier: 'premium', costPerMinute: null },
-  { id: 'fal-heygen-avatar4-twin', name: 'HeyGen Avatar4 (Digital Twin)', tier: 'premium', costPerMinute: null },
-  { id: 'fal-veed-fabric-1.0', name: 'VEED Fabric 1.0 (Lip Sync)', tier: 'standard', costPerMinute: null },
-  { id: 'fal-kling-avatar-v2-pro', name: 'Kling Avatar v2 Pro (Lip Sync)', tier: 'premium', costPerMinute: null },
+  { id: 'fal-heygen-avatar4-i2v', name: 'HeyGen Avatar4 (Image-to-Video)', tier: 'premium', costPerMinute: 6.00 },
+  { id: 'fal-heygen-avatar4-twin', name: 'HeyGen Avatar4 (Digital Twin)', tier: 'premium', costPerMinute: 6.00 },
+  { id: 'fal-veed-fabric-1.0', name: 'VEED Fabric 1.0 (Lip Sync)', tier: 'standard', costPerMinute: 4.80 },
+  { id: 'fal-kling-avatar-v2-pro', name: 'Kling Avatar v2 Pro (Lip Sync)', tier: 'premium', costPerMinute: 0.84 },
 ];
 
 interface CacheData {
