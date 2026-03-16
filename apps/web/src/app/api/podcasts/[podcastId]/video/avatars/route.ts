@@ -17,7 +17,6 @@ import { cache } from '@/lib/redis';
 
 type RouteParams = { params: Promise<{ podcastId: string }> };
 
-const MAX_AVATAR_DURATION_SECONDS = 600;
 
 /**
  * GET — List available avatars (Redis-cached, 1hr TTL).
@@ -163,15 +162,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return errorResponse('Podcast must be READY to configure avatars', 400);
   }
 
-  if (podcast.duration && podcast.duration > MAX_AVATAR_DURATION_SECONDS) {
-    return errorResponse(`Podcast too long for avatars (max ${MAX_AVATAR_DURATION_SECONDS / 60} minutes)`, 400);
-  }
-
   const body = await request.json();
   const parsed = configureAvatarsSchema.safeParse(body);
   if (!parsed.success) {
     return errorResponse(`Invalid request: ${parsed.error.issues[0].message}`, 400);
   }
+
 
   const avatarVoiceTrackId: string | null = parsed.data.voiceTrackId ?? null;
   const videoGeneration = await prisma.videoGeneration.findFirst({
