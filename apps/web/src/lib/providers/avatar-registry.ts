@@ -12,6 +12,8 @@ export interface AvatarModelOption {
   id: string;
   displayName: string;
   tier: 'standard' | 'premium' | 'translation';
+  /** True for lip-sync models that require a user-uploaded portrait image. */
+  requiresImage?: boolean;
 }
 
 export interface AvatarProviderMeta {
@@ -103,8 +105,8 @@ const AVATAR_PROVIDERS: Record<AvatarProviderId, AvatarProviderMeta> = {
     models: [
       { id: 'fal-heygen-avatar4-i2v', displayName: 'HeyGen Avatar4 (Image-to-Video)', tier: 'premium' },
       { id: 'fal-heygen-avatar4-twin', displayName: 'HeyGen Avatar4 (Digital Twin)', tier: 'premium' },
-      { id: 'fal-veed-fabric-1.0', displayName: 'VEED Fabric 1.0 (Lip Sync)', tier: 'standard' },
-      { id: 'fal-kling-avatar-v2-pro', displayName: 'Kling Avatar v2 Pro (Lip Sync)', tier: 'premium' },
+      { id: 'fal-veed-fabric-1.0', displayName: 'VEED Fabric 1.0 (Lip Sync)', tier: 'standard', requiresImage: true },
+      { id: 'fal-kling-avatar-v2-pro', displayName: 'Kling Avatar v2 Pro (Lip Sync)', tier: 'premium', requiresImage: true },
     ],
     platformKeyEnv: 'FAL_KEY',
     auth: {
