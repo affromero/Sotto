@@ -7,20 +7,46 @@ interface AvatarImage {
   id: string;
   name: string;
   imageUrl: string;
-  sourceType: 'UPLOAD' | 'GENERATED';
+  sourceType: 'UPLOAD' | 'GENERATED' | 'DEFAULT';
+  shareable?: boolean;
+}
+
+interface Capabilities {
+  canUpload: boolean;
+  canGenerate: boolean;
+  isVerified: boolean;
+  uploadsEnabled: boolean;
+}
+
+interface SharedImage {
+  shareId: string;
+  image: AvatarImage;
+  owner: { id: string; name: string | null; handle: string | null; image: string | null };
 }
 
 const MAX_IMAGES = 10;
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
+const SOURCE_LABELS: Record<string, string> = {
+  UPLOAD: 'Uploaded',
+  GENERATED: 'Generated',
+  DEFAULT: 'Default',
+};
+
 export function AvatarImageManager() {
   const [images, setImages] = useState<AvatarImage[]>([]);
+  const [sharedImages, setSharedImages] = useState<SharedImage[]>([]);
+  const [capabilities, setCapabilities] = useState<Capabilities>({
+    canUpload: false,
+    canGenerate: false,
+    isVerified: false,
+    uploadsEnabled: true,
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [generating, setGenerating] = useState(false);
-  const [generatePrompt, setGeneratePrompt] = useState('');
+  const [consentChecked, setConsentChecked] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -30,6 +56,8 @@ export function AvatarImageManager() {
       if (!res.ok) throw new Error('Failed to load images');
       const data = await res.json();
       setImages(data.images);
+      setSharedImages(data.shared ?? []);
+      setCapabilities(data.capabilities);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load images');
     } finally {
@@ -61,6 +89,7 @@ export function AvatarImageManager() {
       const formData = new FormData();
       formData.append('image', file);
       formData.append('name', file.name.replace(/\.[^.]+$/, ''));
+      formData.append('consentAcknowledged', 'true');
 
       const res = await fetch('/api/avatar-images', {
         method: 'POST',
@@ -80,33 +109,6 @@ export function AvatarImageManager() {
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   }, [fetchImages]);
-
-  const handleGenerate = useCallback(async () => {
-    if (!generatePrompt.trim()) return;
-
-    setGenerating(true);
-    setError(null);
-
-    try {
-      const res = await fetch('/api/avatar-images/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: `generated-${Date.now()}`, prompt: generatePrompt }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(typeof data.error === 'string' ? data.error : `Generation failed (${res.status})`);
-      }
-
-      setGeneratePrompt('');
-      await fetchImages();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Generation failed');
-    } finally {
-      setGenerating(false);
-    }
-  }, [generatePrompt, fetchImages]);
 
   const handleDelete = useCallback(async (id: string) => {
     if (!confirm('Delete this avatar image?')) return;
@@ -129,7 +131,23 @@ export function AvatarImageManager() {
     }
   }, []);
 
+  const handleToggleShareable = useCallback(async (id: string, shareable: boolean) => {
+    setError(null);
+    try {
+      const res = await fetch(`/api/avatar-images/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shareable }),
+      });
+      if (!res.ok) throw new Error('Failed to update');
+      setImages((prev) => prev.map((img) => img.id === id ? { ...img, shareable } : img));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update shareable');
+    }
+  }, []);
+
   const atLimit = images.length >= MAX_IMAGES;
+  const uploadDisabled = !consentChecked || !capabilities.canUpload || atLimit || uploading;
 
   if (loading) {
     return <div className={styles.root}><p className={styles.status}>Loading images...</p></div>;
@@ -143,63 +161,109 @@ export function AvatarImageManager() {
         </span>
       </div>
 
-      {images.length === 0 ? (
-        <p className={styles.empty}>
-          No avatar images yet. Upload a portrait photo or generate one to use with lip-sync models like Kling and VEED.
+      {/* Disabled state notices */}
+      {!capabilities.uploadsEnabled && (
+        <p className={styles.disabledNotice}>
+          Avatar uploads are currently disabled by an administrator.
         </p>
-      ) : (
-        <div className={styles.grid}>
-          {images.map((img) => (
-            <div key={img.id} className={styles.card}>
-              <img src={img.imageUrl} alt={img.name} className={styles.cardImage} />
-              <span className={styles.cardName}>{img.name}</span>
-              <span className={styles.cardSource}>{img.sourceType === 'GENERATED' ? 'Generated' : 'Uploaded'}</span>
-              <button
-                className={styles.deleteBtn}
-                onClick={() => handleDelete(img.id)}
-                disabled={deletingId === img.id}
-                aria-label={`Delete ${img.name}`}
-              >
-                {deletingId === img.id ? 'Deleting...' : 'Delete'}
-              </button>
-            </div>
-          ))}
-        </div>
+      )}
+      {capabilities.uploadsEnabled && !capabilities.isVerified && (
+        <p className={styles.disabledNotice}>
+          You must be a verified user to upload avatar images. Complete the verification process to unlock uploads.
+        </p>
       )}
 
-      <div className={styles.actions}>
-        <label className={`${styles.uploadLabel} ${atLimit ? styles.uploadLabelDisabled : ''}`}>
-          {uploading ? 'Uploading...' : 'Upload Image'}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            onChange={handleUpload}
-            disabled={atLimit || uploading}
-            className={styles.hiddenInput}
-          />
-        </label>
-      </div>
+      {images.length === 0 && sharedImages.length === 0 ? (
+        <p className={styles.empty}>
+          No avatar images yet. Upload a portrait photo to use with lip-sync models.
+          {!capabilities.isVerified && ' Verification is required before uploading.'}
+        </p>
+      ) : (
+        <>
+          {images.length > 0 && (
+            <div className={styles.grid}>
+              {images.map((img) => (
+                <div key={img.id} className={styles.card}>
+                  <img src={img.imageUrl} alt={img.name} className={styles.cardImage} />
+                  <span className={styles.cardName}>{img.name}</span>
+                  <span className={styles.cardSource}>{SOURCE_LABELS[img.sourceType] ?? img.sourceType}</span>
+                  <label className={styles.shareToggle}>
+                    <input
+                      type="checkbox"
+                      checked={img.shareable ?? false}
+                      onChange={(e) => handleToggleShareable(img.id, e.target.checked)}
+                      aria-label={`Allow sharing of ${img.name}`}
+                    />
+                    <span className={styles.shareToggleLabel}>Shareable</span>
+                  </label>
+                  <button
+                    className={styles.deleteBtn}
+                    onClick={() => handleDelete(img.id)}
+                    disabled={deletingId === img.id}
+                    aria-label={`Delete ${img.name}`}
+                  >
+                    {deletingId === img.id ? 'Deleting...' : 'Delete'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
 
-      <div className={styles.generateRow}>
-        <div className={styles.generateField}>
-          <label className={styles.generateLabel}>Generate from prompt</label>
-          <input
-            className={styles.generateInput}
-            value={generatePrompt}
-            onChange={(e) => setGeneratePrompt(e.target.value)}
-            placeholder="Professional portrait, female, warm smile..."
-            disabled={atLimit || generating}
-          />
-        </div>
-        <button
-          className={styles.generateBtn}
-          onClick={handleGenerate}
-          disabled={!generatePrompt.trim() || atLimit || generating}
-        >
-          {generating ? 'Generating...' : 'Generate'}
-        </button>
-      </div>
+          {/* Shared With You */}
+          {sharedImages.length > 0 && (
+            <div className={styles.sharedSection}>
+              <h3 className={styles.sharedHeader}>Shared With You</h3>
+              <div className={styles.grid}>
+                {sharedImages.map((shared) => (
+                  <div key={shared.shareId} className={`${styles.card} ${styles.cardShared}`}>
+                    <img src={shared.image.imageUrl} alt={shared.image.name} className={styles.cardImage} />
+                    <span className={styles.cardName}>{shared.image.name}</span>
+                    <span className={styles.ownerBadge}>
+                      by {shared.owner.name ?? shared.owner.handle ?? 'Unknown'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Consent + Upload */}
+      {capabilities.canUpload && (
+        <>
+          <div className={styles.disclaimer}>
+            <label className={styles.consentRow}>
+              <input
+                type="checkbox"
+                checked={consentChecked}
+                onChange={(e) => setConsentChecked(e.target.checked)}
+                className={styles.consentCheckbox}
+                aria-label="Consent acknowledgment for avatar upload"
+              />
+              <span className={styles.consentLabel}>
+                I confirm this is an image of myself. I have not uploaded someone
+                else&apos;s likeness without their written consent. I understand
+                generated avatars may appear on public podcasts.
+              </span>
+            </label>
+          </div>
+
+          <div className={styles.actions}>
+            <label className={`${styles.uploadLabel} ${uploadDisabled ? styles.uploadLabelDisabled : ''}`}>
+              {uploading ? 'Uploading...' : 'Upload Image'}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={handleUpload}
+                disabled={uploadDisabled}
+                className={styles.hiddenInput}
+              />
+            </label>
+          </div>
+        </>
+      )}
 
       {error && <p className={styles.error}>{error}</p>}
     </div>

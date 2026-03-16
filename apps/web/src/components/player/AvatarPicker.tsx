@@ -368,7 +368,7 @@ export function AvatarPicker({ podcastId, speakers, segments, onConfigured, onCa
 
       {activeProvider === 'fal' && avatars.length === 0 && (
         <p className={styles.runwayNotice}>
-          Upload avatar images in <a href="/settings#avatar-images" className={styles.runwayNoticeLink}>Settings &rarr; Avatar Images</a> to get started.
+          Upload avatar images in <a href="/settings#avatar-images" className={styles.runwayNoticeLink}>Settings &rarr; Avatar Images</a> to get started. Verified users only.
         </p>
       )}
 

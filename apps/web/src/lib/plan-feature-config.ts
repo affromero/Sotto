@@ -1,6 +1,6 @@
 import { prisma } from './prisma';
 
-export interface PlanVoiceConfig {
+export interface PlanFeatureConfigData {
   freeVoiceCloningEnabled: boolean;
   proVoiceCloningEnabled: boolean;
   freeVoiceTracksEnabled: boolean;
@@ -8,13 +8,18 @@ export interface PlanVoiceConfig {
   freeMaxVoiceTracks: number;
   proMaxVoiceTracks: number;
   voiceMarketplaceEnabled: boolean;
+  avatarUploadsEnabled: boolean;
+  avatarGenerationEnabled: boolean;
 }
+
+/** @deprecated Use PlanFeatureConfigData instead */
+export type PlanVoiceConfig = PlanFeatureConfigData;
 
 /**
  * Get the current plan feature configuration.
  * Creates the singleton row with defaults if it doesn't exist.
  */
-export async function getPlanFeatureConfig(): Promise<PlanVoiceConfig> {
+export async function getPlanFeatureConfig(): Promise<PlanFeatureConfigData> {
   const row = await prisma.planFeatureConfig.upsert({
     where: { id: 'singleton' },
     update: {},
@@ -29,6 +34,8 @@ export async function getPlanFeatureConfig(): Promise<PlanVoiceConfig> {
     freeMaxVoiceTracks: row.freeMaxVoiceTracks,
     proMaxVoiceTracks: row.proMaxVoiceTracks,
     voiceMarketplaceEnabled: row.voiceMarketplaceEnabled,
+    avatarUploadsEnabled: row.avatarUploadsEnabled,
+    avatarGenerationEnabled: row.avatarGenerationEnabled,
   };
 }
 
@@ -36,7 +43,7 @@ export async function getPlanFeatureConfig(): Promise<PlanVoiceConfig> {
  * Update the plan feature configuration (admin only).
  */
 export async function setPlanFeatureConfig(
-  data: Partial<PlanVoiceConfig>,
+  data: Partial<PlanFeatureConfigData>,
   adminId: string,
 ): Promise<void> {
   await prisma.planFeatureConfig.upsert({

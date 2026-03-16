@@ -73,6 +73,11 @@
 | `/api/podcasts/[id]/quiz/submit` | POST | Yes | Submit quiz answers, compute score, update aggregates |
 | `/api/podcasts/[id]/video/pipeline` | POST/PATCH | Yes | Pipeline editor API: POST classifies segments + returns pipeline JSON; PATCH validates + recalculates costs |
 | `/api/fal-models` | GET | Yes | Available Fal image/video models with live pricetoken pricing |
+| `/api/avatar-images` | GET/POST | Yes | List own + shared avatar images with capabilities; upload with consent + verification gate |
+| `/api/avatar-images/[id]` | PATCH/DELETE | Yes | Toggle shareable flag; delete image |
+| `/api/avatar-images/generate` | POST | ADMIN | AI-generate avatar image (feature flag gated) |
+| `/api/avatar-images/share` | GET/POST | Yes | List sent/received share requests; request access to shareable image |
+| `/api/avatar-images/share/[id]` | PATCH | Yes | Approve/deny/revoke share request (image owner only) |
 | `/api/podcasts/[id]/export` | POST/GET | Yes | PDF export |
 | `/api/feed` | GET | No | Public feed (search/filter/sort) |
 | `/api/activity` | GET | Yes | Followed users activity |

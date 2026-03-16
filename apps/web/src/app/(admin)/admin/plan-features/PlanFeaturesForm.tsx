@@ -155,6 +155,40 @@ export function PlanFeaturesForm({ initialConfig }: PlanFeaturesFormProps) {
         </div>
       </section>
 
+      {/* Avatar Image Controls */}
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>Avatar Image Controls</h2>
+        <p className={styles.rowLabelDesc} style={{ marginBottom: 'var(--spacing-md)' }}>
+          Control avatar image uploads and AI generation. Admins always bypass these gates.
+        </p>
+        <div className={styles.grid}>
+          <div className={styles.row}>
+            <div className={styles.rowLabel}>
+              <div className={styles.rowLabelText}>User uploads enabled</div>
+              <div className={styles.rowLabelDesc}>
+                Allow verified users to upload their own portrait images for lip-sync avatars.
+              </div>
+            </div>
+            <Toggle
+              checked={config.avatarUploadsEnabled}
+              onChange={(v) => setBoolean('avatarUploadsEnabled', v)}
+            />
+          </div>
+          <div className={styles.row}>
+            <div className={styles.rowLabel}>
+              <div className={styles.rowLabelText}>AI generation enabled</div>
+              <div className={styles.rowLabelDesc}>
+                Allow admins to generate avatar images via AI. This is admin-only regardless of this toggle.
+              </div>
+            </div>
+            <Toggle
+              checked={config.avatarGenerationEnabled}
+              onChange={(v) => setBoolean('avatarGenerationEnabled', v)}
+            />
+          </div>
+        </div>
+      </section>
+
       <div className={styles.actions}>
         <button
           type="button"

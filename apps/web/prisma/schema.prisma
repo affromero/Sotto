@@ -215,6 +215,8 @@ model User {
 
   // Avatar images (lip-sync)
   avatarImages AvatarImage[]
+  avatarSharesSent     AvatarImageShare[] @relation("AvatarShareRequester")
+  avatarSharesReceived AvatarImageShare[] @relation("AvatarShareOwner")
 
   // Daily Briefings
   briefingEnabled    Boolean           @default(false)
@@ -934,6 +936,10 @@ enum NotificationType {
   RENDITION_ACCEPTED
   RENDITION_REJECTED
   BRIEFING_READY
+  AVATAR_IMAGE_REQUEST_RECEIVED
+  AVATAR_IMAGE_REQUEST_APPROVED
+  AVATAR_IMAGE_REQUEST_DENIED
+  AVATAR_IMAGE_REQUEST_REVOKED
 }
 
 // ============ MODERATION ============
@@ -1837,6 +1843,9 @@ model PlanFeatureConfig {
   proMaxVoiceTracks       Int      @default(3)
   // Voice marketplace (buying/selling voices globally)
   voiceMarketplaceEnabled Boolean  @default(true)
+  // Avatar image controls
+  avatarUploadsEnabled    Boolean  @default(true)
+  avatarGenerationEnabled Boolean  @default(false)
   updatedAt               DateTime @updatedAt
   updatedBy               String?
 }
@@ -2376,17 +2385,47 @@ enum AvatarImageSource {
 }
 
 model AvatarImage {
-  id         String            @id @default(cuid())
-  userId     String
-  user       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name       String
-  imageUrl   String
-  sourceType AvatarImageSource
-  prompt     String?           @db.Text
-  createdAt  DateTime          @default(now())
+  id                   String            @id @default(cuid())
+  userId               String
+  user                 User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name                 String
+  imageUrl             String
+  sourceType           AvatarImageSource
+  prompt               String?           @db.Text
+  consentAcknowledgedAt DateTime?
+  shareable            Boolean           @default(false)
+  createdAt            DateTime          @default(now())
+
+  shares AvatarImageShare[]
 
   @@unique([userId, name])
   @@index([userId])
+}
+
+enum AvatarImageShareStatus {
+  PENDING
+  APPROVED
+  DENIED
+  REVOKED
+}
+
+model AvatarImageShare {
+  id            String                 @id @default(cuid())
+  requesterId   String
+  imageOwnerId  String
+  avatarImageId String
+  status        AvatarImageShareStatus @default(PENDING)
+  message       String?                @db.Text
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+
+  requester   User        @relation("AvatarShareRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  imageOwner  User        @relation("AvatarShareOwner", fields: [imageOwnerId], references: [id], onDelete: Cascade)
+  avatarImage AvatarImage @relation(fields: [avatarImageId], references: [id], onDelete: Cascade)
+
+  @@unique([requesterId, avatarImageId])
+  @@index([imageOwnerId])
+  @@index([status])
 }
 
 // ============ NEWS INGESTION ============

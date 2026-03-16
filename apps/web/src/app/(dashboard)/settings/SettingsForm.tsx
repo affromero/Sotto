@@ -1077,7 +1077,7 @@ export function SettingsForm({
       <section className={styles.section} id="avatar-images">
         <h2 className={styles.sectionTitle}>Avatar Images</h2>
         <p className={styles.sectionDesc}>
-          Manage portrait images for lip-sync models that require a user-provided image.
+          Manage portrait images for lip-sync models. Verified users can upload their own photos with consent. Share images with other users for collaborative projects.
         </p>
         <AvatarImageManager />
       </section>
