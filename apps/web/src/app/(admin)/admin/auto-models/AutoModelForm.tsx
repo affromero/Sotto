@@ -154,41 +154,57 @@ function useModalityState(config: ModalityStateConfig) {
     return null;
   }, [freeIncluded, proIncluded, providers, compositeIds]);
 
-  const cycle = useCallback((tier: 'free' | 'pro', key: string) => {
-    const setDefault = tier === 'free' ? setFreeDefaultKey : setProDefaultKey;
-    const setIncluded = tier === 'free' ? setFreeIncluded : setProIncluded;
+  // Left click: toggle off ↔ enabled (or disable if currently default)
+  const toggle = useCallback((tier: 'free' | 'pro', key: string) => {
+    const setDefaultFn = tier === 'free' ? setFreeDefaultKey : setProDefaultKey;
+    const setIncludedFn = tier === 'free' ? setFreeIncluded : setProIncluded;
     const defaultKey = tier === 'free' ? freeDefaultKey : proDefaultKey;
     const included = tier === 'free' ? freeIncluded : proIncluded;
 
-    let current: TriState;
-    if (key === defaultKey) current = 'default';
-    else if (included.has(key)) current = 'enabled';
-    else current = 'off';
-
-    if (current === 'off') {
-      // off → enabled
-      setIncluded(prev => {
+    if (key === defaultKey) {
+      // default → off: remove from included, pick fallback default
+      const fallback = findFirstEnabled(tier, key) ?? firstModelKey(providers, compositeIds);
+      setDefaultFn(fallback);
+      setIncludedFn(prev => {
         const next = new Set(prev);
-        next.add(key);
+        next.delete(key);
         return next;
       });
-    } else if (current === 'enabled') {
-      // enabled → default (previous default stays in included)
-      const prevDefault = defaultKey;
-      setDefault(key);
-      setIncluded(prev => {
+    } else if (included.has(key)) {
+      // enabled → off
+      setIncludedFn(prev => {
         const next = new Set(prev);
-        next.add(key);
-        if (prevDefault && prevDefault !== key) next.add(prevDefault);
+        next.delete(key);
         return next;
       });
     } else {
-      // default → off: remove from included, pick fallback
-      const fallback = findFirstEnabled(tier, key) ?? firstModelKey(providers, compositeIds);
-      setDefault(fallback);
-      setIncluded(prev => {
+      // off → enabled
+      setIncludedFn(prev => {
         const next = new Set(prev);
-        next.delete(key);
+        next.add(key);
+        return next;
+      });
+    }
+  }, [freeDefaultKey, proDefaultKey, freeIncluded, proIncluded, findFirstEnabled, providers, compositeIds]);
+
+  // Right click: set as default (from any state), or demote default → enabled
+  const toggleDefault = useCallback((tier: 'free' | 'pro', key: string) => {
+    const setDefaultFn = tier === 'free' ? setFreeDefaultKey : setProDefaultKey;
+    const setIncludedFn = tier === 'free' ? setFreeIncluded : setProIncluded;
+    const defaultKey = tier === 'free' ? freeDefaultKey : proDefaultKey;
+
+    if (key === defaultKey) {
+      // Already default → demote to enabled, pick fallback
+      const fallback = findFirstEnabled(tier, key) ?? firstModelKey(providers, compositeIds);
+      setDefaultFn(fallback);
+    } else {
+      // off or enabled → default (enable + set as default)
+      const prevDefault = defaultKey;
+      setDefaultFn(key);
+      setIncludedFn(prev => {
+        const next = new Set(prev);
+        next.add(key);
+        if (prevDefault && prevDefault !== key) next.add(prevDefault);
         return next;
       });
     }
@@ -205,7 +221,8 @@ function useModalityState(config: ModalityStateConfig) {
 
   return {
     getState,
-    cycle,
+    toggle,
+    toggleDefault,
     freeDefault: parseKey(freeDefaultKey, compositeIds, providers),
     proDefault: parseKey(proDefaultKey, compositeIds, providers),
     freeIncluded,
@@ -255,10 +272,15 @@ function UnifiedModelEditor({
 
   const ariaLabel = (modelName: string, tier: string, triState: TriState): string => {
     switch (triState) {
-      case 'off': return `${modelName} ${tier} tier: off. Click to enable.`;
-      case 'enabled': return `${modelName} ${tier} tier: enabled. Click to set as default.`;
-      case 'default': return `${modelName} ${tier} tier: default. Click to disable.`;
+      case 'off': return `${modelName} ${tier} tier: off. Click to enable, right-click to set as default.`;
+      case 'enabled': return `${modelName} ${tier} tier: enabled. Click to disable, right-click to set as default.`;
+      case 'default': return `${modelName} ${tier} tier: default. Click to disable, right-click to demote.`;
     }
+  };
+
+  const handleContextMenu = (e: React.MouseEvent, tier: 'free' | 'pro', key: string) => {
+    e.preventDefault();
+    state.toggleDefault(tier, key);
   };
 
   return (
@@ -311,7 +333,8 @@ function UnifiedModelEditor({
                           freeState === 'default' ? styles.triToggleDefault : ''
                         }`}
                         aria-label={ariaLabel(model.displayName, 'free', freeState)}
-                        onClick={() => state.cycle('free', key)}
+                        onClick={() => state.toggle('free', key)}
+                        onContextMenu={(e) => handleContextMenu(e, 'free', key)}
                       >
                         {freeState === 'enabled' && <CheckIcon />}
                         {freeState === 'default' && <StarIcon />}
@@ -325,7 +348,8 @@ function UnifiedModelEditor({
                           proState === 'default' ? styles.triToggleDefault : ''
                         }`}
                         aria-label={ariaLabel(model.displayName, 'pro', proState)}
-                        onClick={() => state.cycle('pro', key)}
+                        onClick={() => state.toggle('pro', key)}
+                        onContextMenu={(e) => handleContextMenu(e, 'pro', key)}
                       >
                         {proState === 'enabled' && <CheckIcon />}
                         {proState === 'default' && <StarIcon />}
@@ -540,7 +564,7 @@ export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttPro
     <div className={styles.form}>
       <UnifiedModelEditor
         title="AI Models"
-        description="Control which AI models appear in the picker for non-BYOK users. Star = default for the tier."
+        description="Control which AI models appear in the picker for non-BYOK users. Click to enable/disable, right-click to set default (★)."
         state={aiState}
       />
 
