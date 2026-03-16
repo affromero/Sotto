@@ -369,23 +369,25 @@ export function AvatarPicker({ podcastId, speakers, segments, onConfigured, onCa
         </p>
       )}
 
-      {selectedCount > 0 && (
-        <div className={styles.advancedSection}>
-          <button
-            className={styles.advancedToggle}
-            onClick={() => setShowAdvanced(!showAdvanced)}
-            type="button"
-            aria-expanded={showAdvanced}
-          >
-            <span>Segment visibility</span>
-            {showAdvanced ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-          </button>
-          {showAdvanced && (
-            <div className={styles.segmentToggles}>
-              <p className={styles.advancedHint}>
-                Choose which segments the avatar appears on. Fewer segments = lower cost.
-              </p>
-              {speakers.filter((sp) => selections[sp]).map((speaker) => {
+      <div className={styles.advancedSection}>
+        <button
+          className={styles.advancedToggle}
+          onClick={() => setShowAdvanced(!showAdvanced)}
+          type="button"
+          aria-expanded={showAdvanced}
+        >
+          <span>Segment visibility</span>
+          {showAdvanced ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+        </button>
+        {showAdvanced && (
+          <div className={styles.segmentToggles}>
+            <p className={styles.advancedHint}>
+              Choose which segments the avatar appears on. Fewer segments = lower cost.
+            </p>
+            {selectedCount === 0 ? (
+              <p className={styles.advancedHint}>Select avatars above to configure per-segment visibility.</p>
+            ) : (
+              speakers.filter((sp) => selections[sp]).map((speaker) => {
                 const speakerSegs = segmentsBySpeaker[speaker] ?? [];
                 const enabled = enabledSegments[speaker] ?? new Set(speakerSegs.map((s) => s.id));
                 const allOn = enabled.size === speakerSegs.length;
@@ -424,11 +426,11 @@ export function AvatarPicker({ podcastId, speakers, segments, onConfigured, onCa
                     </div>
                   </div>
                 );
-              })}
-            </div>
-          )}
-        </div>
-      )}
+              })
+            )}
+          </div>
+        )}
+      </div>
 
       <div className={styles.footer}>
         <p className={styles.costEstimate}>
