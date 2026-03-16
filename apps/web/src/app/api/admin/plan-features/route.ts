@@ -20,6 +20,8 @@ const planFeaturesSchema = z.object({
   freeMaxVoiceTracks: z.number().int().min(0).optional(),
   proMaxVoiceTracks: z.number().int().min(0).optional(),
   voiceMarketplaceEnabled: z.boolean().optional(),
+  avatarUploadsEnabled: z.boolean().optional(),
+  avatarGenerationEnabled: z.boolean().optional(),
 });
 
 export async function PATCH(request: NextRequest) {

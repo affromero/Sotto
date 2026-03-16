@@ -8,9 +8,9 @@ export default async function PlanFeaturesPage() {
   return (
     <div className={styles.container}>
       <div className={styles.header}>
-        <h1 className={styles.title}>Voice Features</h1>
+        <h1 className={styles.title}>Plan Features</h1>
         <p className={styles.subtitle}>
-          Enable or disable voice management features per plan tier.
+          Enable or disable voice and avatar features per plan tier.
           Changes take effect immediately for all users.
         </p>
       </div>

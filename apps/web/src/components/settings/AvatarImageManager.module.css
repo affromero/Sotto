@@ -36,6 +36,11 @@
   background: var(--color-surface);
 }
 
+.cardShared {
+  border-style: dashed;
+  border-color: var(--color-primary);
+}
+
 .cardImage {
   width: 96px;
   height: 96px;
@@ -118,61 +123,6 @@
   display: none;
 }
 
-.generateRow {
-  display: flex;
-  gap: var(--spacing-sm);
-  align-items: flex-end;
-}
-
-.generateField {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xs);
-  flex: 1;
-}
-
-.generateLabel {
-  font-size: 0.8125rem;
-  font-weight: 500;
-  color: var(--color-text-secondary);
-}
-
-.generateInput {
-  padding: var(--spacing-sm) var(--spacing-md);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  font-size: 0.875rem;
-  color: var(--color-text);
-}
-
-.generateInput:focus {
-  outline: none;
-  border-color: var(--color-primary);
-}
-
-.generateBtn {
-  padding: var(--spacing-sm) var(--spacing-md);
-  border: none;
-  border-radius: var(--radius-md);
-  background: var(--color-border);
-  color: var(--color-text);
-  cursor: pointer;
-  font-size: 0.875rem;
-  font-weight: 500;
-  white-space: nowrap;
-}
-
-.generateBtn:hover {
-  background: var(--color-primary);
-  color: white;
-}
-
-.generateBtn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
 .error {
   color: var(--color-error);
   font-size: 0.8125rem;
@@ -181,4 +131,72 @@
 .status {
   font-size: 0.8125rem;
   color: var(--color-text-secondary);
+}
+
+/* Consent disclaimer */
+.disclaimer {
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.consentRow {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  cursor: pointer;
+}
+
+.consentCheckbox {
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.consentLabel {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+  line-height: 1.4;
+}
+
+/* Shared section */
+.sharedSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.sharedHeader {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.ownerBadge {
+  font-size: 0.6875rem;
+  color: var(--color-primary);
+  font-style: italic;
+}
+
+/* Shareable toggle on own cards */
+.shareToggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  font-size: 0.6875rem;
+}
+
+.shareToggleLabel {
+  color: var(--color-text-secondary);
+}
+
+/* Disabled notice */
+.disabledNotice {
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--color-warning);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-warning) 8%, transparent);
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
 }

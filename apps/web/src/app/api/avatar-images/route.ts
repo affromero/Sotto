@@ -5,6 +5,7 @@ import { uploadFile } from '@/lib/r2';
 import { logger } from '@/lib/logger';
 import { errorResponse } from '@/lib/api-response';
 import { avatarImageUploadSchema } from '@/lib/validations';
+import { getPlanFeatureConfig } from '@/lib/plan-feature-config';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -17,12 +18,43 @@ export async function GET() {
       return errorResponse('Unauthorized', 401);
     }
 
-    const images = await prisma.avatarImage.findMany({
-      where: { userId: session.user.id },
-      orderBy: { createdAt: 'desc' },
-    });
+    const [user, config, images, sharedRecords] = await Promise.all([
+      prisma.user.findUniqueOrThrow({
+        where: { id: session.user.id },
+        select: { referralVerified: true, role: true },
+      }),
+      getPlanFeatureConfig(),
+      prisma.avatarImage.findMany({
+        where: { userId: session.user.id },
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.avatarImageShare.findMany({
+        where: { requesterId: session.user.id, status: 'APPROVED' },
+        include: {
+          avatarImage: true,
+          imageOwner: { select: { id: true, name: true, handle: true, image: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+    ]);
 
-    return NextResponse.json({ images });
+    const isAdmin = user.role === 'ADMIN';
+    const isVerified = user.referralVerified;
+
+    const shared = sharedRecords.map((s) => ({
+      shareId: s.id,
+      image: s.avatarImage,
+      owner: s.imageOwner,
+    }));
+
+    const capabilities = {
+      canUpload: isAdmin || (isVerified && config.avatarUploadsEnabled),
+      canGenerate: isAdmin && config.avatarGenerationEnabled,
+      isVerified,
+      uploadsEnabled: config.avatarUploadsEnabled,
+    };
+
+    return NextResponse.json({ images, shared, capabilities });
   } catch (error: unknown) {
     logger.error('Failed to list avatar images', { error: error instanceof Error ? error.message : String(error) });
     return errorResponse('Failed to list avatar images', 500);
@@ -36,6 +68,26 @@ export async function POST(request: NextRequest) {
       return errorResponse('Unauthorized', 401);
     }
 
+    const [user, config] = await Promise.all([
+      prisma.user.findUniqueOrThrow({
+        where: { id: session.user.id },
+        select: { referralVerified: true, role: true },
+      }),
+      getPlanFeatureConfig(),
+    ]);
+
+    const isAdmin = user.role === 'ADMIN';
+
+    // Feature flag gate
+    if (!isAdmin && !config.avatarUploadsEnabled) {
+      return errorResponse('Avatar uploads are currently disabled', 503);
+    }
+
+    // Verification gate
+    if (!isAdmin && !user.referralVerified) {
+      return errorResponse('You must be verified to upload avatar images', 403);
+    }
+
     const count = await prisma.avatarImage.count({ where: { userId: session.user.id } });
     if (count >= MAX_IMAGES) {
       return errorResponse(`Avatar image limit reached (${MAX_IMAGES})`, 409);
@@ -44,10 +96,11 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const file = formData.get('image') as File | null;
     const nameRaw = formData.get('name') as string | null;
+    const consentRaw = formData.get('consentAcknowledged') as string | null;
 
-    const parsed = avatarImageUploadSchema.safeParse({ name: nameRaw });
+    const parsed = avatarImageUploadSchema.safeParse({ name: nameRaw, consentAcknowledged: consentRaw });
     if (!parsed.success) {
-      return errorResponse('Invalid name', 400);
+      return errorResponse('Invalid request. Consent acknowledgment is required.', 400);
     }
 
     if (!file) {
@@ -76,6 +129,7 @@ export async function POST(request: NextRequest) {
         name: parsed.data.name,
         imageUrl,
         sourceType: 'UPLOAD',
+        consentAcknowledgedAt: new Date(),
       },
     });
 

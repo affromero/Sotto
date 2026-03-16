@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   Trash2,
   Gift,
+  ImagePlus,
 } from 'lucide-react';
 import styles from './NotificationList.module.css';
 
@@ -53,6 +54,10 @@ const typeIcons: Record<string, typeof Bell> = {
   REFERRAL_SIGNUP: Gift,
   VIDEO_FAILED: AlertTriangle,
   AVATAR_FAILED: AlertTriangle,
+  AVATAR_IMAGE_REQUEST_RECEIVED: ImagePlus,
+  AVATAR_IMAGE_REQUEST_APPROVED: ImagePlus,
+  AVATAR_IMAGE_REQUEST_DENIED: ImagePlus,
+  AVATAR_IMAGE_REQUEST_REVOKED: ImagePlus,
 };
 
 function getRelativeTime(dateString: string): string {

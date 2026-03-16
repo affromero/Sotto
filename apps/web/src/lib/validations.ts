@@ -934,11 +934,25 @@ export const generateMusicSchema = z.object({
 
 export const avatarImageUploadSchema = z.object({
   name: z.string().min(1).max(100),
+  consentAcknowledged: z.enum(['true']).transform(() => true),
 });
 
 export const avatarImageGenerateSchema = z.object({
   name: z.string().min(1).max(100),
   prompt: z.string().min(1).max(1000),
+});
+
+export const createAvatarImageShareSchema = z.object({
+  avatarImageId: z.string().min(1),
+  message: z.string().max(500).optional(),
+});
+
+export const updateAvatarImageShareSchema = z.object({
+  status: z.enum(['APPROVED', 'DENIED', 'REVOKED']),
+});
+
+export const updateAvatarImageSchema = z.object({
+  shareable: z.boolean(),
 });
 
 export const updateMusicVolumeSchema = z.object({
