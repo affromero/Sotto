@@ -3,14 +3,22 @@ import { auth } from '@/lib/auth';
 import { errorResponse } from '@/lib/api-response';
 import { addJob, JobType, lipSyncTestQueue } from '@/lib/queue';
 import { checkRateLimit } from '@/lib/redis';
+import { uploadFile } from '@/lib/r2';
 import { logger } from '@/lib/logger';
 import { z } from 'zod';
 
 const submitSchema = z.object({
-  audioUrl: z.string().url(),
+  audioUrl: z.string().min(1),
   avatarImageUrl: z.string().url(),
   avatarModelId: z.string().min(1),
 });
+
+/** Convert a data URL to a Buffer + content type. */
+function parseDataUrl(dataUrl: string): { buffer: Buffer; contentType: string } | null {
+  const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+  if (!match) return null;
+  return { contentType: match[1], buffer: Buffer.from(match[2], 'base64') };
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -30,9 +38,19 @@ export async function POST(request: NextRequest) {
       return errorResponse('Rate limit exceeded (3 tests per minute)', 429);
     }
 
+    // If audioUrl is a data URL, upload to R2 first so Fal can access it
+    let { audioUrl } = parsed.data;
+    if (audioUrl.startsWith('data:')) {
+      const parsed_data = parseDataUrl(audioUrl);
+      if (!parsed_data) return errorResponse('Invalid audio data URL', 400);
+      const key = `lip-sync-test/${session.user.id}/${Date.now()}.mp3`;
+      audioUrl = await uploadFile(key, parsed_data.buffer, parsed_data.contentType);
+      logger.info('Uploaded lip-sync test audio to R2', { key });
+    }
+
     const job = await addJob(lipSyncTestQueue, JobType.LIP_SYNC_TEST, {
       userId: session.user.id,
-      audioUrl: parsed.data.audioUrl,
+      audioUrl,
       avatarImageUrl: parsed.data.avatarImageUrl,
       avatarModelId: parsed.data.avatarModelId,
     });
