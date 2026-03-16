@@ -8,6 +8,7 @@ const mockPrismaSegmentUpdate = vi.fn().mockResolvedValue({});
 const mockPrismaSegmentCount = vi.fn().mockResolvedValue(0);
 const mockPrismaSegmentFindMany = vi.fn().mockResolvedValue([]);
 const mockPrismaPodcastUpdate = vi.fn().mockResolvedValue({});
+const mockPrismaPodcastUpdateMany = vi.fn().mockResolvedValue({ count: 1 });
 const mockPrismaPodcastFindUnique = vi.fn().mockResolvedValue({ status: 'GENERATING_AUDIO' });
 const mockPrismaPodcastFindUniqueOrThrow = vi.fn().mockResolvedValue({
   userId: 'user-1',
@@ -31,6 +32,7 @@ vi.mock('@/lib/prisma', () => {
     },
     podcast: {
       update: (...args: unknown[]) => mockPrismaPodcastUpdate(...args),
+      updateMany: (...args: unknown[]) => mockPrismaPodcastUpdateMany(...args),
       findUnique: (...args: unknown[]) => mockPrismaPodcastFindUnique(...args),
       findUniqueOrThrow: (...args: unknown[]) => mockPrismaPodcastFindUniqueOrThrow(...args),
     },
@@ -320,10 +322,11 @@ describe('processAudioGeneration', () => {
       expect(mockAddJob).toHaveBeenCalledWith(
         { name: 'audio-stitching' },
         'stitch_audio',
-        { podcastId: 'podcast-001', segmentIds: ['seg-1', 'seg-2'] }
+        { podcastId: 'podcast-001', segmentIds: ['seg-1', 'seg-2'] },
+        { jobId: 'stitch-podcast-001' }
       );
-      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
-        where: { id: 'podcast-001' },
+      expect(mockPrismaPodcastUpdateMany).toHaveBeenCalledWith({
+        where: { id: 'podcast-001', status: 'GENERATING_AUDIO' },
         data: { status: 'STITCHING' },
       });
     });
@@ -766,7 +769,7 @@ describe('processAudioGeneration', () => {
       });
     });
 
-    it('queues a stitching job with all segment IDs', async () => {
+    it('queues a stitching job with all segment IDs and stable jobId', async () => {
       mockPrismaSegmentFindMany.mockResolvedValue([
         { id: 'seg-a' },
         { id: 'seg-b' },
@@ -778,15 +781,15 @@ describe('processAudioGeneration', () => {
       expect(mockAddJob).toHaveBeenCalledWith({ name: 'audio-stitching' }, 'stitch_audio', {
         podcastId: 'podcast-001',
         segmentIds: ['seg-a', 'seg-b', 'seg-c'],
-      });
+      }, { jobId: 'stitch-podcast-001' });
     });
 
-    it('updates podcast status to STITCHING', async () => {
+    it('CAS-updates podcast status to STITCHING', async () => {
       const job = createMockJob(defaultPayload);
       await processAudioGeneration(job);
 
-      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
-        where: { id: 'podcast-001' },
+      expect(mockPrismaPodcastUpdateMany).toHaveBeenCalledWith({
+        where: { id: 'podcast-001', status: 'GENERATING_AUDIO' },
         data: { status: 'STITCHING' },
       });
     });
@@ -799,7 +802,8 @@ describe('processAudioGeneration', () => {
       expect(mockAddJob).toHaveBeenCalledWith(
         expect.anything(),
         'stitch_audio',
-        expect.objectContaining({ segmentIds: ['only-segment'] })
+        expect.objectContaining({ segmentIds: ['only-segment'] }),
+        { jobId: 'stitch-podcast-001' }
       );
     });
   });
@@ -828,7 +832,7 @@ describe('processAudioGeneration', () => {
       const job = createMockJob(defaultPayload);
       await processAudioGeneration(job);
 
-      expect(mockPrismaPodcastUpdate).not.toHaveBeenCalled();
+      expect(mockPrismaPodcastUpdateMany).not.toHaveBeenCalled();
     });
 
     it('does not query segments list when segments are still pending', async () => {
@@ -925,10 +929,10 @@ describe('processAudioGeneration', () => {
       // Cost logged
       expect(mockPrismaApiUsageLogCreate).toHaveBeenCalled();
 
-      // Stitching queued (last segment)
+      // Stitching queued (last segment) with CAS
       expect(mockAddJob).toHaveBeenCalled();
-      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
-        where: { id: 'podcast-001' },
+      expect(mockPrismaPodcastUpdateMany).toHaveBeenCalledWith({
+        where: { id: 'podcast-001', status: 'GENERATING_AUDIO' },
         data: { status: 'STITCHING' },
       });
     });
@@ -981,7 +985,7 @@ describe('processAudioGeneration', () => {
 
       // No stitching (still pending)
       expect(mockAddJob).not.toHaveBeenCalled();
-      expect(mockPrismaPodcastUpdate).not.toHaveBeenCalled();
+      expect(mockPrismaPodcastUpdateMany).not.toHaveBeenCalled();
     });
   });
 
