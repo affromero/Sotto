@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react';
 import styles from './LipSyncTester.module.css';
 
 const DEFAULT_PROMPT = 'Welcome to Sotto. Let me tell you something fascinating today.';
+const DEFAULT_VOICE_ID = '21m00Tcm4TlvDq8ikWAM'; // Rachel — stable ElevenLabs voice
 
 const LIP_SYNC_MODELS = [
   { id: 'fal-veed-fabric-1.0', name: 'VEED Fabric 1.0', disabled: false },
@@ -33,7 +34,7 @@ export function LipSyncTester() {
       const res = await fetch('/api/voices/preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: textPrompt }),
+        body: JSON.stringify({ voiceId: DEFAULT_VOICE_ID, text: textPrompt }),
       });
 
       if (!res.ok) {
@@ -42,8 +43,9 @@ export function LipSyncTester() {
         throw new Error(msg);
       }
 
-      const data = await res.json();
-      setAudioUrl(data.audioUrl);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      setAudioUrl(url);
       setStage('audio-ready');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Audio generation failed');
