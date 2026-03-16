@@ -15,13 +15,6 @@ interface AvatarModel {
   costPerMinute: number | null;
 }
 
-// Fallback models with static pricing from pricetoken — used until API responds
-const AVATAR_MODELS: AvatarModel[] = [
-  { id: 'fal-heygen-avatar4-i2v', name: 'HeyGen Avatar4 (Image-to-Video)', tier: 'premium', costPerMinute: 6.00 },
-  { id: 'fal-heygen-avatar4-twin', name: 'HeyGen Avatar4 (Digital Twin)', tier: 'premium', costPerMinute: 6.00 },
-  { id: 'fal-veed-fabric-1.0', name: 'VEED Fabric 1.0 (Lip Sync)', tier: 'standard', costPerMinute: 4.80 },
-  { id: 'fal-kling-avatar-v2-pro', name: 'Kling Avatar v2 Pro (Lip Sync)', tier: 'premium', costPerMinute: 0.84 },
-];
 
 interface CacheData {
   audioDataUrl: string | null;
@@ -80,8 +73,8 @@ export function LipSyncTester() {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [avatarImageUrl, setAvatarImageUrl] = useState('');
   const [imagePrompt, setImagePrompt] = useState('');
-  const [models, setModels] = useState<AvatarModel[]>(AVATAR_MODELS);
-  const [selectedModel, setSelectedModel] = useState(AVATAR_MODELS[0].id);
+  const [models, setModels] = useState<AvatarModel[]>([]);
+  const [selectedModel, setSelectedModel] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [generatingImage, setGeneratingImage] = useState(false);
   const audioDataUrlRef = useRef<string | null>(null);
@@ -105,10 +98,14 @@ export function LipSyncTester() {
     }
   }, []);
 
-  // Fetch pro-included models with pricing (falls back to static list)
+  // Fetch pro-included models with live pricing from pricetoken
   useEffect(() => {
-    fetch('/api/avatar-models')
-      .then((res) => (res.ok ? res.json() : null))
+    const controller = new AbortController();
+    fetch('/api/avatar-models', { signal: controller.signal })
+      .then((res) => {
+        if (!res.ok) throw new Error(`${res.status}`);
+        return res.json();
+      })
       .then((data) => {
         if (!data?.models?.length) return;
         const apiModels: AvatarModel[] = data.models.map(
@@ -121,12 +118,12 @@ export function LipSyncTester() {
         );
         setModels(apiModels);
         setSelectedModel((prev) => {
-          // Keep current selection if it's in the new list, otherwise pick first
           if (apiModels.some((m) => m.id === prev)) return prev;
           return apiModels[0].id;
         });
       })
       .catch(() => {});
+    return () => controller.abort();
   }, []);
 
   const generateAudio = useCallback(async () => {
@@ -342,8 +339,9 @@ export function LipSyncTester() {
             className={styles.select}
             value={selectedModel}
             onChange={(e) => setSelectedModel(e.target.value)}
-            disabled={isGenerating}
+            disabled={isGenerating || models.length === 0}
           >
+            {models.length === 0 && <option value="">Loading models…</option>}
             {models.map((m) => (
               <option key={m.id} value={m.id}>
                 {m.name}{formatPrice(m.costPerMinute)}{m.tier === 'premium' ? ' ★' : ''}

@@ -81,7 +81,6 @@
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
-  transition: opacity var(--transition-fast);
   white-space: nowrap;
 }
 
