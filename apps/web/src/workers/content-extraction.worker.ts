@@ -38,7 +38,7 @@ export async function processContentExtraction(job: Job<ExtractContentPayload>):
       discoveryId: existingDiscovery.id,
       sourceContent: existingDiscovery.sourceContent,
       useAdminCredits,
-    });
+    }, { jobId: `script-${podcastId}` });
 
     await job.updateProgress(100);
     return;
@@ -177,7 +177,7 @@ export async function processContentExtraction(job: Job<ExtractContentPayload>):
     discoveryId: discovery.id,
     sourceContent: content || undefined,
     useAdminCredits,
-  });
+  }, { jobId: `script-${podcastId}` });
 
   await logPipelineStageComplete(podcastId, 'content-extraction');
   await job.updateProgress(100);
