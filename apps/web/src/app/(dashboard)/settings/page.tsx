@@ -113,7 +113,10 @@ export default async function SettingsPage() {
     getAutoModelConfig().catch(() => null),
   ]);
   const avatarPricingMap = new Map(avatarPricing.map((m) => [m.modelId, m.costPerMinute]));
-  const avatarIncludedIds = autoModelConfig?.proIncludedAvatarModels ?? null;
+  // DB stores IDs as "provider:modelId" — strip prefix for registry matching
+  const avatarIncludedIds = autoModelConfig?.proIncludedAvatarModels?.map(
+    (id) => id.includes(':') ? id.split(':').slice(1).join(':') : id
+  ) ?? null;
   const avatarModels = getAllAvatarProviderMeta()
     .filter((p) => !p.disabled)
     .flatMap((provider) =>
