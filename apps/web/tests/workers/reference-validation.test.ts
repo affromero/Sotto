@@ -311,7 +311,7 @@ describe('processReferenceValidation', () => {
         text: 'Welcome to the show! [1]',
         previousText: undefined,
         nextText: 'Thanks for having me!',
-      });
+      }, expect.anything());
 
       expect(mockAddJob).toHaveBeenCalledWith({ name: 'audio-generation' }, 'generate_audio', {
         podcastId: 'podcast-001',
@@ -320,7 +320,7 @@ describe('processReferenceValidation', () => {
         text: 'Thanks for having me!',
         previousText: 'Welcome to the show! [1]',
         nextText: undefined,
-      });
+      }, expect.anything());
     });
 
     it('still queues audio generation when no references exist', async () => {
@@ -330,7 +330,8 @@ describe('processReferenceValidation', () => {
       expect(mockAddJob).toHaveBeenCalledWith(
         { name: 'audio-generation' },
         'generate_audio',
-        expect.objectContaining({ podcastId: 'podcast-001' })
+        expect.objectContaining({ podcastId: 'podcast-001' }),
+        expect.anything()
       );
     });
   });
@@ -884,7 +885,8 @@ describe('processReferenceValidation', () => {
           podcastId: 'podcast-001',
           segmentId: 'segment-000',
           speaker: 'HOST',
-        })
+        }),
+        expect.anything()
       );
     });
 
@@ -1144,7 +1146,7 @@ describe('processReferenceValidation', () => {
 
       // Showcase should proceed to audio, not pause at SCRIPT_READY due to gate
       expect(mockAddJob).toHaveBeenCalledWith(
-        expect.anything(), 'generate_audio', expect.anything()
+        expect.anything(), 'generate_audio', expect.anything(), expect.anything()
       );
     });
 

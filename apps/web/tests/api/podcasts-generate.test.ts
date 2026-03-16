@@ -11,6 +11,7 @@ vi.mock('@/lib/api-keys', () => ({
 
 const mockPrismaPodcastFindUnique = vi.fn();
 const mockPrismaPodcastUpdate = vi.fn().mockResolvedValue({});
+const mockPrismaPodcastUpdateMany = vi.fn().mockResolvedValue({ count: 1 });
 const mockPrismaJobUpdateMany = vi.fn().mockResolvedValue({ count: 0 });
 const mockPrismaPodcastVersionSegmentDeleteMany = vi.fn().mockResolvedValue({ count: 0 });
 const mockPrismaPodcastVersionDeleteMany = vi.fn().mockResolvedValue({ count: 0 });
@@ -30,6 +31,7 @@ vi.mock('@/lib/prisma', () => {
     podcast: {
       findUnique: (...args: unknown[]) => mockPrismaPodcastFindUnique(...args),
       update: (...args: unknown[]) => mockPrismaPodcastUpdate(...args),
+      updateMany: (...args: unknown[]) => mockPrismaPodcastUpdateMany(...args),
     },
     job: {
       updateMany: (...args: unknown[]) => mockPrismaJobUpdateMany(...args),
@@ -190,6 +192,7 @@ describe('POST /api/podcasts/[podcastId]/generate', () => {
     mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', isByokUser: true });
     mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 19, resetAt: 0 });
     mockPrismaPodcastUpdate.mockResolvedValue({});
+    mockPrismaPodcastUpdateMany.mockResolvedValue({ count: 1 });
     mockAddJob.mockResolvedValue({ id: 'job-1' });
   });
 
@@ -406,7 +409,8 @@ describe('POST /api/podcasts/[podcastId]/generate', () => {
       expect(mockAddJob).toHaveBeenCalledWith(
         expect.objectContaining({ name: 'audio-stitching' }),
         'stitch_audio',
-        expect.objectContaining({ segmentIds: ['seg-1', 'seg-2', 'seg-3'] })
+        expect.objectContaining({ segmentIds: ['seg-1', 'seg-2', 'seg-3'] }),
+        { jobId: 'stitch-podcast-f3' }
       );
     });
 
@@ -523,9 +527,9 @@ describe('POST /api/podcasts/[podcastId]/generate', () => {
 
       expect(response.status).toBe(200);
       expect(data.resumedAt).toBe('SCRIPT_READY');
-      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith(
+      expect(mockPrismaPodcastUpdateMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: 'podcast-fail' },
+          where: { id: 'podcast-fail', status: 'FAILED' },
           data: expect.objectContaining({
             ttsProvider: null,
             ttsModel: null,

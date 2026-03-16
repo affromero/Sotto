@@ -48,15 +48,20 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
         select: { id: true },
       });
 
+      // Queue stitch with stable jobId (idempotent — BullMQ deduplicates)
       await addJob(audioStitchingQueue, JobType.STITCH_AUDIO, {
         podcastId,
         segmentIds: segments.map((s) => s.id),
-      });
+      }, { jobId: `stitch-${podcastId}` });
 
-      await prisma.podcast.update({
-        where: { id: podcastId },
+      // CAS status transition — only one worker wins
+      const cas = await prisma.podcast.updateMany({
+        where: { id: podcastId, status: 'GENERATING_AUDIO' },
         data: { status: 'STITCHING' },
       });
+      if (cas.count === 0) {
+        logger.info('Another worker already transitioned to STITCHING', { podcastId });
+      }
     }
 
     await job.updateProgress(100);
@@ -245,15 +250,20 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
       select: { id: true },
     });
 
+    // Queue stitch with stable jobId (idempotent — BullMQ deduplicates)
     await addJob(audioStitchingQueue, JobType.STITCH_AUDIO, {
       podcastId,
       segmentIds: segments.map((s) => s.id),
-    });
+    }, { jobId: `stitch-${podcastId}` });
 
-    await prisma.podcast.update({
-      where: { id: podcastId },
+    // CAS status transition — only one worker wins
+    const cas = await prisma.podcast.updateMany({
+      where: { id: podcastId, status: 'GENERATING_AUDIO' },
       data: { status: 'STITCHING' },
     });
+    if (cas.count === 0) {
+      logger.info('Another worker already transitioned to STITCHING', { podcastId });
+    }
   }
 
   await job.updateProgress(100);
