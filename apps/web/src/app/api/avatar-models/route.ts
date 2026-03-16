@@ -11,14 +11,13 @@ export async function GET() {
     return errorResponse('Unauthorized', 401);
   }
 
-  const [allPricing, config] = await Promise.all([
-    fetchAvatarModels(),
+  // Registry is always available — pricing is best-effort
+  const [pricing, config] = await Promise.all([
+    fetchAvatarModels().catch(() => []),
     getAutoModelConfig(),
   ]);
 
-  const pricingMap = new Map(allPricing.map((m) => [m.modelId, m.costPerMinute]));
-
-  // Admin/pro users see proIncludedAvatarModels; fall back to all non-disabled models
+  const pricingMap = new Map(pricing.map((m) => [m.modelId, m.costPerMinute]));
   const includedIds = config.proIncludedAvatarModels;
   const providers = getAllAvatarProviderMeta().filter((p) => !p.disabled);
 
