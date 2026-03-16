@@ -105,18 +105,26 @@ export function LipSyncTester() {
     }
   }, []);
 
-  // Enrich with live pricing (best-effort)
+  // Fetch pro-included models with pricing (falls back to static list)
   useEffect(() => {
     fetch('/api/avatar-models')
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (!data?.models?.length) return;
-        const priceMap = new Map<string, number | null>(
-          data.models.map((m: { id: string; costPerMinute: number | null }) => [m.id, m.costPerMinute])
+        const apiModels: AvatarModel[] = data.models.map(
+          (m: { id: string; name: string; tier: string; costPerMinute: number | null }) => ({
+            id: m.id,
+            name: m.name,
+            tier: m.tier as 'standard' | 'premium',
+            costPerMinute: m.costPerMinute,
+          })
         );
-        setModels((prev) =>
-          prev.map((m) => ({ ...m, costPerMinute: priceMap.get(m.id) ?? m.costPerMinute }))
-        );
+        setModels(apiModels);
+        setSelectedModel((prev) => {
+          // Keep current selection if it's in the new list, otherwise pick first
+          if (apiModels.some((m) => m.id === prev)) return prev;
+          return apiModels[0].id;
+        });
       })
       .catch(() => {});
   }, []);
