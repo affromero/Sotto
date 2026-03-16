@@ -66,15 +66,18 @@ function blobToDataUrl(blob: Blob): Promise<string> {
   });
 }
 
-export function LipSyncTester() {
+interface LipSyncTesterProps {
+  models: AvatarModel[];
+}
+
+export function LipSyncTester({ models }: LipSyncTesterProps) {
   const [stage, setStage] = useState<Stage>('idle');
   const [textPrompt, setTextPrompt] = useState(DEFAULT_PROMPT);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [avatarImageUrl, setAvatarImageUrl] = useState('');
   const [imagePrompt, setImagePrompt] = useState('');
-  const [models, setModels] = useState<AvatarModel[]>([]);
-  const [selectedModel, setSelectedModel] = useState('');
+  const [selectedModel, setSelectedModel] = useState(models[0]?.id ?? '');
   const [error, setError] = useState<string | null>(null);
   const [generatingImage, setGeneratingImage] = useState(false);
   const [progress, setProgress] = useState<number>(0);
@@ -99,33 +102,6 @@ export function LipSyncTester() {
     }
   }, []);
 
-  // Fetch pro-included models with live pricing from pricetoken
-  useEffect(() => {
-    const controller = new AbortController();
-    fetch('/api/avatar-models', { signal: controller.signal })
-      .then((res) => {
-        if (!res.ok) throw new Error(`${res.status}`);
-        return res.json();
-      })
-      .then((data) => {
-        if (!data?.models?.length) return;
-        const apiModels: AvatarModel[] = data.models.map(
-          (m: { id: string; name: string; tier: string; costPerMinute: number | null }) => ({
-            id: m.id,
-            name: m.name,
-            tier: m.tier as 'standard' | 'premium',
-            costPerMinute: m.costPerMinute,
-          })
-        );
-        setModels(apiModels);
-        setSelectedModel((prev) => {
-          if (apiModels.some((m) => m.id === prev)) return prev;
-          return apiModels[0].id;
-        });
-      })
-      .catch(() => {});
-    return () => controller.abort();
-  }, []);
 
   const generateAudio = useCallback(async () => {
     setStage('generating-audio');
@@ -343,9 +319,8 @@ export function LipSyncTester() {
             className={styles.select}
             value={selectedModel}
             onChange={(e) => setSelectedModel(e.target.value)}
-            disabled={isGenerating || models.length === 0}
+            disabled={isGenerating}
           >
-            {models.length === 0 && <option value="">Loading models…</option>}
             {models.map((m) => (
               <option key={m.id} value={m.id}>
                 {m.name}{formatPrice(m.costPerMinute)}{m.tier === 'premium' ? ' ★' : ''}
