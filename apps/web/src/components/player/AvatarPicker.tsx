@@ -27,6 +27,9 @@ interface AvatarPickerProps {
 
 const VISIBLE_COUNT = 12;
 
+/** Lip-sync models that require a user-uploaded portrait image (from avatar-registry). */
+const IMAGE_REQUIRED_MODELS = new Set(['fal-veed-fabric-1.0', 'fal-kling-avatar-v2-pro']);
+
 interface AvatarSelection {
   avatarId: string;
   provider: 'heygen' | 'runway' | 'fal';
@@ -365,8 +368,12 @@ export function AvatarPicker({ podcastId, speakers, segments, onConfigured, onCa
 
       {activeProvider === 'fal' && avatars.length === 0 && (
         <p className={styles.runwayNotice}>
-          Upload avatar images in Settings &rarr; Avatar Lip-Sync to get started.
+          Upload avatar images in <a href="/settings#avatar-images" className={styles.runwayNoticeLink}>Settings &rarr; Avatar Images</a> to get started.
         </p>
+      )}
+
+      {activeProvider === 'fal' && falModelId && IMAGE_REQUIRED_MODELS.has(falModelId) && (
+        <p className={styles.modelNote}>This model uses your uploaded portrait image</p>
       )}
 
       <div className={styles.advancedSection}>

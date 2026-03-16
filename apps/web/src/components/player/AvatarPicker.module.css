@@ -478,3 +478,21 @@
   text-align: center;
   flex-shrink: 0;
 }
+
+.runwayNoticeLink {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+.runwayNoticeLink:hover {
+  text-decoration: underline;
+}
+
+.modelNote {
+  padding: 0 24px 4px;
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  text-align: center;
+  flex-shrink: 0;
+}
