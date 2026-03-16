@@ -38,7 +38,8 @@ export function LipSyncTester() {
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || `Audio generation failed (${res.status})`);
+        const msg = typeof data.error === 'string' ? data.error : `Audio generation failed (${res.status})`;
+        throw new Error(msg);
       }
 
       const data = await res.json();
@@ -64,7 +65,8 @@ export function LipSyncTester() {
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || `Image generation failed (${res.status})`);
+        const msg = typeof data.error === 'string' ? data.error : `Image generation failed (${res.status})`;
+        throw new Error(msg);
       }
 
       const data = await res.json();
@@ -96,7 +98,8 @@ export function LipSyncTester() {
 
       if (!submitRes.ok) {
         const data = await submitRes.json().catch(() => ({}));
-        throw new Error(data.error || `Failed to queue test (${submitRes.status})`);
+        const msg = typeof data.error === 'string' ? data.error : `Failed to queue test (${submitRes.status})`;
+        throw new Error(msg);
       }
 
       const { jobId } = await submitRes.json();
@@ -117,7 +120,8 @@ export function LipSyncTester() {
         }
 
         if (status.status === 'failed') {
-          throw new Error(status.error || 'Lip-sync generation failed');
+          const msg = typeof status.error === 'string' ? status.error : 'Lip-sync generation failed';
+          throw new Error(msg);
         }
       }
 
