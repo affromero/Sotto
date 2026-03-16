@@ -1,0 +1,205 @@
+/* ==========================================================================
+   IDENTITY CHAPTER — Verification-gated voice cloning + avatar images
+   ========================================================================== */
+
+.root {
+  padding: var(--section-pad-y) var(--spacing-lg);
+  max-width: var(--max-content-width);
+  margin: 0 auto;
+}
+
+/* ==========================================================================
+   ASYMMETRIC 2-COLUMN — text left, cards right
+   ========================================================================== */
+
+.columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 64px;
+  align-items: center;
+  margin-bottom: 80px;
+}
+
+.colText {
+  display: flex;
+  flex-direction: column;
+}
+
+.colVisual {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Text column */
+.overline {
+  composes: overline from './shared.module.css';
+}
+
+.heading {
+  font-family: var(--font-heading);
+  font-size: clamp(2.25rem, 4.5vw, 3.25rem);
+  font-weight: 400;
+  color: var(--color-text);
+  line-height: 1.15;
+  margin-bottom: 20px;
+}
+
+.description {
+  font-size: 18px;
+  line-height: 1.7;
+  color: var(--color-text-secondary);
+  margin-bottom: 32px;
+}
+
+.footer {
+  font-size: 15px;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+}
+
+/* ==========================================================================
+   FEATURE CARDS
+   ========================================================================== */
+
+.featureCard {
+  padding: 28px;
+  background: var(--color-surface);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-xl);
+}
+
+.cardIcon {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-lg);
+  background: rgba(217, 119, 6, 0.06);
+  color: var(--color-primary);
+  margin-bottom: 16px;
+}
+
+.cardTitle {
+  font-family: var(--font-heading);
+  font-size: 1.25rem;
+  font-weight: 400;
+  color: var(--color-text);
+  margin-bottom: 8px;
+}
+
+.cardDesc {
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--color-text-secondary);
+  margin-bottom: 16px;
+}
+
+.verifiedBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  border-radius: var(--radius-full);
+  background: rgba(22, 163, 74, 0.06);
+  border: 1px solid rgba(22, 163, 74, 0.15);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-success);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* ==========================================================================
+   LOOP STRIP — full-bleed pipeline visualization
+   ========================================================================== */
+
+.strip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 20px 28px;
+  background: linear-gradient(135deg, rgba(217, 119, 6, 0.06) 0%, rgba(217, 119, 6, 0.02) 100%);
+  border: 1px solid rgba(217, 119, 6, 0.12);
+  border-radius: var(--radius-2xl);
+  margin-left: calc(-1 * var(--spacing-lg));
+  margin-right: calc(-1 * var(--spacing-lg));
+}
+
+.stripIcon {
+  flex-shrink: 0;
+  color: var(--color-success);
+}
+
+.stripText {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.loopStep {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+
+.loopStepHighlight {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.loopArrow {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  opacity: 0.5;
+}
+
+/* ==========================================================================
+   MOBILE — single column stack
+   ========================================================================== */
+
+@media (max-width: 767px) {
+  .root {
+    padding: var(--section-pad-y-sm) var(--spacing-md);
+  }
+
+  .columns {
+    grid-template-columns: 1fr;
+    gap: 40px;
+    margin-bottom: 56px;
+  }
+
+  .colText {
+    text-align: center;
+  }
+
+  .description {
+    margin-left: auto;
+    margin-right: auto;
+    max-width: 560px;
+  }
+
+  .strip {
+    flex-direction: column;
+    text-align: center;
+    gap: 10px;
+    margin-left: calc(-1 * var(--spacing-md));
+    margin-right: calc(-1 * var(--spacing-md));
+  }
+}
+
+/* ==========================================================================
+   REDUCED MOTION
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  .featureCard {
+    transition: none;
+  }
+}
