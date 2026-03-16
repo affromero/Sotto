@@ -78,6 +78,7 @@ interface SettingsFormProps {
   quizAnswerCount: number;
   referredUsers: Array<{ name: string | null; handle: string | null; image: string | null; joinedAt: string; verified: boolean }>;
   referralBonus: number;
+  avatarModels: Array<{ id: string; name: string; tier: 'standard' | 'premium'; costPerMinute: number | null }>;
 }
 
 const providerLabels: Record<string, string> = {
@@ -123,6 +124,7 @@ export function SettingsForm({
   quizAnswerCount,
   referredUsers,
   referralBonus,
+  avatarModels,
 }: SettingsFormProps) {
   const [name, setName] = useState(initialName);
   const [bio, setBio] = useState(initialBio);
@@ -1079,7 +1081,7 @@ export function SettingsForm({
         <p className={styles.sectionDesc}>
           Test lip-sync models by generating audio from text, selecting an avatar image, and generating a lip-synced video.
         </p>
-        <LipSyncTester />
+        <LipSyncTester models={avatarModels} />
       </section>
 
       {/* Reset Recommendations */}
