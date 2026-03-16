@@ -7,6 +7,7 @@ import { JourneyChapter } from '@/components/landing/chapters/JourneyChapter';
 import { TrustChapter } from '@/components/landing/chapters/TrustChapter';
 import { NetworkChapter } from '@/components/landing/chapters/NetworkChapter';
 import { ShowcaseChapter } from '@/components/landing/chapters/ShowcaseChapter';
+import { IdentityChapter } from '@/components/landing/chapters/IdentityChapter';
 import { BotChapter } from '@/components/landing/chapters/BotChapter';
 import { ConvertChapter } from '@/components/landing/chapters/ConvertChapter';
 import { getLandingShowcaseData } from '@/lib/showcase';
@@ -27,6 +28,7 @@ export default async function LandingPage() {
           <HeroChapter />
           <JourneyChapter showcase={showcaseData} />
           <ShowcaseChapter showcase={showcaseData} />
+          <IdentityChapter />
           <TrustChapter />
           <NetworkChapter />
           <BotChapter showcase={showcaseData} />
