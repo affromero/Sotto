@@ -1,18 +1,25 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import styles from './LipSyncTester.module.css';
 
 const DEFAULT_PROMPT = 'Welcome to Sotto. Let me tell you something fascinating today.';
 const DEFAULT_VOICE_ID = '21m00Tcm4TlvDq8ikWAM'; // Rachel — stable ElevenLabs voice
 
-const LIP_SYNC_MODELS = [
-  { id: 'fal-veed-fabric-1.0', name: 'VEED Fabric 1.0', disabled: false },
-  { id: 'fal-kling-avatar-v2-pro', name: 'Kling Avatar v2 Pro', disabled: false },
-  { id: 'runway-characters', name: 'Runway Characters', disabled: true, reason: 'Not ready — conversational AI only' },
-];
+interface AvatarModel {
+  id: string;
+  name: string;
+  tier: 'standard' | 'premium' | 'translation';
+  provider: string;
+  costPerMinute: number | null;
+}
 
 type Stage = 'idle' | 'generating-audio' | 'audio-ready' | 'generating-video' | 'video-ready' | 'error';
+
+function formatPrice(costPerMinute: number | null): string {
+  if (costPerMinute === null) return '';
+  return ` — $${costPerMinute.toFixed(2)}/min`;
+}
 
 export function LipSyncTester() {
   const [stage, setStage] = useState<Stage>('idle');
@@ -21,9 +28,22 @@ export function LipSyncTester() {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [avatarImageUrl, setAvatarImageUrl] = useState('');
   const [imagePrompt, setImagePrompt] = useState('');
-  const [selectedModel, setSelectedModel] = useState(LIP_SYNC_MODELS[0].id);
+  const [models, setModels] = useState<AvatarModel[]>([]);
+  const [selectedModel, setSelectedModel] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [generatingImage, setGeneratingImage] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/avatar-models')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.models?.length) {
+          setModels(data.models);
+          setSelectedModel(data.models[0].id);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const generateAudio = useCallback(async () => {
     setStage('generating-audio');
@@ -213,11 +233,12 @@ export function LipSyncTester() {
             className={styles.select}
             value={selectedModel}
             onChange={(e) => setSelectedModel(e.target.value)}
-            disabled={isGenerating}
+            disabled={isGenerating || models.length === 0}
           >
-            {LIP_SYNC_MODELS.map((m) => (
-              <option key={m.id} value={m.id} disabled={m.disabled}>
-                {m.name}{m.disabled ? ` (${m.reason})` : ''}
+            {models.length === 0 && <option value="">Loading models…</option>}
+            {models.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name}{formatPrice(m.costPerMinute)}{m.tier === 'premium' ? ' ★' : ''}
               </option>
             ))}
           </select>
@@ -226,7 +247,7 @@ export function LipSyncTester() {
         <button
           className={`${styles.button} ${styles.buttonPrimary}`}
           onClick={generateVideo}
-          disabled={!audioUrl || !avatarImageUrl || isGenerating}
+          disabled={!audioUrl || !avatarImageUrl || !selectedModel || isGenerating}
         >
           {stage === 'generating-video' ? 'Generating Video...' : 'Generate Video'}
         </button>
