@@ -77,6 +77,7 @@ export function LipSyncTester() {
   const [selectedModel, setSelectedModel] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [generatingImage, setGeneratingImage] = useState(false);
+  const [progress, setProgress] = useState<number>(0);
   const audioDataUrlRef = useRef<string | null>(null);
 
   // Restore cache on mount
@@ -204,6 +205,7 @@ export function LipSyncTester() {
     setStage('generating-video');
     setError(null);
     setVideoUrl(null);
+    setProgress(0);
 
     try {
       const submitRes = await fetch('/api/avatar-test', {
@@ -224,16 +226,18 @@ export function LipSyncTester() {
 
       const { jobId } = await submitRes.json();
 
-      // Poll for completion
-      for (let i = 0; i < 60; i++) {
+      // Poll for completion (5min timeout)
+      for (let i = 0; i < 100; i++) {
         await new Promise((r) => setTimeout(r, 3000));
 
         const pollRes = await fetch(`/api/avatar-test?jobId=${jobId}`);
         if (!pollRes.ok) continue;
 
         const status = await pollRes.json();
+        if (typeof status.progress === 'number') setProgress(status.progress);
 
         if (status.status === 'completed' && status.videoUrl) {
+          setProgress(100);
           setVideoUrl(status.videoUrl);
           setStage('video-ready');
           saveCache({
@@ -361,7 +365,7 @@ export function LipSyncTester() {
         {stage === 'generating-video' && (
           <div className={styles.status}>
             <span className={styles.spinner} />
-            Processing lip-sync...
+            Processing lip-sync…{progress > 0 ? ` ${progress}%` : ''}
           </div>
         )}
 
