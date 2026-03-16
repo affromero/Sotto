@@ -5,9 +5,6 @@ import { listByokProviders, listAiProviders } from '@/lib/byok';
 import { getAllAiProviderClientMeta } from '@/lib/providers/ai-registry';
 import { getAllTtsProviderClientMeta } from '@/lib/providers/tts-registry';
 import { getMusicByokProviderMeta } from '@/lib/providers/music-registry';
-import { getAllAvatarProviderMeta } from '@/lib/providers/avatar-registry';
-import { fetchAvatarModels } from '@/lib/avatar-cost-estimator';
-import { getAutoModelConfig } from '@/lib/auto-model-config';
 import { getReferralBonus, getActiveReferralCount } from '@/lib/referrals';
 import { SettingsForm } from './SettingsForm';
 import styles from './page.module.css';
@@ -107,28 +104,6 @@ export default async function SettingsPage() {
   const ttsProviderMeta = getAllTtsProviderClientMeta();
   const musicProviderMeta = getMusicByokProviderMeta();
 
-  // Avatar models with live pricing from pricetoken
-  const [avatarPricing, autoModelConfig] = await Promise.all([
-    fetchAvatarModels().catch(() => []),
-    getAutoModelConfig().catch(() => null),
-  ]);
-  const avatarPricingMap = new Map(avatarPricing.map((m) => [m.modelId, m.costPerMinute]));
-  // DB stores IDs as "provider:modelId" — strip prefix for registry matching
-  const avatarIncludedIds = autoModelConfig?.proIncludedAvatarModels?.map(
-    (id) => id.includes(':') ? id.split(':').slice(1).join(':') : id
-  ) ?? null;
-  const avatarModels = getAllAvatarProviderMeta()
-    .filter((p) => !p.disabled)
-    .flatMap((provider) =>
-      provider.models
-        .filter((m) => !avatarIncludedIds || avatarIncludedIds.includes(m.id))
-        .map((m) => ({
-          id: m.id,
-          name: m.displayName,
-          tier: m.tier as 'standard' | 'premium',
-          costPerMinute: avatarPricingMap.get(m.id) ?? null,
-        }))
-    );
   const configuredMusicProviders = configuredProviders.filter((p) => (p.provider as string) === 'suno');
   const isTwitterProviderAvailable = !!process.env.TWITTER_CLIENT_ID && !!process.env.TWITTER_CLIENT_SECRET;
 
@@ -172,7 +147,6 @@ export default async function SettingsPage() {
         quizAnswerCount={quizAnswerCount}
         referredUsers={referredUsers.map((u) => ({ name: u.name, handle: u.handle, image: u.image, joinedAt: u.createdAt.toISOString(), verified: u.referralVerified }))}
         referralBonus={getReferralBonus(activeReferralCount)}
-        avatarModels={avatarModels}
       />
     </main>
   );
