@@ -49,7 +49,18 @@ interface AvatarModelOption {
   maxDuration: number | null;
 }
 
+// Build a lookup of currently-assigned avatar IDs per speaker from existing overlays
+function buildCurrentAvatarMap(overlays?: ExistingAvatarOverlay[]): Record<string, string> {
+  if (!overlays?.length) return {};
+  const map: Record<string, string> = {};
+  for (const ov of overlays) {
+    map[ov.speaker] = ov.avatarId;
+  }
+  return map;
+}
+
 export function AvatarPicker({ podcastId, speakers, segments, onConfigured, onCancel, existingOverlays }: AvatarPickerProps) {
+  const currentAvatarMap = useMemo(() => buildCurrentAvatarMap(existingOverlays), [existingOverlays]);
   const [avatars, setAvatars] = useState<UnifiedAvatarData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -344,6 +355,9 @@ export function AvatarPicker({ podcastId, speakers, segments, onConfigured, onCa
                     </div>
                   )}
                   <span className={styles.avatarName}>{avatar.name}</span>
+                  {currentAvatarMap[speaker] === avatar.id && (
+                    <span className={styles.currentBadge}>Current</span>
+                  )}
                   {avatar.provider === 'runway' && (
                     <span className={styles.providerBadge}>Runway</span>
                   )}
