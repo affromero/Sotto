@@ -16,7 +16,8 @@ export type GateReason =
   | 'ok'
   | 'no_provider'
   | 'daily_limit_reached'
-  | 'generation_in_progress';
+  | 'generation_in_progress'
+  | 'budget_exceeded';
 
 export interface GenerationGateResult {
   allowed: boolean;
@@ -93,7 +94,14 @@ export async function checkGenerationGate(userId: string): Promise<GenerationGat
     getAutoModelConfig(),
     prisma.user.findUniqueOrThrow({
       where: { id: userId },
-      select: { role: true, plan: true, dailyGenerationOverride: true },
+      select: {
+        role: true,
+        plan: true,
+        dailyGenerationOverride: true,
+        spentMonthCents: true,
+        budgetMonthCents: true,
+        spentMonthResetAt: true,
+      },
     }),
   ]);
 
@@ -130,6 +138,21 @@ export async function checkGenerationGate(userId: string): Promise<GenerationGat
   // Per-user unlimited override (dailyGenerationOverride === 0)
   if (user.dailyGenerationOverride === 0) {
     return { ...baseResult, allowed: true, reason: 'ok' };
+  }
+
+  // Budget enforcement (budgetMonthCents > 0 means a cap is set)
+  if (user.budgetMonthCents > 0) {
+    const now = new Date();
+    const resetAt = user.spentMonthResetAt;
+    if (!resetAt || resetAt.getMonth() !== now.getMonth() || resetAt.getFullYear() !== now.getFullYear()) {
+      // New month — reset spend counter
+      await prisma.user.update({
+        where: { id: userId },
+        data: { spentMonthCents: 0, spentMonthResetAt: now },
+      });
+    } else if (user.spentMonthCents >= user.budgetMonthCents) {
+      return { ...baseResult, allowed: false, reason: 'budget_exceeded' as GateReason };
+    }
   }
 
   // Ensure platform TTS (KittenTTS) is available

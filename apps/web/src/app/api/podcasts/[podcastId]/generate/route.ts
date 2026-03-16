@@ -67,7 +67,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   if (!gate.allowed) {
     const msg = gate.reason === 'generation_in_progress'
       ? 'A podcast is already generating. Wait for it to finish before starting another.'
-      : 'No voice provider available. Add a TTS key in Settings for unlimited generation.';
+      : gate.reason === 'budget_exceeded'
+        ? 'Monthly spend budget exceeded. Contact your admin to increase your limit.'
+        : 'No voice provider available. Add a TTS key in Settings for unlimited generation.';
     return errorResponse(msg, 403, { code: gate.reason });
   }
 
@@ -195,11 +197,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return await startImport(podcastId, authResult.userId, podcast, plan);
   }
 
-  // Standard generation pipeline: start from scratch
-  await prisma.podcast.update({
-    where: { id: podcastId },
+  // Standard generation pipeline: start from scratch (CAS prevents concurrent starts)
+  const cas = await prisma.podcast.updateMany({
+    where: { id: podcastId, status: { in: ['PENDING', 'DISCOVERING'] } },
     data: { status: 'EXTRACTING', failedAtStatus: null, failureReason: null },
   });
+  if (cas.count === 0) {
+    return errorResponse('Podcast is no longer in a startable state', 409);
+  }
 
   const payload: ExtractContentPayload = {
     podcastId,
@@ -209,7 +214,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     useAdminCredits: useAdminCredits || undefined,
   };
 
-  await addJob(contentExtractionQueue, JobType.EXTRACT_CONTENT, payload);
+  await addJob(contentExtractionQueue, JobType.EXTRACT_CONTENT, payload, { jobId: `extract-${podcastId}` });
 
   if (useAdminCredits || !gate.isByokUser) {
     // Auto-resolve providers — quota consumed on success by workers
@@ -246,10 +251,13 @@ async function routeResume(
     }
 
     case 'EXTRACT_CONTENT': {
-      await prisma.podcast.update({
-        where: { id: podcastId },
+      const casExtract = await prisma.podcast.updateMany({
+        where: { id: podcastId, status: 'FAILED' },
         data: { status: 'EXTRACTING', failedAtStatus: null, failureReason: null },
       });
+      if (casExtract.count === 0) {
+        return errorResponse('Podcast is no longer in a resumable state', 409);
+      }
 
       const payload: ExtractContentPayload = {
         podcastId,
@@ -259,7 +267,7 @@ async function routeResume(
         useAdminCredits: useAdminCredits || undefined,
       };
 
-      await addJob(contentExtractionQueue, JobType.EXTRACT_CONTENT, payload);
+      await addJob(contentExtractionQueue, JobType.EXTRACT_CONTENT, payload, { jobId: `extract-${podcastId}` });
       return NextResponse.json({
         success: true,
         message: 'Generation resumed from content extraction',
@@ -276,10 +284,13 @@ async function routeResume(
         where: { podcastId },
       });
 
-      await prisma.podcast.update({
-        where: { id: podcastId },
+      const casScript = await prisma.podcast.updateMany({
+        where: { id: podcastId, status: 'FAILED' },
         data: { status: 'SCRIPTING', failedAtStatus: null, failureReason: null },
       });
+      if (casScript.count === 0) {
+        return errorResponse('Podcast is no longer in a resumable state', 409);
+      }
 
       const payload: GenerateScriptPayload = {
         podcastId,
@@ -289,7 +300,7 @@ async function routeResume(
         useAdminCredits: useAdminCredits || undefined,
       };
 
-      await addJob(scriptGenerationQueue, JobType.GENERATE_SCRIPT, payload);
+      await addJob(scriptGenerationQueue, JobType.GENERATE_SCRIPT, payload, { jobId: `script-${podcastId}` });
       return NextResponse.json({
         success: true,
         message: 'Generation resumed from script generation',
@@ -302,10 +313,13 @@ async function routeResume(
         where: { podcastId },
       });
 
-      await prisma.podcast.update({
-        where: { id: podcastId },
+      const casVerify = await prisma.podcast.updateMany({
+        where: { id: podcastId, status: 'FAILED' },
         data: { status: 'VERIFYING_SCRIPT', failedAtStatus: null, failureReason: null },
       });
+      if (casVerify.count === 0) {
+        return errorResponse('Podcast is no longer in a resumable state', 409);
+      }
 
       const payload: VerifyScriptPayload = {
         podcastId,
@@ -315,7 +329,7 @@ async function routeResume(
       };
 
       await addJob(scriptVerificationQueue, JobType.VERIFY_SCRIPT, payload, {
-        jobId: `verify-${podcastId}-resume-${Date.now()}`,
+        jobId: `verify-${podcastId}-resume`,
       });
       return NextResponse.json({
         success: true,
@@ -325,10 +339,13 @@ async function routeResume(
     }
 
     case 'VALIDATE_REFERENCES': {
-      await prisma.podcast.update({
-        where: { id: podcastId },
+      const casRefs = await prisma.podcast.updateMany({
+        where: { id: podcastId, status: 'FAILED' },
         data: { status: 'VALIDATING_REFERENCES', failedAtStatus: null, failureReason: null },
       });
+      if (casRefs.count === 0) {
+        return errorResponse('Podcast is no longer in a resumable state', 409);
+      }
 
       const payload: ValidateReferencesPayload = {
         podcastId,
@@ -336,7 +353,7 @@ async function routeResume(
         useAdminCredits: useAdminCredits || undefined,
       };
 
-      await addJob(referenceValidationQueue, JobType.VALIDATE_REFERENCES, payload);
+      await addJob(referenceValidationQueue, JobType.VALIDATE_REFERENCES, payload, { jobId: `validate-${podcastId}` });
       return NextResponse.json({
         success: true,
         message: 'Generation resumed from reference validation',
@@ -355,9 +372,9 @@ async function routeResume(
       // for whatever provider the user picks
       await prisma.podcastVoice.deleteMany({ where: { podcastId } });
 
-      // Clear TTS provider so user re-enters audio config UI
-      await prisma.podcast.update({
-        where: { id: podcastId },
+      // Clear TTS provider so user re-enters audio config UI (CAS on FAILED)
+      const casReady = await prisma.podcast.updateMany({
+        where: { id: podcastId, status: 'FAILED' },
         data: {
           status: 'SCRIPT_READY',
           failedAtStatus: null,
@@ -366,6 +383,9 @@ async function routeResume(
           ttsModel: null,
         },
       });
+      if (casReady.count === 0) {
+        return errorResponse('Podcast is no longer in a resumable state', 409);
+      }
 
       return NextResponse.json({
         success: true,
@@ -375,10 +395,13 @@ async function routeResume(
     }
 
     case 'GENERATE_AUDIO': {
-      await prisma.podcast.update({
-        where: { id: podcastId },
+      const casAudio = await prisma.podcast.updateMany({
+        where: { id: podcastId, status: 'FAILED' },
         data: { status: 'GENERATING_AUDIO', failedAtStatus: null, failureReason: null },
       });
+      if (casAudio.count === 0) {
+        return errorResponse('Podcast is no longer in a resumable state', 409);
+      }
 
       // Queue audio generation only for pending segments
       const pendingSegments = await prisma.segment.findMany({
@@ -393,7 +416,7 @@ async function routeResume(
           speaker: seg.speaker,
           text: seg.text,
         };
-        await addJob(audioGenerationQueue, JobType.GENERATE_AUDIO, payload);
+        await addJob(audioGenerationQueue, JobType.GENERATE_AUDIO, payload, { jobId: `audio-${podcastId}-${seg.id}` });
       }
 
       return NextResponse.json({
@@ -411,17 +434,20 @@ async function routeResume(
       });
       await prisma.podcastVersion.deleteMany({ where: { podcastId } });
 
-      await prisma.podcast.update({
-        where: { id: podcastId },
+      const casStitch = await prisma.podcast.updateMany({
+        where: { id: podcastId, status: 'FAILED' },
         data: { status: 'STITCHING', failedAtStatus: null, failureReason: null },
       });
+      if (casStitch.count === 0) {
+        return errorResponse('Podcast is no longer in a resumable state', 409);
+      }
 
       const payload: StitchAudioPayload = {
         podcastId,
         segmentIds: resumePoint.segmentIds,
       };
 
-      await addJob(audioStitchingQueue, JobType.STITCH_AUDIO, payload);
+      await addJob(audioStitchingQueue, JobType.STITCH_AUDIO, payload, { jobId: `stitch-${podcastId}` });
       return NextResponse.json({
         success: true,
         message: 'Generation resumed from audio stitching',
@@ -460,10 +486,13 @@ async function startImport(
     // No STT provider available — worker will handle
   }
 
-  await prisma.podcast.update({
-    where: { id: podcastId },
+  const casImport = await prisma.podcast.updateMany({
+    where: { id: podcastId, status: { in: ['PENDING', 'DISCOVERING', 'FAILED'] } },
     data: { status: 'IMPORTING', failedAtStatus: null, failureReason: null },
   });
+  if (casImport.count === 0) {
+    return errorResponse('Podcast is no longer in a restartable state', 409);
+  }
 
   const importPayload: ImportAudioPayload = {
     podcastId,
@@ -476,7 +505,7 @@ async function startImport(
     sttModel,
   };
 
-  await addJob(audioImportQueue, JobType.IMPORT_AUDIO, importPayload);
+  await addJob(audioImportQueue, JobType.IMPORT_AUDIO, importPayload, { jobId: `import-${podcastId}` });
 
   return NextResponse.json({ success: true, message: 'Import retry started' });
 }

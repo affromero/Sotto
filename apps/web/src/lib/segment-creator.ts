@@ -30,6 +30,6 @@ export async function createSegmentsAndQueueAudio(
       previousText,
       nextText,
       direction: turns[i].direction,
-    });
+    }, { jobId: `audio-${podcastId}-${segment.id}` });
   }
 }
