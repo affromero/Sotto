@@ -306,7 +306,8 @@ describe('processScriptVerification', () => {
       expect(mockAddJob).toHaveBeenCalledWith(
         { name: 'reference-validation' },
         'validate_references',
-        { podcastId: 'podcast-001', userId: 'user-001' }
+        { podcastId: 'podcast-001', userId: 'user-001' },
+        { jobId: 'validate-podcast-001' }
       );
     });
 
@@ -368,6 +369,7 @@ describe('processScriptVerification', () => {
       expect(mockAddJob).not.toHaveBeenCalledWith(
         { name: 'reference-validation' },
         'validate_references',
+        expect.anything(),
         expect.anything()
       );
       expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
@@ -696,7 +698,7 @@ describe('processScriptVerification', () => {
         { name: 'script-verification' },
         'verify_script',
         { podcastId: 'podcast-001', userId: 'user-001', discoveryId: 'discovery-001', useAdminCredits: undefined },
-        { jobId: expect.stringMatching(/^verify-podcast-001-\d+-2$/) }
+        { jobId: 'verify-podcast-001-2' }
       );
     });
 
