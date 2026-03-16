@@ -529,3 +529,46 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ── Lip-Sync Section ── */
+
+.lipSyncAudio {
+  width: 100%;
+  border-radius: var(--radius-md);
+}
+
+.lipSyncAvatarPreview {
+  width: 96px;
+  height: 96px;
+  border-radius: var(--radius-md);
+  object-fit: cover;
+}
+
+.lipSyncVideo {
+  width: 100%;
+  max-width: 400px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.lipSyncStatus {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.lipSyncSpinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: lipSyncSpin 0.6s linear infinite;
+}
+
+@keyframes lipSyncSpin {
+  to { transform: rotate(360deg); }
+}
