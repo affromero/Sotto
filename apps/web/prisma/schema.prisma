@@ -162,6 +162,11 @@ model User {
   // Free tier
   dailyGenerationOverride Int? // null = use global, 0 = unlimited, N = custom daily limit
 
+  // Budget enforcement
+  spentMonthCents   Int       @default(0)
+  budgetMonthCents  Int       @default(0) // 0 = no budget limit
+  spentMonthResetAt DateTime?
+
   // Subscription plan
   plan         UserPlan      @default(FREE)
   subscription Subscription?
