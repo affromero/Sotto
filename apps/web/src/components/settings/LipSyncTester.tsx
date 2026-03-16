@@ -1,10 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import styles from './LipSyncTester.module.css';
 
 const DEFAULT_PROMPT = 'Welcome to Sotto. Let me tell you something fascinating today.';
 const DEFAULT_VOICE_ID = '21m00Tcm4TlvDq8ikWAM'; // Rachel — stable ElevenLabs voice
+const CACHE_KEY = 'lip-sync-tester-cache';
+const CACHE_TTL_MS = 15 * 60 * 1000;
 
 interface AvatarModel {
   id: string;
@@ -14,11 +16,54 @@ interface AvatarModel {
   costPerMinute: number | null;
 }
 
+interface CacheData {
+  audioDataUrl: string | null;
+  avatarImageUrl: string;
+  videoUrl: string | null;
+  textPrompt: string;
+  imagePrompt: string;
+  selectedModel: string;
+  expiresAt: number;
+}
+
 type Stage = 'idle' | 'generating-audio' | 'audio-ready' | 'generating-video' | 'video-ready' | 'error';
 
 function formatPrice(costPerMinute: number | null): string {
   if (costPerMinute === null) return '';
   return ` — $${costPerMinute.toFixed(2)}/min`;
+}
+
+function loadCache(): CacheData | null {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw) as CacheData;
+    if (Date.now() > data.expiresAt) {
+      localStorage.removeItem(CACHE_KEY);
+      return null;
+    }
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+function saveCache(data: Omit<CacheData, 'expiresAt'>) {
+  try {
+    const entry: CacheData = { ...data, expiresAt: Date.now() + CACHE_TTL_MS };
+    localStorage.setItem(CACHE_KEY, JSON.stringify(entry));
+  } catch {
+    // localStorage full or unavailable — ignore
+  }
+}
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
 }
 
 export function LipSyncTester() {
@@ -32,14 +77,36 @@ export function LipSyncTester() {
   const [selectedModel, setSelectedModel] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [generatingImage, setGeneratingImage] = useState(false);
+  const audioDataUrlRef = useRef<string | null>(null);
 
+  // Restore cache on mount
+  useEffect(() => {
+    const cached = loadCache();
+    if (cached) {
+      if (cached.audioDataUrl) {
+        setAudioUrl(cached.audioDataUrl);
+        audioDataUrlRef.current = cached.audioDataUrl;
+      }
+      if (cached.avatarImageUrl) setAvatarImageUrl(cached.avatarImageUrl);
+      if (cached.videoUrl) setVideoUrl(cached.videoUrl);
+      if (cached.textPrompt) setTextPrompt(cached.textPrompt);
+      if (cached.imagePrompt) setImagePrompt(cached.imagePrompt);
+      if (cached.selectedModel) setSelectedModel(cached.selectedModel);
+
+      if (cached.videoUrl) setStage('video-ready');
+      else if (cached.audioDataUrl) setStage('audio-ready');
+    }
+  }, []);
+
+  // Fetch models
   useEffect(() => {
     fetch('/api/avatar-models')
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data?.models?.length) {
           setModels(data.models);
-          setSelectedModel(data.models[0].id);
+          // Only set default model if none restored from cache
+          setSelectedModel((prev) => prev || data.models[0].id);
         }
       })
       .catch(() => {});
@@ -64,14 +131,23 @@ export function LipSyncTester() {
       }
 
       const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      setAudioUrl(url);
+      const dataUrl = await blobToDataUrl(blob);
+      audioDataUrlRef.current = dataUrl;
+      setAudioUrl(dataUrl);
       setStage('audio-ready');
+      saveCache({
+        audioDataUrl: dataUrl,
+        avatarImageUrl,
+        videoUrl: null,
+        textPrompt,
+        imagePrompt,
+        selectedModel,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Audio generation failed');
       setStage('error');
     }
-  }, [textPrompt]);
+  }, [textPrompt, avatarImageUrl, imagePrompt, selectedModel]);
 
   const generateImage = useCallback(async () => {
     if (!imagePrompt.trim()) return;
@@ -93,12 +169,20 @@ export function LipSyncTester() {
 
       const data = await res.json();
       setAvatarImageUrl(data.imageUrl);
+      saveCache({
+        audioDataUrl: audioDataUrlRef.current,
+        avatarImageUrl: data.imageUrl,
+        videoUrl,
+        textPrompt,
+        imagePrompt,
+        selectedModel,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Image generation failed');
     } finally {
       setGeneratingImage(false);
     }
-  }, [imagePrompt]);
+  }, [imagePrompt, videoUrl, textPrompt, selectedModel]);
 
   const generateVideo = useCallback(async () => {
     if (!audioUrl || !avatarImageUrl) return;
@@ -138,6 +222,14 @@ export function LipSyncTester() {
         if (status.status === 'completed' && status.videoUrl) {
           setVideoUrl(status.videoUrl);
           setStage('video-ready');
+          saveCache({
+            audioDataUrl: audioDataUrlRef.current,
+            avatarImageUrl,
+            videoUrl: status.videoUrl,
+            textPrompt,
+            imagePrompt,
+            selectedModel,
+          });
           return;
         }
 
@@ -152,7 +244,7 @@ export function LipSyncTester() {
       setError(err instanceof Error ? err.message : 'Video generation failed');
       setStage('error');
     }
-  }, [audioUrl, avatarImageUrl, selectedModel]);
+  }, [audioUrl, avatarImageUrl, selectedModel, textPrompt, imagePrompt]);
 
   const isGenerating = stage === 'generating-audio' || stage === 'generating-video';
 
