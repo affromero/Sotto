@@ -57,7 +57,6 @@ export const EXPERIMENTAL_WORKERS = new Set([
   'demo-scene-composition',
   'avatar-generation',
   'music-generation',
-  'lip-sync-test',
 ]);
 
 /** Check if a worker matches the given profile (heavy/pipeline/light/all) */
