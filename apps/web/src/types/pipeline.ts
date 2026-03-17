@@ -75,4 +75,8 @@ export interface FalModelsResponse {
   imageModels: FalImageModelInfo[];
   videoModels: FalVideoModelInfo[];
   hasFalKey: boolean;
+  hasMiniMaxKey: boolean;
+  hasHeraKey: boolean;
+  defaultImageModel: string;
+  defaultVideoModel: string;
 }

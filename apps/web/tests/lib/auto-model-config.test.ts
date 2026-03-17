@@ -49,7 +49,7 @@ vi.mock('@/lib/logger', () => ({
 
 // ---- Import under test ----
 
-import { getAutoModelConfig, setAutoModelConfig, resolveAutoModel, resolveIncludedModels, resolveTtsIncludedModels, resolveSttIncludedModels } from '@/lib/auto-model-config';
+import { getAutoModelConfig, setAutoModelConfig, resolveAutoModel, resolveIncludedModels, resolveTtsIncludedModels, resolveSttIncludedModels, resolveIncludedImageModels, resolveIncludedVideoModels } from '@/lib/auto-model-config';
 
 // ---- Default row ----
 
@@ -703,6 +703,94 @@ describe('resolveSttIncludedModels', () => {
     });
 
     const count = result.proSttModels.filter((m) => m === 'openai:whisper-1').length;
+    expect(count).toBe(1);
+  });
+});
+
+describe('resolveIncludedImageModels', () => {
+  const baseConfig: Parameters<typeof resolveIncludedImageModels>[0] = {
+    free: { aiProvider: 'anthropic' as const, aiModel: 'claude-haiku-4-5-20251001', ttsProvider: 'kittentts' as const, ttsModel: 'kitten-tts-mini-0.8', sttProvider: 'openai' as const, sttModel: 'whisper-1' },
+    pro: { aiProvider: 'anthropic' as const, aiModel: 'claude-haiku-4-5-20251001', ttsProvider: 'elevenlabs' as const, ttsModel: 'eleven_v3', sttProvider: 'openai' as const, sttModel: 'whisper-1' },
+    platform: { aiProvider: 'anthropic' as const, aiModel: 'claude-haiku-4-5-20251001' },
+    freeIncludedModels: null, proIncludedModels: null, freeIncludedTtsModels: null, proIncludedTtsModels: null, freeIncludedSttModels: null, proIncludedSttModels: null,
+    freeImageProvider: 'fal', freeImageModel: 'fal-flux-1-schnell', proImageProvider: 'fal', proImageModel: 'fal-flux-2-pro',
+    freeIncludedImageModels: null, proIncludedImageModels: null,
+    freeVideoProvider: 'fal', freeVideoModel: 'fal-wan2.5-480p', proVideoProvider: 'fal', proVideoModel: 'fal-wan2.5-480p',
+    freeIncludedVideoModels: null, proIncludedVideoModels: null,
+    freeAvatarProvider: 'heygen', freeAvatarModel: 'heygen-avatar-standard', proAvatarProvider: 'heygen', proAvatarModel: 'heygen-avatar-standard',
+    freeIncludedAvatarModels: null, proIncludedAvatarModels: null,
+    freeMusicProvider: 'suno', freeMusicModel: 'suno-v5', proMusicProvider: 'suno', proMusicModel: 'suno-v5',
+    freeIncludedMusicModels: null, proIncludedMusicModels: null,
+    freeMotionProvider: 'remotion', proMotionProvider: 'remotion',
+    dailyGenerationLimit: 1, dailyGenerationLimitPro: 5, dailyVideoLimit: 1, dailyVideoLimitPro: 2,
+    dailyMusicLimit: 1, dailyMusicLimitPro: 3, dailyAvatarLimit: 1, dailyAvatarLimitPro: 1,
+    aiAllocations: [], ttsAllocations: [],
+  };
+
+  it('derives from auto defaults when lists are null', () => {
+    const result = resolveIncludedImageModels(baseConfig);
+    expect(result.freeImageModels).toEqual(['fal-flux-1-schnell']);
+    expect(result.proImageModels).toContain('fal-flux-2-pro');
+    expect(result.proImageModels).toContain('fal-flux-1-schnell');
+  });
+
+  it('returns explicit lists when set', () => {
+    const result = resolveIncludedImageModels({ ...baseConfig, freeIncludedImageModels: ['img-a'], proIncludedImageModels: ['img-a', 'img-b'] });
+    expect(result.freeImageModels).toEqual(['img-a']);
+    expect(result.proImageModels).toContain('img-a');
+    expect(result.proImageModels).toContain('img-b');
+  });
+
+  it('always includes free image models in pro output', () => {
+    const result = resolveIncludedImageModels({ ...baseConfig, freeIncludedImageModels: ['free-img'], proIncludedImageModels: ['pro-img'] });
+    expect(result.proImageModels).toContain('free-img');
+    expect(result.proImageModels).toContain('pro-img');
+  });
+});
+
+describe('resolveIncludedVideoModels', () => {
+  const baseConfig: Parameters<typeof resolveIncludedVideoModels>[0] = {
+    free: { aiProvider: 'anthropic' as const, aiModel: 'claude-haiku-4-5-20251001', ttsProvider: 'kittentts' as const, ttsModel: 'kitten-tts-mini-0.8', sttProvider: 'openai' as const, sttModel: 'whisper-1' },
+    pro: { aiProvider: 'anthropic' as const, aiModel: 'claude-haiku-4-5-20251001', ttsProvider: 'elevenlabs' as const, ttsModel: 'eleven_v3', sttProvider: 'openai' as const, sttModel: 'whisper-1' },
+    platform: { aiProvider: 'anthropic' as const, aiModel: 'claude-haiku-4-5-20251001' },
+    freeIncludedModels: null, proIncludedModels: null, freeIncludedTtsModels: null, proIncludedTtsModels: null, freeIncludedSttModels: null, proIncludedSttModels: null,
+    freeImageProvider: 'fal', freeImageModel: 'fal-flux-1-schnell', proImageProvider: 'fal', proImageModel: 'fal-flux-1-schnell',
+    freeIncludedImageModels: null, proIncludedImageModels: null,
+    freeVideoProvider: 'fal', freeVideoModel: 'fal-wan2.5-480p', proVideoProvider: 'fal', proVideoModel: 'fal-kling3-1080p',
+    freeIncludedVideoModels: null, proIncludedVideoModels: null,
+    freeAvatarProvider: 'heygen', freeAvatarModel: 'heygen-avatar-standard', proAvatarProvider: 'heygen', proAvatarModel: 'heygen-avatar-standard',
+    freeIncludedAvatarModels: null, proIncludedAvatarModels: null,
+    freeMusicProvider: 'suno', freeMusicModel: 'suno-v5', proMusicProvider: 'suno', proMusicModel: 'suno-v5',
+    freeIncludedMusicModels: null, proIncludedMusicModels: null,
+    freeMotionProvider: 'remotion', proMotionProvider: 'remotion',
+    dailyGenerationLimit: 1, dailyGenerationLimitPro: 5, dailyVideoLimit: 1, dailyVideoLimitPro: 2,
+    dailyMusicLimit: 1, dailyMusicLimitPro: 3, dailyAvatarLimit: 1, dailyAvatarLimitPro: 1,
+    aiAllocations: [], ttsAllocations: [],
+  };
+
+  it('derives from auto defaults when lists are null', () => {
+    const result = resolveIncludedVideoModels(baseConfig);
+    expect(result.freeVideoModels).toEqual(['fal-wan2.5-480p']);
+    expect(result.proVideoModels).toContain('fal-kling3-1080p');
+    expect(result.proVideoModels).toContain('fal-wan2.5-480p');
+  });
+
+  it('returns explicit lists when set', () => {
+    const result = resolveIncludedVideoModels({ ...baseConfig, freeIncludedVideoModels: ['vid-a'], proIncludedVideoModels: ['vid-a', 'vid-b'] });
+    expect(result.freeVideoModels).toEqual(['vid-a']);
+    expect(result.proVideoModels).toContain('vid-a');
+    expect(result.proVideoModels).toContain('vid-b');
+  });
+
+  it('always includes free video models in pro output', () => {
+    const result = resolveIncludedVideoModels({ ...baseConfig, freeIncludedVideoModels: ['free-vid'], proIncludedVideoModels: ['pro-vid'] });
+    expect(result.proVideoModels).toContain('free-vid');
+    expect(result.proVideoModels).toContain('pro-vid');
+  });
+
+  it('deduplicates when free model is already in pro list', () => {
+    const result = resolveIncludedVideoModels({ ...baseConfig, freeIncludedVideoModels: ['shared-vid'], proIncludedVideoModels: ['shared-vid', 'pro-vid'] });
+    const count = result.proVideoModels.filter((m) => m === 'shared-vid').length;
     expect(count).toBe(1);
   });
 });
