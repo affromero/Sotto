@@ -116,6 +116,12 @@
   font-weight: 500;
 }
 
+.fieldHint {
+  font: var(--text-body-xs);
+  color: var(--color-text-tertiary);
+  font-style: italic;
+}
+
 .input {
   width: 100%;
   padding: 8px 12px;

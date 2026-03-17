@@ -26,7 +26,40 @@ interface SearchResult {
   creator: string;
 }
 
+interface SegmentTiming {
+  order: number;
+  speaker: string;
+  startTime: number | null;
+  duration: number | null;
+}
+
 const COLOR_CYCLE = ['purple', 'amber', 'navy', 'green'] as const;
+
+function secondsToSegment(seconds: number, segments: SegmentTiming[]): number {
+  if (segments.length === 0) return 0;
+  let best = 0;
+  let bestDist = Infinity;
+  for (const seg of segments) {
+    if (seg.startTime == null) continue;
+    const dist = Math.abs(seg.startTime - seconds);
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = seg.order;
+    }
+  }
+  return best;
+}
+
+function segmentToSeconds(order: number, segments: SegmentTiming[]): number | null {
+  const seg = segments.find((s) => s.order === order);
+  return seg?.startTime ?? null;
+}
+
+function segmentEndSeconds(order: number, segments: SegmentTiming[]): number | null {
+  const seg = segments.find((s) => s.order === order);
+  if (!seg || seg.startTime == null) return null;
+  return seg.startTime + (seg.duration ?? 30);
+}
 
 export function LandingShowcaseDashboard() {
   const [config, setConfig] = useState<Config | null>(null);
@@ -39,6 +72,9 @@ export function LandingShowcaseDashboard() {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [selectedTitle, setSelectedTitle] = useState('');
+
+  // Segment timing data (for segment# ↔ seconds conversion)
+  const [segments, setSegments] = useState<SegmentTiming[]>([]);
 
   // Preview state
   const [preview, setPreview] = useState<LandingShowcaseData | null>(null);
@@ -59,6 +95,18 @@ export function LandingShowcaseDashboard() {
     telegramTopic: null,
   });
 
+  const fetchSegments = useCallback(async (podcastId: string) => {
+    try {
+      const res = await fetch(`/api/admin/landing-showcase/segments?podcastId=${encodeURIComponent(podcastId)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setSegments(data.segments ?? []);
+      }
+    } catch {
+      setSegments([]);
+    }
+  }, []);
+
   useEffect(() => {
     fetch('/api/admin/landing-showcase')
       .then((r) => r.json())
@@ -66,10 +114,11 @@ export function LandingShowcaseDashboard() {
         if (data.config) {
           setConfig(data.config);
           setForm(data.config);
+          fetchSegments(data.config.podcastId);
         }
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [fetchSegments]);
 
   const handleSearch = useCallback(async (q: string) => {
     setSearchQuery(q);
@@ -92,7 +141,8 @@ export function LandingShowcaseDashboard() {
     setSelectedTitle(result.title);
     setSearchResults([]);
     setSearchQuery('');
-  }, []);
+    fetchSegments(result.id);
+  }, [fetchSegments]);
 
   const handleSave = useCallback(async () => {
     if (!form.podcastId) {
@@ -287,6 +337,24 @@ export function LandingShowcaseDashboard() {
         <h2 className={styles.sectionTitle}>Media Clip — Audio + Video (Step 3)</h2>
         <div className={styles.row}>
           <label className={styles.field}>
+            <span className={styles.fieldLabel}>Start segment #</span>
+            <input
+              type="number"
+              min={0}
+              max={segments.length - 1}
+              value={segments.length > 0 ? secondsToSegment(form.audioClipStart, segments) : ''}
+              onChange={(e) => {
+                const order = parseInt(e.target.value);
+                if (isNaN(order)) return;
+                const secs = segmentToSeconds(order, segments);
+                if (secs != null) setForm((f) => ({ ...f, audioClipStart: secs }));
+              }}
+              className={styles.inputSmall}
+              disabled={segments.length === 0}
+              placeholder={segments.length === 0 ? 'loading...' : ''}
+            />
+          </label>
+          <label className={styles.field}>
             <span className={styles.fieldLabel}>Start (seconds)</span>
             <input
               type="number"
@@ -295,6 +363,26 @@ export function LandingShowcaseDashboard() {
               value={form.audioClipStart}
               onChange={(e) => setForm((f) => ({ ...f, audioClipStart: parseFloat(e.target.value) || 0 }))}
               className={styles.inputSmall}
+            />
+          </label>
+        </div>
+        <div className={styles.row}>
+          <label className={styles.field}>
+            <span className={styles.fieldLabel}>End segment #</span>
+            <input
+              type="number"
+              min={0}
+              max={segments.length - 1}
+              value={segments.length > 0 && form.audioClipEnd != null ? secondsToSegment(form.audioClipEnd, segments) : ''}
+              onChange={(e) => {
+                const order = parseInt(e.target.value);
+                if (isNaN(order)) return;
+                const secs = segmentEndSeconds(order, segments);
+                if (secs != null) setForm((f) => ({ ...f, audioClipEnd: secs }));
+              }}
+              className={styles.inputSmall}
+              disabled={segments.length === 0}
+              placeholder={segments.length === 0 ? 'loading...' : 'auto'}
             />
           </label>
           <label className={styles.field}>
@@ -325,9 +413,18 @@ export function LandingShowcaseDashboard() {
               type="number"
               min={0}
               value={form.videoSegmentStart}
-              onChange={(e) => setForm((f) => ({ ...f, videoSegmentStart: parseInt(e.target.value) || 0 }))}
+              onChange={(e) => {
+                const idx = parseInt(e.target.value) || 0;
+                setForm((f) => ({ ...f, videoSegmentStart: idx }));
+              }}
               className={styles.inputSmall}
             />
+            {segments.length > 0 && (() => {
+              const secs = segmentToSeconds(form.videoSegmentStart, segments);
+              return secs != null ? (
+                <span className={styles.fieldHint}>&asymp; {Math.round(secs)}s</span>
+              ) : null;
+            })()}
           </label>
           <label className={styles.field}>
             <span className={styles.fieldLabel}>Segment count</span>
