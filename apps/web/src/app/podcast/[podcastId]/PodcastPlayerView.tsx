@@ -403,10 +403,39 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
     }
   }, [segmentVisuals.length > 0]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleGenerateVideo = useCallback(async (override?: { aiModel: string }) => {
+  const handleGenerateVideo = useCallback(async (override?: { aiModel: string }, forceReclassify?: boolean) => {
+    // If we already have pipeline data in memory, just reopen the editor
+    if (pipelineData && !override && !forceReclassify) {
+      if (!falModels) {
+        const res = await fetch('/api/fal-models');
+        if (res.ok) setFalModels(await res.json());
+      }
+      setShowPipelineEditor(true);
+      return;
+    }
+
     setPipelineLoading(true);
     setVideoError(null);
     try {
+      // Check for a saved draft before triggering classification
+      if (!override && !forceReclassify) {
+        const [draftRes, modelsRes] = await Promise.all([
+          fetch(`/api/podcasts/${podcast.id}/video/pipeline`),
+          !falModels ? fetch('/api/fal-models') : Promise.resolve(null),
+        ]);
+        if (modelsRes?.ok) setFalModels(await modelsRes.json());
+        if (draftRes.ok) {
+          const draft = await draftRes.json();
+          if (draft.status === 'saved' && draft.pipeline) {
+            setPipelineData(draft.pipeline);
+            setShowPipelineEditor(true);
+            setPipelineLoading(false);
+            return;
+          }
+        }
+      }
+
+      // No saved draft — trigger classification
       const pipelineBody = { ...override, ...(activeVoiceTrackId && { voiceTrackId: activeVoiceTrackId }) };
       const hasBody = Object.keys(pipelineBody).length > 0;
       const pipelineOpts: RequestInit = hasBody
@@ -414,8 +443,9 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
         : { method: 'POST' };
       const [pipelineRes, modelsRes] = await Promise.all([
         fetch(`/api/podcasts/${podcast.id}/video/pipeline`, pipelineOpts),
-        fetch('/api/fal-models'),
+        !falModels ? fetch('/api/fal-models') : Promise.resolve(null),
       ]);
+      if (modelsRes?.ok) setFalModels(await modelsRes.json());
       if (!pipelineRes.ok) {
         const err = await pipelineRes.json().catch(() => ({}));
         setVideoError({
@@ -426,21 +456,14 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
         setPipelineLoading(false);
         return;
       }
-      if (!modelsRes.ok) {
-        setVideoError({ message: 'Failed to load available models.' });
-        setPipelineLoading(false);
-        return;
-      }
       const data = await pipelineRes.json();
-      const models: FalModelsResponse = await modelsRes.json();
-      setFalModels(models);
       // POST now returns { classificationId, status: 'classifying' } — start polling
       setClassificationId(data.classificationId);
     } catch {
       setVideoError({ message: 'Failed to create pipeline.' });
       setPipelineLoading(false);
     }
-  }, [podcast.id, activeVoiceTrackId]);
+  }, [podcast.id, activeVoiceTrackId, pipelineData, falModels]);
 
   // Poll for pipeline classification result
   useEffect(() => {
@@ -1601,7 +1624,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
       </Modal>
 
       {/* Pipeline Editor Modal (pre-generation storyboard) */}
-      <Modal isOpen={showPipelineEditor && !!pipelineData && !!falModels} onClose={() => { setShowPipelineEditor(false); setPipelineData(null); }} title="Video Storyboard" size="large">
+      <Modal isOpen={showPipelineEditor && !!pipelineData && !!falModels} onClose={() => { setShowPipelineEditor(false); }} title="Video Storyboard" size="large">
         {pipelineData && falModels && (
           <PipelineEditor
             podcastId={podcast.id}
@@ -1609,9 +1632,20 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
             pipeline={pipelineData}
             falModels={falModels}
             onApprove={handlePipelineApprove}
-            onCancel={() => {
+            onCancel={(edited) => {
+              setPipelineData(edited);
               setShowPipelineEditor(false);
+              // Persist edits to DRAFT (fire-and-forget via PATCH)
+              fetch(`/api/podcasts/${podcast.id}/video/pipeline`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(edited),
+              }).catch(() => {});
+            }}
+            onReclassify={() => {
               setPipelineData(null);
+              setShowPipelineEditor(false);
+              handleGenerateVideo(undefined, true);
             }}
           />
         )}

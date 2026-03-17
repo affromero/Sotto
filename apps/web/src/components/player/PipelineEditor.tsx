@@ -14,10 +14,11 @@ interface PipelineEditorProps {
   pipeline: VideoPipeline;
   falModels: FalModelsResponse;
   onApprove: (pipeline: VideoPipeline) => void;
-  onCancel: () => void;
+  onCancel: (pipeline: VideoPipeline) => void;
+  onReclassify?: () => void;
 }
 
-export function PipelineEditor({ pipeline, falModels, onApprove, onCancel }: PipelineEditorProps) {
+export function PipelineEditor({ pipeline, falModels, onApprove, onCancel, onReclassify }: PipelineEditorProps) {
   const [segments, setSegments] = useState<PipelineSegmentNode[]>(pipeline.segments);
   const [transitions, setTransitions] = useState<PipelineTransition[]>(pipeline.transitions ?? []);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -73,14 +74,20 @@ export function PipelineEditor({ pipeline, falModels, onApprove, onCancel }: Pip
     [falModels.videoModels],
   );
 
+  const buildCurrentPipeline = useCallback((): VideoPipeline => ({
+    ...pipeline,
+    segments,
+    transitions,
+    totalEstimatedCost: estimatePipelineCost(segments, falModels.imageModels, falModels.videoModels, transitions),
+  }), [pipeline, segments, transitions, falModels.imageModels, falModels.videoModels]);
+
   const handleApprove = useCallback(() => {
-    onApprove({
-      ...pipeline,
-      segments,
-      transitions,
-      totalEstimatedCost: estimatePipelineCost(segments, falModels.imageModels, falModels.videoModels, transitions),
-    });
-  }, [pipeline, segments, transitions, onApprove, falModels.imageModels, falModels.videoModels]);
+    onApprove(buildCurrentPipeline());
+  }, [onApprove, buildCurrentPipeline]);
+
+  const handleCancel = useCallback(() => {
+    onCancel(buildCurrentPipeline());
+  }, [onCancel, buildCurrentPipeline]);
 
   const toggleExpand = useCallback((segmentId: string) => {
     setExpandedId((prev) => (prev === segmentId ? null : segmentId));
@@ -140,7 +147,12 @@ export function PipelineEditor({ pipeline, falModels, onApprove, onCancel }: Pip
           <span className={styles.costLabel}>Free</span> · est. {formatCost(totalCost)} on us
         </p>
         <div className={styles.footerActions}>
-          <button className={styles.cancelBtn} onClick={onCancel} type="button">
+          {onReclassify && (
+            <button className={styles.cancelBtn} onClick={onReclassify} type="button">
+              Re-classify
+            </button>
+          )}
+          <button className={styles.cancelBtn} onClick={handleCancel} type="button">
             Cancel
           </button>
           <button className={styles.approveBtn} onClick={handleApprove} type="button">
