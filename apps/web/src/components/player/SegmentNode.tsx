@@ -75,13 +75,35 @@ function StoryboardCardComponent({
   const handleVisualTypeChange = useCallback(
     (visualType: VisualTypeString) => {
       const isProg = PROGRAMMATIC_TYPES.has(visualType);
-      onUpdate(segment.segmentId, {
-        visualType,
-        visualMode: isProg ? 'programmatic' : segment.visualMode === 'programmatic' ? 'image' : segment.visualMode,
-        model: isProg ? null : segment.model,
-      });
+      const isAiIllustration = visualType === 'AI_ILLUSTRATION';
+      let visualMode: VisualMode;
+      let model: string | null;
+
+      if (isProg) {
+        visualMode = 'programmatic';
+        model = null;
+      } else if (isAiIllustration) {
+        // Keep current mode if already image/video, default to image from programmatic
+        visualMode = segment.visualMode === 'programmatic' ? 'image' : segment.visualMode;
+        // Auto-select cheapest model if current model is null
+        if (segment.model && !PROGRAMMATIC_TYPES.has(segment.visualType)) {
+          model = segment.model;
+        } else if (visualMode === 'video' && videoModels.length > 0) {
+          model = videoModels.reduce((a: FalVideoModelInfo, b: FalVideoModelInfo) => (a.costPerMinute <= b.costPerMinute ? a : b)).modelId;
+        } else if (imageModels.length > 0) {
+          model = imageModels.reduce((a: FalImageModelInfo, b: FalImageModelInfo) => (a.pricePerImage <= b.pricePerImage ? a : b)).modelId;
+        } else {
+          model = null;
+        }
+      } else {
+        // STOCK_FOOTAGE, MAP_OVERLAY — no fal model, image mode
+        visualMode = 'image';
+        model = null;
+      }
+
+      onUpdate(segment.segmentId, { visualType, visualMode, model });
     },
-    [segment.segmentId, segment.visualMode, segment.model, onUpdate],
+    [segment.segmentId, segment.visualMode, segment.visualType, segment.model, imageModels, videoModels, onUpdate],
   );
 
   const handleModeChange = useCallback(
@@ -150,7 +172,7 @@ function StoryboardCardComponent({
         <span className={styles.textPreview}>{textPreview}</span>
         <span className={`${styles.typeBadge} ${badgeClass}`}>
           {VISUAL_TYPE_LABELS[segment.visualType]}
-          {!isProgrammatic && segment.visualMode === 'video' && (
+          {segment.visualType === 'AI_ILLUSTRATION' && segment.visualMode === 'video' && (
             <span className={styles.modeDot}> · Video</span>
           )}
         </span>
@@ -208,8 +230,8 @@ function StoryboardCardComponent({
             ))}
           </div>
 
-          {/* Image / Video toggle — only for non-programmatic */}
-          {!isProgrammatic && (
+          {/* Image / Video toggle — only for AI Illustration */}
+          {segment.visualType === 'AI_ILLUSTRATION' && (
             <div>
               <span className={styles.fieldLabel}>Generate as</span>
               <div className={styles.modeToggle} role="group" aria-label="Generate as">

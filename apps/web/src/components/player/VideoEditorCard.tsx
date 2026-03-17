@@ -88,14 +88,34 @@ function VideoEditorCardComponent({
 
   const handleVisualTypeChange = useCallback(
     (visualType: VisualTypeString) => {
-      const isProgrammatic = PROGRAMMATIC_TYPES.has(visualType);
-      onUpdate(segment.segmentVisualId, {
-        visualType,
-        visualMode: isProgrammatic ? 'programmatic' : segment.visualMode === 'programmatic' ? 'image' : segment.visualMode,
-        model: isProgrammatic ? null : segment.model,
-      });
+      const isProg = PROGRAMMATIC_TYPES.has(visualType);
+      const isAiIllustration = visualType === 'AI_ILLUSTRATION';
+      let visualMode: VisualMode;
+      let model: string | null;
+
+      if (isProg) {
+        visualMode = 'programmatic';
+        model = null;
+      } else if (isAiIllustration) {
+        visualMode = segment.visualMode === 'programmatic' ? 'image' : segment.visualMode;
+        if (segment.model && !PROGRAMMATIC_TYPES.has(segment.visualType)) {
+          model = segment.model;
+        } else if (visualMode === 'video' && videoModels.length > 0) {
+          model = videoModels.reduce((a, b) => (a.costPerMinute <= b.costPerMinute ? a : b)).modelId;
+        } else if (imageModels.length > 0) {
+          model = imageModels.reduce((a, b) => (a.pricePerImage <= b.pricePerImage ? a : b)).modelId;
+        } else {
+          model = null;
+        }
+      } else {
+        // STOCK_FOOTAGE, MAP_OVERLAY — no fal model
+        visualMode = 'image';
+        model = null;
+      }
+
+      onUpdate(segment.segmentVisualId, { visualType, visualMode, model });
     },
-    [segment.segmentVisualId, segment.visualMode, segment.model, onUpdate],
+    [segment.segmentVisualId, segment.visualMode, segment.visualType, segment.model, imageModels, videoModels, onUpdate],
   );
 
   const handleModeChange = useCallback(
@@ -220,8 +240,8 @@ function VideoEditorCardComponent({
             </div>
           </div>
 
-          {/* Image / Video toggle */}
-          {!isProgrammatic && (
+          {/* Image / Video toggle — only for AI Illustration */}
+          {segment.visualType === 'AI_ILLUSTRATION' && (
             <div>
               <span className={styles.fieldLabel}>Generate as</span>
               <div className={styles.modeToggle} role="group" aria-label="Generate as">
