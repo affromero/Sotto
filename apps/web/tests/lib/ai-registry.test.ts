@@ -129,7 +129,7 @@ describe('resolveAiModelAndProvider — unknown model fallthrough', () => {
 
     // Should fall through to BYOK default model, NOT pair unknown model with 'anthropic'
     expect(result.provider).toBe('openai');
-    expect(result.model).toBe('gpt-5');
+    expect(result.model).toBe('gpt-5.4');  // defaultModel changed to gpt-5.4
   });
 
   it('falls through to auto-model when podcastAiModel is unknown and no BYOK key', async () => {
