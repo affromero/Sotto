@@ -3,35 +3,85 @@ import { hasByokKey } from '@/lib/byok';
 import { authenticateRequest } from '@/lib/api-keys';
 import { errorResponse } from '@/lib/api-response';
 import { fetchFalImageModels, fetchAllVideoModels } from '@/lib/video-cost-estimator';
+import { getAutoModelConfig, resolveIncludedImageModels, resolveIncludedVideoModels, resolveImageModel, resolveVideoModel } from '@/lib/auto-model-config';
+import { getVideoModelProvider, type VideoProviderId } from '@/lib/providers/video-registry';
+import { prisma } from '@/lib/prisma';
 
 /**
  * GET — Returns available image and video models with live pricetoken pricing.
- * Image models are FAL-only; video models span all providers (FAL + MiniMax).
+ * Filters by user's plan tier: returns included models + models from BYOK providers.
+ * Includes plan-appropriate default models.
  */
 export async function GET(request: NextRequest) {
   const auth = await authenticateRequest(request);
   if (!auth) return errorResponse('Unauthorized', 401);
 
-  const [imageModels, videoModels, userHasFalKey, userHasMiniMaxKey] = await Promise.all([
+  const [user, imageModels, videoModels, autoConfig, userHasFalKey, userHasMiniMaxKey, userHasHeraKey] = await Promise.all([
+    prisma.user.findUnique({ where: { id: auth.userId }, select: { plan: true, role: true } }),
     fetchFalImageModels(),
     fetchAllVideoModels(),
+    getAutoModelConfig(),
     hasByokKey(auth.userId, 'fal'),
     hasByokKey(auth.userId, 'minimax'),
+    hasByokKey(auth.userId, 'hera'),
   ]);
+
+  const tier = (user?.plan as 'FREE' | 'PRO') ?? 'FREE';
+  const isAdmin = user?.role === 'ADMIN';
 
   // Platform keys count — users don't need BYOK if the platform provides them
   const hasFalKey = userHasFalKey || !!process.env.FAL_KEY;
   const hasMiniMaxKey = userHasMiniMaxKey || !!process.env.MINIMAX_API_KEY;
+  const hasHeraKey = userHasHeraKey || !!process.env.HERA_API_KEY;
+
+  // Resolve plan defaults
+  const [configuredImage, configuredVideo] = await Promise.all([
+    resolveImageModel(tier),
+    resolveVideoModel(tier),
+  ]);
+
+  // Admins see all models; regular users see tier-included + BYOK-accessible models
+  let filteredImageModels = imageModels;
+  let filteredVideoModels = videoModels;
+
+  if (!isAdmin) {
+    // Determine which BYOK video providers the user has access to
+    const byokVideoProviders = new Set<VideoProviderId>();
+    if (userHasFalKey) byokVideoProviders.add('fal');
+    if (userHasMiniMaxKey) byokVideoProviders.add('minimax');
+    if (userHasHeraKey) byokVideoProviders.add('hera');
+
+    // Image model filtering
+    const { freeImageModels, proImageModels } = resolveIncludedImageModels(autoConfig);
+    const allowedImageSet = new Set(tier === 'PRO' ? proImageModels : freeImageModels);
+    // BYOK users with a fal key can use any fal image model
+    if (userHasFalKey) {
+      for (const m of imageModels) allowedImageSet.add(m.modelId);
+    }
+    filteredImageModels = imageModels.filter((m) => allowedImageSet.has(m.modelId));
+
+    // Video model filtering
+    const { freeVideoModels, proVideoModels } = resolveIncludedVideoModels(autoConfig);
+    const allowedVideoSet = new Set(tier === 'PRO' ? proVideoModels : freeVideoModels);
+    // BYOK users can use any model from their BYOK providers
+    for (const m of videoModels) {
+      const provider = getVideoModelProvider(m.modelId);
+      if (provider && byokVideoProviders.has(provider)) {
+        allowedVideoSet.add(m.modelId);
+      }
+    }
+    filteredVideoModels = videoModels.filter((m) => allowedVideoSet.has(m.modelId));
+  }
 
   return NextResponse.json({
-    imageModels: imageModels.map((m) => ({
+    imageModels: filteredImageModels.map((m) => ({
       modelId: m.modelId,
       displayName: m.displayName,
       pricePerImage: m.pricePerImage,
       defaultResolution: m.defaultResolution,
       qualityTier: m.qualityTier,
     })),
-    videoModels: videoModels.map((m) => ({
+    videoModels: filteredVideoModels.map((m) => ({
       modelId: m.modelId,
       displayName: m.displayName,
       costPerMinute: m.costPerMinute,
@@ -41,5 +91,8 @@ export async function GET(request: NextRequest) {
     })),
     hasFalKey,
     hasMiniMaxKey,
+    hasHeraKey,
+    defaultImageModel: configuredImage.imageModel,
+    defaultVideoModel: configuredVideo.videoModel,
   });
 }

@@ -120,6 +120,8 @@ export function PipelineEditor({ pipeline, falModels, onApprove, onCancel, onRec
                   speakerIndex={getSpeakerIndex(seg.speaker, allSpeakers)}
                   imageModels={falModels.imageModels}
                   videoModels={falModels.videoModels}
+                  defaultImageModel={falModels.defaultImageModel}
+                  defaultVideoModel={falModels.defaultVideoModel}
                   hasFalKey={falModels.hasFalKey}
                   isExpanded={expandedId === seg.segmentId}
                   onToggleExpand={() => toggleExpand(seg.segmentId)}
