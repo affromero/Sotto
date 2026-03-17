@@ -58,14 +58,23 @@ export const LANGUAGE_DISPLAY: Record<string, string> = {
   ca: 'Catalan',
 };
 
+import { STATIC_PRICING } from 'pricetoken';
+
+// Derive OpenAI model display names from pricetoken (auto-updates with new models)
+const openaiModels = STATIC_PRICING.filter(m => m.provider === 'openai');
+const openaiDisplay: Record<string, string> = {};
+const openaiShortDisplay: Record<string, string> = {};
+for (const m of openaiModels) {
+  openaiDisplay[m.modelId] = m.displayName;
+  // Strip "GPT-" prefix for short name (e.g. "GPT-5.4 Nano" → "5.4 Nano")
+  openaiShortDisplay[m.modelId] = m.displayName.replace(/^GPT-/, '');
+}
+
 export const AI_MODEL_DISPLAY: Record<string, string> = {
   'claude-haiku-4-5-20251001': 'Claude Haiku 4.5',
   'claude-sonnet-4-6': 'Claude Sonnet 4.6',
   'claude-opus-4-6': 'Claude Opus 4.6',
-  'gpt-5-nano': 'GPT-5 Nano',
-  'gpt-5-mini': 'GPT-5 Mini',
-  'gpt-5': 'GPT-5',
-  'gpt-5.2': 'GPT-5.2',
+  ...openaiDisplay,
   'gemini-3.1-flash-lite-preview': 'Gemini 3.1 Flash Lite',
   'gemini-3.1-pro-preview': 'Gemini 3.1 Pro',
   'llama-3.1-8b-instant': 'Llama 3.1 8B (Fast)',
@@ -80,10 +89,7 @@ export const AI_MODEL_SHORT_DISPLAY: Record<string, string> = {
   'claude-haiku-4-5-20251001': 'Haiku 4.5',
   'claude-sonnet-4-6': 'Sonnet 4.6',
   'claude-opus-4-6': 'Opus 4.6',
-  'gpt-5-nano': '5 Nano',
-  'gpt-5-mini': '5 Mini',
-  'gpt-5': '5',
-  'gpt-5.2': '5.2',
+  ...openaiShortDisplay,
   'gemini-3.1-flash-lite-preview': 'Flash Lite 3.1',
   'gemini-3.1-pro-preview': 'Pro 3.1',
   'llama-3.1-8b-instant': '3.1 8B',

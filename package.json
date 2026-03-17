@@ -74,7 +74,7 @@
     "@next/swc-darwin-arm64": "^16.1.7",
     "@prisma/client": "^6.19.2",
     "geoip-lite": "^1.4.10",
-    "pricetoken": "^0.13.3"
+    "pricetoken": "^0.13.8"
   },
   "overrides": {
     "react-native-reanimated": "4.1.1",

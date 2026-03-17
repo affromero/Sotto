@@ -133,13 +133,17 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
     displayName: 'OpenAI',
     shortLabel: 'GPT',
     platformEnvKey: 'OPENAI_API_KEY',
-    defaultModel: 'gpt-5',
+    defaultModel: 'gpt-5.4',
     getApiKeyUrl: 'https://platform.openai.com/api-keys',
     models: [
       { id: 'gpt-5-nano', displayName: 'GPT-5 Nano', shortDisplayName: '5 Nano', tier: 'fast', requiredPlan: 'FREE', contextWindow: 400_000, maxOutputTokens: 128_000, isReasoning: true },
       { id: 'gpt-5-mini', displayName: 'GPT-5 Mini', shortDisplayName: '5 Mini', tier: 'fast', requiredPlan: 'FREE', contextWindow: 400_000, maxOutputTokens: 128_000, isReasoning: true },
       { id: 'gpt-5', displayName: 'GPT-5', shortDisplayName: '5', tier: 'balanced', requiredPlan: 'PRO', contextWindow: 400_000, maxOutputTokens: 128_000, isReasoning: true },
       { id: 'gpt-5.2', displayName: 'GPT-5.2', shortDisplayName: '5.2', tier: 'best', requiredPlan: 'PRO', contextWindow: 400_000, maxOutputTokens: 128_000, isReasoning: true },
+      { id: 'gpt-5.4-nano', displayName: 'GPT-5.4 Nano', shortDisplayName: '5.4 Nano', tier: 'fast', requiredPlan: 'FREE', contextWindow: 400_000, maxOutputTokens: 128_000, isReasoning: true },
+      { id: 'gpt-5.4-mini', displayName: 'GPT-5.4 Mini', shortDisplayName: '5.4 Mini', tier: 'fast', requiredPlan: 'FREE', contextWindow: 400_000, maxOutputTokens: 128_000, isReasoning: true },
+      { id: 'gpt-5.4', displayName: 'GPT-5.4', shortDisplayName: '5.4', tier: 'balanced', requiredPlan: 'PRO', contextWindow: 1_050_000, maxOutputTokens: 128_000, isReasoning: true },
+      { id: 'gpt-5.4-pro', displayName: 'GPT-5.4 Pro', shortDisplayName: '5.4 Pro', tier: 'best', requiredPlan: 'PRO', contextWindow: 1_050_000, maxOutputTokens: 128_000, isReasoning: true },
     ],
     auth: {
       fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'sk-...' }],

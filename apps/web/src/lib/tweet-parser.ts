@@ -292,6 +292,7 @@ const AI_MODEL_ALIASES: Record<string, string> = {
   claude: getAiProviderMeta('anthropic').models.find(m => m.tier === 'balanced')!.id,
   // OpenAI
   'gpt-5': getAiProviderMeta('openai').defaultModel,
+  'gpt-5.4': getAiProviderMeta('openai').defaultModel,
   'gpt5': getAiProviderMeta('openai').defaultModel,
   chatgpt: getAiProviderMeta('openai').defaultModel,
   openai: getAiProviderMeta('openai').defaultModel,
