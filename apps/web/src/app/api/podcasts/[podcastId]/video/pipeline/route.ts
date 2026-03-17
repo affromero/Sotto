@@ -21,6 +21,7 @@ import {
   type AiProviderId,
 } from '@/lib/providers/ai-registry';
 import { getAiKey } from '@/lib/byok';
+import { Prisma } from '@prisma/client';
 import type { VideoPipeline } from '@/types/pipeline';
 import { videoModelSupportsLastFrame } from '@/lib/providers/video-registry';
 import { logger } from '@/lib/logger';
@@ -170,14 +171,6 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   const auth = await authenticateRequest(request);
   if (!auth) return errorResponse('Unauthorized', 401);
 
-  const url = new URL(request.url);
-  const rawId = url.searchParams.get('classificationId');
-  const parsed = classificationIdSchema.safeParse(rawId);
-  if (!parsed.success) {
-    return errorResponse('Missing or invalid classificationId', 400);
-  }
-  const classificationId = parsed.data;
-
   // Verify podcast ownership to prevent enumeration
   const podcast = await prisma.podcast.findUnique({
     where: { id: podcastId },
@@ -189,6 +182,28 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   if (podcast.userId !== auth.userId && adminId === null) {
     return errorResponse('Forbidden', 403);
   }
+
+  const url = new URL(request.url);
+  const rawId = url.searchParams.get('classificationId');
+
+  // No classificationId — load saved draft from DB
+  if (!rawId) {
+    const draft = await prisma.videoGeneration.findFirst({
+      where: { podcastId, status: 'DRAFT' },
+      select: { pipelineJson: true },
+    });
+    if (draft?.pipelineJson) {
+      return NextResponse.json({ status: 'saved', pipeline: draft.pipelineJson });
+    }
+    return NextResponse.json({ status: 'none' });
+  }
+
+  // With classificationId — poll Redis for classification result
+  const parsed = classificationIdSchema.safeParse(rawId);
+  if (!parsed.success) {
+    return errorResponse('Invalid classificationId', 400);
+  }
+  const classificationId = parsed.data;
 
   const result = await cache.get<{
     status: 'ready' | 'failed';
@@ -276,6 +291,14 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     transitions,
     totalEstimatedCost: estimatePipelineCost(segments, imageModels, videoModels, transitions),
   };
+
+  // Persist edits to DRAFT VideoGeneration (fire-and-forget)
+  prisma.videoGeneration.updateMany({
+    where: { podcastId, status: 'DRAFT' },
+    data: { pipelineJson: pipeline as unknown as Prisma.InputJsonValue },
+  }).catch((err) => {
+    logger.warn('Failed to persist pipeline draft', { podcastId, error: String(err) });
+  });
 
   return NextResponse.json(pipeline);
 }
