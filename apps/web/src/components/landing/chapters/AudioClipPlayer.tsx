@@ -56,6 +56,7 @@ export function AudioClipPlayer({
   videoClip,
 }: AudioClipPlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const pendingResumeRef = useRef<{ elapsed: number; play: boolean } | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -65,28 +66,45 @@ export function AudioClipPlayer({
   const clipDuration = endTime - startTime;
   const progress = clipDuration > 0 ? Math.min(currentTime / clipDuration, 1) : 0;
 
+  const syncVideo = useCallback((time: number, playing: boolean) => {
+    const video = videoRef.current;
+    if (!video) return;
+    // Only sync if drift exceeds 0.3s to avoid constant seeking
+    if (Math.abs(video.currentTime - time) > 0.3) {
+      video.currentTime = time;
+    }
+    if (playing && video.paused) {
+      video.play().catch(() => {});
+    } else if (!playing && !video.paused) {
+      video.pause();
+    }
+  }, []);
+
   const handlePlay = useCallback(() => {
     const audio = audioRef.current;
     if (!audio) return;
 
     if (isPlaying) {
       audio.pause();
+      syncVideo(audio.currentTime, false);
       setIsPlaying(false);
     } else {
       audio.currentTime = startTime;
       audio.play();
+      syncVideo(startTime, true);
       setIsPlaying(true);
     }
-  }, [isPlaying, startTime]);
+  }, [isPlaying, startTime, syncVideo]);
 
   const handleTrackSwitch = useCallback((index: number) => {
     if (index === activeTrackIndex) return;
     const audio = audioRef.current;
     const elapsed = audio ? audio.currentTime - startTime : 0;
     if (audio) audio.pause();
+    syncVideo(startTime + Math.max(0, elapsed), false);
     pendingResumeRef.current = { elapsed: Math.max(0, elapsed), play: isPlaying };
     setActiveTrackIndex(index);
-  }, [isPlaying, startTime, activeTrackIndex]);
+  }, [isPlaying, startTime, activeTrackIndex, syncVideo]);
 
   // When src changes, load and resume from saved position
   useEffect(() => {
@@ -100,6 +118,7 @@ export function AudioClipPlayer({
       audio.currentTime = startTime + pending.elapsed;
       if (pending.play) {
         audio.play();
+        syncVideo(startTime + pending.elapsed, true);
         setIsPlaying(true);
       }
     };
@@ -110,7 +129,7 @@ export function AudioClipPlayer({
     return () => {
       audio.removeEventListener('canplay', onCanPlay);
     };
-  }, [activeUrl, startTime]);
+  }, [activeUrl, startTime, syncVideo]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -119,16 +138,19 @@ export function AudioClipPlayer({
     const onTimeUpdate = () => {
       const elapsed = audio.currentTime - startTime;
       setCurrentTime(Math.max(0, elapsed));
+      syncVideo(audio.currentTime, true);
 
       if (audio.currentTime >= endTime) {
         audio.pause();
         audio.currentTime = startTime;
+        syncVideo(startTime, false);
         setIsPlaying(false);
         setCurrentTime(0);
       }
     };
 
     const onEnded = () => {
+      syncVideo(startTime, false);
       setIsPlaying(false);
       setCurrentTime(0);
     };
@@ -139,7 +161,7 @@ export function AudioClipPlayer({
       audio.removeEventListener('timeupdate', onTimeUpdate);
       audio.removeEventListener('ended', onEnded);
     };
-  }, [startTime, endTime]);
+  }, [startTime, endTime, syncVideo]);
 
   return (
     <div className={styles.mockPlayer}>
@@ -148,6 +170,32 @@ export function AudioClipPlayer({
         <span>Now Playing</span>
       </div>
       <div className={styles.mockBody}>
+        {videoClip && (
+          <div className={styles.videoInline}>
+            {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+            <video
+              ref={videoRef}
+              src={videoClip.url}
+              preload="metadata"
+              className={styles.videoPlayer}
+              playsInline
+              muted
+            />
+            {!isPlaying && (
+              <button
+                type="button"
+                className={styles.videoPlayOverlay}
+                onClick={handlePlay}
+                aria-label="Play"
+              >
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+              </button>
+            )}
+          </div>
+        )}
+
         <a href={`/podcast/${podcastId}`} className={styles.playerTitle}>
           {title}
         </a>
@@ -226,25 +274,6 @@ export function AudioClipPlayer({
             </a>
           </div>
         </div>
-
-        {videoClip && (
-          <a href={`/podcast/${podcastId}?tab=video`} className={styles.videoPreview}>
-            {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-            <video
-              src={`${videoClip.url}#t=${videoClip.start}`}
-              preload="metadata"
-              className={styles.videoThumb}
-              playsInline
-              muted
-            />
-            <div className={styles.videoPreviewOverlay}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <path d="M8 5v14l11-7z" />
-              </svg>
-              <span>Watch video</span>
-            </div>
-          </a>
-        )}
       </div>
       {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
       <audio ref={audioRef} src={activeUrl} preload="metadata" />
