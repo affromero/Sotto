@@ -108,7 +108,7 @@ docker compose -f "$COMPOSE_APP" -p "sotto-${NEW_SLOT}" build
 echo ""
 echo "=== Running database migrations ==="
 docker compose -f "$COMPOSE_APP" -p "sotto-${NEW_SLOT}" run --rm --no-deps \
-  web npx prisma@6 db push --skip-generate --accept-data-loss --schema=prisma/schema.prisma
+  web npx prisma@6 db push --skip-generate --schema=prisma/schema.prisma
 
 # --- Start new slot ---
 
