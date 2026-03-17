@@ -1,6 +1,5 @@
 import type { LandingShowcaseData } from '@/lib/showcase';
 import { ScrollChapter } from '../ScrollChapter';
-import { VideoClipPlayer } from './VideoClipPlayer';
 import styles from './ShowcaseChapter.module.css';
 
 interface ShowcaseChapterProps {
@@ -64,13 +63,6 @@ export function ShowcaseChapter({ showcase }: ShowcaseChapterProps) {
                 </div>
               </div>
             </div>
-            {showcase?.videoClip && (
-              <VideoClipPlayer
-                videoUrl={showcase.videoClip.url}
-                startTime={showcase.videoClip.start}
-                endTime={showcase.videoClip.end}
-              />
-            )}
           </div>
           <div className={styles.splitText}>
             <div className={styles.textContent}>

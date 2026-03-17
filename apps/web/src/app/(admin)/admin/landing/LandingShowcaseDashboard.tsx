@@ -11,8 +11,6 @@ interface Config {
   audioClipEnd: number | null;
   videoSegmentStart: number;
   videoSegmentCount: number;
-  videoClipStart: number;
-  videoClipEnd: number | null;
   twitterHandle: string;
   twitterName: string;
   telegramTopic: string | null;
@@ -46,8 +44,6 @@ export function LandingShowcaseDashboard() {
     audioClipEnd: null,
     videoSegmentStart: 0,
     videoSegmentCount: 4,
-    videoClipStart: 0,
-    videoClipEnd: null,
     twitterHandle: 'andres',
     twitterName: 'Andres',
     telegramTopic: null,
@@ -132,8 +128,6 @@ export function LandingShowcaseDashboard() {
           audioClipEnd: null,
           videoSegmentStart: 0,
           videoSegmentCount: 4,
-          videoClipStart: 0,
-          videoClipEnd: null,
           twitterHandle: 'andres',
           twitterName: 'Andres',
           telegramTopic: null,
@@ -252,7 +246,7 @@ export function LandingShowcaseDashboard() {
 
       {/* Audio Clip */}
       <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Audio Clip (Step 3)</h2>
+        <h2 className={styles.sectionTitle}>Media Clip — Audio + Video (Step 3)</h2>
         <div className={styles.row}>
           <label className={styles.field}>
             <span className={styles.fieldLabel}>Start (seconds)</span>
@@ -283,9 +277,9 @@ export function LandingShowcaseDashboard() {
         </div>
       </section>
 
-      {/* Video Segments + Clip */}
+      {/* Video Segments */}
       <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Video (Showcase)</h2>
+        <h2 className={styles.sectionTitle}>Video Segments (Showcase)</h2>
         <div className={styles.row}>
           <label className={styles.field}>
             <span className={styles.fieldLabel}>Segment start</span>
@@ -306,34 +300,6 @@ export function LandingShowcaseDashboard() {
               value={form.videoSegmentCount}
               onChange={(e) => setForm((f) => ({ ...f, videoSegmentCount: parseInt(e.target.value) || 4 }))}
               className={styles.inputSmall}
-            />
-          </label>
-        </div>
-        <div className={styles.row}>
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>Clip start (seconds)</span>
-            <input
-              type="number"
-              min={0}
-              step={0.1}
-              value={form.videoClipStart}
-              onChange={(e) => setForm((f) => ({ ...f, videoClipStart: parseFloat(e.target.value) || 0 }))}
-              className={styles.inputSmall}
-            />
-          </label>
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>End (seconds, blank = +30s)</span>
-            <input
-              type="number"
-              min={0}
-              step={0.1}
-              value={form.videoClipEnd ?? ''}
-              onChange={(e) => setForm((f) => ({
-                ...f,
-                videoClipEnd: e.target.value ? parseFloat(e.target.value) : null,
-              }))}
-              className={styles.inputSmall}
-              placeholder="auto"
             />
           </label>
         </div>

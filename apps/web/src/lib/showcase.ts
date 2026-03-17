@@ -304,11 +304,10 @@ export async function getLandingShowcaseData(): Promise<LandingShowcaseData | nu
         type: VISUAL_TYPE_LABELS[v.visualType] ?? v.visualType,
       }));
 
-    // Video clip
+    // Video clip — uses same clip range as audio so they sync on one timeline
     const videoUrl = podcast.videoGenerations[0]?.videoUrl;
-    const videoClipEnd = config.videoClipEnd ?? config.videoClipStart + 30;
     const videoClip = videoUrl
-      ? { url: videoUrl, start: config.videoClipStart, end: videoClipEnd }
+      ? { url: videoUrl, start: config.audioClipStart, end: audioClipEnd }
       : null;
 
     // Bot overrides
