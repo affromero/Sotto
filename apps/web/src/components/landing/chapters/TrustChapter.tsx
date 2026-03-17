@@ -46,6 +46,11 @@ export function TrustChapter() {
               Every reference is scored by its domain &mdash; because news articles don&apos;t
               need DOIs, and Wikipedia isn&apos;t held to the same bar as Nature.
             </p>
+            <p className={styles.description}>
+              We don&apos;t optimize for watch time or retention metrics &mdash; we optimize
+              for genuine understanding. The goal isn&apos;t more content. It&apos;s better
+              content that actually teaches you something.
+            </p>
 
             <p className={styles.footer}>
               Scoring logic is open source &mdash;{' '}
