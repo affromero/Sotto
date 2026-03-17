@@ -17,6 +17,7 @@
     "@fontsource/dm-serif-display": "^5.0.0",
     "@fontsource/inter": "^5.0.0",
     "@remotion/media-utils": "^4.0.0",
+    "@remotion/transitions": "^4.0.0",
     "recharts": "^2.15.0",
     "remotion": "^4.0.0"
   },
