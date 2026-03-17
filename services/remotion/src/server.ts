@@ -4,7 +4,6 @@ import { renderRouter, preWarmBundle } from './routes/render';
 import { stillRouter } from './routes/still';
 import { clipRouter, TMP_ASSETS_DIR } from './routes/clip';
 import { recordRouter } from './routes/record';
-import { stitchRouter } from './routes/stitch';
 import { probeRouter } from './routes/probe';
 
 const app = express();
@@ -23,7 +22,6 @@ app.use('/render', renderRouter);
 app.use('/still', stillRouter);
 app.use('/clip', clipRouter);
 app.use('/record', recordRouter);
-app.use('/stitch', stitchRouter);
 app.use('/probe', probeRouter);
 
 // GET /health — health check

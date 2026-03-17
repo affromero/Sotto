@@ -2,11 +2,11 @@ export type { VideoSegment, RenderConfig, RenderInput, VisualsInput, Branding, R
 export { DEFAULT_RENDER_CONFIG, DEFAULT_BRANDING, RenderStatus, VisualType } from './types';
 export { PodcastVideo } from './compositions/PodcastVideo';
 export { PodcastVisuals } from './compositions/PodcastVisuals';
-export { LaunchVideo, computeSceneLayouts } from './compositions/LaunchVideo';
+export { LaunchVideo, computeTotalDurationFrames } from './compositions/LaunchVideo';
 export { LaunchScene } from './compositions/LaunchScene';
 export { resolveSegmentComponent } from './compositions/segments';
 export { SegmentStill } from './compositions/SegmentStill';
-export { KenBurns, AvatarEntrance, KineticText, SceneTransition, SubtitleTrack, ParticleField } from './compositions/effects';
+export { KenBurns, AvatarEntrance, KineticText, SubtitleTrack, ParticleField } from './compositions/effects';
 export { SottoWatermark } from './compositions/shared/SottoWatermark';
 export { SpeakerLabel } from './compositions/shared/SpeakerLabel';
 export { Background } from './compositions/shared/Background';

@@ -1,5 +1,7 @@
 import React from 'react';
-import { AbsoluteFill, Audio, Sequence, useVideoConfig, useCurrentFrame, interpolate, OffthreadVideo } from 'remotion';
+import { AbsoluteFill, Audio, useVideoConfig, useCurrentFrame, interpolate, OffthreadVideo } from 'remotion';
+import { TransitionSeries, linearTiming } from '@remotion/transitions';
+import { fade } from '@remotion/transitions/fade';
 import type { LaunchVideoInput, LaunchSceneInput } from '../types';
 import { DEFAULT_RENDER_CONFIG } from '../types';
 import { LaunchScene } from './LaunchScene';
@@ -13,48 +15,41 @@ function sceneDurationSec(scene: LaunchSceneInput): number {
   if (scene.voiceoverDurationSec && scene.voiceoverDurationSec > 0) {
     return scene.voiceoverDurationSec;
   }
-  return scene.recordingDurationSec ?? 10; // fallback 10s if somehow missing
+  return scene.recordingDurationSec ?? 10;
 }
+
+/** Transition clip duration (seconds) when a pre-rendered video is provided. */
+const TRANSITION_CLIP_DURATION_SEC = 1.5;
+
+/** Crossfade duration (frames) when no transition video is provided. */
+const CROSSFADE_FRAMES = 15;
 
 /**
- * Estimate transition clip duration — default 1.5s if a transition URL is present.
- * The worker can extend LaunchSceneInput with exact transition durations later.
+ * Compute total duration in frames for the TransitionSeries layout.
+ * Used by calculateMetadata in Root.tsx.
+ *
+ * - Scenes with transitionUrl: adds a separate transition clip sequence (no overlap)
+ * - Scenes without transitionUrl (not last): crossfade overlaps by CROSSFADE_FRAMES
  */
-const TRANSITION_DURATION_SEC = 1.5;
-
-export interface SceneLayout {
-  startFrame: number;
-  durationFrames: number;
-  transitionStartFrame?: number;
-  transitionDurationFrames?: number;
-}
-
-export function computeSceneLayouts(scenes: LaunchSceneInput[], fps: number): SceneLayout[] {
-  const layouts: SceneLayout[] = [];
-  let currentFrame = 0;
+export function computeTotalDurationFrames(scenes: LaunchSceneInput[], fps: number): number {
+  let totalFrames = 0;
 
   for (let i = 0; i < scenes.length; i++) {
     const scene = scenes[i];
-    const durationFrames = Math.ceil(sceneDurationSec(scene) * fps);
+    totalFrames += Math.ceil(sceneDurationSec(scene) * fps);
 
-    const layout: SceneLayout = {
-      startFrame: currentFrame,
-      durationFrames,
-    };
-
-    currentFrame += durationFrames;
-
-    // Transition clip between scenes (not after the last)
-    if (scene.transitionUrl && i < scenes.length - 1) {
-      layout.transitionStartFrame = currentFrame;
-      layout.transitionDurationFrames = Math.ceil(TRANSITION_DURATION_SEC * fps);
-      currentFrame += layout.transitionDurationFrames;
+    if (i < scenes.length - 1) {
+      if (scene.transitionUrl) {
+        // Pre-rendered transition clip adds frames (no overlap)
+        totalFrames += Math.ceil(TRANSITION_CLIP_DURATION_SEC * fps);
+      } else {
+        // Crossfade overlaps scenes, reducing total duration
+        totalFrames -= CROSSFADE_FRAMES;
+      }
     }
-
-    layouts.push(layout);
   }
 
-  return layouts;
+  return Math.max(1, totalFrames);
 }
 
 /**
@@ -75,7 +70,6 @@ export const LaunchVideo: React.FC<LaunchVideoInput> = ({
   const fps = config?.fps ?? DEFAULT_RENDER_CONFIG.fps;
   const { durationInFrames } = useVideoConfig();
   const frame = useCurrentFrame();
-  const layouts = React.useMemo(() => computeSceneLayouts(scenes, fps), [scenes, fps]);
 
   const bgVol = backgroundMusicVolume ?? 0.1;
 
@@ -99,24 +93,34 @@ export const LaunchVideo: React.FC<LaunchVideoInput> = ({
         <Audio src={backgroundMusicUrl} volume={musicVolume} loop />
       )}
 
-      {/* Scenes */}
-      {scenes.map((scene, i) => {
-        const layout = layouts[i];
-        return (
-          <React.Fragment key={`scene-${i}`}>
-            <Sequence from={layout.startFrame} durationInFrames={layout.durationFrames}>
-              <LaunchScene scene={scene} sceneIndex={i} fps={fps} />
-            </Sequence>
+      {/* Scenes with transitions */}
+      <TransitionSeries>
+        {scenes.map((scene, i) => {
+          const durationFrames = Math.ceil(sceneDurationSec(scene) * fps);
+          const isLast = i === scenes.length - 1;
 
-            {/* Transition clip between scenes */}
-            {scene.transitionUrl && layout.transitionStartFrame !== undefined && layout.transitionDurationFrames && (
-              <Sequence from={layout.transitionStartFrame} durationInFrames={layout.transitionDurationFrames}>
-                <TransitionClip src={scene.transitionUrl} />
-              </Sequence>
-            )}
-          </React.Fragment>
-        );
-      })}
+          return (
+            <React.Fragment key={`scene-${i}`}>
+              <TransitionSeries.Sequence durationInFrames={durationFrames}>
+                <LaunchScene scene={scene} sceneIndex={i} fps={fps} />
+              </TransitionSeries.Sequence>
+
+              {!isLast && scene.transitionUrl && (
+                <TransitionSeries.Sequence durationInFrames={Math.ceil(TRANSITION_CLIP_DURATION_SEC * fps)}>
+                  <TransitionClip src={scene.transitionUrl} />
+                </TransitionSeries.Sequence>
+              )}
+
+              {!isLast && !scene.transitionUrl && (
+                <TransitionSeries.Transition
+                  presentation={fade()}
+                  timing={linearTiming({ durationInFrames: CROSSFADE_FRAMES })}
+                />
+              )}
+            </React.Fragment>
+          );
+        })}
+      </TransitionSeries>
 
       <SottoWatermark />
     </AbsoluteFill>
