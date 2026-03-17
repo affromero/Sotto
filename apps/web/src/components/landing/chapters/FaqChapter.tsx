@@ -7,10 +7,10 @@ const FAQ_ITEMS = [
     question: 'What exactly is Sotto?',
     answer: (
       <>
-        Sotto is a social podcast network. You describe what you want to learn, and AI
+        Sotto is a social podcast network. You describe what you want to learn. AI
         writes a fact-checked script, generates studio-quality audio with real voice
-        providers, and can even turn it into video. Then you publish it to a social feed
-        where others can listen, fork, remix, and ask questions &mdash; all inside the
+        providers, and can turn it into video. Then you publish it to a social feed
+        where others can listen, fork, remix, and ask questions right inside the
         episode.
       </>
     ),
@@ -20,20 +20,19 @@ const FAQ_ITEMS = [
     answer: (
       <>
         Go to <Link href="/create">Create</Link> and chat with our AI assistant.
-        Describe what you want to learn about &mdash; a topic, an article URL, a YouTube
-        video &mdash; and it asks follow-up questions to nail down exactly what you need.
-        Once you&apos;re happy, it writes a script, you review it, and then it generates
-        studio audio. The whole thing takes minutes, not hours.
+        Give it a topic, an article URL, a YouTube video. It asks follow-up questions
+        to figure out exactly what you need. Then it writes a script, you review it,
+        and it generates studio audio. Minutes, not hours.
       </>
     ),
   },
   {
-    question: 'Too many API keys — which ones do I actually need?',
+    question: 'Too many API keys. Which ones do I actually need?',
     answer: (
       <>
         If you don&apos;t want to think about it: <strong>just Fal</strong>. A single Fal
-        API key covers the entire pipeline &mdash; LLM, text-to-speech, images, video, and
-        avatars. One key, full access, done. Of course, you can also mix and match providers
+        API key covers the entire pipeline: LLM, text-to-speech, images, video, and
+        avatars. One key, full access, done. You can also mix and match providers
         (Anthropic for AI, ElevenLabs for voices, etc.) if you have preferences. But
         Fal alone gets you everything.
       </>
@@ -43,7 +42,7 @@ const FAQ_ITEMS = [
     question: 'Is it really free?',
     answer: (
       <>
-        Right now, yes. During early access everything works with platform AI &mdash; no
+        Right now, yes. During early access everything works with platform AI. No
         card, no limits. If you bring your own API keys (BYOK), you get unlimited
         generations at whatever your provider charges. We&apos;ll introduce plans down the
         road, but early members get grandfathered in. We&apos;re building in the open and
@@ -57,8 +56,8 @@ const FAQ_ITEMS = [
       <>
         Voice cloning and avatar images are gated behind identity verification. You record
         or upload your own voice, and we verify it&apos;s actually yours before it goes
-        live. Same for portrait photos used in lip-sync avatars &mdash; consent-based,
-        verified, and shareable only with your explicit permission. No one can clone your
+        live. Portrait photos for lip-sync avatars go through the same process: consent-based,
+        verified, shareable only with your permission. No one can clone your
         voice or use your face without your approval.
       </>
     ),
@@ -68,7 +67,7 @@ const FAQ_ITEMS = [
     answer: (
       <>
         This is something we take very seriously. Voice cloning requires identity
-        verification and explicit consent &mdash; you can only clone your own voice. Avatar
+        verification and explicit consent. You can only clone your own voice. Avatar
         images go through the same consent gate. All AI-generated content is clearly
         labeled. We have active content moderation, a reporting system, and a zero-tolerance
         policy for impersonation or deepfakes. If someone misuses the platform, they&apos;re
@@ -81,7 +80,7 @@ const FAQ_ITEMS = [
     answer: (
       <>
         The opposite. We don&apos;t optimize for retention, watch time, or engagement
-        metrics &mdash; we optimize for <em>learning</em>. Every script is fact-checked
+        metrics. We optimize for <em>learning</em>. Every script is fact-checked
         against real sources. Every claim gets a verification score. We built an{' '}
         <a
           href="https://github.com/SottoFM/reference-verification-standard"
@@ -99,10 +98,10 @@ const FAQ_ITEMS = [
     question: 'I listen to podcasts but forget everything.',
     answer: (
       <>
-        Us too &mdash; that&apos;s why we built comprehension quizzes and daily briefings.
+        Us too. That&apos;s why we built comprehension quizzes and daily briefings.
         After every podcast, you get a quick quiz to test what you actually retained. Daily
         briefings give you a 5-minute personalized recap every morning based on your
-        interests. Think of it as spaced repetition for your ears &mdash; turn passive
+        interests. Spaced repetition for your ears. Passive
         listening into knowledge that sticks.
       </>
     ),
@@ -111,10 +110,10 @@ const FAQ_ITEMS = [
     question: 'Can I import my own podcast?',
     answer: (
       <>
-        Yes &mdash; from anywhere. Spotify, Apple Podcasts, YouTube, NotebookLM, or just
-        drag in an audio file. Sotto adds transcripts, social features, interactive Q&amp;A,
-        and everything else on top. Human-created content is labeled as such &mdash; we
-        never misrepresent what&apos;s AI and what isn&apos;t.
+        From anywhere. Spotify, Apple Podcasts, YouTube, NotebookLM, or just
+        drag in an audio file. Sotto adds transcripts, social features, and interactive
+        Q&amp;A on top. Human-created content is always labeled as human. We never
+        misrepresent what&apos;s AI and what isn&apos;t.
       </>
     ),
   },
@@ -122,7 +121,7 @@ const FAQ_ITEMS = [
     question: 'Can I interrupt mid-playback to ask a question?',
     answer: (
       <>
-        Yes &mdash; that&apos;s one of our favorite features. Pause at any point, ask a
+        Absolutely. Pause at any point, ask a
         follow-up question, and get an answer drawn from the full context of the episode.
         Your Q&amp;A gets woven back into the podcast permanently, so the next person who
         listens benefits too.
@@ -134,7 +133,7 @@ const FAQ_ITEMS = [
     answer: (
       <>
         All BYOK keys are encrypted with AES-256-GCM before storage. They&apos;re only
-        decrypted in memory when making API calls on your behalf &mdash; never logged, never
+        decrypted in memory when making API calls on your behalf. Never logged, never
         shared. You can revoke your keys at any time from{' '}
         <Link href="/settings/api">Settings</Link>.
       </>
@@ -145,7 +144,7 @@ const FAQ_ITEMS = [
     answer: (
       <>
         Yes, fully. Go to your profile settings and hit &quot;Delete Account.&quot; It
-        permanently removes everything &mdash; podcasts, comments, API keys, all of it. No
+        permanently removes everything: podcasts, comments, API keys, all of it. No
         dark patterns, no &quot;are you sure?&quot; loops. Your data is yours.
       </>
     ),
@@ -160,7 +159,7 @@ export function FaqChapter() {
           <span className={styles.overline}>FAQ</span>
           <h2 className={styles.heading}>Questions? Answers.</h2>
           <p className={styles.description}>
-            The stuff people actually ask us &mdash; no corporate fluff.
+            The stuff people actually ask us. No corporate fluff.
           </p>
         </div>
 

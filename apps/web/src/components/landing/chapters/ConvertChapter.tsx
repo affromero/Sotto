@@ -19,11 +19,11 @@ export function ConvertChapter() {
                 early access.
               </h2>
               <p className={styles.descLight}>
-                During early access, everything works with platform AI &mdash; no card, no
+                During early access, everything works with platform AI. No card, no
                 limits. Bring your own API keys for unlimited generations at your
                 provider&apos;s rates. Just one Fal key covers the entire pipeline: AI,
                 voices, images, video, and avatars. We&apos;ll introduce plans down the
-                road &mdash; early members get grandfathered in.
+                road. Early members get grandfathered in.
               </p>
             </div>
             <div className={styles.stats} data-reveal>

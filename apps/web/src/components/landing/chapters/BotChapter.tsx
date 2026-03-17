@@ -31,7 +31,7 @@ export function BotChapter({ showcase }: BotChapterProps) {
           <p className={styles.description}>
             Tag <strong><a href="https://x.com/sottofm" className={styles.extLink}>@sottofm</a></strong> on X to generate a podcast instantly, or message{' '}
             <strong><a href="https://t.me/SottoFMBot" className={styles.extLink}>@SottoFMBot</a></strong> on
-            Telegram to save ideas for later &mdash; come back and turn them into
+            Telegram to save ideas for later. Come back and turn them into
             podcasts whenever you&apos;re ready.
           </p>
         </div>

@@ -84,8 +84,7 @@ export function JourneyChapter({ showcase }: JourneyChapterProps) {
                       <div className={`${styles.mockMsg} ${styles.mockBot}`}>
                         <div className={styles.mockAvatar}>S</div>
                         <div className={styles.mockBubble}>
-                          Fascinating topic! To tailor this for you &mdash; what&apos;s your
-                          background in biology?
+                          Fascinating topic! What&apos;s your background in biology?
                         </div>
                       </div>
                       <div className={`${styles.mockMsg} ${styles.mockUser}`}>
@@ -124,8 +123,8 @@ export function JourneyChapter({ showcase }: JourneyChapterProps) {
                 <div className={styles.stepBody}>
                   <h3 className={styles.stepTitle}>Review &amp; choose voices</h3>
                   <p className={styles.stepDesc}>
-                    Edit every line of the script. Pick from 7 TTS providers &mdash;
-                    ElevenLabs, Cartesia, Hume, OpenAI, and more &mdash; or use your
+                    Edit every line of the script. Pick from 7 TTS providers
+                    (ElevenLabs, Cartesia, Hume, OpenAI, and more) or use your
                     cloned voice.
                   </p>
                 </div>
@@ -151,7 +150,7 @@ export function JourneyChapter({ showcase }: JourneyChapterProps) {
                           <span className={styles.scriptSpeaker} data-speaker="host">Host</span>
                           <p>
                             Today we&apos;re diving into one of the most revolutionary technologies
-                            of our time &mdash; CRISPR gene editing.{' '}
+                            of our time: CRISPR gene editing.{' '}
                             <sup className={styles.citation}>[1]</sup>
                           </p>
                         </div>

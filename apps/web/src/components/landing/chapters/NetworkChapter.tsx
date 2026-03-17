@@ -42,7 +42,7 @@ const FEATURES = [
   {
     title: 'Daily Briefings',
     description:
-      'Most podcast listening evaporates by lunchtime. Daily briefings fix that — a 5-minute personalized recap every morning, reinforcing what you learned and surfacing new stories from your interests.',
+      'Most podcast listening evaporates by lunchtime. Daily briefings fix that. A 5-minute personalized recap every morning, reinforcing what you learned and surfacing new stories from your interests.',
     icon: (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <circle cx="12" cy="12" r="10" />
@@ -53,7 +53,7 @@ const FEATURES = [
   {
     title: 'Comprehension Quizzes',
     description:
-      'You listened for 20 minutes — what do you actually remember? Quick quizzes after every episode test retention and explain what you missed. Passive listening becomes active learning.',
+      'You listened for 20 minutes. What do you actually remember? Quick quizzes after every episode test retention and explain what you missed. Passive listening becomes active learning.',
     icon: (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <path d="M9 11l3 3L22 4" />
