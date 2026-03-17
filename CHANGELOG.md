@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.27.0] - 2026-03-17
+
+### Added
+- Storyboard persistence — save video pipeline as DRAFT VideoGeneration with re-classify option
+- DRAFT status for VideoStatus enum enabling storyboard save/resume workflow
+- `@remotion/transitions` with fade crossfade fallback between LaunchVideo scenes (replaces hard cuts)
+- GPT-5.4 model family support, pricetoken updated to 0.13.8
+
+### Changed
+- Remotion render pipeline: parallel frame rendering via `concurrency` + `enableMultiProcessOnLinux`
+- Removed single-render mutex — concurrent renders now allowed (BullMQ controls load)
+- `/clip` endpoint streams MP4 output instead of buffering in memory
+
+### Removed
+- Legacy `/stitch` FFmpeg pipeline (845 lines) — fully superseded by Remotion LaunchVideo composition
+- Unused `SceneTransition` effect component — replaced by `@remotion/transitions`
+
 ## [0.26.0] - 2026-03-17
 
 ### Added
