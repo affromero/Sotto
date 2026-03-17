@@ -71,10 +71,12 @@
     "sort-package-json": "^3.6.1"
   },
   "dependencies": {
-    "@next/swc-darwin-arm64": "^16.1.7",
     "@prisma/client": "^6.19.2",
     "geoip-lite": "^1.4.10",
     "pricetoken": "^0.13.8"
+  },
+  "optionalDependencies": {
+    "@next/swc-darwin-arm64": "^16.1.7"
   },
   "overrides": {
     "react-native-reanimated": "4.1.1",
