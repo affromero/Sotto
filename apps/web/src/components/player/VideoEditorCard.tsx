@@ -10,11 +10,6 @@ import type { VisualTypeString } from '@/lib/visual-classifier';
 import type { FalImageModelInfo, FalVideoModelInfo, VisualMode } from '@/types/pipeline';
 import styles from './VideoEditorCard.module.css';
 
-const VISUAL_TYPES: VisualTypeString[] = [
-  'AI_ILLUSTRATION', 'STOCK_FOOTAGE', 'DATA_CHART', 'QUOTE',
-  'COMPARISON', 'TIMELINE', 'DIAGRAM', 'TEXT_CARD', 'MAP_OVERLAY',
-];
-
 const VISUAL_TYPE_LABELS: Record<VisualTypeString, string> = {
   AI_ILLUSTRATION: 'AI Illustration',
   STOCK_FOOTAGE: 'Stock Footage',
@@ -37,6 +32,25 @@ const VISUAL_TYPE_ICONS: Record<string, typeof ImageIcon> = {
   DIAGRAM: Network,
   TEXT_CARD: Type,
 };
+
+// Match SegmentNode's grouped type picker with color-coded badges
+type BadgeVariant = 'purple' | 'amber' | 'navy' | 'green' | 'teal';
+const BADGE_VARIANTS: Record<VisualTypeString, BadgeVariant> = {
+  AI_ILLUSTRATION: 'purple',
+  STOCK_FOOTAGE: 'navy',
+  MAP_OVERLAY: 'amber',
+  DATA_CHART: 'green',
+  QUOTE: 'teal',
+  COMPARISON: 'green',
+  TIMELINE: 'teal',
+  DIAGRAM: 'green',
+  TEXT_CARD: 'teal',
+};
+
+const TYPE_GROUPS = [
+  { label: 'AI-Generated', types: ['AI_ILLUSTRATION', 'STOCK_FOOTAGE', 'MAP_OVERLAY'] as VisualTypeString[] },
+  { label: 'Programmatic', types: ['DATA_CHART', 'QUOTE', 'COMPARISON', 'TIMELINE', 'DIAGRAM', 'TEXT_CARD'] as VisualTypeString[] },
+];
 
 const PROGRAMMATIC_TYPES = new Set<VisualTypeString>([
   'DATA_CHART', 'QUOTE', 'COMPARISON', 'TIMELINE', 'DIAGRAM', 'TEXT_CARD',
@@ -219,22 +233,31 @@ function VideoEditorCardComponent({
           role="region"
           aria-labelledby={headerId}
         >
-          {/* Visual type pills */}
+          {/* Visual type picker — grouped, matching SegmentNode */}
           <div>
             <span className={styles.fieldLabel}>Visual style</span>
-            <div className={styles.typeGrid} role="group" aria-label="Visual type">
-              {VISUAL_TYPES.map((vt) => (
-                <button
-                  key={vt}
-                  className={`${styles.typePill} ${segment.visualType === vt ? styles.typePillActive : ''}`}
-                  onClick={() => handleVisualTypeChange(vt)}
-                  type="button"
-                  aria-pressed={segment.visualType === vt}
-                >
-                  {VISUAL_TYPE_LABELS[vt]}
-                </button>
-              ))}
-            </div>
+            {TYPE_GROUPS.map((group) => (
+              <div key={group.label} className={styles.typeGroup}>
+                <span className={styles.typeGroupLabel}>{group.label}</span>
+                <div className={styles.typeGrid} role="group" aria-label={`${group.label} visual types`}>
+                  {group.types.map((vt) => {
+                    const variant = BADGE_VARIANTS[vt] ?? 'amber';
+                    const pillClass = styles[`pill${variant.charAt(0).toUpperCase()}${variant.slice(1)}`];
+                    return (
+                      <button
+                        key={vt}
+                        className={`${styles.typePill} ${segment.visualType === vt ? `${styles.typePillActive} ${pillClass}` : ''}`}
+                        onClick={() => handleVisualTypeChange(vt)}
+                        type="button"
+                        aria-pressed={segment.visualType === vt}
+                      >
+                        {VISUAL_TYPE_LABELS[vt]}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
 
           {/* Image / Video toggle — only for AI Illustration */}
@@ -271,18 +294,20 @@ function VideoEditorCardComponent({
           )}
 
           {!isProgrammatic && (
-            <button
-              className={styles.resetBtn}
-              onClick={() => setShowAdvanced(!showAdvanced)}
-              type="button"
-              aria-expanded={showAdvanced}
-            >
-              {showAdvanced ? 'Hide advanced' : 'Advanced'}
-            </button>
+            <div className={styles.cardFooter}>
+              <button
+                className={styles.advancedToggle}
+                onClick={() => setShowAdvanced(!showAdvanced)}
+                type="button"
+                aria-expanded={showAdvanced}
+              >
+                {showAdvanced ? 'Hide advanced' : 'Show advanced'}
+              </button>
+            </div>
           )}
 
           {showAdvanced && !isProgrammatic && (
-            <>
+            <div className={styles.advancedContent}>
               {models.length > 0 && (
                 <div>
                   <label className={styles.fieldLabel} htmlFor={`model-${segment.segmentVisualId}`}>
@@ -294,6 +319,9 @@ function VideoEditorCardComponent({
                     value={segment.model ?? ''}
                     onChange={handleModelChange}
                   >
+                    {!segment.model && (
+                      <option value="" disabled>Select a model...</option>
+                    )}
                     {models.map((m) => (
                       <option key={m.modelId} value={m.modelId}>
                         {m.displayName} —{' '}
@@ -319,7 +347,7 @@ function VideoEditorCardComponent({
                   rows={3}
                 />
               </div>
-            </>
+            </div>
           )}
 
           {/* Footer with reset */}
