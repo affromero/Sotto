@@ -14,18 +14,18 @@ export function IdentityChapter() {
             </h2>
             <p className={styles.description}>
               Verified users can clone their voice and upload a portrait photo
-              for lip-sync avatars &mdash; making every podcast truly theirs.
-              Sound like yourself. Look like yourself. Own your content.
+              for lip-sync avatars. Every podcast sounds and looks like them.
+              Own your content.
             </p>
             <p className={styles.description}>
               We gate these features behind identity verification because they
               matter. No one can clone your voice or use your face without your
               explicit consent. We have zero tolerance for impersonation or
-              deepfakes &mdash; protecting creators and public figures isn&apos;t
-              a policy footnote, it&apos;s a core design decision.
+              deepfakes. Protecting creators and public figures isn&apos;t
+              a policy footnote. It&apos;s a core design decision.
             </p>
             <p className={styles.footer}>
-              Verification is quick and free &mdash; once verified, you unlock
+              Verification is quick and free. Once verified, you get access to
               voice cloning, avatar uploads, and the ability to share with other
               creators. All AI-generated content is clearly labeled, always.
             </p>
@@ -53,7 +53,7 @@ export function IdentityChapter() {
               </div>
               <h3 className={styles.cardTitle}>Voice Cloning</h3>
               <p className={styles.cardDesc}>
-                Record or import your voice. Every episode sounds like you &mdash;
+                Record or import your voice. Every episode sounds like you,
                 across any topic, any length.
               </p>
               <span className={styles.verifiedBadge}>
@@ -95,7 +95,7 @@ export function IdentityChapter() {
               <h3 className={styles.cardTitle}>Avatar Images</h3>
               <p className={styles.cardDesc}>
                 Upload your portrait. Lip-sync avatars bring your face to
-                video podcasts &mdash; consent-verified and shareable.
+                video podcasts. Consent-verified and shareable.
               </p>
               <span className={styles.verifiedBadge}>
                 <svg

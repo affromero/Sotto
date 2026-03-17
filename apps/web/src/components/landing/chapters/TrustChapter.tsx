@@ -43,17 +43,17 @@ export function TrustChapter() {
             </div>
             <h2 className={styles.heading}>Domain-aware. Claim-level. Open source.</h2>
             <p className={styles.description}>
-              Every reference is scored by its domain &mdash; because news articles don&apos;t
+              Every reference is scored by its domain. News articles don&apos;t
               need DOIs, and Wikipedia isn&apos;t held to the same bar as Nature.
             </p>
             <p className={styles.description}>
-              We don&apos;t optimize for watch time or retention metrics &mdash; we optimize
+              We don&apos;t optimize for watch time or retention metrics. We optimize
               for genuine understanding. The goal isn&apos;t more content. It&apos;s better
               content that actually teaches you something.
             </p>
 
             <p className={styles.footer}>
-              Scoring logic is open source &mdash;{' '}
+              Scoring logic is open source.{' '}
               <a
                 href="https://github.com/SottoFM/reference-verification-standard"
                 target="_blank"
@@ -90,7 +90,7 @@ export function TrustChapter() {
 
               <div className={styles.cardCallout}>
                 <p>
-                  <strong>Claim-level verification</strong> &mdash; AI reads the exact sentence
+                  <strong>Claim-level verification.</strong> The AI reads the exact sentence
                   that cites each reference and checks whether the source actually supports
                   the claim.
                 </p>
