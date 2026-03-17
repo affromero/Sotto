@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { getLandingShowcaseConfig } from '@/lib/landing-showcase';
+import type { LandingShowcaseConfig } from '@/lib/landing-showcase';
 import { logger } from '@/lib/logger';
 import { findByVoiceId } from '@/lib/voice-pool';
 import type { ReferenceData } from '@/types/reference';
@@ -107,14 +108,11 @@ export async function getShowcasePodcast(): Promise<ShowcasePodcast | null> {
 }
 
 /**
- * Fetch full landing showcase data for all chapters.
- * Returns null if no LandingShowcase config exists — chapters fall back to hardcoded.
+ * Build showcase data from a config object (shared by saved config + live preview).
+ * Returns null if the podcast is missing or incomplete.
  */
-export async function getLandingShowcaseData(): Promise<LandingShowcaseData | null> {
+export async function buildShowcaseData(config: LandingShowcaseConfig): Promise<LandingShowcaseData | null> {
   try {
-    const config = await getLandingShowcaseConfig();
-    if (!config) return null;
-
     const podcast = await prisma.podcast.findUnique({
       where: { id: config.podcastId },
       select: {
@@ -304,11 +302,10 @@ export async function getLandingShowcaseData(): Promise<LandingShowcaseData | nu
         type: VISUAL_TYPE_LABELS[v.visualType] ?? v.visualType,
       }));
 
-    // Video clip
+    // Video clip — uses same clip range as audio so they sync on one timeline
     const videoUrl = podcast.videoGenerations[0]?.videoUrl;
-    const videoClipEnd = config.videoClipEnd ?? config.videoClipStart + 30;
     const videoClip = videoUrl
-      ? { url: videoUrl, start: config.videoClipStart, end: videoClipEnd }
+      ? { url: videoUrl, start: config.audioClipStart, end: audioClipEnd }
       : null;
 
     // Bot overrides
@@ -336,9 +333,19 @@ export async function getLandingShowcaseData(): Promise<LandingShowcaseData | nu
       bot,
     };
   } catch (err) {
-    logger.warn('Failed to fetch landing showcase data', {
+    logger.warn('Failed to build landing showcase data', {
       error: err instanceof Error ? err.message : String(err),
     });
     return null;
   }
+}
+
+/**
+ * Fetch full landing showcase data for all chapters.
+ * Returns null if no LandingShowcase config exists — chapters fall back to hardcoded.
+ */
+export async function getLandingShowcaseData(): Promise<LandingShowcaseData | null> {
+  const config = await getLandingShowcaseConfig();
+  if (!config) return null;
+  return buildShowcaseData(config);
 }

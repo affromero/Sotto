@@ -678,8 +678,6 @@ export const landingShowcaseUpdateSchema = z.object({
   audioClipEnd: z.number().min(0).nullable().optional(),
   videoSegmentStart: z.number().int().min(0).optional(),
   videoSegmentCount: z.number().int().min(1).max(50).optional(),
-  videoClipStart: z.number().min(0).optional(),
-  videoClipEnd: z.number().min(0).nullable().optional(),
   twitterHandle: z.string().min(1).max(50).optional(),
   twitterName: z.string().min(1).max(100).optional(),
   telegramTopic: z.string().max(200).nullable().optional(),
