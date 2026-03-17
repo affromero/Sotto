@@ -129,7 +129,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     select: { id: true, status: true, videoUrl: true },
   });
 
-  if (existing && existing.status !== 'FAILED' && existing.status !== 'STALE') {
+  if (existing && existing.status !== 'FAILED' && existing.status !== 'STALE' && existing.status !== 'DRAFT') {
     return NextResponse.json({
       videoGenerationId: existing.id,
       status: existing.status,
@@ -138,7 +138,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   }
 
   // Resume or restart failed/stale generation
-  if (existing?.status === 'FAILED' || existing?.status === 'STALE') {
+  if (existing?.status === 'FAILED' || existing?.status === 'STALE' || existing?.status === 'DRAFT') {
     if (pipeline || existing.status === 'STALE') {
       // New pipeline provided — start fresh (user changed settings)
       await prisma.segmentTransition.deleteMany({ where: { videoGenerationId: existing.id } });
