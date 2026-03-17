@@ -18,6 +18,7 @@ import { logUsage } from '@/lib/usage-logger';
 import { cache } from '@/lib/redis';
 import { logger } from '@/lib/logger';
 import { resolveSegmentTiming } from '@/lib/segment-timing';
+import { Prisma } from '@prisma/client';
 import type { PipelineSegmentNode, PipelineTransition, VisualMode, VideoPipeline } from '@/types/pipeline';
 
 const REDIS_KEY_PREFIX = 'pipeline-classification:';
@@ -178,8 +179,36 @@ export async function processPipelineClassification(job: Job<ClassifyPipelinePay
       defaultTransitionModel: defaultTransitionModel ?? undefined,
     };
 
-    // Store result in Redis
+    // Store result in Redis (fast polling cache)
     await cache.set(redisKey, { status: 'ready', pipeline }, REDIS_TTL_SECONDS);
+
+    // Persist as DRAFT to DB so the storyboard survives across sessions
+    const existingGen = await prisma.videoGeneration.findFirst({
+      where: { podcastId, voiceTrackId: voiceTrackId ?? null },
+      select: { id: true, status: true },
+    });
+    // Only save if no active generation exists (don't overwrite READY/GENERATING_*)
+    if (!existingGen || existingGen.status === 'DRAFT' || existingGen.status === 'FAILED') {
+      if (existingGen) {
+        await prisma.videoGeneration.update({
+          where: { id: existingGen.id },
+          data: {
+            status: 'DRAFT',
+            pipelineJson: pipeline as unknown as Prisma.InputJsonValue,
+            failureReason: null,
+          },
+        });
+      } else {
+        await prisma.videoGeneration.create({
+          data: {
+            podcastId,
+            voiceTrackId: voiceTrackId ?? null,
+            status: 'DRAFT',
+            pipelineJson: pipeline as unknown as Prisma.InputJsonValue,
+          },
+        });
+      }
+    }
 
     // Log usage
     logUsage({
