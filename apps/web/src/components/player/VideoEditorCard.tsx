@@ -64,6 +64,8 @@ export interface VideoEditorCardProps {
   speakerIndex: number;
   imageModels: FalImageModelInfo[];
   videoModels: FalVideoModelInfo[];
+  defaultImageModel: string;
+  defaultVideoModel: string;
   hasFalKey: boolean;
   isExpanded: boolean;
   isDirty: boolean;
@@ -78,6 +80,8 @@ function VideoEditorCardComponent({
   speakerIndex,
   imageModels,
   videoModels,
+  defaultImageModel,
+  defaultVideoModel,
   isExpanded,
   isDirty,
   onToggleExpand,
@@ -100,12 +104,10 @@ function VideoEditorCardComponent({
         visualMode = segment.visualMode === 'programmatic' ? 'image' : segment.visualMode;
         if (segment.model && !PROGRAMMATIC_TYPES.has(segment.visualType)) {
           model = segment.model;
-        } else if (visualMode === 'video' && videoModels.length > 0) {
-          model = videoModels.reduce((a, b) => (a.costPerMinute <= b.costPerMinute ? a : b)).modelId;
-        } else if (imageModels.length > 0) {
-          model = imageModels.reduce((a, b) => (a.pricePerImage <= b.pricePerImage ? a : b)).modelId;
+        } else if (visualMode === 'video') {
+          model = defaultVideoModel;
         } else {
-          model = null;
+          model = defaultImageModel;
         }
       } else {
         // STOCK_FOOTAGE, MAP_OVERLAY — no fal model
@@ -115,21 +117,16 @@ function VideoEditorCardComponent({
 
       onUpdate(segment.segmentVisualId, { visualType, visualMode, model });
     },
-    [segment.segmentVisualId, segment.visualMode, segment.visualType, segment.model, imageModels, videoModels, onUpdate],
+    [segment.segmentVisualId, segment.visualMode, segment.visualType, segment.model, defaultImageModel, defaultVideoModel, onUpdate],
   );
 
   const handleModeChange = useCallback(
     (mode: VisualMode) => {
       if (mode === segment.visualMode) return;
-      let model: string | null = null;
-      if (mode === 'image' && imageModels.length > 0) {
-        model = imageModels.reduce((a, b) => (a.pricePerImage <= b.pricePerImage ? a : b)).modelId;
-      } else if (mode === 'video' && videoModels.length > 0) {
-        model = videoModels.reduce((a, b) => (a.costPerMinute <= b.costPerMinute ? a : b)).modelId;
-      }
+      const model = mode === 'image' ? defaultImageModel : mode === 'video' ? defaultVideoModel : null;
       onUpdate(segment.segmentVisualId, { visualMode: mode, model });
     },
-    [segment.segmentVisualId, segment.visualMode, imageModels, videoModels, onUpdate],
+    [segment.segmentVisualId, segment.visualMode, defaultImageModel, defaultVideoModel, onUpdate],
   );
 
   const handleModelChange = useCallback(
