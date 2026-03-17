@@ -262,6 +262,8 @@ export function VideoEditor({
                 speakerIndex={getSpeakerIndex(seg.speaker, allSpeakers)}
                 imageModels={falModels.imageModels}
                 videoModels={falModels.videoModels}
+                defaultImageModel={falModels.defaultImageModel}
+                defaultVideoModel={falModels.defaultVideoModel}
                 hasFalKey={falModels.hasFalKey}
                 isExpanded={expandedId === seg.segmentVisualId}
                 isDirty={dirtyIds.has(seg.segmentVisualId)}
