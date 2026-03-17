@@ -51,6 +51,10 @@ export async function resolveVideoProvider(context: {
     return resolveMiniMaxVideo(userId, model);
   }
 
+  if (providerId === 'hera') {
+    return resolveHeraVideo(model);
+  }
+
   throw new Error(`Unsupported video provider: ${providerId}`);
 }
 
@@ -84,4 +88,14 @@ async function resolveMiniMaxVideo(userId: string, model: string): Promise<Resol
 
   logger.error('No MiniMax API key available for video generation', { userId });
   throw new Error('No MiniMax API key available. Add a MiniMax key in Settings or contact support.');
+}
+
+async function resolveHeraVideo(model: string): Promise<ResolvedVideoProvider> {
+  if (process.env.HERA_API_KEY) {
+    const { HeraVideoProvider } = await import('./video/hera.provider');
+    return { provider: new HeraVideoProvider(model), source: 'platform', providerId: 'hera' };
+  }
+
+  logger.error('No Hera API key available for video generation');
+  throw new Error('No Hera API key available. Set HERA_API_KEY in Doppler.');
 }
