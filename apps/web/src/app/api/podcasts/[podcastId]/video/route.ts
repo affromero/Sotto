@@ -130,6 +130,29 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   });
 
   if (existing && existing.status !== 'FAILED' && existing.status !== 'STALE' && existing.status !== 'DRAFT') {
+    // If generation is in progress but has failed visuals, reset and re-queue them
+    if (existing.status === 'GENERATING_VISUALS') {
+      const failedVisuals = await prisma.segmentVisual.findMany({
+        where: { videoGenerationId: existing.id, status: 'failed' },
+        select: { id: true, segmentId: true, visualType: true, prompt: true, metadata: true },
+      });
+      if (failedVisuals.length > 0) {
+        await prisma.segmentVisual.updateMany({
+          where: { id: { in: failedVisuals.map(v => v.id) } },
+          data: { status: 'pending', failureReason: null },
+        });
+        for (const visual of failedVisuals) {
+          await addJob(visualGenerationQueue, JobType.GENERATE_VISUAL, {
+            podcastId,
+            videoGenerationId: existing.id,
+            segmentVisualId: visual.id,
+            visualType: visual.visualType,
+            prompt: visual.prompt ?? '',
+            metadata: (visual.metadata as Record<string, unknown>) ?? {},
+          });
+        }
+      }
+    }
     return NextResponse.json({
       videoGenerationId: existing.id,
       status: existing.status,
