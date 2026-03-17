@@ -19,15 +19,17 @@ export function ConvertChapter() {
                 early access.
               </h2>
               <p className={styles.descLight}>
-                Everything is free for early members &mdash; no limits, no card required.
-                Generate podcasts with platform AI and voices, or bring your own API keys.
-                We&apos;ll introduce plans later, and early members will be grandfathered in.
+                During early access, everything works with platform AI &mdash; no card, no
+                limits. Bring your own API keys for unlimited generations at your
+                provider&apos;s rates. Just one Fal key covers the entire pipeline: AI,
+                voices, images, video, and avatars. We&apos;ll introduce plans down the
+                road &mdash; early members get grandfathered in.
               </p>
             </div>
             <div className={styles.stats} data-reveal>
               <div className={styles.stat}>
-                <span className={styles.statNum}>$0</span>
-                <span className={styles.statLabel}>Early access</span>
+                <span className={styles.statNum}>Free</span>
+                <span className={styles.statLabel}>During early access</span>
               </div>
               <div className={styles.statDivider} aria-hidden="true" />
               <div className={styles.stat}>
