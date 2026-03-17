@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { deleteFile } from '@/lib/r2';
+
 import { logger } from '@/lib/logger';
 import { errorResponse } from '@/lib/api-response';
 import { updateAvatarImageSchema } from '@/lib/validations';
@@ -68,8 +68,7 @@ export async function DELETE(
       return errorResponse('Avatar image not found', 404);
     }
 
-    await deleteFile(image.imageUrl, { force: true });
-
+    // R2 assets kept — no deletion
     await prisma.avatarImage.delete({ where: { id } });
 
     return NextResponse.json({ success: true });

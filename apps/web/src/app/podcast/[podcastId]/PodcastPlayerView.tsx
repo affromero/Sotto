@@ -508,17 +508,10 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
     [podcast.id],
   );
 
-  const dismissVideoError = useCallback(async () => {
+  const dismissVideoError = useCallback(() => {
     setVideoState('idle');
     setVideoError(null);
-    setVideoGenerationId(null);
-    // Delete failed generation from DB so it doesn't reappear on refresh
-    try {
-      await fetch(`/api/podcasts/${podcast.id}/video`, { method: 'DELETE' });
-    } catch {
-      // Best-effort — local state already cleared
-    }
-  }, [podcast.id]);
+  }, []);
 
   const avatarPositionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleAvatarPositionChange = useCallback(
