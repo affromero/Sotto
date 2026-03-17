@@ -9,8 +9,6 @@ export interface LandingShowcaseConfig {
   audioClipEnd: number | null;
   videoSegmentStart: number;
   videoSegmentCount: number;
-  videoClipStart: number;
-  videoClipEnd: number | null;
   twitterHandle: string;
   twitterName: string;
   telegramTopic: string | null;
@@ -31,8 +29,6 @@ export async function getLandingShowcaseConfig(): Promise<LandingShowcaseConfig 
       audioClipEnd: row.audioClipEnd,
       videoSegmentStart: row.videoSegmentStart,
       videoSegmentCount: row.videoSegmentCount,
-      videoClipStart: row.videoClipStart,
-      videoClipEnd: row.videoClipEnd,
       twitterHandle: row.twitterHandle,
       twitterName: row.twitterName,
       telegramTopic: row.telegramTopic,
@@ -59,8 +55,6 @@ export async function setLandingShowcaseConfig(
       ...(data.audioClipEnd !== undefined && { audioClipEnd: data.audioClipEnd }),
       ...(data.videoSegmentStart !== undefined && { videoSegmentStart: data.videoSegmentStart }),
       ...(data.videoSegmentCount !== undefined && { videoSegmentCount: data.videoSegmentCount }),
-      ...(data.videoClipStart !== undefined && { videoClipStart: data.videoClipStart }),
-      ...(data.videoClipEnd !== undefined && { videoClipEnd: data.videoClipEnd }),
       ...(data.twitterHandle !== undefined && { twitterHandle: data.twitterHandle }),
       ...(data.twitterName !== undefined && { twitterName: data.twitterName }),
       ...(data.telegramTopic !== undefined && { telegramTopic: data.telegramTopic }),
@@ -75,8 +69,6 @@ export async function setLandingShowcaseConfig(
       audioClipEnd: data.audioClipEnd ?? null,
       videoSegmentStart: data.videoSegmentStart ?? 0,
       videoSegmentCount: data.videoSegmentCount ?? 4,
-      videoClipStart: data.videoClipStart ?? 0,
-      videoClipEnd: data.videoClipEnd ?? null,
       twitterHandle: data.twitterHandle ?? 'andres',
       twitterName: data.twitterName ?? 'Andres',
       telegramTopic: data.telegramTopic ?? null,
