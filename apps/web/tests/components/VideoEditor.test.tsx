@@ -27,6 +27,10 @@ const falModels: FalModelsResponse = {
   imageModels: [],
   videoModels: [],
   hasFalKey: true,
+  hasMiniMaxKey: false,
+  hasHeraKey: false,
+  defaultImageModel: 'fal-flux-1-schnell',
+  defaultVideoModel: 'fal-wan2.5-480p',
 };
 
 const segments: SegmentData[] = [

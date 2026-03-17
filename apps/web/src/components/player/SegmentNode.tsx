@@ -1,7 +1,7 @@
 'use client';
 
 import { memo, useCallback, useState } from 'react';
-import type { PipelineSegmentNode, FalImageModelInfo, FalVideoModelInfo, VisualMode } from '@/types/pipeline';
+import type { PipelineSegmentNode, PipelineSubVisualNode, FalImageModelInfo, FalVideoModelInfo, VisualMode } from '@/types/pipeline';
 import type { VisualTypeString } from '@/lib/visual-classifier';
 import { formatCost, getClipInfo } from '@/lib/video-cost-estimator';
 import styles from './SegmentNode.module.css';
@@ -47,16 +47,24 @@ const TYPE_GROUPS = [
   { label: 'Programmatic', types: ['DATA_CHART', 'QUOTE', 'COMPARISON', 'TIMELINE', 'DIAGRAM', 'TEXT_CARD'] as VisualTypeString[] },
 ];
 
+function getBadgeClass(visualType: VisualTypeString): string {
+  const variant = BADGE_VARIANTS[visualType] ?? 'amber';
+  return styles[`badge${variant.charAt(0).toUpperCase()}${variant.slice(1)}`];
+}
+
 export interface StoryboardCardProps {
   segment: PipelineSegmentNode;
   index: number;
   speakerIndex: number;
   imageModels: FalImageModelInfo[];
   videoModels: FalVideoModelInfo[];
+  defaultImageModel: string;
+  defaultVideoModel: string;
   hasFalKey: boolean;
   isExpanded: boolean;
   onToggleExpand: () => void;
   onUpdate: (segmentId: string, updates: Partial<PipelineSegmentNode>) => void;
+  onSubVisualUpdate?: (segmentId: string, subOrder: number, updates: Partial<PipelineSubVisualNode>) => void;
 }
 
 function StoryboardCardComponent({
@@ -65,12 +73,17 @@ function StoryboardCardComponent({
   speakerIndex,
   imageModels,
   videoModels,
+  defaultImageModel,
+  defaultVideoModel,
   hasFalKey,
   isExpanded,
   onToggleExpand,
   onUpdate,
+  onSubVisualUpdate,
 }: StoryboardCardProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
+
+  const hasMultipleSubVisuals = segment.subVisuals && segment.subVisuals.length > 1;
 
   const handleVisualTypeChange = useCallback(
     (visualType: VisualTypeString) => {
@@ -85,15 +98,13 @@ function StoryboardCardComponent({
       } else if (isAiIllustration) {
         // Keep current mode if already image/video, default to image from programmatic
         visualMode = segment.visualMode === 'programmatic' ? 'image' : segment.visualMode;
-        // Auto-select cheapest model if current model is null
+        // Keep current model if switching from another non-programmatic type; otherwise use plan default
         if (segment.model && !PROGRAMMATIC_TYPES.has(segment.visualType)) {
           model = segment.model;
-        } else if (visualMode === 'video' && videoModels.length > 0) {
-          model = videoModels.reduce((a: FalVideoModelInfo, b: FalVideoModelInfo) => (a.costPerMinute <= b.costPerMinute ? a : b)).modelId;
-        } else if (imageModels.length > 0) {
-          model = imageModels.reduce((a: FalImageModelInfo, b: FalImageModelInfo) => (a.pricePerImage <= b.pricePerImage ? a : b)).modelId;
+        } else if (visualMode === 'video') {
+          model = defaultVideoModel;
         } else {
-          model = null;
+          model = defaultImageModel;
         }
       } else {
         // STOCK_FOOTAGE, MAP_OVERLAY — no fal model, image mode
@@ -103,21 +114,16 @@ function StoryboardCardComponent({
 
       onUpdate(segment.segmentId, { visualType, visualMode, model });
     },
-    [segment.segmentId, segment.visualMode, segment.visualType, segment.model, imageModels, videoModels, onUpdate],
+    [segment.segmentId, segment.visualMode, segment.visualType, segment.model, defaultImageModel, defaultVideoModel, onUpdate],
   );
 
   const handleModeChange = useCallback(
     (mode: VisualMode) => {
       if (mode === segment.visualMode) return;
-      let model: string | null = null;
-      if (mode === 'image' && imageModels.length > 0) {
-        model = imageModels.reduce((a: FalImageModelInfo, b: FalImageModelInfo) => (a.pricePerImage <= b.pricePerImage ? a : b)).modelId;
-      } else if (mode === 'video' && videoModels.length > 0) {
-        model = videoModels.reduce((a: FalVideoModelInfo, b: FalVideoModelInfo) => (a.costPerMinute <= b.costPerMinute ? a : b)).modelId;
-      }
+      const model = mode === 'image' ? defaultImageModel : mode === 'video' ? defaultVideoModel : null;
       onUpdate(segment.segmentId, { visualMode: mode, model });
     },
-    [segment.segmentId, segment.visualMode, imageModels, videoModels, onUpdate],
+    [segment.segmentId, segment.visualMode, defaultImageModel, defaultVideoModel, onUpdate],
   );
 
   const handleModelChange = useCallback(
@@ -137,8 +143,7 @@ function StoryboardCardComponent({
   const isProgrammatic = segment.visualMode === 'programmatic';
   const models = segment.visualMode === 'image' ? imageModels : segment.visualMode === 'video' ? videoModels : [];
   const textPreview = segment.text.length > 100 ? `${segment.text.slice(0, 100)}...` : segment.text;
-  const badgeVariant = BADGE_VARIANTS[segment.visualType] ?? 'amber';
-  const badgeClass = styles[`badge${badgeVariant.charAt(0).toUpperCase()}${badgeVariant.slice(1)}`];
+  const badgeClass = getBadgeClass(segment.visualType);
 
   // Compute clip info for chained video segments
   const videoClipLabel = (() => {
@@ -170,12 +175,25 @@ function StoryboardCardComponent({
           {index + 1}
         </span>
         <span className={styles.textPreview}>{textPreview}</span>
-        <span className={`${styles.typeBadge} ${badgeClass}`}>
-          {VISUAL_TYPE_LABELS[segment.visualType]}
-          {segment.visualType === 'AI_ILLUSTRATION' && segment.visualMode === 'video' && (
-            <span className={styles.modeDot}> · Video</span>
-          )}
-        </span>
+        {hasMultipleSubVisuals ? (
+          <span className={styles.subVisualBadges}>
+            {segment.subVisuals!.map((sv) => {
+              const svBadgeClass = getBadgeClass(sv.visualType);
+              return (
+                <span key={sv.subOrder} className={`${styles.subVisualBadge} ${svBadgeClass}`}>
+                  {VISUAL_TYPE_LABELS[sv.visualType]}
+                </span>
+              );
+            })}
+          </span>
+        ) : (
+          <span className={`${styles.typeBadge} ${badgeClass}`}>
+            {VISUAL_TYPE_LABELS[segment.visualType]}
+            {segment.visualType === 'AI_ILLUSTRATION' && segment.visualMode === 'video' && (
+              <span className={styles.modeDot}> · Video</span>
+            )}
+          </span>
+        )}
       </button>
 
       {/* Expanded content */}
@@ -203,131 +221,285 @@ function StoryboardCardComponent({
           {/* Full text */}
           <p className={styles.fullText}>{segment.text}</p>
 
-          {/* Visual type picker — grouped */}
-          <div>
-            <span className={styles.fieldLabel}>Visual style</span>
-            {TYPE_GROUPS.map((group) => (
-              <div key={group.label} className={styles.typeGroup}>
-                <span className={styles.typeGroupLabel}>{group.label}</span>
-                <div className={styles.typeGrid} role="group" aria-label={`${group.label} visual types`}>
-                  {group.types.map((vt) => {
-                    const variant = BADGE_VARIANTS[vt] ?? 'amber';
-                    const pillClass = styles[`pill${variant.charAt(0).toUpperCase()}${variant.slice(1)}`];
-                    return (
-                      <button
-                        key={vt}
-                        className={`${styles.typePill} ${segment.visualType === vt ? `${styles.typePillActive} ${pillClass}` : ''}`}
-                        onClick={() => handleVisualTypeChange(vt)}
-                        type="button"
-                        aria-pressed={segment.visualType === vt}
-                      >
-                        {VISUAL_TYPE_LABELS[vt]}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Image / Video toggle — only for AI Illustration */}
-          {segment.visualType === 'AI_ILLUSTRATION' && (
-            <div>
-              <span className={styles.fieldLabel}>Generate as</span>
-              <div className={styles.modeToggle} role="group" aria-label="Generate as">
-                <button
-                  className={`${styles.modeBtn} ${segment.visualMode === 'image' ? styles.modeBtnActive : ''}`}
-                  onClick={() => handleModeChange('image')}
-                  type="button"
-                  aria-pressed={segment.visualMode === 'image'}
-                >
-                  Image
-                </button>
-                <button
-                  className={`${styles.modeBtn} ${segment.visualMode === 'video' ? styles.modeBtnActive : ''}`}
-                  onClick={() => handleModeChange('video')}
-                  type="button"
-                  aria-pressed={segment.visualMode === 'video'}
-                >
-                  Video
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* AI prompt preview */}
-          {!isProgrammatic && segment.prompt && !showAdvanced && (
-            <div>
-              <span className={styles.fieldLabel}>AI prompt</span>
-              <p className={styles.promptPreview}>{segment.prompt}</p>
-            </div>
-          )}
-
-          {/* Footer row: no-key hint + advanced toggle */}
-          {!isProgrammatic && (
-            <div className={styles.cardFooter}>
-              {!hasFalKey && (
-                <span className={styles.noKeyHint}>No API key — add in Settings to use your own</span>
-              )}
-              <button
-                className={styles.advancedToggle}
-                onClick={() => setShowAdvanced(!showAdvanced)}
-                type="button"
-                aria-expanded={showAdvanced}
-              >
-                {showAdvanced ? 'Hide advanced' : 'Show advanced'}
-              </button>
-            </div>
-          )}
-
-          {/* Advanced: Model + Prompt */}
-          {showAdvanced && !isProgrammatic && (
-            <div className={styles.advancedContent}>
-              {models.length > 0 && (
-                <div>
-                  <label className={styles.fieldLabel} htmlFor={`model-${segment.segmentId}`}>
-                    Model
-                  </label>
-                  <select
-                    id={`model-${segment.segmentId}`}
-                    className={styles.select}
-                    value={segment.model ?? ''}
-                    onChange={handleModelChange}
-                  >
-                    {!segment.model && (
-                      <option value="" disabled>Select a model...</option>
-                    )}
-                    {models.map((m: FalImageModelInfo | FalVideoModelInfo) => (
-                      <option key={m.modelId} value={m.modelId}>
-                        {m.displayName} —{' '}
-                        {'pricePerImage' in m
-                          ? `$${(m as FalImageModelInfo).pricePerImage}/img`
-                          : `$${(m as FalVideoModelInfo).costPerMinute}/min`}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              <div>
-                <label className={styles.fieldLabel} htmlFor={`prompt-${segment.segmentId}`}>
-                  Visual prompt
-                </label>
-                <textarea
-                  id={`prompt-${segment.segmentId}`}
-                  className={styles.prompt}
-                  value={segment.prompt ?? ''}
-                  onChange={handlePromptChange}
-                  placeholder="Describe the visual..."
-                  rows={3}
+          {/* Sub-visuals breakdown — when multiple exist */}
+          {hasMultipleSubVisuals ? (
+            <div className={styles.subVisualList}>
+              <span className={styles.fieldLabel}>
+                {segment.subVisuals!.length} visual segments
+              </span>
+              {segment.subVisuals!.map((sv) => (
+                <SubVisualRow
+                  key={sv.subOrder}
+                  sv={sv}
+                  segmentId={segment.segmentId}
+                  segmentDuration={segment.duration}
+                  imageModels={imageModels}
+                  videoModels={videoModels}
+                  defaultImageModel={defaultImageModel}
+                  defaultVideoModel={defaultVideoModel}
+                  onSubVisualUpdate={onSubVisualUpdate}
                 />
-              </div>
+              ))}
             </div>
+          ) : (
+            <>
+              {/* Single visual — full controls */}
+              {/* Visual type picker — grouped */}
+              <div>
+                <span className={styles.fieldLabel}>Visual style</span>
+                {TYPE_GROUPS.map((group) => (
+                  <div key={group.label} className={styles.typeGroup}>
+                    <span className={styles.typeGroupLabel}>{group.label}</span>
+                    <div className={styles.typeGrid} role="group" aria-label={`${group.label} visual types`}>
+                      {group.types.map((vt) => {
+                        const variant = BADGE_VARIANTS[vt] ?? 'amber';
+                        const pillClass = styles[`pill${variant.charAt(0).toUpperCase()}${variant.slice(1)}`];
+                        return (
+                          <button
+                            key={vt}
+                            className={`${styles.typePill} ${segment.visualType === vt ? `${styles.typePillActive} ${pillClass}` : ''}`}
+                            onClick={() => handleVisualTypeChange(vt)}
+                            type="button"
+                            aria-pressed={segment.visualType === vt}
+                          >
+                            {VISUAL_TYPE_LABELS[vt]}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Image / Video toggle — only for AI Illustration */}
+              {segment.visualType === 'AI_ILLUSTRATION' && (
+                <div>
+                  <span className={styles.fieldLabel}>Generate as</span>
+                  <div className={styles.modeToggle} role="group" aria-label="Generate as">
+                    <button
+                      className={`${styles.modeBtn} ${segment.visualMode === 'image' ? styles.modeBtnActive : ''}`}
+                      onClick={() => handleModeChange('image')}
+                      type="button"
+                      aria-pressed={segment.visualMode === 'image'}
+                    >
+                      Image
+                    </button>
+                    <button
+                      className={`${styles.modeBtn} ${segment.visualMode === 'video' ? styles.modeBtnActive : ''}`}
+                      onClick={() => handleModeChange('video')}
+                      type="button"
+                      aria-pressed={segment.visualMode === 'video'}
+                    >
+                      Video
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* AI prompt preview */}
+              {!isProgrammatic && segment.prompt && !showAdvanced && (
+                <div>
+                  <span className={styles.fieldLabel}>AI prompt</span>
+                  <p className={styles.promptPreview}>{segment.prompt}</p>
+                </div>
+              )}
+
+              {/* Footer row: no-key hint + advanced toggle */}
+              {!isProgrammatic && (
+                <div className={styles.cardFooter}>
+                  {!hasFalKey && (
+                    <span className={styles.noKeyHint}>No API key — add in Settings to use your own</span>
+                  )}
+                  <button
+                    className={styles.advancedToggle}
+                    onClick={() => setShowAdvanced(!showAdvanced)}
+                    type="button"
+                    aria-expanded={showAdvanced}
+                  >
+                    {showAdvanced ? 'Hide advanced' : 'Show advanced'}
+                  </button>
+                </div>
+              )}
+
+              {/* Advanced: Model + Prompt */}
+              {showAdvanced && !isProgrammatic && (
+                <div className={styles.advancedContent}>
+                  {models.length > 0 && (
+                    <div>
+                      <label className={styles.fieldLabel} htmlFor={`model-${segment.segmentId}`}>
+                        Model
+                      </label>
+                      <select
+                        id={`model-${segment.segmentId}`}
+                        className={styles.select}
+                        value={segment.model ?? ''}
+                        onChange={handleModelChange}
+                      >
+                        {!segment.model && (
+                          <option value="" disabled>Select a model...</option>
+                        )}
+                        {models.map((m: FalImageModelInfo | FalVideoModelInfo) => (
+                          <option key={m.modelId} value={m.modelId}>
+                            {m.displayName} —{' '}
+                            {'pricePerImage' in m
+                              ? `$${(m as FalImageModelInfo).pricePerImage}/img`
+                              : `$${(m as FalVideoModelInfo).costPerMinute}/min`}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className={styles.fieldLabel} htmlFor={`prompt-${segment.segmentId}`}>
+                      Visual prompt
+                    </label>
+                    <textarea
+                      id={`prompt-${segment.segmentId}`}
+                      className={styles.prompt}
+                      value={segment.prompt ?? ''}
+                      onChange={handlePromptChange}
+                      placeholder="Describe the visual..."
+                      rows={3}
+                    />
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       )}
     </div>
   );
 }
+
+/* ---- Sub-visual row component ---- */
+
+interface SubVisualRowProps {
+  sv: PipelineSubVisualNode;
+  segmentId: string;
+  segmentDuration: number;
+  imageModels: FalImageModelInfo[];
+  videoModels: FalVideoModelInfo[];
+  defaultImageModel: string;
+  defaultVideoModel: string;
+  onSubVisualUpdate?: (segmentId: string, subOrder: number, updates: Partial<PipelineSubVisualNode>) => void;
+}
+
+function SubVisualRowComponent({
+  sv,
+  segmentId,
+  segmentDuration,
+  imageModels,
+  videoModels,
+  defaultImageModel,
+  defaultVideoModel,
+  onSubVisualUpdate,
+}: SubVisualRowProps) {
+  const [expanded, setExpanded] = useState(false);
+  const svBadgeClass = getBadgeClass(sv.visualType);
+  const isProg = PROGRAMMATIC_TYPES.has(sv.visualType);
+  const startSec = sv.startOffset.toFixed(1);
+  const endSec = (sv.startOffset + sv.duration).toFixed(1);
+  const models = sv.visualMode === 'image' ? imageModels : sv.visualMode === 'video' ? videoModels : [];
+
+  const handleSvTypeChange = useCallback(
+    (visualType: VisualTypeString) => {
+      if (!onSubVisualUpdate) return;
+      const newIsProg = PROGRAMMATIC_TYPES.has(visualType);
+      let visualMode: VisualMode = newIsProg ? 'programmatic' : 'image';
+      let model: string | null = null;
+      if (!newIsProg && visualType === 'AI_ILLUSTRATION') {
+        visualMode = sv.visualMode === 'programmatic' ? 'image' : sv.visualMode;
+        model = visualMode === 'video' ? defaultVideoModel : defaultImageModel;
+      }
+      onSubVisualUpdate(segmentId, sv.subOrder, { visualType, visualMode, model });
+    },
+    [segmentId, sv.subOrder, sv.visualMode, defaultImageModel, defaultVideoModel, onSubVisualUpdate],
+  );
+
+  return (
+    <div className={styles.subVisualRow}>
+      <div className={styles.subVisualHeader}>
+        <span className={styles.subVisualTime}>{startSec}s - {endSec}s</span>
+        <span className={styles.subVisualDuration}>{sv.duration.toFixed(1)}s / {segmentDuration.toFixed(1)}s</span>
+        <span className={`${styles.subVisualBadge} ${svBadgeClass}`}>
+          {VISUAL_TYPE_LABELS[sv.visualType]}
+        </span>
+        {sv.estimatedCost > 0 && (
+          <span className={styles.subVisualCost}>{formatCost(sv.estimatedCost)}</span>
+        )}
+        {!isProg && (
+          <button
+            className={styles.advancedToggle}
+            onClick={() => setExpanded(!expanded)}
+            type="button"
+            aria-expanded={expanded}
+          >
+            {expanded ? 'Hide' : 'Edit'}
+          </button>
+        )}
+      </div>
+
+      {/* Prompt preview when not editing */}
+      {sv.prompt && !expanded && (
+        <p className={styles.subVisualPrompt}>{sv.prompt}</p>
+      )}
+
+      {/* Expanded edit controls */}
+      {expanded && !isProg && (
+        <div className={styles.subVisualEdit}>
+          {/* Visual type picker */}
+          <div className={styles.typeGrid} role="group" aria-label="Sub-visual type">
+            {[...TYPE_GROUPS[0].types, ...TYPE_GROUPS[1].types].map((vt) => {
+              const variant = BADGE_VARIANTS[vt] ?? 'amber';
+              const pillClass = styles[`pill${variant.charAt(0).toUpperCase()}${variant.slice(1)}`];
+              return (
+                <button
+                  key={vt}
+                  className={`${styles.typePill} ${styles.typePillSmall} ${sv.visualType === vt ? `${styles.typePillActive} ${pillClass}` : ''}`}
+                  onClick={() => handleSvTypeChange(vt)}
+                  type="button"
+                  aria-pressed={sv.visualType === vt}
+                >
+                  {VISUAL_TYPE_LABELS[vt]}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Model selector */}
+          {models.length > 0 && (
+            <select
+              className={styles.select}
+              value={sv.model ?? ''}
+              onChange={(e) => onSubVisualUpdate?.(segmentId, sv.subOrder, { model: e.target.value || null })}
+            >
+              {!sv.model && <option value="" disabled>Select a model...</option>}
+              {models.map((m) => (
+                <option key={m.modelId} value={m.modelId}>
+                  {m.displayName} — {'pricePerImage' in m
+                    ? `$${(m as FalImageModelInfo).pricePerImage}/img`
+                    : `$${(m as FalVideoModelInfo).costPerMinute}/min`}
+                </option>
+              ))}
+            </select>
+          )}
+
+          {/* Prompt editor */}
+          <textarea
+            className={styles.prompt}
+            value={sv.prompt ?? ''}
+            onChange={(e) => onSubVisualUpdate?.(segmentId, sv.subOrder, { prompt: e.target.value || null })}
+            placeholder="Describe the visual..."
+            rows={2}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+const SubVisualRow = memo(SubVisualRowComponent);
 
 export const SegmentNode = memo(StoryboardCardComponent);

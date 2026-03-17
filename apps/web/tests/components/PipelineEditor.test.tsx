@@ -38,6 +38,10 @@ const defaultModels: FalModelsResponse = {
     { modelId: 'fal-wan2.5-480p', displayName: 'FAL WAN 2.5 480p', costPerMinute: 3, resolution: '480p', maxDuration: 5, qualityMode: 'standard' },
   ],
   hasFalKey: true,
+  hasMiniMaxKey: false,
+  hasHeraKey: false,
+  defaultImageModel: 'fal-recraft-v3',
+  defaultVideoModel: 'fal-wan2.5-480p',
 };
 
 function makePipeline(segments: PipelineSegmentNode[]): VideoPipeline {
