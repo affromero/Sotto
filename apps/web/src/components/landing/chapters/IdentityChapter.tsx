@@ -17,10 +17,17 @@ export function IdentityChapter() {
               for lip-sync avatars &mdash; making every podcast truly theirs.
               Sound like yourself. Look like yourself. Own your content.
             </p>
+            <p className={styles.description}>
+              We gate these features behind identity verification because they
+              matter. No one can clone your voice or use your face without your
+              explicit consent. We have zero tolerance for impersonation or
+              deepfakes &mdash; protecting creators and public figures isn&apos;t
+              a policy footnote, it&apos;s a core design decision.
+            </p>
             <p className={styles.footer}>
               Verification is quick and free &mdash; once verified, you unlock
               voice cloning, avatar uploads, and the ability to share with other
-              creators.
+              creators. All AI-generated content is clearly labeled, always.
             </p>
           </div>
 
