@@ -55,7 +55,6 @@ export const EXPERIMENTAL_WORKERS = new Set([
   'demo-transition',
   'demo-composition',
   'demo-scene-composition',
-  'avatar-generation',
   'music-generation',
 ]);
 
