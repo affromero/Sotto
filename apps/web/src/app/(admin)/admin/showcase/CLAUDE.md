@@ -35,9 +35,6 @@ DemoProject.scenes → demo-composition.worker.ts
   → Downloads /render/:jobId/output → uploads to R2
 ```
 
-**IMPORTANT**: As of the Remotion unification, composition goes through `POST /render` with
-`compositionId='LaunchVideo'`, NOT through the deprecated `POST /stitch` route.
-
 ## Data Model
 
 - `DemoProject` — top-level container (title, status, videoUrl, backgroundMusicUrl, etc.)
