@@ -9,6 +9,7 @@ import { NetworkChapter } from '@/components/landing/chapters/NetworkChapter';
 import { ShowcaseChapter } from '@/components/landing/chapters/ShowcaseChapter';
 import { IdentityChapter } from '@/components/landing/chapters/IdentityChapter';
 import { BotChapter } from '@/components/landing/chapters/BotChapter';
+import { FaqChapter } from '@/components/landing/chapters/FaqChapter';
 import { ConvertChapter } from '@/components/landing/chapters/ConvertChapter';
 import { getLandingShowcaseData } from '@/lib/showcase';
 import styles from './page.module.css';
@@ -32,6 +33,7 @@ export default async function LandingPage() {
           <TrustChapter />
           <NetworkChapter />
           <BotChapter showcase={showcaseData} />
+          <FaqChapter />
           <ConvertChapter />
         </div>
       </LandingShell>
