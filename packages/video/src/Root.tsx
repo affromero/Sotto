@@ -1,7 +1,7 @@
 import React from 'react';
 import { Composition, registerRoot } from 'remotion';
 import { PodcastVideo } from './compositions/PodcastVideo';
-import { LaunchVideo, computeSceneLayouts } from './compositions/LaunchVideo';
+import { LaunchVideo, computeTotalDurationFrames } from './compositions/LaunchVideo';
 import { SegmentStill } from './compositions/SegmentStill';
 import type { RenderInput, LaunchVideoInput, VideoSegment } from './types';
 import { DEFAULT_RENDER_CONFIG, DEFAULT_BRANDING } from './types';
@@ -46,13 +46,7 @@ const RemotionRoot: React.FC = () => {
         } satisfies LaunchVideoInput}
         calculateMetadata={({ props }) => {
           const fps = props.config?.fps ?? DEFAULT_RENDER_CONFIG.fps;
-          const layouts = computeSceneLayouts(props.scenes, fps);
-          const lastLayout = layouts[layouts.length - 1];
-          const totalFrames = lastLayout
-            ? (lastLayout.transitionStartFrame !== undefined && lastLayout.transitionDurationFrames
-              ? lastLayout.transitionStartFrame + lastLayout.transitionDurationFrames
-              : lastLayout.startFrame + lastLayout.durationFrames)
-            : 1;
+          const totalFrames = computeTotalDurationFrames(props.scenes, fps);
           // Add 1 second padding
           const durationInFrames = Math.max(1, totalFrames + fps);
           return { durationInFrames };
