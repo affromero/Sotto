@@ -15,6 +15,8 @@ interface SegmentVisual {
   prompt: string | null;
   metadata: Record<string, unknown> | null;
   status: string;
+  failureReason: string | null;
+  videoModel: string | null;
   assetUrl: string | null;
   assetType: string | null;
   order: number;
@@ -278,7 +280,8 @@ export function VideoProgress({ podcastId, videoGenerationId, voiceTrackId, onCo
   const currentStage = stageIndex(currentStatus);
   const visuals = data?.segmentVisuals || [];
   const readyCount = visuals.filter(v => v.status === 'ready').length;
-  const failedCount = visuals.filter(v => v.status === 'failed').length;
+  const failedVisuals = visuals.filter(v => v.status === 'failed');
+  const failedCount = failedVisuals.length;
   const totalCount = visuals.length;
   const showFilmstrip = totalCount > 0 && currentStatus !== 'PENDING';
 
@@ -339,10 +342,21 @@ export function VideoProgress({ podcastId, videoGenerationId, voiceTrackId, onCo
       </div>
 
       {currentStatus === 'GENERATING_VISUALS' && totalCount > 0 && (
-        <p className={styles.counter}>
-          {readyCount} of {totalCount} visuals generated
-          {failedCount > 0 && <span className={styles.counterFailed}> ({failedCount} failed)</span>}
-        </p>
+        <div>
+          <p className={styles.counter}>
+            {readyCount} of {totalCount} visuals generated
+            {failedCount > 0 && <span className={styles.counterFailed}> ({failedCount} failed)</span>}
+          </p>
+          {failedCount > 0 && (
+            <ul className={styles.failedList}>
+              {failedVisuals.map(v => (
+                <li key={v.id} className={styles.failedItem}>
+                  Segment {v.order}{v.videoModel ? ` (${v.videoModel})` : ''}: {v.failureReason ?? 'unknown error'}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
 
       {!isFailed && (

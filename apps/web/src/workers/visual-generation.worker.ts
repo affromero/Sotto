@@ -457,16 +457,20 @@ async function checkAllReady(videoGenerationId: string, podcastId: string): Prom
 
   if (pending === 0) {
     // Check for failures
-    const failed = await prisma.segmentVisual.count({
+    const failedVisuals = await prisma.segmentVisual.findMany({
       where: { videoGenerationId, status: 'failed' },
+      select: { order: true, videoModel: true, failureReason: true },
     });
 
-    if (failed > 0) {
+    if (failedVisuals.length > 0) {
+      const details = failedVisuals.map(v =>
+        `Segment ${v.order}${v.videoModel ? ` (${v.videoModel})` : ''}: ${v.failureReason ?? 'unknown'}`
+      ).join('; ');
       await prisma.videoGeneration.update({
         where: { id: videoGenerationId },
         data: {
           status: 'FAILED',
-          failureReason: `${failed} visual(s) failed to generate`,
+          failureReason: `${failedVisuals.length} visual(s) failed — ${details}`,
         },
       });
       return;
