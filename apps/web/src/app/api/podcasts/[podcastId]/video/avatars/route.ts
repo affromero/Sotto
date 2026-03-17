@@ -10,7 +10,6 @@ import type { AvatarProviderId } from '@/lib/providers/avatar-registry';
 import { getAvatarModelProvider } from '@/lib/providers/avatar-registry';
 import { fetchAvatarModels } from '@/lib/avatar-cost-estimator';
 import { getAutoModelConfig } from '@/lib/auto-model-config';
-import { deleteFile, extractR2Key } from '@/lib/r2';
 import { addJob, JobType, avatarGenerationQueue } from '@/lib/queue';
 import { logger } from '@/lib/logger';
 import { cache } from '@/lib/redis';
@@ -322,25 +321,9 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     return errorResponse('No video generation found', 404);
   }
 
-  // Delete R2 assets
-  const deletePromises: Promise<void>[] = [];
-  for (const overlay of videoGeneration.avatarOverlays) {
-    if (overlay.videoUrl) {
-      const key = extractR2Key(overlay.videoUrl);
-      if (key) deletePromises.push(deleteFile(key));
-    }
-    if (overlay.concatAudioUrl) {
-      const key = extractR2Key(overlay.concatAudioUrl);
-      if (key) deletePromises.push(deleteFile(key));
-    }
-    if (overlay.chunkVideoUrl) {
-      const key = extractR2Key(overlay.chunkVideoUrl);
-      if (key) deletePromises.push(deleteFile(key));
-    }
-  }
-  await Promise.allSettled(deletePromises);
+  // R2 assets kept — no deletion
 
-  // Delete records
+  // Delete DB records only (R2 files preserved)
   await prisma.avatarOverlay.deleteMany({
     where: { videoGenerationId: videoGeneration.id },
   });

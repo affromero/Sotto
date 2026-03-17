@@ -2,7 +2,7 @@ import { type Job, UnrecoverableError } from 'bullmq';
 import type { GenerateAvatarPayload } from '@/lib/queue';
 import { addJob, JobType, videoCompositionQueue } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
-import { uploadFile, deleteFile } from '@/lib/r2';
+import { uploadFile } from '@/lib/r2';
 import { logger } from '@/lib/logger';
 import { logUsage } from '@/lib/usage-logger';
 import { submitAvatarVideo, pollAvatarVideo, isNonRetryableHeyGenError } from '@/lib/heygen';
@@ -659,11 +659,7 @@ async function processRunwayAvatar(job: Job<GenerateAvatarPayload>): Promise<voi
     const webmKey = `podcasts/${podcastId}/avatars/${videoGenerationId}/${avatarOverlayId}/video.webm`;
     const videoUrl = await uploadFile(webmKey, webmBuffer, 'video/webm');
 
-    // Clean up chunk files from R2
-    for (let i = 0; i < chunks.length; i++) {
-      const chunkKey = `podcasts/${podcastId}/avatars/${videoGenerationId}/${avatarOverlayId}/chunk-${i}.webm`;
-      await deleteFile(chunkKey).catch(() => {});
-    }
+    // Chunk files kept in R2 — no deletion
 
     // Update overlay as ready with rounded mask, clear chunk preview fields
     await prisma.avatarOverlay.update({

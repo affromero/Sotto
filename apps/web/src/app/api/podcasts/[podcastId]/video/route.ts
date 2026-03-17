@@ -7,7 +7,7 @@ import { checkVideoGenerationGate, tryIncrementVideoGeneration } from '@/lib/vid
 import { generateVideoSchema, updateVideoSegmentsSchema } from '@/lib/validations';
 import { Prisma } from '@prisma/client';
 import { addJob, JobType, visualClassificationQueue, visualGenerationQueue, videoCompositionQueue } from '@/lib/queue';
-import { deleteFile, extractR2Key } from '@/lib/r2';
+
 import { logger } from '@/lib/logger';
 
 type RouteParams = { params: Promise<{ podcastId: string }> };
@@ -527,46 +527,9 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
     return errorResponse('No video generation found', 404);
   }
 
-  // Delete assets from R2
-  const deletePromises: Promise<void>[] = [];
+  // R2 assets kept — no deletion
 
-  for (const visual of videoGeneration.visuals) {
-    if (visual.assetUrl) {
-      const key = extractR2Key(visual.assetUrl);
-      if (key) deletePromises.push(deleteFile(key));
-    }
-  }
-
-  for (const overlay of videoGeneration.avatarOverlays) {
-    if (overlay.videoUrl) {
-      const key = extractR2Key(overlay.videoUrl);
-      if (key) deletePromises.push(deleteFile(key));
-    }
-    if (overlay.concatAudioUrl) {
-      const key = extractR2Key(overlay.concatAudioUrl);
-      if (key) deletePromises.push(deleteFile(key));
-    }
-    if (overlay.chunkVideoUrl) {
-      const key = extractR2Key(overlay.chunkVideoUrl);
-      if (key) deletePromises.push(deleteFile(key));
-    }
-  }
-
-  for (const transition of videoGeneration.transitions) {
-    if (transition.assetUrl) {
-      const key = extractR2Key(transition.assetUrl);
-      if (key) deletePromises.push(deleteFile(key));
-    }
-  }
-
-  if (videoGeneration.videoUrl) {
-    const key = extractR2Key(videoGeneration.videoUrl);
-    if (key) deletePromises.push(deleteFile(key));
-  }
-
-  await Promise.allSettled(deletePromises);
-
-  // Delete records (cascade deletes SegmentVisuals)
+  // Delete DB records only (cascade deletes SegmentVisuals)
   await prisma.videoGeneration.delete({
     where: { id: videoGeneration.id },
   });
@@ -657,20 +620,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     return errorResponse(`Segment visuals not found: ${missing.join(', ')}`, 404);
   }
 
-  // Delete old assets from R2
-  const deletePromises: Promise<void>[] = [];
-  for (const visual of existingVisuals) {
-    if (visual.assetUrl) {
-      const key = extractR2Key(visual.assetUrl);
-      if (key) deletePromises.push(deleteFile(key));
-    }
-  }
-  // Delete old composed video if it exists
-  if (videoGeneration.videoUrl) {
-    const key = extractR2Key(videoGeneration.videoUrl);
-    if (key) deletePromises.push(deleteFile(key));
-  }
-  await Promise.allSettled(deletePromises);
+  // R2 assets kept — no deletion
 
   const EXTERNAL_MODES = new Set(['image', 'video']);
 
