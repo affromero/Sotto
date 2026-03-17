@@ -258,6 +258,15 @@ export function VideoProgress({ podcastId, videoGenerationId, voiceTrackId, onCo
         return;
       }
       completedRef.current = false;
+      // Optimistically reset failed visuals so the counter clears immediately
+      setData(prev => prev ? {
+        ...prev,
+        status: 'GENERATING_VISUALS',
+        failureReason: null,
+        segmentVisuals: prev.segmentVisuals.map(v =>
+          v.status === 'failed' ? { ...v, status: 'pending' } : v
+        ),
+      } : prev);
       schedulePoll(1000);
     } catch {
       setRetryError('Network error — could not retry.');
