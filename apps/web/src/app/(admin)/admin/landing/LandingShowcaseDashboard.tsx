@@ -1,6 +1,9 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import type { LandingShowcaseData } from '@/lib/showcase';
+import { AudioClipPlayer } from '@/components/landing/chapters/AudioClipPlayer';
+import { ScriptEditorMock } from '@/components/landing/chapters/ScriptEditorMock';
 import styles from './LandingShowcaseDashboard.module.css';
 
 interface Config {
@@ -23,6 +26,8 @@ interface SearchResult {
   creator: string;
 }
 
+const COLOR_CYCLE = ['purple', 'amber', 'navy', 'green'] as const;
+
 export function LandingShowcaseDashboard() {
   const [config, setConfig] = useState<Config | null>(null);
   const [loading, setLoading] = useState(true);
@@ -34,6 +39,11 @@ export function LandingShowcaseDashboard() {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [selectedTitle, setSelectedTitle] = useState('');
+
+  // Preview state
+  const [preview, setPreview] = useState<LandingShowcaseData | null>(null);
+  const [previewing, setPreviewing] = useState(false);
+  const [previewError, setPreviewError] = useState('');
 
   // Form state
   const [form, setForm] = useState<Config>({
@@ -120,6 +130,7 @@ export function LandingShowcaseDashboard() {
       const res = await fetch('/api/admin/landing-showcase', { method: 'DELETE' });
       if (res.ok) {
         setConfig(null);
+        setPreview(null);
         setForm({
           podcastId: '',
           scriptTurnStart: 0,
@@ -161,6 +172,33 @@ export function LandingShowcaseDashboard() {
       setMessage(`Error: ${e instanceof Error ? e.message : 'Unknown error'}`);
     } finally {
       setBootstrapping(false);
+    }
+  }, [form]);
+
+  const handlePreview = useCallback(async () => {
+    if (!form.podcastId) {
+      setPreviewError('Select a podcast first');
+      return;
+    }
+    setPreviewing(true);
+    setPreviewError('');
+    try {
+      const res = await fetch('/api/admin/landing-showcase/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        setPreview(json.data);
+      } else {
+        const err = await res.json();
+        setPreviewError(err.error ?? 'Failed to load preview');
+      }
+    } catch (e) {
+      setPreviewError(e instanceof Error ? e.message : 'Unknown error');
+    } finally {
+      setPreviewing(false);
     }
   }, [form]);
 
@@ -244,7 +282,7 @@ export function LandingShowcaseDashboard() {
         </div>
       </section>
 
-      {/* Audio Clip */}
+      {/* Media Clip */}
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Media Clip — Audio + Video (Step 3)</h2>
         <div className={styles.row}>
@@ -347,6 +385,14 @@ export function LandingShowcaseDashboard() {
       <div className={styles.actions}>
         <button
           type="button"
+          className={styles.previewBtn}
+          onClick={handlePreview}
+          disabled={previewing || !form.podcastId}
+        >
+          {previewing ? 'Loading...' : 'Load Preview'}
+        </button>
+        <button
+          type="button"
           className={styles.saveBtn}
           onClick={handleSave}
           disabled={saving || !form.podcastId}
@@ -374,7 +420,85 @@ export function LandingShowcaseDashboard() {
           </button>
         )}
         {message && <span className={styles.message}>{message}</span>}
+        {previewError && <span className={styles.previewError}>{previewError}</span>}
       </div>
+
+      {/* Live Preview */}
+      {preview && (
+        <section className={styles.previewPanel}>
+          <h2 className={styles.previewTitle}>Landing Page Preview</h2>
+
+          {/* Step 1: Discovery chat */}
+          <div className={styles.previewBlock}>
+            <h3 className={styles.previewBlockTitle}>Step 1 — Discovery Chat</h3>
+            <div className={styles.previewChat}>
+              {preview.chatMessages.map((msg, i) => (
+                <div
+                  key={i}
+                  className={`${styles.chatMsg} ${msg.role === 'user' ? styles.chatMsgUser : styles.chatMsgBot}`}
+                >
+                  {msg.role === 'assistant' && <div className={styles.chatAvatar}>S</div>}
+                  <div className={styles.chatBubble}>{msg.content}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Step 2: Script excerpt */}
+          {preview.scriptTurns.length > 0 && (
+            <div className={styles.previewBlock}>
+              <h3 className={styles.previewBlockTitle}>Step 2 — Script Excerpt</h3>
+              <ScriptEditorMock turns={preview.scriptTurns} references={preview.references} />
+            </div>
+          )}
+
+          {/* Step 3: Audio + Video player */}
+          <div className={styles.previewBlock}>
+            <h3 className={styles.previewBlockTitle}>Step 3 — Media Player</h3>
+            <AudioClipPlayer
+              title={preview.podcast.title}
+              voiceCount={preview.voiceCount}
+              sourceCount={preview.sourceCount}
+              audioUrl={preview.audioClip.url}
+              originalTrackName={preview.originalTrackName}
+              startTime={preview.audioClip.start}
+              endTime={preview.audioClip.end}
+              totalDuration={preview.audioClip.totalDuration}
+              podcastId={preview.podcast.podcastId}
+              voiceTracks={preview.voiceTracks}
+              videoClip={preview.videoClip}
+            />
+          </div>
+
+          {/* Video segments */}
+          {preview.videoSegments.length > 0 && (
+            <div className={styles.previewBlock}>
+              <h3 className={styles.previewBlockTitle}>Showcase — Video Pipeline</h3>
+              <div className={styles.previewSegments}>
+                {preview.videoSegments.map((seg, i) => (
+                  <div key={seg.order} className={styles.previewSegment}>
+                    <span className={styles.segNum}>{seg.order}</span>
+                    <span className={styles.segLabel}>{seg.label}</span>
+                    <span className={`${styles.segBadge} ${styles[`badge${COLOR_CYCLE[i % COLOR_CYCLE.length]}`]}`}>
+                      {seg.type}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Bot overrides */}
+          <div className={styles.previewBlock}>
+            <h3 className={styles.previewBlockTitle}>Bot — Overrides</h3>
+            <div className={styles.previewBot}>
+              <div>Twitter: <strong>@{preview.bot.twitterHandle}</strong> ({preview.bot.twitterName})</div>
+              <div>Podcast: <strong>{preview.bot.podcastTitle}</strong> &middot; {preview.bot.podcastDuration}</div>
+              <div>Telegram topic: <strong>{preview.bot.telegramTopic}</strong></div>
+            </div>
+          </div>
+        </section>
+      )}
     </div>
   );
 }
