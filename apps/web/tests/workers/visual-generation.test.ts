@@ -11,7 +11,7 @@ const {
   mockFetchAllVideoModels,
 } = vi.hoisted(() => ({
   mockPrisma: {
-    segmentVisual: { findUnique: vi.fn(), update: vi.fn(), count: vi.fn() },
+    segmentVisual: { findUnique: vi.fn(), update: vi.fn(), count: vi.fn(), findMany: vi.fn() },
     segment: { findUnique: vi.fn() },
     podcast: { findUniqueOrThrow: vi.fn(), findUnique: vi.fn() },
     videoGeneration: { findUnique: vi.fn(), update: vi.fn() },
@@ -91,6 +91,7 @@ describe('visual-generation worker', () => {
       status: 'ready',
     });
     mockPrisma.segmentVisual.count.mockResolvedValue(0);
+    mockPrisma.segmentVisual.findMany.mockResolvedValue([]);
     mockPrisma.videoGeneration.update.mockResolvedValue({});
 
     await processVisualGeneration(makeJob(baseData));
@@ -119,9 +120,8 @@ describe('visual-generation worker', () => {
     });
 
     // All visuals ready after this one
-    mockPrisma.segmentVisual.count
-      .mockResolvedValueOnce(0)  // pending/generating count
-      .mockResolvedValueOnce(0); // failed count
+    mockPrisma.segmentVisual.count.mockResolvedValueOnce(0); // pending/generating count
+    mockPrisma.segmentVisual.findMany.mockResolvedValueOnce([]); // failed visuals
 
     await processVisualGeneration(makeJob(baseData));
 
@@ -161,9 +161,8 @@ describe('visual-generation worker', () => {
       providerId: 'fal',
     });
 
-    mockPrisma.segmentVisual.count
-      .mockResolvedValueOnce(0)  // pending/generating count
-      .mockResolvedValueOnce(0); // failed count
+    mockPrisma.segmentVisual.count.mockResolvedValueOnce(0); // pending/generating count
+    mockPrisma.segmentVisual.findMany.mockResolvedValueOnce([]); // failed visuals
 
     const stockData = { ...baseData, visualType: 'STOCK_FOOTAGE', prompt: 'ocean waves' };
     await processVisualGeneration(makeJob(stockData));
@@ -196,9 +195,8 @@ describe('visual-generation worker', () => {
     mockPrisma.segmentVisual.findUnique
       .mockResolvedValueOnce({ assetUrl: null, status: 'pending' })      // idempotency
       .mockResolvedValueOnce({ visualMode: 'image', videoModel: null }); // mode check
-    mockPrisma.segmentVisual.count
-      .mockResolvedValueOnce(0)
-      .mockResolvedValueOnce(0);
+    mockPrisma.segmentVisual.count.mockResolvedValueOnce(0); // pending/generating
+    mockPrisma.segmentVisual.findMany.mockResolvedValueOnce([]); // failed visuals
 
     const mapData = {
       ...baseData,
@@ -250,9 +248,8 @@ describe('visual-generation worker', () => {
       providerId: 'fal',
     });
 
-    mockPrisma.segmentVisual.count
-      .mockResolvedValueOnce(0)
-      .mockResolvedValueOnce(0);
+    mockPrisma.segmentVisual.count.mockResolvedValueOnce(0); // pending/generating
+    mockPrisma.segmentVisual.findMany.mockResolvedValueOnce([]); // failed visuals
 
     const mapData = {
       ...baseData,
@@ -311,9 +308,8 @@ describe('visual-generation worker', () => {
       .mockResolvedValueOnce('https://cdn.example.com/last-frame.png')   // last-frame upload
       .mockResolvedValueOnce('https://cdn.example.com/visual.mp4');       // video upload
 
-    mockPrisma.segmentVisual.count
-      .mockResolvedValueOnce(0)  // pending/generating
-      .mockResolvedValueOnce(0); // failed
+    mockPrisma.segmentVisual.count.mockResolvedValueOnce(0); // pending/generating
+    mockPrisma.segmentVisual.findMany.mockResolvedValueOnce([]); // failed visuals
 
     await processVisualGeneration(makeJob(baseData));
 
@@ -374,9 +370,8 @@ describe('visual-generation worker', () => {
       providerId: 'fal',
     });
 
-    mockPrisma.segmentVisual.count
-      .mockResolvedValueOnce(0)  // pending/generating
-      .mockResolvedValueOnce(0); // failed
+    mockPrisma.segmentVisual.count.mockResolvedValueOnce(0); // pending/generating
+    mockPrisma.segmentVisual.findMany.mockResolvedValueOnce([]); // failed visuals
 
     await processVisualGeneration(makeJob(baseData));
 

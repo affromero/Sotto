@@ -112,6 +112,23 @@
   color: var(--color-error);
 }
 
+.failedList {
+  list-style: none;
+  padding: 0;
+  margin: var(--spacing-xs) 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xxs);
+}
+
+.failedItem {
+  font: var(--text-caption);
+  color: var(--color-error);
+  padding: var(--spacing-xxs) var(--spacing-xs);
+  background: color-mix(in srgb, var(--color-error) 6%, transparent);
+  border-radius: var(--radius-sm);
+}
+
 /* Sub-message */
 
 .subMessage {

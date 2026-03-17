@@ -432,6 +432,8 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
           endStatePrompt: true,
           metadata: true,
           status: true,
+          failureReason: true,
+          videoModel: true,
           assetUrl: true,
           assetType: true,
           firstFrameUrl: true,
