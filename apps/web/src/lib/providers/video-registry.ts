@@ -3,7 +3,7 @@
  * Follows the same pattern as image-registry.ts.
  */
 
-export type VideoProviderId = 'fal' | 'minimax';
+export type VideoProviderId = 'fal' | 'minimax' | 'hera';
 
 export interface VideoModelOption {
   id: string;
@@ -55,6 +55,32 @@ const VIDEO_PROVIDERS: Record<VideoProviderId, VideoProviderMeta> = {
             headers: { Authorization: `Key ${creds.apiKey}` },
           });
           return res.ok;
+        } catch {
+          return false;
+        }
+      },
+    },
+  },
+
+  hera: {
+    id: 'hera',
+    displayName: 'Hera',
+    getApiKeyUrl: 'https://hera.video',
+    defaultModel: 'hera-motion-1080p',
+    models: [
+      { id: 'hera-motion-1080p', displayName: 'Hera Motion (1080p)', tier: 'standard', costPerMinute: 1.5, supportsFirstFrame: true },
+    ],
+    platformKeyEnv: 'HERA_API_KEY',
+    auth: {
+      validate: async (creds) => {
+        try {
+          const res = await fetch('https://api.hera.video/v1/generations', {
+            method: 'POST',
+            headers: { 'x-api-key': creds.apiKey, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt: 'test', duration: 1 }),
+          });
+          // Any non-401/403 means the key is valid (the request itself may fail for other reasons)
+          return res.status !== 401 && res.status !== 403;
         } catch {
           return false;
         }
