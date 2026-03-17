@@ -21,7 +21,9 @@ interface RenderJob {
 }
 
 const jobs = new Map<string, RenderJob>();
-let currentRender: string | null = null;
+
+/** Use half of available CPUs for per-render frame concurrency (min 1, max 4). */
+const RENDER_CONCURRENCY = Math.min(4, Math.max(1, Math.floor(os.cpus().length / 2)));
 
 // Cache the bundled Remotion project
 let bundlePromise: Promise<string> | null = null;
@@ -46,7 +48,6 @@ async function executeRender(jobId: string, compositionId: CompositionId, input:
   if (!job) return;
 
   job.status = RenderStatus.RENDERING;
-  currentRender = jobId;
 
   const outputPath = path.join(os.tmpdir(), `sotto-video-${jobId}.mp4`);
 
@@ -68,6 +69,8 @@ async function executeRender(jobId: string, compositionId: CompositionId, input:
       audioBitrate: `${config.audioBitrate}` as `${number}k`,
       outputLocation: outputPath,
       inputProps: input,
+      concurrency: RENDER_CONCURRENCY,
+      enableMultiProcessOnLinux: true,
       onProgress: ({ progress }: { progress: number }) => {
         job.progress = Math.round(progress * 100);
       },
@@ -80,8 +83,6 @@ async function executeRender(jobId: string, compositionId: CompositionId, input:
     job.status = RenderStatus.ERROR;
     job.error = err instanceof Error ? err.message : 'Render failed';
     console.error(`Render ${jobId} failed:`, err);
-  } finally {
-    currentRender = null;
   }
 }
 
@@ -94,14 +95,6 @@ export function preWarmBundle(): void {
 
 // POST /render — start a new render
 renderRouter.post('/', (req, res) => {
-  if (currentRender) {
-    res.status(429).json({
-      error: 'A render is already in progress',
-      currentJobId: currentRender,
-    });
-    return;
-  }
-
   const { compositionId: rawCompositionId, ...body } = req.body;
   const compositionId: CompositionId = rawCompositionId === 'LaunchVideo' ? 'LaunchVideo' : 'PodcastVideo';
 
