@@ -18,6 +18,7 @@ COPY packages/maps/package.json ./packages/maps/
 COPY apps/web/prisma ./apps/web/prisma/
 
 RUN --mount=type=cache,target=/root/.npm npm ci --ignore-scripts
+RUN npm rebuild esbuild
 RUN npx prisma generate --schema=apps/web/prisma/schema.prisma
 
 # ---- Stage 2: Production runner ----
