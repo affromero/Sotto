@@ -40,6 +40,17 @@ export function PipelineEditor({ pipeline, falModels, onApprove, onCancel }: Pip
         prev.map((seg) => {
           if (seg.segmentId !== segmentId) return seg;
           const updated = { ...seg, ...updates };
+          // Propagate model/mode/type changes to sub-visuals so cost estimation stays in sync
+          if (updated.subVisuals && updated.subVisuals.length > 0) {
+            if ('model' in updates || 'visualMode' in updates || 'visualType' in updates) {
+              updated.subVisuals = updated.subVisuals.map((sv) => ({
+                ...sv,
+                ...('model' in updates ? { model: updates.model ?? null } : {}),
+                ...('visualMode' in updates && updates.visualMode ? { visualMode: updates.visualMode } : {}),
+                ...('visualType' in updates && updates.visualType ? { visualType: updates.visualType } : {}),
+              }));
+            }
+          }
           updated.estimatedCost = estimateSegmentCost(updated, falModels.imageModels, falModels.videoModels);
           return updated;
         }),
