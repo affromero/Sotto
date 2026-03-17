@@ -104,14 +104,22 @@ clipRouter.post('/', async (req, res) => {
       inputProps: { segment },
     });
 
-    const buffer = fs.readFileSync(outputPath);
-    fs.unlinkSync(outputPath);
-
+    const stat = fs.statSync(outputPath);
     res.setHeader('Content-Type', 'video/mp4');
-    res.setHeader('Content-Length', buffer.length);
-    res.send(buffer);
+    res.setHeader('Content-Length', stat.size);
+
+    const stream = fs.createReadStream(outputPath);
+    stream.pipe(res);
+    stream.on('end', () => {
+      fs.unlink(outputPath, () => {});
+    });
+    stream.on('error', () => {
+      fs.unlink(outputPath, () => {});
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Failed to stream clip' });
+      }
+    });
   } catch (err) {
-    // Clean up temp file on error
     try { fs.unlinkSync(outputPath); } catch { /* ignore */ }
 
     const message = err instanceof Error ? err.message : 'Clip render failed';
