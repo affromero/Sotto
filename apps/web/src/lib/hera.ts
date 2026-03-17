@@ -28,19 +28,21 @@ export async function createHeraJob(params: {
     return null;
   }
 
-  const res = await fetch(`${HERA_BASE_URL}/generations`, {
+  const res = await fetch(`${HERA_BASE_URL}/videos`, {
     method: 'POST',
     headers: headers(),
     body: JSON.stringify({
       prompt: params.prompt,
-      duration: params.durationSeconds,
+      duration_seconds: params.durationSeconds,
       reference_image_url: params.referenceImageUrl,
-      output: {
-        format: 'mp4',
-        aspect_ratio: params.aspectRatio ?? '16:9',
-        fps: '30',
-        resolution: '1080p',
-      },
+      outputs: [
+        {
+          format: 'mp4',
+          aspect_ratio: params.aspectRatio ?? '16:9',
+          fps: '30',
+          resolution: '1080p',
+        },
+      ],
     }),
   });
 
@@ -50,13 +52,13 @@ export async function createHeraJob(params: {
     return null;
   }
 
-  const data = (await res.json()) as { id?: string };
-  if (!data.id) {
+  const data = (await res.json()) as { video_id?: string };
+  if (!data.video_id) {
     logger.error('Hera response missing video ID', { data });
     return null;
   }
 
-  return { videoId: data.id };
+  return { videoId: data.video_id };
 }
 
 export async function pollHeraJob(videoId: string): Promise<{
@@ -64,7 +66,7 @@ export async function pollHeraJob(videoId: string): Promise<{
   fileUrl?: string;
   error?: string;
 }> {
-  const res = await fetch(`${HERA_BASE_URL}/generations/${videoId}`, {
+  const res = await fetch(`${HERA_BASE_URL}/videos/${videoId}`, {
     headers: headers(),
   });
 
@@ -75,16 +77,18 @@ export async function pollHeraJob(videoId: string): Promise<{
 
   const data = (await res.json()) as {
     status?: string;
-    output?: { file_url?: string };
+    outputs?: Array<{ status?: string; file_url?: string | null; error?: string }>;
     error?: string;
   };
 
   if (data.status === 'success' || data.status === 'completed') {
-    return { status: 'success', fileUrl: data.output?.file_url };
+    const firstOutput = data.outputs?.[0];
+    return { status: 'success', fileUrl: firstOutput?.file_url ?? undefined };
   }
 
   if (data.status === 'failed' || data.status === 'error') {
-    return { status: 'failed', error: data.error ?? 'Generation failed' };
+    const firstError = data.outputs?.find((o) => o.error)?.error;
+    return { status: 'failed', error: firstError ?? data.error ?? 'Generation failed' };
   }
 
   return { status: 'in-progress' };
