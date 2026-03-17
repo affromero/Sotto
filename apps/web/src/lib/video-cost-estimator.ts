@@ -61,6 +61,26 @@ function staticFalVideoModels(): FalVideoModelInfo[] {
     .map(mapVideoModel);
 }
 
+/** Video models from the registry that aren't in pricetoken (e.g. Hera). */
+function registryOnlyVideoModels(alreadyFetched: Set<string>): FalVideoModelInfo[] {
+  const result: FalVideoModelInfo[] = [];
+  for (const provider of getAllVideoProviderMeta()) {
+    for (const model of provider.models) {
+      if (!alreadyFetched.has(model.id)) {
+        result.push({
+          modelId: model.id,
+          displayName: model.displayName,
+          costPerMinute: model.costPerMinute,
+          resolution: null,
+          maxDuration: 60, // registry models default to 60s max
+          qualityMode: model.tier,
+        });
+      }
+    }
+  }
+  return result;
+}
+
 /** Return available Fal image models with live pricing from pricetoken. */
 export async function fetchFalImageModels(): Promise<FalImageModelInfo[]> {
   const now = Date.now();
@@ -139,8 +159,12 @@ export async function fetchAllVideoModels(): Promise<FalVideoModelInfo[]> {
       .map(mapVideoModel);
 
     if (models.length > 0) {
-      videoCache = { data: models, expiresAt: now + CACHE_TTL_MS };
-      return models;
+      // Append registry-only models not covered by pricetoken (e.g. Hera)
+      const fetchedIds = new Set(models.map((m) => m.modelId));
+      const extra = registryOnlyVideoModels(fetchedIds);
+      const merged = [...models, ...extra];
+      videoCache = { data: merged, expiresAt: now + CACHE_TTL_MS };
+      return merged;
     }
   } catch (err) {
     logger.warn('Failed to fetch video pricing from pricetoken, using static fallback', {
@@ -149,8 +173,12 @@ export async function fetchAllVideoModels(): Promise<FalVideoModelInfo[]> {
   }
 
   const fallback = staticFalVideoModels();
-  videoCache = { data: fallback, expiresAt: now + CACHE_TTL_MS };
-  return fallback;
+  // Append registry-only models to fallback too
+  const fallbackIds = new Set(fallback.map((m) => m.modelId));
+  const extra = registryOnlyVideoModels(fallbackIds);
+  const merged = [...fallback, ...extra];
+  videoCache = { data: merged, expiresAt: now + CACHE_TTL_MS };
+  return merged;
 }
 
 /** Compute clip count and per-clip duration for a video segment. */
