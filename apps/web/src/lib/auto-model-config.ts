@@ -501,6 +501,38 @@ export function resolveSttIncludedModels(config: AutoModelConfigData): {
 }
 
 /**
+ * Resolve effective included image models per tier.
+ * When lists are null (unconfigured), derive from auto defaults.
+ */
+export function resolveIncludedImageModels(config: AutoModelConfigData): {
+  freeImageModels: string[];
+  proImageModels: string[];
+} {
+  const freeImageModels = config.freeIncludedImageModels ?? [config.freeImageModel];
+  const proSet = new Set([
+    ...(config.proIncludedImageModels ?? [config.proImageModel]),
+    ...freeImageModels,
+  ]);
+  return { freeImageModels, proImageModels: [...proSet] };
+}
+
+/**
+ * Resolve effective included video models per tier.
+ * When lists are null (unconfigured), derive from auto defaults.
+ */
+export function resolveIncludedVideoModels(config: AutoModelConfigData): {
+  freeVideoModels: string[];
+  proVideoModels: string[];
+} {
+  const freeVideoModels = config.freeIncludedVideoModels ?? [config.freeVideoModel];
+  const proSet = new Set([
+    ...(config.proIncludedVideoModels ?? [config.proVideoModel]),
+    ...freeVideoModels,
+  ]);
+  return { freeVideoModels, proVideoModels: [...proSet] };
+}
+
+/**
  * Resolve the auto model config for a specific plan tier.
  * 'PLATFORM' is a dedicated AI-only config for internal operations
  * (handle screening, credential lookup).
