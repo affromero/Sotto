@@ -161,6 +161,7 @@ export type VisualType =
   | 'MAP_OVERLAY';
 
 export type VideoStatus =
+  | 'DRAFT'
   | 'PENDING'
   | 'CLASSIFYING'
   | 'GENERATING_VISUALS'
