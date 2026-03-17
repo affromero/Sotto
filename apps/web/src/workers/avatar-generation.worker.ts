@@ -141,7 +141,7 @@ async function processHeyGenAvatar(job: Job<GenerateAvatarPayload>): Promise<voi
       await job.updateProgress(25);
 
       const concatAudioBuffer = await readFile(concatOutputPath);
-      const concatAudioKey = `podcasts/${podcastId}/avatars/${speaker}-audio.mp3`;
+      const concatAudioKey = `podcasts/${podcastId}/avatars/${videoGenerationId}/${avatarOverlayId}/audio.mp3`;
       concatAudioUrl = await uploadFile(concatAudioKey, concatAudioBuffer, 'audio/mpeg');
 
       await prisma.avatarOverlay.update({
@@ -206,7 +206,7 @@ async function processHeyGenAvatar(job: Job<GenerateAvatarPayload>): Promise<voi
     await job.updateProgress(90);
 
     const webmBuffer = await readFile(transparentPath);
-    const webmKey = `podcasts/${podcastId}/avatars/${speaker}-avatar.webm`;
+    const webmKey = `podcasts/${podcastId}/avatars/${videoGenerationId}/${avatarOverlayId}/video.webm`;
     const videoUrl = await uploadFile(webmKey, webmBuffer, 'video/webm');
 
     await prisma.avatarOverlay.update({
@@ -321,7 +321,7 @@ async function processFalLipSync(job: Job<GenerateAvatarPayload>): Promise<void>
       durationSeconds = concatResult.durationSeconds;
 
       const concatAudioBuffer = await readFile(concatOutputPath);
-      const concatAudioKey = `podcasts/${podcastId}/avatars/${speaker}-audio.mp3`;
+      const concatAudioKey = `podcasts/${podcastId}/avatars/${videoGenerationId}/${avatarOverlayId}/audio.mp3`;
       concatAudioUrl = await uploadFile(concatAudioKey, concatAudioBuffer, 'audio/mpeg');
 
       await prisma.avatarOverlay.update({
@@ -366,7 +366,7 @@ async function processFalLipSync(job: Job<GenerateAvatarPayload>): Promise<void>
       const videoRes = await fetch(result.videoUrl);
       if (!videoRes.ok) throw new Error(`Failed to download fal lip-sync video: ${videoRes.status}`);
       const videoBuffer = Buffer.from(await videoRes.arrayBuffer());
-      const videoKey = `podcasts/${podcastId}/avatars/${speaker}-avatar.mp4`;
+      const videoKey = `podcasts/${podcastId}/avatars/${videoGenerationId}/${avatarOverlayId}/video.mp4`;
       const videoUrl = await uploadFile(videoKey, videoBuffer, 'video/mp4');
 
       await prisma.avatarOverlay.update({
@@ -404,7 +404,7 @@ async function processFalLipSync(job: Job<GenerateAvatarPayload>): Promise<void>
 
         // Upload chunk audio to R2 for fal to access
         const chunkAudioBuffer = await readFile(chunk.inputPath);
-        const chunkAudioKey = `podcasts/${podcastId}/avatars/${speaker}-chunk-audio-${i}.mp3`;
+        const chunkAudioKey = `podcasts/${podcastId}/avatars/${videoGenerationId}/${avatarOverlayId}/chunk-audio-${i}.mp3`;
         const chunkAudioUrl = await uploadFile(chunkAudioKey, chunkAudioBuffer, 'audio/mpeg');
 
         const { statusUrl, resultUrl } = await submitFalLipSync({
@@ -443,7 +443,7 @@ async function processFalLipSync(job: Job<GenerateAvatarPayload>): Promise<void>
       await job.updateProgress(85);
 
       const finalBuffer = await readFile(finalVideoPath);
-      const videoKey = `podcasts/${podcastId}/avatars/${speaker}-avatar.mp4`;
+      const videoKey = `podcasts/${podcastId}/avatars/${videoGenerationId}/${avatarOverlayId}/video.mp4`;
       const videoUrl = await uploadFile(videoKey, finalBuffer, 'video/mp4');
 
       await prisma.avatarOverlay.update({
@@ -548,7 +548,7 @@ async function processRunwayAvatar(job: Job<GenerateAvatarPayload>): Promise<voi
       durationSeconds = concatResult.durationSeconds;
 
       const concatAudioBuffer = await readFile(concatOutputPath);
-      const concatAudioKey = `podcasts/${podcastId}/avatars/${speaker}-audio.mp3`;
+      const concatAudioKey = `podcasts/${podcastId}/avatars/${videoGenerationId}/${avatarOverlayId}/audio.mp3`;
       concatAudioUrl = await uploadFile(concatAudioKey, concatAudioBuffer, 'audio/mpeg');
 
       await prisma.avatarOverlay.update({
@@ -624,7 +624,7 @@ async function processRunwayAvatar(job: Job<GenerateAvatarPayload>): Promise<voi
 
         // Upload chunk to R2 for progressive playback
         const chunkBuffer = await readFile(chunk.outputPath);
-        const chunkR2Key = `podcasts/${podcastId}/avatars/${speaker}-chunk-${i}.webm`;
+        const chunkR2Key = `podcasts/${podcastId}/avatars/${videoGenerationId}/${avatarOverlayId}/chunk-${i}.webm`;
         const chunkR2Url = await uploadFile(chunkR2Key, chunkBuffer, 'video/webm');
         const cumulativeDuration = chunks.slice(0, i + 1).reduce((sum, c) => sum + c.durationSeconds, 0);
 
@@ -656,12 +656,12 @@ async function processRunwayAvatar(job: Job<GenerateAvatarPayload>): Promise<voi
 
     // Upload to R2 (no chromakey — Runway has scene background)
     const webmBuffer = await readFile(finalVideoPath);
-    const webmKey = `podcasts/${podcastId}/avatars/${speaker}-avatar.webm`;
+    const webmKey = `podcasts/${podcastId}/avatars/${videoGenerationId}/${avatarOverlayId}/video.webm`;
     const videoUrl = await uploadFile(webmKey, webmBuffer, 'video/webm');
 
     // Clean up chunk files from R2
     for (let i = 0; i < chunks.length; i++) {
-      const chunkKey = `podcasts/${podcastId}/avatars/${speaker}-chunk-${i}.webm`;
+      const chunkKey = `podcasts/${podcastId}/avatars/${videoGenerationId}/${avatarOverlayId}/chunk-${i}.webm`;
       await deleteFile(chunkKey).catch(() => {});
     }
 
