@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { SegmentNode } from './SegmentNode';
 import { TransitionConnector } from './TransitionConnector';
-import type { VideoPipeline, PipelineSegmentNode, PipelineTransition, FalModelsResponse } from '@/types/pipeline';
+import type { VideoPipeline, PipelineSegmentNode, PipelineSubVisualNode, PipelineTransition, FalModelsResponse } from '@/types/pipeline';
 import { estimateSegmentCost, estimatePipelineCost, estimateTransitionCost, formatCost } from '@/lib/video-cost-estimator';
 import { getSpeakerIndex, getUniqueSpeakers } from '@/lib/speaker-colors';
 import styles from './PipelineEditor.module.css';
@@ -52,6 +52,24 @@ export function PipelineEditor({ pipeline, falModels, onApprove, onCancel, onRec
               }));
             }
           }
+          updated.estimatedCost = estimateSegmentCost(updated, falModels.imageModels, falModels.videoModels);
+          return updated;
+        }),
+      );
+    },
+    [falModels.imageModels, falModels.videoModels],
+  );
+
+  const handleSubVisualUpdate = useCallback(
+    (segmentId: string, subOrder: number, updates: Partial<PipelineSubVisualNode>) => {
+      setSegments((prev) =>
+        prev.map((seg) => {
+          if (seg.segmentId !== segmentId || !seg.subVisuals) return seg;
+          const updated = { ...seg };
+          updated.subVisuals = seg.subVisuals.map((sv) => {
+            if (sv.subOrder !== subOrder) return sv;
+            return { ...sv, ...updates };
+          });
           updated.estimatedCost = estimateSegmentCost(updated, falModels.imageModels, falModels.videoModels);
           return updated;
         }),
@@ -126,6 +144,7 @@ export function PipelineEditor({ pipeline, falModels, onApprove, onCancel, onRec
                   isExpanded={expandedId === seg.segmentId}
                   onToggleExpand={() => toggleExpand(seg.segmentId)}
                   onUpdate={handleSegmentUpdate}
+                  onSubVisualUpdate={handleSubVisualUpdate}
                 />
               </div>
               {transition && (

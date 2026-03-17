@@ -448,6 +448,103 @@
   border-color: var(--color-primary);
 }
 
+/* Sub-visual badges — collapsed header with multiple types */
+
+.subVisualBadges {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 50%;
+}
+
+.subVisualBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+/* Sub-visual list — expanded view */
+
+.subVisualList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.subVisualRow {
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.subVisualRow:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.subVisualHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.subVisualTime {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-tertiary);
+}
+
+.subVisualDuration {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-tertiary);
+  opacity: 0.6;
+}
+
+.subVisualCost {
+  margin-left: auto;
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-success);
+}
+
+.subVisualPrompt {
+  margin: 6px 0 0;
+  font-size: 12px;
+  font-style: italic;
+  color: var(--color-text-tertiary);
+  line-height: 1.4;
+}
+
+.subVisualEdit {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Smaller pills for sub-visual type picker */
+.typePillSmall {
+  padding: 4px 10px;
+  font-size: 11px;
+  min-height: 26px;
+}
+
 /* Mobile */
 
 @media (max-width: 480px) {
