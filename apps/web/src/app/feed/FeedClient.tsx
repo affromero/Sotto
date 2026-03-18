@@ -11,6 +11,7 @@ import { FeedGrid } from '@/components/feed/FeedGrid';
 import { PodcastCard } from '@/components/feed/PodcastCard';
 import { UserSearchGrid, type UserDiscoveryResult } from '@/components/feed/UserSearchGrid';
 import { ActivityFeed } from '@/components/feed/ActivityFeed';
+import { NewsTab } from '@/components/feed/NewsTab';
 import type { PodcastSummary } from '@/types/podcast';
 import styles from './page.module.css';
 
@@ -20,7 +21,7 @@ interface Tag {
   slug: string;
 }
 
-type FeedTab = 'discover' | 'activity';
+type FeedTab = 'discover' | 'news' | 'activity';
 type SearchMode = 'podcasts' | 'people';
 
 interface FeedClientProps {
@@ -43,7 +44,7 @@ const SORT_OPTIONS: Array<{ value: SortOption; label: string }> = [
 
 const SORT_VALID = new Set<SortOption>(['recent', 'popular', 'trending', 'most_forked']);
 const MODE_VALID = new Set<ModeOption>(['all', 'remixes']);
-const TAB_VALID = new Set<FeedTab>(['discover', 'activity']);
+const TAB_VALID = new Set<FeedTab>(['discover', 'news', 'activity']);
 const SEARCH_MODE_VALID = new Set<SearchMode>(['podcasts', 'people']);
 
 export function FeedClient({ initialPodcasts, trendingPodcasts, tags, isAuthenticated, currentUserId }: FeedClientProps) {
@@ -286,19 +287,30 @@ export function FeedClient({ initialPodcasts, trendingPodcasts, tags, isAuthenti
 
   return (
     <div className={styles.feedContent}>
-      {isAuthenticated && (
-        <div className={styles.feedTabs} role="tablist" aria-label="Feed tabs">
-          <button
-            className={`${styles.feedTab} ${activeTab === 'discover' ? styles.feedTabActive : ''}`}
-            onClick={() => { setActiveTab('discover'); syncUrl({ tab: undefined }); }}
-            role="tab"
-            aria-selected={activeTab === 'discover'}
-            aria-controls="feed-discover-panel"
-            id="feed-discover-tab"
-            type="button"
-          >
-            Discover
-          </button>
+      <div className={styles.feedTabs} role="tablist" aria-label="Feed tabs">
+        <button
+          className={`${styles.feedTab} ${activeTab === 'discover' ? styles.feedTabActive : ''}`}
+          onClick={() => { setActiveTab('discover'); syncUrl({ tab: undefined }); }}
+          role="tab"
+          aria-selected={activeTab === 'discover'}
+          aria-controls="feed-discover-panel"
+          id="feed-discover-tab"
+          type="button"
+        >
+          Discover
+        </button>
+        <button
+          className={`${styles.feedTab} ${activeTab === 'news' ? styles.feedTabActive : ''}`}
+          onClick={() => { setActiveTab('news'); syncUrl({ tab: 'news' }); }}
+          role="tab"
+          aria-selected={activeTab === 'news'}
+          aria-controls="feed-news-panel"
+          id="feed-news-tab"
+          type="button"
+        >
+          News
+        </button>
+        {isAuthenticated && (
           <button
             className={`${styles.feedTab} ${activeTab === 'activity' ? styles.feedTabActive : ''}`}
             onClick={() => { setActiveTab('activity'); syncUrl({ tab: 'activity' }); }}
@@ -310,15 +322,15 @@ export function FeedClient({ initialPodcasts, trendingPodcasts, tags, isAuthenti
           >
             Activity
           </button>
-        </div>
-      )}
+        )}
+      </div>
 
       {activeTab === 'discover' ? (
         <div
           key="discover"
           id="feed-discover-panel"
           role="tabpanel"
-          aria-labelledby={isAuthenticated ? 'feed-discover-tab' : undefined}
+          aria-labelledby="feed-discover-tab"
           className={`${styles.tabPanel} ${styles.discoverPanel}`}
         >
           <div className={styles.filters}>
@@ -455,6 +467,16 @@ export function FeedClient({ initialPodcasts, trendingPodcasts, tags, isAuthenti
               )}
             </div>
           )}
+        </div>
+      ) : activeTab === 'news' ? (
+        <div
+          key="news"
+          id="feed-news-panel"
+          role="tabpanel"
+          aria-labelledby="feed-news-tab"
+          className={styles.tabPanel}
+        >
+          <NewsTab isAuthenticated={!!isAuthenticated} />
         </div>
       ) : (
         <div
