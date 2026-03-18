@@ -64,6 +64,9 @@ export {
   NEWS_TIME_RANGE_LABELS,
 } from './types/discovery';
 
+export type { NewsArticle, NewsMeta, NewsResponse, NewsCategory } from './types/news';
+export { NEWS_CATEGORIES, NEWS_CATEGORY_LABELS } from './types/news';
+
 export type { PlayerState, PlayerControls } from './types/player';
 
 export type {
