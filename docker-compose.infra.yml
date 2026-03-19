@@ -76,8 +76,8 @@ services:
     deploy:
       resources:
         limits:
-          memory: 4g
-    shm_size: '2gb'
+          memory: 8g
+    shm_size: '4gb'
     healthcheck:
       test: ['CMD', 'wget', '-q', '--spider', 'http://localhost:3100/health']
       interval: 30s
