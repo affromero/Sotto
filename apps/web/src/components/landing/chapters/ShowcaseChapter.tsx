@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
 import type { LandingShowcaseData } from '@/lib/showcase';
+import { useShowcaseToggles } from '../ShowcaseTogglesProvider';
 import { ScrollChapter } from '../ScrollChapter';
 import styles from './ShowcaseChapter.module.css';
 
@@ -18,15 +18,18 @@ const DEFAULT_SEGMENTS = [
 
 const COLOR_CYCLE = ['purple', 'amber', 'navy', 'green'] as const;
 
-const COLOR_MAP = {
+const COLOR_MAP: Record<string, string> = {
   purple: styles.badgePurple,
   amber: styles.badgeAmber,
   navy: styles.badgeNavy,
   green: styles.badgeGreen,
-} as Record<string, string>;
+};
 
 export function ShowcaseChapter({ showcase }: ShowcaseChapterProps) {
-  const [avatarOn, setAvatarOn] = useState(true);
+  const toggles = useShowcaseToggles();
+  const videoEnabled = toggles?.videoEnabled ?? false;
+  const avatarEnabled = toggles?.avatarEnabled ?? false;
+  const showVideoToggle = showcase?.showVideo ?? false;
   const showAvatarToggle = showcase?.showAvatar ?? false;
 
   const segments = showcase && showcase.videoSegments.length > 0
@@ -59,20 +62,34 @@ export function ShowcaseChapter({ showcase }: ShowcaseChapterProps) {
                   </div>
                 ))}
                 <div className={styles.videoFooter}>
-                  {showAvatarToggle && (
-                    <button
-                      type="button"
-                      className={styles.toggle}
-                      onClick={() => setAvatarOn((v) => !v)}
-                      aria-pressed={avatarOn}
-                      aria-label={`Avatars: ${avatarOn ? 'On' : 'Off'}`}
-                    >
-                      <span className={`${styles.toggleTrack} ${avatarOn ? styles.toggleTrackOn : ''}`}>
-                        <span className={styles.toggleKnob} />
-                      </span>
-                      Avatars: {avatarOn ? 'On' : 'Off'}
-                    </button>
-                  )}
+                {showVideoToggle && (
+                  <button
+                    type="button"
+                    className={styles.toggle}
+                    onClick={() => toggles?.setVideoEnabled(!videoEnabled)}
+                    aria-pressed={videoEnabled}
+                    aria-label={`Video: ${videoEnabled ? 'On' : 'Off'}`}
+                  >
+                    <span className={`${styles.toggleTrack} ${videoEnabled ? styles.toggleTrackOn : ''}`}>
+                      <span className={styles.toggleKnob} />
+                    </span>
+                    Video: {videoEnabled ? 'On' : 'Off'}
+                  </button>
+                )}
+                {showAvatarToggle && (
+                  <button
+                    type="button"
+                    className={styles.toggle}
+                    onClick={() => toggles?.setAvatarEnabled(!avatarEnabled)}
+                    aria-pressed={avatarEnabled}
+                    aria-label={`Avatars: ${avatarEnabled ? 'On' : 'Off'}`}
+                  >
+                    <span className={`${styles.toggleTrack} ${avatarEnabled ? styles.toggleTrackOn : ''}`}>
+                      <span className={styles.toggleKnob} />
+                    </span>
+                    Avatars: {avatarEnabled ? 'On' : 'Off'}
+                  </button>
+                )}
                   <span className={styles.videoCount}>9 visual types</span>
                 </div>
               </div>

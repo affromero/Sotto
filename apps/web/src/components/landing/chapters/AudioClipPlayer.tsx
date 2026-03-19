@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState, useCallback, useEffect } from 'react';
+import { useShowcaseToggles } from '../ShowcaseTogglesProvider';
 import styles from './AudioClipPlayer.module.css';
 
 interface VoiceTrackOption {
@@ -63,9 +64,16 @@ export function AudioClipPlayer({
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [activeTrackIndex, setActiveTrackIndex] = useState(-1); // -1 = original
-  const [videoEnabled, setVideoEnabled] = useState(false);
+  const [localVideoEnabled, setLocalVideoEnabled] = useState(false);
 
-  const showVideo = showVideoToggle && videoClip && videoEnabled;
+  // When inside ShowcaseTogglesProvider (landing page), read from context.
+  // When outside (admin dashboard), fall back to local state.
+  const showcaseToggles = useShowcaseToggles();
+  const videoEnabled = showcaseToggles ? showcaseToggles.videoEnabled : localVideoEnabled;
+  const avatarEnabled = showcaseToggles?.avatarEnabled ?? false;
+
+  const showVideo = videoClip && videoEnabled;
+  const showLocalVideoToggle = !showcaseToggles && showVideoToggle && videoClip;
 
   const activeUrl = activeTrackIndex >= 0 ? voiceTracks[activeTrackIndex].audioUrl : audioUrl;
   const clipDuration = endTime - startTime;
@@ -201,6 +209,14 @@ export function AudioClipPlayer({
           </div>
         )}
 
+        {avatarEnabled && (
+          <div className={styles.avatarPlaceholder}>
+            <div className={`${styles.avatarCircle} ${styles.avatarHost}`} aria-hidden="true">H</div>
+            <div className={`${styles.avatarCircle} ${styles.avatarExpert}`} aria-hidden="true">E</div>
+            <span className={styles.avatarLabel}>Avatar presenters</span>
+          </div>
+        )}
+
         <a href={`/podcast/${podcastId}`} className={styles.playerTitle}>
           {title}
         </a>
@@ -271,13 +287,13 @@ export function AudioClipPlayer({
             {formatTime(currentTime)} / {formatTime(clipDuration)}
           </span>
           <div className={styles.playerActions}>
-            {showVideoToggle && videoClip && (
+            {showLocalVideoToggle && (
               <button
                 type="button"
-                className={`${styles.videoToggle} ${videoEnabled ? styles.videoToggleActive : ''}`}
-                onClick={() => setVideoEnabled((v) => !v)}
-                aria-pressed={videoEnabled}
-                aria-label={`Video: ${videoEnabled ? 'On' : 'Off'}`}
+                className={`${styles.videoToggle} ${localVideoEnabled ? styles.videoToggleActive : ''}`}
+                onClick={() => setLocalVideoEnabled((v) => !v)}
+                aria-pressed={localVideoEnabled}
+                aria-label={`Video: ${localVideoEnabled ? 'On' : 'Off'}`}
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                   <path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4V6.5l-4 4z" />
