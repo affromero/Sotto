@@ -29,6 +29,8 @@ export async function POST(request: NextRequest) {
     audioClipEnd: parsed.data.audioClipEnd ?? null,
     videoSegmentStart: parsed.data.videoSegmentStart ?? 0,
     videoSegmentCount: parsed.data.videoSegmentCount ?? 4,
+    showAvatar: parsed.data.showAvatar ?? false,
+    showVideo: parsed.data.showVideo ?? false,
     twitterHandle: parsed.data.twitterHandle ?? 'andres',
     twitterName: parsed.data.twitterName ?? 'Andres',
     telegramTopic: parsed.data.telegramTopic ?? null,

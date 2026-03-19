@@ -14,6 +14,8 @@ interface Config {
   audioClipEnd: number | null;
   videoSegmentStart: number;
   videoSegmentCount: number;
+  showAvatar: boolean;
+  showVideo: boolean;
   twitterHandle: string;
   twitterName: string;
   telegramTopic: string | null;
@@ -90,6 +92,8 @@ export function LandingShowcaseDashboard() {
     audioClipEnd: null,
     videoSegmentStart: 0,
     videoSegmentCount: 4,
+    showAvatar: false,
+    showVideo: false,
     twitterHandle: 'andres',
     twitterName: 'Andres',
     telegramTopic: null,
@@ -189,6 +193,8 @@ export function LandingShowcaseDashboard() {
           audioClipEnd: null,
           videoSegmentStart: 0,
           videoSegmentCount: 4,
+          showAvatar: false,
+          showVideo: false,
           twitterHandle: 'andres',
           twitterName: 'Andres',
           telegramTopic: null,
@@ -440,6 +446,29 @@ export function LandingShowcaseDashboard() {
         </div>
       </section>
 
+      {/* Feature Toggles */}
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>Feature Toggles</h2>
+        <div className={styles.row}>
+          <label className={styles.field}>
+            <input
+              type="checkbox"
+              checked={form.showAvatar}
+              onChange={(e) => setForm((f) => ({ ...f, showAvatar: e.target.checked }))}
+            />
+            <span className={styles.fieldLabel}>Show avatar toggle on landing page</span>
+          </label>
+          <label className={styles.field}>
+            <input
+              type="checkbox"
+              checked={form.showVideo}
+              onChange={(e) => setForm((f) => ({ ...f, showVideo: e.target.checked }))}
+            />
+            <span className={styles.fieldLabel}>Show video toggle on landing page</span>
+          </label>
+        </div>
+      </section>
+
       {/* Bot Overrides */}
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Bot Overrides</h2>
@@ -564,6 +593,7 @@ export function LandingShowcaseDashboard() {
               podcastId={preview.podcast.podcastId}
               voiceTracks={preview.voiceTracks}
               videoClip={preview.videoClip}
+              showVideoToggle={preview.showVideo}
             />
           </div>
 

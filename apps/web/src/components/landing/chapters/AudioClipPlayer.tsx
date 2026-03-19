@@ -28,6 +28,7 @@ interface AudioClipPlayerProps {
   podcastId: string;
   voiceTracks?: VoiceTrackOption[];
   videoClip?: VideoClip | null;
+  showVideoToggle?: boolean;
 }
 
 function formatTime(seconds: number): string {
@@ -54,6 +55,7 @@ export function AudioClipPlayer({
   podcastId,
   voiceTracks = [],
   videoClip,
+  showVideoToggle = false,
 }: AudioClipPlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -61,6 +63,9 @@ export function AudioClipPlayer({
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [activeTrackIndex, setActiveTrackIndex] = useState(-1); // -1 = original
+  const [videoEnabled, setVideoEnabled] = useState(false);
+
+  const showVideo = showVideoToggle && videoClip && videoEnabled;
 
   const activeUrl = activeTrackIndex >= 0 ? voiceTracks[activeTrackIndex].audioUrl : audioUrl;
   const clipDuration = endTime - startTime;
@@ -170,7 +175,7 @@ export function AudioClipPlayer({
         <span>Now Playing</span>
       </div>
       <div className={styles.mockBody}>
-        {videoClip && (
+        {showVideo && videoClip && (
           <div className={styles.videoInline}>
             {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
             <video
@@ -266,6 +271,20 @@ export function AudioClipPlayer({
             {formatTime(currentTime)} / {formatTime(clipDuration)}
           </span>
           <div className={styles.playerActions}>
+            {showVideoToggle && videoClip && (
+              <button
+                type="button"
+                className={`${styles.videoToggle} ${videoEnabled ? styles.videoToggleActive : ''}`}
+                onClick={() => setVideoEnabled((v) => !v)}
+                aria-pressed={videoEnabled}
+                aria-label={`Video: ${videoEnabled ? 'On' : 'Off'}`}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4V6.5l-4 4z" />
+                </svg>
+                Video
+              </button>
+            )}
             <a href={`/podcast/${podcastId}?fork=1`} className={styles.playerAction}>
               Fork
             </a>
