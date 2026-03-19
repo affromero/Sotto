@@ -102,9 +102,12 @@ export function AudioClipPlayer({
       syncVideo(audio.currentTime, false);
       setIsPlaying(false);
     } else {
-      audio.currentTime = startTime;
+      // Only seek to start if we haven't started yet or finished
+      if (audio.currentTime < startTime || audio.currentTime >= endTime) {
+        audio.currentTime = startTime;
+      }
       audio.play();
-      syncVideo(startTime, true);
+      syncVideo(audio.currentTime, true);
       setIsPlaying(true);
     }
   }, [isPlaying, startTime, syncVideo]);
