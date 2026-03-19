@@ -21,11 +21,10 @@ export async function createHeraJob(params: {
   durationSeconds: number;
   referenceImageUrl?: string;
   aspectRatio?: '16:9' | '9:16' | '1:1';
-}): Promise<{ videoId: string } | null> {
+}): Promise<{ videoId: string }> {
   const apiKey = getApiKey();
   if (!apiKey) {
-    logger.warn('HERA_API_KEY not set, skipping Hera job creation');
-    return null;
+    throw new Error('Hera: HERA_API_KEY not configured');
   }
 
   const res = await fetch(`${HERA_BASE_URL}/videos`, {
@@ -48,14 +47,20 @@ export async function createHeraJob(params: {
 
   if (!res.ok) {
     const text = await res.text().catch(() => 'unknown');
-    logger.error('Hera job creation failed', { status: res.status, body: text });
-    return null;
+    // Parse structured error body (e.g. {"error":"USAGE_LIMIT_REACHED"})
+    let reason = `HTTP ${res.status}`;
+    try {
+      const parsed = JSON.parse(text) as { error?: string };
+      if (parsed.error) reason = parsed.error;
+    } catch {
+      if (text && text !== 'unknown') reason = text;
+    }
+    throw new Error(`Hera job creation failed: ${reason}`);
   }
 
   const data = (await res.json()) as { video_id?: string };
   if (!data.video_id) {
-    logger.error('Hera response missing video ID', { data });
-    return null;
+    throw new Error('Hera response missing video_id');
   }
 
   return { videoId: data.video_id };
@@ -97,7 +102,8 @@ export async function pollHeraJob(videoId: string): Promise<{
 /**
  * End-to-end Hera motion graphic generation.
  * Creates a job, polls until completion, downloads the result.
- * Returns null when HERA_API_KEY is not set or on any failure (logged, not thrown).
+ * Returns null when HERA_API_KEY is not set (logged, not thrown).
+ * Throws on API errors so callers get descriptive messages.
  */
 export async function generateHeraMotionGraphic(params: {
   prompt: string;
@@ -106,13 +112,16 @@ export async function generateHeraMotionGraphic(params: {
   podcastId?: string;
   userId?: string;
 }): Promise<Buffer | null> {
+  if (!getApiKey()) {
+    logger.warn('HERA_API_KEY not set, skipping Hera motion graphic');
+    return null;
+  }
+
   const job = await createHeraJob({
     prompt: params.prompt,
     durationSeconds: params.durationSeconds,
     referenceImageUrl: params.referenceImageUrl,
   });
-
-  if (!job) return null;
 
   const startTime = Date.now();
 
