@@ -195,16 +195,9 @@ async function checkAllTransitionsReady(videoGenerationId: string, podcastId: st
     return;
   }
 
-  // All transitions (and avatars) ready
-  if (process.env.ENABLE_VIDEO_EXPORT === 'true') {
-    await addJob(videoCompositionQueue, JobType.COMPOSE_VIDEO, {
-      podcastId,
-      videoGenerationId,
-    });
-  } else {
-    await prisma.videoGeneration.update({
-      where: { id: videoGenerationId },
-      data: { status: 'READY' },
-    });
-  }
+  // All transitions (and avatars) ready — compose MP4
+  await addJob(videoCompositionQueue, JobType.COMPOSE_VIDEO, {
+    podcastId,
+    videoGenerationId,
+  });
 }

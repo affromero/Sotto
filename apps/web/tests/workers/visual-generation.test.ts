@@ -352,7 +352,7 @@ describe('visual-generation worker', () => {
     });
   });
 
-  it('marks generation READY when all visuals ready (client-side rendering)', async () => {
+  it('queues video composition when all visuals ready', async () => {
     mockPrisma.segmentVisual.findUnique
       .mockResolvedValueOnce({ assetUrl: null, status: 'pending' })      // idempotency
       .mockResolvedValueOnce({ visualMode: 'image', videoModel: null }); // mode check
@@ -375,15 +375,10 @@ describe('visual-generation worker', () => {
 
     await processVisualGeneration(makeJob(baseData));
 
-    // Default: client-side rendering — marks READY directly, no composition queue
-    expect(mockPrisma.videoGeneration.update).toHaveBeenCalledWith({
-      where: { id: 'vg-1' },
-      data: { status: 'READY' },
-    });
-    expect(mockAddJob).not.toHaveBeenCalledWith(
+    expect(mockAddJob).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'video-composition' }),
-      expect.anything(),
-      expect.anything(),
+      'compose_video',
+      expect.objectContaining({ podcastId: 'pod-1', videoGenerationId: 'vg-1' }),
     );
   });
 });
