@@ -631,21 +631,39 @@ async function handleWorkerFailure(
         return;
       }
 
-      const descriptive = `[${queueName}] ${failedReason || 'Unknown error'}`;
-      await prisma.videoGeneration.update({
+      // Only update VideoGeneration if the worker hasn't already set a detailed failureReason
+      // (checkAllReady in the worker sets per-segment details — don't overwrite with generic message)
+      const existing = await prisma.videoGeneration.findUnique({
         where: { id: videoGenerationId },
-        data: { status: 'FAILED', failureReason: descriptive },
-      }).catch((err: unknown) => {
-        logger.error('Failed to mark VideoGeneration FAILED', { videoGenerationId, error: err instanceof Error ? err.message : String(err) });
-      });
+        select: { status: true, failureReason: true },
+      }).catch(() => null);
 
-      if (notifQueue) {
+      if (!existing || (existing.status === 'FAILED' && existing.failureReason)) {
+        // Already failed with details (set by worker's checkAllReady) or not found — skip
+        // Still send notification if this is the first failure (dedup below)
+      } else {
+        const descriptive = `[${queueName}] ${failedReason || 'Unknown error'}`;
+        await prisma.videoGeneration.update({
+          where: { id: videoGenerationId },
+          data: { status: 'FAILED', failureReason: descriptive },
+        }).catch((err: unknown) => {
+          logger.error('Failed to mark VideoGeneration FAILED', { videoGenerationId, error: err instanceof Error ? err.message : String(err) });
+        });
+      }
+
+      // Dedup: only send one VIDEO_FAILED notification per videoGenerationId
+      const alreadyNotified = await prisma.notification.count({
+        where: { userId: podcast.userId, type: 'VIDEO_FAILED', data: { path: ['videoGenerationId'], equals: videoGenerationId } },
+      }).catch(() => 0);
+
+      if (alreadyNotified === 0 && notifQueue) {
+        const reason = existing?.failureReason || failedReason || 'Unknown error';
         await notifQueue.add('send_notification', {
           userId: podcast.userId,
           type: 'VIDEO_FAILED',
           title: 'Video Generation Failed',
-          message: `Video generation failed: ${failedReason || 'Unknown error'}`,
-          data: { podcastId },
+          message: `Video generation failed: ${reason}`,
+          data: { podcastId, videoGenerationId },
         });
       }
 

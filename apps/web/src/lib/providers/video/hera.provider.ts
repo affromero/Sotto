@@ -42,10 +42,6 @@ export class HeraVideoProvider implements VideoProvider {
       referenceImageUrl: params.firstFrameImage,
     });
 
-    if (!job) {
-      throw new Error('Hera job creation failed (check HERA_API_KEY)');
-    }
-
     const startTime = Date.now();
 
     while (Date.now() - startTime < POLL_TIMEOUT_MS) {
