@@ -164,11 +164,12 @@
   color: var(--color-success);
 }
 
-/* Footer with toggle + count */
+/* Footer with toggles + count */
 .videoFooter {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
   padding-top: 16px;
   margin-top: 4px;
   border-top: 1px solid rgba(0, 0, 0, 0.05);
@@ -182,7 +183,9 @@
   color: var(--color-text-secondary);
   background: none;
   border: none;
-  padding: 0;
+  padding: 8px 4px;
+  min-height: 44px;
+  min-width: 44px;
   cursor: pointer;
   font-family: inherit;
 }

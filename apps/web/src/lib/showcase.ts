@@ -61,6 +61,34 @@ const VISUAL_TYPE_LABELS: Record<string, string> = {
   MAP_OVERLAY: 'Map Overlay',
 };
 
+function extractVisualLabel(v: { order: number; prompt: string | null; metadata: unknown; visualType: string }): string {
+  // Prefer prompt (first sentence) when available
+  if (v.prompt) return v.prompt.split('.')[0];
+
+  // Fall back to type-specific metadata fields
+  const meta = v.metadata as Record<string, unknown> | null;
+  if (meta) {
+    if (typeof meta.headline === 'string' && meta.headline) return meta.headline;
+    if (typeof meta.title === 'string' && meta.title) return meta.title;
+    if (typeof meta.quoteText === 'string' && meta.quoteText) return meta.quoteText.slice(0, 80);
+    if (Array.isArray(meta.events) && meta.events.length > 0) {
+      const first = meta.events[0] as Record<string, unknown>;
+      if (typeof first.label === 'string') return first.label;
+    }
+    if (typeof meta.leftLabel === 'string' && typeof meta.rightLabel === 'string') {
+      return `${meta.leftLabel} vs ${meta.rightLabel}`;
+    }
+    if (Array.isArray(meta.places) && meta.places.length > 0) {
+      const first = meta.places[0] as Record<string, unknown>;
+      if (typeof first.name === 'string') return first.name;
+    }
+  }
+
+  // No label found — this is a data bug, log it so we can fix the visual
+  logger.warn(`Visual #${v.order} (${v.visualType}) has no label: missing prompt and metadata`);
+  return v.visualType;
+}
+
 function formatDurationMinutes(seconds: number | null): string {
   if (!seconds) return '10 min';
   const minutes = Math.round(seconds / 60);
@@ -183,6 +211,7 @@ export async function buildShowcaseData(config: LandingShowcaseConfig): Promise<
                 order: true,
                 prompt: true,
                 visualType: true,
+                metadata: true,
               },
             },
           },
@@ -302,7 +331,7 @@ export async function buildShowcaseData(config: LandingShowcaseConfig): Promise<
       .slice(config.videoSegmentStart, config.videoSegmentStart + config.videoSegmentCount)
       .map((v) => ({
         order: v.order,
-        label: v.prompt ? v.prompt.split('.')[0] : `Segment ${v.order}`,
+        label: extractVisualLabel(v),
         type: VISUAL_TYPE_LABELS[v.visualType] ?? v.visualType,
       }));
 

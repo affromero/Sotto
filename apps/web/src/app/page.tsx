@@ -1,6 +1,7 @@
 import { LandingShell } from '@/components/landing/LandingShell';
 import { LandingNav } from '@/components/landing/LandingNav';
 import { WaitlistProvider } from '@/components/landing/WaitlistProvider';
+import { ShowcaseTogglesProvider } from '@/components/landing/ShowcaseTogglesProvider';
 import { JsonLd } from '@/components/landing/JsonLd';
 import { HeroChapter } from '@/components/landing/chapters/HeroChapter';
 import { JourneyChapter } from '@/components/landing/chapters/JourneyChapter';
@@ -21,22 +22,24 @@ export default async function LandingPage() {
 
   return (
     <WaitlistProvider>
-      <LandingShell>
-        <JsonLd />
-        <LandingNav />
+      <ShowcaseTogglesProvider>
+        <LandingShell>
+          <JsonLd />
+          <LandingNav />
 
-        <div className={styles.chapters}>
-          <HeroChapter />
-          <JourneyChapter showcase={showcaseData} />
-          <ShowcaseChapter showcase={showcaseData} />
-          <IdentityChapter />
-          <TrustChapter />
-          <NetworkChapter />
-          <BotChapter showcase={showcaseData} />
-          <FaqChapter />
-          <ConvertChapter />
-        </div>
-      </LandingShell>
+          <div className={styles.chapters}>
+            <HeroChapter />
+            <JourneyChapter showcase={showcaseData} />
+            <ShowcaseChapter showcase={showcaseData} />
+            <IdentityChapter />
+            <TrustChapter />
+            <NetworkChapter />
+            <BotChapter showcase={showcaseData} />
+            <FaqChapter />
+            <ConvertChapter />
+          </div>
+        </LandingShell>
+      </ShowcaseTogglesProvider>
     </WaitlistProvider>
   );
 }
