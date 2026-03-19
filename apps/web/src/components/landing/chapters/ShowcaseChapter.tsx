@@ -30,7 +30,7 @@ export function ShowcaseChapter({ showcase }: ShowcaseChapterProps) {
   const videoEnabled = toggles?.videoEnabled ?? false;
   const avatarEnabled = toggles?.avatarEnabled ?? false;
   const showVideoToggle = showcase?.showVideo ?? false;
-  const showAvatarToggle = showcase?.showAvatar ?? false;
+  const showAvatarToggle = (showcase?.showAvatar && showcase?.hasAvatars) ?? false;
 
   const segments = showcase && showcase.videoSegments.length > 0
     ? showcase.videoSegments.map((seg, i) => ({
@@ -52,8 +52,8 @@ export function ShowcaseChapter({ showcase }: ShowcaseChapterProps) {
                 <span>Video Pipeline</span>
               </div>
               <div className={styles.mockBody}>
-                {segments.map((seg) => (
-                  <div key={seg.num} className={styles.segment}>
+                {segments.map((seg, i) => (
+                  <div key={i} className={styles.segment}>
                     <span className={styles.segNum}>{seg.num}</span>
                     <span className={styles.segLabel}>{seg.label}</span>
                     <span className={`${styles.segBadge} ${COLOR_MAP[seg.colorClass]}`}>

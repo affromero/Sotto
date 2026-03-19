@@ -33,6 +33,7 @@ export interface LandingShowcaseData {
   // Feature toggles — whether landing page shows interactive toggles
   showAvatar: boolean;
   showVideo: boolean;
+  hasAvatars: boolean;
 
   // ShowcaseChapter — Video pipeline
   videoSegments: { order: number; label: string; type: string }[];
@@ -214,6 +215,11 @@ export async function buildShowcaseData(config: LandingShowcaseConfig): Promise<
                 metadata: true,
               },
             },
+            avatarOverlays: {
+              where: { status: 'ready', videoUrl: { not: null } },
+              select: { id: true },
+              take: 1,
+            },
           },
         },
       },
@@ -363,6 +369,7 @@ export async function buildShowcaseData(config: LandingShowcaseConfig): Promise<
       sourceCount,
       showAvatar: config.showAvatar,
       showVideo: config.showVideo,
+      hasAvatars: (podcast.videoGenerations[0]?.avatarOverlays?.length ?? 0) > 0,
       videoSegments,
       videoClip,
       bot,
