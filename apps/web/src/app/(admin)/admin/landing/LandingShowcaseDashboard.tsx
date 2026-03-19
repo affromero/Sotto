@@ -405,7 +405,7 @@ export function LandingShowcaseDashboard() {
 
       {/* Video Segments */}
       <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Video Segments (Showcase)</h2>
+        <h2 className={styles.sectionTitle}>Video Storyboard</h2>
         <div className={styles.row}>
           <label className={styles.field}>
             <span className={styles.fieldLabel}>Segment start</span>
@@ -570,7 +570,7 @@ export function LandingShowcaseDashboard() {
           {/* Video segments */}
           {preview.videoSegments.length > 0 && (
             <div className={styles.previewBlock}>
-              <h3 className={styles.previewBlockTitle}>Showcase — Video Pipeline</h3>
+              <h3 className={styles.previewBlockTitle}>Video Storyboard</h3>
               <div className={styles.previewSegments}>
                 {preview.videoSegments.map((seg, i) => (
                   <div key={seg.order} className={styles.previewSegment}>

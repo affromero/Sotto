@@ -404,10 +404,12 @@ export async function processVisualGeneration(job: Job<GenerateVisualPayload>): 
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
 
-    // Config errors will never succeed on retry — fail immediately
+    // Config/quota errors will never succeed on retry — fail immediately
     const isConfigError = errMsg.includes('No Fal endpoint') ||
       errMsg.includes('No image provider available') ||
-      errMsg.includes('No video provider available');
+      errMsg.includes('No video provider available') ||
+      errMsg.includes('USAGE_LIMIT_REACHED') ||
+      errMsg.includes('HERA_API_KEY not configured');
 
     if (isConfigError) {
       await prisma.segmentVisual.update({
