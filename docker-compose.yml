@@ -92,8 +92,8 @@ services:
     deploy:
       resources:
         limits:
-          memory: 4g
-    shm_size: '2gb'
+          memory: 8g
+    shm_size: '4gb'
     ports:
       - '3100:3100'
     healthcheck:
