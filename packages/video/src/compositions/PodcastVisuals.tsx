@@ -43,7 +43,8 @@ export const PodcastVisuals: React.FC<VisualsInput> = ({
     const cleanups: (() => void)[] = [];
     const tryPrefetch = (url: string) => {
       try {
-        const { free } = prefetch(url, { method: 'blob-url' });
+        const { free, waitUntilDone } = prefetch(url, { method: 'blob-url' });
+        waitUntilDone().catch(() => {});
         cleanups.push(free);
       } catch {
         // Asset may be missing or CORS-blocked — non-fatal, skip prefetch
