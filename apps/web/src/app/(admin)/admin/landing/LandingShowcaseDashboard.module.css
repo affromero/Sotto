@@ -116,6 +116,14 @@
   font-weight: 500;
 }
 
+.checkboxField {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
 .fieldHint {
   font: var(--text-body-xs);
   color: var(--color-text-tertiary);

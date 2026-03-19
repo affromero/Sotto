@@ -450,7 +450,7 @@ export function LandingShowcaseDashboard() {
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Feature Toggles</h2>
         <div className={styles.row}>
-          <label className={styles.field}>
+          <label className={styles.checkboxField}>
             <input
               type="checkbox"
               checked={form.showAvatar}
@@ -458,7 +458,7 @@ export function LandingShowcaseDashboard() {
             />
             <span className={styles.fieldLabel}>Show avatar toggle on landing page</span>
           </label>
-          <label className={styles.field}>
+          <label className={styles.checkboxField}>
             <input
               type="checkbox"
               checked={form.showVideo}
@@ -603,7 +603,7 @@ export function LandingShowcaseDashboard() {
               <h3 className={styles.previewBlockTitle}>Video Storyboard</h3>
               <div className={styles.previewSegments}>
                 {preview.videoSegments.map((seg, i) => (
-                  <div key={seg.order} className={styles.previewSegment}>
+                  <div key={`${seg.order}-${i}`} className={styles.previewSegment}>
                     <span className={styles.segNum}>{seg.order}</span>
                     <span className={styles.segLabel}>{seg.label}</span>
                     <span className={`${styles.segBadge} ${styles[`badge${COLOR_CYCLE[i % COLOR_CYCLE.length]}`]}`}>
