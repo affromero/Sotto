@@ -30,6 +30,10 @@ export interface LandingShowcaseData {
   voiceCount: number;
   sourceCount: number;
 
+  // Feature toggles — whether landing page shows interactive toggles
+  showAvatar: boolean;
+  showVideo: boolean;
+
   // ShowcaseChapter — Video pipeline
   videoSegments: { order: number; label: string; type: string }[];
   videoClip: { url: string; start: number; end: number } | null;
@@ -328,6 +332,8 @@ export async function buildShowcaseData(config: LandingShowcaseConfig): Promise<
       voiceTracks,
       voiceCount,
       sourceCount,
+      showAvatar: config.showAvatar,
+      showVideo: config.showVideo,
       videoSegments,
       videoClip,
       bot,

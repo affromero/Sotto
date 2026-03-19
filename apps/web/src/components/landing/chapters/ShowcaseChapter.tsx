@@ -1,3 +1,6 @@
+'use client';
+
+import { useState } from 'react';
 import type { LandingShowcaseData } from '@/lib/showcase';
 import { ScrollChapter } from '../ScrollChapter';
 import styles from './ShowcaseChapter.module.css';
@@ -23,6 +26,9 @@ const COLOR_MAP = {
 } as Record<string, string>;
 
 export function ShowcaseChapter({ showcase }: ShowcaseChapterProps) {
+  const [avatarOn, setAvatarOn] = useState(true);
+  const showAvatarToggle = showcase?.showAvatar ?? false;
+
   const segments = showcase && showcase.videoSegments.length > 0
     ? showcase.videoSegments.map((seg, i) => ({
         num: seg.order,
@@ -53,12 +59,20 @@ export function ShowcaseChapter({ showcase }: ShowcaseChapterProps) {
                   </div>
                 ))}
                 <div className={styles.videoFooter}>
-                  <span className={styles.toggle}>
-                    <span className={styles.toggleTrack}>
-                      <span className={styles.toggleKnob} />
-                    </span>
-                    Avatars: On
-                  </span>
+                  {showAvatarToggle && (
+                    <button
+                      type="button"
+                      className={styles.toggle}
+                      onClick={() => setAvatarOn((v) => !v)}
+                      aria-pressed={avatarOn}
+                      aria-label={`Avatars: ${avatarOn ? 'On' : 'Off'}`}
+                    >
+                      <span className={`${styles.toggleTrack} ${avatarOn ? styles.toggleTrackOn : ''}`}>
+                        <span className={styles.toggleKnob} />
+                      </span>
+                      Avatars: {avatarOn ? 'On' : 'Off'}
+                    </button>
+                  )}
                   <span className={styles.videoCount}>9 visual types</span>
                 </div>
               </div>
