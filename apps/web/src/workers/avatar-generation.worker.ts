@@ -726,15 +726,9 @@ async function checkAllAvatarsReady(videoGenerationId: string, podcastId: string
     return;
   }
 
-  if (process.env.ENABLE_VIDEO_EXPORT === 'true') {
-    await addJob(videoCompositionQueue, JobType.COMPOSE_VIDEO, {
-      podcastId,
-      videoGenerationId,
-    });
-  } else {
-    await prisma.videoGeneration.update({
-      where: { id: videoGenerationId },
-      data: { status: 'READY' },
-    });
-  }
+  // All avatars ready — compose MP4
+  await addJob(videoCompositionQueue, JobType.COMPOSE_VIDEO, {
+    podcastId,
+    videoGenerationId,
+  });
 }

@@ -359,9 +359,7 @@ describe('checkAllAvatarsReady', () => {
     );
   });
 
-  it('marks videoGeneration READY when all avatars succeed and export disabled', async () => {
-    delete process.env.ENABLE_VIDEO_EXPORT;
-
+  it('queues video composition when all avatars succeed', async () => {
     // Simulate: overlay found → idempotent (already has videoUrl)
     vi.mocked(prisma.avatarOverlay.findUnique).mockResolvedValue({
       id: 'ao_1',
@@ -376,10 +374,11 @@ describe('checkAllAvatarsReady', () => {
 
     await processAvatarGeneration(mockJob);
 
-    expect(prisma.videoGeneration.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: { status: 'READY' },
-      }),
+    const { addJob } = await import('@/lib/queue');
+    expect(addJob).toHaveBeenCalledWith(
+      expect.objectContaining({}),
+      'compose_video',
+      expect.objectContaining({ podcastId: 'pod_1', videoGenerationId: 'vg_1' }),
     );
   });
 });
