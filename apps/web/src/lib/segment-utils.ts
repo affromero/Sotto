@@ -21,7 +21,9 @@ export interface SegmentVisualData {
   metadata?: Record<string, unknown> | null;
   assetUrl?: string | null;
   assetType?: string | null;
+  firstFrameUrl?: string | null;
   status: string;
+  failureReason?: string | null;
   order: number;
   subOrder?: number;
   startOffset?: number;
