@@ -7,6 +7,7 @@ import {
   videoCompositionQueue,
   avatarGenerationQueue,
   transitionGenerationQueue,
+  notificationQueue,
 } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { resolveImageProvider } from '@/lib/providers/image';
@@ -468,13 +469,26 @@ async function checkAllReady(videoGenerationId: string, podcastId: string): Prom
       const details = failedVisuals.map(v =>
         `Segment ${v.order}${v.videoModel ? ` (${v.videoModel})` : ''}: ${v.failureReason ?? 'unknown'}`
       ).join('; ');
+      const failureReason = `${failedVisuals.length} visual(s) failed — ${details}`;
       await prisma.videoGeneration.update({
         where: { id: videoGenerationId },
-        data: {
-          status: 'FAILED',
-          failureReason: `${failedVisuals.length} visual(s) failed — ${details}`,
-        },
+        data: { status: 'FAILED', failureReason },
       });
+
+      // Send exactly one VIDEO_FAILED notification (checkAllReady fires once)
+      const podcast = await prisma.podcast.findUnique({
+        where: { id: podcastId },
+        select: { userId: true },
+      });
+      if (podcast) {
+        await addJob(notificationQueue, JobType.SEND_NOTIFICATION, {
+          userId: podcast.userId,
+          type: 'VIDEO_FAILED',
+          title: 'Video Generation Failed',
+          message: `Video generation failed: ${failureReason}`,
+          data: { podcastId, videoGenerationId },
+        });
+      }
       return;
     }
 

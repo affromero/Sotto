@@ -631,77 +631,10 @@ async function handleWorkerFailure(
         return;
       }
 
-      // Only update VideoGeneration if the worker hasn't already set a detailed failureReason
-      // (checkAllReady in the worker sets per-segment details — don't overwrite with generic message)
-      const existing = await prisma.videoGeneration.findUnique({
-        where: { id: videoGenerationId },
-        select: { status: true, failureReason: true },
-      }).catch(() => null);
-
-      if (!existing || (existing.status === 'FAILED' && existing.failureReason)) {
-        // Already failed with details (set by worker's checkAllReady) or not found — skip
-        // Still send notification if this is the first failure (dedup below)
-      } else {
-        const descriptive = `[${queueName}] ${failedReason || 'Unknown error'}`;
-        await prisma.videoGeneration.update({
-          where: { id: videoGenerationId },
-          data: { status: 'FAILED', failureReason: descriptive },
-        }).catch((err: unknown) => {
-          logger.error('Failed to mark VideoGeneration FAILED', { videoGenerationId, error: err instanceof Error ? err.message : String(err) });
-        });
-      }
-
-      // Dedup: only send one VIDEO_FAILED notification per videoGenerationId
-      const alreadyNotified = await prisma.notification.count({
-        where: { userId: podcast.userId, type: 'VIDEO_FAILED', data: { path: ['videoGenerationId'], equals: videoGenerationId } },
-      }).catch(() => 0);
-
-      if (alreadyNotified === 0 && notifQueue) {
-        const reason = existing?.failureReason || failedReason || 'Unknown error';
-        await notifQueue.add('send_notification', {
-          userId: podcast.userId,
-          type: 'VIDEO_FAILED',
-          title: 'Video Generation Failed',
-          message: `Video generation failed: ${reason}`,
-          data: { podcastId, videoGenerationId },
-        });
-      }
-
-      const podcastLabel = podcast.title || podcastId;
-      const adminUsers = await prisma.user.findMany({
-        where: { role: 'ADMIN', id: { not: podcast.userId } },
-        select: { id: true, telegramChatId: true },
-      });
-      const adminMsg = `[${queueName}] ${podcastLabel} (by ${ownerLabel}) — ${errorKind}`;
-      for (const admin of adminUsers) {
-        if (notifQueue) {
-          notifQueue.add('send_notification', {
-            userId: admin.id,
-            type: 'PIPELINE_FAILURE',
-            title: 'Video Pipeline Failure',
-            message: adminMsg,
-            data: { podcastId },
-          }).catch((err: unknown) => {
-            logger.warn('Failed to queue admin video-failure notification', { adminId: admin.id, error: err instanceof Error ? err.message : String(err) });
-          });
-        }
-        if (admin.telegramChatId && isTelegramBotConfigured()) {
-          const errorId = `verr_${Array.from(crypto.getRandomValues(new Uint8Array(6)))
-            .map(b => b.toString(16).padStart(2, '0')).join('')}`;
-          const telegramText = [
-            `🎬 *Video Pipeline Failure*`,
-            `*Queue:* ${queueName}`,
-            `*Podcast:* ${podcastLabel}`,
-            `*Owner:* ${ownerLabel}`,
-            `*Error:* ${errorKind}`,
-            `*Ref:* \`${errorId}\``,
-            `\`${(failedReason || 'Unknown').substring(0, 500)}\``,
-          ].join('\n');
-          sendTelegram(admin.telegramChatId, telegramText, { parse_mode: 'Markdown' }).catch((err: unknown) => {
-            logger.warn('Failed to send admin video-failure Telegram', { adminId: admin.id, error: err instanceof Error ? err.message : String(err) });
-          });
-        }
-      }
+      // Don't update VideoGeneration or send notifications here.
+      // The worker's checkAllReady() handles aggregate state + notifications
+      // once ALL visuals are done — avoids duplicate notifications per failed job.
+      // PipelineEvent (logged above) still captures every individual failure.
       return;
     }
 
