@@ -48,6 +48,9 @@ function toEditable(visual: SegmentVisualData, segment: SegmentData): EditableSe
     prompt: visual.prompt ?? null,
     assetUrl: visual.assetUrl ?? null,
     assetType: visual.assetType ?? null,
+    firstFrameUrl: visual.firstFrameUrl ?? null,
+    status: visual.status,
+    failureReason: visual.failureReason ?? null,
   };
 }
 

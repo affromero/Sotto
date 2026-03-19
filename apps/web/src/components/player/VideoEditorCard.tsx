@@ -69,6 +69,9 @@ export interface EditableSegmentVisual {
   prompt: string | null;
   assetUrl: string | null;
   assetType: string | null;
+  firstFrameUrl: string | null;
+  status: string;
+  failureReason: string | null;
 }
 
 export interface VideoEditorCardProps {
@@ -162,7 +165,9 @@ function VideoEditorCardComponent({
   const textPreview = segment.text.length > 120 ? `${segment.text.slice(0, 120)}...` : segment.text;
   const Icon = VISUAL_TYPE_ICONS[segment.visualType] || Type;
 
-  const showThumbnail = segment.assetUrl && !isProgrammatic;
+  const isFailed = segment.status === 'failed';
+  const thumbnailSrc = segment.assetUrl || segment.firstFrameUrl;
+  const showThumbnail = thumbnailSrc && !isProgrammatic;
 
   const headerId = `editor-header-${segment.segmentVisualId}`;
   const panelId = `editor-panel-${segment.segmentVisualId}`;
@@ -171,6 +176,7 @@ function VideoEditorCardComponent({
     styles.card,
     isExpanded ? styles.cardExpanded : '',
     isDirty ? styles.cardDirty : '',
+    isFailed ? styles.cardFailed : '',
   ].filter(Boolean).join(' ');
 
   return (
@@ -183,10 +189,10 @@ function VideoEditorCardComponent({
         aria-controls={panelId}
         type="button"
       >
-        <div className={styles.thumbnail}>
+        <div className={`${styles.thumbnail} ${isFailed ? styles.thumbnailFailed : ''}`}>
           {showThumbnail ? (
             <NextImage
-              src={segment.assetUrl!}
+              src={thumbnailSrc!}
               alt={`Scene ${index + 1} visual`}
               className={styles.thumbnailImage}
               fill
@@ -200,6 +206,7 @@ function VideoEditorCardComponent({
               </span>
             </div>
           )}
+          {isFailed && <div className={styles.failedOverlay} title={segment.failureReason ?? 'Generation failed'}>!</div>}
         </div>
 
         <div className={styles.headerInfo}>
@@ -212,8 +219,13 @@ function VideoEditorCardComponent({
               {VISUAL_TYPE_LABELS[segment.visualType]}
             </span>
             {isDirty && <span className={styles.dirtyDot} title="Modified" />}
+            {isFailed && <span className={styles.failedBadge}>Failed</span>}
           </div>
-          <p className={styles.textPreview}>{textPreview}</p>
+          {isFailed && segment.failureReason ? (
+            <p className={styles.failureReason}>{segment.failureReason}</p>
+          ) : (
+            <p className={styles.textPreview}>{textPreview}</p>
+          )}
         </div>
 
         <div className={styles.headerMeta}>
