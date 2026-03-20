@@ -2,23 +2,10 @@
 
 import { memo } from 'react';
 import NextImage from 'next/image';
-import {
-  Image as ImageIcon, Film, BarChart3, Quote, GitCompare, Clock, Network, Type, Map,
-} from 'lucide-react';
-import type { EditableSegmentVisual } from './VideoEditorCard';
+import { Type } from 'lucide-react';
+import type { EditableSegmentVisual } from './visual-editor-constants';
+import { VISUAL_TYPE_ICONS } from './visual-editor-constants';
 import styles from './FilmstripBlock.module.css';
-
-const VISUAL_TYPE_ICONS: Record<string, typeof ImageIcon> = {
-  AI_ILLUSTRATION: ImageIcon,
-  STOCK_FOOTAGE: Film,
-  DATA_CHART: BarChart3,
-  QUOTE: Quote,
-  COMPARISON: GitCompare,
-  TIMELINE: Clock,
-  DIAGRAM: Network,
-  TEXT_CARD: Type,
-  MAP_OVERLAY: Map,
-};
 
 interface FilmstripBlockProps {
   segment: EditableSegmentVisual;

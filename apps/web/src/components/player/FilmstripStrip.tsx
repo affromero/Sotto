@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useRef } from 'react';
 import { FilmstripBlock } from './FilmstripBlock';
-import type { EditableSegmentVisual } from './VideoEditorCard';
+import type { EditableSegmentVisual } from './visual-editor-constants';
 import type { PipelineTransition } from '@/types/pipeline';
 import { getSpeakerIndex } from '@/lib/speaker-colors';
 import styles from './FilmstripStrip.module.css';
@@ -10,8 +10,8 @@ import styles from './FilmstripStrip.module.css';
 interface VoiceInfo {
   speaker: string;
   voiceId: string;
-  provider: string | null;
-  voiceName: string | null;
+  provider?: string | null;
+  voiceName?: string | null;
 }
 
 interface FilmstripStripProps {

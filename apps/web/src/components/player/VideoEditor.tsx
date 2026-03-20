@@ -1,9 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { VideoEditorCard } from './VideoEditorCard';
-import type { EditableSegmentVisual } from './VideoEditorCard';
-import { TransitionConnector } from './TransitionConnector';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { FilmstripStrip } from './FilmstripStrip';
+import { SegmentDetailPanel } from './SegmentDetailPanel';
+import type { EditableSegmentVisual } from './visual-editor-constants';
 import type { SegmentVisualData } from '@/lib/segment-utils';
 import type { SegmentData } from '@/types/podcast';
 import type { FalModelsResponse, PipelineTransition } from '@/types/pipeline';
@@ -28,8 +28,8 @@ interface TransitionData {
 export interface VoiceInfo {
   speaker: string;
   voiceId: string;
-  provider: string | null;
-  voiceName: string | null;
+  provider?: string | null;
+  voiceName?: string | null;
 }
 
 interface VideoEditorProps {
@@ -111,15 +111,17 @@ export function VideoEditor({
   }, [segmentVisuals, segmentMap]);
 
   const [editedSegments, setEditedSegments] = useState<EditableSegmentVisual[]>(originals);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(originals[0]?.segmentVisualId ?? null);
   const [submitting, setSubmitting] = useState(false);
   const [transitions, setTransitions] = useState<PipelineTransition[]>([]);
-  const cardListRef = useRef<HTMLDivElement>(null);
 
   // Reset when source data changes
   useEffect(() => {
     setEditedSegments(originals);
-  }, [originals]);
+    if (!originals.find(o => o.segmentVisualId === selectedId)) {
+      setSelectedId(originals[0]?.segmentVisualId ?? null);
+    }
+  }, [originals, selectedId]);
 
   // Fetch transitions on mount
   useEffect(() => {
@@ -194,20 +196,26 @@ export function VideoEditor({
     [falModels.videoModels],
   );
 
-  const toggleExpand = useCallback((segmentVisualId: string) => {
-    setExpandedId((prev) => (prev === segmentVisualId ? null : segmentVisualId));
+  const handleSelect = useCallback((segmentVisualId: string) => {
+    setSelectedId(segmentVisualId);
   }, []);
 
-  // Scroll expanded card into view
-  useEffect(() => {
-    if (!expandedId || !cardListRef.current) return;
-    const card = cardListRef.current.querySelector(`[data-segment-id="${expandedId}"]`);
-    if (card) {
-      card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }
-  }, [expandedId]);
-
   const enabledTransitions = useMemo(() => transitions.filter((t) => t.enabled), [transitions]);
+
+  const selectedSegment = useMemo(
+    () => editedSegments.find(s => s.segmentVisualId === selectedId) ?? null,
+    [editedSegments, selectedId],
+  );
+
+  const voiceMap = useMemo(() => {
+    const map = new Map<string, string>();
+    if (voices) {
+      for (const v of voices) {
+        if (v.voiceName) map.set(v.speaker, v.voiceName);
+      }
+    }
+    return map;
+  }, [voices]);
 
   const submitRegeneration = useCallback(async (segmentIds: Set<string>) => {
     if (segmentIds.size === 0) return;
@@ -258,41 +266,42 @@ export function VideoEditor({
         <span className={styles.headerHint}>
           {editedSegments.length} scene{editedSegments.length !== 1 ? 's' : ''}
           {enabledTransitions.length > 0 && ` · ${enabledTransitions.length} transition${enabledTransitions.length !== 1 ? 's' : ''}`}
-          {' '}— click to edit
+          {' '}— select a scene to edit
         </span>
       </div>
 
-      <div className={styles.cardList} ref={cardListRef} role="list" aria-label="Video storyboard scenes">
-        {editedSegments.map((seg, i) => {
-          const transition = transitions.find((t) => t.fromSegmentOrder === seg.order);
-          return (
-            <div key={seg.segmentVisualId} role="listitem" data-segment-id={seg.segmentVisualId}>
-              <VideoEditorCard
-                segment={seg}
-                original={originalMap.get(seg.segmentVisualId)!}
-                index={i}
-                speakerIndex={getSpeakerIndex(seg.speaker, allSpeakers)}
-                imageModels={falModels.imageModels}
-                videoModels={falModels.videoModels}
-                defaultImageModel={falModels.defaultImageModel}
-                defaultVideoModel={falModels.defaultVideoModel}
-                hasFalKey={falModels.hasFalKey}
-                isExpanded={expandedId === seg.segmentVisualId}
-                isDirty={dirtyIds.has(seg.segmentVisualId)}
-                onToggleExpand={() => toggleExpand(seg.segmentVisualId)}
-                onUpdate={handleSegmentUpdate}
-                onReset={handleReset}
-              />
-              {transition && (
-                <TransitionConnector
-                  transition={transition}
-                  videoModels={falModels.videoModels}
-                  onUpdate={handleTransitionUpdate}
-                />
-              )}
-            </div>
-          );
-        })}
+      <div className={styles.filmstrip}>
+        <FilmstripStrip
+          segments={editedSegments}
+          selectedId={selectedId}
+          dirtyIds={dirtyIds}
+          allSpeakers={allSpeakers}
+          voices={voices ?? []}
+          transitions={transitions}
+          onSelect={handleSelect}
+        />
+      </div>
+
+      <div className={styles.detailPanel}>
+        {selectedSegment ? (
+          <SegmentDetailPanel
+            segment={selectedSegment}
+            index={editedSegments.indexOf(selectedSegment)}
+            speakerIndex={getSpeakerIndex(selectedSegment.speaker, allSpeakers)}
+            voiceName={voiceMap.get(selectedSegment.speaker) ?? null}
+            imageModels={falModels.imageModels}
+            videoModels={falModels.videoModels}
+            defaultImageModel={falModels.defaultImageModel}
+            defaultVideoModel={falModels.defaultVideoModel}
+            isDirty={dirtyIds.has(selectedSegment.segmentVisualId)}
+            transition={transitions.find(t => t.fromSegmentOrder === selectedSegment.order) ?? null}
+            onUpdate={handleSegmentUpdate}
+            onReset={handleReset}
+            onTransitionUpdate={handleTransitionUpdate}
+          />
+        ) : (
+          <div className={styles.emptyState}>Select a scene above to edit</div>
+        )}
       </div>
 
       <div className={styles.footer}>
