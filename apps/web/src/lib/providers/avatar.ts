@@ -54,6 +54,12 @@ export async function resolveAvatarProvider(context: {
     if (process.env.FAL_KEY) return buildFalProvider(process.env.FAL_KEY, model, 'platform');
   }
 
+  if (effectiveProvider === 'replicate') {
+    const byokKey = await getByokKey(userId, 'replicate');
+    if (byokKey) return buildReplicateAvatarProvider(byokKey, model, 'byok');
+    if (process.env.REPLICATE_API_TOKEN) return buildReplicateAvatarProvider(process.env.REPLICATE_API_TOKEN, model, 'platform');
+  }
+
   if (effectiveProvider === 'runway') {
     const byokKey = await getByokKey(userId, 'runway');
     if (byokKey) return buildRunwayProvider(byokKey, model, 'byok');
@@ -86,6 +92,24 @@ export async function listUnifiedAvatars(apiKey: string, provider: AvatarProvide
       previewImageUrl: img.imageUrl,
       imageUrl: img.imageUrl,
       provider: 'fal' as const,
+      isPreset: false,
+      premium: false,
+    }));
+  }
+
+  if (provider === 'replicate') {
+    if (!userId) return [];
+    const { prisma } = await import('../prisma');
+    const images = await prisma.avatarImage.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+    });
+    return images.map((img) => ({
+      id: img.id,
+      name: img.name,
+      previewImageUrl: img.imageUrl,
+      imageUrl: img.imageUrl,
+      provider: 'replicate' as const,
       isPreset: false,
       premium: false,
     }));
@@ -184,6 +208,32 @@ function buildRunwayProvider(
   };
 
   return { provider, source, providerId: 'runway', apiKey };
+}
+
+function buildReplicateAvatarProvider(
+  apiKey: string,
+  model: string,
+  source: 'byok' | 'platform',
+): ResolvedAvatarProvider {
+  const provider: AvatarProvider = {
+    providerId: 'replicate',
+
+    getModelId() {
+      return model;
+    },
+
+    async listAvatars() {
+      // Replicate lip-sync uses user-uploaded images, not a catalog
+      return [];
+    },
+
+    async generateAvatar() {
+      // Replicate generation is handled by the worker pipeline
+      throw new Error('Replicate lip-sync avatar generation is handled via the worker pipeline');
+    },
+  };
+
+  return { provider, source, providerId: 'replicate', apiKey };
 }
 
 function buildFalProvider(
