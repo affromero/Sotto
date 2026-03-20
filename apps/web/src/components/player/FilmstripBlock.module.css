@@ -1,0 +1,171 @@
+/* FilmstripBlock — compact thumbnail button for timeline strip */
+
+.block {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px;
+  background: #252525;
+  border: 1px solid #333;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  flex: 0 0 var(--block-width, 80px);
+  min-width: 80px;
+  min-height: 44px;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.block:hover {
+  border-color: #555;
+  background: #2a2a2a;
+}
+
+.blockSelected {
+  border-color: var(--color-primary);
+  background: rgba(217, 119, 6, 0.08);
+}
+
+.blockDirty {
+  border-color: #ca8a04;
+}
+
+.blockFailed {
+  border-color: #dc2626;
+  background: rgba(220, 38, 38, 0.06);
+}
+
+.block:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* Thumbnail */
+
+.thumbnail {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: #1a1a1a;
+}
+
+.thumbnailImage {
+  object-fit: cover;
+}
+
+.thumbnailPlaceholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: var(--color-text-tertiary);
+}
+
+.sceneNumber {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 1px 5px;
+  border-radius: var(--radius-sm);
+  z-index: 1;
+  line-height: 1.4;
+}
+
+/* Speaker color bar */
+
+.speakerBar {
+  width: 100%;
+  height: 3px;
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+}
+
+.speakerBar[data-speaker-index='1'] {
+  background: #93c5fd;
+}
+
+.speakerBar[data-speaker-index='2'] {
+  background: #6ee7b7;
+}
+
+.speakerBar[data-speaker-index='3'] {
+  background: #fca5a5;
+}
+
+/* Meta row */
+
+.meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 4px;
+  padding: 0 2px;
+}
+
+.voiceName {
+  font-size: 9px;
+  color: var(--color-text-tertiary);
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+  max-width: 60%;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.duration {
+  font-size: 10px;
+  font-family: var(--font-mono, monospace);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+/* Dirty / Failed indicators */
+
+.dirtyDot {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ca8a04;
+  z-index: 1;
+}
+
+.failedOverlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(220, 38, 38, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+}
+
+.failedIcon {
+  font-size: 16px;
+  font-weight: 700;
+  color: #f87171;
+}
+
+/* Reduced motion */
+
+@media (prefers-reduced-motion: reduce) {
+  .block {
+    transition: none;
+  }
+}

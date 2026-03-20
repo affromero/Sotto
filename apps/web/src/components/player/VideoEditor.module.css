@@ -36,29 +36,43 @@
   color: var(--color-text-secondary);
 }
 
-/* Scrollable card list */
+/* Filmstrip (horizontal timeline) */
 
-.cardList {
+.filmstrip {
+  flex-shrink: 0;
+  border-bottom: 1px solid #333;
+  background: #1e1e1e;
+}
+
+/* Detail panel (selected segment editor) */
+
+.detailPanel {
   flex: 1;
   overflow-y: auto;
   padding: 16px 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
   -webkit-overflow-scrolling: touch;
 }
 
-.cardList::-webkit-scrollbar {
+.detailPanel::-webkit-scrollbar {
   width: 6px;
 }
 
-.cardList::-webkit-scrollbar-track {
+.detailPanel::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.cardList::-webkit-scrollbar-thumb {
+.detailPanel::-webkit-scrollbar-thumb {
   background: #444;
   border-radius: var(--radius-full);
+}
+
+.emptyState {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  color: var(--color-text-tertiary);
+  font-size: 14px;
 }
 
 /* Sticky footer */
@@ -186,9 +200,8 @@
     font-size: 16px;
   }
 
-  .cardList {
+  .detailPanel {
     padding: 12px;
-    gap: 8px;
   }
 
   .footer {

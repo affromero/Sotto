@@ -5,17 +5,44 @@ import type { SegmentData } from '@/types/podcast';
 import type { SegmentVisualData } from '@/lib/segment-utils';
 import type { FalModelsResponse } from '@/types/pipeline';
 
-vi.mock('@/components/player/VideoEditorCard', () => ({
-  VideoEditorCard: ({
+vi.mock('@/components/player/FilmstripStrip', () => ({
+  FilmstripStrip: ({
+    segments,
+    selectedId,
+    onSelect,
+  }: {
+    segments: Array<{ segmentVisualId: string; speaker: string }>;
+    selectedId: string | null;
+    onSelect: (id: string) => void;
+  }) => (
+    <div data-testid="filmstrip-strip" role="tablist">
+      {segments.map((seg) => (
+        <button
+          key={seg.segmentVisualId}
+          type="button"
+          role="tab"
+          aria-selected={selectedId === seg.segmentVisualId}
+          data-segment-id={seg.segmentVisualId}
+          onClick={() => onSelect(seg.segmentVisualId)}
+        >
+          {seg.speaker}
+        </button>
+      ))}
+    </div>
+  ),
+}));
+
+vi.mock('@/components/player/SegmentDetailPanel', () => ({
+  SegmentDetailPanel: ({
     segment,
-    onToggleExpand,
+    index,
   }: {
     segment: { segmentVisualId: string; speaker: string };
-    onToggleExpand: () => void;
+    index: number;
   }) => (
-    <button type="button" data-segment-id={segment.segmentVisualId} onClick={onToggleExpand}>
-      {segment.speaker}
-    </button>
+    <div data-testid="segment-detail-panel" data-segment-id={segment.segmentVisualId}>
+      Scene {index + 1}: {segment.speaker}
+    </div>
   ),
 }));
 
@@ -65,6 +92,7 @@ const segmentVisuals: SegmentVisualData[] = [
     metadata: null,
     assetUrl: null,
     assetType: null,
+    firstFrameUrl: null,
     status: 'ready',
     order: 0,
   },
@@ -78,6 +106,7 @@ const segmentVisuals: SegmentVisualData[] = [
     metadata: null,
     assetUrl: null,
     assetType: null,
+    firstFrameUrl: null,
     status: 'ready',
     order: 1,
   },
@@ -106,6 +135,49 @@ describe('VideoEditor', () => {
     }) as typeof fetch;
 
     Element.prototype.scrollIntoView = vi.fn();
+  });
+
+  it('selects first segment by default', () => {
+    render(
+      <VideoEditor
+        podcastId="pod-1"
+        segments={segments}
+        segmentVisuals={segmentVisuals}
+        falModels={falModels}
+        onRegenerate={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    const tabs = screen.getAllByRole('tab');
+    expect(tabs[0]).toHaveAttribute('aria-selected', 'true');
+    expect(tabs[1]).toHaveAttribute('aria-selected', 'false');
+
+    const detailPanel = screen.getByTestId('segment-detail-panel');
+    expect(detailPanel).toHaveAttribute('data-segment-id', 'sv-1');
+  });
+
+  it('clicking a block selects it and shows its detail panel', () => {
+    render(
+      <VideoEditor
+        podcastId="pod-1"
+        segments={segments}
+        segmentVisuals={segmentVisuals}
+        falModels={falModels}
+        onRegenerate={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    const tabs = screen.getAllByRole('tab');
+    fireEvent.click(tabs[1]);
+
+    expect(tabs[1]).toHaveAttribute('aria-selected', 'true');
+    expect(tabs[0]).toHaveAttribute('aria-selected', 'false');
+
+    const detailPanel = screen.getByTestId('segment-detail-panel');
+    expect(detailPanel).toHaveAttribute('data-segment-id', 'sv-2');
+    expect(detailPanel).toHaveTextContent('Scene 2: EXPERT');
   });
 
   it('regenerates every storyboard scene from the footer button', async () => {
