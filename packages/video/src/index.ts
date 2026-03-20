@@ -12,4 +12,3 @@ export { SpeakerLabel } from './compositions/shared/SpeakerLabel';
 export { Background } from './compositions/shared/Background';
 export { AvatarPip } from './compositions/shared/AvatarPip';
 export { ProviderBadge } from './compositions/shared/ProviderBadge';
-export { LightLeakOverlay } from './compositions/shared/LightLeakOverlay';
