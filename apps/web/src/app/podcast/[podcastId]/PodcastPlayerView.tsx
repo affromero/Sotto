@@ -1652,13 +1652,19 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
       </Modal>
 
       {/* Video Editor Modal (post-generation storyboard) */}
-      <Modal isOpen={showVideoEditor && (videoState === 'ready' || videoState === 'failed') && !!falModels} onClose={() => setShowVideoEditor(false)} title="Edit Storyboard" size="large">
+      <Modal isOpen={showVideoEditor && (videoState === 'ready' || videoState === 'failed') && !!falModels} onClose={() => setShowVideoEditor(false)} title="Edit Storyboard" size="xlarge">
         {falModels && (
           <VideoEditor
             podcastId={podcast.id}
             segments={podcast.segments}
             segmentVisuals={segmentVisuals}
             falModels={falModels}
+            voices={
+              (activeVoiceTrackId
+                ? podcast.voiceTracks.find(t => t.id === activeVoiceTrackId)?.voices
+                : podcast.voiceTracks.find(t => t.id === podcast.defaultVoiceTrackId)?.voices
+              ) ?? []
+            }
             onRegenerate={(genId) => {
               setShowVideoEditor(false);
               setVideoState('generating');
