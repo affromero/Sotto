@@ -33,7 +33,7 @@ export function InlineWaitlistForm() {
   if (status === 'success') {
     return (
       <div className={styles.success}>
-        You're on the list! We'll email you when your spot is ready.
+        You&apos;re on the list! We&apos;ll email you when your spot is ready.
       </div>
     );
   }
