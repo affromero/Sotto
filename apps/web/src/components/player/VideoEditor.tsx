@@ -25,11 +25,19 @@ interface TransitionData {
   cost: number | null;
 }
 
+export interface VoiceInfo {
+  speaker: string;
+  voiceId: string;
+  provider: string | null;
+  voiceName: string | null;
+}
+
 interface VideoEditorProps {
   podcastId: string;
   segments: SegmentData[];
   segmentVisuals: SegmentVisualData[];
   falModels: FalModelsResponse;
+  voices?: VoiceInfo[];
   onRegenerate: (videoGenerationId: string) => void;
   onCancel: () => void;
 }
@@ -82,6 +90,7 @@ export function VideoEditor({
   segments,
   segmentVisuals,
   falModels,
+  voices,
   onRegenerate,
   onCancel,
 }: VideoEditorProps) {

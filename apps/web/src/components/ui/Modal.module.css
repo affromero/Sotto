@@ -36,6 +36,7 @@
 .small { max-width: 400px; }
 .medium { max-width: 560px; }
 .large { max-width: 720px; }
+.xlarge { max-width: 960px; }
 
 .header {
   display: flex;
