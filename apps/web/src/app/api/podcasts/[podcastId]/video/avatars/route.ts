@@ -74,9 +74,11 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   if (!apiKey) return errorResponse('Avatar generation is not configured', 503);
 
   // Filter avatar models for the active provider — only those in the included list
+  // Config may store IDs with or without provider prefix (e.g. "fal:fal-veed-fabric-1.0" or "fal-veed-fabric-1.0")
+  const normalizedIncluded = new Set(includedModels.map((id: string) => id.includes(':') ? id.split(':').pop()! : id));
   const providerModels = avatarModels
     .filter((m) => getAvatarModelProvider(m.modelId) === provider)
-    .filter((m) => includedModels.includes(m.modelId) || m.modelId === defaultAvatarModel);
+    .filter((m) => normalizedIncluded.has(m.modelId) || m.modelId === defaultAvatarModel);
 
   // Find cost per minute from the configured default or first available model
   let matchedModel = providerModels.find((m) => m.modelId === defaultAvatarModel);

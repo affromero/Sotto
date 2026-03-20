@@ -282,7 +282,7 @@ export function AvatarPicker({ podcastId, speakers, segments, onConfigured, onCa
         )}
       </div>
 
-      {activeProvider === 'fal' && providerModels.length > 1 && (
+      {activeProvider === 'fal' && providerModels.length > 0 && (
         <div className={styles.falModelRow}>
           <label className={styles.falModelLabel}>Lip-sync model</label>
           <select
