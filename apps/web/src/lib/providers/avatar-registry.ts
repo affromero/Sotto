@@ -6,7 +6,7 @@
  * dynamically at runtime via avatar-cost-estimator.ts.
  */
 
-export type AvatarProviderId = 'heygen' | 'fal' | 'runway';
+export type AvatarProviderId = 'heygen' | 'fal' | 'runway' | 'replicate';
 
 export interface AvatarModelOption {
   id: string;
@@ -114,6 +114,33 @@ const AVATAR_PROVIDERS: Record<AvatarProviderId, AvatarProviderMeta> = {
         try {
           const res = await fetch('https://rest.fal.ai/keys/', {
             headers: { Authorization: `Key ${creds.apiKey}` },
+          });
+          return res.ok;
+        } catch {
+          return false;
+        }
+      },
+    },
+  },
+  replicate: {
+    id: 'replicate',
+    displayName: 'Replicate',
+    getApiKeyUrl: 'https://replicate.com/account/api-tokens',
+    defaultModel: 'replicate-wav2lip',
+    models: [
+      { id: 'replicate-wav2lip', displayName: 'Wav2Lip (Lip Sync)', tier: 'standard', requiresImage: true },
+      { id: 'replicate-sadtalker', displayName: 'SadTalker (Talking Face)', tier: 'standard', requiresImage: true },
+      { id: 'replicate-veed-fabric-480p', displayName: 'VEED Fabric 1.0 480p', tier: 'standard', requiresImage: true },
+      { id: 'replicate-veed-fabric-720p', displayName: 'VEED Fabric 1.0 720p', tier: 'premium', requiresImage: true },
+      { id: 'replicate-video-retalking', displayName: 'VideoRetalking (Re-sync)', tier: 'standard', requiresImage: true },
+      { id: 'replicate-dreamactor-m2', displayName: 'DreamActor M2.0', tier: 'premium', requiresImage: true },
+    ],
+    platformKeyEnv: 'REPLICATE_API_TOKEN',
+    auth: {
+      validate: async (creds) => {
+        try {
+          const res = await fetch('https://api.replicate.com/v1/models', {
+            headers: { Authorization: `Bearer ${creds.apiKey}` },
           });
           return res.ok;
         } catch {
