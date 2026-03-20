@@ -335,6 +335,20 @@ async function processFalLipSync(job: Job<GenerateAvatarPayload>): Promise<void>
       await job.updateProgress(10);
     }
 
+    // Optional: trim audio for quick test runs (set testMaxSeconds in job data)
+    const testMaxSeconds = (job.data as Record<string, unknown>).testMaxSeconds as number | undefined;
+    if (testMaxSeconds && durationSeconds > testMaxSeconds) {
+      const { execSync } = await import('child_process');
+      const trimmedPath = join(tmpDir, 'trimmed.mp3');
+      execSync(`ffmpeg -i "${join(tmpDir, `${speaker}-concat.mp3`)}" -t ${testMaxSeconds} -y "${trimmedPath}" 2>/dev/null`);
+      // Re-upload trimmed audio
+      const trimmedBuffer = await readFile(trimmedPath);
+      const trimmedKey = `podcasts/${podcastId}/avatars/${videoGenerationId}/${avatarOverlayId}/audio-test.mp3`;
+      concatAudioUrl = await uploadFile(trimmedKey, trimmedBuffer, 'audio/mpeg');
+      durationSeconds = testMaxSeconds;
+      logger.info('Trimmed audio for test', { avatarOverlayId, testMaxSeconds });
+    }
+
     // Checkpoint 2: Determine chunking based on model limits
     const { LIP_SYNC_CONFIG } = await import('@/lib/providers/fal-endpoints');
     const lipSyncConfig = LIP_SYNC_CONFIG[modelId];
