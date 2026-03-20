@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { InlineWaitlistForm } from './InlineWaitlistForm';
 import styles from './page.module.css';
 
 export const metadata = {
@@ -39,6 +40,7 @@ export default async function WaitlistedPage({ searchParams }: PageProps) {
       <div className={styles.container}>
         <h1 className={styles.title}>{title}</h1>
         <p className={styles.body}>{body}</p>
+        {params.reason === 'not-on-list' && <InlineWaitlistForm />}
         <div className={styles.links}>
           <Link href="/" className={styles.primaryLink}>
             Back to Homepage

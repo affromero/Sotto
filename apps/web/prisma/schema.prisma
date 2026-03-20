@@ -1830,6 +1830,15 @@ model AutoModelConfig {
   updatedBy                String?
 }
 
+// ============ SITE CONFIG ============
+
+model SiteConfig {
+  id         String   @id @default("singleton")
+  openSignup Boolean  @default(false)
+  updatedAt  DateTime @updatedAt
+  updatedBy  String?
+}
+
 // ============ PLAN FEATURE CONFIG ============
 
 model PlanFeatureConfig {

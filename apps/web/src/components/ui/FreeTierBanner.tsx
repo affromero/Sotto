@@ -210,7 +210,7 @@ export function FreeTierBanner({
             )
           )}
           {exhausted && (
-            <Link href="/onboarding?step=keys" className={styles.linkSecondary}>
+            <Link href="/billing" className={styles.linkSecondary}>
               Add own keys
             </Link>
           )}

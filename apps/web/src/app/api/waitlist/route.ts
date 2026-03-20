@@ -5,9 +5,16 @@ import { sendEmail } from '@/lib/email';
 import { buildWaitlistWelcomeEmail } from '@/lib/email-templates';
 import { sendMessage, isTelegramBotConfigured } from '@/lib/telegram';
 import { logger } from '@/lib/logger';
+import { checkRateLimit } from '@/lib/redis';
 
 import { errorResponse } from '@/lib/api-response';
 export async function POST(request: NextRequest) {
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+  const { allowed } = await checkRateLimit(`waitlist:${ip}`, 5, 60);
+  if (!allowed) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+  }
+
   const body = await request.json();
   const parsed = waitlistSchema.safeParse(body);
 

@@ -35,7 +35,7 @@ export async function DashboardStats({ userId, userEmail, userRole }: DashboardS
 
   return (
     <>
-      {userRole !== 'ADMIN' && userRole !== 'SYSTEM' && (
+      {userRole !== 'ADMIN' && userRole !== 'SYSTEM' && hasPodcasts && (
         <FreeTierBanner
           dailyUsed={freeTier.dailyUsed}
           dailyLimit={freeTier.dailyLimit}

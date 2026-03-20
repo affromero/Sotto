@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/lib/auth';
 import { z } from 'zod';
+import { checkRateLimit } from '@/lib/redis';
 
 import { errorResponse } from '@/lib/api-response';
 const feedbackSchema = z.object({
@@ -15,6 +16,12 @@ const feedbackSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+  const { allowed } = await checkRateLimit(`feedback:${ip}`, 5, 60);
+  if (!allowed) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+  }
+
   const body = await request.json();
   const parsed = feedbackSchema.safeParse(body);
 
