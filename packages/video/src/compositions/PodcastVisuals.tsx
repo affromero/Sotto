@@ -8,7 +8,7 @@ import { SpeakerLabel } from './shared/SpeakerLabel';
 import { Background } from './shared/Background';
 import { TransitionOverlay } from './shared/TransitionOverlay';
 import { ProviderBadge } from './shared/ProviderBadge';
-import { LightLeakOverlay } from './shared/LightLeakOverlay';
+const LightLeakOverlay = React.lazy(() => import('./shared/LightLeakOverlay').then(m => ({ default: m.LightLeakOverlay })));
 
 const TRANSITION_FRAMES = 30;
 
