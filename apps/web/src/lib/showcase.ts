@@ -39,6 +39,10 @@ export interface LandingShowcaseData {
   videoSegments: { order: number; label: string; type: string }[];
   videoClip: { url: string; start: number; end: number } | null;
 
+  // Clip-range segments + visuals for client-side Remotion Player
+  clipSegments: { id: string; order: number; speaker: string; text: string; startTime: number; duration: number }[];
+  clipVisuals: { id: string; segmentId: string; order: number; subOrder: number; startOffset: number; subDuration: number | null; visualType: string; visualMode: string | null; prompt: string | null; metadata: Record<string, unknown> | null; assetUrl: string | null; assetType: string | null; firstFrameUrl: string | null; status: string }[];
+
   // BotChapter — Real links + overrides
   bot: {
     twitterHandle: string;
@@ -186,7 +190,8 @@ export async function buildShowcaseData(config: LandingShowcaseConfig): Promise<
           },
         },
         segments: {
-          select: { speaker: true, ttsVoiceId: true },
+          orderBy: { order: 'asc' },
+          select: { id: true, order: true, speaker: true, text: true, startTime: true, duration: true, ttsVoiceId: true },
         },
         voices: {
           select: { speaker: true, voiceId: true },
@@ -207,12 +212,23 @@ export async function buildShowcaseData(config: LandingShowcaseConfig): Promise<
           select: {
             videoUrl: true,
             visuals: {
-              orderBy: { order: 'asc' },
+              orderBy: [{ order: 'asc' }, { subOrder: 'asc' }],
               select: {
+                id: true,
+                segmentId: true,
                 order: true,
+                subOrder: true,
+                startOffset: true,
+                subDuration: true,
                 prompt: true,
                 visualType: true,
+                visualMode: true,
+                videoModel: true,
                 metadata: true,
+                assetUrl: true,
+                assetType: true,
+                firstFrameUrl: true,
+                status: true,
               },
             },
             avatarOverlays: {
@@ -347,6 +363,39 @@ export async function buildShowcaseData(config: LandingShowcaseConfig): Promise<
       ? { url: videoUrl, start: config.audioClipStart, end: audioClipEnd }
       : null;
 
+    // Clip-range segments + visuals for client-side Remotion Player
+    const clipStart = config.audioClipStart;
+    const clipEnd = audioClipEnd;
+    const clipSegments = podcast.segments
+      .filter((s) => s.startTime !== null && s.duration !== null && s.startTime! + s.duration! > clipStart && s.startTime! < clipEnd)
+      .map((s) => ({
+        id: s.id,
+        order: s.order,
+        speaker: s.speaker,
+        text: s.text,
+        startTime: Math.max(0, (s.startTime ?? 0) - clipStart),
+        duration: s.duration ?? 0,
+      }));
+    const clipSegmentIds = new Set(clipSegments.map((s) => s.id));
+    const clipVisuals = allVisuals
+      .filter((v) => v.segmentId && clipSegmentIds.has(v.segmentId))
+      .map((v) => ({
+        id: v.id,
+        segmentId: v.segmentId!,
+        order: v.order,
+        subOrder: v.subOrder ?? 0,
+        startOffset: v.startOffset ?? 0,
+        subDuration: v.subDuration ?? null,
+        visualType: v.visualType,
+        visualMode: v.visualMode ?? null,
+        prompt: v.prompt ?? null,
+        metadata: (v.metadata as Record<string, unknown>) ?? null,
+        assetUrl: v.assetUrl ?? null,
+        assetType: v.assetType ?? null,
+        firstFrameUrl: v.firstFrameUrl ?? null,
+        status: v.status,
+      }));
+
     // Bot overrides
     const bot = {
       twitterHandle: config.twitterHandle,
@@ -372,6 +421,8 @@ export async function buildShowcaseData(config: LandingShowcaseConfig): Promise<
       hasAvatars: (podcast.videoGenerations[0]?.avatarOverlays?.length ?? 0) > 0,
       videoSegments,
       videoClip,
+      clipSegments,
+      clipVisuals,
       bot,
     };
   } catch (err) {
