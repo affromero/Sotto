@@ -43,10 +43,16 @@ vi.mock('@/lib/r2', () => ({
 }));
 vi.mock('@/lib/queue', () => ({
   addJob: (...args: unknown[]) => mockAddJob(...args),
-  JobType: { COMPOSE_VIDEO: 'compose_video', GENERATE_AVATAR: 'generate_avatar', GENERATE_TRANSITION: 'generate_transition' },
+  JobType: {
+    COMPOSE_VIDEO: 'compose_video',
+    GENERATE_AVATAR: 'generate_avatar',
+    GENERATE_TRANSITION: 'generate_transition',
+    SEND_NOTIFICATION: 'send_notification',
+  },
   videoCompositionQueue: { name: 'video-composition' },
   avatarGenerationQueue: { name: 'avatar-generation' },
   transitionGenerationQueue: { name: 'transition-generation' },
+  notificationQueue: { name: 'notifications' },
 }));
 vi.mock('@/lib/providers/video', () => ({
   resolveVideoProvider: (...args: unknown[]) => mockResolveVideoProvider(...args),
@@ -379,6 +385,103 @@ describe('visual-generation worker', () => {
       expect.objectContaining({ name: 'video-composition' }),
       'compose_video',
       expect.objectContaining({ podcastId: 'pod-1', videoGenerationId: 'vg-1' }),
+    );
+  });
+
+  it('sends exactly one VIDEO_FAILED notification when multiple visuals fail', async () => {
+    // Visual already exists — triggers checkAllReady directly
+    mockPrisma.segmentVisual.findUnique.mockResolvedValueOnce({
+      assetUrl: 'https://existing.com/img.png',
+      status: 'ready',
+    });
+
+    // checkAllReady: no pending/generating
+    mockPrisma.segmentVisual.count.mockResolvedValueOnce(0);
+
+    // Two failed visuals
+    mockPrisma.segmentVisual.findMany.mockResolvedValueOnce([
+      { order: 1, videoModel: 'minimax-hailuo02', failureReason: 'No video provider available' },
+      { order: 2, videoModel: null, failureReason: 'timeout' },
+    ]);
+
+    // Podcast lookup for notification
+    mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1' });
+
+    await processVisualGeneration(makeJob(baseData));
+
+    // Exactly one notification job
+    const notificationCalls = mockAddJob.mock.calls.filter(
+      (call) => call[1] === 'send_notification',
+    );
+    expect(notificationCalls).toHaveLength(1);
+
+    // The notification payload includes per-segment failure details
+    const [, , payload] = notificationCalls[0];
+    expect(payload.type).toBe('VIDEO_FAILED');
+    expect(payload.message).toContain('Segment 1');
+    expect(payload.message).toContain('Segment 2');
+    expect(payload.message).toContain('No video provider available');
+    expect(payload.message).toContain('timeout');
+  });
+
+  it('marks USAGE_LIMIT_REACHED as UnrecoverableError', async () => {
+    mockPrisma.segmentVisual.findUnique
+      .mockResolvedValueOnce({ assetUrl: null, status: 'pending' })      // idempotency
+      .mockResolvedValueOnce({ visualMode: 'image', videoModel: null }); // mode check
+
+    mockPrisma.podcast.findUniqueOrThrow.mockResolvedValue({ userId: 'user-1' });
+    mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1' });
+    mockPrisma.videoGeneration.findUnique.mockResolvedValue({ imageModel: null });
+
+    mockResolveImageProvider.mockRejectedValue(new Error('USAGE_LIMIT_REACHED'));
+
+    // checkAllReady after marking failed
+    mockPrisma.segmentVisual.count.mockResolvedValueOnce(0);
+    mockPrisma.segmentVisual.findMany.mockResolvedValueOnce([]);
+
+    const { UnrecoverableError } = await import('bullmq');
+    await expect(processVisualGeneration(makeJob(baseData))).rejects.toThrow(UnrecoverableError);
+  });
+
+  it('passes avatarProvider, avatarImageUrl, avatarModelId when queuing avatar jobs', async () => {
+    // Visual already exists — triggers checkAllReady directly
+    mockPrisma.segmentVisual.findUnique.mockResolvedValueOnce({
+      assetUrl: 'https://existing.com/img.png',
+      status: 'ready',
+    });
+
+    // checkAllReady: no pending/generating
+    mockPrisma.segmentVisual.count.mockResolvedValueOnce(0);
+    // No failed visuals
+    mockPrisma.segmentVisual.findMany.mockResolvedValueOnce([]);
+
+    // No pending transitions
+    mockPrisma.segmentTransition.count.mockResolvedValueOnce(0);
+
+    // One pending avatar overlay
+    mockPrisma.avatarOverlay.count.mockResolvedValueOnce(1);
+    mockPrisma.podcast.findUniqueOrThrow.mockResolvedValue({ userId: 'user-1' });
+    mockPrisma.avatarOverlay.findMany.mockResolvedValueOnce([
+      {
+        id: 'ao-1',
+        speaker: 'Host',
+        avatarId: 'avatar_anna',
+        avatarProvider: 'fal',
+        avatarImageUrl: 'https://cdn.example.com/anna.png',
+        avatarModelId: 'fal-lipsync-v1',
+      },
+    ]);
+
+    await processVisualGeneration(makeJob(baseData));
+
+    expect(mockAddJob).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'avatar-generation' }),
+      'generate_avatar',
+      expect.objectContaining({
+        avatarProvider: 'fal',
+        avatarImageUrl: 'https://cdn.example.com/anna.png',
+        avatarModelId: 'fal-lipsync-v1',
+      }),
     );
   });
 });
