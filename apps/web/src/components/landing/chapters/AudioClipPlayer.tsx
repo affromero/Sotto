@@ -1,6 +1,12 @@
 'use client';
 
-import { useRef, useState, useCallback, useEffect } from 'react';
+import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
+import { Player, type PlayerRef } from '@remotion/player';
+import { PodcastVisuals, DEFAULT_RENDER_CONFIG, DEFAULT_BRANDING } from '@sotto/video';
+import type { VisualsInput } from '@sotto/video';
+import { buildVideoSegments, computeTotalFrames } from '@/lib/segment-utils';
+import type { SegmentVisualData } from '@/lib/segment-utils';
+import type { SegmentData } from '@/types/podcast';
 import { useShowcaseToggles } from '../ShowcaseTogglesProvider';
 import styles from './AudioClipPlayer.module.css';
 
@@ -17,6 +23,32 @@ interface VideoClip {
   end: number;
 }
 
+interface ClipSegment {
+  id: string;
+  order: number;
+  speaker: string;
+  text: string;
+  startTime: number;
+  duration: number;
+}
+
+interface ClipVisual {
+  id: string;
+  segmentId: string;
+  order: number;
+  subOrder: number;
+  startOffset: number;
+  subDuration: number | null;
+  visualType: string;
+  visualMode: string | null;
+  prompt: string | null;
+  metadata: Record<string, unknown> | null;
+  assetUrl: string | null;
+  assetType: string | null;
+  firstFrameUrl: string | null;
+  status: string;
+}
+
 interface AudioClipPlayerProps {
   title: string;
   voiceCount: number;
@@ -29,8 +61,12 @@ interface AudioClipPlayerProps {
   podcastId: string;
   voiceTracks?: VoiceTrackOption[];
   videoClip?: VideoClip | null;
+  clipSegments?: ClipSegment[];
+  clipVisuals?: ClipVisual[];
   showVideoToggle?: boolean;
 }
+
+const FPS = DEFAULT_RENDER_CONFIG.fps;
 
 function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60);
@@ -56,10 +92,13 @@ export function AudioClipPlayer({
   podcastId,
   voiceTracks = [],
   videoClip,
+  clipSegments = [],
+  clipVisuals = [],
   showVideoToggle = false,
 }: AudioClipPlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const remotionRef = useRef<PlayerRef>(null);
   const pendingResumeRef = useRef<{ elapsed: number; play: boolean } | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -72,26 +111,57 @@ export function AudioClipPlayer({
   const videoEnabled = showcaseToggles ? showcaseToggles.videoEnabled : localVideoEnabled;
   const avatarEnabled = showcaseToggles?.avatarEnabled ?? false;
 
-  const showVideo = videoClip && videoEnabled;
-  const showLocalVideoToggle = !showcaseToggles && showVideoToggle && videoClip;
+  // Prefer composed MP4, fall back to client-side Remotion Player
+  const hasRemotionVisuals = clipSegments.length > 0 && clipVisuals.length > 0;
+  const showMp4Video = videoClip && videoEnabled;
+  const showRemotionVideo = !videoClip && hasRemotionVisuals && videoEnabled;
+  const showVideo = showMp4Video || showRemotionVideo;
+  const showLocalVideoToggle = !showcaseToggles && showVideoToggle && (videoClip || hasRemotionVisuals);
+
+
+  // Build Remotion Player input from clip segments/visuals
+  const segmentData = useMemo<SegmentData[]>(() =>
+    clipSegments.map((s) => ({ ...s, startTime: s.startTime, duration: s.duration, audioUrl: null })) as SegmentData[],
+    [clipSegments],
+  );
+  const visualData = useMemo<SegmentVisualData[]>(() =>
+    clipVisuals.map((v) => ({ ...v, videoModel: null, failureReason: null })),
+    [clipVisuals],
+  );
+  const videoSegments = useMemo(() => buildVideoSegments(segmentData, visualData), [segmentData, visualData]);
+  const totalFrames = useMemo(() => computeTotalFrames(videoSegments, FPS), [videoSegments]);
+  const remotionInput = useMemo<VisualsInput>(() => ({
+    segments: videoSegments,
+    config: DEFAULT_RENDER_CONFIG,
+    branding: DEFAULT_BRANDING,
+  }), [videoSegments]);
 
   const activeUrl = activeTrackIndex >= 0 ? voiceTracks[activeTrackIndex].audioUrl : audioUrl;
   const clipDuration = endTime - startTime;
   const progress = clipDuration > 0 ? Math.min(currentTime / clipDuration, 1) : 0;
 
   const syncVideo = useCallback((time: number, playing: boolean) => {
+    // Sync MP4 <video> element
     const video = videoRef.current;
-    if (!video) return;
-    // Only sync if drift exceeds 0.3s to avoid constant seeking
-    if (Math.abs(video.currentTime - time) > 0.3) {
-      video.currentTime = time;
+    if (video) {
+      if (Math.abs(video.currentTime - time) > 0.3) {
+        video.currentTime = time;
+      }
+      if (playing && video.paused) {
+        video.play().catch(() => {});
+      } else if (!playing && !video.paused) {
+        video.pause();
+      }
     }
-    if (playing && video.paused) {
-      video.play().catch(() => {});
-    } else if (!playing && !video.paused) {
-      video.pause();
+    // Sync Remotion Player
+    const player = remotionRef.current;
+    if (player) {
+      const elapsed = time - startTime;
+      const frame = Math.round(Math.max(0, elapsed) * FPS);
+      player.seekTo(frame);
+      if (playing) player.play(); else player.pause();
     }
-  }, []);
+  }, [startTime]);
 
   const handlePlay = useCallback(() => {
     const audio = audioRef.current;
@@ -186,17 +256,33 @@ export function AudioClipPlayer({
         <span>Now Playing</span>
       </div>
       <div className={styles.mockBody}>
-        {showVideo && videoClip && (
+        {showVideo && (
           <div className={styles.videoInline}>
-            {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-            <video
-              ref={videoRef}
-              src={videoClip.url}
-              preload="metadata"
-              className={styles.videoPlayer}
-              playsInline
-              muted
-            />
+            {showMp4Video && videoClip ? (
+              <>
+                { }
+                <video
+                  ref={videoRef}
+                  src={videoClip.url}
+                  preload="metadata"
+                  className={styles.videoPlayer}
+                  playsInline
+                  muted
+                />
+              </>
+            ) : showRemotionVideo && totalFrames > 0 ? (
+              <Player
+                ref={remotionRef}
+                component={PodcastVisuals as unknown as React.ComponentType<Record<string, unknown>>}
+                inputProps={remotionInput as unknown as Record<string, unknown>}
+                durationInFrames={totalFrames}
+                fps={FPS}
+                compositionWidth={DEFAULT_RENDER_CONFIG.width}
+                compositionHeight={DEFAULT_RENDER_CONFIG.height}
+                style={{ width: '100%', height: '100%' }}
+                controls={false}
+              />
+            ) : null}
             {!isPlaying && (
               <button
                 type="button"
@@ -313,7 +399,7 @@ export function AudioClipPlayer({
           </div>
         </div>
       </div>
-      {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+      { }
       <audio ref={audioRef} src={activeUrl} preload="metadata" />
     </div>
   );

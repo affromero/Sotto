@@ -211,6 +211,8 @@ export function JourneyChapter({ showcase }: JourneyChapterProps) {
                   podcastId={showcase.podcast.podcastId}
                   voiceTracks={showcase.voiceTracks}
                   videoClip={showcase.videoClip}
+                  clipSegments={showcase.clipSegments}
+                  clipVisuals={showcase.clipVisuals}
                   showVideoToggle={showcase.showVideo}
                 />
               ) : (
