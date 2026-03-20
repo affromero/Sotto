@@ -26,6 +26,12 @@ vi.mock('@/lib/admin-emails', () => ({
   isAdminEmail: (...args: unknown[]) => mockIsAdminEmail(...args),
 }));
 
+// Mock site-config
+const mockIsOpenSignup = vi.fn();
+vi.mock('@/lib/site-config', () => ({
+  isOpenSignup: () => mockIsOpenSignup(),
+}));
+
 // Mock other auth dependencies that NextAuth imports
 vi.mock('@auth/prisma-adapter', () => ({
   PrismaAdapter: () => ({}),
@@ -65,6 +71,7 @@ describe('Waitlist Sign-Up Gate — signIn callback', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     mockIsAdminEmail.mockReturnValue(false);
+    mockIsOpenSignup.mockResolvedValue(false);
     mockPrismaUser.findUnique.mockResolvedValue(null);
     mockPrismaWaitlist.findUnique.mockResolvedValue(null);
     signIn = await getSignInCallback();
@@ -165,5 +172,28 @@ describe('Waitlist Sign-Up Gate — signIn callback', () => {
     });
 
     expect(result).toBe('/auth/waitlisted?reason=pending');
+  });
+
+  it('allows signup when openSignup=true even without waitlist entry', async () => {
+    mockIsOpenSignup.mockResolvedValue(true);
+
+    const result = await signIn({
+      user: { email: 'new@example.com' },
+      profile: { email: 'new@example.com' },
+    });
+
+    expect(result).toBe(true);
+    expect(mockPrismaWaitlist.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('still gates when openSignup=false', async () => {
+    mockIsOpenSignup.mockResolvedValue(false);
+
+    const result = await signIn({
+      user: { email: 'new@example.com' },
+      profile: { email: 'new@example.com' },
+    });
+
+    expect(result).toBe('/auth/waitlisted?reason=not-on-list');
   });
 });

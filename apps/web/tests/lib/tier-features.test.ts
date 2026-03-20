@@ -5,8 +5,8 @@ describe('getTierFeatures', () => {
   describe('FREE + no BYOK', () => {
     const features = getTierFeatures('FREE', false);
 
-    it('caps duration at 5 minutes', () => {
-      expect(features.maxDurationMinutes).toBe(5);
+    it('caps duration at 10 minutes', () => {
+      expect(features.maxDurationMinutes).toBe(10);
     });
 
     it('limits to 2 speakers', () => {
@@ -177,7 +177,7 @@ describe('getTierFeatures', () => {
     it('regular USER role does not get privileged access', () => {
       const features = getTierFeatures('FREE', false, 'USER');
       expect(features.privateAllowed).toBe(false);
-      expect(features.maxDurationMinutes).toBe(5);
+      expect(features.maxDurationMinutes).toBe(10);
     });
 
     it('undefined role does not get privileged access', () => {

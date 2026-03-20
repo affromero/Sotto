@@ -10,6 +10,7 @@ import { generateUniqueHandle } from './handles';
 import { isAdminEmail } from './admin-emails';
 import { sendEmail } from './email';
 import { buildMagicLinkEmail } from './email-templates';
+import { isOpenSignup } from './site-config';
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
@@ -147,10 +148,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       // Admins bypass waitlist
       if (isAdminEmail(email)) return true;
 
-      // New user — check waitlist
-      const entry = await prisma.waitlist.findUnique({ where: { email } });
-      if (!entry) return '/auth/waitlisted?reason=not-on-list';
-      if (entry.status !== 'APPROVED') return '/auth/waitlisted?reason=pending';
+      // New user — check waitlist (bypassed when openSignup is enabled)
+      if (!await isOpenSignup()) {
+        const entry = await prisma.waitlist.findUnique({ where: { email } });
+        if (!entry) return '/auth/waitlisted?reason=not-on-list';
+        if (entry.status !== 'APPROVED') return '/auth/waitlisted?reason=pending';
+      }
       return true;
     },
     async session({ session, token }) {

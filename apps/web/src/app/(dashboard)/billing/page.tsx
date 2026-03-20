@@ -142,7 +142,7 @@ export default async function BillingPage() {
           {freeTier.dailyRemaining === 0 && (
             <p className={styles.manageText}>
               You&apos;ve used today&apos;s podcasts.{' '}
-              <Link href="/onboarding?step=keys">Add a voice provider key</Link> for unlimited access.
+              <Link href="/settings">Add a voice provider key</Link> for unlimited access.
             </p>
           )}
         </section>
