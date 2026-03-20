@@ -6,6 +6,7 @@ import { checkRateLimit } from '@/lib/redis';
 import { generateApiKey } from '@/lib/api-keys';
 import { generateUniqueHandle } from '@/lib/handles';
 import { isAdminEmail } from '@/lib/admin-emails';
+import { isOpenSignup } from '@/lib/site-config';
 
 import { errorResponse } from '@/lib/api-response';
 // --- JWKS for Apple + Google JWT verification ---
@@ -217,8 +218,8 @@ async function handleOAuthLogin(body: unknown) {
 
   // Step 3: No Account, no User — create both (full mobile sign-up)
 
-  // Admins bypass waitlist; everyone else needs approval
-  if (!isAdminEmail(email)) {
+  // Admins bypass waitlist; when openSignup is on, everyone can sign up
+  if (!isAdminEmail(email) && !await isOpenSignup()) {
     const waitlistEntry = await prisma.waitlist.findUnique({ where: { email } });
     if (!waitlistEntry || waitlistEntry.status !== 'APPROVED') {
       return errorResponse('Your email is not on the approved waitlist. Join at sotto.fm', 403);
