@@ -195,9 +195,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           return NextResponse.json({
             videoGenerationId: existing.id, status: 'COMPOSING',
           });
-          return NextResponse.json({
-            videoGenerationId: existing.id, status: 'READY',
-          });
         }
 
         // Some visuals failed/pending — reset and re-queue those
