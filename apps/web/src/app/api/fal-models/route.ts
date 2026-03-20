@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
   const auth = await authenticateRequest(request);
   if (!auth) return errorResponse('Unauthorized', 401);
 
-  const [user, imageModels, videoModels, autoConfig, userHasFalKey, userHasMiniMaxKey, userHasHeraKey] = await Promise.all([
+  const [user, imageModels, videoModels, autoConfig, userHasFalKey, userHasMiniMaxKey, userHasHeraKey, userHasReplicateKey] = await Promise.all([
     prisma.user.findUnique({ where: { id: auth.userId }, select: { plan: true, role: true } }),
     fetchFalImageModels(),
     fetchAllVideoModels(),
@@ -24,6 +24,7 @@ export async function GET(request: NextRequest) {
     hasByokKey(auth.userId, 'fal'),
     hasByokKey(auth.userId, 'minimax'),
     hasByokKey(auth.userId, 'hera'),
+    hasByokKey(auth.userId, 'replicate'),
   ]);
 
   const tier = (user?.plan as 'FREE' | 'PRO') ?? 'FREE';
@@ -33,6 +34,7 @@ export async function GET(request: NextRequest) {
   const hasFalKey = userHasFalKey || !!process.env.FAL_KEY;
   const hasMiniMaxKey = userHasMiniMaxKey || !!process.env.MINIMAX_API_KEY;
   const hasHeraKey = userHasHeraKey || !!process.env.HERA_API_KEY;
+  const hasReplicateKey = userHasReplicateKey || !!process.env.REPLICATE_API_TOKEN;
 
   // Resolve plan defaults
   const [configuredImage, configuredVideo] = await Promise.all([
@@ -50,6 +52,7 @@ export async function GET(request: NextRequest) {
     if (userHasFalKey) byokVideoProviders.add('fal');
     if (userHasMiniMaxKey) byokVideoProviders.add('minimax');
     if (userHasHeraKey) byokVideoProviders.add('hera');
+    if (userHasReplicateKey) byokVideoProviders.add('replicate');
 
     // Image model filtering
     const { freeImageModels, proImageModels } = resolveIncludedImageModels(autoConfig);
@@ -92,6 +95,7 @@ export async function GET(request: NextRequest) {
     hasFalKey,
     hasMiniMaxKey,
     hasHeraKey,
+    hasReplicateKey,
     defaultImageModel: configuredImage.imageModel,
     defaultVideoModel: configuredVideo.videoModel,
   });

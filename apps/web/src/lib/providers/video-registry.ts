@@ -3,7 +3,7 @@
  * Follows the same pattern as image-registry.ts.
  */
 
-export type VideoProviderId = 'fal' | 'minimax' | 'hera';
+export type VideoProviderId = 'fal' | 'minimax' | 'hera' | 'replicate';
 
 export interface VideoModelOption {
   id: string;
@@ -113,6 +113,36 @@ const VIDEO_PROVIDERS: Record<VideoProviderId, VideoProviderMeta> = {
             return body.base_resp?.status_code !== 1004;
           }
           return true;
+        } catch {
+          return false;
+        }
+      },
+    },
+  },
+
+  replicate: {
+    id: 'replicate',
+    displayName: 'Replicate',
+    getApiKeyUrl: 'https://replicate.com/account/api-tokens',
+    defaultModel: 'replicate-wan2.2-t2v-fast-480p',
+    models: [
+      { id: 'replicate-wan2.2-t2v-fast-480p', displayName: 'Wan 2.2 Fast T2V (480p)', tier: 'standard', costPerMinute: 0.18 },
+      { id: 'replicate-ltx-video-768p', displayName: 'LTX-Video (768p)', tier: 'standard', costPerMinute: 0.26 },
+      { id: 'replicate-seedance1-lite-480p', displayName: 'Seedance 1.0 Lite (480p)', tier: 'standard', costPerMinute: 1.08, supportsFirstFrame: true },
+      { id: 'replicate-seedance1-pro-fast-720p', displayName: 'Seedance 1.0 Pro Fast (720p)', tier: 'standard', costPerMinute: 2.4, requiresFirstFrame: true, supportsFirstFrame: true },
+      { id: 'replicate-haiper-v2-720p', displayName: 'Haiper Video 2 (720p)', tier: 'standard', costPerMinute: 3, supportsFirstFrame: true },
+      { id: 'replicate-pixverse-v4-360p', displayName: 'PixVerse v4 (360p)', tier: 'high', costPerMinute: 3.6, supportsFirstFrame: true },
+      { id: 'replicate-wan2.1-i2v-480p', displayName: 'Wan 2.1 I2V (480p)', tier: 'high', costPerMinute: 5.4, requiresFirstFrame: true, supportsFirstFrame: true },
+      { id: 'replicate-wan2.1-i2v-720p', displayName: 'Wan 2.1 I2V (720p)', tier: 'best', costPerMinute: 15, requiresFirstFrame: true, supportsFirstFrame: true },
+    ],
+    platformKeyEnv: 'REPLICATE_API_TOKEN',
+    auth: {
+      validate: async (creds) => {
+        try {
+          const res = await fetch('https://api.replicate.com/v1/models', {
+            headers: { Authorization: `Bearer ${creds.apiKey}` },
+          });
+          return res.ok;
         } catch {
           return false;
         }
