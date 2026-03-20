@@ -1,5 +1,6 @@
 'use client';
 
+import { useCallback, useRef } from 'react';
 import { usePlayer } from '@/components/providers/AudioPlayerProvider';
 import { WaveformBars } from '@/components/ui/WaveformBars';
 import styles from './MiniPlayer.module.css';
@@ -10,8 +11,22 @@ interface MiniPlayerProps {
   onClose?: () => void;
 }
 
+function formatTime(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
 export function MiniPlayer({ podcastTitle, onExpand, onClose }: MiniPlayerProps) {
   const player = usePlayer();
+  const seekBarRef = useRef<HTMLDivElement>(null);
+
+  const handleSeek = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (!player || !seekBarRef.current) return;
+    const rect = seekBarRef.current.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    player.seek(ratio * player.duration);
+  }, [player]);
 
   if (!player || !player.podcastId) return null;
 
@@ -19,7 +34,21 @@ export function MiniPlayer({ podcastTitle, onExpand, onClose }: MiniPlayerProps)
 
   return (
     <div className={`${styles.miniPlayer} ${player.isPlaying ? styles.playing : ''}`}>
-      <div className={styles.progressLine} style={{ width: `${progress}%` }} />
+      <div
+        ref={seekBarRef}
+        className={styles.seekBar}
+        onClick={handleSeek}
+        role="slider"
+        aria-label="Seek"
+        aria-valuemin={0}
+        aria-valuemax={player.duration}
+        aria-valuenow={player.currentTime}
+        tabIndex={0}
+      >
+        <div className={styles.seekTrack}>
+          <div className={styles.seekFill} style={{ width: `${progress}%` }} />
+        </div>
+      </div>
 
       <div className={styles.content}>
         <button className={styles.artworkButton} onClick={onExpand} aria-label="Expand player">
@@ -36,6 +65,9 @@ export function MiniPlayer({ podcastTitle, onExpand, onClose }: MiniPlayerProps)
 
         <button className={styles.info} onClick={onExpand}>
           <span className={styles.title}>{podcastTitle || 'Now Playing'}</span>
+          <span className={styles.time}>
+            {formatTime(player.currentTime)} / {formatTime(player.duration)}
+          </span>
         </button>
 
         <button
