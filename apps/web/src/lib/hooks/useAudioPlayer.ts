@@ -27,15 +27,28 @@ export function useAudioPlayer(): PlayerState & PlayerControls {
     if (typeof window === 'undefined') return null;
     if (!audioRef.current) {
       const audio = new Audio();
-      audio.addEventListener('timeupdate', () => {
-        setState((s) => ({ ...s, currentTime: audio.currentTime || 0 }));
-        // Drift correction for music
-        syncMusic(audio.currentTime);
-      });
+      // Use requestAnimationFrame for frame-accurate time updates (~16ms)
+      // instead of timeupdate (~250ms) for precise avatar/video sync
+      let rafId = 0;
+      const tick = () => {
+        if (!audio.paused) {
+          setState((s) => {
+            if (Math.abs(s.currentTime - audio.currentTime) > 0.016) {
+              return { ...s, currentTime: audio.currentTime || 0 };
+            }
+            return s;
+          });
+          syncMusic(audio.currentTime);
+        }
+        rafId = requestAnimationFrame(tick);
+      };
+      audio.addEventListener('play', () => { rafId = requestAnimationFrame(tick); });
+      audio.addEventListener('pause', () => { cancelAnimationFrame(rafId); });
       audio.addEventListener('loadedmetadata', () => {
         setState((s) => ({ ...s, duration: audio.duration || 0 }));
       });
       audio.addEventListener('ended', () => {
+        cancelAnimationFrame(rafId);
         setState((s) => ({ ...s, isPlaying: false }));
         musicRef.current?.pause();
       });
