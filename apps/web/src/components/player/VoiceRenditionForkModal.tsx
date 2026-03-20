@@ -87,7 +87,7 @@ export function VoiceRenditionForkModal({
       if (!response.ok) {
         const data = await response.json();
         if (data.code === 'daily_limit_reached') {
-          router.push('/onboarding?step=keys');
+          router.push('/billing');
           onClose();
           return;
         }

@@ -75,7 +75,7 @@ export default async function CreatePage({
   const gate = await checkGenerationGate(session.user.id);
 
   if (!gate.allowed && gate.reason === 'no_provider') {
-    redirect('/onboarding?step=keys&reason=no_provider');
+    redirect('/billing');
   }
 
   const userRole = ((session?.user as Record<string, unknown>)?.role as string) ?? 'USER';
