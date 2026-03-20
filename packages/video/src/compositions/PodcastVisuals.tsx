@@ -8,6 +8,7 @@ import { SpeakerLabel } from './shared/SpeakerLabel';
 import { Background } from './shared/Background';
 import { TransitionOverlay } from './shared/TransitionOverlay';
 import { ProviderBadge } from './shared/ProviderBadge';
+import { LightLeakOverlay } from './shared/LightLeakOverlay';
 
 const TRANSITION_FRAMES = 30;
 
@@ -31,10 +32,13 @@ const SegmentWithFade: React.FC<{
   );
 };
 
+const LIGHT_LEAK_FRAMES = 45;
+
 export const PodcastVisuals: React.FC<VisualsInput> = ({
   segments,
   branding,
   transitions,
+  enableLightLeaks = true,
 }) => {
   const { fps } = useVideoConfig();
 
@@ -166,6 +170,37 @@ export const PodcastVisuals: React.FC<VisualsInput> = ({
             </Sequence>
           );
         })}
+
+        {enableLightLeaks && segments.length > 1 && (() => {
+          const coveredBoundaries = new Set(
+            transitions?.map((t) => `${t.fromSegmentOrder}-${t.toSegmentOrder}`) ?? [],
+          );
+          const halfLeak = Math.round(LIGHT_LEAK_FRAMES / 2);
+
+          return segments.slice(1).map((segment, i) => {
+            const prevSegment = segments[i];
+            const key = `${prevSegment.order}-${segment.order}`;
+            if (coveredBoundaries.has(key)) return null;
+
+            const centerFrame = Math.round(segment.startTime * fps);
+            const fromFrame = Math.max(0, centerFrame - halfLeak);
+            const seed = prevSegment.order * 7 + segment.order;
+
+            return (
+              <Sequence
+                key={`light-leak-${key}`}
+                from={fromFrame}
+                durationInFrames={LIGHT_LEAK_FRAMES}
+              >
+                <LightLeakOverlay
+                  durationInFrames={LIGHT_LEAK_FRAMES}
+                  seed={seed}
+                  hueShift={15}
+                />
+              </Sequence>
+            );
+          });
+        })()}
 
         <SottoWatermark />
         <ProviderBadge segments={segments} />
