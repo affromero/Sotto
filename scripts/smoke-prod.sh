@@ -10,3 +10,17 @@ if [[ "${status}" != "200" ]]; then
 fi
 
 echo "Health check OK: ${BASE_URL}/api/health"
+
+status="$(curl -sS -o /dev/null -w "%{http_code}" "${BASE_URL}/feed")"
+if [[ "${status}" != "200" ]]; then
+  echo "Feed check failed (status ${status}) for ${BASE_URL}/feed"
+  exit 1
+fi
+echo "Feed check OK: ${BASE_URL}/feed"
+
+status="$(curl -sS -o /dev/null -w "%{http_code}" "${BASE_URL}/api/tags")"
+if [[ "${status}" != "200" ]]; then
+  echo "Tags check failed (status ${status}) for ${BASE_URL}/api/tags"
+  exit 1
+fi
+echo "Tags check OK: ${BASE_URL}/api/tags"
