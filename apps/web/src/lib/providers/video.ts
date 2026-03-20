@@ -55,6 +55,10 @@ export async function resolveVideoProvider(context: {
     return resolveHeraVideo(model);
   }
 
+  if (providerId === 'replicate') {
+    return resolveReplicateVideo(userId, model);
+  }
+
   throw new Error(`Unsupported video provider: ${providerId}`);
 }
 
@@ -98,4 +102,20 @@ async function resolveHeraVideo(model: string): Promise<ResolvedVideoProvider> {
 
   logger.error('No Hera API key available for video generation');
   throw new Error('No Hera API key available. Set HERA_API_KEY in Doppler.');
+}
+
+async function resolveReplicateVideo(userId: string, model: string): Promise<ResolvedVideoProvider> {
+  const byokKey = await getByokKey(userId, 'replicate');
+  if (byokKey) {
+    const { ReplicateVideoProvider } = await import('./video/replicate.provider');
+    return { provider: new ReplicateVideoProvider(byokKey, model), source: 'byok', providerId: 'replicate' };
+  }
+
+  if (process.env.REPLICATE_API_TOKEN) {
+    const { ReplicateVideoProvider } = await import('./video/replicate.provider');
+    return { provider: new ReplicateVideoProvider(process.env.REPLICATE_API_TOKEN, model), source: 'platform', providerId: 'replicate' };
+  }
+
+  logger.error('No Replicate API key available for video generation', { userId });
+  throw new Error('No Replicate API key available. Add a Replicate key in Settings or contact support.');
 }

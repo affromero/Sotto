@@ -148,12 +148,13 @@ export async function fetchAllVideoModels(): Promise<FalVideoModelInfo[]> {
     const apiKey = process.env.PRICETOKEN_API_KEY;
     const client = new PriceTokenClient(apiKey ? { apiKey } : undefined);
     // Fetch from all video providers
-    const [falModels, minimaxModels, runwayModels] = await Promise.all([
+    const [falModels, minimaxModels, runwayModels, replicateModels] = await Promise.all([
       client.getVideoPricing({ provider: 'fal' }).catch(() => [] as VideoModelPricing[]),
       client.getVideoPricing({ provider: 'minimax' }).catch(() => [] as VideoModelPricing[]),
       client.getVideoPricing({ provider: 'runway' }).catch(() => [] as VideoModelPricing[]),
+      client.getVideoPricing({ provider: 'replicate' }).catch(() => [] as VideoModelPricing[]),
     ]);
-    const all = [...falModels, ...minimaxModels, ...runwayModels];
+    const all = [...falModels, ...minimaxModels, ...runwayModels, ...replicateModels];
     const models = all
       .filter((m) => knownIds.has(m.modelId))
       .map(mapVideoModel);

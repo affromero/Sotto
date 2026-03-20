@@ -59,12 +59,13 @@ export async function fetchAvatarModels(): Promise<AvatarModelInfo[]> {
   try {
     const apiKey = process.env.PRICETOKEN_API_KEY;
     const client = new PriceTokenClient(apiKey ? { apiKey } : undefined);
-    const [heygenModels, falModels, runwayModels] = await Promise.all([
+    const [heygenModels, falModels, runwayModels, replicateModels] = await Promise.all([
       client.getAvatarPricing({ provider: 'heygen' }).catch(() => [] as AvatarModelPricing[]),
       client.getAvatarPricing({ provider: 'fal' }).catch(() => [] as AvatarModelPricing[]),
       client.getAvatarPricing({ provider: 'runway' }).catch(() => [] as AvatarModelPricing[]),
+      client.getAvatarPricing({ provider: 'replicate' }).catch(() => [] as AvatarModelPricing[]),
     ]);
-    const all = [...heygenModels, ...falModels, ...runwayModels];
+    const all = [...heygenModels, ...falModels, ...runwayModels, ...replicateModels];
     const models = all
       .map((m) => {
         const registryId = mapPricetokenToRegistry(m.modelId, knownIds);
