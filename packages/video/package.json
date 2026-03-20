@@ -16,6 +16,7 @@
   "dependencies": {
     "@fontsource/dm-serif-display": "^5.0.0",
     "@fontsource/inter": "^5.0.0",
+    "@remotion/light-leaks": "^4.0.436",
     "@remotion/media-utils": "^4.0.0",
     "@remotion/transitions": "^4.0.0",
     "recharts": "^2.15.0",
