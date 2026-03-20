@@ -9,12 +9,13 @@ export const PodcastVideo: React.FC<RenderInput> = ({
   segments,
   config,
   branding,
+  transitions,
   avatarOverlays,
 }) => {
   return (
     <AbsoluteFill>
       <Audio src={audioUrl} />
-      <PodcastVisuals segments={segments} config={config} branding={branding} />
+      <PodcastVisuals segments={segments} config={config} branding={branding} transitions={transitions} />
       {avatarOverlays?.map((overlay) => (
         <AvatarPip key={overlay.speaker} overlay={overlay} />
       ))}
