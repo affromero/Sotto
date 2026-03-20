@@ -12,14 +12,39 @@
   view-transition-name: miniplayer;
 }
 
-.progressLine {
+.seekBar {
   position: absolute;
-  top: 0;
+  top: -4px;
   left: 0;
+  right: 0;
+  height: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  z-index: 1;
+}
+
+.seekTrack {
+  width: 100%;
   height: 3px;
+  background: rgba(128, 128, 128, 0.2);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.seekBar:hover .seekTrack {
+  height: 5px;
+}
+
+.seekFill {
+  height: 100%;
   background: var(--gradient-warm);
-  border-radius: 0 var(--radius-full) var(--radius-full) 0;
+  border-radius: var(--radius-full);
   transition: width 100ms linear;
+}
+
+.seekBar:hover .seekFill {
+  box-shadow: 0 0 8px rgba(217, 119, 6, 0.4);
 }
 
 .content {
@@ -80,6 +105,14 @@
   overflow: hidden;
   text-overflow: ellipsis;
   display: block;
+}
+
+.time {
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+  color: var(--color-primary);
+  font-weight: 500;
+  letter-spacing: 0.02em;
 }
 
 .playButton {
@@ -161,8 +194,12 @@
     0 -1px 0 rgba(255, 255, 255, 0.04) inset;
 }
 
-:global([data-theme='dark']) .progressLine {
+:global([data-theme='dark']) .seekFill {
   box-shadow: 0 0 12px rgba(232, 137, 15, 0.35), 0 0 4px rgba(232, 137, 15, 0.2);
+}
+
+:global([data-theme='dark']) .time {
+  color: var(--color-primary);
 }
 
 @media (prefers-reduced-motion: reduce) {
