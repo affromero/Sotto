@@ -52,6 +52,7 @@ export async function submitFalLipSync(params: FalLipSyncParams): Promise<{ requ
   const body: Record<string, string> = {
     image_url: imageUrl,
     audio_url: audioUrl,
+    resolution: '512',
   };
   if (prompt) body.prompt = prompt;
 
