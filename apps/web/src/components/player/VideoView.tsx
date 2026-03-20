@@ -110,7 +110,7 @@ export function VideoView({
 
   const playableOverlays = useMemo(
     () => (avatarOverlays ?? []).filter(
-      (o) => (o.status === 'ready' && o.videoUrl) || (o.chunkVideoUrl && o.status !== 'failed') || o.status === 'failed',
+      (o) => (o.status === 'ready' && o.videoUrl) || (o.chunkVideoUrl && o.status !== 'failed'),
     ),
     [avatarOverlays],
   );
