@@ -360,7 +360,8 @@ async function processFalLipSync(job: Job<GenerateAvatarPayload>): Promise<void>
 
       await job.updateProgress(30);
 
-      const timeoutMs = durationSeconds * 3000 + 120_000;
+      // Premium models (Kling) take longer — use generous timeout
+      const timeoutMs = durationSeconds * 10_000 + 300_000;
       const result = await pollFalLipSync(statusUrl, resultUrl, apiKey, timeoutMs);
 
       await job.updateProgress(80);
