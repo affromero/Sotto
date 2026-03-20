@@ -21,6 +21,10 @@ vi.mock('@/lib/auth', () => ({
   auth: (...args: unknown[]) => mockAuth(...args),
 }));
 
+vi.mock('@/lib/redis', () => ({
+  checkRateLimit: vi.fn().mockResolvedValue({ allowed: true, remaining: 4 }),
+}));
+
 import { POST, GET } from '@/app/api/feedback/route';
 
 const mockPrisma = {
