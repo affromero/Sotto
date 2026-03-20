@@ -971,9 +971,10 @@ async function checkAllAvatarsReady(videoGenerationId: string, podcastId: string
     return;
   }
 
-  // All avatars ready — compose MP4
-  await addJob(videoCompositionQueue, JobType.COMPOSE_VIDEO, {
-    podcastId,
-    videoGenerationId,
+  // All avatars ready — mark READY (avatars are overlays rendered client-side,
+  // composition is only triggered explicitly by the user)
+  await prisma.videoGeneration.update({
+    where: { id: videoGenerationId },
+    data: { status: 'READY' },
   });
 }
