@@ -55,6 +55,7 @@ export interface VisualsInput {
   config: RenderConfig;
   branding: Branding;
   transitions?: VideoTransition[];
+  enableLightLeaks?: boolean;
 }
 
 export interface AvatarOverlayInput {
