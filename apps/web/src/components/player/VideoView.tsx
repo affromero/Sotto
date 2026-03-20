@@ -119,22 +119,28 @@ export function VideoView({
   const activeIndex = findActiveIndex(segments, currentTime);
   const activeSegment = segments[activeIndex] ?? null;
 
+  // Look ahead by audio crossfade duration to show avatar when the voice actually starts
+  const AUDIO_CROSSFADE_SEC = 0.3;
+  const avatarIndex = findActiveIndex(segments, currentTime + AUDIO_CROSSFADE_SEC);
+  const avatarSegment = segments[avatarIndex] ?? activeSegment;
+
   // Show avatar only when the matching speaker is active AND the segment is enabled
   const visibleOverlays = useMemo(() => {
-    if (!activeSegment) return [];
+    if (!avatarSegment) return [];
     return playableOverlays.filter((o) => {
-      if (o.speaker !== activeSegment.speaker) return false;
+      if (o.speaker !== avatarSegment.speaker) return false;
       // If enabledSegmentIds is set, only show on those segments
       const enabled = o.enabledSegmentIds;
-      if (enabled && enabled.length > 0) return enabled.includes(activeSegment.id);
+      if (enabled && enabled.length > 0) return enabled.includes(avatarSegment.id);
       return true;
     });
-  }, [playableOverlays, activeSegment]);
+  }, [playableOverlays, avatarSegment]);
 
   // Compute avatar video time: cumulative duration of prior enabled same-speaker segments + elapsed in current
+  // Uses avatarIndex/avatarSegment (crossfade-adjusted) for correct sync
   const avatarTimeMap = useMemo(() => {
     const map = new Map<string, number>();
-    if (!activeSegment) return map;
+    if (!avatarSegment) return map;
     for (const overlay of playableOverlays) {
       const enabled = overlay.enabledSegmentIds;
       const isEnabled = (segId: string) => !enabled || enabled.length === 0 || enabled.includes(segId);
@@ -142,17 +148,17 @@ export function VideoView({
       for (let i = 0; i < segments.length; i++) {
         if (segments[i].speaker !== overlay.speaker) continue;
         if (!isEnabled(segments[i].id)) continue;
-        if (i < activeIndex) {
+        if (i < avatarIndex) {
           avatarTime += segments[i].duration ?? 0;
-        } else if (i === activeIndex) {
-          avatarTime += currentTime - (segments[i].startTime ?? 0);
+        } else if (i === avatarIndex) {
+          avatarTime += currentTime - (segments[i].startTime ?? 0) + AUDIO_CROSSFADE_SEC;
           break;
         }
       }
       map.set(overlay.speaker, avatarTime);
     }
     return map;
-  }, [playableOverlays, segments, activeIndex, activeSegment, currentTime]);
+  }, [playableOverlays, segments, avatarIndex, avatarSegment, currentTime]);
   // Find the active sub-visual based on elapsed time within the segment
   const activeVisual = useMemo(() => {
     if (!activeSegment) return null;
