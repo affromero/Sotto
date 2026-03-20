@@ -540,6 +540,9 @@ async function checkAllReady(videoGenerationId: string, podcastId: string): Prom
           avatarOverlayId: overlay.id,
           speaker: overlay.speaker,
           avatarId: overlay.avatarId,
+          avatarProvider: overlay.avatarProvider ?? undefined,
+          avatarImageUrl: overlay.avatarImageUrl ?? undefined,
+          avatarModelId: overlay.avatarModelId ?? undefined,
         });
       }
       return;
