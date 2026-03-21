@@ -7,7 +7,8 @@ interface ShowcaseItem {
   visualType: string;
   label: string;
   description: string;
-  imageUrl: string;
+  url: string;
+  mediaType: 'image' | 'video';
   credits?: string;
 }
 
@@ -175,11 +176,22 @@ export function VisualShowcasePanel() {
           {items.map((item) => (
             <div key={item.visualType} className={styles.card}>
               <div className={styles.imageWrap}>
-                <img
-                  src={item.imageUrl}
-                  alt={item.label}
-                  className={styles.image}
-                />
+                {item.mediaType === 'video' ? (
+                  <video
+                    src={item.url}
+                    className={styles.image}
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                  />
+                ) : (
+                  <img
+                    src={item.url}
+                    alt={item.label}
+                    className={styles.image}
+                  />
+                )}
                 {item.credits && (
                   <span className={styles.credits}>{item.credits}</span>
                 )}
