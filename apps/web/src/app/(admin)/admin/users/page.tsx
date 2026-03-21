@@ -67,6 +67,7 @@ async function getUsers(search: string | undefined, page: number, tier: TierFilt
         suspendedUntil: true,
         plan: true,
         dailyGenerationOverride: true,
+        spentMonthCents: true,
         subscription: { select: { status: true, currentPeriodEnd: true } },
         _count: {
           select: {
@@ -153,6 +154,7 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
               <th>Tier</th>
               <th>Limit</th>
               <th>Podcasts</th>
+              <th>Cost</th>
               <th>Joined</th>
             </tr>
           </thead>
@@ -221,6 +223,7 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
                         : `${user.dailyGenerationOverride}/day`}
                   </td>
                   <td className={styles.numberCell}>{user._count.podcasts}</td>
+                  <td className={styles.numberCell}>${(user.spentMonthCents / 100).toFixed(2)}</td>
                   <td className={styles.dateCell}>
                     {new Date(user.createdAt).toLocaleDateString('en-US', {
                       year: 'numeric',
