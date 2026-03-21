@@ -6,6 +6,7 @@ import { findByVoiceId } from '@/lib/voice-pool';
 import { getAllProviderMeta } from '@/lib/providers/tts-registry';
 import { computeCompletenessChecklist } from '@/lib/data-completeness';
 import type { CompletenessInput } from '@/lib/data-completeness';
+import { getPodcastCostBreakdown } from '@/lib/podcast-cost-stats';
 import { InspectorContent } from './InspectorContent';
 import { InspectorVoices } from './InspectorVoices';
 import styles from './page.module.css';
@@ -128,7 +129,7 @@ export default async function PodcastInspectorPage({ params }: PageProps) {
 
   const [
     podcastFeature,
-    apiUsageAgg,
+    apiCostBreakdown,
     pipelineEventsRaw,
     segmentVoiceMapRaw,
     r2Files,
@@ -143,12 +144,8 @@ export default async function PodcastInspectorPage({ params }: PageProps) {
         relistenRate: true,
       },
     }),
-    // API costs
-    prisma.apiUsageLog.aggregate({
-      where: { podcastId },
-      _sum: { totalCost: true },
-      _count: true,
-    }),
+    // API costs (4-bucket breakdown)
+    getPodcastCostBreakdown(podcastId),
     // Pipeline events
     prisma.pipelineEvent.groupBy({
       by: ['type'],
@@ -309,7 +306,7 @@ export default async function PodcastInspectorPage({ params }: PageProps) {
     ratingCount: ratingsAgg._count,
     playbackSessionCount: playbackCount,
     hasMLFeatures: podcastFeature !== null,
-    apiCostLogCount: apiUsageAgg._count,
+    apiCostLogCount: apiCostBreakdown.callCount,
     segmentVoiceMapCount: segVoiceMapWithAudio,
   };
 
@@ -345,8 +342,12 @@ export default async function PodcastInspectorPage({ params }: PageProps) {
         tags={tags}
         ratings={ratingsData}
         apiCosts={{
-          totalCost: apiUsageAgg._sum.totalCost ?? 0,
-          callCount: apiUsageAgg._count,
+          totalCost: apiCostBreakdown.total,
+          callCount: apiCostBreakdown.callCount,
+          text: apiCostBreakdown.text,
+          audio: apiCostBreakdown.audio,
+          video: apiCostBreakdown.video,
+          avatar: apiCostBreakdown.avatar,
         }}
         pipelineEvents={pipelineEvents}
         mlFeatures={podcastFeature}
