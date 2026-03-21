@@ -110,7 +110,7 @@ export const DataChart: React.FC<{ segment: VideoSegment }> = ({ segment }) => {
 
   const hasMultipleKeys = dataKeys.length > 1;
 
-  // Fixed Y-axis domain — compute max from raw data so axis doesn't jump during animation
+  // Fixed Y-axis — compute max from raw data, generate stable ticks so axis never moves
   const maxY = rawData.reduce((max, row) => {
     for (const key of dataKeys) {
       const v = Number(row[key]) || 0;
@@ -118,8 +118,10 @@ export const DataChart: React.FC<{ segment: VideoSegment }> = ({ segment }) => {
     }
     return max;
   }, 0);
-  // Add 10% headroom and round to a nice number
-  const yDomainMax = Math.ceil(maxY * 1.1 / Math.pow(10, Math.floor(Math.log10(maxY * 1.1 || 1)))) * Math.pow(10, Math.floor(Math.log10(maxY * 1.1 || 1)));
+  const niceMax = maxY > 0 ? Math.ceil(maxY * 1.1) : 10;
+  const tickStep = Math.ceil(niceMax / 5);
+  const yDomainMax = tickStep * 5;
+  const yTicks = Array.from({ length: 6 }, (_, i) => i * tickStep);
 
   const renderChart = () => {
     switch (chartType) {
@@ -138,7 +140,7 @@ export const DataChart: React.FC<{ segment: VideoSegment }> = ({ segment }) => {
                   />
                 )}
               </XAxis>
-              <YAxis stroke="#6B7280" tick={TICK_STYLE} domain={[0, yDomainMax]}>
+              <YAxis stroke="#6B7280" tick={TICK_STYLE} domain={[0, yDomainMax]} ticks={yTicks} allowDataOverflow>
                 {yAxisLabel && (
                   <Label
                     value={yAxisLabel}
@@ -223,7 +225,7 @@ export const DataChart: React.FC<{ segment: VideoSegment }> = ({ segment }) => {
                   />
                 )}
               </XAxis>
-              <YAxis stroke="#6B7280" tick={TICK_STYLE} domain={[0, yDomainMax]}>
+              <YAxis stroke="#6B7280" tick={TICK_STYLE} domain={[0, yDomainMax]} ticks={yTicks} allowDataOverflow>
                 {yAxisLabel && (
                   <Label
                     value={yAxisLabel}
