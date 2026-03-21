@@ -214,13 +214,20 @@
   display: inline-block;
   margin-top: 12px;
   font-size: 15px;
-  color: var(--color-primary);
+  color: rgba(255, 255, 255, 0.55);
   text-decoration: none;
   transition: color var(--transition-fast);
 }
 
 .teamsLink:hover {
-  color: var(--color-primary-hover);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.teamsLink:focus-visible {
+  color: rgba(255, 255, 255, 0.8);
+  outline: 2px solid var(--color-primary);
+  outline-offset: 4px;
+  border-radius: 2px;
 }
 
 /* ==========================================================================
@@ -355,6 +362,10 @@
   .statDivider {
     width: 56px;
     height: 1px;
+  }
+
+  .teams {
+    margin-top: 44px;
   }
 
   .footer {
