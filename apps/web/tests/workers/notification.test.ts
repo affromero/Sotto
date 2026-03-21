@@ -27,6 +27,12 @@ vi.mock('@/lib/push-notifications', () => ({
   sendExpoPushNotification: (...args: unknown[]) => mockSendExpoPushNotification(...args),
 }));
 
+const mockPublishNotification = vi.fn().mockResolvedValue(undefined);
+
+vi.mock('@/lib/redis', () => ({
+  publishNotification: (...args: unknown[]) => mockPublishNotification(...args),
+}));
+
 vi.mock('@/lib/logger', () => ({
   logger: {
     info: vi.fn(),
@@ -62,10 +68,19 @@ const defaultPayload: SendNotificationPayload = {
 describe('processNotification', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockPrismaNotificationCreate.mockResolvedValue({ id: 'notif-001' });
+    mockPrismaNotificationCreate.mockResolvedValue({
+      id: 'notif-001',
+      type: 'PODCAST_READY',
+      title: 'Your podcast is ready!',
+      message: 'Ready.',
+      data: null,
+      read: false,
+      createdAt: new Date('2026-03-22T00:00:00Z'),
+    });
     mockPrismaUserFindUnique.mockResolvedValue({ pushNotifications: true });
     mockSendPushNotification.mockResolvedValue(undefined);
     mockSendExpoPushNotification.mockResolvedValue(undefined);
+    mockPublishNotification.mockResolvedValue(undefined);
   });
 
   describe('in-app notification creation', () => {
@@ -165,6 +180,29 @@ describe('processNotification', () => {
           }),
         })
       );
+    });
+  });
+
+  describe('SSE publish via Redis', () => {
+    it('publishes notification to Redis after DB creation', async () => {
+      const job = createMockJob(defaultPayload);
+      await processNotification(job);
+
+      expect(mockPublishNotification).toHaveBeenCalledWith(
+        'user-001',
+        expect.objectContaining({
+          id: 'notif-001',
+          type: 'PODCAST_READY',
+          title: 'Your podcast is ready!',
+        })
+      );
+    });
+
+    it('does not fail if Redis publish fails', async () => {
+      mockPublishNotification.mockRejectedValue(new Error('Redis down'));
+      const job = createMockJob(defaultPayload);
+
+      await expect(processNotification(job)).resolves.toBeUndefined();
     });
   });
 
