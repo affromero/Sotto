@@ -119,12 +119,8 @@ export function VideoView({
   const activeIndex = findActiveIndex(segments, currentTime);
   const activeSegment = segments[activeIndex] ?? null;
 
-  // Avatar should appear when the voice becomes audible during the crossfade,
-  // not at startTime. The audio stitcher uses 300ms crossfades, so the voice
-  // starts ~300ms before the segment's startTime in the stitched audio.
-  const CROSSFADE_SEC = 0.3;
-  const avatarIndex = findActiveIndex(segments, currentTime + CROSSFADE_SEC);
-  const avatarSegment = segments[avatarIndex] ?? activeSegment;
+  const avatarIndex = activeIndex;
+  const avatarSegment = activeSegment;
 
   // Show avatar only when the matching speaker is active AND the segment is enabled
   const visibleOverlays = useMemo(() => {
