@@ -900,9 +900,9 @@ describe('resolveModelFromTweet', () => {
     expect(result.ttsModel).toBe('tts-1-hd');
   });
 
-  it('resolves "octave" to octave-v1', () => {
+  it('resolves "octave" to octave-v2', () => {
     const result = resolveModelFromTweet({ ...baseParsed, requestedTtsModel: 'octave' });
-    expect(result.ttsModel).toBe('octave-v1');
+    expect(result.ttsModel).toBe('octave-v2');
   });
 
   it('resolves "eleven flash" to eleven_flash_v2_5', () => {
