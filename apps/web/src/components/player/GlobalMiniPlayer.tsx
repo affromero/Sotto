@@ -10,7 +10,7 @@ export function GlobalMiniPlayer() {
   const router = useRouter();
   const player = usePlayer();
 
-  const isPodcastRoute = pathname.startsWith('/podcast/');
+  const isPodcastRoute = pathname.startsWith('/podcast/') || pathname.startsWith('/@');
   const isVisible = !isPodcastRoute && !!player.podcastId;
 
   useEffect(() => {
