@@ -9,6 +9,7 @@ import {
   avatarGenerationQueue,
   transitionGenerationQueue,
   notificationQueue,
+  visualGenerationQueue,
 } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { resolveImageProvider } from '@/lib/providers/image';

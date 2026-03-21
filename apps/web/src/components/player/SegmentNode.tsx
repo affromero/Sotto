@@ -44,12 +44,13 @@ const BADGE_VARIANTS: Record<VisualTypeString, BadgeVariant> = {
   DIAGRAM: 'green',
   TEXT_CARD: 'teal',
   DATA_TABLE: 'green',
+  SOURCE_FIGURE: 'amber',
 };
 
 // Group visual types for the picker
 const TYPE_GROUPS = [
   { label: 'AI-Generated', types: ['AI_ILLUSTRATION', 'STOCK_FOOTAGE', 'MAP_OVERLAY'] as VisualTypeString[] },
-  { label: 'Programmatic', types: ['DATA_CHART', 'QUOTE', 'COMPARISON', 'TIMELINE', 'DIAGRAM', 'TEXT_CARD', 'DATA_TABLE'] as VisualTypeString[] },
+  { label: 'Programmatic', types: ['DATA_CHART', 'QUOTE', 'COMPARISON', 'TIMELINE', 'DIAGRAM', 'TEXT_CARD', 'DATA_TABLE', 'SOURCE_FIGURE'] as VisualTypeString[] },
 ];
 
 function getBadgeClass(visualType: VisualTypeString): string {

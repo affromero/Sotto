@@ -89,7 +89,7 @@ export async function extractDiscoveryFigures(
   await prisma.discovery.update({
     where: { podcastId },
     data: {
-      sourceMetadata: updatedMetadata as Prisma.InputJsonValue,
+      sourceMetadata: JSON.parse(JSON.stringify(updatedMetadata)) as Prisma.InputJsonValue,
     },
   });
 
