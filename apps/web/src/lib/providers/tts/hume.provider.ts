@@ -49,18 +49,17 @@ export class HumeProvider implements TtsProvider {
   async generateSpeech(params: SpeechParams): Promise<Buffer> {
     const isV1 = this.octaveVersion === '1';
 
-    // Acting instructions only supported on Octave v1
-    let description: string | undefined;
-    if (isV1) {
-      const expression = mapDirectionToExpression(params.direction, params.speaker, 'hume');
-      description = expression.hume?.description;
-    }
+    // Acting instructions + expression params only supported on Octave v1
+    const expression = isV1
+      ? mapDirectionToExpression(params.direction, params.speaker, 'hume')
+      : undefined;
+    const description = expression?.hume?.description;
 
     const utterance: Record<string, unknown> = {
       text: convertInlineAudioTags(params.text, 'hume'),
       voice: { id: params.voiceId },
-      speed: expression.hume?.speed ?? 1,
-      trailing_silence: expression.hume?.trailingSilence ?? 0.3,
+      speed: expression?.hume?.speed ?? 1,
+      trailing_silence: expression?.hume?.trailingSilence ?? 0.3,
     };
 
     if (description) {
