@@ -13,10 +13,11 @@ export async function POST() {
     return errorResponse('Forbidden', 403);
   }
 
-  const items = await generateShowcaseStills();
+  const { items, failures } = await generateShowcaseStills();
 
   return NextResponse.json({
     count: items.length,
     items,
+    ...(failures.length > 0 && { failures }),
   });
 }
