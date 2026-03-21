@@ -21,7 +21,7 @@ import { generateHeraMotionGraphic } from '@/lib/hera';
 import { buildHeraPrompt } from '@/lib/hera-prompt-builder';
 import { logger } from '@/lib/logger';
 
-const PROGRAMMATIC_TYPES = new Set(['DATA_CHART', 'QUOTE', 'COMPARISON', 'TIMELINE', 'DIAGRAM', 'TEXT_CARD', 'DATA_TABLE']);
+const PROGRAMMATIC_TYPES = new Set(['DATA_CHART', 'QUOTE', 'COMPARISON', 'TIMELINE', 'DIAGRAM', 'TEXT_CARD', 'DATA_TABLE', 'SOURCE_FIGURE']);
 
 async function generateAiImage(
   podcastId: string,
@@ -302,6 +302,39 @@ export async function processVisualGeneration(job: Job<GenerateVisualPayload>): 
           },
         });
       }
+    } else if (visualType === 'SOURCE_FIGURE') {
+      // SOURCE_FIGURE: validate the figure URL from metadata, fall back to AI_ILLUSTRATION if broken
+      const sv = await prisma.segmentVisual.findUnique({
+        where: { id: segmentVisualId },
+        select: { metadata: true },
+      });
+      const figureUrl = (sv?.metadata as Record<string, unknown> | null)?.figureUrl as string | undefined;
+
+      if (figureUrl) {
+        try {
+          const headResp = await fetch(figureUrl, { method: 'HEAD', signal: AbortSignal.timeout(10000) });
+          if (headResp.ok) {
+            await prisma.segmentVisual.update({
+              where: { id: segmentVisualId },
+              data: { assetUrl: figureUrl, assetType: 'image/png', status: 'ready' },
+            });
+            await checkAllReady(videoGenerationId, podcastId);
+            await job.updateProgress(100);
+            return;
+          }
+        } catch {
+          logger.warn('SOURCE_FIGURE URL validation failed, falling back to AI_ILLUSTRATION', { segmentVisualId, figureUrl });
+        }
+      }
+
+      // Fallback: convert to AI_ILLUSTRATION and re-queue
+      await prisma.segmentVisual.update({
+        where: { id: segmentVisualId },
+        data: { visualType: 'AI_ILLUSTRATION', status: 'pending' },
+      });
+      await checkAllReady(videoGenerationId, podcastId);
+      await job.updateProgress(100);
+      return;
     } else if (PROGRAMMATIC_TYPES.has(visualType)) {
       // Hera motion — programmatic types only reach here when motionProvider='hera'
       const sv = await prisma.segmentVisual.findUnique({
