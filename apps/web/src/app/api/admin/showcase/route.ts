@@ -23,18 +23,23 @@ export async function GET() {
   const adminId = await requireAdmin();
   if (!adminId) return errorResponse('Forbidden', 403);
 
-  const sets = await prisma.showcaseSet.findMany({
-    orderBy: { createdAt: 'desc' },
-  });
-
-  let costPreview = null;
   try {
-    costPreview = await getShowcaseCostPreview();
-  } catch {
-    // Cost preview is non-critical — don't block the sets list
-  }
+    const sets = await prisma.showcaseSet.findMany({
+      orderBy: { createdAt: 'desc' },
+    });
 
-  return NextResponse.json({ sets, costPreview });
+    let costPreview = null;
+    try {
+      costPreview = await getShowcaseCostPreview();
+    } catch (err) {
+      console.error('[showcase GET] costPreview failed:', (err as Error).message);
+    }
+
+    return NextResponse.json({ sets, costPreview });
+  } catch (err) {
+    console.error('[showcase GET] fatal:', err);
+    return errorResponse((err as Error).message, 500);
+  }
 }
 
 /**
