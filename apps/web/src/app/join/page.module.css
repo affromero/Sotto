@@ -1,5 +1,5 @@
 .main {
-  min-height: 100vh;
+  min-height: var(--full-height);
   padding: var(--spacing-2xl) var(--spacing-md);
   background: var(--color-background);
 }

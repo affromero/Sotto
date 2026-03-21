@@ -1,7 +1,7 @@
 /* Profile Page — shared with /profile/[userId] */
 
 .main {
-  min-height: 100vh;
+  min-height: var(--full-height);
   background: var(--color-background);
   padding: var(--spacing-md);
 }

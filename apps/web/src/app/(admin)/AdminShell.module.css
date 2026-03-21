@@ -1,7 +1,7 @@
 /* Admin Shell - Dark Navy Sidebar */
 
 .layout {
-  min-height: 100vh;
+  min-height: var(--full-height);
   background: var(--color-background);
 }
 
@@ -198,7 +198,7 @@
 /* Main Content */
 
 .main {
-  min-height: 100vh;
+  min-height: var(--full-height);
   display: flex;
   flex-direction: column;
   padding-top: var(--impersonation-banner-height, 0px);

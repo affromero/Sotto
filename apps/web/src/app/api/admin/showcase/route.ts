@@ -98,7 +98,7 @@ export async function PATCH(request: NextRequest) {
     if (!existing) return errorResponse('Set not found', 404);
 
     const newItem = await regenerateShowcaseItem(regenerateType, { imageModel: body?.imageModel });
-    const items = (existing.items as ShowcaseItem[]).map((item) =>
+    const items = (existing.items as unknown as ShowcaseItem[]).map((item) =>
       item.visualType === regenerateType ? newItem : item,
     );
 

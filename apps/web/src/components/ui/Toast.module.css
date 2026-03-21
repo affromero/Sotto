@@ -57,7 +57,7 @@
 /* Toast container — positioned by ToastProvider */
 .container {
   position: fixed;
-  bottom: var(--spacing-lg);
+  bottom: calc(var(--spacing-lg) + env(safe-area-inset-bottom, 0px));
   right: var(--spacing-lg);
   z-index: var(--z-toast);
   display: flex;
@@ -72,5 +72,5 @@
 
 /* Shift above MiniPlayer when active */
 body[data-mini-player] .container {
-  bottom: calc(var(--spacing-lg) + var(--mini-player-height));
+  bottom: calc(var(--spacing-lg) + var(--mini-player-height) + env(safe-area-inset-bottom, 0px));
 }
