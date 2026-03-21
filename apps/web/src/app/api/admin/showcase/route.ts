@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
   }
 
   const { name, imageModel } = parsed.data;
-  const { items, failures } = await generateShowcaseClips({ imageModel });
+  const { items, failures } = await generateShowcaseClips({ imageModel, topic: name });
 
   // New set is active by default — deactivate others
   await prisma.showcaseSet.updateMany({
@@ -97,7 +97,7 @@ export async function PATCH(request: NextRequest) {
     const existing = await prisma.showcaseSet.findUnique({ where: { id } });
     if (!existing) return errorResponse('Set not found', 404);
 
-    const newItem = await regenerateShowcaseItem(regenerateType, { imageModel: body?.imageModel });
+    const newItem = await regenerateShowcaseItem(regenerateType, { imageModel: body?.imageModel, topic: existing.name });
     const items = (existing.items as unknown as ShowcaseItem[]).map((item) =>
       item.visualType === regenerateType ? newItem : item,
     );

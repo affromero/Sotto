@@ -1,5 +1,6 @@
 import { uploadFile } from './r2';
 import { logger } from './logger';
+import { createAIProvider } from './providers/ai';
 import type { VideoSegment } from '@sotto/video';
 
 const REMOTION_URL = process.env.REMOTION_URL;
@@ -37,201 +38,176 @@ interface ShowcaseCostPreview {
   mapOverlay: { provider: string; available: boolean; cost: string };
 }
 
-const CURATED_SEGMENTS: Array<{
+interface GeneratedSegment {
   visualType: string;
   label: string;
   description: string;
   segment: VideoSegment;
-  frame?: number;
-}> = [
-  {
-    visualType: 'DATA_CHART',
-    label: 'Data Charts',
-    description: 'Found investment figures in a Nature Energy paper and rendered them as an animated bar chart with exact values',
-    segment: {
-      segmentId: 'showcase-chart',
-      order: 0,
-      speaker: 'Host',
-      text: '',
-      startTime: 0,
-      duration: 5,
+}
+
+const SHOWCASE_PROMPT = `You are a researcher creating rich, factual sample data for a podcast video showcase. Given a topic, generate compelling content for 8 visual types. The data should be impressive, insightful, and demonstrate deep knowledge of the topic. Use REAL data, REAL people, REAL dates, and REAL organizations.
+
+Return a JSON object:
+
+1. "dataChart": A striking data visualization that reveals an important trend or comparison.
+   { "title": string (compelling, specific — not generic), "xAxisLabel": string, "yAxisLabel": string, "chartType": "bar", "data": [{"name": string, "value": number}] (5-6 items with realistic numbers that tell a story — show contrast, growth, or surprising gaps) }
+   "description": Explain what source this data was extracted from and why it matters.
+
+2. "dataTable": A comparison or ranking that invites row-by-row scanning.
+   { "headers": {"title": string, "sourceLabel": string (real publication + year)}, "columns": [{"key": string, "label": string, "align": "left"|"right"|"center", "widthPercent": number, "isNumeric": boolean}] (4 columns), "rows": [{"key": string, "values": {[columnKey]: string}}] (4-5 rows with specific, verifiable data), "styleHints": {"density": "comfortable", "zebraRows": true} }
+   "description": What table was found in the source and what it reveals.
+
+3. "quote": A powerful, real quote that captures the essence of the topic.
+   { "quoteText": string (REAL quote from a REAL person — memorable, under 25 words), "quoteAuthor": string (full name, specific title/role) }
+   "description": Who said this, when, and why it matters to the topic.
+
+4. "comparison": A meaningful side-by-side that highlights a key tension or choice.
+   { "leftLabel": string, "rightLabel": string, "leftItems": string[] (4 concise points), "rightItems": string[] (4 concise contrasting points) }
+   "description": What the hosts debated and why this comparison illuminates the topic.
+
+5. "timeline": Key milestones that show how the topic evolved — real dates, real events.
+   { "events": [{"year": string, "label": string (3-4 words), "description": string (one vivid sentence)}] (5 events spanning significant time) }
+   "description": The arc this timeline reveals about the topic.
+
+6. "diagram": A conceptual model that explains how something works in the topic.
+   { "title": string, "centerLabel": string (the core concept), "topLabel": string (input/driver), "bottomLeftLabel": string (component A), "bottomRightLabel": string (component B), "subtitle": string (the key insight) }
+   "description": What system or process the diagram explains.
+
+7. "textCard": The most important takeaways — punchy, memorable, with a headline stat.
+   { "headline": string (5-8 words, compelling), "bullets": string[] (4 items, each 5-8 words, each a standalone insight), "statValue": number (a striking number), "statLabel": string (what the number means, 3-5 words) }
+   "description": Why these are the key takeaways from the discussion.
+
+8. "sourceFigure": A description of a real figure that would exist in a source paper/report.
+   { "caption": string (specific, descriptive — what the figure shows), "sourceLabel": string (real journal/org + year) }
+   "description": That this is an actual figure extracted from the source, shown with attribution.
+
+9. "aiIllustration": An image generation prompt for this topic.
+   { "prompt": string (detailed scene description for an editorial illustration — vivid, specific to this topic, no real people likenesses, warm tones) }
+   "description": What scene was illustrated and why it matches the discussion.
+
+10. "stockFootage": A search query for finding relevant video clips.
+    { "searchQuery": string (2-4 words, specific enough to find relevant footage on Pexels) }
+    "description": What real-world footage was found to accompany the narration.
+
+11. "mapOverlay": A specific real geographic location relevant to the topic.
+    { "placeName": string (specific place — a city, facility, landmark), "latitude": number, "longitude": number, "region": string (country or area) }
+    "description": Why this location is significant to the topic.
+
+CRITICAL: All data must be factually plausible and specific. No placeholder or generic content. Every number, name, date, and organization should be real or realistically derived from actual sources. For mapOverlay, use REAL coordinates of a REAL place relevant to the topic.
+
+Return ONLY valid JSON, no markdown fences.`;
+
+interface ExternalHints {
+  aiPrompt: string;
+  stockQuery: string;
+  aiDescription: string;
+  stockDescription: string;
+  mapPlace: { name: string; lat: number; lng: number; region: string };
+  mapDescription: string;
+}
+
+async function generateShowcaseMetadata(topic: string): Promise<{ segments: GeneratedSegment[]; hints: ExternalHints }> {
+  const ai = createAIProvider();
+  const result = await ai.generateResponse(
+    SHOWCASE_PROMPT,
+    [{ role: 'user', content: `Topic: ${topic}` }],
+    { maxTokens: 4096, skipModeration: true },
+  );
+
+  let parsed: Record<string, unknown>;
+  try {
+    const cleaned = result.text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    parsed = JSON.parse(cleaned);
+  } catch {
+    throw new Error(`Failed to parse LLM showcase metadata: ${result.text.substring(0, 200)}`);
+  }
+
+  const chart = parsed.dataChart as Record<string, unknown>;
+  const table = parsed.dataTable as Record<string, unknown>;
+  const quote = parsed.quote as Record<string, unknown>;
+  const comparison = parsed.comparison as Record<string, unknown>;
+  const timeline = parsed.timeline as Record<string, unknown>;
+  const diagram = parsed.diagram as Record<string, unknown>;
+  const textCard = parsed.textCard as Record<string, unknown>;
+  const sourceFigure = parsed.sourceFigure as Record<string, unknown>;
+  const aiIllustration = parsed.aiIllustration as Record<string, unknown> | undefined;
+  const stockFootage = parsed.stockFootage as Record<string, unknown> | undefined;
+  const mapOverlay = parsed.mapOverlay as Record<string, unknown> | undefined;
+
+  // Build SVG from diagram fields
+  const d = diagram;
+  const svgContent = `<svg viewBox="0 0 600 400" xmlns="http://www.w3.org/2000/svg"><rect width="600" height="400" fill="#1E3A5F" rx="20"/><text x="300" y="50" text-anchor="middle" font-family="Inter,sans-serif" font-size="22" font-weight="bold" fill="white">${d.title ?? topic}</text><circle cx="300" cy="200" r="80" fill="none" stroke="#D97706" stroke-width="4"/><circle cx="300" cy="200" r="50" fill="rgba(217,119,6,0.2)" stroke="#D97706" stroke-width="2"/><text x="300" y="205" text-anchor="middle" fill="#D97706" font-size="14" font-family="Inter,sans-serif" font-weight="600">${d.centerLabel ?? ''}</text><text x="300" y="90" text-anchor="middle" fill="#9CA3AF" font-size="13" font-family="Inter,sans-serif">${d.topLabel ?? ''}</text><text x="120" y="350" text-anchor="middle" fill="white" font-size="14" font-family="Inter,sans-serif">${d.bottomLeftLabel ?? ''}</text><text x="480" y="350" text-anchor="middle" fill="white" font-size="14" font-family="Inter,sans-serif">${d.bottomRightLabel ?? ''}</text><line x1="120" y1="335" x2="200" y2="280" stroke="#6B7280" stroke-width="2" stroke-dasharray="6"/><line x1="480" y1="335" x2="400" y2="280" stroke="#6B7280" stroke-width="2" stroke-dasharray="6"/><text x="300" y="380" text-anchor="middle" fill="#6B7280" font-size="12" font-family="Inter,sans-serif">${d.subtitle ?? ''}</text></svg>`;
+
+  // Source figure uses a generic relevant image
+  const figureUrl = `https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1280&h=720&fit=crop`;
+
+  const hints: ExternalHints = {
+    aiPrompt: (aiIllustration?.prompt as string) ?? `Editorial illustration about ${topic}, warm amber and deep navy tones, clean lines, no text, no real people likenesses`,
+    aiDescription: (aiIllustration?.description as string) ?? `Created an editorial illustration for the ${topic} discussion`,
+    stockQuery: (stockFootage?.searchQuery as string) ?? topic,
+    stockDescription: (stockFootage?.description as string) ?? `Found relevant footage for ${topic}`,
+    mapPlace: {
+      name: (mapOverlay?.placeName as string) ?? topic,
+      lat: (mapOverlay?.latitude as number) ?? 30,
+      lng: (mapOverlay?.longitude as number) ?? 0,
+      region: (mapOverlay?.region as string) ?? '',
+    },
+    mapDescription: (mapOverlay?.description as string) ?? `Location relevant to ${topic}`,
+  };
+
+  const segments: GeneratedSegment[] = [
+    {
       visualType: 'DATA_CHART',
-      metadata: {
-        chartType: 'bar',
-        title: 'Global Fusion Energy Investment by Region',
-        xAxisLabel: 'Region',
-        yAxisLabel: 'Investment ($B)',
-        data: [
-          { name: 'EU (ITER)', value: 24.7 },
-          { name: 'United States', value: 6.4 },
-          { name: 'Private Sector', value: 6.2 },
-          { name: 'China', value: 3.8 },
-          { name: 'South Korea', value: 1.2 },
-        ],
-      },
+      label: 'Data Charts',
+      description: (chart.description as string) ?? 'Extracted numerical data and rendered as an animated chart',
+      segment: { segmentId: 'showcase-chart', order: 0, speaker: 'Host', text: '', startTime: 0, duration: 5, visualType: 'DATA_CHART', metadata: { chartType: chart.chartType ?? 'bar', title: chart.title, xAxisLabel: chart.xAxisLabel, yAxisLabel: chart.yAxisLabel, data: chart.data } },
     },
-    frame: 90, // Mid-animation: bars partially grown
-  },
-  {
-    visualType: 'DATA_TABLE',
-    label: 'Data Tables',
-    description: 'Extracted a comparison table from the paper and rendered it with funding data, approach types, and target dates',
-    segment: {
-      segmentId: 'showcase-table',
-      order: 1,
-      speaker: 'Expert',
-      text: '',
-      startTime: 0,
-      duration: 5,
+    {
       visualType: 'DATA_TABLE',
-      metadata: {
-        headers: { title: 'Leading Fusion Startups', sourceLabel: 'Nature Energy, 2025' },
-        columns: [
-          { key: 'company', label: 'Company', align: 'left', widthPercent: 30 },
-          { key: 'approach', label: 'Approach', align: 'left', widthPercent: 25 },
-          { key: 'funding', label: 'Funding', align: 'right', widthPercent: 20, isNumeric: true },
-          { key: 'target', label: 'Target Year', align: 'center', widthPercent: 25 },
-        ],
-        rows: [
-          { key: 'cfs', values: { company: 'Commonwealth Fusion', approach: 'Tokamak (HTS)', funding: '$2.0B', target: '2030s' } },
-          { key: 'helion', values: { company: 'Helion Energy', approach: 'FRC Pulsed', funding: '$577M', target: '2028' } },
-          { key: 'tae', values: { company: 'TAE Technologies', approach: 'Beam-Driven FRC', funding: '$1.2B', target: '2030s' } },
-          { key: 'zap', values: { company: 'Zap Energy', approach: 'Z-Pinch', funding: '$200M', target: '2030s' } },
-        ],
-        styleHints: { density: 'comfortable', zebraRows: true },
-      },
+      label: 'Data Tables',
+      description: (table.description as string) ?? 'Structured data into a comparison table',
+      segment: { segmentId: 'showcase-table', order: 1, speaker: 'Expert', text: '', startTime: 0, duration: 5, visualType: 'DATA_TABLE', metadata: { headers: table.headers, columns: table.columns, rows: table.rows, styleHints: table.styleHints ?? { density: 'comfortable', zebraRows: true } } },
     },
-    frame: 120, // After all row animations complete (~frame 40 + margin)
-  },
-  {
-    visualType: 'QUOTE',
-    label: 'Quotes',
-    description: 'Identified a key statement from ITER Deputy Director-General and presented it with proper attribution',
-    segment: {
-      segmentId: 'showcase-quote',
-      order: 2,
-      speaker: 'Host',
-      text: '',
-      startTime: 0,
-      duration: 5,
+    {
       visualType: 'QUOTE',
-      metadata: {
-        quoteText: 'We have put the sun in a bottle. Now the question is whether we can make it shine on demand.',
-        quoteAuthor: 'Dr. Mark Henderson, ITER Deputy Director-General',
-      },
+      label: 'Quotes',
+      description: (quote.description as string) ?? 'Identified a notable quote and presented it with attribution',
+      segment: { segmentId: 'showcase-quote', order: 2, speaker: 'Host', text: '', startTime: 0, duration: 5, visualType: 'QUOTE', metadata: { quoteText: quote.quoteText, quoteAuthor: quote.quoteAuthor } },
     },
-    frame: 60,
-  },
-  {
-    visualType: 'COMPARISON',
-    label: 'Comparisons',
-    description: 'The hosts compared fission vs fusion — the system structured their points into a side-by-side visual',
-    segment: {
-      segmentId: 'showcase-comparison',
-      order: 3,
-      speaker: 'Expert',
-      text: '',
-      startTime: 0,
-      duration: 5,
+    {
       visualType: 'COMPARISON',
-      metadata: {
-        leftLabel: 'Nuclear Fission',
-        rightLabel: 'Nuclear Fusion',
-        leftItems: ['Uranium fuel (finite)', 'Radioactive waste (10,000+ yrs)', 'Meltdown risk', 'Proven at scale'],
-        rightItems: ['Hydrogen fuel (abundant)', 'Minimal waste (100 yrs)', 'Inherently safe', 'Not yet at scale'],
-      },
+      label: 'Comparisons',
+      description: (comparison.description as string) ?? 'Structured a comparison discussed by the hosts',
+      segment: { segmentId: 'showcase-comparison', order: 3, speaker: 'Expert', text: '', startTime: 0, duration: 5, visualType: 'COMPARISON', metadata: { leftLabel: comparison.leftLabel, rightLabel: comparison.rightLabel, leftItems: comparison.leftItems, rightItems: comparison.rightItems } },
     },
-    frame: 90,
-  },
-  {
-    visualType: 'TIMELINE',
-    label: 'Timelines',
-    description: 'Detected historical milestones mentioned in the conversation and arranged them chronologically',
-    segment: {
-      segmentId: 'showcase-timeline',
-      order: 4,
-      speaker: 'Host',
-      text: '',
-      startTime: 0,
-      duration: 5,
+    {
       visualType: 'TIMELINE',
-      metadata: {
-        events: [
-          { year: '1958', label: 'First Tokamak', description: 'Soviet scientists build the first tokamak reactor' },
-          { year: '1997', label: 'JET Record', description: 'JET produces 16 MW of fusion power in the UK' },
-          { year: '2022', label: 'NIF Ignition', description: 'US National Ignition Facility achieves fusion ignition' },
-          { year: '2025', label: 'ITER Assembly', description: 'ITER tokamak assembly nears completion in France' },
-          { year: '2030s', label: 'Commercial Era', description: 'First commercial fusion plants expected online' },
-        ],
-      },
+      label: 'Timelines',
+      description: (timeline.description as string) ?? 'Arranged key events chronologically',
+      segment: { segmentId: 'showcase-timeline', order: 4, speaker: 'Host', text: '', startTime: 0, duration: 5, visualType: 'TIMELINE', metadata: { events: timeline.events } },
     },
-    frame: 120,
-  },
-  {
-    visualType: 'DIAGRAM',
-    label: 'Diagrams',
-    description: 'Generated a diagram to illustrate how a tokamak reactor works, based on the technical explanation in the script',
-    segment: {
-      segmentId: 'showcase-diagram',
-      order: 5,
-      speaker: 'Expert',
-      text: '',
-      startTime: 0,
-      duration: 5,
+    {
       visualType: 'DIAGRAM',
-      metadata: {
-        svgContent: `<svg viewBox="0 0 600 400" xmlns="http://www.w3.org/2000/svg"><rect width="600" height="400" fill="#FEFCF8"/><text x="300" y="40" text-anchor="middle" font-family="Inter,sans-serif" font-size="22" font-weight="bold" fill="#1A1A1A">Tokamak Fusion Reactor</text><ellipse cx="300" cy="200" rx="200" ry="100" stroke="#1E3A5F" stroke-width="4" fill="none"/><ellipse cx="300" cy="200" rx="130" ry="60" stroke="#D97706" stroke-width="3" fill="rgba(217,119,6,0.08)"/><text x="300" y="205" text-anchor="middle" font-family="Inter,sans-serif" font-size="16" fill="#D97706" font-weight="600">Plasma (150 million C)</text><text x="300" y="80" text-anchor="middle" font-family="Inter,sans-serif" font-size="13" fill="#6B7280">Magnetic Confinement</text><line x1="300" y1="88" x2="300" y2="100" stroke="#6B7280" stroke-width="2"/><text x="100" y="350" text-anchor="middle" font-family="Inter,sans-serif" font-size="14" fill="#1A1A1A">Deuterium</text><text x="500" y="350" text-anchor="middle" font-family="Inter,sans-serif" font-size="14" fill="#1A1A1A">Tritium</text><line x1="100" y1="335" x2="170" y2="270" stroke="#6B7280" stroke-width="2" stroke-dasharray="6"/><line x1="500" y1="335" x2="430" y2="270" stroke="#6B7280" stroke-width="2" stroke-dasharray="6"/><text x="300" y="380" text-anchor="middle" font-family="Inter,sans-serif" font-size="12" fill="#6B7280">Target: Q=10 (10x more energy out than in)</text></svg>`,
-      },
+      label: 'Diagrams',
+      description: (diagram.description as string) ?? 'Generated a conceptual diagram from the discussion',
+      segment: { segmentId: 'showcase-diagram', order: 5, speaker: 'Expert', text: '', startTime: 0, duration: 5, visualType: 'DIAGRAM', metadata: { svgContent } },
     },
-    frame: 140, // After clip-path reveal completes (60% of 150 frames = frame 90)
-  },
-  {
-    visualType: 'TEXT_CARD',
-    label: 'Key Takeaways',
-    description: 'Summarized the main arguments from the discussion into a bullet-point card with a headline stat',
-    segment: {
-      segmentId: 'showcase-textcard',
-      order: 6,
-      speaker: 'Host',
-      text: '',
-      startTime: 0,
-      duration: 5,
+    {
       visualType: 'TEXT_CARD',
-      metadata: {
-        headline: 'Why Fusion Energy Matters',
-        bullets: [
-          'Virtually unlimited fuel from seawater',
-          'Zero carbon emissions during operation',
-          'No long-lived radioactive waste',
-          'Inherently safe — no meltdown risk',
-        ],
-        statValue: 10,
-        statLabel: 'x more energy per kg than fission',
-      },
+      label: 'Key Takeaways',
+      description: (textCard.description as string) ?? 'Summarized key points into a card',
+      segment: { segmentId: 'showcase-textcard', order: 6, speaker: 'Host', text: '', startTime: 0, duration: 5, visualType: 'TEXT_CARD', metadata: { headline: textCard.headline, bullets: textCard.bullets, statValue: textCard.statValue, statLabel: textCard.statLabel } },
     },
-    frame: 90,
-  },
-  {
-    visualType: 'SOURCE_FIGURE',
-    label: 'Source Figures',
-    description: 'Pulled an actual figure from the source paper and displayed it with proper attribution — not an AI re-interpretation',
-    segment: {
-      segmentId: 'showcase-source-figure',
-      order: 7,
-      speaker: 'Expert',
-      text: '',
-      startTime: 0,
-      duration: 5,
+    {
       visualType: 'SOURCE_FIGURE',
-      metadata: {
-        figureUrl: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1280&h=720&fit=crop',
-        sourceLabel: 'NASA Earth Observatory',
-        caption: 'Global energy distribution — visualizing where fusion could transform power grids',
-      },
+      label: 'Source Figures',
+      description: (sourceFigure.description as string) ?? 'Displayed an actual figure from the source with attribution',
+      segment: { segmentId: 'showcase-source-figure', order: 7, speaker: 'Expert', text: '', startTime: 0, duration: 5, visualType: 'SOURCE_FIGURE', metadata: { figureUrl, sourceLabel: sourceFigure.sourceLabel, caption: sourceFigure.caption } },
     },
-    frame: 60,
-  },
-];
+  ];
+
+  return { segments, hints };
+}
 
 const CLIP_TIMEOUT_MS = 60000;
 const SHOWCASE_CLIP_SECONDS = 5;
@@ -254,13 +230,19 @@ async function renderClip(segment: VideoSegment, durationSeconds = SHOWCASE_CLIP
   return Buffer.from(await response.arrayBuffer());
 }
 
-export async function generateShowcaseClips(opts?: { imageModel?: string }): Promise<ShowcaseResult> {
+export async function generateShowcaseClips(opts?: { imageModel?: string; topic?: string }): Promise<ShowcaseResult> {
   const items: ShowcaseItem[] = [];
   const failures: Array<{ visualType: string; error: string }> = [];
-  const cacheBust = Date.now(); // Unique suffix to avoid CDN cache on regeneration
+  const cacheBust = Date.now();
+
+  const topic = opts?.topic || 'Technology';
+
+  // Generate all metadata from the topic via LLM
+  logger.info('Generating showcase metadata via LLM', { topic });
+  const { segments: generatedSegments, hints } = await generateShowcaseMetadata(topic);
 
   // 1. Render programmatic types as animated clips via /clip
-  for (const entry of CURATED_SEGMENTS) {
+  for (const entry of generatedSegments) {
     try {
       logger.info('Rendering showcase clip', { visualType: entry.visualType });
       const buffer = await renderClip(entry.segment);
@@ -294,7 +276,7 @@ export async function generateShowcaseClips(opts?: { imageModel?: string }): Pro
       logger.info('Generating AI illustration', { model: selectedModel ?? 'default (fal-flux-1-schnell)' });
       const provider = new FalImageProvider(falKey, selectedModel);
       const imageBuffer = await provider.generateImage({
-        prompt: 'Inside a fusion reactor, glowing plasma contained by magnetic fields, editorial illustration style, warm amber and deep navy tones, clean lines, no text, no real people',
+        prompt: hints.aiPrompt,
         width: 1280,
         height: 720,
       });
@@ -315,7 +297,7 @@ export async function generateShowcaseClips(opts?: { imageModel?: string }): Pro
       items.push({
         visualType: 'AI_ILLUSTRATION',
         label: 'AI Illustrations',
-        description: 'Created an editorial illustration of plasma containment inside a reactor, matching the segment where hosts describe the process',
+        description: hints.aiDescription,
         url: clipUrl,
         mediaType: 'video',
       });
@@ -330,14 +312,14 @@ export async function generateShowcaseClips(opts?: { imageModel?: string }): Pro
   try {
     logger.info('Fetching showcase stock footage');
     const { searchStockVideo, downloadStockAsset } = await import('./stock-footage');
-    const result = await searchStockVideo('fusion reactor plasma energy');
+    const result = await searchStockVideo(hints.stockQuery);
     if (result) {
       const videoBuffer = await downloadStockAsset(result.url);
       const url = await uploadFile(`showcase/stock_footage-${cacheBust}.mp4`, videoBuffer, 'video/mp4');
       items.push({
         visualType: 'STOCK_FOOTAGE',
         label: 'Stock Footage',
-        description: 'Found relevant stock footage of energy infrastructure to accompany the discussion on power generation',
+        description: hints.stockDescription,
         url,
         mediaType: 'video',
         credits: `Video by ${result.photographer} on Pexels`,
@@ -354,10 +336,10 @@ export async function generateShowcaseClips(opts?: { imageModel?: string }): Pro
     logger.info('Generating showcase map with globe zoom');
     const { generateMapZoomFrames } = await import('./map-image');
     const place = {
-      name: 'ITER Facility',
-      aliases: ['ITER'],
-      coordinates: [5.7583, 43.7074] as [number, number],
-      modernRegion: 'Saint-Paul-lès-Durance, France',
+      name: hints.mapPlace.name,
+      aliases: [],
+      coordinates: [hints.mapPlace.lng, hints.mapPlace.lat] as [number, number],
+      modernRegion: hints.mapPlace.region,
       source: 'geonames' as const,
       confidence: 1,
     };
@@ -380,7 +362,7 @@ export async function generateShowcaseClips(opts?: { imageModel?: string }): Pro
     items.push({
       visualType: 'MAP_OVERLAY',
       label: 'Map Overlays',
-      description: 'Globe-to-location zoom on geographic references',
+      description: hints.mapDescription,
       url,
       mediaType: 'video',
     });
@@ -403,14 +385,16 @@ export async function generateShowcaseClips(opts?: { imageModel?: string }): Pro
  */
 export async function regenerateShowcaseItem(
   visualType: string,
-  opts?: { imageModel?: string },
+  opts?: { imageModel?: string; topic?: string },
 ): Promise<ShowcaseItem> {
   const cacheBust = Date.now();
-  // Find the curated segment for this type
-  const entry = CURATED_SEGMENTS.find((s) => s.visualType === visualType);
+  const topic = opts?.topic || 'Technology';
+
+  // Generate fresh metadata for this single type via LLM
+  const generatedSegments = await generateShowcaseMetadata(topic);
+  const entry = generatedSegments.find((s) => s.visualType === visualType);
 
   if (entry) {
-    // Programmatic type — re-render via /clip
     const buffer = await renderClip(entry.segment);
     const key = `showcase/${entry.visualType.toLowerCase()}-${cacheBust}.mp4`;
     const url = await uploadFile(key, buffer, 'video/mp4');
@@ -434,7 +418,7 @@ export async function regenerateShowcaseItem(
     if (!falKey) throw new Error('FAL_KEY not configured');
     const provider = new FalImageProvider(falKey, opts?.imageModel);
     const imageBuffer = await provider.generateImage({
-      prompt: 'Inside a fusion reactor, glowing plasma contained by magnetic fields, editorial illustration style, warm amber and deep navy tones, clean lines, no text, no real people',
+      prompt: `Editorial illustration about ${topic}, warm amber and deep navy tones, clean lines, no text, no real people likenesses`,
       width: 1280, height: 720,
     });
     const imageUrl = await uploadFile(`showcase/ai_illustration_src-${cacheBust}.png`, imageBuffer, 'image/png');
@@ -443,21 +427,22 @@ export async function regenerateShowcaseItem(
       duration: SHOWCASE_CLIP_SECONDS, visualType: 'AI_ILLUSTRATION', assetUrl: imageUrl, assetType: 'image/png',
     });
     const clipUrl = await uploadFile(`showcase/ai_illustration-${cacheBust}.mp4`, clipBuffer, 'video/mp4');
-    return { visualType: 'AI_ILLUSTRATION', label: 'AI Illustrations', description: 'Created an editorial illustration of plasma containment inside a reactor, matching the segment where hosts describe the process', url: clipUrl, mediaType: 'video' };
+    return { visualType: 'AI_ILLUSTRATION', label: 'AI Illustrations', description: `Created an editorial illustration matching the podcast discussion about ${topic}`, url: clipUrl, mediaType: 'video' };
   }
 
   if (visualType === 'STOCK_FOOTAGE') {
     const { searchStockVideo, downloadStockAsset } = await import('./stock-footage');
-    const result = await searchStockVideo('fusion reactor plasma energy');
+    const result = await searchStockVideo(topic);
     if (!result) throw new Error('No stock footage found');
     const videoBuffer = await downloadStockAsset(result.url);
     const url = await uploadFile(`showcase/stock_footage-${cacheBust}.mp4`, videoBuffer, 'video/mp4');
-    return { visualType: 'STOCK_FOOTAGE', label: 'Stock Footage', description: 'Found relevant stock footage of energy infrastructure to accompany the discussion on power generation', url, mediaType: 'video', credits: `Video by ${result.photographer} on Pexels` };
+    return { visualType: 'STOCK_FOOTAGE', label: 'Stock Footage', description: `Found relevant stock footage to accompany the discussion about ${topic}`, url, mediaType: 'video', credits: `Video by ${result.photographer} on Pexels` };
   }
 
   if (visualType === 'MAP_OVERLAY') {
     const { generateMapZoomFrames } = await import('./map-image');
-    const place = { name: 'ITER Facility', aliases: ['ITER'], coordinates: [5.7583, 43.7074] as [number, number], modernRegion: 'Saint-Paul-les-Durance, France', source: 'geonames' as const, confidence: 1 };
+    // Use a generic notable location — could be improved with LLM-picked location
+    const place = { name: topic, aliases: [], coordinates: [0, 30] as [number, number], modernRegion: '', source: 'geonames' as const, confidence: 0.5 };
     const zoomFrames = await generateMapZoomFrames(place, 'satellite');
     const clipBuffer = await renderClip({
       segmentId: 'showcase-map', order: 0, speaker: 'Host', text: '', startTime: 0,
@@ -465,7 +450,7 @@ export async function regenerateShowcaseItem(
       metadata: { places: [place], preset: 'satellite', zoomFrames },
     }, SHOWCASE_CLIP_SECONDS);
     const url = await uploadFile(`showcase/map_overlay-${cacheBust}.mp4`, clipBuffer, 'video/mp4');
-    return { visualType: 'MAP_OVERLAY', label: 'Map Overlays', description: 'Globe-to-location zoom on geographic references', url, mediaType: 'video' };
+    return { visualType: 'MAP_OVERLAY', label: 'Map Overlays', description: `Globe-to-location zoom on a geographic reference from the ${topic} discussion`, url, mediaType: 'video' };
   }
 
   throw new Error(`Unknown visual type: ${visualType}`);
