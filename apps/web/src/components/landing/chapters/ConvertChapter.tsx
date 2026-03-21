@@ -54,17 +54,17 @@ export function ConvertChapter() {
               or start creating now &rarr;
             </Link>
           </div>
-          <div className={styles.teams} data-reveal>
+          <aside className={styles.teams} data-reveal>
             <div className={styles.teamsDivider} aria-hidden="true" />
             <p className={styles.teamsText}>
-              <strong>Sotto for teams</strong> &mdash; Turn internal docs and updates into
-              private audio briefings, video explainers, and avatar-hosted presentations
-              your team will actually consume.
+              <strong>Exploring Sotto for your organization?</strong> We&apos;re working
+              with early partners on internal audio briefings, video explainers, and
+              avatar-hosted presentations from company docs and updates.
             </p>
             <a href="mailto:teams@sotto.fm" className={styles.teamsLink}>
-              Talk to us about a team pilot &rarr;
+              Let&apos;s talk &rarr;
             </a>
-          </div>
+          </aside>
         </div>
       </ScrollChapter>
 
