@@ -260,7 +260,7 @@
 .latencyBadge {
   display: inline-block;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   font: var(--text-caption);
   font-weight: 600;
   background: #f3f4f6;
@@ -322,7 +322,7 @@
 .visualTypeBadge {
   display: inline-block;
   padding: 2px 7px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   font: var(--text-caption);
   font-weight: 600;
   background: #fef3c7;

@@ -1,8 +1,8 @@
 .collectButton {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-4);
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
   background: var(--color-surface);
   color: var(--color-text-primary);
   font: var(--text-body-sm);

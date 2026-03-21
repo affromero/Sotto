@@ -130,7 +130,7 @@
 .progressTrack {
   height: 3px;
   background: rgba(0, 0, 0, 0.08);
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   overflow: hidden;
   margin-bottom: 6px;
 }
@@ -138,7 +138,7 @@
 .progressFill {
   height: 100%;
   background: var(--color-primary);
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   transition: width 0.1s linear;
 }
 
@@ -153,7 +153,7 @@
   flex: 1;
   min-width: 2px;
   background: var(--color-primary);
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   opacity: 0.2;
   height: calc(8px + sin(var(--i, 0) * 0.5) * 20px);
   transform-origin: bottom;

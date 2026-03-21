@@ -78,7 +78,7 @@
 
 .heatmapCell {
   aspect-ratio: 1;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   min-height: 20px;
   transition: opacity var(--transition-fast);
 }

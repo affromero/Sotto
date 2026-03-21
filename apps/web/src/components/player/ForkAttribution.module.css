@@ -1,12 +1,12 @@
 .banner {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
+  gap: var(--spacing-ms);
+  padding: var(--spacing-ms) var(--spacing-md);
   background: rgba(217, 119, 6, 0.05);
   border-left: 3px solid var(--color-primary);
   border-radius: var(--radius-md);
-  margin-bottom: var(--space-6);
+  margin-bottom: var(--spacing-lg);
   transition: background var(--transition-fast);
   text-decoration: none;
   color: var(--color-text-primary);
@@ -34,7 +34,7 @@
 .userInfo {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--spacing-sm);
   flex-shrink: 0;
 }
 
@@ -69,11 +69,11 @@
 @media (max-width: 768px) {
   .banner {
     flex-wrap: wrap;
-    gap: var(--space-2);
+    gap: var(--spacing-sm);
   }
 
   .podcastTitle {
     flex-basis: 100%;
-    padding-left: calc(16px + var(--space-3));
+    padding-left: calc(16px + var(--spacing-ms));
   }
 }
