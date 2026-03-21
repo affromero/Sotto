@@ -261,6 +261,16 @@ body::before {
   --gradient-amber-spot: radial-gradient(ellipse at 30% 20%, rgba(217,119,6,0.12) 0%, transparent 60%);
   --gradient-navy-spot: radial-gradient(ellipse at 70% 80%, rgba(30,58,95,0.08) 0%, transparent 60%);
   --noise-texture: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+
+  /* State Layer Tokens */
+  --state-hover-surface: var(--color-surface-hover);
+  --state-active-surface: var(--color-primary-subtle);
+  --state-hover-lift: -2px;
+  --state-hover-shadow: var(--shadow-lg);
+  --state-hover-primary: var(--color-primary-hover);
+  --state-hover-primary-shadow: var(--shadow-primary-glow);
+  --state-hover-border: var(--color-primary);
+  --state-hover-border-shadow: 0 2px 8px var(--color-primary-subtle);
 }
 
 /* ============================================ */
