@@ -228,7 +228,7 @@
 }
 
 /* ==========================================================================
-   SHOWCASE GRID — replaces mock when active showcase set exists
+   SHOWCASE CAROUSEL — hybrid: featured video + thumbnail rail
    ========================================================================== */
 
 .showcaseHeader {
@@ -236,60 +236,134 @@
   margin-bottom: 48px;
 }
 
-.showcaseGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 20px;
+.carousel {
+  max-width: 800px;
+  margin: 0 auto;
 }
 
-.showcaseCard {
-  border-radius: var(--radius-xl);
+/* Featured (main) video */
+.featured {
+  border-radius: var(--radius-2xl);
   overflow: hidden;
   background: var(--color-surface);
   border: 1px solid var(--glass-border);
-  box-shadow: var(--shadow-md);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: var(--shadow-xl);
+  margin-bottom: 24px;
 }
 
-.showcaseCard:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-lg);
-}
-
-.showcaseMedia {
+.featuredMedia {
   aspect-ratio: 16 / 9;
   overflow: hidden;
   background: #111;
   position: relative;
 }
 
-.showcaseVideo {
+.featuredVideo {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  animation: fadeIn 0.35s ease;
 }
 
-.showcaseCredits {
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.featuredCredits {
   position: absolute;
   bottom: 0;
   left: 0;
   right: 0;
-  padding: 4px 10px;
+  padding: 6px 14px;
   background: linear-gradient(transparent, rgba(0, 0, 0, 0.65));
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.75);
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.8);
   text-align: right;
 }
 
-.showcaseCardBody {
-  padding: 12px 16px;
+.featuredInfo {
+  padding: 16px 24px 20px;
   text-align: center;
 }
 
-.showcaseType {
+.featuredLabel {
+  font-family: var(--font-heading);
+  font-size: 22px;
+  color: var(--color-text);
+  display: block;
+  margin-bottom: 4px;
+}
+
+.featuredDesc {
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+/* Thumbnail rail */
+.rail {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 0;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.rail::-webkit-scrollbar {
+  display: none;
+}
+
+.thumb {
+  flex-shrink: 0;
+  padding: 8px 16px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+  font-family: inherit;
+  min-height: 44px;
+}
+
+.thumb:hover {
+  border-color: var(--color-primary);
+  background: var(--color-primary-subtle);
+}
+
+.thumbActive {
+  border-color: var(--color-primary);
+  background: var(--color-primary-subtle);
+}
+
+.thumbLabel {
   font-size: 13px;
   font-weight: 600;
   color: var(--color-text);
+  white-space: nowrap;
+}
+
+.thumbActive .thumbLabel {
+  color: var(--color-primary);
+}
+
+/* Auto-advance progress bar inside active thumb */
+.thumbProgress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  background: var(--color-primary);
+  animation: thumbTimer 5s linear;
+}
+
+@keyframes thumbTimer {
+  from { width: 0; }
+  to { width: 100%; }
 }
 
 /* ==========================================================================
@@ -323,12 +397,31 @@
     max-width: 100%;
   }
 
-  .showcaseGrid {
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 12px;
-  }
-
   .showcaseHeader {
     margin-bottom: 32px;
+  }
+
+  .featuredInfo {
+    padding: 12px 16px 16px;
+  }
+
+  .featuredLabel {
+    font-size: 18px;
+  }
+
+  .featuredDesc {
+    font-size: 14px;
+  }
+
+  .rail {
+    gap: 6px;
+  }
+
+  .thumb {
+    padding: 6px 12px;
+  }
+
+  .thumbLabel {
+    font-size: 12px;
   }
 }
