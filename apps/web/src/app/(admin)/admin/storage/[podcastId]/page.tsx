@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { prisma } from '@/lib/prisma';
 import { listObjectsDetailed } from '@/lib/r2';
-import { findByVoiceId } from '@/lib/voice-pool';
+import { findVoiceName } from '@/lib/voice-pool';
 import { getAllProviderMeta } from '@/lib/providers/tts-registry';
 import { computeCompletenessChecklist } from '@/lib/data-completeness';
 import type { CompletenessInput } from '@/lib/data-completeness';
@@ -243,7 +243,7 @@ export default async function PodcastInspectorPage({ params }: PageProps) {
     speaker: v.speaker,
     voiceId: v.voiceId,
     provider: v.provider,
-    resolvedName: v.voiceId ? (findByVoiceId(v.voiceId)?.name ?? null) : null,
+    resolvedName: v.voiceId ? (findVoiceName(v.voiceId) ?? null) : null,
   }));
 
   // Process voice tracks

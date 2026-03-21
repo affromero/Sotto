@@ -13,34 +13,45 @@ import { resolveAutoModel } from '@/lib/auto-model-config';
 import { checkRateLimit } from '@/lib/redis';
 import { checkSuspension } from '@/lib/auth-guards';
 import { getProviderMeta, type TtsProviderId } from '@/lib/providers/tts-registry';
-import { findByVoiceId, type VoiceMatchMetadata } from '@/lib/voice-pool';
+import { findVoiceName, type VoiceMatchMetadata } from '@/lib/voice-pool';
 import type { GenerateVoiceTrackAudioPayload } from '@/lib/queue';
 
 import { errorResponse } from '@/lib/api-response';
 type RouteParams = { params: Promise<{ podcastId: string }> };
 
 /**
+ * Title-case a model ID for display: "eleven_v3" → "Eleven v3", "tts-1-hd" → "TTS-1-HD".
+ */
+function formatModelName(model: string): string {
+  // All-uppercase for known acronym-style models (tts-*, gpt-*)
+  if (/^(tts|gpt|stt)-/i.test(model)) return model.toUpperCase();
+  // Replace underscores with spaces, capitalize first letter of each word
+  return model.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/**
  * Build a display name from resolved voice assignments.
- * Format: "Aria [ElevenLabs] · Nova [OpenAI]"
- * Groups voices by provider: "Aria + River [ElevenLabs] · Nova [OpenAI]"
+ * Format: "Aria + River [ElevenLabs - Eleven v3]"
+ * Groups voices by provider+model pair.
  */
 function buildTrackName(
-  voices: Array<{ speaker: string; voiceId: string; providerId: TtsProviderId }>,
+  voices: Array<{ speaker: string; voiceId: string; providerId: TtsProviderId; ttsModel?: string }>,
 ): string {
-  // Group by provider, preserving speaker order
-  const byProvider = new Map<string, string[]>();
+  // Group by provider+model, preserving speaker order
+  const byKey = new Map<string, string[]>();
   for (const v of voices) {
     const providerLabel = getProviderMeta(v.providerId).displayName;
+    const key = v.ttsModel ? `${providerLabel} - ${formatModelName(v.ttsModel)}` : providerLabel;
     const voiceName = v.voiceId
-      ? (findByVoiceId(v.voiceId)?.name ?? v.voiceId)
+      ? (findVoiceName(v.voiceId) ?? v.voiceId)
       : 'Auto';
-    const existing = byProvider.get(providerLabel) ?? [];
+    const existing = byKey.get(key) ?? [];
     existing.push(voiceName);
-    byProvider.set(providerLabel, existing);
+    byKey.set(key, existing);
   }
 
-  return Array.from(byProvider.entries())
-    .map(([provider, names]) => `${names.join(' + ')} [${provider}]`)
+  return Array.from(byKey.entries())
+    .map(([key, names]) => `${names.join(' + ')} [${key}]`)
     .join(' · ');
 }
 
