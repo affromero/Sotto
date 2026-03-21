@@ -2,7 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { getLandingShowcaseConfig } from '@/lib/landing-showcase';
 import type { LandingShowcaseConfig } from '@/lib/landing-showcase';
 import { logger } from '@/lib/logger';
-import { findByVoiceId } from '@/lib/voice-pool';
+import { findVoiceName } from '@/lib/voice-pool';
 import type { ReferenceData } from '@/types/reference';
 
 export interface ShowcasePodcast {
@@ -328,8 +328,8 @@ export async function buildShowcaseData(config: LandingShowcaseConfig): Promise<
     for (const pv of podcast.voices) {
       if (pv.voiceId && !seenVoiceIds.has(pv.voiceId)) {
         seenVoiceIds.add(pv.voiceId);
-        const entry = findByVoiceId(pv.voiceId);
-        voiceNames.push(entry?.name ?? pv.voiceId);
+        const name = findVoiceName(pv.voiceId);
+        voiceNames.push(name ?? pv.voiceId);
       }
     }
     // Fallback to segment ttsVoiceId if no PodcastVoice records
@@ -337,8 +337,8 @@ export async function buildShowcaseData(config: LandingShowcaseConfig): Promise<
       for (const seg of podcast.segments) {
         if (seg.ttsVoiceId && !seenVoiceIds.has(seg.ttsVoiceId)) {
           seenVoiceIds.add(seg.ttsVoiceId);
-          const entry = findByVoiceId(seg.ttsVoiceId);
-          if (entry) voiceNames.push(entry.name);
+          const name = findVoiceName(seg.ttsVoiceId);
+          if (name) voiceNames.push(name);
         }
       }
     }

@@ -6,7 +6,7 @@ import { getTierFeatures } from '@/lib/tier-features';
 import { getVideoGenerationStatus, getAvatarGenerationStatus } from '@/lib/video-gate';
 import { getMusicGenerationStatus } from '@/lib/music-gate';
 import { resolveAudioUrl } from '@/lib/r2';
-import { findByVoiceId } from '@/lib/voice-pool';
+import { findVoiceName } from '@/lib/voice-pool';
 import type { Metadata } from 'next';
 import { PodcastPlayerView } from './PodcastPlayerView';
 import { PodcastJsonLd } from '@/components/player/PodcastJsonLd';
@@ -298,8 +298,8 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
     }
     for (const voiceId of allVoiceIds) {
       if (!voiceNameMap.has(voiceId)) {
-        const poolEntry = findByVoiceId(voiceId);
-        if (poolEntry) voiceNameMap.set(voiceId, poolEntry.name);
+        const name = findVoiceName(voiceId);
+        if (name) voiceNameMap.set(voiceId, name);
       }
     }
   }

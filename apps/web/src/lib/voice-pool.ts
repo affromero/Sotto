@@ -361,6 +361,26 @@ export function findByVoiceId(voiceId: string): VoicePoolEntry | undefined {
   );
 }
 
+/**
+ * Look up a human-readable voice name by ID across ALL voice pools
+ * (main pool + Cartesia, Hume, Fal, Inworld, MiniMax).
+ */
+export function findVoiceName(voiceId: string): string | undefined {
+  const main = findByVoiceId(voiceId);
+  if (main) return main.name;
+
+  // Lazy import to avoid circular deps — these pools are static arrays
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { CARTESIA_VOICE_POOL, HUME_VOICE_POOL, FAL_VOICE_POOL, INWORLD_VOICE_POOL, MINIMAX_VOICE_POOL } = require('./providers/tts-voices') as typeof import('./providers/tts-voices');
+  const providerPools = [CARTESIA_VOICE_POOL, HUME_VOICE_POOL, FAL_VOICE_POOL, INWORLD_VOICE_POOL, MINIMAX_VOICE_POOL];
+  for (const pool of providerPools) {
+    const match = pool.find((v: { id: string }) => v.id === voiceId);
+    if (match) return match.name;
+  }
+
+  return undefined;
+}
+
 // ---------------------------------------------------------------------------
 // KittenTTS-specific voice pool
 // KittenTTS mini ships with 8 named voices — 4 host (warm/conversational),
