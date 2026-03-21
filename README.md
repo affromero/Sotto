@@ -16,7 +16,7 @@ Create AI podcasts, compare voices side-by-side, remix anything.
 
 **Sotto** (from Italian *"sotto voce"* — speaking in a soft, intimate voice) is the social podcast network. Create AI podcasts or import human ones, compare 8+ voice providers side-by-side, fork and remix anything. Bring your own API keys — unlimited and free.
 
-Describe what you want to learn through a natural conversation. Sotto generates a personalized two-voice podcast — a warm Host and a grounding Expert — that you can listen to anywhere. The twist: you can **interrupt mid-playback** to ask questions, get contextual answers, and update the episode with those clarifications for all future listeners.
+Describe what you want to hear through a natural conversation. Sotto generates a personalized two-voice podcast — a warm Host and a grounding Expert — that you can listen to anywhere. The twist: you can **interrupt mid-playback** to ask questions, get contextual answers, and update the episode with those clarifications for all future listeners.
 
 ### What makes Sotto different
 
@@ -33,7 +33,7 @@ Describe what you want to learn through a natural conversation. Sotto generates 
 
 ### 1. Chat with AI to design your podcast
 
-No forms, no wizards. Describe what you want to learn and Sotto's discovery agent asks smart follow-up questions — topic depth, audience background, preferred tone, duration — with tappable suggestion chips. Before generating, Sotto searches existing public podcasts and recommends relevant ones.
+No forms, no wizards. Describe what you want to hear and Sotto's discovery agent asks smart follow-up questions — topic depth, audience background, preferred tone, duration — with tappable suggestion chips. Before generating, Sotto searches existing public podcasts and recommends relevant ones.
 
 ### 2. AI generates a two-voice conversation
 
