@@ -66,6 +66,42 @@ describe('Toast', () => {
     expect(handleClose).not.toHaveBeenCalled();
   });
 
+  it('renders action button when action prop is provided', () => {
+    const handleAction = vi.fn();
+    render(
+      <Toast
+        message="Podcast ready"
+        onClose={vi.fn()}
+        action={{ label: 'View', onClick: handleAction }}
+      />
+    );
+    expect(screen.getByText('View')).toBeInTheDocument();
+  });
+
+  it('calls action onClick and onClose when action button is clicked', async () => {
+    const handleAction = vi.fn();
+    const handleClose = vi.fn();
+    render(
+      <Toast
+        message="Podcast ready"
+        onClose={handleClose}
+        action={{ label: 'View', onClick: handleAction }}
+      />
+    );
+
+    await act(async () => {
+      screen.getByText('View').click();
+    });
+    expect(handleAction).toHaveBeenCalled();
+    expect(handleClose).toHaveBeenCalled();
+  });
+
+  it('does not render action button when action prop is omitted', () => {
+    render(<Toast message="No action" onClose={vi.fn()} />);
+    expect(screen.queryByText('View')).not.toBeInTheDocument();
+    expect(screen.queryByText('Report')).not.toBeInTheDocument();
+  });
+
   it('renders multiple toasts independently', () => {
     render(
       <>

@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useCallback, useContext, useMemo, useState } from 'react';
-import { Toast } from '@/components/ui/Toast';
+import { Toast, type ToastAction } from '@/components/ui/Toast';
 import styles from '@/components/ui/Toast.module.css';
 
 type ToastType = 'success' | 'error' | 'info' | 'warning';
@@ -11,10 +11,11 @@ interface ToastItem {
   message: string;
   type: ToastType;
   duration: number;
+  action?: ToastAction;
 }
 
 interface ToastContextValue {
-  showToast: (message: string, type?: ToastType, duration?: number) => void;
+  showToast: (message: string, type?: ToastType, duration?: number, action?: ToastAction) => void;
 }
 
 const ToastContext = createContext<ToastContextValue>({
@@ -26,9 +27,9 @@ let nextId = 0;
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
-  const showToast = useCallback((message: string, type: ToastType = 'info', duration = 4000) => {
+  const showToast = useCallback((message: string, type: ToastType = 'info', duration = 4000, action?: ToastAction) => {
     const id = nextId++;
-    setToasts((prev) => [...prev, { id, message, type, duration }]);
+    setToasts((prev) => [...prev, { id, message, type, duration, action }]);
   }, []);
 
   const removeToast = useCallback((id: number) => {
@@ -47,6 +48,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             message={toast.message}
             type={toast.type}
             duration={toast.duration}
+            action={toast.action}
             onClose={() => removeToast(toast.id)}
           />
         ))}
