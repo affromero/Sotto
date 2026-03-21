@@ -482,7 +482,7 @@ export async function getShowcaseCostPreview(): Promise<ShowcaseCostPreview> {
 
   return {
     programmatic: {
-      count: CURATED_SEGMENTS.length,
+      count: 8,
       cost: 'Free (Remotion sidecar, no external API)',
     },
     aiIllustration: {
