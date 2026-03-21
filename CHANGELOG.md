@@ -1,5 +1,43 @@
 # Changelog
 
+## [0.28.0] - 2026-03-21
+
+### Added
+- Rich content extraction: tables, figures, and key statistics preserved from HTML and PDF sources
+- PDF figure extraction via pdfjs-dist with embedded image capture
+- `SOURCE_FIGURE` visual type: renders actual source figures in video with attribution overlay
+- Per-section video preview: users can preview individual segments before final render
+- Preview API (`POST/GET /api/podcasts/[id]/video/preview`) with Zod validation and ownership auth
+- Segment preview worker renders per-segment MP4 via sidecar `/clip` with audio
+- Per-segment feedback and selective regeneration via PATCH endpoint
+- FFmpeg concat optimization: skip full Remotion re-render when all segments have full-quality previews
+- Discovery-sourced figure extraction from verified reference URLs with attribution
+- Per-podcast cost breakdown (text/audio/video/avatar) on player page and billing page
+- Admin per-user cost oversight dashboard
+- Storage inspector with 4-bucket cost breakdown
+- Hume Octave v2 as default TTS model
+- Daily TTS provider health monitor cron
+- Per-direction speed/volume optimization for TTS provider configs
+
+### Fixed
+- All 15 pre-existing TypeScript errors resolved (avatar provider types, glob API, unused vars, Prisma casts)
+- All 31 pre-existing test failures resolved across 9 test files
+- SSRF protection for SOURCE_FIGURE URLs (safeFetch + https-only)
+- SOURCE_FIGURE fallback re-queues AI_ILLUSTRATION job instead of stranding visuals
+- Base64 data URIs filtered from classifier prompt to prevent token explosion
+- HTML table row duplication from double-matching selectors
+- Audio offset in previews uses composition fps instead of hardcoded 30
+- Cross-correlation segment timing wrapped in try/catch for test fallback
+- Avatar timing crossfade drift compensation
+
+### Changed
+- Visual classifier receives structured source data (tables, figures, stats) for accurate DATA_CHART/DATA_TABLE rendering
+- Script generator `formatSourceBlock()` appends real data so AI gets exact values
+- Both classification workers load Discovery.sourceMetadata and merge user + discovery figures
+- Sidecar `/clip` route accepts `audioUrl`, `audioStartTime`, and `quality` params
+- `SegmentStill` composition supports optional audio rendering
+- Replicate added as avatar provider across all type definitions
+
 ## [0.27.0] - 2026-03-17
 
 ### Added
