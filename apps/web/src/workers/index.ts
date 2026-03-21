@@ -15,6 +15,7 @@ import {
   draftCleanupQueue,
   r2UsageQueue,
   pricingFetchQueue,
+  ttsProviderMonitorQueue,
   featureComputationQueue,
   newsIngestQueue,
   briefingSchedulerQueue,
@@ -55,6 +56,7 @@ import { processVoiceTrackStitching } from './voice-track-stitching.worker';
 import { processDraftCleanup } from './draft-cleanup.worker';
 import { processR2Usage } from './r2-usage.worker';
 import { processPricingFetch } from './pricing-fetch.worker';
+import { processTtsProviderMonitor } from './tts-provider-monitor.worker';
 import { processVisualClassification } from './visual-classification.worker';
 import { processVisualGeneration } from './visual-generation.worker';
 import { processVideoComposition } from './video-composition.worker';
@@ -155,6 +157,7 @@ const workers = [
   shouldRun('draft-cleanup') && createWorker('draft-cleanup', processDraftCleanup, { concurrency: 1 }),
   shouldRun('r2-usage') && createWorker('r2-usage', processR2Usage, { concurrency: 1 }),
   shouldRun('pricing-fetch') && createWorker('pricing-fetch', processPricingFetch, { concurrency: 1 }),
+  shouldRun('tts-provider-monitor') && createWorker('tts-provider-monitor', processTtsProviderMonitor, { concurrency: 1 }),
   shouldRun('visual-classification') && createWorker('visual-classification', processVisualClassification, { concurrency: 2 }),
   shouldRun('visual-generation') && createWorker('visual-generation', processVisualGeneration, { concurrency: 5 }),
   shouldRun('video-composition') && createWorker('video-composition', processVideoComposition, { concurrency: 1, lockDuration: 600000 }),
@@ -264,6 +267,14 @@ if (shouldRun('r2-usage') && isR2MonitoringConfigured()) {
     .catch((err) => logger.error('Failed to schedule R2 usage monitoring', { error: err.message }));
 } else if (shouldRun('r2-usage')) {
   logger.info('R2 monitoring not configured — usage collection disabled');
+}
+
+// Schedule daily TTS provider monitor (6am UTC)
+if (shouldRun('tts-provider-monitor')) {
+  ttsProviderMonitorQueue
+    .add(JobType.MONITOR_TTS_PROVIDERS, {}, { repeat: { pattern: '0 6 * * *' } })
+    .then(() => logger.info('TTS provider monitor scheduled', { schedule: '6:00 UTC daily' }))
+    .catch((err) => logger.error('Failed to schedule TTS provider monitor', { error: err.message }));
 }
 
 // Schedule daily pricing fetch (every 24 hours)

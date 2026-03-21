@@ -240,4 +240,8 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
     description: 'Classifies segment visuals via LLM and builds pipeline JSON for the video editor',
     stage: 'Video Pipeline',
   },
+  'tts-provider-monitor': {
+    description: 'Daily monitor: fetches models/voices from TTS APIs, diffs against snapshot, creates GitHub issues for changes',
+    stage: 'Platform Ops',
+  },
 };
