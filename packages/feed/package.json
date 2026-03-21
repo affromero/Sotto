@@ -1,0 +1,40 @@
+{
+  "name": "@sottofm/feed",
+  "version": "0.1.0",
+  "description": "Open-source feed ranking algorithm for the Sotto podcast network",
+  "homepage": "https://github.com/SottoFM/feed#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SottoFM/feed.git"
+  },
+  "license": "MIT",
+  "author": "SottoFM <hello@sotto.fm>",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "publishConfig": {
+    "main": "./dist/index.js",
+    "module": "./dist/index.mjs",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "import": "./dist/index.mjs",
+        "require": "./dist/index.js",
+        "types": "./dist/index.d.ts"
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts --clean",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^2.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.4.0",
+    "vitest": "^2.0.0"
+  }
+}
