@@ -55,7 +55,7 @@
   font-size: 0.875em;
   background: var(--color-surface-secondary, #f3f4f6);
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 
 .codeBlock {
@@ -64,7 +64,7 @@
   font-family: 'SF Mono', 'Fira Code', monospace;
   font-size: 13px;
   padding: var(--spacing-md);
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   overflow-x: auto;
   margin-bottom: var(--spacing-md);
 }
@@ -73,7 +73,7 @@
 
 .endpoint {
   border: 1px solid var(--color-border);
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   padding: var(--spacing-md);
   margin-bottom: var(--spacing-md);
 }
@@ -92,7 +92,7 @@
   font-weight: 700;
   text-transform: uppercase;
   padding: 3px 8px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 
 .method_get {
@@ -123,7 +123,7 @@
   color: #d97706;
   background: #d9770610;
   padding: 2px 8px;
-  border-radius: 9999px;
+  border-radius: var(--radius-full);
 }
 
 .endpointDescription {

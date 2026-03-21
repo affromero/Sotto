@@ -62,7 +62,7 @@
 .badge {
   display: inline-block;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   font: var(--text-caption);
   font-weight: 600;
 }
@@ -164,7 +164,7 @@
 .tier {
   display: inline-block;
   padding: 2px 7px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   font: var(--text-caption);
   font-weight: 600;
   text-transform: capitalize;
@@ -275,7 +275,7 @@
 .badgePlatform {
   display: inline-block;
   padding: 2px 7px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   font: var(--text-caption);
   font-weight: 600;
   background: #fef3c7;
@@ -285,7 +285,7 @@
 .badgeByok {
   display: inline-block;
   padding: 2px 7px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   font: var(--text-caption);
   font-weight: 600;
   background: #dbeafe;
@@ -322,13 +322,13 @@
 
 .testImage {
   max-width: 128px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 
 .testVideo {
   max-width: 240px;
   max-height: 180px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 
 /* ── Disabled provider badge ── */
@@ -337,7 +337,7 @@
   display: inline-block;
   margin-left: 6px;
   padding: 1px 6px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   font: var(--text-caption);
   font-weight: 600;
   background: #f3f4f6;

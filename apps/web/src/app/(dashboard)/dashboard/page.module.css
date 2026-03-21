@@ -214,7 +214,7 @@
   width: 4px;
   height: 1.1em;
   background: var(--color-primary);
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   flex-shrink: 0;
 }
 

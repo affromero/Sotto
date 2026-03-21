@@ -129,7 +129,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   margin: 0 1px;
   transition: opacity 0.15s ease;
 }
@@ -163,7 +163,7 @@
   z-index: 2;
   background: var(--color-text-primary);
   opacity: 0;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   transition: opacity 0.15s ease;
 }
 

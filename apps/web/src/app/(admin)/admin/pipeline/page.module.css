@@ -188,7 +188,7 @@
 .statPillDot {
   width: 8px;
   height: 8px;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   flex-shrink: 0;
 }
 .statPillDotTotal   { background: var(--color-text-secondary); }
@@ -274,7 +274,7 @@
 .chartLegendDot {
   width: 8px;
   height: 8px;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   flex-shrink: 0;
 }
 

@@ -106,14 +106,14 @@
 .legendDotStorage {
   width: 10px;
   height: 10px;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   background: var(--color-primary);
 }
 
 .legendDotOps {
   width: 10px;
   height: 10px;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   background: var(--color-accent);
 }
 

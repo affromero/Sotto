@@ -415,7 +415,7 @@
   flex: 1;
   min-width: 2px;
   background: var(--color-primary);
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   opacity: 0.35;
   height: calc(8px + sin(var(--i, 0) * 0.5) * 24px);
   transform-origin: bottom;
