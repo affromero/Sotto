@@ -35,13 +35,14 @@ export const Quote: React.FC<{ segment: VideoSegment }> = ({ segment }) => {
     >
       <div
         style={{
-          fontSize: 28,
-          color: '#6B7280',
-          marginBottom: 20,
-          fontFamily: 'DM Serif Display, serif',
+          fontSize: 64,
+          color: '#D97706',
+          marginBottom: -10,
+          fontFamily: 'Georgia, serif',
+          lineHeight: 1,
         }}
       >
-        &ldquo;
+        &#x201C;
       </div>
       <p
         style={{
