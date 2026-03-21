@@ -539,7 +539,7 @@
 
 .highlightedText {
   background: var(--color-primary-light);
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   padding: 0 1px;
   position: relative;
   cursor: default;

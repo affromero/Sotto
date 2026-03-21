@@ -378,11 +378,11 @@
 }
 
 .preview_none {
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 
 .preview_rounded {
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
 }
 
 .preview_circle {

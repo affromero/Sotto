@@ -161,7 +161,7 @@
   width: 100%;
   height: 2px;
   background: rgba(255, 255, 255, 0.9);
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   transition:
     transform var(--transition-base),
     opacity var(--transition-fast);

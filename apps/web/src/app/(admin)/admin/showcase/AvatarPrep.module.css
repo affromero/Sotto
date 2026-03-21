@@ -37,7 +37,7 @@
 
 .video {
   max-width: 400px;
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
 }
 
 .urlText {
@@ -58,14 +58,14 @@
 .input {
   padding: 0.5rem;
   border: 1px solid var(--color-border, #e5e7eb);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   font-size: 0.9rem;
 }
 
 .textarea {
   padding: 0.5rem;
   border: 1px solid var(--color-border, #e5e7eb);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   font-size: 0.9rem;
   font-family: inherit;
   resize: vertical;
@@ -76,7 +76,7 @@
   background: var(--color-primary, #D97706);
   color: #fff;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   font-weight: 600;
   font-size: 0.85rem;
