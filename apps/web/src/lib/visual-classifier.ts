@@ -27,7 +27,8 @@ export type VisualTypeString =
   | 'DIAGRAM'
   | 'TEXT_CARD'
   | 'MAP_OVERLAY'
-  | 'DATA_TABLE';
+  | 'DATA_TABLE'
+  | 'SOURCE_FIGURE';
 
 export interface ClassifiedSubVisual {
   subOrder: number;
@@ -62,6 +63,7 @@ const VISUAL_TYPE_ENUM = [
   'TEXT_CARD',
   'MAP_OVERLAY',
   'DATA_TABLE',
+  'SOURCE_FIGURE',
 ] as const;
 
 const subVisualSchema = z.object({

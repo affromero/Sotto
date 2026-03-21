@@ -19,7 +19,7 @@ import { logger } from '@/lib/logger';
 import { resolveSegmentTiming } from '@/lib/segment-timing';
 
 const EXTERNAL_ASSET_TYPES = new Set(['AI_ILLUSTRATION', 'STOCK_FOOTAGE', 'MAP_OVERLAY']);
-const PROGRAMMATIC_TYPES: VisualType[] = ['TEXT_CARD', 'TIMELINE', 'QUOTE', 'COMPARISON', 'DIAGRAM', 'DATA_CHART', 'DATA_TABLE'];
+const PROGRAMMATIC_TYPES: VisualType[] = ['TEXT_CARD', 'TIMELINE', 'QUOTE', 'COMPARISON', 'DIAGRAM', 'DATA_CHART', 'DATA_TABLE', 'SOURCE_FIGURE'];
 const REMOTION_URL = process.env.REMOTION_URL;
 const STILL_FPS = 30;
 const STILL_CONCURRENCY = 4;
