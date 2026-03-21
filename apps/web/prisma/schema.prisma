@@ -2668,3 +2668,12 @@ model QuizAnswer {
 
   @@unique([attemptId, questionId])
 }
+
+model ShowcaseSet {
+  id        String   @id @default(cuid())
+  name      String
+  items     Json     // Array of ShowcaseItem: { visualType, label, description, url, mediaType, credits? }
+  active    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
