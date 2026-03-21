@@ -119,11 +119,11 @@ export function VideoView({
   const activeIndex = findActiveIndex(segments, currentTime);
   const activeSegment = segments[activeIndex] ?? null;
 
-  // Look ahead by the visual transition duration so the avatar appears
-  // when the segment visual starts fading in, matching perceived timing
-  const VISUAL_TRANSITION_SEC = 1.0;
-  const avatarIndex = findActiveIndex(segments, currentTime + VISUAL_TRANSITION_SEC);
-  const avatarSegment = segments[avatarIndex] ?? activeSegment;
+  // Avatar uses the same active segment as the audio — no lookahead.
+  // The avatar video was generated from the segment's raw audio, so
+  // avatarTime = currentTime - startTime gives exact sync.
+  const avatarIndex = activeIndex;
+  const avatarSegment = activeSegment;
 
   // Show avatar only when the matching speaker is active AND the segment is enabled
   const visibleOverlays = useMemo(() => {
