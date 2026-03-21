@@ -2,11 +2,94 @@ import Link from 'next/link';
 import { BRAND } from '@sotto/shared';
 import { ScrollChapter } from '../ScrollChapter';
 import { AuthCTA } from '../AuthCTA';
+import { PoweredByProviders } from '../PoweredByProviders';
 import styles from './ConvertChapter.module.css';
+
+const FAQ_ITEMS = [
+  {
+    question: 'What exactly is Sotto?',
+    answer: (
+      <>
+        Sotto is a social podcast network. You describe what you want to learn. AI
+        writes a fact-checked script, generates studio-quality audio with real voice
+        providers, and can turn it into video. Then you publish it to a social feed
+        where others can listen, fork, remix, and ask questions right inside the
+        episode.
+      </>
+    ),
+  },
+  {
+    question: 'Too many API keys. Which ones do I actually need?',
+    answer: (
+      <>
+        If you don&apos;t want to think about it: <strong>just Fal</strong>. A single Fal
+        API key covers the entire pipeline: LLM, text-to-speech, images, video, and
+        avatars. One key, full access, done. You can also mix and match providers
+        (Anthropic for AI, ElevenLabs for voices, etc.) if you have preferences.
+      </>
+    ),
+  },
+  {
+    question: 'Is it really free?',
+    answer: (
+      <>
+        Right now, yes. During early access everything works with platform AI. No
+        card, no limits. If you bring your own API keys (BYOK), you get unlimited
+        generations at whatever your provider charges. We&apos;ll introduce plans down the
+        road, but early members get grandfathered in.
+      </>
+    ),
+  },
+  {
+    question: 'How do you protect creators and public figures?',
+    answer: (
+      <>
+        Voice cloning requires identity verification and explicit consent. You can
+        only clone your own voice. Avatar images go through the same consent gate.
+        All AI-generated content is clearly labeled. We have active content moderation
+        and a zero-tolerance policy for impersonation or deepfakes.
+      </>
+    ),
+  },
+  {
+    question: 'Can I import my own podcast?',
+    answer: (
+      <>
+        From anywhere. Spotify, Apple Podcasts, YouTube, NotebookLM, or just
+        drag in an audio file. Sotto adds transcripts, social features, and interactive
+        Q&amp;A on top. Human-created content is always labeled as human.
+      </>
+    ),
+  },
+] as const;
 
 export function ConvertChapter() {
   return (
     <>
+      {/* FAQ section */}
+      <ScrollChapter id="faq" alt>
+        <div className={styles.faq}>
+          <div className={styles.faqHeader} data-reveal>
+            <span className={styles.overline}>FAQ</span>
+            <h2 className={styles.heading}>Questions? Answers.</h2>
+          </div>
+
+          <div className={styles.faqGrid} data-reveal>
+            {FAQ_ITEMS.map((item) => (
+              <details key={item.question} className={styles.faqItem}>
+                <summary className={styles.faqQuestion}>
+                  {item.question}
+                  <span className={styles.chevron} aria-hidden="true" />
+                </summary>
+                <div className={styles.faqAnswer}>
+                  <p>{item.answer}</p>
+                </div>
+              </details>
+            ))}
+          </div>
+        </div>
+      </ScrollChapter>
+
       {/* Early access pricing */}
       <ScrollChapter dark>
         <div className={styles.pricing}>
@@ -94,6 +177,9 @@ export function ConvertChapter() {
               <Link href="/join">Join Us</Link>
             </div>
           </div>
+        </div>
+        <div className={styles.providers}>
+          <PoweredByProviders />
         </div>
         <div className={styles.socialRow}>
           {/* X/Twitter */}

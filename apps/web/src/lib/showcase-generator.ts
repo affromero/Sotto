@@ -116,10 +116,10 @@ async function generateShowcaseMetadata(topic: string): Promise<{ segments: Gene
 
   let parsed: Record<string, unknown>;
   try {
-    const cleaned = result.text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    const cleaned = result.content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
     parsed = JSON.parse(cleaned);
   } catch {
-    throw new Error(`Failed to parse LLM showcase metadata: ${result.text.substring(0, 200)}`);
+    throw new Error(`Failed to parse LLM showcase metadata: ${result.content.substring(0, 200)}`);
   }
 
   const chart = parsed.dataChart as Record<string, unknown>;
@@ -391,8 +391,8 @@ export async function regenerateShowcaseItem(
   const topic = opts?.topic || 'Technology';
 
   // Generate fresh metadata for this single type via LLM
-  const generatedSegments = await generateShowcaseMetadata(topic);
-  const entry = generatedSegments.find((s) => s.visualType === visualType);
+  const { segments: generatedSegments } = await generateShowcaseMetadata(topic);
+  const entry = generatedSegments.find((s: GeneratedSegment) => s.visualType === visualType);
 
   if (entry) {
     const buffer = await renderClip(entry.segment);
@@ -482,7 +482,7 @@ export async function getShowcaseCostPreview(): Promise<ShowcaseCostPreview> {
 
   return {
     programmatic: {
-      count: CURATED_SEGMENTS.length,
+      count: 8,
       cost: 'Free (Remotion sidecar, no external API)',
     },
     aiIllustration: {

@@ -1,5 +1,5 @@
 /* ==========================================================================
-   JOURNEY CHAPTER — 3-step alternating split layout with glassmorphism mocks
+   JOURNEY CHAPTER — 2-step alternating split layout with glassmorphism mocks
    ========================================================================== */
 
 .root {
@@ -139,8 +139,7 @@
    ========================================================================== */
 
 .mockChat,
-.mockScript,
-.mockPlayer {
+.mockScript {
   width: 100%;
   max-width: 440px;
   background: var(--color-surface);
@@ -366,88 +365,34 @@
 }
 
 /* ==========================================================================
-   PLAYER MOCK — play button, waveform animation, controls
+   FEATURE LIST — compact bullets replacing NetworkChapter cards
    ========================================================================== */
 
-.playerTitle {
-  font-family: var(--font-heading);
-  font-size: 1.25rem;
-  color: var(--color-text);
-  margin-bottom: 4px;
-}
-
-.playerMeta {
-  font-size: 13px;
-  color: var(--color-text-secondary);
-  margin-bottom: 20px;
-}
-
-.playerPlayRow {
+.featureList {
+  list-style: none;
+  padding: 0;
+  margin: 80px auto 0;
+  max-width: 520px;
   display: flex;
-  align-items: center;
-  gap: 14px;
-  margin-bottom: 16px;
-}
-
-.playButton {
-  flex-shrink: 0;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  border: none;
-  background: var(--color-primary);
-  color: var(--color-text-inverse);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-
-.playerWaveform {
-  flex: 1;
-  display: flex;
-  align-items: flex-end;
-  gap: 3px;
-  height: 36px;
-}
-
-.playerBar {
-  flex: 1;
-  min-width: 2px;
-  background: var(--color-primary);
-  border-radius: var(--radius-xs);
-  opacity: 0.35;
-  height: calc(8px + sin(var(--i, 0) * 0.5) * 24px);
-  transform-origin: bottom;
-  animation: waveformPulse 1.5s ease-in-out infinite;
-  animation-delay: calc(var(--i, 0) * 50ms);
-}
-
-.playerBar:nth-child(-n+12) {
-  opacity: 0.75;
-}
-
-.playerControls {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.playerTime {
-  font-size: 12px;
-  font-family: var(--font-mono);
-  color: var(--color-text-secondary);
-}
-
-.playerActions {
-  display: flex;
+  flex-direction: column;
   gap: 16px;
 }
 
-.playerAction {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--color-primary);
+.featureItem {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+}
+
+.featureDot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-primary);
 }
 
 /* ==========================================================================
@@ -488,9 +433,12 @@
   }
 
   .mockChat,
-  .mockScript,
-  .mockPlayer {
+  .mockScript {
     max-width: 100%;
+  }
+
+  .featureList {
+    margin-top: 56px;
   }
 }
 
@@ -506,15 +454,9 @@
   }
 
   .mockChat,
-  .mockScript,
-  .mockPlayer {
+  .mockScript {
     transform: none;
     transition: none;
-  }
-
-  .playerBar {
-    animation: none;
-    opacity: 0.5;
   }
 
   .typingIndicator span {
