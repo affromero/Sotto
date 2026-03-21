@@ -1,5 +1,5 @@
 import {
-  Image as ImageIcon, Film, BarChart3, Quote, GitCompare, Clock, Network, Type, Map,
+  Image as ImageIcon, Film, BarChart3, Quote, GitCompare, Clock, Network, Type, Map, Table2,
 } from 'lucide-react';
 import type { VisualTypeString } from '@/lib/visual-classifier';
 import type { VisualMode } from '@/types/pipeline';
@@ -32,6 +32,7 @@ export const VISUAL_TYPE_LABELS: Record<VisualTypeString, string> = {
   DIAGRAM: 'Diagram',
   TEXT_CARD: 'Text Card',
   MAP_OVERLAY: 'Map Overlay',
+  DATA_TABLE: 'Data Table',
 };
 
 export const VISUAL_TYPE_ICONS: Record<string, typeof ImageIcon> = {
@@ -44,6 +45,7 @@ export const VISUAL_TYPE_ICONS: Record<string, typeof ImageIcon> = {
   DIAGRAM: Network,
   TEXT_CARD: Type,
   MAP_OVERLAY: Map,
+  DATA_TABLE: Table2,
 };
 
 export type BadgeVariant = 'purple' | 'amber' | 'navy' | 'green' | 'teal';
@@ -58,13 +60,14 @@ export const BADGE_VARIANTS: Record<VisualTypeString, BadgeVariant> = {
   TIMELINE: 'teal',
   DIAGRAM: 'green',
   TEXT_CARD: 'teal',
+  DATA_TABLE: 'green',
 };
 
 export const TYPE_GROUPS = [
   { label: 'AI-Generated', types: ['AI_ILLUSTRATION', 'STOCK_FOOTAGE', 'MAP_OVERLAY'] as VisualTypeString[] },
-  { label: 'Programmatic', types: ['DATA_CHART', 'QUOTE', 'COMPARISON', 'TIMELINE', 'DIAGRAM', 'TEXT_CARD'] as VisualTypeString[] },
+  { label: 'Programmatic', types: ['DATA_CHART', 'QUOTE', 'COMPARISON', 'TIMELINE', 'DIAGRAM', 'TEXT_CARD', 'DATA_TABLE'] as VisualTypeString[] },
 ];
 
 export const PROGRAMMATIC_TYPES = new Set<VisualTypeString>([
-  'DATA_CHART', 'QUOTE', 'COMPARISON', 'TIMELINE', 'DIAGRAM', 'TEXT_CARD',
+  'DATA_CHART', 'QUOTE', 'COMPARISON', 'TIMELINE', 'DIAGRAM', 'TEXT_CARD', 'DATA_TABLE',
 ]);

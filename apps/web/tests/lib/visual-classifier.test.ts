@@ -109,6 +109,31 @@ describe('classifySegmentVisuals', () => {
     expect(result.classifications[0].subVisuals[0].endStatePrompt).toBe('Scene after');
   });
 
+  it('accepts DATA_TABLE as a valid visual type with metadata', async () => {
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify({
+        segments: [
+          { order: 0, subVisuals: [{ subOrder: 0, startOffsetFraction: 0, durationFraction: 1, visualType: 'DATA_TABLE', prompt: null, metadata: '{"headers":{"title":"AI Adoption by Year"},"columns":[{"key":"year","label":"Year"},{"key":"rate","label":"Adoption Rate","isNumeric":true}],"rows":[{"key":"r1","values":{"year":"2022","rate":45}},{"key":"r2","values":{"year":"2023","rate":78}}]}', endStatePrompt: null }] },
+          { order: 1, subVisuals: [{ subOrder: 0, startOffsetFraction: 0, durationFraction: 1, visualType: 'TEXT_CARD', prompt: null, metadata: null, endStatePrompt: null }] },
+          { order: 2, subVisuals: [{ subOrder: 0, startOffsetFraction: 0, durationFraction: 1, visualType: 'TEXT_CARD', prompt: null, metadata: null, endStatePrompt: null }] },
+        ],
+      }),
+      inputTokens: 100,
+      outputTokens: 200,
+      model: 'claude-haiku-4-5-20251001',
+    });
+
+    const result = await classifySegmentVisuals(SEGMENTS, 'AI Stats', 'AI adoption data');
+
+    expect(result.classifications).toHaveLength(3);
+    expect(result.classifications[0].subVisuals[0].visualType).toBe('DATA_TABLE');
+    expect(result.classifications[0].subVisuals[0].metadata).toEqual(expect.objectContaining({
+      headers: expect.objectContaining({ title: 'AI Adoption by Year' }),
+      columns: expect.arrayContaining([expect.objectContaining({ key: 'year' })]),
+      rows: expect.arrayContaining([expect.objectContaining({ key: 'r1' })]),
+    }));
+  });
+
   it('fills missing segments with TEXT_CARD fallback sub-visual', async () => {
     mockGenerateResponse.mockResolvedValue({
       content: JSON.stringify({

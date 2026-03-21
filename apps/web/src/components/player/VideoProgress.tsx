@@ -79,6 +79,7 @@ const VISUAL_TYPE_ICONS: Record<string, typeof ImageIcon> = {
   TIMELINE: Clock,
   DIAGRAM: Network,
   TEXT_CARD: Type,
+  DATA_TABLE: BarChart3,
 };
 
 const VISUAL_TYPE_LABELS: Record<string, string> = {
@@ -90,9 +91,11 @@ const VISUAL_TYPE_LABELS: Record<string, string> = {
   TIMELINE: 'Timeline',
   DIAGRAM: 'Diagram',
   TEXT_CARD: 'Text Card',
+  MAP_OVERLAY: 'Map Overlay',
+  DATA_TABLE: 'Data Table',
 };
 
-const PROGRAMMATIC_TYPES = new Set(['DATA_CHART', 'QUOTE', 'COMPARISON', 'TIMELINE', 'DIAGRAM', 'TEXT_CARD']);
+const PROGRAMMATIC_TYPES = new Set(['DATA_CHART', 'QUOTE', 'COMPARISON', 'TIMELINE', 'DIAGRAM', 'TEXT_CARD', 'DATA_TABLE']);
 
 const SUB_MESSAGES: Record<string, string[]> = {
   PENDING: ['Preparing your video...', 'Setting up the pipeline...'],

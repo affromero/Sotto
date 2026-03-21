@@ -21,7 +21,7 @@ import { generateHeraMotionGraphic } from '@/lib/hera';
 import { buildHeraPrompt } from '@/lib/hera-prompt-builder';
 import { logger } from '@/lib/logger';
 
-const PROGRAMMATIC_TYPES = new Set(['DATA_CHART', 'QUOTE', 'COMPARISON', 'TIMELINE', 'DIAGRAM', 'TEXT_CARD']);
+const PROGRAMMATIC_TYPES = new Set(['DATA_CHART', 'QUOTE', 'COMPARISON', 'TIMELINE', 'DIAGRAM', 'TEXT_CARD', 'DATA_TABLE']);
 
 async function generateAiImage(
   podcastId: string,
