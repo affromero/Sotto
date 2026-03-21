@@ -8,9 +8,10 @@
  *   - trailing_silence: seconds of silence after utterance
  *   - Native text markers: [pause], [long pause]
  *   - Octave infers emotion from text content — description refines/overrides
- *   - Use Octave v1 for acting instructions (v2 doesn't support them yet)
+ *   - Octave v1: acting instructions via description field
+ *   - Octave v2: 2x faster, half price, 11 languages, word/phoneme timestamps — no acting instructions yet
  *
- * @tts-research-date 2026-02-27 — Octave description field, speed, continuation, v1 vs v2
+ * @tts-research-date 2026-03-21 — Added Octave v2 support (version param, skip description for v2)
  */
 import { logger } from '../../logger';
 import type { TtsProvider, SpeechParams } from '../tts';
@@ -38,13 +39,22 @@ export class HumeProvider implements TtsProvider {
 
   constructor(apiKey: string, model?: string) {
     this.apiKey = apiKey;
-    this.model = model ?? 'octave-v1';
+    this.model = model ?? 'octave-v2';
+  }
+
+  private get octaveVersion(): '1' | '2' {
+    return this.model === 'octave-v1' ? '1' : '2';
   }
 
   async generateSpeech(params: SpeechParams): Promise<Buffer> {
-    // Map direction to Hume description (always provides a value — falls back to speaker baseline)
-    const expression = mapDirectionToExpression(params.direction, params.speaker, 'hume');
-    const description = expression.hume?.description;
+    const isV1 = this.octaveVersion === '1';
+
+    // Acting instructions only supported on Octave v1
+    let description: string | undefined;
+    if (isV1) {
+      const expression = mapDirectionToExpression(params.direction, params.speaker, 'hume');
+      description = expression.hume?.description;
+    }
 
     const utterance: Record<string, unknown> = {
       text: convertInlineAudioTags(params.text, 'hume'),
@@ -53,7 +63,6 @@ export class HumeProvider implements TtsProvider {
       trailing_silence: 0.3,
     };
 
-    // Add description for acting instructions (Octave's core differentiator)
     if (description) {
       utterance.description = description;
     }
@@ -72,6 +81,7 @@ export class HumeProvider implements TtsProvider {
       body: JSON.stringify({
         utterances: [utterance],
         format: { type: 'mp3' },
+        version: this.octaveVersion,
       }),
     });
 
@@ -90,6 +100,7 @@ export class HumeProvider implements TtsProvider {
     logger.info('Hume AI speech generated', {
       voiceId: params.voiceId,
       chars: params.text.length,
+      version: this.octaveVersion,
       description: description ?? 'none',
     });
     return Buffer.from(data.generations[0].audio, 'base64');
