@@ -159,7 +159,8 @@ export type VisualType =
   | 'AI_ILLUSTRATION'
   | 'TEXT_CARD'
   | 'MAP_OVERLAY'
-  | 'DATA_TABLE';
+  | 'DATA_TABLE'
+  | 'SOURCE_FIGURE';
 
 export type VideoStatus =
   | 'DRAFT'

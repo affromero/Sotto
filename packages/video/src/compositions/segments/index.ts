@@ -10,6 +10,7 @@ import { ImageSlide } from './ImageSlide';
 import { TextCard } from './TextCard';
 import { MapSlide } from './MapSlide';
 import { DataTable } from './DataTable';
+import { SourceFigure } from './SourceFigure';
 
 const SEGMENT_MAP: Record<VisualTypeValue, React.FC<{ segment: VideoSegment }>> = {
   [VisualType.DATA_CHART]: React.memo(DataChart),
@@ -22,6 +23,7 @@ const SEGMENT_MAP: Record<VisualTypeValue, React.FC<{ segment: VideoSegment }>> 
   [VisualType.TEXT_CARD]: React.memo(TextCard),
   [VisualType.MAP_OVERLAY]: React.memo(MapSlide),
   [VisualType.DATA_TABLE]: React.memo(DataTable),
+  [VisualType.SOURCE_FIGURE]: React.memo(SourceFigure),
 };
 
 const VIDEO_ASSET_TYPES = new Set(['video/mp4', 'video/webm']);
@@ -38,4 +40,4 @@ export function resolveSegmentComponent(
   return SEGMENT_MAP[visualType as VisualTypeValue] ?? TextCard;
 }
 
-export { DataChart, Quote, Comparison, Timeline, Diagram, ImageSlide, TextCard, MapSlide, DataTable };
+export { DataChart, Quote, Comparison, Timeline, Diagram, ImageSlide, TextCard, MapSlide, DataTable, SourceFigure };

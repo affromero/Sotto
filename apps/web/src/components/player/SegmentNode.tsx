@@ -17,6 +17,7 @@ const VISUAL_TYPE_LABELS: Record<VisualTypeString, string> = {
   TEXT_CARD: 'Text Card',
   MAP_OVERLAY: 'Map Overlay',
   DATA_TABLE: 'Data Table',
+  SOURCE_FIGURE: 'Source Figure',
 };
 
 const PROGRAMMATIC_TYPES = new Set<VisualTypeString>([
@@ -27,6 +28,7 @@ const PROGRAMMATIC_TYPES = new Set<VisualTypeString>([
   'DIAGRAM',
   'TEXT_CARD',
   'DATA_TABLE',
+  'SOURCE_FIGURE',
 ]);
 
 // Color-coded badge variants — programmatic (green/teal) vs external (purple/navy/amber)

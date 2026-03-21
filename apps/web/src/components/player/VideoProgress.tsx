@@ -93,6 +93,7 @@ const VISUAL_TYPE_LABELS: Record<string, string> = {
   TEXT_CARD: 'Text Card',
   MAP_OVERLAY: 'Map Overlay',
   DATA_TABLE: 'Data Table',
+  SOURCE_FIGURE: 'Source Figure',
 };
 
 const PROGRAMMATIC_TYPES = new Set(['DATA_CHART', 'QUOTE', 'COMPARISON', 'TIMELINE', 'DIAGRAM', 'TEXT_CARD', 'DATA_TABLE']);
