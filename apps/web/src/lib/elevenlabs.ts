@@ -93,6 +93,8 @@ export async function generateSpeech(params: {
   stability?: number;
   similarityBoost?: number;
   style?: number;
+  speed?: number;
+  seed?: number;
   apiKeyOverride?: string;
   previousText?: string;
   nextText?: string;
@@ -118,8 +120,13 @@ export async function generateSpeech(params: {
       // style 0.0 per ElevenLabs recommendation — higher values add latency and instability
       style: params.style ?? 0.0,
       use_speaker_boost: true,
+      ...(params.speed && { speed: params.speed }),
     },
   };
+
+  if (params.seed != null) {
+    body.seed = params.seed;
+  }
 
   if (skipTextContext) {
     // eleven_v3 rejects both previous_text/next_text AND previous_request_ids.

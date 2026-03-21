@@ -15,6 +15,7 @@ import type { TtsProvider, SpeechParams, SfxParams } from '../tts';
 import { getProviderMeta, type TtsProviderId } from '../tts-registry';
 import { VOICE_POOL, selectVoicePair, resolveVoiceId, type VoiceMatchMetadata } from '../../voice-pool';
 import { mapDirectionToExpression } from '../../tts-expression-mapper';
+import { applyPronunciationAliases } from '../../pronunciation-dictionary';
 
 // Speakers that use the "host" voice slot; all others use "expert" slot.
 // HOST/GUEST are at even indices (0, 2); EXPERT/SKEPTIC at odd (1, 3).
@@ -60,14 +61,17 @@ export class ElevenLabsProvider implements TtsProvider {
     const expression = mapDirectionToExpression(params.direction, params.speaker, 'elevenlabs');
     const elExpr = expression.elevenlabs;
 
+    // Apply pronunciation aliases before audio tag injection
+    const cleanText = applyPronunciationAliases(params.text);
+
     // Apply audio tag: re-inject before every sentence for sustained delivery styles,
     // or prepend once for one-shot sound events (laughs, gasps, sighs).
     const prefix = elExpr?.audioTagPrefix;
     const text = prefix
       ? elExpr.sustainedDelivery
-        ? injectTagAtSentenceBoundaries(params.text, prefix)
-        : prefix + params.text
-      : params.text;
+        ? injectTagAtSentenceBoundaries(cleanText, prefix)
+        : prefix + cleanText
+      : cleanText;
 
     const { audio, requestId } = await el.generateSpeech({
       text,
@@ -81,6 +85,8 @@ export class ElevenLabsProvider implements TtsProvider {
       similarityBoost: params.similarityBoost,
       // style: 0.0 per ElevenLabs recommendation — higher values add latency and instability
       style: 0.0,
+      speed: elExpr?.speed,
+      seed: params.seed,
     });
 
     this.lastRequestId = requestId;

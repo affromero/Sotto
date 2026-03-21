@@ -59,8 +59,8 @@ export class HumeProvider implements TtsProvider {
     const utterance: Record<string, unknown> = {
       text: convertInlineAudioTags(params.text, 'hume'),
       voice: { id: params.voiceId },
-      speed: 1,
-      trailing_silence: 0.3,
+      speed: expression.hume?.speed ?? 1,
+      trailing_silence: expression.hume?.trailingSilence ?? 0.3,
     };
 
     if (description) {

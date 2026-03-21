@@ -24,6 +24,8 @@ const OPENAI_VOICES = [
   'alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer',
   // Additional voices on gpt-4o-mini-tts
   'ash', 'ballad', 'coral', 'sage', 'verse',
+  // Highest-quality recommended voices (gpt-4o-mini-tts)
+  'marin', 'cedar',
 ] as const;
 
 // Speakers at even indices (HOST, GUEST) → host voice slot; odd (EXPERT, SKEPTIC) → expert slot.
