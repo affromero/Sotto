@@ -5,6 +5,7 @@ import { uploadFile } from '@/lib/r2';
 import { logger } from '@/lib/logger';
 import { RenderStatus } from '@sotto/video';
 import { resolveSegmentTiming } from '@/lib/segment-timing';
+import { concatenateSegmentPreviews } from '@/lib/video-concat';
 
 if (!process.env.REMOTION_URL) {
   throw new Error('REMOTION_URL is not set — video composition worker cannot start');
@@ -148,7 +149,58 @@ export async function processVideoComposition(job: Job<ComposeVideoPayload>): Pr
 
     await job.updateProgress(20);
 
-    // POST to Remotion sidecar
+    // Optimization: if all segments have full-quality previews, use FFmpeg concat (much faster)
+    const allPreviewVisuals = await prisma.segmentVisual.findMany({
+      where: { videoGenerationId },
+      select: { order: true, previewUrl: true, previewStatus: true, previewQuality: true },
+      orderBy: [{ order: 'asc' }, { subOrder: 'asc' }],
+    });
+
+    const allHaveFullPreviews = allPreviewVisuals.length > 0 &&
+      allPreviewVisuals.every((v) => v.previewStatus === 'ready' && v.previewQuality === 'full' && v.previewUrl);
+
+    if (allHaveFullPreviews && transitionInputs.length === 0) {
+      logger.info('All segments have full-quality previews, using FFmpeg concat', { podcastId, segments: String(allPreviewVisuals.length) });
+
+      // Deduplicate by order (take first sub-visual per segment)
+      const seenOrders = new Set<number>();
+      const uniqueSegments = allPreviewVisuals.filter((v) => {
+        if (seenOrders.has(v.order)) return false;
+        seenOrders.add(v.order);
+        return true;
+      });
+
+      const videoBuffer = await concatenateSegmentPreviews(
+        uniqueSegments.map((v) => ({ order: v.order, previewUrl: v.previewUrl! })),
+        audioUrl,
+      );
+
+      const videoKey = voiceTrackId
+        ? `podcasts/${podcastId}/video-${voiceTrackId}.mp4`
+        : `podcasts/${podcastId}/video.mp4`;
+      const videoUrl = await uploadFile(videoKey, videoBuffer, 'video/mp4');
+
+      await prisma.videoGeneration.update({
+        where: { id: videoGenerationId },
+        data: { status: 'READY', videoUrl },
+      });
+      await prisma.podcast.update({
+        where: { id: podcastId },
+        data: { videoUrl },
+      });
+
+      await addJob(notificationQueue, JobType.NOTIFY, {
+        type: 'VIDEO_READY',
+        podcastId,
+        userId: podcast.userId,
+      });
+
+      logger.info('Video composition complete (FFmpeg concat)', { podcastId, videoUrl });
+      await job.updateProgress(100);
+      return;
+    }
+
+    // POST to Remotion sidecar (full render path)
     const renderResponse = await fetch(`${REMOTION_URL}/render`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
