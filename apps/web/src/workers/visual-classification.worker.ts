@@ -85,8 +85,14 @@ export async function processVisualClassification(job: Job<ClassifyVisualsPayloa
     // Extract structured data from source metadata for the classifier
     const sourceMetadata = discovery?.sourceMetadata as Record<string, unknown> | null;
     const structuredData = sourceMetadata ? {
-      tables: sourceMetadata.tables as StructuredSourceData['tables'],
-      figures: sourceMetadata.figures as StructuredSourceData['figures'],
+      tables: [
+        ...(sourceMetadata.tables as StructuredSourceData['tables'] || []),
+        ...(sourceMetadata.discoveryTables as StructuredSourceData['tables'] || []),
+      ].slice(0, 10),
+      figures: [
+        ...(sourceMetadata.figures as StructuredSourceData['figures'] || []),
+        ...(sourceMetadata.discoveryFigures as StructuredSourceData['figures'] || []),
+      ].slice(0, 20),
       keyStatistics: sourceMetadata.keyStatistics as StructuredSourceData['keyStatistics'],
     } : undefined;
 
