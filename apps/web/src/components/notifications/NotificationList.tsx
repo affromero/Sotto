@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import {
   Headphones,
   Heart,
@@ -7,53 +8,91 @@ import {
   UserPlus,
   Bell,
   AlertTriangle,
+  AlertOctagon,
   MessageCircle,
   Reply,
   HelpCircle,
   ThumbsUp,
   FileText,
   ShieldCheck,
+  ShieldAlert,
   Trash2,
   Gift,
   ImagePlus,
+  Video,
+  Music,
+  Newspaper,
+  MicVocal,
+  Megaphone,
+  Flag,
+  Mic,
 } from 'lucide-react';
+import type { NotificationData } from '@/types/notification';
+import { getNotificationUrl } from '@/lib/notification-utils';
 import styles from './NotificationList.module.css';
 
-interface Notification {
-  id: string;
-  type: string;
-  title: string;
-  message: string;
-  read: boolean;
-  createdAt: string;
-}
-
 interface NotificationListProps {
-  notifications: Notification[];
+  notifications: NotificationData[];
   onMarkRead: (id: string) => void;
   onMarkAllRead: () => void;
+  onNavigate?: () => void;
 }
 
 const typeIcons: Record<string, typeof Bell> = {
+  // Pipeline — success
   PODCAST_READY: Headphones,
+  SCRIPT_READY: FileText,
+  VIDEO_READY: Video,
+  BRIEFING_READY: Newspaper,
+  MUSIC_READY: Music,
+
+  // Pipeline — failure
   PODCAST_FAILED: AlertTriangle,
+  VIDEO_FAILED: AlertTriangle,
+  MUSIC_FAILED: AlertTriangle,
+  AVATAR_FAILED: AlertTriangle,
+  VOICE_TRACK_FAILED: AlertTriangle,
   KEY_INVALID: AlertTriangle,
+  PIPELINE_FAILURE: AlertTriangle,
+
+  // Social
   PODCAST_LIKED: Heart,
   PODCAST_FORKED: GitFork,
   NEW_FOLLOWER: UserPlus,
-  PIPELINE_FAILURE: AlertTriangle,
   COMMENT_ON_YOUR_PODCAST: MessageCircle,
   COMMENT_REPLY: Reply,
   QUESTION_ON_YOUR_PODCAST: HelpCircle,
   QUESTION_UPVOTED: ThumbsUp,
-  SCRIPT_READY: FileText,
+  REFERRAL_SIGNUP: Gift,
+
+  // Voice verification
   VOICE_VERIFICATION_REQUIRED: ShieldCheck,
   VOICE_VERIFICATION_PASSED: ShieldCheck,
   VOICE_VERIFICATION_FAILED: ShieldCheck,
+  VOICE_BLOCKED_DUPLICATE: ShieldAlert,
+  VOICE_OWNERSHIP_ALERT: ShieldAlert,
+
+  // Voice marketplace
+  VOICE_REQUEST_RECEIVED: Mic,
+  VOICE_REQUEST_APPROVED: Mic,
+  VOICE_REQUEST_DENIED: Mic,
+
+  // Voice tracks (renditions)
+  RENDITION_PROPOSED: MicVocal,
+  RENDITION_ACCEPTED: MicVocal,
+  RENDITION_REJECTED: MicVocal,
+
+  // Moderation
   CONTENT_REMOVED: Trash2,
-  REFERRAL_SIGNUP: Gift,
-  VIDEO_FAILED: AlertTriangle,
-  AVATAR_FAILED: AlertTriangle,
+  ACCOUNT_WARNING: AlertOctagon,
+  ACCOUNT_SUSPENDED: AlertOctagon,
+  ACCOUNT_BANNED: AlertOctagon,
+  CLAIM_REPORT_ON_YOUR_PODCAST: Flag,
+
+  // System
+  PLATFORM_ANNOUNCEMENT: Megaphone,
+
+  // Avatar images
   AVATAR_IMAGE_REQUEST_RECEIVED: ImagePlus,
   AVATAR_IMAGE_REQUEST_APPROVED: ImagePlus,
   AVATAR_IMAGE_REQUEST_DENIED: ImagePlus,
@@ -80,8 +119,21 @@ export function NotificationList({
   notifications,
   onMarkRead,
   onMarkAllRead,
+  onNavigate,
 }: NotificationListProps) {
+  const router = useRouter();
   const hasUnread = notifications.some((n) => !n.read);
+
+  function handleClick(notification: NotificationData) {
+    if (!notification.read) {
+      onMarkRead(notification.id);
+    }
+    const url = getNotificationUrl(notification);
+    if (url) {
+      onNavigate?.();
+      router.push(url);
+    }
+  }
 
   return (
     <div className={styles.panel} role="region" aria-label="Notifications">
@@ -106,14 +158,15 @@ export function NotificationList({
         <ul className={styles.list} role="list">
           {notifications.map((notification) => {
             const IconComponent = typeIcons[notification.type] || Bell;
+            const url = getNotificationUrl(notification);
             return (
               <li
                 key={notification.id}
                 className={`${styles.item} ${!notification.read ? styles.unread : ''}`}
               >
                 <button
-                  className={styles.itemButton}
-                  onClick={() => onMarkRead(notification.id)}
+                  className={`${styles.itemButton} ${url ? styles.clickable : ''}`}
+                  onClick={() => handleClick(notification)}
                   aria-label={`${notification.read ? '' : 'Unread: '}${notification.title}`}
                 >
                   <span className={styles.iconWrapper} aria-hidden="true">

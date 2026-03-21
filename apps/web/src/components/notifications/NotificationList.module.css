@@ -92,6 +92,14 @@
   background: var(--color-surface-hover);
 }
 
+.clickable {
+  cursor: pointer;
+}
+
+.clickable:hover .itemTitle {
+  color: var(--color-primary);
+}
+
 /* Icon */
 .iconWrapper {
   display: flex;
