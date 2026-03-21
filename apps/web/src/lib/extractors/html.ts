@@ -3,7 +3,7 @@ import { JSDOM } from 'jsdom';
 import * as cheerio from 'cheerio';
 import { logger } from '../logger';
 import { safeFetch } from '../url-validator';
-import type { ExtractedContent } from './types';
+import type { ExtractedContent, ExtractedTable, ExtractedFigure } from './types';
 
 export const MAX_CONTENT_LENGTH = 50000;
 const FETCH_TIMEOUT_MS = 15000;
@@ -39,6 +39,10 @@ export async function extractHtmlContent(url: string): Promise<ExtractedContent>
   const html = await fetchHtml(url);
   const ogMeta = extractOpenGraphMeta(html);
 
+  // Extract structured data from the full HTML (before Readability strips it)
+  const tables = extractTables(html);
+  const figures = extractFigures(html, url);
+
   // Try Readability first
   const readabilityResult = tryReadability(html, url);
   if (readabilityResult && readabilityResult.content) {
@@ -58,6 +62,8 @@ export async function extractHtmlContent(url: string): Promise<ExtractedContent>
       wordCount: countWords(truncatedText),
       sourceType: 'html',
       extractionMethod: 'readability',
+      ...(tables.length > 0 && { tables }),
+      ...(figures.length > 0 && { figures }),
     };
   }
 
@@ -85,6 +91,8 @@ export async function extractHtmlContent(url: string): Promise<ExtractedContent>
     wordCount: countWords(truncatedText),
     sourceType: 'html',
     extractionMethod: 'cheerio-fallback',
+    ...(tables.length > 0 && { tables }),
+    ...(figures.length > 0 && { figures }),
   };
 }
 
@@ -227,4 +235,91 @@ function stripHtml(html: string): string {
 
 export function countWords(text: string): number {
   return text.split(/\s+/).filter((w) => w.length > 0).length;
+}
+
+const MAX_TABLES = 10;
+const MAX_ROWS_PER_TABLE = 50;
+const MAX_FIGURES = 20;
+const MIN_FIGURE_DIMENSION = 200;
+
+function extractTables(html: string): ExtractedTable[] {
+  const $ = cheerio.load(html);
+  const tables: ExtractedTable[] = [];
+
+  $('table').each((_, tableEl) => {
+    if (tables.length >= MAX_TABLES) return false;
+
+    const $table = $(tableEl);
+    const caption = $table.find('caption').text().trim() || null;
+
+    const headers: string[] = [];
+    $table.find('thead th, thead td, tr:first-child th').each((_, th) => {
+      headers.push($(th).text().trim());
+    });
+
+    const rows: string[][] = [];
+    const rowSelector = headers.length > 0 ? 'tbody tr, tr:not(:first-child)' : 'tr';
+    $table.find(rowSelector).each((_, tr) => {
+      if (rows.length >= MAX_ROWS_PER_TABLE) return false;
+      const cells: string[] = [];
+      $(tr).find('td, th').each((__, cell) => {
+        cells.push($(cell).text().trim());
+      });
+      if (cells.length > 0 && cells.some((c) => c.length > 0)) {
+        rows.push(cells);
+      }
+    });
+
+    // Skip trivial tables (layout tables with 1 row/col, or empty)
+    if (rows.length === 0 || (headers.length === 0 && rows.length < 2)) return;
+
+    tables.push({ caption, headers, rows, sourceLabel: null });
+  });
+
+  return tables;
+}
+
+function extractFigures(html: string, baseUrl: string): ExtractedFigure[] {
+  const $ = cheerio.load(html);
+  const figures: ExtractedFigure[] = [];
+  const seenUrls = new Set<string>();
+
+  // Extract <figure> elements first (higher quality — typically editorial images)
+  $('figure img, article img, main img, .post-content img, .entry-content img').each((_, img) => {
+    if (figures.length >= MAX_FIGURES) return false;
+
+    const $img = $(img);
+    const src = $img.attr('src') || $img.attr('data-src');
+    if (!src) return;
+
+    // Filter out tiny images (icons, tracking pixels, avatars)
+    const width = parseInt($img.attr('width') || '0', 10);
+    const height = parseInt($img.attr('height') || '0', 10);
+    if ((width > 0 && width < MIN_FIGURE_DIMENSION) || (height > 0 && height < MIN_FIGURE_DIMENSION)) return;
+
+    // Filter out common non-content images by URL pattern
+    if (/\b(icon|logo|avatar|badge|sprite|tracking|pixel|ad[_-])\b/i.test(src)) return;
+
+    let absoluteUrl: string;
+    try {
+      absoluteUrl = new URL(src, baseUrl).href;
+    } catch {
+      return;
+    }
+
+    if (seenUrls.has(absoluteUrl)) return;
+    seenUrls.add(absoluteUrl);
+
+    const $figure = $img.closest('figure');
+    const caption = $figure.find('figcaption').text().trim() || null;
+    const altText = $img.attr('alt')?.trim() || null;
+
+    const ext = absoluteUrl.split('?')[0].split('.').pop()?.toLowerCase() || '';
+    const mimeMap: Record<string, string> = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml' };
+    const mimeType = mimeMap[ext] || 'image/jpeg';
+
+    figures.push({ url: absoluteUrl, caption, altText, sourceLabel: null, mimeType });
+  });
+
+  return figures;
 }

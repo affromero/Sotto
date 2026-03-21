@@ -6,7 +6,7 @@ import { isYouTubeUrl, extractYouTubeContent } from './youtube';
 import { logger } from '../logger';
 import type { ExtractedContent } from './types';
 
-export type { ExtractedContent } from './types';
+export type { ExtractedContent, ExtractedTable, ExtractedFigure, ExtractedStatistic } from './types';
 
 const MIN_WORD_COUNT = 50;
 
@@ -55,6 +55,9 @@ export async function extractContent(url: string): Promise<ExtractedContent> {
         wordCount: pinchtabWordCount,
         sourceType: 'html',
         extractionMethod: 'pinchtab',
+        ...(htmlResult.tables && { tables: htmlResult.tables }),
+        ...(htmlResult.figures && { figures: htmlResult.figures }),
+        ...(htmlResult.keyStatistics && { keyStatistics: htmlResult.keyStatistics }),
       };
     }
 
