@@ -10,6 +10,8 @@ import { findByVoiceId } from '@/lib/voice-pool';
 import type { Metadata } from 'next';
 import { PodcastPlayerView } from './PodcastPlayerView';
 import { PodcastJsonLd } from '@/components/player/PodcastJsonLd';
+import { CostBreakdown } from '@/components/player/CostBreakdown';
+import { getPodcastCostBreakdown } from '@/lib/podcast-cost-stats';
 import { JoinCTA } from '@/components/referral/JoinCTA';
 import styles from './page.module.css';
 
@@ -258,18 +260,25 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
   let videoStatus: { dailyUsed: number; dailyLimit: number; dailyRemaining: number; resetInSeconds?: number; isByokUser: boolean; isProUser: boolean } | undefined;
   let avatarStatus: { dailyUsed: number; dailyLimit: number; dailyRemaining: number; resetInSeconds?: number; isByokUser: boolean; isProUser: boolean } | undefined;
   let musicStatus: { dailyUsed: number; dailyLimit: number; dailyRemaining: number; resetInSeconds?: number; isByokUser: boolean; isProUser: boolean } | undefined;
+  let costBreakdown: Awaited<ReturnType<typeof getPodcastCostBreakdown>> | undefined;
+  let ownerIsPro = false;
+  let ownerIsByok = false;
   if (isOwner && userId) {
-    const [freeTier, vidStatus, avStatus, musStatus] = await Promise.all([
+    const [freeTier, vidStatus, avStatus, musStatus, costStats] = await Promise.all([
       getFreeTierStatus(userId),
       getVideoGenerationStatus(userId),
       getAvatarGenerationStatus(userId),
       getMusicGenerationStatus(userId),
+      podcast.status === 'READY' ? getPodcastCostBreakdown(podcastId) : Promise.resolve(undefined),
     ]);
     const plan = freeTier.isProUser ? 'PRO' as const : 'FREE' as const;
     canMakePrivate = getTierFeatures(plan, freeTier.isByokUser, session?.user?.role as string | undefined).privateAllowed;
     videoStatus = vidStatus;
     avatarStatus = avStatus;
     musicStatus = musStatus;
+    costBreakdown = costStats;
+    ownerIsPro = freeTier.isProUser;
+    ownerIsByok = freeTier.isByokUser;
   }
 
   const visibility = podcast.visibility;
@@ -438,6 +447,9 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
       )}
       <div className={styles.container}>
         <PodcastPlayerView podcast={podcastData} isOwner={isOwner} isAdmin={isAdmin} isAuthenticated={!!userId} currentUserId={userId} canMakePrivate={canMakePrivate} videoStatus={videoStatus} avatarStatus={avatarStatus} musicStatus={musicStatus} hasQuiz={hasQuiz} quizStats={quizStats} />
+        {costBreakdown && costBreakdown.total > 0 && (
+          <CostBreakdown breakdown={costBreakdown} isPro={ownerIsPro} isByok={ownerIsByok} />
+        )}
         {!userId && podcast.visibility === 'PUBLIC' && (
           <JoinCTA creatorHandle={podcast.user.handle} creatorName={podcast.user.name} />
         )}
