@@ -4,15 +4,15 @@
   width: 100%;
   background: var(--color-primary-subtle);
   border-radius: var(--radius-2xl);
-  padding: var(--space-5);
-  margin-bottom: var(--space-8);
+  padding: var(--spacing-ml);
+  margin-bottom: var(--spacing-xl);
 }
 
 .header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: var(--space-4);
+  margin-bottom: var(--spacing-md);
 }
 
 .heading {
@@ -35,7 +35,7 @@
 /* Carousel — horizontal scroll-snap */
 .carousel {
   display: flex;
-  gap: var(--space-4);
+  gap: var(--spacing-md);
   overflow-x: auto;
   scroll-snap-type: x mandatory;
   scroll-behavior: smooth;
@@ -56,13 +56,13 @@
 
 @media (min-width: 768px) {
   .slide {
-    flex: 0 0 calc(50% - var(--space-4) / 2);
+    flex: 0 0 calc(50% - var(--spacing-md) / 2);
   }
 }
 
 @media (min-width: 1024px) {
   .slide {
-    flex: 0 0 calc(33.333% - var(--space-4) * 2 / 3);
+    flex: 0 0 calc(33.333% - var(--spacing-md) * 2 / 3);
   }
 }
 
@@ -71,7 +71,7 @@
   display: flex;
   justify-content: center;
   gap: var(--spacing-xs);
-  margin-top: var(--space-4);
+  margin-top: var(--spacing-md);
 }
 
 .dot {

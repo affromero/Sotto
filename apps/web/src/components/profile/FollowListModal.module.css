@@ -64,7 +64,7 @@
   flex: 1;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding: var(--space-2) 0;
+  padding: var(--spacing-sm) 0;
 }
 
 /* User list */
@@ -86,7 +86,7 @@
 .loadMoreContainer {
   display: flex;
   justify-content: center;
-  padding: var(--space-4) var(--spacing-lg) var(--spacing-lg);
+  padding: var(--spacing-md) var(--spacing-lg) var(--spacing-lg);
 }
 
 .loadMoreBtn {
@@ -130,14 +130,14 @@
 
 /* Skeleton loading */
 .skeletonList {
-  padding: var(--space-2) 0;
+  padding: var(--spacing-sm) 0;
 }
 
 .skeletonItem {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
+  gap: var(--spacing-ms);
+  padding: var(--spacing-ms) var(--spacing-md);
 }
 
 .skeleton {
@@ -157,7 +157,7 @@
 .skeletonInfo {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: var(--spacing-xs);
   flex: 1;
 }
 

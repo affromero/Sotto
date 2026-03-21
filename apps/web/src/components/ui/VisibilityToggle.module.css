@@ -1,8 +1,8 @@
 .pill {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-1);
-  padding: 2px var(--space-2);
+  gap: var(--spacing-xs);
+  padding: 2px var(--spacing-sm);
   border: none;
   border-radius: var(--radius-full);
   font: var(--text-caption);

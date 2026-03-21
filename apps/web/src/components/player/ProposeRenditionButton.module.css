@@ -1,8 +1,8 @@
 .proposeBtn {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-3) var(--space-5);
+  gap: var(--spacing-sm);
+  padding: var(--spacing-ms) var(--spacing-ml);
   background: var(--color-primary);
   color: var(--color-text-inverse);
   border: none;
@@ -26,8 +26,8 @@
 .successBanner {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-3) var(--space-4);
+  gap: var(--spacing-sm);
+  padding: var(--spacing-ms) var(--spacing-md);
   background: var(--color-success-lighter);
   border: 1px solid var(--color-success-light);
   border-radius: var(--radius-lg);
@@ -55,13 +55,13 @@
 .modal {
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
+  gap: var(--spacing-ml);
 }
 
 .header {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--spacing-sm);
 }
 
 .title {
@@ -80,7 +80,7 @@
 .field {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--spacing-sm);
 }
 
 .label {
@@ -91,7 +91,7 @@
 
 .textarea {
   width: 100%;
-  padding: var(--space-3);
+  padding: var(--spacing-ms);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   font: var(--text-body);
@@ -120,8 +120,8 @@
 .error {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-3) var(--space-4);
+  gap: var(--spacing-sm);
+  padding: var(--spacing-ms) var(--spacing-md);
   background: var(--color-error-lighter);
   border: 1px solid var(--color-error-light);
   border-radius: var(--radius-md);
@@ -132,8 +132,8 @@
 .actions {
   display: flex;
   justify-content: flex-end;
-  gap: var(--space-3);
-  padding-top: var(--space-4);
+  gap: var(--spacing-ms);
+  padding-top: var(--spacing-md);
   border-top: 1px solid var(--color-border);
 }
 
