@@ -60,16 +60,16 @@ export function ShowcaseChapter({ showcase }: ShowcaseChapterProps) {
     return (
       <ScrollChapter id="video">
         <div className={styles.root}>
-          <div className={styles.showcaseHeader} data-reveal>
+          <div className={styles.showcaseHeader}>
             <span className={styles.overline}>Video generation</span>
-            <h2 className={styles.heading}>Every segment gets a visual</h2>
+            <h2 className={styles.heading}>Turn podcasts into video</h2>
             <p className={styles.description}>
-              AI illustrations, data charts, source figures, maps,
-              stock footage, timelines, diagrams, and more.
-              All generated automatically from your content.
+              Choose from 11 visual types — AI illustrations, data charts,
+              source figures, maps, stock footage, timelines, and more.
+              Fully customizable per segment.
             </p>
           </div>
-          <div className={styles.showcaseGrid} data-reveal>
+          <div className={styles.showcaseGrid}>
             {showcaseItems.map((item) => (
               <div key={item.visualType} className={styles.showcaseCard}>
                 <div className={styles.showcaseMedia}>
