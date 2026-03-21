@@ -1,6 +1,6 @@
 .nav {
   position: fixed;
-  top: 0;
+  top: var(--impersonation-banner-height, 0px);
   left: 0;
   right: 0;
   z-index: var(--z-sticky);
