@@ -119,11 +119,12 @@ export function VideoView({
   const activeIndex = findActiveIndex(segments, currentTime);
   const activeSegment = segments[activeIndex] ?? null;
 
-  // Avatar uses the same active segment as the audio — no lookahead.
-  // The avatar video was generated from the segment's raw audio, so
-  // avatarTime = currentTime - startTime gives exact sync.
-  const avatarIndex = activeIndex;
-  const avatarSegment = activeSegment;
+  // Avatar should appear when the voice becomes audible during the crossfade,
+  // not at startTime. The audio stitcher uses 300ms crossfades, so the voice
+  // starts ~300ms before the segment's startTime in the stitched audio.
+  const CROSSFADE_SEC = 0.3;
+  const avatarIndex = findActiveIndex(segments, currentTime + CROSSFADE_SEC);
+  const avatarSegment = segments[avatarIndex] ?? activeSegment;
 
   // Show avatar only when the matching speaker is active AND the segment is enabled
   const visibleOverlays = useMemo(() => {
@@ -138,10 +139,6 @@ export function VideoView({
   }, [playableOverlays, avatarSegment]);
 
   // Compute avatar video time: cumulative duration of prior enabled same-speaker segments + elapsed in current
-  // DB startTimes are raw cumulative sums; the stitched audio has 300ms crossfades per segment
-  // boundary, so each segment starts ~0.3s earlier in the actual audio than its startTime indicates.
-  // Cross-correlation confirms: drift ≈ segmentIndex × 0.3s (verified: 4 × 0.3 = 1.2 ≈ measured 1.18s)
-  const CROSSFADE_SEC = 0.3;
   const avatarTimeMap = useMemo(() => {
     const map = new Map<string, number>();
     if (!avatarSegment) return map;
@@ -155,8 +152,7 @@ export function VideoView({
         if (i < avatarIndex) {
           avatarTime += segments[i].duration ?? 0;
         } else if (i === avatarIndex) {
-          const crossfadeDrift = i * CROSSFADE_SEC;
-          avatarTime += Math.max(0, currentTime - (segments[i].startTime ?? 0) + crossfadeDrift);
+          avatarTime += Math.max(0, currentTime - (segments[i].startTime ?? 0));
           break;
         }
       }
