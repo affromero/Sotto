@@ -1,6 +1,150 @@
 /* ==========================================================================
-   CONVERT CHAPTER — Pricing + CTA + Footer
+   CONVERT CHAPTER — FAQ + Pricing + CTA + Footer
    ========================================================================== */
+
+/* ==========================================================================
+   FAQ SECTION
+   ========================================================================== */
+
+.faq {
+  padding: var(--section-pad-y) var(--spacing-lg);
+  max-width: var(--max-content-width);
+  margin: 0 auto;
+}
+
+.faqHeader {
+  text-align: center;
+  margin-bottom: 48px;
+}
+
+.overline {
+  composes: overline from './shared.module.css';
+}
+
+.heading {
+  font-family: var(--font-heading);
+  font-size: clamp(2.25rem, 4.5vw, 3.25rem);
+  font-weight: 400;
+  color: var(--color-text);
+  line-height: 1.15;
+}
+
+.faqGrid {
+  max-width: 720px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.faqItem {
+  background: var(--color-surface);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: var(--radius-2xl);
+  overflow: hidden;
+  transition: box-shadow var(--transition-base);
+}
+
+.faqItem:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.faqItem[open] {
+  box-shadow: var(--shadow-lg);
+}
+
+.faqQuestion {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 24px 28px;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  color: var(--color-text);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.faqQuestion::-webkit-details-marker {
+  display: none;
+}
+
+.faqQuestion::marker {
+  display: none;
+  content: '';
+}
+
+.faqQuestion:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+  border-radius: var(--radius-2xl);
+}
+
+/* Chevron */
+.chevron {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  position: relative;
+}
+
+.chevron::before,
+.chevron::after {
+  content: '';
+  position: absolute;
+  background: var(--color-text-secondary);
+  border-radius: 1px;
+  transition: transform 0.25s var(--ease-out-expo);
+}
+
+.chevron::before {
+  top: 50%;
+  left: 3px;
+  right: 3px;
+  height: 2px;
+  transform: translateY(-50%);
+}
+
+.chevron::after {
+  left: 50%;
+  top: 3px;
+  bottom: 3px;
+  width: 2px;
+  transform: translateX(-50%);
+}
+
+.faqItem[open] .chevron::after {
+  transform: translateX(-50%) rotate(90deg);
+  opacity: 0;
+}
+
+.faqAnswer {
+  padding: 0 28px 24px;
+}
+
+.faqAnswer p {
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--color-text-secondary);
+}
+
+.faqAnswer a {
+  color: var(--color-primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: rgba(217, 119, 6, 0.3);
+}
+
+.faqAnswer a:hover {
+  text-decoration-color: var(--color-primary);
+}
+
+.faqAnswer strong {
+  font-weight: 600;
+  color: var(--color-text);
+}
 
 /* ==========================================================================
    PRICING
@@ -52,10 +196,6 @@
 
 .header {
   margin-bottom: 48px;
-}
-
-.overline {
-  composes: overline from './shared.module.css';
 }
 
 .headingLight {
@@ -302,6 +442,12 @@
   font-weight: 500;
 }
 
+/* PoweredByProviders in footer */
+.providers {
+  max-width: var(--max-content-width);
+  margin: 0 auto 32px;
+}
+
 /* Social icons row */
 .socialRow {
   display: flex;
@@ -342,6 +488,23 @@
    ========================================================================== */
 
 @media (max-width: 768px) {
+  .faq {
+    padding: var(--section-pad-y-sm) var(--spacing-md);
+  }
+
+  .faqHeader {
+    margin-bottom: 32px;
+  }
+
+  .faqQuestion {
+    padding: 20px 20px;
+    font-size: 1rem;
+  }
+
+  .faqAnswer {
+    padding: 0 20px 20px;
+  }
+
   .pricing {
     padding: var(--section-pad-y-sm) var(--spacing-md);
   }
@@ -379,5 +542,20 @@
 
   .footerCols {
     gap: 40px;
+  }
+}
+
+/* ==========================================================================
+   REDUCED MOTION
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  .faqItem {
+    transition: none;
+  }
+
+  .chevron::before,
+  .chevron::after {
+    transition: none;
   }
 }

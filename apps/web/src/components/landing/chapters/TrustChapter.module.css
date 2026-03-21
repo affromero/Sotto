@@ -1,5 +1,5 @@
 /* ==========================================================================
-   TRUST CHAPTER — Asymmetric editorial layout for verification
+   TRUST CHAPTER — Merged trust + identity verification
    ========================================================================== */
 
 .root {
@@ -55,7 +55,9 @@
 
 .colVisual {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  gap: 20px;
+  align-items: center;
 }
 
 /* Text column */
@@ -207,6 +209,30 @@
 
 .cardCallout strong {
   font-weight: 600;
+}
+
+/* ==========================================================================
+   VERIFIED FEATURES — inline badges below card
+   ========================================================================== */
+
+.verifiedFeatures {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.verifiedBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 16px;
+  border-radius: var(--radius-full);
+  background: rgba(22, 163, 74, 0.06);
+  border: 1px solid rgba(22, 163, 74, 0.15);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-success);
 }
 
 /* ==========================================================================
