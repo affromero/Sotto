@@ -342,16 +342,16 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
         if ((data.status === 'READY' || data.status === 'GENERATING_AVATARS' || data.status === 'STALE') && data.segmentVisuals?.length > 0) {
           setVideoState('ready');
           setSegmentVisuals(data.segmentVisuals);
-          if (isOwner) {
-            if (data.avatarOverlays) {
-              setAvatarOverlays(data.avatarOverlays);
+          if (data.avatarOverlays) {
+            setAvatarOverlays(data.avatarOverlays);
+            if (isOwner) {
               const hasInProgress = data.avatarOverlays.some(
                 (o: AvatarOverlayData) => ['pending', 'concatenating', 'submitting', 'processing'].includes(o.status)
               );
               if (hasInProgress) setAvatarGenerating(true);
             }
-            if (typeof data.avatarsVisible === 'boolean') setAvatarsVisible(data.avatarsVisible);
           }
+          if (typeof data.avatarsVisible === 'boolean') setAvatarsVisible(data.avatarsVisible);
         } else if (isOwner && data.status === 'FAILED') {
           setVideoState('failed');
           setVideoError({ message: data.failureReason || 'Video generation failed.' });
