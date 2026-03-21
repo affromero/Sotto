@@ -446,7 +446,7 @@ describe('processContentExtraction', () => {
         userId: 'user-001',
         discoveryId: 'discovery-abc',
         sourceContent: 'Test content',
-      });
+      }, { jobId: expect.any(String) });
     });
 
     it('passes undefined sourceContent when content is empty', async () => {
@@ -464,7 +464,8 @@ describe('processContentExtraction', () => {
         'generate_script',
         expect.objectContaining({
           sourceContent: undefined,
-        })
+        }),
+        { jobId: expect.any(String) },
       );
     });
   });
@@ -535,7 +536,8 @@ describe('processContentExtraction', () => {
           podcastId: 'podcast-001',
           discoveryId: 'discovery-existing',
           sourceContent: 'Already extracted content',
-        })
+        }),
+        { jobId: expect.any(String) },
       );
     });
 

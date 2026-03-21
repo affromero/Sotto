@@ -23,11 +23,18 @@ const mockFindUnique = vi.fn();
 const mockUserFindUniqueOrThrow = vi.fn();
 const mockUserAiKeyFindMany = vi.fn();
 
+const mockVideoGenFindFirst = vi.fn().mockResolvedValue(null);
+const mockVideoGenUpdateMany = vi.fn().mockResolvedValue({ count: 0 });
+
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     podcast: { findUnique: (...args: unknown[]) => mockFindUnique(...args) },
     user: { findUniqueOrThrow: (...args: unknown[]) => mockUserFindUniqueOrThrow(...args) },
     userAiKey: { findMany: (...args: unknown[]) => mockUserAiKeyFindMany(...args) },
+    videoGeneration: {
+      findFirst: (...args: unknown[]) => mockVideoGenFindFirst(...args),
+      updateMany: (...args: unknown[]) => mockVideoGenUpdateMany(...args),
+    },
   },
 }));
 
@@ -326,12 +333,15 @@ describe('GET /api/podcasts/[id]/video/pipeline', () => {
     expect(res.status).toBe(401);
   });
 
-  it('rejects missing classificationId', async () => {
+  it('returns none status when no classificationId and no draft exists', async () => {
+    mockVideoGenFindFirst.mockResolvedValue(null);
     const res = await GET(
       createRequest('GET', undefined, 'http://localhost:3000/api/podcasts/pod-1/video/pipeline'),
       routeParams,
     );
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.status).toBe('none');
   });
 
   it('rejects non-UUID classificationId', async () => {
