@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import type { LandingShowcaseData } from '@/lib/showcase';
 import { useShowcaseToggles } from '../ShowcaseTogglesProvider';
 import { ScrollChapter } from '../ScrollChapter';
@@ -7,6 +8,15 @@ import styles from './ShowcaseChapter.module.css';
 
 interface ShowcaseChapterProps {
   showcase: LandingShowcaseData | null;
+}
+
+interface ShowcaseItem {
+  visualType: string;
+  label: string;
+  description: string;
+  url: string;
+  mediaType: 'image' | 'video';
+  credits?: string;
 }
 
 const DEFAULT_SEGMENTS = [
@@ -32,6 +42,69 @@ export function ShowcaseChapter({ showcase }: ShowcaseChapterProps) {
   const showVideoToggle = showcase?.showVideo ?? false;
   const showAvatarToggle = (showcase?.showAvatar && showcase?.hasAvatars) ?? false;
 
+  const [showcaseItems, setShowcaseItems] = useState<ShowcaseItem[] | null>(null);
+
+  useEffect(() => {
+    fetch('/api/showcase')
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (data?.items?.length > 0) {
+          setShowcaseItems(data.items);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // If we have showcase clips, show the visual grid instead of the mock
+  if (showcaseItems && showcaseItems.length > 0) {
+    return (
+      <ScrollChapter id="video">
+        <div className={styles.root}>
+          <div className={styles.showcaseHeader} data-reveal>
+            <span className={styles.overline}>Video generation</span>
+            <h2 className={styles.heading}>Every segment gets a visual</h2>
+            <p className={styles.description}>
+              AI illustrations, data charts, source figures, maps,
+              stock footage, timelines, diagrams, and more.
+              All generated automatically from your content.
+            </p>
+          </div>
+          <div className={styles.showcaseGrid} data-reveal>
+            {showcaseItems.map((item) => (
+              <div key={item.visualType} className={styles.showcaseCard}>
+                <div className={styles.showcaseMedia}>
+                  {item.mediaType === 'video' ? (
+                    <video
+                      src={item.url}
+                      className={styles.showcaseVideo}
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                    />
+                  ) : (
+                    <img
+                      src={item.url}
+                      alt={item.label}
+                      className={styles.showcaseVideo}
+                    />
+                  )}
+                  {item.credits && (
+                    <span className={styles.showcaseCredits}>{item.credits}</span>
+                  )}
+                </div>
+                <div className={styles.showcaseCardBody}>
+                  <span className={styles.showcaseType}>{item.label}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </ScrollChapter>
+    );
+  }
+
+  // Fallback: original mock pipeline card
   const segments = showcase && showcase.videoSegments.length > 0
     ? showcase.videoSegments.map((seg, i) => ({
         num: seg.order,
@@ -90,7 +163,7 @@ export function ShowcaseChapter({ showcase }: ShowcaseChapterProps) {
                     Avatars: {avatarEnabled ? 'On' : 'Off'}
                   </button>
                 )}
-                  <span className={styles.videoCount}>10 visual types</span>
+                  <span className={styles.videoCount}>11 visual types</span>
                 </div>
               </div>
             </div>
@@ -102,7 +175,7 @@ export function ShowcaseChapter({ showcase }: ShowcaseChapterProps) {
               <p className={styles.description}>
                 Every segment gets a visual. AI illustrations, maps,
                 data charts, stock footage, timelines, diagrams, and more.
-                Add avatar presenters or keep it clean. Ten visual types, fully automatic.
+                Add avatar presenters or keep it clean. Eleven visual types, fully automatic.
               </p>
             </div>
           </div>
