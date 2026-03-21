@@ -180,7 +180,7 @@ export function AudioClipPlayer({
       syncVideo(audio.currentTime, true);
       setIsPlaying(true);
     }
-  }, [isPlaying, startTime, syncVideo]);
+  }, [isPlaying, startTime, endTime, syncVideo]);
 
   const handleTrackSwitch = useCallback((index: number) => {
     if (index === activeTrackIndex) return;
