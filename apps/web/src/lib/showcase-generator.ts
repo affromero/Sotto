@@ -224,9 +224,9 @@ const CURATED_SEGMENTS: Array<{
       duration: 5,
       visualType: 'SOURCE_FIGURE',
       metadata: {
-        figureUrl: 'https://www.iter.org/img/resize-900-90/www/content/com/Lists/ITER%20Newsline/Attachments/2177/tokamak_complex_2022.jpg',
-        sourceLabel: 'ITER Organization, iter.org',
-        caption: 'ITER tokamak complex — the largest fusion experiment in the world',
+        figureUrl: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1280&h=720&fit=crop',
+        sourceLabel: 'NASA Earth Observatory',
+        caption: 'Global energy distribution — visualizing where fusion could transform power grids',
       },
     },
     frame: 60,
@@ -234,7 +234,7 @@ const CURATED_SEGMENTS: Array<{
 ];
 
 const CLIP_TIMEOUT_MS = 60000;
-const SHOWCASE_CLIP_SECONDS = 4;
+const SHOWCASE_CLIP_SECONDS = 5;
 
 async function renderClip(segment: VideoSegment, durationSeconds = SHOWCASE_CLIP_SECONDS): Promise<Buffer> {
   if (!REMOTION_URL) throw new Error('REMOTION_URL not configured');
@@ -289,7 +289,9 @@ export async function generateShowcaseClips(opts?: { imageModel?: string }): Pro
     const { FalImageProvider } = await import('./providers/image/fal.provider');
     const falKey = process.env.FAL_KEY;
     if (falKey) {
-      const provider = new FalImageProvider(falKey, opts?.imageModel);
+      const selectedModel = opts?.imageModel;
+      logger.info('Generating AI illustration', { model: selectedModel ?? 'default (fal-flux-1-schnell)' });
+      const provider = new FalImageProvider(falKey, selectedModel);
       const imageBuffer = await provider.generateImage({
         prompt: 'Inside a fusion reactor, glowing plasma contained by magnetic fields, editorial illustration style, warm amber and deep navy tones, clean lines, no text, no real people',
         width: 1280,
