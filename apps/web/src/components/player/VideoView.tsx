@@ -152,7 +152,7 @@ export function VideoView({
         if (i < avatarIndex) {
           avatarTime += segments[i].duration ?? 0;
         } else if (i === avatarIndex) {
-          avatarTime += currentTime - (segments[i].startTime ?? 0) + VISUAL_TRANSITION_SEC;
+          avatarTime += Math.max(0, currentTime - (segments[i].startTime ?? 0));
           break;
         }
       }
