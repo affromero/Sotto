@@ -3,7 +3,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { NotificationData } from '@/types/notification';
 
-const POLL_INTERVAL_MS = 30_000;
+/** Background poll interval when SSE is connected (consistency check) */
+const SSE_POLL_INTERVAL_MS = 60_000;
+/** Poll interval when SSE is not available (fallback) */
+const FALLBACK_POLL_INTERVAL_MS = 30_000;
 
 interface UseNotificationsOptions {
   onNewNotifications?: (notifications: NotificationData[]) => void;
@@ -28,6 +31,7 @@ export function useNotifications(options?: UseNotificationsOptions): UseNotifica
   const initialLoadRef = useRef(true);
   const onNewRef = useRef(options?.onNewNotifications);
   onNewRef.current = options?.onNewNotifications;
+  const sseConnectedRef = useRef(false);
 
   const fetchNotifications = useCallback(async () => {
     try {
@@ -56,10 +60,82 @@ export function useNotifications(options?: UseNotificationsOptions): UseNotifica
     }
   }, []);
 
+  const prepend = useCallback((notification: NotificationData) => {
+    seenIdsRef.current.add(notification.id);
+    setNotifications((prev) => {
+      if (prev.some((n) => n.id === notification.id)) return prev;
+      return [notification, ...prev];
+    });
+  }, []);
+
+  // SSE connection for real-time notifications
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof EventSource === 'undefined') return;
+
+    let es: EventSource | null = null;
+    let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+    let disposed = false;
+
+    function connect() {
+      if (disposed) return;
+
+      es = new EventSource('/api/notifications/stream');
+
+      es.onopen = () => {
+        sseConnectedRef.current = true;
+        // Switch to slower background poll now that SSE is active
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+        }
+        intervalRef.current = setInterval(fetchNotifications, SSE_POLL_INTERVAL_MS);
+      };
+
+      es.onmessage = (event) => {
+        try {
+          const notification: NotificationData = JSON.parse(event.data);
+          prepend(notification);
+          // Fire toast callback for SSE-delivered notifications
+          if (onNewRef.current) {
+            onNewRef.current([notification]);
+          }
+        } catch {
+          // Ignore malformed SSE data
+        }
+      };
+
+      es.onerror = () => {
+        sseConnectedRef.current = false;
+        es?.close();
+        es = null;
+
+        // Switch back to faster poll
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+        }
+        intervalRef.current = setInterval(fetchNotifications, FALLBACK_POLL_INTERVAL_MS);
+
+        // Reconnect after 5s
+        if (!disposed) {
+          reconnectTimeout = setTimeout(connect, 5_000);
+        }
+      };
+    }
+
+    connect();
+
+    return () => {
+      disposed = true;
+      sseConnectedRef.current = false;
+      es?.close();
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+    };
+  }, [fetchNotifications, prepend]);
+
+  // Initial fetch + polling (SSE effect may adjust the interval)
   useEffect(() => {
     fetchNotifications();
 
-    intervalRef.current = setInterval(fetchNotifications, POLL_INTERVAL_MS);
+    intervalRef.current = setInterval(fetchNotifications, FALLBACK_POLL_INTERVAL_MS);
 
     return () => {
       if (intervalRef.current) {
@@ -71,7 +147,6 @@ export function useNotifications(options?: UseNotificationsOptions): UseNotifica
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   const markRead = useCallback(async (notificationId: string) => {
-    // Optimistic update
     setNotifications((prev) =>
       prev.map((n) => (n.id === notificationId ? { ...n, read: true } : n))
     );
@@ -86,7 +161,6 @@ export function useNotifications(options?: UseNotificationsOptions): UseNotifica
         throw new Error('Failed to mark notification as read');
       }
     } catch {
-      // Revert optimistic update
       setNotifications((prev) =>
         prev.map((n) => (n.id === notificationId ? { ...n, read: false } : n))
       );
@@ -94,7 +168,6 @@ export function useNotifications(options?: UseNotificationsOptions): UseNotifica
   }, []);
 
   const markAllRead = useCallback(async () => {
-    // Optimistic update
     const previousNotifications = notifications;
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
 
@@ -106,7 +179,6 @@ export function useNotifications(options?: UseNotificationsOptions): UseNotifica
         throw new Error('Failed to mark all notifications as read');
       }
     } catch {
-      // Revert optimistic update
       setNotifications(previousNotifications);
     }
   }, [notifications]);
@@ -115,15 +187,6 @@ export function useNotifications(options?: UseNotificationsOptions): UseNotifica
     setIsLoading(true);
     await fetchNotifications();
   }, [fetchNotifications]);
-
-  const prepend = useCallback((notification: NotificationData) => {
-    seenIdsRef.current.add(notification.id);
-    setNotifications((prev) => {
-      // Deduplicate — if already in the list, don't add
-      if (prev.some((n) => n.id === notification.id)) return prev;
-      return [notification, ...prev];
-    });
-  }, []);
 
   return { notifications, unreadCount, isLoading, markRead, markAllRead, refresh, prepend };
 }
