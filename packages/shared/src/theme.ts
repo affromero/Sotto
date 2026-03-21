@@ -123,6 +123,7 @@ export const darkColors: ColorScheme = {
 } as const;
 
 export const spacing = {
+  xxs: 2,
   xs: 4,
   sm: 8,
   md: 16,
@@ -130,6 +131,7 @@ export const spacing = {
   xl: 32,
   '2xl': 48,
   '3xl': 64,
+  xxl: 96,
 } as const;
 
 export const typography = {
