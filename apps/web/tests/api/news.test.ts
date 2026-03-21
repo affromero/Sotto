@@ -46,16 +46,6 @@ const mockArticle = {
   pubDate: new Date('2026-03-17T10:00:00Z'),
 };
 
-const mockArticle2 = {
-  id: 'art-2',
-  title: 'Climate summit reaches agreement',
-  url: 'https://bbc.com/climate',
-  summary: 'World leaders agree on carbon targets',
-  source: 'BBC',
-  category: 'world',
-  pubDate: new Date('2026-03-16T08:00:00Z'),
-};
-
 function setupDefaultMocks() {
   mockCheckRateLimit.mockResolvedValue({ allowed: true });
   mockArticleFindMany.mockResolvedValue([mockArticle]);

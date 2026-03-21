@@ -63,6 +63,48 @@ const WELL_STRUCTURED_HTML = `<!DOCTYPE html>
 </body>
 </html>`;
 
+const HTML_WITH_TABLE = `<!DOCTYPE html>
+<html>
+<head><title>Data Article</title></head>
+<body>
+  <article>
+    <h1>Revenue Report</h1>
+    <p>Here is the quarterly revenue data for 2024.</p>
+    <table>
+      <caption>Q1-Q4 Revenue</caption>
+      <thead><tr><th>Quarter</th><th>Revenue</th><th>Growth</th></tr></thead>
+      <tbody>
+        <tr><td>Q1</td><td>$10M</td><td>5%</td></tr>
+        <tr><td>Q2</td><td>$12M</td><td>20%</td></tr>
+        <tr><td>Q3</td><td>$15M</td><td>25%</td></tr>
+        <tr><td>Q4</td><td>$18M</td><td>20%</td></tr>
+      </tbody>
+    </table>
+    <p>Revenue grew significantly throughout the year.</p>
+  </article>
+</body>
+</html>`;
+
+const HTML_WITH_FIGURES = `<!DOCTYPE html>
+<html>
+<head><title>Research Paper</title></head>
+<body>
+  <article>
+    <h1>Study Results</h1>
+    <figure>
+      <img src="https://example.com/images/chart1.png" alt="GDP Growth Chart" width="800" height="600">
+      <figcaption>Figure 1: GDP growth over time</figcaption>
+    </figure>
+    <p>The chart shows steady growth.</p>
+    <figure>
+      <img src="https://example.com/images/chart2.jpg" alt="Population Distribution" width="600" height="400">
+      <figcaption>Figure 2: Population by region</figcaption>
+    </figure>
+    <img src="https://example.com/icon-small.png" alt="icon" width="16" height="16">
+  </article>
+</body>
+</html>`;
+
 const MINIMAL_HTML = `<html><body><p>Just a paragraph.</p></body></html>`;
 
 const EMPTY_HTML = `<html><head><title>Empty</title></head><body></body></html>`;
@@ -250,6 +292,39 @@ describe('extractors', () => {
       expect(result.text).toContain('日本語');
       expect(result.text).toContain('Ñoño');
       expect(result.text).toContain('€');
+    });
+
+    it('extracts tables with headers, rows, and caption', async () => {
+      mockFetchResponse(HTML_WITH_TABLE);
+      const result = await extractHtmlContent('https://example.com/data');
+
+      expect(result.tables).toBeDefined();
+      expect(result.tables!.length).toBe(1);
+      expect(result.tables![0].caption).toBe('Q1-Q4 Revenue');
+      expect(result.tables![0].headers).toEqual(['Quarter', 'Revenue', 'Growth']);
+      expect(result.tables![0].rows).toHaveLength(4);
+      expect(result.tables![0].rows[0]).toEqual(['Q1', '$10M', '5%']);
+    });
+
+    it('extracts figures with caption, alt text, and absolute URLs', async () => {
+      mockFetchResponse(HTML_WITH_FIGURES);
+      const result = await extractHtmlContent('https://example.com/paper');
+
+      expect(result.figures).toBeDefined();
+      expect(result.figures!.length).toBe(2); // small icon should be filtered out
+      expect(result.figures![0].url).toBe('https://example.com/images/chart1.png');
+      expect(result.figures![0].caption).toBe('Figure 1: GDP growth over time');
+      expect(result.figures![0].altText).toBe('GDP Growth Chart');
+      expect(result.figures![0].mimeType).toBe('image/png');
+      expect(result.figures![1].mimeType).toBe('image/jpeg');
+    });
+
+    it('does not include tables or figures fields when none found', async () => {
+      mockFetchResponse(MINIMAL_HTML);
+      const result = await extractHtmlContent('https://example.com/minimal');
+
+      expect(result.tables).toBeUndefined();
+      expect(result.figures).toBeUndefined();
     });
   });
 

@@ -113,9 +113,20 @@ export const VisualType = {
   TEXT_CARD: 'TEXT_CARD',
   MAP_OVERLAY: 'MAP_OVERLAY',
   DATA_TABLE: 'DATA_TABLE',
+  SOURCE_FIGURE: 'SOURCE_FIGURE',
 } as const;
 
 export type VisualTypeValue = (typeof VisualType)[keyof typeof VisualType];
+
+// ---------------------------------------------------------------------------
+// SOURCE_FIGURE metadata types
+// ---------------------------------------------------------------------------
+
+export interface SourceFigureMetadata {
+  sourceLabel: string;
+  caption: string | null;
+  figureUrl: string;
+}
 
 // ---------------------------------------------------------------------------
 // DATA_TABLE metadata types

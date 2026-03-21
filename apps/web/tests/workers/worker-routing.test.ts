@@ -63,9 +63,7 @@ describe('matchesPreset', () => {
   it('preset=core excludes EXPERIMENTAL_WORKERS (denylist)', () => {
     expect(matchesPreset('demo-voiceover', 'core')).toBe(false);
     expect(matchesPreset('demo-script', 'core')).toBe(false);
-    expect(matchesPreset('avatar-generation', 'core')).toBe(false);
     expect(matchesPreset('music-generation', 'core')).toBe(false);
-    expect(matchesPreset('lip-sync-test', 'core')).toBe(false);
   });
 
   it('preset=core includes production workers', () => {
@@ -110,8 +108,8 @@ describe('shouldRun — experimental workers excluded', () => {
     expect(shouldRun('demo-composition', opts({ profile: 'heavy', preset: 'core' }))).toBe(false);
   });
 
-  it('avatar-generation excluded with heavy+core', () => {
-    expect(shouldRun('avatar-generation', opts({ profile: 'heavy', preset: 'core' }))).toBe(false);
+  it('avatar-generation runs with heavy+core (not experimental)', () => {
+    expect(shouldRun('avatar-generation', opts({ profile: 'heavy', preset: 'core' }))).toBe(true);
   });
 
   it('music-generation excluded with heavy+core', () => {
@@ -172,9 +170,8 @@ describe('shouldRun — profile filtering with preset=core', () => {
 });
 
 describe('set integrity', () => {
-  it('all EXPERIMENTAL entries exist in HEAVY or PIPELINE (except lip-sync-test)', () => {
+  it('all EXPERIMENTAL entries exist in HEAVY or PIPELINE', () => {
     for (const worker of EXPERIMENTAL_WORKERS) {
-      if (worker === 'lip-sync-test') continue;
       const inHeavy = HEAVY_WORKERS.has(worker);
       const inPipeline = PIPELINE_WORKERS.has(worker);
       expect(
@@ -184,9 +181,8 @@ describe('set integrity', () => {
     }
   });
 
-  it('lip-sync-test is experimental but not in heavy/pipeline (standalone)', () => {
-    expect(EXPERIMENTAL_WORKERS.has('lip-sync-test')).toBe(true);
-    expect(HEAVY_WORKERS.has('lip-sync-test')).toBe(false);
-    expect(PIPELINE_WORKERS.has('lip-sync-test')).toBe(false);
+  it('segment-preview is in HEAVY_WORKERS (not experimental)', () => {
+    expect(HEAVY_WORKERS.has('segment-preview')).toBe(true);
+    expect(EXPERIMENTAL_WORKERS.has('segment-preview')).toBe(false);
   });
 });

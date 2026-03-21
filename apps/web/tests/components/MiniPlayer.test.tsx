@@ -177,8 +177,8 @@ describe('MiniPlayer', () => {
       duration: 180,
     });
     const { container } = render(<MiniPlayer />);
-    const progressLine = container.querySelector('[class*="progressLine"]');
-    expect(progressLine).toHaveStyle({ width: '50%' });
+    const seekFill = container.querySelector('[class*="seekFill"]');
+    expect(seekFill).toHaveStyle({ width: '50%' });
   });
 
   it('shows zero progress when duration is zero', () => {
@@ -188,8 +188,8 @@ describe('MiniPlayer', () => {
       duration: 0,
     });
     const { container } = render(<MiniPlayer />);
-    const progressLine = container.querySelector('[class*="progressLine"]');
-    expect(progressLine).toHaveStyle({ width: '0%' });
+    const seekFill = container.querySelector('[class*="seekFill"]');
+    expect(seekFill).toHaveStyle({ width: '0%' });
   });
 
   it('capitalizes first letter of lowercase title when paused', () => {

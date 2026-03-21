@@ -248,6 +248,54 @@ describe('processContentExtraction', () => {
         })
       );
     });
+
+    it('stores tables and figures in sourceMetadata when extraction returns them', async () => {
+      mockExtractContent.mockResolvedValue({
+        text: 'Revenue data',
+        markdown: '# Revenue\n\nData here',
+        title: 'Revenue Report',
+        description: null,
+        siteName: null,
+        author: null,
+        publishedDate: null,
+        wordCount: 2,
+        sourceType: 'html',
+        extractionMethod: 'readability',
+        tables: [{ caption: 'Q1-Q4', headers: ['Quarter', 'Revenue'], rows: [['Q1', '$10M']], sourceLabel: null }],
+        figures: [{ url: 'https://example.com/chart.png', caption: 'Figure 1', altText: null, sourceLabel: null, mimeType: 'image/png' }],
+      });
+
+      const job = createMockJob({
+        ...defaultPayload,
+        sourceUrl: 'https://example.com/data',
+      });
+      await processContentExtraction(job);
+
+      expect(mockPrismaDiscoveryUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            sourceMetadata: expect.objectContaining({
+              tables: [{ caption: 'Q1-Q4', headers: ['Quarter', 'Revenue'], rows: [['Q1', '$10M']], sourceLabel: null }],
+              figures: [{ url: 'https://example.com/chart.png', caption: 'Figure 1', altText: null, sourceLabel: null, mimeType: 'image/png' }],
+            }),
+          }),
+        })
+      );
+    });
+
+    it('omits structured data fields from sourceMetadata when extraction returns none', async () => {
+      const job = createMockJob({
+        ...defaultPayload,
+        sourceUrl: 'https://example.com/article',
+      });
+      await processContentExtraction(job);
+
+      const updateCall = mockPrismaDiscoveryUpdate.mock.calls[0][0];
+      const metadata = updateCall.data.sourceMetadata as Record<string, unknown>;
+      expect(metadata).not.toHaveProperty('tables');
+      expect(metadata).not.toHaveProperty('figures');
+      expect(metadata).not.toHaveProperty('keyStatistics');
+    });
   });
 
   describe('text extraction', () => {
@@ -398,7 +446,7 @@ describe('processContentExtraction', () => {
         userId: 'user-001',
         discoveryId: 'discovery-abc',
         sourceContent: 'Test content',
-      });
+      }, { jobId: expect.any(String) });
     });
 
     it('passes undefined sourceContent when content is empty', async () => {
@@ -416,7 +464,8 @@ describe('processContentExtraction', () => {
         'generate_script',
         expect.objectContaining({
           sourceContent: undefined,
-        })
+        }),
+        { jobId: expect.any(String) },
       );
     });
   });
@@ -487,7 +536,8 @@ describe('processContentExtraction', () => {
           podcastId: 'podcast-001',
           discoveryId: 'discovery-existing',
           sourceContent: 'Already extracted content',
-        })
+        }),
+        { jobId: expect.any(String) },
       );
     });
 

@@ -65,11 +65,39 @@ function createGetRequest(params?: Record<string, string>): NextRequest {
   return new NextRequest(url, { method: 'GET' });
 }
 
-function createPostRequest(formData: FormData): NextRequest {
-  return new NextRequest('http://localhost:3000/api/voices/verify', {
+function createPostRequest(fields: Record<string, string>, includeAudio?: boolean): NextRequest {
+  // Stub out the request then override formData() to avoid jsdom/undici FormData interop issues.
+  const req = new NextRequest('http://localhost:3000/api/voices/verify', {
     method: 'POST',
-    body: formData,
   });
+
+  // Build a Map-like FormData stub that the route handler consumes via .get()
+  const fakeFormData = {
+    _data: new Map<string, string | File>(),
+    get(key: string) { return this._data.get(key) ?? null; },
+    has(key: string) { return this._data.has(key); },
+  };
+  for (const [k, v] of Object.entries(fields)) {
+    fakeFormData._data.set(k, v);
+  }
+  if (includeAudio) {
+    // The route does: `const audio = formData.get('audio') as File | null`
+    // then calls audio.arrayBuffer(). Create a minimal File-like object
+    // with explicit arrayBuffer() since jsdom's Blob may not provide it.
+    const audioData = new TextEncoder().encode('audio-data');
+    const audioFile = {
+      name: 'recording.webm',
+      type: 'audio/webm',
+      size: audioData.byteLength,
+      lastModified: Date.now(),
+      arrayBuffer: () => Promise.resolve(audioData.buffer),
+    };
+    fakeFormData._data.set('audio', audioFile as unknown as File);
+  }
+
+  // Override formData() on the request instance
+  (req as unknown as { formData: () => Promise<typeof fakeFormData> }).formData = () => Promise.resolve(fakeFormData);
+  return req;
 }
 
 const mockSession = { user: { id: 'user-1' } };
@@ -171,11 +199,7 @@ describe('POST /api/voices/verify', () => {
   it('returns 401 when unauthenticated', async () => {
     mockAuth.mockResolvedValue(null);
 
-    const formData = new FormData();
-    formData.append('voiceCloneId', 'clone-1');
-    formData.append('audio', new File(['audio-data'], 'recording.webm', { type: 'audio/webm' }));
-
-    const response = await POST(createPostRequest(formData));
+    const response = await POST(createPostRequest({ voiceCloneId: 'clone-1' }, true));
 
     expect(response.status).toBe(401);
   });
@@ -183,10 +207,7 @@ describe('POST /api/voices/verify', () => {
   it('returns 400 when voiceCloneId is missing', async () => {
     mockAuth.mockResolvedValue(mockSession);
 
-    const formData = new FormData();
-    formData.append('audio', new File(['audio-data'], 'recording.webm', { type: 'audio/webm' }));
-
-    const response = await POST(createPostRequest(formData));
+    const response = await POST(createPostRequest({}, true));
 
     expect(response.status).toBe(400);
   });
@@ -194,10 +215,7 @@ describe('POST /api/voices/verify', () => {
   it('returns 400 when audio file is missing', async () => {
     mockAuth.mockResolvedValue(mockSession);
 
-    const formData = new FormData();
-    formData.append('voiceCloneId', 'clone-1');
-
-    const response = await POST(createPostRequest(formData));
+    const response = await POST(createPostRequest({ voiceCloneId: 'clone-1' }));
 
     expect(response.status).toBe(400);
   });
@@ -209,11 +227,7 @@ describe('POST /api/voices/verify', () => {
       verificationStatus: 'AWAITING_CHALLENGE',
     });
 
-    const formData = new FormData();
-    formData.append('voiceCloneId', 'clone-1');
-    formData.append('audio', new File(['audio-data'], 'recording.webm', { type: 'audio/webm' }));
-
-    const response = await POST(createPostRequest(formData));
+    const response = await POST(createPostRequest({ voiceCloneId: 'clone-1' }, true));
 
     expect(response.status).toBe(403);
   });
@@ -225,11 +239,7 @@ describe('POST /api/voices/verify', () => {
       verificationStatus: 'VERIFIED',
     });
 
-    const formData = new FormData();
-    formData.append('voiceCloneId', 'clone-1');
-    formData.append('audio', new File(['audio-data'], 'recording.webm', { type: 'audio/webm' }));
-
-    const response = await POST(createPostRequest(formData));
+    const response = await POST(createPostRequest({ voiceCloneId: 'clone-1' }, true));
 
     expect(response.status).toBe(409);
   });
@@ -246,11 +256,7 @@ describe('POST /api/voices/verify', () => {
       expiresAt: new Date(Date.now() - 60000), // expired 1 minute ago
     });
 
-    const formData = new FormData();
-    formData.append('voiceCloneId', 'clone-1');
-    formData.append('audio', new File(['audio-data'], 'recording.webm', { type: 'audio/webm' }));
-
-    const response = await POST(createPostRequest(formData));
+    const response = await POST(createPostRequest({ voiceCloneId: 'clone-1' }, true));
 
     expect(response.status).toBe(410);
   });
@@ -267,11 +273,7 @@ describe('POST /api/voices/verify', () => {
       expiresAt: new Date(Date.now() + 600000), // 10 minutes from now
     });
 
-    const formData = new FormData();
-    formData.append('voiceCloneId', 'clone-1');
-    formData.append('audio', new File(['audio-data'], 'recording.webm', { type: 'audio/webm' }));
-
-    const response = await POST(createPostRequest(formData));
+    const response = await POST(createPostRequest({ voiceCloneId: 'clone-1' }, true));
     const body = await response.json();
 
     expect(response.status).toBe(200);
@@ -308,11 +310,7 @@ describe('POST /api/voices/verify', () => {
     });
     mockPrismaVoiceVerificationChallengeFindFirst.mockResolvedValue(null);
 
-    const formData = new FormData();
-    formData.append('voiceCloneId', 'clone-1');
-    formData.append('audio', new File(['audio-data'], 'recording.webm', { type: 'audio/webm' }));
-
-    const response = await POST(createPostRequest(formData));
+    const response = await POST(createPostRequest({ voiceCloneId: 'clone-1' }, true));
 
     expect(response.status).toBe(409);
   });

@@ -53,7 +53,7 @@ export async function processContentExtraction(job: Job<ExtractContentPayload>):
     content = content
       ? `${content}\n\n---\n\n## Referenced Article\n\n${urlContent}`
       : urlContent;
-    sourceMetadata = {
+    sourceMetadata = JSON.parse(JSON.stringify({
       title: extracted.title,
       author: extracted.author,
       publishedDate: extracted.publishedDate,
@@ -61,7 +61,10 @@ export async function processContentExtraction(job: Job<ExtractContentPayload>):
       wordCount: extracted.wordCount,
       sourceType: extracted.sourceType,
       extractionMethod: extracted.extractionMethod,
-    };
+      ...(extracted.tables && extracted.tables.length > 0 && { tables: extracted.tables }),
+      ...(extracted.figures && extracted.figures.length > 0 && { figures: extracted.figures }),
+      ...(extracted.keyStatistics && extracted.keyStatistics.length > 0 && { keyStatistics: extracted.keyStatistics }),
+    }));
   }
 
   // Fetch topic/depth/focusAreas in one query for bias analysis + feasibility check

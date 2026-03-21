@@ -43,9 +43,12 @@ function extractDataUri(dataUri: string, port: number): { localUrl: string; file
  * Uses CRF 28 for faster/smaller preview renders (vs production CRF 23).
  */
 clipRouter.post('/', async (req, res) => {
-  const { segment, durationSeconds = 3 } = req.body as {
+  const { segment, durationSeconds = 3, audioUrl, audioStartTime, quality = 'preview' } = req.body as {
     segment: VideoSegment;
     durationSeconds?: number;
+    audioUrl?: string;
+    audioStartTime?: number;
+    quality?: 'preview' | 'full';
   };
 
   if (!segment?.visualType) {
@@ -89,19 +92,27 @@ clipRouter.post('/', async (req, res) => {
 
     const serveUrl = await getBundlePath();
 
+    const inputProps = {
+      segment,
+      ...(audioUrl && { audioUrl }),
+      ...(audioStartTime !== undefined && { audioStartTime }),
+    };
+
     const composition = await selectComposition({
       serveUrl,
       id: 'SegmentStill',
-      inputProps: { segment },
+      inputProps,
     });
+
+    const crf = quality === 'full' ? 23 : 28;
 
     await renderMedia({
       composition,
       serveUrl,
       codec: 'h264',
-      crf: 28,
+      crf,
       outputLocation: outputPath,
-      inputProps: { segment },
+      inputProps,
     });
 
     const stat = fs.statSync(outputPath);

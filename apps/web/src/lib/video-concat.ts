@@ -160,3 +160,79 @@ export async function concatenateVideoClips(clips: Buffer[]): Promise<Buffer> {
     await rmdir(tmpDir).catch(() => {});
   }
 }
+
+// ---------------------------------------------------------------------------
+// Per-segment preview concatenation
+// ---------------------------------------------------------------------------
+
+interface PreviewSegment {
+  order: number;
+  previewUrl: string;
+}
+
+/**
+ * Concatenate pre-rendered segment previews into a final video via FFmpeg.
+ * All previews must use the same codec, resolution, and frame rate.
+ */
+export async function concatenateSegmentPreviews(
+  segments: PreviewSegment[],
+  audioUrl: string,
+): Promise<Buffer> {
+  const { exec } = await import('child_process');
+  const { promisify } = await import('util');
+  const fs = await import('fs');
+  const path = await import('path');
+  const os = await import('os');
+  const { v4: uuidv4 } = await import('uuid');
+  const execAsync = promisify(exec);
+
+  const tmpDir = path.join(os.tmpdir(), `sotto-concat-${uuidv4()}`);
+  fs.mkdirSync(tmpDir, { recursive: true });
+
+  const sorted = [...segments].sort((a, b) => a.order - b.order);
+
+  try {
+    // Download all preview MP4s
+    const localPaths: string[] = [];
+    await Promise.all(
+      sorted.map(async (seg, i) => {
+        const localPath = path.join(tmpDir, `seg-${String(i).padStart(4, '0')}.mp4`);
+        const response = await fetch(seg.previewUrl);
+        if (!response.ok) throw new Error(`Failed to download preview: ${seg.previewUrl}`);
+        const buffer = Buffer.from(await response.arrayBuffer());
+        fs.writeFileSync(localPath, buffer);
+        localPaths[i] = localPath;
+      }),
+    );
+
+    // Create FFmpeg concat file
+    const concatFile = path.join(tmpDir, 'concat.txt');
+    const concatContent = localPaths.map((p) => `file '${p}'`).join('\n');
+    fs.writeFileSync(concatFile, concatContent);
+
+    // Download audio
+    const audioPath = path.join(tmpDir, 'audio.mp3');
+    const audioResponse = await fetch(audioUrl);
+    if (!audioResponse.ok) throw new Error(`Failed to download audio: ${audioUrl}`);
+    fs.writeFileSync(audioPath, Buffer.from(await audioResponse.arrayBuffer()));
+
+    // Concatenate videos + mux audio
+    const outputPath = path.join(tmpDir, 'final.mp4');
+    await execAsync(
+      `ffmpeg -y -f concat -safe 0 -i "${concatFile}" -i "${audioPath}" ` +
+      `-c:v copy -c:a aac -b:a 192k -shortest "${outputPath}"`,
+      { timeout: 300000 },
+    );
+
+    const result = fs.readFileSync(outputPath);
+
+    logger.info('Video preview concatenation complete', {
+      segments: String(sorted.length),
+      size: String(result.length),
+    });
+
+    return result;
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+}

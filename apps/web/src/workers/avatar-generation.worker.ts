@@ -1,6 +1,5 @@
 import { type Job, UnrecoverableError } from 'bullmq';
 import type { GenerateAvatarPayload } from '@/lib/queue';
-import { addJob, JobType, videoCompositionQueue } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { uploadFile } from '@/lib/r2';
 import { logger } from '@/lib/logger';
@@ -336,7 +335,7 @@ async function processFalLipSync(job: Job<GenerateAvatarPayload>): Promise<void>
     }
 
     // Optional: trim audio for quick test runs (set testMaxSeconds in job data)
-    const testMaxSeconds = (job.data as Record<string, unknown>).testMaxSeconds as number | undefined;
+    const testMaxSeconds = (job.data as unknown as Record<string, unknown>).testMaxSeconds as number | undefined;
     if (testMaxSeconds && durationSeconds > testMaxSeconds) {
       const { execSync } = await import('child_process');
       const trimmedPath = join(tmpDir, 'trimmed.mp3');
@@ -949,7 +948,7 @@ async function processRunwayAvatar(job: Job<GenerateAvatarPayload>): Promise<voi
 
 // ── Shared ──
 
-async function checkAllAvatarsReady(videoGenerationId: string, podcastId: string): Promise<void> {
+async function checkAllAvatarsReady(videoGenerationId: string, _podcastId: string): Promise<void> {
   const pending = await prisma.avatarOverlay.count({
     where: {
       videoGenerationId,

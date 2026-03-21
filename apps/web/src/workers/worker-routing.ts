@@ -24,6 +24,7 @@ export const HEAVY_WORKERS = new Set([
   'demo-transition',
   'demo-composition',
   'demo-scene-composition',
+  'segment-preview',
 ]);
 
 /** Pipeline orchestration workers */

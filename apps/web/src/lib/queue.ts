@@ -66,6 +66,7 @@ export enum JobType {
   SCHEDULE_BRIEFINGS = 'schedule_briefings',
   CLASSIFY_PIPELINE = 'classify_pipeline',
   MONITOR_TTS_PROVIDERS = 'monitor_tts_providers',
+  RENDER_SEGMENT_PREVIEW = 'render_segment_preview',
 }
 
 /**
@@ -312,6 +313,13 @@ export interface ComposeVideoPayload {
   voiceTrackId?: string;
 }
 
+export interface RenderSegmentPreviewPayload {
+  podcastId: string;
+  videoGenerationId: string;
+  segmentVisualId: string;
+  quality: 'preview' | 'full';
+}
+
 export interface PlaceEnrichmentPayload {
   segmentVisualId: string;
   podcastId: string;
@@ -325,7 +333,7 @@ export interface GenerateAvatarPayload {
   avatarOverlayId: string;
   speaker: string;
   avatarId: string;
-  avatarProvider?: 'heygen' | 'runway' | 'fal';
+  avatarProvider?: 'heygen' | 'runway' | 'fal' | 'replicate';
   avatarImageUrl?: string;
   avatarModelId?: string;
   isPreset?: boolean;
@@ -1061,6 +1069,7 @@ export const quizGenerationQueue = createQueueReference('quiz-generation');
 export const briefingSchedulerQueue = createQueueReference('briefing-scheduler');
 export const pipelineClassificationQueue = createQueueReference('pipeline-classification');
 export const ttsProviderMonitorQueue = createQueueReference('tts-provider-monitor');
+export const segmentPreviewQueue = createQueueReference('segment-preview');
 
 /** All queue names — single source of truth for admin and health endpoints */
 export const ALL_QUEUE_NAMES = Object.freeze(Object.keys(QUEUE_DEFINITIONS));
