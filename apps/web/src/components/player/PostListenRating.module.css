@@ -81,7 +81,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 40px;
+  height: 44px;
   padding: 0 var(--spacing-lg);
   border: none;
   border-radius: var(--radius-lg);
@@ -108,7 +108,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 40px;
+  height: 44px;
   padding: 0 var(--spacing-lg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);

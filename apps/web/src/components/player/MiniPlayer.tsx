@@ -21,12 +21,20 @@ export function MiniPlayer({ podcastTitle, onExpand, onClose }: MiniPlayerProps)
   const player = usePlayer();
   const seekBarRef = useRef<HTMLDivElement>(null);
 
-  const handleSeek = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+  const seekFromX = useCallback((clientX: number) => {
     if (!player || !seekBarRef.current) return;
     const rect = seekBarRef.current.getBoundingClientRect();
-    const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
     player.seek(ratio * player.duration);
   }, [player]);
+
+  const handleSeek = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    seekFromX(e.clientX);
+  }, [seekFromX]);
+
+  const handleTouchSeek = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
+    seekFromX(e.touches[0].clientX);
+  }, [seekFromX]);
 
   if (!player || !player.podcastId) return null;
 
@@ -38,6 +46,8 @@ export function MiniPlayer({ podcastTitle, onExpand, onClose }: MiniPlayerProps)
         ref={seekBarRef}
         className={styles.seekBar}
         onClick={handleSeek}
+        onTouchStart={handleTouchSeek}
+        onTouchMove={handleTouchSeek}
         role="slider"
         aria-label="Seek"
         aria-valuemin={0}

@@ -1,6 +1,6 @@
 /* Password gate */
 .main {
-  min-height: 100vh;
+  min-height: var(--full-height);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -85,7 +85,7 @@
 
 /* Loading */
 .loading {
-  min-height: 100vh;
+  min-height: var(--full-height);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -111,7 +111,7 @@
 .viewer {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: var(--full-height);
   background: var(--color-background);
   position: relative;
 }

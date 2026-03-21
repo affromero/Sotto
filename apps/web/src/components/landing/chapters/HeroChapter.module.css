@@ -4,8 +4,7 @@
 
 .root {
   position: relative;
-  min-height: 100vh;
-  min-height: 100dvh;
+  min-height: var(--full-height);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -130,7 +129,7 @@
    MOBILE
    ========================================================================== */
 
-@media (max-width: 767px) {
+@media (max-width: 768px) {
   .root {
     padding: calc(100px + var(--impersonation-banner-height, 0px)) var(--spacing-md) 60px;
   }

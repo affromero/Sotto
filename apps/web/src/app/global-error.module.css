@@ -22,7 +22,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 100vh;
+  min-height: var(--full-height);
   padding: 32px;
   text-align: center;
 }

@@ -112,7 +112,7 @@
   color: var(--color-text-inverse);
 }
 
-@media (max-width: 767px) {
+@media (max-width: 768px) {
   .mockScript {
     max-width: 100%;
   }

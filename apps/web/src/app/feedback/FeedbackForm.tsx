@@ -158,6 +158,8 @@ export function FeedbackForm() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Your email"
               maxLength={200}
+              inputMode="email"
+              autoComplete="email"
             />
           </div>
         </div>
