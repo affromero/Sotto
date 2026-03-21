@@ -44,21 +44,10 @@ export function categorizePicks(
       const siblingTag = candidate.tags.find(
         (t) => t.parentId && context.interestParentIds.has(t.parentId)
       );
-      if (siblingTag) {
-        // Find the user's interest that shares this parent
-        for (const [tagId, name] of context.interestTagNames) {
-          const candidateTag = candidates
-            .find((c) => c.id === pick.id)
-            ?.tags.find((t) => t.id === tagId);
-          if (candidateTag) {
-            matchingInterestName = name;
-            break;
-          }
-        }
-        // Fallback: use the sibling tag's parent interest name
-        if (!matchingInterestName && siblingTag.parentId) {
-          matchingInterestName = context.interestTagNames.get(siblingTag.parentId) ?? undefined;
-        }
+      if (siblingTag && siblingTag.parentId) {
+        // Look up the user's interest tag name that shares this parent
+        matchingInterestName =
+          context.interestParentToName.get(siblingTag.parentId) ?? undefined;
       }
     }
 
