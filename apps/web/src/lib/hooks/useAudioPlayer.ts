@@ -27,18 +27,18 @@ export function useAudioPlayer(): PlayerState & PlayerControls {
     if (typeof window === 'undefined') return null;
     if (!audioRef.current) {
       const audio = new Audio();
-      // Use requestAnimationFrame for frame-accurate time updates (~16ms)
-      // instead of timeupdate (~250ms) for precise avatar/video sync
+      // Use requestAnimationFrame for smooth time updates (~60fps)
+      // with 50ms threshold to avoid excessive re-renders
       let rafId = 0;
+      let lastReported = 0;
       const tick = () => {
         if (!audio.paused) {
-          setState((s) => {
-            if (Math.abs(s.currentTime - audio.currentTime) > 0.016) {
-              return { ...s, currentTime: audio.currentTime || 0 };
-            }
-            return s;
-          });
-          syncMusic(audio.currentTime);
+          const now = audio.currentTime;
+          if (Math.abs(now - lastReported) > 0.05) {
+            lastReported = now;
+            setState((s) => ({ ...s, currentTime: now }));
+          }
+          syncMusic(now);
         }
         rafId = requestAnimationFrame(tick);
       };
