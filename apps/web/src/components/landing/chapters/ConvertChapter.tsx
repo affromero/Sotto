@@ -54,6 +54,17 @@ export function ConvertChapter() {
               or start creating now &rarr;
             </Link>
           </div>
+          <aside id="teams" className={styles.teams} data-reveal>
+            <div className={styles.teamsDivider} aria-hidden="true" />
+            <p className={styles.teamsText}>
+              <strong>Exploring Sotto for your organization?</strong> We&apos;re working
+              with early partners on internal audio briefings, video explainers, and
+              avatar-hosted presentations from company docs and updates.
+            </p>
+            <a href="mailto:teams@sotto.fm" className={styles.teamsLink}>
+              Let&apos;s talk &rarr;
+            </a>
+          </aside>
         </div>
       </ScrollChapter>
 
@@ -70,6 +81,7 @@ export function ConvertChapter() {
               <a href="#features">Features</a>
               <Link href="/voices">Voices</Link>
               <Link href="/feed">Feed</Link>
+              <a href="#teams">Teams</a>
             </div>
             <div>
               <strong className={styles.footerHeading}>Company</strong>
