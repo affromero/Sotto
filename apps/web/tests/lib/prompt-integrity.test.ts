@@ -11,7 +11,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
-import { globSync } from 'glob';
+import glob from 'glob';
 
 const PROMPTS_DIR = join(__dirname, '../../prompts');
 
@@ -147,12 +147,12 @@ const STATIC_TEMPLATES = EXPECTED_FILES.filter((f) => !VARIABLE_CONTRACTS[f]);
 
 describe('prompt file existence', () => {
   it(`prompts directory contains exactly ${EXPECTED_FILES.length} .md files`, () => {
-    const actual = globSync('**/*.md', { cwd: PROMPTS_DIR }).sort();
+    const actual = glob.sync('**/*.md', { cwd: PROMPTS_DIR }).sort();
     expect(actual).toHaveLength(EXPECTED_FILES.length);
     expect(actual).toEqual(EXPECTED_FILES.sort());
   });
 
-  it.each(EXPECTED_FILES)('%s exists and is non-empty', (file) => {
+  it.each(EXPECTED_FILES)('%s exists and is non-empty', (file: string) => {
     const fullPath = join(PROMPTS_DIR, file);
     expect(existsSync(fullPath)).toBe(true);
     const content = readFileSync(fullPath, 'utf-8');
@@ -160,7 +160,7 @@ describe('prompt file existence', () => {
   });
 
   it('no orphaned .md files outside expected set', () => {
-    const actual = new Set(globSync('**/*.md', { cwd: PROMPTS_DIR }));
+    const actual = new Set(glob.sync('**/*.md', { cwd: PROMPTS_DIR }));
     const expected = new Set(EXPECTED_FILES);
     const orphaned = [...actual].filter((f) => !expected.has(f));
     expect(orphaned).toEqual([]);

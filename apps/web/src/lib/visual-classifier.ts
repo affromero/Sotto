@@ -27,7 +27,8 @@ export type VisualTypeString =
   | 'DIAGRAM'
   | 'TEXT_CARD'
   | 'MAP_OVERLAY'
-  | 'DATA_TABLE';
+  | 'DATA_TABLE'
+  | 'SOURCE_FIGURE';
 
 export interface ClassifiedSubVisual {
   subOrder: number;
@@ -62,6 +63,7 @@ const VISUAL_TYPE_ENUM = [
   'TEXT_CARD',
   'MAP_OVERLAY',
   'DATA_TABLE',
+  'SOURCE_FIGURE',
 ] as const;
 
 const subVisualSchema = z.object({
@@ -111,6 +113,7 @@ VISUAL TYPES:
 - DIAGRAM: Conceptual diagram. Provide metadata: { svgContent } with a simple SVG string.
 - TEXT_CARD: Key points summary. Provide metadata: { headline, bullets: string[], statValue?, statLabel? }.
 - MAP_OVERLAY: Geographic content — specific locations, historical places, battle sites, trade routes, geographic features. Provide a search-friendly place description in prompt. Provide metadata: { places: [{ name, yearHint? }], preset: "vintage"|"satellite"|"cinematic" }.
+- SOURCE_FIGURE: An actual figure, chart, or screenshot extracted from the source material. Use when verified source figures are listed and the segment references the same content. Provide metadata: { figureUrl: "the URL from the available source figures list", sourceLabel: "attribution text e.g. Figure 3, Smith et al. 2024", caption: "figure description" }. Prefer SOURCE_FIGURE over AI_ILLUSTRATION when a matching source figure exists.
 - DATA_TABLE: Tabular data — exact-value lookups, rankings, league tables, benchmark matrices, before/after numeric inventories, or any case where the viewer should scan rows and compare precise cells. Use DATA_TABLE when exact numbers or labels matter more than visual shape; use DATA_CHART for trends/proportions instead. Keep to <= 5 columns and <= 8 rows. Provide metadata: { headers: { title?, subtitle?, sourceLabel? }, columns: [{ key, label, align?, widthPercent?, isNumeric? }], rows: [{ key, values: { [columnKey]: string|number }, toneByColumnKey?, isSummary? }], styleHints?: { density?, zebraRows?, showGridLines?, emphasizeFirstColumn?, maxVisibleRows? }, highlightCells?: [{ rowKey, columnKey, tone?, pulse? }], sortIndicators?: [{ columnKey, direction: "asc"|"desc" }] }.
 
 SUB-VISUAL RULES:
@@ -184,22 +187,54 @@ function wrapLegacyAsSubVisual(item: z.infer<typeof legacyClassificationItemSche
   };
 }
 
+export interface StructuredSourceData {
+  tables?: { caption: string | null; headers: string[]; rows: string[][]; sourceLabel: string | null }[];
+  figures?: { url: string; caption: string | null; altText: string | null; sourceLabel: string | null; mimeType: string }[];
+  keyStatistics?: { label: string; value: string; unit: string | null; context: string | null }[];
+}
+
 export async function classifySegmentVisuals(
   segments: SegmentInput[],
   podcastTitle: string,
   podcastTopic: string,
-  opts?: { provider?: string; model?: string; apiKeyOverride?: string },
+  opts?: { provider?: string; model?: string; apiKeyOverride?: string; structuredData?: StructuredSourceData },
 ): Promise<{ classifications: ClassifiedSegment[]; transitionRecommendations: TransitionRecommendation[]; inputTokens: number; outputTokens: number; model: string }> {
   const segmentList = segments
     .map((s) => `[${s.order}] ${s.speaker}: ${s.text} (${s.duration.toFixed(1)}s)`)
     .join('\n');
+
+  const structuredSections: string[] = [];
+
+  if (opts?.structuredData?.tables && opts.structuredData.tables.length > 0) {
+    const tableBlocks = opts.structuredData.tables.map((t, i) => {
+      const label = t.caption || `Table ${i + 1}`;
+      const header = t.headers.join(' | ');
+      const rows = t.rows.slice(0, 20).map((r) => r.join(' | ')).join('\n');
+      return `[${label}]\n${header}\n${rows}`;
+    });
+    structuredSections.push(`\nAvailable Source Tables (use exact values for DATA_TABLE/DATA_CHART):\n${tableBlocks.join('\n\n')}`);
+  }
+
+  if (opts?.structuredData?.figures && opts.structuredData.figures.length > 0) {
+    // Exclude data URIs from the prompt — they'd explode token count
+    const httpFigures = opts.structuredData.figures.filter((f) => !f.url.startsWith('data:'));
+    if (httpFigures.length > 0) {
+      const figureLines = httpFigures.map((f, i) => {
+        const label = f.caption || f.altText || `Figure ${i + 1}`;
+        return `[Figure ${i + 1}: "${label}"] URL: ${f.url}`;
+      });
+      structuredSections.push(`\nAvailable Source Figures (use SOURCE_FIGURE when segment references these):\n${figureLines.join('\n')}`);
+    }
+  }
+
+  const structuredBlock = structuredSections.length > 0 ? `\n${structuredSections.join('\n')}` : '';
 
   const userMessage = `Podcast: "${podcastTitle}"
 Topic: ${podcastTopic}
 
 Segments:
 ${segmentList}
-
+${structuredBlock}
 Classify each segment with sub-visuals. Return JSON only.`;
 
   const ai = createAIProvider(opts?.provider);

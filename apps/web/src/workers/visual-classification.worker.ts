@@ -9,7 +9,7 @@ import {
   videoCompositionQueue,
 } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
-import { classifySegmentVisuals } from '@/lib/visual-classifier';
+import { classifySegmentVisuals, type StructuredSourceData } from '@/lib/visual-classifier';
 import { resolveAiModelAndProvider } from '@/lib/providers/ai-registry';
 import { resolveMotionProvider } from '@/lib/auto-model-config';
 import { getAiKey } from '@/lib/byok';
@@ -19,7 +19,7 @@ import { logger } from '@/lib/logger';
 import { resolveSegmentTiming } from '@/lib/segment-timing';
 
 const EXTERNAL_ASSET_TYPES = new Set(['AI_ILLUSTRATION', 'STOCK_FOOTAGE', 'MAP_OVERLAY']);
-const PROGRAMMATIC_TYPES: VisualType[] = ['TEXT_CARD', 'TIMELINE', 'QUOTE', 'COMPARISON', 'DIAGRAM', 'DATA_CHART', 'DATA_TABLE'];
+const PROGRAMMATIC_TYPES: VisualType[] = ['TEXT_CARD', 'TIMELINE', 'QUOTE', 'COMPARISON', 'DIAGRAM', 'DATA_CHART', 'DATA_TABLE', 'SOURCE_FIGURE'];
 const REMOTION_URL = process.env.REMOTION_URL;
 const STILL_FPS = 30;
 const STILL_CONCURRENCY = 4;
@@ -37,8 +37,8 @@ export async function processVisualClassification(job: Job<ClassifyVisualsPayloa
   });
 
   try {
-    // Fetch podcast metadata + resolve AI model + segment timing
-    const [podcast, aiKey, user, segmentTimings] = await Promise.all([
+    // Fetch podcast metadata + resolve AI model + segment timing + source data
+    const [podcast, aiKey, user, segmentTimings, discovery] = await Promise.all([
       prisma.podcast.findUniqueOrThrow({
         where: { id: podcastId },
         select: {
@@ -54,6 +54,10 @@ export async function processVisualClassification(job: Job<ClassifyVisualsPayloa
       getAiKey(userId),
       prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { plan: true } }),
       resolveSegmentTiming(podcastId, voiceTrackId),
+      prisma.discovery.findUnique({
+        where: { podcastId },
+        select: { sourceMetadata: true },
+      }),
     ]);
     const { model: aiModel, provider: aiProvider } = await resolveAiModelAndProvider({
       podcastAiModel: podcast.aiModel,
@@ -78,11 +82,25 @@ export async function processVisualClassification(job: Job<ClassifyVisualsPayloa
     await job.updateProgress(30);
 
     // Classify all segments in a single AI call
+    // Extract structured data from source metadata for the classifier
+    const sourceMetadata = discovery?.sourceMetadata as Record<string, unknown> | null;
+    const structuredData = sourceMetadata ? {
+      tables: [
+        ...(sourceMetadata.tables as StructuredSourceData['tables'] || []),
+        ...(sourceMetadata.discoveryTables as StructuredSourceData['tables'] || []),
+      ].slice(0, 10),
+      figures: [
+        ...(sourceMetadata.figures as StructuredSourceData['figures'] || []),
+        ...(sourceMetadata.discoveryFigures as StructuredSourceData['figures'] || []),
+      ].slice(0, 20),
+      keyStatistics: sourceMetadata.keyStatistics as StructuredSourceData['keyStatistics'],
+    } : undefined;
+
     const { classifications, transitionRecommendations, inputTokens, outputTokens, model } = await classifySegmentVisuals(
       segmentInputs,
       podcast.title,
       podcast.topic,
-      { provider: aiProvider, model: aiModel, apiKeyOverride: aiKey?.apiKey },
+      { provider: aiProvider, model: aiModel, apiKeyOverride: aiKey?.apiKey, structuredData },
     );
 
     await job.updateProgress(60);
@@ -97,10 +115,19 @@ export async function processVisualClassification(job: Job<ClassifyVisualsPayloa
         c.subVisuals.map((sv) => {
           const isProgrammatic = PROGRAMMATIC_SET.has(sv.visualType);
           const isExternal = EXTERNAL_ASSET_TYPES.has(sv.visualType);
+          const isSourceFigure = sv.visualType === 'SOURCE_FIGURE';
+
+          // SOURCE_FIGURE: asset URL comes from metadata.figureUrl, immediately ready
+          const figureUrl = isSourceFigure && sv.metadata
+            ? (sv.metadata as Record<string, unknown>).figureUrl as string | undefined
+            : undefined;
+
           // Hera-routed programmatic types need generation (pending); plain Remotion ones are ready immediately
-          const status = isExternal
-            ? 'pending'
-            : (isProgrammatic && motionProvider === 'hera' ? 'pending' : 'ready');
+          const status = isSourceFigure && figureUrl
+            ? 'ready'
+            : isExternal
+              ? 'pending'
+              : (isProgrammatic && motionProvider === 'hera' ? 'pending' : 'ready');
           return {
             videoGenerationId,
             segmentId: c.segmentId,
@@ -114,6 +141,7 @@ export async function processVisualClassification(job: Job<ClassifyVisualsPayloa
             metadata: sv.metadata ? (sv.metadata as unknown as Prisma.InputJsonValue) : Prisma.JsonNull,
             motionProvider: isProgrammatic ? motionProvider : null,
             status,
+            ...(isSourceFigure && figureUrl && { assetUrl: figureUrl, assetType: 'image/png' }),
           };
         }),
       ),

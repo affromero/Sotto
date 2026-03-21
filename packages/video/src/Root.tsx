@@ -69,6 +69,8 @@ const RemotionRoot: React.FC = () => {
             duration: 5,
             visualType: 'TEXT_CARD',
           } satisfies VideoSegment,
+          audioUrl: undefined as string | undefined,
+          audioStartTime: undefined as number | undefined,
         }}
         calculateMetadata={({ props }) => ({
           durationInFrames: Math.max(1, Math.ceil((props.segment.duration ?? 5) * DEFAULT_RENDER_CONFIG.fps)),

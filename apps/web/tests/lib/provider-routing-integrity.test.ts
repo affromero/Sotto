@@ -11,7 +11,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'fs';
 import { join, relative } from 'path';
-import { globSync } from 'glob';
+import glob from 'glob';
 
 vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
@@ -45,7 +45,7 @@ describe('no direct llm.ts imports outside allowlist', () => {
   const DYNAMIC_IMPORT_RE = /import\(\s*['"].*\/llm['"]\s*\)/;
 
   it('no static or dynamic imports of llm.ts outside allowlist', () => {
-    const allTs = globSync('**/*.ts', { cwd: SRC_DIR, ignore: ['**/*.d.ts', '**/*.test.ts'] });
+    const allTs = glob.sync('**/*.ts', { cwd: SRC_DIR, ignore: ['**/*.d.ts', '**/*.test.ts'] });
     const violations: string[] = [];
 
     for (const file of allTs) {
@@ -84,7 +84,7 @@ describe('no hardcoded anthropic in logUsage service fields', () => {
   const SERVICE_ANTHROPIC_RE = /service:\s*.*['"]anthropic['"]/;
 
   it('no logUsage calls with hardcoded anthropic service outside allowlist', () => {
-    const allTs = globSync('**/*.ts', { cwd: SRC_DIR, ignore: ['**/*.d.ts', '**/*.test.ts'] });
+    const allTs = glob.sync('**/*.ts', { cwd: SRC_DIR, ignore: ['**/*.d.ts', '**/*.test.ts'] });
     const violations: Array<{ file: string; line: number; text: string }> = [];
 
     for (const file of allTs) {
@@ -120,7 +120,7 @@ describe('no hardcoded provider anthropic in AI resolution calls', () => {
   const PROVIDER_ANTHROPIC_RE = /provider:\s*['"]anthropic['"]/;
 
   it('no hardcoded provider: \'anthropic\' in source files outside providers/', () => {
-    const allTs = globSync('**/*.ts', {
+    const allTs = glob.sync('**/*.ts', {
       cwd: SRC_DIR,
       ignore: ['**/*.d.ts', '**/*.test.ts'],
     });

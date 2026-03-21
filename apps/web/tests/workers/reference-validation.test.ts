@@ -157,6 +157,10 @@ vi.mock('@/lib/pipeline-events', () => ({
   logPipelineStageComplete: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock('@/lib/discovery-figure-extractor', () => ({
+  extractDiscoveryFigures: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock('@/lib/pipeline-resume', () => ({
   markPodcastFailed: vi.fn(),
 }));

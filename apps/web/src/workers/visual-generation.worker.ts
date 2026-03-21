@@ -1,4 +1,5 @@
 import { Job, UnrecoverableError } from 'bullmq';
+import { safeFetch } from '@/lib/url-validator';
 import { fetchAllVideoModels } from '@/lib/video-cost-estimator';
 import {
   GenerateVisualPayload,
@@ -8,6 +9,7 @@ import {
   avatarGenerationQueue,
   transitionGenerationQueue,
   notificationQueue,
+  visualGenerationQueue,
 } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { resolveImageProvider } from '@/lib/providers/image';
@@ -21,7 +23,7 @@ import { generateHeraMotionGraphic } from '@/lib/hera';
 import { buildHeraPrompt } from '@/lib/hera-prompt-builder';
 import { logger } from '@/lib/logger';
 
-const PROGRAMMATIC_TYPES = new Set(['DATA_CHART', 'QUOTE', 'COMPARISON', 'TIMELINE', 'DIAGRAM', 'TEXT_CARD', 'DATA_TABLE']);
+const PROGRAMMATIC_TYPES = new Set(['DATA_CHART', 'QUOTE', 'COMPARISON', 'TIMELINE', 'DIAGRAM', 'TEXT_CARD', 'DATA_TABLE', 'SOURCE_FIGURE']);
 
 async function generateAiImage(
   podcastId: string,
@@ -173,9 +175,15 @@ async function generateAiVideo(
 }
 
 export async function processVisualGeneration(job: Job<GenerateVisualPayload>): Promise<void> {
-  const { podcastId, videoGenerationId, segmentVisualId, visualType, prompt } = job.data;
+  const { podcastId, videoGenerationId, segmentVisualId, visualType } = job.data;
 
-  logger.info('Generating visual asset', { podcastId, segmentVisualId, visualType });
+  // Apply user feedback to the prompt if present in metadata
+  const userFeedback = (job.data.metadata as Record<string, unknown> | undefined)?.userFeedback as string | undefined;
+  const prompt = userFeedback
+    ? `${job.data.prompt}\n\nUser feedback: ${userFeedback}`
+    : job.data.prompt;
+
+  logger.info('Generating visual asset', { podcastId, segmentVisualId, visualType, hasFeedback: !!userFeedback });
   await job.updateProgress(10);
 
   // Idempotency: skip if asset already generated
@@ -302,6 +310,47 @@ export async function processVisualGeneration(job: Job<GenerateVisualPayload>): 
           },
         });
       }
+    } else if (visualType === 'SOURCE_FIGURE') {
+      // SOURCE_FIGURE: validate the figure URL from metadata, fall back to AI_ILLUSTRATION if broken
+      const sv = await prisma.segmentVisual.findUnique({
+        where: { id: segmentVisualId },
+        select: { metadata: true },
+      });
+      const figureUrl = (sv?.metadata as Record<string, unknown> | null)?.figureUrl as string | undefined;
+
+      if (figureUrl && figureUrl.startsWith('https://')) {
+        try {
+          const headResp = await safeFetch(figureUrl, { method: 'HEAD', signal: AbortSignal.timeout(10000) });
+          if (headResp.ok) {
+            await prisma.segmentVisual.update({
+              where: { id: segmentVisualId },
+              data: { assetUrl: figureUrl, assetType: 'image/png', status: 'ready' },
+            });
+            await checkAllReady(videoGenerationId, podcastId);
+            await job.updateProgress(100);
+            return;
+          }
+        } catch {
+          logger.warn('SOURCE_FIGURE URL validation failed, falling back to AI_ILLUSTRATION', { segmentVisualId, figureUrl });
+        }
+      }
+
+      // Fallback: convert to AI_ILLUSTRATION and re-queue a generation job
+      const fallbackPrompt = prompt || 'Editorial illustration for podcast segment';
+      await prisma.segmentVisual.update({
+        where: { id: segmentVisualId },
+        data: { visualType: 'AI_ILLUSTRATION', status: 'pending' },
+      });
+      await addJob(visualGenerationQueue, JobType.GENERATE_VISUAL, {
+        podcastId,
+        videoGenerationId,
+        segmentVisualId,
+        visualType: 'AI_ILLUSTRATION',
+        prompt: fallbackPrompt,
+        metadata: {},
+      });
+      await job.updateProgress(100);
+      return;
     } else if (PROGRAMMATIC_TYPES.has(visualType)) {
       // Hera motion — programmatic types only reach here when motionProvider='hera'
       const sv = await prisma.segmentVisual.findUnique({

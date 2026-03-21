@@ -24,6 +24,7 @@ import { resolveAiModelAndProvider, getCheapestModelForProvider, type AiProvider
 import type { TtsProviderId } from '@/lib/providers/tts-registry';
 import { logger } from '@/lib/logger';
 import { logPipelineStageComplete } from '@/lib/pipeline-events';
+import { extractDiscoveryFigures } from '@/lib/discovery-figure-extractor';
 
 export async function processReferenceValidation(
   job: Job<ValidateReferencesPayload>
@@ -240,6 +241,14 @@ export async function processReferenceValidation(
   await Promise.all(refUpdates.filter(Boolean));
 
   await job.updateProgress(70);
+
+  // Extract figures/tables from verified reference URLs and merge into sourceMetadata
+  const verifiedRefs = references.filter(
+    (ref) => ref.url && !rejectedRefIds.has(ref.id) && verificationResults.get(ref.id)?.verdict.status !== 'REMOVED'
+  );
+  if (verifiedRefs.length > 0) {
+    await extractDiscoveryFigures(podcastId, verifiedRefs);
+  }
 
   // Clean script if any references were removed
   let turns = scriptTurns;
