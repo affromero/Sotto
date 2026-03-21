@@ -343,7 +343,7 @@
   z-index: 1;
   font: var(--text-body-sm);
   font-weight: 600;
-  color: var(--color-text-inverse);
+  color: #fff;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
   margin: 0;
   display: -webkit-box;
