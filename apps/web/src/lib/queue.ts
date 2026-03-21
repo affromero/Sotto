@@ -65,6 +65,7 @@ export enum JobType {
   GENERATE_QUIZ = 'generate_quiz',
   SCHEDULE_BRIEFINGS = 'schedule_briefings',
   CLASSIFY_PIPELINE = 'classify_pipeline',
+  RENDER_SEGMENT_PREVIEW = 'render_segment_preview',
 }
 
 /**
@@ -307,6 +308,13 @@ export interface ComposeVideoPayload {
   podcastId: string;
   videoGenerationId: string;
   voiceTrackId?: string;
+}
+
+export interface RenderSegmentPreviewPayload {
+  podcastId: string;
+  videoGenerationId: string;
+  segmentVisualId: string;
+  quality: 'preview' | 'full';
 }
 
 export interface PlaceEnrichmentPayload {
@@ -1056,6 +1064,7 @@ export const waveformGenerationQueue = createQueueReference('waveform-generation
 export const quizGenerationQueue = createQueueReference('quiz-generation');
 export const briefingSchedulerQueue = createQueueReference('briefing-scheduler');
 export const pipelineClassificationQueue = createQueueReference('pipeline-classification');
+export const segmentPreviewQueue = createQueueReference('segment-preview');
 
 /** All queue names — single source of truth for admin and health endpoints */
 export const ALL_QUEUE_NAMES = Object.freeze(Object.keys(QUEUE_DEFINITIONS));
