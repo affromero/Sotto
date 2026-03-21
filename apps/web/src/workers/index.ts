@@ -61,6 +61,7 @@ import { processVideoComposition } from './video-composition.worker';
 import { processAvatarGeneration } from './avatar-generation.worker';
 import { processPlaceEnrichment } from './place-enrichment.worker';
 import { processTransitionGeneration } from './transition-generation.worker';
+import { processSegmentPreview } from './segment-preview.worker';
 import { processNewsIngest } from './news-ingest.worker';
 import { processDemoScriptGeneration } from './demo-script-generation.worker';
 import { processDemoRecording } from './demo-recording.worker';
@@ -161,6 +162,7 @@ const workers = [
   shouldRun('avatar-generation') && createWorker('avatar-generation', processAvatarGeneration, { concurrency: 2, lockDuration: 1200000 }),
   shouldRun('place-enrichment') && createWorker('place-enrichment', processPlaceEnrichment, { concurrency: 3 }),
   shouldRun('transition-generation') && createWorker('transition-generation', processTransitionGeneration, { concurrency: 3, lockDuration: 600000 }),
+  shouldRun('segment-preview') && createWorker('segment-preview', processSegmentPreview, { concurrency: 3, lockDuration: 300000 }),
   shouldRun('news-ingest') && createWorker('news-ingest', processNewsIngest, { concurrency: 1 }),
   shouldRun('demo-script') && createWorker('demo-script', processDemoScriptGeneration, { concurrency: 2 }),
   shouldRun('demo-recording') && createWorker('demo-recording', processDemoRecording, { concurrency: 1, lockDuration: 600000 }),

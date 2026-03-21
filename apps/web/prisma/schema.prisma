@@ -2338,6 +2338,9 @@ model SegmentVisual {
   motionProvider    String? // 'remotion' | 'hera' — which motion provider rendered this visual
   status            String     @default("pending") // pending | generating | ready | failed
   failureReason     String?    @db.Text
+  previewUrl        String?    // R2 URL of per-segment preview MP4
+  previewStatus     String?    // pending | rendering | ready | failed
+  previewQuality    String?    // 'preview' | 'full'
   createdAt         DateTime   @default(now())
   updatedAt         DateTime   @updatedAt
 
