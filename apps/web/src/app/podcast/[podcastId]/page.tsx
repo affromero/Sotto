@@ -6,7 +6,8 @@ import { getTierFeatures } from '@/lib/tier-features';
 import { getVideoGenerationStatus, getAvatarGenerationStatus } from '@/lib/video-gate';
 import { getMusicGenerationStatus } from '@/lib/music-gate';
 import { resolveAudioUrl } from '@/lib/r2';
-import { findVoiceName } from '@/lib/voice-pool';
+import { findVoiceName, formatModelName } from '@/lib/voice-pool';
+import { getProviderMeta } from '@/lib/providers/tts-registry';
 import type { Metadata } from 'next';
 import { PodcastPlayerView } from './PodcastPlayerView';
 import { PodcastJsonLd } from '@/components/player/PodcastJsonLd';
@@ -189,6 +190,9 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
           createdAt: true,
         },
       },
+      voices: {
+        select: { speaker: true, voiceId: true, provider: true },
+      },
       voiceTracks: {
         orderBy: { createdAt: 'asc' as const },
         select: {
@@ -303,6 +307,27 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
       }
     }
   }
+
+  // Build original track display name from podcast's own voice assignments
+  const originalVoiceNames: string[] = [];
+  const seenVoiceIds = new Set<string>();
+  for (const pv of podcast.voices) {
+    if (pv.voiceId && !seenVoiceIds.has(pv.voiceId)) {
+      seenVoiceIds.add(pv.voiceId);
+      const name = voiceNameMap.get(pv.voiceId) ?? findVoiceName(pv.voiceId) ?? pv.voiceId;
+      originalVoiceNames.push(name);
+    }
+  }
+  const providerLabel = podcast.ttsProvider
+    ? getProviderMeta(podcast.ttsProvider as Parameters<typeof getProviderMeta>[0]).displayName
+    : null;
+  const modelLabel = podcast.ttsModel ? formatModelName(podcast.ttsModel) : null;
+  const providerSuffix = providerLabel
+    ? `[${modelLabel ? `${providerLabel} - ${modelLabel}` : providerLabel}]`
+    : '';
+  const originalTrackName = originalVoiceNames.length > 0
+    ? `${originalVoiceNames.join(' + ')} ${providerSuffix}`.trim()
+    : providerSuffix || 'Original';
 
   // Resolve audio URLs: presigned for PRIVATE/UNLISTED, public CDN for PUBLIC
   const [resolvedAudioUrl, resolvedSegments, resolvedVersions, resolvedVoiceTracks, resolvedVideoUrl, resolvedMusicUrl] =
@@ -422,6 +447,7 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
     versions: resolvedVersions,
     voiceTracks: resolvedVoiceTracks,
     defaultVoiceTrackId: podcast.defaultVoiceTrackId,
+    originalTrackName,
     isLiked,
     isSaved,
   };

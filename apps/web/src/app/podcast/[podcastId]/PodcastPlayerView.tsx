@@ -1174,6 +1174,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
               podcastTitle={podcast.title}
               voiceTracks={podcast.voiceTracks}
               defaultVoiceTrackId={podcast.defaultVoiceTrackId}
+              originalTrackName={podcast.originalTrackName}
               isOwner={isOwner}
               speakers={[...new Set(podcast.segments.map(s => s.speaker))]}
             />

@@ -14,6 +14,7 @@ interface VoiceTrackSelectorProps {
   podcastTitle: string;
   voiceTracks: VoiceTrackSummary[];
   defaultVoiceTrackId: string | null;
+  originalTrackName: string;
   isOwner: boolean;
   speakers: string[];
   onTracksChange?: () => void;
@@ -47,6 +48,7 @@ export function VoiceTrackSelector({
   podcastTitle,
   voiceTracks,
   defaultVoiceTrackId,
+  originalTrackName,
   isOwner,
   speakers,
   onTracksChange,
@@ -136,7 +138,7 @@ export function VoiceTrackSelector({
           title={buildVoiceTooltip(track.voices)}
           type="button"
         >
-          <span className={styles.pillName}>{track.name}</span>
+          <span>{track.name}</span>
           {track.contributor && (
             <span className={styles.contributor}>
               {track.contributor.image && (
@@ -203,7 +205,7 @@ export function VoiceTrackSelector({
               onClick={handleSelectOriginal}
               type="button"
             >
-              Original
+              {originalTrackName}
             </button>
             {visibleTracks.map(renderTrackPill)}
             {isOwner && (
@@ -224,7 +226,7 @@ export function VoiceTrackSelector({
               onClick={handleSelectOriginal}
               type="button"
             >
-              Original
+              {originalTrackName}
             </button>
             {Array.from(groupedByProvider.entries()).map(([provider, tracks]) => (
               <div key={provider} className={styles.providerGroup}>
