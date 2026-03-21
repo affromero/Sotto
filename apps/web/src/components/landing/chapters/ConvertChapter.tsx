@@ -54,7 +54,7 @@ export function ConvertChapter() {
               or start creating now &rarr;
             </Link>
           </div>
-          <aside className={styles.teams} data-reveal>
+          <aside id="teams" className={styles.teams} data-reveal>
             <div className={styles.teamsDivider} aria-hidden="true" />
             <p className={styles.teamsText}>
               <strong>Exploring Sotto for your organization?</strong> We&apos;re working
@@ -81,6 +81,7 @@ export function ConvertChapter() {
               <a href="#features">Features</a>
               <Link href="/voices">Voices</Link>
               <Link href="/feed">Feed</Link>
+              <a href="#teams">Teams</a>
             </div>
             <div>
               <strong className={styles.footerHeading}>Company</strong>
