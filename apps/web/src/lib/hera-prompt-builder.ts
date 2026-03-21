@@ -82,6 +82,18 @@ function buildTextCardPrompt(metadata: Record<string, unknown>, segmentText: str
   return `Animated text card motion graphic.${headline ? ` Headline: "${headline}".` : ''}${body ? ` Body: "${truncate(body, 200)}".` : ''} Text fades in with subtle upward drift, headline first then body. ${BRAND_STYLE} Context: ${truncate(segmentText, 200)}`;
 }
 
+function buildDataTablePrompt(metadata: Record<string, unknown>, segmentText: string): string {
+  const headers = metadata.headers as { title?: string; subtitle?: string } | undefined;
+  const columns = (metadata.columns as Array<{ label: string }>) ?? [];
+  const rows = (metadata.rows as Array<{ values: Record<string, string | number> }>) ?? [];
+
+  const title = headers?.title ?? '';
+  const colLabels = columns.map((c) => c.label).join(' | ');
+  const rowCount = rows.length;
+
+  return `Animated data table motion graphic${title ? `: "${title}"` : ''}. Columns: ${colLabels}. ${rowCount} rows of data revealed row-by-row with staggered fade-in. ${BRAND_STYLE} Context: ${truncate(segmentText, 300)}`;
+}
+
 export function buildHeraPrompt(params: {
   visualType: string;
   metadata: Record<string, unknown> | null;
@@ -103,6 +115,8 @@ export function buildHeraPrompt(params: {
       return buildDiagramPrompt(metadata, segmentText);
     case 'TEXT_CARD':
       return buildTextCardPrompt(metadata, segmentText);
+    case 'DATA_TABLE':
+      return buildDataTablePrompt(metadata, segmentText);
     default:
       return `Animated motion graphic for podcast visual. ${BRAND_STYLE} Context: ${truncate(segmentText, 300)}`;
   }
