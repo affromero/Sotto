@@ -27,6 +27,8 @@ export interface SpeechParams {
   direction?: string;
   /** Speaker role (e.g. "HOST", "EXPERT") — used by some providers for baseline expression */
   speaker?: string;
+  /** Deterministic seed for reproducible output (ElevenLabs only, 0–4294967295) */
+  seed?: number;
 }
 
 export interface SfxParams {

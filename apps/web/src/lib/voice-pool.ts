@@ -36,7 +36,7 @@ export const VOICE_POOL: VoicePoolEntry[] = [
   },
   {
     name: 'Eric',
-    ids: { elevenlabs: 'cjVigY5qzO86Huf0OWal', openai: 'echo', kittentts: 'bruno' },
+    ids: { elevenlabs: 'cjVigY5qzO86Huf0OWal', openai: 'cedar', kittentts: 'bruno' },
     gender: 'male',
     accent: 'american',
     ageRange: 'young',
@@ -60,7 +60,7 @@ export const VOICE_POOL: VoicePoolEntry[] = [
   },
   {
     name: 'Roger',
-    ids: { elevenlabs: 'CwhRBWXzGAHq8TQ4Fs17', openai: 'echo', kittentts: 'jasper' },
+    ids: { elevenlabs: 'CwhRBWXzGAHq8TQ4Fs17', openai: 'cedar', kittentts: 'jasper' },
     gender: 'male',
     accent: 'american',
     ageRange: 'middle',
@@ -109,7 +109,7 @@ export const VOICE_POOL: VoicePoolEntry[] = [
   },
   {
     name: 'Jessica',
-    ids: { elevenlabs: 'cgSgspJ2msm6clMCkdW9', openai: 'alloy', kittentts: 'kiki' },
+    ids: { elevenlabs: 'cgSgspJ2msm6clMCkdW9', openai: 'marin', kittentts: 'kiki' },
     gender: 'female',
     accent: 'american',
     ageRange: 'young',
@@ -133,7 +133,7 @@ export const VOICE_POOL: VoicePoolEntry[] = [
   },
   {
     name: 'Alice',
-    ids: { elevenlabs: 'Xb7hH8MSUJpSbSDYk0k2', openai: 'alloy', kittentts: 'kiki' },
+    ids: { elevenlabs: 'Xb7hH8MSUJpSbSDYk0k2', openai: 'marin', kittentts: 'kiki' },
     gender: 'female',
     accent: 'british',
     ageRange: 'young',
