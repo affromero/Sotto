@@ -37,8 +37,6 @@ interface ShowcaseCostPreview {
   mapOverlay: { provider: string; available: boolean; cost: string };
 }
 
-const STILL_TIMEOUT_MS = 30000;
-
 const CURATED_SEGMENTS: Array<{
   visualType: string;
   label: string;
