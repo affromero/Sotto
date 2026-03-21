@@ -242,6 +242,36 @@
   text-align: center;
 }
 
+/* Cost Breakdown Grid */
+
+.costGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--spacing-sm);
+  margin: var(--spacing-md) 0;
+}
+
+.costBucket {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--color-surface-hover, #f9fafb);
+  border-radius: var(--radius-md);
+}
+
+.costBucketLabel {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+}
+
+.costBucketValue {
+  font: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
 @media (min-width: 600px) {
   .section {
     padding: var(--spacing-xl);
@@ -253,5 +283,9 @@
 
   .creditPackGrid {
     grid-template-columns: repeat(3, 1fr);
+  }
+
+  .costGrid {
+    grid-template-columns: repeat(4, 1fr);
   }
 }
