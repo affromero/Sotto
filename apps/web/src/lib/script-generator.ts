@@ -328,6 +328,9 @@ export interface SourceMetadata {
   wordCount?: number;
   sourceType?: string;
   biasAnalysis?: BiasAnalysis;
+  tables?: { caption: string | null; headers: string[]; rows: string[][]; sourceLabel: string | null }[];
+  figures?: { url: string; caption: string | null; altText: string | null; sourceLabel: string | null; mimeType: string }[];
+  keyStatistics?: { label: string; value: string; unit: string | null; context: string | null }[];
 }
 
 /**
@@ -741,6 +744,7 @@ const SOURCE_CONTENT_LIMIT = 20000;
 
 function formatSourceBlock(content: string, metadata?: SourceMetadata): string {
   const truncated = content.substring(0, SOURCE_CONTENT_LIMIT);
+  const sections: string[] = [];
 
   if (metadata && (metadata.title || metadata.author || metadata.publishedDate || metadata.siteName)) {
     const parts = [
@@ -749,8 +753,38 @@ function formatSourceBlock(content: string, metadata?: SourceMetadata): string {
       metadata.publishedDate && `Published: ${metadata.publishedDate}`,
       metadata.siteName && `Source: ${metadata.siteName}`,
     ].filter(Boolean);
-    return `Source material:\n${parts.join(' | ')}\nContent:\n${truncated}`;
+    sections.push(`Source material:\n${parts.join(' | ')}\nContent:\n${truncated}`);
+  } else {
+    sections.push(`Source material:\n${truncated}`);
   }
 
-  return `Source material:\n${truncated}`;
+  // Append structured data so the AI gets exact values
+  if (metadata?.tables && metadata.tables.length > 0) {
+    const tableBlocks = metadata.tables.map((t, i) => {
+      const label = t.caption || `Table ${i + 1}`;
+      const header = t.headers.join(' | ');
+      const rows = t.rows.slice(0, 20).map((r) => r.join(' | ')).join('\n');
+      return `[${label}]\n${header}\n${rows}`;
+    });
+    sections.push(`\nSource Tables:\n${tableBlocks.join('\n\n')}`);
+  }
+
+  if (metadata?.figures && metadata.figures.length > 0) {
+    const figureLines = metadata.figures.map((f, i) => {
+      const label = f.caption || f.altText || `Figure ${i + 1}`;
+      return `[Figure ${i + 1}: "${label}"]`;
+    });
+    sections.push(`\nSource Figures:\n${figureLines.join('\n')}`);
+  }
+
+  if (metadata?.keyStatistics && metadata.keyStatistics.length > 0) {
+    const statLines = metadata.keyStatistics.map((s) => {
+      const unit = s.unit ? ` ${s.unit}` : '';
+      const ctx = s.context ? ` (${s.context})` : '';
+      return `- ${s.label}: ${s.value}${unit}${ctx}`;
+    });
+    sections.push(`\nKey Statistics:\n${statLines.join('\n')}`);
+  }
+
+  return sections.join('\n');
 }

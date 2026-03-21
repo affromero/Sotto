@@ -1,7 +1,7 @@
 import { Job } from 'bullmq';
 import { ClassifyPipelinePayload } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
-import { classifySegmentVisuals, type VisualTypeString } from '@/lib/visual-classifier';
+import { classifySegmentVisuals, type VisualTypeString, type StructuredSourceData } from '@/lib/visual-classifier';
 import {
   estimateSegmentCost,
   estimatePipelineCost,
@@ -34,6 +34,7 @@ const PROGRAMMATIC_TYPES = new Set<VisualTypeString>([
   'DIAGRAM',
   'TEXT_CARD',
   'DATA_TABLE',
+  'SOURCE_FIGURE',
 ]);
 
 function visualModeForType(visualType: VisualTypeString): VisualMode {
@@ -48,13 +49,24 @@ export async function processPipelineClassification(job: Job<ClassifyPipelinePay
   logger.info('Starting pipeline classification', { classificationId, podcastId });
 
   try {
-    const [podcast, segmentTimings] = await Promise.all([
+    const [podcast, segmentTimings, discovery] = await Promise.all([
       prisma.podcast.findUniqueOrThrow({
         where: { id: podcastId },
         select: { id: true, title: true, topic: true },
       }),
       resolveSegmentTiming(podcastId, voiceTrackId),
+      prisma.discovery.findUnique({
+        where: { podcastId },
+        select: { sourceMetadata: true },
+      }),
     ]);
+
+    const sourceMetadata = discovery?.sourceMetadata as Record<string, unknown> | null;
+    const structuredData: StructuredSourceData | undefined = sourceMetadata ? {
+      tables: sourceMetadata.tables as StructuredSourceData['tables'],
+      figures: sourceMetadata.figures as StructuredSourceData['figures'],
+      keyStatistics: sourceMetadata.keyStatistics as StructuredSourceData['keyStatistics'],
+    } : undefined;
 
     const segmentInputs = segmentTimings.map((s) => ({
       segmentId: s.segmentId,
@@ -71,6 +83,7 @@ export async function processPipelineClassification(job: Job<ClassifyPipelinePay
         provider: aiProvider,
         model: aiModel,
         apiKeyOverride,
+        structuredData,
       }),
       fetchFalImageModels(),
       fetchAllVideoModels(),
