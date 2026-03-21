@@ -4,7 +4,6 @@ import { errorResponse } from '@/lib/api-response';
 import { generateShowcaseClips, getShowcaseCostPreview } from '@/lib/showcase-generator';
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
-import { Prisma } from '@prisma/client';
 
 const generateSchema = z.object({
   name: z.string().min(1).max(100),
@@ -62,7 +61,7 @@ export async function POST(request: NextRequest) {
   const set = await prisma.showcaseSet.create({
     data: {
       name,
-      items: items as unknown as Prisma.InputJsonValue,
+      items: JSON.parse(JSON.stringify(items)),
     },
   });
 
