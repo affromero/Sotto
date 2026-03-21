@@ -140,10 +140,13 @@ export function VisualShowcasePanel() {
               <div className={styles.setActions}>
                 <button
                   type="button"
-                  className={s.active ? styles.activeBtn : styles.inactiveBtn}
+                  className={styles.toggleBtn}
                   onClick={(e) => { e.stopPropagation(); handleToggleActive(s.id, !s.active); }}
+                  aria-pressed={s.active}
                 >
-                  {s.active ? 'Active' : 'Inactive'}
+                  <span className={`${styles.toggleTrack} ${s.active ? styles.toggleOn : ''}`}>
+                    <span className={styles.toggleKnob} />
+                  </span>
                 </button>
                 <button
                   type="button"

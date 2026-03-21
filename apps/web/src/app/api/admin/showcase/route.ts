@@ -57,10 +57,16 @@ export async function POST(request: NextRequest) {
   const { name, imageModel } = parsed.data;
   const { items, failures } = await generateShowcaseClips({ imageModel });
 
-  // Save to DB
+  // New set is active by default — deactivate others
+  await prisma.showcaseSet.updateMany({
+    where: { active: true },
+    data: { active: false },
+  });
+
   const set = await prisma.showcaseSet.create({
     data: {
       name,
+      active: true,
       items: JSON.parse(JSON.stringify(items)),
     },
   });
