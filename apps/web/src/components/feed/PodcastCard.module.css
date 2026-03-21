@@ -318,7 +318,7 @@
 
 /* ── Mobile ─────────────────────────────────── */
 
-@media (max-width: 767px) {
+@media (max-width: 768px) {
   .playButton {
     opacity: 1;
     transform: translate(-50%, -50%) scale(1);

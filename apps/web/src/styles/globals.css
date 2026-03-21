@@ -55,10 +55,15 @@ body::before {
 :root {
   /* Breakpoints (use in @media — cannot be CSS vars):
      sm:  480px   — large phones
-     md:  768px   — tablets
+     md:  768px   — tablets (mobile/desktop boundary)
      lg:  1024px  — desktops
      xl:  1280px  — wide screens
-     Mobile-first: always use min-width */
+
+     Standard pairs:
+       mobile:  @media (max-width: 768px)  { ... }
+       desktop: @media (min-width: 769px)  { ... }
+
+     Mobile-first: prefer min-width. Use max-width only for overrides. */
 
   /* Full viewport height — dvh fallback for iOS Safari address bar */
   --full-height: 100vh;

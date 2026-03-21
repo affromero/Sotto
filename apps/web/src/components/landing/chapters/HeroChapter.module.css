@@ -129,7 +129,7 @@
    MOBILE
    ========================================================================== */
 
-@media (max-width: 767px) {
+@media (max-width: 768px) {
   .root {
     padding: calc(100px + var(--impersonation-banner-height, 0px)) var(--spacing-md) 60px;
   }

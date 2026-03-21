@@ -341,7 +341,7 @@
    MOBILE
    ========================================================================== */
 
-@media (max-width: 767px) {
+@media (max-width: 768px) {
   .pricing {
     padding: var(--section-pad-y-sm) var(--spacing-md);
   }
