@@ -196,6 +196,7 @@ body::before {
   --space-16: var(--spacing-3xl);  /* 64px */
 
   /* Border Radius */
+  --radius-xs: 2px;
   --radius-sm: 4px;
   --radius-md: 6px;
   --radius-lg: 8px;
