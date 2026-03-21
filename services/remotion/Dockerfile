@@ -43,7 +43,8 @@ COPY services/remotion/package.json services/remotion/
 # Install dependencies
 # Use npm install (not ci) to resolve platform-specific native bindings for Linux
 RUN npm install --workspace=@sotto/video --workspace=@sotto/maps --workspace=@sotto/remotion-server --include-workspace-root \
-    && npm install @rspack/binding-linux-arm64-gnu@1.7.6 @remotion/compositor-linux-arm64-gnu@4.0.436 --no-save 2>/dev/null; true
+    && npm install @rspack/binding-linux-arm64-gnu@1.7.6 @remotion/compositor-linux-arm64-gnu@4.0.436 \
+       @rspack/binding-linux-x64-gnu@1.7.6 @remotion/compositor-linux-x64-gnu@4.0.436 --no-save 2>/dev/null; true
 
 # Copy source
 COPY packages/shared/ packages/shared/
