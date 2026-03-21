@@ -20,7 +20,7 @@ export function HeroChapter() {
           </h1>
 
           <p className={styles.subtitle}>
-            Describe what you want to learn. Sotto writes a fact-checked script,
+            Describe what you want to hear. Sotto writes a fact-checked script,
             generates studio audio from 7 voice providers, and turns it into video.
           </p>
 

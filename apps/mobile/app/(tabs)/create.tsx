@@ -639,7 +639,7 @@ export default function CreateScreen() {
           <View style={styles.inputRow}>
             <TextInput
               style={styles.textInput}
-              placeholder="Describe what you want to learn..."
+              placeholder="Describe what you want to hear..."
               placeholderTextColor={colors.textTertiary}
               value={inputText}
               onChangeText={setInputText}

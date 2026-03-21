@@ -34,7 +34,7 @@ export default function AboutPage() {
               </div>
               <h2 className={styles.featureTitle}>Create</h2>
               <p className={styles.featureDescription}>
-                Describe what you want to learn. Our AI creates a rich,
+                Describe what you want to hear. Our AI creates a rich,
                 multi-voice podcast with references and natural conversation
                 flow — no editing required.
               </p>

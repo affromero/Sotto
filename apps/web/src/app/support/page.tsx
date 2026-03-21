@@ -89,7 +89,7 @@ export default function SupportPage() {
               <h3>How do I create a podcast?</h3>
               <p>
                 Go to the <a href="/create">Create</a> page and chat with our AI
-                assistant. Describe what you want to learn about, and it will ask
+                assistant. Describe what you want to hear about, and it will ask
                 follow-up questions to understand your interests. Once ready, it
                 generates a conversational podcast for you.
               </p>
