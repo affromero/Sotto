@@ -37,6 +37,7 @@
   display: flex;
   gap: var(--spacing-md);
   overflow-x: auto;
+  overscroll-behavior-x: contain;
   scroll-snap-type: x mandatory;
   scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch;

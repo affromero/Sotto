@@ -24,6 +24,7 @@
   display: flex;
   align-items: center;
   z-index: 1;
+  touch-action: none;
 }
 
 .seekTrack {
