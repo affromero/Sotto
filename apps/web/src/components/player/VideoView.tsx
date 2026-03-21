@@ -138,6 +138,10 @@ export function VideoView({
   }, [playableOverlays, avatarSegment]);
 
   // Compute avatar video time: cumulative duration of prior enabled same-speaker segments + elapsed in current
+  // DB startTimes are raw cumulative sums; the stitched audio has 300ms crossfades per segment
+  // boundary, so each segment starts ~0.3s earlier in the actual audio than its startTime indicates.
+  // Cross-correlation confirms: drift ≈ segmentIndex × 0.3s (verified: 4 × 0.3 = 1.2 ≈ measured 1.18s)
+  const CROSSFADE_SEC = 0.3;
   const avatarTimeMap = useMemo(() => {
     const map = new Map<string, number>();
     if (!avatarSegment) return map;
@@ -151,7 +155,8 @@ export function VideoView({
         if (i < avatarIndex) {
           avatarTime += segments[i].duration ?? 0;
         } else if (i === avatarIndex) {
-          avatarTime += Math.max(0, currentTime - (segments[i].startTime ?? 0));
+          const crossfadeDrift = i * CROSSFADE_SEC;
+          avatarTime += Math.max(0, currentTime - (segments[i].startTime ?? 0) + crossfadeDrift);
           break;
         }
       }
