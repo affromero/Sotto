@@ -9,6 +9,7 @@ interface ShowcaseItem {
   label: string;
   description: string;
   imageUrl: string;
+  credits?: string;
 }
 
 interface ShowcaseResult {
@@ -16,8 +17,26 @@ interface ShowcaseResult {
   failures: Array<{ visualType: string; error: string }>;
 }
 
+interface ImageModelOption {
+  modelId: string;
+  displayName: string;
+  pricePerImage: number;
+  formattedPrice: string;
+}
+
+interface ShowcaseCostPreview {
+  programmatic: { count: number; cost: string };
+  aiIllustration: {
+    defaultModel: string;
+    provider: string;
+    available: boolean;
+    models: ImageModelOption[];
+  };
+  stockFootage: { provider: string; available: boolean; cost: string };
+  mapOverlay: { provider: string; available: boolean; cost: string };
+}
+
 const STILL_TIMEOUT_MS = 30000;
-const EXTERNAL_TIMEOUT_MS = 60000;
 
 const CURATED_SEGMENTS: Array<{
   visualType: string;
@@ -83,7 +102,7 @@ const CURATED_SEGMENTS: Array<{
         styleHints: { density: 'comfortable', zebraRows: true },
       },
     },
-    frame: 60,
+    frame: 120, // After all row animations complete (~frame 40 + margin)
   },
   {
     visualType: 'QUOTE',
@@ -162,23 +181,10 @@ const CURATED_SEGMENTS: Array<{
       duration: 5,
       visualType: 'DIAGRAM',
       metadata: {
-        svgContent: `<svg viewBox="0 0 400 300" xmlns="http://www.w3.org/2000/svg">
-          <style>text{font-family:Inter,sans-serif;fill:#1A1A1A}circle,rect,line{stroke:#D97706;fill:none;stroke-width:2}</style>
-          <text x="200" y="30" text-anchor="middle" font-size="16" font-weight="bold">Tokamak Fusion Reactor</text>
-          <ellipse cx="200" cy="160" rx="150" ry="80" stroke="#1E3A5F" stroke-width="3" fill="none"/>
-          <ellipse cx="200" cy="160" rx="100" ry="50" stroke="#D97706" stroke-width="2" fill="rgba(217,119,6,0.1)"/>
-          <text x="200" y="165" text-anchor="middle" font-size="12" fill="#D97706">Plasma (150M°C)</text>
-          <line x1="200" y1="70" x2="200" y2="90" stroke="#6B7280"/>
-          <text x="200" y="65" text-anchor="middle" font-size="11" fill="#6B7280">Magnetic Confinement</text>
-          <text x="80" y="270" text-anchor="middle" font-size="11">Deuterium</text>
-          <text x="320" y="270" text-anchor="middle" font-size="11">Tritium</text>
-          <line x1="80" y1="255" x2="130" y2="210" stroke="#6B7280" stroke-dasharray="4"/>
-          <line x1="320" y1="255" x2="270" y2="210" stroke="#6B7280" stroke-dasharray="4"/>
-          <text x="200" y="290" text-anchor="middle" font-size="10" fill="#6B7280">Energy output: 10x input power (Q=10 target)</text>
-        </svg>`,
+        svgContent: `<svg viewBox="0 0 600 400" xmlns="http://www.w3.org/2000/svg"><rect width="600" height="400" fill="#FEFCF8"/><text x="300" y="40" text-anchor="middle" font-family="Inter,sans-serif" font-size="22" font-weight="bold" fill="#1A1A1A">Tokamak Fusion Reactor</text><ellipse cx="300" cy="200" rx="200" ry="100" stroke="#1E3A5F" stroke-width="4" fill="none"/><ellipse cx="300" cy="200" rx="130" ry="60" stroke="#D97706" stroke-width="3" fill="rgba(217,119,6,0.08)"/><text x="300" y="205" text-anchor="middle" font-family="Inter,sans-serif" font-size="16" fill="#D97706" font-weight="600">Plasma (150 million C)</text><text x="300" y="80" text-anchor="middle" font-family="Inter,sans-serif" font-size="13" fill="#6B7280">Magnetic Confinement</text><line x1="300" y1="88" x2="300" y2="100" stroke="#6B7280" stroke-width="2"/><text x="100" y="350" text-anchor="middle" font-family="Inter,sans-serif" font-size="14" fill="#1A1A1A">Deuterium</text><text x="500" y="350" text-anchor="middle" font-family="Inter,sans-serif" font-size="14" fill="#1A1A1A">Tritium</text><line x1="100" y1="335" x2="170" y2="270" stroke="#6B7280" stroke-width="2" stroke-dasharray="6"/><line x1="500" y1="335" x2="430" y2="270" stroke="#6B7280" stroke-width="2" stroke-dasharray="6"/><text x="300" y="380" text-anchor="middle" font-family="Inter,sans-serif" font-size="12" fill="#6B7280">Target: Q=10 (10x more energy out than in)</text></svg>`,
       },
     },
-    frame: 60,
+    frame: 140, // After clip-path reveal completes (60% of 150 frames = frame 90)
   },
   {
     visualType: 'TEXT_CARD',
@@ -219,12 +225,12 @@ const CURATED_SEGMENTS: Array<{
       duration: 5,
       visualType: 'SOURCE_FIGURE',
       metadata: {
-        figureUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/84/Binding_energy_curve_-_common_isotopes.svg/1280px-Binding_energy_curve_-_common_isotopes.svg.png',
-        sourceLabel: 'Nuclear Physics Reference Data, IAEA',
-        caption: 'Binding energy per nucleon — fusion releases energy by combining light elements',
+        figureUrl: 'https://www.iter.org/img/resize-900-90/www/content/com/Lists/ITER%20Newsline/Attachments/2177/tokamak_complex_2022.jpg',
+        sourceLabel: 'ITER Organization, iter.org',
+        caption: 'ITER tokamak complex — the largest fusion experiment in the world',
       },
     },
-    frame: 45,
+    frame: 60,
   },
 ];
 
@@ -246,7 +252,7 @@ async function renderStill(segment: VideoSegment, frame: number): Promise<Buffer
   return Buffer.from(await response.arrayBuffer());
 }
 
-export async function generateShowcaseStills(): Promise<ShowcaseResult> {
+export async function generateShowcaseStills(opts?: { imageModel?: string }): Promise<ShowcaseResult> {
   const items: ShowcaseItem[] = [];
   const failures: Array<{ visualType: string; error: string }> = [];
 
@@ -257,11 +263,15 @@ export async function generateShowcaseStills(): Promise<ShowcaseResult> {
       const buffer = await renderStill(entry.segment, entry.frame ?? 60);
       const key = `showcase/${entry.visualType.toLowerCase()}.png`;
       const url = await uploadFile(key, buffer, 'image/png');
+      const credits = entry.visualType === 'SOURCE_FIGURE'
+        ? (entry.segment.metadata as Record<string, unknown>)?.sourceLabel as string | undefined
+        : undefined;
       items.push({
         visualType: entry.visualType,
         label: entry.label,
         description: entry.description,
         imageUrl: url,
+        ...(credits && { credits }),
       });
     } catch (err) {
       const message = (err as Error).message;
@@ -276,7 +286,7 @@ export async function generateShowcaseStills(): Promise<ShowcaseResult> {
     const { FalImageProvider } = await import('./providers/image/fal.provider');
     const falKey = process.env.FAL_KEY;
     if (falKey) {
-      const provider = new FalImageProvider(falKey);
+      const provider = new FalImageProvider(falKey, opts?.imageModel);
       const buffer = await provider.generateImage({
         prompt: 'Inside a fusion reactor, glowing plasma contained by magnetic fields, editorial illustration style, warm amber and deep navy tones, clean lines, no text, no real people',
         width: 1280,
@@ -325,6 +335,7 @@ export async function generateShowcaseStills(): Promise<ShowcaseResult> {
         label: 'Stock Footage',
         description: 'Real-world video clips matched to your content',
         imageUrl: url,
+        credits: `Photo by ${result.photographer} on Pexels`,
       });
     }
   } catch (err) {
@@ -366,4 +377,52 @@ export async function generateShowcaseStills(): Promise<ShowcaseResult> {
     failures: String(failures.length),
   });
   return { items, failures };
+}
+
+/**
+ * Preview what the showcase generation will use — models, providers, and costs.
+ * Call before generating to inform the admin.
+ */
+export async function getShowcaseCostPreview(): Promise<ShowcaseCostPreview> {
+  const { getAutoModelConfig } = await import('./auto-model-config');
+  const { fetchFalImageModels, formatCost } = await import('./video-cost-estimator');
+  const config = await getAutoModelConfig();
+  const imageModel = config.proImageModel ?? 'fal-flux-1-schnell';
+
+  // Get live pricing from pricetoken
+  let models: ImageModelOption[] = [];
+  try {
+    const imageModels = await fetchFalImageModels();
+    models = imageModels.map((m) => ({
+      modelId: m.modelId,
+      displayName: m.modelId.replace('fal-', '').replace(/-/g, ' '),
+      pricePerImage: m.pricePerImage,
+      formattedPrice: formatCost(m.pricePerImage),
+    }));
+  } catch {
+    // Empty models list — UI will show "pricing unavailable"
+  }
+
+  return {
+    programmatic: {
+      count: CURATED_SEGMENTS.length,
+      cost: 'Free (Remotion sidecar, no external API)',
+    },
+    aiIllustration: {
+      defaultModel: imageModel,
+      provider: 'fal.ai',
+      available: !!process.env.FAL_KEY,
+      models,
+    },
+    stockFootage: {
+      provider: 'Pexels',
+      available: !!process.env.PEXELS_API_KEY,
+      cost: 'Free (Pexels API)',
+    },
+    mapOverlay: {
+      provider: 'Mapbox',
+      available: !!process.env.MAPBOX_ACCESS_TOKEN,
+      cost: 'Free tier (static image)',
+    },
+  };
 }

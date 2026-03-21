@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import styles from './VisualShowcasePanel.module.css';
 
 interface ShowcaseItem {
@@ -8,6 +8,7 @@ interface ShowcaseItem {
   label: string;
   description: string;
   imageUrl: string;
+  credits?: string;
 }
 
 interface ShowcaseFailure {
@@ -15,11 +16,40 @@ interface ShowcaseFailure {
   error: string;
 }
 
+interface ImageModelOption {
+  modelId: string;
+  displayName: string;
+  formattedPrice: string;
+}
+
+interface CostPreview {
+  programmatic: { count: number; cost: string };
+  aiIllustration: { defaultModel: string; provider: string; available: boolean; models: ImageModelOption[] };
+  stockFootage: { provider: string; available: boolean; cost: string };
+  mapOverlay: { provider: string; available: boolean; cost: string };
+}
+
 export function VisualShowcasePanel() {
   const [items, setItems] = useState<ShowcaseItem[]>([]);
   const [failures, setFailures] = useState<ShowcaseFailure[]>([]);
   const [generating, setGenerating] = useState(false);
   const [progress, setProgress] = useState('');
+  const [costPreview, setCostPreview] = useState<CostPreview | null>(null);
+  const [selectedModel, setSelectedModel] = useState('');
+
+  useEffect(() => {
+    fetch('/api/admin/showcase')
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (data) {
+          setCostPreview(data);
+          if (data.aiIllustration?.defaultModel) {
+            setSelectedModel(data.aiIllustration.defaultModel);
+          }
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const handleGenerate = async () => {
     setGenerating(true);
@@ -27,7 +57,11 @@ export function VisualShowcasePanel() {
     setFailures([]);
 
     try {
-      const res = await fetch('/api/admin/showcase', { method: 'POST' });
+      const res = await fetch('/api/admin/showcase', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageModel: selectedModel || undefined }),
+      });
       const data = await res.json();
 
       if (res.ok) {
@@ -64,6 +98,66 @@ export function VisualShowcasePanel() {
         </button>
       </div>
 
+      {costPreview && !generating && items.length === 0 && (
+        <div className={styles.costPreview}>
+          <h3 className={styles.costTitle}>What will be used</h3>
+          <div className={styles.costGrid}>
+            <div className={styles.costItem}>
+              <span className={styles.costLabel}>Programmatic ({costPreview.programmatic.count} types)</span>
+              <span className={styles.costValue}>{costPreview.programmatic.cost}</span>
+            </div>
+            <div className={styles.costItem}>
+              <span className={styles.costLabel}>AI Illustration</span>
+              <span className={styles.costValue}>
+                {costPreview.aiIllustration.available ? (
+                  <>
+                    {costPreview.aiIllustration.provider}
+                    {costPreview.aiIllustration.models.length > 0 ? (
+                      <>
+                        {' '}&middot;{' '}
+                        <select
+                          className={styles.modelSelect}
+                          value={selectedModel}
+                          onChange={(e) => setSelectedModel(e.target.value)}
+                        >
+                          {costPreview.aiIllustration.models.map((m) => (
+                            <option key={m.modelId} value={m.modelId}>
+                              {m.displayName} ({m.formattedPrice})
+                            </option>
+                          ))}
+                        </select>
+                      </>
+                    ) : (
+                      <> &middot; pricing unavailable</>
+                    )}
+                  </>
+                ) : (
+                  <span className={styles.unavailable}>FAL_KEY not set</span>
+                )}
+              </span>
+            </div>
+            <div className={styles.costItem}>
+              <span className={styles.costLabel}>Stock Footage</span>
+              <span className={styles.costValue}>
+                {costPreview.stockFootage.available
+                  ? <>{costPreview.stockFootage.provider} &middot; {costPreview.stockFootage.cost}</>
+                  : <span className={styles.unavailable}>PEXELS_API_KEY not set</span>
+                }
+              </span>
+            </div>
+            <div className={styles.costItem}>
+              <span className={styles.costLabel}>Map Overlay</span>
+              <span className={styles.costValue}>
+                {costPreview.mapOverlay.available
+                  ? <>{costPreview.mapOverlay.provider} &middot; {costPreview.mapOverlay.cost}</>
+                  : <span className={styles.unavailable}>MAPBOX_ACCESS_TOKEN not set</span>
+                }
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {progress && <p className={styles.progress}>{progress}</p>}
 
       {failures.length > 0 && (
@@ -86,6 +180,9 @@ export function VisualShowcasePanel() {
                   alt={item.label}
                   className={styles.image}
                 />
+                {item.credits && (
+                  <span className={styles.credits}>{item.credits}</span>
+                )}
               </div>
               <div className={styles.cardBody}>
                 <span className={styles.badge}>{item.visualType}</span>
