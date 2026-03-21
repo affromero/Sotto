@@ -381,6 +381,14 @@ export function findVoiceName(voiceId: string): string | undefined {
   return undefined;
 }
 
+/**
+ * Title-case a model ID for display: "eleven_v3" → "Eleven v3", "tts-1-hd" → "TTS-1-HD".
+ */
+export function formatModelName(model: string): string {
+  if (/^(tts|gpt|stt|speech)-/i.test(model)) return model.toUpperCase();
+  return model.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 // ---------------------------------------------------------------------------
 // KittenTTS-specific voice pool
 // KittenTTS mini ships with 8 named voices — 4 host (warm/conversational),

@@ -91,6 +91,7 @@ export interface PodcastDetail extends PodcastSummary {
   isSaved: boolean;
   voiceTracks: VoiceTrackSummary[];
   defaultVoiceTrackId: string | null;
+  originalTrackName: string;
 }
 
 export interface SegmentData {

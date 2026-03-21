@@ -13,21 +13,11 @@ import { resolveAutoModel } from '@/lib/auto-model-config';
 import { checkRateLimit } from '@/lib/redis';
 import { checkSuspension } from '@/lib/auth-guards';
 import { getProviderMeta, type TtsProviderId } from '@/lib/providers/tts-registry';
-import { findVoiceName, type VoiceMatchMetadata } from '@/lib/voice-pool';
+import { findVoiceName, formatModelName, type VoiceMatchMetadata } from '@/lib/voice-pool';
 import type { GenerateVoiceTrackAudioPayload } from '@/lib/queue';
 
 import { errorResponse } from '@/lib/api-response';
 type RouteParams = { params: Promise<{ podcastId: string }> };
-
-/**
- * Title-case a model ID for display: "eleven_v3" → "Eleven v3", "tts-1-hd" → "TTS-1-HD".
- */
-function formatModelName(model: string): string {
-  // All-uppercase for known acronym-style models (tts-*, gpt-*)
-  if (/^(tts|gpt|stt)-/i.test(model)) return model.toUpperCase();
-  // Replace underscores with spaces, capitalize first letter of each word
-  return model.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-}
 
 /**
  * Build a display name from resolved voice assignments.

@@ -46,6 +46,7 @@ const mockPodcastData: PodcastDetail = {
   interactions: [],
   voiceTracks: [],
   defaultVoiceTrackId: null,
+  originalTrackName: 'Aria + Will [ElevenLabs - Eleven v3]',
 };
 
 beforeEach(() => {
