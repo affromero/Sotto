@@ -109,10 +109,19 @@ export async function processVisualClassification(job: Job<ClassifyVisualsPayloa
         c.subVisuals.map((sv) => {
           const isProgrammatic = PROGRAMMATIC_SET.has(sv.visualType);
           const isExternal = EXTERNAL_ASSET_TYPES.has(sv.visualType);
+          const isSourceFigure = sv.visualType === 'SOURCE_FIGURE';
+
+          // SOURCE_FIGURE: asset URL comes from metadata.figureUrl, immediately ready
+          const figureUrl = isSourceFigure && sv.metadata
+            ? (sv.metadata as Record<string, unknown>).figureUrl as string | undefined
+            : undefined;
+
           // Hera-routed programmatic types need generation (pending); plain Remotion ones are ready immediately
-          const status = isExternal
-            ? 'pending'
-            : (isProgrammatic && motionProvider === 'hera' ? 'pending' : 'ready');
+          const status = isSourceFigure && figureUrl
+            ? 'ready'
+            : isExternal
+              ? 'pending'
+              : (isProgrammatic && motionProvider === 'hera' ? 'pending' : 'ready');
           return {
             videoGenerationId,
             segmentId: c.segmentId,
@@ -126,6 +135,7 @@ export async function processVisualClassification(job: Job<ClassifyVisualsPayloa
             metadata: sv.metadata ? (sv.metadata as unknown as Prisma.InputJsonValue) : Prisma.JsonNull,
             motionProvider: isProgrammatic ? motionProvider : null,
             status,
+            ...(isSourceFigure && figureUrl && { assetUrl: figureUrl, assetType: 'image/png' }),
           };
         }),
       ),
