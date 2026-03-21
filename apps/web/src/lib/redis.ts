@@ -241,6 +241,63 @@ export const inspireFailures = {
   },
 };
 
+/**
+ * Notification pub/sub channel prefix.
+ * Workers publish after creating a notification; SSE subscribers listen.
+ */
+const NOTIF_CHANNEL_PREFIX = 'notifications:';
+
+/**
+ * Publish a notification event so SSE subscribers receive it instantly.
+ * Uses the general Redis client (pub/sub publish does not block).
+ */
+export async function publishNotification(
+  userId: string,
+  payload: Record<string, unknown>
+): Promise<void> {
+  const client = getRedisClient();
+  await client.publish(
+    `${NOTIF_CHANNEL_PREFIX}${userId}`,
+    JSON.stringify(payload)
+  );
+}
+
+/**
+ * Create a dedicated Redis connection for subscribing to a user's notification channel.
+ * Each subscriber MUST have its own connection (ioredis enters subscriber mode and
+ * blocks the connection for pub/sub only).
+ *
+ * Returns an object with the subscriber client and cleanup function.
+ */
+export function createNotificationSubscriber(userId: string) {
+  const client = createRedisConnection(`sse-${userId.slice(0, 8)}`);
+  const channel = `${NOTIF_CHANNEL_PREFIX}${userId}`;
+
+  return {
+    channel,
+    client,
+    subscribe(onMessage: (data: string) => void) {
+      client.subscribe(channel).catch((err) => {
+        logger.error('Failed to subscribe to notification channel', {
+          userId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
+      client.on('message', (_ch: string, message: string) => {
+        onMessage(message);
+      });
+    },
+    async cleanup() {
+      try {
+        await client.unsubscribe(channel);
+        await client.quit();
+      } catch {
+        client.disconnect();
+      }
+    },
+  };
+}
+
 export async function closeRedis(): Promise<void> {
   if (generalRedisClient) {
     await generalRedisClient.quit();
