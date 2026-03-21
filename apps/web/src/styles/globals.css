@@ -9,6 +9,12 @@
   padding: 0;
 }
 
+/* Mobile: eliminate 300ms tap delay + remove default tap highlight */
+a, button, [role="button"], input, select, textarea, label {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
 html {
   overflow-y: scroll;
   overflow-x: hidden;
@@ -544,6 +550,13 @@ a:hover {
     --sidebar-width: 0px;
     --topbar-height: 56px;
     --mini-player-height: 64px;
+  }
+}
+
+/* Prevent iOS auto-zoom on input focus (requires font-size >= 16px) */
+@media (max-width: 768px) {
+  input, select, textarea {
+    font-size: max(16px, 1em);
   }
 }
 

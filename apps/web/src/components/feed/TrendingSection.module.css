@@ -81,11 +81,11 @@
   border: none;
   background: var(--color-border);
   cursor: pointer;
-  padding: 0;
+  padding: 18px;
   transition: background 250ms var(--ease-out-expo), transform 250ms var(--ease-out-expo);
-  /* Ensure accessible touch target via padding around the dot */
   box-sizing: content-box;
   outline-offset: 4px;
+  background-clip: content-box;
 }
 
 .dot:hover {

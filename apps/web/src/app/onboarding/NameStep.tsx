@@ -60,6 +60,7 @@ export function NameStep() {
           autoComplete="name"
           autoFocus
           aria-label="Display name"
+          enterKeyHint="done"
           aria-invalid={error ? 'true' : undefined}
           maxLength={100}
         />

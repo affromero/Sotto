@@ -2,7 +2,8 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 0;
+  padding: 8px 4px;
+  min-height: 44px;
   border: none;
   background: none;
   font: var(--text-body-sm);
@@ -19,7 +20,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 4px;
+  padding: 10px;
+  min-width: 44px;
+  min-height: 44px;
   border: none;
   background: none;
   color: var(--color-text-secondary);

@@ -48,6 +48,7 @@ export function SearchBar({
         onChange={(e) => handleChange(e.target.value)}
         placeholder={placeholder}
         aria-label="Search podcasts"
+        enterKeyHint="search"
       />
       {value.length > 0 && (
         <button
