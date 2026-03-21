@@ -828,6 +828,7 @@ export const updateVideoSegmentsSchema = z.object({
       prompt: z.string().nullable().optional(),
       metadata: z.record(z.unknown()).nullable().optional(),
       endStatePrompt: z.string().nullable().optional(),
+      feedback: z.string().optional(),
     }),
   ).min(1),
 });
