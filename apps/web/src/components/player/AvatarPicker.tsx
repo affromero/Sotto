@@ -32,7 +32,7 @@ const IMAGE_REQUIRED_MODELS = new Set(['fal-veed-fabric-1.0', 'fal-kling-avatar-
 
 interface AvatarSelection {
   avatarId: string;
-  provider: 'heygen' | 'runway' | 'fal';
+  provider: 'heygen' | 'runway' | 'fal' | 'replicate';
   isPreset: boolean;
   imageUrl?: string;
 }

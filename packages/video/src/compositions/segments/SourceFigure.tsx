@@ -6,7 +6,7 @@ export const SourceFigure: React.FC<{ segment: VideoSegment }> = ({ segment }) =
   const frame = useCurrentFrame();
   const { durationInFrames } = useVideoConfig();
 
-  const metadata = segment.metadata as SourceFigureMetadata | null;
+  const metadata = (segment.metadata ?? null) as unknown as SourceFigureMetadata | null;
   const figureUrl = metadata?.figureUrl || segment.assetUrl;
   const sourceLabel = metadata?.sourceLabel || '';
   const caption = metadata?.caption || '';

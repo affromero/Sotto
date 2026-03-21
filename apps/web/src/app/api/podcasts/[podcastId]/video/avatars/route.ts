@@ -52,16 +52,18 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     heygen: process.env.HEYGEN_API_KEY,
     runway: process.env.RUNWAY_API_KEY,
     fal: process.env.FAL_KEY,
+    replicate: process.env.REPLICATE_API_TOKEN,
   };
 
   const allRelevantModels = [defaultAvatarModel, ...includedModels];
   const providerHasModels = (pid: AvatarProviderId) =>
     allRelevantModels.some((modelId) => getAvatarModelProvider(modelId) === pid);
 
-  const availableProviders = {
+  const availableProviders: Record<AvatarProviderId, boolean> = {
     heygen: !!apiKeyMap.heygen && providerHasModels('heygen'),
     runway: !!apiKeyMap.runway && providerHasModels('runway'),
     fal: !!apiKeyMap.fal && providerHasModels('fal'),
+    replicate: !!apiKeyMap.replicate && providerHasModels('replicate'),
   };
 
   // Use requested provider if available, otherwise fall back to the configured default
