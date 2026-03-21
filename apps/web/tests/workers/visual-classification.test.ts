@@ -15,6 +15,7 @@ const {
     segmentVisual: { createMany: vi.fn(), findMany: vi.fn(), count: vi.fn(), update: vi.fn() },
     segmentTransition: { createMany: vi.fn() },
     user: { findUniqueOrThrow: vi.fn() },
+    discovery: { findUnique: vi.fn() },
   },
   mockClassify: vi.fn(),
   mockAddJob: vi.fn(),
@@ -61,6 +62,7 @@ beforeEach(() => {
   mockResolveAiModel.mockResolvedValue({ model: 'claude-haiku-4-5-20251001', provider: 'anthropic' });
   mockResolveMotionProvider.mockResolvedValue('remotion');
   mockPrisma.segmentVisual.count.mockResolvedValue(0);
+  mockPrisma.discovery.findUnique.mockResolvedValue(null);
 });
 
 describe('visual-classification worker', () => {
