@@ -61,6 +61,9 @@ export async function processContentExtraction(job: Job<ExtractContentPayload>):
       wordCount: extracted.wordCount,
       sourceType: extracted.sourceType,
       extractionMethod: extracted.extractionMethod,
+      ...(extracted.tables && extracted.tables.length > 0 && { tables: extracted.tables }),
+      ...(extracted.figures && extracted.figures.length > 0 && { figures: extracted.figures }),
+      ...(extracted.keyStatistics && extracted.keyStatistics.length > 0 && { keyStatistics: extracted.keyStatistics }),
     };
   }
 
