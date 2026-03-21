@@ -199,6 +199,28 @@
   margin: 0;
 }
 
+.regenBtn {
+  font: var(--text-caption);
+  padding: 3px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  margin-top: var(--spacing-2xs);
+  transition: all 0.15s;
+}
+
+.regenBtn:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.regenBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* Sets list */
 .setsList {
   border: 1px solid var(--color-border);

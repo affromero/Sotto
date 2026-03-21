@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth-guards';
 import { errorResponse } from '@/lib/api-response';
-import { generateShowcaseClips, getShowcaseCostPreview } from '@/lib/showcase-generator';
+import { generateShowcaseClips, getShowcaseCostPreview, regenerateShowcaseItem, type ShowcaseItem } from '@/lib/showcase-generator';
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
 
@@ -78,7 +78,10 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * PATCH /api/admin/showcase — Update a showcase set (rename, toggle active).
+ * PATCH /api/admin/showcase — Update a showcase set.
+ * Supports: rename, toggle active, or regenerate a single visual type.
+ *
+ * Body: { id, name?, active?, regenerateType?: string, imageModel?: string }
  */
 export async function PATCH(request: NextRequest) {
   const adminId = await requireAdmin();
@@ -87,6 +90,25 @@ export async function PATCH(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
   const id = body?.id as string;
   if (!id) return errorResponse('id is required', 400);
+
+  // Single-item regeneration
+  const regenerateType = body?.regenerateType as string | undefined;
+  if (regenerateType) {
+    const existing = await prisma.showcaseSet.findUnique({ where: { id } });
+    if (!existing) return errorResponse('Set not found', 404);
+
+    const newItem = await regenerateShowcaseItem(regenerateType, { imageModel: body?.imageModel });
+    const items = (existing.items as ShowcaseItem[]).map((item) =>
+      item.visualType === regenerateType ? newItem : item,
+    );
+
+    const set = await prisma.showcaseSet.update({
+      where: { id },
+      data: { items: JSON.parse(JSON.stringify(items)) },
+    });
+
+    return NextResponse.json({ set, regenerated: regenerateType });
+  }
 
   const parsed = updateSchema.safeParse(body);
   if (!parsed.success) {
