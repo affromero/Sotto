@@ -167,6 +167,7 @@ export function PlanFeaturesForm({ initialConfig }: PlanFeaturesFormProps) {
               <div className={styles.rowLabelText}>User uploads enabled</div>
               <div className={styles.rowLabelDesc}>
                 Allow verified users to upload their own portrait images for lip-sync avatars.
+                Unverified users are still blocked even when this is on.
               </div>
             </div>
             <Toggle
