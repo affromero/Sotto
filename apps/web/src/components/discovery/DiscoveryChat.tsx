@@ -267,6 +267,7 @@ export function DiscoveryChat({ podcastId, onComplete, initialTopic, aiModel, on
           disabled={isLoading}
           aria-label="Chat message input"
           autoComplete="off"
+          enterKeyHint="send"
         />
         <button
           type="submit"

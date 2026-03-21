@@ -63,6 +63,8 @@
   height: 32px;
   border-radius: var(--radius-full);
   object-fit: cover;
+  padding: 6px;
+  box-sizing: content-box;
 }
 
 .avatarFallback {

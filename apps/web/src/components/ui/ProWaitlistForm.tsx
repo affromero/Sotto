@@ -62,6 +62,9 @@ export function ProWaitlistForm({
         className={styles.input}
         disabled={state === 'loading'}
         aria-label="Email address for Pro waitlist"
+        inputMode="email"
+        enterKeyHint="done"
+        autoComplete="email"
       />
       <button
         type="submit"

@@ -8,8 +8,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
   border: none;
   background: none;
   color: var(--color-text-secondary, #6b7280);
@@ -40,7 +40,8 @@
 }
 
 .saveButton {
-  padding: 2px 8px;
+  padding: 8px 12px;
+  min-height: 44px;
   border: 1px solid var(--color-border, #e5e7eb);
   border-radius: var(--radius-sm);
   background: none;

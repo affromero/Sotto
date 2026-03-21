@@ -125,6 +125,8 @@ export function AuthButtons({ callbackUrl = '/dashboard' }: AuthButtonsProps) {
                 disabled={emailSending}
                 autoComplete="email"
                 aria-label="Email address"
+                inputMode="email"
+                enterKeyHint="go"
               />
               <button
                 type="submit"

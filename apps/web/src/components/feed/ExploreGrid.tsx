@@ -110,6 +110,7 @@ export function ExploreGrid({ tags }: ExploreGridProps) {
             placeholder="Search by topic..."
             className={styles.input}
             aria-label="Search podcasts by topic"
+            enterKeyHint="search"
           />
         </div>
         <button

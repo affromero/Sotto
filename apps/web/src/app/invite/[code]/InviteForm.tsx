@@ -51,6 +51,9 @@ export function InviteForm({ code }: InviteFormProps) {
         required
         autoFocus
         aria-label="Email address"
+        inputMode="email"
+        enterKeyHint="go"
+        autoComplete="email"
       />
       <button
         type="submit"
