@@ -110,6 +110,17 @@ export const DataChart: React.FC<{ segment: VideoSegment }> = ({ segment }) => {
 
   const hasMultipleKeys = dataKeys.length > 1;
 
+  // Fixed Y-axis domain — compute max from raw data so axis doesn't jump during animation
+  const maxY = rawData.reduce((max, row) => {
+    for (const key of dataKeys) {
+      const v = Number(row[key]) || 0;
+      if (v > max) max = v;
+    }
+    return max;
+  }, 0);
+  // Add 10% headroom and round to a nice number
+  const yDomainMax = Math.ceil(maxY * 1.1 / Math.pow(10, Math.floor(Math.log10(maxY * 1.1 || 1)))) * Math.pow(10, Math.floor(Math.log10(maxY * 1.1 || 1)));
+
   const renderChart = () => {
     switch (chartType) {
       case 'line':
@@ -127,7 +138,7 @@ export const DataChart: React.FC<{ segment: VideoSegment }> = ({ segment }) => {
                   />
                 )}
               </XAxis>
-              <YAxis stroke="#6B7280" tick={TICK_STYLE}>
+              <YAxis stroke="#6B7280" tick={TICK_STYLE} domain={[0, yDomainMax]}>
                 {yAxisLabel && (
                   <Label
                     value={yAxisLabel}
@@ -212,7 +223,7 @@ export const DataChart: React.FC<{ segment: VideoSegment }> = ({ segment }) => {
                   />
                 )}
               </XAxis>
-              <YAxis stroke="#6B7280" tick={TICK_STYLE}>
+              <YAxis stroke="#6B7280" tick={TICK_STYLE} domain={[0, yDomainMax]}>
                 {yAxisLabel && (
                   <Label
                     value={yAxisLabel}
