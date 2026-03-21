@@ -8,7 +8,7 @@ import type { VideoSegment } from '@sotto/video';
 const REMOTION_URL = process.env.REMOTION_URL;
 
 export async function processSegmentPreview(job: Job<RenderSegmentPreviewPayload>): Promise<void> {
-  const { podcastId, videoGenerationId, segmentVisualId, quality } = job.data;
+  const { podcastId, segmentVisualId, quality } = job.data;
 
   logger.info('Rendering segment preview', { podcastId, segmentVisualId, quality });
   await job.updateProgress(10);
@@ -49,7 +49,7 @@ export async function processSegmentPreview(job: Job<RenderSegmentPreviewPayload
       speaker: seg.speaker,
       text: seg.text,
       startTime: 0, // Relative to this segment (starts at 0)
-      duration: segmentVisual.subDuration ?? seg.duration,
+      duration: segmentVisual.subDuration ?? seg.duration ?? 5,
       visualType: segmentVisual.visualType,
       assetUrl: segmentVisual.assetUrl ?? undefined,
       assetType: segmentVisual.assetType ?? undefined,
