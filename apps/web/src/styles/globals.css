@@ -74,6 +74,8 @@ body::before {
   --color-surface: #FFFFFF;
   --color-surface-hover: #FFF9F0;
   --color-surface-elevated: #FFFFFF;
+  --color-surface-nested: #FAF8F4;
+  --color-surface-sunken: #F5F3EE;
   --color-border: #E5E1D8;
   --color-border-hover: #D1CCC2;
 
@@ -270,6 +272,8 @@ body::before {
   --color-surface: #262420;
   --color-surface-hover: #302D28;
   --color-surface-elevated: #2E2B26;
+  --color-surface-nested: #2E2B26;
+  --color-surface-sunken: #1F1E1C;
   --color-border: #3A3733;
   --color-border-hover: #4A4742;
 
