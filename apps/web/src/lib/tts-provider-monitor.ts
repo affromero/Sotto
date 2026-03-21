@@ -11,7 +11,7 @@
 
 import { cache } from './redis';
 import { logger } from './logger';
-import { generateResponse } from './llm';
+import { createAIProvider } from './providers/ai';
 import { getVoiceCatalog } from './voice-catalog';
 import { getProviderMeta, type TtsProviderId } from './providers/tts-registry';
 
@@ -214,11 +214,12 @@ Structure your response as:
 [High/Medium/Low] — [one sentence reasoning]`;
 
   try {
-    const response = await generateResponse(systemPrompt, [
+    const ai = createAIProvider();
+    const response = await ai.generateResponse(systemPrompt, [
       { role: 'user', content: `TTS provider changes detected:\n\n${diffSummary}` },
     ], { maxTokens: 1500, skipModeration: true });
 
-    return typeof response === 'string' ? response : JSON.stringify(response);
+    return response.content;
   } catch (err) {
     logger.warn('LLM analysis failed, using raw diff', {
       error: err instanceof Error ? err.message : String(err),
