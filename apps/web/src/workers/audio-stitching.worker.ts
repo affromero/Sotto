@@ -48,6 +48,7 @@ async function detectSegmentBoundaries(
   if (segmentPaths.length === 0) return [];
   if (segmentPaths.length === 1) return [0];
 
+  try {
   const { readFile } = await import('fs/promises');
   const SR = 16000;
 
@@ -138,6 +139,12 @@ async function detectSegmentBoundaries(
   });
 
   return starts;
+  } catch (err) {
+    logger.warn('Cross-correlation boundary detection failed, returning empty', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return [];
+  }
 }
 
 /** Map SoundCue types to stock SFX filenames bundled in the app */
