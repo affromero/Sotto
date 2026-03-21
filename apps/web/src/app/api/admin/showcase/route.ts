@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth-guards';
 import { errorResponse } from '@/lib/api-response';
-import { generateShowcaseStills, getShowcaseCostPreview } from '@/lib/showcase-generator';
+import { generateShowcaseClips, getShowcaseCostPreview } from '@/lib/showcase-generator';
 import { z } from 'zod';
 
 const generateSchema = z.object({
@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
   const parsed = generateSchema.safeParse(body);
   const imageModel = parsed.success ? parsed.data?.imageModel : undefined;
 
-  const { items, failures } = await generateShowcaseStills({ imageModel });
+  const { items, failures } = await generateShowcaseClips({ imageModel });
 
   return NextResponse.json({
     count: items.length,

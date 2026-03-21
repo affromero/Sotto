@@ -8,7 +8,8 @@ interface ShowcaseItem {
   visualType: string;
   label: string;
   description: string;
-  imageUrl: string;
+  url: string;
+  mediaType: 'image' | 'video';
   credits?: string;
 }
 
@@ -234,35 +235,38 @@ const CURATED_SEGMENTS: Array<{
   },
 ];
 
-async function renderStill(segment: VideoSegment, frame: number): Promise<Buffer> {
+const CLIP_TIMEOUT_MS = 60000;
+const SHOWCASE_CLIP_SECONDS = 4;
+
+async function renderClip(segment: VideoSegment, durationSeconds = SHOWCASE_CLIP_SECONDS): Promise<Buffer> {
   if (!REMOTION_URL) throw new Error('REMOTION_URL not configured');
 
-  const response = await fetch(`${REMOTION_URL}/still`, {
+  const response = await fetch(`${REMOTION_URL}/clip`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ segment, frame }),
-    signal: AbortSignal.timeout(STILL_TIMEOUT_MS),
+    body: JSON.stringify({ segment, durationSeconds, quality: 'full' }),
+    signal: AbortSignal.timeout(CLIP_TIMEOUT_MS),
   });
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(`Still render failed: ${response.status} — ${text}`);
+    throw new Error(`Clip render failed: ${response.status} — ${text}`);
   }
 
   return Buffer.from(await response.arrayBuffer());
 }
 
-export async function generateShowcaseStills(opts?: { imageModel?: string }): Promise<ShowcaseResult> {
+export async function generateShowcaseClips(opts?: { imageModel?: string }): Promise<ShowcaseResult> {
   const items: ShowcaseItem[] = [];
   const failures: Array<{ visualType: string; error: string }> = [];
 
-  // 1. Render programmatic types via /still
+  // 1. Render programmatic types as animated clips via /clip
   for (const entry of CURATED_SEGMENTS) {
     try {
-      logger.info('Rendering showcase still', { visualType: entry.visualType });
-      const buffer = await renderStill(entry.segment, entry.frame ?? 60);
-      const key = `showcase/${entry.visualType.toLowerCase()}.png`;
-      const url = await uploadFile(key, buffer, 'image/png');
+      logger.info('Rendering showcase clip', { visualType: entry.visualType });
+      const buffer = await renderClip(entry.segment);
+      const key = `showcase/${entry.visualType.toLowerCase()}.mp4`;
+      const url = await uploadFile(key, buffer, 'video/mp4');
       const credits = entry.visualType === 'SOURCE_FIGURE'
         ? (entry.segment.metadata as Record<string, unknown>)?.sourceLabel as string | undefined
         : undefined;
@@ -270,7 +274,8 @@ export async function generateShowcaseStills(opts?: { imageModel?: string }): Pr
         visualType: entry.visualType,
         label: entry.label,
         description: entry.description,
-        imageUrl: url,
+        url,
+        mediaType: 'video',
         ...(credits && { credits }),
       });
     } catch (err) {
@@ -280,24 +285,38 @@ export async function generateShowcaseStills(opts?: { imageModel?: string }): Pr
     }
   }
 
-  // 2. AI_ILLUSTRATION via image provider (platform key)
+  // 2. AI_ILLUSTRATION — generate image then render as clip with Ken Burns
   try {
     logger.info('Generating showcase AI illustration');
     const { FalImageProvider } = await import('./providers/image/fal.provider');
     const falKey = process.env.FAL_KEY;
     if (falKey) {
       const provider = new FalImageProvider(falKey, opts?.imageModel);
-      const buffer = await provider.generateImage({
+      const imageBuffer = await provider.generateImage({
         prompt: 'Inside a fusion reactor, glowing plasma contained by magnetic fields, editorial illustration style, warm amber and deep navy tones, clean lines, no text, no real people',
         width: 1280,
         height: 720,
       });
-      const url = await uploadFile('showcase/ai_illustration.png', buffer, 'image/png');
+      // Upload image first, then render as clip with Ken Burns via ImageSlide
+      const imageUrl = await uploadFile('showcase/ai_illustration_src.png', imageBuffer, 'image/png');
+      const clipBuffer = await renderClip({
+        segmentId: 'showcase-ai',
+        order: 0,
+        speaker: 'Host',
+        text: '',
+        startTime: 0,
+        duration: SHOWCASE_CLIP_SECONDS,
+        visualType: 'AI_ILLUSTRATION',
+        assetUrl: imageUrl,
+        assetType: 'image/png',
+      });
+      const clipUrl = await uploadFile('showcase/ai_illustration.mp4', clipBuffer, 'video/mp4');
       items.push({
         visualType: 'AI_ILLUSTRATION',
         label: 'AI Illustrations',
         description: 'Rich editorial illustrations generated from your content',
-        imageUrl: url,
+        url: clipUrl,
+        mediaType: 'video',
       });
     }
   } catch (err) {
@@ -306,36 +325,21 @@ export async function generateShowcaseStills(opts?: { imageModel?: string }): Pr
     failures.push({ visualType: 'AI_ILLUSTRATION', error: message });
   }
 
-  // 3. STOCK_FOOTAGE — search Pexels, download a frame
+  // 3. STOCK_FOOTAGE — search Pexels, upload actual video clip
   try {
     logger.info('Fetching showcase stock footage');
     const { searchStockVideo, downloadStockAsset } = await import('./stock-footage');
     const result = await searchStockVideo('fusion reactor plasma energy');
     if (result) {
       const videoBuffer = await downloadStockAsset(result.url);
-      // Extract first frame via FFmpeg (seek to 1s to skip any black intro)
-      const { execFile } = await import('child_process');
-      const { promisify } = await import('util');
-      const { writeFile, readFile, unlink, mkdtemp } = await import('fs/promises');
-      const { join } = await import('path');
-      const { tmpdir } = await import('os');
-      const execFileAsync = promisify(execFile);
-      const tmpDir = await mkdtemp(join(tmpdir(), 'showcase-frame-'));
-      const inputPath = join(tmpDir, 'input.mp4');
-      const outputPath = join(tmpDir, 'frame.png');
-      await writeFile(inputPath, videoBuffer);
-      await execFileAsync('ffmpeg', ['-y', '-ss', '1', '-i', inputPath, '-frames:v', '1', '-q:v', '2', outputPath]);
-      const frameBuffer = await readFile(outputPath);
-      await Promise.allSettled([unlink(inputPath), unlink(outputPath)]);
-      const { rmdir } = await import('fs/promises');
-      await rmdir(tmpDir).catch(() => {});
-      const url = await uploadFile('showcase/stock_footage.png', frameBuffer, 'image/png');
+      const url = await uploadFile('showcase/stock_footage.mp4', videoBuffer, 'video/mp4');
       items.push({
         visualType: 'STOCK_FOOTAGE',
         label: 'Stock Footage',
         description: 'Real-world video clips matched to your content',
-        imageUrl: url,
-        credits: `Photo by ${result.photographer} on Pexels`,
+        url,
+        mediaType: 'video',
+        credits: `Video by ${result.photographer} on Pexels`,
       });
     }
   } catch (err) {
@@ -344,27 +348,40 @@ export async function generateShowcaseStills(opts?: { imageModel?: string }): Pr
     failures.push({ visualType: 'STOCK_FOOTAGE', error: message });
   }
 
-  // 4. MAP_OVERLAY via Mapbox
+  // 4. MAP_OVERLAY — generate globe-to-location zoom frames, render as animated clip
   try {
-    logger.info('Generating showcase map overlay');
-    const { generateMapImage } = await import('./map-image');
-    const buffer = await generateMapImage(
-      {
-        name: 'ITER Facility',
-        aliases: ['ITER'],
-        coordinates: [5.7583, 43.7074] as [number, number],
-        modernRegion: 'Saint-Paul-lès-Durance, France',
-        source: 'geonames' as const,
-        confidence: 1,
+    logger.info('Generating showcase map with globe zoom');
+    const { generateMapZoomFrames } = await import('./map-image');
+    const place = {
+      name: 'ITER Facility',
+      aliases: ['ITER'],
+      coordinates: [5.7583, 43.7074] as [number, number],
+      modernRegion: 'Saint-Paul-lès-Durance, France',
+      source: 'geonames' as const,
+      confidence: 1,
+    };
+    const zoomFrames = await generateMapZoomFrames(place, 'satellite');
+    const clipBuffer = await renderClip({
+      segmentId: 'showcase-map',
+      order: 0,
+      speaker: 'Host',
+      text: '',
+      startTime: 0,
+      duration: SHOWCASE_CLIP_SECONDS,
+      visualType: 'MAP_OVERLAY',
+      metadata: {
+        places: [place],
+        preset: 'satellite',
+        zoomFrames,
       },
-      'satellite',
-    );
-    const url = await uploadFile('showcase/map_overlay.png', buffer, 'image/png');
+    }, SHOWCASE_CLIP_SECONDS);
+    const url = await uploadFile('showcase/map_overlay.mp4', clipBuffer, 'video/mp4');
     items.push({
       visualType: 'MAP_OVERLAY',
       label: 'Map Overlays',
-      description: 'Geographic locations rendered on beautiful maps',
-      imageUrl: url,
+      description: 'Globe-to-location zoom on geographic references',
+      url,
+      mediaType: 'video',
     });
   } catch (err) {
     const message = (err as Error).message;
