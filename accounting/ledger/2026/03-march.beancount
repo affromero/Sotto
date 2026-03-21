@@ -24,3 +24,7 @@
 2026-03-13 * "Redis" "Redis Cloud — March 2026"
   Expenses:Software:Other                      5.00 USD
   Assets:Current:Cash:Bank                    -5.00 USD
+
+2026-03-21 * "Replicate" "API credits — March 2026"
+  Expenses:AI:Replicate                       10.00 USD
+  Assets:Current:Cash:Bank                   -10.00 USD
