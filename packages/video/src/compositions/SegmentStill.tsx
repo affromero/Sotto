@@ -1,5 +1,5 @@
 import React from 'react';
-import { AbsoluteFill, Audio } from 'remotion';
+import { AbsoluteFill, Audio, useVideoConfig } from 'remotion';
 import type { VideoSegment } from '../types';
 import { resolveSegmentComponent } from './segments';
 
@@ -15,6 +15,7 @@ export interface SegmentStillProps {
  * and by /clip for per-segment preview renders (optionally with audio).
  */
 export const SegmentStill: React.FC<SegmentStillProps> = ({ segment, audioUrl, audioStartTime }) => {
+  const { fps } = useVideoConfig();
   const Component = resolveSegmentComponent(segment.visualType);
 
   return (
@@ -23,7 +24,7 @@ export const SegmentStill: React.FC<SegmentStillProps> = ({ segment, audioUrl, a
       {audioUrl && (
         <Audio
           src={audioUrl}
-          startFrom={Math.round((audioStartTime ?? 0) * 30)}
+          startFrom={Math.round((audioStartTime ?? 0) * fps)}
         />
       )}
     </AbsoluteFill>

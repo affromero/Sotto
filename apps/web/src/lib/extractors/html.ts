@@ -258,7 +258,7 @@ function extractTables(html: string): ExtractedTable[] {
     });
 
     const rows: string[][] = [];
-    const rowSelector = headers.length > 0 ? 'tbody tr, tr:not(:first-child)' : 'tr';
+    const rowSelector = headers.length > 0 ? 'tbody tr' : 'tr';
     $table.find(rowSelector).each((_, tr) => {
       if (rows.length >= MAX_ROWS_PER_TABLE) return false;
       const cells: string[] = [];
@@ -302,7 +302,10 @@ function extractFigures(html: string, baseUrl: string): ExtractedFigure[] {
 
     let absoluteUrl: string;
     try {
-      absoluteUrl = new URL(src, baseUrl).href;
+      const parsed = new URL(src, baseUrl);
+      // Only allow http/https URLs — prevent SSRF via file://, data:, etc.
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return;
+      absoluteUrl = parsed.href;
     } catch {
       return;
     }

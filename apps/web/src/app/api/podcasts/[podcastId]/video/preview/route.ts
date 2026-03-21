@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { authenticateRequest } from '@/lib/api-keys';
+import { requireAdmin } from '@/lib/auth-guards';
 import { errorResponse } from '@/lib/api-response';
 import { addJob, JobType, segmentPreviewQueue } from '@/lib/queue';
 import { z } from 'zod';
@@ -21,6 +22,17 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
   if (!authResult) {
     return errorResponse('Unauthorized', 401);
+  }
+
+  // Verify ownership
+  const podcast = await prisma.podcast.findUnique({
+    where: { id: podcastId },
+    select: { userId: true },
+  });
+  if (!podcast) return errorResponse('Podcast not found', 404);
+  const adminId = await requireAdmin();
+  if (podcast.userId !== authResult.userId && !adminId) {
+    return errorResponse('Forbidden', 403);
   }
 
   const body = await request.json();
@@ -73,6 +85,17 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
   if (!authResult) {
     return errorResponse('Unauthorized', 401);
+  }
+
+  // Verify ownership
+  const podcast = await prisma.podcast.findUnique({
+    where: { id: podcastId },
+    select: { userId: true },
+  });
+  if (!podcast) return errorResponse('Podcast not found', 404);
+  const adminId = await requireAdmin();
+  if (podcast.userId !== authResult.userId && !adminId) {
+    return errorResponse('Forbidden', 403);
   }
 
   const segmentVisualId = request.nextUrl.searchParams.get('segmentVisualId');

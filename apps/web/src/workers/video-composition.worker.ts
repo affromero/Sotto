@@ -156,19 +156,20 @@ export async function processVideoComposition(job: Job<ComposeVideoPayload>): Pr
       orderBy: [{ order: 'asc' }, { subOrder: 'asc' }],
     });
 
-    const allHaveFullPreviews = allPreviewVisuals.length > 0 &&
+    // Count sub-visuals per segment — only use concat when each segment has exactly one visual
+    const subVisualsPerOrder = new Map<number, number>();
+    for (const v of allPreviewVisuals) {
+      subVisualsPerOrder.set(v.order, (subVisualsPerOrder.get(v.order) ?? 0) + 1);
+    }
+    const allSingleVisual = [...subVisualsPerOrder.values()].every((count) => count === 1);
+
+    const allHaveFullPreviews = allPreviewVisuals.length > 0 && allSingleVisual &&
       allPreviewVisuals.every((v) => v.previewStatus === 'ready' && v.previewQuality === 'full' && v.previewUrl);
 
     if (allHaveFullPreviews && transitionInputs.length === 0) {
       logger.info('All segments have full-quality previews, using FFmpeg concat', { podcastId, segments: String(allPreviewVisuals.length) });
 
-      // Deduplicate by order (take first sub-visual per segment)
-      const seenOrders = new Set<number>();
-      const uniqueSegments = allPreviewVisuals.filter((v) => {
-        if (seenOrders.has(v.order)) return false;
-        seenOrders.add(v.order);
-        return true;
-      });
+      const uniqueSegments = allPreviewVisuals;
 
       const videoBuffer = await concatenateSegmentPreviews(
         uniqueSegments.map((v) => ({ order: v.order, previewUrl: v.previewUrl! })),
@@ -189,7 +190,7 @@ export async function processVideoComposition(job: Job<ComposeVideoPayload>): Pr
         data: { videoUrl },
       });
 
-      await addJob(notificationQueue, JobType.NOTIFY, {
+      await addJob(notificationQueue, JobType.SEND_NOTIFICATION, {
         type: 'VIDEO_READY',
         podcastId,
         userId: podcast.userId,
