@@ -9,6 +9,7 @@ import { Prisma } from '@prisma/client';
 import { addJob, JobType, visualClassificationQueue, visualGenerationQueue, videoCompositionQueue } from '@/lib/queue';
 
 import { logger } from '@/lib/logger';
+import type { VisualTypeString } from '@/lib/visual-classifier';
 
 type RouteParams = { params: Promise<{ podcastId: string }> };
 
@@ -262,7 +263,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
             subOrder: sv.subOrder,
             startOffset: sv.startOffset,
             subDuration: sv.duration,
-            visualType: sv.visualType as 'AI_ILLUSTRATION' | 'STOCK_FOOTAGE' | 'DATA_CHART' | 'QUOTE' | 'COMPARISON' | 'TIMELINE' | 'DIAGRAM' | 'TEXT_CARD',
+            visualType: sv.visualType as VisualTypeString,
             visualMode: sv.visualMode,
             videoModel: sv.visualMode === 'video' ? sv.model : null,
             prompt: sv.prompt,

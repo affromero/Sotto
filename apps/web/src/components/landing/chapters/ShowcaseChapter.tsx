@@ -90,7 +90,7 @@ export function ShowcaseChapter({ showcase }: ShowcaseChapterProps) {
                     Avatars: {avatarEnabled ? 'On' : 'Off'}
                   </button>
                 )}
-                  <span className={styles.videoCount}>9 visual types</span>
+                  <span className={styles.videoCount}>10 visual types</span>
                 </div>
               </div>
             </div>
@@ -102,7 +102,7 @@ export function ShowcaseChapter({ showcase }: ShowcaseChapterProps) {
               <p className={styles.description}>
                 Every segment gets a visual. AI illustrations, maps,
                 data charts, stock footage, timelines, diagrams, and more.
-                Add avatar presenters or keep it clean. Nine visual types, fully automatic.
+                Add avatar presenters or keep it clean. Ten visual types, fully automatic.
               </p>
             </div>
           </div>

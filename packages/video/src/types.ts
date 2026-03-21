@@ -112,9 +112,72 @@ export const VisualType = {
   AI_ILLUSTRATION: 'AI_ILLUSTRATION',
   TEXT_CARD: 'TEXT_CARD',
   MAP_OVERLAY: 'MAP_OVERLAY',
+  DATA_TABLE: 'DATA_TABLE',
 } as const;
 
 export type VisualTypeValue = (typeof VisualType)[keyof typeof VisualType];
+
+// ---------------------------------------------------------------------------
+// DATA_TABLE metadata types
+// ---------------------------------------------------------------------------
+
+export type DataTableAlign = 'left' | 'center' | 'right';
+export type DataTableDensity = 'comfortable' | 'compact';
+export type DataTableCellTone = 'default' | 'muted' | 'amber' | 'navy' | 'positive' | 'negative';
+export type DataTableHighlightTone = 'amber' | 'navy' | 'positive' | 'negative';
+export type DataTableSortDirection = 'asc' | 'desc';
+
+export interface DataTableHeaders {
+  title?: string;
+  subtitle?: string;
+  sourceLabel?: string;
+}
+
+export interface DataTableColumn {
+  key: string;
+  label: string;
+  align?: DataTableAlign;
+  widthPercent?: number;
+  isNumeric?: boolean;
+}
+
+export interface DataTableRow {
+  key: string;
+  values: Record<string, string | number>;
+  toneByColumnKey?: Partial<Record<string, DataTableCellTone>>;
+  isSummary?: boolean;
+}
+
+export interface DataTableHighlightCell {
+  rowKey: string;
+  columnKey: string;
+  tone?: DataTableHighlightTone;
+  pulse?: boolean;
+}
+
+export interface DataTableSortIndicator {
+  columnKey: string;
+  direction: DataTableSortDirection;
+  rank?: number;
+  animated?: boolean;
+}
+
+export interface DataTableStyleHints {
+  density?: DataTableDensity;
+  zebraRows?: boolean;
+  showGridLines?: boolean;
+  emphasizeFirstColumn?: boolean;
+  maxVisibleRows?: number;
+}
+
+export interface DataTableMetadata {
+  headers?: DataTableHeaders;
+  columns: DataTableColumn[];
+  rows: DataTableRow[];
+  styleHints?: DataTableStyleHints;
+  highlightCells?: DataTableHighlightCell[];
+  sortIndicators?: DataTableSortIndicator[];
+}
 
 export const DEFAULT_BRANDING: Branding = {
   primaryColor: '#D97706',
