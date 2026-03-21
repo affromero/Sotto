@@ -47,6 +47,7 @@ echo "New slot:    $NEW_SLOT (web=$NEW_WEB_PORT, maps=$NEW_MAPS_PORT)"
 
 echo ""
 echo "=== Pulling latest code ==="
+PREV_SHA=$(git rev-parse --short HEAD)
 git pull origin main
 git submodule update --init --recursive
 
@@ -77,14 +78,17 @@ echo ""
 echo "=== Ensuring infrastructure is running ==="
 docker compose -f "$COMPOSE_INFRA" up -d
 
-# --- Pull remotion from GHCR ---
+# --- Rebuild remotion if source changed ---
 
 echo ""
-echo "=== Pulling remotion from GHCR ==="
-GHCR_TOKEN=$(doppler secrets get GHCR_READ_TOKEN --plain)
-echo "${GHCR_TOKEN}" | docker login ghcr.io -u affromero --password-stdin
-docker compose -f "$COMPOSE_INFRA" pull remotion
-docker compose -f "$COMPOSE_INFRA" up -d --no-deps remotion
+REMOTION_CHANGED=$(git diff --name-only "${PREV_SHA}..HEAD" -- packages/video/ services/remotion/ 2>/dev/null | head -1)
+if [ -n "$REMOTION_CHANGED" ]; then
+  echo "=== Rebuilding remotion (source changed) ==="
+  docker compose -f "$COMPOSE_INFRA" build remotion
+  docker compose -f "$COMPOSE_INFRA" up -d --no-deps remotion
+else
+  echo "=== Remotion unchanged, skipping rebuild ==="
+fi
 
 # --- Pre-build cleanup (prevent disk exhaustion) ---
 
