@@ -67,6 +67,10 @@ interface InspectorContentProps {
   apiCosts: {
     totalCost: number;
     callCount: number;
+    text: number;
+    audio: number;
+    video: number;
+    avatar: number;
   };
   pipelineEvents: Record<string, number>;
   mlFeatures: {
@@ -423,6 +427,30 @@ export function InspectorContent({
             <span className={styles.cardLabel}>API Calls</span>
             <span className={styles.cardValue}>{apiCosts.callCount.toLocaleString()}</span>
           </div>
+          {apiCosts.text > 0 && (
+            <div className={styles.card}>
+              <span className={styles.cardLabel}>Text (AI)</span>
+              <span className={styles.cardValue}>${apiCosts.text.toFixed(4)}</span>
+            </div>
+          )}
+          {apiCosts.audio > 0 && (
+            <div className={styles.card}>
+              <span className={styles.cardLabel}>Audio (TTS)</span>
+              <span className={styles.cardValue}>${apiCosts.audio.toFixed(4)}</span>
+            </div>
+          )}
+          {apiCosts.video > 0 && (
+            <div className={styles.card}>
+              <span className={styles.cardLabel}>Video</span>
+              <span className={styles.cardValue}>${apiCosts.video.toFixed(4)}</span>
+            </div>
+          )}
+          {apiCosts.avatar > 0 && (
+            <div className={styles.card}>
+              <span className={styles.cardLabel}>Avatar</span>
+              <span className={styles.cardValue}>${apiCosts.avatar.toFixed(4)}</span>
+            </div>
+          )}
         </div>
       </section>
 
