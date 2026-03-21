@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import Image from 'next/image';
 import { Plus, AlertTriangle, Loader2, ChevronDown } from 'lucide-react';
 import { usePlayer } from '@/components/providers/AudioPlayerProvider';
@@ -54,9 +54,48 @@ export function VoiceTrackSelector({
   onTracksChange,
 }: VoiceTrackSelectorProps) {
   const player = usePlayer();
+  const [tracks, setTracks] = useState(voiceTracks);
   const [activeTrackId, setActiveTrackId] = useState<string | null>(defaultVoiceTrackId);
   const [managerOpen, setManagerOpen] = useState(false);
   const [expandedProviders, setExpandedProviders] = useState<Set<string>>(new Set());
+
+  // Sync from props when server data changes (e.g. full page refresh)
+  useEffect(() => {
+    setTracks(voiceTracks);
+  }, [voiceTracks]);
+
+  // Fetch latest tracks from API
+  const fetchTracks = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/podcasts/${podcastId}/voice-tracks`);
+      if (res.ok) {
+        const updated: VoiceTrackSummary[] = await res.json();
+        setTracks(updated);
+      }
+    } catch { /* ignore polling errors */ }
+  }, [podcastId]);
+
+  // Poll when any track is in-progress
+  useEffect(() => {
+    const hasInProgress = tracks.some(t =>
+      t.status === 'GENERATING_AUDIO' || t.status === 'STITCHING' || t.status === 'PENDING'
+    );
+    if (!hasInProgress) return;
+
+    const interval = setInterval(fetchTracks, 5000);
+    return () => clearInterval(interval);
+  }, [tracks, fetchTracks]);
+
+  // Re-fetch when tab becomes visible again
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        fetchTracks();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [fetchTracks]);
 
   const handleSelectOriginal = useCallback(() => {
     const currentTime = player.currentTime;
@@ -84,18 +123,18 @@ export function VoiceTrackSelector({
   }, [player, podcastId, podcastTitle]);
 
   const readyTracks = useMemo(
-    () => voiceTracks.filter(t => t.status === 'READY'),
-    [voiceTracks],
+    () => tracks.filter(t => t.status === 'READY'),
+    [tracks],
   );
 
   const pendingProposalCount = useMemo(
-    () => isOwner ? voiceTracks.filter(t => t.proposalStatus === 'PENDING').length : 0,
-    [voiceTracks, isOwner],
+    () => isOwner ? tracks.filter(t => t.proposalStatus === 'PENDING').length : 0,
+    [tracks, isOwner],
   );
 
   const visibleTracks = useMemo(
-    () => isOwner ? voiceTracks : readyTracks,
-    [voiceTracks, readyTracks, isOwner],
+    () => isOwner ? tracks : readyTracks,
+    [tracks, readyTracks, isOwner],
   );
 
   // Group tracks by provider for accordion view
@@ -269,11 +308,11 @@ export function VoiceTrackSelector({
       {managerOpen && (
         <VoiceTrackManager
           podcastId={podcastId}
-          voiceTracks={voiceTracks}
+          voiceTracks={tracks}
           speakers={speakers}
           isOpen={managerOpen}
-          onClose={() => setManagerOpen(false)}
-          onTracksChange={onTracksChange}
+          onClose={() => { setManagerOpen(false); fetchTracks(); }}
+          onTracksChange={() => { fetchTracks(); onTracksChange?.(); }}
         />
       )}
     </>
