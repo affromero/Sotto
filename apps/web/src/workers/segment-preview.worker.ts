@@ -81,7 +81,7 @@ export async function processSegmentPreview(job: Job<RenderSegmentPreviewPayload
 
     // Upload to R2
     const buffer = Buffer.from(await response.arrayBuffer());
-    const r2Key = `podcasts/${podcastId}/previews/${segmentVisualId}.mp4`;
+    const r2Key = `podcasts/${podcastId}/previews/${segmentVisualId}-${quality}.mp4`;
     const previewUrl = await uploadFile(r2Key, buffer, 'video/mp4');
 
     // Update segment visual

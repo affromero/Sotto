@@ -216,11 +216,15 @@ export async function classifySegmentVisuals(
   }
 
   if (opts?.structuredData?.figures && opts.structuredData.figures.length > 0) {
-    const figureLines = opts.structuredData.figures.map((f, i) => {
-      const label = f.caption || f.altText || `Figure ${i + 1}`;
-      return `[Figure ${i + 1}: "${label}"] URL: ${f.url}`;
-    });
-    structuredSections.push(`\nAvailable Source Figures (use SOURCE_FIGURE when segment references these):\n${figureLines.join('\n')}`);
+    // Exclude data URIs from the prompt — they'd explode token count
+    const httpFigures = opts.structuredData.figures.filter((f) => !f.url.startsWith('data:'));
+    if (httpFigures.length > 0) {
+      const figureLines = httpFigures.map((f, i) => {
+        const label = f.caption || f.altText || `Figure ${i + 1}`;
+        return `[Figure ${i + 1}: "${label}"] URL: ${f.url}`;
+      });
+      structuredSections.push(`\nAvailable Source Figures (use SOURCE_FIGURE when segment references these):\n${figureLines.join('\n')}`);
+    }
   }
 
   const structuredBlock = structuredSections.length > 0 ? `\n${structuredSections.join('\n')}` : '';

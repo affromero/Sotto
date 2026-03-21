@@ -1,4 +1,5 @@
 import { Job, UnrecoverableError } from 'bullmq';
+import { safeFetch } from '@/lib/url-validator';
 import { fetchAllVideoModels } from '@/lib/video-cost-estimator';
 import {
   GenerateVisualPayload,
@@ -316,9 +317,9 @@ export async function processVisualGeneration(job: Job<GenerateVisualPayload>): 
       });
       const figureUrl = (sv?.metadata as Record<string, unknown> | null)?.figureUrl as string | undefined;
 
-      if (figureUrl) {
+      if (figureUrl && figureUrl.startsWith('https://')) {
         try {
-          const headResp = await fetch(figureUrl, { method: 'HEAD', signal: AbortSignal.timeout(10000) });
+          const headResp = await safeFetch(figureUrl, { method: 'HEAD', signal: AbortSignal.timeout(10000) });
           if (headResp.ok) {
             await prisma.segmentVisual.update({
               where: { id: segmentVisualId },
@@ -333,12 +334,20 @@ export async function processVisualGeneration(job: Job<GenerateVisualPayload>): 
         }
       }
 
-      // Fallback: convert to AI_ILLUSTRATION and re-queue
+      // Fallback: convert to AI_ILLUSTRATION and re-queue a generation job
+      const fallbackPrompt = prompt || 'Editorial illustration for podcast segment';
       await prisma.segmentVisual.update({
         where: { id: segmentVisualId },
         data: { visualType: 'AI_ILLUSTRATION', status: 'pending' },
       });
-      await checkAllReady(videoGenerationId, podcastId);
+      await addJob(visualGenerationQueue, JobType.GENERATE_VISUAL, {
+        podcastId,
+        videoGenerationId,
+        segmentVisualId,
+        visualType: 'AI_ILLUSTRATION',
+        prompt: fallbackPrompt,
+        metadata: {},
+      });
       await job.updateProgress(100);
       return;
     } else if (PROGRAMMATIC_TYPES.has(visualType)) {
