@@ -257,13 +257,14 @@ async function renderClip(segment: VideoSegment, durationSeconds = SHOWCASE_CLIP
 export async function generateShowcaseClips(opts?: { imageModel?: string }): Promise<ShowcaseResult> {
   const items: ShowcaseItem[] = [];
   const failures: Array<{ visualType: string; error: string }> = [];
+  const cacheBust = Date.now(); // Unique suffix to avoid CDN cache on regeneration
 
   // 1. Render programmatic types as animated clips via /clip
   for (const entry of CURATED_SEGMENTS) {
     try {
       logger.info('Rendering showcase clip', { visualType: entry.visualType });
       const buffer = await renderClip(entry.segment);
-      const key = `showcase/${entry.visualType.toLowerCase()}.mp4`;
+      const key = `showcase/${entry.visualType.toLowerCase()}-${cacheBust}.mp4`;
       const url = await uploadFile(key, buffer, 'video/mp4');
       const credits = entry.visualType === 'SOURCE_FIGURE'
         ? (entry.segment.metadata as Record<string, unknown>)?.sourceLabel as string | undefined
@@ -298,7 +299,7 @@ export async function generateShowcaseClips(opts?: { imageModel?: string }): Pro
         height: 720,
       });
       // Upload image first, then render as clip with Ken Burns via ImageSlide
-      const imageUrl = await uploadFile('showcase/ai_illustration_src.png', imageBuffer, 'image/png');
+      const imageUrl = await uploadFile(`showcase/ai_illustration_src-${cacheBust}.png`, imageBuffer, 'image/png');
       const clipBuffer = await renderClip({
         segmentId: 'showcase-ai',
         order: 0,
@@ -310,7 +311,7 @@ export async function generateShowcaseClips(opts?: { imageModel?: string }): Pro
         assetUrl: imageUrl,
         assetType: 'image/png',
       });
-      const clipUrl = await uploadFile('showcase/ai_illustration.mp4', clipBuffer, 'video/mp4');
+      const clipUrl = await uploadFile(`showcase/ai_illustration-${cacheBust}.mp4`, clipBuffer, 'video/mp4');
       items.push({
         visualType: 'AI_ILLUSTRATION',
         label: 'AI Illustrations',
@@ -332,7 +333,7 @@ export async function generateShowcaseClips(opts?: { imageModel?: string }): Pro
     const result = await searchStockVideo('fusion reactor plasma energy');
     if (result) {
       const videoBuffer = await downloadStockAsset(result.url);
-      const url = await uploadFile('showcase/stock_footage.mp4', videoBuffer, 'video/mp4');
+      const url = await uploadFile(`showcase/stock_footage-${cacheBust}.mp4`, videoBuffer, 'video/mp4');
       items.push({
         visualType: 'STOCK_FOOTAGE',
         label: 'Stock Footage',
@@ -375,7 +376,7 @@ export async function generateShowcaseClips(opts?: { imageModel?: string }): Pro
         zoomFrames,
       },
     }, SHOWCASE_CLIP_SECONDS);
-    const url = await uploadFile('showcase/map_overlay.mp4', clipBuffer, 'video/mp4');
+    const url = await uploadFile(`showcase/map_overlay-${cacheBust}.mp4`, clipBuffer, 'video/mp4');
     items.push({
       visualType: 'MAP_OVERLAY',
       label: 'Map Overlays',
@@ -404,13 +405,14 @@ export async function regenerateShowcaseItem(
   visualType: string,
   opts?: { imageModel?: string },
 ): Promise<ShowcaseItem> {
+  const cacheBust = Date.now();
   // Find the curated segment for this type
   const entry = CURATED_SEGMENTS.find((s) => s.visualType === visualType);
 
   if (entry) {
     // Programmatic type — re-render via /clip
     const buffer = await renderClip(entry.segment);
-    const key = `showcase/${entry.visualType.toLowerCase()}.mp4`;
+    const key = `showcase/${entry.visualType.toLowerCase()}-${cacheBust}.mp4`;
     const url = await uploadFile(key, buffer, 'video/mp4');
     const credits = entry.visualType === 'SOURCE_FIGURE'
       ? (entry.segment.metadata as Record<string, unknown>)?.sourceLabel as string | undefined
@@ -435,12 +437,12 @@ export async function regenerateShowcaseItem(
       prompt: 'Inside a fusion reactor, glowing plasma contained by magnetic fields, editorial illustration style, warm amber and deep navy tones, clean lines, no text, no real people',
       width: 1280, height: 720,
     });
-    const imageUrl = await uploadFile('showcase/ai_illustration_src.png', imageBuffer, 'image/png');
+    const imageUrl = await uploadFile(`showcase/ai_illustration_src-${cacheBust}.png`, imageBuffer, 'image/png');
     const clipBuffer = await renderClip({
       segmentId: 'showcase-ai', order: 0, speaker: 'Host', text: '', startTime: 0,
       duration: SHOWCASE_CLIP_SECONDS, visualType: 'AI_ILLUSTRATION', assetUrl: imageUrl, assetType: 'image/png',
     });
-    const clipUrl = await uploadFile('showcase/ai_illustration.mp4', clipBuffer, 'video/mp4');
+    const clipUrl = await uploadFile(`showcase/ai_illustration-${cacheBust}.mp4`, clipBuffer, 'video/mp4');
     return { visualType: 'AI_ILLUSTRATION', label: 'AI Illustrations', description: 'Created an editorial illustration of plasma containment inside a reactor, matching the segment where hosts describe the process', url: clipUrl, mediaType: 'video' };
   }
 
@@ -449,7 +451,7 @@ export async function regenerateShowcaseItem(
     const result = await searchStockVideo('fusion reactor plasma energy');
     if (!result) throw new Error('No stock footage found');
     const videoBuffer = await downloadStockAsset(result.url);
-    const url = await uploadFile('showcase/stock_footage.mp4', videoBuffer, 'video/mp4');
+    const url = await uploadFile(`showcase/stock_footage-${cacheBust}.mp4`, videoBuffer, 'video/mp4');
     return { visualType: 'STOCK_FOOTAGE', label: 'Stock Footage', description: 'Found relevant stock footage of energy infrastructure to accompany the discussion on power generation', url, mediaType: 'video', credits: `Video by ${result.photographer} on Pexels` };
   }
 
@@ -462,7 +464,7 @@ export async function regenerateShowcaseItem(
       duration: SHOWCASE_CLIP_SECONDS, visualType: 'MAP_OVERLAY',
       metadata: { places: [place], preset: 'satellite', zoomFrames },
     }, SHOWCASE_CLIP_SECONDS);
-    const url = await uploadFile('showcase/map_overlay.mp4', clipBuffer, 'video/mp4');
+    const url = await uploadFile(`showcase/map_overlay-${cacheBust}.mp4`, clipBuffer, 'video/mp4');
     return { visualType: 'MAP_OVERLAY', label: 'Map Overlays', description: 'Globe-to-location zoom on geographic references', url, mediaType: 'video' };
   }
 
