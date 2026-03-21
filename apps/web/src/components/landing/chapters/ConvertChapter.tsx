@@ -57,7 +57,7 @@ export function ConvertChapter() {
           <aside id="teams" className={styles.teams} data-reveal>
             <div className={styles.teamsDivider} aria-hidden="true" />
             <p className={styles.teamsText}>
-              <strong>Exploring Sotto for your organization?</strong> We&apos;re working
+              <strong>Exploring Sotto for your organization?</strong>{' '}We&apos;re working
               with early partners on internal audio briefings, video explainers, and
               avatar-hosted presentations from company docs and updates.
             </p>
