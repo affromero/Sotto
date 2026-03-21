@@ -188,6 +188,8 @@ export function AvatarOverlay({
           muted
           playsInline
           loop
+          crossOrigin="anonymous"
+          preload="auto"
         />
       )}
       {editable && (
