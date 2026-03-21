@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mapDirectionToExpression, getSupportedDirections } from '@/lib/tts-expression-mapper';
+import { mapDirectionToExpression, getSupportedDirections, convertInlineAudioTags } from '@/lib/tts-expression-mapper';
 
 describe('tts-expression-mapper', () => {
   describe('ElevenLabs', () => {
@@ -29,6 +29,26 @@ describe('tts-expression-mapper', () => {
       const result = mapDirectionToExpression(undefined, 'HOST', 'elevenlabs');
       expect(result.elevenlabs).toBeUndefined();
     });
+
+    it('includes speed for energetic direction', () => {
+      const result = mapDirectionToExpression('energetic', 'HOST', 'elevenlabs');
+      expect(result.elevenlabs?.speed).toBe(1.15);
+    });
+
+    it('includes slower speed for thoughtful direction', () => {
+      const result = mapDirectionToExpression('thoughtful', 'HOST', 'elevenlabs');
+      expect(result.elevenlabs?.speed).toBe(0.85);
+    });
+
+    it('includes fastest speed for urgent direction', () => {
+      const result = mapDirectionToExpression('urgent', 'HOST', 'elevenlabs');
+      expect(result.elevenlabs?.speed).toBe(1.2);
+    });
+
+    it('omits speed for confident direction (default pace)', () => {
+      const result = mapDirectionToExpression('confident', 'HOST', 'elevenlabs');
+      expect(result.elevenlabs?.speed).toBeUndefined();
+    });
   });
 
   describe('Cartesia', () => {
@@ -50,6 +70,42 @@ describe('tts-expression-mapper', () => {
     it('returns empty for no direction', () => {
       const result = mapDirectionToExpression(undefined, 'HOST', 'cartesia');
       expect(result.cartesia).toBeUndefined();
+    });
+
+    it('includes speed for energetic direction', () => {
+      const result = mapDirectionToExpression('energetic', 'HOST', 'cartesia');
+      expect(result.cartesia?.speed).toBe(1.3);
+    });
+
+    it('includes slow speed for calm direction', () => {
+      const result = mapDirectionToExpression('calm', 'HOST', 'cartesia');
+      expect(result.cartesia?.speed).toBe(0.8);
+    });
+
+    it('returns speed without emotion for whispering direction', () => {
+      const result = mapDirectionToExpression('whispering', 'HOST', 'cartesia');
+      expect(result.cartesia?.emotion).toBeUndefined();
+      expect(result.cartesia?.speed).toBe(0.7);
+    });
+
+    it('includes volume for energetic direction', () => {
+      const result = mapDirectionToExpression('energetic', 'HOST', 'cartesia');
+      expect(result.cartesia?.volume).toBe(1.3);
+    });
+
+    it('includes quiet volume for whispering direction', () => {
+      const result = mapDirectionToExpression('whispering', 'HOST', 'cartesia');
+      expect(result.cartesia?.volume).toBe(0.6);
+    });
+
+    it('includes quiet volume for sad direction', () => {
+      const result = mapDirectionToExpression('sad', 'HOST', 'cartesia');
+      expect(result.cartesia?.volume).toBe(0.75);
+    });
+
+    it('omits volume for playful direction (default)', () => {
+      const result = mapDirectionToExpression('playful', 'HOST', 'cartesia');
+      expect(result.cartesia?.volume).toBeUndefined();
     });
   });
 
@@ -77,6 +133,36 @@ describe('tts-expression-mapper', () => {
     it('passes unknown direction as-is', () => {
       const result = mapDirectionToExpression('bewildered', 'HOST', 'hume');
       expect(result.hume?.description).toBe('bewildered');
+    });
+
+    it('includes speed for energetic direction', () => {
+      const result = mapDirectionToExpression('energetic', 'HOST', 'hume');
+      expect(result.hume?.speed).toBe(1.3);
+    });
+
+    it('includes slow speed for calm direction', () => {
+      const result = mapDirectionToExpression('calm', 'HOST', 'hume');
+      expect(result.hume?.speed).toBe(0.8);
+    });
+
+    it('omits speed for baseline fallback', () => {
+      const result = mapDirectionToExpression(undefined, 'HOST', 'hume');
+      expect(result.hume?.speed).toBeUndefined();
+    });
+
+    it('includes long trailing silence for dramatic direction', () => {
+      const result = mapDirectionToExpression('dramatic', 'HOST', 'hume');
+      expect(result.hume?.trailingSilence).toBe(0.8);
+    });
+
+    it('includes short trailing silence for urgent direction', () => {
+      const result = mapDirectionToExpression('urgent', 'HOST', 'hume');
+      expect(result.hume?.trailingSilence).toBe(0.1);
+    });
+
+    it('omits trailing silence for confident (uses default 0.3)', () => {
+      const result = mapDirectionToExpression('confident', 'HOST', 'hume');
+      expect(result.hume?.trailingSilence).toBeUndefined();
     });
   });
 
@@ -165,6 +251,48 @@ describe('tts-expression-mapper', () => {
       expect(directions).toContain('energetic');
       expect(directions).toContain('sarcastic');
       expect(directions).toContain('calm');
+    });
+  });
+
+  describe('convertInlineAudioTags', () => {
+    it('passes all tags through for ElevenLabs', () => {
+      expect(convertInlineAudioTags('[laughs] Hello [pause] world', 'elevenlabs'))
+        .toBe('[laughs] Hello [pause] world');
+    });
+
+    it('keeps [pause] and [long pause] for Hume, strips rest', () => {
+      expect(convertInlineAudioTags('[laughs] Hello [pause] world [long pause] end', 'hume'))
+        .toBe(' Hello [pause] world [long pause] end');
+    });
+
+    it('converts laugh variants to [laughter] for Cartesia', () => {
+      expect(convertInlineAudioTags('[laughs] Hello', 'cartesia'))
+        .toBe('[laughter] Hello');
+    });
+
+    it('converts pauses to SSML breaks for Cartesia', () => {
+      expect(convertInlineAudioTags('[pause] Hello [long pause] end', 'cartesia'))
+        .toBe('<break time="0.5s"/> Hello <break time="1.5s"/> end');
+    });
+
+    it('converts inline emotion tags to SSML for Cartesia', () => {
+      expect(convertInlineAudioTags('[emotion:excited]Hello[/emotion]', 'cartesia'))
+        .toBe('<emotion value="excited">Hello</emotion>');
+    });
+
+    it('converts inline speed tags to SSML for Cartesia', () => {
+      expect(convertInlineAudioTags('[speed:1.3]Fast talk[/speed]', 'cartesia'))
+        .toBe('<speed ratio="1.3">Fast talk</speed>');
+    });
+
+    it('strips emotion/speed tags for OpenAI', () => {
+      expect(convertInlineAudioTags('[emotion:excited]Hello[/emotion]', 'openai'))
+        .toBe('Hello');
+    });
+
+    it('converts pauses to punctuation for OpenAI', () => {
+      expect(convertInlineAudioTags('[long pause] Hello [pause] world', 'openai'))
+        .toBe('...  Hello ,  world');
     });
   });
 });
