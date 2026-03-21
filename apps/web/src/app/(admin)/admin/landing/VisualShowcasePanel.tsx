@@ -87,6 +87,22 @@ export function VisualShowcasePanel() {
     }
   };
 
+  const [regenerating, setRegenerating] = useState<string | null>(null);
+
+  const handleRegenerateItem = async (setId: string, visualType: string) => {
+    setRegenerating(visualType);
+    try {
+      await fetch('/api/admin/showcase', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: setId, regenerateType: visualType, imageModel: selectedModel || undefined }),
+      });
+      await fetchSets();
+    } finally {
+      setRegenerating(null);
+    }
+  };
+
   const handleToggleActive = async (id: string, active: boolean) => {
     await fetch('/api/admin/showcase', {
       method: 'PATCH',
@@ -177,7 +193,14 @@ export function VisualShowcasePanel() {
               <div className={styles.cardBody}>
                 <span className={styles.badge}>{item.visualType}</span>
                 <h3 className={styles.cardTitle}>{item.label}</h3>
-                <p className={styles.cardDesc}>{item.description}</p>
+                <button
+                  type="button"
+                  className={styles.regenBtn}
+                  onClick={(e) => { e.stopPropagation(); handleRegenerateItem(selectedSet.id, item.visualType); }}
+                  disabled={regenerating === item.visualType}
+                >
+                  {regenerating === item.visualType ? 'Regenerating...' : 'Regenerate'}
+                </button>
               </div>
             </div>
           ))}

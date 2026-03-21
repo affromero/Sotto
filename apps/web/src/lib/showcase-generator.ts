@@ -4,7 +4,7 @@ import type { VideoSegment } from '@sotto/video';
 
 const REMOTION_URL = process.env.REMOTION_URL;
 
-interface ShowcaseItem {
+export interface ShowcaseItem {
   visualType: string;
   label: string;
   description: string;
@@ -394,6 +394,79 @@ export async function generateShowcaseClips(opts?: { imageModel?: string }): Pro
     failures: String(failures.length),
   });
   return { items, failures };
+}
+
+/**
+ * Regenerate a single visual type within a showcase set.
+ * Returns the updated item or throws on failure.
+ */
+export async function regenerateShowcaseItem(
+  visualType: string,
+  opts?: { imageModel?: string },
+): Promise<ShowcaseItem> {
+  // Find the curated segment for this type
+  const entry = CURATED_SEGMENTS.find((s) => s.visualType === visualType);
+
+  if (entry) {
+    // Programmatic type — re-render via /clip
+    const buffer = await renderClip(entry.segment);
+    const key = `showcase/${entry.visualType.toLowerCase()}.mp4`;
+    const url = await uploadFile(key, buffer, 'video/mp4');
+    const credits = entry.visualType === 'SOURCE_FIGURE'
+      ? (entry.segment.metadata as Record<string, unknown>)?.sourceLabel as string | undefined
+      : undefined;
+    return {
+      visualType: entry.visualType,
+      label: entry.label,
+      description: entry.description,
+      url,
+      mediaType: 'video',
+      ...(credits && { credits }),
+    };
+  }
+
+  // External types — AI_ILLUSTRATION, STOCK_FOOTAGE, MAP_OVERLAY
+  if (visualType === 'AI_ILLUSTRATION') {
+    const { FalImageProvider } = await import('./providers/image/fal.provider');
+    const falKey = process.env.FAL_KEY;
+    if (!falKey) throw new Error('FAL_KEY not configured');
+    const provider = new FalImageProvider(falKey, opts?.imageModel);
+    const imageBuffer = await provider.generateImage({
+      prompt: 'Inside a fusion reactor, glowing plasma contained by magnetic fields, editorial illustration style, warm amber and deep navy tones, clean lines, no text, no real people',
+      width: 1280, height: 720,
+    });
+    const imageUrl = await uploadFile('showcase/ai_illustration_src.png', imageBuffer, 'image/png');
+    const clipBuffer = await renderClip({
+      segmentId: 'showcase-ai', order: 0, speaker: 'Host', text: '', startTime: 0,
+      duration: SHOWCASE_CLIP_SECONDS, visualType: 'AI_ILLUSTRATION', assetUrl: imageUrl, assetType: 'image/png',
+    });
+    const clipUrl = await uploadFile('showcase/ai_illustration.mp4', clipBuffer, 'video/mp4');
+    return { visualType: 'AI_ILLUSTRATION', label: 'AI Illustrations', description: 'Rich editorial illustrations generated from your content', url: clipUrl, mediaType: 'video' };
+  }
+
+  if (visualType === 'STOCK_FOOTAGE') {
+    const { searchStockVideo, downloadStockAsset } = await import('./stock-footage');
+    const result = await searchStockVideo('fusion reactor plasma energy');
+    if (!result) throw new Error('No stock footage found');
+    const videoBuffer = await downloadStockAsset(result.url);
+    const url = await uploadFile('showcase/stock_footage.mp4', videoBuffer, 'video/mp4');
+    return { visualType: 'STOCK_FOOTAGE', label: 'Stock Footage', description: 'Real-world video clips matched to your content', url, mediaType: 'video', credits: `Video by ${result.photographer} on Pexels` };
+  }
+
+  if (visualType === 'MAP_OVERLAY') {
+    const { generateMapZoomFrames } = await import('./map-image');
+    const place = { name: 'ITER Facility', aliases: ['ITER'], coordinates: [5.7583, 43.7074] as [number, number], modernRegion: 'Saint-Paul-les-Durance, France', source: 'geonames' as const, confidence: 1 };
+    const zoomFrames = await generateMapZoomFrames(place, 'satellite');
+    const clipBuffer = await renderClip({
+      segmentId: 'showcase-map', order: 0, speaker: 'Host', text: '', startTime: 0,
+      duration: SHOWCASE_CLIP_SECONDS, visualType: 'MAP_OVERLAY',
+      metadata: { places: [place], preset: 'satellite', zoomFrames },
+    }, SHOWCASE_CLIP_SECONDS);
+    const url = await uploadFile('showcase/map_overlay.mp4', clipBuffer, 'video/mp4');
+    return { visualType: 'MAP_OVERLAY', label: 'Map Overlays', description: 'Globe-to-location zoom on geographic references', url, mediaType: 'video' };
+  }
+
+  throw new Error(`Unknown visual type: ${visualType}`);
 }
 
 /**
