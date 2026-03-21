@@ -156,14 +156,15 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     supportsVoiceCloning: true,
     supportsStreaming: false,
     maxSegmentChars: 5000,
-    defaultModel: 'octave-v1',
+    defaultModel: 'octave-v2',
     models: [
+      { id: 'octave-v2', displayName: 'Octave V2', tier: 'ultra' },
       { id: 'octave-v1', displayName: 'Octave V1', tier: 'ultra' },
     ],
     supportsAudioTags: false,
     docsUrl: 'https://dev.hume.ai/docs/text-to-speech/text-to-speech-guide',
     qualityTier: 'ultra',
-    platformCostPerKChar: 0.25,
+    platformCostPerKChar: 0.125,
     modelsWithoutTextContext: [],
     auth: {
       fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'Your Hume AI API key' }],
