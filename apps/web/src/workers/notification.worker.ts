@@ -3,6 +3,7 @@ import type { NotificationType } from '@prisma/client';
 import { SendNotificationPayload } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { sendPushNotification, sendExpoPushNotification } from '@/lib/push-notifications';
+import { publishNotification } from '@/lib/redis';
 import { logger } from '@/lib/logger';
 
 export async function processNotification(job: Job<SendNotificationPayload>): Promise<void> {
@@ -24,6 +25,23 @@ export async function processNotification(job: Job<SendNotificationPayload>): Pr
       message,
       data: data || undefined,
     },
+  });
+
+  // Publish to Redis so SSE subscribers receive it instantly
+  publishNotification(userId, {
+    id: notification.id,
+    type: notification.type,
+    title: notification.title,
+    message: notification.message,
+    data: notification.data,
+    read: notification.read,
+    createdAt: notification.createdAt.toISOString(),
+  }).catch((err) => {
+    logger.warn('Failed to publish notification to Redis', {
+      userId,
+      type,
+      error: err instanceof Error ? err.message : String(err),
+    });
   });
 
   // Send push notifications (web + mobile) only if user has opted in

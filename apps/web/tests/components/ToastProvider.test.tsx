@@ -70,6 +70,30 @@ describe('ToastProvider', () => {
     expect(screen.getByText('Error occurred')).toBeInTheDocument();
   });
 
+  it('renders toast with action button when action is provided', async () => {
+    function ActionConsumer() {
+      const { showToast } = useToast();
+      return (
+        <button onClick={() => showToast('Ready!', 'success', 4000, { label: 'View', onClick: vi.fn() })}>
+          Trigger
+        </button>
+      );
+    }
+
+    render(
+      <ToastProvider>
+        <ActionConsumer />
+      </ToastProvider>
+    );
+
+    await act(async () => {
+      screen.getByText('Trigger').click();
+    });
+
+    expect(screen.getByText('Ready!')).toBeInTheDocument();
+    expect(screen.getByText('View')).toBeInTheDocument();
+  });
+
   it('renders multiple toasts', async () => {
     function MultiTrigger() {
       const { showToast } = useToast();

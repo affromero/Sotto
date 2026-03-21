@@ -50,6 +50,7 @@ export function NotificationDropdown() {
             onMarkAllRead={() => {
               markAllRead();
             }}
+            onNavigate={() => setOpen(false)}
           />
         </div>
       )}
