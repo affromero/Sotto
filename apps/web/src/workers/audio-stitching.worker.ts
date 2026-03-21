@@ -335,7 +335,8 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
     });
 
     // 9. Update segment start times based on actual durations from FFprobe
-    // Re-fetch segments to get the latest duration values written by audio-generation worker
+    // Use raw cumulative sums — the stitched audio crossfade/SFX interaction
+    // makes the actual timing unpredictable from durations alone.
     const freshSegments = await prisma.segment.findMany({
       where: { id: { in: segmentIds } },
       orderBy: { order: 'asc' },
