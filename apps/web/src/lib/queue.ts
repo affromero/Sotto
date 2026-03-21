@@ -65,6 +65,7 @@ export enum JobType {
   GENERATE_QUIZ = 'generate_quiz',
   SCHEDULE_BRIEFINGS = 'schedule_briefings',
   CLASSIFY_PIPELINE = 'classify_pipeline',
+  MONITOR_TTS_PROVIDERS = 'monitor_tts_providers',
 }
 
 /**
@@ -286,6 +287,8 @@ export interface CollectR2UsagePayload {}
 
 export interface FetchPricingPayload {}
 
+export interface MonitorTtsProvidersPayload {}
+
 export interface ClassifyVisualsPayload {
   podcastId: string;
   videoGenerationId: string;
@@ -455,6 +458,7 @@ const QUEUE_DEFINITIONS: Record<string, QueueDefinition> = {
   'quiz-generation': { attempts: 2, skipEvents: true },
   'briefing-scheduler': { attempts: 1, skipEvents: true },
   'pipeline-classification': { attempts: 2, skipEvents: true },
+  'tts-provider-monitor': { attempts: 2, skipEvents: true },
 };
 
 const queueInstances = new Map<string, Queue>();
@@ -1056,6 +1060,7 @@ export const waveformGenerationQueue = createQueueReference('waveform-generation
 export const quizGenerationQueue = createQueueReference('quiz-generation');
 export const briefingSchedulerQueue = createQueueReference('briefing-scheduler');
 export const pipelineClassificationQueue = createQueueReference('pipeline-classification');
+export const ttsProviderMonitorQueue = createQueueReference('tts-provider-monitor');
 
 /** All queue names — single source of truth for admin and health endpoints */
 export const ALL_QUEUE_NAMES = Object.freeze(Object.keys(QUEUE_DEFINITIONS));
