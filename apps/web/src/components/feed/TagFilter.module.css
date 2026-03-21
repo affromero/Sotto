@@ -9,6 +9,7 @@
   display: flex;
   gap: var(--spacing-sm);
   overflow-x: auto;
+  overscroll-behavior-x: contain;
   padding: var(--spacing-sm) 0;
   scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch;
