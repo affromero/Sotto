@@ -16,6 +16,7 @@ import type { TtsProvider, SpeechParams } from '../tts';
 import type { TtsProviderId } from '../tts-registry';
 import { CARTESIA_VOICE_POOL, selectVoicePairFromPool } from '../tts-voices';
 import { mapDirectionToExpression, convertInlineAudioTags } from '../../tts-expression-mapper';
+import { applyPronunciationAliases } from '../../pronunciation-dictionary';
 
 const CARTESIA_API_VERSION = '2025-04-16';
 
@@ -41,19 +42,25 @@ export class CartesiaProvider implements TtsProvider {
     const emotion = expression.cartesia?.emotion;
 
     const body: Record<string, unknown> = {
-      transcript: convertInlineAudioTags(params.text, 'cartesia'),
+      transcript: convertInlineAudioTags(applyPronunciationAliases(params.text), 'cartesia'),
       model_id: this.model,
       voice: { mode: 'id', id: params.voiceId },
       output_format: {
         container: 'mp3',
-        bit_rate: 128000,
+        bit_rate: 192000,
         sample_rate: 44100,
       },
     };
 
-    // Add generation_config with emotion if available
-    if (emotion) {
-      body.generation_config = { emotion };
+    // Add generation_config with emotion, speed, and/or volume if available
+    const speed = expression.cartesia?.speed;
+    const volume = expression.cartesia?.volume;
+    if (emotion || speed || volume) {
+      body.generation_config = {
+        ...(emotion && { emotion }),
+        ...(speed && { speed }),
+        ...(volume && { volume }),
+      };
     }
 
     const response = await fetch('https://api.cartesia.ai/tts/bytes', {

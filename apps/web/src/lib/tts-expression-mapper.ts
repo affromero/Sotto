@@ -2,9 +2,9 @@
  * Maps script `direction` values to provider-specific expression parameters.
  *
  * Each TTS provider has a different API for controlling emotion and delivery:
- *   - ElevenLabs v3: inline audio tags + stability control
- *   - Cartesia Sonic 3: generation_config.emotion (60 values) + SSML
- *   - Hume Octave: description field (natural language, ≤100 chars)
+ *   - ElevenLabs v3: inline audio tags + stability control + speed (0.7–1.2)
+ *   - Cartesia Sonic 3: generation_config.emotion (60 values) + speed (0.6–1.5) + SSML
+ *   - Hume Octave: description field (natural language, ≤100 chars) + speed (0.5–2.0)
  *   - OpenAI gpt-4o-mini-tts: instructions field (natural language)
  *
  * @tts-research-date 2026-02-27 — Full provider API audit
@@ -26,16 +26,26 @@ export interface ElevenLabsExpression {
    * Set false for one-shot sound events like [laughs], [gasps], [sighs].
    */
   sustainedDelivery?: boolean;
+  /** Speech rate multiplier (0.7–1.2). Goes into voice_settings.speed. */
+  speed?: number;
 }
 
 export interface CartesiaExpression {
   /** Emotion value for generation_config (one of 60 Sonic 3 values) */
   emotion?: string;
+  /** Speech rate multiplier (0.6–1.5). Goes into generation_config.speed. */
+  speed?: number;
+  /** Volume multiplier (0.5–2.0). Goes into generation_config.volume. */
+  volume?: number;
 }
 
 export interface HumeExpression {
   /** Acting instruction for the utterance description field (≤100 chars) */
   description: string;
+  /** Speech rate multiplier (0.5–2.0, stable 0.75–1.5). */
+  speed?: number;
+  /** Seconds of silence after utterance (0–5). Default 0.3. */
+  trailingSilence?: number;
 }
 
 export interface OpenAIExpression {
@@ -69,8 +79,8 @@ export interface TtsExpressionParams {
 interface DirectionMapping {
   elevenlabs: ElevenLabsExpression;
   cartesia: CartesiaExpression;
-  hume: { description: string };
-  openai: { instructions: string };
+  hume: HumeExpression;
+  openai: OpenAIExpression;
   minimax: MinimaxExpression;
   replicate: InworldExpression;
 }
@@ -78,125 +88,130 @@ interface DirectionMapping {
 /**
  * Curated mappings for common direction values.
  * Each maps to the optimal expression for each provider.
+ *
+ * Speed values are tuned per provider's supported range:
+ *   ElevenLabs: 0.7–1.2 (tightest range, values compressed)
+ *   Cartesia:   0.6–1.5 (wide range)
+ *   Hume:       0.5–2.0 (widest, stable 0.75–1.5)
  */
 const DIRECTION_MAP: Record<string, DirectionMapping> = {
   energetic: {
-    elevenlabs: { audioTagPrefix: '[excited] ', stability: 0.0, sustainedDelivery: true },
-    cartesia: { emotion: 'excited' },
-    hume: { description: 'energetic, enthusiastic, high-energy delivery' },
+    elevenlabs: { audioTagPrefix: '[excited] ', stability: 0.0, sustainedDelivery: true, speed: 1.15 },
+    cartesia: { emotion: 'excited', speed: 1.3, volume: 1.3 },
+    hume: { description: 'energetic, enthusiastic, high-energy delivery', speed: 1.3, trailingSilence: 0.15 },
     openai: { instructions: 'Speak with high energy and enthusiasm, like an excited podcast host.' },
     minimax: { emotion: 'happy' },
     replicate: { emotionTag: '[happy]' },
   },
   excited: {
-    elevenlabs: { audioTagPrefix: '[excited] ', stability: 0.0, sustainedDelivery: true },
-    cartesia: { emotion: 'excited' },
-    hume: { description: 'excited, enthusiastic' },
+    elevenlabs: { audioTagPrefix: '[excited] ', stability: 0.0, sustainedDelivery: true, speed: 1.15 },
+    cartesia: { emotion: 'excited', speed: 1.3, volume: 1.25 },
+    hume: { description: 'excited, enthusiastic', speed: 1.3, trailingSilence: 0.15 },
     openai: { instructions: 'Speak with genuine excitement and enthusiasm.' },
     minimax: { emotion: 'happy' },
     replicate: { emotionTag: '[happy]' },
   },
   thoughtful: {
-    elevenlabs: { audioTagPrefix: '[calm] ', stability: 0.5, sustainedDelivery: true },
-    cartesia: { emotion: 'contemplative' },
-    hume: { description: 'thoughtful, measured, reflective' },
+    elevenlabs: { audioTagPrefix: '[calm] ', stability: 0.5, sustainedDelivery: true, speed: 0.85 },
+    cartesia: { emotion: 'contemplative', speed: 0.8, volume: 0.85 },
+    hume: { description: 'thoughtful, measured, reflective', speed: 0.8, trailingSilence: 0.6 },
     openai: { instructions: 'Speak thoughtfully with a measured, reflective pace.' },
     minimax: { emotion: 'neutral' },
     replicate: {},
   },
   serious: {
-    elevenlabs: { stability: 0.5 },
-    cartesia: { emotion: 'determined' },
-    hume: { description: 'serious, grave, measured' },
+    elevenlabs: { stability: 0.5, speed: 0.9 },
+    cartesia: { emotion: 'determined', speed: 0.85 },
+    hume: { description: 'serious, grave, measured', speed: 0.85 },
     openai: { instructions: 'Speak in a serious, measured tone with gravitas.' },
     minimax: { emotion: 'neutral' },
     replicate: {},
   },
   playful: {
-    elevenlabs: { audioTagPrefix: '[playfully] ', stability: 0.0, sustainedDelivery: true },
-    cartesia: { emotion: 'happy' },
-    hume: { description: 'playful, light-hearted, fun' },
+    elevenlabs: { audioTagPrefix: '[playfully] ', stability: 0.0, sustainedDelivery: true, speed: 1.1 },
+    cartesia: { emotion: 'happy', speed: 1.2 },
+    hume: { description: 'playful, light-hearted, fun', speed: 1.2, trailingSilence: 0.2 },
     openai: { instructions: 'Speak playfully and light-heartedly, with a smile in your voice.' },
     minimax: { emotion: 'happy' },
     replicate: { emotionTag: '[happy]' },
   },
   sarcastic: {
-    elevenlabs: { audioTagPrefix: '[sarcastic] ', stability: 0.5, sustainedDelivery: true },
-    cartesia: { emotion: 'sarcastic' },
-    hume: { description: 'sarcastic, dry, deadpan' },
+    elevenlabs: { audioTagPrefix: '[sarcastic] ', stability: 0.5, sustainedDelivery: true, speed: 0.95 },
+    cartesia: { emotion: 'sarcastic', speed: 0.9 },
+    hume: { description: 'sarcastic, dry, deadpan', speed: 0.9 },
     openai: { instructions: 'Speak with dry sarcasm and a slightly flat affect.' },
     minimax: { emotion: 'neutral' },
     replicate: {},
   },
   warm: {
-    elevenlabs: { audioTagPrefix: '[warmly] ', stability: 0.5, sustainedDelivery: true },
-    cartesia: { emotion: 'affectionate' },
-    hume: { description: 'warm, inviting, friendly' },
+    elevenlabs: { audioTagPrefix: '[warmly] ', stability: 0.5, sustainedDelivery: true, speed: 0.95 },
+    cartesia: { emotion: 'affectionate', speed: 0.95 },
+    hume: { description: 'warm, inviting, friendly', speed: 0.95 },
     openai: { instructions: 'Speak warmly and invitingly, like welcoming a friend.' },
     minimax: { emotion: 'neutral' },
     replicate: {},
   },
   urgent: {
-    elevenlabs: { audioTagPrefix: '[rushed] ', stability: 0.0, sustainedDelivery: true },
-    cartesia: { emotion: 'agitated' },
-    hume: { description: 'urgent, fast-paced, pressing' },
+    elevenlabs: { audioTagPrefix: '[rushed] ', stability: 0.0, sustainedDelivery: true, speed: 1.2 },
+    cartesia: { emotion: 'agitated', speed: 1.4, volume: 1.2 },
+    hume: { description: 'urgent, fast-paced, pressing', speed: 1.5, trailingSilence: 0.1 },
     openai: { instructions: 'Speak with urgency, slightly faster pace, conveying importance.' },
     minimax: { emotion: 'angry' },
     replicate: { emotionTag: '[angry]' },
   },
   hesitant: {
-    elevenlabs: { audioTagPrefix: '[hesitantly] ', stability: 0.5, sustainedDelivery: true },
-    cartesia: { emotion: 'hesitant' },
-    hume: { description: 'hesitant, uncertain, searching for words' },
+    elevenlabs: { audioTagPrefix: '[hesitantly] ', stability: 0.5, sustainedDelivery: true, speed: 0.8 },
+    cartesia: { emotion: 'hesitant', speed: 0.75, volume: 0.8 },
+    hume: { description: 'hesitant, uncertain, searching for words', speed: 0.75, trailingSilence: 0.5 },
     openai: { instructions: 'Speak hesitantly, as if carefully choosing your words.' },
     minimax: { emotion: 'fearful' },
     replicate: { emotionTag: '[fearful]' },
   },
   confident: {
     elevenlabs: { stability: 0.5 },
-    cartesia: { emotion: 'confident' },
+    cartesia: { emotion: 'confident', volume: 1.1 },
     hume: { description: 'confident, assured, authoritative' },
     openai: { instructions: 'Speak with confidence and authority.' },
     minimax: { emotion: 'neutral' },
     replicate: {},
   },
   nostalgic: {
-    elevenlabs: { audioTagPrefix: '[calm] ', stability: 0.5, sustainedDelivery: true },
-    cartesia: { emotion: 'nostalgic' },
-    hume: { description: 'nostalgic, wistful, reminiscing' },
+    elevenlabs: { audioTagPrefix: '[calm] ', stability: 0.5, sustainedDelivery: true, speed: 0.85 },
+    cartesia: { emotion: 'nostalgic', speed: 0.8, volume: 0.85 },
+    hume: { description: 'nostalgic, wistful, reminiscing', speed: 0.8, trailingSilence: 0.6 },
     openai: { instructions: 'Speak with nostalgia, as if fondly remembering the past.' },
     minimax: { emotion: 'sad' },
     replicate: { emotionTag: '[sad]' },
   },
   dramatic: {
-    elevenlabs: { audioTagPrefix: '[dramatic] ', stability: 0.0, sustainedDelivery: true },
-    cartesia: { emotion: 'amazed' },
-    hume: { description: 'dramatic, building tension' },
+    elevenlabs: { audioTagPrefix: '[dramatic] ', stability: 0.0, sustainedDelivery: true, speed: 0.9 },
+    cartesia: { emotion: 'amazed', speed: 0.85, volume: 1.1 },
+    hume: { description: 'dramatic, building tension', speed: 0.85, trailingSilence: 0.8 },
     openai: { instructions: 'Speak dramatically, building tension and suspense.' },
     minimax: { emotion: 'surprised' },
     replicate: { emotionTag: '[surprised]' },
   },
   calm: {
-    elevenlabs: { audioTagPrefix: '[calm] ', stability: 0.5, sustainedDelivery: true },
-    cartesia: { emotion: 'calm' },
-    hume: { description: 'calm, serene, measured' },
+    elevenlabs: { audioTagPrefix: '[calm] ', stability: 0.5, sustainedDelivery: true, speed: 0.85 },
+    cartesia: { emotion: 'calm', speed: 0.8, volume: 0.8 },
+    hume: { description: 'calm, serene, measured', speed: 0.8, trailingSilence: 0.5 },
     openai: { instructions: 'Speak calmly and serenely, with a measured pace.' },
     minimax: { emotion: 'neutral' },
     replicate: {},
   },
   curious: {
     elevenlabs: { audioTagPrefix: '[curious] ', stability: 0.5, sustainedDelivery: true },
-    cartesia: { emotion: 'curious' },
-    hume: { description: 'curious, inquisitive, wondering' },
+    cartesia: { emotion: 'curious', speed: 1.05 },
+    hume: { description: 'curious, inquisitive, wondering', speed: 1.05 },
     openai: { instructions: 'Speak with curiosity and genuine interest, slightly questioning.' },
     minimax: { emotion: 'neutral' },
     replicate: {},
   },
   laughing: {
     // One-shot sound event — [laughs] only fires once at the start, not re-injected
-    elevenlabs: { audioTagPrefix: '[laughs] ', stability: 0.0 },
-    cartesia: { emotion: 'happy' },
-    hume: { description: 'amused, laughing, light-hearted' },
+    elevenlabs: { audioTagPrefix: '[laughs] ', stability: 0.0, speed: 1.05 },
+    cartesia: { emotion: 'happy', speed: 1.1 },
+    hume: { description: 'amused, laughing, light-hearted', speed: 1.1, trailingSilence: 0.2 },
     openai: { instructions: 'Speak while lightly laughing, amused and cheerful.' },
     minimax: { emotion: 'happy' },
     replicate: { emotionTag: '[laughing]' },
@@ -204,59 +219,59 @@ const DIRECTION_MAP: Record<string, DirectionMapping> = {
   chuckling: {
     // One-shot sound event — light chuckling at the start of the turn
     elevenlabs: { audioTagPrefix: '[chuckles] ', stability: 0.0 },
-    cartesia: { emotion: 'happy' },
-    hume: { description: 'lightly chuckling, gently amused' },
+    cartesia: { emotion: 'happy', speed: 1.05 },
+    hume: { description: 'lightly chuckling, gently amused', speed: 1.05, trailingSilence: 0.2 },
     openai: { instructions: 'Speak while lightly chuckling, softly amused.' },
     minimax: { emotion: 'happy' },
     replicate: { emotionTag: '[laughing]' },
   },
   giggling: {
     // One-shot sound event — giggly, playful laughter at the start of the turn
-    elevenlabs: { audioTagPrefix: '[giggles] ', stability: 0.0 },
-    cartesia: { emotion: 'happy' },
-    hume: { description: 'giggling, light and playful' },
+    elevenlabs: { audioTagPrefix: '[giggles] ', stability: 0.0, speed: 1.05 },
+    cartesia: { emotion: 'happy', speed: 1.1 },
+    hume: { description: 'giggling, light and playful', speed: 1.1, trailingSilence: 0.2 },
     openai: { instructions: 'Speak while giggling, light and playful.' },
     minimax: { emotion: 'happy' },
     replicate: { emotionTag: '[laughing]' },
   },
   whispering: {
-    elevenlabs: { audioTagPrefix: '[whispers] ', stability: 0.5, sustainedDelivery: true },
-    cartesia: {},
-    hume: { description: 'whispering, hushed, secretive' },
+    elevenlabs: { audioTagPrefix: '[whispers] ', stability: 0.5, sustainedDelivery: true, speed: 0.8 },
+    cartesia: { speed: 0.7, volume: 0.6 },
+    hume: { description: 'whispering, hushed, secretive', speed: 0.75, trailingSilence: 0.5 },
     openai: { instructions: 'Whisper softly, as if sharing a secret.' },
     minimax: { emotion: 'neutral' },
     replicate: { emotionTag: '[whispering]' },
   },
   frustrated: {
-    elevenlabs: { audioTagPrefix: '[frustrated] ', stability: 0.0, sustainedDelivery: true },
-    cartesia: { emotion: 'frustrated' },
-    hume: { description: 'frustrated, exasperated' },
+    elevenlabs: { audioTagPrefix: '[frustrated] ', stability: 0.0, sustainedDelivery: true, speed: 1.1 },
+    cartesia: { emotion: 'frustrated', speed: 1.15, volume: 1.15 },
+    hume: { description: 'frustrated, exasperated', speed: 1.2, trailingSilence: 0.2 },
     openai: { instructions: 'Speak with frustration and exasperation.' },
     minimax: { emotion: 'angry' },
     replicate: { emotionTag: '[angry]' },
   },
   surprised: {
     // One-shot sound event — [gasps] only fires once at the start, not re-injected
-    elevenlabs: { audioTagPrefix: '[gasps] ', stability: 0.0 },
-    cartesia: { emotion: 'surprised' },
-    hume: { description: 'surprised, astonished' },
+    elevenlabs: { audioTagPrefix: '[gasps] ', stability: 0.0, speed: 1.1 },
+    cartesia: { emotion: 'surprised', speed: 1.15, volume: 1.2 },
+    hume: { description: 'surprised, astonished', speed: 1.15, trailingSilence: 0.4 },
     openai: { instructions: 'Speak with genuine surprise and astonishment.' },
     minimax: { emotion: 'surprised' },
     replicate: { emotionTag: '[surprised]' },
   },
   sad: {
     // One-shot sound event — [sighs] only fires once at the start, not re-injected
-    elevenlabs: { audioTagPrefix: '[sighs] ', stability: 0.5 },
-    cartesia: { emotion: 'sad' },
-    hume: { description: 'sad, somber, heavy-hearted' },
+    elevenlabs: { audioTagPrefix: '[sighs] ', stability: 0.5, speed: 0.8 },
+    cartesia: { emotion: 'sad', speed: 0.75, volume: 0.75 },
+    hume: { description: 'sad, somber, heavy-hearted', speed: 0.75, trailingSilence: 0.7 },
     openai: { instructions: 'Speak with sadness, a heavy tone, slightly slower.' },
     minimax: { emotion: 'sad' },
     replicate: { emotionTag: '[sad]' },
   },
   skeptical: {
-    elevenlabs: { stability: 0.5 },
-    cartesia: { emotion: 'skeptical' },
-    hume: { description: 'skeptical, doubtful, questioning' },
+    elevenlabs: { stability: 0.5, speed: 0.9 },
+    cartesia: { emotion: 'skeptical', speed: 0.9 },
+    hume: { description: 'skeptical, doubtful, questioning', speed: 0.9 },
     openai: { instructions: 'Speak with skepticism, as if not entirely convinced.' },
     minimax: { emotion: 'neutral' },
     replicate: {},
@@ -314,13 +329,13 @@ export function mapDirectionToExpression(
       if (mapping) {
         params.elevenlabs = mapping.elevenlabs;
       } else if (normalizedDirection) {
-        // Unknown direction → try it as a raw audio tag (ElevenLabs v3 is generative)
+        // Unknown direction -> try it as a raw audio tag (ElevenLabs v3 is generative)
         params.elevenlabs = { audioTagPrefix: `[${normalizedDirection}] ` };
       }
       break;
     }
     case 'cartesia': {
-      if (mapping?.cartesia.emotion) {
+      if (mapping?.cartesia && (mapping.cartesia.emotion || mapping.cartesia.speed)) {
         params.cartesia = mapping.cartesia;
       } else if (normalizedDirection) {
         // Cartesia accepts 60 emotion strings — pass unknown ones as-is, it'll ignore invalid
@@ -330,9 +345,13 @@ export function mapDirectionToExpression(
     }
     case 'hume': {
       // Hume always gets a description — direction overrides baseline
-      params.hume = {
-        description: mapping?.hume.description ?? normalizedDirection ?? baseline.hume,
-      };
+      if (mapping?.hume) {
+        params.hume = { ...mapping.hume };
+      } else {
+        params.hume = {
+          description: normalizedDirection ?? baseline.hume,
+        };
+      }
       break;
     }
     case 'openai': {
@@ -383,8 +402,8 @@ export function getSupportedDirections(): string[] {
  * Provider support matrix:
  *   ElevenLabs v3  — all audio tags native; pass through unchanged
  *   Hume Octave    — [pause] and [long pause] native; strip everything else
- *   Cartesia Sonic — [laughter] native; [pause] → SSML break; strip rest
- *   OpenAI / rest  — no tag support; pauses → punctuation; strip all tags
+ *   Cartesia Sonic — [laughter] native; [pause] -> SSML break; strip rest
+ *   OpenAI / rest  — no tag support; pauses -> punctuation; strip all tags
  */
 export function convertInlineAudioTags(text: string, providerId: TtsProviderId): string {
   switch (providerId) {
@@ -397,14 +416,19 @@ export function convertInlineAudioTags(text: string, providerId: TtsProviderId):
 
     case 'cartesia': {
       // [laughter] is the native Cartesia transcript marker
-      // [pause] / [short pause] → SSML break 0.5s; [long pause] → 1.5s
+      // [pause] / [short pause] -> SSML break 0.5s; [long pause] -> 1.5s
       const laughRe =
         /\[(?:laughs?|chuckles?|giggles?|starts laughing|laughing|laughs harder|wheezing|cracking up|stifling laughter|laughing hysterically|with genuine belly laugh)\]/gi;
       return text
         .replace(laughRe, '[laughter]')
         .replace(/\[long pause\]/gi, '<break time="1.5s"/>')
         .replace(/\[(?:pause|short pause)\]/gi, '<break time="0.5s"/>')
-        .replace(/\[([^\]]+)\]/g, '');
+        // Convert inline SSML markers before the catch-all strip
+        .replace(/\[emotion:(\w+)\]/gi, '<emotion value="$1">')
+        .replace(/\[\/emotion\]/gi, '</emotion>')
+        .replace(/\[speed:([\d.]+)\]/gi, '<speed ratio="$1">')
+        .replace(/\[\/speed\]/gi, '</speed>')
+        .replace(/\[(?!laughter\])([^\]]+)\]/g, '');
     }
 
     default:
