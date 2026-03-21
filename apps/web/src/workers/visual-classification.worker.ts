@@ -9,7 +9,7 @@ import {
   videoCompositionQueue,
 } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
-import { classifySegmentVisuals } from '@/lib/visual-classifier';
+import { classifySegmentVisuals, type StructuredSourceData } from '@/lib/visual-classifier';
 import { resolveAiModelAndProvider } from '@/lib/providers/ai-registry';
 import { resolveMotionProvider } from '@/lib/auto-model-config';
 import { getAiKey } from '@/lib/byok';
@@ -37,8 +37,8 @@ export async function processVisualClassification(job: Job<ClassifyVisualsPayloa
   });
 
   try {
-    // Fetch podcast metadata + resolve AI model + segment timing
-    const [podcast, aiKey, user, segmentTimings] = await Promise.all([
+    // Fetch podcast metadata + resolve AI model + segment timing + source data
+    const [podcast, aiKey, user, segmentTimings, discovery] = await Promise.all([
       prisma.podcast.findUniqueOrThrow({
         where: { id: podcastId },
         select: {
@@ -54,6 +54,10 @@ export async function processVisualClassification(job: Job<ClassifyVisualsPayloa
       getAiKey(userId),
       prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { plan: true } }),
       resolveSegmentTiming(podcastId, voiceTrackId),
+      prisma.discovery.findUnique({
+        where: { podcastId },
+        select: { sourceMetadata: true },
+      }),
     ]);
     const { model: aiModel, provider: aiProvider } = await resolveAiModelAndProvider({
       podcastAiModel: podcast.aiModel,
@@ -78,11 +82,19 @@ export async function processVisualClassification(job: Job<ClassifyVisualsPayloa
     await job.updateProgress(30);
 
     // Classify all segments in a single AI call
+    // Extract structured data from source metadata for the classifier
+    const sourceMetadata = discovery?.sourceMetadata as Record<string, unknown> | null;
+    const structuredData = sourceMetadata ? {
+      tables: sourceMetadata.tables as StructuredSourceData['tables'],
+      figures: sourceMetadata.figures as StructuredSourceData['figures'],
+      keyStatistics: sourceMetadata.keyStatistics as StructuredSourceData['keyStatistics'],
+    } : undefined;
+
     const { classifications, transitionRecommendations, inputTokens, outputTokens, model } = await classifySegmentVisuals(
       segmentInputs,
       podcast.title,
       podcast.topic,
-      { provider: aiProvider, model: aiModel, apiKeyOverride: aiKey?.apiKey },
+      { provider: aiProvider, model: aiModel, apiKeyOverride: aiKey?.apiKey, structuredData },
     );
 
     await job.updateProgress(60);
