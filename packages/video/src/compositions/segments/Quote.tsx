@@ -33,17 +33,9 @@ export const Quote: React.FC<{ segment: VideoSegment }> = ({ segment }) => {
         backgroundColor: '#FEFCF8',
       }}
     >
-      <div
-        style={{
-          fontSize: 64,
-          color: '#D97706',
-          marginBottom: -10,
-          fontFamily: 'Georgia, serif',
-          lineHeight: 1,
-        }}
-      >
-        &#x201C;
-      </div>
+      <svg width="48" height="40" viewBox="0 0 48 40" style={{ marginBottom: 12 }}>
+        <path d="M0 28.8C0 18.4 4.8 9.6 14.4 2.4L18 6.4C12 11.2 9.2 16.8 9.6 23.2H16V40H0V28.8ZM28 28.8C28 18.4 32.8 9.6 42.4 2.4L46 6.4C40 11.2 37.2 16.8 37.6 23.2H44V40H28V28.8Z" fill="#D97706" />
+      </svg>
       <p
         style={{
           fontFamily: 'DM Serif Display, serif',
