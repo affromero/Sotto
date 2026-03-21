@@ -639,6 +639,17 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       const newMode = seg.visualMode ?? existingMap.get(seg.segmentVisualId)!.visualMode ?? 'image';
       const isExternal = EXTERNAL_MODES.has(newMode);
 
+      // Merge feedback into metadata if provided
+      let metadataUpdate: Prisma.InputJsonValue | typeof Prisma.JsonNull | undefined = undefined;
+      if (seg.metadata !== undefined) {
+        metadataUpdate = seg.metadata ? (seg.metadata as unknown as Prisma.InputJsonValue) : Prisma.JsonNull;
+      }
+      if (seg.feedback) {
+        const existingMeta = existingMap.get(seg.segmentVisualId)!;
+        const baseMeta = seg.metadata ?? (existingMeta as unknown as Record<string, unknown>) ?? {};
+        metadataUpdate = { ...baseMeta, userFeedback: seg.feedback } as unknown as Prisma.InputJsonValue;
+      }
+
       await tx.segmentVisual.update({
         where: { id: seg.segmentVisualId },
         data: {
@@ -647,7 +658,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
           ...(seg.model !== undefined && { videoModel: seg.model }),
           ...(seg.prompt !== undefined && { prompt: seg.prompt }),
           ...(seg.endStatePrompt !== undefined && { endStatePrompt: seg.endStatePrompt }),
-          ...(seg.metadata !== undefined && { metadata: seg.metadata ? (seg.metadata as unknown as Prisma.InputJsonValue) : Prisma.JsonNull }),
+          ...(metadataUpdate !== undefined && { metadata: metadataUpdate }),
           status: isExternal ? 'pending' : 'ready',
           assetUrl: null,
           assetType: null,

@@ -173,9 +173,15 @@ async function generateAiVideo(
 }
 
 export async function processVisualGeneration(job: Job<GenerateVisualPayload>): Promise<void> {
-  const { podcastId, videoGenerationId, segmentVisualId, visualType, prompt } = job.data;
+  const { podcastId, videoGenerationId, segmentVisualId, visualType } = job.data;
 
-  logger.info('Generating visual asset', { podcastId, segmentVisualId, visualType });
+  // Apply user feedback to the prompt if present in metadata
+  const userFeedback = (job.data.metadata as Record<string, unknown> | undefined)?.userFeedback as string | undefined;
+  const prompt = userFeedback
+    ? `${job.data.prompt}\n\nUser feedback: ${userFeedback}`
+    : job.data.prompt;
+
+  logger.info('Generating visual asset', { podcastId, segmentVisualId, visualType, hasFeedback: !!userFeedback });
   await job.updateProgress(10);
 
   // Idempotency: skip if asset already generated
