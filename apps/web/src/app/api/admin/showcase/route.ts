@@ -23,12 +23,16 @@ export async function GET() {
   const adminId = await requireAdmin();
   if (!adminId) return errorResponse('Forbidden', 403);
 
-  const [sets, costPreview] = await Promise.all([
-    prisma.showcaseSet.findMany({
-      orderBy: { createdAt: 'desc' },
-    }),
-    getShowcaseCostPreview(),
-  ]);
+  const sets = await prisma.showcaseSet.findMany({
+    orderBy: { createdAt: 'desc' },
+  });
+
+  let costPreview = null;
+  try {
+    costPreview = await getShowcaseCostPreview();
+  } catch {
+    // Cost preview is non-critical — don't block the sets list
+  }
 
   return NextResponse.json({ sets, costPreview });
 }
