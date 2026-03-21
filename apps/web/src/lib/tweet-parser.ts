@@ -442,8 +442,10 @@ const TTS_MODEL_ALIASES: Record<string, string> = {
   'gpt-4o-mini-tts': 'gpt-4o-mini-tts',
   'gpt tts': 'gpt-4o-mini-tts',
   // Hume
-  octave: 'octave-v1',
-  'hume octave': 'octave-v1',
+  octave: 'octave-v2',
+  'hume octave': 'octave-v2',
+  'octave v1': 'octave-v1',
+  'octave v2': 'octave-v2',
   // MiniMax
   'speech-02-hd': 'speech-02-hd',
   'minimax hd': 'speech-02-hd',
