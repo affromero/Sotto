@@ -11,6 +11,14 @@ interface ShowcaseItem {
   imageUrl: string;
 }
 
+interface ShowcaseResult {
+  items: ShowcaseItem[];
+  failures: Array<{ visualType: string; error: string }>;
+}
+
+const STILL_TIMEOUT_MS = 30000;
+const EXTERNAL_TIMEOUT_MS = 60000;
+
 const CURATED_SEGMENTS: Array<{
   visualType: string;
   label: string;
@@ -192,8 +200,8 @@ const CURATED_SEGMENTS: Array<{
           'No long-lived radioactive waste',
           'Inherently safe — no meltdown risk',
         ],
-        statValue: '10x',
-        statLabel: 'more energy per kg than fission',
+        statValue: 10,
+        statLabel: 'x more energy per kg than fission',
       },
     },
     frame: 90,
@@ -227,6 +235,7 @@ async function renderStill(segment: VideoSegment, frame: number): Promise<Buffer
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ segment, frame }),
+    signal: AbortSignal.timeout(STILL_TIMEOUT_MS),
   });
 
   if (!response.ok) {
@@ -237,8 +246,9 @@ async function renderStill(segment: VideoSegment, frame: number): Promise<Buffer
   return Buffer.from(await response.arrayBuffer());
 }
 
-export async function generateShowcaseStills(): Promise<ShowcaseItem[]> {
+export async function generateShowcaseStills(): Promise<ShowcaseResult> {
   const items: ShowcaseItem[] = [];
+  const failures: Array<{ visualType: string; error: string }> = [];
 
   // 1. Render programmatic types via /still
   for (const entry of CURATED_SEGMENTS) {
@@ -254,10 +264,9 @@ export async function generateShowcaseStills(): Promise<ShowcaseItem[]> {
         imageUrl: url,
       });
     } catch (err) {
-      logger.error('Failed to render showcase still', {
-        visualType: entry.visualType,
-        error: (err as Error).message,
-      });
+      const message = (err as Error).message;
+      logger.error('Failed to render showcase still', { visualType: entry.visualType, error: message });
+      failures.push({ visualType: entry.visualType, error: message });
     }
   }
 
@@ -282,7 +291,9 @@ export async function generateShowcaseStills(): Promise<ShowcaseItem[]> {
       });
     }
   } catch (err) {
-    logger.error('Failed to generate showcase AI illustration', { error: (err as Error).message });
+    const message = (err as Error).message;
+    logger.error('Failed to generate showcase AI illustration', { error: message });
+    failures.push({ visualType: 'AI_ILLUSTRATION', error: message });
   }
 
   // 3. STOCK_FOOTAGE — search Pexels, download a frame
@@ -292,9 +303,22 @@ export async function generateShowcaseStills(): Promise<ShowcaseItem[]> {
     const result = await searchStockVideo('fusion reactor plasma energy');
     if (result) {
       const videoBuffer = await downloadStockAsset(result.url);
-      // Extract first frame via FFmpeg
-      const { extractLastFrame } = await import('./video-concat');
-      const frameBuffer = await extractLastFrame(videoBuffer);
+      // Extract first frame via FFmpeg (seek to 1s to skip any black intro)
+      const { execFile } = await import('child_process');
+      const { promisify } = await import('util');
+      const { writeFile, readFile, unlink, mkdtemp } = await import('fs/promises');
+      const { join } = await import('path');
+      const { tmpdir } = await import('os');
+      const execFileAsync = promisify(execFile);
+      const tmpDir = await mkdtemp(join(tmpdir(), 'showcase-frame-'));
+      const inputPath = join(tmpDir, 'input.mp4');
+      const outputPath = join(tmpDir, 'frame.png');
+      await writeFile(inputPath, videoBuffer);
+      await execFileAsync('ffmpeg', ['-y', '-ss', '1', '-i', inputPath, '-frames:v', '1', '-q:v', '2', outputPath]);
+      const frameBuffer = await readFile(outputPath);
+      await Promise.allSettled([unlink(inputPath), unlink(outputPath)]);
+      const { rmdir } = await import('fs/promises');
+      await rmdir(tmpDir).catch(() => {});
       const url = await uploadFile('showcase/stock_footage.png', frameBuffer, 'image/png');
       items.push({
         visualType: 'STOCK_FOOTAGE',
@@ -304,7 +328,9 @@ export async function generateShowcaseStills(): Promise<ShowcaseItem[]> {
       });
     }
   } catch (err) {
-    logger.error('Failed to fetch showcase stock footage', { error: (err as Error).message });
+    const message = (err as Error).message;
+    logger.error('Failed to fetch showcase stock footage', { error: message });
+    failures.push({ visualType: 'STOCK_FOOTAGE', error: message });
   }
 
   // 4. MAP_OVERLAY via Mapbox
@@ -330,9 +356,14 @@ export async function generateShowcaseStills(): Promise<ShowcaseItem[]> {
       imageUrl: url,
     });
   } catch (err) {
-    logger.error('Failed to generate showcase map', { error: (err as Error).message });
+    const message = (err as Error).message;
+    logger.error('Failed to generate showcase map', { error: message });
+    failures.push({ visualType: 'MAP_OVERLAY', error: message });
   }
 
-  logger.info('Showcase generation complete', { count: String(items.length) });
-  return items;
+  logger.info('Showcase generation complete', {
+    count: String(items.length),
+    failures: String(failures.length),
+  });
+  return { items, failures };
 }
