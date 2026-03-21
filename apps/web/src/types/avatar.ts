@@ -39,7 +39,7 @@ export interface UnifiedAvatarData {
   name: string;
   previewImageUrl: string;
   imageUrl?: string;
-  provider: 'heygen' | 'runway' | 'fal';
+  provider: 'heygen' | 'runway' | 'fal' | 'replicate';
   isPreset: boolean;
   premium: boolean;
 }

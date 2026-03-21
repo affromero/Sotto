@@ -330,7 +330,7 @@ export interface GenerateAvatarPayload {
   avatarOverlayId: string;
   speaker: string;
   avatarId: string;
-  avatarProvider?: 'heygen' | 'runway' | 'fal';
+  avatarProvider?: 'heygen' | 'runway' | 'fal' | 'replicate';
   avatarImageUrl?: string;
   avatarModelId?: string;
   isPreset?: boolean;

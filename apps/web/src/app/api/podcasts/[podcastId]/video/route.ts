@@ -262,7 +262,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
             order: seg.order,
             subOrder: sv.subOrder,
             startOffset: sv.startOffset,
-            subDuration: sv.duration,
+            subDuration: sv.duration as number | null,
             visualType: sv.visualType as VisualTypeString,
             visualMode: sv.visualMode,
             videoModel: sv.visualMode === 'video' ? sv.model : null,

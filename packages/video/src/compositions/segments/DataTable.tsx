@@ -43,7 +43,7 @@ function findHighlight(
 export const DataTable: React.FC<{ segment: VideoSegment }> = ({ segment }) => {
   const frame = useCurrentFrame();
   const { fps, width, height, durationInFrames } = useVideoConfig();
-  const meta = (segment.metadata ?? {}) as DataTableMetadata;
+  const meta = (segment.metadata ?? {}) as unknown as DataTableMetadata;
 
   const columns = meta.columns ?? [];
   const rows = meta.rows ?? [];
