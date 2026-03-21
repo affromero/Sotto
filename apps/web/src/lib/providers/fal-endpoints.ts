@@ -9,7 +9,7 @@ const IMAGE_ENDPOINTS: Record<string, string> = {
   'fal-flux-1-dev': 'fal-ai/flux/dev',
   'fal-flux-1-pro': 'fal-ai/flux-pro/v1.1',
   'fal-flux-1-kontext-pro': 'fal-ai/flux-pro/kontext',
-  'fal-flux-2-pro': 'fal-ai/flux-pro/v2',
+  'fal-flux-2-pro': 'fal-ai/flux-2-pro',
   'fal-flux-2-flex': 'fal-ai/flux-2-flex',
   // Recraft
   'fal-recraft-v3': 'fal-ai/recraft-v3',
