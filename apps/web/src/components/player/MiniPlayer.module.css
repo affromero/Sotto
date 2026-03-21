@@ -10,6 +10,7 @@
   z-index: var(--z-player);
   animation: slideUp 300ms var(--ease-out-expo);
   view-transition-name: miniplayer;
+  overflow: visible;
 }
 
 .seekBar {
@@ -94,6 +95,10 @@
   padding: 0;
   cursor: pointer;
   text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  justify-content: center;
 }
 
 .title {
