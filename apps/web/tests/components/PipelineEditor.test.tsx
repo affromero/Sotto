@@ -85,10 +85,12 @@ describe('PipelineEditor', () => {
     const seg2 = makeSegment({ segmentId: 'seg-2', speaker: 'Expert', order: 1 });
     renderEditor([seg1, seg2]);
 
-    expect(screen.getByText('Scene 1')).toBeDefined();
-    expect(screen.getByText('Scene 2')).toBeDefined();
-    expect(screen.getByText('Host')).toBeDefined();
-    expect(screen.getByText('Expert')).toBeDefined();
+    // Scene numbers are rendered as plain digits in the card header
+    expect(screen.getByText('1')).toBeDefined();
+    expect(screen.getByText('2')).toBeDefined();
+    // Speaker names only appear in expanded content — verify via listitem count
+    const items = screen.getAllByRole('listitem');
+    expect(items).toHaveLength(2);
   });
 
   it('shows Video Storyboard title', () => {
@@ -132,13 +134,13 @@ describe('PipelineEditor', () => {
     renderEditor([makeSegment({ prompt: 'A test image' })]);
 
     // Card starts collapsed — no pill grid visible
-    expect(screen.queryByRole('group', { name: 'Visual type' })).toBeNull();
+    expect(screen.queryAllByRole('group', { name: /visual types/ })).toHaveLength(0);
 
-    // Click header to expand
-    fireEvent.click(screen.getByText('Scene 1'));
+    // Click header to expand (scene number is rendered as plain digit)
+    fireEvent.click(screen.getByText('1'));
 
-    // Pill grid and prompt should now be visible
-    expect(screen.getByRole('group', { name: 'Visual type' })).toBeDefined();
+    // Pill grids should now be visible (AI-Generated + Programmatic groups)
+    expect(screen.getAllByRole('group', { name: /visual types/ }).length).toBeGreaterThan(0);
     expect(screen.getByText('A test image')).toBeDefined();
   });
 
@@ -146,7 +148,7 @@ describe('PipelineEditor', () => {
     renderEditor([makeSegment({ visualType: 'AI_ILLUSTRATION' })]);
 
     // Expand card
-    fireEvent.click(screen.getByText('Scene 1'));
+    fireEvent.click(screen.getByText('1'));
 
     // Click "Stock Footage" pill
     fireEvent.click(screen.getByRole('button', { name: 'Stock Footage' }));

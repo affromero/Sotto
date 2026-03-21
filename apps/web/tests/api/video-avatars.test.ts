@@ -29,6 +29,16 @@ vi.mock('@/lib/auto-model-config', () => ({
   getAutoModelConfig: (...args: unknown[]) => mockGetAutoModelConfig(...args),
 }));
 
+vi.mock('@/lib/providers/avatar-registry', () => ({
+  getAvatarModelProvider: (modelId: string) => {
+    if (modelId?.startsWith('heygen')) return 'heygen';
+    if (modelId?.startsWith('runway')) return 'runway';
+    if (modelId?.startsWith('fal')) return 'fal';
+    if (modelId?.startsWith('replicate')) return 'replicate';
+    return 'heygen';
+  },
+}));
+
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     podcast: { findUnique: (...args: unknown[]) => mockPodcastFindUnique(...args) },
@@ -126,6 +136,8 @@ beforeEach(() => {
   mockGetAutoModelConfig.mockResolvedValue({
     freeAvatarModel: 'heygen-avatar-standard',
     proAvatarModel: 'heygen-avatar-standard',
+    freeAvatarProvider: 'heygen',
+    proAvatarProvider: 'heygen',
     freeIncludedAvatarModels: null,
     proIncludedAvatarModels: null,
   });
@@ -168,6 +180,15 @@ describe('GET /api/podcasts/[podcastId]/video/avatars', () => {
     const { GET } = await import('@/app/api/podcasts/[podcastId]/video/avatars/route');
     process.env.RUNWAY_API_KEY = 'test-runway-key';
     mockCheckAvatarGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', dailyUsed: 0, dailyLimit: 1, dailyRemaining: 1, isByokUser: false, isProUser: false });
+    // Include a runway model so availableProviders.runway is true
+    mockGetAutoModelConfig.mockResolvedValue({
+      freeAvatarModel: 'heygen-avatar-standard',
+      proAvatarModel: 'heygen-avatar-standard',
+      freeAvatarProvider: 'heygen',
+      proAvatarProvider: 'heygen',
+      freeIncludedAvatarModels: ['heygen-avatar-standard', 'runway-characters'],
+      proIncludedAvatarModels: ['heygen-avatar-standard', 'runway-characters'],
+    });
     mockRedisGet.mockResolvedValue(null);
     mockListUnifiedAvatars.mockResolvedValue([
       { id: 'influencer', name: 'Influencer', provider: 'runway', isPreset: true, premium: false, previewImageUrl: '' },
@@ -247,18 +268,21 @@ describe('POST /api/podcasts/[podcastId]/video/avatars', () => {
     expect(mockAddJob).not.toHaveBeenCalled();
   });
 
-  it('rejects podcasts exceeding 600s duration', async () => {
+  it('accepts podcasts with any duration (no duration limit)', async () => {
     const { POST } = await import('@/app/api/podcasts/[podcastId]/video/avatars/route');
     mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'user-1', status: 'READY', duration: 700 });
+    mockVideoGenFindFirst.mockResolvedValue({ id: 'vg-1', status: 'GENERATING_VISUALS' });
+    mockAvatarOverlayUpsert.mockImplementation(({ create }: { create: Record<string, unknown> }) => ({
+      id: `overlay-${create.speaker}`,
+      ...create,
+    }));
 
     const res = await POST(
       makeJson('http://localhost/api/podcasts/pod-1/video/avatars', 'POST', { avatars: [{ speaker: 'Host', avatarId: 'av-1' }] }),
       routeParams,
     );
 
-    expect(res.status).toBe(400);
-    const data = await res.json();
-    expect(data.error).toMatch(/too long/i);
+    expect(res.status).toBe(200);
   });
 
   it('rejects when podcast is not READY', async () => {
@@ -329,7 +353,7 @@ describe('POST /api/podcasts/[podcastId]/video/avatars', () => {
 });
 
 describe('DELETE /api/podcasts/[podcastId]/video/avatars', () => {
-  it('deletes overlays and R2 assets', async () => {
+  it('deletes overlays but preserves R2 assets', async () => {
     const { DELETE } = await import('@/app/api/podcasts/[podcastId]/video/avatars/route');
     mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'user-1' });
     mockVideoGenFindFirst.mockResolvedValue({
@@ -338,7 +362,6 @@ describe('DELETE /api/podcasts/[podcastId]/video/avatars', () => {
         { id: 'o-1', videoUrl: 'r2://avatar.webm', concatAudioUrl: 'r2://concat.mp3' },
       ],
     });
-    mockDeleteFile.mockResolvedValue(undefined);
     mockAvatarOverlayDeleteMany.mockResolvedValue({ count: 1 });
 
     const res = await DELETE(
@@ -347,7 +370,7 @@ describe('DELETE /api/podcasts/[podcastId]/video/avatars', () => {
     );
 
     expect(res.status).toBe(200);
-    expect(mockDeleteFile).toHaveBeenCalledTimes(2);
+    expect(mockDeleteFile).not.toHaveBeenCalled();
     expect(mockAvatarOverlayDeleteMany).toHaveBeenCalled();
   });
 });

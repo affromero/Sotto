@@ -2,9 +2,25 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { FreeTierBanner } from '@/components/ui/FreeTierBanner';
 
+// jsdom may not provide a full localStorage — polyfill if needed
+const storageMap = new Map<string, string>();
+if (typeof localStorage === 'undefined' || typeof localStorage.clear !== 'function') {
+  Object.defineProperty(globalThis, 'localStorage', {
+    value: {
+      getItem: (key: string) => storageMap.get(key) ?? null,
+      setItem: (key: string, value: string) => storageMap.set(key, value),
+      removeItem: (key: string) => storageMap.delete(key),
+      clear: () => storageMap.clear(),
+      get length() { return storageMap.size; },
+      key: (i: number) => [...storageMap.keys()][i] ?? null,
+    },
+    writable: true,
+  });
+}
+
 describe('FreeTierBanner', () => {
   beforeEach(() => {
-    localStorage.clear();
+    storageMap.clear();
   });
 
   it('renders daily limit banner for pro users', () => {
