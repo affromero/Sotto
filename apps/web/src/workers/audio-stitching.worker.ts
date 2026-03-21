@@ -31,6 +31,114 @@ import * as path from 'path';
 import * as os from 'os';
 import * as crypto from 'crypto';
 import { writeFile, mkdir, rm } from 'fs/promises';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
+
+const execFileAsync = promisify(execFile);
+
+/**
+ * Find where each segment's raw audio actually starts in the stitched output
+ * by cross-correlating a short voiced snippet from each segment file against
+ * the stitched audio. Returns an array of start times in seconds.
+ */
+async function detectSegmentBoundaries(
+  stitchedPath: string,
+  segmentPaths: string[],
+): Promise<number[]> {
+  if (segmentPaths.length === 0) return [];
+  if (segmentPaths.length === 1) return [0];
+
+  const { readFile } = await import('fs/promises');
+  const SR = 16000;
+
+  // Convert stitched audio to raw PCM for fast processing
+  const stitchedPcmPath = stitchedPath + '.raw.wav';
+  await execFileAsync('ffmpeg', ['-y', '-i', stitchedPath, '-ar', String(SR), '-ac', '1', stitchedPcmPath]);
+  const stitchedBuf = await readFile(stitchedPcmPath);
+  // Skip WAV header (44 bytes)
+  const stitched = new Float32Array(stitchedBuf.length > 44 ? (stitchedBuf.length - 44) / 2 : 0);
+  for (let i = 0; i < stitched.length; i++) {
+    stitched[i] = stitchedBuf.readInt16LE(44 + i * 2);
+  }
+
+  const starts: number[] = [0]; // first segment always at 0
+  let searchFrom = 0; // only search forward from last found position
+
+  for (let seg = 1; seg < segmentPaths.length; seg++) {
+    try {
+      // Convert segment to same format
+      const segPcmPath = segmentPaths[seg] + '.raw.wav';
+      await execFileAsync('ffmpeg', ['-y', '-i', segmentPaths[seg], '-ar', String(SR), '-ac', '1', segPcmPath]);
+      const segBuf = await readFile(segPcmPath);
+      const segData = new Float32Array(segBuf.length > 44 ? (segBuf.length - 44) / 2 : 0);
+      for (let i = 0; i < segData.length; i++) {
+        segData[i] = segBuf.readInt16LE(44 + i * 2);
+      }
+
+      // Find voice onset in segment (first 320-sample window with RMS > 500)
+      let onset = 0;
+      for (let i = 0; i < segData.length - 320; i += 320) {
+        let sum = 0;
+        for (let j = i; j < i + 320; j++) sum += segData[j] * segData[j];
+        if (Math.sqrt(sum / 320) > 500) { onset = i; break; }
+      }
+
+      // Take 1s of voiced content as search snippet
+      const snippetLen = Math.min(SR, segData.length - onset);
+      const snippet = segData.slice(onset, onset + snippetLen);
+
+      // Normalize snippet
+      let maxSnip = 0;
+      for (let i = 0; i < snippet.length; i++) if (Math.abs(snippet[i]) > maxSnip) maxSnip = Math.abs(snippet[i]);
+      if (maxSnip > 0) for (let i = 0; i < snippet.length; i++) snippet[i] /= maxSnip;
+
+      // Search in stitched audio from last position ± 5s margin
+      const windowStart = Math.max(0, searchFrom - 5 * SR);
+      const windowEnd = Math.min(stitched.length, searchFrom + segData.length + 30 * SR);
+
+      let bestCorr = -Infinity;
+      let bestIdx = searchFrom;
+
+      // Normalize search region
+      let maxSearch = 0;
+      for (let i = windowStart; i < windowEnd; i++) if (Math.abs(stitched[i]) > maxSearch) maxSearch = Math.abs(stitched[i]);
+
+      // Slide snippet over search window (step by 160 samples = 10ms for speed)
+      for (let pos = windowStart; pos < windowEnd - snippetLen; pos += 160) {
+        let corr = 0;
+        for (let j = 0; j < snippetLen; j++) {
+          corr += (stitched[pos + j] / (maxSearch || 1)) * snippet[j];
+        }
+        if (corr > bestCorr) {
+          bestCorr = corr;
+          bestIdx = pos;
+        }
+      }
+
+      // Actual start = match position minus onset offset
+      const actualStart = (bestIdx - onset) / SR;
+      starts.push(Math.max(0, actualStart));
+      searchFrom = bestIdx + segData.length / 2; // advance search position
+
+      // Cleanup temp file
+      await rm(segPcmPath).catch(() => {});
+    } catch {
+      // Fallback: use previous start + previous segment duration estimate
+      const prevStart = starts[starts.length - 1];
+      starts.push(prevStart + 10); // rough fallback
+    }
+  }
+
+  // Cleanup
+  await rm(stitchedPcmPath).catch(() => {});
+
+  logger.info('Segment boundaries detected via cross-correlation', {
+    segmentCount: String(segmentPaths.length),
+    starts: starts.map((s) => s.toFixed(3)).join(', '),
+  });
+
+  return starts;
+}
 
 /** Map SoundCue types to stock SFX filenames bundled in the app */
 const STOCK_SFX: Record<SoundCue['type'], string> = {
@@ -334,21 +442,29 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
       });
     });
 
-    // 9. Update segment start times based on actual durations from FFprobe
-    // Use raw cumulative sums — the stitched audio crossfade/SFX interaction
-    // makes the actual timing unpredictable from durations alone.
+    // 9. Update segment start times by detecting silence boundaries in the stitched audio
+    // This gives exact positions regardless of crossfade/SFX/normalization
     const freshSegments = await prisma.segment.findMany({
       where: { id: { in: segmentIds } },
       orderBy: { order: 'asc' },
       select: { id: true, duration: true },
     });
-    let cumulativeTime = 0;
-    for (const seg of freshSegments) {
-      await prisma.segment.update({
-        where: { id: seg.id },
-        data: { startTime: cumulativeTime },
+
+    let detectedStarts = await detectSegmentBoundaries(outputPath, segmentPaths);
+    if (detectedStarts.length === 0 || detectedStarts.length !== freshSegments.length) {
+      // Fallback: cumulative durations
+      let cum = 0;
+      detectedStarts = freshSegments.map((seg) => {
+        const t = cum;
+        cum += seg.duration ?? 0;
+        return t;
       });
-      cumulativeTime += seg.duration ?? 0;
+    }
+    for (let i = 0; i < freshSegments.length; i++) {
+      await prisma.segment.update({
+        where: { id: freshSegments[i].id },
+        data: { startTime: detectedStarts[i] },
+      });
     }
 
     // Note: segment audio files are NEVER deleted from R2 — they are needed by
