@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.29.0] - 2026-03-21
+
+### Added
+- Visual showcase system: generate animated clips for all 11 visual types from curated sample data
+- Persistent showcase sets with names, active toggle, and random rotation on landing page
+- Per-item regeneration: re-render individual visual types without regenerating the entire set
+- Hybrid carousel on landing page: featured video + thumbnail rail with auto-advance
+- `@sottofm/feed` package: core ranking signals, scoring, diversity, and social proof
+- Design system tokens: surface-nested, surface-sunken, state layers, consolidated spacing
+- Public `GET /api/showcase` endpoint for landing page consumption
+
+### Fixed
+- FLUX 2 Pro fal endpoint corrected (`fal-ai/flux-2-pro`)
+- DataChart Y-axis now fixed with stable ticks (no more flickering during animation)
+- Diagram component uses SVG data URI instead of `dangerouslySetInnerHTML` (renders in headless Chrome)
+- Quote component uses SVG quotation mark (font glyph rendered as broken commas)
+- Remotion Dockerfile installs Linux ARM64 native bindings for rspack and compositor
+- Cache-busting timestamps on showcase R2 keys to prevent CDN stale content
+- 83 hardcoded border-radius values migrated to design tokens
+- 8 ghost CSS tokens that silently resolved to nothing
+
+### Changed
+- Showcase carousel descriptions explain source context (how each visual was generated from the source)
+- Showcase header uses set name dynamically ("From a podcast about Fusion Energy")
+- New showcase sets are automatically active (deactivates previous)
+- Consolidated `var(--space-N)` to semantic spacing tokens
+
 ## [0.28.0] - 2026-03-21
 
 ### Added
