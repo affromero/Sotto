@@ -47,6 +47,7 @@ const defaultContext = {
   interestTagIds: new Set<string>(),
   interestTagNames: new Map<string, string>(),
   interestParentIds: new Set<string>(),
+  interestParentToName: new Map<string, string>(),
 };
 
 describe('constructFeed', () => {

@@ -60,6 +60,8 @@ export interface CategorizationContext {
   interestTagIds: Set<string>;
   interestTagNames: Map<string, string>;
   interestParentIds: Set<string>;
+  /** Maps parentId → interest tag name for sibling matching in categorization. */
+  interestParentToName: Map<string, string>;
 }
 
 /** Candidate metadata needed for diversity filtering. */

@@ -163,6 +163,14 @@ export async function getDailyPicks(
     }),
   ]);
 
+  // Build parentId → interest tag name map for sibling matching
+  const interestParentToName = new Map<string, string>();
+  for (const i of userInterests) {
+    if (i.tag.parentId) {
+      interestParentToName.set(i.tag.parentId, i.tag.name);
+    }
+  }
+
   const catContext: CategorizationContext = {
     followedCreatorIds: new Set(followedIds.map((f) => f.followingId)),
     interestTagIds: new Set(userInterests.map((i) => i.tag.id)),
@@ -170,6 +178,7 @@ export async function getDailyPicks(
     interestParentIds: new Set(
       userInterests.map((i) => i.tag.parentId).filter((p): p is string => p !== null)
     ),
+    interestParentToName,
   };
 
   // Categorize via @sottofm/feed
