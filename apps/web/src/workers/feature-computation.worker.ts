@@ -4,6 +4,7 @@ import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { getEmbeddingProvider } from '@/lib/embeddings';
 import type { ComputeFeaturesPayload } from '@/lib/queue';
+import { classifyArchetype } from '@sottofm/feed';
 
 /**
  * Feature computation worker.
@@ -155,8 +156,12 @@ async function computeUserFeatures(userId: string): Promise<void> {
       }
     }
 
-    // Behavioral archetype
-    const archetype = classifyArchetype(avgCompletionRate, avgListenSpeed, sessions);
+    // Behavioral archetype (via @sottofm/feed)
+    const archetype = classifyArchetype({
+      avgCompletionRate,
+      avgSpeed: avgListenSpeed,
+      sessions,
+    });
 
     // Social metrics
     const [followingCount, followerCount, likeCount, forkCount, interactionCount] =
@@ -598,17 +603,3 @@ async function computePodcastFeatures(podcastId: string): Promise<void> {
   }
 }
 
-function classifyArchetype(
-  avgCompletion: number,
-  avgSpeed: number,
-  sessions: Array<{ seekCount: number; interruptCount: number }>
-): string {
-  const avgSeeks = sessions.reduce((sum, s) => sum + s.seekCount, 0) / sessions.length;
-  const avgInteractions = sessions.reduce((sum, s) => sum + s.interruptCount, 0) / sessions.length;
-
-  if (avgCompletion > 90 && avgSpeed <= 1.25) return 'deep_listener';
-  if (avgCompletion < 50 && avgSpeed > 1.25 && avgSeeks > 2) return 'skimmer';
-  if (avgCompletion > 90 && avgInteractions < 0.5) return 'completer';
-  if (avgInteractions > 1) return 'social_learner';
-  return 'explorer';
-}

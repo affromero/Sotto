@@ -1,9 +1,15 @@
 import { prisma } from './prisma';
 import { createMLProvider, type ScoredPodcast, type RecommendationSignals } from './providers/ml';
 import { logger } from './logger';
+import {
+  applyDiversity as applyDiversityRaw,
+  categorizePicks as categorizePicksRaw,
+  DEFAULT_FEED_CONFIG,
+} from '@sottofm/feed';
+import type { ScoredCandidate, DiversityCandidate, CategorizationContext } from '@sottofm/feed';
 
-const CONFIDENCE_THRESHOLD = 0.45;
-const DAILY_PICKS_MAX = 7;
+const CONFIDENCE_THRESHOLD = DEFAULT_FEED_CONFIG.confidenceThreshold;
+const DAILY_PICKS_MAX = DEFAULT_FEED_CONFIG.maxPicks;
 const EXPLORE_MAX = 10;
 const TRENDING_COUNT = 6;
 
@@ -127,10 +133,25 @@ export async function getDailyPicks(
     .filter((s) => s.score >= CONFIDENCE_THRESHOLD)
     .sort((a, b) => b.score - a.score);
 
-  // Apply MMR diversity: no more than 1 from same creator, at least 3 tags
-  const selected = applyDiversity(confident, candidates, DAILY_PICKS_MAX);
+  // Apply MMR diversity via @sottofm/feed
+  const diversityCandidates: DiversityCandidate[] = candidates.map((c) => ({
+    id: c.id,
+    creatorId: c.userId,
+    tags: c.tags.map((pt) => ({ id: pt.tag.id, parentId: pt.tag.parentId })),
+  }));
+  const scoredCandidates: ScoredCandidate[] = confident.map((s) => ({
+    id: s.podcastId,
+    score: s.score,
+    signals: s.signals,
+    explanation: s.explanation,
+  }));
+  const diverseResult = applyDiversityRaw(scoredCandidates, diversityCandidates, {
+    maxPerCreator: DEFAULT_FEED_CONFIG.maxPerCreator,
+    maxPerPrimaryTag: DEFAULT_FEED_CONFIG.maxPerPrimaryTag,
+    maxPicks: DAILY_PICKS_MAX,
+  });
 
-  // Categorize into slots
+  // Build categorization context from Prisma data
   const [followedIds, userInterests] = await Promise.all([
     prisma.follow.findMany({
       where: { followerId: userId },
@@ -141,78 +162,48 @@ export async function getDailyPicks(
       include: { tag: { select: { id: true, name: true, parentId: true } } },
     }),
   ]);
-  const followedSet = new Set(followedIds.map((f) => f.followingId));
-  const interestTagIds = new Set(userInterests.map((i) => i.tag.id));
-  const interestTagNames = new Map(userInterests.map((i) => [i.tag.id, i.tag.name]));
-  // Build parent→name map for sibling matching
-  const interestParentIds = new Set(
-    userInterests.map((i) => i.tag.parentId).filter((p): p is string => p !== null)
-  );
 
-  const categories: PickCategory[] = [
-    { label: 'Continue Learning', podcasts: [] },
-    { label: 'Fresh Perspective', podcasts: [] },
-    { label: 'From Your People', podcasts: [] },
-  ];
+  const catContext: CategorizationContext = {
+    followedCreatorIds: new Set(followedIds.map((f) => f.followingId)),
+    interestTagIds: new Set(userInterests.map((i) => i.tag.id)),
+    interestTagNames: new Map(userInterests.map((i) => [i.tag.id, i.tag.name])),
+    interestParentIds: new Set(
+      userInterests.map((i) => i.tag.parentId).filter((p): p is string => p !== null)
+    ),
+  };
 
-  for (const pick of selected) {
-    const candidate = candidates.find((c) => c.id === pick.podcastId);
-    if (!candidate) continue;
+  // Categorize via @sottofm/feed
+  const feedCategories = categorizePicksRaw(diverseResult, diversityCandidates, catContext, {
+    continueLearningSlots: DEFAULT_FEED_CONFIG.continueLearningSlots,
+    freshPerspectiveSlots: DEFAULT_FEED_CONFIG.freshPerspectiveSlots,
+    fromYourPeopleSlots: DEFAULT_FEED_CONFIG.fromYourPeopleSlots,
+  });
 
-    const rec: RecommendedPodcast = {
-      podcastId: candidate.id,
-      title: candidate.title,
-      topic: candidate.topic,
-      duration: candidate.duration,
-      audioUrl: candidate.audioUrl,
-      playCount: candidate.playCount,
-      likeCount: candidate.likeCount,
-      forkCount: candidate.forkCount,
-      createdAt: candidate.createdAt.toISOString(),
-      user: candidate.user,
-      tags: candidate.tags.map((pt) => pt.tag),
-      score: pick.score,
-      signals: pick.signals,
-      explanation: pick.explanation,
-      category: '',
-    };
-
-    // Check if podcast matches explicit user interests (exact or sibling via same parent)
-    const matchingTag = candidate.tags.find((pt) => interestTagIds.has(pt.tag.id));
-    let matchingInterestName = matchingTag ? interestTagNames.get(matchingTag.tag.id) : null;
-
-    // Sibling match: podcast tag shares a parent with one of the user's interest tags
-    if (!matchingInterestName) {
-      const siblingTag = candidate.tags.find((pt) => {
-        return pt.tag.parentId && interestParentIds.has(pt.tag.parentId);
-      });
-      if (siblingTag) {
-        const relatedInterest = userInterests.find((i) => i.tag.parentId === siblingTag.tag.parentId);
-        matchingInterestName = relatedInterest?.tag.name ?? siblingTag.tag.name;
-      }
-    }
-
-    if (followedSet.has(candidate.userId) && categories[2].podcasts.length < 2) {
-      rec.category = 'From Your People';
-      categories[2].podcasts.push(rec);
-    } else if (matchingInterestName && categories[0].podcasts.length < 3) {
-      rec.category = 'Continue Learning';
-      rec.explanation = `Because you're interested in ${matchingInterestName}`;
-      categories[0].podcasts.push(rec);
-    } else if (pick.signals.novelty > pick.signals.relevance && categories[1].podcasts.length < 2) {
-      rec.category = 'Fresh Perspective';
-      categories[1].podcasts.push(rec);
-    } else if (categories[0].podcasts.length < 3) {
-      rec.category = 'Continue Learning';
-      categories[0].podcasts.push(rec);
-    } else if (categories[1].podcasts.length < 2) {
-      rec.category = 'Fresh Perspective';
-      categories[1].podcasts.push(rec);
-    } else if (categories[2].podcasts.length < 2) {
-      rec.category = 'From Your People';
-      categories[2].podcasts.push(rec);
-    }
-  }
+  // Map back to RecommendedPodcast / PickCategory
+  const categories: PickCategory[] = feedCategories.map((cat) => ({
+    label: cat.label,
+    podcasts: cat.items.map((item) => {
+      const candidate = candidates.find((c) => c.id === item.id);
+      const categoryLabel = cat.label;
+      return {
+        podcastId: item.id,
+        title: candidate?.title ?? '',
+        topic: candidate?.topic ?? '',
+        duration: candidate?.duration ?? null,
+        audioUrl: candidate?.audioUrl ?? null,
+        playCount: candidate?.playCount ?? 0,
+        likeCount: candidate?.likeCount ?? 0,
+        forkCount: candidate?.forkCount ?? 0,
+        createdAt: candidate?.createdAt.toISOString() ?? '',
+        user: candidate?.user ?? { id: '', name: null, image: null },
+        tags: candidate?.tags.map((pt) => pt.tag) ?? [],
+        score: item.score,
+        signals: item.signals,
+        explanation: item.explanation,
+        category: categoryLabel,
+      };
+    }),
+  }))
 
   const allPicks = [
     ...categories[0].podcasts,
@@ -495,43 +486,3 @@ export async function getTrending(): Promise<RecommendedPodcast[]> {
   });
 }
 
-/**
- * Apply Maximal Marginal Relevance diversity to picks.
- * - No more than 1 podcast from same creator
- * - At least 3 different primary tags
- */
-function applyDiversity(
-  scored: ScoredPodcast[],
-  candidates: Array<{
-    id: string;
-    userId: string;
-    tags: Array<{ tag: { id: string; name: string; slug: string; parentId: string | null } }>;
-  }>,
-  maxPicks: number
-): ScoredPodcast[] {
-  const selected: ScoredPodcast[] = [];
-  const creatorSeen = new Set<string>();
-  const tagCounts = new Map<string, number>();
-
-  for (const pick of scored) {
-    if (selected.length >= maxPicks) break;
-
-    const candidate = candidates.find((c) => c.id === pick.podcastId);
-    if (!candidate) continue;
-
-    // Creator diversity: max 1 from same creator
-    if (creatorSeen.has(candidate.userId)) continue;
-
-    // Tag diversity: max 2 with same primary tag
-    const primaryTag = candidate.tags[0]?.tag.id;
-    if (primaryTag && (tagCounts.get(primaryTag) || 0) >= 2) continue;
-
-    selected.push(pick);
-    creatorSeen.add(candidate.userId);
-    if (primaryTag) {
-      tagCounts.set(primaryTag, (tagCounts.get(primaryTag) || 0) + 1);
-    }
-  }
-
-  return selected;
-}
