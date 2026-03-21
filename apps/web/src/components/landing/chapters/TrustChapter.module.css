@@ -174,14 +174,14 @@
 .progressTrack {
   grid-column: 2 / 4;
   height: 4px;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   background: rgba(0, 0, 0, 0.06);
   overflow: hidden;
 }
 
 .progressFill {
   height: 100%;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   background: var(--color-primary);
   width: 0;
   transition: width 1s var(--ease-out-expo);

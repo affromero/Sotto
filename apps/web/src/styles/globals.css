@@ -74,6 +74,8 @@ body::before {
   --color-surface: #FFFFFF;
   --color-surface-hover: #FFF9F0;
   --color-surface-elevated: #FFFFFF;
+  --color-surface-nested: #FAF8F4;
+  --color-surface-sunken: #F5F3EE;
   --color-border: #E5E1D8;
   --color-border-hover: #D1CCC2;
 
@@ -150,6 +152,10 @@ body::before {
   --text-caption: 500 12px/1.4 var(--font-body);
   --text-overline: 600 11px/1.4 var(--font-body);
   --text-heading-sm: var(--text-h4);
+  --text-body-xs: 400 11px/1.4 var(--font-body);
+  --text-heading-lg: 400 32px/1.25 var(--font-heading);
+  --text-label: 600 13px/1.4 var(--font-body);
+  --text-body-base: var(--text-body);
 
   /* Font Sizes — fluid clamp() for large sizes, fixed for small */
   --font-size-xs: 11px;
@@ -161,22 +167,28 @@ body::before {
   --font-size-3xl: clamp(1.5rem, 2.5vw + 0.5rem, 2rem);
   --font-size-4xl: clamp(2rem, 3.5vw + 0.5rem, 2.75rem);
   --font-size-5xl: clamp(2.5rem, 5vw + 1rem, 4rem);
+  --font-size-md: var(--font-size-base);
 
   /* Spacing - Semantic (source of truth) */
+  --spacing-xxs: 2px;
   --spacing-xs: 4px;
   --spacing-sm: 8px;
+  --spacing-ms: 12px;
   --spacing-md: 16px;
+  --spacing-ml: 20px;
   --spacing-lg: 24px;
   --spacing-xl: 32px;
   --spacing-2xl: 48px;
   --spacing-3xl: 64px;
+  --spacing-xxl: 96px;
+  --spacing-2xs: var(--spacing-xxs);  /* alias */
 
   /* Spacing - Numeric aliases (refer to semantic tokens) */
   --space-1: var(--spacing-xs);    /* 4px */
   --space-2: var(--spacing-sm);    /* 8px */
-  --space-3: 12px;                 /* no semantic equivalent */
+  --space-3: var(--spacing-ms);    /* 12px */
   --space-4: var(--spacing-md);    /* 16px */
-  --space-5: 20px;                 /* no semantic equivalent */
+  --space-5: var(--spacing-ml);    /* 20px */
   --space-6: var(--spacing-lg);    /* 24px */
   --space-8: var(--spacing-xl);    /* 32px */
   --space-10: 40px;                /* no semantic equivalent */
@@ -184,6 +196,7 @@ body::before {
   --space-16: var(--spacing-3xl);  /* 64px */
 
   /* Border Radius */
+  --radius-xs: 2px;
   --radius-sm: 4px;
   --radius-md: 6px;
   --radius-lg: 8px;
@@ -248,6 +261,16 @@ body::before {
   --gradient-amber-spot: radial-gradient(ellipse at 30% 20%, rgba(217,119,6,0.12) 0%, transparent 60%);
   --gradient-navy-spot: radial-gradient(ellipse at 70% 80%, rgba(30,58,95,0.08) 0%, transparent 60%);
   --noise-texture: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+
+  /* State Layer Tokens */
+  --state-hover-surface: var(--color-surface-hover);
+  --state-active-surface: var(--color-primary-subtle);
+  --state-hover-lift: -2px;
+  --state-hover-shadow: var(--shadow-lg);
+  --state-hover-primary: var(--color-primary-hover);
+  --state-hover-primary-shadow: var(--shadow-primary-glow);
+  --state-hover-border: var(--color-primary);
+  --state-hover-border-shadow: 0 2px 8px var(--color-primary-subtle);
 }
 
 /* ============================================ */
@@ -260,6 +283,8 @@ body::before {
   --color-surface: #262420;
   --color-surface-hover: #302D28;
   --color-surface-elevated: #2E2B26;
+  --color-surface-nested: #2E2B26;
+  --color-surface-sunken: #1F1E1C;
   --color-border: #3A3733;
   --color-border-hover: #4A4742;
 

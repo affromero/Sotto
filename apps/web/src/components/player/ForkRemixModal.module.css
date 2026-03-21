@@ -1,14 +1,14 @@
 .modal {
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
+  gap: var(--spacing-lg);
 }
 
 .header {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  padding-bottom: var(--space-4);
+  gap: var(--spacing-sm);
+  padding-bottom: var(--spacing-md);
   border-bottom: 1px solid var(--color-border);
 }
 
@@ -29,8 +29,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--space-4);
-  padding: var(--space-4) 0;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md) 0;
 }
 
 .stepDot {
@@ -64,13 +64,13 @@
 .form {
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
+  gap: var(--spacing-lg);
 }
 
 .stepContent {
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
+  gap: var(--spacing-ml);
   min-height: 320px;
   animation: fadeIn 0.3s ease;
 }
@@ -89,7 +89,7 @@
 .field {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--spacing-sm);
 }
 
 .label {
@@ -100,7 +100,7 @@
 
 .textarea {
   width: 100%;
-  padding: var(--space-3);
+  padding: var(--spacing-ms);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   font: var(--text-body);
@@ -130,7 +130,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--space-4);
+  gap: var(--spacing-md);
   text-align: center;
 }
 
@@ -165,19 +165,19 @@
 
 .summaryBox {
   width: 100%;
-  padding: var(--space-4);
+  padding: var(--spacing-md);
   background: var(--color-surface-hover);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--spacing-ms);
   text-align: left;
 }
 
 .summaryRow {
   display: flex;
-  gap: var(--space-3);
+  gap: var(--spacing-ms);
 }
 
 .summaryLabel {
@@ -195,7 +195,7 @@
 
 /* Error */
 .error {
-  padding: var(--space-3) var(--space-4);
+  padding: var(--spacing-ms) var(--spacing-md);
   background: var(--color-error-lighter);
   border: 1px solid var(--color-error-light);
   border-radius: var(--radius-md);
@@ -208,14 +208,14 @@
 .actions {
   display: flex;
   justify-content: flex-end;
-  gap: var(--space-3);
-  padding-top: var(--space-4);
+  gap: var(--spacing-ms);
+  padding-top: var(--spacing-md);
   border-top: 1px solid var(--color-border);
 }
 
 @media (max-width: 768px) {
   .stepIndicator {
-    gap: var(--space-3);
+    gap: var(--spacing-ms);
   }
 
   .stepDot {

@@ -115,7 +115,7 @@
 
 .typingBar {
   width: 3px;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   background: var(--color-primary);
   transform-origin: bottom;
   animation: waveBar 1.1s ease-in-out infinite;

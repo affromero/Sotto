@@ -303,7 +303,7 @@
   font-size: 13px;
   background: transparent;
   border: 1px solid #3b5069;
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   color: #6ab3f3;
   cursor: default;
   min-height: 36px;
@@ -325,7 +325,7 @@
 .tgKeyUrl {
   background: transparent;
   border: 1px solid #3b5069;
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   color: #6ab3f3;
   padding: 8px 14px;
   font-size: 13px;

@@ -76,14 +76,14 @@
 .grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: var(--space-5);
+  gap: var(--spacing-ml);
   width: 100%;
 }
 
 @media (min-width: 768px) {
   .grid {
     grid-template-columns: repeat(2, 1fr);
-    gap: var(--space-6);
+    gap: var(--spacing-lg);
   }
 }
 
@@ -162,7 +162,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--space-16) var(--space-6);
+  padding: var(--spacing-3xl) var(--spacing-lg);
   text-align: center;
 }
 

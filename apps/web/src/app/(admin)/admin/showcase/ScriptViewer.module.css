@@ -11,7 +11,7 @@
 
 .card {
   border: 1px solid var(--color-border, #e5e7eb);
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   padding: 1rem;
   background: var(--color-surface, #fff);
 }
@@ -64,7 +64,7 @@
 .badge {
   font-size: 0.7rem;
   padding: 2px 8px;
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   background: var(--color-primary, #D97706);
   color: #fff;
   font-weight: 500;

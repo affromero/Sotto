@@ -2,7 +2,7 @@
   position: absolute;
   z-index: 10;
   pointer-events: none;
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   overflow: hidden;
   transition: none;
 }
@@ -39,7 +39,7 @@
   height: 100%;
   object-fit: contain;
   display: block;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
 }
 
 .speakerTag {
@@ -51,7 +51,7 @@
   color: #e0e0e0;
   font-size: 10px;
   font-weight: 600;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   pointer-events: none;
   letter-spacing: 0.05em;
 }
@@ -79,7 +79,7 @@
 }
 
 .maskRounded {
-  border-radius: 16px;
+  border-radius: var(--radius-2xl);
 }
 
 .maskRounded .video {
@@ -143,7 +143,7 @@
 .failedPlaceholder {
   width: 100%;
   height: 100%;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   background: rgba(30, 30, 30, 0.7);
   backdrop-filter: blur(12px);
 }

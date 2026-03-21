@@ -214,7 +214,7 @@
   width: 4px;
   height: 1.1em;
   background: var(--color-primary);
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   flex-shrink: 0;
 }
 
@@ -312,7 +312,7 @@
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  padding: var(--space-3);
+  padding: var(--spacing-ms);
 }
 
 .miniGradientCover::after {
@@ -333,8 +333,8 @@
 
 .miniGradientBadge {
   position: absolute;
-  top: var(--space-2);
-  right: var(--space-3);
+  top: var(--spacing-sm);
+  right: var(--spacing-ms);
   z-index: 1;
 }
 
@@ -353,10 +353,10 @@
 }
 
 .miniGradientBody {
-  padding: var(--space-3);
+  padding: var(--spacing-ms);
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: var(--spacing-xs);
 }
 
 .miniGradientTopic {
@@ -374,7 +374,7 @@
   color: var(--color-text-tertiary);
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--spacing-ms);
 }
 
 .failureReason {
@@ -426,7 +426,7 @@
   background: var(--color-primary-subtle);
   border: 1px solid rgba(217, 119, 6, 0.1);
   border-radius: var(--radius-2xl);
-  padding: var(--space-5);
+  padding: var(--spacing-ml);
 }
 
 .trendingSectionHeader {
@@ -437,11 +437,11 @@
 
 .trendingScroll {
   display: flex;
-  gap: var(--space-4);
+  gap: var(--spacing-md);
   overflow-x: auto;
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
-  padding-bottom: var(--space-2);
+  padding-bottom: var(--spacing-sm);
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
