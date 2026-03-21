@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { listByokProviders, listAiProviders } from '@/lib/byok';
 import { getFreeTierStatus } from '@/lib/generation-gate';
+import { getUserCostSummary } from '@/lib/podcast-cost-stats';
 import { Badge } from '@/components/ui/Badge';
 import { ManageSubscriptionButton } from './ManageSubscriptionButton';
 import { ProWaitlistButton } from '@/components/ui/ProWaitlistButton';
@@ -19,7 +20,7 @@ export default async function BillingPage() {
     return null;
   }
 
-  const [ttsKeys, aiKeys, podcastCount, freeTier, user, subscription] = await Promise.all([
+  const [ttsKeys, aiKeys, podcastCount, freeTier, user, subscription, costSummary] = await Promise.all([
     listByokProviders(userId),
     listAiProviders(userId),
     prisma.podcast.count({ where: { userId } }),
@@ -29,6 +30,7 @@ export default async function BillingPage() {
       where: { userId },
       select: { status: true, currentPeriodEnd: true, cancelAtPeriodEnd: true, stripePriceId: true },
     }),
+    getUserCostSummary(userId),
   ]);
 
   const hasAnyKey = ttsKeys.length > 0 || aiKeys.length > 0;
@@ -176,6 +178,40 @@ export default async function BillingPage() {
           </div>
         </div>
       </section>
+
+      {/* Generation Costs */}
+      {costSummary.totalCost > 0 && (
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Generation Costs</h2>
+          <div className={styles.creditCard}>
+            <div className={styles.creditBalance}>${costSummary.totalCost.toFixed(2)}</div>
+            <div className={styles.creditMeta}>
+              <span>total cost across {costSummary.podcastCount} podcasts</span>
+            </div>
+          </div>
+          <div className={styles.costGrid}>
+            {([
+              { label: 'Text (AI)', value: costSummary.buckets.text },
+              { label: 'Audio (TTS)', value: costSummary.buckets.audio },
+              { label: 'Video', value: costSummary.buckets.video },
+              { label: 'Avatar', value: costSummary.buckets.avatar },
+            ] as const)
+              .filter((b) => b.value > 0)
+              .map((b) => (
+                <div key={b.label} className={styles.costBucket}>
+                  <span className={styles.costBucketLabel}>{b.label}</span>
+                  <span className={styles.costBucketValue}>${b.value.toFixed(2)}</span>
+                </div>
+              ))}
+          </div>
+          <div className={styles.creditCard}>
+            <div className={styles.creditMeta}>
+              <span>This month: ${costSummary.monthCost.toFixed(2)}</span>
+              <span>Avg per podcast: ${costSummary.avgCostPerPodcast.toFixed(2)}</span>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* CTA */}
       {!hasAnyKey && (

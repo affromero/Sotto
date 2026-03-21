@@ -1,4 +1,5 @@
 import { getCostBreakdown, getDailyCostTrend, checkCostThresholds, getPerModelCostBreakdown } from '@/lib/cost-monitor';
+import { getTopUsersByCost } from '@/lib/podcast-cost-stats';
 import { prisma } from '@/lib/prisma';
 import { getAiProviderIdsWithPricing, getAiModelDisplayName } from '@/lib/providers/ai-registry';
 import { subDays, startOfDay } from 'date-fns';
@@ -41,12 +42,13 @@ export default async function AdminCostsPage({ searchParams }: PageProps) {
   })();
   const period = periodFromDays(days);
 
-  const [breakdown, dailyTrend, warnings, costPerPodcast, perModelCosts] = await Promise.all([
+  const [breakdown, dailyTrend, warnings, costPerPodcast, perModelCosts, topUsers] = await Promise.all([
     getCostBreakdown(period),
     getDailyCostTrend(days),
     checkCostThresholds(),
     getCostPerPodcast(since),
     getPerModelCostBreakdown(period),
+    getTopUsersByCost(period, 25),
   ]);
 
   const AI_SERVICES: Set<string> = new Set(getAiProviderIdsWithPricing());
@@ -276,6 +278,37 @@ export default async function AdminCostsPage({ searchParams }: PageProps) {
               <strong>{w.service}</strong> exceeded daily threshold: ${w.dailyCost.toFixed(2)} / ${w.threshold.toFixed(2)}
             </div>
           ))
+        )}
+      </section>
+
+      {/* Top Users by Cost */}
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>Top Users by Cost</h2>
+        {topUsers.length === 0 ? (
+          <p className={styles.empty}>No user cost data for this period.</p>
+        ) : (
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th>User</th>
+                <th>Plan</th>
+                <th className={styles.numCell}>Period Cost</th>
+                <th className={styles.numCell}>This Month</th>
+                <th className={styles.numCell}>Podcasts</th>
+              </tr>
+            </thead>
+            <tbody>
+              {topUsers.map((u) => (
+                <tr key={u.userId}>
+                  <td>{u.name || u.email || u.userId.slice(0, 8)}</td>
+                  <td>{u.plan}</td>
+                  <td className={styles.numCell}>${u.totalCost.toFixed(2)}</td>
+                  <td className={styles.numCell}>${u.monthCost.toFixed(2)}</td>
+                  <td className={styles.numCell}>{u.podcastCount}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </section>
     </div>

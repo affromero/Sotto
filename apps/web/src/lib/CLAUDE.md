@@ -71,6 +71,7 @@ All shared business logic and external service integrations live here.
 | `pricing-metrics.ts` | Admin pricing queries: `getCurrentModelPricing()`, `getModelPriceHistory()`, `getLastFetchTime()` — enriches pricing with registry metadata | Uses `prisma.ts`, `pricing.ts`, `ai-registry.ts` |
 | `usage-logger.ts` | Unified `logUsage()` function for all provider cost tracking — replaces old `logApiUsage()`, auto-computes AI costs from model pricing | Uses `prisma.ts`, `pricing.ts` |
 | `cost-monitor.ts` | Per-provider cost tracking from ApiUsageLog: daily/weekly/monthly breakdowns, per-category + per-model aggregation, `getPerModelCostBreakdown()` | Uses `prisma.ts` |
+| `podcast-cost-stats.ts` | Per-podcast + per-user cost aggregation: 4-bucket breakdown (text/audio/video/avatar), `getPodcastCostBreakdown()`, `getUserCostSummary()`, `getTopUsersByCost()` | Uses `prisma.ts` |
 | `cloudflare-r2-usage.ts` | Cloudflare R2 usage monitoring: `fetchBucketUsage()`, `fetchOperationCounts()`, `estimateCosts()`, `isR2MonitoringConfigured()` — REST + GraphQL API client with cost estimation | Pure utility (Cloudflare API) |
 | `storage-metrics.ts` | R2 storage dashboard queries: `getStorageOverview()`, `getStorageTrend()`, `checkStorageAlerts()` — reads from R2UsageSnapshot | Uses `prisma.ts` |
 | `data-completeness.ts` | Per-podcast ML readiness: 15-dimension completeness scoring (`computeCompletenessChecklist()`), corpus-wide aggregation (`getCorpusCompleteness()`), paginated podcast scores (`getPodcastCompletenessScores()`) | Uses `prisma.ts` |
