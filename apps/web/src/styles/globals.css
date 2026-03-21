@@ -54,6 +54,10 @@ body::before {
      xl:  1280px  — wide screens
      Mobile-first: always use min-width */
 
+  /* Full viewport height — dvh fallback for iOS Safari address bar */
+  --full-height: 100vh;
+  --full-height: 100dvh;
+
   /* Colors - Primary (Golden Amber) */
   --color-primary: #D97706;
   --color-primary-hover: #B45309;
@@ -545,5 +549,5 @@ a:hover {
 
 /* Offset all page content when the MiniPlayer is visible */
 body[data-mini-player] {
-  padding-bottom: var(--mini-player-height);
+  padding-bottom: calc(var(--mini-player-height) + env(safe-area-inset-bottom, 0px));
 }
