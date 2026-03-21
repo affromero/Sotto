@@ -1,7 +1,7 @@
 /* Create Podcast Page */
 
 .main {
-  min-height: 100vh;
+  min-height: var(--full-height);
   display: flex;
   flex-direction: column;
   background: var(--color-background);
@@ -14,7 +14,7 @@
   max-width: 720px;
   width: 100%;
   margin: 0 auto;
-  min-height: 100vh;
+  min-height: var(--full-height);
 }
 
 /* Header */

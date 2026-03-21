@@ -49,6 +49,9 @@ export function InlineWaitlistForm() {
           onChange={(e) => setEmail(e.target.value)}
           required
           aria-label="Email address"
+          inputMode="email"
+          enterKeyHint="done"
+          autoComplete="email"
         />
         <button
           type="submit"

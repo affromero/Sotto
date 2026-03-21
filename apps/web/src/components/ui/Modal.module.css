@@ -17,8 +17,9 @@
   border-radius: var(--radius-2xl);
   box-shadow: var(--shadow-2xl);
   animation: modalEnter 0.35s var(--ease-out-expo);
-  max-height: 90vh;
+  max-height: 90dvh;
   overflow-y: auto;
+  overscroll-behavior: contain;
   width: 100%;
 }
 

@@ -21,6 +21,9 @@ export function WaitlistForm({ source }: WaitlistFormProps) {
           onChange={(e) => setEmail(e.target.value)}
           required
           aria-label="Email address"
+          inputMode="email"
+          enterKeyHint="done"
+          autoComplete="email"
         />
         <div className={styles.inputWrapper}>
           <input

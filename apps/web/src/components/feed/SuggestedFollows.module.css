@@ -47,6 +47,7 @@
   display: flex;
   gap: var(--spacing-md);
   overflow-x: auto;
+  overscroll-behavior-x: contain;
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
   padding-bottom: var(--spacing-sm);
@@ -225,7 +226,7 @@
 
 /* Responsive */
 
-@media (max-width: 767px) {
+@media (max-width: 768px) {
   .cardWrapper {
     width: calc(50vw - var(--spacing-xl));
     min-width: 180px;

@@ -3,7 +3,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 100vh;
+  min-height: var(--full-height);
   padding: var(--spacing-xl);
   background: var(--color-background);
   text-align: center;

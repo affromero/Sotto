@@ -268,8 +268,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 44px;
+  height: 44px;
   padding: 0;
   border-radius: var(--radius-full);
   border: none;
@@ -318,7 +318,7 @@
 
 /* ── Mobile ─────────────────────────────────── */
 
-@media (max-width: 767px) {
+@media (max-width: 768px) {
   .playButton {
     opacity: 1;
     transform: translate(-50%, -50%) scale(1);

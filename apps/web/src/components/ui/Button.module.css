@@ -80,7 +80,7 @@
 
 /* Sizes */
 .small {
-  height: 40px;
+  height: 44px;
   padding: 0 var(--spacing-md);
   font-size: var(--font-size-sm);
 }

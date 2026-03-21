@@ -62,9 +62,18 @@
   pointer-events: none;
 }
 
-.videoContainer:hover > .videoControlsHidden {
-  opacity: 1;
-  pointer-events: auto;
+@media (hover: hover) {
+  .videoContainer:hover > .videoControlsHidden {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+@media (hover: none) {
+  .videoControlsHidden {
+    opacity: 1;
+    pointer-events: auto;
+  }
 }
 
 .playToggle {

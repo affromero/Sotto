@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { PlayerState, PlayerControls } from '@/types/player';
 
 export function useAudioPlayer(): PlayerState & PlayerControls {
@@ -85,12 +85,14 @@ export function useAudioPlayer(): PlayerState & PlayerControls {
     if (music?.src) {
       music.play().catch(() => {});
     }
+    if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
   }, []);
 
   const pause = useCallback(() => {
     getAudio()?.pause();
     musicRef.current?.pause();
     setState((s) => ({ ...s, isPlaying: false }));
+    if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
   }, []);
 
   const toggle = useCallback(() => {
@@ -147,6 +149,15 @@ export function useAudioPlayer(): PlayerState & PlayerControls {
     setState((s) => ({ ...s, activeVoiceTrackId: id }));
   }, []);
 
+  const updateMediaSession = useCallback((title: string | null, playing: boolean) => {
+    if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: title || 'Sotto Podcast',
+      artist: 'Sotto',
+    });
+    navigator.mediaSession.playbackState = playing ? 'playing' : 'paused';
+  }, []);
+
   const loadPodcast = useCallback(
     (podcastId: string, audioUrl: string, podcastTitle?: string) => {
       const audio = getAudio();
@@ -166,8 +177,9 @@ export function useAudioPlayer(): PlayerState & PlayerControls {
         currentTime: 0,
         isPlaying: false,
       }));
+      updateMediaSession(podcastTitle ?? null, false);
     },
-    [state.podcastId, state.audioUrl]
+    [state.podcastId, state.audioUrl, updateMediaSession]
   );
 
   const clearPodcast = useCallback(() => {
@@ -251,6 +263,15 @@ export function useAudioPlayer(): PlayerState & PlayerControls {
       isMusicLoaded: false,
     }));
   }, []);
+
+  // Register MediaSession handlers for lock screen / notification controls
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
+    navigator.mediaSession.setActionHandler('play', play);
+    navigator.mediaSession.setActionHandler('pause', pause);
+    navigator.mediaSession.setActionHandler('seekforward', () => skip(15));
+    navigator.mediaSession.setActionHandler('seekbackward', () => skip(-15));
+  }, [play, pause, skip]);
 
   return {
     ...state,
