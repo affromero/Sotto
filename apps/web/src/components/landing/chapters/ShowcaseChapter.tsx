@@ -140,6 +140,7 @@ export function ShowcaseChapter({ showcase }: ShowcaseChapterProps) {
   const showAvatarToggle = (showcase?.showAvatar && showcase?.hasAvatars) ?? false;
 
   const [showcaseItems, setShowcaseItems] = useState<ShowcaseItem[] | null>(null);
+  const [showcaseName, setShowcaseName] = useState('');
 
   useEffect(() => {
     fetch('/api/showcase')
@@ -147,6 +148,7 @@ export function ShowcaseChapter({ showcase }: ShowcaseChapterProps) {
       .then((data) => {
         if (data?.items?.length > 0) {
           setShowcaseItems(data.items);
+          setShowcaseName(data.name ?? '');
         }
       })
       .catch(() => {});
@@ -161,9 +163,10 @@ export function ShowcaseChapter({ showcase }: ShowcaseChapterProps) {
             <span className={styles.overline}>Video generation</span>
             <h2 className={styles.heading}>Turn podcasts into video</h2>
             <p className={styles.description}>
-              Choose from 11 visual types — AI illustrations, data charts,
-              source figures, maps, stock footage, timelines, and more.
-              Fully customizable per segment.
+              {showcaseName
+                ? <>From a podcast about <strong>{showcaseName}</strong>, here is what the system generated — each visual matched to what the hosts are discussing.</>
+                : <>Every segment gets a matching visual — data charts, timelines, maps, illustrations, and more.</>
+              }
             </p>
           </div>
           <ShowcaseCarousel items={showcaseItems} />

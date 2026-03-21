@@ -47,7 +47,7 @@ const CURATED_SEGMENTS: Array<{
   {
     visualType: 'DATA_CHART',
     label: 'Data Charts',
-    description: 'Real numbers from your sources, animated as bar, line, or pie charts',
+    description: 'Found investment figures in a Nature Energy paper and rendered them as an animated bar chart with exact values',
     segment: {
       segmentId: 'showcase-chart',
       order: 0,
@@ -75,7 +75,7 @@ const CURATED_SEGMENTS: Array<{
   {
     visualType: 'DATA_TABLE',
     label: 'Data Tables',
-    description: 'Exact values, rankings, and comparisons in styled tables',
+    description: 'Extracted a comparison table from the paper and rendered it with funding data, approach types, and target dates',
     segment: {
       segmentId: 'showcase-table',
       order: 1,
@@ -106,7 +106,7 @@ const CURATED_SEGMENTS: Array<{
   {
     visualType: 'QUOTE',
     label: 'Quotes',
-    description: 'Notable statements with attribution, elegantly presented',
+    description: 'Identified a key statement from ITER Deputy Director-General and presented it with proper attribution',
     segment: {
       segmentId: 'showcase-quote',
       order: 2,
@@ -125,7 +125,7 @@ const CURATED_SEGMENTS: Array<{
   {
     visualType: 'COMPARISON',
     label: 'Comparisons',
-    description: 'Side-by-side analysis of competing ideas or approaches',
+    description: 'The hosts compared fission vs fusion — the system structured their points into a side-by-side visual',
     segment: {
       segmentId: 'showcase-comparison',
       order: 3,
@@ -146,7 +146,7 @@ const CURATED_SEGMENTS: Array<{
   {
     visualType: 'TIMELINE',
     label: 'Timelines',
-    description: 'Chronological events that bring history and progress to life',
+    description: 'Detected historical milestones mentioned in the conversation and arranged them chronologically',
     segment: {
       segmentId: 'showcase-timeline',
       order: 4,
@@ -170,7 +170,7 @@ const CURATED_SEGMENTS: Array<{
   {
     visualType: 'DIAGRAM',
     label: 'Diagrams',
-    description: 'Conceptual diagrams that explain systems and processes',
+    description: 'Generated a diagram to illustrate how a tokamak reactor works, based on the technical explanation in the script',
     segment: {
       segmentId: 'showcase-diagram',
       order: 5,
@@ -188,7 +188,7 @@ const CURATED_SEGMENTS: Array<{
   {
     visualType: 'TEXT_CARD',
     label: 'Key Takeaways',
-    description: 'Summary cards that highlight the most important points',
+    description: 'Summarized the main arguments from the discussion into a bullet-point card with a headline stat',
     segment: {
       segmentId: 'showcase-textcard',
       order: 6,
@@ -214,7 +214,7 @@ const CURATED_SEGMENTS: Array<{
   {
     visualType: 'SOURCE_FIGURE',
     label: 'Source Figures',
-    description: 'Actual charts and images from source material with attribution',
+    description: 'Pulled an actual figure from the source paper and displayed it with proper attribution — not an AI re-interpretation',
     segment: {
       segmentId: 'showcase-source-figure',
       order: 7,
@@ -314,7 +314,7 @@ export async function generateShowcaseClips(opts?: { imageModel?: string }): Pro
       items.push({
         visualType: 'AI_ILLUSTRATION',
         label: 'AI Illustrations',
-        description: 'Rich editorial illustrations generated from your content',
+        description: 'Created an editorial illustration of plasma containment inside a reactor, matching the segment where hosts describe the process',
         url: clipUrl,
         mediaType: 'video',
       });
@@ -336,7 +336,7 @@ export async function generateShowcaseClips(opts?: { imageModel?: string }): Pro
       items.push({
         visualType: 'STOCK_FOOTAGE',
         label: 'Stock Footage',
-        description: 'Real-world video clips matched to your content',
+        description: 'Found relevant stock footage of energy infrastructure to accompany the discussion on power generation',
         url,
         mediaType: 'video',
         credits: `Video by ${result.photographer} on Pexels`,
@@ -441,7 +441,7 @@ export async function regenerateShowcaseItem(
       duration: SHOWCASE_CLIP_SECONDS, visualType: 'AI_ILLUSTRATION', assetUrl: imageUrl, assetType: 'image/png',
     });
     const clipUrl = await uploadFile('showcase/ai_illustration.mp4', clipBuffer, 'video/mp4');
-    return { visualType: 'AI_ILLUSTRATION', label: 'AI Illustrations', description: 'Rich editorial illustrations generated from your content', url: clipUrl, mediaType: 'video' };
+    return { visualType: 'AI_ILLUSTRATION', label: 'AI Illustrations', description: 'Created an editorial illustration of plasma containment inside a reactor, matching the segment where hosts describe the process', url: clipUrl, mediaType: 'video' };
   }
 
   if (visualType === 'STOCK_FOOTAGE') {
@@ -450,7 +450,7 @@ export async function regenerateShowcaseItem(
     if (!result) throw new Error('No stock footage found');
     const videoBuffer = await downloadStockAsset(result.url);
     const url = await uploadFile('showcase/stock_footage.mp4', videoBuffer, 'video/mp4');
-    return { visualType: 'STOCK_FOOTAGE', label: 'Stock Footage', description: 'Real-world video clips matched to your content', url, mediaType: 'video', credits: `Video by ${result.photographer} on Pexels` };
+    return { visualType: 'STOCK_FOOTAGE', label: 'Stock Footage', description: 'Found relevant stock footage of energy infrastructure to accompany the discussion on power generation', url, mediaType: 'video', credits: `Video by ${result.photographer} on Pexels` };
   }
 
   if (visualType === 'MAP_OVERLAY') {
