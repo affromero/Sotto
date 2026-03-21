@@ -5,6 +5,10 @@ import { NotificationData } from '@/types/notification';
 
 const POLL_INTERVAL_MS = 30_000;
 
+interface UseNotificationsOptions {
+  onNewNotifications?: (notifications: NotificationData[]) => void;
+}
+
 interface UseNotificationsReturn {
   notifications: NotificationData[];
   unreadCount: number;
@@ -12,12 +16,18 @@ interface UseNotificationsReturn {
   markRead: (notificationId: string) => Promise<void>;
   markAllRead: () => Promise<void>;
   refresh: () => Promise<void>;
+  /** Prepend a notification from an external source (e.g. SSE) */
+  prepend: (notification: NotificationData) => void;
 }
 
-export function useNotifications(): UseNotificationsReturn {
+export function useNotifications(options?: UseNotificationsOptions): UseNotificationsReturn {
   const [notifications, setNotifications] = useState<NotificationData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const seenIdsRef = useRef<Set<string>>(new Set());
+  const initialLoadRef = useRef(true);
+  const onNewRef = useRef(options?.onNewNotifications);
+  onNewRef.current = options?.onNewNotifications;
 
   const fetchNotifications = useCallback(async () => {
     try {
@@ -25,6 +35,19 @@ export function useNotifications(): UseNotificationsReturn {
       if (!response.ok) return;
       const json = await response.json();
       const data: NotificationData[] = json.notifications ?? [];
+
+      // Detect new notifications (skip on first load to avoid toasting old ones)
+      if (!initialLoadRef.current && onNewRef.current) {
+        const newNotifications = data.filter((n) => !seenIdsRef.current.has(n.id));
+        if (newNotifications.length > 0) {
+          onNewRef.current(newNotifications);
+        }
+      }
+      initialLoadRef.current = false;
+
+      // Update seen IDs
+      seenIdsRef.current = new Set(data.map((n) => n.id));
+
       setNotifications(data);
     } catch {
       // Silently fail on poll errors
@@ -93,5 +116,14 @@ export function useNotifications(): UseNotificationsReturn {
     await fetchNotifications();
   }, [fetchNotifications]);
 
-  return { notifications, unreadCount, isLoading, markRead, markAllRead, refresh };
+  const prepend = useCallback((notification: NotificationData) => {
+    seenIdsRef.current.add(notification.id);
+    setNotifications((prev) => {
+      // Deduplicate — if already in the list, don't add
+      if (prev.some((n) => n.id === notification.id)) return prev;
+      return [notification, ...prev];
+    });
+  }, []);
+
+  return { notifications, unreadCount, isLoading, markRead, markAllRead, refresh, prepend };
 }
