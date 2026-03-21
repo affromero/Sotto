@@ -38,8 +38,8 @@
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  padding: var(--space-4);
-  gap: var(--space-1);
+  padding: var(--spacing-md);
+  gap: var(--spacing-xs);
 }
 
 /* Bottom scrim for text legibility */
@@ -70,7 +70,7 @@
 .duration {
   display: inline-flex;
   align-items: center;
-  padding: 1px var(--space-2);
+  padding: 1px var(--spacing-sm);
   font: var(--text-caption);
   font-size: var(--font-size-xs);
   color: rgba(255, 255, 255, 0.65);
@@ -86,7 +86,7 @@
 .limitedSourcesBadge {
   display: inline-flex;
   align-items: center;
-  padding: 1px var(--space-2);
+  padding: 1px var(--spacing-sm);
   font: var(--text-caption);
   font-size: var(--font-size-xs);
   font-weight: 600;
@@ -155,13 +155,13 @@
   z-index: 1;
   display: flex;
   flex-wrap: nowrap;
-  gap: var(--space-1);
+  gap: var(--spacing-xs);
   overflow: hidden;
 }
 
 .coverTag {
   display: inline-block;
-  padding: 1px var(--space-2);
+  padding: 1px var(--spacing-sm);
   font: var(--text-caption);
   font-size: var(--font-size-xs);
   color: #fff;
@@ -181,14 +181,14 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-2);
-  margin-top: var(--space-1);
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-xs);
 }
 
 .coverMetaLeft {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--spacing-sm);
   min-width: 0;
   overflow: hidden;
 }
@@ -203,7 +203,7 @@
 .coverStats {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--spacing-sm);
 }
 
 .coverStat {
@@ -262,8 +262,8 @@
 
 .forkButton {
   position: absolute;
-  top: var(--space-3);
-  right: var(--space-3);
+  top: var(--spacing-ms);
+  right: var(--spacing-ms);
   z-index: 2;
   display: inline-flex;
   align-items: center;

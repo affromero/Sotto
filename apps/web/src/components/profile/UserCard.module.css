@@ -1,8 +1,8 @@
 .root {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
+  gap: var(--spacing-ms);
+  padding: var(--spacing-ms) var(--spacing-md);
   border-radius: var(--radius-lg);
   transition: background var(--transition-fast);
 }
@@ -14,7 +14,7 @@
 .userLink {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--spacing-ms);
   flex: 1;
   min-width: 0;
   text-decoration: none;

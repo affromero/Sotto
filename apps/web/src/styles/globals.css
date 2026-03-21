@@ -171,7 +171,9 @@ body::before {
   --spacing-xxs: 2px;
   --spacing-xs: 4px;
   --spacing-sm: 8px;
+  --spacing-ms: 12px;
   --spacing-md: 16px;
+  --spacing-ml: 20px;
   --spacing-lg: 24px;
   --spacing-xl: 32px;
   --spacing-2xl: 48px;
@@ -182,9 +184,9 @@ body::before {
   /* Spacing - Numeric aliases (refer to semantic tokens) */
   --space-1: var(--spacing-xs);    /* 4px */
   --space-2: var(--spacing-sm);    /* 8px */
-  --space-3: 12px;                 /* no semantic equivalent */
+  --space-3: var(--spacing-ms);    /* 12px */
   --space-4: var(--spacing-md);    /* 16px */
-  --space-5: 20px;                 /* no semantic equivalent */
+  --space-5: var(--spacing-ml);    /* 20px */
   --space-6: var(--spacing-lg);    /* 24px */
   --space-8: var(--spacing-xl);    /* 32px */
   --space-10: 40px;                /* no semantic equivalent */
