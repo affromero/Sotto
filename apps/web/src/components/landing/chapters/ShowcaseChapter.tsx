@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import type { LandingShowcaseData } from '@/lib/showcase';
 import { useShowcaseToggles } from '../ShowcaseTogglesProvider';
 import { ScrollChapter } from '../ScrollChapter';
@@ -35,6 +35,103 @@ const COLOR_MAP: Record<string, string> = {
   green: styles.badgeGreen,
 };
 
+const AUTO_ADVANCE_MS = 5000;
+
+function ShowcaseCarousel({ items }: { items: ShowcaseItem[] }) {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  const goTo = useCallback((index: number) => {
+    setActiveIndex(index);
+    setPaused(true);
+    // Resume auto-advance after 8 seconds of inactivity
+    if (timerRef.current) clearInterval(timerRef.current);
+    const resumeTimer = setTimeout(() => setPaused(false), 8000);
+    return () => clearTimeout(resumeTimer);
+  }, []);
+
+  // Auto-advance
+  useEffect(() => {
+    if (paused) return;
+    const interval = setInterval(() => {
+      setActiveIndex((prev) => (prev + 1) % items.length);
+    }, AUTO_ADVANCE_MS);
+    timerRef.current = interval;
+    return () => clearInterval(interval);
+  }, [paused, items.length]);
+
+  // Preload next video
+  useEffect(() => {
+    const nextIndex = (activeIndex + 1) % items.length;
+    const next = items[nextIndex];
+    if (next?.mediaType === 'video') {
+      const link = document.createElement('link');
+      link.rel = 'prefetch';
+      link.href = next.url;
+      document.head.appendChild(link);
+      return () => { link.remove(); };
+    }
+  }, [activeIndex, items]);
+
+  const active = items[activeIndex];
+
+  return (
+    <div
+      className={styles.carousel}
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+    >
+      {/* Main featured video */}
+      <div className={styles.featured}>
+        <div className={styles.featuredMedia}>
+          {active.mediaType === 'video' ? (
+            <video
+              ref={videoRef}
+              key={active.url}
+              src={active.url}
+              className={styles.featuredVideo}
+              autoPlay
+              loop
+              muted
+              playsInline
+            />
+          ) : (
+            <img src={active.url} alt={active.label} className={styles.featuredVideo} />
+          )}
+          {active.credits && (
+            <span className={styles.featuredCredits}>{active.credits}</span>
+          )}
+        </div>
+        <div className={styles.featuredInfo}>
+          <span className={styles.featuredLabel}>{active.label}</span>
+          <p className={styles.featuredDesc}>{active.description}</p>
+        </div>
+      </div>
+
+      {/* Thumbnail rail */}
+      <div className={styles.rail}>
+        {items.map((item, i) => (
+          <button
+            key={item.visualType}
+            type="button"
+            className={`${styles.thumb} ${i === activeIndex ? styles.thumbActive : ''}`}
+            onClick={() => goTo(i)}
+            aria-label={item.label}
+            aria-pressed={i === activeIndex}
+          >
+            <span className={styles.thumbLabel}>{item.label}</span>
+            {i === activeIndex && !paused && (
+              <span className={styles.thumbProgress} />
+            )}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function ShowcaseChapter({ showcase }: ShowcaseChapterProps) {
   const toggles = useShowcaseToggles();
   const videoEnabled = toggles?.videoEnabled ?? false;
@@ -55,7 +152,7 @@ export function ShowcaseChapter({ showcase }: ShowcaseChapterProps) {
       .catch(() => {});
   }, []);
 
-  // If we have showcase clips, show the visual grid instead of the mock
+  // Showcase carousel mode
   if (showcaseItems && showcaseItems.length > 0) {
     return (
       <ScrollChapter id="video">
@@ -69,36 +166,7 @@ export function ShowcaseChapter({ showcase }: ShowcaseChapterProps) {
               Fully customizable per segment.
             </p>
           </div>
-          <div className={styles.showcaseGrid}>
-            {showcaseItems.map((item) => (
-              <div key={item.visualType} className={styles.showcaseCard}>
-                <div className={styles.showcaseMedia}>
-                  {item.mediaType === 'video' ? (
-                    <video
-                      src={item.url}
-                      className={styles.showcaseVideo}
-                      autoPlay
-                      loop
-                      muted
-                      playsInline
-                    />
-                  ) : (
-                    <img
-                      src={item.url}
-                      alt={item.label}
-                      className={styles.showcaseVideo}
-                    />
-                  )}
-                  {item.credits && (
-                    <span className={styles.showcaseCredits}>{item.credits}</span>
-                  )}
-                </div>
-                <div className={styles.showcaseCardBody}>
-                  <span className={styles.showcaseType}>{item.label}</span>
-                </div>
-              </div>
-            ))}
-          </div>
+          <ShowcaseCarousel items={showcaseItems} />
         </div>
       </ScrollChapter>
     );
