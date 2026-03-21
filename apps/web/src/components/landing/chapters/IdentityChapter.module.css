@@ -164,7 +164,7 @@
    MOBILE — single column stack
    ========================================================================== */
 
-@media (max-width: 767px) {
+@media (max-width: 768px) {
   .root {
     padding: var(--section-pad-y-sm) var(--spacing-md);
   }

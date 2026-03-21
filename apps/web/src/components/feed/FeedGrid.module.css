@@ -122,7 +122,7 @@
   animation-delay: 500ms;
 }
 
-@media (max-width: 767px) {
+@media (max-width: 768px) {
   .skeletonCover {
     height: 140px;
   }

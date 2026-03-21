@@ -226,7 +226,7 @@
 
 /* Responsive */
 
-@media (max-width: 767px) {
+@media (max-width: 768px) {
   .cardWrapper {
     width: calc(50vw - var(--spacing-xl));
     min-width: 180px;
