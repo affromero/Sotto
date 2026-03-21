@@ -16,6 +16,7 @@ const VISUAL_TYPE_LABELS: Record<VisualTypeString, string> = {
   DIAGRAM: 'Diagram',
   TEXT_CARD: 'Text Card',
   MAP_OVERLAY: 'Map Overlay',
+  DATA_TABLE: 'Data Table',
 };
 
 const PROGRAMMATIC_TYPES = new Set<VisualTypeString>([
@@ -25,6 +26,7 @@ const PROGRAMMATIC_TYPES = new Set<VisualTypeString>([
   'TIMELINE',
   'DIAGRAM',
   'TEXT_CARD',
+  'DATA_TABLE',
 ]);
 
 // Color-coded badge variants — programmatic (green/teal) vs external (purple/navy/amber)
@@ -39,12 +41,13 @@ const BADGE_VARIANTS: Record<VisualTypeString, BadgeVariant> = {
   TIMELINE: 'teal',
   DIAGRAM: 'green',
   TEXT_CARD: 'teal',
+  DATA_TABLE: 'green',
 };
 
 // Group visual types for the picker
 const TYPE_GROUPS = [
   { label: 'AI-Generated', types: ['AI_ILLUSTRATION', 'STOCK_FOOTAGE', 'MAP_OVERLAY'] as VisualTypeString[] },
-  { label: 'Programmatic', types: ['DATA_CHART', 'QUOTE', 'COMPARISON', 'TIMELINE', 'DIAGRAM', 'TEXT_CARD'] as VisualTypeString[] },
+  { label: 'Programmatic', types: ['DATA_CHART', 'QUOTE', 'COMPARISON', 'TIMELINE', 'DIAGRAM', 'TEXT_CARD', 'DATA_TABLE'] as VisualTypeString[] },
 ];
 
 function getBadgeClass(visualType: VisualTypeString): string {

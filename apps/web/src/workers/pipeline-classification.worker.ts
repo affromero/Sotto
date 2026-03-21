@@ -33,6 +33,7 @@ const PROGRAMMATIC_TYPES = new Set<VisualTypeString>([
   'TIMELINE',
   'DIAGRAM',
   'TEXT_CARD',
+  'DATA_TABLE',
 ]);
 
 function visualModeForType(visualType: VisualTypeString): VisualMode {

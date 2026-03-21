@@ -223,6 +223,54 @@ describe('visual-classification worker', () => {
     );
   });
 
+  it('treats DATA_TABLE as programmatic with ready status', async () => {
+    mockPrisma.segmentVisual.count.mockResolvedValue(0); // no pending externals
+    const segments = [
+      { id: 'seg-1', order: 0, speaker: 'Host', text: 'Here are the rankings...', startTime: 0, duration: 10 },
+    ];
+    mockPrisma.podcast.findUniqueOrThrow.mockResolvedValue({
+      title: 'Rankings',
+      topic: 'Data',
+      segments,
+    });
+    mockPrisma.segment.findMany.mockResolvedValue(segments);
+
+    mockClassify.mockResolvedValue({
+      classifications: [
+        {
+          segmentId: 'seg-1', order: 0,
+          subVisuals: [{
+            subOrder: 0, startOffsetFraction: 0, durationFraction: 1,
+            visualType: 'DATA_TABLE',
+            prompt: null,
+            metadata: { headers: { title: 'Top Companies' }, columns: [{ key: 'name', label: 'Company' }], rows: [{ key: 'r1', values: { name: 'Acme' } }] },
+            endStatePrompt: null,
+          }],
+        },
+      ],
+      transitionRecommendations: [],
+      inputTokens: 50,
+      outputTokens: 40,
+      model: 'claude-haiku-4-5-20251001',
+    });
+
+    await processVisualClassification(makeJob(baseData));
+
+    // DATA_TABLE is programmatic — should be created as 'ready' with motionProvider
+    expect(mockPrisma.segmentVisual.createMany).toHaveBeenCalledWith({
+      data: expect.arrayContaining([
+        expect.objectContaining({ segmentId: 'seg-1', visualType: 'DATA_TABLE', status: 'ready', motionProvider: 'remotion' }),
+      ]),
+    });
+
+    // No external asset jobs — should skip to composition
+    expect(mockAddJob).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'video-composition' }),
+      'compose_video',
+      expect.objectContaining({ podcastId: 'pod-1', videoGenerationId: 'vg-1' }),
+    );
+  });
+
   it('skips to composition when all sub-visuals are programmatic', async () => {
     const segments = [
       { id: 'seg-1', order: 0, speaker: 'Host', text: 'Hello', startTime: 0, duration: 5 },

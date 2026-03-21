@@ -64,6 +64,7 @@ const VISUAL_TYPE_LABELS: Record<string, string> = {
   DIAGRAM: 'Diagram',
   TEXT_CARD: 'Text Card',
   MAP_OVERLAY: 'Map Overlay',
+  DATA_TABLE: 'Data Table',
 };
 
 function extractVisualLabel(v: { order: number; prompt: string | null; metadata: unknown; visualType: string }): string {

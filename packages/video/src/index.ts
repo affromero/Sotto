@@ -1,4 +1,4 @@
-export type { VideoSegment, RenderConfig, RenderInput, VisualsInput, Branding, RenderStatusValue, VisualTypeValue, AvatarOverlayInput, LaunchSceneInput, LaunchVideoInput, TimingSegment, ActionTimingEntry, SceneSfxConfig, ProviderBannerConfig, TextOverlayConfig, SubtitleConfig, LaunchAvatarConfig, MapZoomFrame } from './types';
+export type { VideoSegment, RenderConfig, RenderInput, VisualsInput, Branding, RenderStatusValue, VisualTypeValue, AvatarOverlayInput, LaunchSceneInput, LaunchVideoInput, TimingSegment, ActionTimingEntry, SceneSfxConfig, ProviderBannerConfig, TextOverlayConfig, SubtitleConfig, LaunchAvatarConfig, MapZoomFrame, DataTableMetadata, DataTableColumn, DataTableRow, DataTableHeaders, DataTableStyleHints, DataTableHighlightCell, DataTableSortIndicator, DataTableAlign, DataTableDensity, DataTableCellTone, DataTableHighlightTone, DataTableSortDirection } from './types';
 export { DEFAULT_RENDER_CONFIG, DEFAULT_BRANDING, RenderStatus, VisualType } from './types';
 export { PodcastVideo } from './compositions/PodcastVideo';
 export { PodcastVisuals } from './compositions/PodcastVisuals';

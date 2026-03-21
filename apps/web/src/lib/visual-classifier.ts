@@ -26,7 +26,8 @@ export type VisualTypeString =
   | 'TIMELINE'
   | 'DIAGRAM'
   | 'TEXT_CARD'
-  | 'MAP_OVERLAY';
+  | 'MAP_OVERLAY'
+  | 'DATA_TABLE';
 
 export interface ClassifiedSubVisual {
   subOrder: number;
@@ -60,6 +61,7 @@ const VISUAL_TYPE_ENUM = [
   'DIAGRAM',
   'TEXT_CARD',
   'MAP_OVERLAY',
+  'DATA_TABLE',
 ] as const;
 
 const subVisualSchema = z.object({
@@ -109,6 +111,7 @@ VISUAL TYPES:
 - DIAGRAM: Conceptual diagram. Provide metadata: { svgContent } with a simple SVG string.
 - TEXT_CARD: Key points summary. Provide metadata: { headline, bullets: string[], statValue?, statLabel? }.
 - MAP_OVERLAY: Geographic content — specific locations, historical places, battle sites, trade routes, geographic features. Provide a search-friendly place description in prompt. Provide metadata: { places: [{ name, yearHint? }], preset: "vintage"|"satellite"|"cinematic" }.
+- DATA_TABLE: Tabular data — exact-value lookups, rankings, league tables, benchmark matrices, before/after numeric inventories, or any case where the viewer should scan rows and compare precise cells. Use DATA_TABLE when exact numbers or labels matter more than visual shape; use DATA_CHART for trends/proportions instead. Keep to <= 5 columns and <= 8 rows. Provide metadata: { headers: { title?, subtitle?, sourceLabel? }, columns: [{ key, label, align?, widthPercent?, isNumeric? }], rows: [{ key, values: { [columnKey]: string|number }, toneByColumnKey?, isSummary? }], styleHints?: { density?, zebraRows?, showGridLines?, emphasizeFirstColumn?, maxVisibleRows? }, highlightCells?: [{ rowKey, columnKey, tone?, pulse? }], sortIndicators?: [{ columnKey, direction: "asc"|"desc" }] }.
 
 SUB-VISUAL RULES:
 1. Each segment can have ONE or MORE sub-visuals that divide it into visual portions.
@@ -129,7 +132,8 @@ GENERAL RULES:
 9. Ensure visual variety across segments — don't assign the same type to more than 3 consecutive sub-visuals.
 10. Use AI_ILLUSTRATION for vivid narrative moments, abstract concepts, and scene-setting.
 11. Use STOCK_FOOTAGE for real-world topics (nature, cities, technology in action).
-12. Use DATA_CHART when numbers, statistics, or trends are discussed.
+12. Use DATA_CHART when numbers, statistics, or trends are discussed — prefer DATA_TABLE when exact values matter more than the shape of the trend.
+12b. Use DATA_TABLE for rankings, league tables, benchmarks, pricing comparisons, or any content where the viewer needs to scan rows and compare precise cell values.
 13. Use QUOTE when a notable quote or key statement is highlighted.
 14. Use TEXT_CARD as a general fallback for explanatory content.
 15. Never generate likenesses of real, identifiable people in AI_ILLUSTRATION prompts.
