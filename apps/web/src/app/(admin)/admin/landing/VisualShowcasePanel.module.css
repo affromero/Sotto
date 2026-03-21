@@ -198,3 +198,124 @@
   color: var(--color-text-secondary);
   margin: 0;
 }
+
+/* Sets list */
+.setsList {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-sm);
+  margin-bottom: var(--spacing-sm);
+}
+
+.activeCount {
+  font-weight: 400;
+  color: #059669;
+}
+
+.setRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.setRow:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.setRowSelected {
+  background: rgba(217, 119, 6, 0.06);
+  border: 1px solid rgba(217, 119, 6, 0.2);
+}
+
+.setInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.setName {
+  font: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.setMeta {
+  font: var(--text-caption);
+  color: var(--color-text-secondary);
+}
+
+.setActions {
+  display: flex;
+  gap: var(--spacing-xs);
+}
+
+.activeBtn {
+  padding: 3px 10px;
+  font: var(--text-caption);
+  font-weight: 600;
+  border: 1px solid #059669;
+  border-radius: var(--radius-sm);
+  background: rgba(5, 150, 105, 0.1);
+  color: #059669;
+  cursor: pointer;
+}
+
+.inactiveBtn {
+  padding: 3px 10px;
+  font: var(--text-caption);
+  font-weight: 600;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.deleteBtn {
+  padding: 3px 10px;
+  font: var(--text-caption);
+  border: 1px solid rgba(220, 38, 38, 0.2);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: #dc2626;
+  cursor: pointer;
+}
+
+.deleteBtn:hover {
+  background: rgba(220, 38, 38, 0.06);
+}
+
+/* Generate new set */
+.generateSection {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-sm);
+}
+
+.generateRow {
+  display: flex;
+  gap: var(--spacing-xs);
+  margin-bottom: var(--spacing-sm);
+}
+
+.nameInput {
+  flex: 1;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  font: var(--text-body-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  color: var(--color-text-primary);
+}
+
+.nameInput::placeholder {
+  color: var(--color-text-secondary);
+}
+
+.nameInput:disabled {
+  opacity: 0.5;
+}
