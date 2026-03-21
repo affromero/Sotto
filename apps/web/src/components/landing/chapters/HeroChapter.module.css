@@ -10,7 +10,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 140px var(--spacing-lg) var(--section-pad-y);
+  padding: calc(140px + var(--impersonation-banner-height, 0px)) var(--spacing-lg) var(--section-pad-y);
   overflow: hidden;
 }
 
@@ -132,7 +132,7 @@
 
 @media (max-width: 767px) {
   .root {
-    padding: 100px var(--spacing-md) 60px;
+    padding: calc(100px + var(--impersonation-banner-height, 0px)) var(--spacing-md) 60px;
   }
 
   .title {
