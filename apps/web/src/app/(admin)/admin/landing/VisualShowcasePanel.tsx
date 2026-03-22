@@ -220,8 +220,8 @@ export function VisualShowcasePanel() {
               onClick={() => handleRegenerateAll(selectedSet.id, selectedSet.items as ShowcaseItem[])}
               disabled={regenerating.size > 0 || queued.length > 0}
             >
-              {regenerating.size > 0
-                ? `Regenerating ${regenerating.size}/${(selectedSet.items as ShowcaseItem[]).length}...`
+              {regenerating.size > 0 || queued.length > 0
+                ? `Regenerating ${(selectedSet.items as ShowcaseItem[]).length - queued.length}/${(selectedSet.items as ShowcaseItem[]).length}...`
                 : 'Regenerate All'}
             </button>
           </div>
