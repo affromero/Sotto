@@ -91,6 +91,21 @@ export async function PATCH(request: NextRequest) {
   const id = body?.id as string;
   if (!id) return errorResponse('id is required', 400);
 
+  // Regenerate all items — single LLM call, render all clips
+  if (body?.regenerateAll) {
+    const existing = await prisma.showcaseSet.findUnique({ where: { id } });
+    if (!existing) return errorResponse('Set not found', 404);
+
+    const { items: newItems, failures } = await generateShowcaseClips({ imageModel: body?.imageModel, topic: existing.name });
+
+    const set = await prisma.showcaseSet.update({
+      where: { id },
+      data: { items: JSON.parse(JSON.stringify(newItems)) },
+    });
+
+    return NextResponse.json({ set, regenerated: 'all', failures: failures.length > 0 ? failures : undefined });
+  }
+
   // Single-item regeneration
   const regenerateType = body?.regenerateType as string | undefined;
   if (regenerateType) {
