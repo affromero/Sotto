@@ -88,15 +88,27 @@ export function VisualShowcasePanel() {
   };
 
   const [regenerating, setRegenerating] = useState<Set<string>>(new Set());
-  const queueRef = useRef<Array<{ setId: string; visualType: string }>>([]);
+  const [queued, setQueued] = useState<Array<{ setId: string; visualType: string }>>([]);
   const processingRef = useRef(false);
 
   const processQueue = useCallback(async () => {
     if (processingRef.current) return;
     processingRef.current = true;
 
-    while (queueRef.current.length > 0) {
-      const job = queueRef.current.shift()!;
+    const drain = () => {
+      let job: { setId: string; visualType: string } | undefined;
+      setQueued((prev) => {
+        if (prev.length === 0) return prev;
+        [job] = prev;
+        return prev.slice(1);
+      });
+      return job;
+    };
+
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const job = drain();
+      if (!job) break;
       setRegenerating((prev) => new Set(prev).add(job.visualType));
       try {
         await fetch('/api/admin/showcase', {
@@ -117,20 +129,28 @@ export function VisualShowcasePanel() {
     processingRef.current = false;
   }, [fetchSets, selectedModel]);
 
-  const handleRegenerateItem = (setId: string, visualType: string) => {
-    if (regenerating.has(visualType) || queueRef.current.some((j) => j.visualType === visualType)) return;
-    queueRef.current.push({ setId, visualType });
-    processQueue();
-  };
+  const handleRegenerateItem = useCallback((setId: string, visualType: string) => {
+    setQueued((prev) => {
+      if (prev.some((j) => j.visualType === visualType)) return prev;
+      return [...prev, { setId, visualType }];
+    });
+  }, []);
 
-  const handleRegenerateAll = (setId: string, items: ShowcaseItem[]) => {
-    for (const item of items) {
-      if (!regenerating.has(item.visualType) && !queueRef.current.some((j) => j.visualType === item.visualType)) {
-        queueRef.current.push({ setId, visualType: item.visualType });
-      }
+  const handleRegenerateAll = useCallback((setId: string, items: ShowcaseItem[]) => {
+    setQueued((prev) => {
+      const existing = new Set(prev.map((j) => j.visualType));
+      const newJobs = items
+        .filter((item) => !existing.has(item.visualType))
+        .map((item) => ({ setId, visualType: item.visualType }));
+      return newJobs.length > 0 ? [...prev, ...newJobs] : prev;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (queued.length > 0 && !processingRef.current) {
+      processQueue();
     }
-    processQueue();
-  };
+  }, [queued, processQueue]);
 
   const handleToggleActive = async (id: string, active: boolean) => {
     await fetch('/api/admin/showcase', {
@@ -214,7 +234,7 @@ export function VisualShowcasePanel() {
               type="button"
               className={styles.regenAllBtn}
               onClick={() => handleRegenerateAll(selectedSet.id, selectedSet.items as ShowcaseItem[])}
-              disabled={regenerating.size > 0 || queueRef.current.length > 0}
+              disabled={regenerating.size > 0 || queued.length > 0}
             >
               {regenerating.size > 0
                 ? `Regenerating ${regenerating.size}/${(selectedSet.items as ShowcaseItem[]).length}...`
@@ -224,7 +244,7 @@ export function VisualShowcasePanel() {
           <div className={styles.grid}>
             {(selectedSet.items as ShowcaseItem[]).map((item) => {
               const isActive = regenerating.has(item.visualType);
-              const isQueued = queueRef.current.some((j) => j.visualType === item.visualType);
+              const isQueued = queued.some((j) => j.visualType === item.visualType);
               return (
                 <div key={item.visualType} className={styles.card}>
                   <div className={styles.imageWrap}>
