@@ -128,7 +128,7 @@ export function ShowcaseChapter() {
   return (
     <ScrollChapter id="video" dark>
       <div className={styles.root}>
-        <div className={styles.showcaseHeader} data-reveal>
+        <div className={styles.showcaseHeader}>
           <span className={styles.overline}>Video generation</span>
           <h2 className={styles.heading}>Turn podcasts into video</h2>
           <p className={styles.description}>
