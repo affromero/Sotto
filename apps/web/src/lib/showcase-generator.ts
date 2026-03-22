@@ -392,7 +392,7 @@ export async function regenerateShowcaseItem(
 
   // Generate fresh metadata for this single type via LLM
   const { segments: generatedSegments } = await generateShowcaseMetadata(topic);
-  const entry = generatedSegments.find((s) => s.visualType === visualType);
+  const entry = generatedSegments.find((s: GeneratedSegment) => s.visualType === visualType);
 
   if (entry) {
     const buffer = await renderClip(entry.segment);

@@ -1,44 +1,24 @@
 /* ==========================================================================
-   SHOWCASE CHAPTER — Video pipeline mock (reversed split)
+   SHOWCASE CHAPTER — Full-bleed dark, carousel only
    ========================================================================== */
 
 .root {
+  position: relative;
   padding: var(--section-pad-y) var(--spacing-lg);
   max-width: var(--max-content-width);
   margin: 0 auto;
 }
 
-/* ==========================================================================
-   SPLIT — reversed: visual left, text right
-   ========================================================================== */
-
-.split {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 64px;
-  align-items: center;
-}
-
-.splitReverse {
-  direction: rtl;
-}
-
-.splitReverse > * {
-  direction: ltr;
-}
-
-.splitVisual {
-  display: flex;
-  justify-content: center;
-}
-
-.splitText {
-  display: flex;
-  align-items: center;
-}
-
-.textContent {
-  max-width: 480px;
+/* Noise texture overlay */
+.root::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: var(--noise-texture);
+  background-repeat: repeat;
+  background-size: 200px 200px;
+  pointer-events: none;
+  z-index: 0;
 }
 
 /* Header text */
@@ -50,7 +30,7 @@
   font-family: var(--font-heading);
   font-size: clamp(2.25rem, 4.5vw, 3.25rem);
   font-weight: 400;
-  color: var(--color-text);
+  color: var(--color-text-inverse);
   line-height: 1.15;
   margin-bottom: 20px;
 }
@@ -58,185 +38,29 @@
 .description {
   font-size: 18px;
   line-height: 1.7;
-  color: var(--color-text-secondary);
+  color: rgba(255, 255, 255, 0.6);
+  max-width: 560px;
+  margin: 0 auto;
+}
+
+.description strong {
+  color: rgba(255, 255, 255, 0.85);
 }
 
 /* ==========================================================================
-   MOCK VIDEO UI — glassmorphism card with segment rows
-   ========================================================================== */
-
-.mockVideo {
-  width: 100%;
-  max-width: 460px;
-  background: var(--color-surface);
-  -webkit-backdrop-filter: blur(var(--glass-blur));
-  backdrop-filter: blur(var(--glass-blur));
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-2xl);
-  overflow: hidden;
-  box-shadow: var(--shadow-xl);
-}
-
-.mockHeader {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 14px 20px;
-  background: rgba(0, 0, 0, 0.02);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--color-text);
-}
-
-.mockDot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--color-primary);
-}
-
-.mockBody {
-  padding: 20px;
-}
-
-/* Segment rows */
-.segment {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 0;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-}
-
-.segment:last-of-type {
-  border-bottom: none;
-}
-
-.segNum {
-  flex-shrink: 0;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.05);
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--color-text-secondary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.segLabel {
-  flex: 1;
-  font-size: 14px;
-  color: var(--color-text);
-}
-
-.segBadge {
-  flex-shrink: 0;
-  padding: 4px 10px;
-  border-radius: var(--radius-full);
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-}
-
-/* Badge color variants */
-.badgePurple {
-  background: rgba(139, 92, 246, 0.08);
-  color: #8B5CF6;
-}
-
-.badgeAmber {
-  background: var(--color-primary-subtle);
-  color: var(--color-primary);
-}
-
-.badgeNavy {
-  background: rgba(30, 58, 95, 0.08);
-  color: var(--color-accent);
-}
-
-.badgeGreen {
-  background: rgba(22, 163, 74, 0.08);
-  color: var(--color-success);
-}
-
-/* Footer with toggles + count */
-.videoFooter {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 12px;
-  padding-top: 16px;
-  margin-top: 4px;
-  border-top: 1px solid rgba(0, 0, 0, 0.05);
-}
-
-.toggle {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: var(--color-text-secondary);
-  background: none;
-  border: none;
-  padding: 8px 4px;
-  min-height: 44px;
-  min-width: 44px;
-  cursor: pointer;
-  font-family: inherit;
-}
-
-.toggleTrack {
-  width: 32px;
-  height: 18px;
-  border-radius: var(--radius-full);
-  background: rgba(0, 0, 0, 0.15);
-  position: relative;
-  display: inline-block;
-  transition: background 0.2s ease;
-}
-
-.toggleTrackOn {
-  background: var(--color-primary);
-}
-
-.toggleKnob {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--color-text-inverse);
-  transition: transform 0.2s ease;
-}
-
-.toggleTrackOn .toggleKnob {
-  transform: translateX(14px);
-}
-
-.videoCount {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--color-text-tertiary);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-/* ==========================================================================
-   SHOWCASE CAROUSEL — hybrid: featured video + thumbnail rail
+   SHOWCASE CAROUSEL — featured video + thumbnail rail
    ========================================================================== */
 
 .showcaseHeader {
+  position: relative;
+  z-index: 1;
   text-align: center;
   margin-bottom: 48px;
 }
 
 .carousel {
+  position: relative;
+  z-index: 1;
   max-width: 800px;
   margin: 0 auto;
 }
@@ -245,8 +69,8 @@
 .featured {
   border-radius: var(--radius-2xl);
   overflow: hidden;
-  background: var(--color-surface);
-  border: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: var(--shadow-xl);
   margin-bottom: 24px;
 }
@@ -290,7 +114,7 @@
 .featuredLabel {
   font-family: var(--font-heading);
   font-size: 22px;
-  color: var(--color-text);
+  color: var(--color-text-inverse);
   display: block;
   margin-bottom: 4px;
 }
@@ -298,7 +122,7 @@
 .featuredDesc {
   font-size: 15px;
   line-height: 1.5;
-  color: var(--color-text-secondary);
+  color: rgba(255, 255, 255, 0.5);
   margin: 0;
 }
 
@@ -320,8 +144,8 @@
   flex-shrink: 0;
   padding: 8px 16px;
   border-radius: var(--radius-full);
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
   cursor: pointer;
   transition: all 0.2s ease;
   position: relative;
@@ -332,18 +156,18 @@
 
 .thumb:hover {
   border-color: var(--color-primary);
-  background: var(--color-primary-subtle);
+  background: rgba(217, 119, 6, 0.1);
 }
 
 .thumbActive {
   border-color: var(--color-primary);
-  background: var(--color-primary-subtle);
+  background: rgba(217, 119, 6, 0.1);
 }
 
 .thumbLabel {
   font-size: 13px;
   font-weight: 600;
-  color: var(--color-text);
+  color: rgba(255, 255, 255, 0.7);
   white-space: nowrap;
 }
 
@@ -373,28 +197,6 @@
 @media (max-width: 768px) {
   .root {
     padding: var(--section-pad-y-sm) var(--spacing-md);
-  }
-
-  .split {
-    grid-template-columns: 1fr;
-    gap: 32px;
-  }
-
-  .splitReverse {
-    direction: ltr;
-  }
-
-  .splitVisual {
-    order: -1;
-  }
-
-  .mockVideo {
-    max-width: 100%;
-  }
-
-  .textContent {
-    text-align: center;
-    max-width: 100%;
   }
 
   .showcaseHeader {

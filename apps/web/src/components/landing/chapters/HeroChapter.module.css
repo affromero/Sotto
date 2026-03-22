@@ -1,15 +1,17 @@
 /* ==========================================================================
-   HERO CHAPTER — centered headline with atmospheric depth
+   HERO CHAPTER — split grid: text left, player right
    ========================================================================== */
 
 .root {
   position: relative;
   min-height: var(--full-height);
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   align-items: center;
-  justify-content: center;
+  gap: 64px;
   padding: calc(140px + var(--impersonation-banner-height, 0px)) var(--spacing-lg) var(--section-pad-y);
+  max-width: var(--max-content-width);
+  margin: 0 auto;
   overflow: hidden;
 }
 
@@ -44,13 +46,12 @@
   z-index: 0;
 }
 
-/* Content — centered stack */
+/* Content — left column */
 .content {
   position: relative;
   z-index: 1;
-  text-align: center;
-  max-width: 720px;
-  width: 100%;
+  text-align: left;
+  max-width: 520px;
   animation: heroFadeIn 1s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
@@ -63,6 +64,16 @@
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* Visual — right column */
+.visual {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  animation: heroFadeIn 1s var(--ease-out-expo) 0.4s both;
 }
 
 /* Badge */
@@ -121,8 +132,84 @@
   line-height: 1.7;
   color: rgba(255, 255, 255, 0.6);
   max-width: 520px;
-  margin: 0 auto 40px;
+  margin-bottom: 40px;
   animation: heroFadeIn 0.9s var(--ease-out-expo) 0.3s both;
+}
+
+/* Proof chips below player */
+.proof {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.proofDot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* ==========================================================================
+   WAVEFORM FALLBACK — CSS-only animated bars when no showcase data
+   ========================================================================== */
+
+.waveformFallback {
+  width: 100%;
+  max-width: 440px;
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-2xl);
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+
+.waveformBars {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 64px;
+  width: 100%;
+}
+
+.waveformBar {
+  flex: 1;
+  min-width: 2px;
+  background: var(--color-primary);
+  border-radius: var(--radius-xs);
+  opacity: 0.35;
+  height: calc(8px + sin(var(--i, 0) * 0.5) * 48px);
+  transform-origin: bottom;
+  animation: waveformPulse 1.5s ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * 50ms);
+}
+
+.waveformCta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+  min-height: 44px;
+}
+
+.waveformCta:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-primary-glow);
 }
 
 /* ==========================================================================
@@ -131,7 +218,15 @@
 
 @media (max-width: 768px) {
   .root {
+    grid-template-columns: 1fr;
+    gap: 40px;
     padding: calc(100px + var(--impersonation-banner-height, 0px)) var(--spacing-md) 60px;
+    min-height: auto;
+  }
+
+  .content {
+    text-align: center;
+    max-width: 100%;
   }
 
   .title {
@@ -141,6 +236,16 @@
 
   .subtitle {
     font-size: 17px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .visual {
+    order: 1;
+  }
+
+  .waveformFallback {
+    max-width: 100%;
   }
 }
 
@@ -150,6 +255,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .content,
+  .visual,
   .badge,
   .title,
   .subtitle {
@@ -160,5 +266,10 @@
 
   .badgeDot {
     animation: none;
+  }
+
+  .waveformBar {
+    animation: none;
+    opacity: 0.5;
   }
 }
