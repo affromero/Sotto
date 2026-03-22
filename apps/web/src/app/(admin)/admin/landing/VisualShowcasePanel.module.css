@@ -68,6 +68,33 @@
   padding: var(--spacing-2xs) 0;
 }
 
+.gridHeader {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: var(--spacing-xs);
+}
+
+.regenAllBtn {
+  padding: var(--spacing-xs) var(--spacing-md);
+  font: var(--text-body-sm);
+  font-weight: 600;
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-primary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.regenAllBtn:hover:not(:disabled) {
+  background: rgba(217, 119, 6, 0.08);
+}
+
+.regenAllBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
