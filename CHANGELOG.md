@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.30.0] - 2026-03-22
+
+### Added
+- Landing page overhaul: 9 chapters consolidated to 5 for a visual-first experience
+- Hero chapter split grid with playable AudioClipPlayer demo and CSS waveform fallback
+- Compact feature bullet list in JourneyChapter replacing 9 NetworkChapter cards
+- Merged Trust + Identity chapters with inline verified badges for voice cloning and avatars
+- FAQ accordion (5 curated items) absorbed into ConvertChapter with PoweredByProviders in footer
+- Real-time SSE notifications via Redis pub/sub for pipeline events
+- Toast notifications with action buttons for generation progress
+- Complete notification icon coverage with click-through navigation
+- LLM-generated showcase content from topic name
+
+### Fixed
+- ShowcaseChapter header invisible due to data-reveal on dynamically rendered client component
+- showcase-generator type errors: AIResponse.content, destructured segments, CURATED_SEGMENTS reference
+- Voice track loading state persistence across tab switches
+- Architecture detection at build time for correct native bindings
+- Dockerfile packages/feed import path for @sottofm/feed
+
+### Changed
+- ShowcaseChapter now dark full-bleed, returns null when no showcase data (no fallback mock)
+- Removed LandingShell click ripple effect (decorative, no narrative purpose)
+- Deleted BotChapter, NetworkChapter, IdentityChapter, FaqChapter (8 files, -1,800 lines)
+
 ## [0.29.0] - 2026-03-21
 
 ### Added
