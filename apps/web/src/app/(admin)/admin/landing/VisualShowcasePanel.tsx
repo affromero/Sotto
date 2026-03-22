@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import styles from './VisualShowcasePanel.module.css';
 
 interface ShowcaseItem {
@@ -87,20 +87,49 @@ export function VisualShowcasePanel() {
     }
   };
 
-  const [regenerating, setRegenerating] = useState<string | null>(null);
+  const [regenerating, setRegenerating] = useState<Set<string>>(new Set());
+  const queueRef = useRef<Array<{ setId: string; visualType: string }>>([]);
+  const processingRef = useRef(false);
 
-  const handleRegenerateItem = async (setId: string, visualType: string) => {
-    setRegenerating(visualType);
-    try {
-      await fetch('/api/admin/showcase', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: setId, regenerateType: visualType, imageModel: selectedModel || undefined }),
-      });
-      await fetchSets();
-    } finally {
-      setRegenerating(null);
+  const processQueue = useCallback(async () => {
+    if (processingRef.current) return;
+    processingRef.current = true;
+
+    while (queueRef.current.length > 0) {
+      const job = queueRef.current.shift()!;
+      setRegenerating((prev) => new Set(prev).add(job.visualType));
+      try {
+        await fetch('/api/admin/showcase', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: job.setId, regenerateType: job.visualType, imageModel: selectedModel || undefined }),
+        });
+        await fetchSets();
+      } finally {
+        setRegenerating((prev) => {
+          const next = new Set(prev);
+          next.delete(job.visualType);
+          return next;
+        });
+      }
     }
+
+    processingRef.current = false;
+  }, [fetchSets, selectedModel]);
+
+  const handleRegenerateItem = (setId: string, visualType: string) => {
+    if (regenerating.has(visualType) || queueRef.current.some((j) => j.visualType === visualType)) return;
+    queueRef.current.push({ setId, visualType });
+    processQueue();
+  };
+
+  const handleRegenerateAll = (setId: string, items: ShowcaseItem[]) => {
+    for (const item of items) {
+      if (!regenerating.has(item.visualType) && !queueRef.current.some((j) => j.visualType === item.visualType)) {
+        queueRef.current.push({ setId, visualType: item.visualType });
+      }
+    }
+    processQueue();
   };
 
   const handleToggleActive = async (id: string, active: boolean) => {
@@ -179,32 +208,50 @@ export function VisualShowcasePanel() {
 
       {/* Selected set preview */}
       {selectedSet && (
-        <div className={styles.grid}>
-          {(selectedSet.items as ShowcaseItem[]).map((item) => (
-            <div key={item.visualType} className={styles.card}>
-              <div className={styles.imageWrap}>
-                {item.mediaType === 'video' ? (
-                  <video src={item.url} className={styles.image} autoPlay loop muted playsInline />
-                ) : (
-                  <img src={item.url} alt={item.label} className={styles.image} />
-                )}
-                {item.credits && <span className={styles.credits}>{item.credits}</span>}
-              </div>
-              <div className={styles.cardBody}>
-                <span className={styles.badge}>{item.visualType}</span>
-                <h3 className={styles.cardTitle}>{item.label}</h3>
-                <button
-                  type="button"
-                  className={styles.regenBtn}
-                  onClick={(e) => { e.stopPropagation(); handleRegenerateItem(selectedSet.id, item.visualType); }}
-                  disabled={regenerating === item.visualType}
-                >
-                  {regenerating === item.visualType ? 'Regenerating...' : 'Regenerate'}
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+        <>
+          <div className={styles.gridHeader}>
+            <button
+              type="button"
+              className={styles.regenAllBtn}
+              onClick={() => handleRegenerateAll(selectedSet.id, selectedSet.items as ShowcaseItem[])}
+              disabled={regenerating.size > 0 || queueRef.current.length > 0}
+            >
+              {regenerating.size > 0
+                ? `Regenerating ${regenerating.size}/${(selectedSet.items as ShowcaseItem[]).length}...`
+                : 'Regenerate All'}
+            </button>
+          </div>
+          <div className={styles.grid}>
+            {(selectedSet.items as ShowcaseItem[]).map((item) => {
+              const isActive = regenerating.has(item.visualType);
+              const isQueued = queueRef.current.some((j) => j.visualType === item.visualType);
+              return (
+                <div key={item.visualType} className={styles.card}>
+                  <div className={styles.imageWrap}>
+                    {item.mediaType === 'video' ? (
+                      <video src={item.url} className={styles.image} autoPlay loop muted playsInline />
+                    ) : (
+                      <img src={item.url} alt={item.label} className={styles.image} />
+                    )}
+                    {item.credits && <span className={styles.credits}>{item.credits}</span>}
+                  </div>
+                  <div className={styles.cardBody}>
+                    <span className={styles.badge}>{item.visualType}</span>
+                    <h3 className={styles.cardTitle}>{item.label}</h3>
+                    <button
+                      type="button"
+                      className={styles.regenBtn}
+                      onClick={(e) => { e.stopPropagation(); handleRegenerateItem(selectedSet.id, item.visualType); }}
+                      disabled={isActive || isQueued}
+                    >
+                      {isActive ? 'Regenerating...' : isQueued ? 'Queued' : 'Regenerate'}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
       )}
 
       {/* Generate new set */}
