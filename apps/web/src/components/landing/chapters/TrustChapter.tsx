@@ -10,7 +10,7 @@ const DOMAINS = [
 
 export function TrustChapter() {
   return (
-    <ScrollChapter id="verification">
+    <ScrollChapter id="verification" alt>
       <div className={styles.root}>
         {/* Trust strip — full bleed */}
         <div className={styles.strip} data-reveal>
@@ -37,14 +37,17 @@ export function TrustChapter() {
         {/* Asymmetric 2-column */}
         <div className={styles.columns}>
           <div className={styles.colText} data-reveal>
-            <span className={styles.overline}>Open Verification Standard</span>
-            <div className={styles.pillRow}>
-              <span className={styles.pill}>Bayesian v2</span>
-            </div>
-            <h2 className={styles.heading}>Domain-aware. Claim-level. Open source.</h2>
+            <span className={styles.overline}>Trust &amp; Verification</span>
+            <h2 className={styles.heading}>Fact-checked claims. Verified voices.</h2>
             <p className={styles.description}>
               Every reference is scored by its domain. News articles don&apos;t
               need DOIs, and Wikipedia isn&apos;t held to the same bar as Nature.
+              Bayesian scoring adapts to each source type.
+            </p>
+            <p className={styles.description}>
+              Voice cloning and avatar images are gated behind identity
+              verification. No one can clone your voice or use your face without
+              explicit consent. Zero tolerance for impersonation or deepfakes.
             </p>
             <p className={styles.description}>
               We don&apos;t optimize for watch time or retention metrics. We optimize
@@ -95,6 +98,44 @@ export function TrustChapter() {
                   the claim.
                 </p>
               </div>
+            </div>
+
+            {/* Inline verified badges (from IdentityChapter) */}
+            <div className={styles.verifiedFeatures}>
+              <span className={styles.verifiedBadge}>
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                  <path d="M9 12l2 2 4-4" />
+                </svg>
+                Voice Cloning
+              </span>
+              <span className={styles.verifiedBadge}>
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                  <path d="M9 12l2 2 4-4" />
+                </svg>
+                Avatar Images
+              </span>
             </div>
           </div>
         </div>

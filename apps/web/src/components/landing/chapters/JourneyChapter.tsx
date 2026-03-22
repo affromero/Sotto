@@ -1,12 +1,19 @@
 import type { LandingShowcaseData } from '@/lib/showcase';
 import { ScrollChapter } from '../ScrollChapter';
 import { ScriptEditorMock } from './ScriptEditorMock';
-import { AudioClipPlayer } from './AudioClipPlayer';
 import styles from './JourneyChapter.module.css';
 
 interface JourneyChapterProps {
   showcase: LandingShowcaseData | null;
 }
+
+const FEATURES = [
+  'Fork and remix any public podcast',
+  'Import from Spotify, YouTube, Apple Podcasts, or audio files',
+  'Ask follow-up questions mid-playback',
+  'Daily briefings and comprehension quizzes',
+  'Generate video with AI illustrations, maps, avatars',
+];
 
 export function JourneyChapter({ showcase }: JourneyChapterProps) {
   const chat = showcase?.chatMessages;
@@ -18,7 +25,7 @@ export function JourneyChapter({ showcase }: JourneyChapterProps) {
       <div className={styles.root}>
         <div className={styles.header} data-reveal>
           <span className={styles.overline}>How it works</span>
-          <h2 className={styles.heading}>Three steps. One incredible podcast.</h2>
+          <h2 className={styles.heading}>Two steps. One incredible podcast.</h2>
         </div>
 
         <div className={styles.stepsContainer}>
@@ -182,74 +189,17 @@ export function JourneyChapter({ showcase }: JourneyChapterProps) {
               )}
             </div>
           </div>
-
-          {/* Step 3: Listen */}
-          <div className={styles.split} data-reveal>
-            <div className={styles.splitText}>
-              <div className={styles.step}>
-                <div className={styles.stepNum}>3</div>
-                <div className={styles.stepBody}>
-                  <h3 className={styles.stepTitle}>Listen, share, or create video</h3>
-                  <p className={styles.stepDesc}>
-                    Publish to the social feed, fork any public podcast, generate a full video
-                    with AI illustrations and avatar presenters, or ask questions mid-playback.
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className={styles.splitVisual}>
-              {showcase ? (
-                <AudioClipPlayer
-                  title={showcase.podcast.title}
-                  voiceCount={showcase.voiceCount}
-                  sourceCount={showcase.sourceCount}
-                  audioUrl={showcase.audioClip.url}
-                  originalTrackName={showcase.originalTrackName}
-                  startTime={showcase.audioClip.start}
-                  endTime={showcase.audioClip.end}
-                  totalDuration={showcase.audioClip.totalDuration}
-                  podcastId={showcase.podcast.podcastId}
-                  voiceTracks={showcase.voiceTracks}
-                  videoClip={showcase.videoClip}
-                  clipSegments={showcase.clipSegments}
-                  clipVisuals={showcase.clipVisuals}
-                  showVideoToggle={showcase.showVideo}
-                />
-              ) : (
-                <div className={styles.mockPlayer}>
-                  <div className={styles.mockHeader}>
-                    <div className={styles.mockDot} aria-hidden="true" />
-                    <span>Now Playing</span>
-                  </div>
-                  <div className={styles.mockBody}>
-                    <div className={styles.playerTitle}>CRISPR Gene Editing Explained</div>
-                    <div className={styles.playerMeta}>10 min &middot; 2 voices &middot; 8 sources</div>
-                    <div className={styles.playerPlayRow}>
-                      <button className={styles.playButton} aria-label="Play">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                          <path d="M8 5v14l11-7z" />
-                        </svg>
-                      </button>
-                      <div className={styles.playerWaveform}>
-                        {Array.from({ length: 32 }, (_, i) => (
-                          <span key={i} className={styles.playerBar} style={{ '--i': i } as React.CSSProperties} />
-                        ))}
-                      </div>
-                    </div>
-                    <div className={styles.playerControls}>
-                      <span className={styles.playerTime}>3:42 / 10:15</span>
-                      <div className={styles.playerActions}>
-                        <span className={styles.playerAction}>Fork</span>
-                        <span className={styles.playerAction}>Video</span>
-                        <span className={styles.playerAction}>Share</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
         </div>
+
+        {/* Compact feature list replacing NetworkChapter's 9 cards */}
+        <ul className={styles.featureList} data-reveal>
+          {FEATURES.map((feature) => (
+            <li key={feature} className={styles.featureItem}>
+              <span className={styles.featureDot} aria-hidden="true" />
+              {feature}
+            </li>
+          ))}
+        </ul>
       </div>
     </ScrollChapter>
   );
