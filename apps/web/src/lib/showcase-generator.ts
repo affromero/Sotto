@@ -111,7 +111,7 @@ async function generateShowcaseMetadata(topic: string): Promise<{ segments: Gene
   const result = await ai.generateResponse(
     SHOWCASE_PROMPT,
     [{ role: 'user', content: `Topic: ${topic}` }],
-    { maxTokens: 4096, skipModeration: true },
+    { maxTokens: 4096, skipModeration: true, useWebSearch: true },
   );
 
   let parsed: Record<string, unknown>;
