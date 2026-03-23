@@ -150,14 +150,16 @@ describe('InspireMe', () => {
     });
   });
 
-  it('shows loading state while fetching', async () => {
+  it('shows skeleton loading state while fetching', async () => {
     (global.fetch as ReturnType<typeof vi.fn>).mockImplementation(
       () => new Promise(() => {}) // Never resolves
     );
 
     render(<InspireMe open={true} onClose={vi.fn()} onSelectTopic={vi.fn()} />);
 
-    expect(screen.getByText('Finding ideas for you...')).toBeInTheDocument();
+    const skeletonGrid = screen.getByLabelText('Loading suggestions');
+    expect(skeletonGrid).toBeInTheDocument();
+    expect(skeletonGrid).toHaveAttribute('aria-busy', 'true');
   });
 
   it('displays ForYou quiz questions once loaded (JSON path)', async () => {
@@ -371,7 +373,7 @@ describe('InspireMe', () => {
     });
   });
 
-  it('shows topic-specific loading message', async () => {
+  it('shows skeleton loading state when topic filter triggers re-fetch', async () => {
     const user = userEvent.setup();
     let resolveFirst!: (value: unknown) => void;
     const firstPromise = new Promise((resolve) => { resolveFirst = resolve; });
@@ -393,7 +395,7 @@ describe('InspireMe', () => {
     await user.keyboard('{Enter}');
 
     await waitFor(() => {
-      expect(screen.getByText(/Finding ideas about "AI"/)).toBeInTheDocument();
+      expect(screen.getByLabelText('Loading suggestions')).toBeInTheDocument();
     });
   });
 
