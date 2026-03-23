@@ -285,6 +285,24 @@ describe('InspireMe', () => {
     expect(handleClose).toHaveBeenCalled();
   });
 
+  it('uses prefetched response instead of fetching again', async () => {
+    const prefetchedResponse = createJsonResponse(mockAllResponse);
+    const prefetchRef = { current: Promise.resolve(prefetchedResponse) as Promise<Response> };
+
+    render(
+      <InspireMe open={true} onClose={vi.fn()} onSelectTopic={vi.fn()} prefetchRef={prefetchRef} />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('AI meets Ancient History')).toBeInTheDocument();
+    });
+
+    // fetch should NOT have been called — prefetch was consumed
+    expect(global.fetch).not.toHaveBeenCalled();
+    // prefetch ref should be cleared after consumption
+    expect(prefetchRef.current).toBeNull();
+  });
+
   it('shows generate button when no ForYou questions returned', async () => {
     (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
       createJsonResponse({ forYou: [], trending: [], news: [] })
