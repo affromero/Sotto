@@ -120,7 +120,7 @@ export async function generateTtsAudio(params: TtsGenerationParams): Promise<Tts
   } else if (providerId === 'hume' && resolvedApiKey) {
     concurrencyLimit = await getHumeConcurrencyLimit(resolvedApiKey);
   } else if (providerId === 'replicate') {
-    concurrencyLimit = 10;
+    concurrencyLimit = 1;
   }
 
   const semaphoreKey = `tts:sem:${userId}:${providerId}`;
