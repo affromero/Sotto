@@ -1,6 +1,7 @@
 import { logger } from './logger';
 
-const RETRY_DELAYS_MS = [2000, 4000, 8000, 16000];
+const MAX_RETRIES = 4;
+const DEFAULT_RETRY_DELAY_MS = 8000;
 
 type ReplicateFetchError = Error & {
   bodyText: string;
@@ -15,26 +16,40 @@ function createReplicateFetchError(status: number, bodyText: string): ReplicateF
   return error;
 }
 
+function parseRetryAfter(bodyText: string): number {
+  try {
+    const parsed = JSON.parse(bodyText);
+    if (typeof parsed.retry_after === 'number' && parsed.retry_after > 0) {
+      return Math.ceil(parsed.retry_after * 1000);
+    }
+    const match = typeof parsed.detail === 'string' && parsed.detail.match(/resets in ~(\d+)s/);
+    if (match) return parseInt(match[1], 10) * 1000;
+  } catch {}
+  return DEFAULT_RETRY_DELAY_MS;
+}
+
 export async function replicateFetch(url: string, options?: RequestInit): Promise<Response> {
-  for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     const response = await fetch(url, options);
     if (response.status !== 429) {
       return response;
     }
 
     const bodyText = await response.text();
-    if (attempt === RETRY_DELAYS_MS.length) {
+    if (attempt === MAX_RETRIES) {
       throw createReplicateFetchError(response.status, bodyText);
     }
 
+    const delayMs = parseRetryAfter(bodyText);
+
     logger.warn('Replicate API rate limited, retrying', {
       attempt: attempt + 1,
-      delayMs: RETRY_DELAYS_MS[attempt],
+      delayMs,
       status: response.status,
       url,
     });
 
-    await new Promise((resolve) => setTimeout(resolve, RETRY_DELAYS_MS[attempt]));
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
   }
 
   throw new Error('Unreachable');
