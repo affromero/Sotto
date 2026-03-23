@@ -8,6 +8,7 @@ import {
   cleanAndRenumberMarkdown,
   buildRenumberMap,
 } from '@/lib/script-updater';
+import { MIN_REFERENCE_COUNTS } from '@/lib/script-verifier';
 import type { ScriptTurn } from '@/lib/script-generator';
 
 type RouteParams = { params: Promise<{ podcastId: string }> };
@@ -21,7 +22,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
   const podcast = await prisma.podcast.findUnique({
     where: { id: podcastId },
-    select: { userId: true },
+    select: { userId: true, lowReferences: true },
   });
 
   if (!podcast) {
@@ -44,11 +45,23 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     orderBy: { number: 'asc' },
   });
 
-  return NextResponse.json({
+  const response: Record<string, unknown> = {
     turns: script.turns as ScriptTurn[],
     references,
     version: script.version,
-  });
+  };
+
+  if (podcast.lowReferences) {
+    const discovery = await prisma.discovery.findUnique({
+      where: { podcastId },
+      select: { depth: true },
+    });
+    const depth = discovery?.depth ?? 'standard';
+    response.lowReferences = true;
+    response.requiredRefCount = MIN_REFERENCE_COUNTS[depth] ?? 5;
+  }
+
+  return NextResponse.json(response);
 }
 
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
