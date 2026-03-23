@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, type MutableRefObject } from 'react';
 import { X, Sparkles, RefreshCw, Search } from 'lucide-react';
 import type { TasteQuestion, InspireSection, NewsTimeRange } from '@sotto/shared';
 import { INSPIRE_SECTION_LABELS, NEWS_TIME_RANGE_LABELS } from '@sotto/shared';
@@ -15,6 +15,7 @@ interface InspireMeProps {
   onClose: () => void;
   onSelectTopic: (topic: string) => void;
   aiModel?: string;
+  prefetchRef?: MutableRefObject<Promise<Response> | null>;
 }
 
 type Section = InspireSection;
@@ -35,7 +36,7 @@ interface SseEvent {
   error?: string;
 }
 
-export function InspireMe({ open, onClose, onSelectTopic, aiModel }: InspireMeProps) {
+export function InspireMe({ open, onClose, onSelectTopic, aiModel, prefetchRef }: InspireMeProps) {
   const [activeSection, setActiveSection] = useState<Section>('forYou');
   const [sectionsLoading, setSectionsLoading] = useState<Record<Section, boolean>>({
     forYou: false,
@@ -69,7 +70,13 @@ export function InspireMe({ open, onClose, onSelectTopic, aiModel }: InspireMePr
 
     const url = buildUrl({ topic, model: aiModel });
 
-    fetch(url, { signal: controller.signal })
+    // Use prefetched response if available and no topic filter (prefetch has no topic)
+    const prefetchPromise = !topic && prefetchRef?.current ? prefetchRef.current : null;
+    if (prefetchPromise) prefetchRef!.current = null; // consume once
+
+    const responsePromise = prefetchPromise ?? fetch(url, { signal: controller.signal });
+
+    responsePromise
       .then(async (res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
 

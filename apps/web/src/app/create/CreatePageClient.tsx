@@ -108,6 +108,8 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
   const [voiceCharges, setVoiceCharges] = useState<VoiceChargeItem[]>([]);
   const [draftId, setDraftId] = useState<string | null>(draftData?.id ?? null);
   const draftSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inspireButtonRef = useRef<HTMLButtonElement>(null);
+  const inspirePrefetchRef = useRef<Promise<Response> | null>(null);
 
   // Auto-populate topic from URL query parameter (e.g., from Saved Ideas page)
   useEffect(() => {
@@ -116,6 +118,30 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
       setInitialTopic(topic);
     }
   }, [searchParams]);
+
+  // Prefetch inspire data on hover/touch or after 3s idle — warms Redis cache
+  const triggerInspirePrefetch = useCallback(() => {
+    if (inspirePrefetchRef.current) return;
+    const url = aiModel ? `/api/inspire/all?model=${encodeURIComponent(aiModel)}` : '/api/inspire/all';
+    inspirePrefetchRef.current = fetch(url).catch(() => null as unknown as Response);
+  }, [aiModel]);
+
+  useEffect(() => {
+    const btn = inspireButtonRef.current;
+    if (!btn) return;
+
+    btn.addEventListener('mouseenter', triggerInspirePrefetch);
+    btn.addEventListener('touchstart', triggerInspirePrefetch, { passive: true });
+
+    // Fallback: prefetch after 3s idle if user hasn't hovered
+    const timer = setTimeout(triggerInspirePrefetch, 3000);
+
+    return () => {
+      btn.removeEventListener('mouseenter', triggerInspirePrefetch);
+      btn.removeEventListener('touchstart', triggerInspirePrefetch);
+      clearTimeout(timer);
+    };
+  }, [triggerInspirePrefetch]);
 
   const handleInspireTopic = useCallback((topic: string) => {
     setInitialTopic(topic);
@@ -480,6 +506,7 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
           <div className={styles.chatArea}>
             <div className={styles.inspireRow}>
               <button
+                ref={inspireButtonRef}
                 type="button"
                 className={styles.inspireMeButton}
                 onClick={() => setInspireMeOpen(true)}
@@ -545,6 +572,7 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
           onClose={() => setInspireMeOpen(false)}
           onSelectTopic={handleInspireTopic}
           aiModel={aiModel}
+          prefetchRef={inspirePrefetchRef}
         />
 
         {step === 'voice' && tabMode === 'create' && (
