@@ -132,12 +132,13 @@ describe('GET /api/inspire/all', () => {
 
   it('returns all cached sections as JSON when all hit', async () => {
     const cachedTrending = [{ id: 'pod-1', title: 'Top Pod' }];
-    // Return cached values for all 4 (fresh TTL = 1700 means <5 min old)
+    // Return cached values for all 4 — TTLs above per-section stale thresholds (hard - soft)
+    // forYou: 14400-3600=10800, trending: 1800-600=1200, news: 5400-900=4500, curiosity: 14400-3600=10800
     mockCacheGetWithTtl
-      .mockResolvedValueOnce({ value: mockForYou, ttl: 1700 }) // forYou
-      .mockResolvedValueOnce({ value: cachedTrending, ttl: 1700 }) // trending
-      .mockResolvedValueOnce({ value: mockNews, ttl: 1700 }) // news
-      .mockResolvedValueOnce({ value: mockCuriosity, ttl: 1700 }); // curiosity
+      .mockResolvedValueOnce({ value: mockForYou, ttl: 13000 }) // forYou (fresh)
+      .mockResolvedValueOnce({ value: cachedTrending, ttl: 1500 }) // trending (fresh)
+      .mockResolvedValueOnce({ value: mockNews, ttl: 5000 }) // news (fresh)
+      .mockResolvedValueOnce({ value: mockCuriosity, ttl: 13000 }); // curiosity (fresh)
 
     const res = await GET(createRequest());
     const body = await res.json();
