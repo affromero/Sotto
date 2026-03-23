@@ -38,12 +38,20 @@ function sanitizeTopic(raw: string): string {
 
 // Cache TTLs in seconds
 // Hard TTL: how long data stays in Redis. Soft TTL: after this, serve stale + regen in background.
-const SOFT_TTL = 300; // 5 min
+// forYou/curiosity: interests don't change fast, stale content is fine.
+// news: needs freshness. trending: DB-backed, cheap to regen.
 const CACHE_TTL = {
-  forYou: 1800, // 30 min
-  news: 1800, // 30 min
-  trending: 1800, // 30 min (global)
-  curiosity: 1800, // 30 min
+  forYou: 14400, // 4h
+  news: 5400, // 90 min
+  trending: 1800, // 30 min (global, DB-backed)
+  curiosity: 14400, // 4h
+} as const;
+
+const SOFT_TTL = {
+  forYou: 3600, // 60 min
+  news: 900, // 15 min
+  trending: 600, // 10 min
+  curiosity: 3600, // 60 min
 } as const;
 
 type Section = 'forYou' | 'trending' | 'news' | 'curiosity';
@@ -212,11 +220,11 @@ export async function GET(request: NextRequest) {
   // If any section is stale (past soft TTL), fire background regeneration
   if (allCached) {
     const staleSections: Section[] = [];
-    const ttlThreshold = CACHE_TTL.forYou - SOFT_TTL; // remaining TTL below this = stale
-    if (forYouResult.ttl >= 0 && forYouResult.ttl < ttlThreshold) staleSections.push('forYou');
-    if (trendingResult.ttl >= 0 && trendingResult.ttl < ttlThreshold) staleSections.push('trending');
-    if (newsResult.ttl >= 0 && newsResult.ttl < ttlThreshold) staleSections.push('news');
-    if (curiosityResult.ttl >= 0 && curiosityResult.ttl < ttlThreshold) staleSections.push('curiosity');
+    const isStale = (ttl: number, section: Section) => ttl >= 0 && ttl < CACHE_TTL[section] - SOFT_TTL[section];
+    if (isStale(forYouResult.ttl, 'forYou')) staleSections.push('forYou');
+    if (isStale(trendingResult.ttl, 'trending')) staleSections.push('trending');
+    if (isStale(newsResult.ttl, 'news')) staleSections.push('news');
+    if (isStale(curiosityResult.ttl, 'curiosity')) staleSections.push('curiosity');
 
     if (staleSections.length > 0) {
       logger.debug('Inspire: serving stale cache, regenerating in background', { staleSections });
