@@ -89,6 +89,7 @@ export interface GenerateScriptPayload {
   userFeedback?: string;
   previousTurns?: Array<{ speaker: string; text: string; direction?: string }>;
   previousReferences?: Array<{ number: number; title: string; authors?: string; year?: number; url?: string; type: string; publisher?: string; doi?: string }>;
+  sourceUrls?: string[];
 }
 
 export interface GenerateAudioPayload {

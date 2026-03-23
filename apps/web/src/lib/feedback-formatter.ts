@@ -19,6 +19,7 @@ export function formatUserFeedback(params: {
   turnComments?: Record<number, string>;
   highlights?: Highlight[];
   turns?: TurnInfo[];
+  sourceUrls?: string[];
 }): string {
   const sections: string[] = [];
 
@@ -49,6 +50,11 @@ export function formatUserFeedback(params: {
     if (entries.length > 0) {
       sections.push(`### Text Annotations\n${entries.join('\n')}`);
     }
+  }
+
+  if (params.sourceUrls && params.sourceUrls.length > 0) {
+    const urlList = params.sourceUrls.map((url) => `- ${url}`).join('\n');
+    sections.push(`### User-Provided Source URLs\nThe user provided these URLs as reference sources. Use them to cite real facts, events, and quotes:\n${urlList}`);
   }
 
   return sections.join('\n\n');

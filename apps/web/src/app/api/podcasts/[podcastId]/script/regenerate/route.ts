@@ -39,7 +39,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   }
 
   // Parse optional feedback body
-  let feedbackBody: { feedback?: string; turnComments?: Record<number, string>; highlights?: Array<{ turnIndex: number; text: string; note: string }> } | undefined;
+  let feedbackBody: { feedback?: string; turnComments?: Record<number, string>; highlights?: Array<{ turnIndex: number; text: string; note: string }>; sourceUrls?: string[] } | undefined;
   try {
     const text = await request.text();
     if (text.trim()) {
@@ -109,6 +109,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       turnComments: feedbackBody!.turnComments,
       highlights: feedbackBody!.highlights,
       turns: previousTurns,
+      sourceUrls: feedbackBody!.sourceUrls,
     });
   }
 
@@ -119,10 +120,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     prisma.script.deleteMany({ where: { podcastId } }),
   ]);
 
-  // Set status back to SCRIPTING and queue script generation
+  // Set status back to SCRIPTING, reset lowReferences flag
   await prisma.podcast.update({
     where: { id: podcastId },
-    data: { status: 'SCRIPTING' },
+    data: { status: 'SCRIPTING', lowReferences: false },
   });
 
   await addJob(scriptGenerationQueue, JobType.GENERATE_SCRIPT, {
@@ -135,6 +136,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       previousTurns,
       previousReferences,
     } : {}),
+    ...(feedbackBody?.sourceUrls?.length ? { sourceUrls: feedbackBody.sourceUrls } : {}),
   });
 
   return NextResponse.json({ success: true });
