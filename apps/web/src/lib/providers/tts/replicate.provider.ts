@@ -7,6 +7,7 @@
  * @tts-research-date 2026-03-11 — Inworld TTS 1.5 Max/Mini added
  */
 import { logger } from '../../logger';
+import { replicateFetch } from '../../replicate-fetch';
 import type { TtsProvider, SpeechParams } from '../tts';
 import { getProviderMeta, type TtsProviderId } from '../tts-registry';
 import { FAL_VOICE_POOL, INWORLD_VOICE_POOL, selectVoicePairFromPool } from '../tts-voices';
@@ -67,15 +68,30 @@ export class ReplicateProvider implements TtsProvider {
       ? { text, voice_id: params.voiceId, audio_format: 'mp3' }
       : { text, voice: params.voiceId };
 
-    const response = await fetch(`https://api.replicate.com/v1/models/${modelPath}/predictions`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${this.apiKey}`,
-        'Content-Type': 'application/json',
-        Prefer: 'wait',
-      },
-      body: JSON.stringify({ input }),
-    });
+    let response: Response;
+    try {
+      response = await replicateFetch(`https://api.replicate.com/v1/models/${modelPath}/predictions`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json',
+          Prefer: 'wait',
+        },
+        body: JSON.stringify({ input }),
+      });
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.name === 'ReplicateFetchError' &&
+        'status' in error &&
+        'bodyText' in error
+      ) {
+        throw new Error(
+          `Replicate API error (${String(error.status)}): ${String(error.bodyText)}`,
+        );
+      }
+      throw error;
+    }
 
     if (!response.ok) {
       const errorText = await response.text();
