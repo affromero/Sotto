@@ -3,6 +3,7 @@
  * Supports VEED Fabric, Wav2Lip, and SadTalker models.
  */
 import { logger } from '@/lib/logger';
+import { replicateFetch } from './replicate-fetch';
 
 export interface ReplicateLipSyncParams {
   modelId: string;
@@ -72,18 +73,33 @@ export async function submitReplicateLipSync(
 
   logger.info('Submitting Replicate lip-sync prediction', { modelId, modelPath });
 
-  const response = await fetch(
-    `https://api.replicate.com/v1/models/${modelPath}/predictions`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        Prefer: 'wait',
+  let response: Response;
+  try {
+    response = await replicateFetch(
+      `https://api.replicate.com/v1/models/${modelPath}/predictions`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+          Prefer: 'wait',
+        },
+        body: JSON.stringify({ input }),
       },
-      body: JSON.stringify({ input }),
-    },
-  );
+    );
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.name === 'ReplicateFetchError' &&
+      'status' in error &&
+      'bodyText' in error
+    ) {
+      throw new Error(
+        `Replicate lip-sync submission failed (${String(error.status)}): ${String(error.bodyText)}`,
+      );
+    }
+    throw error;
+  }
 
   if (!response.ok) {
     const errorText = await response.text();
