@@ -1,15 +1,21 @@
 .form {
   display: flex;
+  flex-direction: column;
   gap: 8px;
-  flex-wrap: wrap;
-  justify-content: center;
+  align-items: center;
   max-width: 520px;
+  width: 100%;
+}
+
+.primaryRow {
+  display: flex;
+  gap: 8px;
   width: 100%;
 }
 
 .input {
   flex: 1;
-  min-width: 180px;
+  min-width: 0;
   height: 48px;
   padding: 0 16px;
   background: rgba(255, 255, 255, 0.08);
@@ -29,9 +35,39 @@
   border-color: var(--color-primary);
 }
 
+.expandToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 13px;
+  cursor: pointer;
+  transition: color var(--transition-fast);
+}
+
+.expandToggle:hover {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.chevron {
+  transition: transform var(--transition-fast);
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
+}
+
+.extras {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
 .inputWrapper {
-  flex: 1;
-  min-width: 180px;
   position: relative;
 }
 
@@ -82,14 +118,6 @@
   border-color: var(--color-primary);
 }
 
-.actions {
-  display: flex;
-  gap: 10px;
-  width: 100%;
-  align-items: center;
-  justify-content: center;
-}
-
 .discord {
   display: inline-flex;
   align-items: center;
@@ -119,7 +147,6 @@
 }
 
 .submit {
-  flex: 1;
   height: 48px;
   padding: 0 24px;
   background: var(--color-primary);
@@ -167,18 +194,14 @@
   .discord:active {
     transform: none;
   }
+
+  .chevron {
+    transition: none;
+  }
 }
 
 @media (max-width: 600px) {
-  .form {
+  .primaryRow {
     flex-direction: column;
-  }
-
-  .input {
-    min-width: 0;
-  }
-
-  .inputWrapper {
-    min-width: 0;
   }
 }
