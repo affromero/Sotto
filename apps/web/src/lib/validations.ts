@@ -756,6 +756,7 @@ export const regenerateWithFeedbackSchema = z.object({
     text: z.string().max(500),
     note: z.string().max(2000),
   })).max(50).optional(),
+  sourceUrls: z.array(z.string().url()).max(5).optional(),
 }).optional();
 
 /**

@@ -95,4 +95,33 @@ describe('formatUserFeedback', () => {
 
     expect(result).toBe('### General Feedback\nMake it shorter');
   });
+
+  it('formats source URLs section', () => {
+    const result = formatUserFeedback({
+      sourceUrls: ['https://example.com/article', 'https://bbc.co.uk/news'],
+    });
+
+    expect(result).toContain('### User-Provided Source URLs');
+    expect(result).toContain('- https://example.com/article');
+    expect(result).toContain('- https://bbc.co.uk/news');
+  });
+
+  it('skips source URLs section when array is empty', () => {
+    const result = formatUserFeedback({
+      sourceUrls: [],
+    });
+
+    expect(result).toBe('');
+  });
+
+  it('includes source URLs after other sections', () => {
+    const result = formatUserFeedback({
+      feedback: 'More references needed',
+      sourceUrls: ['https://example.com'],
+    });
+
+    expect(result).toContain('### General Feedback');
+    expect(result).toContain('### User-Provided Source URLs');
+    expect(result.indexOf('General Feedback')).toBeLessThan(result.indexOf('User-Provided Source URLs'));
+  });
 });

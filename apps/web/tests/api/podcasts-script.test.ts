@@ -6,6 +6,7 @@ const mockPodcastFindUnique = vi.fn();
 const mockScriptFindUnique = vi.fn();
 const mockScriptUpdate = vi.fn();
 const mockReferenceFindMany = vi.fn();
+const mockDiscoveryFindUnique = vi.fn();
 
 vi.mock('@/lib/api-keys', () => ({
   authenticateRequest: (...args: unknown[]) => mockAuthenticateRequest(...args),
@@ -23,12 +24,19 @@ vi.mock('@/lib/prisma', () => {
     reference: {
       findMany: (...args: unknown[]) => mockReferenceFindMany(...args),
     },
+    discovery: {
+      findUnique: (...args: unknown[]) => mockDiscoveryFindUnique(...args),
+    },
   };
   return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
 });
 
 vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+}));
+
+vi.mock('@/lib/script-verifier', () => ({
+  MIN_REFERENCE_COUNTS: { deep_dive: 10, standard: 5, quick_overview: 3, eli5: 2 },
 }));
 
 vi.mock('@/lib/script-updater', () => ({
@@ -116,7 +124,7 @@ describe('GET /api/podcasts/[podcastId]/script', () => {
 
   it('returns script turns, references, and version on success', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
-    mockPodcastFindUnique.mockResolvedValue({ userId: 'user-1' });
+    mockPodcastFindUnique.mockResolvedValue({ userId: 'user-1', lowReferences: false });
     const turns = [
       { speaker: 'HOST', text: 'Hello' },
       { speaker: 'EXPERT', text: 'Hi there' },
@@ -130,6 +138,39 @@ describe('GET /api/podcasts/[podcastId]/script', () => {
 
     expect(response.status).toBe(200);
     expect(body).toEqual({ turns, references: refs, version: 2 });
+    expect(body.lowReferences).toBeUndefined();
+  });
+
+  it('includes lowReferences and requiredRefCount when podcast has low references', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockPodcastFindUnique.mockResolvedValue({ userId: 'user-1', lowReferences: true });
+    const turns = [{ speaker: 'HOST', text: 'Hello' }];
+    mockScriptFindUnique.mockResolvedValue({ turns, version: 1 });
+    mockReferenceFindMany.mockResolvedValue([]);
+    mockDiscoveryFindUnique.mockResolvedValue({ depth: 'deep_dive' });
+
+    const response = await GET(createGetRequest(), await createParams('pod-1'));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.lowReferences).toBe(true);
+    expect(body.requiredRefCount).toBe(10);
+  });
+
+  it('defaults requiredRefCount to 5 when discovery not found', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockPodcastFindUnique.mockResolvedValue({ userId: 'user-1', lowReferences: true });
+    const turns = [{ speaker: 'HOST', text: 'Hello' }];
+    mockScriptFindUnique.mockResolvedValue({ turns, version: 1 });
+    mockReferenceFindMany.mockResolvedValue([]);
+    mockDiscoveryFindUnique.mockResolvedValue(null);
+
+    const response = await GET(createGetRequest(), await createParams('pod-1'));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.lowReferences).toBe(true);
+    expect(body.requiredRefCount).toBe(5);
   });
 });
 

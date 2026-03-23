@@ -58,6 +58,7 @@ import { MetadataBadges } from '@/components/ui/MetadataBadges';
 import { Button } from '@/components/ui/Button';
 import { GenerationProgress } from '@/components/create/GenerationProgress';
 import { ScriptEditor } from '@/components/create/ScriptEditor';
+import { InsufficientRefsBanner } from '@/components/create/InsufficientRefsBanner';
 import { AudioConfigPanel, type AudioConfig } from '@/components/player/AudioConfigPanel';
 import { MiniPlayer } from '@/components/player/MiniPlayer';
 import { VideoModelPicker } from '@/components/player/VideoModelPicker';
@@ -191,6 +192,8 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [scriptTurns, setScriptTurns] = useState<Array<{ speaker: string; text: string }> | null>(null);
+  const [lowReferences, setLowReferences] = useState(false);
+  const [requiredRefCount, setRequiredRefCount] = useState(0);
   const [audioConfig, setAudioConfig] = useState<AudioConfig>({ voices: [] });
   const playerSectionRef = useRef<HTMLElement>(null);
   const [showRatingPrompt, setShowRatingPrompt] = useState(false);
@@ -290,6 +293,10 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data?.turns) setScriptTurns(data.turns);
+        if (data?.lowReferences) {
+          setLowReferences(true);
+          setRequiredRefCount(data.requiredRefCount ?? 5);
+        }
       })
       .catch(() => {});
   }, [needsScript, isOwner, podcast.id]);
@@ -876,6 +883,17 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
             <AudioConfigPanel
               speakers={[...new Set(scriptTurns.map((t) => t.speaker))]}
               onConfigChange={setAudioConfig}
+            />
+          )}
+          {lowReferences && (
+            <InsufficientRefsBanner
+              refCount={podcast.references?.length ?? 0}
+              requiredCount={requiredRefCount}
+              podcastId={podcast.id}
+              onRegenerate={() => {
+                setLowReferences(false);
+                setLiveStatus('SCRIPTING');
+              }}
             />
           )}
           <ScriptEditor
@@ -1549,7 +1567,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
 
       {/* Verification mode badge */}
       {podcast.verificationMode === 'relaxed' && (
-        <div className={styles.verificationBadge} title="This podcast uses relaxed fact-checking for opinion and creative content">
+        <div className={styles.verificationBadge} title="This podcast uses relaxed fact-checking at the creator's request. Claims may not be fully sourced.">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <circle cx="12" cy="12" r="10" />
             <line x1="12" y1="8" x2="12" y2="12" />
@@ -1560,9 +1578,9 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
       )}
 
       {podcast.lowReferences && (
-        <div className={styles.limitedSourcesBadge} aria-label="Limited Sources" title="This podcast has fewer verified references than recommended. Information may be less thoroughly sourced.">
+        <div className={styles.limitedSourcesBadge} aria-label="Limited Sources" title="This podcast has fewer verified references than recommended. Some claims may not be backed by cited sources.">
           <AlertTriangle size={14} aria-hidden="true" />
-          Limited Sources
+          Limited Sources ({podcast.references.length} verified)
         </div>
       )}
 
