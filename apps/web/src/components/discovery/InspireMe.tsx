@@ -313,6 +313,17 @@ export function InspireMe({ open, onClose, onSelectTopic, aiModel, prefetchRef }
             </div>
           ) : activeTabLoading ? (
             <div className={styles.skeletonGrid} aria-busy="true" aria-label="Loading suggestions">
+              <p className={styles.skeletonHint}>
+                {activeSection === 'news'
+                  ? 'Searching for news...'
+                  : activeSection === 'trending'
+                    ? 'Loading trending podcasts...'
+                    : activeSection === 'curiosity'
+                      ? 'Discovering curiosities...'
+                      : activeTopic
+                        ? `Finding ideas about "${activeTopic}"...`
+                        : 'Finding ideas for you...'}
+              </p>
               {Array.from({ length: 4 }).map((_, i) => (
                 <div key={i} className={styles.skeletonCard}>
                   <div className={styles.skeletonLine} style={{ width: '85%' }} />
