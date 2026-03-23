@@ -331,6 +331,13 @@
 
 /* Skeleton loading cards */
 
+.skeletonHint {
+  font: var(--text-body-sm);
+  color: var(--color-text-tertiary);
+  text-align: center;
+  margin: 0 0 var(--spacing-xs);
+}
+
 .skeletonGrid {
   display: flex;
   flex-direction: column;
