@@ -148,7 +148,7 @@ export function PodcastCard({
                 {getContentBadgeLabel(podcast)}
               </span>
               {podcast.lowReferences && (
-                <span className={styles.limitedSourcesBadge} aria-label="Limited Sources" title="This podcast has fewer verified references than recommended">
+                <span className={styles.limitedSourcesBadge} aria-label="Limited Sources" title="This podcast has fewer verified references than recommended. Some claims may not be backed by cited sources.">
                   Limited Sources
                 </span>
               )}

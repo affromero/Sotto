@@ -1567,7 +1567,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
 
       {/* Verification mode badge */}
       {podcast.verificationMode === 'relaxed' && (
-        <div className={styles.verificationBadge} title="This podcast uses relaxed fact-checking for opinion and creative content">
+        <div className={styles.verificationBadge} title="This podcast uses relaxed fact-checking at the creator's request. Claims may not be fully sourced.">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <circle cx="12" cy="12" r="10" />
             <line x1="12" y1="8" x2="12" y2="12" />
@@ -1578,9 +1578,9 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
       )}
 
       {podcast.lowReferences && (
-        <div className={styles.limitedSourcesBadge} aria-label="Limited Sources" title="This podcast has fewer verified references than recommended. Information may be less thoroughly sourced.">
+        <div className={styles.limitedSourcesBadge} aria-label="Limited Sources" title="This podcast has fewer verified references than recommended. Some claims may not be backed by cited sources.">
           <AlertTriangle size={14} aria-hidden="true" />
-          Limited Sources
+          Limited Sources ({podcast.references.length} verified)
         </div>
       )}
 
