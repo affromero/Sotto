@@ -71,7 +71,7 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
     );
     const extractedTexts = results
       .filter((r): r is PromiseFulfilledResult<Awaited<ReturnType<typeof extractContent>>> => r.status === 'fulfilled')
-      .map((r) => r.value.content)
+      .map((r) => r.value.text)
       .filter(Boolean);
 
     if (extractedTexts.length > 0) {
