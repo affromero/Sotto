@@ -128,9 +128,9 @@ logger.info('Starting Sotto workers...', {
 // Create workers filtered by WORKER_PROFILE
 const workers = [
   shouldRun('content-extraction') && createWorker('content-extraction', processContentExtraction, { concurrency: 2 }),
-  shouldRun('script-generation') && createWorker('script-generation', processScriptGeneration, { concurrency: 2 }),
-  shouldRun('script-verification') && createWorker('script-verification', processScriptVerification, { concurrency: 2 }),
-  shouldRun('reference-validation') && createWorker('reference-validation', processReferenceValidation, { concurrency: 2 }),
+  shouldRun('script-generation') && createWorker('script-generation', processScriptGeneration, { concurrency: 2, lockDuration: 300000 }),
+  shouldRun('script-verification') && createWorker('script-verification', processScriptVerification, { concurrency: 2, lockDuration: 300000 }),
+  shouldRun('reference-validation') && createWorker('reference-validation', processReferenceValidation, { concurrency: 2, lockDuration: 300000 }),
   shouldRun('audio-generation') && createWorker('audio-generation', processAudioGeneration, { concurrency: 15 }),
   shouldRun('audio-stitching') && createWorker('audio-stitching', processAudioStitching, { concurrency: 1 }),
   shouldRun('interactions') && createWorker('interactions', processInteraction, { concurrency: 3 }),
