@@ -222,6 +222,35 @@ describe('POST /api/podcasts/[podcastId]/script/regenerate', () => {
     expect(payload.userFeedback).toBeUndefined();
   });
 
+  it('passes sourceUrls in job payload and resets lowReferences', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockPodcastFindUnique.mockResolvedValue({ userId: 'user-1', status: 'SCRIPT_READY' });
+    mockDiscoveryFindUnique.mockResolvedValue({ id: 'disc-1', sourceContent: null });
+    mockTransaction.mockResolvedValue(undefined);
+    mockPodcastUpdate.mockResolvedValue({});
+    mockAddJob.mockResolvedValue(undefined);
+
+    const response = await POST(
+      createRequest({
+        feedback: 'Need better sources',
+        sourceUrls: ['https://example.com/article', 'https://bbc.co.uk/news'],
+      }),
+      await createParams('pod-1'),
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toEqual({ success: true });
+
+    // Verify sourceUrls in payload
+    const payload = mockAddJob.mock.calls[0][2];
+    expect(payload.sourceUrls).toEqual(['https://example.com/article', 'https://bbc.co.uk/news']);
+
+    // Verify lowReferences reset
+    const updateData = mockPodcastUpdate.mock.calls[0][0].data;
+    expect(updateData.lowReferences).toBe(false);
+  });
+
   it('returns 400 for invalid feedback body', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
 

@@ -7,6 +7,7 @@ import {
   feedQuerySchema,
   configureAvatarsSchema,
   updateAvatarPositionsSchema,
+  regenerateWithFeedbackSchema,
 } from '@/lib/validations';
 
 describe('discoveryMessageSchema', () => {
@@ -503,6 +504,49 @@ describe('updateAvatarPositionsSchema', () => {
   it('accepts empty positions array (clears all positions)', () => {
     const result = updateAvatarPositionsSchema.safeParse({ positions: [] });
     expect(result.success).toBe(true);
+  });
+});
+
+describe('regenerateWithFeedbackSchema — sourceUrls', () => {
+  it('accepts valid sourceUrls', () => {
+    const result = regenerateWithFeedbackSchema.safeParse({
+      sourceUrls: ['https://example.com/article', 'https://bbc.co.uk/news/123'],
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data?.sourceUrls).toHaveLength(2);
+    }
+  });
+
+  it('rejects invalid URLs', () => {
+    const result = regenerateWithFeedbackSchema.safeParse({
+      sourceUrls: ['not-a-url'],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects more than 5 URLs', () => {
+    const result = regenerateWithFeedbackSchema.safeParse({
+      sourceUrls: Array.from({ length: 6 }, (_, i) => `https://example.com/${i}`),
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts empty sourceUrls array', () => {
+    const result = regenerateWithFeedbackSchema.safeParse({
+      sourceUrls: [],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts body without sourceUrls (backward compat)', () => {
+    const result = regenerateWithFeedbackSchema.safeParse({
+      feedback: 'Make it better',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data?.sourceUrls).toBeUndefined();
+    }
   });
 });
 

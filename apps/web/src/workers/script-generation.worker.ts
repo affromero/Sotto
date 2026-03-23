@@ -2,6 +2,7 @@ import { Job } from 'bullmq';
 import { GenerateScriptPayload, addJob, JobType, scriptVerificationQueue } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { generateScript, generateScriptWithUserFeedback, type SourceMetadata } from '@/lib/script-generator';
+import { extractContent } from '@/lib/extractors';
 import { logUsage } from '@/lib/usage-logger';
 import { getAiKey, hasByokKey } from '@/lib/byok';
 import { resolveAiModelAndProvider } from '@/lib/providers/ai-registry';
@@ -58,6 +59,38 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
     aiKey,
     plan: user.plan as 'FREE' | 'PRO',
   });
+
+  // Extract content from user-provided source URLs and append to discovery.sourceContent
+  if (job.data.sourceUrls && job.data.sourceUrls.length > 0) {
+    logger.info('Extracting content from user-provided source URLs', {
+      podcastId,
+      urlCount: String(job.data.sourceUrls.length),
+    });
+    const results = await Promise.allSettled(
+      job.data.sourceUrls.slice(0, 5).map((url) => extractContent(url))
+    );
+    const extractedTexts = results
+      .filter((r): r is PromiseFulfilledResult<Awaited<ReturnType<typeof extractContent>>> => r.status === 'fulfilled')
+      .map((r) => r.value.content)
+      .filter(Boolean);
+
+    if (extractedTexts.length > 0) {
+      const appendedContent = extractedTexts.join('\n\n---\n\n');
+      const existingContent = discovery.sourceContent || '';
+      const newContent = existingContent
+        ? `${existingContent}\n\n---\n\n### User-Provided Sources\n\n${appendedContent}`
+        : `### User-Provided Sources\n\n${appendedContent}`;
+      await prisma.discovery.update({
+        where: { id: discoveryId },
+        data: { sourceContent: newContent },
+      });
+      discovery.sourceContent = newContent;
+      logger.info('Appended extracted source content', {
+        podcastId,
+        extractedCount: String(extractedTexts.length),
+      });
+    }
+  }
 
   const sourceMetadata = discovery.sourceMetadata as SourceMetadata | null;
 
