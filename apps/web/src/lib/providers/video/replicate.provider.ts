@@ -3,6 +3,7 @@
  * Follows the same async pattern as the Replicate TTS provider.
  */
 import { logger } from '../../logger';
+import { replicateFetch } from '../../replicate-fetch';
 import type { VideoProvider } from '../video';
 import type { VideoProviderId } from '../video-registry';
 
@@ -94,18 +95,33 @@ export class ReplicateVideoProvider implements VideoProvider {
       hasImage: !!params.firstFrameImage,
     });
 
-    const response = await fetch(
-      `https://api.replicate.com/v1/models/${modelPath}/predictions`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${this.apiKey}`,
-          'Content-Type': 'application/json',
-          Prefer: 'wait',
+    let response: Response;
+    try {
+      response = await replicateFetch(
+        `https://api.replicate.com/v1/models/${modelPath}/predictions`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${this.apiKey}`,
+            'Content-Type': 'application/json',
+            Prefer: 'wait',
+          },
+          body: JSON.stringify({ input }),
         },
-        body: JSON.stringify({ input }),
-      },
-    );
+      );
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.name === 'ReplicateFetchError' &&
+        'status' in error &&
+        'bodyText' in error
+      ) {
+        throw new Error(
+          `Replicate video API error (${String(error.status)}): ${String(error.bodyText)}`,
+        );
+      }
+      throw error;
+    }
 
     if (!response.ok) {
       const errorText = await response.text();
