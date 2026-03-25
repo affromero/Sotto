@@ -33,6 +33,38 @@
   line-height: 1.5;
 }
 
+.failureList {
+  list-style: none;
+  padding: 0;
+  margin: var(--space-xs) 0;
+}
+
+.failureList li {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  padding: var(--space-xxs) 0;
+  padding-left: var(--space-sm);
+  position: relative;
+}
+
+.failureList li::before {
+  content: '\2022';
+  position: absolute;
+  left: 0;
+  color: var(--color-text-tertiary);
+}
+
+.successItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  color: var(--color-success) !important;
+}
+
+.successItem::before {
+  display: none !important;
+}
+
 .urlFields {
   display: flex;
   flex-direction: column;
