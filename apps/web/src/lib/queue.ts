@@ -136,6 +136,8 @@ export interface ValidateReferencesPayload {
   podcastId: string;
   userId: string;
   useAdminCredits?: boolean;
+  referenceRetryAttempt?: number; // 0-based, undefined = first pass
+  previousVerifiedCount?: number; // for early termination (going backward = stop)
 }
 
 export interface VerifyVoicePayload {
