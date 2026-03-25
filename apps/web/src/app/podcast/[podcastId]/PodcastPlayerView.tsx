@@ -194,6 +194,9 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
   const [scriptTurns, setScriptTurns] = useState<Array<{ speaker: string; text: string }> | null>(null);
   const [lowReferences, setLowReferences] = useState(false);
   const [requiredRefCount, setRequiredRefCount] = useState(0);
+  const [verificationProgress, setVerificationProgress] = useState<Record<string, unknown> | null>(
+    (podcast as Record<string, unknown>).verificationProgress as Record<string, unknown> | null ?? null
+  );
   const [audioConfig, setAudioConfig] = useState<AudioConfig>({ voices: [] });
   const playerSectionRef = useRef<HTMLElement>(null);
   const [showRatingPrompt, setShowRatingPrompt] = useState(false);
@@ -296,6 +299,9 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
         if (data?.lowReferences) {
           setLowReferences(true);
           setRequiredRefCount(data.requiredRefCount ?? 5);
+          if (data.verificationProgress) {
+            setVerificationProgress(data.verificationProgress as Record<string, unknown>);
+          }
         }
       })
       .catch(() => {});
@@ -311,6 +317,9 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
         if (!res.ok) return;
         const data = await res.json();
         setLiveStatus(data.status);
+        if (data.verificationProgress) {
+          setVerificationProgress(data.verificationProgress as Record<string, unknown>);
+        }
         if (data.status === 'READY') {
           router.refresh();
         }
@@ -871,14 +880,14 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
       {/* Processing state */}
       {isProcessing && (
         <div className={styles.processingState}>
-          <GenerationProgress status={liveStatus} topic={podcast.topic} />
+          <GenerationProgress status={liveStatus} topic={podcast.topic} verificationProgress={verificationProgress as import('@/types/podcast').VerificationProgressSnapshot | null} />
         </div>
       )}
 
       {/* Script ready for review */}
       {isScriptReady && isOwner && (
         <div className={styles.scriptReadyState}>
-          <GenerationProgress status={liveStatus} topic={podcast.topic} />
+          <GenerationProgress status={liveStatus} topic={podcast.topic} verificationProgress={verificationProgress as import('@/types/podcast').VerificationProgressSnapshot | null} />
           {scriptTurns && scriptTurns.length > 0 && (
             <AudioConfigPanel
               speakers={[...new Set(scriptTurns.map((t) => t.speaker))]}
@@ -894,6 +903,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
                 setLowReferences(false);
                 setLiveStatus('SCRIPTING');
               }}
+              verificationProgress={verificationProgress as import('@/types/podcast').VerificationProgressSnapshot | null}
             />
           )}
           <ScriptEditor

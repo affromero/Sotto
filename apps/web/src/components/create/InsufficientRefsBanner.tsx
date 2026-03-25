@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { AlertTriangle, Plus, X } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Plus, X } from 'lucide-react';
+import type { VerificationProgressSnapshot } from '@/types/podcast';
 import styles from './InsufficientRefsBanner.module.css';
 
 interface InsufficientRefsBannerProps {
@@ -9,6 +10,7 @@ interface InsufficientRefsBannerProps {
   requiredCount: number;
   podcastId: string;
   onRegenerate: () => void;
+  verificationProgress?: VerificationProgressSnapshot | null;
 }
 
 const MAX_URLS = 5;
@@ -27,6 +29,7 @@ export function InsufficientRefsBanner({
   requiredCount,
   podcastId,
   onRegenerate,
+  verificationProgress,
 }: InsufficientRefsBannerProps) {
   const [urls, setUrls] = useState<string[]>(['']);
   const [submitting, setSubmitting] = useState(false);
@@ -80,10 +83,40 @@ export function InsufficientRefsBanner({
         <h3 className={styles.title}>This podcast needs more references</h3>
       </div>
 
-      <p className={styles.body}>
-        We found {refCount} of {requiredCount} required sources. You can help by
-        providing links to relevant articles, news reports, or papers.
-      </p>
+      {verificationProgress?.phase === 'insufficient' && verificationProgress.failureDetails ? (
+        <div className={styles.body}>
+          <p>
+            We verified {verificationProgress.verified} of {verificationProgress.total} references
+            but couldn&apos;t find enough reliable sources.
+            {requiredCount - verificationProgress.verified > 0 && (
+              <> {requiredCount - verificationProgress.verified} more needed.</>
+            )}
+          </p>
+          <ul className={styles.failureList}>
+            {verificationProgress.failureDetails.hallucinated > 0 && (
+              <li>{verificationProgress.failureDetails.hallucinated} references had URLs that don&apos;t exist (AI-generated)</li>
+            )}
+            {verificationProgress.failureDetails.urlNotFound > 0 && (
+              <li>{verificationProgress.failureDetails.urlNotFound} references had broken links</li>
+            )}
+            {verificationProgress.failureDetails.blockedDomain > 0 && (
+              <li>{verificationProgress.failureDetails.blockedDomain} references were from blocked domains</li>
+            )}
+            {verificationProgress.failureDetails.replacementFound > 0 && (
+              <li className={styles.successItem}>
+                <CheckCircle size={14} aria-hidden="true" />
+                {verificationProgress.failureDetails.replacementFound} were replaced with verified alternatives
+              </li>
+            )}
+          </ul>
+          <p>Provide links to relevant sources below, or regenerate to try again.</p>
+        </div>
+      ) : (
+        <p className={styles.body}>
+          We found {refCount} of {requiredCount} required sources. You can help by
+          providing links to relevant articles, news reports, or papers.
+        </p>
+      )}
 
       <div className={styles.urlFields}>
         {urls.map((url, i) => (
