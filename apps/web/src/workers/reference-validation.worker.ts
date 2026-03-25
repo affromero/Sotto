@@ -4,10 +4,13 @@ import {
   addJob,
   JobType,
   notificationQueue,
+  referenceValidationQueue,
 } from '@/lib/queue';
+import { Prisma } from '@prisma/client';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { type ReferenceInput } from '@/lib/reference-validator';
-import { runReferenceVerification } from '@/lib/reference-verification';
+import { runReferenceVerification, buildReferenceRetryFeedback, mergeVerifiedReferences } from '@/lib/reference-verification';
+import { generateScriptWithFeedback } from '@/lib/script-generator';
 import {
   buildRenumberMap,
   cleanAndRenumberCitations,
@@ -26,12 +29,20 @@ import { logger } from '@/lib/logger';
 import { logPipelineStageComplete } from '@/lib/pipeline-events';
 import { extractDiscoveryFigures } from '@/lib/discovery-figure-extractor';
 
+const MAX_REF_RETRY_ATTEMPTS: Record<string, number> = {
+  deep_dive: 3,
+  standard: 2,
+  quick_overview: 1,
+  eli5: 1,
+};
+
 export async function processReferenceValidation(
   job: Job<ValidateReferencesPayload>
 ): Promise<void> {
-  const { podcastId, userId, useAdminCredits } = job.data;
+  const { podcastId, userId, useAdminCredits, referenceRetryAttempt, previousVerifiedCount } = job.data;
+  const attempt = referenceRetryAttempt ?? 0;
 
-  logger.info('Starting reference validation', { podcastId });
+  logger.info('Starting reference validation', { podcastId, attempt: String(attempt) });
   await job.updateProgress(5);
 
   const aiKey = useAdminCredits ? null : await getAiKey(userId);
@@ -52,7 +63,18 @@ export async function processReferenceValidation(
     prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { plan: true } }),
     prisma.discovery.findUnique({
       where: { podcastId },
-      select: { depth: true },
+      select: {
+        depth: true,
+        topic: true,
+        audienceLevel: true,
+        audience: true,
+        focusAreas: true,
+        tone: true,
+        durationTarget: true,
+        sourceContent: true,
+        sourceMetadata: true,
+        speakers: true,
+      },
     }),
   ]);
 
@@ -142,10 +164,28 @@ export async function processReferenceValidation(
 
   const scriptTurns = script.turns as Array<{ speaker: string; text: string; direction?: string }>;
 
+  // Write initial progress snapshot
+  await prisma.podcast.update({
+    where: { id: podcastId },
+    data: {
+      verificationProgress: {
+        total: refInputs.length,
+        checked: 0,
+        verified: 0,
+        replaced: 0,
+        removed: 0,
+        rejected: 0,
+        attempt: attempt + 1,
+        maxAttempts: MAX_REF_RETRY_ATTEMPTS[effectiveDepth] ?? 1,
+        phase: 'checking',
+      },
+    },
+  });
+
   await job.updateProgress(15);
 
   // Run domain-aware verification pipeline
-  const { results: verificationResults, rejectedRefIds } = await runReferenceVerification(
+  const { results: verificationResults, rejectedRefIds, claimContexts } = await runReferenceVerification(
     refInputs,
     scriptTurns,
     podcast?.topic || '',
@@ -299,18 +339,217 @@ export async function processReferenceValidation(
 
   // Gate: pause as draft if remaining references are below minimum for depth
   const remainingRefCount = references.length - removedNumbers.size;
+  const verifiedCount = [...verificationResults.values()].filter(
+    (r) => r.verdict.status === 'VERIFIED' || r.verdict.status === 'REPLACED'
+  ).length;
+  const maxRetries = MAX_REF_RETRY_ATTEMPTS[effectiveDepth] ?? 1;
+
   if (!isShowcase && remainingRefCount < requiredRefCount) {
+    // Early termination: if this attempt verified fewer than last, stop (going backward)
+    const goingBackward = previousVerifiedCount !== undefined && verifiedCount < previousVerifiedCount;
+
+    if (attempt < maxRetries && !goingBackward) {
+      // --- RETRY PATH: regenerate script with feedback ---
+      logger.info('References below minimum — retrying with feedback', {
+        podcastId,
+        attempt: String(attempt),
+        maxRetries: String(maxRetries),
+        verified: String(verifiedCount),
+        required: String(requiredRefCount),
+      });
+
+      // Write progress snapshot (replacing phase)
+      await prisma.podcast.update({
+        where: { id: podcastId },
+        data: {
+          verificationProgress: {
+            total: references.length,
+            checked: references.length,
+            verified: verifiedCount,
+            replaced: [...verificationResults.values()].filter((r) => r.verdict.status === 'REPLACED').length,
+            removed: removedNumbers.size,
+            rejected: rejectedRefIds.size,
+            attempt: attempt + 1,
+            maxAttempts: maxRetries,
+            phase: 'replacing',
+          },
+        },
+      });
+
+      // Build feedback for LLM
+      const feedback = buildReferenceRetryFeedback({
+        references: references.map((r) => ({
+          id: r.id,
+          number: r.number,
+          title: r.title,
+          url: r.url,
+          doi: r.doi,
+        })),
+        verificationResults,
+        rejectedRefIds,
+        claimContexts,
+        requiredRefCount,
+      });
+
+      // Load the current (possibly cleaned) script for regeneration
+      const currentScript = await prisma.script.findUnique({ where: { podcastId } });
+      const currentRefs = await prisma.reference.findMany({
+        where: { podcastId },
+        orderBy: { number: 'asc' },
+      });
+
+      if (currentScript && discovery) {
+        const regenResult = await generateScriptWithFeedback({
+          topic: discovery.topic || podcast?.topic || '',
+          depth: discovery.depth || 'standard',
+          audienceLevel: discovery.audienceLevel || 'intermediate',
+          audience: discovery.audience || undefined,
+          focusAreas: discovery.focusAreas || [],
+          tone: discovery.tone || 'casual',
+          durationTarget: discovery.durationTarget || 10,
+          sourceContent: discovery.sourceContent || undefined,
+          sourceMetadata: discovery.sourceMetadata as Parameters<typeof generateScriptWithFeedback>[0]['sourceMetadata'],
+          speakers: discovery.speakers as Array<{ name: string; description: string }> | undefined,
+          previousScript: currentScript.turns as Array<{ speaker: string; text: string }>,
+          previousReferences: currentRefs.map((r) => ({
+            number: r.number,
+            title: r.title,
+            type: r.type,
+            url: r.url,
+            authors: r.authors,
+            year: r.year,
+            publisher: r.publisher,
+            doi: r.doi,
+          })),
+          verificationFeedback: feedback,
+          apiKeyOverride: aiKey?.apiKey,
+          model: verificationModel,
+          provider,
+          webSearchEnabled: true,
+        });
+
+        // Merge verified refs back into the regenerated output
+        const merged = mergeVerifiedReferences({
+          previousRefs: currentRefs.map((r) => ({
+            id: r.id,
+            number: r.number,
+            title: r.title,
+            url: r.url,
+            doi: r.doi,
+          })),
+          previousResults: verificationResults,
+          newRefs: regenResult.references.map((r) => ({
+            number: r.number,
+            title: r.title,
+            authors: r.authors,
+            year: r.year,
+            url: r.url,
+            doi: r.doi,
+            type: r.type,
+            publisher: r.publisher,
+          })),
+        });
+
+        // Save regenerated script
+        await prisma.script.update({
+          where: { podcastId },
+          data: {
+            turns: regenResult.turns,
+            markdown: regenResult.markdown,
+          },
+        });
+
+        // Replace all references with merged set
+        await prisma.reference.deleteMany({ where: { podcastId } });
+        if (merged.length > 0) {
+          await prisma.reference.createMany({
+            data: merged.map((r) => ({
+              podcastId,
+              number: r.number,
+              title: r.title,
+              authors: r.authors,
+              year: r.year,
+              url: r.url,
+              doi: r.doi,
+              type: r.type.toUpperCase() as 'WEB' | 'PAPER' | 'BOOK' | 'ARTICLE' | 'VIDEO' | 'REPORT',
+              publisher: r.publisher,
+              verificationStatus: r.isVerified ? 'VERIFIED' as const : 'PENDING' as const,
+            })),
+          });
+        }
+
+        // Log pipeline event
+        await logPipelineStageComplete(
+          podcastId,
+          'reference-validation-retry',
+          `Attempt ${attempt + 1}: ${verifiedCount} verified, regenerated ${merged.length} refs`
+        );
+
+        // Re-queue for next validation pass
+        await addJob(referenceValidationQueue, JobType.VALIDATE_REFERENCES, {
+          podcastId,
+          userId,
+          useAdminCredits,
+          referenceRetryAttempt: attempt + 1,
+          previousVerifiedCount: verifiedCount,
+        });
+        return;
+      }
+    }
+
+    // --- EXHAUSTED RETRIES (or going backward) — fall through to banner ---
+    if (goingBackward) {
+      logger.warn('Reference retry going backward — stopping', {
+        podcastId,
+        attempt: String(attempt),
+        currentVerified: String(verifiedCount),
+        previousVerified: String(previousVerifiedCount),
+      });
+    }
+
     logger.warn('References below minimum after validation — pausing at SCRIPT_READY', {
       podcastId,
       remaining: String(remainingRefCount),
       required: String(requiredRefCount),
       depth,
       removed: String(removedNumbers.size),
+      retriesExhausted: String(attempt >= maxRetries),
     });
+
+    // Compute failure details for the banner
+    const hallucinated = [...verificationResults.values()].filter(
+      (r) => r.verdict.status === 'REMOVED' && r.checks.some((c) => c.layer === 'ai' && !c.passed)
+    ).length;
+    const urlNotFound = [...verificationResults.values()].filter(
+      (r) => r.verdict.status === 'REMOVED' && r.checks.some((c) => c.layer === 'url' && !c.passed)
+    ).length;
+    const replacementFound = [...verificationResults.values()].filter(
+      (r) => r.verdict.status === 'REPLACED'
+    ).length;
 
     await prisma.podcast.update({
       where: { id: podcastId },
-      data: { status: 'SCRIPT_READY', lowReferences: true },
+      data: {
+        status: 'SCRIPT_READY',
+        lowReferences: true,
+        verificationProgress: {
+          total: references.length,
+          checked: references.length,
+          verified: verifiedCount,
+          replaced: replacementFound,
+          removed: removedNumbers.size,
+          rejected: rejectedRefIds.size,
+          attempt: attempt + 1,
+          maxAttempts: maxRetries,
+          phase: 'insufficient',
+          failureDetails: {
+            hallucinated,
+            blockedDomain: rejectedRefIds.size,
+            urlNotFound,
+            replacementFound,
+          },
+        },
+      },
     });
 
     await addJob(notificationQueue, JobType.SEND_NOTIFICATION, {
@@ -322,6 +561,24 @@ export async function processReferenceValidation(
     });
     return;
   }
+
+  // Write complete progress snapshot
+  await prisma.podcast.update({
+    where: { id: podcastId },
+    data: {
+      verificationProgress: {
+        total: references.length,
+        checked: references.length,
+        verified: verifiedCount,
+        replaced: [...verificationResults.values()].filter((r) => r.verdict.status === 'REPLACED').length,
+        removed: removedNumbers.size,
+        rejected: rejectedRefIds.size,
+        attempt: attempt + 1,
+        maxAttempts: MAX_REF_RETRY_ATTEMPTS[effectiveDepth] ?? 1,
+        phase: 'complete',
+      },
+    },
+  });
 
   await job.updateProgress(80);
 
@@ -343,7 +600,7 @@ export async function processReferenceValidation(
     // Pause for user review (Pro users get script review)
     await prisma.podcast.update({
       where: { id: podcastId },
-      data: { status: 'SCRIPT_READY' },
+      data: { status: 'SCRIPT_READY', verificationProgress: Prisma.DbNull },
     });
 
     await addJob(notificationQueue, JobType.SEND_NOTIFICATION, {
@@ -385,7 +642,7 @@ export async function processReferenceValidation(
 
     await prisma.podcast.update({
       where: { id: podcastId },
-      data: { status: 'GENERATING_AUDIO' },
+      data: { status: 'GENERATING_AUDIO', verificationProgress: Prisma.DbNull },
     });
 
     logger.info('References validated, auto-approved for audio generation', { podcastId });
@@ -394,9 +651,6 @@ export async function processReferenceValidation(
   await logPipelineStageComplete(podcastId, 'reference-validation');
   await job.updateProgress(100);
 
-  const verifiedCount = [...verificationResults.values()].filter(
-    (r) => r.verdict.status === 'VERIFIED'
-  ).length;
   const replacedCount = [...verificationResults.values()].filter(
     (r) => r.verdict.status === 'REPLACED'
   ).length;
