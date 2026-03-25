@@ -18,6 +18,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     where: { id: podcastId },
     select: {
       ...PODCAST_PUBLIC_SELECT,
+      verificationProgress: true,
       user: { select: { id: true, name: true, image: true } },
       tags: { include: { tag: true } },
       segments: { orderBy: { order: 'asc' } },

@@ -22,7 +22,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
   const podcast = await prisma.podcast.findUnique({
     where: { id: podcastId },
-    select: { userId: true, lowReferences: true },
+    select: { userId: true, lowReferences: true, verificationProgress: true },
   });
 
   if (!podcast) {
@@ -59,6 +59,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const depth = discovery?.depth ?? 'standard';
     response.lowReferences = true;
     response.requiredRefCount = MIN_REFERENCE_COUNTS[depth] ?? 5;
+    if (podcast.verificationProgress) {
+      response.verificationProgress = podcast.verificationProgress;
+    }
   }
 
   return NextResponse.json(response);
