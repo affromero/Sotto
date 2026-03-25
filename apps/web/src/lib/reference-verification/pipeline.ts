@@ -15,7 +15,7 @@ import {
   type ReplacementData,
 } from '@/lib/reference-validator';
 import { logger } from '@/lib/logger';
-import { extractClaimContexts } from './claim-extractor';
+import { extractClaimContexts, type ClaimContext } from './claim-extractor';
 import { aiEvaluateWithDomainContext } from './ai-layer';
 
 const MAX_CONCURRENT = 5;
@@ -63,7 +63,7 @@ export async function runReferenceVerification(
   apiKeyOverride?: string,
   model?: string,
   provider?: string
-): Promise<{ results: Map<string, VerificationResult>; rejectedRefIds: Set<string> }> {
+): Promise<{ results: Map<string, VerificationResult>; rejectedRefIds: Set<string>; claimContexts: Map<number, ClaimContext> }> {
   const results = new Map<string, VerificationResult>();
   const rejectedRefIds = new Set<string>();
 
@@ -192,5 +192,5 @@ export async function runReferenceVerification(
     results.set(ref.id, { domain, verdict, score: posterior, checks, logOddsContributions });
   }
 
-  return { results, rejectedRefIds };
+  return { results, rejectedRefIds, claimContexts };
 }
