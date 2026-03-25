@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { Check, AlertCircle, Pause, ShieldCheck } from 'lucide-react';
 import { useRotatingMessage } from '@/lib/hooks/useRotatingMessage';
 import { SottoSpinner } from '@/components/ui/SottoSpinner';
+import type { VerificationProgressSnapshot } from '@/types/podcast';
 import styles from './GenerationProgress.module.css';
 
 const VERIFICATION_STAGES = new Set(['VERIFYING_SCRIPT', 'VALIDATING_REFERENCES']);
@@ -13,6 +14,7 @@ interface GenerationProgressProps {
   progress?: number;
   error?: string;
   topic?: string;
+  verificationProgress?: VerificationProgressSnapshot | null;
 }
 
 const PIPELINE_STEPS = [
@@ -28,7 +30,20 @@ const PIPELINE_STEPS = [
 
 type StepState = 'completed' | 'current' | 'future' | 'error' | 'paused';
 
-export function GenerationProgress({ status, progress, error, topic }: GenerationProgressProps) {
+function getVerificationMessage(vp: VerificationProgressSnapshot): string | null {
+  if (vp.phase === 'checking' && vp.checked > 0) {
+    return `Checked ${vp.checked} of ${vp.total} references...`;
+  }
+  if (vp.phase === 'replacing') {
+    return `${vp.verified} verified, ${vp.removed + vp.rejected} need replacement — searching for better sources (attempt ${vp.attempt} of ${vp.maxAttempts})...`;
+  }
+  if (vp.phase === 'complete') {
+    return `All ${vp.total} references verified`;
+  }
+  return null;
+}
+
+export function GenerationProgress({ status, progress, error, topic, verificationProgress }: GenerationProgressProps) {
   const currentIndex = useMemo(
     () => PIPELINE_STEPS.findIndex((step) => step.key === status),
     [status]
@@ -52,11 +67,20 @@ export function GenerationProgress({ status, progress, error, topic }: Generatio
   const isActive = currentState === 'current';
   const isDone = currentStep?.key === 'READY';
 
-  const { message: subMessage, transitionKey } = useRotatingMessage({
+  const { message: rotatingMessage, transitionKey } = useRotatingMessage({
     status,
     topic,
     isActive,
   });
+
+  // Override sub-message and progress with real-time verification data
+  const vpMessage = verificationProgress && status === 'VALIDATING_REFERENCES'
+    ? getVerificationMessage(verificationProgress)
+    : null;
+  const subMessage = vpMessage ?? rotatingMessage;
+  const derivedProgress = verificationProgress && status === 'VALIDATING_REFERENCES' && verificationProgress.total > 0
+    ? Math.round((verificationProgress.checked / verificationProgress.total) * 100)
+    : progress;
 
   return (
     <div className={styles.root} role="progressbar" aria-label="Podcast generation progress">
@@ -86,8 +110,8 @@ export function GenerationProgress({ status, progress, error, topic }: Generatio
             <Pause size={24} strokeWidth={2} aria-hidden="true" />
           ) : isDone ? (
             <Check size={24} strokeWidth={2.5} aria-hidden="true" />
-          ) : progress !== undefined && isActive ? (
-            <span className={styles.orbPercent}>{Math.round(progress)}%</span>
+          ) : derivedProgress !== undefined && isActive ? (
+            <span className={styles.orbPercent}>{Math.round(derivedProgress)}%</span>
           ) : (
             <SottoSpinner className={styles.orbLottie} />
           )}
@@ -166,12 +190,12 @@ export function GenerationProgress({ status, progress, error, topic }: Generatio
       </ol>
 
       {/* Progress bar (when percentage is available) */}
-      {isActive && progress !== undefined && (
+      {isActive && derivedProgress !== undefined && (
         <div className={styles.progressWrap}>
           <div className={styles.progressTrack}>
             <div
               className={styles.progressFill}
-              style={{ width: `${Math.min(Math.max(progress, 0), 100)}%` }}
+              style={{ width: `${Math.min(Math.max(derivedProgress, 0), 100)}%` }}
             />
           </div>
         </div>

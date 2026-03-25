@@ -118,6 +118,24 @@ export interface CreatePodcastRequest {
   discoveryId: string;
 }
 
+export interface VerificationProgressSnapshot {
+  total: number;
+  checked: number;
+  verified: number;
+  replaced: number;
+  removed: number;
+  rejected: number;
+  attempt: number;
+  maxAttempts: number;
+  phase: 'checking' | 'replacing' | 'complete' | 'insufficient';
+  failureDetails?: {
+    hallucinated: number;
+    blockedDomain: number;
+    urlNotFound: number;
+    replacementFound: number;
+  };
+}
+
 export interface GeneratePodcastRequest {
   podcastId: string;
 }

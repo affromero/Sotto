@@ -71,6 +71,10 @@ export const STAGE_MESSAGES: Partial<Record<string, StageMessagePool>> = {
     late: [
       { text: 'A few more sources to validate', topicAware: false },
       { text: 'Almost done — every reference accounted for', topicAware: false },
+      { text: 'Finding verified sources for every claim', topicAware: false },
+      { text: 'Replacing unverifiable references with real ones', topicAware: false },
+      { text: 'Cross-checking sources against databases', topicAware: false },
+      { text: 'Making sure every citation leads somewhere real', topicAware: false },
     ],
   },
   GENERATING_AUDIO: {
