@@ -123,7 +123,7 @@ export function mergeVerifiedReferences(params: {
 
   const merged = newRefs.map((newRef) => {
     // Try to match against a verified previous ref
-    const match = findMatchingVerifiedRef(newRef, verifiedPrev, previousRefs);
+    const match = findMatchingVerifiedRef(newRef, verifiedPrev);
 
     if (match) {
       // Use DB version of verified ref with the new number
@@ -160,7 +160,6 @@ export function mergeVerifiedReferences(params: {
 function findMatchingVerifiedRef(
   newRef: { title: string; url?: string | null; doi?: string | null },
   verifiedPrev: Map<string, ReferenceRecord>,
-  allPrevRefs: ReferenceRecord[]
 ): ReferenceRecord | undefined {
   for (const prev of verifiedPrev.values()) {
     // Exact DOI match

@@ -195,7 +195,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
   const [lowReferences, setLowReferences] = useState(false);
   const [requiredRefCount, setRequiredRefCount] = useState(0);
   const [verificationProgress, setVerificationProgress] = useState<Record<string, unknown> | null>(
-    (podcast as Record<string, unknown>).verificationProgress as Record<string, unknown> | null ?? null
+    ('verificationProgress' in podcast ? (podcast as { verificationProgress?: Record<string, unknown> | null }).verificationProgress : null) ?? null
   );
   const [audioConfig, setAudioConfig] = useState<AudioConfig>({ voices: [] });
   const playerSectionRef = useRef<HTMLElement>(null);

@@ -6,6 +6,7 @@ import {
   notificationQueue,
   referenceValidationQueue,
 } from '@/lib/queue';
+import { Prisma } from '@prisma/client';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { type ReferenceInput } from '@/lib/reference-validator';
 import { runReferenceVerification, buildReferenceRetryFeedback, mergeVerifiedReferences } from '@/lib/reference-verification';
@@ -470,9 +471,9 @@ export async function processReferenceValidation(
               year: r.year,
               url: r.url,
               doi: r.doi,
-              type: r.type,
+              type: r.type.toUpperCase() as 'WEB' | 'PAPER' | 'BOOK' | 'ARTICLE' | 'VIDEO' | 'REPORT',
               publisher: r.publisher,
-              verificationStatus: r.isVerified ? 'VERIFIED' : 'PENDING',
+              verificationStatus: r.isVerified ? 'VERIFIED' as const : 'PENDING' as const,
             })),
           });
         }
@@ -599,7 +600,7 @@ export async function processReferenceValidation(
     // Pause for user review (Pro users get script review)
     await prisma.podcast.update({
       where: { id: podcastId },
-      data: { status: 'SCRIPT_READY', verificationProgress: null },
+      data: { status: 'SCRIPT_READY', verificationProgress: Prisma.DbNull },
     });
 
     await addJob(notificationQueue, JobType.SEND_NOTIFICATION, {
@@ -641,7 +642,7 @@ export async function processReferenceValidation(
 
     await prisma.podcast.update({
       where: { id: podcastId },
-      data: { status: 'GENERATING_AUDIO', verificationProgress: null },
+      data: { status: 'GENERATING_AUDIO', verificationProgress: Prisma.DbNull },
     });
 
     logger.info('References validated, auto-approved for audio generation', { podcastId });
