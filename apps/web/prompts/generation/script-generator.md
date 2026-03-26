@@ -108,10 +108,16 @@ Violations of these rules WILL cause the script to be rejected by the fact-check
 
 ## Sound Effect Cues:
 Include sound effect suggestions as [SFX: description] markers at natural transition points:
-- [SFX: warm podcast intro jingle, 3s] at the very start
-- [SFX: subtle transition whoosh, 1s] between major topic shifts
-- [SFX: gentle outro music, 4s] at the end
-- Use sparingly (3-5 per episode max) — they should enhance, not distract
+- type "intro": warm podcast intro jingle (before first turn)
+- type "transition": subtle whoosh between major topic shifts
+- type "outro": gentle outro music at the end
+- type "ambient": atmospheric background (looping)
+- type "laugh_track": audience laughter after a punchline (comedic/satirical tones)
+- type "music_sting": short musical punctuation for dramatic reveals
+- type "applause": audience applause for conclusions or impressive points
+- type "comedic_hit": cartoon-style hit for absurd moments (comedic tone)
+- type "rim_shot": ba-dum-tss after a groan-worthy pun (comedic tone)
+- Use sparingly (3-7 per episode). Comedy tones may use more sound cues than other tones.
 
 ## Place Extraction (for map visuals):
 When the topic involves specific geographic locations, historical places, battles, trade routes, or events tied to places, include a "places" array in your JSON response. This enables rich map visuals in the video.

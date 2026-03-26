@@ -1,11 +1,25 @@
 import { logger } from './logger';
 
+export type SfxType = 'intro' | 'transition' | 'outro' | 'ambient' | 'laugh_track' | 'music_sting' | 'applause' | 'comedic_hit' | 'rim_shot';
+
+const SFX_VOLUME_MAP: Record<SfxType, string> = {
+  intro: '0.4',
+  outro: '0.4',
+  transition: '0.3',
+  ambient: '0.15',
+  laugh_track: '0.35',
+  music_sting: '0.3',
+  applause: '0.3',
+  comedic_hit: '0.45',
+  rim_shot: '0.4',
+};
+
 export interface SfxInsert {
   path: string;
   insertAfterSegment: number; // index of the segment after which to insert SFX
   durationMs: number;
   delayMs?: number; // cumulative offset from start of speech track (computed by worker)
-  type: 'intro' | 'transition' | 'outro' | 'ambient';
+  type: SfxType;
 }
 
 /**
@@ -107,8 +121,7 @@ export async function stitchWithEffects(params: {
     for (let i = 0; i < sfxInserts.length; i++) {
       const sfxIdx = sfxStartIndex + i;
       const sfx = sfxInserts[i];
-      // Ambient SFX are quieter, intro/outro at moderate volume, transitions subtle
-      const volume = sfx.type === 'ambient' ? '0.15' : sfx.type === 'transition' ? '0.3' : '0.4';
+      const volume = SFX_VOLUME_MAP[sfx.type] ?? '0.3';
       filters.push(
         `[${sfxIdx}:a]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=mono,volume=${volume}[sfx${i}]`
       );
