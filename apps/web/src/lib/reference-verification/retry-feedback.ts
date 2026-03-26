@@ -6,8 +6,12 @@ interface ReferenceRecord {
   id: string;
   number: number;
   title: string;
+  authors: string[];
+  year: number | null;
   url: string | null;
   doi: string | null;
+  type: string;
+  publisher: string | null;
 }
 
 /**
@@ -130,12 +134,12 @@ export function mergeVerifiedReferences(params: {
       return {
         number: newRef.number,
         title: match.title,
-        authors: [] as string[], // Will be filled from DB record in worker
-        year: null as number | null,
+        authors: match.authors,
+        year: match.year,
         url: match.url,
         doi: match.doi,
-        type: 'article',
-        publisher: null as string | null,
+        type: match.type,
+        publisher: match.publisher,
         isVerified: true,
         matchedRefId: match.id,
       };

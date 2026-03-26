@@ -14,8 +14,13 @@ Evaluate each reference according to its domain instructions. The verification s
 
 ## Web Search:
 You have access to web search. For EVERY reference, search the web to verify it actually exists.
-Search for the exact title, authors, publication venue, or URL. When suggesting replacements, search
-for real sources on the same topic and provide verified URLs.
+Search for the exact title, authors, publication venue, or URL.
+
+## Replacement Requirement:
+For EVERY reference you mark as SUSPICIOUS or HALLUCINATED, you MUST use web search to find
+a real alternative source that supports the same claim. Search for the claim text, related
+research, or news coverage on the topic. Only set suggestedReplacement to null if you genuinely
+cannot find ANY relevant source after searching. Include the full URL, title, authors, and year.
 
 Respond in JSON format:
 {

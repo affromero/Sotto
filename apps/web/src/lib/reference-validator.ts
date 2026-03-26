@@ -10,7 +10,7 @@
 import { safeFetch } from './url-validator';
 
 export interface VerificationCheck {
-  layer: 'url' | 'doi' | 'title_search' | 'ai';
+  layer: 'url' | 'doi' | 'title_search' | 'ai' | 'grounding';
   passed: boolean;
   confidence: number;
   detail: string;

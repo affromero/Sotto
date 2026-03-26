@@ -382,8 +382,12 @@ export async function processReferenceValidation(
           id: r.id,
           number: r.number,
           title: r.title,
+          authors: r.authors,
+          year: r.year,
           url: r.url,
           doi: r.doi,
+          type: r.type,
+          publisher: r.publisher,
         })),
         verificationResults,
         rejectedRefIds,
@@ -434,8 +438,12 @@ export async function processReferenceValidation(
             id: r.id,
             number: r.number,
             title: r.title,
+            authors: r.authors,
+            year: r.year,
             url: r.url,
             doi: r.doi,
+            type: r.type,
+            publisher: r.publisher,
           })),
           previousResults: verificationResults,
           newRefs: regenResult.references.map((r) => ({
@@ -516,13 +524,21 @@ export async function processReferenceValidation(
       retriesExhausted: String(attempt >= maxRetries),
     });
 
-    // Compute failure details for the banner
-    const hallucinated = [...verificationResults.values()].filter(
-      (r) => r.verdict.status === 'REMOVED' && r.checks.some((c) => c.layer === 'ai' && !c.passed)
-    ).length;
-    const urlNotFound = [...verificationResults.values()].filter(
-      (r) => r.verdict.status === 'REMOVED' && r.checks.some((c) => c.layer === 'url' && !c.passed)
-    ).length;
+    // Compute failure details for the banner — mutually exclusive categories
+    const removedResults = [...verificationResults.values()].filter(
+      (r) => r.verdict.status === 'REMOVED'
+    );
+    let hallucinated = 0;
+    let urlNotFound = 0;
+    for (const r of removedResults) {
+      const aiFailed = r.checks.some((c) => c.layer === 'ai' && !c.passed);
+      const urlFailed = r.checks.some((c) => c.layer === 'url' && !c.passed);
+      if (aiFailed) {
+        hallucinated++;
+      } else if (urlFailed) {
+        urlNotFound++;
+      }
+    }
     const replacementFound = [...verificationResults.values()].filter(
       (r) => r.verdict.status === 'REPLACED'
     ).length;

@@ -17,6 +17,7 @@ import {
 import { logger } from '@/lib/logger';
 import { extractClaimContexts, type ClaimContext } from './claim-extractor';
 import { aiEvaluateWithDomainContext } from './ai-layer';
+import { groundFailedReferences, type GroundingInput } from './grounding';
 
 const MAX_CONCURRENT = 5;
 
@@ -40,7 +41,7 @@ async function runWithConcurrencyLimit<T>(
 }
 
 function findBestReplacement(checks: VerificationCheck[]): ReplacementData | undefined {
-  const priority: Array<'doi' | 'title_search' | 'ai'> = ['doi', 'title_search', 'ai'];
+  const priority: Array<'doi' | 'title_search' | 'grounding' | 'ai'> = ['doi', 'title_search', 'grounding', 'ai'];
   for (const layer of priority) {
     const check = checks.find((c) => c.layer === layer && c.replacement);
     if (check?.replacement) return check.replacement;
@@ -161,17 +162,36 @@ export async function runReferenceVerification(
     allChecks.set(refId, existing);
   }
 
+  // Grounding step: search for real sources for refs where all checks failed
+  const groundingInputs: GroundingInput[] = acceptedRefs.map((ref) => ({
+    ref,
+    domain: domainMap.get(ref.id)!,
+    claimContext: claimContexts.get(ref.number) ?? { sentences: [], speakerTurns: [] },
+    allChecks: allChecks.get(ref.id) ?? [],
+  }));
+  const groundingResults = await groundFailedReferences(
+    groundingInputs, topic, apiKeyOverride, model, provider
+  );
+  for (const [refId, check] of groundingResults) {
+    const existing = allChecks.get(refId) ?? [];
+    existing.push(check);
+    allChecks.set(refId, existing);
+  }
+
   // Compute domain-aware verdicts
   for (const ref of acceptedRefs) {
     const domain = domainMap.get(ref.id)!;
     const checks = allChecks.get(ref.id) ?? [];
 
     // Convert VerificationCheck[] → LayerResult[] for Bayesian scoring
-    const layerResults: LayerResult[] = checks.map((c) => ({
-      layerId: c.layer as LayerResult['layerId'],
-      passed: c.passed,
-      confidence: c.confidence,
-    }));
+    // Filter out grounding layer — it only provides replacement data, not a scoring signal
+    const layerResults: LayerResult[] = checks
+      .filter((c) => c.layer !== 'grounding')
+      .map((c) => ({
+        layerId: c.layer as LayerResult['layerId'],
+        passed: c.passed,
+        confidence: c.confidence,
+      }));
 
     const { posterior, verdict: rawVerdict, logOddsContributions } = computeBayesianScore(domain, layerResults);
 
