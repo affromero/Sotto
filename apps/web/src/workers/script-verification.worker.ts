@@ -10,6 +10,7 @@ import {
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { Prisma } from '@prisma/client';
 import { markPodcastFailed } from '@/lib/pipeline-resume';
+import { invalidatePodcastCache, publishPodcastStatus } from '@/lib/redis';
 import { verifyScript, type ClaimAnalysis } from '@/lib/script-verifier';
 import {
   generateScriptWithFeedback,
@@ -249,6 +250,8 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
         where: { id: podcastId },
         data: { status: 'VALIDATING_REFERENCES' },
       });
+      await invalidatePodcastCache(podcastId);
+      await publishPodcastStatus(podcastId, { status: 'VALIDATING_REFERENCES' });
 
       await addJob(referenceValidationQueue, JobType.VALIDATE_REFERENCES, {
         podcastId,
@@ -274,6 +277,8 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
           where: { id: podcastId },
           data: { status: 'SCRIPT_READY' },
         });
+        await invalidatePodcastCache(podcastId);
+        await publishPodcastStatus(podcastId, { status: 'SCRIPT_READY' });
 
         await addJob(notificationQueue, JobType.SEND_NOTIFICATION, {
           userId,
@@ -319,6 +324,8 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
           where: { id: podcastId },
           data: { status: 'GENERATING_AUDIO' },
         });
+        await invalidatePodcastCache(podcastId);
+        await publishPodcastStatus(podcastId, { status: 'GENERATING_AUDIO' });
 
         logger.info('Script verified (no refs), auto-approved for audio generation', { podcastId });
       }

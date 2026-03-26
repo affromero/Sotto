@@ -5,6 +5,7 @@ import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { extractContent } from '@/lib/extractors';
 import { assessTopicFeasibility } from '@/lib/topic-assessor';
 import { markPodcastFailed } from '@/lib/pipeline-resume';
+import { invalidatePodcastCache, publishPodcastStatus } from '@/lib/redis';
 import { logUsage } from '@/lib/usage-logger';
 import { getAiKey } from '@/lib/byok';
 import { resolveAiModelAndProvider } from '@/lib/providers/ai-registry';
@@ -31,6 +32,8 @@ export async function processContentExtraction(job: Job<ExtractContentPayload>):
       where: { id: podcastId },
       data: { status: 'SCRIPTING' },
     });
+    await invalidatePodcastCache(podcastId);
+    await publishPodcastStatus(podcastId, { status: 'SCRIPTING' });
 
     await addJob(scriptGenerationQueue, JobType.GENERATE_SCRIPT, {
       podcastId,
@@ -172,6 +175,8 @@ export async function processContentExtraction(job: Job<ExtractContentPayload>):
     where: { id: podcastId },
     data: { status: 'SCRIPTING' },
   });
+  await invalidatePodcastCache(podcastId);
+  await publishPodcastStatus(podcastId, { status: 'SCRIPTING' });
 
   // Chain to script generation
   await addJob(scriptGenerationQueue, JobType.GENERATE_SCRIPT, {

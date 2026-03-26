@@ -8,28 +8,41 @@ import { PODCAST_PUBLIC_SELECT } from '@/lib/podcast-select';
 import { resolveAudioUrl } from '@/lib/r2';
 import { generatePodcastSlug } from '@/lib/slugify';
 import { errorResponse } from '@/lib/api-response';
+import { cache, getPodcastCacheTtl } from '@/lib/redis';
 type RouteParams = { params: Promise<{ podcastId: string }> };
 
 export async function GET(request: NextRequest, { params }: RouteParams) {
   const { podcastId } = await params;
   const authResult = await authenticateRequest(request);
 
-  const podcast = await prisma.podcast.findUnique({
-    where: { id: podcastId },
-    select: {
-      ...PODCAST_PUBLIC_SELECT,
-      verificationProgress: true,
-      user: { select: { id: true, name: true, image: true } },
-      tags: { include: { tag: true } },
-      segments: { orderBy: { order: 'asc' } },
-      interactions: {
-        orderBy: { createdAt: 'desc' },
-        include: {
-          user: { select: { id: true, name: true, image: true } },
+  // Try Redis cache first (shared, non-user-specific data)
+  const cacheKey = `podcast:public:${podcastId}`;
+  type CachedPodcast = Awaited<ReturnType<typeof prisma.podcast.findUnique>>;
+  let podcast = await cache.get<CachedPodcast>(cacheKey);
+
+  if (!podcast) {
+    podcast = await prisma.podcast.findUnique({
+      where: { id: podcastId },
+      select: {
+        ...PODCAST_PUBLIC_SELECT,
+        verificationProgress: true,
+        user: { select: { id: true, name: true, image: true } },
+        tags: { include: { tag: true } },
+        segments: { orderBy: { order: 'asc' } },
+        interactions: {
+          orderBy: { createdAt: 'desc' },
+          include: {
+            user: { select: { id: true, name: true, image: true } },
+          },
         },
       },
-    },
-  });
+    });
+
+    if (podcast) {
+      const ttl = getPodcastCacheTtl(podcast.status);
+      await cache.set(cacheKey, podcast, ttl);
+    }
+  }
 
   if (!podcast) {
     return errorResponse('Podcast not found', 404);
@@ -42,7 +55,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }
   }
 
-  // Check if the authenticated user has liked/saved this podcast
+  // Per-user fields fetched separately (cheap, not cached)
   let isLiked = false;
   let isSaved = false;
 

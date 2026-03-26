@@ -13,6 +13,7 @@ import {
   waveformGenerationQueue,
   quizGenerationQueue,
 } from '@/lib/queue';
+import { invalidatePodcastCache, publishPodcastStatus } from '@/lib/redis';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { markPodcastFailed } from '@/lib/pipeline-resume';
 import { downloadToFile, uploadPodcastAudio } from '@/lib/r2';
@@ -413,6 +414,8 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
         currentVersion: newVersion,
       },
     });
+    await invalidatePodcastCache(podcastId);
+    await publishPodcastStatus(podcastId, { status: 'READY' });
 
     // Consume free-tier quota on successful generation (not at creation time)
     const podcastUser = await prisma.user.findUniqueOrThrow({
