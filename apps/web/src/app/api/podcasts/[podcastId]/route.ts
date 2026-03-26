@@ -77,7 +77,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   const [resolvedAudioUrl, resolvedSegments] = await Promise.all([
     resolveAudioUrl(podcast.audioUrl, podcast.visibility),
     Promise.all(
-      podcast.segments.map(async (s) => ({
+      podcast.segments.map(async (s: Record<string, unknown>) => ({
         ...s,
         audioUrl: await resolveAudioUrl(s.audioUrl, podcast.visibility),
       }))
