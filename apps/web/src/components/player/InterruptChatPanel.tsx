@@ -73,6 +73,7 @@ export function InterruptChatPanel({
 
       // Poll for answer
       pollRef.current = setInterval(async () => {
+        if (document.visibilityState === 'hidden') return;
         try {
           const pollRes = await fetch(`/api/podcasts/${podcastId}/interact/${data.id}`);
           if (!pollRes.ok) return;
@@ -88,7 +89,7 @@ export function InterruptChatPanel({
         } catch {
           // Silently retry on next interval
         }
-      }, 2000);
+      }, 5000);
 
       // Safety timeout: stop polling after 60s
       setTimeout(() => {

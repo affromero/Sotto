@@ -162,7 +162,10 @@ export function MusicGenerator({ podcastId, onMusicReady, onMusicRemoved, isOpen
   // Poll while any generation is in progress
   useEffect(() => {
     if (!hasInProgress) return;
-    const interval = setInterval(poll, 5000);
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'hidden') return;
+      poll();
+    }, 10000);
     return () => clearInterval(interval);
   }, [hasInProgress, poll]);
 

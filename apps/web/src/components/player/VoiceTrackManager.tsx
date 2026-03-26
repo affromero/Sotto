@@ -73,6 +73,7 @@ export function VoiceTrackManager({
     if (!inProgress) return;
 
     const interval = setInterval(async () => {
+      if (document.visibilityState === 'hidden') return;
       try {
         const res = await fetch(`/api/podcasts/${podcastId}/voice-tracks`);
         if (res.ok) {
@@ -80,7 +81,7 @@ export function VoiceTrackManager({
           setTracks(updated);
         }
       } catch { /* ignore polling errors */ }
-    }, 5000);
+    }, 10000);
 
     return () => clearInterval(interval);
   }, [tracks, podcastId]);

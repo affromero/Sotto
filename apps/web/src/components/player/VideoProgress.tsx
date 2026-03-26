@@ -210,8 +210,13 @@ export function VideoProgress({ podcastId, videoGenerationId, voiceTrackId, onCo
         return;
       }
 
-      // Adaptive polling interval
-      const interval = json.status === 'GENERATING_VISUALS' || json.status === 'GENERATING_TRANSITIONS' ? 3000 : 5000;
+      // Adaptive polling interval (skip if tab is hidden)
+      if (document.visibilityState === 'hidden') {
+        const resume = () => { schedulePoll(0); document.removeEventListener('visibilitychange', resume); };
+        document.addEventListener('visibilitychange', resume);
+        return;
+      }
+      const interval = json.status === 'GENERATING_VISUALS' || json.status === 'GENERATING_TRANSITIONS' ? 5000 : 10000;
       schedulePoll(interval);
     } catch {
       schedulePoll(5000);

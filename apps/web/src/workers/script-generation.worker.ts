@@ -7,6 +7,7 @@ import { logUsage } from '@/lib/usage-logger';
 import { getAiKey, hasByokKey } from '@/lib/byok';
 import { resolveAiModelAndProvider } from '@/lib/providers/ai-registry';
 import { detectLanguage } from '@/lib/language-detect';
+import { invalidatePodcastCache, publishPodcastStatus } from '@/lib/redis';
 import { matchTopicTags, TAG_PARENT_MAP } from '@/lib/topic-tagger';
 import { getTierFeatures } from '@/lib/tier-features';
 import { logger } from '@/lib/logger';
@@ -31,6 +32,8 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
       where: { id: podcastId },
       data: { status: 'VERIFYING_SCRIPT' },
     });
+    await invalidatePodcastCache(podcastId);
+    await publishPodcastStatus(podcastId, { status: 'VERIFYING_SCRIPT' });
 
     await addJob(scriptVerificationQueue, JobType.VERIFY_SCRIPT, {
       podcastId,
@@ -255,6 +258,8 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
       language: detectedLanguage ?? undefined,
     },
   });
+  await invalidatePodcastCache(podcastId);
+  await publishPodcastStatus(podcastId, { status: 'VERIFYING_SCRIPT' });
 
   await addJob(scriptVerificationQueue, JobType.VERIFY_SCRIPT, {
     podcastId,

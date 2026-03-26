@@ -8,6 +8,7 @@ import { logUsage } from '@/lib/usage-logger';
 import { uploadSegmentAudio } from '@/lib/r2';
 import { getAudioDuration } from '@/lib/audio-stitcher';
 import { cleanTextForTts } from '@/lib/tts-text-cleaner';
+import { invalidatePodcastCache, publishPodcastStatus } from '@/lib/redis';
 import { estimateDurationFromText } from '@/lib/duration';
 import type { VoiceMatchMetadata } from '@/lib/voice-pool';
 import { logger } from '@/lib/logger';
@@ -192,6 +193,8 @@ export async function processSegmentRegeneration(
     where: { id: podcastId },
     data: { status: 'STITCHING' },
   });
+  await invalidatePodcastCache(podcastId);
+  await publishPodcastStatus(podcastId, { status: 'STITCHING' });
 
   await job.updateProgress(100);
   logger.info('Segment regeneration complete, queued re-stitch', {

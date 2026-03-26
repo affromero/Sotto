@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { authenticateRequest } from '@/lib/api-keys';
 import { addJob, JobType, scriptGenerationQueue } from '@/lib/queue';
-import { checkRateLimit } from '@/lib/redis';
+import { checkRateLimit, invalidatePodcastCache, publishPodcastStatus } from '@/lib/redis';
 import { checkGenerationGate } from '@/lib/generation-gate';
 import { regenerateWithFeedbackSchema } from '@/lib/validations';
 import { formatUserFeedback } from '@/lib/feedback-formatter';
@@ -125,6 +125,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     where: { id: podcastId },
     data: { status: 'SCRIPTING', lowReferences: false },
   });
+  await invalidatePodcastCache(podcastId);
+  await publishPodcastStatus(podcastId, { status: 'SCRIPTING' });
 
   await addJob(scriptGenerationQueue, JobType.GENERATE_SCRIPT, {
     podcastId,

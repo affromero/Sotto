@@ -1,5 +1,5 @@
 import { ConnectionOptions, Queue, Worker, Job } from 'bullmq';
-import { createRedisConnection, getSharedQueueRedisClient } from './redis';
+import { createRedisConnection, getSharedQueueRedisClient, cache } from './redis';
 import { logger } from './logger';
 import { prismaUnfiltered as prisma } from './prisma';
 import { markPodcastFailed } from './pipeline-resume';
@@ -9,6 +9,19 @@ import type { AiProviderId } from './providers/ai-registry';
 import type { TtsProviderId } from './providers/tts-registry';
 import type { SttProviderId } from '@sotto/shared';
 import { sendMessage as sendTelegram, isTelegramBotConfigured } from './telegram';
+
+/** Cached admin user lookup — avoids hitting DB on every worker failure. */
+async function getCachedAdminUsers(): Promise<Array<{ id: string; telegramChatId: string | null }>> {
+  const cacheKey = 'admin_users';
+  const cached = await cache.get<Array<{ id: string; telegramChatId: string | null }>>(cacheKey);
+  if (cached) return cached;
+  const admins = await prisma.user.findMany({
+    where: { role: 'ADMIN' },
+    select: { id: true, telegramChatId: true },
+  });
+  await cache.set(cacheKey, admins, 3600);
+  return admins;
+}
 
 /**
  * Job types for the Sotto queue system
@@ -672,10 +685,8 @@ async function handleWorkerFailure(
       }
 
       const podcastLabel = podcast.title || podcastId;
-      const adminUsers = await prisma.user.findMany({
-        where: { role: 'ADMIN', id: { not: podcast.userId } },
-        select: { id: true, telegramChatId: true },
-      });
+      const allAdmins = await getCachedAdminUsers();
+      const adminUsers = allAdmins.filter((a) => a.id !== podcast.userId);
       for (const admin of adminUsers) {
         if (notifQueue) {
           notifQueue.add('send_notification', {
