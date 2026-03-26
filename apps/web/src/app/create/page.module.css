@@ -379,6 +379,31 @@
   color: var(--color-primary);
 }
 
+.cancelGeneration {
+  display: block;
+  margin: var(--spacing-sm) auto 0;
+  padding: var(--spacing-xs) var(--spacing-md);
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  min-height: 44px;
+  min-width: 44px;
+}
+
+.cancelGeneration:hover {
+  border-color: var(--color-text-secondary);
+  color: var(--color-text);
+}
+
+.cancelGeneration:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 @media (min-width: 769px) {
   .header {
     padding: var(--spacing-lg) var(--spacing-lg) 0;
