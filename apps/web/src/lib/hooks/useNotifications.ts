@@ -10,6 +10,8 @@ const FALLBACK_POLL_INTERVAL_MS = 60_000;
 
 interface UseNotificationsOptions {
   onNewNotifications?: (notifications: NotificationData[]) => void;
+  /** When false, skip all fetching/SSE/polling and return static empty state. Default: true */
+  enabled?: boolean;
 }
 
 interface UseNotificationsReturn {
@@ -23,7 +25,23 @@ interface UseNotificationsReturn {
   prepend: (notification: NotificationData) => void;
 }
 
+const DISABLED_NOOP_MARK_READ = async () => {};
+const DISABLED_NOOP_MARK_ALL = async () => {};
+const DISABLED_NOOP_REFRESH = async () => {};
+const DISABLED_NOOP_PREPEND = () => {};
+
+const DISABLED_RETURN: UseNotificationsReturn = {
+  notifications: [],
+  unreadCount: 0,
+  isLoading: false,
+  markRead: DISABLED_NOOP_MARK_READ,
+  markAllRead: DISABLED_NOOP_MARK_ALL,
+  refresh: DISABLED_NOOP_REFRESH,
+  prepend: DISABLED_NOOP_PREPEND,
+};
+
 export function useNotifications(options?: UseNotificationsOptions): UseNotificationsReturn {
+  const enabled = options?.enabled ?? true;
   const [notifications, setNotifications] = useState<NotificationData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -70,6 +88,7 @@ export function useNotifications(options?: UseNotificationsOptions): UseNotifica
 
   // SSE connection for real-time notifications
   useEffect(() => {
+    if (!enabled) return;
     if (typeof window === 'undefined' || typeof EventSource === 'undefined') return;
 
     let es: EventSource | null = null;
@@ -129,10 +148,11 @@ export function useNotifications(options?: UseNotificationsOptions): UseNotifica
       es?.close();
       if (reconnectTimeout) clearTimeout(reconnectTimeout);
     };
-  }, [fetchNotifications, prepend]);
+  }, [enabled, fetchNotifications, prepend]);
 
   // Initial fetch + polling (SSE effect may adjust the interval)
   useEffect(() => {
+    if (!enabled) return;
     fetchNotifications();
 
     intervalRef.current = setInterval(fetchNotifications, FALLBACK_POLL_INTERVAL_MS);
@@ -142,7 +162,7 @@ export function useNotifications(options?: UseNotificationsOptions): UseNotifica
         clearInterval(intervalRef.current);
       }
     };
-  }, [fetchNotifications]);
+  }, [enabled, fetchNotifications]);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
@@ -187,6 +207,8 @@ export function useNotifications(options?: UseNotificationsOptions): UseNotifica
     setIsLoading(true);
     await fetchNotifications();
   }, [fetchNotifications]);
+
+  if (!enabled) return DISABLED_RETURN;
 
   return { notifications, unreadCount, isLoading, markRead, markAllRead, refresh, prepend };
 }
