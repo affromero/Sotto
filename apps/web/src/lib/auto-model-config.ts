@@ -145,11 +145,20 @@ const SEEDS = {
  * Self-heals orphaned model/provider pairs in existing rows.
  */
 export async function getAutoModelConfig(): Promise<AutoModelConfigData> {
-  const row = await prisma.autoModelConfig.upsert({
+  let row = await prisma.autoModelConfig.findUnique({
     where: { id: 'singleton' },
-    update: {},
-    create: { id: 'singleton', ...SEEDS },
   });
+  if (!row) {
+    try {
+      row = await prisma.autoModelConfig.create({
+        data: { id: 'singleton', ...SEEDS },
+      });
+    } catch {
+      // Another request may have created it first — read it
+      row = await prisma.autoModelConfig.findUnique({ where: { id: 'singleton' } });
+      if (!row) throw new Error('AutoModelConfig singleton missing after create race');
+    }
+  }
 
   // Detect and fix orphaned model/provider pairs in existing rows
   const repairs: Record<string, string> = {};

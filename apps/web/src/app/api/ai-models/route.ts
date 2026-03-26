@@ -8,6 +8,8 @@ import { prisma } from '@/lib/prisma';
 
 import { errorResponse } from '@/lib/api-response';
 
+const CACHE_HEADERS = { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=300' };
+
 const TIER_GROUP_LABELS: Record<string, string> = {
   fast: 'Quick generation',
   balanced: 'Balanced',
@@ -77,7 +79,7 @@ export async function GET(request: NextRequest) {
         userPlan: 'PRO',
         isByok: false,
         models: [...platformModels, ...claudeCodeModels],
-      });
+      }, { headers: CACHE_HEADERS });
     }
 
     // Free/Pro non-BYOK: filter to only included models with dynamic requiredPlan
@@ -107,7 +109,7 @@ export async function GET(request: NextRequest) {
       userPlan,
       isByok: false,
       models: platformModels,
-    });
+    }, { headers: CACHE_HEADERS });
   }
 
   // BYOK keys present — show models for every valid provider, grouped by quality tier
@@ -138,5 +140,5 @@ export async function GET(request: NextRequest) {
     userPlan,
     isByok: true,
     models: isAdmin ? [...byokModels, ...claudeCodeModels] : byokModels,
-  });
+  }, { headers: CACHE_HEADERS });
 }
