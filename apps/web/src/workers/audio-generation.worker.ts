@@ -265,7 +265,10 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
       where: { id: podcastId, status: 'GENERATING_AUDIO' },
       data: { status: 'STITCHING' },
     });
-    if (cas.count === 0) {
+    if (cas.count > 0) {
+      await invalidatePodcastCache(podcastId);
+      await publishPodcastStatus(podcastId, { status: 'STITCHING' });
+    } else {
       logger.info('Another worker already transitioned to STITCHING', { podcastId });
     }
   }
