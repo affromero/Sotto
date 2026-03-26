@@ -1,0 +1,98 @@
+/* Create page loading skeleton */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
+  min-height: var(--full-height);
+}
+
+.bone {
+  background: var(--color-border);
+  border-radius: var(--radius-md);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* Header */
+.header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md) var(--spacing-md) 0;
+}
+
+.backButton {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-full);
+  flex-shrink: 0;
+}
+
+.titleBlock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.title {
+  width: 200px;
+  height: 24px;
+}
+
+.subtitle {
+  width: 300px;
+  height: 16px;
+  max-width: 100%;
+}
+
+/* Tab toggle */
+.tabRow {
+  display: flex;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md) var(--spacing-md) 0;
+}
+
+.tab {
+  width: 80px;
+  height: 36px;
+  border-radius: var(--radius-full);
+}
+
+/* Chat area */
+.chatArea {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md);
+}
+
+.messageBone {
+  width: 70%;
+  height: 48px;
+  border-radius: var(--radius-lg);
+}
+
+.messageBoneShort {
+  width: 50%;
+  height: 36px;
+  border-radius: var(--radius-lg);
+  align-self: flex-end;
+}
+
+/* Input bar */
+.inputBar {
+  height: 52px;
+  border-radius: var(--radius-xl);
+  margin: 0 var(--spacing-md) var(--spacing-md);
+}
+
+/* Staggered animation delays */
+.delay1 { animation-delay: 100ms; }
+.delay2 { animation-delay: 200ms; }
+.delay3 { animation-delay: 300ms; }
+.delay4 { animation-delay: 400ms; }

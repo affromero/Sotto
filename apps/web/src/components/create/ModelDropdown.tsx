@@ -71,7 +71,14 @@ export function ModelDropdown({
     return () => document.removeEventListener('keydown', handleKey);
   }, [isOpen]);
 
-  if (loading || options.length === 0) return null;
+  if (loading) {
+    return (
+      <div className={styles.container}>
+        <div className={styles.skeleton} aria-hidden="true" />
+      </div>
+    );
+  }
+  if (options.length === 0) return null;
 
   const selected = options.find((o) => o.id === value) ?? options[0];
 

@@ -5,6 +5,8 @@ import { getAutoModelConfig, resolveSttIncludedModels } from '@/lib/auto-model-c
 import { getAllSttProviderMeta } from '@/lib/providers/stt-registry';
 import { prisma } from '@/lib/prisma';
 
+const CACHE_HEADERS = { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=300' };
+
 interface SttProviderInfo {
   id: string;
   displayName: string;
@@ -56,34 +58,28 @@ export async function GET() {
     const userId = session.user.id;
     const isAdmin = session.user.role === 'ADMIN';
 
-    // OpenAI Whisper: BYOK key, or platform key (admin only)
-    const hasOpenAi =
-      (await getAiKey(userId, 'openai')) !== null ||
-      (isAdmin && !!process.env.OPENAI_API_KEY);
+    // Check all provider keys in parallel
+    const [openAiKey, elevenLabsKey, togetherKey, deepgramKey, assemblyAiKey] = await Promise.all([
+      getAiKey(userId, 'openai'),
+      getByokKey(userId, 'elevenlabs'),
+      getAiKey(userId, 'together'),
+      getAiKey(userId, 'deepgram'),
+      getAiKey(userId, 'assemblyai'),
+    ]);
+
+    const hasOpenAi = openAiKey !== null || (isAdmin && !!process.env.OPENAI_API_KEY);
     if (hasOpenAi) configuredProviders.push('openai');
 
-    // ElevenLabs Scribe: BYOK key, or platform key (admin only)
-    const hasElevenLabs =
-      (await getByokKey(userId, 'elevenlabs')) !== null ||
-      (isAdmin && !!process.env.ELEVENLABS_API_KEY);
+    const hasElevenLabs = elevenLabsKey !== null || (isAdmin && !!process.env.ELEVENLABS_API_KEY);
     if (hasElevenLabs) configuredProviders.push('elevenlabs');
 
-    // Together AI Whisper: BYOK key, or platform key (admin only)
-    const hasTogether =
-      (await getAiKey(userId, 'together')) !== null ||
-      (isAdmin && !!process.env.TOGETHER_API_KEY);
+    const hasTogether = togetherKey !== null || (isAdmin && !!process.env.TOGETHER_API_KEY);
     if (hasTogether) configuredProviders.push('together');
 
-    // Deepgram: BYOK key, or platform key (admin only)
-    const hasDeepgram =
-      (await getAiKey(userId, 'deepgram')) !== null ||
-      (isAdmin && !!process.env.DEEPGRAM_API_KEY);
+    const hasDeepgram = deepgramKey !== null || (isAdmin && !!process.env.DEEPGRAM_API_KEY);
     if (hasDeepgram) configuredProviders.push('deepgram');
 
-    // AssemblyAI: BYOK key, or platform key (admin only)
-    const hasAssemblyAi =
-      (await getAiKey(userId, 'assemblyai')) !== null ||
-      (isAdmin && !!process.env.ASSEMBLYAI_API_KEY);
+    const hasAssemblyAi = assemblyAiKey !== null || (isAdmin && !!process.env.ASSEMBLYAI_API_KEY);
     if (hasAssemblyAi) configuredProviders.push('assemblyai');
 
     // Check if any BYOK keys exist (AI keys that double as STT keys)
@@ -120,9 +116,9 @@ export async function GET() {
         userPlan,
         isByok: false,
         includedModels,
-      });
+      }, { headers: CACHE_HEADERS });
     }
   }
 
-  return NextResponse.json({ providers: STT_PROVIDERS, configuredProviders });
+  return NextResponse.json({ providers: STT_PROVIDERS, configuredProviders }, { headers: CACHE_HEADERS });
 }
