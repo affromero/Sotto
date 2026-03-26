@@ -181,10 +181,10 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
       throw new Error(`No segments found for podcast ${podcastId}`);
     }
 
-    // 2. Fetch the script for sound cues
+    // 2. Fetch the script for sound cues and turn text (for audience reactions)
     const script = await prisma.script.findUnique({
       where: { podcastId },
-      select: { soundCues: true },
+      select: { soundCues: true, turns: true },
     });
 
     const soundCues = (script?.soundCues ?? []) as SoundCue[];
@@ -279,6 +279,34 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
       // Update progress: SFX generation is 50-65%
       const sfxProgress = 50 + Math.round((i / soundCues.length) * 15);
       await job.updateProgress(sfxProgress);
+    }
+
+    // 5b. Extract inline audience reactions from turn text and convert to SFX inserts
+    if (!skipSfx) {
+      const turns = (script?.turns ?? []) as Array<{ text: string }>;
+      const { extractAudienceReactions } = await import('@/lib/tts-text-cleaner');
+
+      for (let i = 0; i < turns.length && i < segments.length; i++) {
+        const reactions = extractAudienceReactions(turns[i].text);
+        for (const reaction of reactions) {
+          const delayMs = Math.round(cumulativeDurations[i] ?? 0);
+          const stockFile = STOCK_SFX[reaction.type];
+          if (stockFile) {
+            const reactionPath = path.join(tmpDir, `reaction-${i}-${reaction.type}.mp3`);
+            const stockPath = path.resolve(__dirname, '..', 'assets', 'sfx', stockFile);
+            const { copyFile } = await import('fs/promises');
+            await copyFile(stockPath, reactionPath);
+            sfxInserts.push({
+              path: reactionPath,
+              insertAfterSegment: i,
+              durationMs: 2000,
+              delayMs,
+              type: reaction.type,
+              volume: 0.3,
+            });
+          }
+        }
+      }
     }
 
     await job.updateProgress(65);

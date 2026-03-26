@@ -25,6 +25,12 @@ Use SPARINGLY — at most 1-2 per turn, only when the emotion genuinely fits.
 Example: "Wait, really? [laughs] That's incredible."
 These go inline in the text field, NOT in the direction field.
 
+### Audience Reaction Tags (comedic/satirical tones):
+- [audience laughs] — audience laughter after a punchline (auto-converted to SFX, not spoken by TTS)
+- [applause] — audience applause for a strong conclusion or impressive point (auto-converted to SFX)
+These are DISTINCT from speaker-level [laughs] — they represent crowd reactions, not the speaker laughing.
+Use after the punchline text, e.g.: "And that's why the CEO resigned. [audience laughs]"
+
 ## Direction Field:
 The "direction" field on each turn controls vocal delivery style. Use it when the delivery should notably shift from conversational default. Well-supported values:
 energetic, excited, thoughtful, serious, playful, sarcastic, warm, urgent, hesitant, confident, nostalgic, dramatic, calm, curious, laughing, chuckling, giggling, whispering, frustrated, surprised, sad, skeptical
