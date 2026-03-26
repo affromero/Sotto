@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { usePodcastStatus } from '@/lib/hooks/usePodcastStatus';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
@@ -307,29 +308,21 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
       .catch(() => {});
   }, [needsScript, isOwner, podcast.id]);
 
-  // Poll for status updates while podcast is processing
-  useEffect(() => {
-    if (liveStatus === 'READY' || liveStatus === 'FAILED' || liveStatus === 'SCRIPT_READY') return;
-
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/podcasts/${podcast.id}`);
-        if (!res.ok) return;
-        const data = await res.json();
-        setLiveStatus(data.status);
-        if (data.verificationProgress) {
-          setVerificationProgress(data.verificationProgress as Record<string, unknown>);
-        }
-        if (data.status === 'READY') {
-          router.refresh();
-        }
-      } catch {
-        // Silently retry next interval
+  // SSE-based status watching while podcast is processing
+  const isProcessing = liveStatus !== 'READY' && liveStatus !== 'FAILED' && liveStatus !== 'SCRIPT_READY';
+  usePodcastStatus({
+    podcastId: isProcessing ? podcast.id : null,
+    initialStatus: liveStatus,
+    onStatusChange: useCallback((event) => {
+      setLiveStatus(event.status);
+      if (event.verificationProgress) {
+        setVerificationProgress(event.verificationProgress as Record<string, unknown>);
       }
-    }, 3000);
-
-    return () => clearInterval(interval);
-  }, [podcast.id, liveStatus, router]);
+      if (event.status === 'READY') {
+        router.refresh();
+      }
+    }, [router]),
+  });
 
   // Fetch fork lineage for ForkGraph
   useEffect(() => {

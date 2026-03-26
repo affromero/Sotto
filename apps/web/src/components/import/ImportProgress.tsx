@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { usePodcastStatus } from '@/lib/hooks/usePodcastStatus';
 import Link from 'next/link';
 import { Upload, FileAudio, CheckCircle, XCircle, Loader2, Shield, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
@@ -54,26 +55,17 @@ export function ImportProgress({ podcastId, isAdmin }: ImportProgressProps) {
     }
   };
 
-  useEffect(() => {
-    let mounted = true;
-    let intervalId: NodeJS.Timeout | null = null;
+  // Initial fetch + SSE-based status watching
+  useEffect(() => { fetchPodcast(); }, [podcastId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const poll = async () => {
-      const data = await fetchPodcast();
-      if (!mounted) return;
-      if (data?.status === 'READY' || data?.status === 'FAILED' || data?.status === 'DUPLICATE_REVIEW') {
-        if (intervalId) clearInterval(intervalId);
-      }
-    };
-
-    poll();
-    intervalId = setInterval(poll, 3000);
-
-    return () => {
-      mounted = false;
-      if (intervalId) clearInterval(intervalId);
-    };
-  }, [podcastId]);
+  const isTerminal = podcast?.status === 'READY' || podcast?.status === 'FAILED' || podcast?.status === 'DUPLICATE_REVIEW';
+  usePodcastStatus({
+    podcastId: isTerminal ? null : podcastId,
+    initialStatus: podcast?.status,
+    onStatusChange: useCallback(() => {
+      fetchPodcast();
+    }, []), // eslint-disable-line react-hooks/exhaustive-deps
+  });
 
   const steps: Step[] = [
     {
