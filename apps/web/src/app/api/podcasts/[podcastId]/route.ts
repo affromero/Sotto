@@ -79,7 +79,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     Promise.all(
       podcast.segments.map(async (s: Record<string, unknown>) => ({
         ...s,
-        audioUrl: await resolveAudioUrl(s.audioUrl, podcast.visibility),
+        audioUrl: await resolveAudioUrl(s.audioUrl as string | null, podcast.visibility),
       }))
     ),
   ]);
