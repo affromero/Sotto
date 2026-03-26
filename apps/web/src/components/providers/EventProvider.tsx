@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useAuth } from '@/lib/hooks/useAuth';
 import { EventBuffer } from '@/lib/event-buffer';
 import type { EventPayload } from '@/types/events';
 
@@ -16,9 +17,11 @@ interface EventProviderProps {
 }
 
 export function EventProvider({ userId, children }: EventProviderProps) {
+  const { isAuthenticated } = useAuth();
   const bufferRef = useRef<EventBuffer | null>(null);
 
   useEffect(() => {
+    if (!isAuthenticated) return;
     if (!bufferRef.current) {
       bufferRef.current = new EventBuffer();
     }
@@ -26,7 +29,7 @@ export function EventProvider({ userId, children }: EventProviderProps) {
       bufferRef.current?.destroy();
       bufferRef.current = null;
     };
-  }, []);
+  }, [isAuthenticated]);
 
   useEffect(() => {
     bufferRef.current?.setUserId(userId);
