@@ -1,3 +1,4 @@
+import { cache } from 'react';
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import type { Metadata } from 'next';
@@ -9,7 +10,7 @@ interface BySlugPageProps {
   params: Promise<{ handle: string; slug: string }>;
 }
 
-async function resolveSlug(handle: string, slug: string): Promise<string | null> {
+const resolveSlug = cache(async (handle: string, slug: string): Promise<string | null> => {
   const user = await prisma.user.findUnique({
     where: { handle: handle.toLowerCase() },
     select: { id: true },
@@ -21,7 +22,7 @@ async function resolveSlug(handle: string, slug: string): Promise<string | null>
     select: { id: true },
   });
   return podcast?.id ?? null;
-}
+});
 
 export async function generateMetadata({ params }: BySlugPageProps): Promise<Metadata> {
   const { handle, slug } = await params;
