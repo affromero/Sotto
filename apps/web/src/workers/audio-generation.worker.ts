@@ -7,6 +7,7 @@ import type { TtsProvider } from '@/lib/providers/tts';
 import { uploadSegmentAudio } from '@/lib/r2';
 import type { VoiceMatchMetadata } from '@/lib/voice-pool';
 import { generateTtsAudio, getPlatformTtsKey } from '@/lib/tts-generation';
+import { invalidatePodcastCache, publishPodcastStatus } from '@/lib/redis';
 import { logger } from '@/lib/logger';
 
 export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Promise<void> {
@@ -59,7 +60,10 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
         where: { id: podcastId, status: 'GENERATING_AUDIO' },
         data: { status: 'STITCHING' },
       });
-      if (cas.count === 0) {
+      if (cas.count > 0) {
+        await invalidatePodcastCache(podcastId);
+        await publishPodcastStatus(podcastId, { status: 'STITCHING' });
+      } else {
         logger.info('Another worker already transitioned to STITCHING', { podcastId });
       }
     }

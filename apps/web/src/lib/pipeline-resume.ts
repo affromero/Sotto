@@ -1,6 +1,7 @@
 import { prismaUnfiltered as prisma } from './prisma';
 import { logger } from './logger';
 import { cancelPodcastPayments } from './voice-pricing';
+import { invalidatePodcastCache, publishPodcastStatus } from './redis';
 
 /**
  * Discriminated union of pipeline resume points.
@@ -60,6 +61,9 @@ export async function markPodcastFailed(
     logger.info('markPodcastFailed: status already changed, skipping', { podcastId });
     return false;
   }
+
+  await invalidatePodcastCache(podcastId);
+  await publishPodcastStatus(podcastId, { status: 'FAILED' });
 
   // Cancel any authorized voice payments for this podcast
   await cancelPodcastPayments(podcastId).catch((err) => {

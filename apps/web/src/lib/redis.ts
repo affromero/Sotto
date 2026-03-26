@@ -241,6 +241,63 @@ export const inspireFailures = {
   },
 };
 
+// ---------------------------------------------------------------------------
+// Podcast status cache + pub/sub
+// ---------------------------------------------------------------------------
+
+const PODCAST_CACHE_PREFIX = 'podcast:public:';
+const PODCAST_CHANNEL_PREFIX = 'podcast:status:';
+
+const ACTIVE_STATUSES = new Set([
+  'EXTRACTING', 'DISCOVERING', 'SCRIPTING', 'VERIFYING_SCRIPT',
+  'VALIDATING_REFERENCES', 'GENERATING_AUDIO', 'STITCHING',
+]);
+
+export function getPodcastCacheTtl(status: string): number {
+  return ACTIVE_STATUSES.has(status) ? 2 : 30;
+}
+
+export async function invalidatePodcastCache(podcastId: string): Promise<void> {
+  await cache.delete(`${PODCAST_CACHE_PREFIX}${podcastId}`);
+}
+
+export async function publishPodcastStatus(
+  podcastId: string,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  const client = getRedisClient();
+  await client.publish(`${PODCAST_CHANNEL_PREFIX}${podcastId}`, JSON.stringify(payload));
+}
+
+export function createPodcastStatusSubscriber(podcastId: string) {
+  const client = createRedisConnection(`sse-pod-${podcastId.slice(0, 8)}`);
+  const channel = `${PODCAST_CHANNEL_PREFIX}${podcastId}`;
+
+  return {
+    channel,
+    client,
+    subscribe(onMessage: (data: string) => void) {
+      client.subscribe(channel).catch((err) => {
+        logger.error('Failed to subscribe to podcast status channel', {
+          podcastId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
+      client.on('message', (_ch: string, message: string) => {
+        onMessage(message);
+      });
+    },
+    async cleanup() {
+      try {
+        await client.unsubscribe(channel);
+        await client.quit();
+      } catch {
+        client.disconnect();
+      }
+    },
+  };
+}
+
 /**
  * Notification pub/sub channel prefix.
  * Workers publish after creating a notification; SSE subscribers listen.
