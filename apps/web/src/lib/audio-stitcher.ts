@@ -20,6 +20,8 @@ export interface SfxInsert {
   durationMs: number;
   delayMs?: number; // cumulative offset from start of speech track (computed by worker)
   type: SfxType;
+  volume?: number; // 0.0-1.0, overrides SFX_VOLUME_MAP
+  fadeOutMs?: number; // fade-out duration in ms
 }
 
 /**
@@ -121,9 +123,12 @@ export async function stitchWithEffects(params: {
     for (let i = 0; i < sfxInserts.length; i++) {
       const sfxIdx = sfxStartIndex + i;
       const sfx = sfxInserts[i];
-      const volume = SFX_VOLUME_MAP[sfx.type] ?? '0.3';
+      const volume = sfx.volume?.toString() ?? SFX_VOLUME_MAP[sfx.type] ?? '0.3';
+      const fadeFilter = sfx.fadeOutMs && sfx.durationMs > sfx.fadeOutMs
+        ? `,afade=t=out:st=${((sfx.durationMs - sfx.fadeOutMs) / 1000).toFixed(3)}:d=${(sfx.fadeOutMs / 1000).toFixed(3)}`
+        : '';
       filters.push(
-        `[${sfxIdx}:a]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=mono,volume=${volume}[sfx${i}]`
+        `[${sfxIdx}:a]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=mono,volume=${volume}${fadeFilter}[sfx${i}]`
       );
     }
 

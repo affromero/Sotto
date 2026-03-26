@@ -272,6 +272,8 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
         durationMs: cue.durationSeconds * 1000,
         delayMs,
         type: cue.type,
+        volume: cue.volume,
+        fadeOutMs: cue.fadeOutMs,
       });
 
       // Update progress: SFX generation is 50-65%

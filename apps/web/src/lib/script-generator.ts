@@ -74,6 +74,8 @@ export type SoundCue = {
   prompt: string; // text prompt for sound effect generation
   durationSeconds: number;
   insertAfterTurn: number; // index of the turn after which to insert this cue
+  volume?: number; // 0.0-1.0, overrides type-based default
+  fadeOutMs?: number; // milliseconds of fade-out at end of cue
 };
 
 export type GeneratedReference = {
@@ -247,6 +249,8 @@ function coerceScriptOutput(raw: Record<string, unknown>): Record<string, unknow
             item.durationSeconds ?? item.duration_seconds ?? item.duration,
           insertAfterTurn:
             item.insertAfterTurn ?? item.insert_after_turn ?? item.afterTurn,
+          volume: item.volume ?? undefined,
+          fadeOutMs: item.fadeOutMs ?? item.fade_out_ms ?? undefined,
         };
       })
       .filter(

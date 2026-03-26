@@ -848,6 +848,8 @@ export const generatedScriptSchema = z.object({
     prompt: z.string().min(1),
     durationSeconds: z.number().positive(),
     insertAfterTurn: z.number().int(),
+    volume: z.number().min(0).max(1).optional(),
+    fadeOutMs: z.number().int().min(0).max(10000).optional(),
   })).catch([]),
   references: z.preprocess(
     (val) => {
