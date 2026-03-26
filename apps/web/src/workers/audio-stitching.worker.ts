@@ -17,7 +17,7 @@ import { invalidatePodcastCache, publishPodcastStatus } from '@/lib/redis';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { markPodcastFailed } from '@/lib/pipeline-resume';
 import { downloadToFile, uploadPodcastAudio } from '@/lib/r2';
-import { stitchWithEffects, type SfxInsert } from '@/lib/audio-stitcher';
+import { stitchWithEffectsAndMusic, type SfxInsert } from '@/lib/audio-stitcher';
 import { generateSoundEffect } from '@/lib/elevenlabs';
 import { LIMITS } from '@/lib/stripe';
 import { type SoundCue } from '@/lib/script-generator';
@@ -311,13 +311,30 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
 
     await job.updateProgress(65);
 
-    // 6. Run FFmpeg stitching
+    // 5c. Download background music if available (for baking into final MP3)
+    let musicLocalPath: string | undefined;
+    let musicVolume = 0.15;
+    if (!skipSfx) {
+      const podcastWithMusic = await prisma.podcast.findUnique({
+        where: { id: podcastId },
+        select: { musicUrl: true, musicVolume: true },
+      });
+      if (podcastWithMusic?.musicUrl) {
+        musicLocalPath = path.join(tmpDir, 'music-bed.mp3');
+        await downloadToFile(podcastWithMusic.musicUrl, musicLocalPath);
+        musicVolume = podcastWithMusic.musicVolume ?? 0.15;
+      }
+    }
+
+    // 6. Run FFmpeg stitching (with music ducking if music bed available)
     const outputPath = path.join(tmpDir, 'final.mp3');
-    const { duration } = await stitchWithEffects({
+    const { duration } = await stitchWithEffectsAndMusic({
       segmentPaths,
       sfxInserts,
       outputPath,
       crossfadeMs: 300,
+      musicPath: musicLocalPath,
+      musicVolume,
     });
 
     await job.updateProgress(80);
@@ -447,6 +464,7 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
         durationDeviation,
         fileSize: finalAudio.length,
         currentVersion: newVersion,
+        musicBaked: !!musicLocalPath,
       },
     });
     await invalidatePodcastCache(podcastId);
