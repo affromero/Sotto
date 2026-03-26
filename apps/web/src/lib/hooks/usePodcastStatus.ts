@@ -32,7 +32,7 @@ export function usePodcastStatus({
   const [status, setStatus] = useState<string | null>(initialStatus ?? null);
   const [isConnected, setIsConnected] = useState(false);
   const onStatusChangeRef = useRef(onStatusChange);
-  onStatusChangeRef.current = onStatusChange;
+  useEffect(() => { onStatusChangeRef.current = onStatusChange; });
 
   const pollFallback = useCallback(async (id: string, signal: AbortSignal) => {
     const interval = setInterval(async () => {
