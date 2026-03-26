@@ -2,8 +2,13 @@
 
 import { useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import { usePlayer } from '@/components/providers/AudioPlayerProvider';
-import { MiniPlayer } from './MiniPlayer';
+
+const MiniPlayer = dynamic(
+  () => import('./MiniPlayer').then((m) => ({ default: m.MiniPlayer })),
+  { ssr: false }
+);
 
 export function GlobalMiniPlayer() {
   const pathname = usePathname();
