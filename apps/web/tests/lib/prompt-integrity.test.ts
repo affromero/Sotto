@@ -47,6 +47,7 @@ const EXPECTED_FILES = [
   'social/thread-analyzer.md',
   'verification/reference-validator.md',
   'verification/reference-verification-ai.md',
+  'verification/reference-grounding.md',
   'verification/script-verifier-base.md',
   'verification/script-verifier-previous-feedback.md',
   'verification/script-verifier-incremental.md',
