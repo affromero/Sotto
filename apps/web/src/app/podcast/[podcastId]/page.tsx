@@ -14,6 +14,7 @@ import { PodcastJsonLd } from '@/components/player/PodcastJsonLd';
 import { CostBreakdown } from '@/components/player/CostBreakdown';
 import { getPodcastCostBreakdown } from '@/lib/podcast-cost-stats';
 import { JoinCTA } from '@/components/referral/JoinCTA';
+import { getPodcastForDetailPage } from '@/lib/podcast-data';
 import styles from './page.module.css';
 
 interface PodcastPageProps {
@@ -22,19 +23,7 @@ interface PodcastPageProps {
 
 export async function generateMetadata({ params }: PodcastPageProps): Promise<Metadata> {
   const { podcastId } = await params;
-  const podcast = await prisma.podcast.findUnique({
-    where: { id: podcastId },
-    select: {
-      title: true,
-      topic: true,
-      slug: true,
-      audioUrl: true,
-      visibility: true,
-      defaultVoiceTrackId: true,
-      voiceTracks: { where: { status: 'READY' }, select: { id: true, audioUrl: true } },
-      user: { select: { name: true, handle: true } },
-    },
-  });
+  const podcast = await getPodcastForDetailPage(podcastId);
 
   if (!podcast) return { title: 'Podcast Not Found' };
 
@@ -57,8 +46,9 @@ export async function generateMetadata({ params }: PodcastPageProps): Promise<Me
       siteName: 'Sotto',
       ...(() => {
         if (podcast.visibility !== 'PUBLIC') return {};
+        const readyTracks = podcast.voiceTracks.filter(t => t.status === 'READY');
         const defaultTrack = podcast.defaultVoiceTrackId
-          ? podcast.voiceTracks.find(t => t.id === podcast.defaultVoiceTrackId)
+          ? readyTracks.find(t => t.id === podcast.defaultVoiceTrackId)
           : null;
         const ogAudioUrl = defaultTrack?.audioUrl || podcast.audioUrl;
         return ogAudioUrl ? { audio: ogAudioUrl } : {};
@@ -81,139 +71,13 @@ export async function generateMetadata({ params }: PodcastPageProps): Promise<Me
 
 export default async function PodcastPage({ params }: PodcastPageProps) {
   const { podcastId } = await params;
-  const session = await auth();
-  const userId = session?.user?.id;
 
-  const podcast = await prisma.podcast.findUnique({
-    where: { id: podcastId },
-    include: {
-      user: {
-        select: {
-          id: true,
-          name: true,
-          image: true,
-          handle: true,
-        },
-      },
-      segments: {
-        orderBy: { order: 'asc' },
-        select: {
-          id: true,
-          speaker: true,
-          text: true,
-          audioUrl: true,
-          order: true,
-          startTime: true,
-          duration: true,
-        },
-      },
-      interactions: {
-        where: userId ? { userId } : { id: 'none' },
-        orderBy: { createdAt: 'desc' },
-        select: {
-          id: true,
-          question: true,
-          timestamp: true,
-          status: true,
-          answer: true,
-          helpful: true,
-          segmentOrder: true,
-        },
-      },
-      tags: {
-        include: {
-          tag: {
-            select: { id: true, name: true, slug: true },
-          },
-        },
-      },
-      references: {
-        orderBy: { number: 'asc' },
-        select: {
-          id: true,
-          number: true,
-          title: true,
-          authors: true,
-          year: true,
-          url: true,
-          type: true,
-          publisher: true,
-          doi: true,
-          verificationStatus: true,
-          verificationDetails: true,
-          contentDomain: true,
-        },
-      },
-      forkedFrom: {
-        select: {
-          id: true,
-          title: true,
-          user: {
-            select: {
-              id: true,
-              name: true,
-              handle: true,
-              image: true,
-            },
-          },
-        },
-      },
-      forks: {
-        take: 10,
-        orderBy: { forkCount: 'desc' },
-        select: {
-          id: true,
-          title: true,
-          remixNote: true,
-          createdAt: true,
-          isVoiceOnlyFork: true,
-          user: {
-            select: {
-              id: true,
-              name: true,
-              handle: true,
-              image: true,
-            },
-          },
-        },
-      },
-      versions: {
-        orderBy: { version: 'desc' },
-        select: {
-          id: true,
-          version: true,
-          audioUrl: true,
-          duration: true,
-          changeType: true,
-          changeSummary: true,
-          interactionId: true,
-          createdAt: true,
-        },
-      },
-      voices: {
-        select: { speaker: true, voiceId: true, provider: true },
-      },
-      voiceTracks: {
-        orderBy: { createdAt: 'asc' as const },
-        select: {
-          id: true,
-          name: true,
-          status: true,
-          audioUrl: true,
-          duration: true,
-          ttsProvider: true,
-          ttsModel: true,
-          failureReason: true,
-          voices: { select: { speaker: true, voiceId: true, provider: true } },
-          proposalStatus: true,
-          proposalMessage: true,
-          contributor: {
-            select: { id: true, name: true, handle: true, image: true },
-          },
-        },
-      },
-    },
-  });
+  // Parallel: auth + cached podcast fetch (cache hit if generateMetadata already ran)
+  const [session, podcast] = await Promise.all([
+    auth(),
+    getPodcastForDetailPage(podcastId),
+  ]);
+  const userId = session?.user?.id;
 
   if (!podcast) {
     notFound();
@@ -232,34 +96,83 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
     notFound();
   }
 
-  // Check if quiz is available + get stats
-  const quizData = await prisma.podcastQuiz.findUnique({
-    where: { podcastId: podcast.id },
-    select: { status: true, attemptCount: true, avgScore: true },
-  });
+  const isOwner = userId === podcast.userId;
+  const isAdmin = session?.user?.role === 'ADMIN';
+
+  // Compute voiceIds needed for clone lookup (pure computation, no DB)
+  const allVoiceIds = [...new Set(
+    podcast.voiceTracks.flatMap((t) => t.voices.map((v) => v.voiceId)).filter(Boolean)
+  )];
+
+  // All secondary queries in parallel
+  const [interactions, quizData, likeAndSave, clones, ownerData] = await Promise.all([
+    // Interactions (separate from cached query because it depends on userId)
+    userId
+      ? prisma.interaction.findMany({
+          where: { podcastId: podcast.id, userId },
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            question: true,
+            timestamp: true,
+            status: true,
+            answer: true,
+            helpful: true,
+            segmentOrder: true,
+          },
+        })
+      : Promise.resolve([]),
+
+    // Quiz
+    prisma.podcastQuiz.findUnique({
+      where: { podcastId: podcast.id },
+      select: { status: true, attemptCount: true, avgScore: true },
+    }),
+
+    // Like + Save
+    userId
+      ? Promise.all([
+          prisma.like.findUnique({
+            where: { userId_podcastId: { userId, podcastId: podcast.id } },
+          }),
+          prisma.save.findUnique({
+            where: { userId_podcastId: { userId, podcastId: podcast.id } },
+          }),
+        ])
+      : Promise.resolve([null, null] as const),
+
+    // Voice clone names
+    allVoiceIds.length > 0
+      ? prisma.voiceClone.findMany({
+          where: { externalVoiceId: { in: allVoiceIds } },
+          select: { externalVoiceId: true, name: true },
+        })
+      : Promise.resolve([]),
+
+    // Owner-only gates (already internally parallel)
+    isOwner && userId
+      ? Promise.all([
+          getFreeTierStatus(userId),
+          getVideoGenerationStatus(userId),
+          getAvatarGenerationStatus(userId),
+          getMusicGenerationStatus(userId),
+          podcast.status === 'READY' ? getPodcastCostBreakdown(podcastId) : Promise.resolve(undefined),
+        ])
+      : Promise.resolve(null),
+  ]);
+
+  // Quiz
   const hasQuiz = quizData?.status === 'READY';
   const quizStats = hasQuiz && quizData.attemptCount > 0
     ? { attemptCount: quizData.attemptCount, avgScore: quizData.avgScore }
     : undefined;
 
-  // Check if current user has liked/saved
-  let isLiked = false;
-  let isSaved = false;
-  if (userId) {
-    const [like, save] = await Promise.all([
-      prisma.like.findUnique({
-        where: { userId_podcastId: { userId, podcastId: podcast.id } },
-      }),
-      prisma.save.findUnique({
-        where: { userId_podcastId: { userId, podcastId: podcast.id } },
-      }),
-    ]);
-    isLiked = !!like;
-    isSaved = !!save;
-  }
+  // Like/Save
+  const [like, save] = likeAndSave;
+  const isLiked = !!like;
+  const isSaved = !!save;
 
-  const isOwner = userId === podcast.userId;
-  const isAdmin = session?.user?.role === 'ADMIN';
+  // Owner data
   let canMakePrivate: boolean | undefined;
   let videoStatus: { dailyUsed: number; dailyLimit: number; dailyRemaining: number; resetInSeconds?: number; isByokUser: boolean; isProUser: boolean } | undefined;
   let avatarStatus: { dailyUsed: number; dailyLimit: number; dailyRemaining: number; resetInSeconds?: number; isByokUser: boolean; isProUser: boolean } | undefined;
@@ -267,14 +180,8 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
   let costBreakdown: Awaited<ReturnType<typeof getPodcastCostBreakdown>> | undefined;
   let ownerIsPro = false;
   let ownerIsByok = false;
-  if (isOwner && userId) {
-    const [freeTier, vidStatus, avStatus, musStatus, costStats] = await Promise.all([
-      getFreeTierStatus(userId),
-      getVideoGenerationStatus(userId),
-      getAvatarGenerationStatus(userId),
-      getMusicGenerationStatus(userId),
-      podcast.status === 'READY' ? getPodcastCostBreakdown(podcastId) : Promise.resolve(undefined),
-    ]);
+  if (ownerData) {
+    const [freeTier, vidStatus, avStatus, musStatus, costStats] = ownerData;
     const plan = freeTier.isProUser ? 'PRO' as const : 'FREE' as const;
     canMakePrivate = getTierFeatures(plan, freeTier.isByokUser, session?.user?.role as string | undefined).privateAllowed;
     videoStatus = vidStatus;
@@ -288,23 +195,14 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
   const visibility = podcast.visibility;
 
   // Build a voiceId → name map for tooltip enrichment
-  const allVoiceIds = [...new Set(
-    podcast.voiceTracks.flatMap((t) => t.voices.map((v) => v.voiceId)).filter(Boolean)
-  )];
   const voiceNameMap = new Map<string, string>();
-  if (allVoiceIds.length > 0) {
-    const clones = await prisma.voiceClone.findMany({
-      where: { externalVoiceId: { in: allVoiceIds } },
-      select: { externalVoiceId: true, name: true },
-    });
-    for (const clone of clones) {
-      voiceNameMap.set(clone.externalVoiceId, clone.name);
-    }
-    for (const voiceId of allVoiceIds) {
-      if (!voiceNameMap.has(voiceId)) {
-        const name = findVoiceName(voiceId);
-        if (name) voiceNameMap.set(voiceId, name);
-      }
+  for (const clone of clones) {
+    voiceNameMap.set(clone.externalVoiceId, clone.name);
+  }
+  for (const voiceId of allVoiceIds) {
+    if (!voiceNameMap.has(voiceId)) {
+      const name = findVoiceName(voiceId);
+      if (name) voiceNameMap.set(voiceId, name);
     }
   }
 
@@ -419,7 +317,7 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
     currentVersion: podcast.currentVersion,
     user: podcast.user,
     segments: resolvedSegments,
-    interactions: podcast.interactions,
+    interactions,
     references: podcast.references.map((r) => ({
       ...r,
       verificationDetails: r.verificationDetails as Record<string, unknown> | null,
