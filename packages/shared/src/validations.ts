@@ -51,7 +51,7 @@ export const feedQuerySchema = z.object({
   tags: z.string().optional(),
   depth: z.enum(['eli5', 'quick_overview', 'standard', 'deep_dive']).optional(),
   audience: z.enum(['beginner', 'intermediate', 'expert']).optional(),
-  tone: z.enum(['casual', 'professional', 'socratic']).optional(),
+  tone: z.enum(['casual', 'professional', 'socratic', 'comedic', 'satirical', 'storytelling']).optional(),
   durationMin: z.coerce.number().int().min(0).optional(),
   durationMax: z.coerce.number().int().min(0).optional(),
   dateFrom: z.string().optional(),

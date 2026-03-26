@@ -17,7 +17,7 @@ import { invalidatePodcastCache, publishPodcastStatus } from '@/lib/redis';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { markPodcastFailed } from '@/lib/pipeline-resume';
 import { downloadToFile, uploadPodcastAudio } from '@/lib/r2';
-import { stitchWithEffects, type SfxInsert } from '@/lib/audio-stitcher';
+import { stitchWithEffectsAndMusic, type SfxInsert } from '@/lib/audio-stitcher';
 import { generateSoundEffect } from '@/lib/elevenlabs';
 import { LIMITS } from '@/lib/stripe';
 import { type SoundCue } from '@/lib/script-generator';
@@ -154,6 +154,11 @@ const STOCK_SFX: Record<SoundCue['type'], string> = {
   transition: 'transition-whoosh.mp3',
   outro: 'outro-gentle.mp3',
   ambient: 'ambient-soft.mp3',
+  laugh_track: 'laugh-track.mp3',
+  music_sting: 'music-sting.mp3',
+  applause: 'applause.mp3',
+  comedic_hit: 'comedic-hit.mp3',
+  rim_shot: 'rim-shot.mp3',
 };
 
 export async function processAudioStitching(job: Job<StitchAudioPayload>): Promise<void> {
@@ -176,10 +181,10 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
       throw new Error(`No segments found for podcast ${podcastId}`);
     }
 
-    // 2. Fetch the script for sound cues
+    // 2. Fetch the script for sound cues and turn text (for audience reactions)
     const script = await prisma.script.findUnique({
       where: { podcastId },
-      select: { soundCues: true },
+      select: { soundCues: true, turns: true },
     });
 
     const soundCues = (script?.soundCues ?? []) as SoundCue[];
@@ -267,6 +272,8 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
         durationMs: cue.durationSeconds * 1000,
         delayMs,
         type: cue.type,
+        volume: cue.volume,
+        fadeOutMs: cue.fadeOutMs,
       });
 
       // Update progress: SFX generation is 50-65%
@@ -274,15 +281,60 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
       await job.updateProgress(sfxProgress);
     }
 
+    // 5b. Extract inline audience reactions from turn text and convert to SFX inserts
+    if (!skipSfx) {
+      const turns = (script?.turns ?? []) as Array<{ text: string }>;
+      const { extractAudienceReactions } = await import('@/lib/tts-text-cleaner');
+
+      for (let i = 0; i < turns.length && i < segments.length; i++) {
+        const reactions = extractAudienceReactions(turns[i].text);
+        for (const reaction of reactions) {
+          const delayMs = Math.round(cumulativeDurations[i] ?? 0);
+          const stockFile = STOCK_SFX[reaction.type];
+          if (stockFile) {
+            const reactionPath = path.join(tmpDir, `reaction-${i}-${reaction.type}.mp3`);
+            const stockPath = path.resolve(__dirname, '..', 'assets', 'sfx', stockFile);
+            const { copyFile } = await import('fs/promises');
+            await copyFile(stockPath, reactionPath);
+            sfxInserts.push({
+              path: reactionPath,
+              insertAfterSegment: i,
+              durationMs: 2000,
+              delayMs,
+              type: reaction.type,
+              volume: 0.3,
+            });
+          }
+        }
+      }
+    }
+
     await job.updateProgress(65);
 
-    // 6. Run FFmpeg stitching
+    // 5c. Download background music if available (for baking into final MP3)
+    let musicLocalPath: string | undefined;
+    let musicVolume = 0.15;
+    if (!skipSfx) {
+      const podcastWithMusic = await prisma.podcast.findUnique({
+        where: { id: podcastId },
+        select: { musicUrl: true, musicVolume: true },
+      });
+      if (podcastWithMusic?.musicUrl) {
+        musicLocalPath = path.join(tmpDir, 'music-bed.mp3');
+        await downloadToFile(podcastWithMusic.musicUrl, musicLocalPath);
+        musicVolume = podcastWithMusic.musicVolume ?? 0.15;
+      }
+    }
+
+    // 6. Run FFmpeg stitching (with music ducking if music bed available)
     const outputPath = path.join(tmpDir, 'final.mp3');
-    const { duration } = await stitchWithEffects({
+    const { duration } = await stitchWithEffectsAndMusic({
       segmentPaths,
       sfxInserts,
       outputPath,
       crossfadeMs: 300,
+      musicPath: musicLocalPath,
+      musicVolume,
     });
 
     await job.updateProgress(80);
@@ -412,6 +464,7 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
         durationDeviation,
         fileSize: finalAudio.length,
         currentVersion: newVersion,
+        musicBaked: !!musicLocalPath,
       },
     });
     await invalidatePodcastCache(podcastId);

@@ -384,6 +384,7 @@ model Podcast {
   // Background music
   musicUrl    String?
   musicVolume Float   @default(0.15)
+  musicBaked  Boolean @default(false)
 
   // Import fields
   importedAudioKey   String?
