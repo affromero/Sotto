@@ -5,6 +5,16 @@
   flex-shrink: 0;
 }
 
+/* ===== Loading skeleton ===== */
+
+.skeleton {
+  height: 36px;
+  width: 120px;
+  border-radius: var(--radius-full);
+  background: var(--color-border);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
 /* ===== Trigger pill ===== */
 
 .trigger {
