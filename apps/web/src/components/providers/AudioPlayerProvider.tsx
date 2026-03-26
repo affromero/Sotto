@@ -9,6 +9,11 @@ type AudioPlayerContextType = PlayerState & PlayerControls & { lastSeekFrom?: nu
 
 const AudioPlayerContext = createContext<AudioPlayerContextType | null>(null);
 
+function PlaybackTelemetryBridge({ playerState }: { playerState: AudioPlayerContextType }) {
+  usePlaybackTelemetry(playerState);
+  return null;
+}
+
 export function AudioPlayerProvider({ children }: { children: React.ReactNode }) {
   const player = useAudioPlayer();
   const [lastSeekFrom, setLastSeekFrom] = useState<number | undefined>(undefined);
@@ -41,10 +46,12 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
     [player, wrappedSeek, wrappedSkip, lastSeekFrom]
   );
 
-  // Activate telemetry globally — every playback surface gets it
-  usePlaybackTelemetry(value);
-
-  return <AudioPlayerContext.Provider value={value}>{children}</AudioPlayerContext.Provider>;
+  return (
+    <AudioPlayerContext.Provider value={value}>
+      {value.podcastId && <PlaybackTelemetryBridge playerState={value} />}
+      {children}
+    </AudioPlayerContext.Provider>
+  );
 }
 
 export function usePlayer(): AudioPlayerContextType {
