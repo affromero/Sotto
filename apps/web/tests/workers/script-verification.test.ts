@@ -247,16 +247,15 @@ describe('processScriptVerification', () => {
   });
 
   describe('model resolution', () => {
-    it('uses cheap model for verification even when full model is resolved', async () => {
+    it('uses the resolved model for verification', async () => {
       const { resolveAiModelAndProvider } = await import('@/lib/providers/ai-registry');
       vi.mocked(resolveAiModelAndProvider).mockResolvedValueOnce({ model: 'claude-opus-4-6-20251101', provider: 'anthropic' });
 
       const job = createMockJob(defaultPayload);
       await processScriptVerification(job);
 
-      // verifyScript gets the cheap model, not the full resolved model
       expect(mockVerifyScript).toHaveBeenCalledWith(
-        expect.objectContaining({ model: 'claude-haiku-4-5-20251001' })
+        expect.objectContaining({ model: 'claude-opus-4-6-20251101' })
       );
     });
 
@@ -273,8 +272,8 @@ describe('processScriptVerification', () => {
     });
   });
 
-  describe('cheap model for verification', () => {
-    it('uses cheap model for verifyScript but full model for regeneration', async () => {
+  describe('model used for verification and regeneration', () => {
+    it('uses same resolved model for both verifyScript and regeneration', async () => {
       // First call fails verification, triggering regeneration
       mockVerifyScript.mockResolvedValue(failedVerdict);
       mockPrismaScriptFindUniqueOrThrow.mockResolvedValue({ ...defaultScript, verificationAttempts: 0 });
@@ -282,12 +281,11 @@ describe('processScriptVerification', () => {
       const job = createMockJob(defaultPayload);
       await processScriptVerification(job);
 
-      // verifyScript should receive the cheap model
+      // Both verifyScript and generateScriptWithFeedback use the resolved model
       expect(mockVerifyScript).toHaveBeenCalledWith(
-        expect.objectContaining({ model: 'claude-haiku-4-5-20251001' })
+        expect.objectContaining({ model: 'claude-sonnet-4-6' })
       );
 
-      // generateScriptWithFeedback should receive the full model
       expect(mockGenerateScriptWithFeedback).toHaveBeenCalledWith(
         expect.objectContaining({ model: 'claude-sonnet-4-6' })
       );
