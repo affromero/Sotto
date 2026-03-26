@@ -268,7 +268,7 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
   usePodcastStatus({
     podcastId: isWatchingStatus ? podcastId : null,
     initialStatus: pipelineStatus ?? undefined,
-    onStatusChange: useCallback((event) => {
+    onStatusChange: useCallback((event: { status: string; [key: string]: unknown }) => {
       setPipelineStatus(event.status);
 
       if (event.status === 'SCRIPT_READY') {

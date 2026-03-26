@@ -17,8 +17,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
   // Try Redis cache first (shared, non-user-specific data)
   const cacheKey = `podcast:public:${podcastId}`;
-  type CachedPodcast = Awaited<ReturnType<typeof prisma.podcast.findUnique>>;
-  let podcast = await cache.get<CachedPodcast>(cacheKey);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let podcast: Record<string, any> | null = await cache.get(cacheKey);
 
   if (!podcast) {
     podcast = await prisma.podcast.findUnique({

@@ -309,11 +309,11 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
   }, [needsScript, isOwner, podcast.id]);
 
   // SSE-based status watching while podcast is processing
-  const isProcessing = liveStatus !== 'READY' && liveStatus !== 'FAILED' && liveStatus !== 'SCRIPT_READY';
+  const isStillProcessing = liveStatus !== 'READY' && liveStatus !== 'FAILED' && liveStatus !== 'SCRIPT_READY';
   usePodcastStatus({
-    podcastId: isProcessing ? podcast.id : null,
+    podcastId: isStillProcessing ? podcast.id : null,
     initialStatus: liveStatus,
-    onStatusChange: useCallback((event) => {
+    onStatusChange: useCallback((event: { status: string; [key: string]: unknown }) => {
       setLiveStatus(event.status);
       if (event.verificationProgress) {
         setVerificationProgress(event.verificationProgress as Record<string, unknown>);
