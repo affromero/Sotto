@@ -311,6 +311,8 @@ const TONE_GUIDANCE_MAIN: Record<string, string> = {
   professional: '- Maintain a professional but warm tone, with occasional humor to keep it engaging',
   socratic: '- Use the Socratic method — HOST asks probing questions that build on each other, EXPERT guides discovery',
   storytelling: '- Frame everything as a narrative — characters, conflict, resolution. Make facts feel like plot points.',
+  comedic: '- Write like a John Oliver editorial comedy segment: clear setup/punchline structure, callbacks to earlier jokes, absurdist escalation, and satirical commentary grounded in real facts. Balance humor with substance — jokes should illuminate the topic, not replace it. Include comedic tangents that circle back to the main point. Use [audience laughs] and [applause] tags after punchlines.',
+  satirical: '- Deploy biting wit and irony to expose contradictions. Use the contrast between dry delivery and absurd subject matter. Employ rhetorical questions that answer themselves. Reference real headlines and public figures for satirical effect. Every joke should make a point. Use [audience laughs] sparingly for the sharpest lines.',
 };
 
 const TONE_GUIDANCE_REVISION: Record<string, string> = {
@@ -318,6 +320,8 @@ const TONE_GUIDANCE_REVISION: Record<string, string> = {
   professional: '- Maintain a professional but warm tone',
   socratic: '- Use the Socratic method — probing questions building on each other',
   storytelling: '- Frame everything as narrative — characters, conflict, resolution',
+  comedic: '- Maintain John Oliver-style comedy: setup/punchline, callbacks, absurdist escalation. Include [audience laughs] after punchlines.',
+  satirical: '- Deploy biting wit and irony, dry delivery contrasting absurd subject matter. Use [audience laughs] sparingly.',
 };
 
 export interface SourceMetadata {

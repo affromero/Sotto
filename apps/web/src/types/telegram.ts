@@ -5,7 +5,7 @@ export interface TelegramParseResult {
   title: string;
   depth: 'eli5' | 'quick_overview' | 'standard' | 'deep_dive';
   audienceLevel: 'beginner' | 'intermediate' | 'expert';
-  tone: 'casual' | 'professional' | 'socratic';
+  tone: 'casual' | 'professional' | 'socratic' | 'comedic' | 'satirical' | 'storytelling';
   focusAreas: string[];
   sourceUrl?: string;
   isComplete: boolean;

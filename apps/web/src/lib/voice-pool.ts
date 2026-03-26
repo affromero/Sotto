@@ -158,7 +158,7 @@ export const VOICE_POOL: VoicePoolEntry[] = [
 ];
 
 export interface VoiceMatchMetadata {
-  tone?: 'casual' | 'professional' | 'socratic';
+  tone?: 'casual' | 'professional' | 'socratic' | 'comedic' | 'satirical' | 'storytelling';
   audienceLevel?: 'beginner' | 'intermediate' | 'expert';
   audience?: 'kids' | 'teens' | 'family' | 'general' | 'nerds' | 'mature';
 }
@@ -178,6 +178,18 @@ const TONE_KEYWORDS: Record<
   socratic: {
     preferred: ['professor', 'wise', 'intellectual', 'curious', 'witty', 'sharp', 'articulate'],
     penalty: ['playful', 'upbeat', 'energetic'],
+  },
+  comedic: {
+    preferred: ['witty', 'sharp', 'playful', 'energetic', 'engaging', 'upbeat', 'casual', 'curious'],
+    penalty: ['calm', 'polished', 'distinguished'],
+  },
+  satirical: {
+    preferred: ['witty', 'sharp', 'articulate', 'intellectual', 'confident', 'authoritative'],
+    penalty: ['casual', 'warm', 'approachable'],
+  },
+  storytelling: {
+    preferred: ['warm', 'engaging', 'articulate', 'confident', 'curious', 'friendly'],
+    penalty: ['authoritative', 'distinguished'],
   },
 };
 

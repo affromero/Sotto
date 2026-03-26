@@ -44,6 +44,9 @@ const TONE_STYLE_MAP: Record<string, string> = {
   dramatic: 'dynamic with subtle tension',
   inspirational: 'uplifting and hopeful',
   conversational: 'warm and inviting',
+  comedic: 'playful and punchy with comic timing',
+  satirical: 'wry and sophisticated with ironic undertones',
+  storytelling: 'cinematic and narrative-driven',
 };
 
 function mapTagsToGenre(tags: string[]): string {
