@@ -22,7 +22,7 @@ import { createSegmentsAndQueueAudio } from '@/lib/segment-creator';
 import { convertTurnsForProvider } from '@/lib/tts-tag-converter';
 import { logUsage } from '@/lib/usage-logger';
 import { getAiKey, getByokKey, hasByokKey } from '@/lib/byok';
-import { resolveAiModelAndProvider, getCheapestModelForProvider, type AiProviderId } from '@/lib/providers/ai-registry';
+import { resolveAiModelAndProvider } from '@/lib/providers/ai-registry';
 import { assignVoicesForPodcast } from '@/lib/voice-assigner';
 import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
 import type { TtsProviderId } from '@/lib/providers/tts-registry';
@@ -72,9 +72,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
     plan: userPlan.plan as 'FREE' | 'PRO',
   });
 
-  // Use cheapest model for structured verification (fact-check analysis) — save the
-  // full model for creative regeneration tasks where quality matters more.
-  const verificationModel = getCheapestModelForProvider(provider as AiProviderId) ?? model;
+  const verificationModel = model;
 
   const requestedDuration = discovery.durationTarget || 10;
   const maxDurationMinutes = isFinite(tierFeatures.maxDurationMinutes)
