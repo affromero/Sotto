@@ -8,7 +8,7 @@ import { PODCAST_PUBLIC_SELECT } from '@/lib/podcast-select';
 import { resolveAudioUrl } from '@/lib/r2';
 import { generatePodcastSlug } from '@/lib/slugify';
 import { errorResponse } from '@/lib/api-response';
-import { cache, getPodcastCacheTtl } from '@/lib/redis';
+import { cache, getPodcastCacheTtl, invalidatePodcastCache } from '@/lib/redis';
 type RouteParams = { params: Promise<{ podcastId: string }> };
 
 export async function GET(request: NextRequest, { params }: RouteParams) {
@@ -155,6 +155,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       tags: { include: { tag: true } },
     },
   });
+  await invalidatePodcastCache(podcastId);
 
   return NextResponse.json(updated);
 }
@@ -206,6 +207,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       data: { deletedAt: new Date() },
     });
   });
+  await invalidatePodcastCache(podcastId);
 
   return new NextResponse(null, { status: 204 });
 }

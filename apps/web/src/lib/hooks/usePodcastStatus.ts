@@ -24,6 +24,31 @@ interface UsePodcastStatusReturn {
   isConnected: boolean;
 }
 
+/**
+ * Reconcile current status with a GET fetch.
+ * SSE only carries { status } — clients that need failureReason, verificationProgress,
+ * etc. get the full object from the cached GET endpoint.
+ */
+async function fetchCurrentStatus(
+  podcastId: string,
+  setStatus: (s: string) => void,
+  onStatusChangeRef: React.RefObject<((event: PodcastStatusEvent) => void) | undefined>,
+): Promise<string | null> {
+  try {
+    const res = await fetch(`/api/podcasts/${podcastId}`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data.status) {
+      setStatus(data.status);
+      onStatusChangeRef.current?.(data);
+      return data.status;
+    }
+  } catch {
+    // Silently fail
+  }
+  return null;
+}
+
 export function usePodcastStatus({
   podcastId,
   initialStatus,
@@ -34,33 +59,35 @@ export function usePodcastStatus({
   const onStatusChangeRef = useRef(onStatusChange);
   useEffect(() => { onStatusChangeRef.current = onStatusChange; });
 
-  const pollFallback = useCallback(async (id: string, signal: AbortSignal) => {
-    const interval = setInterval(async () => {
+  // Ref to track the single fallback interval so reconnects don't stack them
+  const fallbackIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const clearFallbackPolling = useCallback(() => {
+    if (fallbackIntervalRef.current) {
+      clearInterval(fallbackIntervalRef.current);
+      fallbackIntervalRef.current = null;
+    }
+  }, []);
+
+  const startFallbackPolling = useCallback((id: string, signal: AbortSignal) => {
+    // Clear any existing interval first — prevents stacking
+    clearFallbackPolling();
+
+    fallbackIntervalRef.current = setInterval(async () => {
       if (signal.aborted) {
-        clearInterval(interval);
+        clearFallbackPolling();
         return;
       }
-      // Pause polling when tab is hidden
       if (document.visibilityState === 'hidden') return;
 
-      try {
-        const res = await fetch(`/api/podcasts/${id}`);
-        if (!res.ok) return;
-        const data = await res.json();
-        if (data.status) {
-          setStatus(data.status);
-          onStatusChangeRef.current?.({ status: data.status });
-          if (TERMINAL_STATUSES.has(data.status)) {
-            clearInterval(interval);
-          }
-        }
-      } catch {
-        // Silently retry next interval
+      const currentStatus = await fetchCurrentStatus(id, setStatus, onStatusChangeRef);
+      if (currentStatus && TERMINAL_STATUSES.has(currentStatus)) {
+        clearFallbackPolling();
       }
     }, FALLBACK_POLL_MS);
 
-    signal.addEventListener('abort', () => clearInterval(interval));
-  }, []);
+    signal.addEventListener('abort', clearFallbackPolling);
+  }, [clearFallbackPolling]);
 
   useEffect(() => {
     if (!podcastId) return;
@@ -70,7 +97,7 @@ export function usePodcastStatus({
     const { signal } = abortController;
 
     if (typeof EventSource === 'undefined') {
-      pollFallback(podcastId, signal);
+      startFallbackPolling(podcastId, signal);
       return () => abortController.abort();
     }
 
@@ -80,22 +107,41 @@ export function usePodcastStatus({
     function connect() {
       if (signal.aborted) return;
 
+      // Clear stale reconnect timeout
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+        reconnectTimeout = null;
+      }
+
       es = new EventSource(`/api/podcasts/${podcastId}/stream`);
 
       es.onopen = () => {
         setIsConnected(true);
+        // Stop fallback polling now that SSE is connected
+        clearFallbackPolling();
+
+        // Reconciliation fetch — catches any status change that happened
+        // between the last known status and the subscription becoming active
+        fetchCurrentStatus(podcastId!, setStatus, onStatusChangeRef).then((s) => {
+          if (s && TERMINAL_STATUSES.has(s)) {
+            es?.close();
+            setIsConnected(false);
+          }
+        });
       };
 
       es.onmessage = (event) => {
         try {
           const data: PodcastStatusEvent = JSON.parse(event.data);
           setStatus(data.status);
-          onStatusChangeRef.current?.(data);
 
-          if (TERMINAL_STATUSES.has(data.status)) {
-            es?.close();
-            setIsConnected(false);
-          }
+          // SSE only carries { status } — do a full GET to get failureReason etc.
+          fetchCurrentStatus(podcastId!, setStatus, onStatusChangeRef).then((s) => {
+            if (s && TERMINAL_STATUSES.has(s)) {
+              es?.close();
+              setIsConnected(false);
+            }
+          });
         } catch {
           // Ignore malformed SSE data
         }
@@ -107,8 +153,7 @@ export function usePodcastStatus({
         es = null;
 
         if (!signal.aborted) {
-          // Fall back to polling, then try SSE again after 10s
-          pollFallback(podcastId!, signal);
+          startFallbackPolling(podcastId!, signal);
           reconnectTimeout = setTimeout(connect, 10_000);
         }
       };
@@ -120,6 +165,7 @@ export function usePodcastStatus({
         es?.close();
         es = null;
         setIsConnected(false);
+        clearFallbackPolling();
       } else if (!signal.aborted) {
         connect();
       }
@@ -131,11 +177,12 @@ export function usePodcastStatus({
     return () => {
       abortController.abort();
       es?.close();
+      clearFallbackPolling();
       if (reconnectTimeout) clearTimeout(reconnectTimeout);
       document.removeEventListener('visibilitychange', handleVisibility);
       setIsConnected(false);
     };
-  }, [podcastId, initialStatus, pollFallback]);
+  }, [podcastId, initialStatus, startFallbackPolling, clearFallbackPolling]);
 
   return { status, isConnected };
 }
