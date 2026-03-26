@@ -75,6 +75,8 @@ const mockRunReferenceVerification = vi.fn().mockResolvedValue({
 
 vi.mock('@/lib/reference-verification', () => ({
   runReferenceVerification: (...args: unknown[]) => mockRunReferenceVerification(...args),
+  buildReferenceRetryFeedback: vi.fn().mockReturnValue(''),
+  mergeVerifiedReferences: vi.fn().mockReturnValue([]),
 }));
 
 // reference-validator is still imported for ReferenceInput type — keep a minimal mock
@@ -129,10 +131,14 @@ vi.mock('@/lib/tier-features', () => ({
   getJobPriority: vi.fn().mockReturnValue(1),
 }));
 
-vi.mock('@/lib/providers/ai-registry', () => ({
-  resolveAiModelAndProvider: vi.fn().mockResolvedValue({ model: 'claude-haiku-4-5-20251001', provider: 'anthropic' }),
-  getCheapestModelForProvider: vi.fn().mockReturnValue('claude-haiku-4-5-20251001'),
-}));
+vi.mock('@/lib/providers/ai-registry', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/providers/ai-registry')>();
+  return {
+    ...actual,
+    resolveAiModelAndProvider: vi.fn().mockResolvedValue({ model: 'claude-haiku-4-5-20251001', provider: 'anthropic' }),
+    getCheapestModelForProvider: vi.fn().mockReturnValue('claude-haiku-4-5-20251001'),
+  };
+});
 
 vi.mock('@/lib/free-tier-provider-selector', () => ({
   selectFreeTierProviders: vi.fn().mockResolvedValue({
