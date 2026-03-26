@@ -74,6 +74,7 @@ vi.mock('@/lib/redis', () => ({
   checkRateLimit: (...args: unknown[]) => mockCheckRateLimit(...args),
   cache: { get: vi.fn().mockResolvedValue(null), set: vi.fn().mockResolvedValue(undefined), delete: vi.fn().mockResolvedValue(undefined) },
   getPodcastCacheTtl: vi.fn().mockReturnValue(30),
+  invalidatePodcastCache: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('@/lib/auth', () => ({

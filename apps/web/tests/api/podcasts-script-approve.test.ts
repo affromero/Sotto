@@ -47,6 +47,8 @@ vi.mock('@/lib/segment-creator', () => ({
 vi.mock('@/lib/redis', () => ({
   checkRateLimit: vi.fn().mockResolvedValue({ allowed: true }),
   getRedisClient: vi.fn(),
+  invalidatePodcastCache: vi.fn().mockResolvedValue(undefined),
+  publishPodcastStatus: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('@/lib/generation-gate', () => ({
