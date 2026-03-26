@@ -100,6 +100,7 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
   );
   const [error, setError] = useState<string | null>(null);
   const [failedPodcastId, setFailedPodcastId] = useState<string | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
   const [inspireMeOpen, setInspireMeOpen] = useState(false);
   const [initialTopic, setInitialTopic] = useState<string | undefined>();
   const [podcastId, setPodcastId] = useState<string | null>(null);
@@ -328,6 +329,20 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
       clearInterval(interval);
     };
   }, [step, podcastId, router]);
+
+  const handleCancel = useCallback(async () => {
+    if (!podcastId || isCancelling) return;
+    setIsCancelling(true);
+    try {
+      await fetch(`/api/podcasts/${podcastId}`, { method: 'DELETE' });
+    } catch {
+      // Best-effort — even if the DELETE fails, reset the UI
+    }
+    setPodcastId(null);
+    setPipelineStatus('PENDING');
+    setIsCancelling(false);
+    setStep('voice');
+  }, [podcastId, isCancelling]);
 
   const handleScriptApprove = useCallback(() => {
     setStep('generating');
@@ -615,6 +630,14 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
               </svg>
               You can safely leave this page — your podcast keeps generating in the background. Find it in your dashboard when it&apos;s ready.
             </p>
+            <button
+              type="button"
+              className={styles.cancelGeneration}
+              onClick={handleCancel}
+              disabled={isCancelling}
+            >
+              {isCancelling ? 'Cancelling...' : 'Cancel generation'}
+            </button>
           </div>
         )}
 
