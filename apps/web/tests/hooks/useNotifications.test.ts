@@ -367,6 +367,65 @@ describe('useNotifications', () => {
     });
   });
 
+  describe('enabled: false (disabled mode)', () => {
+    it('returns static empty state without fetching', () => {
+      const { result } = renderHook(() => useNotifications({ enabled: false }));
+
+      expect(result.current.notifications).toEqual([]);
+      expect(result.current.unreadCount).toBe(0);
+      expect(result.current.isLoading).toBe(false);
+      expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it('does not create EventSource connection', () => {
+      const EventSourceSpy = vi.fn();
+      global.EventSource = EventSourceSpy as unknown as typeof EventSource;
+
+      renderHook(() => useNotifications({ enabled: false }));
+
+      expect(EventSourceSpy).not.toHaveBeenCalled();
+
+      // @ts-expect-error — cleanup global mock
+      delete global.EventSource;
+    });
+
+    it('does not start polling', async () => {
+      vi.useFakeTimers();
+
+      renderHook(() => useNotifications({ enabled: false }));
+
+      await act(async () => {
+        vi.advanceTimersByTime(120_000);
+        await Promise.resolve();
+      });
+
+      expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it('provides no-op functions that do not throw', async () => {
+      const { result } = renderHook(() => useNotifications({ enabled: false }));
+
+      // These should not throw or call fetch
+      await act(async () => {
+        await result.current.markRead('any-id');
+        await result.current.markAllRead();
+        await result.current.refresh();
+        result.current.prepend({
+          id: 'x',
+          type: 'PODCAST_READY',
+          title: 't',
+          message: 'm',
+          read: false,
+          data: null,
+          createdAt: '',
+        });
+      });
+
+      expect(fetch).not.toHaveBeenCalled();
+      expect(result.current.notifications).toEqual([]);
+    });
+  });
+
   describe('refresh', () => {
     it('manually refetches notifications', async () => {
       const initialNotifications = [mockNotifications[0]];

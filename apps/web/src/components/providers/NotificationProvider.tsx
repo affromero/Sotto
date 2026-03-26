@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext } from 'react';
 import { useRouter } from 'next/navigation';
 import { useNotifications } from '@/lib/hooks/useNotifications';
+import { useAuth } from '@/lib/hooks/useAuth';
 import { useToast } from '@/components/providers/ToastProvider';
 import {
   isPipelineSuccessNotification,
@@ -26,6 +27,7 @@ const NotificationContext = createContext<NotificationContextType | null>(null);
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
   const { showToast } = useToast();
   const router = useRouter();
+  const { isAuthenticated } = useAuth();
 
   const handleNewNotifications = useCallback(
     (newNotifications: NotificationData[]) => {
@@ -49,6 +51,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
   const notificationState = useNotifications({
     onNewNotifications: handleNewNotifications,
+    enabled: isAuthenticated,
   });
 
   return (
