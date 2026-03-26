@@ -47,6 +47,27 @@ vi.mock('@/lib/prisma', () => {
     user: {
       findUniqueOrThrow: vi.fn().mockResolvedValue({ plan: 'PRO', role: 'USER' }),
     },
+    autoModelConfig: {
+      upsert: vi.fn().mockResolvedValue({
+        id: 'singleton',
+        freeAiProvider: 'anthropic',
+        freeAiModel: 'claude-haiku-4-5-20251001',
+        freeTtsProvider: 'elevenlabs',
+        freeTtsModel: 'eleven_flash_v2_5',
+        freeSttProvider: 'openai',
+        freeSttModel: 'whisper-1',
+        proAiProvider: 'anthropic',
+        proAiModel: 'claude-sonnet-4-20250514',
+        proTtsProvider: 'elevenlabs',
+        proTtsModel: 'eleven_multilingual_v2',
+        proSttProvider: 'openai',
+        proSttModel: 'whisper-1',
+        platformAiProvider: 'anthropic',
+        platformAiModel: 'claude-haiku-4-5-20251001',
+        dailyFreeLimit: 3,
+        dailyProLimit: 50,
+      }),
+    },
   };
   return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
 });
@@ -75,6 +96,10 @@ const mockRunReferenceVerification = vi.fn().mockResolvedValue({
 
 vi.mock('@/lib/reference-verification', () => ({
   runReferenceVerification: (...args: unknown[]) => mockRunReferenceVerification(...args),
+  buildReferenceRetryFeedback: vi.fn().mockReturnValue('mock feedback'),
+  mergeVerifiedReferences: vi.fn().mockReturnValue([]),
+  extractClaimContexts: vi.fn().mockReturnValue([]),
+  groundFailedReferences: vi.fn().mockResolvedValue({ results: new Map(), rejectedRefIds: new Set() }),
 }));
 
 // reference-validator is still imported for ReferenceInput type — keep a minimal mock
@@ -101,9 +126,16 @@ vi.mock('@/lib/queue', () => ({
   JobType: {
     GENERATE_AUDIO: 'generate_audio',
     SEND_NOTIFICATION: 'send_notification',
+    VALIDATE_REFERENCES: 'validate_references',
   },
   audioGenerationQueue: { name: 'audio-generation' },
   notificationQueue: { name: 'notifications' },
+  referenceValidationQueue: { name: 'reference-validation' },
+}));
+
+const mockCreateSegmentsAndQueueAudio = vi.fn().mockResolvedValue(undefined);
+vi.mock('@/lib/segment-creator', () => ({
+  createSegmentsAndQueueAudio: (...args: unknown[]) => mockCreateSegmentsAndQueueAudio(...args),
 }));
 
 vi.mock('@/lib/byok', () => ({
@@ -132,6 +164,21 @@ vi.mock('@/lib/tier-features', () => ({
 vi.mock('@/lib/providers/ai-registry', () => ({
   resolveAiModelAndProvider: vi.fn().mockResolvedValue({ model: 'claude-haiku-4-5-20251001', provider: 'anthropic' }),
   getCheapestModelForProvider: vi.fn().mockReturnValue('claude-haiku-4-5-20251001'),
+  getAllAiProviderMeta: vi.fn().mockReturnValue([]),
+  getAiProviderMeta: vi.fn().mockReturnValue({ id: 'anthropic', models: [] }),
+  getAiProviderIds: vi.fn().mockReturnValue([]),
+  getAiProviderIdsWithPricing: vi.fn().mockReturnValue([]),
+  isValidAiProviderId: vi.fn().mockReturnValue(false),
+  isValidModelId: vi.fn().mockReturnValue(false),
+  isReasoningModel: vi.fn().mockReturnValue(false),
+  getProviderForModel: vi.fn().mockReturnValue('anthropic'),
+  getAiModelDisplayName: vi.fn().mockReturnValue('claude-haiku-4-5-20251001'),
+  getAllAiProviderClientMeta: vi.fn().mockReturnValue([]),
+  getPricetokenModelInfo: vi.fn().mockReturnValue(null),
+  getModelRequiredPlan: vi.fn().mockReturnValue(null),
+  getModelContextWindow: vi.fn().mockReturnValue(200000),
+  getModelMaxOutputTokens: vi.fn().mockReturnValue(8192),
+  validateAiProviderCredentials: vi.fn().mockResolvedValue({ valid: true }),
 }));
 
 vi.mock('@/lib/free-tier-provider-selector', () => ({
@@ -172,6 +219,35 @@ vi.mock('@/lib/script-verifier', () => ({
     quick_overview: 3,
     eli5: 3,
   },
+}));
+
+vi.mock('@/lib/script-generator', () => ({
+  generateScript: vi.fn().mockResolvedValue({ turns: [], references: [], markdown: '' }),
+  generateScriptWithFeedback: vi.fn().mockResolvedValue({ turns: [], references: [], markdown: '' }),
+  generateScriptWithUserFeedback: vi.fn().mockResolvedValue({ turns: [], references: [], markdown: '' }),
+}));
+
+vi.mock('@/lib/auto-model-config', () => ({
+  getAutoModelConfig: vi.fn().mockResolvedValue({
+    freeAiProvider: 'anthropic',
+    freeAiModel: 'claude-haiku-4-5-20251001',
+    proAiProvider: 'anthropic',
+    proAiModel: 'claude-sonnet-4-20250514',
+    platformAiProvider: 'anthropic',
+    platformAiModel: 'claude-haiku-4-5-20251001',
+    dailyFreeLimit: 3,
+    dailyProLimit: 50,
+  }),
+  resolveAutoModel: vi.fn().mockResolvedValue({
+    aiProvider: 'anthropic',
+    aiModel: 'claude-haiku-4-5-20251001',
+  }),
+}));
+
+vi.mock('@/lib/llm', () => ({
+  generateResponse: vi.fn().mockResolvedValue('mock LLM response'),
+  streamResponse: vi.fn(),
+  WEB_SEARCH_TOOL: { name: 'web_search', type: 'web_search_20250305' },
 }));
 
 vi.mock('@/lib/logger', () => ({
@@ -281,61 +357,16 @@ describe('processReferenceValidation', () => {
       });
     });
 
-    it('creates segments from script turns when no references exist', async () => {
+    it('creates segments and queues audio when no references exist', async () => {
       const job = createMockJob(defaultPayload);
       await processReferenceValidation(job);
 
-      expect(mockPrismaSegmentCreate).toHaveBeenCalledWith({
-        data: {
-          podcastId: 'podcast-001',
-          speaker: 'HOST',
-          text: 'Welcome to the show! [1]',
-          order: 0,
-        },
-      });
-
-      expect(mockPrismaSegmentCreate).toHaveBeenCalledWith({
-        data: {
-          podcastId: 'podcast-001',
-          speaker: 'EXPERT',
-          text: 'Thanks for having me!',
-          order: 1,
-        },
-      });
-    });
-
-    it('queues audio generation for each segment when no references exist', async () => {
-      const job = createMockJob(defaultPayload);
-      await processReferenceValidation(job);
-
-      expect(mockAddJob).toHaveBeenCalledWith({ name: 'audio-generation' }, 'generate_audio', {
-        podcastId: 'podcast-001',
-        segmentId: 'segment-000',
-        speaker: 'HOST',
-        text: 'Welcome to the show! [1]',
-        previousText: undefined,
-        nextText: 'Thanks for having me!',
-      }, expect.anything());
-
-      expect(mockAddJob).toHaveBeenCalledWith({ name: 'audio-generation' }, 'generate_audio', {
-        podcastId: 'podcast-001',
-        segmentId: 'segment-001',
-        speaker: 'EXPERT',
-        text: 'Thanks for having me!',
-        previousText: 'Welcome to the show! [1]',
-        nextText: undefined,
-      }, expect.anything());
-    });
-
-    it('still queues audio generation when no references exist', async () => {
-      const job = createMockJob(defaultPayload);
-      await processReferenceValidation(job);
-
-      expect(mockAddJob).toHaveBeenCalledWith(
-        { name: 'audio-generation' },
-        'generate_audio',
-        expect.objectContaining({ podcastId: 'podcast-001' }),
-        expect.anything()
+      expect(mockCreateSegmentsAndQueueAudio).toHaveBeenCalledWith(
+        'podcast-001',
+        expect.arrayContaining([
+          expect.objectContaining({ speaker: 'HOST', text: 'Welcome to the show! [1]' }),
+          expect.objectContaining({ speaker: 'EXPERT', text: 'Thanks for having me!' }),
+        ])
       );
     });
   });
@@ -825,29 +856,26 @@ describe('processReferenceValidation', () => {
       );
     });
 
-    it('pauses at SCRIPT_READY when all references are removed', async () => {
-      const job = createMockJob(defaultPayload);
+    it('pauses at SCRIPT_READY when all references are removed (retries exhausted)', async () => {
+      // Use max retry attempt so the worker falls through to SCRIPT_READY
+      const job = createMockJob({ ...defaultPayload, referenceRetryAttempt: 2 });
       await processReferenceValidation(job);
 
       expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
         where: { id: 'podcast-001' },
-        data: { status: 'SCRIPT_READY', lowReferences: true },
+        data: expect.objectContaining({ status: 'SCRIPT_READY', lowReferences: true }),
       });
     });
 
     it('does not continue to audio generation when all references are removed', async () => {
-      const job = createMockJob(defaultPayload);
+      const job = createMockJob({ ...defaultPayload, referenceRetryAttempt: 2 });
       await processReferenceValidation(job);
 
-      expect(mockAddJob).not.toHaveBeenCalledWith(
-        expect.anything(),
-        'generate_audio',
-        expect.anything()
-      );
+      expect(mockCreateSegmentsAndQueueAudio).not.toHaveBeenCalled();
     });
 
     it('sends SCRIPT_READY notification when all references are removed', async () => {
-      const job = createMockJob(defaultPayload);
+      const job = createMockJob({ ...defaultPayload, referenceRetryAttempt: 2 });
       await processReferenceValidation(job);
 
       expect(mockAddJob).toHaveBeenCalledWith(
@@ -863,34 +891,15 @@ describe('processReferenceValidation', () => {
   });
 
   describe('segment creation and audio generation queueing', () => {
-    it('creates segments from script turns after validation', async () => {
+    it('delegates segment creation and audio queueing to createSegmentsAndQueueAudio', async () => {
       const job = createMockJob(defaultPayload);
       await processReferenceValidation(job);
 
-      expect(mockPrismaSegmentCreate).toHaveBeenCalledTimes(2);
-      expect(mockPrismaSegmentCreate).toHaveBeenCalledWith({
-        data: {
-          podcastId: 'podcast-001',
-          speaker: 'HOST',
-          text: 'Welcome to the show! [1]',
-          order: 0,
-        },
-      });
-    });
-
-    it('queues audio generation for each segment', async () => {
-      const job = createMockJob(defaultPayload);
-      await processReferenceValidation(job);
-
-      expect(mockAddJob).toHaveBeenCalledWith(
-        { name: 'audio-generation' },
-        'generate_audio',
-        expect.objectContaining({
-          podcastId: 'podcast-001',
-          segmentId: 'segment-000',
-          speaker: 'HOST',
-        }),
-        expect.anything()
+      expect(mockCreateSegmentsAndQueueAudio).toHaveBeenCalledWith(
+        'podcast-001',
+        expect.arrayContaining([
+          expect.objectContaining({ speaker: 'HOST', text: 'Welcome to the show! [1]' }),
+        ])
       );
     });
 
@@ -900,7 +909,7 @@ describe('processReferenceValidation', () => {
 
       expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
         where: { id: 'podcast-001' },
-        data: { status: 'GENERATING_AUDIO' },
+        data: expect.objectContaining({ status: 'GENERATING_AUDIO' }),
       });
     });
   });
@@ -1033,7 +1042,7 @@ describe('processReferenceValidation', () => {
 
     it('propagates errors from segment creation', async () => {
       mockPrismaReferenceUpdate.mockResolvedValue({});
-      mockPrismaSegmentCreate.mockRejectedValueOnce(new Error('Segment creation failed'));
+      mockCreateSegmentsAndQueueAudio.mockRejectedValueOnce(new Error('Segment creation failed'));
       const job = createMockJob(defaultPayload);
 
       await expect(processReferenceValidation(job)).rejects.toThrow('Segment creation failed');
@@ -1059,16 +1068,15 @@ describe('processReferenceValidation', () => {
         rejectedRefIds: new Set<string>(),
       });
 
-      const job = createMockJob(defaultPayload);
+      // Exhaust retries so the worker falls through to SCRIPT_READY
+      const job = createMockJob({ ...defaultPayload, referenceRetryAttempt: 2 });
       await processReferenceValidation(job);
 
       expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
         where: { id: 'podcast-001' },
-        data: { status: 'SCRIPT_READY', lowReferences: true },
+        data: expect.objectContaining({ status: 'SCRIPT_READY', lowReferences: true }),
       });
-      expect(mockAddJob).not.toHaveBeenCalledWith(
-        expect.anything(), 'generate_audio', expect.anything()
-      );
+      expect(mockCreateSegmentsAndQueueAudio).not.toHaveBeenCalled();
     });
 
     it('continues when remaining references meet minimum', async () => {
@@ -1149,8 +1157,9 @@ describe('processReferenceValidation', () => {
       await processReferenceValidation(job);
 
       // Showcase should proceed to audio, not pause at SCRIPT_READY due to gate
-      expect(mockAddJob).toHaveBeenCalledWith(
-        expect.anything(), 'generate_audio', expect.anything(), expect.anything()
+      expect(mockCreateSegmentsAndQueueAudio).toHaveBeenCalledWith(
+        'podcast-001',
+        expect.any(Array)
       );
     });
 
