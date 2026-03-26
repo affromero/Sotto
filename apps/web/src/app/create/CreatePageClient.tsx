@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { usePodcastStatus } from '@/lib/hooks/usePodcastStatus';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Shield } from 'lucide-react';
@@ -262,73 +263,26 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
     await createPodcast(paymentIntentIds);
   }, [createPodcast]);
 
-  // Poll during scripting phase (waiting for SCRIPT_READY)
-  const scriptingPollRef = useRef(false);
-  useEffect(() => {
-    if (step !== 'scripting' || !podcastId) return;
-    scriptingPollRef.current = true;
+  // SSE-based status watching for scripting + generating phases
+  const isWatchingStatus = (step === 'scripting' || step === 'generating') && !!podcastId;
+  usePodcastStatus({
+    podcastId: isWatchingStatus ? podcastId : null,
+    initialStatus: pipelineStatus ?? undefined,
+    onStatusChange: useCallback((event) => {
+      setPipelineStatus(event.status);
 
-    const interval = setInterval(async () => {
-      if (!scriptingPollRef.current) return;
-      try {
-        const res = await fetch(`/api/podcasts/${podcastId}`);
-        if (!res.ok) return;
-        const data = await res.json();
-        setPipelineStatus(data.status);
-
-        if (data.status === 'SCRIPT_READY') {
-          scriptingPollRef.current = false;
-          setStep('script-preview');
-        } else if (data.status === 'FAILED') {
-          scriptingPollRef.current = false;
-          setError(data.failureReason || 'Script generation failed. Please try again.');
-          setFailedPodcastId(podcastId);
-          setStep('voice');
-        }
-      } catch {
-        // Silently ignore polling errors
+      if (event.status === 'SCRIPT_READY') {
+        setStep('script-preview');
+      } else if (event.status === 'READY') {
+        router.push(`/podcast/${podcastId}`);
+      } else if (event.status === 'FAILED') {
+        const reason = (event.failureReason as string) || 'Generation failed. Please try again.';
+        setError(reason);
+        setFailedPodcastId(podcastId);
+        setStep(step === 'scripting' ? 'voice' : 'script-preview');
       }
-    }, 3000);
-
-    return () => {
-      scriptingPollRef.current = false;
-      clearInterval(interval);
-    };
-  }, [step, podcastId]);
-
-  // Poll during generating phase (waiting for READY)
-  const generatingPollRef = useRef(false);
-  useEffect(() => {
-    if (step !== 'generating' || !podcastId) return;
-    generatingPollRef.current = true;
-
-    const interval = setInterval(async () => {
-      if (!generatingPollRef.current) return;
-      try {
-        const res = await fetch(`/api/podcasts/${podcastId}`);
-        if (!res.ok) return;
-        const data = await res.json();
-        setPipelineStatus(data.status);
-
-        if (data.status === 'READY') {
-          generatingPollRef.current = false;
-          router.push(`/podcast/${podcastId}`);
-        } else if (data.status === 'FAILED') {
-          generatingPollRef.current = false;
-          setError(data.failureReason || 'Audio generation failed. Please try again.');
-          setFailedPodcastId(podcastId);
-          setStep('script-preview');
-        }
-      } catch {
-        // Silently ignore polling errors
-      }
-    }, 3000);
-
-    return () => {
-      generatingPollRef.current = false;
-      clearInterval(interval);
-    };
-  }, [step, podcastId, router]);
+    }, [podcastId, router, step]),
+  });
 
   const handleCancel = useCallback(async () => {
     if (!podcastId || isCancelling) return;
