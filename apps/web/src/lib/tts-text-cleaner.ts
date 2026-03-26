@@ -1,10 +1,41 @@
 /**
+ * Audience reaction tags that should be stripped from TTS input and
+ * converted to SFX inserts at render time. Scoped carefully to NOT
+ * match speaker-level tags like [laughs], [chuckles], [sighs].
+ */
+export const AUDIENCE_REACTION_PATTERN = /\[(?:audience laughs?|audience laughter|crowd laughter|applause|audience applause|crowd cheers)\]/gi;
+
+export type AudienceReactionType = 'laugh_track' | 'applause';
+
+export interface AudienceReaction {
+  type: AudienceReactionType;
+  offsetChars: number; // character offset in the original text
+}
+
+/**
+ * Extract audience reaction tags and their positions from turn text.
+ * Used by the stitching worker to inject SFX at correct timestamps.
+ */
+export function extractAudienceReactions(text: string): AudienceReaction[] {
+  const reactions: AudienceReaction[] = [];
+  const re = /\[(audience laughs?|audience laughter|crowd laughter|applause|audience applause|crowd cheers)\]/gi;
+  let match;
+  while ((match = re.exec(text)) !== null) {
+    const tag = match[1].toLowerCase();
+    const type: AudienceReactionType = tag.includes('applause') || tag.includes('cheers') ? 'applause' : 'laugh_track';
+    reactions.push({ type, offsetChars: match.index });
+  }
+  return reactions;
+}
+
+/**
  * TTS text safety net — strips non-speech markers before sending to TTS.
  * Provider-specific tag conversion is handled upstream by tts-tag-converter.ts.
  */
 export function cleanTextForTts(text: string): string {
   return text
     .replace(/\[SFX:.*?\]/gi, '')
+    .replace(AUDIENCE_REACTION_PATTERN, '')
     .replace(/\s*\[\d+(?:,\s*\d+)*\]/g, '')
     .replace(/\s{2,}/g, ' ')
     .trim();
