@@ -129,15 +129,14 @@ export async function getAllCurrentPricing(): Promise<
   }
 }
 
-let refreshInterval: ReturnType<typeof setInterval> | null = null;
-
 /**
- * Start the 5-minute pricing refresh interval.
+ * Load pricing from DB once on startup.
+ * The daily pricing-fetch worker handles ongoing updates — no in-process interval needed.
  * Call this from workers/index.ts or Next.js instrumentation — NOT at module scope.
  */
+let _startedOnce = false;
 export function startPricingRefreshInterval(): void {
-  if (refreshInterval) return;
-  refreshInterval = setInterval(refreshPricingFromDb, 5 * 60 * 1000);
-  // Do an initial refresh
+  if (_startedOnce) return;
+  _startedOnce = true;
   refreshPricingFromDb().catch(() => {});
 }

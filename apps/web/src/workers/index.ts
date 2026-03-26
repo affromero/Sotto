@@ -245,11 +245,11 @@ if (shouldRun('email-digest')) {
     .catch((err) => logger.error('Failed to schedule email digest', { error: err.message }));
 }
 
-// Schedule cleanup every 15 minutes (stale drafts + stuck video generations)
+// Schedule cleanup every 2 hours (stale drafts + stuck video generations)
 if (shouldRun('draft-cleanup')) {
   draftCleanupQueue
-    .add(JobType.CLEANUP_DRAFTS, {}, { repeat: { every: 15 * 60 * 1000 } })
-    .then(() => logger.info('Cleanup scheduled', { intervalMs: '900000' }))
+    .add(JobType.CLEANUP_DRAFTS, {}, { repeat: { every: 2 * 60 * 60 * 1000 } })
+    .then(() => logger.info('Cleanup scheduled', { intervalMs: '7200000' }))
     .catch((err) => logger.error('Failed to schedule cleanup', { error: err.message }));
 }
 
@@ -295,17 +295,17 @@ if (shouldRun('feature-computation')) {
     .catch((err) => logger.error('Failed to schedule feature computation', { error: err.message }));
 }
 
-// Schedule news ingestion every 30 minutes
+// Schedule news ingestion every 4 hours
 if (shouldRun('news-ingest')) {
   newsIngestQueue
-    .add(JobType.INGEST_NEWS, {}, { repeat: { every: 30 * 60 * 1000 } })
-    .then(() => logger.info('News ingestion scheduled', { intervalMs: '1800000' }))
+    .add(JobType.INGEST_NEWS, {}, { repeat: { every: 4 * 60 * 60 * 1000 } })
+    .then(() => logger.info('News ingestion scheduled', { intervalMs: '14400000' }))
     .catch((err) => logger.error('Failed to schedule news ingestion', { error: err.message }));
 
-  // Daily briefing scheduler (every 15 minutes)
+  // Briefing scheduler (every 1 hour)
   briefingSchedulerQueue
-    .add(JobType.SCHEDULE_BRIEFINGS, {}, { repeat: { every: 15 * 60 * 1000 } })
-    .then(() => logger.info('Briefing scheduler started', { intervalMs: '900000' }))
+    .add(JobType.SCHEDULE_BRIEFINGS, {}, { repeat: { every: 60 * 60 * 1000 } })
+    .then(() => logger.info('Briefing scheduler started', { intervalMs: '3600000' }))
     .catch((err) => logger.error('Failed to schedule briefings', { error: err.message }));
 }
 
