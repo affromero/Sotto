@@ -4,7 +4,7 @@ import { authenticateRequest } from '@/lib/api-keys';
 import { createSegmentsAndQueueAudio } from '@/lib/segment-creator';
 import { convertTurnsForProvider } from '@/lib/tts-tag-converter';
 import type { TtsProviderId } from '@/lib/providers/tts-registry';
-import { checkRateLimit } from '@/lib/redis';
+import { checkRateLimit, invalidatePodcastCache, publishPodcastStatus } from '@/lib/redis';
 import { checkGenerationGate } from '@/lib/generation-gate';
 import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
 import { assignVoicesForPodcast } from '@/lib/voice-assigner';
@@ -147,6 +147,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     where: { id: podcastId },
     data: { status: 'GENERATING_AUDIO' },
   });
+  await invalidatePodcastCache(podcastId);
+  await publishPodcastStatus(podcastId, { status: 'GENERATING_AUDIO' });
 
   return NextResponse.json({ success: true });
 }

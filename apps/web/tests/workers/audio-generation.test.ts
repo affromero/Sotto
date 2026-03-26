@@ -135,6 +135,8 @@ vi.mock('@/lib/redis', () => ({
     acquire: vi.fn().mockResolvedValue(true),
     release: vi.fn().mockResolvedValue(undefined),
   },
+  invalidatePodcastCache: vi.fn().mockResolvedValue(undefined),
+  publishPodcastStatus: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('@/lib/byok', () => ({

@@ -80,6 +80,14 @@ vi.mock('@/lib/pipeline-resume', () => ({
   markPodcastFailed: vi.fn().mockResolvedValue(undefined),
 }));
 
+const mockInvalidatePodcastCache = vi.fn().mockResolvedValue(undefined);
+const mockPublishPodcastStatus = vi.fn().mockResolvedValue(undefined);
+
+vi.mock('@/lib/redis', () => ({
+  invalidatePodcastCache: (...args: unknown[]) => mockInvalidatePodcastCache(...args),
+  publishPodcastStatus: (...args: unknown[]) => mockPublishPodcastStatus(...args),
+}));
+
 vi.mock('@/lib/usage-logger', () => ({
   logUsage: vi.fn().mockResolvedValue(undefined),
 }));
@@ -425,6 +433,17 @@ describe('processContentExtraction', () => {
         data: { status: 'SCRIPTING' },
       });
     });
+
+    it('invalidates podcast cache and publishes status after SCRIPTING transition', async () => {
+      const job = createMockJob({
+        ...defaultPayload,
+        sourceText: 'Test content',
+      });
+      await processContentExtraction(job);
+
+      expect(mockInvalidatePodcastCache).toHaveBeenCalledWith('podcast-001');
+      expect(mockPublishPodcastStatus).toHaveBeenCalledWith('podcast-001', { status: 'SCRIPTING' });
+    });
   });
 
   describe('pipeline chaining', () => {
@@ -539,6 +558,22 @@ describe('processContentExtraction', () => {
         }),
         { jobId: expect.any(String) },
       );
+    });
+
+    it('invalidates cache on the idempotent early-return path too', async () => {
+      mockPrismaDiscoveryFindUnique.mockResolvedValue({
+        id: 'discovery-existing',
+        sourceContent: 'Already extracted content',
+      });
+
+      const job = createMockJob({
+        ...defaultPayload,
+        sourceUrl: 'https://example.com/article',
+      });
+      await processContentExtraction(job);
+
+      expect(mockInvalidatePodcastCache).toHaveBeenCalledWith('podcast-001');
+      expect(mockPublishPodcastStatus).toHaveBeenCalledWith('podcast-001', { status: 'SCRIPTING' });
     });
 
     it('proceeds normally when sourceContent is null', async () => {

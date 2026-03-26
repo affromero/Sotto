@@ -82,7 +82,7 @@ export function VoiceTrackSelector({
     );
     if (!hasInProgress) return;
 
-    const interval = setInterval(fetchTracks, 5000);
+    const interval = setInterval(fetchTracks, 10000);
     return () => clearInterval(interval);
   }, [tracks, fetchTracks]);
 

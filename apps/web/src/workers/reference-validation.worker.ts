@@ -8,6 +8,7 @@ import {
 } from '@/lib/queue';
 import { Prisma } from '@prisma/client';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
+import { invalidatePodcastCache, publishPodcastStatus } from '@/lib/redis';
 import { type ReferenceInput } from '@/lib/reference-validator';
 import { runReferenceVerification, buildReferenceRetryFeedback, mergeVerifiedReferences } from '@/lib/reference-verification';
 import { generateScriptWithFeedback } from '@/lib/script-generator';
@@ -109,6 +110,8 @@ export async function processReferenceValidation(
         where: { id: podcastId },
         data: { status: 'SCRIPT_READY', lowReferences: true },
       });
+      await invalidatePodcastCache(podcastId);
+      await publishPodcastStatus(podcastId, { status: 'SCRIPT_READY' });
 
       await addJob(notificationQueue, JobType.SEND_NOTIFICATION, {
         userId,
@@ -567,6 +570,8 @@ export async function processReferenceValidation(
         },
       },
     });
+    await invalidatePodcastCache(podcastId);
+    await publishPodcastStatus(podcastId, { status: 'SCRIPT_READY' });
 
     await addJob(notificationQueue, JobType.SEND_NOTIFICATION, {
       userId,
@@ -618,6 +623,8 @@ export async function processReferenceValidation(
       where: { id: podcastId },
       data: { status: 'SCRIPT_READY', verificationProgress: Prisma.DbNull },
     });
+    await invalidatePodcastCache(podcastId);
+    await publishPodcastStatus(podcastId, { status: 'SCRIPT_READY' });
 
     await addJob(notificationQueue, JobType.SEND_NOTIFICATION, {
       userId,
@@ -660,6 +667,8 @@ export async function processReferenceValidation(
       where: { id: podcastId },
       data: { status: 'GENERATING_AUDIO', verificationProgress: Prisma.DbNull },
     });
+    await invalidatePodcastCache(podcastId);
+    await publishPodcastStatus(podcastId, { status: 'GENERATING_AUDIO' });
 
     logger.info('References validated, auto-approved for audio generation', { podcastId });
   }

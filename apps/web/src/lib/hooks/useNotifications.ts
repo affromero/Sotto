@@ -4,9 +4,9 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { NotificationData } from '@/types/notification';
 
 /** Background poll interval when SSE is connected (consistency check) */
-const SSE_POLL_INTERVAL_MS = 60_000;
+const SSE_POLL_INTERVAL_MS = 120_000;
 /** Poll interval when SSE is not available (fallback) */
-const FALLBACK_POLL_INTERVAL_MS = 30_000;
+const FALLBACK_POLL_INTERVAL_MS = 60_000;
 
 interface UseNotificationsOptions {
   onNewNotifications?: (notifications: NotificationData[]) => void;

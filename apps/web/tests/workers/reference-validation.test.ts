@@ -212,6 +212,11 @@ vi.mock('@/lib/pipeline-resume', () => ({
   markPodcastFailed: vi.fn(),
 }));
 
+vi.mock('@/lib/redis', () => ({
+  invalidatePodcastCache: vi.fn().mockResolvedValue(undefined),
+  publishPodcastStatus: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock('@/lib/script-verifier', () => ({
   MIN_REFERENCE_COUNTS: {
     deep_dive: 10,
