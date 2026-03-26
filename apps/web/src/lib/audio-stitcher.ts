@@ -197,6 +197,175 @@ export async function stitchWithEffects(params: {
 }
 
 /**
+ * Stitch speech + SFX with an optional music bed that ducks under speech.
+ *
+ * When musicPath is provided, adds sidechain compression so the music
+ * automatically drops in volume when speech is present and rises during pauses.
+ * When absent, delegates to stitchWithEffects (backward compatible).
+ */
+export async function stitchWithEffectsAndMusic(params: {
+  segmentPaths: string[];
+  sfxInserts: SfxInsert[];
+  outputPath: string;
+  crossfadeMs?: number;
+  musicPath?: string;
+  musicVolume?: number; // 0.0-1.0, default 0.15
+}): Promise<{ duration: number }> {
+  const { musicPath, musicVolume = 0.15 } = params;
+
+  // No music — delegate to existing function
+  if (!musicPath) {
+    return stitchWithEffects(params);
+  }
+
+  const { execFile } = await import('child_process');
+  const { promisify } = await import('util');
+  const execFileAsync = promisify(execFile);
+
+  const { segmentPaths, sfxInserts, outputPath, crossfadeMs = 300 } = params;
+
+  if (segmentPaths.length === 0) {
+    throw new Error('No segments to stitch');
+  }
+
+  // Build FFmpeg inputs: segments + SFX + music (last input)
+  const inputArgs: string[] = [];
+  let inputIndex = 0;
+
+  for (const segPath of segmentPaths) {
+    inputArgs.push('-i', segPath);
+    inputIndex++;
+  }
+
+  const sfxStartIndex = inputIndex;
+  for (const sfx of sfxInserts) {
+    inputArgs.push('-i', sfx.path);
+    inputIndex++;
+  }
+
+  const musicIdx = inputIndex;
+  inputArgs.push('-i', musicPath);
+  inputIndex++;
+
+  // Build filter graph
+  const filters: string[] = [];
+  const crossfadeSec = crossfadeMs / 1000;
+
+  // Step 1: Normalize speech segments
+  for (let i = 0; i < segmentPaths.length; i++) {
+    filters.push(
+      `[${i}:a]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=mono[seg${i}]`
+    );
+  }
+
+  // Step 2: Crossfade speech
+  if (segmentPaths.length === 1) {
+    filters.push(`[seg0]acopy[speech]`);
+  } else if (segmentPaths.length === 2) {
+    filters.push(`[seg0][seg1]acrossfade=d=${crossfadeSec}:c1=tri:c2=tri[speech]`);
+  } else {
+    filters.push(`[seg0][seg1]acrossfade=d=${crossfadeSec}:c1=tri:c2=tri[xf0]`);
+    for (let i = 2; i < segmentPaths.length; i++) {
+      const prevLabel = i === 2 ? 'xf0' : `xf${i - 2}`;
+      const outLabel = i === segmentPaths.length - 1 ? 'speech' : `xf${i - 1}`;
+      filters.push(
+        `[${prevLabel}][seg${i}]acrossfade=d=${crossfadeSec}:c1=tri:c2=tri[${outLabel}]`
+      );
+    }
+  }
+
+  // Step 3: Normalize music and apply sidechain compression (duck under speech)
+  filters.push(
+    `[${musicIdx}:a]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=mono,volume=${musicVolume}[music_raw]`
+  );
+  // Sidechain compress: music ducks when speech is present
+  // threshold=0.02 (duck on any speech), ratio=6 (aggressive), attack=50ms, release=300ms
+  filters.push(
+    `[music_raw][speech]sidechaincompress=threshold=0.02:ratio=6:attack=50:release=300:level_sc=1:mix=0.8[ducked_music]`
+  );
+  // Mix ducked music with speech; duration=first so speech controls length
+  filters.push(
+    `[speech][ducked_music]amix=inputs=2:duration=first:dropout_transition=0[speech_with_music]`
+  );
+
+  // Step 4: Mix SFX onto speech+music (same logic as stitchWithEffects)
+  const speechLabel = 'speech_with_music';
+  if (sfxInserts.length > 0) {
+    for (let i = 0; i < sfxInserts.length; i++) {
+      const sfxIdx = sfxStartIndex + i;
+      const sfx = sfxInserts[i];
+      const volume = sfx.volume?.toString() ?? SFX_VOLUME_MAP[sfx.type] ?? '0.3';
+      const fadeFilter = sfx.fadeOutMs && sfx.durationMs > sfx.fadeOutMs
+        ? `,afade=t=out:st=${((sfx.durationMs - sfx.fadeOutMs) / 1000).toFixed(3)}:d=${(sfx.fadeOutMs / 1000).toFixed(3)}`
+        : '';
+      filters.push(
+        `[${sfxIdx}:a]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=mono,volume=${volume}${fadeFilter}[sfx${i}]`
+      );
+    }
+
+    for (let i = 0; i < sfxInserts.length; i++) {
+      const sfx = sfxInserts[i];
+      const delayMs = sfx.delayMs ?? 0;
+      if (delayMs > 0) {
+        filters.push(`[sfx${i}]adelay=${delayMs}|${delayMs}[sfxd${i}]`);
+      } else {
+        filters.push(`[sfx${i}]acopy[sfxd${i}]`);
+      }
+    }
+
+    let currentLabel = speechLabel;
+    for (let i = 0; i < sfxInserts.length; i++) {
+      const outLabel = i === sfxInserts.length - 1 ? 'mixed' : `mix${i}`;
+      filters.push(
+        `[${currentLabel}][sfxd${i}]amix=inputs=2:duration=first:dropout_transition=0[${outLabel}]`
+      );
+      currentLabel = outLabel;
+    }
+
+    filters.push(`[${currentLabel}]loudnorm=I=-16:TP=-1.5:LRA=11[out]`);
+  } else {
+    filters.push(`[${speechLabel}]loudnorm=I=-16:TP=-1.5:LRA=11[out]`);
+  }
+
+  const filterGraph = filters.join(';');
+
+  const ffmpegArgs = [
+    '-y',
+    ...inputArgs,
+    '-filter_complex',
+    filterGraph,
+    '-map',
+    '[out]',
+    '-c:a',
+    'libmp3lame',
+    '-b:a',
+    '128k',
+    '-ac',
+    '1',
+    outputPath,
+  ];
+
+  logger.info('Running FFmpeg stitch with music', {
+    segments: String(segmentPaths.length),
+    sfx: String(sfxInserts.length),
+    musicVolume: String(musicVolume),
+  });
+
+  await execFileAsync('ffmpeg', ffmpegArgs, { maxBuffer: 50 * 1024 * 1024 });
+
+  const duration = await getAudioDuration(outputPath);
+
+  logger.info('Audio stitching with music complete', {
+    outputPath,
+    segmentCount: String(segmentPaths.length),
+    sfxCount: String(sfxInserts.length),
+    duration: String(Math.round(duration)),
+  });
+
+  return { duration };
+}
+
+/**
  * Simple segment concatenation with loudness normalization (no SFX).
  * Kept as a fast path for re-stitching after interactions.
  */
