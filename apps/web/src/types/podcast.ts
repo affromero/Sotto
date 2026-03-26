@@ -87,6 +87,7 @@ export interface PodcastDetail extends PodcastSummary {
   videoUrl: string | null;
   musicUrl: string | null;
   musicVolume: number;
+  musicBaked: boolean;
   isLiked: boolean;
   isSaved: boolean;
   voiceTracks: VoiceTrackSummary[];

@@ -13,6 +13,7 @@ const mockPodcastData: PodcastDetail = {
   videoUrl: null,
   musicUrl: null,
   musicVolume: 0.15,
+  musicBaked: false,
   duration: 600,
   visibility: 'PUBLIC',
   createdAt: '2024-01-01T00:00:00Z',

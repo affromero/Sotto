@@ -326,6 +326,7 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
     videoUrl: resolvedVideoUrl ?? null,
     musicUrl: resolvedMusicUrl ?? null,
     musicVolume: podcast.musicVolume,
+    musicBaked: podcast.musicBaked,
     tags: podcast.tags.map((pt) => pt.tag),
     forkedFrom: podcast.forkedFrom
       ? {
