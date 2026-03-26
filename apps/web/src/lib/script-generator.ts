@@ -70,7 +70,7 @@ export type ScriptTurn = {
 };
 
 export type SoundCue = {
-  type: 'intro' | 'transition' | 'outro' | 'ambient';
+  type: 'intro' | 'transition' | 'outro' | 'ambient' | 'laugh_track' | 'music_sting' | 'applause' | 'comedic_hit' | 'rim_shot';
   prompt: string; // text prompt for sound effect generation
   durationSeconds: number;
   insertAfterTurn: number; // index of the turn after which to insert this cue

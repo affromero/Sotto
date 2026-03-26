@@ -844,7 +844,7 @@ export const generatedScriptSchema = z.object({
     direction: z.string().optional(),
   })).min(1),
   soundCues: z.array(z.object({
-    type: z.enum(['intro', 'transition', 'outro', 'ambient']),
+    type: z.enum(['intro', 'transition', 'outro', 'ambient', 'laugh_track', 'music_sting', 'applause', 'comedic_hit', 'rim_shot']),
     prompt: z.string().min(1),
     durationSeconds: z.number().positive(),
     insertAfterTurn: z.number().int(),
