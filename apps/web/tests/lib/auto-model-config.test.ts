@@ -2,14 +2,18 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ---- Mocks ----
 
-const mockAutoModelConfigUpsert = vi.fn();
+const mockAutoModelConfigFindUnique = vi.fn();
+const mockAutoModelConfigCreate = vi.fn();
 const mockAutoModelConfigUpdate = vi.fn();
+const mockAutoModelConfigUpsert = vi.fn();
 
 vi.mock('@/lib/prisma', () => {
   const _mockPrisma = {
     autoModelConfig: {
-      upsert: (...args: unknown[]) => mockAutoModelConfigUpsert(...args),
+      findUnique: (...args: unknown[]) => mockAutoModelConfigFindUnique(...args),
+      create: (...args: unknown[]) => mockAutoModelConfigCreate(...args),
       update: (...args: unknown[]) => mockAutoModelConfigUpdate(...args),
+      upsert: (...args: unknown[]) => mockAutoModelConfigUpsert(...args),
     },
   };
   return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
@@ -123,7 +127,7 @@ describe('getAutoModelConfig', () => {
   });
 
   it('returns correct structure with free, pro, and included model fields', async () => {
-    mockAutoModelConfigUpsert.mockResolvedValue(defaultRow);
+    mockAutoModelConfigFindUnique.mockResolvedValue(defaultRow);
 
     const result = await getAutoModelConfig();
 
@@ -194,7 +198,7 @@ describe('getAutoModelConfig', () => {
   });
 
   it('parses JSON included model arrays from database', async () => {
-    mockAutoModelConfigUpsert.mockResolvedValue({
+    mockAutoModelConfigFindUnique.mockResolvedValue({
       ...defaultRow,
       freeIncludedModels: ['model-a'],
       proIncludedModels: ['model-a', 'model-b'],
@@ -215,7 +219,7 @@ describe('getAutoModelConfig', () => {
   });
 
   it('falls back to null for malformed JSON in included models', async () => {
-    mockAutoModelConfigUpsert.mockResolvedValue({
+    mockAutoModelConfigFindUnique.mockResolvedValue({
       ...defaultRow,
       freeIncludedModels: 'not-an-array',
       proIncludedModels: 123,
@@ -235,15 +239,25 @@ describe('getAutoModelConfig', () => {
     expect(result.proIncludedSttModels).toBeNull();
   });
 
-  it('calls upsert with singleton id, empty update, and registry-derived seeds', async () => {
-    mockAutoModelConfigUpsert.mockResolvedValue(defaultRow);
+  it('calls findUnique with singleton id and skips create when row exists', async () => {
+    mockAutoModelConfigFindUnique.mockResolvedValue(defaultRow);
 
     await getAutoModelConfig();
 
-    expect(mockAutoModelConfigUpsert).toHaveBeenCalledWith({
+    expect(mockAutoModelConfigFindUnique).toHaveBeenCalledWith({
       where: { id: 'singleton' },
-      update: {},
-      create: expect.objectContaining({
+    });
+    expect(mockAutoModelConfigCreate).not.toHaveBeenCalled();
+  });
+
+  it('creates the singleton row when findUnique returns null', async () => {
+    mockAutoModelConfigFindUnique.mockResolvedValueOnce(null);
+    mockAutoModelConfigCreate.mockResolvedValueOnce(defaultRow);
+
+    await getAutoModelConfig();
+
+    expect(mockAutoModelConfigCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
         id: 'singleton',
         freeAiProvider: 'anthropic',
         freeAiModel: 'claude-haiku-4-5-20251001',
@@ -257,6 +271,7 @@ describe('getAutoModelConfig', () => {
 describe('setAutoModelConfig', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockAutoModelConfigFindUnique.mockResolvedValue(defaultRow);
     mockAutoModelConfigUpsert.mockResolvedValue(defaultRow);
   });
 
@@ -798,7 +813,7 @@ describe('resolveIncludedVideoModels', () => {
 describe('resolveAutoModel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockAutoModelConfigUpsert.mockResolvedValue(defaultRow);
+    mockAutoModelConfigFindUnique.mockResolvedValue(defaultRow);
   });
 
   it('returns free config for FREE plan', async () => {

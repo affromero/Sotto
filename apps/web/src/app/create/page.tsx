@@ -13,6 +13,51 @@ export const metadata = {
   robots: { index: false, follow: false },
 };
 
+async function loadDraft(draftId: string, userId: string): Promise<DraftData | undefined> {
+  const podcast = await prisma.podcast.findUnique({
+    where: { id: draftId },
+    include: {
+      discovery: {
+        include: {
+          messages: { orderBy: { createdAt: 'asc' } },
+        },
+      },
+    },
+  });
+
+  if (
+    podcast &&
+    podcast.userId === userId &&
+    podcast.status === 'DRAFT'
+  ) {
+    const dd = podcast.draftData as Record<string, unknown> | null;
+    return {
+      id: podcast.id,
+      tabMode: (dd?.tabMode as 'create' | 'import') ?? 'create',
+      messages: podcast.discovery?.messages.map((msg) => ({
+        id: msg.id,
+        role: msg.role as 'user' | 'assistant',
+        content: msg.content,
+        chips: Array.isArray(msg.chips) ? (msg.chips as string[]) : [],
+        createdAt: msg.createdAt.toISOString(),
+      })) ?? [],
+      metadata: podcast.discovery
+        ? {
+            topic: podcast.discovery.topic ?? undefined,
+            depth: podcast.discovery.depth ?? undefined,
+            audienceLevel: podcast.discovery.audienceLevel ?? undefined,
+            audience: podcast.discovery.audience ?? undefined,
+            focusAreas: podcast.discovery.focusAreas,
+            tone: podcast.discovery.tone ?? undefined,
+            durationTarget: podcast.discovery.durationTarget ?? undefined,
+          }
+        : null,
+      draftData: dd ?? null,
+    };
+  }
+  return undefined;
+}
+
 export default async function CreatePage({
   searchParams,
 }: {
@@ -25,54 +70,11 @@ export default async function CreatePage({
 
   const params = await searchParams;
 
-  // Load draft data if draftId is present
-  let draftData: DraftData | undefined;
-  if (params.draftId) {
-    const podcast = await prisma.podcast.findUnique({
-      where: { id: params.draftId },
-      include: {
-        discovery: {
-          include: {
-            messages: { orderBy: { createdAt: 'asc' } },
-          },
-        },
-      },
-    });
-
-    if (
-      podcast &&
-      podcast.userId === session.user.id &&
-      podcast.status === 'DRAFT'
-    ) {
-      const dd = podcast.draftData as Record<string, unknown> | null;
-      draftData = {
-        id: podcast.id,
-        tabMode: (dd?.tabMode as 'create' | 'import') ?? 'create',
-        messages: podcast.discovery?.messages.map((msg) => ({
-          id: msg.id,
-          role: msg.role as 'user' | 'assistant',
-          content: msg.content,
-          chips: Array.isArray(msg.chips) ? (msg.chips as string[]) : [],
-          createdAt: msg.createdAt.toISOString(),
-        })) ?? [],
-        metadata: podcast.discovery
-          ? {
-              topic: podcast.discovery.topic ?? undefined,
-              depth: podcast.discovery.depth ?? undefined,
-              audienceLevel: podcast.discovery.audienceLevel ?? undefined,
-              audience: podcast.discovery.audience ?? undefined,
-              focusAreas: podcast.discovery.focusAreas,
-              tone: podcast.discovery.tone ?? undefined,
-              durationTarget: podcast.discovery.durationTarget ?? undefined,
-            }
-          : null,
-        draftData: dd ?? null,
-      };
-    }
-    // If invalid draft, ignore it silently — render normal create page
-  }
-
-  const gate = await checkGenerationGate(session.user.id);
+  // Draft fetch and generation gate check run in parallel
+  const [draftData, gate] = await Promise.all([
+    params.draftId ? loadDraft(params.draftId, session.user.id) : Promise.resolve(undefined),
+    checkGenerationGate(session.user.id),
+  ]);
 
   if (!gate.allowed && gate.reason === 'no_provider') {
     redirect('/billing');

@@ -6,6 +6,8 @@ import { getAutoModelConfig, resolveTtsIncludedModels } from '@/lib/auto-model-c
 import { prisma } from '@/lib/prisma';
 
 import { errorResponse } from '@/lib/api-response';
+
+const CACHE_HEADERS = { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=300' };
 const QUALITY_BADGES: Record<string, string> = {
   standard: 'Standard',
   premium: 'Premium',
@@ -84,7 +86,7 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      return NextResponse.json({ readOnly: false, options });
+      return NextResponse.json({ readOnly: false, options }, { headers: CACHE_HEADERS });
     }
 
     // Non-admins: show included TTS models with plan gating
@@ -115,7 +117,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ readOnly: false, userPlan, isByok: false, options });
+    return NextResponse.json({ readOnly: false, userPlan, isByok: false, options }, { headers: CACHE_HEADERS });
   }
 
   // BYOK keys present — show models for every valid provider
@@ -138,5 +140,5 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  return NextResponse.json({ readOnly: false, options });
+  return NextResponse.json({ readOnly: false, options }, { headers: CACHE_HEADERS });
 }
