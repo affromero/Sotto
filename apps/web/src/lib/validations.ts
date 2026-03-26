@@ -197,7 +197,7 @@ export const feedQuerySchema = z.object({
   tags: z.string().optional(), // comma-separated tag slugs
   depth: z.enum(['eli5', 'quick_overview', 'standard', 'deep_dive']).optional(),
   audience: z.enum(['beginner', 'intermediate', 'expert']).optional(),
-  tone: z.enum(['casual', 'professional', 'socratic']).optional(),
+  tone: z.enum(['casual', 'professional', 'socratic', 'comedic', 'satirical', 'storytelling']).optional(),
   durationMin: z.coerce.number().int().min(0).optional(),
   durationMax: z.coerce.number().int().min(0).optional(),
   dateFrom: z.string().optional(),
@@ -473,7 +473,7 @@ export const forkBodySchema = z.object({
   remixNote: z.string().max(2000).optional(),
   focusAreas: z.array(z.string()).max(10).optional(),
   depth: z.enum(['eli5', 'quick_overview', 'standard', 'deep_dive']).optional(),
-  tone: z.enum(['casual', 'professional', 'socratic']).optional(),
+  tone: z.enum(['casual', 'professional', 'socratic', 'comedic', 'satirical', 'storytelling']).optional(),
 });
 
 /**

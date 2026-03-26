@@ -37,6 +37,9 @@ const TONE_OPTIONS = [
   { value: 'casual', label: 'Casual' },
   { value: 'professional', label: 'Professional' },
   { value: 'socratic', label: 'Socratic' },
+  { value: 'comedic', label: 'Comedic' },
+  { value: 'satirical', label: 'Satirical' },
+  { value: 'storytelling', label: 'Storytelling' },
 ];
 
 const LANGUAGE_OPTIONS = Object.entries(LANGUAGE_DISPLAY).map(([value, label]) => ({
