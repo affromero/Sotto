@@ -74,6 +74,7 @@ describe('no hardcoded anthropic in logUsage service fields', () => {
   const SERVICE_ALLOWLIST = new Set([
     'lib/transcript-parser.ts',
     'lib/reference-verification/ai-layer.ts',
+    'lib/reference-verification/grounding.ts',
     'lib/import-metadata-generator.ts',
     'app/api/discovery/route.ts',
     // visual-classification always uses Anthropic Claude for batch classification
