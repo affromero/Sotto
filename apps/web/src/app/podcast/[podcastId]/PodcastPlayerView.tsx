@@ -314,7 +314,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
     podcastId: isStillProcessing ? podcast.id : null,
     initialStatus: liveStatus,
     onStatusChange: useCallback((event: { status: string; [key: string]: unknown }) => {
-      setLiveStatus(event.status);
+      setLiveStatus(event.status as typeof podcast.status);
       if (event.verificationProgress) {
         setVerificationProgress(event.verificationProgress as Record<string, unknown>);
       }
