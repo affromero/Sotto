@@ -145,18 +145,18 @@ describe('useNotifications', () => {
       expect(fetch).toHaveBeenCalledTimes(1);
       expect(result.current.isLoading).toBe(false);
 
-      // Advance 30 seconds and flush promises
+      // Advance 60 seconds and flush promises
       await act(async () => {
-        vi.advanceTimersByTime(30000);
+        vi.advanceTimersByTime(60000);
         await Promise.resolve();
         await Promise.resolve();
       });
 
       expect(fetch).toHaveBeenCalledTimes(2);
 
-      // Advance another 30 seconds
+      // Advance another 60 seconds
       await act(async () => {
-        vi.advanceTimersByTime(30000);
+        vi.advanceTimersByTime(60000);
         await Promise.resolve();
         await Promise.resolve();
       });
@@ -186,7 +186,7 @@ describe('useNotifications', () => {
 
       // Advance timers after unmount - should not trigger more fetches
       act(() => {
-        vi.advanceTimersByTime(60000);
+        vi.advanceTimersByTime(120000);
       });
 
       expect(fetch).toHaveBeenCalledTimes(1);
@@ -218,9 +218,9 @@ describe('useNotifications', () => {
 
       expect(result.current.notifications).toHaveLength(1);
 
-      // Advance 30 seconds and flush promises
+      // Advance 60 seconds and flush promises
       await act(async () => {
-        vi.advanceTimersByTime(30000);
+        vi.advanceTimersByTime(60000);
         await Promise.resolve();
         await Promise.resolve();
       });
