@@ -24,7 +24,7 @@ import { getAiKey, getByokKey, hasByokKey } from '@/lib/byok';
 import { getTierFeatures } from '@/lib/tier-features';
 import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
 import { assignVoicesForPodcast } from '@/lib/voice-assigner';
-import { resolveAiModelAndProvider, getCheapestModelForProvider, type AiProviderId } from '@/lib/providers/ai-registry';
+import { resolveAiModelAndProvider } from '@/lib/providers/ai-registry';
 import type { TtsProviderId } from '@/lib/providers/tts-registry';
 import { logger } from '@/lib/logger';
 import { logPipelineStageComplete } from '@/lib/pipeline-events';
@@ -85,7 +85,7 @@ export async function processReferenceValidation(
     aiKey,
     plan: userPlanRecord.plan as 'FREE' | 'PRO',
   });
-  const verificationModel = getCheapestModelForProvider(provider as AiProviderId) ?? model;
+  const verificationModel = model;
 
   if (!script) {
     throw new Error(`Script not found for podcast ${podcastId}`);
