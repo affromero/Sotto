@@ -324,13 +324,6 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
   const handleTabChange = useCallback((mode: TabMode) => {
     setTabMode(mode);
     setError(null);
-    if (mode === 'create') {
-      setStep('discovery');
-      setImportStep('upload');
-      setImportingPodcastId(null);
-    } else {
-      setImportStep('upload');
-    }
   }, []);
 
   const getTitle = () => {
@@ -448,7 +441,7 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
           </div>
         )}
 
-        {(step === 'discovery' || step === 'voice') && (
+        {step === 'discovery' && (
           <div className={styles.tabToggle} role="tablist">
             <button
               role="tab"
@@ -471,8 +464,8 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
           </div>
         )}
 
-        {step === 'discovery' && tabMode === 'create' && (
-          <div className={styles.chatArea}>
+        {step === 'discovery' && (
+          <div className={styles.chatArea} style={tabMode !== 'create' ? { display: 'none' } : undefined}>
             <div className={styles.inspireRow}>
               <button
                 ref={inspireButtonRef}
@@ -510,31 +503,29 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
           </div>
         )}
 
-        {tabMode === 'import' && (
-          <div className={styles.chatArea}>
-            {importStep === 'upload' && (
-              <ImportUploader
-                onImportStarted={handleImportStarted}
-                draftId={draftData?.tabMode === 'import' ? draftData.id : undefined}
-                initialImportData={
-                  draftData?.tabMode === 'import' && draftData.draftData?.importData
-                    ? (draftData.draftData.importData as {
-                        title?: string;
-                        topic?: string;
-                        sourcePlatform?: string;
-                        isHumanContent?: boolean;
-                        sttProvider?: string;
-                      })
-                    : undefined
-                }
-                onDraftCreated={handleDraftCreated}
-              />
-            )}
-            {importStep === 'importing' && importingPodcastId && (
-              <ImportProgress podcastId={importingPodcastId} isAdmin={isAdmin} />
-            )}
-          </div>
-        )}
+        <div className={styles.chatArea} style={tabMode !== 'import' ? { display: 'none' } : undefined}>
+          {importStep === 'upload' && (
+            <ImportUploader
+              onImportStarted={handleImportStarted}
+              draftId={draftData?.tabMode === 'import' ? draftData.id : undefined}
+              initialImportData={
+                draftData?.tabMode === 'import' && draftData.draftData?.importData
+                  ? (draftData.draftData.importData as {
+                      title?: string;
+                      topic?: string;
+                      sourcePlatform?: string;
+                      isHumanContent?: boolean;
+                      sttProvider?: string;
+                    })
+                  : undefined
+              }
+              onDraftCreated={handleDraftCreated}
+            />
+          )}
+          {importStep === 'importing' && importingPodcastId && (
+            <ImportProgress podcastId={importingPodcastId} isAdmin={isAdmin} />
+          )}
+        </div>
 
         <InspireMe
           open={inspireMeOpen}
@@ -544,8 +535,8 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
           prefetchRef={inspirePrefetchRef}
         />
 
-        {step === 'voice' && tabMode === 'create' && (
-          <div className={styles.chatArea}>
+        {step === 'voice' && (
+          <div className={styles.chatArea} style={tabMode !== 'create' ? { display: 'none' } : undefined}>
             <VoicePicker onSelectionChange={handleVoiceSelectionChange} maxSpeakers={maxSpeakers} ttsProvider={ttsProvider} />
             <TtsModelDropdown
               ttsProvider={ttsProvider}
