@@ -97,9 +97,15 @@ const basePodcast = {
 };
 
 function makeRequest(method = 'GET', body?: Record<string, unknown>) {
-  const init: RequestInit = { method, headers: { 'Content-Type': 'application/json' } };
-  if (body) init.body = JSON.stringify(body);
-  return new NextRequest('http://localhost:3000/api/podcasts/pod-1', init);
+  const url = 'http://localhost:3000/api/podcasts/pod-1';
+  if (body) {
+    return new NextRequest(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  }
+  return new NextRequest(url, { method });
 }
 
 const routeParams = { params: Promise.resolve({ podcastId: 'pod-1' }) };
