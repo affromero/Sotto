@@ -9,7 +9,7 @@ import { PageViewTracker } from '@/components/providers/PageViewTracker';
 import { GlobalMiniPlayer } from '@/components/player/GlobalMiniPlayer';
 import { ToastProvider } from '@/components/providers/ToastProvider';
 import { NotificationProvider } from '@/components/providers/NotificationProvider';
-import { CommandPalette } from '@/components/ui/CommandPalette';
+import { CommandPaletteLoader } from '@/components/ui/CommandPaletteLoader';
 import { ImpersonationBanner } from '@/components/layout/ImpersonationBanner';
 import { THEME_INIT_SCRIPT } from '@/lib/theme-script';
 import '@/styles/globals.css';
@@ -80,7 +80,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   <PageViewTracker />
                   {children}
                   <GlobalMiniPlayer />
-                  <CommandPalette />
+                  <CommandPaletteLoader />
                 </AudioPlayerProvider>
               </EventProvider>
               </NotificationProvider>
