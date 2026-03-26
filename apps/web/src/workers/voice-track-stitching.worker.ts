@@ -19,6 +19,11 @@ const STOCK_SFX: Record<SoundCue['type'], string> = {
   transition: 'transition-whoosh.mp3',
   outro: 'outro-gentle.mp3',
   ambient: 'ambient-soft.mp3',
+  laugh_track: 'laugh-track.mp3',
+  music_sting: 'music-sting.mp3',
+  applause: 'applause.mp3',
+  comedic_hit: 'comedic-hit.mp3',
+  rim_shot: 'rim-shot.mp3',
 };
 
 export async function processVoiceTrackStitching(job: Job<StitchVoiceTrackPayload>): Promise<void> {

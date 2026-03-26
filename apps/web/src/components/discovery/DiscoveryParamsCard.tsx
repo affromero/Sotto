@@ -6,7 +6,7 @@ import type { DiscoveryMetadata } from '@/types/discovery';
 const DEPTH_OPTIONS = ['eli5', 'quick_overview', 'standard', 'deep_dive'] as const;
 const AUDIENCE_OPTIONS = ['general', 'kids', 'teens', 'family', 'nerds', 'mature'] as const;
 const LEVEL_OPTIONS = ['beginner', 'intermediate', 'expert'] as const;
-const TONE_OPTIONS = ['casual', 'professional', 'socratic'] as const;
+const TONE_OPTIONS = ['casual', 'professional', 'socratic', 'comedic', 'satirical', 'storytelling'] as const;
 
 const PARAM_LABELS: Record<string, string> = {
   eli5: 'ELI5',
@@ -25,6 +25,9 @@ const PARAM_LABELS: Record<string, string> = {
   casual: 'Casual',
   professional: 'Professional',
   socratic: 'Socratic',
+  comedic: 'Comedic',
+  satirical: 'Satirical',
+  storytelling: 'Storytelling',
 };
 
 interface DiscoveryParamsCardProps {

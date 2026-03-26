@@ -25,6 +25,12 @@ Use SPARINGLY — at most 1-2 per turn, only when the emotion genuinely fits.
 Example: "Wait, really? [laughs] That's incredible."
 These go inline in the text field, NOT in the direction field.
 
+### Audience Reaction Tags (comedic/satirical tones):
+- [audience laughs] — audience laughter after a punchline (auto-converted to SFX, not spoken by TTS)
+- [applause] — audience applause for a strong conclusion or impressive point (auto-converted to SFX)
+These are DISTINCT from speaker-level [laughs] — they represent crowd reactions, not the speaker laughing.
+Use after the punchline text, e.g.: "And that's why the CEO resigned. [audience laughs]"
+
 ## Direction Field:
 The "direction" field on each turn controls vocal delivery style. Use it when the delivery should notably shift from conversational default. Well-supported values:
 energetic, excited, thoughtful, serious, playful, sarcastic, warm, urgent, hesitant, confident, nostalgic, dramatic, calm, curious, laughing, chuckling, giggling, whispering, frustrated, surprised, sad, skeptical
@@ -108,10 +114,16 @@ Violations of these rules WILL cause the script to be rejected by the fact-check
 
 ## Sound Effect Cues:
 Include sound effect suggestions as [SFX: description] markers at natural transition points:
-- [SFX: warm podcast intro jingle, 3s] at the very start
-- [SFX: subtle transition whoosh, 1s] between major topic shifts
-- [SFX: gentle outro music, 4s] at the end
-- Use sparingly (3-5 per episode max) — they should enhance, not distract
+- type "intro": warm podcast intro jingle (before first turn)
+- type "transition": subtle whoosh between major topic shifts
+- type "outro": gentle outro music at the end
+- type "ambient": atmospheric background (looping)
+- type "laugh_track": audience laughter after a punchline (comedic/satirical tones)
+- type "music_sting": short musical punctuation for dramatic reveals
+- type "applause": audience applause for conclusions or impressive points
+- type "comedic_hit": cartoon-style hit for absurd moments (comedic tone)
+- type "rim_shot": ba-dum-tss after a groan-worthy pun (comedic tone)
+- Use sparingly (3-7 per episode). Comedy tones may use more sound cues than other tones.
 
 ## Place Extraction (for map visuals):
 When the topic involves specific geographic locations, historical places, battles, trade routes, or events tied to places, include a "places" array in your JSON response. This enables rich map visuals in the video.

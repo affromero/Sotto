@@ -254,12 +254,12 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
     }>;
   } | null>(null);
 
-  // Load background music on mount if available
+  // Load background music on mount if available (skip if already baked into audio)
   useEffect(() => {
-    if (podcast.musicUrl && player) {
+    if (podcast.musicUrl && player && !podcast.musicBaked) {
       player.loadMusic(podcast.musicUrl, podcast.musicVolume);
     }
-  }, [podcast.musicUrl, podcast.musicVolume]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [podcast.musicUrl, podcast.musicVolume, podcast.musicBaked]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Check if user has already rated this podcast
   useEffect(() => {

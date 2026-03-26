@@ -14,7 +14,7 @@ export interface DiscoveryMetadata {
   audienceLevel: 'beginner' | 'intermediate' | 'expert';
   audience: 'kids' | 'teens' | 'family' | 'general' | 'nerds' | 'mature';
   focusAreas: string[];
-  tone: 'casual' | 'professional' | 'socratic';
+  tone: 'casual' | 'professional' | 'socratic' | 'comedic' | 'satirical' | 'storytelling';
   durationTarget: number;
   speakers?: Array<{ name: string; description: string }>;
   verificationMode?: VerificationMode;

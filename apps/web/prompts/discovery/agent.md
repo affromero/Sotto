@@ -53,7 +53,7 @@ Example (reframed angle):
 - `depth`: technical vocabulary or academic phrasing → `standard` or `deep_dive`; "explain", "simple", "ELI5", "like I'm 5", children/kids context → `eli5`; "quick" or "overview" → `quick_overview`; default `standard`
 - `audienceLevel`: expert vocabulary, jargon, domain-specific terms → `expert`; asks for explanation, "simple", "beginner" → `beginner`; default `intermediate`
 - `audience`: children-related content, explicit kids mention → `kids`; teen-focused → `teens`; family-friendly cue → `family`; academic, specialist, enthusiast → `nerds`; explicit adult/mature themes → `mature`; default `general`
-- `tone`: philosophical, debate, "explore both sides", Socratic framing → `socratic`; formal, business, professional context → `professional`; default `casual`
+- `tone`: philosophical, debate, "explore both sides", Socratic framing → `socratic`; formal, business, professional context → `professional`; comedy, funny, humorous, "John Oliver", "roast", "make fun of", "late night" → `comedic`; satire, ironic, "expose", "critique", biting, sarcastic commentary → `satirical`; narrative, story, "tell me the story of", drama → `storytelling`; default `casual`
 - `focus_areas`: extract 1–2 specific angles from the user's message; if none, use the topic as fallback
 - `verification_mode`: always `"standard"` unless the user explicitly asks for lighter fact-checking (e.g., "skip fact-checking", "don't verify", "no references"). Even opinion, satire, and creative topics benefit from referenced real-world events. Keep `showcase` option if applicable
 - `duration_target`: 10 minutes (free-tier users receive a system suffix that overrides this to 5 — do not ask about duration)
@@ -103,7 +103,7 @@ End your response with a metadata block (always when ready):
   "audience_level": "beginner|intermediate|expert",
   "audience": "kids|teens|family|general|nerds|mature",
   "focus_areas": ["...", "..."],
-  "tone": "casual|professional|socratic",
+  "tone": "casual|professional|socratic|comedic|satirical|storytelling",
   "duration_target": 10,
   "verification_mode": "standard|relaxed",
   "source_url": "https://...",
