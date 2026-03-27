@@ -603,4 +603,72 @@ describe('processContentExtraction', () => {
       expect(mockPrismaDiscoveryUpdate).toHaveBeenCalled();
     });
   });
+
+  describe('empty content detection', () => {
+    it('throws when URL extraction returns empty content and no sourceText', async () => {
+      mockExtractContent.mockResolvedValue({
+        text: '', markdown: '', title: null, description: null,
+        siteName: null, author: null, publishedDate: null,
+        wordCount: 0, sourceType: 'html', extractionMethod: 'readability',
+      });
+
+      const job = createMockJob({
+        ...defaultPayload,
+        sourceUrl: 'https://example.com/empty',
+      });
+
+      await expect(processContentExtraction(job)).rejects.toThrow(
+        'Could not extract content from https://example.com/empty'
+      );
+    });
+
+    it('throws YouTube-specific message when transcript is empty', async () => {
+      mockExtractContent.mockResolvedValue({
+        text: '', markdown: '', title: null,
+        description: 'No transcript available for this video',
+        siteName: 'YouTube', author: null, publishedDate: null,
+        wordCount: 0, sourceType: 'youtube', extractionMethod: 'summarize-core',
+      });
+
+      const job = createMockJob({
+        ...defaultPayload,
+        sourceUrl: 'https://www.youtube.com/watch?v=no-transcript',
+      });
+
+      await expect(processContentExtraction(job)).rejects.toThrow(
+        'No transcript available for this YouTube video'
+      );
+    });
+
+    it('succeeds when sourceText is provided even if URL extraction is empty', async () => {
+      mockExtractContent.mockResolvedValue({
+        text: '', markdown: '', title: null, description: null,
+        siteName: null, author: null, publishedDate: null,
+        wordCount: 0, sourceType: 'html', extractionMethod: 'readability',
+      });
+
+      const job = createMockJob({
+        ...defaultPayload,
+        sourceUrl: 'https://example.com/empty',
+        sourceText: 'User provided text content here',
+      });
+
+      await processContentExtraction(job);
+
+      expect(mockPrismaDiscoveryUpdate).toHaveBeenCalled();
+      expect(mockAddJob).toHaveBeenCalled();
+    });
+
+    it('succeeds when sourceText-only is provided without sourceUrl', async () => {
+      const job = createMockJob({
+        ...defaultPayload,
+        sourceText: 'Just user text, no URL',
+      });
+
+      await processContentExtraction(job);
+
+      expect(mockExtractContent).not.toHaveBeenCalled();
+      expect(mockPrismaDiscoveryUpdate).toHaveBeenCalled();
+    });
+  });
 });
