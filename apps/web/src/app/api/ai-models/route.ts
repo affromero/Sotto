@@ -57,8 +57,41 @@ export async function GET(request: NextRequest) {
     const autoConfig = await getAutoModelConfig();
     const tierConfig = userPlan === 'PRO' ? autoConfig.pro : autoConfig.free;
 
-    // Admins see all platform-configured API providers (from env vars) + Claude Code local
+    // Admins: respect adminViewMode toggle
     if (isAdmin) {
+      const proView = autoConfig.adminViewMode === 'PRO';
+
+      if (proView) {
+        const { freeModels, proModels } = resolveIncludedModels(autoConfig);
+        const freeSet = new Set(freeModels);
+        const proSet = new Set(proModels);
+
+        const platformModels = getAllAiProviderMeta()
+          .filter((p) => p.id !== 'claude-code' && process.env[PLATFORM_PROVIDER_ENV[p.id] ?? ''])
+          .flatMap((p) =>
+            p.models
+              .filter((m) => proSet.has(m.id))
+              .map((m) => ({
+                id: m.id,
+                displayName: m.displayName,
+                tier: m.tier,
+                requiredPlan: freeSet.has(m.id) ? ('FREE' as const) : ('PRO' as const),
+                isDefault: false,
+                group: TIER_GROUP_LABELS[m.tier] ?? m.tier,
+                hint: p.displayName,
+              }))
+          );
+
+        return NextResponse.json({
+          provider: tierConfig.aiProvider,
+          readOnly: false,
+          userPlan: 'PRO',
+          isByok: false,
+          adminViewMode: autoConfig.adminViewMode,
+          models: platformModels,
+        }, { headers: CACHE_HEADERS });
+      }
+
       const platformModels = getAllAiProviderMeta()
         .filter((p) => process.env[PLATFORM_PROVIDER_ENV[p.id] ?? ''])
         .flatMap((p) =>
@@ -78,6 +111,7 @@ export async function GET(request: NextRequest) {
         readOnly: false,
         userPlan: 'PRO',
         isByok: false,
+        adminViewMode: autoConfig.adminViewMode,
         models: [...platformModels, ...claudeCodeModels],
       }, { headers: CACHE_HEADERS });
     }

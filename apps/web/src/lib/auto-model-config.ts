@@ -80,6 +80,8 @@ export interface AutoModelConfigData {
   // Motion (programmatic visual rendering)
   freeMotionProvider: string;
   proMotionProvider: string;
+  // Admin view mode
+  adminViewMode: 'ALL' | 'PRO';
   // Daily limits & allocations (migrated from FreeTierConfig)
   dailyGenerationLimit: number;
   dailyGenerationLimitPro: number;
@@ -282,6 +284,8 @@ export async function getAutoModelConfig(): Promise<AutoModelConfigData> {
     // Motion
     freeMotionProvider: row.freeMotionProvider,
     proMotionProvider: row.proMotionProvider,
+    // Admin view mode
+    adminViewMode: (row.adminViewMode === 'PRO' ? 'PRO' : 'ALL') as 'ALL' | 'PRO',
     // Daily limits & allocations
     dailyGenerationLimit: row.dailyGenerationLimit,
     dailyGenerationLimitPro: row.dailyGenerationLimitPro,
@@ -341,6 +345,8 @@ export async function setAutoModelConfig(
     // Motion
     freeMotionProvider?: string;
     proMotionProvider?: string;
+    // Admin view mode
+    adminViewMode?: 'ALL' | 'PRO';
     // Daily limits & allocations
     dailyGenerationLimit?: number;
     dailyGenerationLimitPro?: number;
@@ -439,6 +445,9 @@ export async function setAutoModelConfig(
   // Motion
   if (data.freeMotionProvider) update.freeMotionProvider = data.freeMotionProvider;
   if (data.proMotionProvider) update.proMotionProvider = data.proMotionProvider;
+
+  // Admin view mode
+  if (data.adminViewMode !== undefined) update.adminViewMode = data.adminViewMode;
 
   // Daily limits & allocations
   if (data.dailyGenerationLimit !== undefined) update.dailyGenerationLimit = data.dailyGenerationLimit;

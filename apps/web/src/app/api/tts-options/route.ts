@@ -65,28 +65,54 @@ export async function GET(request: NextRequest) {
 
   // No BYOK TTS keys
   if (validProviderIds.length === 0) {
-    // Admins see all platform-configured TTS providers (from env vars)
+    // Admins: respect adminViewMode toggle
     if (isAdmin) {
-      const options: TtsOption[] = [
-        { id: 'auto', displayName: 'Auto', badge: 'Best available', hint: 'Picks the best voice and provider based on your podcast\u2019s topic, tone, and speakers' },
-      ];
+      const autoConfig = await getAutoModelConfig();
+      const proView = autoConfig.adminViewMode === 'PRO';
+      const options: TtsOption[] = [];
 
-      for (const meta of getAllProviderMeta()) {
-        if (!hasPlatformKey(meta.id)) continue;
+      if (!proView) {
+        options.push({ id: 'auto', displayName: 'Auto', badge: 'Best available', hint: 'Picks the best voice and provider based on your podcast\u2019s topic, tone, and speakers' });
+      }
 
-        const isKitten = meta.id === 'kittentts';
-        for (const model of meta.models) {
-          options.push({
-            id: `${meta.id}:${model.id}`,
-            displayName: `${meta.displayName} ${model.displayName}`,
-            badge: QUALITY_BADGES[model.tier],
-            group: isKitten ? 'KittenTTS (Platform)' : (TIER_GROUP_LABELS[model.tier] ?? model.tier),
-            hint: isKitten ? undefined : meta.displayName,
-          });
+      if (proView) {
+        const { freeTtsModels, proTtsModels } = resolveTtsIncludedModels(autoConfig);
+        const freeSet = new Set(freeTtsModels);
+        const proSet = new Set(proTtsModels);
+
+        for (const meta of getAllProviderMeta()) {
+          if (!hasPlatformKey(meta.id)) continue;
+          const isKitten = meta.id === 'kittentts';
+          for (const model of meta.models) {
+            const compositeId = `${meta.id}:${model.id}`;
+            if (!proSet.has(compositeId)) continue;
+            options.push({
+              id: compositeId,
+              displayName: `${meta.displayName} ${model.displayName}`,
+              badge: QUALITY_BADGES[model.tier],
+              group: isKitten ? 'KittenTTS (Platform)' : (TIER_GROUP_LABELS[model.tier] ?? model.tier),
+              hint: isKitten ? undefined : meta.displayName,
+              requiredPlan: freeSet.has(compositeId) ? 'FREE' : 'PRO',
+            });
+          }
+        }
+      } else {
+        for (const meta of getAllProviderMeta()) {
+          if (!hasPlatformKey(meta.id)) continue;
+          const isKitten = meta.id === 'kittentts';
+          for (const model of meta.models) {
+            options.push({
+              id: `${meta.id}:${model.id}`,
+              displayName: `${meta.displayName} ${model.displayName}`,
+              badge: QUALITY_BADGES[model.tier],
+              group: isKitten ? 'KittenTTS (Platform)' : (TIER_GROUP_LABELS[model.tier] ?? model.tier),
+              hint: isKitten ? undefined : meta.displayName,
+            });
+          }
         }
       }
 
-      return NextResponse.json({ readOnly: false, options }, { headers: CACHE_HEADERS });
+      return NextResponse.json({ readOnly: false, adminViewMode: autoConfig.adminViewMode, options }, { headers: CACHE_HEADERS });
     }
 
     // Non-admins: show included TTS models with plan gating
