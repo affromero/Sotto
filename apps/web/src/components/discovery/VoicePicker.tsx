@@ -39,6 +39,8 @@ interface VoicePickerProps {
   speakers?: Array<{ name: string; description: string }>;
   /** Maximum speakers allowed by the user's tier (2 = FREE, 4 = PRO). */
   maxSpeakers?: number;
+  /** LLM-suggested format (1=Solo, 2=Dialogue, 3=Panel, 4=Roundtable). Used as initial selection. */
+  suggestedFormat?: 1 | 2 | 3 | 4;
   /** Currently selected TTS provider (e.g. 'hume'). When set, shows provider-specific voice browser. */
   ttsProvider?: string;
 }
@@ -73,14 +75,14 @@ const FORMAT_LABELS: Record<number, string> = {
   4: 'Roundtable',
 };
 
-export function VoicePicker({ onSelectionChange, maxSpeakers = 2, ttsProvider }: VoicePickerProps) {
+export function VoicePicker({ onSelectionChange, maxSpeakers = 2, suggestedFormat, ttsProvider }: VoicePickerProps) {
   const [poolVoices, setPoolVoices] = useState<VoiceProfile[]>([]);
   const [userClones, setUserClones] = useState<VoiceClone[]>([]);
   const [sharedVoices, setSharedVoices] = useState<SharedVoice[]>([]);
   const [customMode, setCustomMode] = useState(false);
   const [voiceMap, setVoiceMap] = useState<Record<string, string>>({});
   const [loaded, setLoaded] = useState(false);
-  const [speakerCount, setSpeakerCount] = useState(Math.min(2, maxSpeakers));
+  const [speakerCount, setSpeakerCount] = useState(Math.min(suggestedFormat ?? 2, maxSpeakers));
   const [customVoiceId, setCustomVoiceId] = useState('');
   const [addingVoice, setAddingVoice] = useState(false);
   const [addVoiceError, setAddVoiceError] = useState<string | null>(null);

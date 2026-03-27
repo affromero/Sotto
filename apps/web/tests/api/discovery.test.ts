@@ -316,6 +316,7 @@ describe('POST /api/discovery', () => {
         audience_level: 'intermediate',
         focus_areas: ['qubits', 'entanglement'],
         tone: 'professional',
+        suggested_format: 2,
         duration_target: 10,
         ready: true,
       });
@@ -337,6 +338,7 @@ describe('POST /api/discovery', () => {
         audienceLevel: 'intermediate',
         focusAreas: ['qubits', 'entanglement'],
         tone: 'professional',
+        suggestedFormat: 2,
         durationTarget: 10,
         ready: true,
       });
@@ -411,6 +413,7 @@ describe('POST /api/discovery', () => {
         audience_level: 'expert',
         focus_areas: ['neural networks', 'transformers'],
         tone: 'professional',
+        suggested_format: 3,
         duration_target: 15,
         ready: true,
       });
@@ -430,6 +433,7 @@ describe('POST /api/discovery', () => {
         audienceLevel: 'expert',
         focusAreas: ['neural networks', 'transformers'],
         tone: 'professional',
+        suggestedFormat: 3,
         durationTarget: 15,
         ready: true,
       });
