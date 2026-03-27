@@ -922,10 +922,10 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
       {/* Video Section */}
       {isReady && isOwner && (
         <section className={styles.videoSection} aria-label="Video">
+          <OwnerOnlyBadge />
           {videoState === 'idle' && (
             <>
               <div className={styles.ownerToolbar}>
-                <OwnerOnlyBadge />
                 <button
                   className={styles.toolbarBtn}
                   onClick={() => setShowModelPicker(true)}
