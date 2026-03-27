@@ -19,7 +19,7 @@ import {
 } from '@/lib/script-updater';
 import { createSegmentsAndQueueAudio } from '@/lib/segment-creator';
 import { convertTurnsForProvider } from '@/lib/tts-tag-converter';
-import { MIN_REFERENCE_COUNTS } from '@/lib/script-verifier';
+import { getMinReferenceCount } from '@/lib/script-verifier';
 import { getAiKey, getByokKey, hasByokKey } from '@/lib/byok';
 import { getTierFeatures } from '@/lib/tier-features';
 import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
@@ -95,7 +95,7 @@ export async function processReferenceValidation(
   const depth = discovery?.depth || 'standard';
   const isShowcase = podcast?.verificationMode === 'showcase';
   const effectiveDepth = podcast?.verificationMode === 'relaxed' ? 'eli5' : depth;
-  const requiredRefCount = MIN_REFERENCE_COUNTS[effectiveDepth] ?? 5;
+  const requiredRefCount = getMinReferenceCount(effectiveDepth, discovery?.durationTarget ?? 10);
 
   if (references.length === 0) {
     // Gate: pause as draft if references are required but none exist
