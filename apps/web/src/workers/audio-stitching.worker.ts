@@ -514,6 +514,23 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
     });
 
     let detectedStarts = await detectSegmentBoundaries(outputPath, segmentPaths);
+
+    // Validate monotonicity: each start must be >= previous + 50% of segment duration.
+    // Cross-correlation can produce false matches for single-speaker podcasts where
+    // the voice is identical across segments.
+    if (detectedStarts.length === freshSegments.length && detectedStarts.length > 1) {
+      const isMonotonic = detectedStarts.every((start, i) => {
+        if (i === 0) return true;
+        const prevDuration = freshSegments[i - 1].duration ?? 0;
+        const minGap = prevDuration * 0.5;
+        return start >= detectedStarts[i - 1] + minGap;
+      });
+      if (!isMonotonic) {
+        logger.warn('Cross-correlation starts failed monotonicity check, using cumulative fallback', { podcastId });
+        detectedStarts = [];
+      }
+    }
+
     if (detectedStarts.length === 0 || detectedStarts.length !== freshSegments.length) {
       // Fallback: cumulative durations
       let cum = 0;

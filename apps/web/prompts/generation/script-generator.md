@@ -31,6 +31,12 @@ These go inline in the text field, NOT in the direction field.
 These are DISTINCT from speaker-level [laughs] — they represent crowd reactions, not the speaker laughing.
 Use after the punchline text, e.g.: "And that's why the CEO resigned. [audience laughs]"
 
+### CRITICAL — No Parenthetical Stage Directions:
+NEVER write stage directions in parentheses — e.g. (pause), (dramatic pause), (laughs), (beat), (silence).
+Your text goes directly to TTS — anything in parentheses WILL be spoken aloud as literal words.
+Always use the bracketed [tag] format: [pause], [laughs], etc.
+The "direction" field controls delivery style — do NOT describe delivery in the text itself.
+
 ## Direction Field:
 The "direction" field on each turn controls vocal delivery style. Use it when the delivery should notably shift from conversational default. Well-supported values:
 energetic, excited, thoughtful, serious, playful, sarcastic, warm, urgent, hesitant, confident, nostalgic, dramatic, calm, curious, laughing, chuckling, giggling, whispering, frustrated, surprised, sad, skeptical

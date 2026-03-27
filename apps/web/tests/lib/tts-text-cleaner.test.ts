@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { cleanTextForTts, splitTextForTts } from '@/lib/tts-text-cleaner';
+import { cleanTextForTts, splitTextForTts, STAGE_DIRECTION_PATTERN } from '@/lib/tts-text-cleaner';
 
 describe('tts-text-cleaner', () => {
   it('strips SFX markers', () => {
@@ -25,6 +25,26 @@ describe('tts-text-cleaner', () => {
   it('handles combined SFX + citation markers', () => {
     expect(cleanTextForTts('[SFX: whoosh] A study [1] found [SFX: ding] results [2, 3].'))
       .toBe('A study found results.');
+  });
+
+  it('strips parenthetical stage directions', () => {
+    expect(cleanTextForTts('Hello (pause) world')).toBe('Hello world');
+    expect(cleanTextForTts('Really? (dramatic pause) Yes.')).toBe('Really? Yes.');
+    expect(cleanTextForTts('(laughs) That is funny')).toBe('That is funny');
+    expect(cleanTextForTts('Wait (long pause) what?')).toBe('Wait what?');
+    expect(cleanTextForTts('(beat) And then...')).toBe('And then...');
+    expect(cleanTextForTts('(sighs) Fine.')).toBe('Fine.');
+  });
+
+  it('preserves parentheses that are not stage directions', () => {
+    expect(cleanTextForTts('The GDP (gross domestic product) grew.')).toBe('The GDP (gross domestic product) grew.');
+    expect(cleanTextForTts('He said (and I quote) it was fine.')).toBe('He said (and I quote) it was fine.');
+  });
+});
+
+describe('STAGE_DIRECTION_PATTERN', () => {
+  it('is exported for reuse in teleprompter', () => {
+    expect(STAGE_DIRECTION_PATTERN).toBeInstanceOf(RegExp);
   });
 });
 
