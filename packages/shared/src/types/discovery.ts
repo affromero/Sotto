@@ -17,6 +17,8 @@ export interface DiscoveryMetadata {
   tone: 'casual' | 'professional' | 'socratic' | 'comedic' | 'satirical' | 'storytelling';
   durationTarget: number;
   speakers?: Array<{ name: string; description: string }>;
+  /** LLM-suggested format: 1=Solo, 2=Dialogue, 3=Panel, 4=Roundtable */
+  suggestedFormat?: 1 | 2 | 3 | 4;
   verificationMode?: VerificationMode;
   ready: boolean;
 }

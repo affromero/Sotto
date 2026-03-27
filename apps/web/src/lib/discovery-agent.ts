@@ -37,6 +37,7 @@ export function parseMetadata(
   focus_areas: string[];
   tone: string;
   duration_target: number;
+  suggested_format?: number;
   verification_mode?: string;
   ready: boolean;
 } | null {
