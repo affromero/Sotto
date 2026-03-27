@@ -53,6 +53,15 @@ export async function processContentExtraction(job: Job<ExtractContentPayload>):
   if (sourceUrl) {
     const extracted = await extractContent(sourceUrl);
     const urlContent = extracted.markdown || extracted.text;
+
+    // Fail gracefully when extraction returns empty content (e.g., YouTube with no transcript)
+    if (!urlContent.trim() && !sourceText?.trim()) {
+      const reason = extracted.sourceType === 'youtube'
+        ? `No transcript available for this YouTube video`
+        : `Could not extract content from ${sourceUrl}`;
+      throw new Error(reason);
+    }
+
     content = content
       ? `${content}\n\n---\n\n## Referenced Article\n\n${urlContent}`
       : urlContent;
