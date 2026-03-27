@@ -1,5 +1,6 @@
 import { extractHtmlFromString } from './html';
 import { countWords, MAX_CONTENT_LENGTH } from './html';
+import { extractViaMarkit } from './markit';
 import { extractPdfContent } from './pdf';
 import { isPinchtabAvailable, extractViaPinchtab } from './pinchtab';
 import { isYouTubeUrl, extractYouTubeContent } from './youtube';
@@ -125,14 +126,22 @@ export async function extractContent(url: string): Promise<ExtractedContent> {
   // Route by detected content type
   if (contentCategory === 'pdf') {
     const buffer = Buffer.from(await response.arrayBuffer());
-    return extractPdfContent(buffer);
+    const extension = getUrlExtension(url) || '.pdf';
+    try {
+      return await extractViaMarkit(buffer, { extension, url });
+    } catch (err) {
+      logger.warn('Markit PDF extraction failed, falling back to pdf-parse', {
+        url,
+        error: (err as Error).message,
+      });
+      return extractPdfContent(buffer);
+    }
   }
 
   if (contentCategory === 'document') {
-    throw new Error(
-      `Unsupported document format: ${mimeType || getUrlExtension(url)}. ` +
-      'Document extraction (DOCX, PPTX, XLSX, EPUB) will be available soon.'
-    );
+    const buffer = Buffer.from(await response.arrayBuffer());
+    const extension = getUrlExtension(url) || '.bin';
+    return extractViaMarkit(buffer, { extension, url });
   }
 
   // Default: treat as HTML
@@ -188,7 +197,15 @@ export async function extractContent(url: string): Promise<ExtractedContent> {
 
 /**
  * Extract content from a PDF buffer.
+ * Tries Markit first (better markdown), falls back to pdf-parse.
  */
 export async function extractFromPdfBuffer(buffer: Buffer): Promise<ExtractedContent> {
-  return extractPdfContent(buffer);
+  try {
+    return await extractViaMarkit(buffer, { extension: '.pdf', url: 'buffer://pdf' });
+  } catch (err) {
+    logger.warn('Markit PDF buffer extraction failed, falling back to pdf-parse', {
+      error: (err as Error).message,
+    });
+    return extractPdfContent(buffer);
+  }
 }

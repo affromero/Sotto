@@ -28,6 +28,12 @@ vi.mock('@/lib/logger', () => ({
   },
 }));
 
+// Mock Markit extractor to avoid real file parsing in facade tests
+const mockExtractViaMarkit = vi.fn();
+vi.mock('@/lib/extractors/markit', () => ({
+  extractViaMarkit: (...args: unknown[]) => mockExtractViaMarkit(...args),
+}));
+
 // Fixtures
 const WELL_STRUCTURED_HTML = `<!DOCTYPE html>
 <html>
@@ -392,25 +398,50 @@ describe('extractors', () => {
       expect(result.extractionMethod).toBe('summarize-core');
     });
 
-    it('routes PDF URLs (by Content-Type) to pdf extractor', async () => {
+    it('routes PDF URLs (by Content-Type) to Markit extractor', async () => {
+      mockExtractViaMarkit.mockResolvedValue({
+        text: 'PDF extracted text from URL.', markdown: '# PDF\n\nPDF extracted text from URL.',
+        title: 'URL PDF', description: null, siteName: null, author: null,
+        publishedDate: null, wordCount: 5, sourceType: 'pdf', extractionMethod: 'markit',
+      });
+
+      fetchSpy.mockResolvedValue(
+        new Response(Buffer.from('fake-pdf-content'), {
+          status: 200,
+          headers: { 'Content-Type': 'application/pdf' },
+        })
+      );
+
+      const result = await extractContent('https://example.com/paper.pdf');
+
+      expect(result.sourceType).toBe('pdf');
+      expect(result.extractionMethod).toBe('markit');
+      expect(result.text).toContain('PDF extracted text');
+      expect(mockExtractViaMarkit).toHaveBeenCalledWith(
+        expect.any(Buffer),
+        expect.objectContaining({ extension: '.pdf' })
+      );
+    });
+
+    it('falls back to pdf-parse when Markit fails for PDF', async () => {
+      mockExtractViaMarkit.mockRejectedValue(new Error('Markit PDF error'));
+
       vi.doMock('pdf-parse', () => ({
         PDFParse: class {
           async getText() {
-            return { text: 'PDF extracted text from URL.', pages: [], total: 2 };
+            return { text: 'Fallback PDF text.', pages: [], total: 1 };
           }
           async getInfo() {
-            return { total: 2, info: { Title: 'URL PDF', Author: null } };
+            return { total: 1, info: { Title: 'Fallback PDF' } };
           }
         },
       }));
-      // Mock pdfjs-dist to avoid figure extraction failures
       vi.doMock('pdfjs-dist/legacy/build/pdf.mjs', () => ({
         getDocument: () => ({ promise: Promise.resolve({ numPages: 0 }) }),
       }));
 
-      const pdfBuffer = Buffer.from('fake-pdf-content');
       fetchSpy.mockResolvedValue(
-        new Response(pdfBuffer, {
+        new Response(Buffer.from('fake-pdf'), {
           status: 200,
           headers: { 'Content-Type': 'application/pdf' },
         })
@@ -420,27 +451,17 @@ describe('extractors', () => {
 
       expect(result.sourceType).toBe('pdf');
       expect(result.extractionMethod).toBe('pdf-parse');
-      expect(result.text).toContain('PDF extracted text');
     });
 
     it('detects PDF by URL extension when Content-Type is application/octet-stream', async () => {
-      vi.doMock('pdf-parse', () => ({
-        PDFParse: class {
-          async getText() {
-            return { text: 'Octet-stream PDF text.', pages: [], total: 1 };
-          }
-          async getInfo() {
-            return { total: 1, info: {} };
-          }
-        },
-      }));
-      vi.doMock('pdfjs-dist/legacy/build/pdf.mjs', () => ({
-        getDocument: () => ({ promise: Promise.resolve({ numPages: 0 }) }),
-      }));
+      mockExtractViaMarkit.mockResolvedValue({
+        text: 'Octet-stream PDF text.', markdown: 'Octet-stream PDF text.',
+        title: null, description: null, siteName: null, author: null,
+        publishedDate: null, wordCount: 3, sourceType: 'pdf', extractionMethod: 'markit',
+      });
 
-      const pdfBuffer = Buffer.from('fake-pdf');
       fetchSpy.mockResolvedValue(
-        new Response(pdfBuffer, {
+        new Response(Buffer.from('fake-pdf'), {
           status: 200,
           headers: { 'Content-Type': 'application/octet-stream' },
         })
@@ -465,7 +486,13 @@ describe('extractors', () => {
       expect(result.text).toContain('first paragraph');
     });
 
-    it('throws for unsupported document types (DOCX/PPTX/XLSX/EPUB)', async () => {
+    it('routes DOCX URLs (by Content-Type) to Markit extractor', async () => {
+      mockExtractViaMarkit.mockResolvedValue({
+        text: 'Quarterly review.', markdown: '## Meeting Notes\n\nQuarterly review.',
+        title: 'Meeting Notes', description: null, siteName: null, author: null,
+        publishedDate: null, wordCount: 2, sourceType: 'document', extractionMethod: 'markit',
+      });
+
       fetchSpy.mockResolvedValue(
         new Response(Buffer.from('fake-docx'), {
           status: 200,
@@ -473,12 +500,84 @@ describe('extractors', () => {
         })
       );
 
-      await expect(
-        extractContent('https://example.com/doc.docx')
-      ).rejects.toThrow('Unsupported document format');
+      const result = await extractContent('https://example.com/doc.docx');
+
+      expect(result.sourceType).toBe('document');
+      expect(result.extractionMethod).toBe('markit');
+      expect(result.title).toBe('Meeting Notes');
+      expect(mockExtractViaMarkit).toHaveBeenCalledWith(
+        expect.any(Buffer),
+        expect.objectContaining({ extension: '.docx' })
+      );
+    });
+
+    it('routes PPTX URLs to Markit extractor', async () => {
+      mockExtractViaMarkit.mockResolvedValue({
+        text: 'Slide content', markdown: 'Slide content', title: 'Deck',
+        description: null, siteName: null, author: null, publishedDate: null,
+        wordCount: 2, sourceType: 'document', extractionMethod: 'markit',
+      });
+
+      fetchSpy.mockResolvedValue(
+        new Response(Buffer.from('fake-pptx'), {
+          status: 200,
+          headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.presentationml.presentation' },
+        })
+      );
+
+      const result = await extractContent('https://example.com/deck.pptx');
+
+      expect(result.sourceType).toBe('document');
+      expect(result.extractionMethod).toBe('markit');
+    });
+
+    it('routes XLSX URLs to Markit extractor', async () => {
+      mockExtractViaMarkit.mockResolvedValue({
+        text: '1 2', markdown: '| A | B |\n|---|---|\n| 1 | 2 |', title: 'Data',
+        description: null, siteName: null, author: null, publishedDate: null,
+        wordCount: 2, sourceType: 'document', extractionMethod: 'markit',
+      });
+
+      fetchSpy.mockResolvedValue(
+        new Response(Buffer.from('fake-xlsx'), {
+          status: 200,
+          headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
+        })
+      );
+
+      const result = await extractContent('https://example.com/data.xlsx');
+
+      expect(result.sourceType).toBe('document');
+      expect(result.extractionMethod).toBe('markit');
+    });
+
+    it('routes EPUB URLs to Markit extractor', async () => {
+      mockExtractViaMarkit.mockResolvedValue({
+        text: 'Once upon a time.', markdown: '# Chapter 1\n\nOnce upon a time.', title: 'Novel',
+        description: null, siteName: null, author: null, publishedDate: null,
+        wordCount: 5, sourceType: 'document', extractionMethod: 'markit',
+      });
+
+      fetchSpy.mockResolvedValue(
+        new Response(Buffer.from('fake-epub'), {
+          status: 200,
+          headers: { 'Content-Type': 'application/epub+zip' },
+        })
+      );
+
+      const result = await extractContent('https://example.com/book.epub');
+
+      expect(result.sourceType).toBe('document');
+      expect(result.extractionMethod).toBe('markit');
     });
 
     it('detects document type by extension when Content-Type is octet-stream', async () => {
+      mockExtractViaMarkit.mockResolvedValue({
+        text: 'Report content.', markdown: 'Report content.', title: 'Report',
+        description: null, siteName: null, author: null, publishedDate: null,
+        wordCount: 2, sourceType: 'document', extractionMethod: 'markit',
+      });
+
       fetchSpy.mockResolvedValue(
         new Response(Buffer.from('fake-docx'), {
           status: 200,
@@ -486,9 +585,10 @@ describe('extractors', () => {
         })
       );
 
-      await expect(
-        extractContent('https://example.com/report.docx')
-      ).rejects.toThrow('Unsupported document format');
+      const result = await extractContent('https://example.com/report.docx');
+
+      expect(result.sourceType).toBe('document');
+      expect(result.extractionMethod).toBe('markit');
     });
 
     it('handles Content-Type with charset parameter', async () => {
