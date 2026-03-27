@@ -13,6 +13,7 @@ import {
   Play,
   MessageSquare,
   X,
+  ExternalLink,
 } from 'lucide-react';
 import { parseTextWithCitations } from '@/lib/citation-parser';
 import { getSpeakerIndex, getUniqueSpeakers } from '@/lib/speaker-colors';
@@ -75,6 +76,7 @@ export function ScriptEditor({ podcastId, onApprove, onRegenerate, getApproveBod
   const [highlights, setHighlights] = useState<Highlight[]>([]);
   const [selectionPopover, setSelectionPopover] = useState<SelectionPopover | null>(null);
   const [highlightNoteInput, setHighlightNoteInput] = useState('');
+  const [showReferences, setShowReferences] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -792,6 +794,57 @@ export function ScriptEditor({ podcastId, onApprove, onRegenerate, getApproveBod
           Add Turn
         </button>
       </div>
+
+      {/* References section */}
+      {references.length > 0 && (
+        <div className={styles.referencesPanel}>
+          <button
+            type="button"
+            className={styles.feedbackToggle}
+            onClick={() => setShowReferences(!showReferences)}
+            aria-expanded={showReferences}
+          >
+            {showReferences ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            References ({references.length})
+          </button>
+          {showReferences && (
+            <ol className={styles.referencesList} aria-label="Script references">
+              {references
+                .slice()
+                .sort((a, b) => a.number - b.number)
+                .map((ref) => (
+                  <li key={ref.id} className={styles.referenceItem}>
+                    <div className={styles.referenceHeader}>
+                      <span className={styles.referenceNumber}>[{ref.number}]</span>
+                      <span className={styles.referenceType}>{ref.type}</span>
+                    </div>
+                    <p className={styles.referenceTitle}>{ref.title}</p>
+                    {ref.authors.length > 0 && (
+                      <p className={styles.referenceAuthors}>{ref.authors.join(', ')}</p>
+                    )}
+                    {(ref.year || ref.publisher) && (
+                      <p className={styles.referenceMeta}>
+                        {ref.year && <span>{ref.year}</span>}
+                        {ref.year && ref.publisher && <span> &middot; </span>}
+                        {ref.publisher && <span>{ref.publisher}</span>}
+                      </p>
+                    )}
+                    {ref.url && (
+                      <a
+                        href={ref.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={styles.referenceLink}
+                      >
+                        View source <ExternalLink size={12} />
+                      </a>
+                    )}
+                  </li>
+                ))}
+            </ol>
+          )}
+        </div>
+      )}
 
       {/* Feedback panel */}
       <div className={styles.feedbackPanel}>
