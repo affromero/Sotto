@@ -778,57 +778,44 @@ async function handleWorkerFailure(
     let failureReason = userMessage(errorKind, 'the provider');
 
     if (isKeyInvalidationError(errorKind)) {
+      // Dedupe: markTts/AiKeyInvalid returns true only on the first flip
+      // (updateMany WHERE isValid=true), so only the first worker sends the notification.
+      let didInvalidateKey = false;
+
       if (TTS_QUEUES.includes(queueName) && podcast.ttsProvider) {
-        await markTtsKeyInvalid(podcast.userId, podcast.ttsProvider as TtsProviderId);
+        didInvalidateKey = await markTtsKeyInvalid(podcast.userId, podcast.ttsProvider as TtsProviderId);
         failureReason = userMessage(errorKind, podcast.ttsProvider);
         await prisma.podcast.update({
           where: { id: podcastId },
           data: { ttsProvider: null, ttsModel: null },
         });
-        if (notifQueue) {
-          await notifQueue.add('send_notification', {
-            userId: podcast.userId,
-            type: 'KEY_INVALID',
-            title: 'API Key Invalid',
-            message: failureReason,
-            data: { podcastId },
-          });
-        }
       } else if (AI_QUEUES.includes(queueName)) {
         const aiKey = await prisma.userAiKey.findFirst({
           where: { userId: podcast.userId, isValid: true },
         });
         if (aiKey) {
-          await markAiKeyInvalid(podcast.userId, aiKey.provider as AiProviderId);
+          didInvalidateKey = await markAiKeyInvalid(podcast.userId, aiKey.provider as AiProviderId);
           failureReason = userMessage(errorKind, aiKey.provider);
-          if (notifQueue) {
-            await notifQueue.add('send_notification', {
-              userId: podcast.userId,
-              type: 'KEY_INVALID',
-              title: 'API Key Invalid',
-              message: failureReason,
-              data: { podcastId },
-            });
-          }
         }
       } else if (queueName === 'audio-import') {
         const sttProvider = ((job?.data as Record<string, unknown> | undefined)?.sttProvider ?? 'openai') as SttProviderId;
         if (sttProvider === 'elevenlabs') {
-          await markTtsKeyInvalid(podcast.userId, 'elevenlabs');
+          didInvalidateKey = await markTtsKeyInvalid(podcast.userId, 'elevenlabs');
           failureReason = userMessage(errorKind, 'ElevenLabs');
         } else {
-          await markAiKeyInvalid(podcast.userId, sttProvider as AiProviderId);
+          didInvalidateKey = await markAiKeyInvalid(podcast.userId, sttProvider as AiProviderId);
           failureReason = userMessage(errorKind, sttProvider);
         }
-        if (notifQueue) {
-          await notifQueue.add('send_notification', {
-            userId: podcast.userId,
-            type: 'KEY_INVALID',
-            title: 'API Key Invalid',
-            message: failureReason,
-            data: { podcastId },
-          });
-        }
+      }
+
+      if (didInvalidateKey && notifQueue) {
+        await notifQueue.add('send_notification', {
+          userId: podcast.userId,
+          type: 'KEY_INVALID',
+          title: 'API Key Invalid',
+          message: failureReason,
+          data: { podcastId },
+        });
       }
     }
 
