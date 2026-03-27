@@ -75,6 +75,7 @@ interface AutoModelFormProps {
     dailyAvatarLimitPro: number;
     freeMotionProvider: string;
     proMotionProvider: string;
+    adminViewMode: 'ALL' | 'PRO';
   };
   aiProviders: ProviderOption[];
   ttsProviders: ProviderOption[];
@@ -474,6 +475,9 @@ export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttPro
   const [freeMotionProvider, setFreeMotionProvider] = useState(initialConfig.freeMotionProvider);
   const [proMotionProvider, setProMotionProvider] = useState(initialConfig.proMotionProvider);
 
+  // Admin view mode
+  const [adminViewMode, setAdminViewMode] = useState<'ALL' | 'PRO'>(initialConfig.adminViewMode);
+
   const setToArray = (s: Set<string>) => s.size > 0 ? [...s] : null;
 
   const handleSave = async () => {
@@ -543,6 +547,7 @@ export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttPro
           dailyAvatarLimitPro,
           freeMotionProvider,
           proMotionProvider,
+          adminViewMode,
         }),
       });
 
@@ -562,6 +567,26 @@ export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttPro
 
   return (
     <div className={styles.form}>
+      <div className={styles.viewModeBar}>
+        <div className={styles.viewModeInfo}>
+          <span className={styles.viewModeLabel}>Admin Experience</span>
+          <span className={styles.viewModeHint}>
+            {adminViewMode === 'PRO'
+              ? 'You see the same models as PRO users when browsing the app.'
+              : 'You see all platform models when browsing the app.'}
+          </span>
+        </div>
+        <button
+          type="button"
+          className={`${styles.viewModeToggle} ${adminViewMode === 'PRO' ? styles.viewModeTogglePro : ''}`}
+          onClick={() => setAdminViewMode(prev => prev === 'ALL' ? 'PRO' : 'ALL')}
+        >
+          <span className={styles.viewModeBadge}>
+            {adminViewMode === 'PRO' ? 'PRO View' : 'All Models'}
+          </span>
+        </button>
+      </div>
+
       <UnifiedModelEditor
         title="AI Models"
         description="Control which AI models appear in the picker for non-BYOK users. Click to enable/disable, right-click to set default (★)."

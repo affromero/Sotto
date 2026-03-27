@@ -115,6 +115,7 @@ const defaultRow = {
   dailyAvatarLimitPro: 1,
   aiAllocations: [],
   ttsAllocations: [],
+  adminViewMode: 'ALL',
   updatedAt: new Date(),
   updatedBy: null,
 };
@@ -188,6 +189,7 @@ describe('getAutoModelConfig', () => {
       dailyAvatarLimitPro: 1,
       aiAllocations: [],
       ttsAllocations: [],
+      adminViewMode: 'ALL',
       freeIncludedModels: null,
       proIncludedModels: null,
       freeIncludedTtsModels: null,
@@ -467,6 +469,7 @@ describe('resolveIncludedModels', () => {
     dailyAvatarLimitPro: 1,
     aiAllocations: [],
     ttsAllocations: [],
+    adminViewMode: 'ALL' as const,
   };
 
   it('derives from auto defaults when lists are null', () => {
@@ -573,6 +576,7 @@ describe('resolveTtsIncludedModels', () => {
     dailyAvatarLimitPro: 1,
     aiAllocations: [],
     ttsAllocations: [],
+    adminViewMode: 'ALL' as const,
   };
 
   it('derives from auto defaults when lists are null', () => {
@@ -679,6 +683,7 @@ describe('resolveSttIncludedModels', () => {
     dailyAvatarLimitPro: 1,
     aiAllocations: [],
     ttsAllocations: [],
+    adminViewMode: 'ALL' as const,
   };
 
   it('derives from auto defaults when lists are null', () => {
@@ -740,6 +745,7 @@ describe('resolveIncludedImageModels', () => {
     dailyGenerationLimit: 1, dailyGenerationLimitPro: 5, dailyVideoLimit: 1, dailyVideoLimitPro: 2,
     dailyMusicLimit: 1, dailyMusicLimitPro: 3, dailyAvatarLimit: 1, dailyAvatarLimitPro: 1,
     aiAllocations: [], ttsAllocations: [],
+    adminViewMode: 'ALL' as const,
   };
 
   it('derives from auto defaults when lists are null', () => {
@@ -781,6 +787,7 @@ describe('resolveIncludedVideoModels', () => {
     dailyGenerationLimit: 1, dailyGenerationLimitPro: 5, dailyVideoLimit: 1, dailyVideoLimitPro: 2,
     dailyMusicLimit: 1, dailyMusicLimitPro: 3, dailyAvatarLimit: 1, dailyAvatarLimitPro: 1,
     aiAllocations: [], ttsAllocations: [],
+    adminViewMode: 'ALL' as const,
   };
 
   it('derives from auto defaults when lists are null', () => {

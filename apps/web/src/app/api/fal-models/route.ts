@@ -42,11 +42,14 @@ export async function GET(request: NextRequest) {
     resolveVideoModel(tier),
   ]);
 
-  // Admins see all models; regular users see tier-included + BYOK-accessible models
+  // Admins in PRO view mode see the same curated set as PRO users
+  const adminProView = isAdmin && autoConfig.adminViewMode === 'PRO';
+
+  // Admins (ALL mode) see all models; regular users + admins in PRO view see tier-included + BYOK-accessible models
   let filteredImageModels = imageModels;
   let filteredVideoModels = videoModels;
 
-  if (!isAdmin) {
+  if (!isAdmin || adminProView) {
     // Determine which BYOK video providers the user has access to
     const byokVideoProviders = new Set<VideoProviderId>();
     if (userHasFalKey) byokVideoProviders.add('fal');
@@ -56,7 +59,8 @@ export async function GET(request: NextRequest) {
 
     // Image model filtering
     const { freeImageModels, proImageModels } = resolveIncludedImageModels(autoConfig);
-    const allowedImageSet = new Set(tier === 'PRO' ? proImageModels : freeImageModels);
+    const effectiveTier = adminProView ? 'PRO' : tier;
+    const allowedImageSet = new Set(effectiveTier === 'PRO' ? proImageModels : freeImageModels);
     // BYOK users with a fal key can use any fal image model
     if (userHasFalKey) {
       for (const m of imageModels) allowedImageSet.add(m.modelId);
@@ -65,7 +69,7 @@ export async function GET(request: NextRequest) {
 
     // Video model filtering
     const { freeVideoModels, proVideoModels } = resolveIncludedVideoModels(autoConfig);
-    const allowedVideoSet = new Set(tier === 'PRO' ? proVideoModels : freeVideoModels);
+    const allowedVideoSet = new Set(effectiveTier === 'PRO' ? proVideoModels : freeVideoModels);
     // BYOK users can use any model from their BYOK providers
     for (const m of videoModels) {
       const provider = getVideoModelProvider(m.modelId);

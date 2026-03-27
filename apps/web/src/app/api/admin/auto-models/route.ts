@@ -74,6 +74,8 @@ const updateSchema = z.object({
   // Motion
   freeMotionProvider: z.enum(['remotion', 'hera']).optional(),
   proMotionProvider: z.enum(['remotion', 'hera']).optional(),
+  // Admin view mode
+  adminViewMode: z.enum(['ALL', 'PRO']).optional(),
   // Daily limits & allocations
   dailyGenerationLimit: z.number().int().min(0).optional(),
   dailyGenerationLimitPro: z.number().int().min(0).optional(),
