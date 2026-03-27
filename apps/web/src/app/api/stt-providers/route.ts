@@ -87,12 +87,15 @@ export async function GET() {
       (v) => v && !isAdmin
     );
 
-    // Non-BYOK, non-admin: include STT models filtered by included lists
-    if (!isByok && !isAdmin) {
+    // Non-BYOK users + admins in PRO view: include STT models filtered by included lists
+    const autoConfig = (!isByok || isAdmin) ? await getAutoModelConfig() : null;
+    const adminProView = isAdmin && autoConfig?.adminViewMode === 'PRO';
+
+    if ((!isByok && !isAdmin) || adminProView) {
       const dbUser = await prisma.user.findUnique({ where: { id: userId }, select: { plan: true } });
-      const userPlan = (dbUser?.plan ?? 'FREE') as 'FREE' | 'PRO';
-      const autoConfig = await getAutoModelConfig();
-      const { freeSttModels, proSttModels } = resolveSttIncludedModels(autoConfig);
+      const userPlan = adminProView ? 'PRO' as const : (dbUser?.plan ?? 'FREE') as 'FREE' | 'PRO';
+      const config = autoConfig ?? await getAutoModelConfig();
+      const { freeSttModels, proSttModels } = resolveSttIncludedModels(config);
       const freeSet = new Set(freeSttModels);
       const proSet = new Set(proSttModels);
 
@@ -115,6 +118,7 @@ export async function GET() {
         configuredProviders,
         userPlan,
         isByok: false,
+        ...(adminProView ? { adminViewMode: 'PRO' } : {}),
         includedModels,
       }, { headers: CACHE_HEADERS });
     }

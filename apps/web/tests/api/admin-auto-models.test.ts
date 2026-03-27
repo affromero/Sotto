@@ -477,4 +477,43 @@ describe('PATCH /api/admin/auto-models', () => {
       'admin-1'
     );
   });
+
+  it('accepts adminViewMode ALL in PATCH', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
+
+    const response = await PATCH(
+      createPatchRequest({ adminViewMode: 'ALL' })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockSetAutoModelConfig).toHaveBeenCalledWith(
+      { adminViewMode: 'ALL' },
+      'admin-1'
+    );
+  });
+
+  it('accepts adminViewMode PRO in PATCH', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
+
+    const response = await PATCH(
+      createPatchRequest({ adminViewMode: 'PRO' })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockSetAutoModelConfig).toHaveBeenCalledWith(
+      { adminViewMode: 'PRO' },
+      'admin-1'
+    );
+  });
+
+  it('rejects invalid adminViewMode value', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
+
+    const response = await PATCH(
+      createPatchRequest({ adminViewMode: 'INVALID' })
+    );
+
+    expect(response.status).toBe(400);
+    expect(mockSetAutoModelConfig).not.toHaveBeenCalled();
+  });
 });
