@@ -22,7 +22,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
   const podcast = await prisma.podcast.findUnique({
     where: { id: podcastId },
-    select: { userId: true, lowReferences: true, verificationProgress: true },
+    select: { userId: true, lowReferences: true, verificationProgress: true, verificationMode: true },
   });
 
   if (!podcast) {
@@ -57,8 +57,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       select: { depth: true, durationTarget: true },
     });
     const depth = discovery?.depth ?? 'standard';
+    const effectiveDepth = podcast.verificationMode === 'relaxed' ? 'eli5' : depth;
     response.lowReferences = true;
-    response.requiredRefCount = getMinReferenceCount(depth, discovery?.durationTarget ?? undefined);
+    response.requiredRefCount = getMinReferenceCount(effectiveDepth, discovery?.durationTarget ?? 10);
     if (podcast.verificationProgress) {
       response.verificationProgress = podcast.verificationProgress;
     }
