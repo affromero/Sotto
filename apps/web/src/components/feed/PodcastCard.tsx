@@ -4,6 +4,7 @@ import { useRef, useCallback, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Play, Heart, GitFork } from 'lucide-react';
+import { OwnerOnlyBadge } from '@/components/ui/OwnerOnlyBadge';
 import { getContentBadgeLabel } from '@sotto/shared';
 import { useTrack } from '@/components/providers/EventProvider';
 import { useAuth } from '@/lib/hooks/useAuth';
@@ -168,6 +169,7 @@ export function PodcastCard({
                   <GitFork size={10} aria-hidden="true" />
                   {formatCount(podcast.forkCount)}
                 </span>
+                <OwnerOnlyBadge className={styles.coverStatBadge} />
               </div>
             )}
           </div>

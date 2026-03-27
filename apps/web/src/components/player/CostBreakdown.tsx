@@ -1,4 +1,5 @@
 import type { PodcastCostBreakdown } from '@/lib/podcast-cost-stats';
+import { OwnerOnlyBadge } from '@/components/ui/OwnerOnlyBadge';
 import styles from './CostBreakdown.module.css';
 
 interface CostBreakdownProps {
@@ -28,7 +29,10 @@ export function CostBreakdown({ breakdown, isPro, isByok }: CostBreakdownProps) 
 
   return (
     <section className={styles.root} aria-label="Generation cost breakdown">
-      <h3 className={styles.header}>{header}</h3>
+      <div className={styles.headerRow}>
+        <h3 className={styles.header}>{header}</h3>
+        <OwnerOnlyBadge />
+      </div>
       <div className={styles.chips}>
         {activeBuckets.map((bucket) => (
           <div key={bucket.key} className={styles.chip}>

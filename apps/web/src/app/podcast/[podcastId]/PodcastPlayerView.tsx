@@ -28,6 +28,7 @@ import {
   Check,
   AlertTriangle,
 } from 'lucide-react';
+import { OwnerOnlyBadge } from '@/components/ui/OwnerOnlyBadge';
 import { usePlayer } from '@/components/providers/AudioPlayerProvider';
 import { AudioPlayer } from '@/components/player/AudioPlayer';
 import { TranscriptPanel } from '@/components/player/TranscriptPanel';
@@ -921,6 +922,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
       {/* Video Section */}
       {isReady && isOwner && (
         <section className={styles.videoSection} aria-label="Video">
+          <OwnerOnlyBadge />
           {videoState === 'idle' && (
             <>
               <div className={styles.ownerToolbar}>
@@ -1264,6 +1266,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
               <GitFork size={16} aria-hidden="true" />
               {formatCount(podcast.forkCount)}
             </span>
+            <OwnerOnlyBadge />
           </div>
         )}
 
