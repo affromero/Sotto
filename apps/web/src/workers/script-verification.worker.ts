@@ -104,6 +104,8 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
     audienceLevel: discovery.audienceLevel || 'intermediate',
     attemptNumber,
     maxDurationMinutes,
+    tone: discovery.tone || 'casual',
+    durationTarget: discovery.durationTarget || 10,
     previousFeedback: script.verificationFeedback || undefined,
     apiKeyOverride: aiKey?.apiKey,
     model: verificationModel,

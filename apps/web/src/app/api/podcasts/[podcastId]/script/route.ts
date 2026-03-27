@@ -8,7 +8,7 @@ import {
   cleanAndRenumberMarkdown,
   buildRenumberMap,
 } from '@/lib/script-updater';
-import { MIN_REFERENCE_COUNTS } from '@/lib/script-verifier';
+import { getMinReferenceCount } from '@/lib/script-verifier';
 import type { ScriptTurn } from '@/lib/script-generator';
 
 type RouteParams = { params: Promise<{ podcastId: string }> };
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
   const podcast = await prisma.podcast.findUnique({
     where: { id: podcastId },
-    select: { userId: true, lowReferences: true, verificationProgress: true },
+    select: { userId: true, lowReferences: true, verificationProgress: true, verificationMode: true },
   });
 
   if (!podcast) {
@@ -54,11 +54,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   if (podcast.lowReferences) {
     const discovery = await prisma.discovery.findUnique({
       where: { podcastId },
-      select: { depth: true },
+      select: { depth: true, durationTarget: true },
     });
     const depth = discovery?.depth ?? 'standard';
+    const effectiveDepth = podcast.verificationMode === 'relaxed' ? 'eli5' : depth;
     response.lowReferences = true;
-    response.requiredRefCount = MIN_REFERENCE_COUNTS[depth] ?? 5;
+    response.requiredRefCount = getMinReferenceCount(effectiveDepth, discovery?.durationTarget ?? 10);
     if (podcast.verificationProgress) {
       response.verificationProgress = podcast.verificationProgress;
     }

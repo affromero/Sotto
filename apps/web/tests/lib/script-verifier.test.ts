@@ -11,7 +11,7 @@ vi.mock('@/lib/providers/ai', () => ({
 }));
 
 // ---- Import under test ----
-import { verifyScript, assessReferenceQuality, type ClaimAnalysis } from '@/lib/script-verifier';
+import { verifyScript, assessReferenceQuality, getMinReferenceCount, getMinSeriousRatio, type ClaimAnalysis } from '@/lib/script-verifier';
 import { hashTurn } from '@/lib/turn-diff';
 import type { GeneratedReference } from '@/lib/script-generator';
 
@@ -1400,5 +1400,97 @@ describe('incremental verification', () => {
 
     const expectedHash = hashTurn('EXPERT', turnText);
     expect(result.allClaims[0].turnHash).toBe(expectedHash);
+  });
+});
+
+describe('getMinReferenceCount', () => {
+  it('returns base count when no duration provided', () => {
+    expect(getMinReferenceCount('standard')).toBe(5);
+    expect(getMinReferenceCount('deep_dive')).toBe(10);
+    expect(getMinReferenceCount('eli5')).toBe(3);
+  });
+
+  it('scales with duration', () => {
+    expect(getMinReferenceCount('standard', 10)).toBe(10);
+    expect(getMinReferenceCount('standard', 20)).toBe(20);
+    expect(getMinReferenceCount('deep_dive', 10)).toBe(15);
+    expect(getMinReferenceCount('quick_overview', 10)).toBe(7);
+    expect(getMinReferenceCount('eli5', 10)).toBe(5);
+  });
+
+  it('uses base as floor for short durations', () => {
+    expect(getMinReferenceCount('standard', 3)).toBe(5);
+    expect(getMinReferenceCount('deep_dive', 5)).toBe(10);
+    expect(getMinReferenceCount('eli5', 2)).toBe(3);
+  });
+
+  it('caps at 30', () => {
+    expect(getMinReferenceCount('deep_dive', 30)).toBe(30);
+    expect(getMinReferenceCount('standard', 60)).toBe(30);
+    expect(getMinReferenceCount('deep_dive', 100)).toBe(30);
+  });
+
+  it('handles unknown depth with defaults', () => {
+    expect(getMinReferenceCount('unknown')).toBe(5);
+    expect(getMinReferenceCount('unknown', 15)).toBe(15);
+  });
+});
+
+describe('getMinSeriousRatio', () => {
+  it('returns base ratio when no tone provided', () => {
+    expect(getMinSeriousRatio('standard')).toBe(0.4);
+    expect(getMinSeriousRatio('deep_dive')).toBe(0.6);
+    expect(getMinSeriousRatio('eli5')).toBe(0);
+  });
+
+  it('returns base ratio for non-creative tones', () => {
+    expect(getMinSeriousRatio('standard', 'casual')).toBe(0.4);
+    expect(getMinSeriousRatio('standard', 'professional')).toBe(0.4);
+    expect(getMinSeriousRatio('standard', 'socratic')).toBe(0.4);
+  });
+
+  it('halves ratio for comedic/satirical/storytelling tones', () => {
+    expect(getMinSeriousRatio('standard', 'satirical')).toBe(0.2);
+    expect(getMinSeriousRatio('standard', 'comedic')).toBe(0.2);
+    expect(getMinSeriousRatio('standard', 'storytelling')).toBe(0.2);
+    expect(getMinSeriousRatio('deep_dive', 'satirical')).toBe(0.3);
+  });
+
+  it('never goes below zero', () => {
+    expect(getMinSeriousRatio('eli5', 'satirical')).toBe(0);
+    expect(getMinSeriousRatio('eli5', 'comedic')).toBe(0);
+  });
+});
+
+describe('assessReferenceQuality with duration and tone', () => {
+  it('requires more refs for longer podcasts', () => {
+    const refs = Array.from({ length: 5 }, (_, i) => makeRef(i + 1, 'PAPER'));
+    const result = assessReferenceQuality(refs, 'standard', 15);
+    expect(result.requiredCount).toBe(15);
+    expect(result.countPassed).toBe(false);
+  });
+
+  it('passes when ref count meets duration-scaled minimum', () => {
+    const refs = Array.from({ length: 10 }, (_, i) => makeRef(i + 1, 'PAPER'));
+    const result = assessReferenceQuality(refs, 'standard', 10);
+    expect(result.requiredCount).toBe(10);
+    expect(result.countPassed).toBe(true);
+  });
+
+  it('lowers serious ratio for satirical tone', () => {
+    const refs = [
+      makeRef(1, 'PAPER'),
+      makeRef(2, 'ARTICLE'),
+      makeRef(3, 'ARTICLE'),
+      makeRef(4, 'ARTICLE'),
+      makeRef(5, 'ARTICLE'),
+    ];
+    const withoutTone = assessReferenceQuality(refs, 'standard');
+    expect(withoutTone.requiredSeriousRatio).toBe(0.4);
+    expect(withoutTone.ratioPassed).toBe(false);
+
+    const withTone = assessReferenceQuality(refs, 'standard', undefined, 'satirical');
+    expect(withTone.requiredSeriousRatio).toBe(0.2);
+    expect(withTone.ratioPassed).toBe(true);
   });
 });

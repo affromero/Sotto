@@ -218,11 +218,9 @@ vi.mock('@/lib/redis', () => ({
 }));
 
 vi.mock('@/lib/script-verifier', () => ({
-  MIN_REFERENCE_COUNTS: {
-    deep_dive: 10,
-    standard: 5,
-    quick_overview: 3,
-    eli5: 3,
+  getMinReferenceCount: (depth: string) => {
+    const bases: Record<string, number> = { deep_dive: 10, standard: 5, quick_overview: 3, eli5: 3 };
+    return bases[depth] ?? 5;
   },
 }));
 

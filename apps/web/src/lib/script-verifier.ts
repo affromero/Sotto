@@ -158,21 +158,53 @@ const DEPTH_THRESHOLDS: Record<string, number> = {
   eli5: 0.6,
 };
 
-export const MIN_REFERENCE_COUNTS: Record<string, number> = {
+// Base counts (floor) per depth — used when durationMinutes is undefined
+const BASE_REFERENCE_COUNTS: Record<string, number> = {
   deep_dive: 10,
   standard: 5,
   quick_overview: 3,
   eli5: 3,
 };
 
+// References per minute by depth
+const REFS_PER_MINUTE: Record<string, number> = {
+  deep_dive: 1.5,
+  standard: 1.0,
+  quick_overview: 0.7,
+  eli5: 0.5,
+};
+
+const MAX_REFERENCE_COUNT = 30;
+
+export function getMinReferenceCount(depth: string, durationMinutes?: number): number {
+  const base = BASE_REFERENCE_COUNTS[depth] ?? 5;
+  if (!durationMinutes || durationMinutes <= 0) return base;
+  const scaled = Math.round((REFS_PER_MINUTE[depth] ?? 1.0) * durationMinutes);
+  return Math.min(MAX_REFERENCE_COUNT, Math.max(base, scaled));
+}
+
+/** @deprecated Use getMinReferenceCount() instead */
+export const MIN_REFERENCE_COUNTS = BASE_REFERENCE_COUNTS;
+
 export const SERIOUS_REFERENCE_TYPES: Set<string> = new Set(['PAPER', 'BOOK', 'REPORT']);
 
-export const MIN_SERIOUS_RATIO: Record<string, number> = {
+const BASE_SERIOUS_RATIO: Record<string, number> = {
   deep_dive: 0.6,
   standard: 0.4,
   quick_overview: 0.2,
   eli5: 0,
 };
+
+const LOW_SERIOUS_TONES = new Set(['comedic', 'satirical', 'storytelling']);
+
+export function getMinSeriousRatio(depth: string, tone?: string): number {
+  const base = BASE_SERIOUS_RATIO[depth] ?? 0.4;
+  if (tone && LOW_SERIOUS_TONES.has(tone)) return Math.max(0, base * 0.5);
+  return base;
+}
+
+/** @deprecated Use getMinSeriousRatio() instead */
+export const MIN_SERIOUS_RATIO = BASE_SERIOUS_RATIO;
 
 export const REFERENCE_TYPE_WEIGHTS: Record<string, number> = {
   PAPER: 1.0,
@@ -197,15 +229,17 @@ export interface ReferenceQualityAssessment {
 
 export function assessReferenceQuality(
   references: GeneratedReference[],
-  depth: string
+  depth: string,
+  durationMinutes?: number,
+  tone?: string,
 ): ReferenceQualityAssessment {
   const totalCount = references.length;
-  const requiredCount = MIN_REFERENCE_COUNTS[depth] ?? 5;
+  const requiredCount = getMinReferenceCount(depth, durationMinutes);
   const countPassed = totalCount >= requiredCount;
 
   const seriousCount = references.filter((r) => SERIOUS_REFERENCE_TYPES.has(r.type)).length;
   const seriousRatio = totalCount > 0 ? seriousCount / totalCount : 0;
-  const requiredSeriousRatio = MIN_SERIOUS_RATIO[depth] ?? 0.4;
+  const requiredSeriousRatio = getMinSeriousRatio(depth, tone);
   const ratioPassed = seriousRatio >= requiredSeriousRatio;
 
   const qualityScore =
@@ -250,7 +284,9 @@ function buildVerdict(
   turns: ScriptTurn[],
   aiFeedback: string,
   tokenUsage: { inputTokens: number; outputTokens: number; model: string },
-  verificationMode?: string
+  verificationMode?: string,
+  tone?: string,
+  durationTarget?: number,
 ): VerificationVerdict {
   const commonKnowledgeClaims = claims.filter((c) => c.isCommonKnowledge);
   const sourcingRequired = claims.filter((c) => !c.isCommonKnowledge);
@@ -294,7 +330,7 @@ function buildVerdict(
   const effectiveDepth = isRelaxed ? 'eli5' : depth;
   const threshold = DEPTH_THRESHOLDS[effectiveDepth] || 0.8;
 
-  const refQuality = assessReferenceQuality(references, isRelaxed ? 'eli5' : depth);
+  const refQuality = assessReferenceQuality(references, isRelaxed ? 'eli5' : depth, durationTarget, tone);
 
   // Misattribution tolerance: allow up to 2 for standard/quick/eli5, strict zero for deep_dive
   const misattributionLimit = depth === 'deep_dive' ? 0 : 2;
@@ -425,6 +461,8 @@ export async function verifyScript(params: {
   audienceLevel: string;
   attemptNumber: number;
   maxDurationMinutes?: number;
+  tone?: string;
+  durationTarget?: number;
   previousFeedback?: string;
   apiKeyOverride?: string;
   model?: string;
@@ -467,7 +505,7 @@ export async function verifyScript(params: {
         inputTokens: 0,
         outputTokens: 0,
         model: params.model || 'skipped',
-      }, params.verificationMode);
+      }, params.verificationMode, params.tone, params.durationTarget);
     }
 
     const turnsText = turns.map((t, i) => `[Turn ${i}] ${t.speaker}: ${t.text}`).join('\n\n');
@@ -537,11 +575,11 @@ Analyze ONLY the changed turns listed in the system instructions. Return JSON on
           misattributedClaims: [],
           referenceQuality: {
             totalCount: 0,
-            requiredCount: MIN_REFERENCE_COUNTS[depth] ?? 5,
+            requiredCount: getMinReferenceCount(params.verificationMode === 'relaxed' ? 'eli5' : depth, params.durationTarget),
             countPassed: false,
             seriousCount: 0,
             seriousRatio: 0,
-            requiredSeriousRatio: MIN_SERIOUS_RATIO[depth] ?? 0.4,
+            requiredSeriousRatio: getMinSeriousRatio(params.verificationMode === 'relaxed' ? 'eli5' : depth, params.tone),
             ratioPassed: false,
             qualityScore: 0,
             feedback: null,
@@ -568,7 +606,7 @@ Analyze ONLY the changed turns listed in the system instructions. Return JSON on
       inputTokens: response.inputTokens + extraInputTokens,
       outputTokens: response.outputTokens + extraOutputTokens,
       model: response.model,
-    }, params.verificationMode);
+    }, params.verificationMode, params.tone, params.durationTarget);
   }
 
   // Full verification path (attempt 1 or no previous claims)
@@ -634,11 +672,11 @@ Analyze every factual claim. Return JSON only.`;
         misattributedClaims: [],
         referenceQuality: {
           totalCount: 0,
-          requiredCount: MIN_REFERENCE_COUNTS[depth] ?? 5,
+          requiredCount: getMinReferenceCount(depth, params.durationTarget),
           countPassed: false,
           seriousCount: 0,
           seriousRatio: 0,
-          requiredSeriousRatio: MIN_SERIOUS_RATIO[depth] ?? 0.4,
+          requiredSeriousRatio: getMinSeriousRatio(depth, params.tone),
           ratioPassed: false,
           qualityScore: 0,
           feedback: null,
@@ -660,7 +698,7 @@ Analyze every factual claim. Return JSON only.`;
     inputTokens: response.inputTokens + extraInputTokens,
     outputTokens: response.outputTokens + extraOutputTokens,
     model: response.model,
-  }, params.verificationMode);
+  }, params.verificationMode, params.tone, params.durationTarget);
 }
 
 function extractDomain(url: string): string {
