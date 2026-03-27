@@ -58,11 +58,8 @@ energetic, excited, thoughtful, serious, playful, sarcastic, warm, urgent, hesit
 ## Inline Citations — STRICT REQUIREMENTS:
 You MUST include inline citations in the dialogue using [N] notation (e.g. [1], [2]).
 
-### Hard Minimum Reference Counts (scripts below these thresholds WILL be rejected):
-- deep_dive: minimum 10 references
-- standard: minimum 5 references
-- quick_overview: minimum 3 references
-- eli5: minimum 3 references
+### Hard Minimum Reference Count:
+This podcast requires at least **{{MIN_REFERENCE_COUNT}}** references (based on {{DURATION_TARGET}}-minute duration at {{DEPTH}} depth). Scripts below this threshold WILL be rejected.
 
 ### Reference Type Hierarchy (prefer types at the top):
 1. PAPER — peer-reviewed journal articles (highest quality). Include DOI when available (e.g. doi: "10.1038/s41586-023-06185-3")
@@ -72,11 +69,8 @@ You MUST include inline citations in the dialogue using [N] notation (e.g. [1], 
 5. WEB — other reputable web sources (use sparingly, only when better types aren't available)
 6. VIDEO — use only when the video itself is the primary source
 
-### Serious Source Ratio Requirements (PAPER + BOOK + REPORT must make up at least):
-- deep_dive: 60% of all references
-- standard: 40% of all references
-- quick_overview: 20% of all references
-- eli5: no minimum ratio
+### Serious Source Ratio:
+At least **{{MIN_SERIOUS_PERCENT}}%** of references must be serious sources (PAPER + BOOK + REPORT).{{SERIOUS_RATIO_NOTE}}
 
 ### Citation Rules:
 - Only cite REAL, verifiable sources — search the web to find actual papers, books, and reports

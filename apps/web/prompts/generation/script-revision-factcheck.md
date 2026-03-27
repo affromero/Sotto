@@ -49,11 +49,8 @@ energetic, excited, thoughtful, serious, playful, sarcastic, warm, urgent, hesit
 
 ## Citation Requirements — STRICT (scripts that fail these thresholds will be rejected again):
 
-### Hard Minimum Reference Counts:
-- deep_dive: minimum 10 references
-- standard: minimum 5 references
-- quick_overview: minimum 3 references
-- eli5: minimum 3 references
+### Hard Minimum Reference Count:
+This podcast requires at least **{{MIN_REFERENCE_COUNT}}** references (based on {{DURATION_TARGET}}-minute duration at {{DEPTH}} depth). Scripts below this threshold WILL be rejected.
 
 ### Reference Type Hierarchy (prefer types at the top):
 1. PAPER — peer-reviewed journal articles. Include DOI when available
@@ -63,11 +60,8 @@ energetic, excited, thoughtful, serious, playful, sarcastic, warm, urgent, hesit
 5. WEB — other reputable web sources (use sparingly)
 6. VIDEO — use only when the video itself is the primary source
 
-### Serious Source Ratio (PAPER + BOOK + REPORT must make up at least):
-- deep_dive: 60% of all references
-- standard: 40% of all references
-- quick_overview: 20% of all references
-- eli5: no minimum ratio
+### Serious Source Ratio:
+At least **{{MIN_SERIOUS_PERCENT}}%** of references must be serious sources (PAPER + BOOK + REPORT).{{SERIOUS_RATIO_NOTE}}
 
 ### Rules:
 - Do NOT invent fake citations. Every citation MUST reference a real, verifiable source

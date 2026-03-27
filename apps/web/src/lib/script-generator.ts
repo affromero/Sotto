@@ -3,6 +3,7 @@ import { CONTENT_SAFETY_INSTRUCTIONS } from './safety-prompts';
 import { VOICE_REALISM_INSTRUCTIONS } from './voice-realism-prompts';
 import { loadPrompt, loadAndRender } from './prompt-loader';
 import { minutesToWords, wordCountBounds } from './duration';
+import { getMinReferenceCount, getMinSeriousRatio } from './script-verifier';
 import { generatedScriptSchema } from './validations';
 import { logger } from './logger';
 import type { BiasAnalysis } from './media-bias';
@@ -428,6 +429,12 @@ export async function generateScript(params: {
         EXPERT_SPEAKER: speakers.length > 1 ? speakers[1].name : speakers[0].name,
         BIAS_GUIDANCE: renderBiasGuidance(params.sourceMetadata),
         CONTENT_SAFETY: CONTENT_SAFETY_INSTRUCTIONS,
+        DEPTH: params.depth,
+        MIN_REFERENCE_COUNT: String(getMinReferenceCount(params.depth, params.durationTarget)),
+        MIN_SERIOUS_PERCENT: String(Math.round(getMinSeriousRatio(params.depth, params.tone) * 100)),
+        SERIOUS_RATIO_NOTE: ['comedic', 'satirical', 'storytelling'].includes(params.tone)
+          ? ' (Relaxed for this tone — prefer ARTICLE sources from established news outlets over academic papers.)'
+          : '',
       });
 
   const userMessage = params.sourceContent
@@ -503,6 +510,12 @@ export async function generateScriptWithFeedback(params: {
     BIAS_GUIDANCE: renderBiasGuidance(params.sourceMetadata),
     CONTENT_SAFETY: CONTENT_SAFETY_INSTRUCTIONS,
     WEB_SEARCH_GUIDANCE: webSearchGuidance,
+    DEPTH: params.depth,
+    MIN_REFERENCE_COUNT: String(getMinReferenceCount(params.depth, params.durationTarget)),
+    MIN_SERIOUS_PERCENT: String(Math.round(getMinSeriousRatio(params.depth, params.tone) * 100)),
+    SERIOUS_RATIO_NOTE: ['comedic', 'satirical', 'storytelling'].includes(params.tone)
+      ? ' (Relaxed for this tone — prefer ARTICLE sources from established news outlets over academic papers.)'
+      : '',
   });
 
   const previousScriptText = params.previousScript
