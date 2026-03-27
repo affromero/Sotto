@@ -292,6 +292,43 @@ describe('parseMetadata', () => {
     expect(result).toBeNull();
   });
 
+  it('parses metadata with suggested_format field', () => {
+    const message = `[METADATA]
+{
+  "topic": "My morning routine",
+  "depth": "standard",
+  "audience_level": "beginner",
+  "focus_areas": ["productivity"],
+  "tone": "casual",
+  "suggested_format": 1,
+  "duration_target": 10,
+  "ready": true
+}
+[/METADATA]`;
+
+    const result = parseMetadata(message);
+
+    expect(result?.suggested_format).toBe(1);
+  });
+
+  it('parses metadata without suggested_format (backward compatible)', () => {
+    const message = `[METADATA]
+{
+  "topic": "Climate debate",
+  "depth": "standard",
+  "audience_level": "intermediate",
+  "focus_areas": ["policy"],
+  "tone": "socratic",
+  "duration_target": 10,
+  "ready": true
+}
+[/METADATA]`;
+
+    const result = parseMetadata(message);
+
+    expect(result?.suggested_format).toBeUndefined();
+  });
+
   it('parses metadata when embedded in longer message', () => {
     const message = `Perfect! Let me summarize what we'll create:
 
