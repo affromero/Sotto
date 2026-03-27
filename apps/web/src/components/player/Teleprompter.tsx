@@ -5,6 +5,7 @@ import { Minus, Plus } from 'lucide-react';
 import { parseTextWithCitations } from '@/lib/citation-parser';
 import { findActiveIndex } from '@/lib/segment-utils';
 import { getSpeakerIndex, getUniqueSpeakers } from '@/lib/speaker-colors';
+import { STAGE_DIRECTION_PATTERN } from '@/lib/tts-text-cleaner';
 import type { SegmentData } from '@/types/podcast';
 import type { ReferenceData } from '@/types/reference';
 import styles from './Teleprompter.module.css';
@@ -45,7 +46,7 @@ function SegmentBlock({
         {segment.speaker}
       </span>
       <p className={styles.text}>
-        {parseTextWithCitations(segment.text, references)}
+        {parseTextWithCitations(segment.text.replace(STAGE_DIRECTION_PATTERN, '').replace(/\s{2,}/g, ' ').trim(), references)}
       </p>
     </div>
   );
