@@ -6,7 +6,7 @@ import { podcastUrl as buildPodcastPath } from '@/lib/urls';
 import { logger } from '@/lib/logger';
 import type { AutoTweetPayload } from '@/lib/queue';
 
-const SOTTO_APP_URL = process.env.NEXTAUTH_URL || 'https://sotto.fm';
+const SOTTO_APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://sotto.fm';
 
 function interpolateTemplate(
   template: string,

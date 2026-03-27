@@ -5,7 +5,7 @@ import { replyToTweet } from '@/lib/twitter';
 import { podcastUrl as buildPodcastPath } from '@/lib/urls';
 import { logger } from '@/lib/logger';
 
-const SOTTO_APP_URL = process.env.NEXTAUTH_URL || 'https://sotto.fm';
+const SOTTO_APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://sotto.fm';
 
 export async function processTwitterReply(job: Job<ReplyTwitterPayload>): Promise<void> {
   const { podcastId, tweetMentionId, originalTweetId } = job.data;

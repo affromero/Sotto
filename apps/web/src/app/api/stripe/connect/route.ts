@@ -46,7 +46,7 @@ export async function POST() {
   }
 
   // Create onboarding link
-  const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://sotto.fm';
   const accountLink = await stripe.accountLinks.create({
     account: accountId,
     refresh_url: `${baseUrl}/settings/voices?stripe=refresh`,
