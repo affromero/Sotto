@@ -483,6 +483,11 @@ export async function generateScriptWithFeedback(params: {
   ];
   const feedbackSpeakerSection = feedbackSpeakers.map((s) => `- ${s.name}: ${s.description}`).join('\n');
 
+  const useSearch = params.webSearchEnabled !== false;
+  const webSearchGuidance = useSearch
+    ? '## Web Search:\nYou have access to web search. Use it to verify facts, find accurate statistics, and discover current information to improve the script.'
+    : '## Web Search:\nYou do NOT have web search in this revision pass. Work with the references and source material already provided. If a claim cannot be verified from the available references, soften the language or remove the claim. Ignore any instructions above that reference "web search."';
+
   const systemPrompt = loadAndRender('generation/script-revision-factcheck.md', {
     SPEAKER_SECTION: feedbackSpeakerSection,
     VOICE_REALISM: VOICE_REALISM_INSTRUCTIONS,
@@ -497,6 +502,7 @@ export async function generateScriptWithFeedback(params: {
     FOCUS_AREAS: params.focusAreas.join(', '),
     BIAS_GUIDANCE: renderBiasGuidance(params.sourceMetadata),
     CONTENT_SAFETY: CONTENT_SAFETY_INSTRUCTIONS,
+    WEB_SEARCH_GUIDANCE: webSearchGuidance,
   });
 
   const previousScriptText = params.previousScript
