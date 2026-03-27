@@ -246,8 +246,7 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
       }
 
       const data = await response.json();
-      setPodcastId(data.id);
-      setPipelineStatus(data.status || 'EXTRACTING');
+      router.push(`/podcast/${data.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
       setStep('voice');
