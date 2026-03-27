@@ -11,6 +11,12 @@
   margin-top: var(--spacing-md);
 }
 
+.headerRow {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
 .header {
   font: var(--text-body-sm);
   font-weight: 600;
