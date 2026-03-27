@@ -84,12 +84,24 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     ),
   ]);
 
+  // Owner-only fields: fetch separately (cheap, not cached) so the shared
+  // public cache never leaks failure details to non-owners.
+  let failureReason: string | null = null;
+  if (authResult && authResult.userId === podcast.userId && podcast.status === 'FAILED') {
+    const ownerFields = await prisma.podcast.findUnique({
+      where: { id: podcastId },
+      select: { failureReason: true },
+    });
+    failureReason = ownerFields?.failureReason ?? null;
+  }
+
   return NextResponse.json({
     ...podcast,
     audioUrl: resolvedAudioUrl,
     segments: resolvedSegments,
     isLiked,
     isSaved,
+    ...(failureReason ? { failureReason } : {}),
   });
 }
 
