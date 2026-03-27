@@ -37,6 +37,14 @@ const STRIP_SELECTORS = [
  */
 export async function extractHtmlContent(url: string): Promise<ExtractedContent> {
   const html = await fetchHtml(url);
+  return extractHtmlFromString(html, url);
+}
+
+/**
+ * Extract content from a pre-fetched HTML string.
+ * Use this when the HTML has already been fetched (e.g., by the MIME-routing layer).
+ */
+export async function extractHtmlFromString(html: string, url: string): Promise<ExtractedContent> {
   const ogMeta = extractOpenGraphMeta(html);
 
   // Extract structured data from the full HTML (before Readability strips it)
