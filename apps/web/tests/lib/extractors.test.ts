@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { extractContent } from '@/lib/extractors';
+import { extractContent, extractFromPdfBuffer } from '@/lib/extractors';
 import { extractHtmlContent } from '@/lib/extractors/html';
 import * as pinchtabModule from '@/lib/extractors/pinchtab';
 
@@ -602,6 +602,48 @@ describe('extractors', () => {
       const result = await extractContent('https://example.com/article');
 
       expect(result.sourceType).toBe('html');
+    });
+  });
+
+  describe('extractFromPdfBuffer', () => {
+    it('tries Markit first for PDF buffer extraction', async () => {
+      mockExtractViaMarkit.mockResolvedValue({
+        text: 'Markit PDF content.', markdown: '# Markit PDF\n\nMarkit PDF content.',
+        title: 'Markit PDF', description: null, siteName: null, author: null,
+        publishedDate: null, wordCount: 3, sourceType: 'pdf', extractionMethod: 'markit',
+      });
+
+      const result = await extractFromPdfBuffer(Buffer.from('fake-pdf'));
+
+      expect(result.extractionMethod).toBe('markit');
+      expect(result.text).toContain('Markit PDF content');
+      expect(mockExtractViaMarkit).toHaveBeenCalledWith(
+        expect.any(Buffer),
+        expect.objectContaining({ extension: '.pdf' })
+      );
+    });
+
+    it('falls back to pdf-parse when Markit fails', async () => {
+      mockExtractViaMarkit.mockRejectedValue(new Error('Markit buffer error'));
+
+      vi.doMock('pdf-parse', () => ({
+        PDFParse: class {
+          async getText() {
+            return { text: 'Fallback PDF buffer text.', pages: [], total: 1 };
+          }
+          async getInfo() {
+            return { total: 1, info: { Title: 'Fallback' } };
+          }
+        },
+      }));
+      vi.doMock('pdfjs-dist/legacy/build/pdf.mjs', () => ({
+        getDocument: () => ({ promise: Promise.resolve({ numPages: 0 }) }),
+      }));
+
+      const result = await extractFromPdfBuffer(Buffer.from('fake-pdf'));
+
+      expect(result.extractionMethod).toBe('pdf-parse');
+      expect(result.sourceType).toBe('pdf');
     });
   });
 
