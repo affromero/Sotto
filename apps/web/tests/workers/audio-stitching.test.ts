@@ -70,11 +70,11 @@ vi.mock('@/lib/prisma', () => {
   return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
 });
 
-const mockStitchWithEffects = vi.fn().mockResolvedValue({ duration: 300 });
+const mockStitchWithEffectsAndMusic = vi.fn().mockResolvedValue({ duration: 300 });
 const mockGetAudioDuration = vi.fn().mockResolvedValue(300);
 
 vi.mock('@/lib/audio-stitcher', () => ({
-  stitchWithEffects: (...args: unknown[]) => mockStitchWithEffects(...args),
+  stitchWithEffectsAndMusic: (...args: unknown[]) => mockStitchWithEffectsAndMusic(...args),
   getAudioDuration: (...args: unknown[]) => mockGetAudioDuration(...args),
 }));
 
@@ -242,7 +242,7 @@ describe('processAudioStitching', () => {
     mockPrismaScriptFindUnique.mockResolvedValue({ soundCues: [] });
 
     // Default stitch result
-    mockStitchWithEffects.mockResolvedValue({ duration: 300 });
+    mockStitchWithEffectsAndMusic.mockResolvedValue({ duration: 300 });
 
     // Default file operations
     mockDownloadToFile.mockResolvedValue(undefined);
@@ -295,11 +295,11 @@ describe('processAudioStitching', () => {
   });
 
   describe('FFmpeg stitching', () => {
-    it('calls stitchWithEffects with segment paths', async () => {
+    it('calls stitchWithEffectsAndMusic with segment paths', async () => {
       const job = createMockJob(defaultPayload);
       await processAudioStitching(job);
 
-      expect(mockStitchWithEffects).toHaveBeenCalledWith(
+      expect(mockStitchWithEffectsAndMusic).toHaveBeenCalledWith(
         expect.objectContaining({
           segmentPaths: expect.arrayContaining([
             expect.stringMatching(/seg-000\.mp3$/),
@@ -312,11 +312,11 @@ describe('processAudioStitching', () => {
       );
     });
 
-    it('passes correct number of segment paths to stitchWithEffects', async () => {
+    it('passes correct number of segment paths to stitchWithEffectsAndMusic', async () => {
       const job = createMockJob(defaultPayload);
       await processAudioStitching(job);
 
-      const callArgs = mockStitchWithEffects.mock.calls[0][0];
+      const callArgs = mockStitchWithEffectsAndMusic.mock.calls[0][0];
       expect(callArgs.segmentPaths).toHaveLength(3);
     });
 
@@ -325,7 +325,7 @@ describe('processAudioStitching', () => {
       const job = createMockJob(defaultPayload);
       await processAudioStitching(job);
 
-      const callArgs = mockStitchWithEffects.mock.calls[0][0];
+      const callArgs = mockStitchWithEffectsAndMusic.mock.calls[0][0];
       expect(callArgs.sfxInserts).toEqual([]);
     });
   });
@@ -353,11 +353,11 @@ describe('processAudioStitching', () => {
       expect(mockCopyFile).not.toHaveBeenCalled();
     });
 
-    it('passes SFX inserts to stitchWithEffects', async () => {
+    it('passes SFX inserts to stitchWithEffectsAndMusic', async () => {
       const job = createMockJob(defaultPayload);
       await processAudioStitching(job);
 
-      const callArgs = mockStitchWithEffects.mock.calls[0][0];
+      const callArgs = mockStitchWithEffectsAndMusic.mock.calls[0][0];
       expect(callArgs.sfxInserts).toHaveLength(2);
       expect(callArgs.sfxInserts[0]).toMatchObject({
         insertAfterSegment: 0,
@@ -396,7 +396,7 @@ describe('processAudioStitching', () => {
       const job = createMockJob(defaultPayload);
       await processAudioStitching(job);
 
-      const callArgs = mockStitchWithEffects.mock.calls[0][0];
+      const callArgs = mockStitchWithEffectsAndMusic.mock.calls[0][0];
       expect(callArgs.sfxInserts).toHaveLength(2);
       expect(callArgs.sfxInserts[0].delayMs).toBe(50000); // 50s * 1000ms
       expect(callArgs.sfxInserts[1].delayMs).toBe(125000); // (50s + 75s) * 1000ms
@@ -420,11 +420,11 @@ describe('processAudioStitching', () => {
       expect(mockCopyFile).not.toHaveBeenCalled();
     });
 
-    it('passes empty sfxInserts array to stitchWithEffects when skipSfx is true', async () => {
+    it('passes empty sfxInserts array to stitchWithEffectsAndMusic when skipSfx is true', async () => {
       const job = createMockJob({ ...defaultPayload, skipSfx: true });
       await processAudioStitching(job);
 
-      const callArgs = mockStitchWithEffects.mock.calls[0][0];
+      const callArgs = mockStitchWithEffectsAndMusic.mock.calls[0][0];
       expect(callArgs.sfxInserts).toEqual([]);
     });
 
@@ -432,7 +432,7 @@ describe('processAudioStitching', () => {
       const job = createMockJob({ ...defaultPayload, skipSfx: true });
       await processAudioStitching(job);
 
-      expect(mockStitchWithEffects).toHaveBeenCalled();
+      expect(mockStitchWithEffectsAndMusic).toHaveBeenCalled();
       expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
         where: { id: 'podcast-001' },
         data: expect.objectContaining({ status: 'READY' }),
@@ -515,7 +515,7 @@ describe('processAudioStitching', () => {
     });
 
     it('updates podcast with duration from stitcher', async () => {
-      mockStitchWithEffects.mockResolvedValue({ duration: 250.75 });
+      mockStitchWithEffectsAndMusic.mockResolvedValue({ duration: 250.75 });
       const job = createMockJob(defaultPayload);
       await processAudioStitching(job);
 
@@ -658,7 +658,7 @@ describe('processAudioStitching', () => {
     });
 
     it('does not enqueue feature computation when duration exceeds limit', async () => {
-      mockStitchWithEffects.mockResolvedValue({ duration: 2100 });
+      mockStitchWithEffectsAndMusic.mockResolvedValue({ duration: 2100 });
       const job = createMockJob(defaultPayload);
       await processAudioStitching(job);
 
@@ -762,7 +762,7 @@ describe('processAudioStitching', () => {
         { id: 'seg-2', audioUrl: 'https://r2.example.com/seg-2.mp3', order: 1, duration: 100 },
         { id: 'seg-3', audioUrl: 'https://r2.example.com/seg-3.mp3', order: 2, duration: 100 },
       ]);
-      mockStitchWithEffects.mockRejectedValue(new Error('FFmpeg error'));
+      mockStitchWithEffectsAndMusic.mockRejectedValue(new Error('FFmpeg error'));
       const job = createMockJob(defaultPayload);
 
       await expect(processAudioStitching(job)).rejects.toThrow('FFmpeg error');
@@ -774,7 +774,7 @@ describe('processAudioStitching', () => {
   describe('duration limit failure', () => {
     it('sends PODCAST_FAILED notification when duration exceeds limit', async () => {
       // LIMITS.maxDurationMinutes is 30, so max with 10% grace = 1980s
-      mockStitchWithEffects.mockResolvedValue({ duration: 2100 });
+      mockStitchWithEffectsAndMusic.mockResolvedValue({ duration: 2100 });
       const job = createMockJob(defaultPayload);
       await processAudioStitching(job);
 
@@ -791,7 +791,7 @@ describe('processAudioStitching', () => {
 
   describe('error handling', () => {
     it('re-throws error without marking podcast failed (centralized handler does that)', async () => {
-      mockStitchWithEffects.mockReset().mockRejectedValue(new Error('FFmpeg error'));
+      mockStitchWithEffectsAndMusic.mockReset().mockRejectedValue(new Error('FFmpeg error'));
       mockPrismaSegmentFindMany.mockReset().mockResolvedValueOnce([
         { id: 'seg-1', audioUrl: 'https://r2.example.com/seg-1.mp3', order: 0, duration: 100 },
         { id: 'seg-2', audioUrl: 'https://r2.example.com/seg-2.mp3', order: 1, duration: 100 },
@@ -834,7 +834,7 @@ describe('processAudioStitching', () => {
         audioUrl: null,
         user: { telegramEnabled: false, telegramChatId: null },
       });
-      mockStitchWithEffects.mockRejectedValue(new Error('FFmpeg error'));
+      mockStitchWithEffectsAndMusic.mockRejectedValue(new Error('FFmpeg error'));
       mockPrismaSegmentFindMany.mockReset().mockResolvedValueOnce([
         { id: 'seg-1', audioUrl: 'https://r2.example.com/seg-1.mp3', order: 0, duration: 100 },
       ]);
@@ -893,7 +893,7 @@ describe('processAudioStitching', () => {
         status: 'GENERATING',
       });
       // LIMITS.maxDurationMinutes is 30, so max with 10% grace = 1980s
-      mockStitchWithEffects.mockResolvedValue({ duration: 2100 });
+      mockStitchWithEffectsAndMusic.mockResolvedValue({ duration: 2100 });
 
       const job = createMockJob(defaultPayload);
       await processAudioStitching(job);
@@ -916,7 +916,7 @@ describe('processAudioStitching', () => {
   describe('end-to-end flow', () => {
     it('executes full pipeline for basic podcast (no SFX)', async () => {
       // Reset mocks and set up fresh data
-      mockStitchWithEffects.mockReset().mockResolvedValue({ duration: 305.5 });
+      mockStitchWithEffectsAndMusic.mockReset().mockResolvedValue({ duration: 305.5 });
       mockReadFile.mockReset().mockResolvedValue(Buffer.alloc(1024 * 256));
       mockUploadPodcastAudio.mockReset().mockResolvedValue('https://cdn.sotto.fm/final.mp3');
       mockPrismaSegmentFindMany
@@ -948,7 +948,7 @@ describe('processAudioStitching', () => {
       expect(mockDownloadToFile).toHaveBeenCalledTimes(3);
 
       // FFmpeg stitching called
-      expect(mockStitchWithEffects).toHaveBeenCalled();
+      expect(mockStitchWithEffectsAndMusic).toHaveBeenCalled();
 
       // Final audio uploaded to R2
       expect(mockUploadPodcastAudio).toHaveBeenCalledWith('podcast-001', expect.any(Buffer));
@@ -963,6 +963,7 @@ describe('processAudioStitching', () => {
           durationDeviation: 6, // 306 - 5*60 = 6
           fileSize: 1024 * 256,
           currentVersion: 0,
+          musicBaked: false,
         },
       });
 
@@ -1005,7 +1006,7 @@ describe('processAudioStitching', () => {
       });
 
       // SFX passed to stitcher
-      const stitchCall = mockStitchWithEffects.mock.calls[0][0];
+      const stitchCall = mockStitchWithEffectsAndMusic.mock.calls[0][0];
       expect(stitchCall.sfxInserts).toHaveLength(2);
 
       // Podcast completed successfully
