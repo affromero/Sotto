@@ -1820,6 +1820,8 @@ model AutoModelConfig {
   freeMotionProvider       String   @default("remotion")
   proMotionProvider        String   @default("remotion")
   proIncludedMusicModels   Json?
+  // Admin view mode: "ALL" = see everything, "PRO" = see curated PRO set
+  adminViewMode            String   @default("ALL")
   // Daily limits (migrated from FreeTierConfig)
   dailyGenerationLimit     Int      @default(1)
   dailyGenerationLimitPro  Int      @default(5)
