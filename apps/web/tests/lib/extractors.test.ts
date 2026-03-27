@@ -391,6 +391,118 @@ describe('extractors', () => {
       expect(result.sourceType).toBe('youtube');
       expect(result.extractionMethod).toBe('summarize-core');
     });
+
+    it('routes PDF URLs (by Content-Type) to pdf extractor', async () => {
+      vi.doMock('pdf-parse', () => ({
+        PDFParse: class {
+          async getText() {
+            return { text: 'PDF extracted text from URL.', pages: [], total: 2 };
+          }
+          async getInfo() {
+            return { total: 2, info: { Title: 'URL PDF', Author: null } };
+          }
+        },
+      }));
+      // Mock pdfjs-dist to avoid figure extraction failures
+      vi.doMock('pdfjs-dist/legacy/build/pdf.mjs', () => ({
+        getDocument: () => ({ promise: Promise.resolve({ numPages: 0 }) }),
+      }));
+
+      const pdfBuffer = Buffer.from('fake-pdf-content');
+      fetchSpy.mockResolvedValue(
+        new Response(pdfBuffer, {
+          status: 200,
+          headers: { 'Content-Type': 'application/pdf' },
+        })
+      );
+
+      const result = await extractContent('https://example.com/paper.pdf');
+
+      expect(result.sourceType).toBe('pdf');
+      expect(result.extractionMethod).toBe('pdf-parse');
+      expect(result.text).toContain('PDF extracted text');
+    });
+
+    it('detects PDF by URL extension when Content-Type is application/octet-stream', async () => {
+      vi.doMock('pdf-parse', () => ({
+        PDFParse: class {
+          async getText() {
+            return { text: 'Octet-stream PDF text.', pages: [], total: 1 };
+          }
+          async getInfo() {
+            return { total: 1, info: {} };
+          }
+        },
+      }));
+      vi.doMock('pdfjs-dist/legacy/build/pdf.mjs', () => ({
+        getDocument: () => ({ promise: Promise.resolve({ numPages: 0 }) }),
+      }));
+
+      const pdfBuffer = Buffer.from('fake-pdf');
+      fetchSpy.mockResolvedValue(
+        new Response(pdfBuffer, {
+          status: 200,
+          headers: { 'Content-Type': 'application/octet-stream' },
+        })
+      );
+
+      const result = await extractContent('https://example.com/download/report.pdf');
+
+      expect(result.sourceType).toBe('pdf');
+    });
+
+    it('falls back to HTML when Content-Type is missing', async () => {
+      fetchSpy.mockResolvedValue(
+        new Response(WELL_STRUCTURED_HTML, {
+          status: 200,
+          headers: {},
+        })
+      );
+
+      const result = await extractContent('https://example.com/article');
+
+      expect(result.sourceType).toBe('html');
+      expect(result.text).toContain('first paragraph');
+    });
+
+    it('throws for unsupported document types (DOCX/PPTX/XLSX/EPUB)', async () => {
+      fetchSpy.mockResolvedValue(
+        new Response(Buffer.from('fake-docx'), {
+          status: 200,
+          headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
+        })
+      );
+
+      await expect(
+        extractContent('https://example.com/doc.docx')
+      ).rejects.toThrow('Unsupported document format');
+    });
+
+    it('detects document type by extension when Content-Type is octet-stream', async () => {
+      fetchSpy.mockResolvedValue(
+        new Response(Buffer.from('fake-docx'), {
+          status: 200,
+          headers: { 'Content-Type': 'application/octet-stream' },
+        })
+      );
+
+      await expect(
+        extractContent('https://example.com/report.docx')
+      ).rejects.toThrow('Unsupported document format');
+    });
+
+    it('handles Content-Type with charset parameter', async () => {
+      fetchSpy.mockResolvedValue(
+        new Response(WELL_STRUCTURED_HTML, {
+          status: 200,
+          headers: { 'Content-Type': 'text/html; charset=utf-8' },
+        })
+      );
+
+      const result = await extractContent('https://example.com/article');
+
+      expect(result.sourceType).toBe('html');
+    });
   });
 
   describe('Pinchtab fallback', () => {

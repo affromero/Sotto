@@ -37,10 +37,10 @@ export interface ExtractedContent {
   publishedDate: string | null;
   /** Word count of extracted text */
   wordCount: number;
-  /** Source type: html, pdf, youtube, video */
-  sourceType: 'html' | 'pdf' | 'youtube' | 'video';
+  /** Source type: html, pdf, youtube, video, document */
+  sourceType: 'html' | 'pdf' | 'youtube' | 'video' | 'document';
   /** Which extraction method succeeded */
-  extractionMethod: 'readability' | 'cheerio-fallback' | 'pdf-parse' | 'youtube-transcript' | 'summarize-core' | 'pinchtab';
+  extractionMethod: 'readability' | 'cheerio-fallback' | 'pdf-parse' | 'youtube-transcript' | 'summarize-core' | 'pinchtab' | 'markit';
   /** Structured tables extracted from the source */
   tables?: ExtractedTable[];
   /** Figures/images extracted from the source */
