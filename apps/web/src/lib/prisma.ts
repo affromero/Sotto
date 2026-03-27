@@ -23,8 +23,8 @@ function createPrismaClient(): PrismaClient {
   const poolUrl = url.includes('connection_limit')
     ? url
     : isPooler
-      ? `${url}${url.includes('?') ? '&' : '?'}connection_limit=1&pgbouncer=true`
-      : `${url}${url.includes('?') ? '&' : '?'}connection_limit=5&pool_timeout=10`;
+      ? `${url}${url.includes('?') ? '&' : '?'}connection_limit=10&pool_timeout=30&pgbouncer=true`
+      : `${url}${url.includes('?') ? '&' : '?'}connection_limit=10&pool_timeout=30`;
 
   return new PrismaClient({
     datasources: { db: { url: poolUrl } },
