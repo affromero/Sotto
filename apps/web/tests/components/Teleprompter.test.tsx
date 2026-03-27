@@ -136,6 +136,20 @@ describe('Teleprompter', () => {
     expect(screen.getByLabelText('Teleprompter view')).toBeInTheDocument();
   });
 
+  it('strips parenthetical stage directions from display text', () => {
+    const segmentsWithDirections: SegmentData[] = [
+      { id: 'seg-a', speaker: 'HOST', text: 'Hello (pause) world!', audioUrl: null, order: 0, startTime: 0, duration: 5 },
+      { id: 'seg-b', speaker: 'EXPERT', text: '(laughs) That is great.', audioUrl: null, order: 1, startTime: 5, duration: 5 },
+    ];
+
+    render(
+      <Teleprompter segments={segmentsWithDirections} references={[]} currentTime={0} />
+    );
+
+    expect(screen.getByText('Hello world!')).toBeInTheDocument();
+    expect(screen.queryByText(/\(pause\)/)).not.toBeInTheDocument();
+  });
+
   it('does not call scrollIntoView during playback', () => {
     (Element.prototype.scrollIntoView as ReturnType<typeof vi.fn>).mockClear();
 

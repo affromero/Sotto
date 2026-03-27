@@ -5,6 +5,14 @@
  */
 export const AUDIENCE_REACTION_PATTERN = /\[(?:audience laughs?|audience laughter|crowd laughter|applause|audience applause|crowd cheers)\]/gi;
 
+/**
+ * Parenthetical stage directions that should be stripped from TTS input
+ * and teleprompter display. These are NOT valid inline audio tags — the
+ * correct format is [pause], [laughs], etc. When the LLM writes (pause)
+ * in parentheses, TTS speaks it literally.
+ */
+export const STAGE_DIRECTION_PATTERN = /\((?:(?:long |short |dramatic )?pause|laughs?|chuckles?|giggles?|sighs?|gasps?|whispers?|excited|sarcastic|curious|nervously|cautiously|beat|silence)\)/gi;
+
 export type AudienceReactionType = 'laugh_track' | 'applause';
 
 export interface AudienceReaction {
@@ -36,6 +44,7 @@ export function cleanTextForTts(text: string): string {
   return text
     .replace(/\[SFX:.*?\]/gi, '')
     .replace(AUDIENCE_REACTION_PATTERN, '')
+    .replace(STAGE_DIRECTION_PATTERN, '')
     .replace(/\s*\[\d+(?:,\s*\d+)*\]/g, '')
     .replace(/\s{2,}/g, ' ')
     .trim();
