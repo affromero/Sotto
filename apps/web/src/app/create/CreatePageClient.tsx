@@ -537,7 +537,7 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
 
         {step === 'voice' && (
           <div className={styles.chatArea} style={tabMode !== 'create' ? { display: 'none' } : undefined}>
-            <VoicePicker onSelectionChange={handleVoiceSelectionChange} maxSpeakers={maxSpeakers} ttsProvider={ttsProvider} />
+            <VoicePicker onSelectionChange={handleVoiceSelectionChange} maxSpeakers={maxSpeakers} suggestedFormat={metadata?.suggestedFormat} ttsProvider={ttsProvider} />
             <TtsModelDropdown
               ttsProvider={ttsProvider}
               ttsModel={ttsModel}
