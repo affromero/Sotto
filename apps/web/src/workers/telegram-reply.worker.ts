@@ -5,7 +5,7 @@ import { sendMessage } from '@/lib/telegram';
 import { podcastUrl as buildPodcastPath } from '@/lib/urls';
 import { logger } from '@/lib/logger';
 
-const SOTTO_APP_URL = process.env.NEXTAUTH_URL || 'https://sotto.fm';
+const SOTTO_APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://sotto.fm';
 
 export async function processTelegramReply(job: Job<ReplyTelegramPayload>): Promise<void> {
   const { podcastId, telegramMessageId, chatId } = job.data;
