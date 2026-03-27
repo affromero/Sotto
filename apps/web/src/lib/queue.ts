@@ -151,6 +151,7 @@ export interface ValidateReferencesPayload {
   useAdminCredits?: boolean;
   referenceRetryAttempt?: number; // 0-based, undefined = first pass
   previousVerifiedCount?: number; // for early termination (going backward = stop)
+  previouslyVerifiedRefIds?: string[]; // skip re-verification on retry
 }
 
 export interface VerifyVoicePayload {

@@ -40,7 +40,7 @@ const MAX_REF_RETRY_ATTEMPTS: Record<string, number> = {
 export async function processReferenceValidation(
   job: Job<ValidateReferencesPayload>
 ): Promise<void> {
-  const { podcastId, userId, useAdminCredits, referenceRetryAttempt, previousVerifiedCount } = job.data;
+  const { podcastId, userId, useAdminCredits, referenceRetryAttempt, previousVerifiedCount, previouslyVerifiedRefIds } = job.data;
   const attempt = referenceRetryAttempt ?? 0;
 
   logger.info('Starting reference validation', { podcastId, attempt: String(attempt) });
@@ -165,6 +165,19 @@ export async function processReferenceValidation(
     type: r.type,
   }));
 
+  // Filter out previously verified refs on retry
+  const previouslyVerifiedSet = new Set(previouslyVerifiedRefIds ?? []);
+  const refsToVerify = refInputs.filter((r) => !previouslyVerifiedSet.has(r.id));
+  const skippedVerifiedCount = refInputs.length - refsToVerify.length;
+
+  if (skippedVerifiedCount > 0) {
+    logger.info('Skipping re-verification for previously verified refs', {
+      podcastId,
+      skipped: String(skippedVerifiedCount),
+      verifying: String(refsToVerify.length),
+    });
+  }
+
   const scriptTurns = script.turns as Array<{ speaker: string; text: string; direction?: string }>;
 
   // Write initial progress snapshot
@@ -173,8 +186,8 @@ export async function processReferenceValidation(
     data: {
       verificationProgress: {
         total: refInputs.length,
-        checked: 0,
-        verified: 0,
+        checked: skippedVerifiedCount,
+        verified: skippedVerifiedCount,
         replaced: 0,
         removed: 0,
         rejected: 0,
@@ -187,14 +200,15 @@ export async function processReferenceValidation(
 
   await job.updateProgress(15);
 
-  // Run domain-aware verification pipeline
+  // Run domain-aware verification pipeline (only on refs that need verification)
   const { results: verificationResults, rejectedRefIds, claimContexts } = await runReferenceVerification(
-    refInputs,
+    refsToVerify,
     scriptTurns,
     podcast?.topic || '',
     aiKey?.apiKey,
     verificationModel,
-    provider
+    provider,
+    requiredRefCount
   );
 
   await job.updateProgress(55);
@@ -217,6 +231,9 @@ export async function processReferenceValidation(
 
   // Update Reference records — independent rows, safe to parallelize
   const refUpdates = references.map((ref) => {
+    // Skip DB update for previously verified refs — already written in prior attempt
+    if (previouslyVerifiedSet.has(ref.id)) return null;
+
     if (rejectedRefIds.has(ref.id)) {
       return prisma.reference.update({
         where: { id: ref.id },
@@ -344,7 +361,7 @@ export async function processReferenceValidation(
   const remainingRefCount = references.length - removedNumbers.size;
   const verifiedCount = [...verificationResults.values()].filter(
     (r) => r.verdict.status === 'VERIFIED' || r.verdict.status === 'REPLACED'
-  ).length;
+  ).length + skippedVerifiedCount;
   const maxRetries = MAX_REF_RETRY_ATTEMPTS[effectiveDepth] ?? 1;
 
   if (!isShowcase && remainingRefCount < requiredRefCount) {
@@ -496,6 +513,13 @@ export async function processReferenceValidation(
           `Attempt ${attempt + 1}: ${verifiedCount} verified, regenerated ${merged.length} refs`
         );
 
+        // Collect verified ref IDs to skip on next pass
+        const verifiedRefIds = [...verificationResults.entries()]
+          .filter(([, r]) => r.verdict.status === 'VERIFIED' || r.verdict.status === 'REPLACED')
+          .map(([id]) => id);
+        // Include previously verified refs that were skipped this pass
+        const allVerifiedRefIds = [...previouslyVerifiedSet, ...verifiedRefIds];
+
         // Re-queue for next validation pass
         await addJob(referenceValidationQueue, JobType.VALIDATE_REFERENCES, {
           podcastId,
@@ -503,6 +527,7 @@ export async function processReferenceValidation(
           useAdminCredits,
           referenceRetryAttempt: attempt + 1,
           previousVerifiedCount: verifiedCount,
+          previouslyVerifiedRefIds: allVerifiedRefIds,
         });
         return;
       }
