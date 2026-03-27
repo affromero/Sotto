@@ -139,6 +139,14 @@ All secrets via **Doppler** — NEVER suggest `.env` files, dotenv, or hardcoded
 Critical: `DATABASE_URL`, `REDIS_URL`, `NEXTAUTH_SECRET`, `ANTHROPIC_API_KEY`, `ELEVENLABS_API_KEY`, `R2_*`, `BYOK_ENCRYPTION_KEY`, `KITTENTTS_URL`.
 Swappable: `AI_PROVIDER`, `TTS_PROVIDER`, `STT_PROVIDER`, `STORAGE_PROVIDER`, `PAYMENT_PROVIDER`.
 
+## Known Gotchas
+
+- **Alpine + Chromium**: Pin Alpine version to match the Chromium version available in its repos. Alpine 3.22+ works with Chromium 136+. Never mix versions — CDP protocol mismatches cause silent crashes. Test with `chromium --version` inside the container.
+- **Docker service names**: Workers reach sidecars via Docker service names (`http://remotion:3100`, `http://kittentts:8000`), NOT `localhost`. Only use `localhost` for local dev outside Docker.
+- **Prisma in Docker**: Always run `npx prisma generate` inside the Docker build — the generated client is platform-specific (linux-musl vs darwin).
+- **`__dirname` in monorepo Docker**: Never use `__dirname`-relative paths to reach across package boundaries. Use `process.cwd()` for cross-package references.
+- **DB enum values are UPPERCASE**: `AI_ILLUSTRATION`, `STOCK_FOOTAGE`, `TEXT_CARD` — any mapping or switch statement must match exactly.
+
 ## Reference
 
 Full product plan: `docs/00-plan.md`
