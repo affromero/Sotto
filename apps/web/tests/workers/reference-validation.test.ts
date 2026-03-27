@@ -394,7 +394,8 @@ describe('processReferenceValidation', () => {
         'Quantum Computing Basics',
         undefined,
         expect.any(String),
-        'anthropic'
+        'anthropic',
+        expect.any(Number)
       );
     });
 
@@ -1184,6 +1185,74 @@ describe('processReferenceValidation', () => {
         'send_notification',
         expect.objectContaining({ type: 'SCRIPT_READY' })
       );
+    });
+  });
+
+  describe('skip re-verification on retry', () => {
+    it('excludes previously verified refs from verification pipeline', async () => {
+      // 3 refs total, ref-001 was verified in prior attempt
+      mockPrismaReferenceFindMany.mockResolvedValue([
+        { id: 'ref-001', number: 1, title: 'Paper A', authors: [], year: 2023, url: 'https://example.com/a', doi: null, type: 'article' },
+        { id: 'ref-002', number: 2, title: 'Paper B', authors: [], year: 2023, url: 'https://example.com/b', doi: null, type: 'article' },
+        { id: 'ref-003', number: 3, title: 'Paper C', authors: [], year: 2023, url: 'https://example.com/c', doi: null, type: 'article' },
+      ]);
+
+      mockRunReferenceVerification.mockResolvedValue({
+        results: new Map([
+          ['ref-002', { domain: 'GENERAL', verdict: { status: 'VERIFIED' as const, confidence: 0.8 }, score: 0.8, checks: [], logOddsContributions: {} }],
+          ['ref-003', { domain: 'GENERAL', verdict: { status: 'VERIFIED' as const, confidence: 0.8 }, score: 0.8, checks: [], logOddsContributions: {} }],
+        ]),
+        rejectedRefIds: new Set<string>(),
+      });
+
+      const job = createMockJob({
+        ...defaultPayload,
+        referenceRetryAttempt: 1,
+        previouslyVerifiedRefIds: ['ref-001'],
+      });
+      await processReferenceValidation(job);
+
+      // Should only pass ref-002 and ref-003 to verification (not ref-001)
+      const passedRefs = mockRunReferenceVerification.mock.calls[0][0] as Array<{ id: string }>;
+      expect(passedRefs).toHaveLength(2);
+      expect(passedRefs.map((r) => r.id)).toEqual(['ref-002', 'ref-003']);
+    });
+
+    it('includes skipped count in verified total', async () => {
+      // Use quick_overview depth (requires 3) so 3 verified refs passes the gate
+      mockPrismaDiscoveryFindUnique.mockResolvedValue({ depth: 'quick_overview' });
+
+      mockPrismaReferenceFindMany.mockResolvedValue([
+        { id: 'ref-001', number: 1, title: 'Paper A', authors: [], year: 2023, url: 'https://example.com/a', doi: null, type: 'article' },
+        { id: 'ref-002', number: 2, title: 'Paper B', authors: [], year: 2023, url: 'https://example.com/b', doi: null, type: 'article' },
+        { id: 'ref-003', number: 3, title: 'Paper C', authors: [], year: 2023, url: 'https://example.com/c', doi: null, type: 'article' },
+      ]);
+
+      mockRunReferenceVerification.mockResolvedValue({
+        results: new Map([
+          ['ref-002', { domain: 'GENERAL', verdict: { status: 'VERIFIED' as const, confidence: 0.8 }, score: 0.8, checks: [], logOddsContributions: {} }],
+          ['ref-003', { domain: 'GENERAL', verdict: { status: 'VERIFIED' as const, confidence: 0.8 }, score: 0.8, checks: [], logOddsContributions: {} }],
+        ]),
+        rejectedRefIds: new Set<string>(),
+      });
+
+      const job = createMockJob({
+        ...defaultPayload,
+        referenceRetryAttempt: 1,
+        previouslyVerifiedRefIds: ['ref-001'],
+      });
+      await processReferenceValidation(job);
+
+      // Complete progress snapshot should show 3 verified (1 skipped + 2 new)
+      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
+        where: { id: 'podcast-001' },
+        data: expect.objectContaining({
+          verificationProgress: expect.objectContaining({
+            verified: 3,
+            phase: 'complete',
+          }),
+        }),
+      });
     });
   });
 });
