@@ -454,7 +454,7 @@ describe('processTwitterMentions', () => {
 
       expect(mockReplyToTweet).toHaveBeenCalledWith(
         tweet.id,
-        expect.stringContaining('Sign up at')
+        expect.stringContaining('Join Sotto at')
       );
       expect(mockRedisSet).toHaveBeenCalledWith(`twitter:cta_sent:${tweet.author_id}`, '1');
     });

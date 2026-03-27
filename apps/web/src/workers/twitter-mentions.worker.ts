@@ -19,7 +19,7 @@ import type { ParticipantCredential } from '@/lib/credential-lookup';
 
 const REDIS_CURSOR_KEY = 'twitter:last_processed_tweet_id';
 const REDIS_CTA_PREFIX = 'twitter:cta_sent:';
-const SOTTO_APP_URL = process.env.NEXTAUTH_URL || 'https://sotto.fm';
+const SOTTO_APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://sotto.fm';
 
 export async function processTwitterMentions(job: Job<PollTwitterMentionsPayload>): Promise<void> {
   const redis = getRedisClient();
@@ -408,7 +408,7 @@ async function handleUnlinkedUser(tweet: TwitterTweet): Promise<void> {
   try {
     await replyToTweet(
       tweet.id,
-      `Sign up at ${SOTTO_APP_URL} and get 3 free podcasts! Connect your Twitter account to generate podcasts directly from tweets.`
+      `Join Sotto at ${SOTTO_APP_URL} and turn any topic into a podcast. Already have an account? Connect your Twitter in Settings and just tag us to generate one.`
     );
     await redis.set(ctaKey, '1');
 

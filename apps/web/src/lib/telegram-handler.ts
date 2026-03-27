@@ -11,7 +11,7 @@ import type {
 
 const REDIS_LINK_PREFIX = 'telegram:link:';
 const LINK_CODE_TTL = 600; // 10 minutes
-const SOTTO_APP_URL = process.env.NEXTAUTH_URL || 'https://sotto.fm';
+const SOTTO_APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://sotto.fm';
 
 export async function routeUpdate(update: TelegramUpdate): Promise<void> {
   if (update.callback_query) {
