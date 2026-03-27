@@ -8,24 +8,17 @@
 - `ambient-soft.mp3` — original Sotto production
 - `silence-500ms.mp3` — generated silence
 
-## Comedy SFX (placeholder — replace with CC0 audio)
+## Comedy SFX (ElevenLabs Sound Effects API)
 
-These files are currently FFmpeg-generated synthetic placeholders.
-Replace with proper royalty-free (CC0) audio from freesound.org or similar.
+Generated via ElevenLabs Sound Effects API, normalized to mono 44.1kHz 128kbps.
 
-- `laugh-track.mp3` — crowd laughter (2s, placeholder)
-- `music-sting.mp3` — dramatic musical sting (1.5s, placeholder)
-- `applause.mp3` — crowd applause (2.5s, placeholder)
-- `comedic-hit.mp3` — cartoon bonk (<0.2s, placeholder)
-- `rim-shot.mp3` — ba-dum-tss (0.3s, placeholder)
-
-### Recommended CC0 sources
-
-- [freesound.org](https://freesound.org) — filter by CC0 license
-- [pixabay.com/sound-effects](https://pixabay.com/sound-effects/) — Pixabay license (free commercial use)
-- [mixkit.co/free-sound-effects](https://mixkit.co/free-sound-effects/) — Mixkit license
+- `laugh-track.mp3` — studio audience laughter (2.5s)
+- `music-sting.mp3` — dramatic orchestral brass sting (1.5s)
+- `applause.mp3` — studio audience applause and cheering (2.5s)
+- `comedic-hit.mp3` — cartoon bonk comedy impact (0.5s)
+- `rim-shot.mp3` — ba-dum-tss drum punchline (1s)
 
 ### File spec
 
 - Format: MP3, 44.1kHz, mono, 128kbps
-- Target size: 5-40KB per file
+- Target size: 5-41KB per file
