@@ -97,7 +97,7 @@ interface DirectionMapping {
 const DIRECTION_MAP: Record<string, DirectionMapping> = {
   energetic: {
     elevenlabs: { audioTagPrefix: '[excited] ', stability: 0.0, sustainedDelivery: true, speed: 1.15 },
-    cartesia: { emotion: 'excited', speed: 1.3, volume: 1.3 },
+    cartesia: { emotion: 'excited', speed: 1.1, volume: 1.3 },
     hume: { description: 'energetic, enthusiastic, high-energy delivery', speed: 1.3, trailingSilence: 0.15 },
     openai: { instructions: 'Speak with high energy and enthusiasm, like an excited podcast host.' },
     minimax: { emotion: 'happy' },
@@ -105,7 +105,7 @@ const DIRECTION_MAP: Record<string, DirectionMapping> = {
   },
   excited: {
     elevenlabs: { audioTagPrefix: '[excited] ', stability: 0.0, sustainedDelivery: true, speed: 1.15 },
-    cartesia: { emotion: 'excited', speed: 1.3, volume: 1.25 },
+    cartesia: { emotion: 'excited', speed: 1.1, volume: 1.25 },
     hume: { description: 'excited, enthusiastic', speed: 1.3, trailingSilence: 0.15 },
     openai: { instructions: 'Speak with genuine excitement and enthusiasm.' },
     minimax: { emotion: 'happy' },
@@ -129,7 +129,7 @@ const DIRECTION_MAP: Record<string, DirectionMapping> = {
   },
   playful: {
     elevenlabs: { audioTagPrefix: '[playfully] ', stability: 0.0, sustainedDelivery: true, speed: 1.1 },
-    cartesia: { emotion: 'happy', speed: 1.2 },
+    cartesia: { emotion: 'happy', speed: 1.1 },
     hume: { description: 'playful, light-hearted, fun', speed: 1.2, trailingSilence: 0.2 },
     openai: { instructions: 'Speak playfully and light-heartedly, with a smile in your voice.' },
     minimax: { emotion: 'happy' },
@@ -153,7 +153,7 @@ const DIRECTION_MAP: Record<string, DirectionMapping> = {
   },
   urgent: {
     elevenlabs: { audioTagPrefix: '[rushed] ', stability: 0.0, sustainedDelivery: true, speed: 1.2 },
-    cartesia: { emotion: 'agitated', speed: 1.4, volume: 1.2 },
+    cartesia: { emotion: 'agitated', speed: 1.2, volume: 1.2 },
     hume: { description: 'urgent, fast-paced, pressing', speed: 1.5, trailingSilence: 0.1 },
     openai: { instructions: 'Speak with urgency, slightly faster pace, conveying importance.' },
     minimax: { emotion: 'angry' },
@@ -244,7 +244,7 @@ const DIRECTION_MAP: Record<string, DirectionMapping> = {
   },
   frustrated: {
     elevenlabs: { audioTagPrefix: '[frustrated] ', stability: 0.0, sustainedDelivery: true, speed: 1.1 },
-    cartesia: { emotion: 'frustrated', speed: 1.15, volume: 1.15 },
+    cartesia: { emotion: 'frustrated', speed: 1.05, volume: 1.15 },
     hume: { description: 'frustrated, exasperated', speed: 1.2, trailingSilence: 0.2 },
     openai: { instructions: 'Speak with frustration and exasperation.' },
     minimax: { emotion: 'angry' },
@@ -253,7 +253,7 @@ const DIRECTION_MAP: Record<string, DirectionMapping> = {
   surprised: {
     // One-shot sound event — [gasps] only fires once at the start, not re-injected
     elevenlabs: { audioTagPrefix: '[gasps] ', stability: 0.0, speed: 1.1 },
-    cartesia: { emotion: 'surprised', speed: 1.15, volume: 1.2 },
+    cartesia: { emotion: 'surprised', speed: 1.05, volume: 1.2 },
     hume: { description: 'surprised, astonished', speed: 1.15, trailingSilence: 0.4 },
     openai: { instructions: 'Speak with genuine surprise and astonishment.' },
     minimax: { emotion: 'surprised' },

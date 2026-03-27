@@ -74,7 +74,7 @@ describe('tts-expression-mapper', () => {
 
     it('includes speed for energetic direction', () => {
       const result = mapDirectionToExpression('energetic', 'HOST', 'cartesia');
-      expect(result.cartesia?.speed).toBe(1.3);
+      expect(result.cartesia?.speed).toBe(1.1);
     });
 
     it('includes slow speed for calm direction', () => {
