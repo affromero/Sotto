@@ -45,11 +45,13 @@ async function openAlexGrounding(
 ): Promise<Map<string, VerificationCheck>> {
   const results = new Map<string, VerificationCheck>();
 
-  for (const { ref, claimContext, domain } of candidates) {
-    if (domain !== 'ACADEMIC' && domain !== 'EDUCATIONAL' && domain !== 'GENERAL') continue;
+  const eligible = candidates.filter(
+    ({ domain }) => domain === 'ACADEMIC' || domain === 'EDUCATIONAL' || domain === 'GENERAL',
+  );
 
+  const tasks = eligible.map(async ({ ref, claimContext }) => {
     const query = buildSearchQuery(claimContext, ref.title);
-    if (query.length < 10) continue;
+    if (query.length < 10) return;
 
     try {
       const syntheticRef: ReferenceInput = {
@@ -80,7 +82,9 @@ async function openAlexGrounding(
         error: error instanceof Error ? error.message : 'Unknown',
       });
     }
-  }
+  });
+
+  await Promise.allSettled(tasks);
 
   return results;
 }
@@ -139,7 +143,7 @@ ${refsContext}
 
 Find one real, verifiable source per reference. Return JSON only.`;
 
-  const AI_TIMEOUT_MS = 90_000;
+  const AI_TIMEOUT_MS = 60_000;
 
   try {
     const ai = createAIProvider(provider);
@@ -155,7 +159,7 @@ Find one real, verifiable source per reference. Return JSON only.`;
         },
       ),
       new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Grounding AI search timed out after 90s')), AI_TIMEOUT_MS),
+        setTimeout(() => reject(new Error('Grounding AI search timed out after 60s')), AI_TIMEOUT_MS),
       ),
     ]);
 

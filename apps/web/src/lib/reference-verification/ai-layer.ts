@@ -78,7 +78,7 @@ ${refsContext}
 
 Evaluate each reference according to its domain instructions. Return JSON only.`;
 
-  const AI_TIMEOUT_MS = 90_000;
+  const AI_TIMEOUT_MS = 60_000;
 
   try {
     const ai = createAIProvider(provider);
@@ -94,7 +94,7 @@ Evaluate each reference according to its domain instructions. Return JSON only.`
         }
       ),
       new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('AI evaluation timed out after 90s')), AI_TIMEOUT_MS)
+        setTimeout(() => reject(new Error('AI evaluation timed out after 60s')), AI_TIMEOUT_MS)
       ),
     ]);
 
