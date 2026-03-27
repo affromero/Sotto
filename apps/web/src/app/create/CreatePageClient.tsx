@@ -276,10 +276,18 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
       } else if (event.status === 'READY') {
         router.push(`/podcast/${podcastId}`);
       } else if (event.status === 'FAILED') {
-        const reason = (event.failureReason as string) || 'Generation failed. Please try again.';
-        setError(reason);
-        setFailedPodcastId(podcastId);
-        setStep(step === 'scripting' ? 'voice' : 'script-preview');
+        if (step === 'scripting') {
+          // Script generation failed — let user start fresh
+          const reason = (event.failureReason as string) || 'Generation failed. Please try again.';
+          setError(reason);
+          setFailedPodcastId(podcastId);
+          setStep('voice');
+        } else {
+          // Audio generation failed — redirect to podcast page where
+          // the existing retry UI (AudioConfigPanel) lets the user
+          // change provider and retry without losing the script.
+          router.push(`/podcast/${podcastId}`);
+        }
       }
     }, [podcastId, router, step]),
   });
