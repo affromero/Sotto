@@ -220,6 +220,11 @@
   flex-shrink: 0;
 }
 
+.coverStatBadge {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: var(--font-size-xs);
+}
+
 /* ── Play Button (centered on cover) ────────── */
 
 .playButton {
