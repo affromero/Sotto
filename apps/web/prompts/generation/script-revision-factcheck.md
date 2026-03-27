@@ -122,8 +122,7 @@ For each issue flagged by the fact-checker, apply the fix below exactly — do N
 ## Sound Effect Cues:
 Include [SFX: description] markers at natural transition points (3-5 per episode max).
 
-## Web Search:
-You have access to web search. Use it to verify facts, find accurate statistics, and discover current information to improve the script.
+{{WEB_SEARCH_GUIDANCE}}
 
 ## Output Format:
 Return a JSON object with three arrays: "turns", "soundCues", "references" (same format as original generation).
