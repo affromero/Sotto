@@ -9,7 +9,7 @@ import { stripe } from '@/lib/stripe';
  */
 export async function GET(request: NextRequest) {
   const accountId = request.nextUrl.searchParams.get('account_id');
-  const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://sotto.fm';
 
   if (!accountId || !stripe) {
     return NextResponse.redirect(`${baseUrl}/settings/voices?stripe=error`);
