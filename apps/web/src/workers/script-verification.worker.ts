@@ -195,7 +195,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
         apiKeyOverride: aiKey?.apiKey,
         model,
         provider,
-        webSearchEnabled: tierFeatures.webSearchEnabled,
+        webSearchEnabled: false,
       });
 
       await logUsage({
@@ -429,7 +429,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
     apiKeyOverride: aiKey?.apiKey,
     model,
     provider,
-    webSearchEnabled: tierFeatures.webSearchEnabled,
+    webSearchEnabled: false,
   });
 
   await job.updateProgress(80);

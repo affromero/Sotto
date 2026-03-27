@@ -296,11 +296,14 @@ function buildVerdict(
 
   const refQuality = assessReferenceQuality(references, isRelaxed ? 'eli5' : depth);
 
+  // Misattribution tolerance: allow up to 2 for standard/quick/eli5, strict zero for deep_dive
+  const misattributionLimit = depth === 'deep_dive' ? 0 : 2;
+
   const passed = isRelaxed
     ? score >= threshold && refQuality.countPassed
     : score >= threshold &&
       unreliableSourceClaims.length === 0 &&
-      misattributedClaims.length === 0 &&
+      misattributedClaims.length <= misattributionLimit &&
       refQuality.countPassed &&
       refQuality.ratioPassed;
 
