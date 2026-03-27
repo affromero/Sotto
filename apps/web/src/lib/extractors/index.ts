@@ -3,6 +3,7 @@ import { countWords, MAX_CONTENT_LENGTH } from './html';
 import { extractViaMarkit } from './markit';
 import { extractPdfContent } from './pdf';
 import { isPinchtabAvailable, extractViaPinchtab } from './pinchtab';
+import { textToMarkdown } from './text-to-markdown';
 import { isYouTubeUrl, extractYouTubeContent } from './youtube';
 import { safeFetch } from '../url-validator';
 import { logger } from '../logger';
@@ -170,9 +171,10 @@ export async function extractContent(url: string): Promise<ExtractedContent> {
         pinchtabWords: pinchtabWordCount,
       });
       const truncated = pinchtabText.substring(0, MAX_CONTENT_LENGTH);
+      const markdown = textToMarkdown(truncated);
       return {
         text: truncated,
-        markdown: truncated,
+        markdown: markdown || truncated,
         title: htmlResult.title,
         description: htmlResult.description,
         siteName: htmlResult.siteName,

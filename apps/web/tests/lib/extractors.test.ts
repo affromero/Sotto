@@ -607,7 +607,7 @@ describe('extractors', () => {
 
   describe('Pinchtab fallback', () => {
     const THIN_HTML = '<html><head><meta property="og:title" content="SPA Page"><meta property="og:site_name" content="MySite"></head><body><p>Loading...</p></body></html>';
-    const LONG_PINCHTAB_TEXT = Array(100).fill('This is rich content from the browser rendering.').join(' ');
+    const LONG_PINCHTAB_TEXT = 'Key Findings\nThe research shows that browser-rendered content provides significantly richer extraction results than static HTML parsing for single-page applications and dynamic websites.\n\n- Better text extraction\n- Improved accuracy\n- More complete content';
 
     it('triggers Pinchtab when static extraction yields thin content', async () => {
       mockFetchResponse(THIN_HTML);
@@ -619,10 +619,13 @@ describe('extractors', () => {
       expect(availableSpy).toHaveBeenCalled();
       expect(extractSpy).toHaveBeenCalledWith('https://example.com/spa');
       expect(result.extractionMethod).toBe('pinchtab');
-      expect(result.text).toContain('rich content from the browser');
+      expect(result.text).toContain('research shows');
       // Preserves static OG metadata
       expect(result.title).toBe('SPA Page');
       expect(result.siteName).toBe('MySite');
+      // Markdown should have formatting applied (headings, lists)
+      expect(result.markdown).toContain('##');
+      expect(result.markdown).toContain('- Better text extraction');
     });
 
     it('returns static result when Pinchtab does not improve word count', async () => {
