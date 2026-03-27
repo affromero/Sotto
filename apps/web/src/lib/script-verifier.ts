@@ -575,11 +575,11 @@ Analyze ONLY the changed turns listed in the system instructions. Return JSON on
           misattributedClaims: [],
           referenceQuality: {
             totalCount: 0,
-            requiredCount: getMinReferenceCount(depth, params.durationTarget),
+            requiredCount: getMinReferenceCount(params.verificationMode === 'relaxed' ? 'eli5' : depth, params.durationTarget),
             countPassed: false,
             seriousCount: 0,
             seriousRatio: 0,
-            requiredSeriousRatio: getMinSeriousRatio(depth, params.tone),
+            requiredSeriousRatio: getMinSeriousRatio(params.verificationMode === 'relaxed' ? 'eli5' : depth, params.tone),
             ratioPassed: false,
             qualityScore: 0,
             feedback: null,
