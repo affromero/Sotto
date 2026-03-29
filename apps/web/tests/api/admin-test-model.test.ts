@@ -47,6 +47,29 @@ vi.mock('@/lib/providers/tts-voices', () => ({
   HUME_VOICE_POOL: [{ id: 'ITO', name: 'Ito', gender: 'female', character: 'warm' }],
   FAL_VOICE_POOL: [{ id: 'Vivian', name: 'Vivian', gender: 'female', character: 'warm' }],
   MINIMAX_VOICE_POOL: [{ id: 'Deep_Voice_Man', name: 'Deep Voice Man', gender: 'male', character: 'authoritative expert' }],
+  MISTRAL_VOICE_POOL: [{ id: 'casual_male', name: 'Casual Male', gender: 'male', character: 'friendly conversationalist' }],
+  getTestVoiceId: vi.fn((provider: string) => {
+    const map: Record<string, string> = {
+      elevenlabs: '21m00Tcm4TlvDq8ikWAM',
+      openai: 'alloy',
+      cartesia: 'cartesia-test-voice',
+      hume: 'ITO',
+      fal: 'Vivian',
+      replicate: 'Vivian',
+      minimax: 'Deep_Voice_Man',
+      mistral: 'casual_male',
+      kittentts: 'bella',
+    };
+    return map[provider] ?? 'alloy';
+  }),
+}));
+
+// getPlatformTtsKey reads process.env directly — no mock needed.
+// Tests control keys via vi.stubEnv() in beforeEach.
+
+vi.mock('@/lib/providers/tts-registry', () => ({
+  getProviderIds: vi.fn(() => ['kittentts', 'elevenlabs', 'openai', 'cartesia', 'hume', 'fal', 'replicate', 'minimax', 'mistral']),
+  getProviderMeta: vi.fn(() => ({ defaultModel: 'test-model' })),
 }));
 
 vi.mock('@/lib/fal-lip-sync', () => ({
