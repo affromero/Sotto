@@ -188,8 +188,12 @@ if (WORKER_PROFILE === 'all' || WORKER_PROFILE === 'light') {
 // Set up Twitter mentions polling if credentials are configured
 if (shouldRun('twitter-mentions') && isTwitterConfigured()) {
   getTwitterConfig()
+    .catch((err) => {
+      logger.warn('Failed to read Twitter config at startup, using env/defaults', { error: err.message });
+      return null;
+    })
     .then((config) => {
-      const pollInterval = config.mentionPollIntervalMs
+      const pollInterval = config?.mentionPollIntervalMs
         || parseInt(process.env.TWITTER_POLL_INTERVAL_MS || '60000', 10);
       return twitterMentionsQueue
         .add(JobType.POLL_TWITTER_MENTIONS, {}, { repeat: { every: pollInterval } })
