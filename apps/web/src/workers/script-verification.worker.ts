@@ -475,8 +475,12 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
       });
     }
 
+    // Cap grounding to 5 refs to control cost/latency in the verification loop
+    const MAX_GROUNDING_REFS = 5;
+    const cappedInputs = groundingInputs.slice(0, MAX_GROUNDING_REFS);
+
     const groundingResults = await groundReferenceCandidates(
-      groundingInputs,
+      cappedInputs,
       discovery.topic || '',
       aiKey?.apiKey,
       model,
@@ -485,30 +489,32 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
 
     await job.updateProgress(68);
 
-    // Build hints for the script generator
-    groundedHints = groundingInputs.map((input) => {
-      const result = groundingResults.get(input.ref.id);
-      const claimText = input.claimContext.sentences[0] ?? '';
-      if (result?.passed && result.replacement) {
+    // Build hints only for refs that were actually searched
+    // Refs beyond the cap are not included — they rely on webSearchEnabled fallback
+    groundedHints = cappedInputs
+      .map((input) => {
+        const result = groundingResults.get(input.ref.id);
+        const claimText = input.claimContext.sentences[0] ?? '';
+        if (result?.passed && result.replacement) {
+          return {
+            refNumber: input.ref.number,
+            originalTitle: input.ref.title,
+            originalUrl: input.ref.url,
+            found: true,
+            replacement: result.replacement,
+            claimText,
+            reasoning: result.detail ?? 'Verified replacement source found',
+          };
+        }
         return {
           refNumber: input.ref.number,
           originalTitle: input.ref.title,
           originalUrl: input.ref.url,
-          found: true,
-          replacement: result.replacement,
+          found: false,
           claimText,
-          reasoning: result.detail ?? 'Verified replacement source found',
+          reasoning: 'Could not find a verifiable source — claim should be removed',
         };
-      }
-      return {
-        refNumber: input.ref.number,
-        originalTitle: input.ref.title,
-        originalUrl: input.ref.url,
-        found: false,
-        claimText,
-        reasoning: 'Could not find a verifiable source — claim should be removed',
-      };
-    });
+      });
 
     // Check if all flagged refs were covered
     hasUncoveredClaims = hasUncoveredClaims || groundedHints.some((h) => !h.found);
