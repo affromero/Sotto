@@ -61,9 +61,7 @@ function getSttPlatformKey(provider: string): string | undefined {
 const TTS_PROBE_ORDER: TtsProviderId[] = (() => {
   const ids = getProviderIds();
   // kittentts first — free sidecar, best for test audio generation
-  const reordered = ids.filter((id) => id === 'kittentts');
-  reordered.push(...ids.filter((id) => id !== 'kittentts'));
-  return reordered;
+  return ['kittentts' as TtsProviderId, ...ids.filter((id) => id !== 'kittentts')];
 })();
 
 async function generateTestAudio(): Promise<{ audio: Buffer; provider: string } | null> {
