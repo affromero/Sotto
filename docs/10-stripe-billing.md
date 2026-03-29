@@ -11,8 +11,8 @@
 
 | Tier | Cost | AI | TTS | Limits |
 |---|---|---|---|---|
-| Free | $0 forever | Platform LLM (admin-configured) | KittenTTS (platform) | 1 podcast/day (configurable via admin) |
-| Pro | $12/month | Platform LLM (admin-configured) | KittenTTS (platform) | Unlimited |
+| Free | $0 forever | Platform LLM (admin-configured) | Platform TTS (admin-configured) | 1 podcast/day (configurable via admin) |
+| Pro | $12/month | Platform LLM (admin-configured) | Platform TTS (admin-configured) | Unlimited |
 | BYOK | $0 (own provider costs) | Any key user adds | Any key user adds | Unlimited |
 
 Voice marketplace is orthogonal to tiers — any user (including Free) can sell voice clones.
@@ -207,8 +207,8 @@ Admin-configurable singleton (`FreeTierConfig`) at `/admin/free-tier`:
 | `dailyGenerationLimit` | `1` | Max podcasts/day for free users |
 | `aiProvider` | (admin-configured) | Platform AI provider |
 | `aiModel` | (admin-configured) | Platform AI model |
-| `ttsProvider` | `kittentts` | Platform TTS provider |
-| `ttsModel` | `kitten-tts-mini-0.8` | Platform TTS model |
+| `ttsProvider` | `openai` | Platform TTS provider |
+| `ttsModel` | `tts-1-hd` | Platform TTS model |
 
 ---
 

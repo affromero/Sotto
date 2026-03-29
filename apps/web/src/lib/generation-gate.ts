@@ -155,9 +155,8 @@ export async function checkGenerationGate(userId: string): Promise<GenerationGat
     }
   }
 
-  // Ensure platform TTS (KittenTTS) is available
+  // Ensure platform TTS is available
   const hasPlatformTts =
-    !!process.env.KITTENTTS_URL ||
     !!process.env.ELEVENLABS_API_KEY ||
     !!process.env.OPENAI_API_KEY;
 

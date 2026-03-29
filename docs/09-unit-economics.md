@@ -29,12 +29,10 @@ BYOK users cost us nothing beyond infrastructure.
 
 Token estimate: one full podcast (script gen + Q&A + discovery chat ≈ 12K input, 5K output).
 
-### TTS Cost: KittenTTS (self-hosted, CPU-only sidecar)
+### TTS Cost: Platform TTS (admin-configured)
 
-**$0.** Runs on the existing VPS. No per-request charge.
-Tradeoff vs. ElevenLabs ($2.55/podcast) or OpenAI TTS ($0.23/podcast): quality is lower,
-which is why BYOK users can bring premium TTS and Pro users still use KittenTTS (for now —
-see roadmap).
+Uses the admin-configured platform TTS provider (e.g. OpenAI TTS at ~$0.23/podcast).
+BYOK users can bring premium TTS (ElevenLabs, Cartesia, etc.).
 
 ### Infrastructure Per Podcast
 
@@ -77,13 +75,12 @@ This is a SaaS gross margin profile. The model works at any realistic usage leve
 
 | Scale | VPS | Storage | Monthly | Annual |
 |---|---|---|---|---|
-| 0–500 users | CPX41 8 vCPU (KittenTTS needs headroom) | 1TB | **$30** | $360 |
-| 500–2K users | CPX51 16 vCPU | 1TB | **$55** | $660 |
+| 0–500 users | CX32 4 vCPU | 1TB | **$15** | $180 |
+| 500–2K users | CPX41 8 vCPU | 1TB | **$30** | $360 |
 | 2K–10K users | 2× CCX33 | 2TB | **$115** | $1,380 |
 | 10K–50K users | Dedicated + CDN | 5TB | **~$400** | $4,800 |
 
-Note: Upgraded from CX32 to CPX41 baseline because KittenTTS is CPU-intensive
-(2–4 vCPU per concurrent synthesis). The $8/month CX32 is too tight under real load.
+Note: KittenTTS sidecar removed — TTS is now API-based, freeing CPU for other workloads.
 
 ---
 
@@ -157,10 +154,9 @@ CAC for BYOK users is $0. They are free distribution.
 
 | Risk | Impact | Mitigation |
 |---|---|---|
-| KittenTTS quality too low → no Pro conversions | High | Upgrade Pro to a premium TTS option (ElevenLabs BYOK subsidy or Cartesia) |
 | Free tier AI quality insufficient → free tier doesn't hook users | Medium | Tune prompts; swap platform LLM via admin model config |
 | Platform LLM pricing increases | Low | Abstraction layer in `ai.ts` → swap to another hosted inference in hours |
-| High CPU load from KittenTTS → VPS upgrade needed | Medium | CPX41 has headroom for ~20 concurrent syntheses; upgrade at 500+ DAU |
+| Platform TTS costs scale with usage | Medium | Use cheapest provider (OpenAI TTS-1 at $0.015/KChar); BYOK offloads to user keys |
 | Low Pro conversion (< 2%) | Medium | Add more Pro-exclusive features; push analytics and priority more visibly |
 
 ---
@@ -188,5 +184,5 @@ The ceiling is high: at 10K MAU with 5% Pro conversion, net profit exceeds $50K 
 subscriptions alone — before voice marketplace revenue, which scales independently.
 
 The risk is not economics. The risk is whether the free tier AI quality (platform LLM +
-KittenTTS) is good enough to convert users to Pro. That's a product question, not a
+platform TTS) is good enough to convert users to Pro. That's a product question, not a
 financial one.

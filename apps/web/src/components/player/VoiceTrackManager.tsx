@@ -16,7 +16,6 @@ const PROVIDER_DISPLAY: Record<string, string> = {
   fal: 'Fal',
   minimax: 'MiniMax',
   replicate: 'Replicate',
-  kittentts: 'KittenTTS',
 };
 
 function buildVoiceTooltip(voices: VoiceTrackSummary['voices']): string | undefined {
