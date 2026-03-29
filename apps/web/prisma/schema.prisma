@@ -241,7 +241,7 @@ model User {
   briefingAudienceLevel String?           // beginner, intermediate, expert
   briefingDuration      Int?              // target minutes (1-40)
   briefingPrompt        String? @db.Text  // custom instructions/topic focus
-  briefingUseByokKeys   Boolean @default(true) // when true + user has BYOK, use their keys
+  briefingUseByokKeys   Boolean @default(false) // opt-in: when true + user has BYOK, use their keys
 
   // Quizzes
   quizEnabled  Boolean       @default(true)

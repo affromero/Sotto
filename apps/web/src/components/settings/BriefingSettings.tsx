@@ -181,7 +181,7 @@ export function BriefingSettings({
             }}
             aria-label="Briefing audience level"
           >
-            <option value="">Default (General)</option>
+            <option value="">Default (Intermediate)</option>
             {AUDIENCE_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
             ))}
@@ -299,7 +299,7 @@ export function BriefingSettings({
 
       {/* BYOK toggle */}
       {hasByokKeys && (
-        <label className={styles.field} style={{ flexDirection: 'row', alignItems: 'center', gap: 'var(--spacing-sm)', cursor: 'pointer' }}>
+        <label className={styles.checkboxRow}>
           <input
             type="checkbox"
             checked={useByokKeys}
@@ -310,7 +310,7 @@ export function BriefingSettings({
             }}
             aria-label="Use my own API keys for briefings"
           />
-          <span className={styles.label} style={{ margin: 0 }}>Use my own API keys for briefings</span>
+          <span className={styles.checkboxLabel}>Use my own API keys for briefings</span>
         </label>
       )}
     </div>

@@ -195,6 +195,7 @@ export function SettingsForm({
   const [emailNotifications, setEmailNotifications] = useState(initialEmailNotifications);
   const [pushNotifications, setPushNotifications] = useState(initialPushNotifications);
   const [briefingEnabled, setBriefingEnabled] = useState(initialBriefingEnabled);
+  const [briefingMountKey, setBriefingMountKey] = useState(0);
   const [briefingTime, setBriefingTime] = useState(initialBriefingTime ?? '08:00');
   const briefingTimezone = initialBriefingTimezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
   const [briefingDays, setBriefingDays] = useState(initialBriefingDays);
@@ -768,6 +769,7 @@ export function SettingsForm({
               onChange={async (e) => {
                 const checked = e.target.checked;
                 setBriefingEnabled(checked);
+                if (checked) setBriefingMountKey((k) => k + 1);
                 await fetch('/api/users/me', {
                   method: 'PATCH',
                   headers: { 'Content-Type': 'application/json' },
@@ -859,6 +861,7 @@ export function SettingsForm({
                 </select>
               </label>
               <BriefingSettings
+                key={briefingMountKey}
                 initialAiModel={initialBriefingAiModel}
                 initialTtsOption={
                   initialBriefingTtsProvider && initialBriefingTtsModel
