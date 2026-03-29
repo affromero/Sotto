@@ -65,6 +65,7 @@ export function BriefingCard({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [generatedPodcastId, setGeneratedPodcastId] = useState<string | null>(null);
+  const [generateError, setGenerateError] = useState<string | null>(null);
 
   const depthLabel = DEPTH_OPTIONS.find((o) => o.value === briefing.depth)?.label ?? 'Quick Overview';
   const durationLabel = DURATION_OPTIONS.find((o) => o.value === briefing.duration)?.label ?? '6 min';
@@ -93,13 +94,18 @@ export function BriefingCard({
   const handleGenerate = async () => {
     setGenerating(true);
     setGeneratedPodcastId(null);
+    setGenerateError(null);
     try {
       const res = await fetch(`/api/briefings/${briefing.id}/generate`, { method: 'POST' });
+      const data = await res.json();
       if (res.ok) {
-        const data = await res.json();
         if (data.podcastId) setGeneratedPodcastId(data.podcastId);
+      } else {
+        setGenerateError(typeof data.error === 'string' ? data.error : 'Generation failed. Try again later.');
       }
       onRefresh();
+    } catch {
+      setGenerateError('Network error. Check your connection and try again.');
     } finally {
       setGenerating(false);
     }
@@ -178,6 +184,11 @@ export function BriefingCard({
           <a href={`/podcast/${generatedPodcastId}`} className={styles.statusLink}>
             View progress
           </a>
+        </div>
+      )}
+      {generateError && !generating && (
+        <div className={styles.errorBanner}>
+          {generateError}
         </div>
       )}
 
