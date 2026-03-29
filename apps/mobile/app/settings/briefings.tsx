@@ -317,9 +317,53 @@ function BriefingEditForm({ briefing, onRefresh }: { briefing: BriefingData; onR
   const [tone, setTone] = useState(briefing.tone ?? undefined);
   const [audienceLevel, setAudienceLevel] = useState(briefing.audienceLevel ?? undefined);
   const [duration, setDuration] = useState(briefing.duration?.toString() ?? undefined);
+  const [aiModel, setAiModel] = useState(briefing.aiModel ?? undefined);
+  const [ttsOption, setTtsOption] = useState(
+    briefing.ttsProvider
+      ? briefing.ttsModel ? `${briefing.ttsProvider}:${briefing.ttsModel}` : briefing.ttsProvider
+      : undefined,
+  );
+  const [hostVoice, setHostVoice] = useState(briefing.hostVoiceId ?? undefined);
+  const [expertVoice, setExpertVoice] = useState(briefing.expertVoiceId ?? undefined);
   const [visibility, setVisibility] = useState(briefing.visibility);
   const [useByokKeys, setUseByokKeys] = useState(briefing.useByokKeys);
   const promptTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Fetch AI models and TTS options from registry
+  const { data: aiModels } = useQuery<Array<{ id: string; displayName: string; group?: string }>>({
+    queryKey: ['ai-models'],
+    queryFn: async () => {
+      const res = await api.get('/ai-models');
+      return res.data.models ?? [];
+    },
+  });
+
+  const { data: ttsModels } = useQuery<Array<{ id: string; displayName: string; badge?: string; group?: string }>>({
+    queryKey: ['tts-options'],
+    queryFn: async () => {
+      const res = await api.get('/tts-options');
+      return (res.data.options ?? []).filter((o: { id: string }) => o.id !== 'auto');
+    },
+  });
+
+  // Build grouped options for pickers (provider → models)
+  const aiModelOptions = (aiModels ?? []).map((m) => ({
+    id: m.id,
+    label: m.displayName,
+    group: m.group,
+  }));
+
+  const ttsOptionsList = (ttsModels ?? []).map((o) => ({
+    id: o.id,
+    label: `${o.displayName}${o.badge ? ` (${o.badge})` : ''}`,
+    group: o.group,
+  }));
+
+  const VOICE_POOL_NAMES = [
+    'Adam', 'Eric', 'Brian', 'Will', 'Roger', 'Charlie', 'George', 'Callum',
+    'Aria', 'Rachel', 'Jessica', 'Laura', 'Matilda', 'Alice', 'Charlotte', 'Grace',
+  ];
+  const voiceOptions = VOICE_POOL_NAMES.map((name) => ({ id: name, label: name }));
 
   useEffect(() => {
     return () => { if (promptTimer.current) clearTimeout(promptTimer.current); };
@@ -394,6 +438,25 @@ function BriefingEditForm({ briefing, onRefresh }: { briefing: BriefingData; onR
         <PickerButton label="Duration" value={DURATION_OPTIONS.find((o) => o.id === duration)?.label ?? 'Default'} onPress={() => setActivePicker('duration')} />
       </View>
 
+      {/* Audio */}
+      <Text style={[styles.editGroupTitle, { marginTop: spacing.md }]}>Audio</Text>
+      <PickerButton
+        label="AI Model"
+        value={aiModelOptions.find((m) => m.id === aiModel)?.label ?? 'Use my default'}
+        onPress={() => setActivePicker('aiModel')}
+        fullWidth
+      />
+      <PickerButton
+        label="Voice Provider"
+        value={ttsOptionsList.find((o) => o.id === ttsOption)?.label ?? 'Use my default'}
+        onPress={() => setActivePicker('ttsOption')}
+        fullWidth
+      />
+      <View style={styles.pickerRow}>
+        <PickerButton label="Host Voice" value={hostVoice ?? 'Auto'} onPress={() => setActivePicker('hostVoice')} />
+        <PickerButton label="Expert Voice" value={expertVoice ?? 'Auto'} onPress={() => setActivePicker('expertVoice')} />
+      </View>
+
       {/* Advanced */}
       <Text style={[styles.editGroupTitle, { marginTop: spacing.md }]}>Advanced</Text>
       <PickerButton label="Visibility" value={VISIBILITY_OPTIONS.find((o) => o.id === visibility)?.label ?? 'Private'} onPress={() => setActivePicker('visibility')} fullWidth />
@@ -428,6 +491,30 @@ function BriefingEditForm({ briefing, onRefresh }: { briefing: BriefingData; onR
       </BottomSheet>
       <BottomSheet visible={activePicker === 'visibility'} onClose={() => setActivePicker(null)} title="Visibility">
         <OptionPicker options={VISIBILITY_OPTIONS} selectedId={visibility} onSelect={(id) => { if (id) { setVisibility(id); patchBriefing(briefing.id, { visibility: id }); } setActivePicker(null); }} />
+      </BottomSheet>
+      <BottomSheet visible={activePicker === 'aiModel'} onClose={() => setActivePicker(null)} title="AI Model">
+        <OptionPicker options={aiModelOptions} selectedId={aiModel} onSelect={(id) => { setAiModel(id); patchBriefing(briefing.id, { aiModel: id ?? null }); setActivePicker(null); }} />
+      </BottomSheet>
+      <BottomSheet visible={activePicker === 'ttsOption'} onClose={() => setActivePicker(null)} title="Voice Provider">
+        <OptionPicker options={ttsOptionsList} selectedId={ttsOption} onSelect={(id) => {
+          setTtsOption(id);
+          setHostVoice(undefined);
+          setExpertVoice(undefined);
+          if (id) {
+            const [provider, ...modelParts] = id.split(':');
+            const model = modelParts.join(':');
+            patchBriefing(briefing.id, { ttsProvider: provider, ttsModel: model || null, hostVoiceId: null, expertVoiceId: null });
+          } else {
+            patchBriefing(briefing.id, { ttsProvider: null, ttsModel: null, hostVoiceId: null, expertVoiceId: null });
+          }
+          setActivePicker(null);
+        }} />
+      </BottomSheet>
+      <BottomSheet visible={activePicker === 'hostVoice'} onClose={() => setActivePicker(null)} title="Host Voice">
+        <OptionPicker options={voiceOptions} selectedId={hostVoice} onSelect={(id) => { setHostVoice(id); patchBriefing(briefing.id, { hostVoiceId: id ?? null }); setActivePicker(null); }} />
+      </BottomSheet>
+      <BottomSheet visible={activePicker === 'expertVoice'} onClose={() => setActivePicker(null)} title="Expert Voice">
+        <OptionPicker options={voiceOptions} selectedId={expertVoice} onSelect={(id) => { setExpertVoice(id); patchBriefing(briefing.id, { expertVoiceId: id ?? null }); setActivePicker(null); }} />
       </BottomSheet>
     </View>
   );
