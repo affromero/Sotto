@@ -109,6 +109,22 @@ vi.mock('@/lib/elevenlabs', () => ({
   selectVoicePair: (...args: unknown[]) => mockSelectVoicePair(...args),
 }));
 
+vi.mock('@/lib/tier-features', () => ({
+  getTierFeatures: vi.fn().mockReturnValue({
+    maxDurationMinutes: 10,
+    maxSpeakers: 2,
+    autoApproveScript: true,
+    webSearchEnabled: true,
+    maxQaInteractions: 3,
+    privateAllowed: false,
+    priorityQueue: false,
+    analyticsEnabled: false,
+    voiceTracksEnabled: false,
+    maxVoiceTracks: 0,
+    voiceCloningEnabled: false,
+  }),
+}));
+
 const mockAddJob = vi.fn();
 
 vi.mock('@/lib/queue', () => ({
@@ -203,6 +219,7 @@ describe('processTwitterMentions', () => {
       mockGetMentions.mockResolvedValue({ tweets: [tweet], mediaByKey: new Map() });
       mockPrismaAccountFindFirst.mockResolvedValue({ userId: 'user-001' });
       mockPrismaUserFindUniqueOrThrow.mockResolvedValue({
+        plan: 'FREE',
         twitterEnabled: true,
         voicePreferences: [],
         preferredTtsProvider: null,
@@ -243,6 +260,7 @@ describe('processTwitterMentions', () => {
       mockGetMentions.mockResolvedValue({ tweets: [tweet1, tweet2], mediaByKey: new Map() });
       mockPrismaAccountFindFirst.mockResolvedValue({ userId: 'user-001' });
       mockPrismaUserFindUniqueOrThrow.mockResolvedValue({
+        plan: 'FREE',
         twitterEnabled: true,
         voicePreferences: [],
         preferredTtsProvider: null,
@@ -282,6 +300,7 @@ describe('processTwitterMentions', () => {
       mockGetMentions.mockResolvedValue({ tweets: [tweet], mediaByKey: new Map() });
       mockPrismaAccountFindFirst.mockResolvedValue({ userId: 'user-001' });
       mockPrismaUserFindUniqueOrThrow.mockResolvedValue({
+        plan: 'FREE',
         twitterEnabled: true,
         voicePreferences: [],
         preferredTtsProvider: null,
@@ -346,6 +365,10 @@ describe('processTwitterMentions', () => {
               tone: mockParseResult.tone,
               focusAreas: mockParseResult.focusAreas,
               durationTarget: 10,
+              speakers: [
+                { name: 'HOST', description: expect.any(String) },
+                { name: 'EXPERT', description: expect.any(String) },
+              ],
               sourceUrl: mockParseResult.sourceUrl,
             },
           },
@@ -363,6 +386,7 @@ describe('processTwitterMentions', () => {
       mockGetMentions.mockResolvedValue({ tweets: [tweet], mediaByKey: new Map() });
       mockPrismaAccountFindFirst.mockResolvedValue({ userId: 'user-001' });
       mockPrismaUserFindUniqueOrThrow.mockResolvedValue({
+        plan: 'FREE',
         twitterEnabled: false,
         voicePreferences: [],
         preferredTtsProvider: null,
@@ -394,6 +418,7 @@ describe('processTwitterMentions', () => {
       mockGetMentions.mockResolvedValue({ tweets: [tweet], mediaByKey: new Map() });
       mockPrismaAccountFindFirst.mockResolvedValue({ userId: 'user-001' });
       mockPrismaUserFindUniqueOrThrow.mockResolvedValue({
+        plan: 'FREE',
         twitterEnabled: true,
         voicePreferences: [],
         preferredTtsProvider: null,
@@ -483,6 +508,7 @@ describe('processTwitterMentions', () => {
       mockGetMentions.mockResolvedValue({ tweets: [tweet], mediaByKey: new Map() });
       mockPrismaAccountFindFirst.mockResolvedValue({ userId: 'user-001' });
       mockPrismaUserFindUniqueOrThrow.mockResolvedValue({
+        plan: 'FREE',
         twitterEnabled: true,
         voicePreferences: [],
         preferredTtsProvider: null,
@@ -524,6 +550,7 @@ describe('processTwitterMentions', () => {
       mockGetMentions.mockResolvedValue({ tweets: [tweet], mediaByKey: new Map() });
       mockPrismaAccountFindFirst.mockResolvedValue({ userId: 'user-001' });
       mockPrismaUserFindUniqueOrThrow.mockResolvedValue({
+        plan: 'FREE',
         twitterEnabled: true,
         voicePreferences: [
           { speaker: 'HOST', voiceId: 'user-host-voice' },
@@ -574,15 +601,17 @@ describe('processTwitterMentions', () => {
   });
 
   describe('thread detection and routing', () => {
-    function setupLinkedUser() {
+    function setupLinkedUser(overrides?: Record<string, unknown>) {
       mockPrismaAccountFindFirst.mockResolvedValue({ userId: 'user-001' });
       mockPrismaUserFindUniqueOrThrow.mockResolvedValue({
+        plan: 'FREE',
         twitterEnabled: true,
         voicePreferences: [],
         preferredTtsProvider: null,
         preferredTtsModel: null,
         preferredAiProvider: null,
         preferredAiModel: null,
+        ...overrides,
       });
       mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', isByokUser: true });
       mockSelectVoicePair.mockReturnValue({
@@ -789,13 +818,13 @@ describe('processTwitterMentions', () => {
       const job = createMockJob({});
       await processTwitterMentions(job);
 
-      // Check durationTarget = 15 for threads
+      // Thread default is 15 but FREE tier caps at maxDurationMinutes=10
       expect(mockPrismaPodcastCreate).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
             discovery: expect.objectContaining({
               create: expect.objectContaining({
-                durationTarget: 15,
+                durationTarget: 10,
               }),
             }),
           }),
