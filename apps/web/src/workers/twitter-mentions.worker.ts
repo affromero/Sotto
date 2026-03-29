@@ -14,8 +14,9 @@ import { lookupParticipantCredentials } from '@/lib/credential-lookup';
 import { formatThreadAsSourceText, getVerifiedParticipants } from '@/lib/twitter-utils';
 import { extractTwitterVideoTranscript } from '@/lib/twitter-video';
 import { generatePodcastSlug } from '@/lib/slugify';
+import { filterMention } from '@/lib/mention-filter';
 import { logger } from '@/lib/logger';
-import type { TwitterTweet, TwitterMedia, TweetParseResult, ThreadData } from '@/types/twitter';
+import type { TwitterTweet, TwitterMedia, TwitterAuthorData, TweetParseResult, ThreadData } from '@/types/twitter';
 import type { ParticipantCredential } from '@/lib/credential-lookup';
 
 const REDIS_CURSOR_KEY = 'twitter:last_processed_tweet_id';
@@ -26,7 +27,7 @@ export async function processTwitterMentions(job: Job<PollTwitterMentionsPayload
   const redis = getRedisClient();
 
   const sinceId = await redis.get(REDIS_CURSOR_KEY);
-  const { tweets: mentions, mediaByKey } = await getMentions(sinceId ?? undefined);
+  const { tweets: mentions, mediaByKey, authorMap } = await getMentions(sinceId ?? undefined);
 
   if (mentions.length === 0) {
     return;
@@ -39,7 +40,7 @@ export async function processTwitterMentions(job: Job<PollTwitterMentionsPayload
 
   for (const tweet of sorted) {
     try {
-      await processSingleMention(tweet, mediaByKey);
+      await processSingleMention(tweet, mediaByKey, authorMap);
     } catch (err) {
       logger.error('Error processing tweet mention', {
         tweetId: tweet.id,
@@ -56,7 +57,7 @@ export async function processTwitterMentions(job: Job<PollTwitterMentionsPayload
   logger.info('Twitter mentions poll complete', { processed: String(sorted.length) });
 }
 
-async function processSingleMention(tweet: TwitterTweet, mediaByKey: Map<string, TwitterMedia>): Promise<void> {
+async function processSingleMention(tweet: TwitterTweet, mediaByKey: Map<string, TwitterMedia>, authorMap: Map<string, TwitterAuthorData>): Promise<void> {
   // 1. Dedup: skip if we already have this tweet
   const existing = await prisma.tweetMention.findUnique({
     where: { tweetId: tweet.id },
@@ -65,7 +66,33 @@ async function processSingleMention(tweet: TwitterTweet, mediaByKey: Map<string,
     return;
   }
 
-  // 2. Look up Sotto user by Twitter numeric user ID (immutable)
+  // 2. Spam gate: structural filters, rate limit, account quality, LLM intent
+  const author = authorMap.get(tweet.author_id);
+  const hasParentTweet = !!getParentTweetId(tweet);
+  const hasImages = !!(tweet.attachments?.media_keys?.length);
+  const filterResult = await filterMention(tweet, author, hasParentTweet, hasImages);
+
+  if (filterResult.verdict !== 'pass') {
+    logger.info('Mention filtered out', {
+      tweetId: tweet.id,
+      authorId: tweet.author_id,
+      verdict: filterResult.verdict,
+      reason: filterResult.reason,
+    });
+    // Record as IGNORED so we don't re-process on next poll
+    await prisma.tweetMention.create({
+      data: {
+        tweetId: tweet.id,
+        authorId: tweet.author_id,
+        text: tweet.text,
+        status: 'IGNORED',
+        errorMessage: `Filtered: ${filterResult.verdict} — ${filterResult.reason}`,
+      },
+    });
+    return;
+  }
+
+  // 3. Look up Sotto user by Twitter numeric user ID (immutable)
   const account = await prisma.account.findFirst({
     where: {
       provider: 'twitter',

@@ -1,5 +1,5 @@
 import { logger } from './logger';
-import type { TwitterTweet, TwitterMedia, TwitterMentionsResult, ThreadTweet, ThreadData, TweetAuthor, TweetSearchResult } from '@/types/twitter';
+import type { TwitterTweet, TwitterMedia, TwitterMentionsResult, TwitterAuthorData, ThreadTweet, ThreadData, TweetAuthor, TweetSearchResult } from '@/types/twitter';
 
 function getEnv(key: string): string | undefined {
   return process.env[key];
@@ -133,13 +133,14 @@ export async function getMentions(sinceId?: string): Promise<TwitterMentionsResu
   }
 
   if (!canMakeRequest('mentions')) {
-    return { tweets: [], mediaByKey: new Map() };
+    return { tweets: [], mediaByKey: new Map(), authorMap: new Map() };
   }
 
   const params = new URLSearchParams({
     'tweet.fields': 'author_id,created_at,in_reply_to_user_id,referenced_tweets,conversation_id,entities,public_metrics,attachments',
-    expansions: 'attachments.media_keys',
+    expansions: 'attachments.media_keys,author_id',
     'media.fields': 'type,url,variants,duration_ms,preview_image_url,alt_text',
+    'user.fields': 'username,name,verified,verified_type,description,created_at,public_metrics',
     max_results: '100',
   });
 
@@ -162,16 +163,33 @@ export async function getMentions(sinceId?: string): Promise<TwitterMentionsResu
   const data = await response.json();
 
   if (!data.data) {
-    return { tweets: [], mediaByKey: new Map() };
+    return { tweets: [], mediaByKey: new Map(), authorMap: new Map() };
   }
 
   const mediaByKey = parseMediaIncludes(data.includes);
 
+  const authorMap = new Map<string, TwitterAuthorData>();
+  if (data.includes?.users) {
+    for (const user of data.includes.users) {
+      authorMap.set(user.id, {
+        id: user.id,
+        username: user.username,
+        name: user.name,
+        verified: user.verified,
+        verifiedType: user.verified_type,
+        description: user.description,
+        createdAt: user.created_at,
+        publicMetrics: user.public_metrics,
+      });
+    }
+  }
+
   logger.info('Fetched Twitter mentions', {
     count: String(data.data.length),
     mediaKeys: String(mediaByKey.size),
+    authors: String(authorMap.size),
   });
-  return { tweets: data.data as TwitterTweet[], mediaByKey };
+  return { tweets: data.data as TwitterTweet[], mediaByKey, authorMap };
 }
 
 /**
