@@ -367,9 +367,6 @@ const IMAGE_MODEL_ALIASES: Record<string, string> = {
   'recraft v3': 'fal-recraft-v3',
   ideogram: 'fal-ideogram-v2',
   'ideogram v2': 'fal-ideogram-v2',
-  sd3: 'fal-sd3',
-  'stable diffusion': 'fal-sd3',
-  'stable diffusion 3': 'fal-sd3',
 };
 
 function resolveImageModel(raw: string): string | null {

@@ -530,7 +530,7 @@ async function processReplicateLipSync(job: Job<GenerateAvatarPayload>): Promise
     throw new Error('avatarImageUrl is required for Replicate lip-sync');
   }
 
-  const modelId = avatarModelId ?? 'replicate-wav2lip';
+  const modelId = avatarModelId ?? 'replicate-sadtalker';
 
   const { mkdtemp, readFile, rm } = await import('fs/promises');
   const { join } = await import('path');

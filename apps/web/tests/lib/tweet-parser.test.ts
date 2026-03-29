@@ -54,7 +54,7 @@ vi.mock('@/lib/logger', () => ({
 }));
 
 vi.mock('@/lib/providers/fal-endpoints', () => ({
-  FAL_IMAGE_MODEL_IDS: new Set(['fal-flux-2-pro', 'fal-flux-1-pro', 'fal-recraft-v3', 'fal-ideogram-v2', 'fal-sd3']),
+  FAL_IMAGE_MODEL_IDS: new Set(['fal-flux-2-pro', 'fal-flux-1-pro', 'fal-recraft-v3', 'fal-ideogram-v2']),
   FAL_VIDEO_MODEL_IDS: new Set(['fal-veo3-1080p', 'fal-veo3-fast-1080p', 'fal-kling3-1080p', 'fal-wan2.5-480p']),
 }));
 
@@ -813,16 +813,6 @@ describe('resolveModelFromTweet', () => {
   it('resolves "ideogram" to fal-ideogram-v2', () => {
     const result = resolveModelFromTweet({ ...baseParsed, requestedImageModel: 'ideogram' });
     expect(result.imageModel).toBe('fal-ideogram-v2');
-  });
-
-  it('resolves "sd3" to fal-sd3', () => {
-    const result = resolveModelFromTweet({ ...baseParsed, requestedImageModel: 'sd3' });
-    expect(result.imageModel).toBe('fal-sd3');
-  });
-
-  it('resolves "stable diffusion" to fal-sd3', () => {
-    const result = resolveModelFromTweet({ ...baseParsed, requestedImageModel: 'stable diffusion' });
-    expect(result.imageModel).toBe('fal-sd3');
   });
 
   it('returns null for unrecognized image model', () => {
