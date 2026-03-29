@@ -192,8 +192,10 @@ services:
 
 volumes:
   sotto_postgres_data:
+    external: true
     name: sotto_postgres_data
   sotto_redis_data:
+    external: true
     name: sotto_sotto_redis_data
 
 networks:
