@@ -76,11 +76,11 @@ function resolveBriefingConfig(user: BriefingUser, adminConfig: BriefingConfigDa
  * If the user specified voice pool names, look them up and resolve for the target provider.
  * Otherwise, use selectVoicePair with tone/audience metadata for smart matching.
  */
-const VOICE_POOL_PROVIDERS = new Set<string>(['elevenlabs', 'openai', 'kittentts']);
+const VOICE_POOL_PROVIDERS = new Set<string>(['elevenlabs', 'openai']);
 
 /**
  * Resolve voice IDs for a user's briefing.
- * Voice pool names only work for providers that have entries in VOICE_POOL (elevenlabs, openai, kittentts).
+ * Voice pool names only work for providers that have entries in VOICE_POOL (elevenlabs, openai).
  * For other providers (cartesia, hume, fal, etc.), fall back to the pool's elevenlabs IDs —
  * the audio-generation worker will resolve provider-specific voices via its own voice mapping.
  */
@@ -92,7 +92,7 @@ function resolveVoices(
 ): { hostId: string; expertId: string; provider: string } {
   const providerKey = ttsProvider ?? 'elevenlabs';
   const poolProvider = VOICE_POOL_PROVIDERS.has(providerKey)
-    ? (providerKey as 'elevenlabs' | 'openai' | 'kittentts')
+    ? (providerKey as 'elevenlabs' | 'openai')
     : 'elevenlabs'; // fallback: store elevenlabs IDs, audio worker resolves per-provider
 
   // Try user-specified voice pool names (only if provider is in the pool)
