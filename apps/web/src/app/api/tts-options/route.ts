@@ -14,12 +14,6 @@ const QUALITY_BADGES: Record<string, string> = {
   ultra: 'Ultra',
 };
 
-const TIER_GROUP_LABELS: Record<string, string> = {
-  standard: 'Standard',
-  premium: 'High quality',
-  ultra: 'Studio quality',
-};
-
 // Env var names for each platform-level TTS provider key
 const PLATFORM_TTS_ENV: Partial<Record<TtsProviderId, string>> = {
   elevenlabs: 'ELEVENLABS_API_KEY',
@@ -29,7 +23,13 @@ const PLATFORM_TTS_ENV: Partial<Record<TtsProviderId, string>> = {
   fal: 'FAL_KEY',
   replicate: 'REPLICATE_API_TOKEN',
   minimax: 'FAL_KEY',
+  mistral: 'MISTRAL_API_KEY',
 };
+
+/** Sort options: providers alphabetically by group, models alphabetically within each provider. */
+function sortOptions(options: TtsOption[]): TtsOption[] {
+  return [...options].sort((a, b) => (a.group ?? '').localeCompare(b.group ?? '') || a.displayName.localeCompare(b.displayName));
+}
 
 function hasPlatformKey(providerId: TtsProviderId): boolean {
   const envVar = PLATFORM_TTS_ENV[providerId];
@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
               id: compositeId,
               displayName: `${meta.displayName} ${model.displayName}`,
               badge: QUALITY_BADGES[model.tier],
-              group: TIER_GROUP_LABELS[model.tier] ?? model.tier,
+              group: meta.displayName,
               hint: meta.displayName,
               requiredPlan: freeSet.has(compositeId) ? 'FREE' : 'PRO',
             });
@@ -99,14 +99,14 @@ export async function GET(request: NextRequest) {
               id: `${meta.id}:${model.id}`,
               displayName: `${meta.displayName} ${model.displayName}`,
               badge: QUALITY_BADGES[model.tier],
-              group: TIER_GROUP_LABELS[model.tier] ?? model.tier,
+              group: meta.displayName,
               hint: meta.displayName,
             });
           }
         }
       }
 
-      return NextResponse.json({ readOnly: false, adminViewMode: autoConfig.adminViewMode, options }, { headers: CACHE_HEADERS });
+      return NextResponse.json({ readOnly: false, adminViewMode: autoConfig.adminViewMode, options: sortOptions(options) }, { headers: CACHE_HEADERS });
     }
 
     // Non-admins: show included TTS models with plan gating
@@ -129,14 +129,14 @@ export async function GET(request: NextRequest) {
           id: compositeId,
           displayName: `${meta.displayName} ${model.displayName}`,
           badge: QUALITY_BADGES[model.tier],
-          group: TIER_GROUP_LABELS[model.tier] ?? model.tier,
+          group: meta.displayName,
           hint: meta.displayName,
           requiredPlan: freeSet.has(compositeId) ? 'FREE' : 'PRO',
         });
       }
     }
 
-    return NextResponse.json({ readOnly: false, userPlan, isByok: false, options }, { headers: CACHE_HEADERS });
+    return NextResponse.json({ readOnly: false, userPlan, isByok: false, options: sortOptions(options) }, { headers: CACHE_HEADERS });
   }
 
   // BYOK keys present — show models for every valid provider
@@ -153,11 +153,11 @@ export async function GET(request: NextRequest) {
         id: `${meta.id}:${model.id}`,
         displayName: `${meta.displayName} ${model.displayName}`,
         badge: QUALITY_BADGES[model.tier],
-        group: TIER_GROUP_LABELS[model.tier] ?? model.tier,
+        group: meta.displayName,
         hint: meta.displayName,
       });
     }
   }
 
-  return NextResponse.json({ readOnly: false, options }, { headers: CACHE_HEADERS });
+  return NextResponse.json({ readOnly: false, options: sortOptions(options) }, { headers: CACHE_HEADERS });
 }
