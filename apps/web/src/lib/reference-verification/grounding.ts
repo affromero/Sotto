@@ -143,7 +143,7 @@ ${claimText}`;
 
   const userMessage = `Topic: ${topic}
 
-References that need real sources (all verification checks failed):
+References that need real, authoritative sources:
 
 ${refsContext}
 
@@ -240,10 +240,8 @@ Find one real, verifiable source per reference. Return JSON only.`;
  * - reference-validation pipeline (all checks failed → reason: 'all_checks_failed')
  * - script-verification retry loop (unreliable source → reason: 'unreliable_source')
  *
- * Cap at MAX_GROUNDING_CANDIDATES to control cost/latency.
+ * Callers should cap input size if needed (e.g. verification loop caps at 5).
  */
-const MAX_GROUNDING_CANDIDATES = 5;
-
 export async function groundReferenceCandidates(
   inputs: GroundingInput[],
   topic: string,
@@ -251,7 +249,7 @@ export async function groundReferenceCandidates(
   model?: string,
   provider?: string,
 ): Promise<Map<string, VerificationCheck>> {
-  const candidates = inputs.slice(0, MAX_GROUNDING_CANDIDATES);
+  const candidates = inputs;
 
   if (candidates.length === 0) {
     return new Map();
