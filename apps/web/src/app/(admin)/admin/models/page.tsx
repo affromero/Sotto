@@ -4,6 +4,7 @@ import { listByokProviders, listAiProviders } from '@/lib/byok';
 import { getAllAiProviderMeta } from '@/lib/providers/ai-registry';
 import { getAllProviderMeta } from '@/lib/providers/tts-registry';
 import { getAllSttProviderMeta } from '@/lib/providers/stt-registry';
+import { getPlatformTtsKey } from '@/lib/tts-generation';
 import { getAllImageProviderMeta } from '@/lib/providers/image-registry';
 import { getAllVideoProviderMeta } from '@/lib/providers/video-registry';
 import { getAllAvatarProviderMeta } from '@/lib/providers/avatar-registry';
@@ -44,17 +45,8 @@ function hasPlatformKey(category: TestableProvider['category'], providerId: stri
     }
   }
   if (category === 'tts') {
-    switch (providerId) {
-      case 'elevenlabs': return !!process.env.ELEVENLABS_API_KEY;
-      case 'openai': return !!process.env.OPENAI_API_KEY;
-      case 'cartesia': return !!process.env.CARTESIA_API_KEY;
-      case 'hume': return !!process.env.HUME_API_KEY;
-      case 'fal': return !!process.env.FAL_KEY;
-      case 'replicate': return !!process.env.REPLICATE_API_TOKEN;
-      case 'minimax': return !!process.env.FAL_KEY;
-      case 'kittentts': return !!process.env.KITTENTTS_URL;
-      default: return false;
-    }
+    if (providerId === 'kittentts') return !!process.env.KITTENTTS_URL;
+    return !!getPlatformTtsKey(providerId as import('@/lib/providers/tts-registry').TtsProviderId);
   }
   if (category === 'stt') {
     switch (providerId) {
