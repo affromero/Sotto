@@ -162,6 +162,8 @@ export function ConvertChapter() {
             <div>
               <strong className={styles.footerHeading}>Product</strong>
               <a href="#features">Features</a>
+              <Link href="/briefings">Daily Briefings</Link>
+              <Link href="/quizzes">Quizzes</Link>
               <Link href="/voices">Voices</Link>
               <Link href="/feed">Feed</Link>
               <a href="#teams">Teams</a>
