@@ -4,7 +4,7 @@
  */
 import { logger } from '../logger';
 
-export type TtsProviderId = 'elevenlabs' | 'openai' | 'cartesia' | 'hume' | 'fal' | 'replicate' | 'minimax' | 'kittentts';
+export type TtsProviderId = 'elevenlabs' | 'openai' | 'cartesia' | 'hume' | 'fal' | 'replicate' | 'minimax' | 'mistral' | 'kittentts';
 
 export interface TtsProviderAuthField {
   key: string;
@@ -202,6 +202,8 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     models: [
       { id: 'qwen3-tts-1.7b', displayName: 'Qwen3 TTS 1.7B', tier: 'premium' },
       { id: 'qwen3-tts-0.6b', displayName: 'Qwen3 TTS 0.6B', tier: 'standard' },
+      { id: 'tada-1b', displayName: 'TADA 1B (voice-clone only)', tier: 'standard' },
+      { id: 'tada-3b', displayName: 'TADA 3B (voice-clone only)', tier: 'premium' },
     ],
     supportsAudioTags: false,
     docsUrl: null,
@@ -247,6 +249,38 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
         try {
           const res = await fetch('https://rest.fal.ai/keys/', {
             headers: { Authorization: `Key ${creds.apiKey}` },
+          });
+          return res.ok;
+        } catch {
+          return false;
+        }
+      },
+    },
+  },
+
+  mistral: {
+    id: 'mistral',
+    displayName: 'Mistral (Voxtral)',
+    getApiKeyUrl: 'https://console.mistral.ai/api-keys',
+    supportsSfx: false,
+    supportsVoiceCloning: true,
+    supportsStreaming: true,
+    maxSegmentChars: 4096,
+    defaultModel: 'voxtral-mini-tts-2603',
+    models: [
+      { id: 'voxtral-mini-tts-2603', displayName: 'Voxtral Mini TTS', tier: 'premium' },
+    ],
+    supportsAudioTags: false,
+    docsUrl: null,
+    qualityTier: 'premium',
+    platformCostPerKChar: 0.016,
+    modelsWithoutTextContext: [],
+    auth: {
+      fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'Your Mistral API key' }],
+      validate: async (creds) => {
+        try {
+          const res = await fetch('https://api.mistral.ai/v1/models', {
+            headers: { Authorization: `Bearer ${creds.apiKey}` },
           });
           return res.ok;
         } catch {
