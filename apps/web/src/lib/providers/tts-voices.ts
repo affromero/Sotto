@@ -112,6 +112,27 @@ export const MINIMAX_VOICE_POOL: ProviderVoice[] = [
 ];
 
 // ---------------------------------------------------------------------------
+// Mistral Voxtral TTS voices — voice_id values for the Mistral API.
+// Voxtral also supports zero-shot voice cloning via ref_audio (base64).
+// When cloned voice is available, it's used instead of these presets.
+// ---------------------------------------------------------------------------
+
+export const MISTRAL_VOICE_POOL: ProviderVoice[] = [
+  // Male voices
+  { id: 'casual_male', name: 'Casual Male', gender: 'male', character: 'friendly conversationalist' },
+  { id: 'neutral_male', name: 'Neutral Male', gender: 'male', character: 'polished professional' },
+  { id: 'fr_male', name: 'French Male', gender: 'male', character: 'warm narrator' },
+  { id: 'es_male', name: 'Spanish Male', gender: 'male', character: 'confident presenter' },
+  { id: 'de_male', name: 'German Male', gender: 'male', character: 'authoritative expert' },
+  // Female voices
+  { id: 'casual_female', name: 'Casual Female', gender: 'female', character: 'engaging storyteller' },
+  { id: 'cheerful_female', name: 'Cheerful Female', gender: 'female', character: 'enthusiastic explainer' },
+  { id: 'neutral_female', name: 'Neutral Female', gender: 'female', character: 'polished professional' },
+  { id: 'fr_female', name: 'French Female', gender: 'female', character: 'warm narrator' },
+  { id: 'es_female', name: 'Spanish Female', gender: 'female', character: 'friendly conversationalist' },
+];
+
+// ---------------------------------------------------------------------------
 // Provider voice scoring (tone-character only, no ageRange/accent)
 // ---------------------------------------------------------------------------
 
