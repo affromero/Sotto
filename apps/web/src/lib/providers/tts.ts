@@ -85,6 +85,11 @@ async function importMinimax() {
   return MinimaxProvider;
 }
 
+async function importMistral() {
+  const { MistralProvider } = await import('./tts/mistral.provider');
+  return MistralProvider;
+}
+
 async function importKittenTts() {
   const { KittenTtsProvider } = await import('./tts/kittentts.provider');
   return KittenTtsProvider;
@@ -164,6 +169,11 @@ export async function createTtsProviderAsync(
     case 'minimax': {
       if (!apiKey) throw new Error('MiniMax requires an API key');
       const Cls = await importMinimax();
+      return new Cls(apiKey, model);
+    }
+    case 'mistral': {
+      if (!apiKey) throw new Error('Mistral requires an API key');
+      const Cls = await importMistral();
       return new Cls(apiKey, model);
     }
     case 'kittentts': {
@@ -269,6 +279,10 @@ export async function resolveTtsProvider(context: {
       const provider = await createTtsProviderAsync('minimax', process.env.FAL_KEY, undefined, requestedModel ?? undefined);
       return { provider, source: 'platform', providerId: 'minimax' };
     }
+    if (requestedProvider === 'mistral' && process.env.MISTRAL_API_KEY) {
+      const provider = await createTtsProviderAsync('mistral', process.env.MISTRAL_API_KEY, undefined, requestedModel ?? undefined);
+      return { provider, source: 'platform', providerId: 'mistral' };
+    }
 
     // No key available for requested provider
     throw new Error(
@@ -322,6 +336,7 @@ export async function canResolveTts(userId: string): Promise<boolean> {
   if (process.env.HUME_API_KEY) return true;
   if (process.env.FAL_KEY) return true;
   if (process.env.REPLICATE_API_TOKEN) return true;
+  if (process.env.MISTRAL_API_KEY) return true;
   return false;
 }
 

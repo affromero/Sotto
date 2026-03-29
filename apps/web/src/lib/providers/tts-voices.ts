@@ -112,6 +112,62 @@ export const MINIMAX_VOICE_POOL: ProviderVoice[] = [
 ];
 
 // ---------------------------------------------------------------------------
+// Mistral Voxtral TTS voices — voice_id values for the Mistral API.
+// Voxtral also supports zero-shot voice cloning via ref_audio (base64).
+// When cloned voice is available, it's used instead of these presets.
+// ---------------------------------------------------------------------------
+
+export const MISTRAL_VOICE_POOL: ProviderVoice[] = [
+  // Male voices
+  { id: 'casual_male', name: 'Casual Male', gender: 'male', character: 'friendly conversationalist' },
+  { id: 'neutral_male', name: 'Neutral Male', gender: 'male', character: 'polished professional' },
+  { id: 'fr_male', name: 'French Male', gender: 'male', character: 'warm narrator' },
+  { id: 'es_male', name: 'Spanish Male', gender: 'male', character: 'confident presenter' },
+  { id: 'de_male', name: 'German Male', gender: 'male', character: 'authoritative expert' },
+  // Female voices
+  { id: 'casual_female', name: 'Casual Female', gender: 'female', character: 'engaging storyteller' },
+  { id: 'cheerful_female', name: 'Cheerful Female', gender: 'female', character: 'enthusiastic explainer' },
+  { id: 'neutral_female', name: 'Neutral Female', gender: 'female', character: 'polished professional' },
+  { id: 'fr_female', name: 'French Female', gender: 'female', character: 'warm narrator' },
+  { id: 'es_female', name: 'Spanish Female', gender: 'female', character: 'friendly conversationalist' },
+];
+
+// ---------------------------------------------------------------------------
+// Provider → voice pool map (auto-populated, never needs manual updates)
+// ---------------------------------------------------------------------------
+
+import type { TtsProviderId } from './tts-registry';
+
+const PROVIDER_VOICE_POOLS: Partial<Record<TtsProviderId, ProviderVoice[]>> = {
+  cartesia: CARTESIA_VOICE_POOL,
+  hume: HUME_VOICE_POOL,
+  fal: FAL_VOICE_POOL,
+  replicate: FAL_VOICE_POOL,
+  minimax: MINIMAX_VOICE_POOL,
+  mistral: MISTRAL_VOICE_POOL,
+};
+
+/** Voice IDs that can't be derived from a pool (legacy IDs, sidecar presets). */
+const SPECIAL_TEST_VOICES: Partial<Record<TtsProviderId, string>> = {
+  elevenlabs: '21m00Tcm4TlvDq8ikWAM', // Rachel — stable free voice
+  openai: 'alloy',
+  kittentts: 'bella',
+};
+
+/**
+ * Return a stable test voice ID for a TTS provider.
+ * Auto-derives from voice pools; falls back to special overrides.
+ * New providers with a voice pool need zero changes here.
+ */
+export function getTestVoiceId(providerId: TtsProviderId): string {
+  const special = SPECIAL_TEST_VOICES[providerId];
+  if (special) return special;
+  const pool = PROVIDER_VOICE_POOLS[providerId];
+  if (pool && pool.length > 0) return pool[0].id;
+  return 'alloy'; // safe fallback
+}
+
+// ---------------------------------------------------------------------------
 // Provider voice scoring (tone-character only, no ageRange/accent)
 // ---------------------------------------------------------------------------
 

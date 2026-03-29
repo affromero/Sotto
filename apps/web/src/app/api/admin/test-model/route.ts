@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { createAIProvider } from '@/lib/providers/ai';
 import { createTtsProviderAsync } from '@/lib/providers/tts';
 import { createSttProvider } from '@/lib/providers/stt';
-import type { TtsProviderId } from '@/lib/providers/tts-registry';
+import { getProviderIds, type TtsProviderId } from '@/lib/providers/tts-registry';
 import type { SttProviderId } from '@/lib/providers/stt-registry';
 import type { AiProviderId } from '@/lib/providers/ai-registry';
 import { getAiKey, getByokKey } from '@/lib/byok';
@@ -12,12 +12,8 @@ import { logUsage } from '@/lib/usage-logger';
 import { errorResponse } from '@/lib/api-response';
 import { logger } from '@/lib/logger';
 import { BRAND } from '@sotto/shared';
-import {
-  CARTESIA_VOICE_POOL,
-  HUME_VOICE_POOL,
-  FAL_VOICE_POOL,
-  MINIMAX_VOICE_POOL,
-} from '@/lib/providers/tts-voices';
+import { getTestVoiceId } from '@/lib/providers/tts-voices';
+import { getPlatformTtsKey } from '@/lib/tts-generation';
 import { FalImageProvider } from '@/lib/providers/image/fal.provider';
 import { getVideoProviderMeta, videoModelRequiresFirstFrame, type VideoProviderId } from '@/lib/providers/video-registry';
 import { getFalVideoEndpoint, getFalFrameParams, isFalWanModel } from '@/lib/providers/fal-endpoints';
@@ -36,43 +32,8 @@ const requestSchema = z.object({
   keySource: z.enum(['platform', 'byok']).default('platform'),
 });
 
-// Stable test voice per TTS provider
-const TTS_TEST_VOICES: Record<string, string> = {
-  elevenlabs: '21m00Tcm4TlvDq8ikWAM', // Rachel — stable free voice
-  openai: 'alloy',
-  cartesia: CARTESIA_VOICE_POOL[0].id,
-  hume: HUME_VOICE_POOL[0].id,
-  fal: FAL_VOICE_POOL[0].id,
-  replicate: FAL_VOICE_POOL[0].id,
-  minimax: MINIMAX_VOICE_POOL[0].id,
-  kittentts: 'bella',
-};
-
-function getTtsPlatformKey(provider: string): {
-  apiKey?: string;
-  extraData?: Record<string, string>;
-} {
-  switch (provider) {
-    case 'elevenlabs':
-      return { apiKey: process.env.ELEVENLABS_API_KEY };
-    case 'openai':
-      return { apiKey: process.env.OPENAI_API_KEY };
-    case 'cartesia':
-      return { apiKey: process.env.CARTESIA_API_KEY };
-    case 'hume':
-      return { apiKey: process.env.HUME_API_KEY };
-    case 'fal':
-      return { apiKey: process.env.FAL_KEY };
-    case 'minimax':
-      return { apiKey: process.env.FAL_KEY };
-    case 'replicate':
-      return { apiKey: process.env.REPLICATE_API_TOKEN };
-    case 'kittentts':
-      return {}; // No key — sidecar at KITTENTTS_URL
-    default:
-      return {};
-  }
-}
+// Voice IDs and platform keys are derived from the registry — no manual updates needed.
+// See: getTestVoiceId() in tts-voices.ts, getPlatformTtsKey() in tts-generation.ts
 
 function getSttPlatformKey(provider: string): string | undefined {
   switch (provider) {
@@ -96,13 +57,18 @@ function getSttPlatformKey(provider: string): string | undefined {
  * Tries providers in order: cheapest/fastest first.
  * Returns null if no TTS provider is available.
  */
-const TTS_PROBE_ORDER: TtsProviderId[] = [
-  'kittentts', 'openai', 'elevenlabs', 'cartesia', 'hume', 'fal', 'replicate', 'minimax',
-];
+/** All TTS providers, kittentts first (cheapest). Auto-populated from registry. */
+const TTS_PROBE_ORDER: TtsProviderId[] = (() => {
+  const ids = getProviderIds();
+  // kittentts first — free sidecar, best for test audio generation
+  const reordered = ids.filter((id) => id === 'kittentts');
+  reordered.push(...ids.filter((id) => id !== 'kittentts'));
+  return reordered;
+})();
 
 async function generateTestAudio(): Promise<{ audio: Buffer; provider: string } | null> {
   for (const id of TTS_PROBE_ORDER) {
-    const { apiKey, extraData } = getTtsPlatformKey(id);
+    const apiKey = getPlatformTtsKey(id);
     // Check if provider has required credentials
     if (id === 'kittentts') {
       if (!process.env.KITTENTTS_URL) continue;
@@ -111,8 +77,8 @@ async function generateTestAudio(): Promise<{ audio: Buffer; provider: string } 
     }
 
     try {
-      const tts = await createTtsProviderAsync(id, apiKey, extraData);
-      const voiceId = TTS_TEST_VOICES[id] ?? 'alloy';
+      const tts = await createTtsProviderAsync(id, apiKey);
+      const voiceId = getTestVoiceId(id);
       const audio = await withTimeout(
         tts.generateSpeech({ text: `${BRAND.name} — ${BRAND.tagline}`, voiceId }),
         5_000,
@@ -283,11 +249,9 @@ export async function POST(request: NextRequest) {
 
     if (type === 'tts') {
       let apiKey: string | undefined;
-      let extraData: Record<string, string> | undefined;
 
       if (keySource === 'byok') {
         if (provider === 'kittentts') {
-          // KittenTTS has no BYOK concept — just needs KITTENTTS_URL set
           if (!process.env.KITTENTTS_URL) {
             return NextResponse.json({
               success: false,
@@ -307,9 +271,7 @@ export async function POST(request: NextRequest) {
           apiKey = key;
         }
       } else {
-        const platformData = getTtsPlatformKey(provider);
-        apiKey = platformData.apiKey;
-        extraData = platformData.extraData;
+        apiKey = getPlatformTtsKey(provider as TtsProviderId);
 
         if (provider === 'kittentts') {
           if (!process.env.KITTENTTS_URL) {
@@ -328,11 +290,11 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      const voiceId = TTS_TEST_VOICES[provider] ?? 'alloy';
+      const voiceId = getTestVoiceId(provider as TtsProviderId);
       const ttsProvider = await createTtsProviderAsync(
         provider as TtsProviderId,
         apiKey,
-        extraData,
+        undefined,
         model
       );
 
