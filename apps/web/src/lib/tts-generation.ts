@@ -39,7 +39,6 @@ export function getPlatformTtsKey(pid: TtsProviderId): string | undefined {
     case 'fal': case 'minimax': return process.env.FAL_KEY;
     case 'replicate': return process.env.REPLICATE_API_TOKEN;
     case 'mistral': return process.env.MISTRAL_API_KEY;
-    case 'kittentts': return undefined;
     default: return undefined;
   }
 }
