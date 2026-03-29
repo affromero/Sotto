@@ -4,7 +4,7 @@
  */
 import { logger } from '../logger';
 
-export type TtsProviderId = 'elevenlabs' | 'openai' | 'cartesia' | 'hume' | 'fal' | 'replicate' | 'minimax' | 'mistral' | 'kittentts';
+export type TtsProviderId = 'elevenlabs' | 'openai' | 'cartesia' | 'hume' | 'fal' | 'replicate' | 'minimax' | 'mistral';
 
 export interface TtsProviderAuthField {
   key: string;
@@ -322,28 +322,6 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     },
   },
 
-  kittentts: {
-    id: 'kittentts',
-    displayName: 'KittenTTS (Platform)',
-    getApiKeyUrl: '',
-    supportsSfx: false,
-    supportsVoiceCloning: false,
-    supportsStreaming: false,
-    maxSegmentChars: 5000,
-    defaultModel: 'kitten-tts-mini-0.8',
-    models: [
-      { id: 'kitten-tts-mini-0.8', displayName: 'KittenTTS Mini 0.8', tier: 'standard' },
-    ],
-    supportsAudioTags: false,
-    docsUrl: null,
-    qualityTier: 'standard',
-    platformCostPerKChar: 0,
-    modelsWithoutTextContext: [],
-    auth: {
-      fields: [],
-      validate: async () => true,
-    },
-  },
 };
 
 export function getProviderMeta(id: TtsProviderId): TtsProviderMeta {
@@ -389,7 +367,7 @@ export async function validateProviderCredentials(
 // ---------------------------------------------------------------------------
 
 export interface TtsProviderClientMeta {
-  id: Exclude<TtsProviderId, 'kittentts'>;
+  id: TtsProviderId;
   displayName: string;
   getApiKeyUrl: string;
   qualityTier: 'standard' | 'premium' | 'ultra';
@@ -403,12 +381,10 @@ export interface TtsProviderClientMeta {
 
 /**
  * Returns serializable provider metadata for client components.
- * Strips `validate()`, filters out `kittentts` (platform-only, not user-facing).
- * Called server-side only — client components receive this as props.
+ * Strips `validate()`. Called server-side only — client components receive this as props.
  */
 export function getAllTtsProviderClientMeta(): TtsProviderClientMeta[] {
   return Object.values(TTS_PROVIDERS)
-    .filter((p): p is TtsProviderMeta & { id: Exclude<TtsProviderId, 'kittentts'> } => p.id !== 'kittentts')
     .map((p) => ({
       id: p.id,
       displayName: p.displayName,

@@ -90,11 +90,6 @@ async function importMistral() {
   return MistralProvider;
 }
 
-async function importKittenTts() {
-  const { KittenTtsProvider } = await import('./tts/kittentts.provider');
-  return KittenTtsProvider;
-}
-
 // ---------------------------------------------------------------------------
 // Factory functions
 // ---------------------------------------------------------------------------
@@ -119,10 +114,6 @@ export function createTtsProvider(type?: string, byokApiKey?: string, model?: st
     case 'cartesia': {
       const { CartesiaProvider } = require('./tts/cartesia.provider');
       return new CartesiaProvider(byokApiKey, model);
-    }
-    case 'kittentts': {
-      const { KittenTtsProvider } = require('./tts/kittentts.provider');
-      return new KittenTtsProvider();
     }
     default:
       throw new Error(`Unknown TTS_PROVIDER "${providerType}"`);
@@ -175,10 +166,6 @@ export async function createTtsProviderAsync(
       if (!apiKey) throw new Error('Mistral requires an API key');
       const Cls = await importMistral();
       return new Cls(apiKey, model);
-    }
-    case 'kittentts': {
-      const Cls = await importKittenTts();
-      return new Cls();
     }
     default:
       throw new Error(`Unknown TTS provider: ${providerId}`);
@@ -325,11 +312,9 @@ export async function resolveTtsProvider(context: {
 
 /**
  * Check if TTS can be resolved for a user without throwing.
- * KittenTTS (platform sidecar) is always available when KITTENTTS_URL is set.
  */
 export async function canResolveTts(userId: string): Promise<boolean> {
   if (await hasByokKey(userId)) return true;
-  if (process.env.KITTENTTS_URL) return true;
   if (process.env.ELEVENLABS_API_KEY) return true;
   if (process.env.OPENAI_API_KEY) return true;
   if (process.env.CARTESIA_API_KEY) return true;

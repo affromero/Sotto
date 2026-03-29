@@ -14,7 +14,7 @@ export interface BriefingConfigData {
 const DEFAULTS: BriefingConfigData = {
   enabled: true,
   defaultAiModel: null,
-  defaultTtsProvider: 'kittentts',
+  defaultTtsProvider: null,
   defaultTtsModel: null,
   maxArticlesPerBriefing: 5,
   targetDurationMinutes: 6,
