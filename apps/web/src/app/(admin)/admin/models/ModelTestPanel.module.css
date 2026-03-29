@@ -59,6 +59,20 @@
   transform: rotate(-90deg);
 }
 
+.countBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: var(--radius-full);
+  font: var(--text-caption);
+  font-weight: 600;
+  background: var(--color-border);
+  color: var(--color-text-secondary);
+}
+
 .badge {
   display: inline-block;
   padding: 2px 8px;
