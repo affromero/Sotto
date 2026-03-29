@@ -3,17 +3,33 @@
 .customizeSection {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-md);
+  gap: var(--spacing-lg);
   margin-top: var(--spacing-md);
   padding-top: var(--spacing-md);
-  border-top: 1px solid var(--color-border);
 }
 
-.customizeTitle {
-  font: var(--text-body-sm);
-  font-weight: 600;
-  color: var(--color-text-primary);
+/* Grouped subsections */
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  padding-bottom: var(--spacing-lg);
+  border-bottom: 1px solid var(--color-border);
 }
+
+.group:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.groupTitle {
+  font: var(--text-h4);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+/* Layout */
 
 .fieldRow {
   display: flex;
@@ -35,6 +51,75 @@
   font-weight: 500;
   color: var(--color-text-secondary);
 }
+
+/* Time input */
+
+.timeInput {
+  width: 100%;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  font: var(--text-body-sm);
+  color: var(--color-text-primary);
+  background: var(--color-background);
+  outline: none;
+  transition: border-color var(--transition-fast);
+  cursor: pointer;
+}
+
+.timezoneHint {
+  font: var(--text-caption);
+  color: var(--color-text-tertiary);
+}
+
+.timeInput:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--color-primary-subtle);
+}
+
+/* Day chips */
+
+.dayChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.dayChip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font-family: var(--font-body);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.dayChip:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.dayChip:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.dayChip[data-active] {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-text-inverse);
+}
+
+/* Select */
 
 .select {
   width: 100%;
@@ -58,6 +143,8 @@
   border-color: var(--color-primary);
   box-shadow: 0 0 0 2px var(--color-primary-subtle);
 }
+
+/* Textarea */
 
 .textarea {
   width: 100%;
@@ -87,6 +174,8 @@
   color: var(--color-text-tertiary);
   align-self: flex-end;
 }
+
+/* Checkbox */
 
 .checkboxRow {
   display: flex;
