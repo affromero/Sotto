@@ -33,6 +33,17 @@ const updateUserSchema = z
     briefingTimezone: z.string().max(50).nullable().optional(),
     briefingDays: z.number().int().min(0).max(127).optional(),
     briefingVisibility: z.enum(['PUBLIC', 'UNLISTED', 'PRIVATE']).optional(),
+    briefingAiModel: z.string().nullable().optional(),
+    briefingTtsProvider: z.string().nullable().optional(),
+    briefingTtsModel: z.string().nullable().optional(),
+    briefingHostVoiceId: z.string().nullable().optional(),
+    briefingExpertVoiceId: z.string().nullable().optional(),
+    briefingDepth: z.enum(['eli5', 'quick_overview', 'standard', 'deep_dive']).nullable().optional(),
+    briefingTone: z.enum(['casual', 'professional', 'socratic', 'comedic', 'satirical', 'storytelling']).nullable().optional(),
+    briefingAudienceLevel: z.enum(['beginner', 'intermediate', 'expert']).nullable().optional(),
+    briefingDuration: z.number().int().min(1).max(40).nullable().optional(),
+    briefingPrompt: z.string().max(2000).nullable().optional(),
+    briefingUseByokKeys: z.boolean().optional(),
     quizEnabled: z.boolean().optional(),
     interests: z.array(z.string()).max(20).optional(),
     customTags: z.array(customTagSchema).max(10).optional(),
@@ -100,7 +111,7 @@ export async function PATCH(request: NextRequest) {
       return errorResponse(validation.error.errors[0].message, 400);
     }
 
-    const { interests, customTags, handle, voicePreferences, preferredAiModel, ...data } = validation.data;
+    const { interests, customTags, handle, voicePreferences, preferredAiModel, briefingAiModel, ...data } = validation.data;
 
     // Validate preferredAiModel against registry (claude-code:* models are exempt)
     if (preferredAiModel && !preferredAiModel.startsWith('claude-code:')) {
@@ -115,6 +126,16 @@ export async function PATCH(request: NextRequest) {
       (data as Record<string, unknown>).preferredAiProvider = preferredAiModel
         ? (getProviderForModel(preferredAiModel) ?? null)
         : null;
+    }
+
+    // Validate briefingAiModel against registry
+    if (briefingAiModel && !briefingAiModel.startsWith('claude-code:')) {
+      if (!isValidModelId(briefingAiModel)) {
+        return errorResponse(`Unknown AI model: "${briefingAiModel}". Check /api/ai-models for available models.`, 400);
+      }
+    }
+    if (briefingAiModel !== undefined) {
+      (data as Record<string, unknown>).briefingAiModel = briefingAiModel;
     }
 
     // Validate handle availability if changing it

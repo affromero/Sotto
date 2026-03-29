@@ -230,6 +230,18 @@ model User {
   briefingVisibility PodcastVisibility @default(PRIVATE)
   lastBriefingAt     DateTime?
   briefingLogs       BriefingLog[]
+  // Briefing customization — null = use user's general pref → admin default → platform auto
+  briefingAiModel       String?           // AI model override for briefings
+  briefingTtsProvider   String?           // TTS provider override
+  briefingTtsModel      String?           // TTS model override
+  briefingHostVoiceId   String?           // Voice pool entry name (provider-agnostic)
+  briefingExpertVoiceId String?           // Voice pool entry name (provider-agnostic)
+  briefingDepth         String?           // eli5, quick_overview, standard, deep_dive
+  briefingTone          String?           // casual, professional, socratic, comedic, satirical, storytelling
+  briefingAudienceLevel String?           // beginner, intermediate, expert
+  briefingDuration      Int?              // target minutes (1-40)
+  briefingPrompt        String? @db.Text  // custom instructions/topic focus
+  briefingUseByokKeys   Boolean @default(true) // when true + user has BYOK, use their keys
 
   // Quizzes
   quizEnabled  Boolean       @default(true)
