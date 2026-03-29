@@ -530,6 +530,22 @@ export async function generateScriptWithFeedback(params: {
   previousScript: ScriptTurn[];
   previousReferences: GeneratedReference[];
   verificationFeedback: string;
+  groundedReferenceHints?: Array<{
+    refNumber: number;
+    originalTitle: string;
+    originalUrl: string | null;
+    found: boolean;
+    replacement?: {
+      title: string;
+      authors: string[];
+      year: number | null;
+      url: string | null;
+      doi: string | null;
+      publisher: string | null;
+    };
+    claimText: string;
+    reasoning: string;
+  }>;
   apiKeyOverride?: string;
   model?: string;
   provider?: string;
@@ -586,12 +602,33 @@ export async function generateScriptWithFeedback(params: {
     .map((r) => `[${r.number}] "${r.title}" (${r.type}) — ${r.url || 'no url'}`)
     .join('\n');
 
+  // Build grounded replacements section if available
+  let groundedSection = '';
+  if (params.groundedReferenceHints && params.groundedReferenceHints.length > 0) {
+    const lines = params.groundedReferenceHints.map((h) => {
+      if (h.found && h.replacement) {
+        const authors = h.replacement.authors.length > 0 ? ` by ${h.replacement.authors.join(', ')}` : '';
+        const year = h.replacement.year ? ` (${h.replacement.year})` : '';
+        const doi = h.replacement.doi ? `\n    DOI: ${h.replacement.doi}` : '';
+        return `[${h.refNumber}] VERIFIED REPLACEMENT — use this source instead:
+    "${h.replacement.title}"${authors}${year}
+    URL: ${h.replacement.url || 'none'}${doi}
+    Claim it supports: "${h.claimText}"
+    Reasoning: ${h.reasoning}`;
+      }
+      return `[${h.refNumber}] NO REPLACEMENT FOUND — we searched and could not verify this claim. Remove it entirely or soften to hedged language ("some researchers suggest...").
+    Original: "${h.originalTitle}"
+    Claim: "${h.claimText}"`;
+    });
+    groundedSection = `\n## GROUNDED REPLACEMENTS (we searched the web for you — use these real sources):\n${lines.join('\n\n')}\n`;
+  }
+
   const userMessage = `Topic: ${params.topic}
 Depth: ${params.depth}
 
 ## FACT-CHECKER FEEDBACK:
 ${params.verificationFeedback}
-
+${groundedSection}
 ## PREVIOUS SCRIPT (to revise):
 ${previousScriptText}
 
