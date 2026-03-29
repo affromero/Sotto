@@ -75,6 +75,11 @@ function FeedCard({
             </Text>
           </View>
           <View style={styles.headerRight}>
+            {isOwner && (
+              <View style={styles.ownerBadge}>
+                <Text style={styles.ownerBadgeText}>Yours</Text>
+              </View>
+            )}
             <View style={styles.contentBadge}>
               <Text style={styles.contentBadgeText}>
                 {getContentBadgeLabel(podcast)}
@@ -226,6 +231,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs + 2,
+  },
+  ownerBadge: {
+    paddingHorizontal: spacing.xs + 4,
+    paddingVertical: 3,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.primary,
+  },
+  ownerBadgeText: {
+    fontFamily: typography.fontBody,
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   contentBadge: {
     paddingHorizontal: spacing.xs + 4,
