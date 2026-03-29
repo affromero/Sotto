@@ -362,8 +362,10 @@ describe('checkGenerationGate', () => {
   it('resets spend counter on new month', async () => {
     mockHasByokKey.mockResolvedValue(false);
     mockGetAutoModelConfig.mockResolvedValue(baseConfig);
-    const lastMonth = new Date();
-    lastMonth.setMonth(lastMonth.getMonth() - 1);
+    // Use day 1 of the previous month to avoid JS Date rollover issues
+    // (e.g., March 29 - 1 month → Feb 29 doesn't exist → rolls to March 1)
+    const now = new Date();
+    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     mockUser.mockResolvedValue({
       role: 'USER', plan: 'FREE', dailyGenerationOverride: null,
       spentMonthCents: 999, budgetMonthCents: 500, spentMonthResetAt: lastMonth,
