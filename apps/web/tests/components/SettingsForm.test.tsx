@@ -53,6 +53,18 @@ const defaultProps = {
   initialBriefingTimezone: null,
   initialBriefingDays: 5,
   initialBriefingVisibility: 'PUBLIC',
+  initialBriefingAiModel: null,
+  initialBriefingTtsProvider: null,
+  initialBriefingTtsModel: null,
+  initialBriefingHostVoiceId: null,
+  initialBriefingExpertVoiceId: null,
+  initialBriefingDepth: null,
+  initialBriefingTone: null,
+  initialBriefingAudienceLevel: null,
+  initialBriefingDuration: null,
+  initialBriefingPrompt: null,
+  initialBriefingUseByokKeys: true,
+  hasByokKeys: false,
   initialQuizEnabled: false,
 };
 
