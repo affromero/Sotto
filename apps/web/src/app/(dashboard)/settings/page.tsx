@@ -39,24 +39,34 @@ export default async function SettingsPage() {
         preferredTtsModel: true,
         emailNotifications: true,
         pushNotifications: true,
-        briefingEnabled: true,
-        briefingTime: true,
-        briefingTimezone: true,
-        briefingDays: true,
-        briefingVisibility: true,
-        briefingAiModel: true,
-        briefingTtsProvider: true,
-        briefingTtsModel: true,
-        briefingHostVoiceId: true,
-        briefingExpertVoiceId: true,
-        briefingDepth: true,
-        briefingTone: true,
-        briefingAudienceLevel: true,
-        briefingDuration: true,
-        briefingFormat: true,
-        briefingPrompt: true,
-        briefingUseByokKeys: true,
         quizEnabled: true,
+        userBriefings: {
+          orderBy: { createdAt: 'asc' as const },
+          select: {
+            id: true,
+            name: true,
+            enabled: true,
+            time: true,
+            timezone: true,
+            days: true,
+            nextRunAt: true,
+            prompt: true,
+            depth: true,
+            tone: true,
+            audienceLevel: true,
+            duration: true,
+            format: true,
+            aiModel: true,
+            ttsProvider: true,
+            ttsModel: true,
+            hostVoiceId: true,
+            expertVoiceId: true,
+            visibility: true,
+            useByokKeys: true,
+            lastGeneratedAt: true,
+            createdAt: true,
+          },
+        },
       },
     }),
     prisma.account.findMany({
@@ -150,23 +160,12 @@ export default async function SettingsPage() {
         isTwitterProviderAvailable={isTwitterProviderAvailable}
         initialEmailNotifications={user.emailNotifications}
         initialPushNotifications={user.pushNotifications}
-        initialBriefingEnabled={user.briefingEnabled}
-        initialBriefingTime={user.briefingTime}
-        initialBriefingTimezone={user.briefingTimezone}
-        initialBriefingDays={user.briefingDays}
-        initialBriefingVisibility={user.briefingVisibility}
-        initialBriefingAiModel={user.briefingAiModel}
-        initialBriefingTtsProvider={user.briefingTtsProvider}
-        initialBriefingTtsModel={user.briefingTtsModel}
-        initialBriefingHostVoiceId={user.briefingHostVoiceId}
-        initialBriefingExpertVoiceId={user.briefingExpertVoiceId}
-        initialBriefingDepth={user.briefingDepth}
-        initialBriefingTone={user.briefingTone}
-        initialBriefingAudienceLevel={user.briefingAudienceLevel}
-        initialBriefingDuration={user.briefingDuration}
-        initialBriefingFormat={user.briefingFormat}
-        initialBriefingPrompt={user.briefingPrompt}
-        initialBriefingUseByokKeys={user.briefingUseByokKeys}
+        briefings={user.userBriefings.map((b) => ({
+          ...b,
+          nextRunAt: b.nextRunAt?.toISOString() ?? null,
+          lastGeneratedAt: b.lastGeneratedAt?.toISOString() ?? null,
+          createdAt: b.createdAt.toISOString(),
+        }))}
         hasByokKeys={configuredProviders.some((p) => p.isValid) || configuredAiProviders.some((p) => p.isValid)}
         initialQuizEnabled={user.quizEnabled}
         quizAnswerCount={quizAnswerCount}

@@ -244,6 +244,9 @@ model User {
   briefingPrompt        String? @db.Text  // custom instructions/topic focus
   briefingUseByokKeys   Boolean @default(false) // opt-in: when true + user has BYOK, use their keys
 
+  // Multi-briefing configs
+  userBriefings UserBriefing[]
+
   // Quizzes
   quizEnabled  Boolean       @default(true)
   quizAttempts QuizAttempt[]
@@ -2588,6 +2591,50 @@ model DemoScene {
 
 // ============ DAILY BRIEFINGS ============
 
+model UserBriefing {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String   // "Morning Tech News", "Evening Finance"
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Schedule
+  time      String   // "HH:mm" (required)
+  timezone  String   // IANA timezone (required)
+  days      Int      @default(127) // bitmask Mon=1..Sun=64
+  nextRunAt DateTime? // pre-computed next eligible run time
+
+  // Content
+  prompt        String? @db.Text
+  depth         String? // eli5, quick_overview, standard, deep_dive
+  tone          String? // casual, professional, socratic, etc.
+  audienceLevel String? // beginner, intermediate, expert
+  duration      Int?    // target minutes 1-40
+  format        Int     @default(2) // 1=Solo 2=Dialogue 3=Panel 4=Roundtable
+
+  // Audio
+  aiModel       String?
+  ttsProvider   String?
+  ttsModel      String?
+  hostVoiceId   String?
+  expertVoiceId String?
+
+  // Advanced
+  visibility  PodcastVisibility @default(PRIVATE)
+  useByokKeys Boolean           @default(false)
+
+  // State
+  lastGeneratedAt DateTime?
+
+  // Relations
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  briefingLogs BriefingLog[]
+
+  @@index([userId])
+  @@index([enabled, nextRunAt])
+}
+
 model BriefingConfig {
   id                     String   @id @default("singleton")
   enabled                Boolean  @default(true)
@@ -2603,16 +2650,20 @@ model BriefingConfig {
 }
 
 model BriefingLog {
-  id          String   @id @default(cuid())
-  userId      String
-  podcastId   String
-  topicSlugs  String[]
-  articleIds  String[]
-  generatedAt DateTime @default(now())
+  id              String   @id @default(cuid())
+  userId          String
+  podcastId       String
+  topicSlugs      String[]
+  articleUrls     String[]
+  generatedAt     DateTime @default(now())
+  userBriefingId  String?
+  scheduledDate   String?  // "YYYY-MM-DD" for idempotency
 
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  podcast Podcast @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  podcast        Podcast        @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+  userBriefing   UserBriefing?  @relation(fields: [userBriefingId], references: [id], onDelete: SetNull)
 
+  @@unique([userBriefingId, scheduledDate])
   @@index([userId, generatedAt])
 }
 

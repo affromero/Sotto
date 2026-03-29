@@ -3,14 +3,14 @@
 import { useState, useEffect } from 'react';
 import styles from './BriefingSettings.module.css';
 
-const DEPTH_OPTIONS = [
+export const DEPTH_OPTIONS = [
   { value: 'eli5', label: 'ELI5' },
   { value: 'quick_overview', label: 'Quick Overview' },
   { value: 'standard', label: 'Standard' },
   { value: 'deep_dive', label: 'Deep Dive' },
 ];
 
-const TONE_OPTIONS = [
+export const TONE_OPTIONS = [
   { value: 'casual', label: 'Casual' },
   { value: 'professional', label: 'Professional' },
   { value: 'socratic', label: 'Socratic' },
@@ -19,13 +19,13 @@ const TONE_OPTIONS = [
   { value: 'storytelling', label: 'Storytelling' },
 ];
 
-const AUDIENCE_OPTIONS = [
+export const AUDIENCE_OPTIONS = [
   { value: 'beginner', label: 'Beginner' },
   { value: 'intermediate', label: 'Intermediate' },
   { value: 'expert', label: 'Expert' },
 ];
 
-const DURATION_OPTIONS = [
+export const DURATION_OPTIONS = [
   { value: 3, label: '3 min' },
   { value: 6, label: '6 min' },
   { value: 10, label: '10 min' },
@@ -34,7 +34,7 @@ const DURATION_OPTIONS = [
   { value: 30, label: '30 min' },
 ];
 
-const FORMAT_OPTIONS = [
+export const FORMAT_OPTIONS = [
   { value: 1, label: 'Solo (Monologue)' },
   { value: 2, label: 'Dialogue (2 voices)' },
   { value: 3, label: 'Panel (3 voices)' },
@@ -48,73 +48,83 @@ interface VoiceOption {
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-interface BriefingSettingsProps {
-  initialTime: string | null;
-  initialTimezone: string | null;
-  initialDays: number;
-  initialVisibility: string;
-  initialAiModel: string | null;
-  initialTtsOption: string | null;
-  initialHostVoiceId: string | null;
-  initialExpertVoiceId: string | null;
-  initialDepth: string | null;
-  initialTone: string | null;
-  initialAudienceLevel: string | null;
-  initialDuration: number | null;
-  initialFormat: number;
-  initialPrompt: string | null;
-  initialUseByokKeys: boolean;
+export interface BriefingFormData {
+  name: string;
+  time: string;
+  timezone: string;
+  days: number;
+  prompt: string | null;
+  depth: string | null;
+  tone: string | null;
+  audienceLevel: string | null;
+  duration: number | null;
+  format: number;
+  aiModel: string | null;
+  ttsProvider: string | null;
+  ttsModel: string | null;
+  hostVoiceId: string | null;
+  expertVoiceId: string | null;
+  visibility: string;
+  useByokKeys: boolean;
+}
+
+interface BriefingFormProps {
+  mode: 'create' | 'edit';
+  briefingId?: string;
+  initial?: Partial<BriefingFormData>;
   hasByokKeys: boolean;
   aiModelOptions: Array<{ id: string; displayName: string; tier: string; group?: string }>;
   ttsOptions: Array<{ id: string; displayName: string; badge?: string; group?: string }>;
+  onSaved?: () => void;
+  onCancel?: () => void;
 }
 
-function patchUser(data: Record<string, unknown>) {
-  return fetch('/api/users/me', {
+function patchBriefing(id: string, data: Record<string, unknown>) {
+  return fetch(`/api/briefings/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });
 }
 
-export function BriefingSettings({
-  initialTime,
-  initialTimezone,
-  initialDays,
-  initialVisibility,
-  initialAiModel,
-  initialTtsOption,
-  initialHostVoiceId,
-  initialExpertVoiceId,
-  initialDepth,
-  initialTone,
-  initialAudienceLevel,
-  initialDuration,
-  initialFormat,
-  initialPrompt,
-  initialUseByokKeys,
+export function BriefingForm({
+  mode,
+  briefingId,
+  initial,
   hasByokKeys,
   aiModelOptions,
   ttsOptions,
-}: BriefingSettingsProps) {
-  const [time, setTime] = useState(initialTime ?? '08:00');
-  const [days, setDays] = useState(initialDays);
-  const [visibility, setVisibility] = useState(initialVisibility);
-  const [aiModel, setAiModel] = useState(initialAiModel ?? '');
-  const [ttsOption, setTtsOption] = useState(initialTtsOption ?? '');
-  const [hostVoice, setHostVoice] = useState(initialHostVoiceId ?? '');
-  const [expertVoice, setExpertVoice] = useState(initialExpertVoiceId ?? '');
-  const [depth, setDepth] = useState(initialDepth ?? '');
-  const [tone, setTone] = useState(initialTone ?? '');
-  const [audienceLevel, setAudienceLevel] = useState(initialAudienceLevel ?? '');
-  const [duration, setDuration] = useState(initialDuration?.toString() ?? '');
-  const [format, setFormat] = useState(initialFormat);
-  const [prompt, setPrompt] = useState(initialPrompt ?? '');
-  const [useByokKeys, setUseByokKeys] = useState(initialUseByokKeys);
+  onSaved,
+  onCancel,
+}: BriefingFormProps) {
+  const defaultTz = typeof window !== 'undefined'
+    ? Intl.DateTimeFormat().resolvedOptions().timeZone
+    : 'America/New_York';
 
-  // Dynamic voice options from selected TTS provider
+  const [name, setName] = useState(initial?.name ?? '');
+  const [time, setTime] = useState(initial?.time ?? '08:00');
+  const [timezone] = useState(initial?.timezone ?? defaultTz);
+  const [days, setDays] = useState(initial?.days ?? 127);
+  const [visibility, setVisibility] = useState(initial?.visibility ?? 'PRIVATE');
+  const [aiModel, setAiModel] = useState(initial?.aiModel ?? '');
+  const [ttsOption, setTtsOption] = useState(
+    initial?.ttsProvider && initial?.ttsModel
+      ? `${initial.ttsProvider}:${initial.ttsModel}`
+      : initial?.ttsProvider ?? '',
+  );
+  const [hostVoice, setHostVoice] = useState(initial?.hostVoiceId ?? '');
+  const [expertVoice, setExpertVoice] = useState(initial?.expertVoiceId ?? '');
+  const [depth, setDepth] = useState(initial?.depth ?? '');
+  const [tone, setTone] = useState(initial?.tone ?? '');
+  const [audienceLevel, setAudienceLevel] = useState(initial?.audienceLevel ?? '');
+  const [duration, setDuration] = useState(initial?.duration?.toString() ?? '');
+  const [format, setFormat] = useState(initial?.format ?? 2);
+  const [prompt, setPrompt] = useState(initial?.prompt ?? '');
+  const [useByokKeys, setUseByokKeys] = useState(initial?.useByokKeys ?? false);
+
   const [voiceOptions, setVoiceOptions] = useState<VoiceOption[]>([]);
   const [voicesLoading, setVoicesLoading] = useState(false);
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     const provider = ttsOption ? ttsOption.split(':')[0] : null;
@@ -143,7 +153,7 @@ export function BriefingSettings({
     return () => { cancelled = true; };
   }, [ttsOption]);
 
-  // Debounce prompt saves
+  // Debounce prompt saves in edit mode
   const [promptTimer, setPromptTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -154,15 +164,90 @@ export function BriefingSettings({
 
   const handlePromptChange = (value: string) => {
     setPrompt(value);
-    if (promptTimer) clearTimeout(promptTimer);
-    const timer = setTimeout(() => {
-      patchUser({ briefingPrompt: value || null });
-    }, 800);
-    setPromptTimer(timer);
+    if (mode === 'edit' && briefingId) {
+      if (promptTimer) clearTimeout(promptTimer);
+      const timer = setTimeout(() => {
+        patchBriefing(briefingId, { prompt: value || null });
+      }, 800);
+      setPromptTimer(timer);
+    }
+  };
+
+  const autoSave = (data: Record<string, unknown>) => {
+    if (mode === 'edit' && briefingId) {
+      patchBriefing(briefingId, data);
+    }
+  };
+
+  const buildPayload = (): Record<string, unknown> => {
+    const ttsProvider = ttsOption ? ttsOption.split(':')[0] : null;
+    const ttsModel = ttsOption ? ttsOption.split(':').slice(1).join(':') || null : null;
+    return {
+      name,
+      time,
+      timezone,
+      days,
+      prompt: prompt || null,
+      depth: depth || null,
+      tone: tone || null,
+      audienceLevel: audienceLevel || null,
+      duration: duration ? parseInt(duration, 10) : null,
+      format,
+      aiModel: aiModel || null,
+      ttsProvider,
+      ttsModel,
+      hostVoiceId: hostVoice || null,
+      expertVoiceId: expertVoice || null,
+      visibility,
+      useByokKeys,
+    };
+  };
+
+  const handleCreate = async (generateNow: boolean) => {
+    if (!name.trim() || !time) return;
+    setCreating(true);
+    try {
+      const res = await fetch('/api/briefings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildPayload()),
+      });
+      if (!res.ok) return;
+      const created = await res.json();
+
+      if (generateNow && created.id) {
+        fetch(`/api/briefings/${created.id}/generate`, { method: 'POST' });
+      }
+      onSaved?.();
+    } finally {
+      setCreating(false);
+    }
   };
 
   return (
     <div className={styles.customizeSection}>
+      {/* Name (create mode) or hidden (edit mode — name shown in card header) */}
+      {mode === 'create' && (
+        <div className={styles.group} role="group" aria-labelledby="briefing-name">
+          <div className={styles.field}>
+            <label className={styles.label}>
+              Briefing Name <span className={styles.required}>*</span>
+            </label>
+            <input
+              type="text"
+              className={styles.timeInput}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Morning Tech News"
+              maxLength={100}
+              aria-label="Briefing name"
+              aria-required="true"
+              autoFocus
+            />
+          </div>
+        </div>
+      )}
+
       {/* Schedule */}
       <div className={styles.group} role="group" aria-labelledby="briefing-schedule">
         <h3 className={styles.groupTitle} id="briefing-schedule">Schedule</h3>
@@ -173,16 +258,14 @@ export function BriefingSettings({
               type="time"
               className={styles.timeInput}
               value={time}
-              onChange={async (e) => {
+              onChange={(e) => {
                 const val = e.target.value;
                 setTime(val);
-                await patchUser({ briefingTime: val });
+                autoSave({ time: val });
               }}
               aria-label="Briefing delivery time"
             />
-            <span className={styles.timezoneHint}>
-              {initialTimezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone}
-            </span>
+            <span className={styles.timezoneHint}>{timezone}</span>
           </div>
           <div className={styles.field}>
             <label className={styles.label}>Days</label>
@@ -196,10 +279,10 @@ export function BriefingSettings({
                     className={styles.dayChip}
                     data-active={(days & bit) !== 0 || undefined}
                     aria-pressed={(days & bit) !== 0}
-                    onClick={async () => {
+                    onClick={() => {
                       const newDays = days ^ bit;
                       setDays(newDays);
-                      await patchUser({ briefingDays: newDays });
+                      autoSave({ days: newDays });
                     }}
                     aria-label={`Toggle ${day}`}
                   >
@@ -241,10 +324,10 @@ export function BriefingSettings({
             <select
               className={styles.select}
               value={depth}
-              onChange={async (e) => {
+              onChange={(e) => {
                 const val = e.target.value;
                 setDepth(val);
-                await patchUser({ briefingDepth: val || null });
+                autoSave({ depth: val || null });
               }}
               aria-label="Briefing depth"
             >
@@ -259,10 +342,10 @@ export function BriefingSettings({
             <select
               className={styles.select}
               value={tone}
-              onChange={async (e) => {
+              onChange={(e) => {
                 const val = e.target.value;
                 setTone(val);
-                await patchUser({ briefingTone: val || null });
+                autoSave({ tone: val || null });
               }}
               aria-label="Briefing tone"
             >
@@ -279,10 +362,10 @@ export function BriefingSettings({
             <select
               className={styles.select}
               value={audienceLevel}
-              onChange={async (e) => {
+              onChange={(e) => {
                 const val = e.target.value;
                 setAudienceLevel(val);
-                await patchUser({ briefingAudienceLevel: val || null });
+                autoSave({ audienceLevel: val || null });
               }}
               aria-label="Briefing audience level"
             >
@@ -297,10 +380,10 @@ export function BriefingSettings({
             <select
               className={styles.select}
               value={duration}
-              onChange={async (e) => {
+              onChange={(e) => {
                 const val = e.target.value;
                 setDuration(val);
-                await patchUser({ briefingDuration: val ? parseInt(val, 10) : null });
+                autoSave({ duration: val ? parseInt(val, 10) : null });
               }}
               aria-label="Briefing duration"
             >
@@ -316,10 +399,10 @@ export function BriefingSettings({
           <select
             className={styles.select}
             value={String(format)}
-            onChange={async (e) => {
+            onChange={(e) => {
               const val = parseInt(e.target.value, 10);
               setFormat(val);
-              await patchUser({ briefingFormat: val });
+              autoSave({ format: val });
             }}
             aria-label="Briefing format"
           >
@@ -338,10 +421,10 @@ export function BriefingSettings({
           <select
             className={styles.select}
             value={aiModel}
-            onChange={async (e) => {
+            onChange={(e) => {
               const val = e.target.value;
               setAiModel(val);
-              await patchUser({ briefingAiModel: val || null });
+              autoSave({ aiModel: val || null });
             }}
             aria-label="Briefing AI model"
           >
@@ -358,18 +441,17 @@ export function BriefingSettings({
           <select
             className={styles.select}
             value={ttsOption}
-            onChange={async (e) => {
+            onChange={(e) => {
               const val = e.target.value;
               setTtsOption(val);
-              // Clear voice selections when provider changes — IDs are provider-specific
               setHostVoice('');
               setExpertVoice('');
               if (val) {
                 const [provider, ...modelParts] = val.split(':');
                 const model = modelParts.join(':');
-                await patchUser({ briefingTtsProvider: provider, briefingTtsModel: model || null, briefingHostVoiceId: null, briefingExpertVoiceId: null });
+                autoSave({ ttsProvider: provider, ttsModel: model || null, hostVoiceId: null, expertVoiceId: null });
               } else {
-                await patchUser({ briefingTtsProvider: null, briefingTtsModel: null, briefingHostVoiceId: null, briefingExpertVoiceId: null });
+                autoSave({ ttsProvider: null, ttsModel: null, hostVoiceId: null, expertVoiceId: null });
               }
             }}
             aria-label="Briefing voice provider"
@@ -388,10 +470,10 @@ export function BriefingSettings({
             <select
               className={styles.select}
               value={hostVoice}
-              onChange={async (e) => {
+              onChange={(e) => {
                 const val = e.target.value;
                 setHostVoice(val);
-                await patchUser({ briefingHostVoiceId: val || null });
+                autoSave({ hostVoiceId: val || null });
               }}
               disabled={voicesLoading || voiceOptions.length === 0}
               aria-label="Briefing host voice"
@@ -407,10 +489,10 @@ export function BriefingSettings({
             <select
               className={styles.select}
               value={expertVoice}
-              onChange={async (e) => {
+              onChange={(e) => {
                 const val = e.target.value;
                 setExpertVoice(val);
-                await patchUser({ briefingExpertVoiceId: val || null });
+                autoSave({ expertVoiceId: val || null });
               }}
               disabled={voicesLoading || voiceOptions.length === 0}
               aria-label="Briefing expert voice"
@@ -432,10 +514,10 @@ export function BriefingSettings({
           <select
             className={styles.select}
             value={visibility}
-            onChange={async (e) => {
+            onChange={(e) => {
               const val = e.target.value;
               setVisibility(val);
-              await patchUser({ briefingVisibility: val });
+              autoSave({ visibility: val });
             }}
             aria-label="Briefing visibility"
           >
@@ -449,10 +531,10 @@ export function BriefingSettings({
             <input
               type="checkbox"
               checked={useByokKeys}
-              onChange={async (e) => {
+              onChange={(e) => {
                 const checked = e.target.checked;
                 setUseByokKeys(checked);
-                await patchUser({ briefingUseByokKeys: checked });
+                autoSave({ useByokKeys: checked });
               }}
               aria-label="Use my own API keys for briefings"
             />
@@ -460,6 +542,41 @@ export function BriefingSettings({
           </label>
         )}
       </div>
+
+      {/* Actions (create mode only) */}
+      {mode === 'create' && (
+        <div className={styles.fieldRow}>
+          <button
+            type="button"
+            className={styles.dayChip}
+            data-active
+            onClick={() => handleCreate(true)}
+            disabled={creating || !name.trim()}
+            aria-label="Generate now and schedule"
+          >
+            {creating ? 'Creating...' : 'Generate now & schedule'}
+          </button>
+          <button
+            type="button"
+            className={styles.dayChip}
+            onClick={() => handleCreate(false)}
+            disabled={creating || !name.trim()}
+            aria-label="Just schedule"
+          >
+            Just schedule
+          </button>
+          {onCancel && (
+            <button
+              type="button"
+              className={styles.dayChip}
+              onClick={onCancel}
+              aria-label="Cancel"
+            >
+              Cancel
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
