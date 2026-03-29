@@ -9,6 +9,7 @@ import { checkGenerationGate, tryIncrementFreeGeneration } from '@/lib/generatio
 import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
 import { getModelRequiredPlan } from '@/lib/providers/ai-registry';
 import { selectVoicePair } from '@/lib/elevenlabs';
+import { getTierFeatures } from '@/lib/tier-features';
 import { lookupParticipantCredentials } from '@/lib/credential-lookup';
 import { formatThreadAsSourceText, getVerifiedParticipants } from '@/lib/twitter-utils';
 import { extractTwitterVideoTranscript } from '@/lib/twitter-video';
@@ -194,7 +195,19 @@ async function processSingleMention(tweet: TwitterTweet, mediaByKey: Map<string,
       }
     }
 
-    // 7c. Resolve user-requested model preferences from tweet
+    // 7c. Resolve plan + tier features (needed for model gating, format, visibility)
+    const userRecord = await prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { plan: true, role: true },
+    });
+    const isByok = await hasByokKey(userId);
+    const tierFeatures = getTierFeatures(
+      userRecord.plan === 'PRO' ? 'PRO' : 'FREE',
+      isByok,
+      userRecord.role ?? undefined,
+    );
+
+    // 7d. Resolve user-requested model preferences from tweet
     let tweetModels = resolveModelFromTweet(parsed);
     if (tweetModels.costPreference === 'cheapest') {
       tweetModels = await resolveCheapestModels(tweetModels);
@@ -207,13 +220,8 @@ async function processSingleMention(tweet: TwitterTweet, mediaByKey: Map<string,
 
     if (tweetModels.aiModel) {
       const requiredPlan = getModelRequiredPlan(tweetModels.aiModel);
-      const userPlan = await prisma.user.findUniqueOrThrow({
-        where: { id: userId },
-        select: { plan: true },
-      });
-      const isByok = await hasByokKey(userId);
 
-      if (requiredPlan === 'PRO' && userPlan.plan !== 'PRO' && !isByok) {
+      if (requiredPlan === 'PRO' && userRecord.plan !== 'PRO' && !isByok) {
         modelWarning = `You asked for ${parsed.requestedAiModel} but it requires a Pro plan or BYOK key. Using your default model instead. Set up your API keys at ${SOTTO_APP_URL}/settings/api`;
       } else {
         effectiveAiModel = tweetModels.aiModel;
@@ -247,20 +255,64 @@ async function processSingleMention(tweet: TwitterTweet, mediaByKey: Map<string,
       },
     });
 
-    // 8. Determine voice IDs
+    // 8. Resolve format, speakers, visibility
+    const format = parsed.format ?? 2;
+    const DEFAULT_SPEAKERS: Record<number, Array<{ name: string; description: string }>> = {
+      1: [{ name: 'HOST', description: 'Warm, insightful narrator who guides the listener through the topic with clarity and personality.' }],
+      2: [
+        { name: 'HOST', description: 'Warm, curious, asks great questions, guides the conversation. Represents the listener.' },
+        { name: 'EXPERT', description: 'Knowledgeable, vivid storyteller, uses analogies and examples.' },
+      ],
+      3: [
+        { name: 'HOST', description: 'Moderates the discussion, asks probing questions, keeps the conversation flowing.' },
+        { name: 'EXPERT', description: 'Primary subject-matter expert, provides deep analysis and context.' },
+        { name: 'ANALYST', description: 'Offers alternative perspectives, challenges assumptions, adds nuance.' },
+      ],
+      4: [
+        { name: 'HOST', description: 'Moderates the roundtable, ensures all voices are heard, synthesizes key points.' },
+        { name: 'EXPERT', description: 'Primary subject-matter expert, provides foundational knowledge.' },
+        { name: 'ANALYST', description: 'Offers data-driven insights and alternative frameworks.' },
+        { name: 'CRITIC', description: 'Plays devil\'s advocate, challenges assumptions, represents the skeptic.' },
+      ],
+    };
+
+    // Use LLM-parsed speakers if provided, otherwise derive from format
+    let speakers = parsed.speakers ?? DEFAULT_SPEAKERS[format] ?? DEFAULT_SPEAKERS[2];
+    // Clamp speaker count to tier limit
+    if (speakers.length > tierFeatures.maxSpeakers) {
+      speakers = speakers.slice(0, tierFeatures.maxSpeakers);
+    }
+
+    // Plan-gate visibility (private/unlisted require PRO or BYOK)
+    const requestedVisibility = parsed.visibility ?? 'public';
+    const visibility = (requestedVisibility !== 'public' && !tierFeatures.privateAllowed)
+      ? 'PUBLIC'
+      : requestedVisibility.toUpperCase() as 'PUBLIC' | 'UNLISTED' | 'PRIVATE';
+
+    // 8b. Determine voice IDs for each speaker
     const tempPodcastId = mention.id; // use mention ID as seed for voice selection
     const voicePair = selectVoicePair(tempPodcastId);
-    const userHostPref = user.voicePreferences.find(v => v.speaker === 'HOST');
-    const userExpertPref = user.voicePreferences.find(v => v.speaker === 'EXPERT');
-    const hostVoiceId = userHostPref?.voiceId ?? voicePair.host.id;
-    const expertVoiceId = userExpertPref?.voiceId ?? voicePair.expert.id;
+    const voiceEntries = speakers.map((speaker, i) => {
+      // Check user preferences first
+      const userPref = user.voicePreferences.find(v => v.speaker === speaker.name);
+      if (userPref?.voiceId) {
+        return { speaker: speaker.name, voiceId: userPref.voiceId };
+      }
+      // Fallback to deterministic pair for first two speakers
+      if (i === 0) return { speaker: speaker.name, voiceId: voicePair.host.id };
+      if (i === 1) return { speaker: speaker.name, voiceId: voicePair.expert.id };
+      // 3rd+ speakers: no voiceId — voice-assigner will handle in audio-generation
+      return { speaker: speaker.name, voiceId: null as string | null };
+    });
 
     // 9. Build podcast metadata — adjust for threads
     const tone = parsed.isDebate ? 'socratic' : parsed.tone;
     const focusAreas = isThreadPodcast && parsed.viewpoints
       ? [...parsed.focusAreas, ...parsed.viewpoints]
       : parsed.focusAreas;
-    const durationTarget = parsed.durationTarget ?? (isThreadPodcast ? 15 : 10);
+    const rawDuration = parsed.durationTarget ?? (isThreadPodcast ? 15 : 10);
+    const maxDuration = isFinite(tierFeatures.maxDurationMinutes) ? tierFeatures.maxDurationMinutes : 40;
+    const durationTarget = Math.min(Math.max(rawDuration, 1), maxDuration);
     let sourceText = isThreadPodcast && threadData
       ? formatThreadAsSourceText(threadData, parsed, participantCredentials)
       : undefined;
@@ -289,10 +341,10 @@ async function processSingleMention(tweet: TwitterTweet, mediaByKey: Map<string,
         sourceTweetId: tweet.id,
         voices: {
           createMany: {
-            data: [
-              { speaker: 'HOST', voiceId: hostVoiceId },
-              { speaker: 'EXPERT', voiceId: expertVoiceId },
-            ],
+            data: voiceEntries.map(v => ({
+              speaker: v.speaker,
+              voiceId: v.voiceId,
+            })),
           },
         },
         ttsProvider: effectiveTtsProvider,
@@ -300,7 +352,7 @@ async function processSingleMention(tweet: TwitterTweet, mediaByKey: Map<string,
         aiModel: effectiveAiModel,
         aiAutoResolved: true,
         ttsAutoResolved: true,
-        visibility: 'PUBLIC',
+        visibility,
         discovery: {
           create: {
             userId,
@@ -311,6 +363,7 @@ async function processSingleMention(tweet: TwitterTweet, mediaByKey: Map<string,
             tone,
             focusAreas,
             durationTarget,
+            speakers: speakers.length > 0 ? speakers : undefined,
             sourceUrl: parsed.sourceUrl,
           },
         },

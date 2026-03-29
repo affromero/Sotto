@@ -1911,6 +1911,7 @@ model TwitterConfig {
   minLikes               Int      @default(10)
   minPlays               Int      @default(50)
   minForks               Int      @default(3)
+  mentionPollIntervalMs  Int      @default(60000)
   trendPollingEnabled    Boolean  @default(false)
   trendPollIntervalMs    Int      @default(7200000)
   maxTrendPodcastsPerDay Int      @default(3)

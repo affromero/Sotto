@@ -18,11 +18,14 @@ Rules:
 - Pick the single most relevant URL as sourceUrl (or null if none)
 - Infer depth from thread complexity: "eli5" or "explain like I'm 5" → eli5, short threads → standard, long detailed threads → deep_dive, self-authored threads → deep_dive
 - Infer audience from language: jargon → expert, plain → beginner, default → intermediate
-- If debate: tone should be "socratic"; if informational: infer from style
+- If debate: tone should be "socratic"; if informational: infer from style — humorous/joking → comedic, sarcastic/ironic → satirical, narrative/story-driven → storytelling, emoji-heavy/casual → casual, formal → professional, question-heavy → socratic
 - Focus areas should include key subtopics discussed across the thread
-- Infer audience content rating: kids/educational → kids, explicit/NSFW → mature, default → general
-- Infer durationTarget in minutes: short threads → 10, long detailed threads → 15, default → 15
+- Infer audience content rating: kids/educational → kids, teen-oriented/young-adult → teens, family-friendly/all-ages → family, niche/technical/geek-culture → nerds, explicit/NSFW → mature, default → general
+- Infer durationTarget in minutes (integer 1-40): "short"/"quick" → 5, "long"/"extended"/"in-depth" → 20, explicit number (e.g. "30 minutes") → that number, short threads → 10, long detailed threads → 15, self-authored threads → 15, default → 15. Clamp to 1-40 range.
 - Strip @sottofm and other handles from the topic
+- Infer format from the tagging user's cues: "monologue"/"solo"/"one voice" → 1 (Solo), "panel"/"group"/"three voices" → 3 (Panel), "roundtable"/"four voices"/"4 speakers" → 4 (Roundtable), default → 2 (Dialogue). Multi-participant debate threads default to format 3 (Panel) if participantCount >= 3. Format determines the default number of speakers: 1=Solo, 2=Dialogue, 3=Panel, 4=Roundtable.
+- If the tagging user specifies custom speaker names or roles (e.g. "host: Sarah, expert: Dr. Smith", "speakers: Alice, Bob, Charlie"), extract them into the speakers array with name and description. For debate threads, if no custom speakers are specified, you may use the thread participants as speaker names (e.g. [{"name": "@alice", "description": "Argues for X"}, {"name": "@bob", "description": "Argues for Y"}]). Otherwise set speakers to null — the system will auto-assign based on format.
+- Infer visibility from the tagging user's tweet: "private"/"just for me"/"keep it private"/"don't share" → "private", "unlisted"/"hidden"/"not public" → "unlisted", default → "public"
 - If the tagging user mentions a specific AI model or TTS/audio provider (e.g. "use opus", "with elevenlabs", "use gpt-5", "use openai voice"), extract those as requestedAiModel and requestedTtsProvider. Use the exact name they mention (lowercase). Only look at the tagging user's tweet, not the thread content. If not mentioned, set to null.
 - If the tagging user mentions a specific TTS model within a provider (e.g. "elevenlabs v3", "sonic 3", "tts-1-hd", "openai hd", "eleven flash", "octave"), extract as requestedTtsModel. Use the exact name they mention (lowercase). If a combined phrase like "elevenlabs v3" is used, extract "elevenlabs" as requestedTtsProvider AND "v3" as requestedTtsModel. Only look at the tagging user's tweet. If not mentioned, set to null.
 - If the tagging user mentions a specific image model (e.g. "use flux", "with recraft", "ideogram", "sd3") or video model (e.g. "use veo", "kling video", "wan video"), extract those as requestedImageModel and requestedVideoModel. Use the exact name they mention (lowercase). Only look at the tagging user's tweet. If not mentioned, set to null.
@@ -44,10 +47,13 @@ Respond with ONLY valid JSON matching this shape:
   "title": "string — engaging podcast title (max 80 chars)",
   "depth": "eli5" | "quick_overview" | "standard" | "deep_dive",
   "audienceLevel": "beginner" | "intermediate" | "expert",
-  "tone": "casual" | "professional" | "socratic",
+  "tone": "casual" | "professional" | "socratic" | "comedic" | "satirical" | "storytelling",
   "focusAreas": ["string array of specific subtopics"],
-  "audience": "general" | "kids" | "mature",
-  "durationTarget": 10 | 15,
+  "audience": "general" | "kids" | "teens" | "family" | "nerds" | "mature",
+  "durationTarget": "integer 1-40 (minutes)",
+  "format": 1 | 2 | 3 | 4,
+  "speakers": [{"name": "string", "description": "string"}] | null,
+  "visibility": "public" | "unlisted" | "private",
   "sourceUrl": "string | null — most relevant URL",
   "sourceUrls": ["all URLs found in thread"],
   "isDebate": true | false,
