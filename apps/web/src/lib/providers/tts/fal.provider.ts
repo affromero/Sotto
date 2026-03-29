@@ -1,12 +1,9 @@
 /**
- * Fal.ai TTS provider — Qwen3-TTS and TADA open-source voice generation.
+ * Fal.ai TTS provider — Qwen3-TTS open-source voice generation.
  * No expression/emotion controls — relies on text content for prosody.
  *
  * Models:
  *   - qwen3-tts-1.7b / qwen3-tts-0.6b: Named preset voices + voice cloning
- *   - tada-1b / tada-3b: Voice-clone-only (requires audio_url reference)
- *
- * @tts-research-date 2026-03-29 — Added TADA 1B/3B support (voice-clone-only)
  */
 import { logger } from '../../logger';
 import type { TtsProvider, SpeechParams } from '../tts';
@@ -21,15 +18,11 @@ interface FalTtsResponse {
   audio: { url: string; duration: number; sample_rate: number };
 }
 
-/** Full endpoint URLs per model. TADA uses a different base path than Qwen3. */
+/** Full endpoint URLs per model. */
 const MODEL_ENDPOINTS: Record<string, string> = {
   'qwen3-tts-1.7b': 'https://fal.run/fal-ai/qwen-3-tts/text-to-speech/1.7b',
   'qwen3-tts-0.6b': 'https://fal.run/fal-ai/qwen-3-tts/text-to-speech/0.6b',
-  'tada-1b': 'https://fal.run/fal-ai/tada/1b/text-to-speech',
-  'tada-3b': 'https://fal.run/fal-ai/tada/3b/text-to-speech',
 };
-
-const TADA_MODELS = new Set(['tada-1b', 'tada-3b']);
 
 export class FalProvider implements TtsProvider {
   readonly providerId: TtsProviderId = 'fal';
@@ -43,33 +36,14 @@ export class FalProvider implements TtsProvider {
 
   async generateSpeech(params: SpeechParams): Promise<Buffer> {
     const url = MODEL_ENDPOINTS[this.model] ?? MODEL_ENDPOINTS['qwen3-tts-1.7b'];
-    const isTada = TADA_MODELS.has(this.model);
     const isClonedVoice = params.voiceId.startsWith('https://');
 
-    // TADA requires a cloned voice (audio_url reference)
-    if (isTada && !isClonedVoice) {
-      throw new Error(
-        'TADA models require a cloned voice. Upload a voice sample in Settings → Voice Cloning first.'
-      );
-    }
-
-    let body: Record<string, unknown>;
-
-    if (isTada) {
-      // TADA uses { prompt, audio_url } — different param names from Qwen3
-      body = {
-        prompt: params.text,
-        audio_url: params.voiceId,
-        output_format: 'mp3',
-      };
+    // Qwen3 uses { text, voice } or { text, speaker_voice_embedding_file_url }
+    const body: Record<string, unknown> = { text: params.text };
+    if (isClonedVoice) {
+      body.speaker_voice_embedding_file_url = params.voiceId;
     } else {
-      // Qwen3 uses { text, voice } or { text, speaker_voice_embedding_file_url }
-      body = { text: params.text };
-      if (isClonedVoice) {
-        body.speaker_voice_embedding_file_url = params.voiceId;
-      } else {
-        body.voice = params.voiceId;
-      }
+      body.voice = params.voiceId;
     }
 
     const response = await fetch(url, {
@@ -102,12 +76,6 @@ export class FalProvider implements TtsProvider {
   }
 
   getVoiceId(speaker: string, podcastId?: string, metadata?: VoiceMatchMetadata): string {
-    // TADA models don't have preset voices — return empty string.
-    // The audio-generation worker will use the user's cloned voice from PodcastVoice.
-    if (TADA_MODELS.has(this.model)) {
-      return '';
-    }
-
     const isHostVoice = SPEAKER_VOICE_HOST_SET.has(speaker.toUpperCase());
     if (!podcastId) {
       return isHostVoice ? FAL_VOICE_POOL[0].id : FAL_VOICE_POOL[1].id;
