@@ -152,6 +152,7 @@ export function BriefingForm({
   const [voiceOptions, setVoiceOptions] = useState<VoiceOption[]>([]);
   const [voicesLoading, setVoicesLoading] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   useEffect(() => {
     const provider = ttsOption ? ttsOption.split(':')[0] : null;
@@ -233,13 +234,18 @@ export function BriefingForm({
   const handleCreate = async (generateNow: boolean) => {
     if (!name.trim() || !time) return;
     setCreating(true);
+    setCreateError(null);
     try {
       const res = await fetch('/api/briefings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(buildPayload()),
       });
-      if (!res.ok) return;
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        setCreateError(typeof data?.error === 'string' ? data.error : 'Failed to create briefing.');
+        return;
+      }
       const created = await res.json();
 
       if (generateNow && created.id) {
@@ -250,9 +256,17 @@ export function BriefingForm({
             window.location.href = `/podcast/${podcastId}`;
             return;
           }
+        } else {
+          const genData = await genRes.json().catch(() => null);
+          // Briefing was created but generate failed — still save, show error inline
+          setCreateError(typeof genData?.error === 'string' ? genData.error : 'Briefing saved, but generation failed. You can retry from the card.');
+          onSaved?.();
+          return;
         }
       }
       onSaved?.();
+    } catch {
+      setCreateError('Network error. Check your connection and try again.');
     } finally {
       setCreating(false);
     }
@@ -568,6 +582,13 @@ export function BriefingForm({
           </label>
         )}
       </div>
+
+      {/* Error display */}
+      {createError && (
+        <div className={styles.hint} style={{ color: 'var(--color-error, #ef4444)' }}>
+          {createError}
+        </div>
+      )}
 
       {/* Actions (create mode only) */}
       {mode === 'create' && (
