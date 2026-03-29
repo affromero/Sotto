@@ -30,6 +30,7 @@ import { colors, spacing, typography, borderRadius, getContentBadgeLabel } from 
 import { getPodcastGradient } from '../../lib/gradients';
 import type { PodcastDetail, SegmentData } from '@sotto/shared';
 import { PostListenQuiz } from '../../components/PostListenQuiz';
+import { PostListenRating } from '../../components/PostListenRating';
 import { api } from '../../lib/api';
 import { setupPlayer, loadTrack } from '../../lib/audio-player';
 import { formatTime } from '../../lib/formatters';
@@ -79,6 +80,7 @@ export default function PodcastScreen() {
   const [versionHistoryVisible, setVersionHistoryVisible] = useState(false);
   const [collectionSheetVisible, setCollectionSheetVisible] = useState(false);
   const [activeVoiceTrackId, setActiveVoiceTrackId] = useState<string | null>(null);
+  const [showRating, setShowRating] = useState(false);
   const [showQuiz, setShowQuiz] = useState(false);
   const playbackEndedRef = useRef(false);
   const setCurrentPodcast = usePlayerStore((s) => s.setCurrentPodcast);
@@ -89,7 +91,7 @@ export default function PodcastScreen() {
   const playbackState = usePlaybackState();
   const isPlaying = playbackState.state === State.Playing;
 
-  // Detect playback completion → show quiz
+  // Detect playback completion → show rating first, then quiz
   useEffect(() => {
     if (
       !playbackEndedRef.current &&
@@ -99,7 +101,7 @@ export default function PodcastScreen() {
       !isPlaying
     ) {
       playbackEndedRef.current = true;
-      setShowQuiz(true);
+      setShowRating(true);
     }
   }, [position, trackDuration, isPlaying]);
 
@@ -916,6 +918,22 @@ export default function PodcastScreen() {
         onClose={() => setCollectionSheetVisible(false)}
         podcastId={podcast.id}
       />
+
+      {/* Post-listen rating → then quiz */}
+      <Modal
+        visible={showRating}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => { setShowRating(false); setShowQuiz(true); }}
+      >
+        <View style={styles.quizModal}>
+          <PostListenRating
+            podcastId={podcast.id}
+            completionPercent={trackDuration > 0 ? (position / trackDuration) * 100 : undefined}
+            onDismiss={() => { setShowRating(false); setShowQuiz(true); }}
+          />
+        </View>
+      </Modal>
 
       {/* Post-listen quiz */}
       <Modal
