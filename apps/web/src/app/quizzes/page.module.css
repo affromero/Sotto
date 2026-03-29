@@ -1,0 +1,206 @@
+.main {
+  min-height: var(--full-height);
+  padding: var(--spacing-2xl) var(--spacing-md);
+  background: var(--color-background);
+}
+
+.container {
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+/* Hero */
+
+.hero {
+  text-align: center;
+  margin-bottom: var(--spacing-3xl);
+}
+
+.overline {
+  display: block;
+  font: var(--text-caption);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--color-primary);
+  margin-bottom: var(--spacing-sm);
+}
+
+.heroTitle {
+  font: var(--text-display);
+  margin-bottom: var(--spacing-md);
+}
+
+.heroSubtitle {
+  font: var(--text-body-lg);
+  color: var(--color-text-secondary);
+  max-width: 600px;
+  margin: 0 auto;
+  line-height: 1.7;
+}
+
+/* Features */
+
+.features {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--spacing-xl);
+  margin-bottom: var(--spacing-3xl);
+}
+
+.feature {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: var(--spacing-xl);
+  text-align: center;
+}
+
+.featureIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-lg);
+  background: var(--color-primary-subtle);
+  color: var(--color-primary);
+  margin-bottom: var(--spacing-md);
+}
+
+.featureTitle {
+  font: var(--text-h3);
+  margin-bottom: var(--spacing-sm);
+}
+
+.featureDescription {
+  font: var(--text-body);
+  color: var(--color-text-secondary);
+  line-height: 1.7;
+}
+
+/* Sections */
+
+.section {
+  margin-bottom: var(--spacing-3xl);
+}
+
+.sectionTitle {
+  font: var(--text-h2);
+  margin-bottom: var(--spacing-md);
+}
+
+.sectionText {
+  font: var(--text-body-lg);
+  color: var(--color-text-secondary);
+  line-height: 1.8;
+  margin-bottom: var(--spacing-md);
+}
+
+.sectionText:last-child {
+  margin-bottom: 0;
+}
+
+/* Flow steps */
+
+.flow {
+  display: flex;
+  flex-direction: column;
+}
+
+.flowStep {
+  display: flex;
+  gap: var(--spacing-lg);
+  align-items: flex-start;
+}
+
+.flowIndicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.flowDot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  color: var(--color-surface);
+  font: var(--text-body-sm);
+  font-weight: 700;
+}
+
+.flowLine {
+  width: 2px;
+  height: 40px;
+  background: var(--color-border);
+}
+
+.flowContent {
+  padding-bottom: var(--spacing-lg);
+}
+
+.flowLabel {
+  font: var(--text-h3);
+  margin-bottom: var(--spacing-xs);
+}
+
+.flowDetail {
+  font: var(--text-body);
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+}
+
+/* CTA */
+
+.cta {
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--spacing-2xl);
+  text-align: center;
+}
+
+.ctaTitle {
+  font: var(--text-h2);
+  margin-bottom: var(--spacing-sm);
+}
+
+.ctaText {
+  font: var(--text-body-lg);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--spacing-lg);
+}
+
+.ctaButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font: var(--text-body);
+  font-weight: 600;
+  color: var(--color-surface);
+  background: var(--color-primary);
+  border: none;
+  border-radius: var(--radius-lg);
+  padding: 14px 32px;
+  text-decoration: none;
+  transition: opacity 0.15s ease;
+}
+
+.ctaButton:hover {
+  opacity: 0.9;
+}
+
+/* Mobile */
+
+@media (max-width: 700px) {
+  .heroTitle {
+    font: var(--text-h1);
+  }
+
+  .features {
+    grid-template-columns: 1fr;
+    gap: var(--spacing-md);
+  }
+}
