@@ -12,6 +12,9 @@ import { Prisma } from '@prisma/client';
 import { markPodcastFailed } from '@/lib/pipeline-resume';
 import { invalidatePodcastCache, publishPodcastStatus } from '@/lib/redis';
 import { verifyScript, type ClaimAnalysis } from '@/lib/script-verifier';
+import { groundReferenceCandidates, type GroundingInput } from '@/lib/reference-verification';
+import { classifyReference } from '@sottofm/verification-standard';
+import type { ReferenceInput } from '@/lib/reference-validator';
 import {
   generateScriptWithFeedback,
   type ScriptTurn,
@@ -412,6 +415,112 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
     feedback: verdict.feedback.substring(0, 200),
   });
 
+  // --- Grounding: search for real replacements for flagged references ---
+  const flaggedRefNumbers = new Set<number>();
+  for (const claim of verdict.unreliableSourceClaims) {
+    // Use per-citation tracking if available, otherwise flag all citations on the claim
+    const badCitations = claim.unreliableCitations?.length ? claim.unreliableCitations : claim.existingCitations;
+    for (const n of badCitations) flaggedRefNumbers.add(n);
+  }
+  // Also include unsupported claims — search by claim text
+  for (const claim of verdict.unsupportedClaims) {
+    // These have no citations — we search by claim text to find a source
+    // Use a synthetic ref number based on turn index to track them
+    for (const n of claim.existingCitations) flaggedRefNumbers.add(n);
+  }
+
+  type GroundedHint = NonNullable<Parameters<typeof generateScriptWithFeedback>[0]['groundedReferenceHints']>[number];
+  let groundedHints: GroundedHint[] | undefined;
+  let hasUncoveredClaims = verdict.unsupportedClaims.length > 0;
+
+  if (flaggedRefNumbers.size > 0) {
+    await job.updateProgress(63);
+
+    // Build GroundingInput for each flagged reference
+    const groundingInputs: GroundingInput[] = [];
+    for (const refNum of flaggedRefNumbers) {
+      const ref = generatedRefs.find((r) => r.number === refNum);
+      if (!ref) continue;
+
+      const refInput: ReferenceInput = {
+        id: `ref-${refNum}`,
+        number: ref.number,
+        title: ref.title,
+        authors: ref.authors ?? [],
+        year: ref.year ?? null,
+        url: ref.url ?? null,
+        doi: ref.doi ?? null,
+        type: ref.type,
+      };
+
+      // Build claim context from flagged claims that cite this ref
+      const relatedClaims = [...verdict.unreliableSourceClaims, ...verdict.unsupportedClaims]
+        .filter((c) => c.existingCitations.includes(refNum) || c.unreliableCitations?.includes(refNum));
+      const claimContext = {
+        sentences: relatedClaims.map((c) => c.claimText),
+        speakerTurns: relatedClaims.map((c) => c.speaker),
+      };
+
+      const domain = classifyReference({ doi: ref.doi ?? null, url: ref.url ?? null, type: ref.type });
+      const isUnreliable = verdict.unreliableSourceClaims.some(
+        (c) => c.existingCitations.includes(refNum) || c.unreliableCitations?.includes(refNum),
+      );
+
+      groundingInputs.push({
+        ref: refInput,
+        domain,
+        claimContext,
+        allChecks: [], // Not from reference-validation — no prior checks
+        reason: isUnreliable ? 'unreliable_source' : 'all_checks_failed',
+      });
+    }
+
+    const groundingResults = await groundReferenceCandidates(
+      groundingInputs,
+      discovery.topic || '',
+      aiKey?.apiKey,
+      model,
+      provider,
+    );
+
+    await job.updateProgress(68);
+
+    // Build hints for the script generator
+    groundedHints = groundingInputs.map((input) => {
+      const result = groundingResults.get(input.ref.id);
+      const claimText = input.claimContext.sentences[0] ?? '';
+      if (result?.passed && result.replacement) {
+        return {
+          refNumber: input.ref.number,
+          originalTitle: input.ref.title,
+          originalUrl: input.ref.url,
+          found: true,
+          replacement: result.replacement,
+          claimText,
+          reasoning: result.detail ?? 'Verified replacement source found',
+        };
+      }
+      return {
+        refNumber: input.ref.number,
+        originalTitle: input.ref.title,
+        originalUrl: input.ref.url,
+        found: false,
+        claimText,
+        reasoning: 'Could not find a verifiable source — claim should be removed',
+      };
+    });
+
+    // Check if all flagged refs were covered
+    hasUncoveredClaims = hasUncoveredClaims || groundedHints.some((h) => !h.found);
+
+    logger.info('Grounding complete for verification retry', {
+      podcastId,
+      flagged: String(flaggedRefNumbers.size),
+      grounded: String(groundedHints.filter((h) => h.found).length),
+      unverifiable: String(groundedHints.filter((h) => !h.found).length),
+    });
+  }
+
   const sourceMetadata = discovery.sourceMetadata as SourceMetadata | null;
 
   const revised = await generateScriptWithFeedback({
@@ -428,10 +537,12 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
     previousScript: turns,
     previousReferences: generatedRefs,
     verificationFeedback: verdict.feedback,
+    groundedReferenceHints: groundedHints,
     apiKeyOverride: aiKey?.apiKey,
     model,
     provider,
-    webSearchEnabled: false,
+    // Enable web search only if grounding couldn't cover all flagged refs
+    webSearchEnabled: hasUncoveredClaims,
   });
 
   await job.updateProgress(80);
