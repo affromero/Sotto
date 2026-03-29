@@ -64,6 +64,7 @@ export function BriefingCard({
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [generatedPodcastId, setGeneratedPodcastId] = useState<string | null>(null);
 
   const depthLabel = DEPTH_OPTIONS.find((o) => o.value === briefing.depth)?.label ?? 'Quick Overview';
   const durationLabel = DURATION_OPTIONS.find((o) => o.value === briefing.duration)?.label ?? '6 min';
@@ -91,8 +92,13 @@ export function BriefingCard({
 
   const handleGenerate = async () => {
     setGenerating(true);
+    setGeneratedPodcastId(null);
     try {
-      await fetch(`/api/briefings/${briefing.id}/generate`, { method: 'POST' });
+      const res = await fetch(`/api/briefings/${briefing.id}/generate`, { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.podcastId) setGeneratedPodcastId(data.podcastId);
+      }
       onRefresh();
     } finally {
       setGenerating(false);
@@ -139,9 +145,16 @@ export function BriefingCard({
       </div>
 
       <div className={styles.summary}>
-        <span className={styles.summaryText}>
-          {formatDays(briefing.days)} at {briefing.time} &middot; {depthLabel} &middot; {durationLabel}
-        </span>
+        <div>
+          <span className={styles.summaryText}>
+            {formatDays(briefing.days)} at {briefing.time} &middot; {depthLabel} &middot; {durationLabel}
+          </span>
+          {briefing.lastGeneratedAt && (
+            <div className={styles.lastGenerated}>
+              Last generated {new Date(briefing.lastGeneratedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
+            </div>
+          )}
+        </div>
         <button
           type="button"
           className={styles.editBtn}
@@ -152,6 +165,21 @@ export function BriefingCard({
           {expanded ? 'Close' : 'Edit'}
         </button>
       </div>
+
+      {/* Generation status */}
+      {generating && (
+        <div className={styles.statusBanner}>
+          Generating your podcast...
+        </div>
+      )}
+      {generatedPodcastId && !generating && (
+        <div className={styles.statusBanner}>
+          Podcast created.{' '}
+          <a href={`/podcast/${generatedPodcastId}`} className={styles.statusLink}>
+            View progress
+          </a>
+        </div>
+      )}
 
       {expanded && (
         <div className={styles.expandedContent}>
