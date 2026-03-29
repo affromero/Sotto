@@ -44,6 +44,17 @@ export default async function SettingsPage() {
         briefingTimezone: true,
         briefingDays: true,
         briefingVisibility: true,
+        briefingAiModel: true,
+        briefingTtsProvider: true,
+        briefingTtsModel: true,
+        briefingHostVoiceId: true,
+        briefingExpertVoiceId: true,
+        briefingDepth: true,
+        briefingTone: true,
+        briefingAudienceLevel: true,
+        briefingDuration: true,
+        briefingPrompt: true,
+        briefingUseByokKeys: true,
         quizEnabled: true,
       },
     }),
@@ -143,6 +154,18 @@ export default async function SettingsPage() {
         initialBriefingTimezone={user.briefingTimezone}
         initialBriefingDays={user.briefingDays}
         initialBriefingVisibility={user.briefingVisibility}
+        initialBriefingAiModel={user.briefingAiModel}
+        initialBriefingTtsProvider={user.briefingTtsProvider}
+        initialBriefingTtsModel={user.briefingTtsModel}
+        initialBriefingHostVoiceId={user.briefingHostVoiceId}
+        initialBriefingExpertVoiceId={user.briefingExpertVoiceId}
+        initialBriefingDepth={user.briefingDepth}
+        initialBriefingTone={user.briefingTone}
+        initialBriefingAudienceLevel={user.briefingAudienceLevel}
+        initialBriefingDuration={user.briefingDuration}
+        initialBriefingPrompt={user.briefingPrompt}
+        initialBriefingUseByokKeys={user.briefingUseByokKeys}
+        hasByokKeys={configuredProviders.some((p) => p.isValid) || configuredAiProviders.some((p) => p.isValid)}
         initialQuizEnabled={user.quizEnabled}
         quizAnswerCount={quizAnswerCount}
         referredUsers={referredUsers.map((u) => ({ name: u.name, handle: u.handle, image: u.image, joinedAt: u.createdAt.toISOString(), verified: u.referralVerified }))}
