@@ -29,6 +29,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography, borderRadius, getContentBadgeLabel } from '@sotto/shared';
 import { getPodcastGradient } from '../../lib/gradients';
 import type { PodcastDetail, SegmentData } from '@sotto/shared';
+import { PostListenQuiz } from '../../components/PostListenQuiz';
 import { api } from '../../lib/api';
 import { setupPlayer, loadTrack } from '../../lib/audio-player';
 import { formatTime } from '../../lib/formatters';
@@ -78,6 +79,8 @@ export default function PodcastScreen() {
   const [versionHistoryVisible, setVersionHistoryVisible] = useState(false);
   const [collectionSheetVisible, setCollectionSheetVisible] = useState(false);
   const [activeVoiceTrackId, setActiveVoiceTrackId] = useState<string | null>(null);
+  const [showQuiz, setShowQuiz] = useState(false);
+  const playbackEndedRef = useRef(false);
   const setCurrentPodcast = usePlayerStore((s) => s.setCurrentPodcast);
   const lastSeekFromRef = useRef<number | undefined>(undefined);
   const interactionCountRef = useRef(0);
@@ -85,6 +88,20 @@ export default function PodcastScreen() {
   const { position, duration: trackDuration } = useProgress(1000);
   const playbackState = usePlaybackState();
   const isPlaying = playbackState.state === State.Playing;
+
+  // Detect playback completion → show quiz
+  useEffect(() => {
+    if (
+      !playbackEndedRef.current &&
+      trackDuration > 0 &&
+      position > 0 &&
+      position >= trackDuration - 1 &&
+      !isPlaying
+    ) {
+      playbackEndedRef.current = true;
+      setShowQuiz(true);
+    }
+  }, [position, trackDuration, isPlaying]);
 
   // Animation values for player buttons
   const playScale = useSharedValue(1);
@@ -899,6 +916,21 @@ export default function PodcastScreen() {
         onClose={() => setCollectionSheetVisible(false)}
         podcastId={podcast.id}
       />
+
+      {/* Post-listen quiz */}
+      <Modal
+        visible={showQuiz}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => setShowQuiz(false)}
+      >
+        <View style={styles.quizModal}>
+          <PostListenQuiz
+            podcastId={podcast.id}
+            onDismiss={() => setShowQuiz(false)}
+          />
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -970,6 +1002,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: colors.error ?? '#DC2626',
+  },
+  quizModal: {
+    flex: 1,
+    backgroundColor: colors.background,
+    justifyContent: 'center',
   },
 
   // Header
