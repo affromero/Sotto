@@ -196,10 +196,6 @@ export function SettingsForm({
   const [pushNotifications, setPushNotifications] = useState(initialPushNotifications);
   const [briefingEnabled, setBriefingEnabled] = useState(initialBriefingEnabled);
   const [briefingMountKey, setBriefingMountKey] = useState(0);
-  const [briefingTime, setBriefingTime] = useState(initialBriefingTime ?? '08:00');
-  const briefingTimezone = initialBriefingTimezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const [briefingDays, setBriefingDays] = useState(initialBriefingDays);
-  const [briefingVisibility, setBriefingVisibility] = useState(initialBriefingVisibility);
   const [quizEnabled, setQuizEnabled] = useState(initialQuizEnabled);
   const { pushState, subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } = usePushSubscription();
 
@@ -770,13 +766,14 @@ export function SettingsForm({
                 const checked = e.target.checked;
                 setBriefingEnabled(checked);
                 if (checked) setBriefingMountKey((k) => k + 1);
+                const tz = initialBriefingTimezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
                 await fetch('/api/users/me', {
                   method: 'PATCH',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
                     briefingEnabled: checked,
-                    ...(checked && !initialBriefingTimezone && { briefingTimezone: briefingTimezone }),
-                    ...(checked && !initialBriefingTime && { briefingTime: briefingTime }),
+                    ...(checked && !initialBriefingTimezone && { briefingTimezone: tz }),
+                    ...(checked && !initialBriefingTime && { briefingTime: '08:00' }),
                   }),
                 });
               }}
@@ -784,103 +781,30 @@ export function SettingsForm({
             />
           </label>
           {briefingEnabled && (
-            <>
-              <div className={styles.toggleRow}>
-                <div className={styles.toggleInfo}>
-                  <span className={styles.toggleLabel}>Delivery Time</span>
-                  <span className={styles.toggleDescription}>When to generate your briefing</span>
-                </div>
-                <input
-                  type="time"
-                  className={styles.toggle}
-                  value={briefingTime}
-                  onChange={async (e) => {
-                    const val = e.target.value;
-                    setBriefingTime(val);
-                    await fetch('/api/users/me', {
-                      method: 'PATCH',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ briefingTime: val }),
-                    });
-                  }}
-                  aria-label="Briefing delivery time"
-                />
-              </div>
-              <div className={styles.toggleRow}>
-                <div className={styles.toggleInfo}>
-                  <span className={styles.toggleLabel}>Days</span>
-                  <span className={styles.toggleDescription}>
-                    {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, i) => {
-                      const bit = i === 6 ? 64 : (1 << i);
-                      return (
-                        <button
-                          key={day}
-                          type="button"
-                          className={styles.dayChip}
-                          data-active={(briefingDays & bit) !== 0 || undefined}
-                          onClick={async () => {
-                            const newDays = briefingDays ^ bit;
-                            setBriefingDays(newDays);
-                            await fetch('/api/users/me', {
-                              method: 'PATCH',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ briefingDays: newDays }),
-                            });
-                          }}
-                          aria-label={`Toggle ${day}`}
-                        >
-                          {day}
-                        </button>
-                      );
-                    })}
-                  </span>
-                </div>
-              </div>
-              <label className={styles.toggleRow}>
-                <div className={styles.toggleInfo}>
-                  <span className={styles.toggleLabel}>Visibility</span>
-                  <span className={styles.toggleDescription}>Who can see your briefings</span>
-                </div>
-                <select
-                  className={styles.toggle}
-                  value={briefingVisibility}
-                  onChange={async (e) => {
-                    const val = e.target.value;
-                    setBriefingVisibility(val);
-                    await fetch('/api/users/me', {
-                      method: 'PATCH',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ briefingVisibility: val }),
-                    });
-                  }}
-                  aria-label="Briefing visibility"
-                >
-                  <option value="PRIVATE">Private</option>
-                  <option value="UNLISTED">Unlisted</option>
-                  <option value="PUBLIC">Public</option>
-                </select>
-              </label>
-              <BriefingSettings
-                key={briefingMountKey}
-                initialAiModel={initialBriefingAiModel}
-                initialTtsOption={
-                  initialBriefingTtsProvider && initialBriefingTtsModel
-                    ? `${initialBriefingTtsProvider}:${initialBriefingTtsModel}`
-                    : initialBriefingTtsProvider ?? null
-                }
-                initialHostVoiceId={initialBriefingHostVoiceId}
-                initialExpertVoiceId={initialBriefingExpertVoiceId}
-                initialDepth={initialBriefingDepth}
-                initialTone={initialBriefingTone}
-                initialAudienceLevel={initialBriefingAudienceLevel}
-                initialDuration={initialBriefingDuration}
-                initialPrompt={initialBriefingPrompt}
-                initialUseByokKeys={initialBriefingUseByokKeys}
-                hasByokKeys={hasByokKeys}
-                aiModelOptions={aiModelOptions}
-                ttsOptions={ttsOptions}
-              />
-            </>
+            <BriefingSettings
+              key={briefingMountKey}
+              initialTime={initialBriefingTime}
+              initialTimezone={initialBriefingTimezone}
+              initialDays={initialBriefingDays}
+              initialVisibility={initialBriefingVisibility}
+              initialAiModel={initialBriefingAiModel}
+              initialTtsOption={
+                initialBriefingTtsProvider && initialBriefingTtsModel
+                  ? `${initialBriefingTtsProvider}:${initialBriefingTtsModel}`
+                  : initialBriefingTtsProvider ?? null
+              }
+              initialHostVoiceId={initialBriefingHostVoiceId}
+              initialExpertVoiceId={initialBriefingExpertVoiceId}
+              initialDepth={initialBriefingDepth}
+              initialTone={initialBriefingTone}
+              initialAudienceLevel={initialBriefingAudienceLevel}
+              initialDuration={initialBriefingDuration}
+              initialPrompt={initialBriefingPrompt}
+              initialUseByokKeys={initialBriefingUseByokKeys}
+              hasByokKeys={hasByokKeys}
+              aiModelOptions={aiModelOptions}
+              ttsOptions={ttsOptions}
+            />
           )}
           <label className={styles.toggleRow}>
             <div className={styles.toggleInfo}>
