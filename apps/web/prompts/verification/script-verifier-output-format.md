@@ -12,6 +12,7 @@ Return a JSON object:
       "existingCitations": [1, 3],
       "needsMoreCitations": true,
       "hasUnreliableSource": false,
+      "unreliableCitations": [],
       "hasMisattribution": false,
       "verificationNote": "brief explanation"
     }

@@ -62,6 +62,7 @@ export const VERIFICATION_JSON_SCHEMA = {
             existingCitations: { type: 'array', items: { type: 'integer' } },
             needsMoreCitations: { type: 'boolean' },
             hasUnreliableSource: { type: 'boolean' },
+            unreliableCitations: { type: 'array', items: { type: 'integer' } },
             hasMisattribution: { type: 'boolean' },
             verificationNote: { type: 'string' },
           },
@@ -70,7 +71,6 @@ export const VERIFICATION_JSON_SCHEMA = {
             'existingCitations', 'needsMoreCitations', 'hasUnreliableSource',
             'hasMisattribution', 'verificationNote',
           ],
-          additionalProperties: false,
         },
       },
       overallScore: { type: 'number' },
@@ -108,6 +108,8 @@ export interface ClaimAnalysis {
   existingCitations: number[];
   needsMoreCitations: boolean;
   hasUnreliableSource: boolean;
+  /** Which specific citation numbers are unreliable (e.g. Reddit, blogs). */
+  unreliableCitations?: number[];
   hasMisattribution: boolean;
   verificationNote: string;
   turnHash?: string;
