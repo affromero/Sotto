@@ -17,6 +17,7 @@ import {
   HUME_VOICE_POOL,
   FAL_VOICE_POOL,
   MINIMAX_VOICE_POOL,
+  MISTRAL_VOICE_POOL,
 } from '@/lib/providers/tts-voices';
 import { FalImageProvider } from '@/lib/providers/image/fal.provider';
 import { getVideoProviderMeta, videoModelRequiresFirstFrame, type VideoProviderId } from '@/lib/providers/video-registry';
@@ -45,6 +46,7 @@ const TTS_TEST_VOICES: Record<string, string> = {
   fal: FAL_VOICE_POOL[0].id,
   replicate: FAL_VOICE_POOL[0].id,
   minimax: MINIMAX_VOICE_POOL[0].id,
+  mistral: MISTRAL_VOICE_POOL[0].id,
   kittentts: 'bella',
 };
 
@@ -67,6 +69,8 @@ function getTtsPlatformKey(provider: string): {
       return { apiKey: process.env.FAL_KEY };
     case 'replicate':
       return { apiKey: process.env.REPLICATE_API_TOKEN };
+    case 'mistral':
+      return { apiKey: process.env.MISTRAL_API_KEY };
     case 'kittentts':
       return {}; // No key — sidecar at KITTENTTS_URL
     default:
@@ -97,7 +101,7 @@ function getSttPlatformKey(provider: string): string | undefined {
  * Returns null if no TTS provider is available.
  */
 const TTS_PROBE_ORDER: TtsProviderId[] = [
-  'kittentts', 'openai', 'elevenlabs', 'cartesia', 'hume', 'fal', 'replicate', 'minimax',
+  'kittentts', 'openai', 'elevenlabs', 'cartesia', 'hume', 'fal', 'replicate', 'minimax', 'mistral',
 ];
 
 async function generateTestAudio(): Promise<{ audio: Buffer; provider: string } | null> {
