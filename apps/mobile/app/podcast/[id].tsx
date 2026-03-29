@@ -29,6 +29,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography, borderRadius, getContentBadgeLabel } from '@sotto/shared';
 import { getPodcastGradient } from '../../lib/gradients';
 import type { PodcastDetail, SegmentData } from '@sotto/shared';
+import { PostListenQuiz } from '../../components/PostListenQuiz';
+import { PostListenRating } from '../../components/PostListenRating';
 import { api } from '../../lib/api';
 import { setupPlayer, loadTrack } from '../../lib/audio-player';
 import { formatTime } from '../../lib/formatters';
@@ -78,6 +80,9 @@ export default function PodcastScreen() {
   const [versionHistoryVisible, setVersionHistoryVisible] = useState(false);
   const [collectionSheetVisible, setCollectionSheetVisible] = useState(false);
   const [activeVoiceTrackId, setActiveVoiceTrackId] = useState<string | null>(null);
+  const [showRating, setShowRating] = useState(false);
+  const [showQuiz, setShowQuiz] = useState(false);
+  const playbackEndedRef = useRef(false);
   const setCurrentPodcast = usePlayerStore((s) => s.setCurrentPodcast);
   const lastSeekFromRef = useRef<number | undefined>(undefined);
   const interactionCountRef = useRef(0);
@@ -85,6 +90,20 @@ export default function PodcastScreen() {
   const { position, duration: trackDuration } = useProgress(1000);
   const playbackState = usePlaybackState();
   const isPlaying = playbackState.state === State.Playing;
+
+  // Detect playback completion → show rating first, then quiz
+  useEffect(() => {
+    if (
+      !playbackEndedRef.current &&
+      trackDuration > 0 &&
+      position > 0 &&
+      position >= trackDuration - 1 &&
+      !isPlaying
+    ) {
+      playbackEndedRef.current = true;
+      setShowRating(true);
+    }
+  }, [position, trackDuration, isPlaying]);
 
   // Animation values for player buttons
   const playScale = useSharedValue(1);
@@ -369,9 +388,66 @@ export default function PodcastScreen() {
     );
   }
 
-  const gradient = getPodcastGradient(podcast.id);
   const currentUser = queryClient.getQueryData<{ id: string }>(['user', 'me']);
   const isOwner = currentUser?.id === podcast.user?.id;
+
+  // Show failure details for owners when generation failed
+  if (podcast.status === 'FAILED' && isOwner) {
+    return (
+      <View style={styles.centered} testID="generation-failed">
+        <Stack.Screen options={{ headerShown: false }} />
+        <Text style={styles.errorIcon}>!</Text>
+        <Text style={styles.errorText}>Generation failed</Text>
+        <Text style={styles.errorSubtext}>
+          {podcast.failureReason ?? 'An unexpected error occurred during generation.'}
+        </Text>
+        <Pressable
+          style={styles.retryButton}
+          onPress={async () => {
+            try {
+              await api.post(`/podcasts/${id}/script/regenerate`);
+              queryClient.invalidateQueries({ queryKey: ['podcast', id] });
+              Alert.alert('Retrying', 'Script generation has been requeued.');
+            } catch {
+              Alert.alert('Error', 'Could not retry generation. Please try again later.');
+            }
+          }}
+          testID="generation-retry-button"
+        >
+          <Text style={styles.retryButtonText}>Retry Generation</Text>
+        </Pressable>
+        <Pressable
+          style={[styles.retryButton, styles.deleteButton]}
+          onPress={() => {
+            Alert.alert(
+              'Delete Podcast',
+              'This will permanently delete this podcast. Are you sure?',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Delete',
+                  style: 'destructive',
+                  onPress: async () => {
+                    try {
+                      await api.delete(`/podcasts/${id}`);
+                      router.back();
+                    } catch {
+                      Alert.alert('Error', 'Could not delete podcast.');
+                    }
+                  },
+                },
+              ],
+            );
+          }}
+          testID="generation-delete-button"
+        >
+          <Text style={styles.deleteButtonText}>Delete</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  const gradient = getPodcastGradient(podcast.id);
 
   const listHeader = (
     <>
@@ -842,6 +918,37 @@ export default function PodcastScreen() {
         onClose={() => setCollectionSheetVisible(false)}
         podcastId={podcast.id}
       />
+
+      {/* Post-listen rating → then quiz */}
+      <Modal
+        visible={showRating}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => { setShowRating(false); setShowQuiz(true); }}
+      >
+        <View style={styles.quizModal}>
+          <PostListenRating
+            podcastId={podcast.id}
+            completionPercent={trackDuration > 0 ? (position / trackDuration) * 100 : undefined}
+            onDismiss={() => { setShowRating(false); setShowQuiz(true); }}
+          />
+        </View>
+      </Modal>
+
+      {/* Post-listen quiz */}
+      <Modal
+        visible={showQuiz}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => setShowQuiz(false)}
+      >
+        <View style={styles.quizModal}>
+          <PostListenQuiz
+            podcastId={podcast.id}
+            onDismiss={() => setShowQuiz(false)}
+          />
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -901,6 +1008,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: colors.textInverse,
+  },
+  deleteButton: {
+    marginTop: spacing.sm,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  deleteButtonText: {
+    fontFamily: typography.fontBody,
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.error ?? '#DC2626',
+  },
+  quizModal: {
+    flex: 1,
+    backgroundColor: colors.background,
+    justifyContent: 'center',
   },
 
   // Header

@@ -21,19 +21,21 @@ interface KeyStatus {
   label?: string;
 }
 
-const AI_PROVIDERS = [
+const FALLBACK_AI_PROVIDERS = [
   { id: 'anthropic', name: 'Anthropic (Claude)' },
   { id: 'openai', name: 'OpenAI' },
-] as const;
+];
 
-const TTS_PROVIDERS = [
+const FALLBACK_TTS_PROVIDERS = [
   { id: 'elevenlabs', name: 'ElevenLabs', qualityTier: 'Premium' },
   { id: 'openai', name: 'OpenAI TTS', qualityTier: 'Standard' },
   { id: 'cartesia', name: 'Cartesia', qualityTier: 'Premium' },
   { id: 'hume', name: 'Hume', qualityTier: 'Ultra' },
   { id: 'fal', name: 'Fal', qualityTier: 'Premium' },
   { id: 'replicate', name: 'Replicate', qualityTier: 'Premium' },
-] as const;
+  { id: 'mistral', name: 'Mistral (Voxtral)', qualityTier: 'Premium' },
+  { id: 'minimax', name: 'MiniMax', qualityTier: 'Premium' },
+];
 
 function ProviderRow({
   name,
@@ -209,6 +211,47 @@ export default function ApiKeysScreen() {
       return res.data;
     },
   });
+
+  // Fetch provider lists dynamically from API (fallback to hardcoded)
+  const { data: aiProviderList } = useQuery<Array<{ id: string; name: string }>>({
+    queryKey: ['ai-providers-list'],
+    queryFn: async () => {
+      const res = await api.get('/ai-models');
+      const models = res.data.models ?? res.data;
+      // Extract unique providers
+      const seen = new Set<string>();
+      const providers: Array<{ id: string; name: string }> = [];
+      for (const m of models) {
+        const pid = m.provider ?? m.id?.split(':')[0];
+        if (pid && !seen.has(pid)) {
+          seen.add(pid);
+          providers.push({ id: pid, name: m.providerName ?? pid.charAt(0).toUpperCase() + pid.slice(1) });
+        }
+      }
+      return providers.length > 0 ? providers : FALLBACK_AI_PROVIDERS;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: ttsProviderList } = useQuery<Array<{ id: string; name: string; qualityTier?: string }>>({
+    queryKey: ['tts-providers-list'],
+    queryFn: async () => {
+      const res = await api.get('/tts-providers');
+      const providers = res.data.providers ?? res.data;
+      if (Array.isArray(providers) && providers.length > 0) {
+        return providers.map((p: { id: string; displayName?: string; name?: string; tier?: string }) => ({
+          id: p.id,
+          name: p.displayName ?? p.name ?? p.id,
+          qualityTier: p.tier,
+        }));
+      }
+      return FALLBACK_TTS_PROVIDERS;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const AI_PROVIDERS = aiProviderList ?? FALLBACK_AI_PROVIDERS;
+  const TTS_PROVIDERS = ttsProviderList ?? FALLBACK_TTS_PROVIDERS;
 
   const handleMutated = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['settings', 'ai-keys'] });

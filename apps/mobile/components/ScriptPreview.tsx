@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -9,9 +9,12 @@ import {
   StyleSheet,
 } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
+import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography, borderRadius } from '@sotto/shared';
+import type { ReferenceData } from '@sotto/shared';
 import { api } from '../lib/api';
 import { ErrorState } from './ErrorState';
+import { ReferencesTab } from './ReferencesTab';
 
 interface ScriptPreviewProps {
   podcastId: string;
@@ -28,7 +31,7 @@ interface Turn {
 
 interface ScriptResponse {
   turns: Turn[];
-  references: Array<unknown>;
+  references: ReferenceData[];
   version: number;
 }
 
@@ -59,6 +62,8 @@ function TurnRow({ turn, uniqueSpeakers }: { turn: Turn; uniqueSpeakers: string[
 }
 
 export function ScriptPreview({ podcastId, onApprove, onRegenerate, onEdit }: ScriptPreviewProps) {
+  const [refsExpanded, setRefsExpanded] = useState(false);
+
   const { data, isLoading, isError, error, refetch } = useQuery<ScriptResponse>({
     queryKey: ['podcast-script', podcastId],
     queryFn: async () => {
@@ -147,6 +152,29 @@ export function ScriptPreview({ podcastId, onApprove, onRegenerate, onEdit }: Sc
           <TurnRow turn={item} uniqueSpeakers={uniqueSpeakers} />
         )}
         style={styles.list}
+        ListFooterComponent={
+          data?.references && data.references.length > 0 ? (
+            <View style={styles.refsSection}>
+              <Pressable
+                style={styles.refsHeader}
+                onPress={() => setRefsExpanded(!refsExpanded)}
+                accessibilityRole="button"
+                accessibilityLabel={`References (${data.references.length})`}
+                accessibilityState={{ expanded: refsExpanded }}
+              >
+                <Text style={styles.refsHeaderText}>
+                  References ({data.references.length})
+                </Text>
+                <Ionicons
+                  name={refsExpanded ? 'chevron-up' : 'chevron-down'}
+                  size={18}
+                  color={colors.textSecondary}
+                />
+              </Pressable>
+              {refsExpanded && <ReferencesTab references={data.references} />}
+            </View>
+          ) : null
+        }
       />
 
       <View style={styles.footer}>
@@ -274,5 +302,23 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: colors.textInverse,
+  },
+  refsSection: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+    marginTop: spacing.sm,
+  },
+  refsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+  },
+  refsHeaderText: {
+    fontFamily: typography.fontBody,
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textSecondary,
   },
 });

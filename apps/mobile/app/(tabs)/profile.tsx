@@ -155,6 +155,20 @@ export default function ProfileScreen() {
     enabled: !!profile,
   });
 
+  const { data: quizStats } = useQuery<{
+    totalQuizzes: number;
+    averageScore: number;
+    correctAnswers: number;
+    totalAnswers: number;
+  }>({
+    queryKey: ['user', 'me', 'quiz-stats'],
+    queryFn: async () => {
+      const res = await api.get('/users/me/quiz-stats');
+      return res.data;
+    },
+    enabled: !!profile,
+  });
+
   const handleSettingsPress = useCallback(() => {
     router.push('/settings');
   }, [router]);
@@ -269,6 +283,18 @@ export default function ProfileScreen() {
         <Text style={styles.savedIdeasLabel}>Collections</Text>
         <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
       </Pressable>
+
+      {quizStats && quizStats.totalQuizzes > 0 && (
+        <View style={styles.quizStatsCard}>
+          <Ionicons name="school-outline" size={18} color={colors.primary} />
+          <Text style={styles.quizStatsLabel}>
+            {quizStats.totalQuizzes} quizzes taken
+          </Text>
+          <Text style={styles.quizStatsScore}>
+            {Math.round(quizStats.averageScore)}% avg
+          </Text>
+        </View>
+      )}
 
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Your Podcasts</Text>
@@ -453,6 +479,28 @@ const styles = StyleSheet.create({
     fontSize: 22,
     color: colors.textTertiary,
     fontWeight: '300',
+  },
+  quizStatsCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderRadius: borderRadius.lg,
+    backgroundColor: colors.primaryLighter,
+    marginBottom: spacing.md,
+  },
+  quizStatsLabel: {
+    fontFamily: typography.fontBody,
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textPrimary,
+    flex: 1,
+  },
+  quizStatsScore: {
+    fontFamily: typography.fontBody,
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.primary,
   },
   sectionHeader: {
     marginBottom: spacing.md,
