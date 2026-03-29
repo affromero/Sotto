@@ -29,13 +29,9 @@ const PLATFORM_TTS_ENV: Partial<Record<TtsProviderId, string>> = {
   fal: 'FAL_KEY',
   replicate: 'REPLICATE_API_TOKEN',
   minimax: 'FAL_KEY',
-  kittentts: 'KITTENTTS_URL',
 };
 
 function hasPlatformKey(providerId: TtsProviderId): boolean {
-  if (providerId === 'kittentts') {
-    return !!process.env.KITTENTTS_URL;
-  }
   const envVar = PLATFORM_TTS_ENV[providerId];
   return envVar ? !!process.env[envVar] : false;
 }
@@ -82,7 +78,6 @@ export async function GET(request: NextRequest) {
 
         for (const meta of getAllProviderMeta()) {
           if (!hasPlatformKey(meta.id)) continue;
-          const isKitten = meta.id === 'kittentts';
           for (const model of meta.models) {
             const compositeId = `${meta.id}:${model.id}`;
             if (!proSet.has(compositeId)) continue;
@@ -90,8 +85,8 @@ export async function GET(request: NextRequest) {
               id: compositeId,
               displayName: `${meta.displayName} ${model.displayName}`,
               badge: QUALITY_BADGES[model.tier],
-              group: isKitten ? 'KittenTTS (Platform)' : (TIER_GROUP_LABELS[model.tier] ?? model.tier),
-              hint: isKitten ? undefined : meta.displayName,
+              group: TIER_GROUP_LABELS[model.tier] ?? model.tier,
+              hint: meta.displayName,
               requiredPlan: freeSet.has(compositeId) ? 'FREE' : 'PRO',
             });
           }
@@ -99,14 +94,13 @@ export async function GET(request: NextRequest) {
       } else {
         for (const meta of getAllProviderMeta()) {
           if (!hasPlatformKey(meta.id)) continue;
-          const isKitten = meta.id === 'kittentts';
           for (const model of meta.models) {
             options.push({
               id: `${meta.id}:${model.id}`,
               displayName: `${meta.displayName} ${model.displayName}`,
               badge: QUALITY_BADGES[model.tier],
-              group: isKitten ? 'KittenTTS (Platform)' : (TIER_GROUP_LABELS[model.tier] ?? model.tier),
-              hint: isKitten ? undefined : meta.displayName,
+              group: TIER_GROUP_LABELS[model.tier] ?? model.tier,
+              hint: meta.displayName,
             });
           }
         }
@@ -127,7 +121,6 @@ export async function GET(request: NextRequest) {
     for (const meta of getAllProviderMeta()) {
       if (!hasPlatformKey(meta.id)) continue;
 
-      const isKitten = meta.id === 'kittentts';
       for (const model of meta.models) {
         const compositeId = `${meta.id}:${model.id}`;
         if (!proSet.has(compositeId)) continue;
@@ -136,8 +129,8 @@ export async function GET(request: NextRequest) {
           id: compositeId,
           displayName: `${meta.displayName} ${model.displayName}`,
           badge: QUALITY_BADGES[model.tier],
-          group: isKitten ? 'KittenTTS (Platform)' : (TIER_GROUP_LABELS[model.tier] ?? model.tier),
-          hint: isKitten ? undefined : meta.displayName,
+          group: TIER_GROUP_LABELS[model.tier] ?? model.tier,
+          hint: meta.displayName,
           requiredPlan: freeSet.has(compositeId) ? 'FREE' : 'PRO',
         });
       }

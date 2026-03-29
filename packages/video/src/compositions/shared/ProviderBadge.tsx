@@ -11,7 +11,6 @@ const PROVIDER_META: Record<string, { name: string; color: string }> = {
   fal: { name: 'Fal', color: '#F87171' },
   replicate: { name: 'Replicate', color: '#60A5FA' },
   minimax: { name: 'MiniMax', color: '#F472B6' },
-  kittentts: { name: 'KittenTTS', color: '#2DD4BF' },
 };
 
 const FALLBACK_META = { name: 'Unknown', color: '#9CA3AF' };

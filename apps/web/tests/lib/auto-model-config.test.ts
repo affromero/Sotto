@@ -34,7 +34,7 @@ vi.mock('@/lib/providers/ai-registry', () => ({
 
 vi.mock('@/lib/providers/tts-registry', () => ({
   getProviderMeta: (id: string) => {
-    if (id === 'kittentts') return { defaultModel: 'kitten-tts-mini-0.8' };
+    if (id === 'openai') return { defaultModel: 'tts-1-hd' };
     if (id === 'elevenlabs') return { defaultModel: 'eleven_v3' };
     return { defaultModel: '' };
   },
@@ -61,8 +61,8 @@ const defaultRow = {
   id: 'singleton',
   freeAiProvider: 'anthropic',
   freeAiModel: 'claude-haiku-4-5-20251001',
-  freeTtsProvider: 'kittentts',
-  freeTtsModel: 'kitten-tts-mini-0.8',
+  freeTtsProvider: 'openai',
+  freeTtsModel: 'tts-1-hd',
   freeSttProvider: 'openai',
   freeSttModel: 'whisper-1',
   proAiProvider: 'anthropic',
@@ -136,8 +136,8 @@ describe('getAutoModelConfig', () => {
       free: {
         aiProvider: 'anthropic',
         aiModel: 'claude-haiku-4-5-20251001',
-        ttsProvider: 'kittentts',
-        ttsModel: 'kitten-tts-mini-0.8',
+        ttsProvider: 'openai',
+        ttsModel: 'tts-1-hd',
         sttProvider: 'openai',
         sttModel: 'whisper-1',
       },
@@ -413,8 +413,8 @@ describe('resolveIncludedModels', () => {
     free: {
       aiProvider: 'anthropic' as const,
       aiModel: 'claude-haiku-4-5-20251001',
-      ttsProvider: 'kittentts' as const,
-      ttsModel: 'kitten-tts-mini-0.8',
+      ttsProvider: 'openai' as const,
+      ttsModel: 'tts-1-hd',
       sttProvider: 'openai' as const,
       sttModel: 'whisper-1',
     },
@@ -520,8 +520,8 @@ describe('resolveTtsIncludedModels', () => {
     free: {
       aiProvider: 'anthropic' as const,
       aiModel: 'claude-haiku-4-5-20251001',
-      ttsProvider: 'kittentts' as const,
-      ttsModel: 'kitten-tts-mini-0.8',
+      ttsProvider: 'openai' as const,
+      ttsModel: 'tts-1-hd',
       sttProvider: 'openai' as const,
       sttModel: 'whisper-1',
     },
@@ -582,19 +582,19 @@ describe('resolveTtsIncludedModels', () => {
   it('derives from auto defaults when lists are null', () => {
     const result = resolveTtsIncludedModels(baseConfig);
 
-    expect(result.freeTtsModels).toEqual(['kittentts:kitten-tts-mini-0.8']);
+    expect(result.freeTtsModels).toEqual(['openai:tts-1-hd']);
     expect(result.proTtsModels).toContain('elevenlabs:eleven_v3');
-    expect(result.proTtsModels).toContain('kittentts:kitten-tts-mini-0.8');
+    expect(result.proTtsModels).toContain('openai:tts-1-hd');
   });
 
   it('returns explicit lists when set', () => {
     const result = resolveTtsIncludedModels({
       ...baseConfig,
-      freeIncludedTtsModels: ['kittentts:kitten-tts-mini-0.8'],
-      proIncludedTtsModels: ['kittentts:kitten-tts-mini-0.8', 'elevenlabs:eleven_v3', 'openai:tts-1-hd'],
+      freeIncludedTtsModels: ['openai:tts-1-hd'],
+      proIncludedTtsModels: ['openai:tts-1-hd', 'elevenlabs:eleven_v3', 'openai:tts-1-hd'],
     });
 
-    expect(result.freeTtsModels).toEqual(['kittentts:kitten-tts-mini-0.8']);
+    expect(result.freeTtsModels).toEqual(['openai:tts-1-hd']);
     expect(result.proTtsModels).toContain('elevenlabs:eleven_v3');
     expect(result.proTtsModels).toContain('openai:tts-1-hd');
   });
@@ -602,11 +602,11 @@ describe('resolveTtsIncludedModels', () => {
   it('always includes free TTS models in pro output', () => {
     const result = resolveTtsIncludedModels({
       ...baseConfig,
-      freeIncludedTtsModels: ['kittentts:kitten-tts-mini-0.8'],
+      freeIncludedTtsModels: ['openai:tts-1-hd'],
       proIncludedTtsModels: ['elevenlabs:eleven_v3'],
     });
 
-    expect(result.proTtsModels).toContain('kittentts:kitten-tts-mini-0.8');
+    expect(result.proTtsModels).toContain('openai:tts-1-hd');
     expect(result.proTtsModels).toContain('elevenlabs:eleven_v3');
   });
 
@@ -627,8 +627,8 @@ describe('resolveSttIncludedModels', () => {
     free: {
       aiProvider: 'anthropic' as const,
       aiModel: 'claude-haiku-4-5-20251001',
-      ttsProvider: 'kittentts' as const,
-      ttsModel: 'kitten-tts-mini-0.8',
+      ttsProvider: 'openai' as const,
+      ttsModel: 'tts-1-hd',
       sttProvider: 'openai' as const,
       sttModel: 'whisper-1',
     },
@@ -729,7 +729,7 @@ describe('resolveSttIncludedModels', () => {
 
 describe('resolveIncludedImageModels', () => {
   const baseConfig: Parameters<typeof resolveIncludedImageModels>[0] = {
-    free: { aiProvider: 'anthropic' as const, aiModel: 'claude-haiku-4-5-20251001', ttsProvider: 'kittentts' as const, ttsModel: 'kitten-tts-mini-0.8', sttProvider: 'openai' as const, sttModel: 'whisper-1' },
+    free: { aiProvider: 'anthropic' as const, aiModel: 'claude-haiku-4-5-20251001', ttsProvider: 'openai' as const, ttsModel: 'tts-1-hd', sttProvider: 'openai' as const, sttModel: 'whisper-1' },
     pro: { aiProvider: 'anthropic' as const, aiModel: 'claude-haiku-4-5-20251001', ttsProvider: 'elevenlabs' as const, ttsModel: 'eleven_v3', sttProvider: 'openai' as const, sttModel: 'whisper-1' },
     platform: { aiProvider: 'anthropic' as const, aiModel: 'claude-haiku-4-5-20251001' },
     freeIncludedModels: null, proIncludedModels: null, freeIncludedTtsModels: null, proIncludedTtsModels: null, freeIncludedSttModels: null, proIncludedSttModels: null,
@@ -771,7 +771,7 @@ describe('resolveIncludedImageModels', () => {
 
 describe('resolveIncludedVideoModels', () => {
   const baseConfig: Parameters<typeof resolveIncludedVideoModels>[0] = {
-    free: { aiProvider: 'anthropic' as const, aiModel: 'claude-haiku-4-5-20251001', ttsProvider: 'kittentts' as const, ttsModel: 'kitten-tts-mini-0.8', sttProvider: 'openai' as const, sttModel: 'whisper-1' },
+    free: { aiProvider: 'anthropic' as const, aiModel: 'claude-haiku-4-5-20251001', ttsProvider: 'openai' as const, ttsModel: 'tts-1-hd', sttProvider: 'openai' as const, sttModel: 'whisper-1' },
     pro: { aiProvider: 'anthropic' as const, aiModel: 'claude-haiku-4-5-20251001', ttsProvider: 'elevenlabs' as const, ttsModel: 'eleven_v3', sttProvider: 'openai' as const, sttModel: 'whisper-1' },
     platform: { aiProvider: 'anthropic' as const, aiModel: 'claude-haiku-4-5-20251001' },
     freeIncludedModels: null, proIncludedModels: null, freeIncludedTtsModels: null, proIncludedTtsModels: null, freeIncludedSttModels: null, proIncludedSttModels: null,
@@ -829,8 +829,8 @@ describe('resolveAutoModel', () => {
     expect(result).toEqual({
       aiProvider: 'anthropic',
       aiModel: 'claude-haiku-4-5-20251001',
-      ttsProvider: 'kittentts',
-      ttsModel: 'kitten-tts-mini-0.8',
+      ttsProvider: 'openai',
+      ttsModel: 'tts-1-hd',
       sttProvider: 'openai',
       sttModel: 'whisper-1',
     });
@@ -855,8 +855,8 @@ describe('resolveAutoModel', () => {
     expect(result).toEqual({
       aiProvider: 'anthropic',
       aiModel: 'claude-haiku-4-5-20251001',
-      ttsProvider: 'kittentts',
-      ttsModel: 'kitten-tts-mini-0.8',
+      ttsProvider: 'openai',
+      ttsModel: 'tts-1-hd',
       sttProvider: 'openai',
       sttModel: 'whisper-1',
     });

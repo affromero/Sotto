@@ -85,8 +85,8 @@ vi.mock('@/lib/auto-model-config', () => ({
 const mockResolveAutoModel = vi.fn().mockResolvedValue({
   aiProvider: 'anthropic',
   aiModel: 'claude-haiku-4-5-20251001',
-  ttsProvider: 'kittentts',
-  ttsModel: 'kitten-tts-mini-0.8',
+  ttsProvider: 'openai',
+  ttsModel: 'tts-1-hd',
   sttProvider: 'openai',
   sttModel: 'whisper-1',
 });

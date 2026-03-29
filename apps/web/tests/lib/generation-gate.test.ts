@@ -193,7 +193,6 @@ describe('checkGenerationGate', () => {
     process.env = { ...ORIGINAL_ENV };
     delete process.env.ELEVENLABS_API_KEY;
     delete process.env.OPENAI_API_KEY;
-    delete process.env.KITTENTTS_URL;
 
     mockHasByokKey.mockResolvedValue(false);
     mockGetAutoModelConfig.mockResolvedValue(baseConfig);

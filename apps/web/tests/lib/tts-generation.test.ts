@@ -452,8 +452,8 @@ describe('getPlatformTtsKey', () => {
     delete process.env.OPENAI_API_KEY;
   });
 
-  it('returns undefined for kittentts', () => {
-    expect(getPlatformTtsKey('kittentts')).toBeUndefined();
+  it('returns undefined for openai', () => {
+    expect(getPlatformTtsKey('openai')).toBeUndefined();
   });
 
   it('returns FAL_KEY for fal', () => {
