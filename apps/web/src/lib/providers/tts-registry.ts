@@ -202,8 +202,6 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     models: [
       { id: 'qwen3-tts-1.7b', displayName: 'Qwen3 TTS 1.7B', tier: 'premium' },
       { id: 'qwen3-tts-0.6b', displayName: 'Qwen3 TTS 0.6B', tier: 'standard' },
-      { id: 'tada-1b', displayName: 'TADA 1B (voice-clone only)', tier: 'standard' },
-      { id: 'tada-3b', displayName: 'TADA 3B (voice-clone only)', tier: 'premium' },
     ],
     supportsAudioTags: false,
     docsUrl: null,
