@@ -45,6 +45,7 @@ const EXPECTED_FILES = [
   'social/telegram-parser.md',
   'social/tweet-parser.md',
   'social/thread-analyzer.md',
+  'social/mention-filter.md',
   'verification/reference-validator.md',
   'verification/reference-verification-ai.md',
   'verification/reference-grounding.md',
