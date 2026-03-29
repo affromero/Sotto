@@ -1,25 +1,19 @@
 import { Job } from 'bullmq';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
-import { getBriefingConfig } from '@/lib/briefing-config';
+import { getBriefingConfig, type BriefingConfigData } from '@/lib/briefing-config';
 import { fetchNewsletterArticles, formatArticlesForPrompt } from '@/lib/newsletter-fetcher';
 import { addJob, JobType, contentExtractionQueue } from '@/lib/queue';
-import { selectVoicePair } from '@/lib/elevenlabs';
+import { selectVoicePair, resolveVoiceId, VOICE_POOL, type VoicePoolEntry } from '@/lib/voice-pool';
 import { generatePodcastSlug } from '@/lib/slugify';
+import { hasByokKey, hasAiKey } from '@/lib/byok';
 import { logger } from '@/lib/logger';
 import type { ScheduleBriefingsPayload } from '@/lib/queue';
 
-export async function processBriefingScheduler(job: Job<ScheduleBriefingsPayload>): Promise<void> {
-  const config = await getBriefingConfig();
-  if (!config.enabled) {
-    logger.info('Briefing scheduler disabled');
-    await job.updateProgress(100);
-    return;
-  }
+/** Fields queried per eligible user. */
+type BriefingUser = Awaited<ReturnType<typeof queryEligibleUsers>>[number];
 
-  const now = new Date();
-
-  // Find eligible users: briefingEnabled, has time+timezone, not already generated today
-  const eligibleUsers = await prisma.user.findMany({
+async function queryEligibleUsers(config: BriefingConfigData) {
+  return prisma.user.findMany({
     where: {
       briefingEnabled: true,
       briefingTime: { not: null },
@@ -38,9 +32,99 @@ export async function processBriefingScheduler(job: Job<ScheduleBriefingsPayload
       interests: {
         select: { tag: { select: { slug: true, name: true } } },
       },
+      // User general preferences (fallback tier)
+      preferredAiModel: true,
+      preferredTtsProvider: true,
+      preferredTtsModel: true,
+      // Briefing-specific overrides (top tier)
+      briefingAiModel: true,
+      briefingTtsProvider: true,
+      briefingTtsModel: true,
+      briefingHostVoiceId: true,
+      briefingExpertVoiceId: true,
+      briefingDepth: true,
+      briefingTone: true,
+      briefingAudienceLevel: true,
+      briefingDuration: true,
+      briefingPrompt: true,
+      briefingUseByokKeys: true,
     },
-    take: config.maxBriefingsPerBatch * 2, // over-fetch, filter in-memory
+    take: config.maxBriefingsPerBatch * 2,
   });
+}
+
+/**
+ * Resolve briefing config for a user using 3-tier fallback:
+ * 1. User's briefing-specific override
+ * 2. User's general preference
+ * 3. Admin BriefingConfig default
+ */
+function resolveBriefingConfig(user: BriefingUser, adminConfig: BriefingConfigData) {
+  return {
+    aiModel: user.briefingAiModel ?? user.preferredAiModel ?? adminConfig.defaultAiModel,
+    ttsProvider: user.briefingTtsProvider ?? user.preferredTtsProvider ?? adminConfig.defaultTtsProvider,
+    ttsModel: user.briefingTtsModel ?? user.preferredTtsModel ?? adminConfig.defaultTtsModel,
+    depth: user.briefingDepth ?? 'quick_overview',
+    tone: user.briefingTone ?? 'casual',
+    audienceLevel: user.briefingAudienceLevel ?? 'general',
+    durationTarget: user.briefingDuration ?? adminConfig.targetDurationMinutes,
+    prompt: user.briefingPrompt,
+    useByokKeys: user.briefingUseByokKeys,
+  };
+}
+
+/**
+ * Resolve voice IDs for a user's briefing.
+ * If the user specified voice pool names, look them up and resolve for the target provider.
+ * Otherwise, use selectVoicePair with tone/audience metadata for smart matching.
+ */
+function resolveVoices(
+  user: BriefingUser,
+  ttsProvider: string | null,
+  seed: string,
+  resolved: ReturnType<typeof resolveBriefingConfig>,
+): { hostId: string; expertId: string; provider: string } {
+  const provider = (ttsProvider ?? 'elevenlabs') as 'elevenlabs' | 'openai' | 'kittentts';
+
+  // Try user-specified voice pool names
+  let hostEntry: VoicePoolEntry | undefined;
+  let expertEntry: VoicePoolEntry | undefined;
+
+  if (user.briefingHostVoiceId) {
+    hostEntry = VOICE_POOL.find((v) => v.name === user.briefingHostVoiceId);
+  }
+  if (user.briefingExpertVoiceId) {
+    expertEntry = VOICE_POOL.find((v) => v.name === user.briefingExpertVoiceId);
+  }
+
+  // Fall back to smart voice pairing for any unset voices
+  if (!hostEntry || !expertEntry) {
+    const pair = selectVoicePair(seed, {
+      tone: resolved.tone as 'casual' | 'professional' | 'socratic' | 'comedic' | 'satirical' | 'storytelling',
+      audienceLevel: resolved.audienceLevel as 'beginner' | 'intermediate' | 'expert',
+    });
+    if (!hostEntry) hostEntry = pair.host;
+    if (!expertEntry) expertEntry = pair.expert;
+  }
+
+  return {
+    hostId: resolveVoiceId(hostEntry, provider),
+    expertId: resolveVoiceId(expertEntry, provider),
+    provider,
+  };
+}
+
+export async function processBriefingScheduler(job: Job<ScheduleBriefingsPayload>): Promise<void> {
+  const config = await getBriefingConfig();
+  if (!config.enabled) {
+    logger.info('Briefing scheduler disabled');
+    await job.updateProgress(100);
+    return;
+  }
+
+  const now = new Date();
+
+  const eligibleUsers = await queryEligibleUsers(config);
 
   const batch: typeof eligibleUsers = [];
 
@@ -119,11 +203,12 @@ export async function processBriefingScheduler(job: Job<ScheduleBriefingsPayload
 
   for (const user of batch) {
     try {
+      const resolved = resolveBriefingConfig(user, config);
+
       // Filter articles by user interests
       const interestSlugs = user.interests.map((i) => i.tag.slug);
       let userArticles = allArticles;
       if (interestSlugs.length > 0) {
-        // Try to match articles to interests via IngestedArticle categories
         const matchedUrls = await prisma.ingestedArticle.findMany({
           where: {
             url: { in: allArticles.map((a) => a.url) },
@@ -133,7 +218,6 @@ export async function processBriefingScheduler(job: Job<ScheduleBriefingsPayload
         });
         const matchedSet = new Set(matchedUrls.map((m) => m.url));
         const matched = allArticles.filter((a) => matchedSet.has(a.url));
-        // Fall back to all articles if no matches
         if (matched.length >= 3) userArticles = matched;
       }
 
@@ -154,13 +238,24 @@ export async function processBriefingScheduler(job: Job<ScheduleBriefingsPayload
       const topicSlugs = interestSlugs.length > 0 ? interestSlugs : ['general'];
       const sourceText = formatArticlesForPrompt(selected);
 
-      // Select voices
+      // Build source content — prepend custom prompt if set
+      const sourceContent = resolved.prompt
+        ? `[Custom Focus]\n${resolved.prompt}\n\n[Articles]\n${sourceText}`
+        : sourceText;
+
+      // Resolve voices (provider-agnostic → provider-specific IDs)
       const seed = `briefing-${user.id}-${now.toISOString().slice(0, 10)}`;
-      const voicePair = selectVoicePair(seed);
+      const voices = resolveVoices(user, resolved.ttsProvider, seed, resolved);
 
       const slug = await generatePodcastSlug(title, user.id, prisma);
 
-      // Create podcast + discovery + briefing log in transaction
+      // Determine BYOK usage
+      const userHasByok = resolved.useByokKeys
+        ? (await hasByokKey(user.id)) || (await hasAiKey(user.id))
+        : false;
+      const useAdminCredits = !userHasByok;
+
+      // Create podcast + discovery + briefing log
       const podcast = await prisma.podcast.create({
         data: {
           userId: user.id,
@@ -170,25 +265,25 @@ export async function processBriefingScheduler(job: Job<ScheduleBriefingsPayload
           status: 'EXTRACTING',
           source: 'BRIEFING',
           visibility: user.briefingVisibility,
-          aiModel: config.defaultAiModel,
-          ttsProvider: config.defaultTtsProvider,
-          ttsModel: config.defaultTtsModel,
+          aiModel: resolved.aiModel,
+          ttsProvider: resolved.ttsProvider,
+          ttsModel: resolved.ttsModel,
           voices: {
             createMany: {
               data: [
-                { speaker: 'Host', voiceId: voicePair.host.id, provider: config.defaultTtsProvider ?? 'elevenlabs' },
-                { speaker: 'Expert', voiceId: voicePair.expert.id, provider: config.defaultTtsProvider ?? 'elevenlabs' },
+                { speaker: 'Host', voiceId: voices.hostId, provider: voices.provider },
+                { speaker: 'Expert', voiceId: voices.expertId, provider: voices.provider },
               ],
             },
           },
           discovery: {
             create: {
               topic: title,
-              depth: 'quick_overview',
-              audienceLevel: 'general',
-              tone: 'casual',
-              durationTarget: config.targetDurationMinutes,
-              sourceContent: sourceText,
+              depth: resolved.depth,
+              audienceLevel: resolved.audienceLevel,
+              tone: resolved.tone,
+              durationTarget: resolved.durationTarget,
+              sourceContent,
               userId: user.id,
             },
           },
@@ -213,13 +308,13 @@ export async function processBriefingScheduler(job: Job<ScheduleBriefingsPayload
       // Enqueue content extraction
       await addJob(contentExtractionQueue, JobType.EXTRACT_CONTENT, {
         podcastId: podcast.id,
-        userId: systemUser?.id ?? user.id,
-        sourceText,
-        useAdminCredits: true,
+        userId: useAdminCredits ? (systemUser?.id ?? user.id) : user.id,
+        sourceText: sourceContent,
+        useAdminCredits,
       });
 
       generated++;
-      logger.info('Briefing created', { userId: user.id, podcastId: podcast.id });
+      logger.info('Briefing created', { userId: user.id, podcastId: podcast.id, byok: !useAdminCredits });
     } catch (error) {
       logger.error('Failed to create briefing for user', {
         userId: user.id,
