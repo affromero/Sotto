@@ -43,6 +43,7 @@ const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 interface BriefingSettingsProps {
   initialTime: string | null;
+  initialTimezone: string | null;
   initialDays: number;
   initialVisibility: string;
   initialAiModel: string | null;
@@ -70,6 +71,7 @@ function patchUser(data: Record<string, unknown>) {
 
 export function BriefingSettings({
   initialTime,
+  initialTimezone,
   initialDays,
   initialVisibility,
   initialAiModel,
@@ -137,6 +139,9 @@ export function BriefingSettings({
               }}
               aria-label="Briefing delivery time"
             />
+            <span className={styles.timezoneHint}>
+              {initialTimezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone}
+            </span>
           </div>
           <div className={styles.field}>
             <label className={styles.label}>Days</label>
@@ -149,6 +154,7 @@ export function BriefingSettings({
                     type="button"
                     className={styles.dayChip}
                     data-active={(days & bit) !== 0 || undefined}
+                    aria-pressed={(days & bit) !== 0}
                     onClick={async () => {
                       const newDays = days ^ bit;
                       setDays(newDays);
