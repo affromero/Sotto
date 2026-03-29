@@ -79,6 +79,33 @@ interface BriefingFormProps {
   onCancel?: () => void;
 }
 
+/** Group items by their `group` field and render <optgroup> elements. */
+function renderGroupedOptions<T extends { id: string; group?: string }>(
+  items: T[],
+  renderLabel: (item: T) => string,
+) {
+  const groups = new Map<string, T[]>();
+  for (const item of items) {
+    const key = item.group ?? '';
+    const list = groups.get(key) ?? [];
+    list.push(item);
+    groups.set(key, list);
+  }
+  return Array.from(groups.entries()).map(([group, groupItems]) =>
+    group ? (
+      <optgroup key={group} label={group}>
+        {groupItems.map((item) => (
+          <option key={item.id} value={item.id}>{renderLabel(item)}</option>
+        ))}
+      </optgroup>
+    ) : (
+      groupItems.map((item) => (
+        <option key={item.id} value={item.id}>{renderLabel(item)}</option>
+      ))
+    ),
+  );
+}
+
 function patchBriefing(id: string, data: Record<string, unknown>) {
   return fetch(`/api/briefings/${id}`, {
     method: 'PATCH',
@@ -429,11 +456,7 @@ export function BriefingForm({
             aria-label="Briefing AI model"
           >
             <option value="">Use my default model</option>
-            {aiModelOptions.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.displayName}{m.tier === 'pro' ? ' (Pro)' : ''}
-              </option>
-            ))}
+            {renderGroupedOptions(aiModelOptions, (m) => m.displayName)}
           </select>
         </div>
         <div className={styles.field}>
@@ -457,11 +480,7 @@ export function BriefingForm({
             aria-label="Briefing voice provider"
           >
             <option value="">Use my default provider</option>
-            {ttsOptions.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.displayName}{o.badge ? ` (${o.badge})` : ''}
-              </option>
-            ))}
+            {renderGroupedOptions(ttsOptions, (o) => `${o.displayName}${o.badge ? ` (${o.badge})` : ''}`)}
           </select>
         </div>
         <div className={styles.fieldRow}>
