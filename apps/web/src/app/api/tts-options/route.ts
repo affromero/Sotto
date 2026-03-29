@@ -139,25 +139,53 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ readOnly: false, userPlan, isByok: false, options: sortOptions(options) }, { headers: CACHE_HEADERS });
   }
 
-  // BYOK keys present — show models for every valid provider
+  // BYOK keys present — filter through AutoModelConfig (same as non-BYOK)
+  // Admins in free view bypass the filter and see all models
+  const autoConfig = await getAutoModelConfig();
+  const adminFreeView = isAdmin && autoConfig.adminViewMode !== 'PRO';
+
   const options: TtsOption[] = [
     { id: 'auto', displayName: 'Auto', badge: 'Best available', hint: 'Picks the best voice and provider based on your podcast\u2019s topic, tone, and speakers' },
   ];
 
-  for (const providerId of validProviderIds) {
-    const meta = getAllProviderMeta().find((p) => p.id === providerId);
-    if (!meta) continue;
+  if (adminFreeView) {
+    // Admin free view: show all BYOK provider models unfiltered
+    for (const providerId of validProviderIds) {
+      const meta = getAllProviderMeta().find((p) => p.id === providerId);
+      if (!meta) continue;
+      for (const model of meta.models) {
+        options.push({
+          id: `${meta.id}:${model.id}`,
+          displayName: `${meta.displayName} ${model.displayName}`,
+          badge: QUALITY_BADGES[model.tier],
+          group: meta.displayName,
+          hint: meta.displayName,
+        });
+      }
+    }
+  } else {
+    // Everyone else (including admin PRO view): filter to AutoModelConfig included models
+    const { freeTtsModels, proTtsModels } = resolveTtsIncludedModels(autoConfig);
+    const freeSet = new Set(freeTtsModels);
+    const proSet = new Set(proTtsModels);
 
-    for (const model of meta.models) {
-      options.push({
-        id: `${meta.id}:${model.id}`,
-        displayName: `${meta.displayName} ${model.displayName}`,
-        badge: QUALITY_BADGES[model.tier],
-        group: meta.displayName,
-        hint: meta.displayName,
-      });
+    for (const providerId of validProviderIds) {
+      const meta = getAllProviderMeta().find((p) => p.id === providerId);
+      if (!meta) continue;
+      for (const model of meta.models) {
+        const compositeId = `${meta.id}:${model.id}`;
+        if (!proSet.has(compositeId)) continue;
+        options.push({
+          id: compositeId,
+          displayName: `${meta.displayName} ${model.displayName}`,
+          badge: QUALITY_BADGES[model.tier],
+          group: meta.displayName,
+          hint: meta.displayName,
+          requiredPlan: freeSet.has(compositeId) ? 'FREE' : 'PRO',
+        });
+      }
     }
   }
 
-  return NextResponse.json({ readOnly: false, options: sortOptions(options) }, { headers: CACHE_HEADERS });
+  return NextResponse.json({ readOnly: false, isByok: true, options: sortOptions(options) }, { headers: CACHE_HEADERS });
 }

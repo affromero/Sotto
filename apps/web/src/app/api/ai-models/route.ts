@@ -144,8 +144,8 @@ export async function GET(request: NextRequest) {
     }, { headers: CACHE_HEADERS });
   }
 
-  // BYOK keys present — show models for every valid provider, grouped by provider
-  // Deduplicate by provider (take first valid key per provider)
+  // BYOK keys present — filter through AutoModelConfig (same as non-BYOK)
+  // Admins in free view bypass the filter and see all models
   const seenProviders = new Set<string>();
   const uniqueKeys = validKeys.filter((key) => {
     if (seenProviders.has(key.provider)) return false;
@@ -153,17 +153,53 @@ export async function GET(request: NextRequest) {
     return true;
   });
   const defaultProvider = getAiProviderMeta(uniqueKeys[0].provider as AiProviderId);
+
+  const autoConfig = await getAutoModelConfig();
+  const adminFreeView = isAdmin && autoConfig.adminViewMode !== 'PRO';
+
+  if (adminFreeView) {
+    // Admin free view: show all BYOK provider models unfiltered
+    const byokModels = uniqueKeys.flatMap((key) => {
+      const p = getAiProviderMeta(key.provider as AiProviderId);
+      return p.models.map((m) => ({
+        id: m.id,
+        displayName: m.displayName,
+        tier: m.tier,
+        requiredPlan: m.requiredPlan,
+        isDefault: false,
+        group: p.displayName,
+        hint: p.displayName,
+      }));
+    });
+
+    return NextResponse.json({
+      provider: defaultProvider.id,
+      readOnly: false,
+      userPlan,
+      isByok: true,
+      adminViewMode: autoConfig.adminViewMode,
+      models: sortModels([...byokModels, ...claudeCodeModels]),
+    }, { headers: CACHE_HEADERS });
+  }
+
+  // Everyone else (including admin PRO view): filter to AutoModelConfig included models
+  const { freeModels, proModels } = resolveIncludedModels(autoConfig);
+  const freeSet = new Set(freeModels);
+  const proSet = new Set(proModels);
+
   const byokModels = uniqueKeys.flatMap((key) => {
     const p = getAiProviderMeta(key.provider as AiProviderId);
-    return p.models.map((m) => ({
-      id: m.id,
-      displayName: m.displayName,
-      tier: m.tier,
-      requiredPlan: m.requiredPlan,
-      isDefault: false,
-      group: p.displayName,
-      hint: p.displayName,
-    }));
+    return p.models
+      .filter((m) => proSet.has(m.id))
+      .map((m) => ({
+        id: m.id,
+        displayName: m.displayName,
+        tier: m.tier,
+        requiredPlan: freeSet.has(m.id) ? ('FREE' as const) : ('PRO' as const),
+        isDefault: false,
+        group: p.displayName,
+        hint: p.displayName,
+      }));
   });
 
   return NextResponse.json({
