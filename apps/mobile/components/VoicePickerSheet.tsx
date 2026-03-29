@@ -11,13 +11,47 @@ import { useQuery } from '@tanstack/react-query';
 import { colors, spacing, typography, borderRadius } from '@sotto/shared';
 import { api } from '../lib/api';
 
-interface Voice {
+interface PoolVoice {
   id: string;
   name: string;
   gender: string;
   accent: string;
   ageRange: string;
   character: string;
+}
+
+interface VoiceClone {
+  id: string;
+  name: string;
+  externalVoiceId: string;
+  sourceType: string;
+  provider: string;
+  description: string | null;
+  requestable: boolean;
+  priceInCents: number | null;
+  verificationStatus: string;
+  createdAt: string;
+  salesCount: number;
+  totalEarningsCents: number;
+}
+
+interface SharedVoice {
+  id: string;
+  name: string;
+  externalVoiceId: string;
+  sourceType: string;
+  provider: string;
+  createdAt: string;
+  owner: { id: string; name: string | null };
+}
+
+interface VoicesResponse {
+  poolVoices: PoolVoice[];
+  userClones: VoiceClone[];
+  sharedVoices: SharedVoice[];
+  maxVoiceClones: number;
+  stripeOnboarded: boolean;
+  stripeAccountId: string | null;
 }
 
 interface Speaker {
@@ -33,6 +67,10 @@ interface VoicePickerSheetProps {
   speakers?: Array<Speaker>;
   /** Maximum speakers allowed by the user's tier (2 = FREE, 4 = PRO). */
   maxSpeakers?: number;
+  /** LLM-suggested format: 1=Solo, 2=Dialogue, 3=Panel, 4=Roundtable */
+  suggestedFormat?: 1 | 2 | 3 | 4;
+  /** Current TTS provider for filtering voice catalog */
+  ttsProvider?: string;
 }
 
 // Speaker presets use UPPERCASE names to match TTS provider convention.
@@ -67,9 +105,11 @@ const FORMAT_OPTIONS: Array<{ count: 1 | 2 | 3 | 4; label: string }> = [
 export function VoicePickerSheet({
   onSelectionChange,
   maxSpeakers = 2,
+  suggestedFormat,
+  ttsProvider,
 }: VoicePickerSheetProps) {
   const [speakerCount, setSpeakerCount] = useState<1 | 2 | 3 | 4>(
-    Math.min(2, maxSpeakers) as 1 | 2 | 3 | 4
+    Math.min(suggestedFormat ?? 2, maxSpeakers) as 1 | 2 | 3 | 4
   );
   const activeSpeakers = SPEAKER_PRESETS[speakerCount] ?? SPEAKER_PRESETS[2];
 
@@ -78,11 +118,13 @@ export function VoicePickerSheet({
     new Map(),
   );
 
-  const { data } = useQuery({
-    queryKey: ['voices'],
+  const { data: voicesData } = useQuery({
+    queryKey: ['voices', ttsProvider],
     queryFn: async () => {
-      const res = await api.get<{ voices: Voice[] }>('/voices');
-      return res.data.voices;
+      const res = await api.get<VoicesResponse>('/voices', {
+        params: ttsProvider ? { provider: ttsProvider } : undefined,
+      });
+      return res.data;
     },
     enabled: isCustom,
   });
@@ -195,7 +237,7 @@ export function VoicePickerSheet({
       </View>
 
       {isCustom &&
-        data &&
+        voicesData &&
         activeSpeakers.map((speaker) => (
           <View key={speaker.name} style={styles.speakerSection}>
             <Text
@@ -206,39 +248,128 @@ export function VoicePickerSheet({
             >
               {speaker.name}
             </Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.voiceGrid}
-            >
-              {data.map((voice) => {
-                const selected =
-                  selectedVoices.get(speaker.name) === voice.id;
-                return (
-                  <Pressable
-                    key={voice.id}
-                    style={[
-                      styles.voiceCard,
-                      selected
-                        ? styles.voiceCardSelected
-                        : styles.voiceCardDefault,
-                    ]}
-                    onPress={() =>
-                      handleVoiceSelect(speaker.name, voice.id)
-                    }
-                    testID={`voice-card-${speaker.name.toLowerCase()}-${voice.id}`}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected }}
-                  >
-                    <Text style={styles.voiceName}>{voice.name}</Text>
-                    <Text style={styles.voiceAccent}>{voice.accent}</Text>
-                    <Text style={styles.voiceCharacter} numberOfLines={2}>
-                      {voice.character}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
+
+            {/* Pool voices */}
+            {voicesData.poolVoices.length > 0 && (
+              <>
+                <Text style={styles.voiceSectionLabel}>Voice Pool</Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.voiceGrid}
+                >
+                  {voicesData.poolVoices.map((voice) => {
+                    const selected =
+                      selectedVoices.get(speaker.name) === voice.id;
+                    return (
+                      <Pressable
+                        key={voice.id}
+                        style={[
+                          styles.voiceCard,
+                          selected
+                            ? styles.voiceCardSelected
+                            : styles.voiceCardDefault,
+                        ]}
+                        onPress={() =>
+                          handleVoiceSelect(speaker.name, voice.id)
+                        }
+                        testID={`voice-card-${speaker.name.toLowerCase()}-${voice.id}`}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected }}
+                      >
+                        <Text style={styles.voiceName}>{voice.name}</Text>
+                        <Text style={styles.voiceAccent}>{voice.accent}</Text>
+                        <Text style={styles.voiceCharacter} numberOfLines={2}>
+                          {voice.character}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              </>
+            )}
+
+            {/* User clones */}
+            {voicesData.userClones.length > 0 && (
+              <>
+                <Text style={styles.voiceSectionLabel}>My Clones</Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.voiceGrid}
+                >
+                  {voicesData.userClones.map((clone) => {
+                    const selected =
+                      selectedVoices.get(speaker.name) === clone.externalVoiceId;
+                    return (
+                      <Pressable
+                        key={clone.id}
+                        style={[
+                          styles.voiceCard,
+                          selected
+                            ? styles.voiceCardSelected
+                            : styles.voiceCardDefault,
+                        ]}
+                        onPress={() =>
+                          handleVoiceSelect(speaker.name, clone.externalVoiceId)
+                        }
+                        testID={`voice-clone-${speaker.name.toLowerCase()}-${clone.id}`}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected }}
+                      >
+                        <Text style={styles.voiceName}>{clone.name}</Text>
+                        <Text style={styles.voiceAccent}>{clone.provider}</Text>
+                        <Text style={styles.voiceCharacter} numberOfLines={2}>
+                          {clone.description ?? 'Custom voice clone'}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              </>
+            )}
+
+            {/* Shared voices */}
+            {voicesData.sharedVoices.length > 0 && (
+              <>
+                <Text style={styles.voiceSectionLabel}>Shared With Me</Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.voiceGrid}
+                >
+                  {voicesData.sharedVoices.map((shared) => {
+                    const selected =
+                      selectedVoices.get(speaker.name) === shared.externalVoiceId;
+                    return (
+                      <Pressable
+                        key={shared.id}
+                        style={[
+                          styles.voiceCard,
+                          selected
+                            ? styles.voiceCardSelected
+                            : styles.voiceCardDefault,
+                        ]}
+                        onPress={() =>
+                          handleVoiceSelect(speaker.name, shared.externalVoiceId)
+                        }
+                        testID={`voice-shared-${speaker.name.toLowerCase()}-${shared.id}`}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected }}
+                      >
+                        <Text style={styles.voiceName}>{shared.name}</Text>
+                        <Text style={styles.voiceAccent}>
+                          by {shared.owner.name ?? 'Unknown'}
+                        </Text>
+                        <Text style={styles.voiceCharacter} numberOfLines={2}>
+                          {shared.provider}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              </>
+            )}
           </View>
         ))}
     </View>
@@ -354,6 +485,16 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontHeading,
     fontSize: 16,
     marginBottom: spacing.sm,
+  },
+  voiceSectionLabel: {
+    fontFamily: typography.fontBody,
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: spacing.xs,
+    marginTop: spacing.sm,
   },
   voiceGrid: {
     gap: spacing.sm,

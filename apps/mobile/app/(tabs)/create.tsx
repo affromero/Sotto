@@ -682,7 +682,11 @@ export default function CreateScreen() {
           </Text>
 
           <View style={styles.voiceSection}>
-            <VoicePickerSheet onSelectionChange={setVoiceSelection} />
+            <VoicePickerSheet
+              onSelectionChange={setVoiceSelection}
+              suggestedFormat={metadata?.suggestedFormat}
+              ttsProvider={ttsProvider}
+            />
           </View>
 
           <View style={styles.voiceSection}>
