@@ -10,12 +10,10 @@ import { errorResponse } from '@/lib/api-response';
 
 const CACHE_HEADERS = { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=300' };
 
-const TIER_GROUP_LABELS: Record<string, string> = {
-  fast: 'Quick generation',
-  balanced: 'Balanced',
-  best: 'Best quality',
-  max: 'Max',
-};
+/** Sort models: providers alphabetically by group, models alphabetically within each provider. */
+function sortModels<T extends { group: string; displayName: string }>(models: T[]): T[] {
+  return [...models].sort((a, b) => a.group.localeCompare(b.group) || a.displayName.localeCompare(b.displayName));
+}
 
 // Derive env var names from registry — no manual map needed
 const PLATFORM_PROVIDER_ENV: Partial<Record<AiProviderId, string>> = {};
@@ -77,7 +75,7 @@ export async function GET(request: NextRequest) {
                 tier: m.tier,
                 requiredPlan: freeSet.has(m.id) ? ('FREE' as const) : ('PRO' as const),
                 isDefault: false,
-                group: TIER_GROUP_LABELS[m.tier] ?? m.tier,
+                group: p.displayName,
                 hint: p.displayName,
               }))
           );
@@ -88,7 +86,7 @@ export async function GET(request: NextRequest) {
           userPlan: 'PRO',
           isByok: false,
           adminViewMode: autoConfig.adminViewMode,
-          models: platformModels,
+          models: sortModels(platformModels),
         }, { headers: CACHE_HEADERS });
       }
 
@@ -101,7 +99,7 @@ export async function GET(request: NextRequest) {
             tier: m.tier,
             requiredPlan: m.requiredPlan,
             isDefault: false,
-            group: TIER_GROUP_LABELS[m.tier] ?? m.tier,
+            group: p.displayName,
             hint: p.displayName,
           }))
         );
@@ -112,7 +110,7 @@ export async function GET(request: NextRequest) {
         userPlan: 'PRO',
         isByok: false,
         adminViewMode: autoConfig.adminViewMode,
-        models: [...platformModels, ...claudeCodeModels],
+        models: sortModels([...platformModels, ...claudeCodeModels]),
       }, { headers: CACHE_HEADERS });
     }
 
@@ -132,7 +130,7 @@ export async function GET(request: NextRequest) {
             tier: m.tier,
             requiredPlan: freeSet.has(m.id) ? ('FREE' as const) : ('PRO' as const),
             isDefault: false,
-            group: TIER_GROUP_LABELS[m.tier] ?? m.tier,
+            group: p.displayName,
             hint: p.displayName,
           }))
       );
@@ -142,11 +140,11 @@ export async function GET(request: NextRequest) {
       readOnly: false,
       userPlan,
       isByok: false,
-      models: platformModels,
+      models: sortModels(platformModels),
     }, { headers: CACHE_HEADERS });
   }
 
-  // BYOK keys present — show models for every valid provider, grouped by quality tier
+  // BYOK keys present — show models for every valid provider, grouped by provider
   // Deduplicate by provider (take first valid key per provider)
   const seenProviders = new Set<string>();
   const uniqueKeys = validKeys.filter((key) => {
@@ -163,7 +161,7 @@ export async function GET(request: NextRequest) {
       tier: m.tier,
       requiredPlan: m.requiredPlan,
       isDefault: false,
-      group: TIER_GROUP_LABELS[m.tier] ?? m.tier,
+      group: p.displayName,
       hint: p.displayName,
     }));
   });
@@ -173,6 +171,6 @@ export async function GET(request: NextRequest) {
     readOnly: false,
     userPlan,
     isByok: true,
-    models: isAdmin ? [...byokModels, ...claudeCodeModels] : byokModels,
+    models: sortModels(isAdmin ? [...byokModels, ...claudeCodeModels] : byokModels),
   }, { headers: CACHE_HEADERS });
 }
