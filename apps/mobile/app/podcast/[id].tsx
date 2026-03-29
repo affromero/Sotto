@@ -369,9 +369,66 @@ export default function PodcastScreen() {
     );
   }
 
-  const gradient = getPodcastGradient(podcast.id);
   const currentUser = queryClient.getQueryData<{ id: string }>(['user', 'me']);
   const isOwner = currentUser?.id === podcast.user?.id;
+
+  // Show failure details for owners when generation failed
+  if (podcast.status === 'FAILED' && isOwner) {
+    return (
+      <View style={styles.centered} testID="generation-failed">
+        <Stack.Screen options={{ headerShown: false }} />
+        <Text style={styles.errorIcon}>!</Text>
+        <Text style={styles.errorText}>Generation failed</Text>
+        <Text style={styles.errorSubtext}>
+          {podcast.failureReason ?? 'An unexpected error occurred during generation.'}
+        </Text>
+        <Pressable
+          style={styles.retryButton}
+          onPress={async () => {
+            try {
+              await api.post(`/podcasts/${id}/script/regenerate`);
+              queryClient.invalidateQueries({ queryKey: ['podcast', id] });
+              Alert.alert('Retrying', 'Script generation has been requeued.');
+            } catch {
+              Alert.alert('Error', 'Could not retry generation. Please try again later.');
+            }
+          }}
+          testID="generation-retry-button"
+        >
+          <Text style={styles.retryButtonText}>Retry Generation</Text>
+        </Pressable>
+        <Pressable
+          style={[styles.retryButton, styles.deleteButton]}
+          onPress={() => {
+            Alert.alert(
+              'Delete Podcast',
+              'This will permanently delete this podcast. Are you sure?',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Delete',
+                  style: 'destructive',
+                  onPress: async () => {
+                    try {
+                      await api.delete(`/podcasts/${id}`);
+                      router.back();
+                    } catch {
+                      Alert.alert('Error', 'Could not delete podcast.');
+                    }
+                  },
+                },
+              ],
+            );
+          }}
+          testID="generation-delete-button"
+        >
+          <Text style={styles.deleteButtonText}>Delete</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  const gradient = getPodcastGradient(podcast.id);
 
   const listHeader = (
     <>
@@ -901,6 +958,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: colors.textInverse,
+  },
+  deleteButton: {
+    marginTop: spacing.sm,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  deleteButtonText: {
+    fontFamily: typography.fontBody,
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.error ?? '#DC2626',
   },
 
   // Header
