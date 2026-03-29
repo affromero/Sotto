@@ -240,6 +240,7 @@ model User {
   briefingTone          String?           // casual, professional, socratic, comedic, satirical, storytelling
   briefingAudienceLevel String?           // beginner, intermediate, expert
   briefingDuration      Int?              // target minutes (1-40)
+  briefingFormat        Int               @default(2) // 1=Solo, 2=Dialogue, 3=Panel, 4=Roundtable
   briefingPrompt        String? @db.Text  // custom instructions/topic focus
   briefingUseByokKeys   Boolean @default(false) // opt-in: when true + user has BYOK, use their keys
 

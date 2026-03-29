@@ -137,7 +137,8 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
     'INTERCEPTOR_CATALOG', 'PRODUCT_CONTEXT', 'VOICE_COMPARISON',
   ].sort(),
   'generation/briefing-script.md': [
-    'CONTENT_SAFETY', 'DURATION_TARGET', 'SOURCE_ARTICLES',
+    'CONTENT_SAFETY', 'DURATION_TARGET', 'EXPERT_SPEAKER', 'HOST_SPEAKER',
+    'SOURCE_ARTICLES', 'SPEAKER_SECTION',
     'VOICE_REALISM', 'WORD_COUNT_IDEAL', 'WORD_COUNT_MAX', 'WORD_COUNT_MIN',
   ].sort(),
   'quiz/generate-quiz.md': [
