@@ -41,10 +41,10 @@ const FORMAT_OPTIONS = [
   { value: 4, label: 'Roundtable (4 voices)' },
 ];
 
-const VOICE_POOL_NAMES = [
-  'Adam', 'Eric', 'Brian', 'Will', 'Roger', 'Charlie', 'George', 'Callum',
-  'Aria', 'Rachel', 'Jessica', 'Laura', 'Matilda', 'Alice', 'Charlotte', 'Grace',
-];
+interface VoiceOption {
+  id: string;
+  name: string;
+}
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -111,6 +111,37 @@ export function BriefingSettings({
   const [format, setFormat] = useState(initialFormat);
   const [prompt, setPrompt] = useState(initialPrompt ?? '');
   const [useByokKeys, setUseByokKeys] = useState(initialUseByokKeys);
+
+  // Dynamic voice options from selected TTS provider
+  const [voiceOptions, setVoiceOptions] = useState<VoiceOption[]>([]);
+  const [voicesLoading, setVoicesLoading] = useState(false);
+
+  useEffect(() => {
+    const provider = ttsOption ? ttsOption.split(':')[0] : null;
+    if (!provider) {
+      setVoiceOptions([]);
+      return;
+    }
+    let cancelled = false;
+    setVoicesLoading(true);
+    fetch(`/api/voices?provider=${encodeURIComponent(provider)}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled) return;
+        const voices: VoiceOption[] = (data?.poolVoices ?? []).map((v: { id: string; name: string }) => ({
+          id: v.id,
+          name: v.name,
+        }));
+        setVoiceOptions(voices);
+      })
+      .catch(() => {
+        if (!cancelled) setVoiceOptions([]);
+      })
+      .finally(() => {
+        if (!cancelled) setVoicesLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [ttsOption]);
 
   // Debounce prompt saves
   const [promptTimer, setPromptTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
@@ -330,12 +361,15 @@ export function BriefingSettings({
             onChange={async (e) => {
               const val = e.target.value;
               setTtsOption(val);
+              // Clear voice selections when provider changes — IDs are provider-specific
+              setHostVoice('');
+              setExpertVoice('');
               if (val) {
                 const [provider, ...modelParts] = val.split(':');
                 const model = modelParts.join(':');
-                await patchUser({ briefingTtsProvider: provider, briefingTtsModel: model || null });
+                await patchUser({ briefingTtsProvider: provider, briefingTtsModel: model || null, briefingHostVoiceId: null, briefingExpertVoiceId: null });
               } else {
-                await patchUser({ briefingTtsProvider: null, briefingTtsModel: null });
+                await patchUser({ briefingTtsProvider: null, briefingTtsModel: null, briefingHostVoiceId: null, briefingExpertVoiceId: null });
               }
             }}
             aria-label="Briefing voice provider"
@@ -359,11 +393,12 @@ export function BriefingSettings({
                 setHostVoice(val);
                 await patchUser({ briefingHostVoiceId: val || null });
               }}
+              disabled={voicesLoading || voiceOptions.length === 0}
               aria-label="Briefing host voice"
             >
               <option value="">Auto-assign</option>
-              {VOICE_POOL_NAMES.map((name) => (
-                <option key={name} value={name}>{name}</option>
+              {voiceOptions.map((v) => (
+                <option key={v.id} value={v.id}>{v.name}</option>
               ))}
             </select>
           </div>
@@ -377,11 +412,12 @@ export function BriefingSettings({
                 setExpertVoice(val);
                 await patchUser({ briefingExpertVoiceId: val || null });
               }}
+              disabled={voicesLoading || voiceOptions.length === 0}
               aria-label="Briefing expert voice"
             >
               <option value="">Auto-assign</option>
-              {VOICE_POOL_NAMES.map((name) => (
-                <option key={name} value={name}>{name}</option>
+              {voiceOptions.map((v) => (
+                <option key={v.id} value={v.id}>{v.name}</option>
               ))}
             </select>
           </div>
