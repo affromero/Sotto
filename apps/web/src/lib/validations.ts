@@ -650,6 +650,7 @@ export const twitterConfigUpdateSchema = z.object({
   minLikes: z.number().int().min(1).max(10000).optional(),
   minPlays: z.number().int().min(1).max(100000).optional(),
   minForks: z.number().int().min(1).max(1000).optional(),
+  mentionPollIntervalMs: z.number().int().min(10000).max(600000).optional(),
   trendPollingEnabled: z.boolean().optional(),
   trendPollIntervalMs: z.number().int().min(300000).max(86400000).optional(),
   maxTrendPodcastsPerDay: z.number().int().min(1).max(20).optional(),

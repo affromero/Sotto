@@ -23,6 +23,7 @@ import {
 } from '@/lib/queue';
 import { processAnnouncement } from './announcement.worker';
 import { isTwitterConfigured } from '@/lib/twitter';
+import { getTwitterConfig } from '@/lib/twitter-config';
 import { isTelegramBotConfigured, setWebhook, deleteWebhook } from '@/lib/telegram';
 import { logger } from '@/lib/logger';
 import { closeRedis } from '@/lib/redis';
@@ -186,12 +187,16 @@ const workers = [
 if (WORKER_PROFILE === 'all' || WORKER_PROFILE === 'light') {
 // Set up Twitter mentions polling if credentials are configured
 if (shouldRun('twitter-mentions') && isTwitterConfigured()) {
-  const pollInterval = parseInt(process.env.TWITTER_POLL_INTERVAL_MS || '60000', 10);
-  twitterMentionsQueue
-    .add(JobType.POLL_TWITTER_MENTIONS, {}, { repeat: { every: pollInterval } })
-    .then(() =>
-      logger.info('Twitter mentions polling scheduled', { intervalMs: String(pollInterval) })
-    )
+  getTwitterConfig()
+    .then((config) => {
+      const pollInterval = config.mentionPollIntervalMs
+        || parseInt(process.env.TWITTER_POLL_INTERVAL_MS || '60000', 10);
+      return twitterMentionsQueue
+        .add(JobType.POLL_TWITTER_MENTIONS, {}, { repeat: { every: pollInterval } })
+        .then(() =>
+          logger.info('Twitter mentions polling scheduled', { intervalMs: String(pollInterval) })
+        );
+    })
     .catch((err) => logger.error('Failed to schedule Twitter polling', { error: err.message }));
 } else if (shouldRun('twitter-mentions')) {
   logger.info('Twitter integration not configured — polling disabled');
