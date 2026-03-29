@@ -58,13 +58,6 @@ describe('getVoiceCatalog', () => {
       expect(catalog[0]).toMatchObject({ id: 'Deep_Voice_Man', name: 'Deep Voice Man' });
     });
 
-    it('returns static KittenTTS voices', async () => {
-      const catalog = await getVoiceCatalog('kittentts');
-
-      expect(catalog.length).toBe(8);
-      expect(catalog.map((v) => v.id)).toContain('bella');
-      expect(catalog.map((v) => v.id)).toContain('hugo');
-    });
   });
 
   describe('dynamic providers — Redis cache hit', () => {

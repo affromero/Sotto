@@ -2,14 +2,13 @@
  * Voice catalog fetcher — returns available voices for any TTS provider.
  *
  * Dynamic providers (ElevenLabs, Cartesia, Hume) fetch from their API
- * with 24-hour Redis caching. Fixed-set providers (OpenAI, Fal, Replicate,
- * KittenTTS) return their static voice pools formatted as CatalogVoice[].
+ * with 24-hour Redis caching. Fixed-set providers (OpenAI, Fal, Replicate)
+ * return their static voice pools formatted as CatalogVoice[].
  */
 
 import type { TtsProviderId } from './providers/tts-registry';
 import {
   VOICE_POOL,
-  KITTENTTS_VOICE_POOL,
   type VoicePoolEntry,
 } from './voice-pool';
 import {
@@ -38,7 +37,7 @@ const CATALOG_TTL = 86400; // 24 hours
 // Static catalogs — built from existing voice pools
 // ---------------------------------------------------------------------------
 
-function voicePoolToCatalog(entries: VoicePoolEntry[], provider: 'elevenlabs' | 'openai' | 'kittentts'): CatalogVoice[] {
+function voicePoolToCatalog(entries: VoicePoolEntry[], provider: 'elevenlabs' | 'openai'): CatalogVoice[] {
   return entries.map((e) => ({
     id: e.ids[provider] ?? e.ids.elevenlabs,
     name: e.name,
@@ -245,13 +244,6 @@ export async function getVoiceCatalog(
 
     case 'minimax':
       return providerVoiceToCatalog(MINIMAX_VOICE_POOL);
-
-    case 'kittentts':
-      return KITTENTTS_VOICE_POOL.map((v) => ({
-        id: v.id,
-        name: v.id,
-        gender: v.gender,
-      }));
 
     default:
       return voicePoolToCatalog(VOICE_POOL, 'elevenlabs');
