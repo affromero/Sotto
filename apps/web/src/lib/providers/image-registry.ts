@@ -32,7 +32,6 @@ const IMAGE_PROVIDERS: Record<ImageProviderId, ImageProviderMeta> = {
     models: [
       // FLUX family
       { id: 'fal-flux-1-schnell', displayName: 'FLUX.1 Schnell', costPerMegapixel: 0.003, tier: 'standard' },
-      { id: 'fal-flux-1-dev', displayName: 'FLUX.1 Dev', costPerMegapixel: 0.025, tier: 'standard' },
       { id: 'fal-flux-1-pro', displayName: 'FLUX 1 Pro', costPerMegapixel: 0.025, tier: 'high' },
       { id: 'fal-flux-1-kontext-pro', displayName: 'FLUX.1 Kontext Pro', costPerMegapixel: 0.04, tier: 'high' },
       { id: 'fal-flux-2-pro', displayName: 'FLUX 2 Pro', costPerMegapixel: 0.04, tier: 'best' },
@@ -43,8 +42,6 @@ const IMAGE_PROVIDERS: Record<ImageProviderId, ImageProviderMeta> = {
       // Ideogram
       { id: 'fal-ideogram-v2', displayName: 'Ideogram V2', costPerMegapixel: 0.08, tier: 'high' },
       { id: 'fal-ideogram-v3', displayName: 'Ideogram V3', costPerMegapixel: 0.06, tier: 'high' },
-      // Stable Diffusion
-      { id: 'fal-sd3', displayName: 'Stable Diffusion 3', costPerMegapixel: 0.035, tier: 'standard' },
       // Google (Nano Banana = Gemini Image on Fal)
       { id: 'fal-nano-banana-2', displayName: 'Nano Banana 2', costPerMegapixel: 0.08, tier: 'standard' },
       { id: 'fal-nano-banana-pro', displayName: 'Nano Banana Pro', costPerMegapixel: 0.15, tier: 'best' },

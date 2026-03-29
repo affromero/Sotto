@@ -6,7 +6,6 @@
 const IMAGE_ENDPOINTS: Record<string, string> = {
   // FLUX family
   'fal-flux-1-schnell': 'fal-ai/flux/schnell',
-  'fal-flux-1-dev': 'fal-ai/flux/dev',
   'fal-flux-1-pro': 'fal-ai/flux-pro/v1.1',
   'fal-flux-1-kontext-pro': 'fal-ai/flux-pro/kontext',
   'fal-flux-2-pro': 'fal-ai/flux-2-pro',
@@ -17,8 +16,6 @@ const IMAGE_ENDPOINTS: Record<string, string> = {
   // Ideogram
   'fal-ideogram-v2': 'fal-ai/ideogram/v2',
   'fal-ideogram-v3': 'fal-ai/ideogram/v3',
-  // Stable Diffusion
-  'fal-sd3': 'fal-ai/stable-diffusion-v3-medium',
   // Google (Nano Banana = Gemini Image on Fal)
   'fal-nano-banana-2': 'fal-ai/nano-banana-2',
   'fal-nano-banana-pro': 'fal-ai/nano-banana-pro',
@@ -65,7 +62,6 @@ export function getFalFrameParams(modelId: string): FalFrameParamConfig {
 const MODEL_ALIASES: Record<string, string> = {
   'flux-schnell': 'fal-flux-1-schnell',
   'flux-1-schnell': 'fal-flux-1-schnell',
-  'flux-1-dev': 'fal-flux-1-dev',
   'flux-pro': 'fal-flux-1-pro',
   'flux-1-pro': 'fal-flux-1-pro',
   'flux-kontext-pro': 'fal-flux-1-kontext-pro',
@@ -76,7 +72,6 @@ const MODEL_ALIASES: Record<string, string> = {
   'recraft-v4-pro': 'fal-recraft-v4-pro',
   'ideogram-v2': 'fal-ideogram-v2',
   'ideogram-v3': 'fal-ideogram-v3',
-  'sd3': 'fal-sd3',
   'nano-banana-2': 'fal-nano-banana-2',
   'nano-banana-pro': 'fal-nano-banana-pro',
   'qwen-image-2-pro': 'fal-qwen-image-2-pro',

@@ -1,6 +1,6 @@
 /**
  * Replicate lip-sync — submit prediction → poll → download.
- * Supports VEED Fabric, Wav2Lip, and SadTalker models.
+ * Supports VEED Fabric and SadTalker models.
  */
 import { logger } from '@/lib/logger';
 import { replicateFetch } from './replicate-fetch';
@@ -20,7 +20,6 @@ export interface ReplicateLipSyncResult {
 const REPLICATE_AVATAR_PATHS: Record<string, string> = {
   'replicate-veed-fabric-480p': 'veed/fabric-1.0',
   'replicate-veed-fabric-720p': 'veed/fabric-1.0',
-  'replicate-wav2lip': 'devxpy/cog-wav2lip',
   'replicate-sadtalker': 'cjwbw/sadtalker',
 };
 
@@ -28,7 +27,6 @@ const REPLICATE_AVATAR_PATHS: Record<string, string> = {
 export const REPLICATE_LIP_SYNC_CONFIG: Record<string, { maxAudioSeconds: number }> = {
   'replicate-veed-fabric-480p': { maxAudioSeconds: 300 },
   'replicate-veed-fabric-720p': { maxAudioSeconds: 300 },
-  'replicate-wav2lip': { maxAudioSeconds: 120 },
   'replicate-sadtalker': { maxAudioSeconds: 60 },
 };
 
@@ -41,10 +39,6 @@ function buildLipSyncInput(
   if (modelId.startsWith('replicate-veed-fabric')) {
     const resolution = modelId.includes('720p') ? '720p' : '480p';
     return { image: imageUrl, audio: audioUrl, resolution };
-  }
-
-  if (modelId === 'replicate-wav2lip') {
-    return { face: imageUrl, audio: audioUrl };
   }
 
   if (modelId === 'replicate-sadtalker') {
