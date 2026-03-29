@@ -75,9 +75,25 @@ export interface TwitterTweet {
   };
 }
 
+export interface TwitterAuthorData {
+  id: string;
+  username: string;
+  name: string;
+  verified?: boolean;
+  verifiedType?: string;
+  description?: string;
+  createdAt?: string;
+  publicMetrics?: {
+    followers_count: number;
+    following_count: number;
+    tweet_count: number;
+  };
+}
+
 export interface TwitterMentionsResult {
   tweets: TwitterTweet[];
   mediaByKey: Map<string, TwitterMedia>;
+  authorMap: Map<string, TwitterAuthorData>;
 }
 
 export interface ThreadTweet {
