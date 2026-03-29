@@ -38,6 +38,8 @@ import { GenerationProgress } from '../../components/GenerationProgress';
 import { ScriptPreview } from '../../components/ScriptPreview';
 import { DraftsList } from '../../components/DraftsList';
 import { ScriptEditor } from '../../components/ScriptEditor';
+import { DiscoveryParamsCard } from '../../components/DiscoveryParamsCard';
+import { setItemAsync, getItemAsync, deleteItemAsync } from 'expo-secure-store';
 
 type Step = 'discovery' | 'voice' | 'scripting' | 'script-preview' | 'generating';
 
@@ -149,6 +151,55 @@ export default function CreateScreen() {
     staleTime: 5 * 60 * 1000,
   });
   const maxSpeakers = billingData?.tier === 'PRO' ? 4 : 2;
+
+  // Persist creation state to survive app background/kill
+  const CREATION_STATE_KEY = 'sotto:creationState';
+
+  useEffect(() => {
+    if (step === 'discovery' || !podcastId) return;
+    const state = JSON.stringify({ podcastId, step, topic: metadata?.topic });
+    setItemAsync(CREATION_STATE_KEY, state).catch(() => {});
+  }, [step, podcastId, metadata?.topic]);
+
+  // On mount, check for pending creation
+  useEffect(() => {
+    (async () => {
+      try {
+        const saved = await getItemAsync(CREATION_STATE_KEY);
+        if (!saved) return;
+        const state = JSON.parse(saved) as { podcastId: string; step: Step; topic?: string };
+        if (state.podcastId && (state.step === 'scripting' || state.step === 'generating')) {
+          Alert.alert(
+            'Resume creation?',
+            `You have a podcast "${state.topic ?? 'Untitled'}" still generating. Resume?`,
+            [
+              {
+                text: 'Discard',
+                style: 'destructive',
+                onPress: () => deleteItemAsync(CREATION_STATE_KEY).catch(() => {}),
+              },
+              {
+                text: 'Resume',
+                onPress: () => {
+                  setPodcastId(state.podcastId);
+                  setStep(state.step);
+                },
+              },
+            ],
+          );
+        }
+      } catch {
+        // Silent fail
+      }
+    })();
+  }, []);
+
+  // Clear persisted state when creation completes
+  useEffect(() => {
+    if (step === 'discovery' && !podcastId) {
+      deleteItemAsync(CREATION_STATE_KEY).catch(() => {});
+    }
+  }, [step, podcastId]);
 
   // Key status queries
   const { data: aiKeys } = useQuery<{ keys: KeyStatus[] }>({
@@ -691,6 +742,15 @@ export default function CreateScreen() {
           <Text style={styles.sectionTitle}>
             {metadata?.topic ?? 'Your Podcast'}
           </Text>
+
+          {metadata && (
+            <View style={styles.voiceSection}>
+              <DiscoveryParamsCard
+                metadata={metadata}
+                onUpdate={(patch) => setMetadata((prev) => prev ? { ...prev, ...patch } : prev)}
+              />
+            </View>
+          )}
 
           <View style={styles.voiceSection}>
             <VoicePickerSheet
