@@ -359,11 +359,18 @@ function BriefingEditForm({ briefing, onRefresh }: { briefing: BriefingData; onR
     group: o.group,
   }));
 
-  const VOICE_POOL_NAMES = [
-    'Adam', 'Eric', 'Brian', 'Will', 'Roger', 'Charlie', 'George', 'Callum',
-    'Aria', 'Rachel', 'Jessica', 'Laura', 'Matilda', 'Alice', 'Charlotte', 'Grace',
-  ];
-  const voiceOptions = VOICE_POOL_NAMES.map((name) => ({ id: name, label: name }));
+  // Fetch voices dynamically based on selected TTS provider
+  const ttsProvider = ttsOption ? ttsOption.split(':')[0] : null;
+  const { data: voiceData } = useQuery<Array<{ id: string; name: string }>>({
+    queryKey: ['voices', ttsProvider],
+    queryFn: async () => {
+      if (!ttsProvider) return [];
+      const res = await api.get(`/voices?provider=${encodeURIComponent(ttsProvider)}`);
+      return res.data?.poolVoices ?? [];
+    },
+    enabled: !!ttsProvider,
+  });
+  const voiceOptions = (voiceData ?? []).map((v) => ({ id: v.id, label: v.name }));
 
   useEffect(() => {
     return () => { if (promptTimer.current) clearTimeout(promptTimer.current); };
