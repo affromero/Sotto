@@ -192,7 +192,9 @@ services:
 
 volumes:
   sotto_postgres_data:
+    name: sotto_postgres_data
   sotto_redis_data:
+    name: sotto_sotto_redis_data
 
 networks:
   sotto-network:
