@@ -141,7 +141,7 @@ interface SectionProps {
 }
 
 function Section({ label, providers, results, onTest, onTestAll }: SectionProps) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
 
   const tested = providers.filter((p) => {
     const r = results[makeKey(p)];
@@ -152,6 +152,13 @@ function Section({ label, providers, results, onTest, onTestAll }: SectionProps)
   const allDone = tested.length === providers.length && tested.length > 0;
   const anyFail = allDone && passed.length < tested.length;
 
+  // Show content when manually opened OR when tests have been triggered
+  const hasActivity = providers.some((p) => {
+    const s = results[makeKey(p)]?.status;
+    return s === 'running' || s === 'pass' || s === 'fail';
+  });
+  const isOpen = open || hasActivity;
+
   return (
     <div className={styles.section}>
       <div className={styles.sectionHeader}>
@@ -159,14 +166,15 @@ function Section({ label, providers, results, onTest, onTestAll }: SectionProps)
           type="button"
           className={`${styles.sectionToggle} ${anyFail ? styles.sectionToggleFail : ''}`}
           onClick={() => setOpen((o) => !o)}
-          aria-expanded={open}
+          aria-expanded={isOpen}
         >
           <ChevronDown
-            className={`${styles.chevron} ${open ? styles.chevronOpen : ''}`}
+            className={`${styles.chevron} ${isOpen ? styles.chevronOpen : ''}`}
             size={16}
             aria-hidden="true"
           />
           <span className={styles.sectionLabel}>{label}</span>
+          <span className={styles.countBadge}>{providers.length}</span>
           {allDone && (
             <span className={`${styles.badge} ${anyFail ? styles.badgeFail : styles.badgePass}`}>
               {passed.length} / {tested.length} passed
@@ -177,14 +185,14 @@ function Section({ label, providers, results, onTest, onTestAll }: SectionProps)
         <button
           type="button"
           className={styles.testAllButton}
-          onClick={() => onTestAll(providers)}
+          onClick={() => { setOpen(true); onTestAll(providers); }}
           disabled={anyRunning}
         >
           Test All
         </button>
       </div>
 
-      {open && (
+      {isOpen && (
         <div className={styles.tableWrapper}>
           <table className={styles.table}>
             <thead>
