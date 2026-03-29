@@ -131,7 +131,7 @@ describe('GET /api/news', () => {
     mockArticleGroupBy.mockResolvedValue([]);
     mockBriefingLogFindMany.mockResolvedValue([
       {
-        articleIds: ['https://reuters.com/ai-protein', 'https://other.com/x'],
+        articleUrls: ['https://reuters.com/ai-protein', 'https://other.com/x'],
         podcast: { id: 'pod-1', slug: 'ai-briefing', user: { handle: 'sotto' } },
       },
     ]);

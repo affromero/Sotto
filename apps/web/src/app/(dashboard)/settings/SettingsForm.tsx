@@ -19,7 +19,8 @@ import { TtsProviderCards } from '@/components/settings/TtsProviderCards';
 import { AiProviderCards } from '@/components/settings/AiProviderCards';
 import { MusicProviderCards } from '@/components/settings/MusicProviderCards';
 import { AvatarImageManager } from '@/components/settings/AvatarImageManager';
-import { BriefingSettings } from '@/components/settings/BriefingSettings';
+import { BriefingSection } from '@/components/settings/BriefingSection';
+import type { BriefingData } from '@/components/settings/BriefingCard';
 import { ThemeSelector } from '@/components/settings/ThemeSelector';
 import { usePushSubscription } from '@/lib/hooks/usePushSubscription';
 import styles from './page.module.css';
@@ -70,23 +71,7 @@ interface SettingsFormProps {
   isTwitterProviderAvailable: boolean;
   initialEmailNotifications: boolean;
   initialPushNotifications: boolean;
-  initialBriefingEnabled: boolean;
-  initialBriefingTime: string | null;
-  initialBriefingTimezone: string | null;
-  initialBriefingDays: number;
-  initialBriefingVisibility: string;
-  initialBriefingAiModel: string | null;
-  initialBriefingTtsProvider: string | null;
-  initialBriefingTtsModel: string | null;
-  initialBriefingHostVoiceId: string | null;
-  initialBriefingExpertVoiceId: string | null;
-  initialBriefingDepth: string | null;
-  initialBriefingTone: string | null;
-  initialBriefingAudienceLevel: string | null;
-  initialBriefingDuration: number | null;
-  initialBriefingFormat: number;
-  initialBriefingPrompt: string | null;
-  initialBriefingUseByokKeys: boolean;
+  briefings: BriefingData[];
   hasByokKeys: boolean;
   initialQuizEnabled: boolean;
   quizAnswerCount: number;
@@ -127,23 +112,7 @@ export function SettingsForm({
   initialPreferredTtsModel,
   initialEmailNotifications,
   initialPushNotifications,
-  initialBriefingEnabled,
-  initialBriefingTime,
-  initialBriefingTimezone,
-  initialBriefingDays,
-  initialBriefingVisibility,
-  initialBriefingAiModel,
-  initialBriefingTtsProvider,
-  initialBriefingTtsModel,
-  initialBriefingHostVoiceId,
-  initialBriefingExpertVoiceId,
-  initialBriefingDepth,
-  initialBriefingTone,
-  initialBriefingAudienceLevel,
-  initialBriefingDuration,
-  initialBriefingFormat,
-  initialBriefingPrompt,
-  initialBriefingUseByokKeys,
+  briefings,
   hasByokKeys,
   initialQuizEnabled,
   isTwitterProviderAvailable,
@@ -196,8 +165,6 @@ export function SettingsForm({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [emailNotifications, setEmailNotifications] = useState(initialEmailNotifications);
   const [pushNotifications, setPushNotifications] = useState(initialPushNotifications);
-  const [briefingEnabled, setBriefingEnabled] = useState(initialBriefingEnabled);
-  const [briefingMountKey, setBriefingMountKey] = useState(0);
   const [quizEnabled, setQuizEnabled] = useState(initialQuizEnabled);
   const { pushState, subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } = usePushSubscription();
 
@@ -749,66 +716,20 @@ export function SettingsForm({
         </div>
       </section>
 
-      {/* Daily Briefing Section */}
+      {/* Daily Briefings Section */}
       <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Daily Briefing</h2>
+        <h2 className={styles.sectionTitle}>Daily Briefings</h2>
+        <BriefingSection
+          initialBriefings={briefings}
+          hasByokKeys={hasByokKeys}
+          aiModelOptions={aiModelOptions}
+          ttsOptions={ttsOptions}
+        />
+      </section>
+
+      {/* Quizzes Section */}
+      <section className={styles.section}>
         <div className={styles.toggleList}>
-          <label className={styles.toggleRow}>
-            <div className={styles.toggleInfo}>
-              <span className={styles.toggleLabel}>Enable Daily Briefing</span>
-              <span className={styles.toggleDescription}>
-                Get a personalized morning podcast based on your interests
-              </span>
-            </div>
-            <input
-              type="checkbox"
-              className={styles.toggle}
-              checked={briefingEnabled}
-              onChange={async (e) => {
-                const checked = e.target.checked;
-                setBriefingEnabled(checked);
-                if (checked) setBriefingMountKey((k) => k + 1);
-                const tz = initialBriefingTimezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
-                await fetch('/api/users/me', {
-                  method: 'PATCH',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    briefingEnabled: checked,
-                    ...(checked && !initialBriefingTimezone && { briefingTimezone: tz }),
-                    ...(checked && !initialBriefingTime && { briefingTime: '08:00' }),
-                  }),
-                });
-              }}
-              aria-label="Toggle daily briefing"
-            />
-          </label>
-          {briefingEnabled && (
-            <BriefingSettings
-              key={briefingMountKey}
-              initialTime={initialBriefingTime}
-              initialTimezone={initialBriefingTimezone}
-              initialDays={initialBriefingDays}
-              initialVisibility={initialBriefingVisibility}
-              initialAiModel={initialBriefingAiModel}
-              initialTtsOption={
-                initialBriefingTtsProvider && initialBriefingTtsModel
-                  ? `${initialBriefingTtsProvider}:${initialBriefingTtsModel}`
-                  : initialBriefingTtsProvider ?? null
-              }
-              initialHostVoiceId={initialBriefingHostVoiceId}
-              initialExpertVoiceId={initialBriefingExpertVoiceId}
-              initialDepth={initialBriefingDepth}
-              initialTone={initialBriefingTone}
-              initialAudienceLevel={initialBriefingAudienceLevel}
-              initialDuration={initialBriefingDuration}
-              initialFormat={initialBriefingFormat}
-              initialPrompt={initialBriefingPrompt}
-              initialUseByokKeys={initialBriefingUseByokKeys}
-              hasByokKeys={hasByokKeys}
-              aiModelOptions={aiModelOptions}
-              ttsOptions={ttsOptions}
-            />
-          )}
           <label className={styles.toggleRow}>
             <div className={styles.toggleInfo}>
               <span className={styles.toggleLabel}>Post-Listen Quizzes</span>
