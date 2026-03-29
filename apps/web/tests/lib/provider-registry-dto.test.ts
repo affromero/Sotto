@@ -45,8 +45,8 @@ describe('AI Provider Client DTO', () => {
 describe('TTS Provider Client DTO', () => {
   const meta = getAllTtsProviderClientMeta();
 
-  it('returns 7 providers and excludes kittentts', () => {
-    expect(meta).toHaveLength(7);
+  it('returns 8 providers and excludes kittentts', () => {
+    expect(meta).toHaveLength(8);
     expect(meta.map((m) => m.id)).not.toContain('kittentts');
   });
 

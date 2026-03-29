@@ -230,6 +230,11 @@ describe('tts-expression-mapper', () => {
       const result = mapDirectionToExpression('energetic', 'HOST', 'kittentts');
       expect(result).toEqual({});
     });
+
+    it('returns empty params for mistral', () => {
+      const result = mapDirectionToExpression('energetic', 'HOST', 'mistral');
+      expect(result).toEqual({});
+    });
   });
 
   describe('case insensitivity', () => {
