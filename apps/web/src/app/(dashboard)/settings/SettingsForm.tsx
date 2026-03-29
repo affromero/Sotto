@@ -84,6 +84,7 @@ interface SettingsFormProps {
   initialBriefingTone: string | null;
   initialBriefingAudienceLevel: string | null;
   initialBriefingDuration: number | null;
+  initialBriefingFormat: number;
   initialBriefingPrompt: string | null;
   initialBriefingUseByokKeys: boolean;
   hasByokKeys: boolean;
@@ -140,6 +141,7 @@ export function SettingsForm({
   initialBriefingTone,
   initialBriefingAudienceLevel,
   initialBriefingDuration,
+  initialBriefingFormat,
   initialBriefingPrompt,
   initialBriefingUseByokKeys,
   hasByokKeys,
@@ -799,6 +801,7 @@ export function SettingsForm({
               initialTone={initialBriefingTone}
               initialAudienceLevel={initialBriefingAudienceLevel}
               initialDuration={initialBriefingDuration}
+              initialFormat={initialBriefingFormat}
               initialPrompt={initialBriefingPrompt}
               initialUseByokKeys={initialBriefingUseByokKeys}
               hasByokKeys={hasByokKeys}

@@ -34,6 +34,13 @@ const DURATION_OPTIONS = [
   { value: 30, label: '30 min' },
 ];
 
+const FORMAT_OPTIONS = [
+  { value: 1, label: 'Solo (Monologue)' },
+  { value: 2, label: 'Dialogue (2 voices)' },
+  { value: 3, label: 'Panel (3 voices)' },
+  { value: 4, label: 'Roundtable (4 voices)' },
+];
+
 const VOICE_POOL_NAMES = [
   'Adam', 'Eric', 'Brian', 'Will', 'Roger', 'Charlie', 'George', 'Callum',
   'Aria', 'Rachel', 'Jessica', 'Laura', 'Matilda', 'Alice', 'Charlotte', 'Grace',
@@ -54,6 +61,7 @@ interface BriefingSettingsProps {
   initialTone: string | null;
   initialAudienceLevel: string | null;
   initialDuration: number | null;
+  initialFormat: number;
   initialPrompt: string | null;
   initialUseByokKeys: boolean;
   hasByokKeys: boolean;
@@ -82,6 +90,7 @@ export function BriefingSettings({
   initialTone,
   initialAudienceLevel,
   initialDuration,
+  initialFormat,
   initialPrompt,
   initialUseByokKeys,
   hasByokKeys,
@@ -99,6 +108,7 @@ export function BriefingSettings({
   const [tone, setTone] = useState(initialTone ?? '');
   const [audienceLevel, setAudienceLevel] = useState(initialAudienceLevel ?? '');
   const [duration, setDuration] = useState(initialDuration?.toString() ?? '');
+  const [format, setFormat] = useState(initialFormat);
   const [prompt, setPrompt] = useState(initialPrompt ?? '');
   const [useByokKeys, setUseByokKeys] = useState(initialUseByokKeys);
 
@@ -175,15 +185,21 @@ export function BriefingSettings({
       <div className={styles.group} role="group" aria-labelledby="briefing-content">
         <h3 className={styles.groupTitle} id="briefing-content">Content</h3>
         <div className={styles.field}>
-          <label className={styles.label}>Custom Instructions</label>
+          <label className={styles.label}>
+            Custom Instructions <span className={styles.required}>*</span>
+          </label>
           <textarea
-            className={styles.textarea}
+            className={`${styles.textarea}${!prompt.trim() ? ` ${styles.textareaEmpty}` : ''}`}
             value={prompt}
             onChange={(e) => handlePromptChange(e.target.value)}
-            placeholder="e.g. Focus on AI research and TypeScript ecosystem news"
+            placeholder="Required — e.g. Focus on AI research breakthroughs, TypeScript ecosystem updates, and startup funding rounds. Skip sports and celebrity news."
             maxLength={2000}
             aria-label="Briefing custom instructions"
+            aria-required="true"
           />
+          {!prompt.trim() && (
+            <span className={styles.hint}>Tell us what topics matter to you. Without this, briefings cover random stories.</span>
+          )}
           {prompt.length > 0 && (
             <span className={styles.charCount}>{prompt.length}/2000</span>
           )}
@@ -263,6 +279,23 @@ export function BriefingSettings({
               ))}
             </select>
           </div>
+        </div>
+        <div className={styles.field}>
+          <label className={styles.label}>Format</label>
+          <select
+            className={styles.select}
+            value={String(format)}
+            onChange={async (e) => {
+              const val = parseInt(e.target.value, 10);
+              setFormat(val);
+              await patchUser({ briefingFormat: val });
+            }}
+            aria-label="Briefing format"
+          >
+            {FORMAT_OPTIONS.map((o) => (
+              <option key={o.value} value={String(o.value)}>{o.label}</option>
+            ))}
+          </select>
         </div>
       </div>
 

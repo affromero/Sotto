@@ -42,6 +42,7 @@ const updateUserSchema = z
     briefingTone: z.enum(['casual', 'professional', 'socratic', 'comedic', 'satirical', 'storytelling']).nullable().optional(),
     briefingAudienceLevel: z.enum(['beginner', 'intermediate', 'expert']).nullable().optional(),
     briefingDuration: z.number().int().min(1).max(40).nullable().optional(),
+    briefingFormat: z.number().int().min(1).max(4).optional(),
     briefingPrompt: z.string().max(2000).nullable().optional(),
     briefingUseByokKeys: z.boolean().optional(),
     quizEnabled: z.boolean().optional(),
@@ -104,6 +105,7 @@ export async function GET(request: NextRequest) {
       briefingTone: user.briefingTone,
       briefingAudienceLevel: user.briefingAudienceLevel,
       briefingDuration: user.briefingDuration,
+      briefingFormat: user.briefingFormat,
       briefingPrompt: user.briefingPrompt,
       briefingUseByokKeys: user.briefingUseByokKeys,
     });
@@ -294,6 +296,7 @@ export async function PATCH(request: NextRequest) {
       briefingTone: updatedUser.briefingTone,
       briefingAudienceLevel: updatedUser.briefingAudienceLevel,
       briefingDuration: updatedUser.briefingDuration,
+      briefingFormat: updatedUser.briefingFormat,
       briefingPrompt: updatedUser.briefingPrompt,
       briefingUseByokKeys: updatedUser.briefingUseByokKeys,
     });

@@ -44,6 +44,7 @@ async function queryEligibleUsers(config: BriefingConfigData) {
       briefingTone: true,
       briefingAudienceLevel: true,
       briefingDuration: true,
+      briefingFormat: true,
       briefingPrompt: true,
       briefingUseByokKeys: true,
     },
@@ -66,6 +67,7 @@ function resolveBriefingConfig(user: BriefingUser, adminConfig: BriefingConfigDa
     tone: user.briefingTone ?? 'casual',
     audienceLevel: user.briefingAudienceLevel ?? 'intermediate',
     durationTarget: user.briefingDuration ?? adminConfig.targetDurationMinutes,
+    format: user.briefingFormat ?? 2,
     prompt: user.briefingPrompt,
     useByokKeys: user.briefingUseByokKeys,
   };
@@ -256,6 +258,35 @@ export async function processBriefingScheduler(job: Job<ScheduleBriefingsPayload
       const seed = `briefing-${user.id}-${now.toISOString().slice(0, 10)}`;
       const voices = resolveVoices(user, resolved.ttsProvider, seed, resolved);
 
+      // Build speaker list based on format
+      const FORMAT_SPEAKERS: Record<number, Array<{ name: string; description: string }>> = {
+        1: [{ name: 'Host', description: 'Warm, insightful narrator who guides the listener through the news with clarity and personality.' }],
+        2: [
+          { name: 'Host', description: 'Warm, sets up topics, asks great questions.' },
+          { name: 'Expert', description: 'Adds depth, key insights, and context.' },
+        ],
+        3: [
+          { name: 'Host', description: 'Moderates the discussion, keeps conversation flowing.' },
+          { name: 'Expert', description: 'Provides deep analysis and context.' },
+          { name: 'Analyst', description: 'Offers alternative perspectives and data-driven insights.' },
+        ],
+        4: [
+          { name: 'Host', description: 'Moderates the roundtable, synthesizes key points.' },
+          { name: 'Expert', description: 'Provides foundational knowledge.' },
+          { name: 'Analyst', description: 'Offers data-driven insights and alternative frameworks.' },
+          { name: 'Critic', description: 'Challenges assumptions, represents the skeptic.' },
+        ],
+      };
+      const speakers = FORMAT_SPEAKERS[resolved.format] ?? FORMAT_SPEAKERS[2];
+
+      // Build voice entries for each speaker
+      const voiceEntries = speakers.map((s, i) => {
+        if (i === 0) return { speaker: s.name, voiceId: voices.hostId, provider: voices.provider };
+        if (i === 1) return { speaker: s.name, voiceId: voices.expertId, provider: voices.provider };
+        // 3rd+ speakers: null voiceId — voice-assigner handles in audio-generation
+        return { speaker: s.name, voiceId: null as string | null, provider: voices.provider };
+      });
+
       const slug = await generatePodcastSlug(title, user.id, prisma);
 
       // Determine BYOK usage
@@ -279,10 +310,11 @@ export async function processBriefingScheduler(job: Job<ScheduleBriefingsPayload
           ttsModel: resolved.ttsModel,
           voices: {
             createMany: {
-              data: [
-                { speaker: 'Host', voiceId: voices.hostId, provider: voices.provider },
-                { speaker: 'Expert', voiceId: voices.expertId, provider: voices.provider },
-              ],
+              data: voiceEntries.map((v) => ({
+                speaker: v.speaker,
+                voiceId: v.voiceId,
+                provider: v.provider,
+              })),
             },
           },
           discovery: {
@@ -292,6 +324,7 @@ export async function processBriefingScheduler(job: Job<ScheduleBriefingsPayload
               audienceLevel: resolved.audienceLevel,
               tone: resolved.tone,
               durationTarget: resolved.durationTarget,
+              speakers: speakers.length > 0 ? speakers : undefined,
               sourceContent,
               userId: user.id,
             },
