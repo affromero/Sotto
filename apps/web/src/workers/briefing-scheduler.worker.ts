@@ -93,18 +93,34 @@ function resolveVoices(
   resolved: ReturnType<typeof resolveBriefingConfig>,
 ): { hostId: string; expertId: string; provider: string } {
   const providerKey = ttsProvider ?? 'elevenlabs';
-  const poolProvider = VOICE_POOL_PROVIDERS.has(providerKey)
+  const isPoolProvider = VOICE_POOL_PROVIDERS.has(providerKey);
+  const poolProvider = isPoolProvider
     ? (providerKey as 'elevenlabs' | 'openai')
-    : 'elevenlabs'; // fallback: store elevenlabs IDs, audio worker resolves per-provider
+    : 'elevenlabs';
 
-  // Try user-specified voice pool names (only if provider is in the pool)
+  // For non-pool providers (Cartesia, Hume, Fal, MiniMax, etc.):
+  // the stored briefingHostVoiceId/briefingExpertVoiceId are provider-native IDs
+  // (e.g. UUIDs for Cartesia, string names for Fal) — use them directly
+  if (!isPoolProvider) {
+    const pair = selectVoicePair(seed, {
+      tone: resolved.tone as 'casual' | 'professional' | 'socratic' | 'comedic' | 'satirical' | 'storytelling',
+      audienceLevel: resolved.audienceLevel as 'beginner' | 'intermediate' | 'expert',
+    });
+    return {
+      hostId: user.briefingHostVoiceId ?? resolveVoiceId(pair.host, poolProvider),
+      expertId: user.briefingExpertVoiceId ?? resolveVoiceId(pair.expert, poolProvider),
+      provider: providerKey,
+    };
+  }
+
+  // For pool providers (ElevenLabs, OpenAI): stored IDs are pool entry names
   let hostEntry: VoicePoolEntry | undefined;
   let expertEntry: VoicePoolEntry | undefined;
 
-  if (user.briefingHostVoiceId && VOICE_POOL_PROVIDERS.has(providerKey)) {
+  if (user.briefingHostVoiceId) {
     hostEntry = VOICE_POOL.find((v) => v.name === user.briefingHostVoiceId);
   }
-  if (user.briefingExpertVoiceId && VOICE_POOL_PROVIDERS.has(providerKey)) {
+  if (user.briefingExpertVoiceId) {
     expertEntry = VOICE_POOL.find((v) => v.name === user.briefingExpertVoiceId);
   }
 
