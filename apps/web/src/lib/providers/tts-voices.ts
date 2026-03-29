@@ -117,19 +117,18 @@ export const MINIMAX_VOICE_POOL: ProviderVoice[] = [
 // When cloned voice is available, it's used instead of these presets.
 // ---------------------------------------------------------------------------
 
+// Verified against Mistral API 2026-03-29. Preset voices (user_id=null).
+// IDs are UUIDs from GET /v1/audio/voices. Limited female presets currently.
 export const MISTRAL_VOICE_POOL: ProviderVoice[] = [
-  // Male voices
-  { id: 'casual_male', name: 'Casual Male', gender: 'male', character: 'friendly conversationalist' },
-  { id: 'neutral_male', name: 'Neutral Male', gender: 'male', character: 'polished professional' },
-  { id: 'fr_male', name: 'French Male', gender: 'male', character: 'warm narrator' },
-  { id: 'es_male', name: 'Spanish Male', gender: 'male', character: 'confident presenter' },
-  { id: 'de_male', name: 'German Male', gender: 'male', character: 'authoritative expert' },
-  // Female voices
-  { id: 'casual_female', name: 'Casual Female', gender: 'female', character: 'engaging storyteller' },
-  { id: 'cheerful_female', name: 'Cheerful Female', gender: 'female', character: 'enthusiastic explainer' },
-  { id: 'neutral_female', name: 'Neutral Female', gender: 'female', character: 'polished professional' },
-  { id: 'fr_female', name: 'French Female', gender: 'female', character: 'warm narrator' },
-  { id: 'es_female', name: 'Spanish Female', gender: 'female', character: 'friendly conversationalist' },
+  // Paul — en_us male, diverse emotions for podcast variety
+  { id: 'c69964a6-ab8b-4f8a-9465-ec0925096ec8', name: 'Paul (Neutral)', gender: 'male', character: 'polished professional' },
+  { id: '98559b22-62b5-4a64-a7cd-fc78ca41faa8', name: 'Paul (Confident)', gender: 'male', character: 'authoritative expert' },
+  { id: '01d985cd-5e0c-4457-bfd8-80ba31a5bc03', name: 'Paul (Cheerful)', gender: 'male', character: 'friendly conversationalist' },
+  { id: '5940190b-f58a-4c3e-8264-a40d63fd6883', name: 'Paul (Excited)', gender: 'male', character: 'enthusiastic explainer' },
+  // Oliver — en_gb male
+  { id: 'e3596645-b1af-469e-b857-f18ddedc7652', name: 'Oliver (Neutral)', gender: 'male', character: 'warm narrator' },
+  // Jane — en_gb female (only female preset currently available)
+  { id: 'a3e41ea8-020b-44c0-8d8b-f6cc03524e31', name: 'Jane (Sarcasm)', gender: 'female', character: 'engaging storyteller' },
 ];
 
 // ---------------------------------------------------------------------------
