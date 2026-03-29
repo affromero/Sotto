@@ -108,6 +108,8 @@ export interface ClaimAnalysis {
   existingCitations: number[];
   needsMoreCitations: boolean;
   hasUnreliableSource: boolean;
+  /** Which specific citation numbers are unreliable (e.g. Reddit, blogs). */
+  unreliableCitations?: number[];
   hasMisattribution: boolean;
   verificationNote: string;
   turnHash?: string;
