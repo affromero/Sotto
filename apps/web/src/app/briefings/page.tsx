@@ -7,7 +7,7 @@ import styles from './page.module.css';
 export const metadata = {
   title: `Daily Briefings — ${BRAND.name}`,
   description:
-    'Wake up to a personalized podcast every morning. Sotto curates the news you care about and turns it into a conversational briefing you can listen to over coffee.',
+    'Create multiple personalized podcast briefings — morning tech news, evening finance, weekend deep dives. Sotto curates the stories you care about and turns them into conversational podcasts.',
 };
 
 const STEPS = [
@@ -27,7 +27,7 @@ const STEPS = [
     number: '2',
     title: 'Set your schedule',
     description:
-      'Choose a delivery time and which days of the week. Your briefing is generated fresh each morning, timed to your timezone.',
+      'Name each briefing, choose a delivery time and which days of the week. Each one runs independently on its own schedule.',
     icon: (
       <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="10" />
@@ -96,14 +96,15 @@ export default function BriefingsPage() {
           <header className={styles.hero}>
             <p className={styles.overline}>Daily Briefings</p>
             <h1 className={styles.heroTitle}>
-              Your morning podcast,
+              Your podcasts,
               <br />
               built overnight.
             </h1>
             <p className={styles.heroSubtitle}>
-              Sotto reads the news while you sleep and turns it into a
-              conversational podcast tailored to your interests. No scrolling,
-              no skimming — just press play.
+              Create up to 5 personalized briefings — morning tech news, evening
+              finance, weekend deep dives. Sotto reads the stories while you sleep
+              and turns them into conversational podcasts. No scrolling, no
+              skimming — just press play.
             </p>
           </header>
 
