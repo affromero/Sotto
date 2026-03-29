@@ -91,8 +91,8 @@ function setupDefaultMocks() {
   mockResolveAutoModel.mockResolvedValue({
     aiProvider: 'anthropic',
     aiModel: 'claude-haiku-4-5-20251001',
-    ttsProvider: 'kittentts',
-    ttsModel: 'kitten-tts-mini-0.8',
+    ttsProvider: 'openai',
+    ttsModel: 'tts-1-hd',
     sttProvider: 'openai',
     sttModel: 'whisper-1',
   });
@@ -212,8 +212,8 @@ describe('generateForYouQuestions', () => {
     mockResolveAutoModel.mockResolvedValue({
       aiProvider: 'anthropic',
       aiModel: 'gpt-5-mini',
-      ttsProvider: 'kittentts',
-      ttsModel: 'kitten-tts-mini-0.8',
+      ttsProvider: 'openai',
+      ttsModel: 'tts-1-hd',
       sttProvider: 'openai',
       sttModel: 'whisper-1',
     });
@@ -232,8 +232,8 @@ describe('generateForYouQuestions', () => {
     mockResolveAutoModel.mockResolvedValue({
       aiProvider: 'anthropic',
       aiModel: 'llama-3.1-8b-instant',
-      ttsProvider: 'kittentts',
-      ttsModel: 'kitten-tts-mini-0.8',
+      ttsProvider: 'openai',
+      ttsModel: 'tts-1-hd',
       sttProvider: 'openai',
       sttModel: 'whisper-1',
     });
