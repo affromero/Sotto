@@ -88,6 +88,21 @@
   align-self: flex-end;
 }
 
+.checkboxRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--spacing-sm);
+  cursor: pointer;
+}
+
+.checkboxLabel {
+  font: var(--text-caption);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
 @media (max-width: 480px) {
   .fieldRow {
     flex-direction: column;

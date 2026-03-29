@@ -63,7 +63,7 @@ const defaultProps = {
   initialBriefingAudienceLevel: null,
   initialBriefingDuration: null,
   initialBriefingPrompt: null,
-  initialBriefingUseByokKeys: true,
+  initialBriefingUseByokKeys: false,
   hasByokKeys: false,
   initialQuizEnabled: false,
 };

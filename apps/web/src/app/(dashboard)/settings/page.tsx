@@ -165,7 +165,7 @@ export default async function SettingsPage() {
         initialBriefingDuration={user.briefingDuration}
         initialBriefingPrompt={user.briefingPrompt}
         initialBriefingUseByokKeys={user.briefingUseByokKeys}
-        hasByokKeys={configuredProviders.length > 0 || configuredAiProviders.length > 0}
+        hasByokKeys={configuredProviders.some((p) => p.isValid) || configuredAiProviders.some((p) => p.isValid)}
         initialQuizEnabled={user.quizEnabled}
         quizAnswerCount={quizAnswerCount}
         referredUsers={referredUsers.map((u) => ({ name: u.name, handle: u.handle, image: u.image, joinedAt: u.createdAt.toISOString(), verified: u.referralVerified }))}

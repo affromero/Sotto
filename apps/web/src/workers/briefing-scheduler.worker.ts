@@ -27,10 +27,8 @@ async function queryEligibleUsers(config: BriefingConfigData) {
       briefingDays: true,
       briefingVisibility: true,
       lastBriefingAt: true,
-      plan: true,
-      role: true,
       interests: {
-        select: { tag: { select: { slug: true, name: true } } },
+        select: { tag: { select: { slug: true } } },
       },
       // User general preferences (fallback tier)
       preferredAiModel: true,
@@ -66,7 +64,7 @@ function resolveBriefingConfig(user: BriefingUser, adminConfig: BriefingConfigDa
     ttsModel: user.briefingTtsModel ?? user.preferredTtsModel ?? adminConfig.defaultTtsModel,
     depth: user.briefingDepth ?? 'quick_overview',
     tone: user.briefingTone ?? 'casual',
-    audienceLevel: user.briefingAudienceLevel ?? 'general',
+    audienceLevel: user.briefingAudienceLevel ?? 'intermediate',
     durationTarget: user.briefingDuration ?? adminConfig.targetDurationMinutes,
     prompt: user.briefingPrompt,
     useByokKeys: user.briefingUseByokKeys,
@@ -78,22 +76,33 @@ function resolveBriefingConfig(user: BriefingUser, adminConfig: BriefingConfigDa
  * If the user specified voice pool names, look them up and resolve for the target provider.
  * Otherwise, use selectVoicePair with tone/audience metadata for smart matching.
  */
+const VOICE_POOL_PROVIDERS = new Set<string>(['elevenlabs', 'openai', 'kittentts']);
+
+/**
+ * Resolve voice IDs for a user's briefing.
+ * Voice pool names only work for providers that have entries in VOICE_POOL (elevenlabs, openai, kittentts).
+ * For other providers (cartesia, hume, fal, etc.), fall back to the pool's elevenlabs IDs —
+ * the audio-generation worker will resolve provider-specific voices via its own voice mapping.
+ */
 function resolveVoices(
   user: BriefingUser,
   ttsProvider: string | null,
   seed: string,
   resolved: ReturnType<typeof resolveBriefingConfig>,
 ): { hostId: string; expertId: string; provider: string } {
-  const provider = (ttsProvider ?? 'elevenlabs') as 'elevenlabs' | 'openai' | 'kittentts';
+  const providerKey = ttsProvider ?? 'elevenlabs';
+  const poolProvider = VOICE_POOL_PROVIDERS.has(providerKey)
+    ? (providerKey as 'elevenlabs' | 'openai' | 'kittentts')
+    : 'elevenlabs'; // fallback: store elevenlabs IDs, audio worker resolves per-provider
 
-  // Try user-specified voice pool names
+  // Try user-specified voice pool names (only if provider is in the pool)
   let hostEntry: VoicePoolEntry | undefined;
   let expertEntry: VoicePoolEntry | undefined;
 
-  if (user.briefingHostVoiceId) {
+  if (user.briefingHostVoiceId && VOICE_POOL_PROVIDERS.has(providerKey)) {
     hostEntry = VOICE_POOL.find((v) => v.name === user.briefingHostVoiceId);
   }
-  if (user.briefingExpertVoiceId) {
+  if (user.briefingExpertVoiceId && VOICE_POOL_PROVIDERS.has(providerKey)) {
     expertEntry = VOICE_POOL.find((v) => v.name === user.briefingExpertVoiceId);
   }
 
@@ -108,9 +117,9 @@ function resolveVoices(
   }
 
   return {
-    hostId: resolveVoiceId(hostEntry, provider),
-    expertId: resolveVoiceId(expertEntry, provider),
-    provider,
+    hostId: resolveVoiceId(hostEntry, poolProvider),
+    expertId: resolveVoiceId(expertEntry, poolProvider),
+    provider: providerKey,
   };
 }
 
