@@ -198,12 +198,13 @@ async function processSingleMention(tweet: TwitterTweet, mediaByKey: Map<string,
     // 7c. Resolve plan + tier features (needed for model gating, format, visibility)
     const userRecord = await prisma.user.findUniqueOrThrow({
       where: { id: userId },
-      select: { plan: true },
+      select: { plan: true, role: true },
     });
     const isByok = await hasByokKey(userId);
     const tierFeatures = getTierFeatures(
       userRecord.plan === 'PRO' ? 'PRO' : 'FREE',
       isByok,
+      userRecord.role ?? undefined,
     );
 
     // 7d. Resolve user-requested model preferences from tweet
