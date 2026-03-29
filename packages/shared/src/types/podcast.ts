@@ -78,6 +78,8 @@ export interface PodcastDetail extends PodcastSummary {
   pdfUrl: string | null;
   isLiked: boolean;
   isSaved: boolean;
+  /** Owner-only: reason the generation pipeline failed (null for non-owners or non-failed podcasts) */
+  failureReason?: string | null;
   voiceTracks: VoiceTrackSummary[];
   defaultVoiceTrackId: string | null;
   originalTrackName: string;
