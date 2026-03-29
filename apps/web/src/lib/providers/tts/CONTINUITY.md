@@ -19,7 +19,6 @@ When text exceeds a provider's character limit, we split into chunks and generat
 | **Fal** | None | Qwen3-TTS has no cross-request continuity. Each request is stateless. | — |
 | **Replicate** | None | Inworld TTS / Qwen3 TTS have no cross-request continuity. | — |
 | **MiniMax** | None | Speech-02 has no cross-request continuity API. | — |
-| **KittenTTS** | None | Local CPU model, no continuity mechanism. | — |
 
 ---
 

@@ -58,7 +58,6 @@ vi.mock('@/lib/providers/tts-voices', () => ({
       replicate: 'Vivian',
       minimax: 'Deep_Voice_Man',
       mistral: 'casual_male',
-      openai: 'bella',
     };
     return map[provider] ?? 'alloy';
   }),

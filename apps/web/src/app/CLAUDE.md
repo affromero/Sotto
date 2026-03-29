@@ -145,7 +145,6 @@
 | `/api/admin/test-video-pipeline` | POST | ADMIN | Video pipeline test bench: classify visuals, resolve places, generate map images, AI illustrations, stock footage search |
 | `/api/admin/briefing-config` | GET/PATCH | ADMIN | Briefing scheduler config (singleton) |
 | `/api/admin/*` | Various | ADMIN | Admin endpoints (users, podcasts, auto-models, costs, model-pricing, ratings, handles, announcements, twitter, moderation, reports, claims, test-model, test-video-pipeline, traffic-report) |
-| `/api/admin/kittentts/health` | GET | ADMIN | Proxy to `KITTENTTS_URL/health`; returns `{ configured, status, model?, latencyMs }` |
 
 ## Route Groups
 
