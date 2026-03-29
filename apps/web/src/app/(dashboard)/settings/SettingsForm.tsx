@@ -773,6 +773,7 @@ export function SettingsForm({
                   body: JSON.stringify({
                     briefingEnabled: checked,
                     ...(checked && !initialBriefingTimezone && { briefingTimezone: tz }),
+                    ...(checked && !initialBriefingTime && { briefingTime: '08:00' }),
                   }),
                 });
               }}
@@ -783,6 +784,7 @@ export function SettingsForm({
             <BriefingSettings
               key={briefingMountKey}
               initialTime={initialBriefingTime}
+              initialTimezone={initialBriefingTimezone}
               initialDays={initialBriefingDays}
               initialVisibility={initialBriefingVisibility}
               initialAiModel={initialBriefingAiModel}
