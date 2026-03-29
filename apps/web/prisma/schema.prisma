@@ -1771,8 +1771,8 @@ model AutoModelConfig {
   id                       String   @id @default("singleton")
   freeAiProvider           String   @default("anthropic")
   freeAiModel              String   @default("claude-haiku-4-5-20251001")
-  freeTtsProvider          String   @default("kittentts")
-  freeTtsModel             String   @default("kitten-tts-mini-0.8")
+  freeTtsProvider          String   @default("openai")
+  freeTtsModel             String   @default("tts-1-hd")
   freeSttProvider          String   @default("openai")
   freeSttModel             String   @default("whisper-large-v3-turbo")
   proAiProvider            String   @default("anthropic")
@@ -2578,7 +2578,7 @@ model BriefingConfig {
   id                     String   @id @default("singleton")
   enabled                Boolean  @default(true)
   defaultAiModel         String?
-  defaultTtsProvider     String? // default: "kittentts"
+  defaultTtsProvider     String?
   defaultTtsModel        String?
   maxArticlesPerBriefing Int      @default(5)
   targetDurationMinutes  Int      @default(6)

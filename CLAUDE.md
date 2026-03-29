@@ -36,7 +36,7 @@ Root `package.json` proxies to `@sotto/web`. Each subdirectory has its own `CLAU
 
 ```bash
 npm install                    # All workspaces
-docker-compose up -d           # PostgreSQL + Redis + KittenTTS
+docker-compose up -d           # PostgreSQL + Redis
 npx prisma db push --schema=apps/web/prisma/schema.prisma
 npx prisma generate --schema=apps/web/prisma/schema.prisma
 npm run dev                    # Syncs prod DB + starts web + workers
@@ -136,13 +136,13 @@ content-extraction → script-generation → script-verification (≤3 loops) �
 
 All secrets via **Doppler** — NEVER suggest `.env` files, dotenv, or hardcoded environment variables. Project: `sotto`, config: `dev`. Scripts wrap with `doppler run --`.
 
-Critical: `DATABASE_URL`, `REDIS_URL`, `NEXTAUTH_SECRET`, `ANTHROPIC_API_KEY`, `ELEVENLABS_API_KEY`, `R2_*`, `BYOK_ENCRYPTION_KEY`, `KITTENTTS_URL`.
+Critical: `DATABASE_URL`, `REDIS_URL`, `NEXTAUTH_SECRET`, `ANTHROPIC_API_KEY`, `ELEVENLABS_API_KEY`, `R2_*`, `BYOK_ENCRYPTION_KEY`.
 Swappable: `AI_PROVIDER`, `TTS_PROVIDER`, `STT_PROVIDER`, `STORAGE_PROVIDER`, `PAYMENT_PROVIDER`.
 
 ## Known Gotchas
 
 - **Alpine + Chromium**: Pin Alpine version to match the Chromium version available in its repos. Alpine 3.22+ works with Chromium 136+. Never mix versions — CDP protocol mismatches cause silent crashes. Test with `chromium --version` inside the container.
-- **Docker service names**: Workers reach sidecars via Docker service names (`http://remotion:3100`, `http://kittentts:8000`), NOT `localhost`. Only use `localhost` for local dev outside Docker.
+- **Docker service names**: Workers reach sidecars via Docker service names (`http://remotion:3100`), NOT `localhost`. Only use `localhost` for local dev outside Docker.
 - **Prisma in Docker**: Always run `npx prisma generate` inside the Docker build — the generated client is platform-specific (linux-musl vs darwin).
 - **`__dirname` in monorepo Docker**: Never use `__dirname`-relative paths to reach across package boundaries. Use `process.cwd()` for cross-package references.
 - **DB enum values are UPPERCASE**: `AI_ILLUSTRATION`, `STOCK_FOOTAGE`, `TEXT_CARD` — any mapping or switch statement must match exactly.
