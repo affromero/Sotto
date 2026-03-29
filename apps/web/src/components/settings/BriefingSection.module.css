@@ -1,0 +1,60 @@
+/* Briefing section — list of cards + create */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.counter {
+  font: var(--text-caption);
+  color: var(--color-text-tertiary);
+}
+
+.capHint {
+  color: var(--color-primary);
+  font-weight: 500;
+}
+
+.empty {
+  padding: var(--spacing-lg);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-lg);
+  text-align: center;
+}
+
+.emptyText {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+.createCard {
+  border: 1px solid var(--color-primary-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-md);
+  background: var(--color-surface);
+}
+
+.addBtn {
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-lg);
+  background: transparent;
+  font: var(--text-body-sm);
+  font-weight: 500;
+  color: var(--color-primary);
+  cursor: pointer;
+  min-height: 44px;
+  transition: all var(--transition-fast);
+}
+
+.addBtn:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  background: var(--color-primary-subtle);
+}
+
+.addBtn:disabled {
+  color: var(--color-text-tertiary);
+  cursor: not-allowed;
+}
