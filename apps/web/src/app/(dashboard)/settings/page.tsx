@@ -53,6 +53,7 @@ export default async function SettingsPage() {
         briefingTone: true,
         briefingAudienceLevel: true,
         briefingDuration: true,
+        briefingFormat: true,
         briefingPrompt: true,
         briefingUseByokKeys: true,
         quizEnabled: true,
@@ -163,6 +164,7 @@ export default async function SettingsPage() {
         initialBriefingTone={user.briefingTone}
         initialBriefingAudienceLevel={user.briefingAudienceLevel}
         initialBriefingDuration={user.briefingDuration}
+        initialBriefingFormat={user.briefingFormat}
         initialBriefingPrompt={user.briefingPrompt}
         initialBriefingUseByokKeys={user.briefingUseByokKeys}
         hasByokKeys={configuredProviders.some((p) => p.isValid) || configuredAiProviders.some((p) => p.isValid)}

@@ -34,10 +34,17 @@ const DURATION_OPTIONS = [
   { value: 30, label: '30 min' },
 ];
 
-const VOICE_POOL_NAMES = [
-  'Adam', 'Eric', 'Brian', 'Will', 'Roger', 'Charlie', 'George', 'Callum',
-  'Aria', 'Rachel', 'Jessica', 'Laura', 'Matilda', 'Alice', 'Charlotte', 'Grace',
+const FORMAT_OPTIONS = [
+  { value: 1, label: 'Solo (Monologue)' },
+  { value: 2, label: 'Dialogue (2 voices)' },
+  { value: 3, label: 'Panel (3 voices)' },
+  { value: 4, label: 'Roundtable (4 voices)' },
 ];
+
+interface VoiceOption {
+  id: string;
+  name: string;
+}
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -54,6 +61,7 @@ interface BriefingSettingsProps {
   initialTone: string | null;
   initialAudienceLevel: string | null;
   initialDuration: number | null;
+  initialFormat: number;
   initialPrompt: string | null;
   initialUseByokKeys: boolean;
   hasByokKeys: boolean;
@@ -82,6 +90,7 @@ export function BriefingSettings({
   initialTone,
   initialAudienceLevel,
   initialDuration,
+  initialFormat,
   initialPrompt,
   initialUseByokKeys,
   hasByokKeys,
@@ -99,8 +108,40 @@ export function BriefingSettings({
   const [tone, setTone] = useState(initialTone ?? '');
   const [audienceLevel, setAudienceLevel] = useState(initialAudienceLevel ?? '');
   const [duration, setDuration] = useState(initialDuration?.toString() ?? '');
+  const [format, setFormat] = useState(initialFormat);
   const [prompt, setPrompt] = useState(initialPrompt ?? '');
   const [useByokKeys, setUseByokKeys] = useState(initialUseByokKeys);
+
+  // Dynamic voice options from selected TTS provider
+  const [voiceOptions, setVoiceOptions] = useState<VoiceOption[]>([]);
+  const [voicesLoading, setVoicesLoading] = useState(false);
+
+  useEffect(() => {
+    const provider = ttsOption ? ttsOption.split(':')[0] : null;
+    if (!provider) {
+      setVoiceOptions([]);
+      return;
+    }
+    let cancelled = false;
+    setVoicesLoading(true);
+    fetch(`/api/voices?provider=${encodeURIComponent(provider)}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled) return;
+        const voices: VoiceOption[] = (data?.poolVoices ?? []).map((v: { id: string; name: string }) => ({
+          id: v.id,
+          name: v.name,
+        }));
+        setVoiceOptions(voices);
+      })
+      .catch(() => {
+        if (!cancelled) setVoiceOptions([]);
+      })
+      .finally(() => {
+        if (!cancelled) setVoicesLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [ttsOption]);
 
   // Debounce prompt saves
   const [promptTimer, setPromptTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
@@ -175,15 +216,21 @@ export function BriefingSettings({
       <div className={styles.group} role="group" aria-labelledby="briefing-content">
         <h3 className={styles.groupTitle} id="briefing-content">Content</h3>
         <div className={styles.field}>
-          <label className={styles.label}>Custom Instructions</label>
+          <label className={styles.label}>
+            Custom Instructions <span className={styles.required}>*</span>
+          </label>
           <textarea
-            className={styles.textarea}
+            className={`${styles.textarea}${!prompt.trim() ? ` ${styles.textareaEmpty}` : ''}`}
             value={prompt}
             onChange={(e) => handlePromptChange(e.target.value)}
-            placeholder="e.g. Focus on AI research and TypeScript ecosystem news"
+            placeholder="Required — e.g. Focus on AI research breakthroughs, TypeScript ecosystem updates, and startup funding rounds. Skip sports and celebrity news."
             maxLength={2000}
             aria-label="Briefing custom instructions"
+            aria-required="true"
           />
+          {!prompt.trim() && (
+            <span className={styles.hint}>Tell us what topics matter to you. Without this, briefings cover random stories.</span>
+          )}
           {prompt.length > 0 && (
             <span className={styles.charCount}>{prompt.length}/2000</span>
           )}
@@ -264,6 +311,23 @@ export function BriefingSettings({
             </select>
           </div>
         </div>
+        <div className={styles.field}>
+          <label className={styles.label}>Format</label>
+          <select
+            className={styles.select}
+            value={String(format)}
+            onChange={async (e) => {
+              const val = parseInt(e.target.value, 10);
+              setFormat(val);
+              await patchUser({ briefingFormat: val });
+            }}
+            aria-label="Briefing format"
+          >
+            {FORMAT_OPTIONS.map((o) => (
+              <option key={o.value} value={String(o.value)}>{o.label}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* Audio */}
@@ -297,12 +361,15 @@ export function BriefingSettings({
             onChange={async (e) => {
               const val = e.target.value;
               setTtsOption(val);
+              // Clear voice selections when provider changes — IDs are provider-specific
+              setHostVoice('');
+              setExpertVoice('');
               if (val) {
                 const [provider, ...modelParts] = val.split(':');
                 const model = modelParts.join(':');
-                await patchUser({ briefingTtsProvider: provider, briefingTtsModel: model || null });
+                await patchUser({ briefingTtsProvider: provider, briefingTtsModel: model || null, briefingHostVoiceId: null, briefingExpertVoiceId: null });
               } else {
-                await patchUser({ briefingTtsProvider: null, briefingTtsModel: null });
+                await patchUser({ briefingTtsProvider: null, briefingTtsModel: null, briefingHostVoiceId: null, briefingExpertVoiceId: null });
               }
             }}
             aria-label="Briefing voice provider"
@@ -326,11 +393,12 @@ export function BriefingSettings({
                 setHostVoice(val);
                 await patchUser({ briefingHostVoiceId: val || null });
               }}
+              disabled={voicesLoading || voiceOptions.length === 0}
               aria-label="Briefing host voice"
             >
               <option value="">Auto-assign</option>
-              {VOICE_POOL_NAMES.map((name) => (
-                <option key={name} value={name}>{name}</option>
+              {voiceOptions.map((v) => (
+                <option key={v.id} value={v.id}>{v.name}</option>
               ))}
             </select>
           </div>
@@ -344,11 +412,12 @@ export function BriefingSettings({
                 setExpertVoice(val);
                 await patchUser({ briefingExpertVoiceId: val || null });
               }}
+              disabled={voicesLoading || voiceOptions.length === 0}
               aria-label="Briefing expert voice"
             >
               <option value="">Auto-assign</option>
-              {VOICE_POOL_NAMES.map((name) => (
-                <option key={name} value={name}>{name}</option>
+              {voiceOptions.map((v) => (
+                <option key={v.id} value={v.id}>{v.name}</option>
               ))}
             </select>
           </div>

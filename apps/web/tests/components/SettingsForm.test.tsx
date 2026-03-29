@@ -62,6 +62,7 @@ const defaultProps = {
   initialBriefingTone: null,
   initialBriefingAudienceLevel: null,
   initialBriefingDuration: null,
+  initialBriefingFormat: 2,
   initialBriefingPrompt: null,
   initialBriefingUseByokKeys: false,
   hasByokKeys: false,

@@ -408,6 +408,9 @@ export async function generateScript(params: {
         WORD_COUNT_MIN: String(wordCountBounds(params.durationTarget).min),
         WORD_COUNT_MAX: String(wordCountBounds(params.durationTarget).max),
         WORD_COUNT_IDEAL: String(minutesToWords(params.durationTarget)),
+        SPEAKER_SECTION: speakerSection,
+        HOST_SPEAKER: speakers[0].name,
+        EXPERT_SPEAKER: speakers.length > 1 ? speakers[1].name : speakers[0].name,
         SOURCE_ARTICLES: params.sourceContent || '',
       })
     : loadAndRender('generation/script-generator.md', {
@@ -449,7 +452,64 @@ export async function generateScript(params: {
     useWebSearch: params.webSearchEnabled !== false,
   });
 
-  return parseScriptResponse(response);
+  const result = parseScriptResponse(response);
+
+  // For BRIEFING source: map references back to real source article URLs.
+  // The LLM may hallucinate URLs despite being told to use source articles.
+  // This deterministic post-processing replaces any reference URLs with the
+  // real URLs extracted from the formatted source articles.
+  if (params.source === 'BRIEFING' && params.sourceContent) {
+    result.references = mapBriefingReferences(result.references, params.sourceContent);
+  }
+
+  return result;
+}
+
+/**
+ * Parse formatted source articles (from formatArticlesForPrompt) to extract
+ * article number → { title, url } mapping, then replace LLM-generated reference
+ * URLs with the real ones by matching on reference number or title similarity.
+ */
+function mapBriefingReferences(
+  refs: GeneratedReference[],
+  sourceContent: string,
+): GeneratedReference[] {
+  // Parse source articles: [N] Source — "Title" (date)\n    URL: https://...\n    Summary
+  const articleMap = new Map<number, { title: string; url: string; source: string }>();
+  const articleRegex = /\[(\d+)\]\s+(.+?)\s*—\s*"(.+?)"\s*\(.+?\)\n\s+URL:\s*(\S+)/g;
+  let match;
+  while ((match = articleRegex.exec(sourceContent)) !== null) {
+    articleMap.set(parseInt(match[1], 10), {
+      source: match[2].trim(),
+      title: match[3].trim(),
+      url: match[4].trim(),
+    });
+  }
+
+  if (articleMap.size === 0) return refs;
+
+  return refs.map((ref) => {
+    // First: try exact number match
+    const byNumber = articleMap.get(ref.number);
+    if (byNumber) {
+      return { ...ref, url: byNumber.url, title: ref.title || byNumber.title, type: 'ARTICLE' as const };
+    }
+
+    // Second: fuzzy title match (LLM may reorder numbers)
+    const refTitleLower = (ref.title || '').toLowerCase();
+    for (const [, article] of articleMap) {
+      if (refTitleLower && article.title.toLowerCase().includes(refTitleLower.slice(0, 30))) {
+        return { ...ref, url: article.url, type: 'ARTICLE' as const };
+      }
+      if (refTitleLower && refTitleLower.includes(article.title.toLowerCase().slice(0, 30))) {
+        return { ...ref, url: article.url, type: 'ARTICLE' as const };
+      }
+    }
+
+    // No match — keep the reference but mark URL as null so verification catches it
+    // rather than using a hallucinated URL
+    return { ...ref, url: null };
+  });
 }
 
 /**
