@@ -211,12 +211,12 @@ export async function processBriefingScheduler(job: Job<ScheduleBriefingsPayload
       userId: { in: batch.map((u) => u.id) },
       generatedAt: { gte: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000) },
     },
-    select: { userId: true, articleIds: true },
+    select: { userId: true, articleUrls: true },
   });
   const usedArticlesByUser = new Map<string, Set<string>>();
   for (const log of recentLogs) {
     const existing = usedArticlesByUser.get(log.userId) ?? new Set();
-    for (const id of log.articleIds) existing.add(id);
+    for (const id of log.articleUrls) existing.add(id);
     usedArticlesByUser.set(log.userId, existing);
   }
 
@@ -353,7 +353,7 @@ export async function processBriefingScheduler(job: Job<ScheduleBriefingsPayload
           userId: user.id,
           podcastId: podcast.id,
           topicSlugs,
-          articleIds: selected.map((a) => a.url),
+          articleUrls: selected.map((a) => a.url),
         },
       });
 
