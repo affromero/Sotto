@@ -86,9 +86,9 @@ export async function GET(request: NextRequest) {
   const articleUrls = results.map((a) => a.url);
   const briefingLogs = articleUrls.length > 0
     ? await prisma.briefingLog.findMany({
-        where: { articleIds: { hasSome: articleUrls } },
+        where: { articleUrls: { hasSome: articleUrls } },
         select: {
-          articleIds: true,
+          articleUrls: true,
           podcast: { select: { id: true, slug: true, user: { select: { handle: true } } } },
         },
       })
@@ -96,7 +96,7 @@ export async function GET(request: NextRequest) {
 
   const urlToPodcast = new Map<string, { id: string; slug: string | null; handle: string | null }>();
   for (const log of briefingLogs) {
-    for (const url of log.articleIds) {
+    for (const url of log.articleUrls) {
       if (!urlToPodcast.has(url)) {
         urlToPodcast.set(url, {
           id: log.podcast.id,
