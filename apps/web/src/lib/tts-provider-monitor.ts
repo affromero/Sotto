@@ -46,7 +46,7 @@ interface SnapshotDiff {
 // Provider list — derived from registry, filtered to API-accessible providers
 // ---------------------------------------------------------------------------
 
-/** Providers with API-accessible model/voice lists. Others (fal, replicate, minimax, kittentts) use fixed sets. */
+/** Providers with API-accessible model/voice lists. Others (fal, replicate, minimax) use fixed sets. */
 const MONITORED_PROVIDERS: TtsProviderId[] = ['elevenlabs', 'cartesia', 'hume', 'openai'];
 
 // ---------------------------------------------------------------------------

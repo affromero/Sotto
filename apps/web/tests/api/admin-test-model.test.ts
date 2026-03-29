@@ -58,7 +58,6 @@ vi.mock('@/lib/providers/tts-voices', () => ({
       replicate: 'Vivian',
       minimax: 'Deep_Voice_Man',
       mistral: 'casual_male',
-      kittentts: 'bella',
     };
     return map[provider] ?? 'alloy';
   }),
@@ -68,7 +67,7 @@ vi.mock('@/lib/providers/tts-voices', () => ({
 // Tests control keys via vi.stubEnv() in beforeEach.
 
 vi.mock('@/lib/providers/tts-registry', () => ({
-  getProviderIds: vi.fn(() => ['kittentts', 'elevenlabs', 'openai', 'cartesia', 'hume', 'fal', 'replicate', 'minimax', 'mistral']),
+  getProviderIds: vi.fn(() => ['elevenlabs', 'openai', 'cartesia', 'hume', 'fal', 'replicate', 'minimax', 'mistral']),
   getProviderMeta: vi.fn(() => ({ defaultModel: 'test-model' })),
 }));
 
@@ -150,7 +149,6 @@ describe('POST /api/admin/test-model', () => {
     vi.stubEnv('HUME_API_KEY', '');
     vi.stubEnv('FAL_KEY', '');
     vi.stubEnv('REPLICATE_API_TOKEN', '');
-    vi.stubEnv('KITTENTTS_URL', '');
     vi.stubEnv('ANTHROPIC_API_KEY', '');
     vi.stubEnv('MINIMAX_API_KEY', '');
   });
@@ -306,14 +304,6 @@ describe('POST /api/admin/test-model', () => {
       expect(body.error).toBe('Platform API key not configured (check .env)');
     });
 
-    it('returns failure for KittenTTS when KITTENTTS_URL is not set', async () => {
-      const res = await POST(createRequest({ type: 'tts', provider: 'kittentts', model: 'kitten-tts-mini-0.8' }));
-      const body = await res.json();
-
-      expect(body.success).toBe(false);
-      expect(body.error).toBe('Platform API key not configured (check .env)');
-    });
-
     it('classifies an auth error from the TTS provider', async () => {
       vi.stubEnv('CARTESIA_API_KEY', 'bad-key');
       mockGenerateSpeech.mockRejectedValue(new Error('403 forbidden'));
@@ -330,7 +320,7 @@ describe('POST /api/admin/test-model', () => {
 
   describe('STT', () => {
     it('returns success with the transcription text', async () => {
-      vi.stubEnv('KITTENTTS_URL', 'http://localhost:8100');
+      vi.stubEnv('ELEVENLABS_API_KEY', 'xi-test-tts');
       mockGenerateSpeech.mockResolvedValue(Buffer.from('fake-audio'));
       vi.stubEnv('OPENAI_API_KEY', 'sk-test-key');
       mockTranscribe.mockResolvedValue({ text: 'Hello world', segments: [], language: 'en' });
@@ -345,7 +335,7 @@ describe('POST /api/admin/test-model', () => {
     });
 
     it('returns silence note when transcription is empty', async () => {
-      vi.stubEnv('KITTENTTS_URL', 'http://localhost:8100');
+      vi.stubEnv('ELEVENLABS_API_KEY', 'xi-test-tts');
       mockGenerateSpeech.mockResolvedValue(Buffer.from('fake-audio'));
       vi.stubEnv('OPENAI_API_KEY', 'sk-test-key');
       mockTranscribe.mockResolvedValue({ text: '', segments: [], language: 'en' });
@@ -367,7 +357,7 @@ describe('POST /api/admin/test-model', () => {
     });
 
     it('routes ElevenLabs STT to ELEVENLABS_API_KEY', async () => {
-      vi.stubEnv('KITTENTTS_URL', 'http://localhost:8100');
+      vi.stubEnv('ELEVENLABS_API_KEY', 'xi-test-tts');
       mockGenerateSpeech.mockResolvedValue(Buffer.from('fake-audio'));
       vi.stubEnv('ELEVENLABS_API_KEY', 'xi-stt-key');
       mockTranscribe.mockResolvedValue({ text: 'transcribed', segments: [], language: 'en' });
@@ -378,7 +368,7 @@ describe('POST /api/admin/test-model', () => {
     });
 
     it('classifies a network error from the STT provider', async () => {
-      vi.stubEnv('KITTENTTS_URL', 'http://localhost:8100');
+      vi.stubEnv('ELEVENLABS_API_KEY', 'xi-test-tts');
       mockGenerateSpeech.mockResolvedValue(Buffer.from('fake-audio'));
       vi.stubEnv('OPENAI_API_KEY', 'sk-test-key');
       mockTranscribe.mockRejectedValue(new Error('fetch failed: ECONNREFUSED'));
@@ -525,7 +515,7 @@ describe('POST /api/admin/test-model', () => {
 
     it('generates a lip-sync video for Fal avatar models', async () => {
       vi.stubEnv('FAL_KEY', 'fal-test-key');
-      vi.stubEnv('KITTENTTS_URL', 'http://localhost:8100');
+      vi.stubEnv('ELEVENLABS_API_KEY', 'xi-test-tts');
       mockGenerateSpeech.mockResolvedValue(Buffer.from('fake-audio'));
       mockUploadFile.mockResolvedValue('https://r2.cdn/admin-tests/test.mp3');
       mockDeleteFile.mockResolvedValue(undefined);
@@ -668,7 +658,7 @@ describe('POST /api/admin/test-model', () => {
 
     describe('STT BYOK', () => {
       it('uses AI BYOK key for openai STT', async () => {
-        vi.stubEnv('KITTENTTS_URL', 'http://localhost:8100');
+        vi.stubEnv('ELEVENLABS_API_KEY', 'xi-test-tts');
         mockGenerateSpeech.mockResolvedValue(Buffer.from('fake-audio'));
         mockGetAiKey.mockResolvedValue({ apiKey: 'byok-openai-key', provider: 'openai' });
         mockTranscribe.mockResolvedValue({ text: 'test', segments: [], language: 'en' });
@@ -680,7 +670,7 @@ describe('POST /api/admin/test-model', () => {
       });
 
       it('uses TTS BYOK key for elevenlabs STT', async () => {
-        vi.stubEnv('KITTENTTS_URL', 'http://localhost:8100');
+        vi.stubEnv('ELEVENLABS_API_KEY', 'xi-test-tts');
         mockGenerateSpeech.mockResolvedValue(Buffer.from('fake-audio'));
         mockGetByokKey.mockResolvedValue('byok-xi-stt-key');
         mockTranscribe.mockResolvedValue({ text: 'test', segments: [], language: 'en' });

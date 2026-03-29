@@ -258,7 +258,6 @@ export async function resolveCheapestModels(current: ResolvedTweetModels): Promi
   if (!result.ttsProvider) {
     let cheapestCost = Infinity;
     for (const provider of getAllProviderMeta()) {
-      if (provider.id === 'kittentts') continue;
       if (provider.platformCostPerKChar < cheapestCost) {
         cheapestCost = provider.platformCostPerKChar;
         result.ttsProvider = provider.id;

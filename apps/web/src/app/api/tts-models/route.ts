@@ -8,7 +8,6 @@ import { errorResponse } from '@/lib/api-response';
 const PLATFORM_TTS_ENV: Partial<Record<TtsProviderId, string>> = {
   elevenlabs: 'ELEVENLABS_API_KEY',
   openai: 'OPENAI_API_KEY',
-  kittentts: 'KITTENTTS_URL',
 };
 
 function modelsResponse(providerId: TtsProviderId) {

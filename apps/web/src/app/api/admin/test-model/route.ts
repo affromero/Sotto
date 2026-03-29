@@ -57,22 +57,13 @@ function getSttPlatformKey(provider: string): string | undefined {
  * Tries providers in order: cheapest/fastest first.
  * Returns null if no TTS provider is available.
  */
-/** All TTS providers, kittentts first (cheapest). Auto-populated from registry. */
-const TTS_PROBE_ORDER: TtsProviderId[] = (() => {
-  const ids = getProviderIds();
-  // kittentts first — free sidecar, best for test audio generation
-  return ['kittentts' as TtsProviderId, ...ids.filter((id) => id !== 'kittentts')];
-})();
+/** All TTS providers. Auto-populated from registry. */
+const TTS_PROBE_ORDER: TtsProviderId[] = getProviderIds();
 
 async function generateTestAudio(): Promise<{ audio: Buffer; provider: string } | null> {
   for (const id of TTS_PROBE_ORDER) {
     const apiKey = getPlatformTtsKey(id);
-    // Check if provider has required credentials
-    if (id === 'kittentts') {
-      if (!process.env.KITTENTTS_URL) continue;
-    } else if (!apiKey) {
-      continue;
-    }
+    if (!apiKey) continue;
 
     try {
       const tts = await createTtsProviderAsync(id, apiKey);
@@ -249,37 +240,19 @@ export async function POST(request: NextRequest) {
       let apiKey: string | undefined;
 
       if (keySource === 'byok') {
-        if (provider === 'kittentts') {
-          if (!process.env.KITTENTTS_URL) {
-            return NextResponse.json({
-              success: false,
-              latencyMs: Date.now() - start,
-              error: 'Platform API key not configured (check .env)',
-            });
-          }
-        } else {
-          const key = await getByokKey(adminId, provider as TtsProviderId);
-          if (!key) {
-            return NextResponse.json({
-              success: false,
-              latencyMs: Date.now() - start,
-              error: 'BYOK key not found for this provider',
-            });
-          }
-          apiKey = key;
+        const key = await getByokKey(adminId, provider as TtsProviderId);
+        if (!key) {
+          return NextResponse.json({
+            success: false,
+            latencyMs: Date.now() - start,
+            error: 'BYOK key not found for this provider',
+          });
         }
+        apiKey = key;
       } else {
         apiKey = getPlatformTtsKey(provider as TtsProviderId);
 
-        if (provider === 'kittentts') {
-          if (!process.env.KITTENTTS_URL) {
-            return NextResponse.json({
-              success: false,
-              latencyMs: Date.now() - start,
-              error: 'Platform API key not configured (check .env)',
-            });
-          }
-        } else if (!apiKey) {
+        if (!apiKey) {
           return NextResponse.json({
             success: false,
             latencyMs: Date.now() - start,

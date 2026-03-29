@@ -226,11 +226,6 @@ describe('tts-expression-mapper', () => {
       expect(result).toEqual({});
     });
 
-    it('returns empty params for kittentts', () => {
-      const result = mapDirectionToExpression('energetic', 'HOST', 'kittentts');
-      expect(result).toEqual({});
-    });
-
     it('returns empty params for mistral', () => {
       const result = mapDirectionToExpression('energetic', 'HOST', 'mistral');
       expect(result).toEqual({});

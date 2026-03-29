@@ -61,8 +61,8 @@ const mockConfig = {
   free: {
     aiProvider: 'anthropic',
     aiModel: 'claude-haiku-4-5-20251001',
-    ttsProvider: 'kittentts',
-    ttsModel: 'kitten-tts-mini-0.8',
+    ttsProvider: 'openai',
+    ttsModel: 'tts-1-hd',
     sttProvider: 'openai',
     sttModel: 'whisper-1',
   },
@@ -266,16 +266,16 @@ describe('PATCH /api/admin/auto-models', () => {
 
     const response = await PATCH(
       createPatchRequest({
-        freeIncludedTtsModels: ['kittentts:kitten-tts-mini-0.8'],
-        proIncludedTtsModels: ['kittentts:kitten-tts-mini-0.8', 'elevenlabs:eleven_v3'],
+        freeIncludedTtsModels: ['openai:tts-1-hd'],
+        proIncludedTtsModels: ['openai:tts-1-hd', 'elevenlabs:eleven_v3'],
       })
     );
 
     expect(response.status).toBe(200);
     expect(mockSetAutoModelConfig).toHaveBeenCalledWith(
       {
-        freeIncludedTtsModels: ['kittentts:kitten-tts-mini-0.8'],
-        proIncludedTtsModels: ['kittentts:kitten-tts-mini-0.8', 'elevenlabs:eleven_v3'],
+        freeIncludedTtsModels: ['openai:tts-1-hd'],
+        proIncludedTtsModels: ['openai:tts-1-hd', 'elevenlabs:eleven_v3'],
       },
       'admin-1'
     );

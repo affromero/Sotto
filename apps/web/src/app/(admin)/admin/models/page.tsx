@@ -45,7 +45,6 @@ function hasPlatformKey(category: TestableProvider['category'], providerId: stri
     }
   }
   if (category === 'tts') {
-    if (providerId === 'kittentts') return !!process.env.KITTENTTS_URL;
     return !!getPlatformTtsKey(providerId as import('@/lib/providers/tts-registry').TtsProviderId);
   }
   if (category === 'stt') {
@@ -240,7 +239,6 @@ export default async function AdminModelsPage() {
         videoProviders={videoProviders}
         avatarProviders={avatarProviders}
         musicProviders={musicProviders}
-        kittenConfigured={!!process.env.KITTENTTS_URL}
       />
     </div>
   );

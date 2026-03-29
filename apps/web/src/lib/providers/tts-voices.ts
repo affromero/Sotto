@@ -150,7 +150,6 @@ const PROVIDER_VOICE_POOLS: Partial<Record<TtsProviderId, ProviderVoice[]>> = {
 const SPECIAL_TEST_VOICES: Partial<Record<TtsProviderId, string>> = {
   elevenlabs: '21m00Tcm4TlvDq8ikWAM', // Rachel — stable free voice
   openai: 'alloy',
-  kittentts: 'bella',
 };
 
 /**

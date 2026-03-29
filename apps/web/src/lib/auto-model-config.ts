@@ -101,8 +101,8 @@ const includedModelsSchema = z.array(z.string()).nullable().catch(null);
 const SEEDS = {
   freeAiProvider: 'anthropic' as const,
   freeAiModel: getAiProviderMeta('anthropic').defaultModel,
-  freeTtsProvider: 'kittentts' as const,
-  freeTtsModel: getProviderMeta('kittentts').defaultModel,
+  freeTtsProvider: 'openai' as const,
+  freeTtsModel: getProviderMeta('openai').defaultModel,
   freeSttProvider: 'openai' as const,
   freeSttModel: getSttProviderMeta('openai').defaultModel,
   proAiProvider: 'anthropic' as const,

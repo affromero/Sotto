@@ -377,7 +377,7 @@ export function mapDirectionToExpression(
       }
       break;
     }
-    // fal, kittentts — no expression support
+    // fal — no expression support
   }
 
   return params;
@@ -432,7 +432,7 @@ export function convertInlineAudioTags(text: string, providerId: TtsProviderId):
     }
 
     default:
-      // openai, minimax, fal, replicate, kittentts — no audio tag support
+      // openai, minimax, fal, replicate — no audio tag support
       // Approximate pauses with punctuation; strip all remaining expression tags
       return text
         .replace(/\[long pause\]/gi, '... ')

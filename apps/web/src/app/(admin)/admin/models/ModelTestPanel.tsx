@@ -3,7 +3,6 @@
 import { useState, useCallback } from 'react';
 import { ChevronDown } from 'lucide-react';
 import type { TestableProvider } from './page';
-import { KittenHealthBanner } from './KittenHealthBanner';
 import styles from './ModelTestPanel.module.css';
 
 interface ModelTestPanelProps {
@@ -14,7 +13,6 @@ interface ModelTestPanelProps {
   videoProviders: TestableProvider[];
   avatarProviders: TestableProvider[];
   musicProviders: TestableProvider[];
-  kittenConfigured: boolean;
 }
 
 type TestStatus = 'idle' | 'running' | 'pass' | 'fail';
@@ -269,7 +267,6 @@ export function ModelTestPanel({
   videoProviders,
   avatarProviders,
   musicProviders,
-  kittenConfigured,
 }: ModelTestPanelProps) {
   const [results, setResults] = useState<Record<string, TestResult>>({});
 
@@ -340,7 +337,6 @@ export function ModelTestPanel({
 
   return (
     <div className={styles.panel}>
-      {kittenConfigured && <KittenHealthBanner />}
       <Section
         label="AI (LLM)"
         providers={aiProviders}

@@ -4,32 +4,6 @@
 # Usage: docker compose -f docker-compose.infra.yml up -d
 
 services:
-  kittentts:
-    build:
-      context: ./services/kittentts
-      dockerfile: Dockerfile
-    container_name: sotto-prod-kittentts
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 1g
-    healthcheck:
-      test: ['CMD', 'python', '-c', 'import urllib.request; urllib.request.urlopen("http://localhost:8000/health")']
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 300s
-    networks:
-      sotto-network:
-        aliases:
-          - kittentts
-    logging:
-      driver: json-file
-      options:
-        max-size: '20m'
-        max-file: '3'
-
   pinchtab:
     image: pinchtab/pinchtab
     container_name: sotto-prod-pinchtab
