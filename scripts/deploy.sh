@@ -78,6 +78,45 @@ echo ""
 echo "=== Ensuring infrastructure is running ==="
 docker compose -f "$COMPOSE_INFRA" up -d
 
+echo "Waiting for postgres..."
+for i in $(seq 1 30); do
+  if docker compose -f "$COMPOSE_INFRA" exec -T postgres pg_isready -U "${POSTGRES_USER:-sotto}" >/dev/null 2>&1; then
+    echo "Postgres ready"
+    break
+  fi
+  if [ "$i" -eq 30 ]; then
+    echo "ERROR: Postgres not ready after 30s"
+    exit 1
+  fi
+  sleep 1
+done
+
+echo "Waiting for redis..."
+for i in $(seq 1 30); do
+  if docker compose -f "$COMPOSE_INFRA" exec -T redis redis-cli -a "$REDIS_PASSWORD" --no-auth-warning ping 2>/dev/null | grep -q PONG; then
+    echo "Redis ready"
+    break
+  fi
+  if [ "$i" -eq 30 ]; then
+    echo "ERROR: Redis not ready after 30s"
+    exit 1
+  fi
+  sleep 1
+done
+
+echo "Waiting for pgbouncer..."
+for i in $(seq 1 30); do
+  if docker compose -f "$COMPOSE_INFRA" exec -T pgbouncer pg_isready -h 127.0.0.1 -p 5432 -U "${POSTGRES_USER:-sotto}" >/dev/null 2>&1; then
+    echo "PgBouncer ready"
+    break
+  fi
+  if [ "$i" -eq 30 ]; then
+    echo "ERROR: PgBouncer not ready after 30s"
+    exit 1
+  fi
+  sleep 1
+done
+
 # --- Rebuild remotion if source changed ---
 
 echo ""
@@ -112,6 +151,7 @@ docker compose -f "$COMPOSE_APP" -p "sotto-${NEW_SLOT}" build
 echo ""
 echo "=== Running database migrations ==="
 docker compose -f "$COMPOSE_APP" -p "sotto-${NEW_SLOT}" run --rm --no-deps \
+  -e DATABASE_URL="${DIRECT_DATABASE_URL:-$DATABASE_URL}" \
   web npx prisma@6 db push --skip-generate --schema=prisma/schema.prisma
 
 # --- Start new slot ---
