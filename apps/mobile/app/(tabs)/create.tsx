@@ -139,6 +139,17 @@ export default function CreateScreen() {
   const [durationTarget, setDurationTarget] = useState(10);
   const [visibility, setVisibility] = useState<'PUBLIC' | 'UNLISTED' | 'PRIVATE'>('PUBLIC');
 
+  // User tier → maxSpeakers
+  const { data: billingData } = useQuery<{ tier: string }>({
+    queryKey: ['billing', 'usage'],
+    queryFn: async () => {
+      const res = await api.get('/billing/usage');
+      return res.data;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+  const maxSpeakers = billingData?.tier === 'PRO' ? 4 : 2;
+
   // Key status queries
   const { data: aiKeys } = useQuery<{ keys: KeyStatus[] }>({
     queryKey: ['settings', 'ai-keys'],
@@ -686,6 +697,7 @@ export default function CreateScreen() {
               onSelectionChange={setVoiceSelection}
               suggestedFormat={metadata?.suggestedFormat}
               ttsProvider={ttsProvider}
+              maxSpeakers={maxSpeakers}
             />
           </View>
 
