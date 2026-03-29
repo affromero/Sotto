@@ -6,11 +6,17 @@ import { searchTitle, type ReferenceInput, type VerificationCheck, type Replacem
 import type { ContentDomain } from '@sottofm/verification-standard';
 import type { ClaimContext } from './claim-extractor';
 
+export type GroundingReason =
+  | 'all_checks_failed'
+  | 'unreliable_source'
+  | 'low_quality_source';
+
 export interface GroundingInput {
   ref: ReferenceInput;
   domain: ContentDomain;
   claimContext: ClaimContext;
   allChecks: VerificationCheck[];
+  reason?: GroundingReason;
 }
 
 /**
@@ -224,31 +230,37 @@ Find one real, verifiable source per reference. Return JSON only.`;
 }
 
 /**
- * Main entry point: ground failed references by searching for real sources.
+ * Generalized grounding: search for real sources to replace flagged references.
  *
  * Two-phase strategy:
  * 1. OpenAlex claim search (fast, free) for ACADEMIC/EDUCATIONAL/GENERAL
  * 2. AI web search for remaining ungrounded refs
  *
- * Only processes refs where needsGrounding() is true (all checks failed).
+ * Works for both:
+ * - reference-validation pipeline (all checks failed → reason: 'all_checks_failed')
+ * - script-verification retry loop (unreliable source → reason: 'unreliable_source')
+ *
+ * Cap at MAX_GROUNDING_CANDIDATES to control cost/latency.
  */
-export async function groundFailedReferences(
+const MAX_GROUNDING_CANDIDATES = 5;
+
+export async function groundReferenceCandidates(
   inputs: GroundingInput[],
   topic: string,
   apiKeyOverride?: string,
   model?: string,
   provider?: string,
 ): Promise<Map<string, VerificationCheck>> {
-  const candidates = inputs.filter((i) => needsGrounding(i.allChecks));
+  const candidates = inputs.slice(0, MAX_GROUNDING_CANDIDATES);
 
   if (candidates.length === 0) {
-    logger.info('No references need grounding — all have at least one passing check');
     return new Map();
   }
 
   logger.info('Starting reference grounding', {
     total: String(inputs.length),
-    needsGrounding: String(candidates.length),
+    candidates: String(candidates.length),
+    reasons: candidates.map((c) => c.reason ?? 'all_checks_failed').join(','),
   });
 
   // Phase 1: OpenAlex
@@ -268,13 +280,9 @@ export async function groundFailedReferences(
 
   // Merge results (OpenAlex takes priority)
   const allResults = new Map<string, VerificationCheck>();
-  for (const [id, check] of openAlexResults) {
-    allResults.set(id, check);
-  }
+  for (const [id, check] of openAlexResults) allResults.set(id, check);
   for (const [id, check] of aiResults) {
-    if (!allResults.has(id)) {
-      allResults.set(id, check);
-    }
+    if (!allResults.has(id)) allResults.set(id, check);
   }
 
   logger.info('Reference grounding complete', {
@@ -284,4 +292,29 @@ export async function groundFailedReferences(
   });
 
   return allResults;
+}
+
+/**
+ * Legacy entry point for reference-validation pipeline.
+ * Filters to refs where all checks failed, then delegates to groundReferenceCandidates.
+ */
+export async function groundFailedReferences(
+  inputs: GroundingInput[],
+  topic: string,
+  apiKeyOverride?: string,
+  model?: string,
+  provider?: string,
+): Promise<Map<string, VerificationCheck>> {
+  const needsWork = inputs.filter((i) => needsGrounding(i.allChecks));
+  if (needsWork.length === 0) {
+    logger.info('No references need grounding — all have at least one passing check');
+    return new Map();
+  }
+  return groundReferenceCandidates(
+    needsWork.map((i) => ({ ...i, reason: 'all_checks_failed' as const })),
+    topic,
+    apiKeyOverride,
+    model,
+    provider,
+  );
 }
