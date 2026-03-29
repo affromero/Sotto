@@ -129,7 +129,8 @@ export default function BriefingsPage() {
             <h2 className={styles.sectionTitle}>Make it yours</h2>
             <p className={styles.sectionText}>
               Every briefing is shaped by your preferences. Choose how deep, how long,
-              and what tone fits your morning.
+              and what tone fits your morning. Change any setting whenever you
+              want — tomorrow&apos;s briefing picks up your latest preferences.
             </p>
             <div className={styles.optionGrid}>
               {OPTIONS.map((option) => (
@@ -166,6 +167,22 @@ export default function BriefingsPage() {
                 </div>
               ))}
             </div>
+          </section>
+
+          {/* Set it and forget it */}
+          <section className={styles.section}>
+            <h2 className={styles.sectionTitle}>Set it once, done.</h2>
+            <p className={styles.sectionText}>
+              Configure your briefing in settings and it runs every day on autopilot.
+              No daily input, no prompts to fill out. It just shows up. If you want
+              to hear something different tomorrow, tweak any control and the next
+              briefing picks it up.
+            </p>
+            <p className={styles.sectionText}>
+              Want a podcast on a topic your briefing didn&apos;t cover? Just{' '}
+              <a href="/create">create one</a> — describe what you want to hear
+              and it&apos;s ready in minutes.
+            </p>
           </section>
 
           {/* BYOK */}
