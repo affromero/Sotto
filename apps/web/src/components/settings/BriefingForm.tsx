@@ -243,7 +243,14 @@ export function BriefingForm({
       const created = await res.json();
 
       if (generateNow && created.id) {
-        fetch(`/api/briefings/${created.id}/generate`, { method: 'POST' });
+        const genRes = await fetch(`/api/briefings/${created.id}/generate`, { method: 'POST' });
+        if (genRes.ok) {
+          const { podcastId } = await genRes.json();
+          if (podcastId) {
+            window.location.href = `/podcast/${podcastId}`;
+            return;
+          }
+        }
       }
       onSaved?.();
     } finally {

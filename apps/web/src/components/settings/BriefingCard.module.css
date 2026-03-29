@@ -105,6 +105,28 @@
   text-decoration: underline;
 }
 
+.statusBanner {
+  margin-top: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-sm);
+  background: var(--color-primary-subtle);
+  font: var(--text-caption);
+  font-weight: 500;
+  color: var(--color-primary);
+}
+
+.statusLink {
+  color: var(--color-primary);
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.lastGenerated {
+  font: var(--text-caption);
+  color: var(--color-text-tertiary);
+  margin-top: 2px;
+}
+
 .expandedContent {
   margin-top: var(--spacing-md);
   padding-top: var(--spacing-md);
