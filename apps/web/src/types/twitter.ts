@@ -7,8 +7,12 @@ export interface TweetParseResult {
   audienceLevel: 'beginner' | 'intermediate' | 'expert';
   tone: 'casual' | 'professional' | 'socratic' | 'comedic' | 'satirical' | 'storytelling';
   focusAreas: string[];
-  audience?: 'general' | 'kids' | 'mature';
+  audience?: 'general' | 'kids' | 'teens' | 'family' | 'nerds' | 'mature';
   durationTarget?: number;
+  /** 1=Solo, 2=Dialogue, 3=Panel, 4=Roundtable */
+  format?: 1 | 2 | 3 | 4;
+  speakers?: Array<{ name: string; description: string }> | null;
+  visibility?: 'public' | 'unlisted' | 'private';
   sourceUrl?: string;
   sourceUrls?: string[];
   isDebate?: boolean;
@@ -136,6 +140,7 @@ export interface TwitterConfigData {
   minLikes: number;
   minPlays: number;
   minForks: number;
+  mentionPollIntervalMs: number;
   trendPollingEnabled: boolean;
   trendPollIntervalMs: number;
   maxTrendPodcastsPerDay: number;
