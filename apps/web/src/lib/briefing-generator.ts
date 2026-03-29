@@ -1,5 +1,5 @@
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
-import { fetchNewsletterArticles, formatArticlesForPrompt } from '@/lib/newsletter-fetcher';
+import { fetchNewsletterArticles, formatArticlesForPrompt, type NewsArticle } from '@/lib/newsletter-fetcher';
 import { addJob, JobType, contentExtractionQueue } from '@/lib/queue';
 import { selectVoicePair, resolveVoiceId, VOICE_POOL, type VoicePoolEntry } from '@/lib/voice-pool';
 import { generatePodcastSlug } from '@/lib/slugify';
@@ -218,7 +218,7 @@ const FORMAT_SPEAKERS: Record<number, Array<{ name: string; description: string 
 export async function createBriefingPodcast(
   briefing: BriefingWithUser,
   resolved: ResolvedConfig,
-  articles: Array<{ url: string; title: string }>,
+  articles: NewsArticle[],
 ): Promise<{ podcastId: string }> {
   const now = new Date();
   const scheduledDate = now.toISOString().slice(0, 10);
