@@ -19,6 +19,7 @@ import { TtsProviderCards } from '@/components/settings/TtsProviderCards';
 import { AiProviderCards } from '@/components/settings/AiProviderCards';
 import { MusicProviderCards } from '@/components/settings/MusicProviderCards';
 import { AvatarImageManager } from '@/components/settings/AvatarImageManager';
+import { BriefingSettings } from '@/components/settings/BriefingSettings';
 import { ThemeSelector } from '@/components/settings/ThemeSelector';
 import { usePushSubscription } from '@/lib/hooks/usePushSubscription';
 import styles from './page.module.css';
@@ -74,6 +75,18 @@ interface SettingsFormProps {
   initialBriefingTimezone: string | null;
   initialBriefingDays: number;
   initialBriefingVisibility: string;
+  initialBriefingAiModel: string | null;
+  initialBriefingTtsProvider: string | null;
+  initialBriefingTtsModel: string | null;
+  initialBriefingHostVoiceId: string | null;
+  initialBriefingExpertVoiceId: string | null;
+  initialBriefingDepth: string | null;
+  initialBriefingTone: string | null;
+  initialBriefingAudienceLevel: string | null;
+  initialBriefingDuration: number | null;
+  initialBriefingPrompt: string | null;
+  initialBriefingUseByokKeys: boolean;
+  hasByokKeys: boolean;
   initialQuizEnabled: boolean;
   quizAnswerCount: number;
   referredUsers: Array<{ name: string | null; handle: string | null; image: string | null; joinedAt: string; verified: boolean }>;
@@ -118,6 +131,18 @@ export function SettingsForm({
   initialBriefingTimezone,
   initialBriefingDays,
   initialBriefingVisibility,
+  initialBriefingAiModel,
+  initialBriefingTtsProvider,
+  initialBriefingTtsModel,
+  initialBriefingHostVoiceId,
+  initialBriefingExpertVoiceId,
+  initialBriefingDepth,
+  initialBriefingTone,
+  initialBriefingAudienceLevel,
+  initialBriefingDuration,
+  initialBriefingPrompt,
+  initialBriefingUseByokKeys,
+  hasByokKeys,
   initialQuizEnabled,
   isTwitterProviderAvailable,
   quizAnswerCount,
@@ -833,6 +858,25 @@ export function SettingsForm({
                   <option value="PUBLIC">Public</option>
                 </select>
               </label>
+              <BriefingSettings
+                initialAiModel={initialBriefingAiModel}
+                initialTtsOption={
+                  initialBriefingTtsProvider && initialBriefingTtsModel
+                    ? `${initialBriefingTtsProvider}:${initialBriefingTtsModel}`
+                    : initialBriefingTtsProvider ?? null
+                }
+                initialHostVoiceId={initialBriefingHostVoiceId}
+                initialExpertVoiceId={initialBriefingExpertVoiceId}
+                initialDepth={initialBriefingDepth}
+                initialTone={initialBriefingTone}
+                initialAudienceLevel={initialBriefingAudienceLevel}
+                initialDuration={initialBriefingDuration}
+                initialPrompt={initialBriefingPrompt}
+                initialUseByokKeys={initialBriefingUseByokKeys}
+                hasByokKeys={hasByokKeys}
+                aiModelOptions={aiModelOptions}
+                ttsOptions={ttsOptions}
+              />
             </>
           )}
           <label className={styles.toggleRow}>
