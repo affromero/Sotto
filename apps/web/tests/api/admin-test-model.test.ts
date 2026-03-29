@@ -67,7 +67,7 @@ vi.mock('@/lib/providers/tts-voices', () => ({
 // Tests control keys via vi.stubEnv() in beforeEach.
 
 vi.mock('@/lib/providers/tts-registry', () => ({
-  getProviderIds: vi.fn(() => ['openai', 'elevenlabs', 'openai', 'cartesia', 'hume', 'fal', 'replicate', 'minimax', 'mistral']),
+  getProviderIds: vi.fn(() => ['elevenlabs', 'openai', 'cartesia', 'hume', 'fal', 'replicate', 'minimax', 'mistral']),
   getProviderMeta: vi.fn(() => ({ defaultModel: 'test-model' })),
 }));
 
