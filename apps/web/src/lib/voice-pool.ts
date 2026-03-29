@@ -12,7 +12,6 @@ export interface VoicePoolEntry {
   ids: {
     elevenlabs: string;
     openai?: string;
-    kittentts?: string;
   };
   gender: 'male' | 'female';
   accent: 'american' | 'british' | 'australian' | 'indian' | 'african';
@@ -28,7 +27,7 @@ export const VOICE_POOL: VoicePoolEntry[] = [
   // --- Male voices ---
   {
     name: 'Adam',
-    ids: { elevenlabs: 'pNInz6obpgDQGcFmaJgB', openai: 'onyx', kittentts: 'hugo' },
+    ids: { elevenlabs: 'pNInz6obpgDQGcFmaJgB', openai: 'onyx' },
     gender: 'male',
     accent: 'american',
     ageRange: 'middle',
@@ -36,7 +35,7 @@ export const VOICE_POOL: VoicePoolEntry[] = [
   },
   {
     name: 'Eric',
-    ids: { elevenlabs: 'cjVigY5qzO86Huf0OWal', openai: 'cedar', kittentts: 'bruno' },
+    ids: { elevenlabs: 'cjVigY5qzO86Huf0OWal', openai: 'cedar' },
     gender: 'male',
     accent: 'american',
     ageRange: 'young',
@@ -44,7 +43,7 @@ export const VOICE_POOL: VoicePoolEntry[] = [
   },
   {
     name: 'Brian',
-    ids: { elevenlabs: 'nPczCjzI2devNBz1zQrb', openai: 'onyx', kittentts: 'jasper' },
+    ids: { elevenlabs: 'nPczCjzI2devNBz1zQrb', openai: 'onyx' },
     gender: 'male',
     accent: 'american',
     ageRange: 'mature',
@@ -52,7 +51,7 @@ export const VOICE_POOL: VoicePoolEntry[] = [
   },
   {
     name: 'Will',
-    ids: { elevenlabs: 'bIHbv24MWmeRgasZH58o', openai: 'fable', kittentts: 'leo' },
+    ids: { elevenlabs: 'bIHbv24MWmeRgasZH58o', openai: 'fable' },
     gender: 'male',
     accent: 'american',
     ageRange: 'young',
@@ -60,7 +59,7 @@ export const VOICE_POOL: VoicePoolEntry[] = [
   },
   {
     name: 'Roger',
-    ids: { elevenlabs: 'CwhRBWXzGAHq8TQ4Fs17', openai: 'cedar', kittentts: 'jasper' },
+    ids: { elevenlabs: 'CwhRBWXzGAHq8TQ4Fs17', openai: 'cedar' },
     gender: 'male',
     accent: 'american',
     ageRange: 'middle',
@@ -68,7 +67,7 @@ export const VOICE_POOL: VoicePoolEntry[] = [
   },
   {
     name: 'Charlie',
-    ids: { elevenlabs: 'IKne3meq5aSn9XLyUdCD', openai: 'fable', kittentts: 'bruno' },
+    ids: { elevenlabs: 'IKne3meq5aSn9XLyUdCD', openai: 'fable' },
     gender: 'male',
     accent: 'australian',
     ageRange: 'young',
@@ -76,7 +75,7 @@ export const VOICE_POOL: VoicePoolEntry[] = [
   },
   {
     name: 'George',
-    ids: { elevenlabs: 'JBFqnCBsd6RMkjVDRZzb', openai: 'onyx', kittentts: 'hugo' },
+    ids: { elevenlabs: 'JBFqnCBsd6RMkjVDRZzb', openai: 'onyx' },
     gender: 'male',
     accent: 'british',
     ageRange: 'mature',
@@ -84,7 +83,7 @@ export const VOICE_POOL: VoicePoolEntry[] = [
   },
   {
     name: 'Callum',
-    ids: { elevenlabs: 'N2lVS1w4EtoT3dr4eOWO', openai: 'echo', kittentts: 'leo' },
+    ids: { elevenlabs: 'N2lVS1w4EtoT3dr4eOWO', openai: 'echo' },
     gender: 'male',
     accent: 'british',
     ageRange: 'middle',
@@ -93,7 +92,7 @@ export const VOICE_POOL: VoicePoolEntry[] = [
   // --- Female voices ---
   {
     name: 'Aria',
-    ids: { elevenlabs: '9BWtsMINqrJLrRacOk9x', openai: 'nova', kittentts: 'bella' },
+    ids: { elevenlabs: '9BWtsMINqrJLrRacOk9x', openai: 'nova' },
     gender: 'female',
     accent: 'american',
     ageRange: 'young',
@@ -101,7 +100,7 @@ export const VOICE_POOL: VoicePoolEntry[] = [
   },
   {
     name: 'Rachel',
-    ids: { elevenlabs: '21m00Tcm4TlvDq8ikWAM', openai: 'shimmer', kittentts: 'rosie' },
+    ids: { elevenlabs: '21m00Tcm4TlvDq8ikWAM', openai: 'shimmer' },
     gender: 'female',
     accent: 'american',
     ageRange: 'middle',
@@ -109,7 +108,7 @@ export const VOICE_POOL: VoicePoolEntry[] = [
   },
   {
     name: 'Jessica',
-    ids: { elevenlabs: 'cgSgspJ2msm6clMCkdW9', openai: 'marin', kittentts: 'kiki' },
+    ids: { elevenlabs: 'cgSgspJ2msm6clMCkdW9', openai: 'marin' },
     gender: 'female',
     accent: 'american',
     ageRange: 'young',
@@ -117,7 +116,7 @@ export const VOICE_POOL: VoicePoolEntry[] = [
   },
   {
     name: 'Laura',
-    ids: { elevenlabs: 'FGY2WhTYpPnrIDTdsKH5', openai: 'nova', kittentts: 'luna' },
+    ids: { elevenlabs: 'FGY2WhTYpPnrIDTdsKH5', openai: 'nova' },
     gender: 'female',
     accent: 'american',
     ageRange: 'young',
@@ -125,7 +124,7 @@ export const VOICE_POOL: VoicePoolEntry[] = [
   },
   {
     name: 'Matilda',
-    ids: { elevenlabs: 'XrExE9yKIg1WjnnlVkGX', openai: 'shimmer', kittentts: 'rosie' },
+    ids: { elevenlabs: 'XrExE9yKIg1WjnnlVkGX', openai: 'shimmer' },
     gender: 'female',
     accent: 'american',
     ageRange: 'mature',
@@ -133,7 +132,7 @@ export const VOICE_POOL: VoicePoolEntry[] = [
   },
   {
     name: 'Alice',
-    ids: { elevenlabs: 'Xb7hH8MSUJpSbSDYk0k2', openai: 'marin', kittentts: 'kiki' },
+    ids: { elevenlabs: 'Xb7hH8MSUJpSbSDYk0k2', openai: 'marin' },
     gender: 'female',
     accent: 'british',
     ageRange: 'young',
@@ -141,7 +140,7 @@ export const VOICE_POOL: VoicePoolEntry[] = [
   },
   {
     name: 'Charlotte',
-    ids: { elevenlabs: 'XB0fDUnXU5powFXDhCwa', openai: 'shimmer', kittentts: 'luna' },
+    ids: { elevenlabs: 'XB0fDUnXU5powFXDhCwa', openai: 'shimmer' },
     gender: 'female',
     accent: 'british',
     ageRange: 'middle',
@@ -149,7 +148,7 @@ export const VOICE_POOL: VoicePoolEntry[] = [
   },
   {
     name: 'Grace',
-    ids: { elevenlabs: 'oWAxZDx7w5VEj9dCyTzz', openai: 'nova', kittentts: 'bella' },
+    ids: { elevenlabs: 'oWAxZDx7w5VEj9dCyTzz', openai: 'nova' },
     gender: 'female',
     accent: 'australian',
     ageRange: 'middle',
@@ -359,7 +358,7 @@ export function selectVoicePair(
  */
 export function resolveVoiceId(
   entry: VoicePoolEntry,
-  provider: 'elevenlabs' | 'openai' | 'kittentts'
+  provider: 'elevenlabs' | 'openai'
 ): string {
   return entry.ids[provider] ?? entry.ids.elevenlabs;
 }
@@ -369,7 +368,7 @@ export function resolveVoiceId(
  */
 export function findByVoiceId(voiceId: string): VoicePoolEntry | undefined {
   return VOICE_POOL.find(
-    (v) => v.ids.elevenlabs === voiceId || v.ids.openai === voiceId || v.ids.kittentts === voiceId
+    (v) => v.ids.elevenlabs === voiceId || v.ids.openai === voiceId
   );
 }
 
@@ -401,59 +400,3 @@ export function formatModelName(model: string): string {
   return model.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-// ---------------------------------------------------------------------------
-// KittenTTS-specific voice pool
-// KittenTTS mini ships with 8 named voices — 4 host (warm/conversational),
-// 4 expert (authoritative). Deterministic pairing via podcast ID hash.
-// ---------------------------------------------------------------------------
-
-export interface KittenVoicePoolEntry {
-  id: string;
-  gender: 'male' | 'female';
-}
-
-export const KITTENTTS_VOICE_POOL: KittenVoicePoolEntry[] = [
-  { id: 'bella', gender: 'female' },
-  { id: 'rosie', gender: 'female' },
-  { id: 'kiki', gender: 'female' },
-  { id: 'luna', gender: 'female' },
-  { id: 'jasper', gender: 'male' },
-  { id: 'bruno', gender: 'male' },
-  { id: 'hugo', gender: 'male' },
-  { id: 'leo', gender: 'male' },
-];
-
-/**
- * Select N diverse KittenTTS voices for a podcast using a deterministic seed.
- * Alternates genders and avoids duplicate voices.
- */
-export function selectKittenVoiceSet(podcastId: string, speakerCount: number): string[] {
-  const count = Math.max(1, Math.min(speakerCount, KITTENTTS_VOICE_POOL.length));
-  const index = hashString(podcastId);
-  const selected: string[] = [];
-  const usedIds = new Set<string>();
-
-  for (let i = 0; i < count; i++) {
-    const wantGender = i % 2 === 0 ? 'female' : 'male';
-    const candidates = KITTENTTS_VOICE_POOL.filter(
-      (v) => !usedIds.has(v.id) && v.gender === wantGender
-    );
-    const fallback = KITTENTTS_VOICE_POOL.filter((v) => !usedIds.has(v.id));
-    const pickFrom = candidates.length > 0 ? candidates : fallback;
-    if (pickFrom.length === 0) break;
-    const pick = pickFrom[(index >>> (i * 4)) % pickFrom.length];
-    selected.push(pick.id);
-    usedIds.add(pick.id);
-  }
-
-  return selected;
-}
-
-/**
- * Select a deterministic KittenTTS host/expert voice pair for a podcast.
- * Wrapper around selectKittenVoiceSet for backward compatibility.
- */
-export function selectKittenVoicePair(podcastId: string): { host: string; expert: string } {
-  const voices = selectKittenVoiceSet(podcastId, 2);
-  return { host: voices[0], expert: voices[1] };
-}

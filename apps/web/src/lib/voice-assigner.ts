@@ -15,7 +15,6 @@ import { resolveAutoModel } from './auto-model-config';
 import {
   selectVoiceSet,
   resolveVoiceId,
-  selectKittenVoiceSet,
   type VoiceMatchMetadata,
 } from './voice-pool';
 import {
@@ -57,12 +56,6 @@ export async function assignVoicesForPodcast(
 
   const unassigned = speakers.filter((s) => !assignedSpeakers.has(s.name));
   if (unassigned.length === 0) return;
-
-  // For KittenTTS, skip LLM — use deterministic hash selection directly
-  if (providerId === 'kittentts') {
-    await fallbackAssign(podcastId, unassigned, providerId, metadata);
-    return;
-  }
 
   // For 2 speakers, the existing pair selection is sufficient — skip LLM
   if (speakers.length <= 2) {
@@ -260,9 +253,6 @@ function getFallbackVoiceIds(
   metadata?: VoiceMatchMetadata,
 ): string[] {
   switch (providerId) {
-    case 'kittentts':
-      return selectKittenVoiceSet(podcastId, speakerCount);
-
     case 'elevenlabs': {
       const entries = selectVoiceSet(podcastId, speakerCount, metadata);
       return entries.map((e) => resolveVoiceId(e, 'elevenlabs'));

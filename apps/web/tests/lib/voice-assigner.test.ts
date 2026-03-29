@@ -198,26 +198,6 @@ describe('assignVoicesForPodcast', () => {
     expect(mockPodcastVoiceCreateMany).toHaveBeenCalled();
   });
 
-  it('uses KittenTTS fallback directly without LLM', async () => {
-    await assignVoicesForPodcast(
-      'pod-1',
-      [{ name: 'HOST' }, { name: 'EXPERT' }, { name: 'GUEST' }],
-      'kittentts',
-    );
-
-    expect(mockGenerateResponse).not.toHaveBeenCalled();
-    expect(mockGetVoiceCatalog).not.toHaveBeenCalled();
-    expect(mockPodcastVoiceCreateMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.arrayContaining([
-          expect.objectContaining({ podcastId: 'pod-1', speaker: 'HOST', provider: 'kittentts' }),
-          expect.objectContaining({ podcastId: 'pod-1', speaker: 'EXPERT', provider: 'kittentts' }),
-          expect.objectContaining({ podcastId: 'pod-1', speaker: 'GUEST', provider: 'kittentts' }),
-        ]),
-      }),
-    );
-  });
-
   it('deduplicates voice IDs from LLM response', async () => {
     mockGetVoiceCatalog.mockResolvedValue([
       { id: 'v1', name: 'Voice 1', gender: 'female' },
