@@ -410,7 +410,7 @@ describe('POST /api/podcasts/[podcastId]/generate', () => {
         expect.objectContaining({ name: 'audio-stitching' }),
         'stitch_audio',
         expect.objectContaining({ segmentIds: ['seg-1', 'seg-2', 'seg-3'] }),
-        { jobId: 'stitch-podcast-f3' }
+        { jobId: expect.stringMatching(/^stitch-podcast-f3-\d+$/) }
       );
     });
 

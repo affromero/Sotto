@@ -267,7 +267,7 @@ async function routeResume(
         useAdminCredits: useAdminCredits || undefined,
       };
 
-      await addJob(contentExtractionQueue, JobType.EXTRACT_CONTENT, payload, { jobId: `extract-${podcastId}` });
+      await addJob(contentExtractionQueue, JobType.EXTRACT_CONTENT, payload, { jobId: `extract-${podcastId}-${Date.now()}` });
       return NextResponse.json({
         success: true,
         message: 'Generation resumed from content extraction',
@@ -300,7 +300,7 @@ async function routeResume(
         useAdminCredits: useAdminCredits || undefined,
       };
 
-      await addJob(scriptGenerationQueue, JobType.GENERATE_SCRIPT, payload, { jobId: `script-${podcastId}` });
+      await addJob(scriptGenerationQueue, JobType.GENERATE_SCRIPT, payload, { jobId: `script-${podcastId}-${Date.now()}` });
       return NextResponse.json({
         success: true,
         message: 'Generation resumed from script generation',
@@ -329,7 +329,7 @@ async function routeResume(
       };
 
       await addJob(scriptVerificationQueue, JobType.VERIFY_SCRIPT, payload, {
-        jobId: `verify-${podcastId}-resume`,
+        jobId: `verify-${podcastId}-resume-${Date.now()}`,
       });
       return NextResponse.json({
         success: true,
@@ -353,7 +353,7 @@ async function routeResume(
         useAdminCredits: useAdminCredits || undefined,
       };
 
-      await addJob(referenceValidationQueue, JobType.VALIDATE_REFERENCES, payload, { jobId: `validate-${podcastId}` });
+      await addJob(referenceValidationQueue, JobType.VALIDATE_REFERENCES, payload, { jobId: `validate-${podcastId}-${Date.now()}` });
       return NextResponse.json({
         success: true,
         message: 'Generation resumed from reference validation',
@@ -416,7 +416,7 @@ async function routeResume(
           speaker: seg.speaker,
           text: seg.text,
         };
-        await addJob(audioGenerationQueue, JobType.GENERATE_AUDIO, payload, { jobId: `audio-${podcastId}-${seg.id}` });
+        await addJob(audioGenerationQueue, JobType.GENERATE_AUDIO, payload, { jobId: `audio-${podcastId}-${seg.id}-${Date.now()}` });
       }
 
       return NextResponse.json({
@@ -447,7 +447,7 @@ async function routeResume(
         segmentIds: resumePoint.segmentIds,
       };
 
-      await addJob(audioStitchingQueue, JobType.STITCH_AUDIO, payload, { jobId: `stitch-${podcastId}` });
+      await addJob(audioStitchingQueue, JobType.STITCH_AUDIO, payload, { jobId: `stitch-${podcastId}-${Date.now()}` });
       return NextResponse.json({
         success: true,
         message: 'Generation resumed from audio stitching',
@@ -505,7 +505,7 @@ async function startImport(
     sttModel,
   };
 
-  await addJob(audioImportQueue, JobType.IMPORT_AUDIO, importPayload, { jobId: `import-${podcastId}` });
+  await addJob(audioImportQueue, JobType.IMPORT_AUDIO, importPayload, { jobId: `import-${podcastId}-${Date.now()}` });
 
   return NextResponse.json({ success: true, message: 'Import retry started' });
 }
