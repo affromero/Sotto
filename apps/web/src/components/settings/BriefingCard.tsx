@@ -165,16 +165,52 @@ export function BriefingCard({
             </div>
           )}
         </div>
-        <button
-          type="button"
-          className={styles.editBtn}
-          onClick={() => setExpanded(!expanded)}
-          aria-expanded={expanded}
-          aria-label={expanded ? 'Collapse settings' : 'Edit settings'}
-        >
-          {expanded ? 'Close' : 'Edit'}
-        </button>
+        <div className={styles.summaryActions}>
+          <button
+            type="button"
+            className={styles.editBtn}
+            onClick={() => setExpanded(!expanded)}
+            aria-expanded={expanded}
+            aria-label={expanded ? 'Collapse settings' : 'Edit settings'}
+          >
+            {expanded ? 'Close' : 'Edit'}
+          </button>
+          {!expanded && !confirmDelete && (
+            <button
+              type="button"
+              className={styles.deleteBtnSubtle}
+              onClick={() => setConfirmDelete(true)}
+              aria-label="Delete briefing"
+            >
+              Delete
+            </button>
+          )}
+        </div>
       </div>
+
+      {/* Inline delete confirmation (collapsed state) */}
+      {!expanded && confirmDelete && (
+        <div className={styles.confirmRow}>
+          <span className={styles.confirmText}>Delete this briefing?</span>
+          <button
+            type="button"
+            className={styles.deleteBtn}
+            onClick={handleDelete}
+            disabled={deleting}
+            aria-label="Confirm delete"
+          >
+            {deleting ? 'Deleting...' : 'Yes, delete'}
+          </button>
+          <button
+            type="button"
+            className={styles.editBtn}
+            onClick={() => setConfirmDelete(false)}
+            aria-label="Cancel delete"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
 
       {/* Generation status */}
       {generating && (
