@@ -424,6 +424,9 @@ export default function CreateScreen() {
     onSuccess: () => {
       setStep('generating');
     },
+    onError: () => {
+      Alert.alert('Error', 'Could not approve script. Please try again.');
+    },
   });
 
   // Script regenerate mutation
@@ -433,6 +436,9 @@ export default function CreateScreen() {
     },
     onSuccess: () => {
       setStep('scripting');
+    },
+    onError: () => {
+      Alert.alert('Error', 'Could not regenerate script. Please try again.');
     },
   });
 

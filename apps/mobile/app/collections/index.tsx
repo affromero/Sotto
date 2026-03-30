@@ -16,6 +16,7 @@ import { colors, spacing, typography, borderRadius } from '@sotto/shared';
 import { api } from '../../lib/api';
 import { shadowSm } from '../../lib/shadows';
 import { BottomSheet } from '../../components/BottomSheet';
+import { ErrorState } from '../../components/ErrorState';
 
 interface Collection {
   id: string;
@@ -34,7 +35,7 @@ export default function CollectionsScreen() {
   const [newName, setNewName] = useState('');
   const [newDescription, setNewDescription] = useState('');
 
-  const { data, isLoading } = useQuery<{ collections: Collection[] }>({
+  const { data, isLoading, isError, refetch } = useQuery<{ collections: Collection[] }>({
     queryKey: ['collections'],
     queryFn: async () => {
       const res = await api.get('/collections');
@@ -97,6 +98,10 @@ export default function CollectionsScreen() {
   );
 
   const collections = data?.collections ?? [];
+
+  if (isError) {
+    return <ErrorState message="Failed to load" onRetry={refetch} />;
+  }
 
   return (
     <View style={styles.container}>

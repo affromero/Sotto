@@ -47,7 +47,7 @@ export function TtsModelSelector({ ttsProvider, ttsModel, onChange }: TtsModelSe
           onChange(provider, model);
         }
       }
-    });
+    }).catch(() => {});
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!data?.options?.length) return null;
@@ -72,12 +72,12 @@ export function TtsModelSelector({ ttsProvider, ttsModel, onChange }: TtsModelSe
     const resolvedId = id ?? AUTO_ID;
     if (resolvedId === AUTO_ID) {
       onChange(undefined, undefined);
-      SecureStore.setItemAsync(STORAGE_KEY, '');
+      SecureStore.setItemAsync(STORAGE_KEY, '').catch(() => {});
     } else {
       const [provider, ...rest] = resolvedId.split(':');
       const model = rest.join(':');
       onChange(provider, model);
-      SecureStore.setItemAsync(STORAGE_KEY, resolvedId);
+      SecureStore.setItemAsync(STORAGE_KEY, resolvedId).catch(() => {});
     }
     setSheetOpen(false);
   }

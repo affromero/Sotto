@@ -13,6 +13,7 @@ import { Stack } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { colors, spacing, typography, borderRadius } from '@sotto/shared';
 import { api } from '../../lib/api';
+import { ErrorState } from '../../components/ErrorState';
 
 interface KeyStatus {
   provider: string;
@@ -196,7 +197,7 @@ function ProviderRow({
 export default function ApiKeysScreen() {
   const queryClient = useQueryClient();
 
-  const { data: aiKeys, isLoading: aiLoading } = useQuery<{ keys: KeyStatus[] }>({
+  const { data: aiKeys, isLoading: aiLoading, isError: aiError, refetch: refetchAi } = useQuery<{ keys: KeyStatus[] }>({
     queryKey: ['settings', 'ai-keys'],
     queryFn: async () => {
       const res = await api.get('/settings/ai-keys');
@@ -204,7 +205,7 @@ export default function ApiKeysScreen() {
     },
   });
 
-  const { data: ttsKeys, isLoading: ttsLoading } = useQuery<{ keys: KeyStatus[] }>({
+  const { data: ttsKeys, isLoading: ttsLoading, isError: ttsError, refetch: refetchTts } = useQuery<{ keys: KeyStatus[] }>({
     queryKey: ['settings', 'byok'],
     queryFn: async () => {
       const res = await api.get('/settings/byok');
@@ -264,6 +265,12 @@ export default function ApiKeysScreen() {
   };
 
   const isLoading = aiLoading || ttsLoading;
+  const isError = aiError || ttsError;
+  const refetch = () => { refetchAi(); refetchTts(); };
+
+  if (isError) {
+    return <ErrorState message="Failed to load" onRetry={refetch} />;
+  }
 
   return (
     <View style={styles.container}>

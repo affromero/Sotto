@@ -41,7 +41,7 @@ function FeedCard({
 }) {
   const queryClient = useQueryClient();
   const currentUser = queryClient.getQueryData<{ id: string }>(['user', 'me']);
-  const isOwner = currentUser?.id === podcast.user.id;
+  const isOwner = currentUser?.id === podcast.user?.id;
   const gradient = getPodcastGradient(podcast.id);
 
   return (
@@ -65,13 +65,13 @@ function FeedCard({
         {/* Top row: avatar + badges */}
         <View style={styles.feedHeader}>
           <Avatar
-            uri={podcast.user.image}
-            name={podcast.user.name}
+            uri={podcast.user?.image}
+            name={podcast.user?.name}
             size={32}
           />
           <View style={styles.feedHeaderText}>
             <Text style={styles.creatorName} numberOfLines={1}>
-              {podcast.user.name ?? 'Unknown'}
+              {podcast.user?.name ?? 'Unknown'}
             </Text>
           </View>
           <View style={styles.headerRight}>
@@ -146,7 +146,7 @@ function CompactCard({
 }) {
   const queryClient = useQueryClient();
   const currentUser = queryClient.getQueryData<{ id: string }>(['user', 'me']);
-  const isOwner = currentUser?.id === podcast.user.id;
+  const isOwner = currentUser?.id === podcast.user?.id;
 
   return (
     <Pressable

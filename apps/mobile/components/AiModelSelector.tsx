@@ -47,7 +47,7 @@ export function AiModelSelector({ value, onChange }: AiModelSelectorProps) {
       if (stored && stored !== AUTO_ID) {
         onChange(stored);
       }
-    });
+    }).catch(() => {});
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!data?.models?.length) return null;
@@ -78,7 +78,7 @@ export function AiModelSelector({ value, onChange }: AiModelSelectorProps) {
     const resolvedId = id ?? AUTO_ID;
     const modelValue = resolvedId === AUTO_ID ? undefined : resolvedId;
     onChange(modelValue);
-    SecureStore.setItemAsync(STORAGE_KEY, resolvedId);
+    SecureStore.setItemAsync(STORAGE_KEY, resolvedId).catch(() => {});
     setSheetOpen(false);
   }
 

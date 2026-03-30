@@ -18,6 +18,7 @@ import { globalStyles } from '../../lib/theme';
 import { PodcastCard } from '../../components/PodcastCard';
 import { UserRow } from '../../components/UserRow';
 import { EmptyState } from '../../components/EmptyState';
+import { ErrorState } from '../../components/ErrorState';
 import { BottomSheet } from '../../components/BottomSheet';
 
 type SearchMode = 'podcasts' | 'people';
@@ -38,7 +39,7 @@ export default function SearchScreen() {
 
   const debouncedQuery = query.trim();
 
-  const { data: podcastResults, isLoading: isPodcastsLoading } = useQuery<{
+  const { data: podcastResults, isLoading: isPodcastsLoading, isError: isPodcastsError, refetch: refetchPodcasts } = useQuery<{
     podcasts: PodcastSummary[];
   }>({
     queryKey: ['search', 'podcasts', debouncedQuery, selectedTags],
@@ -54,7 +55,7 @@ export default function SearchScreen() {
     enabled: mode === 'podcasts' && debouncedQuery.length >= 2,
   });
 
-  const { data: peopleResults, isLoading: isPeopleLoading } = useQuery<{
+  const { data: peopleResults, isLoading: isPeopleLoading, isError: isPeopleError, refetch: refetchPeople } = useQuery<{
     users: UserResult[];
   }>({
     queryKey: ['search', 'people', debouncedQuery],
@@ -87,6 +88,10 @@ export default function SearchScreen() {
 
   const isLoading =
     mode === 'podcasts' ? isPodcastsLoading : isPeopleLoading;
+  const isError =
+    mode === 'podcasts' ? isPodcastsError : isPeopleError;
+  const refetch =
+    mode === 'podcasts' ? refetchPodcasts : refetchPeople;
   const podcasts = podcastResults?.podcasts ?? [];
   const people = peopleResults?.users ?? [];
 
@@ -191,6 +196,8 @@ export default function SearchScreen() {
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
+      ) : isError ? (
+        <ErrorState message="Failed to load" onRetry={refetch} />
       ) : mode === 'podcasts' ? (
         <FlatList
           testID="search-results-list"
