@@ -554,6 +554,10 @@ export async function generateScriptWithFeedback(params: {
     claimText: string;
     reasoning: string;
   }>;
+  /** Escalating repair strategy: replace sources → rewrite claims → drop unverifiable */
+  repairMode?: 'replace_sources' | 'rewrite_to_sources' | 'drop_unverifiable';
+  /** Reference numbers that must NOT be reused (flagged as unreliable) */
+  bannedRefNumbers?: number[];
   apiKeyOverride?: string;
   model?: string;
   provider?: string;
@@ -606,9 +610,20 @@ export async function generateScriptWithFeedback(params: {
     .map((t, i) => `[${i}] ${t.speaker}: ${t.text}`)
     .join('\n');
 
-  const previousRefsText = params.previousReferences
-    .map((r) => `[${r.number}] "${r.title}" (${r.type}) — ${r.url || 'no url'}`)
-    .join('\n');
+  // Split references into allowed and banned
+  const bannedSet = new Set(params.bannedRefNumbers ?? []);
+  const allowedRefs = params.previousReferences.filter((r) => !bannedSet.has(r.number));
+  const bannedRefs = params.previousReferences.filter((r) => bannedSet.has(r.number));
+
+  const allowedRefsText = allowedRefs.length > 0
+    ? allowedRefs.map((r) => `[${r.number}] "${r.title}" (${r.type}) — ${r.url || 'no url'}`).join('\n')
+    : '(none — all previous references were flagged as unreliable)';
+
+  let bannedRefsSection = '';
+  if (bannedRefs.length > 0) {
+    const bannedLines = bannedRefs.map((r) => `[${r.number}] "${r.title}" — ${r.url || 'no url'}`).join('\n');
+    bannedRefsSection = `\n## BANNED REFERENCES (DO NOT REUSE — these are unreliable sources):\n${bannedLines}\n`;
+  }
 
   // Build grounded replacements section if available
   let groundedSection = '';
@@ -631,17 +646,38 @@ export async function generateScriptWithFeedback(params: {
     groundedSection = `\n## GROUNDED REPLACEMENTS (we searched the web for you — use these real sources):\n${lines.join('\n\n')}\n`;
   }
 
+  // Repair mode instructions — escalate with each attempt
+  const REPAIR_INSTRUCTIONS: Record<string, string> = {
+    replace_sources: `## REPAIR MODE: REPLACE SOURCES
+For each flagged claim, use the grounded replacement source if one was found.
+If no replacement was found, use web search to find a reputable source (news outlets, official reports, academic papers).
+Do NOT cite blogs, Reddit, aggregators, or social media.`,
+    rewrite_to_sources: `## REPAIR MODE: REWRITE CLAIMS TO MATCH SOURCES
+Previous attempts to find replacement sources for some claims failed.
+For claims where no verifiable source exists: REWRITE the claim to state a different, related fact that CAN be verified from a reputable source.
+It is better to make a slightly different but well-sourced claim than to keep an unverifiable one.
+Drop claims entirely if you cannot find ANY verifiable angle.`,
+    drop_unverifiable: `## REPAIR MODE: DROP UNVERIFIABLE CLAIMS
+This is the final attempt. Be aggressive:
+1. REMOVE every claim that cannot be backed by a verifiable, reputable source.
+2. REPLACE removed claims with new, well-sourced claims on the same topic.
+3. Every remaining claim MUST have a citation to a reputable source (news outlet, official report, academic paper).
+4. It is acceptable to have fewer claims if they are all well-sourced.`,
+  };
+
+  const repairSection = params.repairMode ? `\n${REPAIR_INSTRUCTIONS[params.repairMode]}\n` : '';
+
   const userMessage = `Topic: ${params.topic}
 Depth: ${params.depth}
 
 ## FACT-CHECKER FEEDBACK:
 ${params.verificationFeedback}
-${groundedSection}
+${repairSection}${groundedSection}${bannedRefsSection}
 ## PREVIOUS SCRIPT (to revise):
 ${previousScriptText}
 
-## PREVIOUS REFERENCES:
-${previousRefsText}
+## ALLOWED REFERENCES (you may keep these):
+${allowedRefsText}
 
 ${params.sourceContent ? `\n${formatSourceBlock(params.sourceContent, params.sourceMetadata)}` : ''}
 
