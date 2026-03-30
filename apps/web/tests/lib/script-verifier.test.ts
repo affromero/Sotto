@@ -1424,10 +1424,10 @@ describe('getMinReferenceCount', () => {
     expect(getMinReferenceCount('eli5', 2)).toBe(3);
   });
 
-  it('caps at 30', () => {
-    expect(getMinReferenceCount('deep_dive', 30)).toBe(30);
-    expect(getMinReferenceCount('standard', 60)).toBe(30);
-    expect(getMinReferenceCount('deep_dive', 100)).toBe(30);
+  it('scales without cap', () => {
+    expect(getMinReferenceCount('deep_dive', 30)).toBe(45);
+    expect(getMinReferenceCount('standard', 60)).toBe(60);
+    expect(getMinReferenceCount('deep_dive', 100)).toBe(150);
   });
 
   it('handles unknown depth with defaults', () => {

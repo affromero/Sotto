@@ -199,7 +199,7 @@ describe('ReplicateProvider', () => {
   });
 
   describe('Qwen3-TTS model (legacy)', () => {
-    it('uses qwen3-tts endpoint and voice field', async () => {
+    it('uses qwen3-tts endpoint and speaker field', async () => {
       const fetchMock = vi.fn();
 
       fetchMock.mockResolvedValueOnce({
@@ -225,7 +225,9 @@ describe('ReplicateProvider', () => {
       const [apiUrl] = fetchMock.mock.calls[0];
       expect(apiUrl).toBe('https://api.replicate.com/v1/models/qwen/qwen3-tts/predictions');
       const body = JSON.parse(fetchMock.mock.calls[0][1].body);
-      expect(body.input.voice).toBe('Dylan');
+      expect(body.input.speaker).toBe('Dylan');
+      expect(body.input.mode).toBe('custom_voice');
+      expect(body.input.language).toBe('auto');
       expect(body.input.voice_id).toBeUndefined();
       expect(body.input.audio_format).toBeUndefined();
     });

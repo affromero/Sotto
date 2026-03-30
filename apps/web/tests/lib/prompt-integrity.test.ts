@@ -138,7 +138,7 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
   ].sort(),
   'generation/briefing-script.md': [
     'CONTENT_SAFETY', 'DURATION_TARGET', 'EXPERT_SPEAKER', 'HOST_SPEAKER',
-    'PREVIOUS_EPISODES', 'SOURCE_ARTICLES', 'SPEAKER_SECTION',
+    'MIN_REFERENCE_COUNT', 'PREVIOUS_EPISODES', 'SOURCE_ARTICLES', 'SPEAKER_SECTION',
     'VOICE_REALISM', 'WORD_COUNT_IDEAL', 'WORD_COUNT_MAX', 'WORD_COUNT_MIN',
   ].sort(),
   'quiz/generate-quiz.md': [

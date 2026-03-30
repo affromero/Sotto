@@ -207,7 +207,10 @@ const failedVerdict = {
   passed: false,
   score: 0.45,
   feedback: 'Claims in segment 2 are unsupported by the provided references.',
-  unsupportedClaims: ['claim-a', 'claim-b'],
+  unsupportedClaims: [
+    { claimText: 'claim-a', turnIndex: 1, speaker: 'HOST', existingCitations: [], isCommonKnowledge: false, needsMoreCitations: true, hasUnreliableSource: false, hasMisattribution: false, verificationNote: '' },
+    { claimText: 'claim-b', turnIndex: 2, speaker: 'EXPERT', existingCitations: [], isCommonKnowledge: false, needsMoreCitations: true, hasUnreliableSource: false, hasMisattribution: false, verificationNote: '' },
+  ],
 };
 
 const parseErrorVerdict = {
