@@ -109,7 +109,7 @@ export class HumeProvider implements TtsProvider {
     return this.lastGenerationId;
   }
 
-  getVoiceId(speaker: string, podcastId?: string, metadata?: VoiceMatchMetadata): string {
+  getVoiceId(speaker: string, podcastId?: string, metadata?: VoiceMatchMetadata, _language?: string): string {
     const isHostVoice = SPEAKER_VOICE_HOST_SET.has(speaker.toUpperCase());
     if (!podcastId) {
       return isHostVoice ? HUME_VOICE_POOL[0].id : HUME_VOICE_POOL[1].id;

@@ -2,6 +2,7 @@ import { prisma } from './prisma';
 import { getAutoModelConfig, resolveAutoModel, type PlanModelConfig, type ProviderAllocation } from './auto-model-config';
 import { getProviderMeta, compareQuality, type TtsProviderId } from './providers/tts-registry';
 import { getAiProviderMeta, type AiProviderId } from './providers/ai-registry';
+import { supportsLanguage } from './tts-language-support';
 
 const AI_TIER_RANK: Record<string, number> = { best: 0, balanced: 1, fast: 2 };
 
@@ -33,7 +34,7 @@ export interface SelectedFreeTierProviders {
  * provider with remaining quota. Falls back to auto model config
  * when no allocations exist.
  */
-export async function selectFreeTierProviders(userId: string): Promise<SelectedFreeTierProviders> {
+export async function selectFreeTierProviders(userId: string, language?: string | null): Promise<SelectedFreeTierProviders> {
   const [config, autoFree] = await Promise.all([
     getAutoModelConfig(),
     resolveAutoModel('FREE'),
@@ -59,7 +60,7 @@ export async function selectFreeTierProviders(userId: string): Promise<SelectedF
   const usageMap = new Map(usageRows.map((r) => [`${r.category}:${r.provider}`, r.used]));
 
   // Select TTS provider: filter to remaining quota, sort by quality tier (highest first)
-  const selectedTts = selectTtsProvider(config.ttsAllocations, usageMap, config, autoFree);
+  const selectedTts = selectTtsProvider(config.ttsAllocations, usageMap, config, autoFree, language);
 
   // Select AI provider: filter to remaining quota, sort by model tier (best first)
   const selectedAi = selectAiProvider(config.aiAllocations, usageMap, config, autoFree);
@@ -78,19 +79,23 @@ function selectTtsProvider(
   allocations: ProviderAllocation[],
   usageMap: Map<string, number>,
   config: { dailyGenerationLimit: number },
-  autoFree: PlanModelConfig
+  autoFree: PlanModelConfig,
+  language?: string | null,
 ): { provider: string; model: string; quota: number } {
   if (allocations.length === 0) {
     return { provider: autoFree.ttsProvider, model: autoFree.ttsModel, quota: config.dailyGenerationLimit };
   }
 
-  // Filter to allocations with remaining quota AND a platform API key available
+  // Filter to allocations with remaining quota, a platform API key, and language support
   const available = allocations
     .filter((a) => {
       const used = usageMap.get(`tts:${a.provider}`) ?? 0;
       if (used >= a.quota) return false;
       const envVar = TTS_PLATFORM_KEY_ENVS[a.provider];
-      return envVar ? !!process.env[envVar] : false;
+      if (!envVar || !process.env[envVar]) return false;
+      // When language is set, only include allocations whose model supports it
+      if (language && !supportsLanguage(a.provider as TtsProviderId, a.model, language)) return false;
+      return true;
     })
     .sort((a, b) => {
       // Sort by quality tier (highest first) using compareQuality from tts-registry

@@ -145,7 +145,7 @@ export class ReplicateProvider implements TtsProvider {
     throw new Error('Replicate prediction timed out after 60 poll attempts');
   }
 
-  getVoiceId(speaker: string, podcastId?: string, metadata?: VoiceMatchMetadata): string {
+  getVoiceId(speaker: string, podcastId?: string, metadata?: VoiceMatchMetadata, _language?: string): string {
     const pool = isInworldModel(this.model) ? INWORLD_VOICE_POOL : FAL_VOICE_POOL;
     const isHostVoice = SPEAKER_VOICE_HOST_SET.has(speaker.toUpperCase());
     if (!podcastId) {
