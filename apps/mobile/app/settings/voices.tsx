@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography, borderRadius } from '@sotto/shared';
 import { api } from '../../lib/api';
 import { shadowSm } from '../../lib/shadows';
+import { ErrorState } from '../../components/ErrorState';
 
 interface VoiceClone {
   id: string;
@@ -28,7 +29,7 @@ interface VoiceClone {
 export default function VoiceManagementScreen() {
   const queryClient = useQueryClient();
 
-  const { data, isLoading } = useQuery<{
+  const { data, isLoading, isError, refetch } = useQuery<{
     userClones: VoiceClone[];
     maxVoiceClones: number;
   }>({
@@ -85,6 +86,10 @@ export default function VoiceManagementScreen() {
 
   const clones = data?.userClones ?? [];
   const maxClones = data?.maxVoiceClones ?? 5;
+
+  if (isError) {
+    return <ErrorState message="Failed to load" onRetry={refetch} />;
+  }
 
   const renderItem = useCallback(
     ({ item }: { item: VoiceClone }) => {

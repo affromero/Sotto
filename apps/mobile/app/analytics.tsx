@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography, borderRadius } from '@sotto/shared';
 import { api } from '../lib/api';
 import { shadowSm, shadowMd } from '../lib/shadows';
+import { ErrorState } from '../components/ErrorState';
 
 type Period = '7d' | '30d' | '90d' | 'all';
 
@@ -76,7 +77,7 @@ function StatCard({
 export default function AnalyticsScreen() {
   const [period, setPeriod] = useState<Period>('30d');
 
-  const { data, isLoading } = useQuery<AnalyticsData>({
+  const { data, isLoading, isError, refetch } = useQuery<AnalyticsData>({
     queryKey: ['creator-analytics', period],
     queryFn: async () => {
       const res = await api.get('/creator-analytics', { params: { period } });
@@ -111,6 +112,10 @@ export default function AnalyticsScreen() {
     ),
     [period],
   );
+
+  if (isError) {
+    return <ErrorState message="Failed to load" onRetry={refetch} />;
+  }
 
   return (
     <View style={styles.container}>

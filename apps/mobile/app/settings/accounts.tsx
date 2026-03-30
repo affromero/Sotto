@@ -11,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography, borderRadius } from '@sotto/shared';
 import { api } from '../../lib/api';
 import { shadowSm } from '../../lib/shadows';
+import { ErrorState } from '../../components/ErrorState';
 
 const PROVIDER_ICONS: Record<string, { icon: string; label: string }> = {
   google: { icon: 'logo-google', label: 'Google' },
@@ -20,7 +21,7 @@ const PROVIDER_ICONS: Record<string, { icon: string; label: string }> = {
 };
 
 export default function ConnectedAccountsScreen() {
-  const { data, isLoading } = useQuery<{
+  const { data, isLoading, isError, refetch } = useQuery<{
     accounts: { provider: string; providerAccountId: string }[];
     twitterHandle: string | null;
     twitterEnabled: boolean;
@@ -37,6 +38,10 @@ export default function ConnectedAccountsScreen() {
   });
 
   const accounts = data?.accounts ?? [];
+
+  if (isError) {
+    return <ErrorState message="Failed to load" onRetry={refetch} />;
+  }
 
   return (
     <View style={styles.container}>

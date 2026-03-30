@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography, borderRadius } from '@sotto/shared';
 import { api } from '../../lib/api';
 import { Avatar } from '../../components/Avatar';
+import { ErrorState } from '../../components/ErrorState';
 
 interface UserProfile {
   id: string;
@@ -27,7 +28,7 @@ interface UserProfile {
 export default function ProfileEditScreen() {
   const queryClient = useQueryClient();
 
-  const { data: profile, isLoading } = useQuery<UserProfile>({
+  const { data: profile, isLoading, isError, refetch } = useQuery<UserProfile>({
     queryKey: ['user', 'me'],
     queryFn: async () => {
       const res = await api.get('/users/me');
@@ -87,6 +88,10 @@ export default function ProfileEditScreen() {
         <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
+  }
+
+  if (isError) {
+    return <ErrorState message="Failed to load" onRetry={refetch} />;
   }
 
   return (

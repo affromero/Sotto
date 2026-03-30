@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography, borderRadius } from '@sotto/shared';
 import { api } from '../../lib/api';
 import { shadowSm, shadowMd } from '../../lib/shadows';
+import { ErrorState } from '../../components/ErrorState';
 
 interface BillingData {
   tier: 'FREE' | 'PRO';
@@ -28,7 +29,7 @@ interface BillingData {
 }
 
 export default function BillingScreen() {
-  const { data, isLoading } = useQuery<BillingData>({
+  const { data, isLoading, isError, refetch } = useQuery<BillingData>({
     queryKey: ['billing', 'usage'],
     queryFn: async () => {
       const res = await api.get('/billing/usage');
@@ -60,6 +61,10 @@ export default function BillingScreen() {
   };
 
   const isPro = data?.tier === 'PRO';
+
+  if (isError) {
+    return <ErrorState message="Failed to load" onRetry={refetch} />;
+  }
 
   return (
     <View style={styles.container}>
