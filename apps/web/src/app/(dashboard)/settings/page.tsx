@@ -61,6 +61,8 @@ export default async function SettingsPage() {
             ttsModel: true,
             hostVoiceId: true,
             expertVoiceId: true,
+            continuousLearning: true,
+            contextEpisodes: true,
             visibility: true,
             useByokKeys: true,
             lastGeneratedAt: true,
