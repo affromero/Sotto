@@ -43,6 +43,7 @@ interface TtsOption {
   group?: string;
   hint?: string;
   requiredPlan?: 'FREE' | 'PRO';
+  supportedLanguages?: string[];
 }
 
 export async function GET(request: NextRequest) {
@@ -88,6 +89,7 @@ export async function GET(request: NextRequest) {
               group: meta.displayName,
               hint: meta.displayName,
               requiredPlan: freeSet.has(compositeId) ? 'FREE' : 'PRO',
+              supportedLanguages: [...model.supportedLanguages],
             });
           }
         }
@@ -101,6 +103,7 @@ export async function GET(request: NextRequest) {
               badge: QUALITY_BADGES[model.tier],
               group: meta.displayName,
               hint: meta.displayName,
+              supportedLanguages: [...model.supportedLanguages],
             });
           }
         }
