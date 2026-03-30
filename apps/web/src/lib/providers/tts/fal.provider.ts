@@ -24,6 +24,13 @@ const MODEL_ENDPOINTS: Record<string, string> = {
   'qwen3-tts-0.6b': 'https://fal.run/fal-ai/qwen-3-tts/text-to-speech/0.6b',
 };
 
+/** ISO 639-1 → Qwen3 language name mapping (Qwen3 expects full language names). */
+const QWEN3_LANGUAGE_MAP: Record<string, string> = {
+  zh: 'Chinese', en: 'English', ja: 'Japanese', ko: 'Korean',
+  fr: 'French', de: 'German', es: 'Spanish', it: 'Italian',
+  pt: 'Portuguese', ru: 'Russian',
+};
+
 export class FalProvider implements TtsProvider {
   readonly providerId: TtsProviderId = 'fal';
   private apiKey: string;
@@ -44,6 +51,12 @@ export class FalProvider implements TtsProvider {
       body.speaker_voice_embedding_file_url = params.voiceId;
     } else {
       body.voice = params.voiceId;
+    }
+
+    // Pass language hint when available (Qwen3 expects full language names)
+    if (params.language) {
+      const langName = QWEN3_LANGUAGE_MAP[params.language];
+      if (langName) body.language = langName;
     }
 
     const response = await fetch(url, {

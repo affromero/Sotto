@@ -29,6 +29,13 @@ function isInworldModel(model: string): boolean {
   return model.startsWith('inworld-');
 }
 
+/** ISO 639-1 → Qwen3 language name mapping (same as Fal provider). */
+const QWEN3_LANGUAGE_MAP: Record<string, string> = {
+  zh: 'Chinese', en: 'English', ja: 'Japanese', ko: 'Korean',
+  fr: 'French', de: 'German', es: 'Spanish', it: 'Italian',
+  pt: 'Portuguese', ru: 'Russian',
+};
+
 interface ReplicatePrediction {
   id: string;
   status: 'starting' | 'processing' | 'succeeded' | 'failed' | 'canceled';
@@ -68,6 +75,12 @@ export class ReplicateProvider implements TtsProvider {
     const input: Record<string, unknown> = inworld
       ? { text, voice_id: params.voiceId, audio_format: 'mp3' }
       : { text, voice: params.voiceId };
+
+    // Pass language hint for Qwen3-TTS (expects full language names)
+    if (!inworld && params.language) {
+      const langName = QWEN3_LANGUAGE_MAP[params.language];
+      if (langName) input.language = langName;
+    }
 
     let response: Response;
     try {
