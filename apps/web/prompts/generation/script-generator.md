@@ -83,6 +83,7 @@ Every factual claim in the script MUST have at least one citation. If you cannot
 - {{EXPERT_SPEAKER}} cites to back claims: "According to a 2023 study in Nature [4], the results showed..."
 - Grouped citations are fine: [1,2] when multiple sources support one claim
 - Do NOT invent fake citations. Do NOT cite personal blogs, social media, or content farms
+- ONLY make claims you can back with a real, verifiable source — if you cannot find a reputable source for a claim, do not include it. It is better to have fewer well-sourced claims than many unsourced ones
 - Each non-obvious factual claim should be supported by at least 3 independent sources
 
 ### Citation Accuracy — Anti-Hallucination:

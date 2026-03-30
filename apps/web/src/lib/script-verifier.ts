@@ -444,6 +444,7 @@ function parseClaims(
     existingCitations: (c.existingCitations as number[]) || [],
     needsMoreCitations: c.needsMoreCitations as boolean,
     hasUnreliableSource: c.hasUnreliableSource as boolean,
+    unreliableCitations: (c.unreliableCitations as number[]) || [],
     hasMisattribution: (c.hasMisattribution as boolean) ?? false,
     verificationNote: c.verificationNote as string,
     turnHash: c.turnIndex != null && (c.turnIndex as number) < turns.length
@@ -498,7 +499,7 @@ export async function verifyScript(params: {
     // the hash matches but the verdict could now differ with the replaced source.
     const problemTurnIndices = new Set(
       rawCarried
-        .filter((c) => c.hasUnreliableSource || c.hasMisattribution)
+        .filter((c) => c.hasUnreliableSource || c.hasMisattribution || (!c.isCommonKnowledge && c.existingCitations.length === 0) || c.needsMoreCitations)
         .map((c) => c.turnIndex)
     );
     for (const idx of problemTurnIndices) {

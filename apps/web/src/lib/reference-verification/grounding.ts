@@ -29,17 +29,37 @@ export function needsGrounding(checks: VerificationCheck[]): boolean {
 }
 
 /**
- * Build a search query from claim context and ref title.
- * Extracts key terms, truncates to ~120 chars for API limits.
+ * Build multiple search queries from claim context, ref title, and topic.
+ * Returns 1-3 queries: claim sentence, original title, and topic+keywords.
+ * Each query is truncated to ~120 chars for API limits.
  */
-function buildSearchQuery(claimContext: ClaimContext, refTitle: string): string {
-  const claimText = claimContext.sentences.slice(0, 2).join(' ');
-  const combined = claimText || refTitle;
-  // Take first ~120 chars, break at word boundary
-  if (combined.length <= 120) return combined;
-  const truncated = combined.slice(0, 120);
-  const lastSpace = truncated.lastIndexOf(' ');
-  return lastSpace > 60 ? truncated.slice(0, lastSpace) : truncated;
+function buildGroundingQueries(claimContext: ClaimContext, refTitle: string, topic?: string): string[] {
+  const truncate = (s: string): string => {
+    if (s.length <= 120) return s;
+    const t = s.slice(0, 120);
+    const lastSpace = t.lastIndexOf(' ');
+    return lastSpace > 60 ? t.slice(0, lastSpace) : t;
+  };
+
+  const queries: string[] = [];
+
+  // Query 1: claim sentence (best for finding supporting evidence)
+  const claimText = claimContext.sentences.slice(0, 2).join(' ').trim();
+  if (claimText.length >= 10) queries.push(truncate(claimText));
+
+  // Query 2: original reference title (may find the actual source or a similar one)
+  if (refTitle.length >= 10 && refTitle !== claimText) queries.push(truncate(refTitle));
+
+  // Query 3: topic + claim keywords (broadens the search)
+  if (topic && claimText.length >= 10) {
+    const keywords = claimText.split(/\s+/).filter(w => w.length > 4).slice(0, 5).join(' ');
+    if (keywords.length >= 10) queries.push(truncate(`${topic} ${keywords}`));
+  }
+
+  // Fallback: at least return the title
+  if (queries.length === 0 && refTitle.length >= 5) queries.push(truncate(refTitle));
+
+  return queries;
 }
 
 /**
@@ -48,6 +68,7 @@ function buildSearchQuery(claimContext: ClaimContext, refTitle: string): string 
  */
 async function openAlexGrounding(
   candidates: Array<{ ref: ReferenceInput; claimContext: ClaimContext; domain: ContentDomain }>,
+  topic?: string,
 ): Promise<Map<string, VerificationCheck>> {
   const results = new Map<string, VerificationCheck>();
 
@@ -56,37 +77,42 @@ async function openAlexGrounding(
   );
 
   const tasks = eligible.map(async ({ ref, claimContext }) => {
-    const query = buildSearchQuery(claimContext, ref.title);
-    if (query.length < 10) return;
+    const queries = buildGroundingQueries(claimContext, ref.title, topic);
+    if (queries.length === 0) return;
 
-    try {
-      const syntheticRef: ReferenceInput = {
-        id: ref.id,
-        number: ref.number,
-        title: query,
-        authors: [],
-        year: null,
-        url: null,
-        doi: null,
-        type: ref.type,
-      };
+    // Try each query until one finds a result
+    for (const query of queries) {
+      try {
+        const syntheticRef: ReferenceInput = {
+          id: ref.id,
+          number: ref.number,
+          title: query,
+          authors: [],
+          year: null,
+          url: null,
+          doi: null,
+          type: ref.type,
+        };
 
-      const titleCheck = await searchTitle(syntheticRef);
+        const titleCheck = await searchTitle(syntheticRef);
 
-      if (titleCheck.passed && titleCheck.replacement) {
-        results.set(ref.id, {
-          layer: 'grounding' as VerificationCheck['layer'],
-          passed: true,
-          confidence: titleCheck.confidence * 0.8, // Discount: claim-based search, not exact title
-          detail: `Grounding via OpenAlex: found "${titleCheck.replacement.title}"`,
-          replacement: titleCheck.replacement,
+        if (titleCheck.passed && titleCheck.replacement) {
+          results.set(ref.id, {
+            layer: 'grounding' as VerificationCheck['layer'],
+            passed: true,
+            confidence: titleCheck.confidence * 0.8,
+            detail: `Grounding via OpenAlex: found "${titleCheck.replacement.title}"`,
+            replacement: titleCheck.replacement,
+          });
+          break; // Found a result, stop trying other queries
+        }
+      } catch (error) {
+        logger.warn('OpenAlex grounding failed for ref', {
+          refNumber: String(ref.number),
+          query,
+          error: error instanceof Error ? error.message : 'Unknown',
         });
       }
-    } catch (error) {
-      logger.warn('OpenAlex grounding failed for ref', {
-        refNumber: String(ref.number),
-        error: error instanceof Error ? error.message : 'Unknown',
-      });
     }
   });
 
@@ -115,22 +141,21 @@ function extractFirstJsonObject(text: string): string {
 }
 
 /**
- * Phase 2: AI web search for remaining ungrounded refs.
- * Batch call with useWebSearch: true.
+ * Process a single batch of AI grounding candidates.
+ * Returns partial results — caller merges across batches.
  */
-async function aiGroundingSearch(
-  candidates: Array<{ ref: ReferenceInput; claimContext: ClaimContext }>,
+async function aiGroundBatch(
+  batch: Array<{ ref: ReferenceInput; claimContext: ClaimContext }>,
   topic: string,
+  systemPrompt: string,
   apiKeyOverride?: string,
   model?: string,
   provider?: string,
 ): Promise<Map<string, VerificationCheck>> {
   const results = new Map<string, VerificationCheck>();
-  if (candidates.length === 0) return results;
+  const BATCH_TIMEOUT_MS = 20_000;
 
-  const systemPrompt = loadPrompt('verification/reference-grounding.md');
-
-  const refsContext = candidates.map(({ ref, claimContext }) => {
+  const refsContext = batch.map(({ ref, claimContext }) => {
     const claimText = claimContext.sentences.length > 0
       ? claimContext.sentences.map((s, i) => `  [${claimContext.speakerTurns[i]}] "${s}"`).join('\n')
       : '  No specific claim extracted.';
@@ -149,23 +174,16 @@ ${refsContext}
 
 Find one real, verifiable source per reference. Return JSON only.`;
 
-  const AI_TIMEOUT_MS = 60_000;
-
   try {
     const ai = createAIProvider(provider);
     const response = await Promise.race([
       ai.generateResponse(
         systemPrompt,
         [{ role: 'user', content: userMessage }],
-        {
-          maxTokens: 4096,
-          apiKeyOverride,
-          model,
-          useWebSearch: true,
-        },
+        { maxTokens: 4096, apiKeyOverride, model, useWebSearch: true },
       ),
       new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Grounding AI search timed out after 60s')), AI_TIMEOUT_MS),
+        setTimeout(() => reject(new Error(`Grounding AI batch timed out after ${BATCH_TIMEOUT_MS / 1000}s`)), BATCH_TIMEOUT_MS),
       ),
     ]);
 
@@ -175,14 +193,14 @@ Find one real, verifiable source per reference. Return JSON only.`;
       category: 'reference_grounding',
       inputTokens: response.inputTokens,
       outputTokens: response.outputTokens,
-      metadata: { refCount: candidates.length },
+      metadata: { refCount: batch.length },
     });
 
     let parsed: ReturnType<typeof JSON.parse>;
     try {
       parsed = JSON.parse(extractFirstJsonObject(response.content));
     } catch {
-      logger.warn('Grounding AI returned non-JSON response');
+      logger.warn('Grounding AI batch returned non-JSON response');
       return results;
     }
 
@@ -199,7 +217,7 @@ Find one real, verifiable source per reference. Return JSON only.`;
     }> = parsed.groundings || [];
 
     for (const grounding of groundings) {
-      const entry = candidates.find((c) => c.ref.number === grounding.refNumber);
+      const entry = batch.find((c) => c.ref.number === grounding.refNumber);
       if (!entry || !grounding.found) continue;
 
       const replacement: ReplacementData = {
@@ -219,14 +237,52 @@ Find one real, verifiable source per reference. Return JSON only.`;
         replacement,
       });
     }
-
-    return results;
   } catch (error) {
-    logger.warn('AI grounding search failed', {
+    logger.warn('AI grounding batch failed', {
       error: error instanceof Error ? error.message : 'Unknown',
+      batchSize: String(batch.length),
+      refNumbers: batch.map((c) => String(c.ref.number)).join(','),
     });
-    return results;
   }
+
+  return results;
+}
+
+/**
+ * Phase 2: AI web search for remaining ungrounded refs.
+ * Processes in small batches of 3 with per-batch timeouts,
+ * merging partial successes so one timeout doesn't lose everything.
+ */
+async function aiGroundingSearch(
+  candidates: Array<{ ref: ReferenceInput; claimContext: ClaimContext }>,
+  topic: string,
+  apiKeyOverride?: string,
+  model?: string,
+  provider?: string,
+): Promise<Map<string, VerificationCheck>> {
+  const results = new Map<string, VerificationCheck>();
+  if (candidates.length === 0) return results;
+
+  const systemPrompt = loadPrompt('verification/reference-grounding.md');
+  const BATCH_SIZE = 3;
+
+  // Split into batches and process sequentially to respect rate limits
+  for (let i = 0; i < candidates.length; i += BATCH_SIZE) {
+    const batch = candidates.slice(i, i + BATCH_SIZE);
+    const batchResults = await aiGroundBatch(batch, topic, systemPrompt, apiKeyOverride, model, provider);
+
+    for (const [id, check] of batchResults) {
+      results.set(id, check);
+    }
+
+    logger.info('AI grounding batch complete', {
+      batch: String(Math.floor(i / BATCH_SIZE) + 1),
+      totalBatches: String(Math.ceil(candidates.length / BATCH_SIZE)),
+      found: String(batchResults.size),
+    });
+  }
+
+  return results;
 }
 
 /**
@@ -261,9 +317,10 @@ export async function groundReferenceCandidates(
     reasons: candidates.map((c) => c.reason ?? 'all_checks_failed').join(','),
   });
 
-  // Phase 1: OpenAlex
+  // Phase 1: OpenAlex (multi-query, claim-based)
   const openAlexResults = await openAlexGrounding(
     candidates.map((c) => ({ ref: c.ref, claimContext: c.claimContext, domain: c.domain })),
+    topic,
   );
 
   // Phase 2: AI search for refs not grounded by OpenAlex
