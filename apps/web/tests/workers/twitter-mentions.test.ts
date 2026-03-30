@@ -17,6 +17,7 @@ vi.mock('@/lib/redis', () => ({
 const mockPrismaTweetMentionFindUnique = vi.fn();
 const mockPrismaTweetMentionCreate = vi.fn();
 const mockPrismaTweetMentionUpdate = vi.fn();
+const mockPrismaTweetMentionUpsert = vi.fn();
 const mockPrismaAccountFindFirst = vi.fn();
 const mockPrismaUserFindUniqueOrThrow = vi.fn();
 const mockPrismaPodcastCreate = vi.fn();
@@ -27,6 +28,7 @@ vi.mock('@/lib/prisma', () => {
       findUnique: (...args: unknown[]) => mockPrismaTweetMentionFindUnique(...args),
       create: (...args: unknown[]) => mockPrismaTweetMentionCreate(...args),
       update: (...args: unknown[]) => mockPrismaTweetMentionUpdate(...args),
+      upsert: (...args: unknown[]) => mockPrismaTweetMentionUpsert(...args),
     },
     account: {
       findFirst: (...args: unknown[]) => mockPrismaAccountFindFirst(...args),
@@ -473,7 +475,7 @@ describe('processTwitterMentions', () => {
   });
 
   describe('unlinked users', () => {
-    it('sends CTA reply to unlinked users (first time only)', async () => {
+    it('sends CTA reply to unlinked users (first time only) and records mention', async () => {
       const tweet = createMockTweet();
       mockGetMentions.mockResolvedValue({ tweets: [tweet], mediaByKey: new Map(), authorMap: new Map() });
       mockPrismaAccountFindFirst.mockResolvedValue(null);
@@ -483,6 +485,16 @@ describe('processTwitterMentions', () => {
       const job = createMockJob({});
       await processTwitterMentions(job);
 
+      expect(mockPrismaTweetMentionUpsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { tweetId: tweet.id },
+          create: expect.objectContaining({
+            tweetId: tweet.id,
+            status: 'IGNORED',
+            errorMessage: 'Unlinked user — CTA reply sent',
+          }),
+        })
+      );
       expect(mockReplyToTweet).toHaveBeenCalledWith(
         tweet.id,
         expect.stringContaining('Join Sotto at')
@@ -490,7 +502,7 @@ describe('processTwitterMentions', () => {
       expect(mockRedisSet).toHaveBeenCalledWith(`twitter:cta_sent:${tweet.author_id}`, '1');
     });
 
-    it('does not send CTA to unlinked user if already sent', async () => {
+    it('does not send CTA to unlinked user if already sent but still records mention', async () => {
       const tweet = createMockTweet();
       mockGetMentions.mockResolvedValue({ tweets: [tweet], mediaByKey: new Map(), authorMap: new Map() });
       mockPrismaAccountFindFirst.mockResolvedValue(null);
@@ -500,6 +512,15 @@ describe('processTwitterMentions', () => {
       await processTwitterMentions(job);
 
       expect(mockReplyToTweet).not.toHaveBeenCalled();
+      expect(mockPrismaTweetMentionUpsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { tweetId: tweet.id },
+          create: expect.objectContaining({
+            status: 'IGNORED',
+            errorMessage: 'Unlinked user — CTA already sent to this author',
+          }),
+        })
+      );
     });
   });
 
