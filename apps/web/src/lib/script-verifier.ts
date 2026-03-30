@@ -91,7 +91,7 @@ async function retryParseWithStricterPrompt(
     const response = await ai.generateResponse(
       systemPrompt + '\n\nCRITICAL: You MUST respond with ONLY a valid JSON object. No prose, no markdown fences, no explanation. Start with { and end with }.',
       [{ role: 'user', content: userMessage + '\n\nRespond with ONLY valid JSON.' }],
-      { maxTokens: opts.maxTokens, apiKeyOverride: opts.apiKeyOverride, model: opts.model, useWebSearch: true, skipModeration: true },
+      { maxTokens: opts.maxTokens, apiKeyOverride: opts.apiKeyOverride, model: opts.model, skipModeration: true },
     );
     const parsed = JSON.parse(extractFirstJsonObject(response.content));
     return { parsed, inputTokens: response.inputTokens, outputTokens: response.outputTokens, model: response.model };
