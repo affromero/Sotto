@@ -52,6 +52,11 @@ export class CartesiaProvider implements TtsProvider {
       },
     };
 
+    // Pass language hint to Cartesia API when available
+    if (params.language) {
+      body.language = params.language;
+    }
+
     // Add generation_config with emotion, speed, and/or volume if available
     const speed = expression.cartesia?.speed;
     const volume = expression.cartesia?.volume;

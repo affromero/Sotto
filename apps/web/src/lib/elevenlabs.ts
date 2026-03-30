@@ -99,6 +99,8 @@ export async function generateSpeech(params: {
   previousText?: string;
   nextText?: string;
   previousRequestIds?: string[];
+  /** ISO 639-1 language hint (e.g. 'es', 'ja'). Passed as language_code to ElevenLabs API. */
+  language?: string;
 }): Promise<{ audio: Buffer; requestId: string | null }> {
   const apiKey = params.apiKeyOverride || getApiKey();
   if (!apiKey) {
@@ -126,6 +128,10 @@ export async function generateSpeech(params: {
 
   if (params.seed != null) {
     body.seed = params.seed;
+  }
+
+  if (params.language) {
+    body.language_code = params.language;
   }
 
   if (skipTextContext) {

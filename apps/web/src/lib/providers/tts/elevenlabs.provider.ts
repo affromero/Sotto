@@ -87,6 +87,7 @@ export class ElevenLabsProvider implements TtsProvider {
       style: 0.0,
       speed: elExpr?.speed,
       seed: params.seed,
+      language: params.language,
     });
 
     this.lastRequestId = requestId;
