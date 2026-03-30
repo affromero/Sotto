@@ -2,12 +2,7 @@ import { createAIProvider } from './providers/ai';
 import { logUsage } from './usage-logger';
 import { logger } from './logger';
 import { resolveAutoModel } from './auto-model-config';
-
-const SUPPORTED_CODES = new Set([
-  'en', 'es', 'fr', 'de', 'pt', 'it', 'ja', 'ko', 'zh', 'ar',
-  'hi', 'ru', 'nl', 'sv', 'pl', 'tr', 'da', 'fi', 'no', 'cs',
-  'ro', 'hu', 'el', 'he', 'th', 'vi', 'id', 'ms', 'uk', 'ca',
-]);
+import { SOTTO_LANGUAGE_CODES } from './tts-language-support';
 
 export async function detectLanguage(text: string): Promise<string | null> {
   if (!text || text.length < 20) return null;
@@ -31,7 +26,7 @@ export async function detectLanguage(text: string): Promise<string | null> {
     });
 
     const code = response.content.trim().toLowerCase();
-    return SUPPORTED_CODES.has(code) ? code : null;
+    return SOTTO_LANGUAGE_CODES.has(code) ? code : null;
   } catch (error) {
     logger.warn('Language detection failed, skipping', { error });
     return null;

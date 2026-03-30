@@ -1,6 +1,6 @@
 /**
- * Declarative TTS provider registry — capabilities, auth config, and
- * validation functions for every supported BYOK provider.
+ * Declarative TTS provider registry — capabilities, auth config, language
+ * support, and validation functions for every supported BYOK provider.
  */
 import { logger } from '../logger';
 
@@ -16,6 +16,8 @@ export interface TtsModelOption {
   id: string;
   displayName: string;
   tier: 'standard' | 'premium' | 'ultra';
+  /** ISO 639-1 codes this model can produce speech for. */
+  supportedLanguages: ReadonlySet<string>;
 }
 
 export interface TtsProviderMeta {
@@ -35,11 +37,45 @@ export interface TtsProviderMeta {
   platformCostPerKChar: number;
   /** Models that do NOT support `previous_text`/`next_text` context params. */
   modelsWithoutTextContext: string[];
+  /** How the provider handles language: auto-detects, accepts optional hint, or recommends explicit param. */
+  languageDetection: 'auto' | 'optional_hint' | 'recommended';
+  /** API parameter name for language hint (null = provider auto-detects, no param accepted). */
+  languageParam: string | null;
+  /** true = any voice works for any supported language (most providers). false = voice–language affinity matters (e.g. Fal/Qwen3). */
+  voicesAreCrossLingual: boolean;
   auth: {
     fields: TtsProviderAuthField[];
     validate: (credentials: Record<string, string>) => Promise<boolean>;
   };
 }
+
+// ---------------------------------------------------------------------------
+// Language support sets — shared across providers/models to avoid duplication.
+// Each set contains ISO 639-1 codes. LANG_ALL matches SOTTO_LANGUAGE_CODES
+// exported from tts-language-support.ts.
+// ---------------------------------------------------------------------------
+
+/** All 30 Sotto-supported languages */
+const LANG_ALL: ReadonlySet<string> = new Set(['en','es','fr','de','pt','it','ja','ko','zh','ar','hi','ru','nl','sv','pl','tr','da','fi','no','cs','ro','hu','el','he','th','vi','id','ms','uk','ca']);
+const LANG_EN: ReadonlySet<string> = new Set(['en']);
+/** ElevenLabs Multilingual v2 — 24 languages */
+const LANG_EL_MLV2: ReadonlySet<string> = new Set(['en','es','fr','de','pt','it','ja','ko','zh','ar','hi','ru','nl','sv','pl','tr','da','fi','cs','ro','hu','el','id','ms']);
+/** ElevenLabs Flash v2.5 — 27 languages */
+const LANG_EL_FLASH: ReadonlySet<string> = new Set(['en','es','fr','de','pt','it','ja','ko','zh','ar','hi','ru','nl','sv','pl','tr','da','fi','no','cs','ro','hu','el','he','vi','id','ms']);
+/** Cartesia Sonic 3 — 28 languages */
+const LANG_CARTESIA_3: ReadonlySet<string> = new Set(['en','es','fr','de','pt','it','ja','ko','zh','ar','hi','ru','nl','sv','pl','tr','da','fi','no','cs','ro','hu','el','he','th','vi','id','ms']);
+/** Cartesia Sonic Turbo / Sonic 2 — 15 languages */
+const LANG_CARTESIA_TURBO: ReadonlySet<string> = new Set(['en','es','fr','de','pt','it','ja','ko','zh','ar','hi','ru','nl','sv','pl']);
+/** Hume Octave v2 — 11 languages */
+const LANG_HUME_V2: ReadonlySet<string> = new Set(['en','es','fr','de','pt','it','ja','ko','zh','hi','ru']);
+/** Hume Octave v1 — 2 languages */
+const LANG_HUME_V1: ReadonlySet<string> = new Set(['en','es']);
+/** Qwen3-TTS (Fal + Replicate) — 10 languages */
+const LANG_QWEN3: ReadonlySet<string> = new Set(['en','es','fr','de','ja','ko','zh','it','pt','ru']);
+/** Mistral Voxtral — 9 languages */
+const LANG_MISTRAL: ReadonlySet<string> = new Set(['en','es','fr','de','pt','it','ja','ko','zh']);
+/** Replicate Inworld TTS — 15 languages */
+const LANG_INWORLD: ReadonlySet<string> = new Set(['en','es','fr','de','pt','it','ja','ko','zh','ar','hi','ru','nl','sv','pl']);
 
 const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
   elevenlabs: {
@@ -52,16 +88,19 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     maxSegmentChars: 5000,
     defaultModel: 'eleven_v3',
     models: [
-      { id: 'eleven_v3', displayName: 'Eleven v3', tier: 'premium' },
-      { id: 'eleven_flash_v2_5', displayName: 'Eleven Flash v2.5', tier: 'standard' },
-      { id: 'eleven_turbo_v2', displayName: 'Eleven Turbo v2', tier: 'standard' },
-      { id: 'eleven_multilingual_v2', displayName: 'Eleven Multilingual v2', tier: 'premium' },
+      { id: 'eleven_v3', displayName: 'Eleven v3', tier: 'premium', supportedLanguages: LANG_ALL },
+      { id: 'eleven_flash_v2_5', displayName: 'Eleven Flash v2.5', tier: 'standard', supportedLanguages: LANG_EL_FLASH },
+      { id: 'eleven_turbo_v2', displayName: 'Eleven Turbo v2', tier: 'standard', supportedLanguages: LANG_EN },
+      { id: 'eleven_multilingual_v2', displayName: 'Eleven Multilingual v2', tier: 'premium', supportedLanguages: LANG_EL_MLV2 },
     ],
     supportsAudioTags: true,
     docsUrl: 'https://elevenlabs.io/docs/speech-synthesis/audio-tags',
     qualityTier: 'premium',
     platformCostPerKChar: 0.17,
     modelsWithoutTextContext: ['eleven_v3'],
+    languageDetection: 'optional_hint',
+    languageParam: 'language_code',
+    voicesAreCrossLingual: true,
     auth: {
       fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'xi-xxxxxxxxxxxxxxxxxxxx' }],
       validate: async (creds) => {
@@ -87,15 +126,18 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     maxSegmentChars: 4096,
     defaultModel: 'tts-1-hd',
     models: [
-      { id: 'tts-1-hd', displayName: 'TTS-1 HD', tier: 'premium' },
-      { id: 'tts-1', displayName: 'TTS-1', tier: 'standard' },
-      { id: 'gpt-4o-mini-tts', displayName: 'GPT-4o Mini TTS', tier: 'standard' },
+      { id: 'tts-1-hd', displayName: 'TTS-1 HD', tier: 'premium', supportedLanguages: LANG_ALL },
+      { id: 'tts-1', displayName: 'TTS-1', tier: 'standard', supportedLanguages: LANG_ALL },
+      { id: 'gpt-4o-mini-tts', displayName: 'GPT-4o Mini TTS', tier: 'standard', supportedLanguages: LANG_ALL },
     ],
     supportsAudioTags: false,
     docsUrl: null,
     qualityTier: 'standard',
     platformCostPerKChar: 0.015,
     modelsWithoutTextContext: [],
+    languageDetection: 'auto',
+    languageParam: null,
+    voicesAreCrossLingual: true,
     auth: {
       fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'sk-...' }],
       validate: async (creds) => {
@@ -121,15 +163,18 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     maxSegmentChars: 5000,
     defaultModel: 'sonic-3',
     models: [
-      { id: 'sonic-3', displayName: 'Sonic 3', tier: 'premium' },
-      { id: 'sonic-turbo', displayName: 'Sonic Turbo', tier: 'standard' },
-      { id: 'sonic-2', displayName: 'Sonic 2 (Legacy)', tier: 'premium' },
+      { id: 'sonic-3', displayName: 'Sonic 3', tier: 'premium', supportedLanguages: LANG_CARTESIA_3 },
+      { id: 'sonic-turbo', displayName: 'Sonic Turbo', tier: 'standard', supportedLanguages: LANG_CARTESIA_TURBO },
+      { id: 'sonic-2', displayName: 'Sonic 2 (Legacy)', tier: 'premium', supportedLanguages: LANG_CARTESIA_TURBO },
     ],
     supportsAudioTags: true,
     docsUrl: 'https://docs.cartesia.ai/build-with-cartesia/text-to-speech/sonic-formatting',
     qualityTier: 'premium',
     platformCostPerKChar: 0.04,
     modelsWithoutTextContext: [],
+    languageDetection: 'optional_hint',
+    languageParam: 'language',
+    voicesAreCrossLingual: true,
     auth: {
       fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'sk_car_...' }],
       validate: async (creds) => {
@@ -158,14 +203,17 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     maxSegmentChars: 5000,
     defaultModel: 'octave-v2',
     models: [
-      { id: 'octave-v2', displayName: 'Octave V2', tier: 'ultra' },
-      { id: 'octave-v1', displayName: 'Octave V1', tier: 'ultra' },
+      { id: 'octave-v2', displayName: 'Octave V2', tier: 'ultra', supportedLanguages: LANG_HUME_V2 },
+      { id: 'octave-v1', displayName: 'Octave V1', tier: 'ultra', supportedLanguages: LANG_HUME_V1 },
     ],
     supportsAudioTags: false,
     docsUrl: 'https://dev.hume.ai/docs/text-to-speech/text-to-speech-guide',
     qualityTier: 'ultra',
     platformCostPerKChar: 0.125,
     modelsWithoutTextContext: [],
+    languageDetection: 'auto',
+    languageParam: null,
+    voicesAreCrossLingual: true,
     auth: {
       fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'Your Hume AI API key' }],
       validate: async (creds) => {
@@ -200,14 +248,17 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     maxSegmentChars: 5000,
     defaultModel: 'qwen3-tts-1.7b',
     models: [
-      { id: 'qwen3-tts-1.7b', displayName: 'Qwen3 TTS 1.7B', tier: 'premium' },
-      { id: 'qwen3-tts-0.6b', displayName: 'Qwen3 TTS 0.6B', tier: 'standard' },
+      { id: 'qwen3-tts-1.7b', displayName: 'Qwen3 TTS 1.7B', tier: 'premium', supportedLanguages: LANG_QWEN3 },
+      { id: 'qwen3-tts-0.6b', displayName: 'Qwen3 TTS 0.6B', tier: 'standard', supportedLanguages: LANG_QWEN3 },
     ],
     supportsAudioTags: false,
     docsUrl: null,
     qualityTier: 'premium',
     platformCostPerKChar: 0,
     modelsWithoutTextContext: [],
+    languageDetection: 'recommended',
+    languageParam: 'language',
+    voicesAreCrossLingual: false,
     auth: {
       fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'fal_sk_...' }],
       validate: async (creds) => {
@@ -233,14 +284,17 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     maxSegmentChars: 5000,
     defaultModel: 'speech-02-hd',
     models: [
-      { id: 'speech-02-hd', displayName: 'Speech-02 HD', tier: 'premium' },
-      { id: 'speech-02-turbo', displayName: 'Speech-02 Turbo', tier: 'standard' },
+      { id: 'speech-02-hd', displayName: 'Speech-02 HD', tier: 'premium', supportedLanguages: LANG_ALL },
+      { id: 'speech-02-turbo', displayName: 'Speech-02 Turbo', tier: 'standard', supportedLanguages: LANG_ALL },
     ],
     supportsAudioTags: false,
     docsUrl: null,
     qualityTier: 'premium',
     platformCostPerKChar: 0.10,
     modelsWithoutTextContext: [],
+    languageDetection: 'auto',
+    languageParam: null,
+    voicesAreCrossLingual: true,
     auth: {
       fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'Your FAL API key' }],
       validate: async (creds) => {
@@ -266,13 +320,16 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     maxSegmentChars: 4096,
     defaultModel: 'voxtral-mini-tts-2603',
     models: [
-      { id: 'voxtral-mini-tts-2603', displayName: 'Voxtral Mini TTS', tier: 'premium' },
+      { id: 'voxtral-mini-tts-2603', displayName: 'Voxtral Mini TTS', tier: 'premium', supportedLanguages: LANG_MISTRAL },
     ],
     supportsAudioTags: false,
     docsUrl: null,
     qualityTier: 'premium',
     platformCostPerKChar: 0.016,
     modelsWithoutTextContext: [],
+    languageDetection: 'auto',
+    languageParam: null,
+    voicesAreCrossLingual: true,
     auth: {
       fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'Your Mistral API key' }],
       validate: async (creds) => {
@@ -298,15 +355,18 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     maxSegmentChars: 5000,
     defaultModel: 'inworld-tts-1.5-max',
     models: [
-      { id: 'inworld-tts-1.5-max', displayName: 'Inworld TTS 1.5 Max', tier: 'premium' },
-      { id: 'inworld-tts-1.5-mini', displayName: 'Inworld TTS 1.5 Mini', tier: 'standard' },
-      { id: 'qwen3-tts', displayName: 'Qwen3 TTS', tier: 'standard' },
+      { id: 'inworld-tts-1.5-max', displayName: 'Inworld TTS 1.5 Max', tier: 'premium', supportedLanguages: LANG_INWORLD },
+      { id: 'inworld-tts-1.5-mini', displayName: 'Inworld TTS 1.5 Mini', tier: 'standard', supportedLanguages: LANG_INWORLD },
+      { id: 'qwen3-tts', displayName: 'Qwen3 TTS', tier: 'standard', supportedLanguages: LANG_QWEN3 },
     ],
     supportsAudioTags: true,
     docsUrl: null,
     qualityTier: 'premium',
     platformCostPerKChar: 0.01,
     modelsWithoutTextContext: [],
+    languageDetection: 'auto',
+    languageParam: null,
+    voicesAreCrossLingual: true,
     auth: {
       fields: [{ key: 'apiKey', label: 'API Token', placeholder: 'r8_xxxxxxxxxxxx' }],
       validate: async (creds) => {
@@ -366,6 +426,14 @@ export async function validateProviderCredentials(
 // Client-safe DTO — serializable subset of TtsProviderMeta (no validate())
 // ---------------------------------------------------------------------------
 
+/** Serializable model option for client components (Set → string[]). */
+export interface TtsModelClientOption {
+  id: string;
+  displayName: string;
+  tier: 'standard' | 'premium' | 'ultra';
+  supportedLanguages: string[];
+}
+
 export interface TtsProviderClientMeta {
   id: TtsProviderId;
   displayName: string;
@@ -374,9 +442,11 @@ export interface TtsProviderClientMeta {
   supportsSfx: boolean;
   supportsVoiceCloning: boolean;
   supportsStreaming: boolean;
-  models: TtsModelOption[];
+  models: TtsModelClientOption[];
   authFields: TtsProviderAuthField[];
   recommended: boolean;
+  languageDetection: 'auto' | 'optional_hint' | 'recommended';
+  voicesAreCrossLingual: boolean;
 }
 
 /**
@@ -393,9 +463,16 @@ export function getAllTtsProviderClientMeta(): TtsProviderClientMeta[] {
       supportsSfx: p.supportsSfx,
       supportsVoiceCloning: p.supportsVoiceCloning,
       supportsStreaming: p.supportsStreaming,
-      models: p.models,
+      models: p.models.map((m) => ({
+        id: m.id,
+        displayName: m.displayName,
+        tier: m.tier,
+        supportedLanguages: [...m.supportedLanguages],
+      })),
       authFields: p.auth.fields,
       recommended: p.id === 'elevenlabs',
+      languageDetection: p.languageDetection,
+      voicesAreCrossLingual: p.voicesAreCrossLingual,
     }));
 }
 

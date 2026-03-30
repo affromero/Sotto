@@ -88,7 +88,8 @@ All shared business logic and external service integrations live here.
 | `embeddings.ts` | Embedding provider abstraction (384-dim): stub hash-based for dev, swap to `text-embedding-3-small` | Pure utility (swappable) |
 | `event-buffer.ts` | Client-side behavioral event buffer: 5s flush / 50-event cap, `sendBeacon` on unload | `'use client'` |
 | `import-metadata-generator.ts` | Claude-based title + topic generation from imported audio transcripts | Uses `llm.ts` |
-| `language-detect.ts` | Language detection via platform AI model (`resolveAutoModel('PLATFORM')`) → ISO 639-1 code | Uses `providers/ai.ts`, `auto-model-config.ts` |
+| `language-detect.ts` | Language detection via platform AI model (`resolveAutoModel('PLATFORM')`) → ISO 639-1 code | Uses `providers/ai.ts`, `auto-model-config.ts`, `tts-language-support.ts` |
+| `tts-language-support.ts` | TTS language support lookups: `supportsLanguage()`, `getProvidersForLanguage()`, `getDefaultModelForLanguage()`, `SOTTO_LANGUAGE_CODES`, `VOICE_LANGUAGE_AFFINITIES` — thin query layer over registry language data | Uses `providers/tts-registry.ts` |
 | `moderation.ts` | OpenAI Moderation API client: per-category thresholds, Redis caching (10min TTL) | OpenAI Moderation API, `redis.ts` |
 | `user-moderation.ts` | Admin user moderation actions: warn, suspend, ban, unban, unsuspend, remove content | Uses `prisma.ts` |
 | `podcast-gradient.ts` | Deterministic gradient generation from podcast ID (12 brand palettes) | Pure utility |
