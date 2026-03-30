@@ -37,7 +37,7 @@ Note: The script may contain inline audio tags like [laughs], [sighs], [whispers
 Note: These sources may be acceptable for definitions, opinions, or practical advice — but any quantitative finding, study result, or causal claim from them requires a Tier 1–2 primary source.
 
 ## Passing Criteria:
-- Every non-obvious factual claim must have at least 1 citation
+- **HARD FAIL: If ANY non-common-knowledge factual claim has ZERO citations (existingCitations is empty), the script MUST fail.** Every factual claim must be cited. No exceptions. Flag every uncited claim individually.
 - **HARD FAIL (regardless of score): If ANY claim has hasUnreliableSource: true, the script fails.** Explicitly list which citations are unacceptable and what Tier 1–2 replacements would work.
 - Depth-scaled threshold: deep_dive requires 90%, standard 80%, quick_overview 70% of sourced claims to have 3+ verifiable sources
 - Overall score must be >= 0.7
