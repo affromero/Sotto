@@ -657,12 +657,15 @@ Previous attempts to find replacement sources for some claims failed.
 For claims where no verifiable source exists: REWRITE the claim to state a different, related fact that CAN be verified from a reputable source.
 It is better to make a slightly different but well-sourced claim than to keep an unverifiable one.
 Drop claims entirely if you cannot find ANY verifiable angle.`,
-    drop_unverifiable: `## REPAIR MODE: DROP UNVERIFIABLE CLAIMS
-This is the final attempt. Be aggressive:
-1. REMOVE every claim that cannot be backed by a verifiable, reputable source.
-2. REPLACE removed claims with new, well-sourced claims on the same topic.
-3. Every remaining claim MUST have a citation to a reputable source (news outlet, official report, academic paper).
-4. It is acceptable to have fewer claims if they are all well-sourced.`,
+    drop_unverifiable: `## REPAIR MODE: SURGICAL FIX — PRESERVE GOOD TURNS, FIX ONLY BAD ONES
+This is the final attempt. The previous script was ALMOST passing — most turns are already good.
+CRITICAL RULES:
+1. Keep ALL turns that are NOT mentioned in the feedback EXACTLY as they are — same wording, same citations, same references.
+2. For turns mentioned in the feedback: ONLY fix the specific issue flagged (unsupported claim or unreliable source).
+3. To fix an unsupported claim: either add a real citation from web search, or REMOVE just that sentence and adjust the turn for flow.
+4. To fix an unreliable source: replace it with a reputable one from web search, or remove the claim.
+5. Do NOT rewrite turns that passed verification. Do NOT introduce new claims. Do NOT change references that were not flagged.
+6. It is better to have a slightly shorter script with all claims verified than to add new unverified content.`,
   };
 
   const repairSection = params.repairMode ? `\n${REPAIR_INSTRUCTIONS[params.repairMode]}\n` : '';
