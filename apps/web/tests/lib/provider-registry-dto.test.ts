@@ -62,6 +62,23 @@ describe('TTS Provider Client DTO', () => {
     expect(recommended[0].id).toBe('elevenlabs');
   });
 
+  it('all models include supportedLanguages as arrays', () => {
+    for (const provider of meta) {
+      for (const model of provider.models) {
+        expect(Array.isArray(model.supportedLanguages)).toBe(true);
+        expect(model.supportedLanguages.length).toBeGreaterThan(0);
+        expect(model.supportedLanguages).toContain('en');
+      }
+    }
+  });
+
+  it('all providers have languageDetection and voicesAreCrossLingual', () => {
+    for (const provider of meta) {
+      expect(['auto', 'optional_hint', 'recommended']).toContain(provider.languageDetection);
+      expect(typeof provider.voicesAreCrossLingual).toBe('boolean');
+    }
+  });
+
   it('DTOs are JSON-serializable', () => {
     const roundtripped = JSON.parse(JSON.stringify(meta));
     expect(roundtripped).toEqual(meta);

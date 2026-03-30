@@ -9,6 +9,7 @@ import { logger } from '../../logger';
 import type { TtsProvider, SpeechParams } from '../tts';
 import { getProviderMeta, type TtsProviderId } from '../tts-registry';
 import { FAL_VOICE_POOL, selectVoicePairFromPool } from '../tts-voices';
+import { VOICE_LANGUAGE_AFFINITIES } from '../../tts-language-support';
 
 // HOST/GUEST → host voice slot; EXPERT/SKEPTIC → expert slot.
 const SPEAKER_VOICE_HOST_SET = new Set(['HOST', 'GUEST']);
@@ -22,6 +23,13 @@ interface FalTtsResponse {
 const MODEL_ENDPOINTS: Record<string, string> = {
   'qwen3-tts-1.7b': 'https://fal.run/fal-ai/qwen-3-tts/text-to-speech/1.7b',
   'qwen3-tts-0.6b': 'https://fal.run/fal-ai/qwen-3-tts/text-to-speech/0.6b',
+};
+
+/** ISO 639-1 → Qwen3 language name mapping (Qwen3 expects full language names). */
+const QWEN3_LANGUAGE_MAP: Record<string, string> = {
+  zh: 'Chinese', en: 'English', ja: 'Japanese', ko: 'Korean',
+  fr: 'French', de: 'German', es: 'Spanish', it: 'Italian',
+  pt: 'Portuguese', ru: 'Russian',
 };
 
 export class FalProvider implements TtsProvider {
@@ -44,6 +52,12 @@ export class FalProvider implements TtsProvider {
       body.speaker_voice_embedding_file_url = params.voiceId;
     } else {
       body.voice = params.voiceId;
+    }
+
+    // Pass language hint when available (Qwen3 expects full language names)
+    if (params.language) {
+      const langName = QWEN3_LANGUAGE_MAP[params.language];
+      if (langName) body.language = langName;
     }
 
     const response = await fetch(url, {
@@ -75,8 +89,21 @@ export class FalProvider implements TtsProvider {
     return Buffer.from(arrayBuffer);
   }
 
-  getVoiceId(speaker: string, podcastId?: string, metadata?: VoiceMatchMetadata): string {
+  getVoiceId(speaker: string, podcastId?: string, metadata?: VoiceMatchMetadata, language?: string): string {
     const isHostVoice = SPEAKER_VOICE_HOST_SET.has(speaker.toUpperCase());
+
+    // When language is set, prefer voices native to that language
+    if (language && podcastId) {
+      const nativeVoices = FAL_VOICE_POOL.filter((v) => {
+        const affinity = VOICE_LANGUAGE_AFFINITIES[v.id];
+        return affinity?.nativeLanguages.includes(language);
+      });
+      if (nativeVoices.length > 0) {
+        const pair = selectVoicePairFromPool(nativeVoices.length >= 2 ? nativeVoices : FAL_VOICE_POOL, podcastId, metadata);
+        return isHostVoice ? pair.host.id : pair.expert.id;
+      }
+    }
+
     if (!podcastId) {
       return isHostVoice ? FAL_VOICE_POOL[0].id : FAL_VOICE_POOL[1].id;
     }

@@ -9,6 +9,7 @@ const mockPrismaInteractionUpdate = vi.fn().mockResolvedValue({});
 const mockPrismaPodcastUpdate = vi.fn().mockResolvedValue({});
 const mockPrismaPodcastFindUniqueOrThrow = vi.fn().mockResolvedValue({
   userId: 'user-1',
+  language: null,
   voices: [],
   ttsProvider: null,
   ttsModel: null,
@@ -187,6 +188,7 @@ describe('processSegmentRegeneration', () => {
     // Default: no custom voice IDs
     mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
       userId: 'user-1',
+        language: null,
       voices: [],
       ttsProvider: null,
       ttsModel: null,
@@ -217,19 +219,20 @@ describe('processSegmentRegeneration', () => {
       const job = createMockJob(defaultPayload);
       await processSegmentRegeneration(job);
 
-      expect(mockProviderGetVoiceId).toHaveBeenCalledWith('EXPERT', 'podcast-001', undefined);
+      expect(mockProviderGetVoiceId).toHaveBeenCalledWith('EXPERT', 'podcast-001', undefined, undefined);
     });
 
     it('passes HOST speaker to getVoiceId when speaker is HOST', async () => {
       const job = createMockJob({ ...defaultPayload, speaker: 'HOST' });
       await processSegmentRegeneration(job);
 
-      expect(mockProviderGetVoiceId).toHaveBeenCalledWith('HOST', 'podcast-001', undefined);
+      expect(mockProviderGetVoiceId).toHaveBeenCalledWith('HOST', 'podcast-001', undefined, undefined);
     });
 
     it('uses custom hostVoiceId when set and provider matches', async () => {
       mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
         userId: 'user-1',
+        language: null,
         voices: [
           { speaker: 'HOST', voiceId: 'custom-host-voice', provider: 'elevenlabs' },
         ],
@@ -248,6 +251,7 @@ describe('processSegmentRegeneration', () => {
     it('uses custom expertVoiceId when set and provider matches', async () => {
       mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
         userId: 'user-1',
+        language: null,
         voices: [
           { speaker: 'EXPERT', voiceId: 'custom-expert-voice', provider: 'elevenlabs' },
         ],
@@ -266,6 +270,7 @@ describe('processSegmentRegeneration', () => {
     it('falls back to pool when stored voice has wrong provider', async () => {
       mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
         userId: 'user-1',
+        language: null,
         voices: [
           { speaker: 'EXPERT', voiceId: 'elevenlabs-voice-id', provider: 'elevenlabs' },
         ],
@@ -286,6 +291,7 @@ describe('processSegmentRegeneration', () => {
     it('falls back to pool when stored voice has null provider (legacy)', async () => {
       mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
         userId: 'user-1',
+        language: null,
         voices: [
           { speaker: 'EXPERT', voiceId: 'old-voice-id', provider: null },
         ],
@@ -346,6 +352,7 @@ describe('processSegmentRegeneration', () => {
     beforeEach(() => {
       mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
         userId: 'user-1',
+        language: null,
         voices: [],
         ttsProvider: null,
         ttsModel: null,
@@ -367,7 +374,7 @@ describe('processSegmentRegeneration', () => {
       const job = createMockJob(defaultPayload);
       await processSegmentRegeneration(job);
 
-      expect(mockStandardGetVoiceId).toHaveBeenCalledWith('EXPERT', 'podcast-001', undefined);
+      expect(mockStandardGetVoiceId).toHaveBeenCalledWith('EXPERT', 'podcast-001', undefined, undefined);
       expect(mockStandardGenerateSpeech).toHaveBeenCalledWith(
         expect.objectContaining({ voiceId: 'openai-voice-xyz' })
       );
@@ -608,7 +615,7 @@ describe('processSegmentRegeneration', () => {
       expect(mockPrismaPodcastFindUniqueOrThrow).toHaveBeenCalled();
 
       // Voice selected via provider
-      expect(mockProviderGetVoiceId).toHaveBeenCalledWith('HOST', 'podcast-001', undefined);
+      expect(mockProviderGetVoiceId).toHaveBeenCalledWith('HOST', 'podcast-001', undefined, undefined);
 
       // Audio generated via premium provider
       expect(mockPremiumGenerateSpeech).toHaveBeenCalledWith({
@@ -661,6 +668,7 @@ describe('processSegmentRegeneration', () => {
     it('executes the full regeneration pipeline for EXPERT segment (standard voice)', async () => {
       mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
         userId: 'user-1',
+        language: null,
         voices: [],
         ttsProvider: null,
         ttsModel: null,
@@ -692,7 +700,7 @@ describe('processSegmentRegeneration', () => {
       await processSegmentRegeneration(job);
 
       // Voice selected for EXPERT via standard provider
-      expect(mockStandardGetVoiceId).toHaveBeenCalledWith('EXPERT', 'podcast-002', undefined);
+      expect(mockStandardGetVoiceId).toHaveBeenCalledWith('EXPERT', 'podcast-002', undefined, undefined);
 
       // Audio generated via standard provider
       expect(mockStandardGenerateSpeech).toHaveBeenCalledWith({
@@ -750,6 +758,7 @@ describe('processSegmentRegeneration', () => {
     it('propagates errors from standard generateSpeech', async () => {
       mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
         userId: 'user-1',
+        language: null,
         voices: [],
         ttsProvider: null,
         ttsModel: null,
