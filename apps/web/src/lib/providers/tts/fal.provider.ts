@@ -98,9 +98,13 @@ export class FalProvider implements TtsProvider {
         const affinity = VOICE_LANGUAGE_AFFINITIES[v.id];
         return affinity?.nativeLanguages.includes(language);
       });
-      if (nativeVoices.length > 0) {
-        const pair = selectVoicePairFromPool(nativeVoices.length >= 2 ? nativeVoices : FAL_VOICE_POOL, podcastId, metadata);
+      if (nativeVoices.length >= 2) {
+        const pair = selectVoicePairFromPool(nativeVoices, podcastId, metadata);
         return isHostVoice ? pair.host.id : pair.expert.id;
+      }
+      // Single native voice (ja → Ono_Anna, ko → Sohee) — use it for both slots
+      if (nativeVoices.length === 1) {
+        return nativeVoices[0].id;
       }
     }
 

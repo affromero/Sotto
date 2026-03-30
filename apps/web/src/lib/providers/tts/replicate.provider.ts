@@ -13,6 +13,7 @@ import { getProviderMeta, type TtsProviderId } from '../tts-registry';
 import { FAL_VOICE_POOL, INWORLD_VOICE_POOL, selectVoicePairFromPool } from '../tts-voices';
 import { mapDirectionToExpression } from '../../tts-expression-mapper';
 import type { VoiceMatchMetadata } from '../../voice-pool';
+import { VOICE_LANGUAGE_AFFINITIES } from '../../tts-language-support';
 
 // HOST/GUEST → host voice slot; EXPERT/SKEPTIC → expert slot.
 const SPEAKER_VOICE_HOST_SET = new Set(['HOST', 'GUEST']);
@@ -158,9 +159,25 @@ export class ReplicateProvider implements TtsProvider {
     throw new Error('Replicate prediction timed out after 60 poll attempts');
   }
 
-  getVoiceId(speaker: string, podcastId?: string, metadata?: VoiceMatchMetadata, _language?: string): string {
+  getVoiceId(speaker: string, podcastId?: string, metadata?: VoiceMatchMetadata, language?: string): string {
     const pool = isInworldModel(this.model) ? INWORLD_VOICE_POOL : FAL_VOICE_POOL;
     const isHostVoice = SPEAKER_VOICE_HOST_SET.has(speaker.toUpperCase());
+
+    // For Qwen3-TTS on Replicate, use voice affinities (same as Fal provider)
+    if (!isInworldModel(this.model) && language && podcastId) {
+      const nativeVoices = pool.filter((v) => {
+        const affinity = VOICE_LANGUAGE_AFFINITIES[v.id];
+        return affinity?.nativeLanguages.includes(language);
+      });
+      if (nativeVoices.length >= 2) {
+        const pair = selectVoicePairFromPool(nativeVoices, podcastId, metadata);
+        return isHostVoice ? pair.host.id : pair.expert.id;
+      }
+      if (nativeVoices.length === 1) {
+        return isHostVoice ? nativeVoices[0].id : nativeVoices[0].id;
+      }
+    }
+
     if (!podcastId) {
       return isHostVoice ? pool[0].id : pool[1].id;
     }

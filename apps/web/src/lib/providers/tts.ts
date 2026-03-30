@@ -337,10 +337,11 @@ export async function resolveTtsProvider(context: {
     }
   }
 
-  // Platform path: auto model config for the user's plan tier
+  // Platform path: auto model config for the user's plan tier, respecting language
   const autoConfig = await resolveAutoModel(context.plan ?? 'FREE');
+  const autoModel = resolveModelForLanguage(autoConfig.ttsProvider as TtsProviderId, autoConfig.ttsModel);
   return {
-    provider: createTtsProvider(autoConfig.ttsProvider as TtsProviderId, undefined, autoConfig.ttsModel),
+    provider: createTtsProvider(autoConfig.ttsProvider as TtsProviderId, undefined, autoModel),
     source: 'platform',
     providerId: autoConfig.ttsProvider as TtsProviderId,
   };
