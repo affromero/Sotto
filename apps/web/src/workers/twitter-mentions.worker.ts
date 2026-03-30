@@ -482,8 +482,33 @@ async function handleUnlinkedUser(tweet: TwitterTweet): Promise<void> {
   // Only send CTA once per Twitter user ID (no expiry)
   const alreadySent = await redis.exists(ctaKey);
   if (alreadySent) {
+    // Still record for dedup so re-polls don't re-process this tweet
+    await prisma.tweetMention.upsert({
+      where: { tweetId: tweet.id },
+      update: {},
+      create: {
+        tweetId: tweet.id,
+        authorId: tweet.author_id,
+        text: tweet.text,
+        status: 'IGNORED',
+        errorMessage: 'Unlinked user — CTA already sent to this author',
+      },
+    });
     return;
   }
+
+  // Record the mention BEFORE replying — ensures dedup even if reply fails
+  await prisma.tweetMention.upsert({
+    where: { tweetId: tweet.id },
+    update: {},
+    create: {
+      tweetId: tweet.id,
+      authorId: tweet.author_id,
+      text: tweet.text,
+      status: 'IGNORED',
+      errorMessage: 'Unlinked user — CTA reply sent',
+    },
+  });
 
   try {
     await replyToTweet(
