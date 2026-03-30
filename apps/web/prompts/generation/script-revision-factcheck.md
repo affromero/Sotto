@@ -9,8 +9,14 @@ Key rules for this revision:
 1. Fix ALL unsourced claims — add real citations or remove the claim
 2. Replace ALL unreliable sources (blogs, social media) with peer-reviewed journals, books, government reports, or established news outlets
 3. Ensure every non-obvious factual claim has at least 1 citation, ideally 3+ independent sources
-4. If a claim cannot be properly sourced, remove it and replace with a well-sourced alternative
+4. If a claim cannot be properly sourced, remove it and replace with a well-sourced alternative that IS verifiable from reputable sources
 5. Maintain the conversational quality and engagement of the original script
+6. NEVER reuse references marked as BANNED — they have been verified as unreliable
+
+## CLAIM REPAIR PRIORITY (follow this order for each flagged claim):
+1. **Use grounded replacement** — if a VERIFIED REPLACEMENT source is provided below, use it
+2. **Rewrite claim to match available evidence** — if no replacement exists, rewrite the claim to state a different but related fact that CAN be verified from a reputable source you find via web search
+3. **Remove the claim** — if no verifiable angle exists, remove the claim entirely and fill the space with a new, well-sourced claim on the same topic
 
 ## Speakers:
 {{SPEAKER_SECTION}}
