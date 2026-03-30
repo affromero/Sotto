@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { moderateOrThrow, moderateContent } from './moderation';
 import { logger } from './logger';
+import { withRetry, isRetryableError, MAX_RETRIES } from './retry';
 import type { ContentPart } from './providers/ai';
 
 type LlmContent = string | ContentPart[];
@@ -27,37 +28,6 @@ if (!ANTHROPIC_API_KEY) {
 }
 
 const client = ANTHROPIC_API_KEY ? new Anthropic({ apiKey: ANTHROPIC_API_KEY }) : null;
-
-/** Status codes that indicate a transient server-side problem worth retrying. */
-const RETRYABLE_STATUS = new Set([429, 500, 503, 529]);
-const MAX_RETRIES = 3;
-
-function isRetryableError(err: unknown): boolean {
-  return (
-    err instanceof Error &&
-    'status' in err &&
-    typeof (err as { status: unknown }).status === 'number' &&
-    RETRYABLE_STATUS.has((err as { status: number }).status)
-  );
-}
-
-async function withRetry<T>(label: string, fn: () => Promise<T>): Promise<T> {
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    try {
-      return await fn();
-    } catch (err) {
-      if (!isRetryableError(err) || attempt === MAX_RETRIES) throw err;
-      const delayMs = 1000 * Math.pow(2, attempt) + Math.random() * 500;
-      logger.warn(`${label} — Claude API transient error, retrying`, {
-        attempt: String(attempt + 1),
-        status: String((err as { status?: number }).status),
-        delayMs: String(Math.round(delayMs)),
-      });
-      await new Promise((r) => setTimeout(r, delayMs));
-    }
-  }
-  throw new Error('unreachable');
-}
 
 export const WEB_SEARCH_TOOL = {
   type: 'web_search_20250305' as const,
