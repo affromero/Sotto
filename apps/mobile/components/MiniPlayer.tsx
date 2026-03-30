@@ -60,9 +60,9 @@ export function MiniPlayer() {
           onPress={(e) => {
             e.stopPropagation();
             if (isPlaying) {
-              TrackPlayer.pause();
+              TrackPlayer.pause().catch(() => {});
             } else {
-              TrackPlayer.play();
+              TrackPlayer.play().catch(() => {});
             }
           }}
           style={styles.playButton}
