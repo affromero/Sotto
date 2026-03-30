@@ -47,8 +47,9 @@ export class ReplicateProvider implements TtsProvider {
   }
 
   async generateSpeech(params: SpeechParams): Promise<Buffer> {
-    const modelPath = MODEL_PATHS[this.model] ?? MODEL_PATHS['inworld-tts-1.5-max'];
-    const inworld = isInworldModel(this.model);
+    const resolvedModel = MODEL_PATHS[this.model] ? this.model : 'inworld-tts-1.5-max';
+    const modelPath = MODEL_PATHS[resolvedModel];
+    const inworld = isInworldModel(resolvedModel);
 
     let text = params.text;
 

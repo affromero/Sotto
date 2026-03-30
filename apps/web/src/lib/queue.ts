@@ -776,7 +776,20 @@ async function handleWorkerFailure(
       return;
     }
 
-    let failureReason = userMessage(errorKind, 'the provider');
+    const STAGE_LABELS: Record<string, string> = {
+      'content-extraction': 'Content extraction',
+      'script-generation': 'Script generation',
+      'script-verification': 'Script verification',
+      'reference-validation': 'Reference validation',
+      'audio-generation': 'Audio generation',
+      'audio-stitching': 'Audio stitching',
+      'segment-regeneration': 'Segment regeneration',
+      'audio-import': 'Audio import',
+      'voice-track-audio': 'Voice track generation',
+      'voice-track-stitching': 'Voice track stitching',
+    };
+    const stageLabel = STAGE_LABELS[queueName] || 'Generation';
+    let failureReason = userMessage(errorKind, 'the provider', stageLabel);
 
     if (isKeyInvalidationError(errorKind)) {
       // Dedupe: markTts/AiKeyInvalid returns true only on the first flip
