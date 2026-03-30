@@ -251,7 +251,7 @@ export default function PodcastScreen() {
       podcast.audioUrl,
       podcast.title,
       podcast.user?.name ?? 'Sotto',
-    );
+    ).catch(() => {});
     setCurrentPodcast({
       id: podcast.id,
       title: podcast.title,
@@ -312,18 +312,19 @@ export default function PodcastScreen() {
 
   const handleSeek = useCallback(
     async (ratio: number) => {
+      if (!playerReady) return;
       const totalDuration = podcast?.duration ?? trackDuration;
       if (totalDuration > 0) {
         lastSeekFromRef.current = position;
-        await TrackPlayer.seekTo(ratio * totalDuration);
+        try { await TrackPlayer.seekTo(ratio * totalDuration); } catch {}
       }
     },
-    [podcast?.duration, trackDuration, position],
+    [podcast?.duration, trackDuration, position, playerReady],
   );
 
   const handleAskQuestion = useCallback(async () => {
     if (!questionText.trim()) return;
-    await TrackPlayer.pause();
+    try { await TrackPlayer.pause(); } catch {}
     interactMutation.mutate({
       question: questionText.trim(),
       timestamp: position,
@@ -334,20 +335,24 @@ export default function PodcastScreen() {
     if (!track.audioUrl) return;
     setActiveVoiceTrackId(track.id);
     setVoicePickerVisible(false);
-    await loadTrack(
-      podcast?.id ?? id,
-      track.audioUrl,
-      podcast?.title ?? '',
-      track.contributor?.name ?? 'Sotto',
-    );
+    try {
+      await loadTrack(
+        podcast?.id ?? id,
+        track.audioUrl,
+        podcast?.title ?? '',
+        track.contributor?.name ?? 'Sotto',
+      );
+    } catch {}
   }, [podcast?.id, podcast?.title, id]);
 
   const handleShare = useCallback(async () => {
     if (!podcast) return;
-    await Share.share({
-      message: `${podcast.title} — Listen on Sotto\nhttps://sotto.fm/podcast/${podcast.id}`,
-      url: `https://sotto.fm/podcast/${podcast.id}`,
-    });
+    try {
+      await Share.share({
+        message: `${podcast.title} — Listen on Sotto\nhttps://sotto.fm/podcast/${podcast.id}`,
+        url: `https://sotto.fm/podcast/${podcast.id}`,
+      });
+    } catch {}
   }, [podcast]);
 
   // Playback telemetry
