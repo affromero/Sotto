@@ -21,6 +21,7 @@ import { api, onAuthRevoked } from '../lib/api';
 import { registerForPushNotifications } from '../lib/notifications';
 import { EventProvider } from '../components/EventProvider';
 import { MiniPlayer } from '../components/MiniPlayer';
+import { AppErrorBoundary } from '../components/AppErrorBoundary';
 
 const queryClient = new QueryClient();
 
@@ -133,6 +134,7 @@ export default function RootLayout() {
   }
 
   return (
+    <AppErrorBoundary>
     <SafeAreaProvider>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <QueryClientProvider client={queryClient}>
@@ -161,5 +163,6 @@ export default function RootLayout() {
         </QueryClientProvider>
       </GestureHandlerRootView>
     </SafeAreaProvider>
+    </AppErrorBoundary>
   );
 }
