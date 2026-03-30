@@ -419,14 +419,14 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
   const flaggedRefNumbers = new Set<number>();
   for (const claim of verdict.unreliableSourceClaims) {
     // Use per-citation tracking if available, otherwise flag all citations on the claim
-    const badCitations = claim.unreliableCitations?.length ? claim.unreliableCitations : claim.existingCitations;
+    const badCitations = claim.unreliableCitations?.length ? claim.unreliableCitations : (claim.existingCitations ?? []);
     for (const n of badCitations) flaggedRefNumbers.add(n);
   }
   // Also include unsupported claims — search by claim text
   for (const claim of verdict.unsupportedClaims) {
     // These have no citations — we search by claim text to find a source
     // Use a synthetic ref number based on turn index to track them
-    for (const n of claim.existingCitations) flaggedRefNumbers.add(n);
+    for (const n of claim.existingCitations ?? []) flaggedRefNumbers.add(n);
   }
 
   type GroundedHint = NonNullable<Parameters<typeof generateScriptWithFeedback>[0]['groundedReferenceHints']>[number];
