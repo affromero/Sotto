@@ -16,7 +16,7 @@ const DEFAULTS: BriefingConfigData = {
   defaultAiModel: null,
   defaultTtsProvider: null,
   defaultTtsModel: null,
-  maxArticlesPerBriefing: 5,
+  maxArticlesPerBriefing: 30,
   targetDurationMinutes: 6,
   maxBriefingsPerBatch: 50,
   pollIntervalMs: 900000,
