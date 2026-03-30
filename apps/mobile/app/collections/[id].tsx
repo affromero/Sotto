@@ -15,6 +15,7 @@ import { colors, spacing, typography, borderRadius } from '@sotto/shared';
 import type { PodcastSummary } from '@sotto/shared';
 import { api } from '../../lib/api';
 import { PodcastCard } from '../../components/PodcastCard';
+import { ErrorState } from '../../components/ErrorState';
 
 interface CollectionDetail {
   id: string;
@@ -34,7 +35,7 @@ export default function CollectionDetailScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
 
-  const { data: collection, isLoading } = useQuery<CollectionDetail>({
+  const { data: collection, isLoading, isError, refetch } = useQuery<CollectionDetail>({
     queryKey: ['collection', id],
     queryFn: async () => {
       const res = await api.get(`/collections/${id}`);
@@ -126,6 +127,10 @@ export default function CollectionDetailScreen() {
         <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
+  }
+
+  if (isError) {
+    return <ErrorState message="Failed to load" onRetry={refetch} />;
   }
 
   const listHeader = (

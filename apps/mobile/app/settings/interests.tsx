@@ -12,6 +12,7 @@ import { Stack } from 'expo-router';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { colors, spacing, typography, borderRadius } from '@sotto/shared';
 import { api } from '../../lib/api';
+import { ErrorState } from '../../components/ErrorState';
 
 interface Category {
   id: string;
@@ -22,7 +23,7 @@ interface Category {
 export default function InterestsScreen() {
   const [selected, setSelected] = useState<string[]>([]);
 
-  const { data, isLoading } = useQuery<{ tags: Category[] }>({
+  const { data, isLoading, isError, refetch } = useQuery<{ tags: Category[] }>({
     queryKey: ['tags'],
     queryFn: async () => {
       const res = await api.get('/tags');
@@ -51,6 +52,10 @@ export default function InterestsScreen() {
   }, []);
 
   const categories = data?.tags ?? [];
+
+  if (isError) {
+    return <ErrorState message="Failed to load" onRetry={refetch} />;
+  }
 
   return (
     <View style={styles.container}>
