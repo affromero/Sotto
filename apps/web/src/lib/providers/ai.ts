@@ -2,6 +2,7 @@ import { moderateOrThrow } from '../moderation';
 import { isReasoningModel } from './ai-registry';
 import type { AiProviderId } from './ai-registry';
 import { logger } from '../logger';
+import { withRetry } from '../retry';
 
 /**
  * Minimum max_completion_tokens for reasoning models.
@@ -138,7 +139,8 @@ class OpenAIProvider implements AIProvider {
     const apiKey = apiKeyOverride || process.env.OPENAI_API_KEY;
     if (!apiKey) throw new Error('OPENAI_API_KEY is not set');
     const { default: OpenAI } = await import('openai');
-    return new OpenAI({ apiKey });
+    // Disable SDK built-in retries — we handle retries via withRetry() to avoid stacking
+    return new OpenAI({ apiKey, maxRetries: 0 });
   }
 
   async generateResponse(
@@ -157,22 +159,24 @@ class OpenAIProvider implements AIProvider {
 
     // web_search_preview requires the Responses API (not Chat Completions)
     if (opts?.useWebSearch) {
-      // OpenAI SDK v6 exposes client.responses but types may lag — cast to access it
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const response = await (client as any).responses.create({
-        model,
-        instructions: system,
-        input: toResponsesInput(messages),
-        tools: [{ type: 'web_search_preview' }],
-        max_output_tokens: opts?.maxTokens || 4096,
-        temperature: opts?.temperature,
+      return withRetry('[OpenAI:Responses]', async () => {
+        // OpenAI SDK v6 exposes client.responses but types may lag — cast to access it
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const response = await (client as any).responses.create({
+          model,
+          instructions: system,
+          input: toResponsesInput(messages),
+          tools: [{ type: 'web_search_preview' }],
+          max_output_tokens: opts?.maxTokens || 4096,
+          temperature: opts?.temperature,
+        });
+        return {
+          content: response.output_text || '',
+          inputTokens: response.usage?.input_tokens || 0,
+          outputTokens: response.usage?.output_tokens || 0,
+          model,
+        };
       });
-      return {
-        content: response.output_text || '',
-        inputTokens: response.usage?.input_tokens || 0,
-        outputTokens: response.usage?.output_tokens || 0,
-        model,
-      };
     }
 
     // For reasoning models, ensure the token budget is high enough for
@@ -183,42 +187,44 @@ class OpenAIProvider implements AIProvider {
       ? Math.max(requestedTokens, REASONING_MODEL_MIN_TOKENS)
       : requestedTokens;
 
-    const response = await client.chat.completions.create({
-      model,
-      max_completion_tokens: effectiveTokens,
-      temperature: opts?.temperature,
-      messages: toOpenAiMessages(system, messages),
-      ...(opts?.jsonSchema ? {
-        response_format: {
-          type: 'json_schema' as const,
-          json_schema: { name: opts.jsonSchema.name, schema: opts.jsonSchema.schema, strict: true },
-        },
-      } : {}),
-    });
-
-    const choice = response.choices[0];
-    const content = choice?.message?.content || '';
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if (!content && (choice as any)?.finish_reason === 'length') {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const details = (response.usage as any)?.completion_tokens_details;
-      logger.warn('[OpenAI] Empty content with finish_reason=length — reasoning model exhausted token budget', {
+    return withRetry('[OpenAI:ChatCompletions]', async () => {
+      const response = await client.chat.completions.create({
         model,
-        max_completion_tokens: String(effectiveTokens),
-        completion_tokens: String(response.usage?.completion_tokens || 0),
-        reasoning_tokens: String(details?.reasoning_tokens ?? 'n/a'),
+        max_completion_tokens: effectiveTokens,
+        temperature: opts?.temperature,
+        messages: toOpenAiMessages(system, messages),
+        ...(opts?.jsonSchema ? {
+          response_format: {
+            type: 'json_schema' as const,
+            json_schema: { name: opts.jsonSchema.name, schema: opts.jsonSchema.schema, strict: true },
+          },
+        } : {}),
       });
-      throw new Error(
-        `OpenAI model "${model}" produced no visible output (finish_reason=length). ` +
-        `Reasoning used all ${effectiveTokens} tokens. Increase max_completion_tokens or use a non-reasoning model.`
-      );
-    }
-    return {
-      content,
-      inputTokens: response.usage?.prompt_tokens || 0,
-      outputTokens: response.usage?.completion_tokens || 0,
-      model,
-    };
+
+      const choice = response.choices[0];
+      const content = choice?.message?.content || '';
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if (!content && (choice as any)?.finish_reason === 'length') {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const details = (response.usage as any)?.completion_tokens_details;
+        logger.warn('[OpenAI] Empty content with finish_reason=length — reasoning model exhausted token budget', {
+          model,
+          max_completion_tokens: String(effectiveTokens),
+          completion_tokens: String(response.usage?.completion_tokens || 0),
+          reasoning_tokens: String(details?.reasoning_tokens ?? 'n/a'),
+        });
+        throw new Error(
+          `OpenAI model "${model}" produced no visible output (finish_reason=length). ` +
+          `Reasoning used all ${effectiveTokens} tokens. Increase max_completion_tokens or use a non-reasoning model.`
+        );
+      }
+      return {
+        content,
+        inputTokens: response.usage?.prompt_tokens || 0,
+        outputTokens: response.usage?.completion_tokens || 0,
+        model,
+      };
+    });
   }
 
   async *streamResponse(
@@ -238,7 +244,7 @@ class OpenAIProvider implements AIProvider {
     // web_search_preview requires the Responses API (not Chat Completions)
     if (opts?.useWebSearch) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const stream = await (client as any).responses.create({
+      const stream: any = await withRetry('[OpenAI:Responses:stream]', () => (client as any).responses.create({
         model,
         instructions: system,
         input: toResponsesInput(messages),
@@ -246,7 +252,7 @@ class OpenAIProvider implements AIProvider {
         max_output_tokens: opts?.maxTokens || 4096,
         temperature: opts?.temperature,
         stream: true,
-      });
+      }));
       for await (const event of stream) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         if ((event as any).type === 'response.output_text.delta') {
@@ -262,13 +268,13 @@ class OpenAIProvider implements AIProvider {
       ? Math.max(requestedTokens, REASONING_MODEL_MIN_TOKENS)
       : requestedTokens;
 
-    const stream = await client.chat.completions.create({
+    const stream = await withRetry('[OpenAI:ChatCompletions:stream]', () => client.chat.completions.create({
       model,
       max_completion_tokens: effectiveTokens,
       temperature: opts?.temperature,
       messages: toOpenAiMessages(system, messages),
       stream: true,
-    });
+    }));
 
     let yieldedAny = false;
     let lastFinishReason: string | null = null;
@@ -313,8 +319,10 @@ class GoogleProvider implements AIProvider {
     const apiKey = apiKeyOverride || process.env.GOOGLE_AI_API_KEY;
     if (!apiKey) throw new Error('GOOGLE_AI_API_KEY is not set');
     const { default: OpenAI } = await import('openai');
+    // Disable SDK built-in retries — we handle retries via withRetry() to avoid stacking
     return new OpenAI({
       apiKey,
+      maxRetries: 0,
       baseURL: process.env.GOOGLE_AI_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta/openai/',
     });
   }
@@ -332,26 +340,28 @@ class GoogleProvider implements AIProvider {
     const client = await this.getClient(opts?.apiKeyOverride);
     const model = opts?.model || process.env.GOOGLE_AI_MODEL || 'gemini-3.1-flash-lite-preview';
 
-    const response = await client.chat.completions.create({
-      model,
-      max_completion_tokens: opts?.maxTokens || 4096,
-      temperature: opts?.temperature,
-      messages: toOpenAiMessages(system, messages),
-      ...(opts?.jsonSchema ? {
-        response_format: {
-          type: 'json_schema' as const,
-          json_schema: { name: opts.jsonSchema.name, schema: opts.jsonSchema.schema, strict: true },
-        },
-      } : {}),
-    });
+    return withRetry('[Google:ChatCompletions]', async () => {
+      const response = await client.chat.completions.create({
+        model,
+        max_completion_tokens: opts?.maxTokens || 4096,
+        temperature: opts?.temperature,
+        messages: toOpenAiMessages(system, messages),
+        ...(opts?.jsonSchema ? {
+          response_format: {
+            type: 'json_schema' as const,
+            json_schema: { name: opts.jsonSchema.name, schema: opts.jsonSchema.schema, strict: true },
+          },
+        } : {}),
+      });
 
-    const content = response.choices[0]?.message?.content || '';
-    return {
-      content,
-      inputTokens: response.usage?.prompt_tokens || 0,
-      outputTokens: response.usage?.completion_tokens || 0,
-      model,
-    };
+      const content = response.choices[0]?.message?.content || '';
+      return {
+        content,
+        inputTokens: response.usage?.prompt_tokens || 0,
+        outputTokens: response.usage?.completion_tokens || 0,
+        model,
+      };
+    });
   }
 
   async *streamResponse(
@@ -367,13 +377,13 @@ class GoogleProvider implements AIProvider {
     const client = await this.getClient(opts?.apiKeyOverride);
     const model = opts?.model || process.env.GOOGLE_AI_MODEL || 'gemini-3.1-flash-lite-preview';
 
-    const stream = await client.chat.completions.create({
+    const stream = await withRetry('[Google:ChatCompletions:stream]', () => client.chat.completions.create({
       model,
       max_completion_tokens: opts?.maxTokens || 4096,
       temperature: opts?.temperature,
       messages: toOpenAiMessages(system, messages),
       stream: true,
-    });
+    }));
 
     for await (const chunk of stream) {
       const delta = chunk.choices[0]?.delta?.content;
