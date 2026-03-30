@@ -654,8 +654,8 @@ async function handleWorkerFailure(
         return;
       }
 
-      const maxAttempts = job?.opts?.attempts ?? 3;
-      const isTerminal = job?.attemptsMade != null && job.attemptsMade >= maxAttempts;
+      const maxAttempts = job?.opts?.attempts ?? QUEUE_DEFINITIONS[queueName]?.attempts ?? 3;
+      const isTerminal = !job || (job.attemptsMade != null && job.attemptsMade >= maxAttempts);
       if (!isTerminal) {
         return;
       }
@@ -669,8 +669,8 @@ async function handleWorkerFailure(
 
     const AVATAR_QUEUES = ['avatar-generation'];
     if (AVATAR_QUEUES.includes(queueName)) {
-      const maxAttempts = job?.opts?.attempts ?? 3;
-      const isTerminal = job?.attemptsMade != null && job.attemptsMade >= maxAttempts;
+      const maxAttempts = job?.opts?.attempts ?? QUEUE_DEFINITIONS[queueName]?.attempts ?? 3;
+      const isTerminal = !job || (job.attemptsMade != null && job.attemptsMade >= maxAttempts);
       if (!isTerminal) {
         return;
       }
@@ -719,8 +719,8 @@ async function handleWorkerFailure(
         return;
       }
 
-      const maxAttempts = job?.opts?.attempts ?? 3;
-      const isTerminal = job?.attemptsMade != null && job.attemptsMade >= maxAttempts;
+      const maxAttempts = job?.opts?.attempts ?? QUEUE_DEFINITIONS[queueName]?.attempts ?? 3;
+      const isTerminal = !job || (job.attemptsMade != null && job.attemptsMade >= maxAttempts);
       if (!isTerminal) {
         return;
       }
@@ -770,8 +770,8 @@ async function handleWorkerFailure(
       return;
     }
 
-    const maxAttempts = job?.opts?.attempts ?? 3;
-    const isTerminal = job?.attemptsMade != null && job.attemptsMade >= maxAttempts;
+    const maxAttempts = job?.opts?.attempts ?? QUEUE_DEFINITIONS[queueName]?.attempts ?? 3;
+    const isTerminal = !job || (job.attemptsMade != null && job.attemptsMade >= maxAttempts);
     if (!isTerminal) {
       return;
     }
@@ -978,12 +978,14 @@ export async function addJob<T>(
   payload: T,
   options?: { priority?: number; delay?: number; attempts?: number; jobId?: string }
 ): Promise<Job<T>> {
-  const job = await queue.add(jobType, payload, {
-    priority: options?.priority,
-    delay: options?.delay,
-    attempts: options?.attempts,
-    jobId: options?.jobId,
-  });
+  // Only pass defined values — undefined overrides BullMQ's defaultJobOptions via Object.assign
+  const opts: Record<string, unknown> = {};
+  if (options?.priority != null) opts.priority = options.priority;
+  if (options?.delay != null) opts.delay = options.delay;
+  if (options?.attempts != null) opts.attempts = options.attempts;
+  if (options?.jobId != null) opts.jobId = options.jobId;
+
+  const job = await queue.add(jobType, payload, opts);
 
   logger.info(`Job added to queue: ${queue.name}`, { jobId: job.id, jobType });
   return job;
