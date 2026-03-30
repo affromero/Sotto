@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography, borderRadius } from '@sotto/shared';
 import { shadowSm } from '../../lib/shadows';
 import { api } from '../../lib/api';
+import { ErrorState } from '../../components/ErrorState';
 import { BottomSheet } from '../../components/BottomSheet';
 import { OptionPicker } from '../../components/OptionPicker';
 
@@ -104,7 +105,7 @@ export default function BriefingSettingsScreen() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
 
-  const { data, isLoading, refetch } = useQuery<{ briefings: BriefingData[] }>({
+  const { data, isLoading, isError, refetch } = useQuery<{ briefings: BriefingData[] }>({
     queryKey: ['briefings'],
     queryFn: async () => {
       const res = await api.get('/briefings');
@@ -114,6 +115,10 @@ export default function BriefingSettingsScreen() {
 
   const briefings = data?.briefings ?? [];
   const enabledCount = briefings.filter((b) => b.enabled).length;
+
+  if (isError) {
+    return <ErrorState message="Failed to load" onRetry={refetch} />;
+  }
 
   const refresh = useCallback(() => {
     refetch();
@@ -211,7 +216,7 @@ function BriefingCard({
     const next = !enabled;
     setEnabled(next);
     try {
-      await patchBriefing(briefing.id, { enabled: next });
+      await patchBriefing(briefing.id, { enabled: next }).catch(() => {});
       onRefresh();
     } catch {
       setEnabled(!next);
@@ -380,7 +385,7 @@ function BriefingEditForm({ briefing, onRefresh }: { briefing: BriefingData; onR
     setPrompt(value);
     if (promptTimer.current) clearTimeout(promptTimer.current);
     promptTimer.current = setTimeout(() => {
-      patchBriefing(briefing.id, { prompt: value || null });
+      patchBriefing(briefing.id, { prompt: value || null }).catch(() => {});
     }, 800);
   }
 
@@ -388,7 +393,7 @@ function BriefingEditForm({ briefing, onRefresh }: { briefing: BriefingData; onR
     const bit = index === 6 ? 64 : (1 << index);
     const newDays = days ^ bit;
     setDays(newDays);
-    patchBriefing(briefing.id, { days: newDays });
+    patchBriefing(briefing.id, { days: newDays }).catch(() => {});
   }
 
   const TIME_OPTIONS = Array.from({ length: 24 }, (_, i) => {
@@ -471,7 +476,7 @@ function BriefingEditForm({ briefing, onRefresh }: { briefing: BriefingData; onR
         <Text style={styles.switchLabel}>Use my own API keys</Text>
         <Switch
           value={useByokKeys}
-          onValueChange={(val) => { setUseByokKeys(val); patchBriefing(briefing.id, { useByokKeys: val }); }}
+          onValueChange={(val) => { setUseByokKeys(val); patchBriefing(briefing.id, { useByokKeys: val }).catch(() => {}); }}
           trackColor={{ false: colors.border, true: colors.primary }}
           thumbColor={colors.surface}
         />
@@ -480,27 +485,27 @@ function BriefingEditForm({ briefing, onRefresh }: { briefing: BriefingData; onR
       {/* Pickers */}
       <BottomSheet visible={activePicker === 'time'} onClose={() => setActivePicker(null)} title="Delivery Time">
         <OptionPicker options={TIME_OPTIONS} selectedId={time} onSelect={(id) => {
-          if (id) { setTime(id); patchBriefing(briefing.id, { time: id }); }
+          if (id) { setTime(id); patchBriefing(briefing.id, { time: id }).catch(() => {}); }
           setActivePicker(null);
         }} />
       </BottomSheet>
       <BottomSheet visible={activePicker === 'depth'} onClose={() => setActivePicker(null)} title="Depth">
-        <OptionPicker options={DEPTH_OPTIONS} selectedId={depth} onSelect={(id) => { setDepth(id); patchBriefing(briefing.id, { depth: id ?? null }); setActivePicker(null); }} />
+        <OptionPicker options={DEPTH_OPTIONS} selectedId={depth} onSelect={(id) => { setDepth(id); patchBriefing(briefing.id, { depth: id ?? null }).catch(() => {}); setActivePicker(null); }} />
       </BottomSheet>
       <BottomSheet visible={activePicker === 'tone'} onClose={() => setActivePicker(null)} title="Tone">
-        <OptionPicker options={TONE_OPTIONS} selectedId={tone} onSelect={(id) => { setTone(id); patchBriefing(briefing.id, { tone: id ?? null }); setActivePicker(null); }} />
+        <OptionPicker options={TONE_OPTIONS} selectedId={tone} onSelect={(id) => { setTone(id); patchBriefing(briefing.id, { tone: id ?? null }).catch(() => {}); setActivePicker(null); }} />
       </BottomSheet>
       <BottomSheet visible={activePicker === 'audience'} onClose={() => setActivePicker(null)} title="Audience Level">
-        <OptionPicker options={AUDIENCE_OPTIONS} selectedId={audienceLevel} onSelect={(id) => { setAudienceLevel(id); patchBriefing(briefing.id, { audienceLevel: id ?? null }); setActivePicker(null); }} />
+        <OptionPicker options={AUDIENCE_OPTIONS} selectedId={audienceLevel} onSelect={(id) => { setAudienceLevel(id); patchBriefing(briefing.id, { audienceLevel: id ?? null }).catch(() => {}); setActivePicker(null); }} />
       </BottomSheet>
       <BottomSheet visible={activePicker === 'duration'} onClose={() => setActivePicker(null)} title="Duration">
-        <OptionPicker options={DURATION_OPTIONS} selectedId={duration} onSelect={(id) => { setDuration(id); patchBriefing(briefing.id, { duration: id ? parseInt(id, 10) : null }); setActivePicker(null); }} />
+        <OptionPicker options={DURATION_OPTIONS} selectedId={duration} onSelect={(id) => { setDuration(id); patchBriefing(briefing.id, { duration: id ? parseInt(id, 10) : null }).catch(() => {}); setActivePicker(null); }} />
       </BottomSheet>
       <BottomSheet visible={activePicker === 'visibility'} onClose={() => setActivePicker(null)} title="Visibility">
-        <OptionPicker options={VISIBILITY_OPTIONS} selectedId={visibility} onSelect={(id) => { if (id) { setVisibility(id); patchBriefing(briefing.id, { visibility: id }); } setActivePicker(null); }} />
+        <OptionPicker options={VISIBILITY_OPTIONS} selectedId={visibility} onSelect={(id) => { if (id) { setVisibility(id); patchBriefing(briefing.id, { visibility: id }).catch(() => {}); } setActivePicker(null); }} />
       </BottomSheet>
       <BottomSheet visible={activePicker === 'aiModel'} onClose={() => setActivePicker(null)} title="AI Model">
-        <OptionPicker options={aiModelOptions} selectedId={aiModel} onSelect={(id) => { setAiModel(id); patchBriefing(briefing.id, { aiModel: id ?? null }); setActivePicker(null); }} />
+        <OptionPicker options={aiModelOptions} selectedId={aiModel} onSelect={(id) => { setAiModel(id); patchBriefing(briefing.id, { aiModel: id ?? null }).catch(() => {}); setActivePicker(null); }} />
       </BottomSheet>
       <BottomSheet visible={activePicker === 'ttsOption'} onClose={() => setActivePicker(null)} title="Voice Provider">
         <OptionPicker options={ttsOptionsList} selectedId={ttsOption} onSelect={(id) => {
@@ -510,18 +515,18 @@ function BriefingEditForm({ briefing, onRefresh }: { briefing: BriefingData; onR
           if (id) {
             const [provider, ...modelParts] = id.split(':');
             const model = modelParts.join(':');
-            patchBriefing(briefing.id, { ttsProvider: provider, ttsModel: model || null, hostVoiceId: null, expertVoiceId: null });
+            patchBriefing(briefing.id, { ttsProvider: provider, ttsModel: model || null, hostVoiceId: null, expertVoiceId: null }).catch(() => {});
           } else {
-            patchBriefing(briefing.id, { ttsProvider: null, ttsModel: null, hostVoiceId: null, expertVoiceId: null });
+            patchBriefing(briefing.id, { ttsProvider: null, ttsModel: null, hostVoiceId: null, expertVoiceId: null }).catch(() => {});
           }
           setActivePicker(null);
         }} />
       </BottomSheet>
       <BottomSheet visible={activePicker === 'hostVoice'} onClose={() => setActivePicker(null)} title="Host Voice">
-        <OptionPicker options={voiceOptions} selectedId={hostVoice} onSelect={(id) => { setHostVoice(id); patchBriefing(briefing.id, { hostVoiceId: id ?? null }); setActivePicker(null); }} />
+        <OptionPicker options={voiceOptions} selectedId={hostVoice} onSelect={(id) => { setHostVoice(id); patchBriefing(briefing.id, { hostVoiceId: id ?? null }).catch(() => {}); setActivePicker(null); }} />
       </BottomSheet>
       <BottomSheet visible={activePicker === 'expertVoice'} onClose={() => setActivePicker(null)} title="Expert Voice">
-        <OptionPicker options={voiceOptions} selectedId={expertVoice} onSelect={(id) => { setExpertVoice(id); patchBriefing(briefing.id, { expertVoiceId: id ?? null }); setActivePicker(null); }} />
+        <OptionPicker options={voiceOptions} selectedId={expertVoice} onSelect={(id) => { setExpertVoice(id); patchBriefing(briefing.id, { expertVoiceId: id ?? null }).catch(() => {}); setActivePicker(null); }} />
       </BottomSheet>
     </View>
   );

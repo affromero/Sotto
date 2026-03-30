@@ -14,6 +14,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography, borderRadius } from '@sotto/shared';
 import { api } from '../../../lib/api';
+import { ErrorState } from '../../../components/ErrorState';
 import { shadowSm } from '../../../lib/shadows';
 
 type Visibility = 'PUBLIC' | 'UNLISTED' | 'PRIVATE';
@@ -29,7 +30,7 @@ export default function PodcastEditScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
 
-  const { data: podcast, isLoading } = useQuery<{
+  const { data: podcast, isLoading, isError, refetch } = useQuery<{
     id: string;
     title: string;
     topic: string | null;
@@ -41,6 +42,7 @@ export default function PodcastEditScreen() {
       const res = await api.get(`/podcasts/${id}`);
       return res.data;
     },
+    enabled: !!id,
   });
 
   const [title, setTitle] = useState('');
@@ -102,6 +104,10 @@ export default function PodcastEditScreen() {
       ],
     );
   }, [deleteMutation]);
+
+  if (isError) {
+    return <ErrorState message="Failed to load podcast" onRetry={refetch} />;
+  }
 
   if (isLoading) {
     return (
