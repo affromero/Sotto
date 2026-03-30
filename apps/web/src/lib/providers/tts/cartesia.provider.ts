@@ -88,7 +88,7 @@ export class CartesiaProvider implements TtsProvider {
     return Buffer.from(arrayBuffer);
   }
 
-  getVoiceId(speaker: string, podcastId?: string, metadata?: VoiceMatchMetadata): string {
+  getVoiceId(speaker: string, podcastId?: string, metadata?: VoiceMatchMetadata, _language?: string): string {
     const isHostVoice = SPEAKER_VOICE_HOST_SET.has(speaker.toUpperCase());
     if (!podcastId) {
       return isHostVoice ? CARTESIA_VOICE_POOL[0].id : CARTESIA_VOICE_POOL[1].id;
