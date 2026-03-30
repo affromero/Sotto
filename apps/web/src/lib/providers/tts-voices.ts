@@ -196,7 +196,8 @@ export function selectVoiceSetFromPool(
   pool: ProviderVoice[],
   podcastId: string,
   speakerCount: number,
-  metadata?: VoiceMatchMetadata
+  metadata?: VoiceMatchMetadata,
+  _language?: string,
 ): ProviderVoice[] {
   const count = Math.max(1, Math.min(speakerCount, pool.length));
   const index = hashString(podcastId);
@@ -239,7 +240,8 @@ export function selectVoiceSetFromPool(
 export function selectVoicePairFromPool(
   pool: ProviderVoice[],
   podcastId: string,
-  metadata?: VoiceMatchMetadata
+  metadata?: VoiceMatchMetadata,
+  _language?: string,
 ): { host: ProviderVoice; expert: ProviderVoice } {
   const index = hashString(podcastId);
 
