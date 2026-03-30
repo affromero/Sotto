@@ -71,15 +71,15 @@ export class ReplicateProvider implements TtsProvider {
       }
     }
 
-    // Inworld uses `voice_id`, Qwen3 uses `voice`
+    // Inworld uses `voice_id`, Qwen3 uses `speaker` + `mode`
     const input: Record<string, unknown> = inworld
       ? { text, voice_id: params.voiceId, audio_format: 'mp3' }
-      : { text, voice: params.voiceId };
+      : { text, speaker: params.voiceId, mode: 'custom_voice' };
 
-    // Pass language hint for Qwen3-TTS (expects full language names)
-    if (!inworld && params.language) {
-      const langName = QWEN3_LANGUAGE_MAP[params.language];
-      if (langName) input.language = langName;
+    // Pass language hint for Qwen3-TTS (accepts language names or 'auto')
+    if (!inworld) {
+      const langName = params.language ? QWEN3_LANGUAGE_MAP[params.language] : undefined;
+      input.language = langName ?? 'auto';
     }
 
     let response: Response;
