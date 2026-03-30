@@ -69,7 +69,7 @@ export function isKeyInvalidationError(kind: ByokErrorKind): boolean {
   return kind === 'auth_invalid' || kind === 'insufficient_credits';
 }
 
-export function userMessage(kind: ByokErrorKind, providerLabel: string): string {
+export function userMessage(kind: ByokErrorKind, providerLabel: string, stageLabel?: string): string {
   switch (kind) {
     case 'auth_invalid':
       return `Your ${providerLabel} API key is invalid or has been revoked. Update it in Settings.`;
@@ -79,7 +79,9 @@ export function userMessage(kind: ByokErrorKind, providerLabel: string): string 
       return `Rate limited by ${providerLabel}. Try again shortly.`;
     case 'provider_error':
       return `${providerLabel} is experiencing issues. Try again later.`;
-    case 'unknown':
-      return 'Generation failed. Please try again.';
+    case 'unknown': {
+      const stage = stageLabel || 'Generation';
+      return `${stage} failed. Please try again.`;
+    }
   }
 }

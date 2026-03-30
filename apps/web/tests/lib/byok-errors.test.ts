@@ -126,8 +126,13 @@ describe('userMessage', () => {
     expect(msg).toContain('issues');
   });
 
-  it('returns generic message for unknown', () => {
+  it('returns generic message for unknown with default stage', () => {
     const msg = userMessage('unknown', 'whatever');
     expect(msg).toBe('Generation failed. Please try again.');
+  });
+
+  it('returns stage-specific message for unknown with stageLabel', () => {
+    const msg = userMessage('unknown', 'whatever', 'Audio generation');
+    expect(msg).toBe('Audio generation failed. Please try again.');
   });
 });

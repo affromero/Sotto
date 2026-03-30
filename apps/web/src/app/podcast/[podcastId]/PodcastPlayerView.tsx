@@ -189,6 +189,9 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
   const [showReVoice, setShowReVoice] = useState(false);
   const [showAddToCollection, setShowAddToCollection] = useState(false);
   const [liveStatus, setLiveStatus] = useState(podcast.status);
+  const [liveFailureReason, setLiveFailureReason] = useState(podcast.failureReason);
+  const [liveFailedAtStatus, setLiveFailedAtStatus] = useState(podcast.failedAtStatus);
+  const [liveErrorId, setLiveErrorId] = useState(podcast.errorId);
   const [retrying, setRetrying] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -291,7 +294,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
   }, [isOwner, podcast.id, podcast.status]);
 
   // Fetch script turns for review when SCRIPT_READY or FAILED (for AudioConfigPanel speakers)
-  const needsScript = liveStatus === 'SCRIPT_READY' || (liveStatus === 'FAILED' && ['GENERATING_AUDIO', 'STITCHING'].includes(podcast.failedAtStatus ?? ''));
+  const needsScript = liveStatus === 'SCRIPT_READY' || (liveStatus === 'FAILED' && ['GENERATING_AUDIO', 'STITCHING'].includes(liveFailedAtStatus ?? ''));
   useEffect(() => {
     if (!needsScript || !isOwner) return;
     fetch(`/api/podcasts/${podcast.id}/script`)
@@ -318,6 +321,15 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
       setLiveStatus(event.status as typeof podcast.status);
       if (event.verificationProgress) {
         setVerificationProgress(event.verificationProgress as Record<string, unknown>);
+      }
+      if (event.failureReason) {
+        setLiveFailureReason(event.failureReason as string);
+      }
+      if (event.failedAtStatus) {
+        setLiveFailedAtStatus(event.failedAtStatus as string);
+      }
+      if (event.errorId) {
+        setLiveErrorId(event.errorId as string);
       }
       if (event.status === 'READY') {
         router.refresh();
@@ -823,11 +835,11 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
           {!retrying && (
             <>
               <p className={styles.failedText}>
-                {podcast.failureReason || 'Generation failed.'} You can retry or delete this podcast.
+                {liveFailureReason || 'Generation failed.'} You can retry or delete this podcast.
               </p>
-              {podcast.errorId && (
+              {liveErrorId && (
                 <p className={styles.errorId}>
-                  Error reference: <code>{podcast.errorId}</code>
+                  Error reference: <code>{liveErrorId}</code>
                 </p>
               )}
             </>
@@ -838,7 +850,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
               View in Admin Panel
             </Link>
           )}
-          {['GENERATING_AUDIO', 'STITCHING'].includes(podcast.failedAtStatus ?? '') && (
+          {['GENERATING_AUDIO', 'STITCHING'].includes(liveFailedAtStatus ?? '') && (
             <AudioConfigPanel
               speakers={scriptTurns?.map((t) => t.speaker).filter((s, i, a) => a.indexOf(s) === i) ?? ['HOST', 'EXPERT']}
               onConfigChange={setAudioConfig}
