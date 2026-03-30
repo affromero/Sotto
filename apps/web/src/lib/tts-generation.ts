@@ -55,6 +55,8 @@ export interface TtsGenerationParams {
   previousText?: string;
   nextText?: string;
   direction?: string;
+  /** ISO 639-1 language code for the podcast (passed as hint to providers that accept it). */
+  language?: string | null;
 
   /** Already-resolved provider instance. */
   provider: TtsProvider;
@@ -98,13 +100,15 @@ export interface TtsGenerationResult {
  */
 export async function generateTtsAudio(params: TtsGenerationParams): Promise<TtsGenerationResult | null> {
   const {
-    text, voiceId, speaker, previousText, nextText, direction,
+    text, voiceId, speaker, previousText, nextText, direction, language,
     provider, providerId, source,
     userId, podcastId,
     requestedModel: _requestedModel, plan: _plan,
     usageCategory, extraMetadata,
     isAborted,
   } = params;
+
+  const langHint = language ?? undefined;
 
   const startTime = Date.now();
 
@@ -165,7 +169,7 @@ export async function generateTtsAudio(params: TtsGenerationParams): Promise<Tts
   try {
     if (chunks.length === 1) {
       // Fast path — single chunk, no splitting needed
-      const speechParams = { text: ttsText, voiceId, previousText, nextText, direction, speaker };
+      const speechParams = { text: ttsText, voiceId, previousText, nextText, direction, speaker, language: langHint };
       audioBuffer = await provider.generateSpeech(speechParams);
     } else {
       // Multi-chunk: generate each with context bridging for voice continuity
@@ -190,6 +194,7 @@ export async function generateTtsAudio(params: TtsGenerationParams): Promise<Tts
           previousText: chunkPrev,
           nextText: chunkNext,
           continuityIds: continuityIds.length > 0 ? continuityIds.slice(-3) : undefined,
+          language: langHint,
         };
         chunkBuffers.push(await provider.generateSpeech(speechParams));
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { ModelDropdown, type ModelOption } from './ModelDropdown';
+import styles from './TtsModelDropdown.module.css';
 
 const STORAGE_KEY = 'sotto:ttsOption';
 
@@ -12,6 +13,7 @@ interface TtsOptionsResponse {
     badge?: string;
     group?: string;
     hint?: string;
+    supportedLanguages?: string[];
   }>;
   readOnly: boolean;
 }
@@ -20,6 +22,8 @@ interface TtsModelDropdownProps {
   ttsProvider: string | undefined;
   ttsModel: string | undefined;
   onChange: (ttsProvider: string | undefined, ttsModel: string | undefined) => void;
+  /** When set, shows a warning if the selected provider/model doesn't support this language. */
+  detectedLanguage?: string | null;
 }
 
 function parseValue(combined: string | undefined): { provider: string | undefined; model: string | undefined } {
@@ -33,8 +37,9 @@ function toValue(provider: string | undefined, model: string | undefined): strin
   return `${provider}:${model}`;
 }
 
-export function TtsModelDropdown({ ttsProvider, ttsModel, onChange }: TtsModelDropdownProps) {
+export function TtsModelDropdown({ ttsProvider, ttsModel, onChange, detectedLanguage }: TtsModelDropdownProps) {
   const [options, setOptions] = useState<ModelOption[]>([]);
+  const [rawOptions, setRawOptions] = useState<TtsOptionsResponse['options']>([]);
   const [readOnly, setReadOnly] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -44,7 +49,9 @@ export function TtsModelDropdown({ ttsProvider, ttsModel, onChange }: TtsModelDr
     fetch('/api/tts-options')
       .then((res) => res.json())
       .then((data: TtsOptionsResponse) => {
-        const mapped: ModelOption[] = (data.options || []).map((o) => ({
+        const opts = data.options || [];
+        setRawOptions(opts);
+        const mapped: ModelOption[] = opts.map((o) => ({
           id: o.id,
           displayName: o.displayName,
           badge: o.badge,
@@ -78,14 +85,32 @@ export function TtsModelDropdown({ ttsProvider, ttsModel, onChange }: TtsModelDr
     onChange(provider, model);
   };
 
+  // Check if selected model supports the detected language
+  const languageUnsupported = (() => {
+    if (!detectedLanguage || !currentValue) return false;
+    const selected = rawOptions.find((o) => o.id === currentValue);
+    if (!selected?.supportedLanguages) return false;
+    return !selected.supportedLanguages.includes(detectedLanguage);
+  })();
+
   return (
-    <ModelDropdown
-      label="Voice Provider"
-      options={options}
-      value={currentValue}
-      onChange={handleChange}
-      disabled={readOnly}
-      loading={loading}
-    />
+    <div>
+      <ModelDropdown
+        label="Voice Provider"
+        options={options}
+        value={currentValue}
+        onChange={handleChange}
+        disabled={readOnly}
+        loading={loading}
+      />
+      {languageUnsupported && detectedLanguage && (
+        <p
+          role="alert"
+          className={styles.languageWarning}
+        >
+          This model may not support {detectedLanguage.toUpperCase()} audio. Consider switching to a multilingual model.
+        </p>
+      )}
+    </div>
   );
 }

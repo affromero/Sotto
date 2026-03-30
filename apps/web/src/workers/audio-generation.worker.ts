@@ -77,6 +77,7 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
     where: { id: podcastId },
     select: {
       userId: true,
+      language: true,
       voices: { select: { speaker: true, voiceId: true, provider: true } },
       ttsProvider: true,
       ttsModel: true,
@@ -136,7 +137,7 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
     providerId = segProviderId;
     source = 'platform';
 
-    voiceId = existingSegment.ttsVoiceId ?? provider.getVoiceId(speaker, podcastId, voiceMetadata);
+    voiceId = existingSegment.ttsVoiceId ?? provider.getVoiceId(speaker, podcastId, voiceMetadata, podcast.language ?? undefined);
 
     // Persist resolved voice for consistency
     try {
@@ -158,6 +159,7 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
       requestedProvider: (podcast.ttsProvider as TtsProviderId | null) ?? undefined,
       requestedModel: podcast.ttsModel,
       plan: podcast.user.plan as 'FREE' | 'PRO',
+      language: podcast.language,
     });
     provider = resolved.provider;
     providerId = resolved.providerId;
@@ -179,7 +181,7 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
     const podcastVoice = podcast.voices.find(v => v.speaker === speaker);
     voiceId = (podcastVoice?.voiceId && podcastVoice.provider === providerId)
       ? podcastVoice.voiceId
-      : provider.getVoiceId(speaker, podcastId, voiceMetadata);
+      : provider.getVoiceId(speaker, podcastId, voiceMetadata, podcast.language ?? undefined);
 
     // Persist resolved voice for retry consistency and analytics
     if (!podcastVoice || podcastVoice.provider !== providerId || podcastVoice.voiceId !== voiceId) {
@@ -205,6 +207,7 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
     previousText,
     nextText,
     direction,
+    language: podcast.language,
     provider,
     providerId,
     source,

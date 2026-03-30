@@ -29,6 +29,13 @@ function isInworldModel(model: string): boolean {
   return model.startsWith('inworld-');
 }
 
+/** ISO 639-1 → Qwen3 language name mapping (same as Fal provider). */
+const QWEN3_LANGUAGE_MAP: Record<string, string> = {
+  zh: 'Chinese', en: 'English', ja: 'Japanese', ko: 'Korean',
+  fr: 'French', de: 'German', es: 'Spanish', it: 'Italian',
+  pt: 'Portuguese', ru: 'Russian',
+};
+
 interface ReplicatePrediction {
   id: string;
   status: 'starting' | 'processing' | 'succeeded' | 'failed' | 'canceled';
@@ -68,6 +75,12 @@ export class ReplicateProvider implements TtsProvider {
     const input: Record<string, unknown> = inworld
       ? { text, voice_id: params.voiceId, audio_format: 'mp3' }
       : { text, voice: params.voiceId };
+
+    // Pass language hint for Qwen3-TTS (expects full language names)
+    if (!inworld && params.language) {
+      const langName = QWEN3_LANGUAGE_MAP[params.language];
+      if (langName) input.language = langName;
+    }
 
     let response: Response;
     try {
@@ -145,7 +158,7 @@ export class ReplicateProvider implements TtsProvider {
     throw new Error('Replicate prediction timed out after 60 poll attempts');
   }
 
-  getVoiceId(speaker: string, podcastId?: string, metadata?: VoiceMatchMetadata): string {
+  getVoiceId(speaker: string, podcastId?: string, metadata?: VoiceMatchMetadata, _language?: string): string {
     const pool = isInworldModel(this.model) ? INWORLD_VOICE_POOL : FAL_VOICE_POOL;
     const isHostVoice = SPEAKER_VOICE_HOST_SET.has(speaker.toUpperCase());
     if (!podcastId) {
