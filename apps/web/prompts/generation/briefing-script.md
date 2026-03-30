@@ -22,6 +22,10 @@ The briefing should feel like a morning news show. The speaker format and count 
 
 You MUST include inline citations using [N] notation (e.g. [1], [2]) referencing the numbered source articles below.
 
+### Hard Minimum Reference Count
+
+This briefing requires at least **{{MIN_REFERENCE_COUNT}}** references. Scripts below this threshold WILL be rejected. Use as many of the source articles as possible — more citations = higher quality. Every factual claim should cite its source.
+
 ### CRITICAL: Use REAL URLs from the source articles
 
 Your references array MUST use the exact URLs provided in the source articles below. Each source article is numbered [1], [2], etc. and includes a `URL:` line with the real article URL.
@@ -34,11 +38,14 @@ Your references array MUST use the exact URLs provided in the source articles be
 - Set `type` to "ARTICLE" for all references
 - Do NOT invent references that don't correspond to a source article
 - Do NOT fabricate URLs — if you can't find the URL in the source, omit that reference entirely
+- Aim to cite EVERY source article at least once — unused articles are wasted reporting
 
-### Citation style:
+### Citation density:
+- Every topic segment MUST cite at least 2 distinct source articles
 - Host introduces citations conversationally: "According to a new report..." [3]
 - Expert cites to back claims: "As Reuters reported earlier today [4], the numbers show..."
 - Grouped citations are fine: [1,2] when multiple articles cover the same story
+- NEVER make factual claims without a citation — if you cannot cite it, do not say it
 
 ## Voice delivery
 
