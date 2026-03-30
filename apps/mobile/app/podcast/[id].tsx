@@ -87,9 +87,13 @@ export default function PodcastScreen() {
   const lastSeekFromRef = useRef<number | undefined>(undefined);
   const interactionCountRef = useRef(0);
 
-  const { position, duration: trackDuration } = useProgress(1000);
+  // TrackPlayer hooks are safe — they return defaults when player isn't ready.
+  // But wrap in try/catch at the usage sites to prevent native exceptions from crashing the app.
+  const progress = useProgress(1000);
+  const position = progress.position;
+  const trackDuration = progress.duration;
   const playbackState = usePlaybackState();
-  const isPlaying = playbackState.state === State.Playing;
+  const isPlaying = playerReady && playbackState.state === State.Playing;
 
   // Detect playback completion → show rating first, then quiz
   useEffect(() => {
@@ -257,34 +261,54 @@ export default function PodcastScreen() {
   }, [playerReady, podcast?.id, podcast?.audioUrl, podcast?.title, podcast?.user?.name, setCurrentPodcast]);
 
   const handlePlayPause = useCallback(async () => {
+    if (!playerReady) return;
     playScale.value = withSequence(
       withSpring(0.9, { damping: 15, stiffness: 400 }),
       withSpring(1.0, { damping: 10, stiffness: 200 }),
     );
-    if (isPlaying) {
-      await TrackPlayer.pause();
-    } else {
-      await TrackPlayer.play();
+    try {
+      if (isPlaying) {
+        await TrackPlayer.pause();
+      } else {
+        await TrackPlayer.play();
+      }
+    } catch {
+      // Native player may be in a bad state — ignore rather than crash
     }
-  }, [isPlaying, playScale]);
+  }, [isPlaying, playScale, playerReady]);
 
   const handleSkipForward = useCallback(async () => {
-    const current = await TrackPlayer.getProgress();
-    lastSeekFromRef.current = current.position;
-    await TrackPlayer.seekTo(current.position + 15);
-  }, []);
+    if (!playerReady) return;
+    try {
+      const current = await TrackPlayer.getProgress();
+      lastSeekFromRef.current = current.position;
+      await TrackPlayer.seekTo(current.position + 15);
+    } catch {
+      // Ignore native player errors
+    }
+  }, [playerReady]);
 
   const handleSkipBackward = useCallback(async () => {
-    const current = await TrackPlayer.getProgress();
-    lastSeekFromRef.current = current.position;
-    await TrackPlayer.seekTo(Math.max(0, current.position - 15));
-  }, []);
+    if (!playerReady) return;
+    try {
+      const current = await TrackPlayer.getProgress();
+      lastSeekFromRef.current = current.position;
+      await TrackPlayer.seekTo(Math.max(0, current.position - 15));
+    } catch {
+      // Ignore native player errors
+    }
+  }, [playerReady]);
 
   const handleSpeedToggle = useCallback(async () => {
+    if (!playerReady) return;
     const nextIndex = (speedIndex + 1) % PLAYBACK_SPEEDS.length;
     setSpeedIndex(nextIndex);
-    await TrackPlayer.setRate(PLAYBACK_SPEEDS[nextIndex]);
-  }, [speedIndex]);
+    try {
+      await TrackPlayer.setRate(PLAYBACK_SPEEDS[nextIndex]);
+    } catch {
+      // Ignore native player errors
+    }
+  }, [speedIndex, playerReady]);
 
   const handleSeek = useCallback(
     async (ratio: number) => {
