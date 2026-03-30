@@ -72,6 +72,9 @@ This podcast requires at least **{{MIN_REFERENCE_COUNT}}** references (based on 
 ### Serious Source Ratio:
 At least **{{MIN_SERIOUS_PERCENT}}%** of references must be serious sources (PAPER + BOOK + REPORT).{{SERIOUS_RATIO_NOTE}}
 
+### ABSOLUTE RULE — No Uncited Factual Claims:
+Every factual claim in the script MUST have at least one citation. If you cannot find a verifiable source for a claim, DO NOT include it. Rephrase as opinion, remove it, or replace with a well-sourced alternative. Zero tolerance for unsourced facts — the verifier will reject any script with uncited factual claims.
+
 ### Citation Rules:
 - Only cite REAL, verifiable sources — search the web to find actual papers, books, and reports
 - Set the correct "type" field for each reference (PAPER, BOOK, REPORT, ARTICLE, WEB, or VIDEO)

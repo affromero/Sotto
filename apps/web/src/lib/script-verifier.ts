@@ -176,13 +176,11 @@ const REFS_PER_MINUTE: Record<string, number> = {
   eli5: 0.5,
 };
 
-const MAX_REFERENCE_COUNT = 30;
-
 export function getMinReferenceCount(depth: string, durationMinutes?: number): number {
   const base = BASE_REFERENCE_COUNTS[depth] ?? 5;
   if (!durationMinutes || durationMinutes <= 0) return base;
   const scaled = Math.round((REFS_PER_MINUTE[depth] ?? 1.0) * durationMinutes);
-  return Math.min(MAX_REFERENCE_COUNT, Math.max(base, scaled));
+  return Math.max(base, scaled);
 }
 
 /** @deprecated Use getMinReferenceCount() instead */
@@ -340,6 +338,7 @@ function buildVerdict(
   const passed = isRelaxed
     ? score >= threshold && refQuality.countPassed
     : score >= threshold &&
+      unsupportedClaims.length === 0 &&
       unreliableSourceClaims.length === 0 &&
       misattributedClaims.length <= misattributionLimit &&
       refQuality.countPassed &&
@@ -348,6 +347,12 @@ function buildVerdict(
   // Strip any PASS:/FAIL: prefix the AI may have written (instruction removed, but AI is non-deterministic)
   const cleanAiFeedback = aiFeedback.replace(/^(PASS|FAIL):\s*/i, '');
   let feedback = cleanAiFeedback;
+  if (unsupportedClaims.length > 0) {
+    const uncitedFeedback = `UNCITED CLAIMS: ${unsupportedClaims.length} factual claim(s) have ZERO citations. Every factual claim must be cited. ` +
+      unsupportedClaims.map((c) => `Turn ${c.turnIndex}: "${c.claimText}"`).join('; ') +
+      '. Either add citations from verifiable sources or remove these claims.';
+    feedback = feedback ? `${feedback}\n\n${uncitedFeedback}` : uncitedFeedback;
+  }
   if (misattributedClaims.length > 0) {
     const misattrFeedback = `MISATTRIBUTION: ${misattributedClaims.length} claim(s) inaccurately describe their cited references. ` +
       misattributedClaims.map((c) => `Turn ${c.turnIndex}: "${c.claimText}" — ${c.verificationNote}`).join('; ');
