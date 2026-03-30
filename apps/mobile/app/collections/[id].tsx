@@ -142,7 +142,7 @@ export default function CollectionDetailScreen() {
         <Text style={styles.headerDescription}>{collection.description}</Text>
       )}
       <Text style={styles.headerMeta}>
-        By {collection.user.name ?? collection.user.handle ?? 'Unknown'}
+        By {collection.user?.name ?? collection.user?.handle ?? 'Unknown'}
         {' \u00B7 '}
         {collection.podcastCount} podcast{collection.podcastCount !== 1 ? 's' : ''}
         {' \u00B7 '}

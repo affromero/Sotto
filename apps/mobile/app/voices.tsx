@@ -72,7 +72,7 @@ export default function VoiceMarketplaceScreen() {
       return (
         <View style={styles.card} testID={`voice-marketplace-card-${item.id}`}>
           <View style={styles.cardRow}>
-            <Avatar uri={item.owner.image} name={item.owner.name} size={44} />
+            <Avatar uri={item.owner?.image} name={item.owner?.name} size={44} />
             <View style={styles.cardInfo}>
               <View style={styles.cardNameRow}>
                 <Text style={styles.cardName} numberOfLines={1}>
@@ -83,7 +83,7 @@ export default function VoiceMarketplaceScreen() {
                 )}
               </View>
               <Text style={styles.cardOwner} numberOfLines={1}>
-                by {item.owner.name ?? item.owner.handle ?? 'Unknown'}
+                by {item.owner?.name ?? item.owner?.handle ?? 'Unknown'}
               </Text>
               {item.description && (
                 <Text style={styles.cardDescription} numberOfLines={2}>
