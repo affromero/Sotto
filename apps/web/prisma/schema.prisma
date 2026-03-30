@@ -2620,6 +2620,10 @@ model UserBriefing {
   hostVoiceId   String?
   expertVoiceId String?
 
+  // Continuous Learning
+  continuousLearning Boolean @default(false)
+  contextEpisodes    Int     @default(3) // 1-5: how many prior episodes to include as context
+
   // Advanced
   visibility  PodcastVisibility @default(PRIVATE)
   useByokKeys Boolean           @default(false)

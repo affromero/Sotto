@@ -152,6 +152,25 @@ export default function BriefingsPage() {
             </p>
           </section>
 
+          {/* Continuous Learning */}
+          <section className={styles.section}>
+            <h2 className={styles.sectionTitle}>Learn progressively</h2>
+            <p className={styles.sectionText}>
+              Turn on continuous learning and each episode picks up where the last one
+              left off. No repeated intros, no starting from scratch. Yesterday&apos;s
+              briefing becomes today&apos;s foundation.
+            </p>
+            <p className={styles.sectionText}>
+              Choose how many prior episodes to build on (1 to 5) and the AI
+              connects the dots — referencing what you already heard, advancing
+              stories as they develop, and deepening your understanding over time.
+            </p>
+            <p className={styles.sectionTextSmall}>
+              Great for learning a new domain, tracking an evolving story, or
+              building expertise one morning at a time.
+            </p>
+          </section>
+
           {/* Examples */}
           <section className={styles.section}>
             <h2 className={styles.sectionTitle}>Example briefings</h2>
