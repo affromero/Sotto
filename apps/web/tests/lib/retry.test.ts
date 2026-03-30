@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
@@ -7,6 +7,19 @@ vi.mock('@/lib/logger', () => ({
 import { withRetry, isRetryableError, RETRYABLE_STATUS } from '@/lib/retry';
 
 describe('retry', () => {
+  // Stub setTimeout to resolve immediately in all withRetry tests
+  let origSetTimeout: typeof globalThis.setTimeout;
+
+  beforeEach(() => {
+    origSetTimeout = globalThis.setTimeout;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    globalThis.setTimeout = ((fn: () => void) => origSetTimeout(fn, 0)) as any;
+  });
+
+  afterEach(() => {
+    globalThis.setTimeout = origSetTimeout;
+  });
+
   describe('isRetryableError', () => {
     it('returns true for 429 rate limit errors', () => {
       const err = Object.assign(new Error('Rate limited'), { status: 429 });
@@ -43,10 +56,21 @@ describe('retry', () => {
       expect(fn).toHaveBeenCalledTimes(1);
     });
 
-    it('retries on retryable errors and succeeds', async () => {
+    it('retries on 429 rate limit and succeeds', async () => {
       const err429 = Object.assign(new Error('Rate limited'), { status: 429 });
       const fn = vi.fn()
         .mockRejectedValueOnce(err429)
+        .mockResolvedValueOnce('recovered');
+
+      const result = await withRetry('test', fn);
+      expect(result).toBe('recovered');
+      expect(fn).toHaveBeenCalledTimes(2);
+    });
+
+    it('retries on 500 server error and succeeds', async () => {
+      const err500 = Object.assign(new Error('Server error'), { status: 500 });
+      const fn = vi.fn()
+        .mockRejectedValueOnce(err500)
         .mockResolvedValueOnce('recovered');
 
       const result = await withRetry('test', fn);
@@ -63,19 +87,12 @@ describe('retry', () => {
     });
 
     it('throws after exhausting all retries', async () => {
-      // Stub setTimeout to resolve immediately (avoid real delays)
-      const origSetTimeout = globalThis.setTimeout;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      globalThis.setTimeout = ((fn: () => void) => origSetTimeout(fn, 0)) as any;
-
       const err429 = Object.assign(new Error('Rate limited'), { status: 429 });
       const fn = vi.fn().mockRejectedValue(err429);
 
       await expect(withRetry('test', fn)).rejects.toThrow('Rate limited');
       // 1 initial + 3 retries = 4 calls
       expect(fn).toHaveBeenCalledTimes(4);
-
-      globalThis.setTimeout = origSetTimeout;
     });
   });
 
