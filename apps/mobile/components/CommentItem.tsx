@@ -32,15 +32,15 @@ export function CommentItem({
   onDelete,
   depth = 0,
 }: CommentItemProps) {
-  const isOwn = currentUserId === comment.user.id;
+  const isOwn = currentUserId === comment.user?.id;
 
   return (
     <View style={[styles.container, depth > 0 && styles.nested]} testID={`comment-item-${comment.id}`}>
       <View style={styles.row}>
-        <Avatar uri={comment.user.image} name={comment.user.name} size={32} />
+        <Avatar uri={comment.user?.image} name={comment.user?.name} size={32} />
         <View style={styles.content}>
           <View style={styles.header}>
-            <Text style={styles.name}>{comment.user.name ?? 'Anonymous'}</Text>
+            <Text style={styles.name}>{comment.user?.name ?? 'Anonymous'}</Text>
             <Text style={styles.time}>{timeAgo(comment.createdAt)}</Text>
           </View>
           <Text style={styles.text}>{comment.content}</Text>

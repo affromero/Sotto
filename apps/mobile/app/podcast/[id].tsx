@@ -375,7 +375,7 @@ export default function PodcastScreen() {
   const totalDuration = podcast?.duration ?? trackDuration;
   const progressRatio = totalDuration > 0 ? position / totalDuration : 0;
   const currentSegmentIndex = podcast?.segments
-    ? findCurrentSegmentIndex(podcast.segments, position)
+    ? findCurrentSegmentIndex(podcast.segments ?? [], position)
     : -1;
 
   // Auto-scroll transcript to current segment (teleprompter mode only)
@@ -675,12 +675,12 @@ export default function PodcastScreen() {
               testID="player-fork-button"
             >
               <Ionicons name="git-branch-outline" size={22} color={colors.textSecondary} />
-              {isOwner && podcast.forks.length > 0 && (
-                <Text style={styles.actionCount}>{podcast.forks.length}</Text>
+              {isOwner && podcast.forks?.length > 0 && (
+                <Text style={styles.actionCount}>{podcast.forks?.length}</Text>
               )}
             </Pressable>
 
-            {podcast.voiceTracks.length > 1 && (
+            {podcast.voiceTracks?.length > 1 && (
               <Pressable
                 onPress={() => setVoicePickerVisible(true)}
                 style={styles.actionIcon}
@@ -691,7 +691,7 @@ export default function PodcastScreen() {
               </Pressable>
             )}
 
-            {podcast.versions.length > 1 && (
+            {podcast.versions?.length > 1 && (
               <Pressable
                 onPress={() => setVersionHistoryVisible(true)}
                 style={styles.actionIcon}
@@ -765,7 +765,7 @@ export default function PodcastScreen() {
 
       <FlatList<SegmentData>
         ref={transcriptRef}
-        data={podcast.segments}
+        data={podcast.segments ?? []}
         keyExtractor={(item) => item.id}
         contentContainerStyle={[
           styles.transcriptContent,
@@ -823,7 +823,7 @@ export default function PodcastScreen() {
         }}
         ListFooterComponent={
           <>
-            {podcast.references.length > 0 && (
+            {podcast.references?.length > 0 && (
               <ReferencesTab references={podcast.references} />
             )}
             <ForkLineage
