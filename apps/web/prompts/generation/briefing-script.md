@@ -67,6 +67,17 @@ Return a valid JSON object with this exact structure — no markdown fencing:
 }
 ```
 
+## Previous episodes
+
+{{PREVIOUS_EPISODES}}
+
+If previous episodes are provided above, this is a **continuous learning** briefing. You MUST:
+- Build on concepts and stories covered in prior episodes — assume the listener heard them
+- Avoid repeating information already covered; instead, reference it briefly ("As we discussed yesterday...", "Building on what we covered last time...")
+- Advance the narrative: show how stories have developed, what changed since last episode, and what new angles emerged
+- Introduce new topics alongside follow-ups to keep the briefing fresh
+- If no previous episodes are provided, ignore this section entirely
+
 ## Source articles
 
 {{SOURCE_ARTICLES}}
