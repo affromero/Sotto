@@ -38,6 +38,8 @@ export interface BriefingData {
   ttsModel: string | null;
   hostVoiceId: string | null;
   expertVoiceId: string | null;
+  continuousLearning: boolean;
+  contextEpisodes: number;
   visibility: string;
   useByokKeys: boolean;
   lastGeneratedAt: string | null;
@@ -127,6 +129,8 @@ export function BriefingCard({
     ttsModel: briefing.ttsModel,
     hostVoiceId: briefing.hostVoiceId,
     expertVoiceId: briefing.expertVoiceId,
+    continuousLearning: briefing.continuousLearning,
+    contextEpisodes: briefing.contextEpisodes,
     visibility: briefing.visibility,
     useByokKeys: briefing.useByokKeys,
   };

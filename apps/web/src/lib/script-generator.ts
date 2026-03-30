@@ -374,6 +374,7 @@ export async function generateScript(params: {
   webSearchEnabled?: boolean;
   mode?: 'standard' | 'demo';
   source?: string;
+  previousEpisodesContext?: string;
 }): Promise<{
   turns: ScriptTurn[];
   soundCues: SoundCue[];
@@ -412,6 +413,7 @@ export async function generateScript(params: {
         HOST_SPEAKER: speakers[0].name,
         EXPERT_SPEAKER: speakers.length > 1 ? speakers[1].name : speakers[0].name,
         SOURCE_ARTICLES: params.sourceContent || '',
+        PREVIOUS_EPISODES: params.previousEpisodesContext || '',
       })
     : loadAndRender('generation/script-generator.md', {
         SPEAKER_COUNT: String(speakerCount),

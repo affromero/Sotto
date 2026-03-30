@@ -24,6 +24,8 @@ const updateBriefingSchema = z.object({
   ttsModel: z.string().max(100).nullable().optional(),
   hostVoiceId: z.string().max(200).nullable().optional(),
   expertVoiceId: z.string().max(200).nullable().optional(),
+  continuousLearning: z.boolean().optional(),
+  contextEpisodes: z.number().int().min(1).max(5).optional(),
   visibility: z.enum(['PUBLIC', 'UNLISTED', 'PRIVATE']).optional(),
   useByokKeys: z.boolean().optional(),
 });
@@ -112,6 +114,8 @@ export async function PATCH(
       ttsModel: true,
       hostVoiceId: true,
       expertVoiceId: true,
+      continuousLearning: true,
+      contextEpisodes: true,
       visibility: true,
       useByokKeys: true,
       lastGeneratedAt: true,

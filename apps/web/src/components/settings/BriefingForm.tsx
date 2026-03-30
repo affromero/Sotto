@@ -64,6 +64,8 @@ export interface BriefingFormData {
   ttsModel: string | null;
   hostVoiceId: string | null;
   expertVoiceId: string | null;
+  continuousLearning: boolean;
+  contextEpisodes: number;
   visibility: string;
   useByokKeys: boolean;
 }
@@ -147,6 +149,8 @@ export function BriefingForm({
   const [duration, setDuration] = useState(initial?.duration?.toString() ?? '');
   const [format, setFormat] = useState(initial?.format ?? 2);
   const [prompt, setPrompt] = useState(initial?.prompt ?? '');
+  const [continuousLearning, setContinuousLearning] = useState(initial?.continuousLearning ?? false);
+  const [contextEpisodes, setContextEpisodes] = useState(initial?.contextEpisodes ?? 3);
   const [useByokKeys, setUseByokKeys] = useState(initial?.useByokKeys ?? false);
 
   const [voiceOptions, setVoiceOptions] = useState<VoiceOption[]>([]);
@@ -226,6 +230,8 @@ export function BriefingForm({
       ttsModel,
       hostVoiceId: hostVoice || null,
       expertVoiceId: expertVoice || null,
+      continuousLearning,
+      contextEpisodes,
       visibility,
       useByokKeys,
     };
@@ -459,6 +465,55 @@ export function BriefingForm({
             ))}
           </select>
         </div>
+      </div>
+
+      {/* Continuous Learning */}
+      <div className={styles.group} role="group" aria-labelledby="briefing-learning">
+        <h3 className={styles.groupTitle} id="briefing-learning">Continuous Learning</h3>
+        <label className={styles.checkboxRow}>
+          <input
+            type="checkbox"
+            checked={continuousLearning}
+            onChange={(e) => {
+              const checked = e.target.checked;
+              setContinuousLearning(checked);
+              autoSave({ continuousLearning: checked });
+            }}
+            aria-label="Build on previous episodes"
+          />
+          <span className={styles.checkboxLabel}>Build on previous episodes</span>
+        </label>
+        <p className={styles.hint}>
+          Each episode picks up where the last one left off, creating a progressive learning experience.
+        </p>
+        {continuousLearning && (
+          <div className={styles.field}>
+            <label className={styles.label}>
+              Episodes to build on: <strong>{contextEpisodes}</strong>
+            </label>
+            <input
+              type="range"
+              className={styles.rangeInput}
+              min={1}
+              max={5}
+              step={1}
+              value={contextEpisodes}
+              onChange={(e) => {
+                const val = parseInt(e.target.value, 10);
+                setContextEpisodes(val);
+                autoSave({ contextEpisodes: val });
+              }}
+              aria-label="Number of previous episodes to include as context"
+            />
+            <div className={styles.rangeLabels}>
+              <span>1</span>
+              <span>2</span>
+              <span>3</span>
+              <span>4</span>
+              <span>5</span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Audio */}
