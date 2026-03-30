@@ -146,7 +146,7 @@ export function ScriptPreview({ podcastId, onApprove, onRegenerate, onEdit }: Sc
       </View>
 
       <FlatList
-        data={data?.turns}
+        data={data?.turns ?? []}
         keyExtractor={(_, index) => String(index)}
         renderItem={({ item }) => (
           <TurnRow turn={item} uniqueSpeakers={uniqueSpeakers} />

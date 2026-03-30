@@ -50,6 +50,7 @@ export function CommentSection({ podcastId, commentCount }: CommentSectionProps)
       });
       queryClient.invalidateQueries({ queryKey: ['podcast', podcastId] });
     },
+    onError: () => { Alert.alert('Error', 'Could not post comment.'); },
   });
 
   const deleteMutation = useMutation({
@@ -62,6 +63,7 @@ export function CommentSection({ podcastId, commentCount }: CommentSectionProps)
       });
       queryClient.invalidateQueries({ queryKey: ['podcast', podcastId] });
     },
+    onError: () => { Alert.alert('Error', 'Could not delete comment.'); },
   });
 
   const handleReply = useCallback((parentId: string) => {

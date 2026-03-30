@@ -60,12 +60,12 @@ export function FeaturedCarousel() {
                 />
                 <View style={styles.cardHeader}>
                   <Avatar
-                    uri={podcast.user.image}
-                    name={podcast.user.name}
+                    uri={podcast.user?.image}
+                    name={podcast.user?.name}
                     size={28}
                   />
                   <Text style={styles.creatorName} numberOfLines={1}>
-                    {podcast.user.name ?? 'Unknown'}
+                    {podcast.user?.name ?? 'Unknown'}
                   </Text>
                 </View>
                 <View style={styles.cardBottom}>

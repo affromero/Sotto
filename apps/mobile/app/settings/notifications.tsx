@@ -12,6 +12,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { colors, spacing, typography, borderRadius } from '@sotto/shared';
 import { api } from '../../lib/api';
 import { shadowSm } from '../../lib/shadows';
+import { ErrorState } from '../../components/ErrorState';
 
 interface NotificationPrefs {
   likes: boolean;
@@ -32,7 +33,7 @@ const PREF_LABELS: Record<keyof NotificationPrefs, string> = {
 export default function NotificationPrefsScreen() {
   const queryClient = useQueryClient();
 
-  const { data: prefs } = useQuery<NotificationPrefs>({
+  const { data: prefs, isError, refetch } = useQuery<NotificationPrefs>({
     queryKey: ['user', 'me', 'notification-prefs'],
     queryFn: async () => {
       const res = await api.get('/users/me');
@@ -82,6 +83,10 @@ export default function NotificationPrefsScreen() {
     },
     [active, saveMutation],
   );
+
+  if (isError) {
+    return <ErrorState message="Failed to load" onRetry={refetch} />;
+  }
 
   return (
     <View style={styles.container}>

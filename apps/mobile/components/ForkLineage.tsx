@@ -61,7 +61,7 @@ export function ForkLineage({ podcastId, forkedFromId, forkCount }: ForkLineageP
           onPress={() => router.push(`/podcast/${data.parent!.id}`)}
         >
           <View style={styles.lineConnector} />
-          <Avatar uri={data.parent.user.image} name={data.parent.user.name} size={28} />
+          <Avatar uri={data.parent.user?.image} name={data.parent.user?.name} size={28} />
           <View style={styles.nodeInfo}>
             <Text style={styles.nodeLabel}>Parent</Text>
             <Text style={styles.nodeTitle} numberOfLines={1}>{data.parent.title}</Text>
@@ -71,7 +71,7 @@ export function ForkLineage({ podcastId, forkedFromId, forkCount }: ForkLineageP
       )}
 
       <View style={[styles.node, styles.currentNode]}>
-        <Avatar uri={data.current.user.image} name={data.current.user.name} size={28} />
+        <Avatar uri={data.current.user?.image} name={data.current.user?.name} size={28} />
         <View style={styles.nodeInfo}>
           <Text style={styles.nodeLabel}>Current</Text>
           <Text style={[styles.nodeTitle, styles.currentTitle]} numberOfLines={1}>
@@ -87,7 +87,7 @@ export function ForkLineage({ podcastId, forkedFromId, forkCount }: ForkLineageP
           onPress={() => router.push(`/podcast/${child.id}`)}
         >
           <View style={styles.lineConnector} />
-          <Avatar uri={child.user.image} name={child.user.name} size={28} />
+          <Avatar uri={child.user?.image} name={child.user?.name} size={28} />
           <View style={styles.nodeInfo}>
             <Text style={styles.nodeLabel}>Fork</Text>
             <Text style={styles.nodeTitle} numberOfLines={1}>{child.title}</Text>

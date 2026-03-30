@@ -251,7 +251,7 @@ export default function PodcastScreen() {
       podcast.audioUrl,
       podcast.title,
       podcast.user?.name ?? 'Sotto',
-    );
+    ).catch(() => {});
     setCurrentPodcast({
       id: podcast.id,
       title: podcast.title,
@@ -312,18 +312,19 @@ export default function PodcastScreen() {
 
   const handleSeek = useCallback(
     async (ratio: number) => {
+      if (!playerReady) return;
       const totalDuration = podcast?.duration ?? trackDuration;
       if (totalDuration > 0) {
         lastSeekFromRef.current = position;
-        await TrackPlayer.seekTo(ratio * totalDuration);
+        try { await TrackPlayer.seekTo(ratio * totalDuration); } catch {}
       }
     },
-    [podcast?.duration, trackDuration, position],
+    [podcast?.duration, trackDuration, position, playerReady],
   );
 
   const handleAskQuestion = useCallback(async () => {
     if (!questionText.trim()) return;
-    await TrackPlayer.pause();
+    try { await TrackPlayer.pause(); } catch {}
     interactMutation.mutate({
       question: questionText.trim(),
       timestamp: position,
@@ -334,20 +335,24 @@ export default function PodcastScreen() {
     if (!track.audioUrl) return;
     setActiveVoiceTrackId(track.id);
     setVoicePickerVisible(false);
-    await loadTrack(
-      podcast?.id ?? id,
-      track.audioUrl,
-      podcast?.title ?? '',
-      track.contributor?.name ?? 'Sotto',
-    );
+    try {
+      await loadTrack(
+        podcast?.id ?? id,
+        track.audioUrl,
+        podcast?.title ?? '',
+        track.contributor?.name ?? 'Sotto',
+      );
+    } catch {}
   }, [podcast?.id, podcast?.title, id]);
 
   const handleShare = useCallback(async () => {
     if (!podcast) return;
-    await Share.share({
-      message: `${podcast.title} — Listen on Sotto\nhttps://sotto.fm/podcast/${podcast.id}`,
-      url: `https://sotto.fm/podcast/${podcast.id}`,
-    });
+    try {
+      await Share.share({
+        message: `${podcast.title} — Listen on Sotto\nhttps://sotto.fm/podcast/${podcast.id}`,
+        url: `https://sotto.fm/podcast/${podcast.id}`,
+      });
+    } catch {}
   }, [podcast]);
 
   // Playback telemetry
@@ -370,7 +375,7 @@ export default function PodcastScreen() {
   const totalDuration = podcast?.duration ?? trackDuration;
   const progressRatio = totalDuration > 0 ? position / totalDuration : 0;
   const currentSegmentIndex = podcast?.segments
-    ? findCurrentSegmentIndex(podcast.segments, position)
+    ? findCurrentSegmentIndex(podcast.segments ?? [], position)
     : -1;
 
   // Auto-scroll transcript to current segment (teleprompter mode only)
@@ -670,12 +675,12 @@ export default function PodcastScreen() {
               testID="player-fork-button"
             >
               <Ionicons name="git-branch-outline" size={22} color={colors.textSecondary} />
-              {isOwner && podcast.forks.length > 0 && (
-                <Text style={styles.actionCount}>{podcast.forks.length}</Text>
+              {isOwner && podcast.forks?.length > 0 && (
+                <Text style={styles.actionCount}>{podcast.forks?.length}</Text>
               )}
             </Pressable>
 
-            {podcast.voiceTracks.length > 1 && (
+            {podcast.voiceTracks?.length > 1 && (
               <Pressable
                 onPress={() => setVoicePickerVisible(true)}
                 style={styles.actionIcon}
@@ -686,7 +691,7 @@ export default function PodcastScreen() {
               </Pressable>
             )}
 
-            {podcast.versions.length > 1 && (
+            {podcast.versions?.length > 1 && (
               <Pressable
                 onPress={() => setVersionHistoryVisible(true)}
                 style={styles.actionIcon}
@@ -760,7 +765,7 @@ export default function PodcastScreen() {
 
       <FlatList<SegmentData>
         ref={transcriptRef}
-        data={podcast.segments}
+        data={podcast.segments ?? []}
         keyExtractor={(item) => item.id}
         contentContainerStyle={[
           styles.transcriptContent,
@@ -818,7 +823,7 @@ export default function PodcastScreen() {
         }}
         ListFooterComponent={
           <>
-            {podcast.references.length > 0 && (
+            {podcast.references?.length > 0 && (
               <ReferencesTab references={podcast.references} />
             )}
             <ForkLineage
