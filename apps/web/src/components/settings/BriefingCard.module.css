@@ -86,6 +86,13 @@
   text-overflow: ellipsis;
 }
 
+.summaryActions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  flex-shrink: 0;
+}
+
 .editBtn {
   padding: var(--spacing-xs) var(--spacing-sm);
   border: none;
@@ -99,6 +106,25 @@
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.deleteBtnSubtle {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: none;
+  background: transparent;
+  font: var(--text-caption);
+  font-weight: 500;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.deleteBtnSubtle:hover {
+  color: var(--color-error, #ef4444);
 }
 
 .editBtn:hover {
