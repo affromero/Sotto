@@ -401,6 +401,11 @@ export async function generateScript(params: {
     : '';
 
   // Use briefing-specific prompt for BRIEFING source
+  const briefingMinRefs = Math.max(
+    getMinReferenceCount(params.depth || 'standard', params.durationTarget),
+    // Briefings should cite most of their input articles
+    Math.ceil((params.sourceContent?.match(/^\[\d+\]/gm)?.length ?? 5) * 0.6),
+  );
   const systemPrompt = params.source === 'BRIEFING'
     ? loadAndRender('generation/briefing-script.md', {
         VOICE_REALISM: VOICE_REALISM_INSTRUCTIONS,
@@ -414,6 +419,7 @@ export async function generateScript(params: {
         EXPERT_SPEAKER: speakers.length > 1 ? speakers[1].name : speakers[0].name,
         SOURCE_ARTICLES: params.sourceContent || '',
         PREVIOUS_EPISODES: params.previousEpisodesContext || '',
+        MIN_REFERENCE_COUNT: String(briefingMinRefs),
       })
     : loadAndRender('generation/script-generator.md', {
         SPEAKER_COUNT: String(speakerCount),
