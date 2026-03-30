@@ -10,9 +10,18 @@ export async function setupPlayer(): Promise<void> {
     return;
   }
 
-  await TrackPlayer.setupPlayer({
-    autoHandleInterruptions: true,
-  });
+  try {
+    await TrackPlayer.setupPlayer({
+      autoHandleInterruptions: true,
+    });
+  } catch (error) {
+    // Player may already be initialized at native level (e.g. after JS bundle reload).
+    // "The player has already been initialized" is not a fatal error.
+    const message = error instanceof Error ? error.message : String(error);
+    if (!message.includes('already been initialized')) {
+      throw error;
+    }
+  }
 
   await TrackPlayer.updateOptions({
     capabilities: [
