@@ -71,7 +71,7 @@ export async function processVoiceTrackAudio(job: Job<GenerateVoiceTrackAudioPay
       ttsModel: true,
       voices: { select: { speaker: true, voiceId: true, provider: true, ttsModel: true } },
       podcast: {
-        select: { userId: true, user: { select: { plan: true } } },
+        select: { userId: true, language: true, user: { select: { plan: true } } },
       },
     },
   });
@@ -99,12 +99,14 @@ export async function processVoiceTrackAudio(job: Job<GenerateVoiceTrackAudioPay
   // Use per-voice model (not track-level) — voice tracks have mixed providers,
   // so each speaker's model must match their provider.
   const requestedModel = trackVoice?.ttsModel ?? undefined;
+  const podcastLanguage = voiceTrack.podcast.language;
   const { provider, source, providerId } = await resolveTtsProvider({
     userId,
     podcastId,
     requestedProvider: requestedProvider ?? undefined,
     requestedModel,
     plan: voiceTrack.podcast.user.plan as 'FREE' | 'PRO',
+    language: podcastLanguage,
   });
 
   const ttsModelId = provider.getModelId();
@@ -122,7 +124,7 @@ export async function processVoiceTrackAudio(job: Job<GenerateVoiceTrackAudioPay
   // Use voice track voice assignment if provider matches, otherwise let provider pick from pool
   const voiceId = (trackVoice?.voiceId && trackVoice.provider === providerId)
     ? trackVoice.voiceId
-    : provider.getVoiceId(speaker, podcastId, voiceMetadata);
+    : provider.getVoiceId(speaker, podcastId, voiceMetadata, podcastLanguage ?? undefined);
 
   // Persist resolved voice for retry consistency
   if (!trackVoice || trackVoice.provider !== providerId || trackVoice.voiceId !== voiceId) {
@@ -147,6 +149,7 @@ export async function processVoiceTrackAudio(job: Job<GenerateVoiceTrackAudioPay
     previousText,
     nextText,
     direction,
+    language: podcastLanguage,
     provider,
     providerId,
     source,

@@ -30,6 +30,7 @@ export async function processSegmentRegeneration(
     where: { id: podcastId },
     select: {
       userId: true,
+      language: true,
       voices: { select: { speaker: true, voiceId: true, provider: true } },
       ttsProvider: true,
       ttsModel: true,
@@ -58,12 +59,13 @@ export async function processSegmentRegeneration(
     requestedProvider: (podcast.ttsProvider as TtsProviderId | null) ?? undefined,
     requestedModel: podcast.ttsModel,
     plan: podcast.user.plan as 'FREE' | 'PRO',
+    language: podcast.language,
   });
 
   const podcastVoice = podcast.voices.find(v => v.speaker === speaker);
   const voiceId = (podcastVoice?.voiceId && podcastVoice.provider === providerId)
     ? podcastVoice.voiceId
-    : provider.getVoiceId(speaker, podcastId, voiceMetadata);
+    : provider.getVoiceId(speaker, podcastId, voiceMetadata, podcast.language ?? undefined);
 
   // Persist resolved voice for retry consistency and analytics
   if (!podcastVoice || podcastVoice.provider !== providerId || podcastVoice.voiceId !== voiceId) {
@@ -89,7 +91,7 @@ export async function processSegmentRegeneration(
   });
 
   const ttsText = cleanTextForTts(newText);
-  const audioBuffer = await provider.generateSpeech({ text: ttsText, voiceId });
+  const audioBuffer = await provider.generateSpeech({ text: ttsText, voiceId, language: podcast.language ?? undefined });
 
   const charCount = ttsText.length;
   const ttsMeta = getProviderMeta(providerId);
