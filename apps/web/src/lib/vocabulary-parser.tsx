@@ -12,7 +12,9 @@ const VOCAB_REGEX = /\[V(\d+):([^\]]+)\]/g;
  */
 export function parseTextWithVocabulary(
   text: string,
-  vocabularyEntries: VocabularyEntryData[]
+  vocabularyEntries: VocabularyEntryData[],
+  onPause?: () => void,
+  onResume?: () => void,
 ): React.ReactNode[] {
   const nodes: React.ReactNode[] = [];
   let lastIndex = 0;
@@ -36,6 +38,8 @@ export function parseTextWithVocabulary(
         <VocabularyMarker
           key={`vocab-${match.index}`}
           entry={entry}
+          onPause={onPause}
+          onResume={onResume}
         >
           {displayText}
         </VocabularyMarker>
@@ -66,7 +70,9 @@ const COMBINED_REGEX = /\[V(\d+):([^\]]+)\]|\[(\d+(?:\s*,\s*\d+)*)\]/g;
 export function parseTextWithCitationsAndVocabulary(
   text: string,
   references: ReferenceData[],
-  vocabularyEntries: VocabularyEntryData[]
+  vocabularyEntries: VocabularyEntryData[],
+  onPause?: () => void,
+  onResume?: () => void,
 ): React.ReactNode[] {
   const nodes: React.ReactNode[] = [];
   let lastIndex = 0;
@@ -91,6 +97,8 @@ export function parseTextWithCitationsAndVocabulary(
           <VocabularyMarker
             key={`vocab-${match.index}`}
             entry={entry}
+            onPause={onPause}
+            onResume={onResume}
           >
             {displayText}
           </VocabularyMarker>

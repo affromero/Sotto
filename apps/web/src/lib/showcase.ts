@@ -4,6 +4,7 @@ import type { LandingShowcaseConfig } from '@/lib/landing-showcase';
 import { logger } from '@/lib/logger';
 import { findVoiceName } from '@/lib/voice-pool';
 import type { ReferenceData } from '@/types/reference';
+import type { VocabularyEntryData } from '@/types/vocabulary';
 
 export interface ShowcasePodcast {
   podcastId: string;
@@ -42,6 +43,9 @@ export interface LandingShowcaseData {
   // Clip-range segments + visuals for client-side Remotion Player
   clipSegments: { id: string; order: number; speaker: string; text: string; startTime: number; duration: number }[];
   clipVisuals: { id: string; segmentId: string; order: number; subOrder: number; startOffset: number; subDuration: number | null; visualType: string; visualMode: string | null; prompt: string | null; metadata: Record<string, unknown> | null; assetUrl: string | null; assetType: string | null; firstFrameUrl: string | null; status: string }[];
+
+  // Vocabulary entries for clip transcript demo
+  clipVocabulary?: VocabularyEntryData[];
 
   // BotChapter — Real links + overrides
   bot: {
@@ -196,6 +200,19 @@ export async function buildShowcaseData(config: LandingShowcaseConfig): Promise<
         },
         voices: {
           select: { speaker: true, voiceId: true },
+        },
+        vocabularyEntries: {
+          orderBy: { number: 'asc' },
+          select: {
+            id: true,
+            number: true,
+            word: true,
+            translation: true,
+            partOfSpeech: true,
+            pronunciation: true,
+            exampleSentence: true,
+            difficulty: true,
+          },
         },
         voiceTracks: {
           where: { status: 'READY', audioUrl: { not: null } },
@@ -424,6 +441,9 @@ export async function buildShowcaseData(config: LandingShowcaseConfig): Promise<
       videoClip,
       clipSegments,
       clipVisuals,
+      clipVocabulary: podcast.vocabularyEntries.length > 0
+        ? (podcast.vocabularyEntries as VocabularyEntryData[])
+        : undefined,
       bot,
     };
   } catch (err) {

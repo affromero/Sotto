@@ -8,6 +8,8 @@ import styles from './VocabularyMarker.module.css';
 interface VocabularyMarkerProps {
   entry: VocabularyEntryData;
   children?: React.ReactNode;
+  onPause?: () => void;
+  onResume?: () => void;
 }
 
 const POS_LABELS: Record<string, string> = {
@@ -21,13 +23,17 @@ const POS_LABELS: Record<string, string> = {
 
 const TOOLTIP_WIDTH = 320;
 
-export function VocabularyMarker({ entry, children }: VocabularyMarkerProps) {
+/** Track how many tooltips are open across all VocabularyMarker instances */
+let openTooltipCount = 0;
+
+export function VocabularyMarker({ entry, children, onPause, onResume }: VocabularyMarkerProps) {
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState<'above' | 'below'>('above');
   const [coords, setCoords] = useState({ top: 0, left: 0 });
   const markerRef = useRef<HTMLButtonElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
   const closeTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const didPauseRef = useRef(false);
 
   const updatePosition = useCallback(() => {
     if (!markerRef.current) return;
@@ -61,6 +67,26 @@ export function VocabularyMarker({ entry, children }: VocabularyMarkerProps) {
   }, []);
 
   useEffect(() => () => { if (closeTimeout.current != null) clearTimeout(closeTimeout.current); }, []);
+
+  // Manage pause/resume coordination across multiple tooltip instances
+  useEffect(() => {
+    if (open) {
+      openTooltipCount++;
+      if (openTooltipCount === 1) {
+        didPauseRef.current = true;
+        onPause?.();
+      }
+    }
+    return () => {
+      if (open) {
+        openTooltipCount--;
+        if (openTooltipCount === 0 && didPauseRef.current) {
+          didPauseRef.current = false;
+          onResume?.();
+        }
+      }
+    };
+  }, [open, onPause, onResume]);
 
   // Close on outside click
   useEffect(() => {
@@ -105,6 +131,11 @@ export function VocabularyMarker({ entry, children }: VocabularyMarkerProps) {
       <div className={styles.tooltipHeader}>
         <span className={styles.tooltipWord}>{entry.word}</span>
         {posLabel && <span className={styles.posBadge}>{posLabel}</span>}
+        {entry.difficulty && (
+          <span className={styles.difficultyBadge} data-level={entry.difficulty}>
+            {entry.difficulty}
+          </span>
+        )}
       </div>
       {entry.pronunciation && (
         <p className={styles.pronunciation}>{entry.pronunciation}</p>
@@ -126,6 +157,7 @@ export function VocabularyMarker({ entry, children }: VocabularyMarkerProps) {
         ref={markerRef}
         type="button"
         className={styles.marker}
+        data-difficulty={entry.difficulty ?? 'beginner'}
         onClick={handleToggle}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {

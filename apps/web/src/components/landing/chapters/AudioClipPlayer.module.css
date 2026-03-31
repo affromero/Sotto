@@ -300,6 +300,28 @@
   color: var(--color-text-secondary);
 }
 
+/* Transcript snippet with vocabulary markers */
+.transcriptArea {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  margin-top: var(--spacing-sm);
+  max-height: 80px;
+  overflow: hidden;
+  line-height: 1.6;
+  position: relative;
+}
+
+.transcriptArea::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 24px;
+  background: linear-gradient(to bottom, transparent, var(--color-surface));
+  pointer-events: none;
+}
+
 @media (max-width: 768px) {
   .mockPlayer {
     max-width: 100%;
