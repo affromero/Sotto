@@ -37,6 +37,17 @@ interface ResolvedConfig {
   languageMode: string | null;
 }
 
+// ─── Helpers ─────────────────────────────────────────────────────
+
+/** Build a concise subtitle from article titles (first 3 + "and N more"). */
+function briefingSubtitle(articles: NewsArticle[]): string {
+  const MAX_SHOWN = 3;
+  const shown = articles.slice(0, MAX_SHOWN).map((a) => a.title);
+  const remaining = articles.length - shown.length;
+  const suffix = remaining > 0 ? `, and ${remaining} more` : '';
+  return shown.join(', ') + suffix;
+}
+
 // ─── nextRunAt Computation ───────────────────────────────────────
 
 /**
@@ -263,7 +274,7 @@ export async function createBriefingPodcast(
       userId: briefing.userId,
       title,
       slug,
-      topic: `Daily briefing: ${articles.map((a) => a.title).join(', ')}`,
+      topic: briefingSubtitle(articles),
       status: 'EXTRACTING',
       source: 'BRIEFING',
       visibility: resolved.visibility,
