@@ -561,15 +561,30 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
           ? 'TELEGRAM_PODCAST_READY'
           : 'PODCAST_READY';
     const isBriefing = podcast.source === 'BRIEFING';
-    await addJob(notificationQueue, JobType.SEND_NOTIFICATION, {
-      userId: podcast.userId,
-      type: notificationType,
-      title: isBriefing ? 'Your daily briefing is ready' : 'Your podcast is ready!',
-      message: isBriefing
-        ? `Your morning briefing "${podcast.title}" is ready to play.`
-        : `"${podcast.title}" is ready to play.`,
-      data: { podcastId },
+
+    // Idempotency: skip if a notification for this podcast+type already exists (stalled job retry)
+    const existingNotif = await prisma.notification.findFirst({
+      where: {
+        userId: podcast.userId,
+        type: notificationType as never,
+        data: { path: ['podcastId'], equals: podcastId },
+      },
+      select: { id: true },
     });
+
+    if (!existingNotif) {
+      await addJob(notificationQueue, JobType.SEND_NOTIFICATION, {
+        userId: podcast.userId,
+        type: notificationType,
+        title: isBriefing ? 'Your daily briefing is ready' : 'Your podcast is ready!',
+        message: isBriefing
+          ? `Your morning briefing "${podcast.title}" is ready to play.`
+          : `"${podcast.title}" is ready to play.`,
+        data: { podcastId },
+      });
+    } else {
+      logger.info('Skipping duplicate notification (already exists)', { podcastId, notificationType });
+    }
 
     // 10a. Verify referral (grants referrer bonus if this is the user's first READY podcast)
     await verifyReferral(podcast.userId).catch((err) => {
@@ -711,22 +726,32 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
 
     // 12. If user has Telegram enabled, send a notification
     if (!skipSfx && podcast.user.telegramEnabled && podcast.user.telegramChatId) {
-      const telegramMsg = podcast.source === 'TELEGRAM'
-        ? await prisma.telegramMessage.findFirst({
-            where: { podcastId, status: { in: ['GENERATING', 'FAILED'] } },
-            select: { id: true, chatId: true },
-          })
-        : null;
-      await addJob(telegramReplyQueue, JobType.REPLY_TELEGRAM, {
-        podcastId,
-        telegramMessageId: telegramMsg?.id,
-        chatId: telegramMsg?.chatId ?? podcast.user.telegramChatId,
+      // Idempotency: skip if Telegram reply was already sent for this podcast (stalled job retry)
+      const existingTgReply = await prisma.telegramMessage.findFirst({
+        where: { podcastId, status: 'READY' },
+        select: { id: true },
       });
-      if (telegramMsg) {
-        await prisma.telegramMessage.update({
-          where: { id: telegramMsg.id },
-          data: { status: 'READY' },
+
+      if (!existingTgReply) {
+        const telegramMsg = podcast.source === 'TELEGRAM'
+          ? await prisma.telegramMessage.findFirst({
+              where: { podcastId, status: { in: ['GENERATING', 'FAILED'] } },
+              select: { id: true, chatId: true },
+            })
+          : null;
+        await addJob(telegramReplyQueue, JobType.REPLY_TELEGRAM, {
+          podcastId,
+          telegramMessageId: telegramMsg?.id,
+          chatId: telegramMsg?.chatId ?? podcast.user.telegramChatId,
         });
+        if (telegramMsg) {
+          await prisma.telegramMessage.update({
+            where: { id: telegramMsg.id },
+            data: { status: 'READY' },
+          });
+        }
+      } else {
+        logger.info('Skipping duplicate Telegram reply (already sent)', { podcastId });
       }
     }
 
