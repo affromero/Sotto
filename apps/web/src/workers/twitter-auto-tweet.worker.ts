@@ -6,7 +6,8 @@ import { podcastUrl as buildPodcastPath } from '@/lib/urls';
 import { logger } from '@/lib/logger';
 import type { AutoTweetPayload } from '@/lib/queue';
 
-const SOTTO_APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://sotto.fm';
+// Always use production URL for public tweets — never inherit localhost from dev env
+const SOTTO_APP_URL = process.env.NEXT_PUBLIC_APP_URL?.startsWith('https://') ? process.env.NEXT_PUBLIC_APP_URL : 'https://sotto.fm';
 
 function interpolateTemplate(
   template: string,
@@ -31,13 +32,23 @@ function interpolateTemplate(
 export async function processAutoTweet(job: Job<AutoTweetPayload>): Promise<void> {
   const { podcastId, trigger } = job.data;
 
-  const autoTweet = await prisma.twitterAutoTweet.findFirst({
+  // CAS: atomically claim the pending record — prevents duplicate posts on retry
+  const claimed = await prisma.twitterAutoTweet.updateMany({
     where: { podcastId, trigger, status: 'pending' },
+    data: { status: 'posting' },
+  });
+
+  if (claimed.count === 0) {
+    logger.info('No pending auto-tweet to claim (already claimed or posted)', { podcastId, trigger });
+    return;
+  }
+
+  const autoTweet = await prisma.twitterAutoTweet.findFirst({
+    where: { podcastId, trigger, status: 'posting' },
     orderBy: { createdAt: 'desc' },
   });
 
   if (!autoTweet) {
-    logger.warn('No pending auto-tweet record found', { podcastId, trigger });
     return;
   }
 

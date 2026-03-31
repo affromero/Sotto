@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // ---- Mocks ----
 
 const mockPrismaPodcastFindUniqueOrThrow = vi.fn();
+const mockPrismaTweetMentionFindUnique = vi.fn();
 const mockPrismaTweetMentionUpdate = vi.fn();
 
 vi.mock('@/lib/prisma', () => {
@@ -11,6 +12,7 @@ vi.mock('@/lib/prisma', () => {
       findUniqueOrThrow: (...args: unknown[]) => mockPrismaPodcastFindUniqueOrThrow(...args),
     },
     tweetMention: {
+      findUnique: (...args: unknown[]) => mockPrismaTweetMentionFindUnique(...args),
       update: (...args: unknown[]) => mockPrismaTweetMentionUpdate(...args),
     },
   };
@@ -52,6 +54,9 @@ describe('processTwitterReply', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockReplyToTweet.mockResolvedValue('reply-tweet-id-123');
+    // Default: no reply already posted (idempotency check passes)
+    mockPrismaTweetMentionFindUnique.mockResolvedValue({ replyTweetId: null, status: 'PENDING' });
+    mockPrismaTweetMentionUpdate.mockResolvedValue({});
   });
 
   describe('successful podcast replies', () => {
@@ -66,6 +71,7 @@ describe('processTwitterReply', () => {
         title: 'Introduction to Quantum Computing',
         duration: 600,
         status: 'READY',
+        visibility: 'PUBLIC',
         slug: null,
         user: { handle: null },
       });
@@ -102,6 +108,7 @@ describe('processTwitterReply', () => {
         title: 'Test Podcast',
         duration: 300,
         status: 'READY',
+        visibility: 'PUBLIC',
         slug: null,
         user: { handle: null },
       });
@@ -126,6 +133,7 @@ describe('processTwitterReply', () => {
         title: 'Machine Learning Basics',
         duration: 480,
         status: 'READY',
+        visibility: 'PUBLIC',
         slug: null,
         user: { handle: null },
       });
@@ -157,6 +165,7 @@ describe('processTwitterReply', () => {
         title: longTitle,
         duration: 720,
         status: 'READY',
+        visibility: 'PUBLIC',
         slug: null,
         user: { handle: null },
       });
@@ -184,6 +193,7 @@ describe('processTwitterReply', () => {
         title: shortTitle,
         duration: 180,
         status: 'READY',
+        visibility: 'PUBLIC',
         slug: null,
         user: { handle: null },
       });
@@ -211,6 +221,7 @@ describe('processTwitterReply', () => {
         title: 'Test Podcast',
         duration: 540,
         status: 'READY',
+        visibility: 'PUBLIC',
         slug: null,
         user: { handle: null },
       });
@@ -235,6 +246,7 @@ describe('processTwitterReply', () => {
         title: 'Test Podcast',
         duration: 635,
         status: 'READY',
+        visibility: 'PUBLIC',
         slug: null,
         user: { handle: null },
       });
@@ -259,6 +271,7 @@ describe('processTwitterReply', () => {
         title: 'Test Podcast',
         duration: 0,
         status: 'READY',
+        visibility: 'PUBLIC',
         slug: null,
         user: { handle: null },
       });
@@ -283,6 +296,7 @@ describe('processTwitterReply', () => {
         title: 'Test Podcast',
         duration: null,
         status: 'READY',
+        visibility: 'PUBLIC',
         slug: null,
         user: { handle: null },
       });
@@ -309,6 +323,7 @@ describe('processTwitterReply', () => {
         title: 'Failed Podcast',
         duration: null,
         status: 'FAILED',
+        visibility: 'PUBLIC',
         slug: null,
         user: { handle: null },
       });
@@ -337,6 +352,7 @@ describe('processTwitterReply', () => {
         title: 'Failed Podcast',
         duration: null,
         status: 'FAILED',
+        visibility: 'PUBLIC',
         slug: null,
         user: { handle: null },
       });
@@ -362,6 +378,7 @@ describe('processTwitterReply', () => {
         title: 'Failed Podcast',
         duration: null,
         status: 'FAILED',
+        visibility: 'PUBLIC',
         slug: null,
         user: { handle: null },
       });
@@ -388,6 +405,7 @@ describe('processTwitterReply', () => {
         title: 'Retrying Podcast',
         duration: null,
         status: 'EXTRACTING',
+        visibility: 'PUBLIC',
         slug: null,
         user: { handle: null },
       });
@@ -412,6 +430,7 @@ describe('processTwitterReply', () => {
         title: 'Progress Test',
         duration: 300,
         status: 'READY',
+        visibility: 'PUBLIC',
         slug: null,
         user: { handle: null },
       });
@@ -439,6 +458,7 @@ describe('processTwitterReply', () => {
         title: 'The History of the Internet',
         duration: 600,
         status: 'READY',
+        visibility: 'PUBLIC',
         slug: null,
         user: { handle: null },
       });
