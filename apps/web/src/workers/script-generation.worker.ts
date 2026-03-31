@@ -48,7 +48,7 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
     useAdminCredits ? Promise.resolve(null) : getAiKey(userId),
     useAdminCredits ? Promise.resolve(true) : hasByokKey(userId),
     prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { plan: true, role: true } }),
-    prisma.podcast.findUniqueOrThrow({ where: { id: podcastId }, select: { aiModel: true, verificationMode: true, source: true } }),
+    prisma.podcast.findUniqueOrThrow({ where: { id: podcastId }, select: { aiModel: true, verificationMode: true, source: true, language: true } }),
     prisma.discovery.findUniqueOrThrow({ where: { id: discoveryId } }),
   ]);
 
@@ -107,8 +107,9 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
     ? requestedSpeakers.slice(0, tierFeatures.maxSpeakers)
     : requestedSpeakers;
 
-  // Fetch previous episode context for continuous learning briefings
+  // Fetch previous episode context and language mode for continuous learning briefings
   let previousEpisodesContext: string | undefined;
+  let briefingLanguageMode: string | null = null;
   if (podcast.source === 'BRIEFING') {
     const briefingLog = await prisma.briefingLog.findFirst({
       where: { podcastId },
@@ -117,8 +118,9 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
     if (briefingLog?.userBriefingId) {
       const briefing = await prisma.userBriefing.findUnique({
         where: { id: briefingLog.userBriefingId },
-        select: { continuousLearning: true, contextEpisodes: true },
+        select: { continuousLearning: true, contextEpisodes: true, languageMode: true },
       });
+      briefingLanguageMode = briefing?.languageMode ?? null;
       if (briefing?.continuousLearning) {
         const priorLogs = await prisma.briefingLog.findMany({
           where: {
@@ -190,6 +192,8 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
         mode: podcast.verificationMode === 'showcase' ? 'demo' : 'standard',
         source: podcast.source,
         previousEpisodesContext,
+        targetLanguage: podcast.language,
+        languageMode: briefingLanguageMode,
       });
 
   await job.updateProgress(50);
@@ -220,6 +224,23 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
       })),
     });
     logger.info('References saved', { podcastId, count: String(result.references.length) });
+  }
+
+  // Persist vocabulary entries for language learning podcasts
+  if (result.vocabulary.length > 0) {
+    await prisma.vocabularyEntry.createMany({
+      data: result.vocabulary.map((v) => ({
+        podcastId,
+        number: v.number,
+        word: v.word,
+        translation: v.translation,
+        partOfSpeech: v.partOfSpeech,
+        pronunciation: v.pronunciation,
+        exampleSentence: v.exampleSentence,
+        difficulty: v.difficulty,
+      })),
+    });
+    logger.info('Vocabulary entries saved', { podcastId, count: String(result.vocabulary.length) });
   }
 
   if (result.places.length > 0) {
@@ -297,7 +318,7 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
       status: 'COMPILING',
       aiProvider: model.startsWith('claude-code:') ? 'claude-code' : provider,
       aiModel: model,
-      language: detectedLanguage ?? undefined,
+      language: podcast.language ?? detectedLanguage ?? undefined,
     },
   });
   await invalidatePodcastCache(podcastId);

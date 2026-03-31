@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { BriefingForm, DEPTH_OPTIONS, DURATION_OPTIONS } from './BriefingForm';
+import { LANGUAGE_DISPLAY } from '@sotto/shared';
+import { BriefingForm, DEPTH_OPTIONS, DURATION_OPTIONS, LANGUAGE_MODE_OPTIONS } from './BriefingForm';
 import type { BriefingFormData } from './BriefingForm';
 import styles from './BriefingCard.module.css';
 
@@ -42,6 +43,8 @@ export interface BriefingData {
   contextEpisodes: number;
   visibility: string;
   useByokKeys: boolean;
+  targetLanguage: string | null;
+  languageMode: string | null;
   lastGeneratedAt: string | null;
   createdAt: string;
   todayPodcast: { id: string; status: string; title: string } | null;
@@ -72,6 +75,12 @@ export function BriefingCard({
 
   const depthLabel = DEPTH_OPTIONS.find((o) => o.value === briefing.depth)?.label ?? 'Quick Overview';
   const durationLabel = DURATION_OPTIONS.find((o) => o.value === briefing.duration)?.label ?? '6 min';
+  const languageLabel = briefing.targetLanguage && briefing.targetLanguage !== 'en'
+    ? LANGUAGE_DISPLAY[briefing.targetLanguage] ?? briefing.targetLanguage
+    : null;
+  const languageModeLabel = languageLabel && briefing.languageMode
+    ? LANGUAGE_MODE_OPTIONS.find((o) => o.value === briefing.languageMode)?.label ?? briefing.languageMode
+    : null;
 
   // Merge server-side today podcast with local generate result
   const todayPodcast = generatedPodcastId
@@ -143,6 +152,8 @@ export function BriefingCard({
     contextEpisodes: briefing.contextEpisodes,
     visibility: briefing.visibility,
     useByokKeys: briefing.useByokKeys,
+    targetLanguage: briefing.targetLanguage,
+    languageMode: briefing.languageMode,
   };
 
   return (
@@ -168,6 +179,7 @@ export function BriefingCard({
         <div>
           <span className={styles.summaryText}>
             {formatDays(briefing.days)} at {briefing.time} &middot; {depthLabel} &middot; {durationLabel}
+            {languageLabel && <> &middot; {languageLabel}{languageModeLabel && <> &middot; {languageModeLabel}</>}</>}
           </span>
           {todayPodcast && (
             <div className={`${styles.todayRow} ${todayFailed ? styles.todayRowFailed : todayReady ? styles.todayRowReady : styles.todayRowProcessing}`}>

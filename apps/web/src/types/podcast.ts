@@ -1,5 +1,6 @@
 import { PodcastSource, PodcastStatus, PodcastVisibility } from '@prisma/client';
 import { ReferenceData } from './reference';
+import type { VocabularyEntryData } from './vocabulary';
 import { PodcastVersionSummary } from './version';
 import type { VoiceTrackSummary } from '@sotto/shared';
 
@@ -83,6 +84,7 @@ export interface PodcastDetail extends PodcastSummary {
   segments: SegmentData[];
   interactions: InteractionSummary[];
   references: ReferenceData[];
+  vocabularyEntries?: VocabularyEntryData[];
   pdfUrl: string | null;
   videoUrl: string | null;
   musicUrl: string | null;
