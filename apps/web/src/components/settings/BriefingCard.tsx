@@ -44,6 +44,7 @@ export interface BriefingData {
   useByokKeys: boolean;
   lastGeneratedAt: string | null;
   createdAt: string;
+  todayPodcast: { id: string; status: string; title: string } | null;
 }
 
 interface BriefingCardProps {
@@ -71,6 +72,15 @@ export function BriefingCard({
 
   const depthLabel = DEPTH_OPTIONS.find((o) => o.value === briefing.depth)?.label ?? 'Quick Overview';
   const durationLabel = DURATION_OPTIONS.find((o) => o.value === briefing.duration)?.label ?? '6 min';
+
+  // Merge server-side today podcast with local generate result
+  const todayPodcast = generatedPodcastId
+    ? { id: generatedPodcastId, status: 'PENDING', title: '' }
+    : briefing.todayPodcast;
+  const todayStatus = todayPodcast?.status;
+  const todayFailed = todayStatus === 'FAILED';
+  const todayReady = todayStatus === 'READY';
+  const todayProcessing = todayPodcast && !todayFailed && !todayReady;
 
   const toggleEnabled = async () => {
     const next = !enabled;
@@ -159,7 +169,17 @@ export function BriefingCard({
           <span className={styles.summaryText}>
             {formatDays(briefing.days)} at {briefing.time} &middot; {depthLabel} &middot; {durationLabel}
           </span>
-          {briefing.lastGeneratedAt && (
+          {todayPodcast && (
+            <div className={`${styles.todayRow} ${todayFailed ? styles.todayRowFailed : todayReady ? styles.todayRowReady : styles.todayRowProcessing}`}>
+              <span className={styles.todayBadge} data-status={todayFailed ? 'failed' : todayReady ? 'ready' : 'processing'}>
+                {todayFailed ? 'Failed' : todayReady ? 'Ready' : 'Generating'}
+              </span>
+              <a href={`/podcast/${todayPodcast.id}`} className={styles.todayLink}>
+                {todayReady ? 'Listen' : todayFailed ? 'View details' : 'View progress'}
+              </a>
+            </div>
+          )}
+          {!todayPodcast && briefing.lastGeneratedAt && (
             <div className={styles.lastGenerated}>
               Last generated {new Date(briefing.lastGeneratedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
             </div>
@@ -212,20 +232,7 @@ export function BriefingCard({
         </div>
       )}
 
-      {/* Generation status */}
-      {generating && (
-        <div className={styles.statusBanner}>
-          Generating your podcast...
-        </div>
-      )}
-      {generatedPodcastId && !generating && (
-        <div className={styles.statusBanner}>
-          Podcast created.{' '}
-          <a href={`/podcast/${generatedPodcastId}`} className={styles.statusLink}>
-            View progress
-          </a>
-        </div>
-      )}
+      {/* Generation error (API-level, not pipeline failure) */}
       {generateError && !generating && (
         <div className={styles.errorBanner}>
           {generateError}
@@ -245,23 +252,31 @@ export function BriefingCard({
           />
 
           <div className={styles.cardActions}>
-            {generatedPodcastId && !generating ? (
+            {todayReady && todayPodcast && !generating ? (
               <a
-                href={`/podcast/${generatedPodcastId}`}
+                href={`/podcast/${todayPodcast.id}`}
                 className={styles.generateBtnSuccess}
-                aria-label="View generated podcast"
+                aria-label="Listen to today's episode"
               >
-                View Podcast
+                Listen Now
+              </a>
+            ) : todayProcessing && todayPodcast && !generating ? (
+              <a
+                href={`/podcast/${todayPodcast.id}`}
+                className={styles.generateBtnLink}
+                aria-label="View generation progress"
+              >
+                View Progress
               </a>
             ) : (
               <button
                 type="button"
-                className={styles.generateBtn}
+                className={todayFailed ? styles.generateBtnRetry : styles.generateBtn}
                 onClick={handleGenerate}
                 disabled={generating}
-                aria-label="Generate briefing now"
+                aria-label={todayFailed ? 'Retry generation' : 'Generate briefing now'}
               >
-                {generating ? 'Generating...' : 'Generate Now'}
+                {generating ? 'Generating...' : todayFailed ? 'Retry' : 'Generate Now'}
               </button>
             )}
 

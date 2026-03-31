@@ -35,6 +35,8 @@ export async function GET(request: NextRequest) {
   const authResult = await authenticateRequest(request);
   if (!authResult) return errorResponse('Unauthorized', 401);
 
+  const today = new Date().toISOString().slice(0, 10);
+
   const briefings = await prisma.userBriefing.findMany({
     where: { userId: authResult.userId },
     orderBy: { createdAt: 'asc' },
@@ -63,16 +65,31 @@ export async function GET(request: NextRequest) {
       useByokKeys: true,
       lastGeneratedAt: true,
       createdAt: true,
+      briefingLogs: {
+        where: { scheduledDate: today },
+        take: 1,
+        select: {
+          podcastId: true,
+          podcast: { select: { status: true, title: true } },
+        },
+      },
     },
   });
 
   return NextResponse.json({
-    briefings: briefings.map((b) => ({
-      ...b,
-      nextRunAt: b.nextRunAt?.toISOString() ?? null,
-      lastGeneratedAt: b.lastGeneratedAt?.toISOString() ?? null,
-      createdAt: b.createdAt.toISOString(),
-    })),
+    briefings: briefings.map((b) => {
+      const todayLog = b.briefingLogs[0] ?? null;
+      return {
+        ...b,
+        briefingLogs: undefined,
+        nextRunAt: b.nextRunAt?.toISOString() ?? null,
+        lastGeneratedAt: b.lastGeneratedAt?.toISOString() ?? null,
+        createdAt: b.createdAt.toISOString(),
+        todayPodcast: todayLog
+          ? { id: todayLog.podcastId, status: todayLog.podcast.status, title: todayLog.podcast.title }
+          : null,
+      };
+    }),
     limits: { max: MAX_BRIEFINGS, maxEnabled: MAX_ENABLED },
   });
 }
