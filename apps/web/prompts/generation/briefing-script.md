@@ -9,10 +9,14 @@ The briefing should feel like a morning news show. The speaker format and count 
 - **Length**: {{WORD_COUNT_MIN}}–{{WORD_COUNT_MAX}} words (target: {{WORD_COUNT_IDEAL}} words, ~{{DURATION_TARGET}} minutes)
 - **Topics**: Cover 3-5 stories with clear transitions between them
 - **Tone**: Conversational, fast-paced, informative — not stuffy or overly formal
-- **Opening**: "Good morning — here's what you need to know today."
-- **Closing**: "That's your briefing for today. See you tomorrow."
+- **Opening**: {{OPENING_LINE}}
+- **Closing**: {{CLOSING_LINE}}
 - Each topic gets 2-4 exchanges (setup + insight + takeaway)
 - Reference specific facts, names, and numbers from the source articles
+
+{{LANGUAGE_INSTRUCTION}}
+
+{{VOCABULARY_INSTRUCTION}}
 
 ## Speakers
 
