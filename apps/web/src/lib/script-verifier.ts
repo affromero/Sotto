@@ -69,8 +69,9 @@ export const VERIFICATION_JSON_SCHEMA = {
           required: [
             'claimText', 'turnIndex', 'speaker', 'isCommonKnowledge',
             'existingCitations', 'needsMoreCitations', 'hasUnreliableSource',
-            'hasMisattribution', 'verificationNote',
+            'unreliableCitations', 'hasMisattribution', 'verificationNote',
           ],
+          additionalProperties: false,
         },
       },
       overallScore: { type: 'number' },
