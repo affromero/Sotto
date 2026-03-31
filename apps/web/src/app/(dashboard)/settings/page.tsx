@@ -67,6 +67,14 @@ export default async function SettingsPage() {
             useByokKeys: true,
             lastGeneratedAt: true,
             createdAt: true,
+            briefingLogs: {
+              where: { scheduledDate: new Date().toISOString().slice(0, 10) },
+              take: 1,
+              select: {
+                podcastId: true,
+                podcast: { select: { status: true, title: true } },
+              },
+            },
           },
         },
       },
@@ -162,12 +170,19 @@ export default async function SettingsPage() {
         isTwitterProviderAvailable={isTwitterProviderAvailable}
         initialEmailNotifications={user.emailNotifications}
         initialPushNotifications={user.pushNotifications}
-        briefings={user.userBriefings.map((b) => ({
-          ...b,
-          nextRunAt: b.nextRunAt?.toISOString() ?? null,
-          lastGeneratedAt: b.lastGeneratedAt?.toISOString() ?? null,
-          createdAt: b.createdAt.toISOString(),
-        }))}
+        briefings={user.userBriefings.map((b) => {
+          const todayLog = b.briefingLogs[0] ?? null;
+          return {
+            ...b,
+            briefingLogs: undefined,
+            nextRunAt: b.nextRunAt?.toISOString() ?? null,
+            lastGeneratedAt: b.lastGeneratedAt?.toISOString() ?? null,
+            createdAt: b.createdAt.toISOString(),
+            todayPodcast: todayLog
+              ? { id: todayLog.podcastId, status: todayLog.podcast.status, title: todayLog.podcast.title }
+              : null,
+          };
+        })}
         hasByokKeys={configuredProviders.some((p) => p.isValid) || configuredAiProviders.some((p) => p.isValid)}
         initialQuizEnabled={user.quizEnabled}
         quizAnswerCount={quizAnswerCount}
