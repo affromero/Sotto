@@ -64,6 +64,13 @@ export async function processQuizGeneration(job: Job<GenerateQuizPayload>): Prom
     // Resolve cheapest AI model (platform operation, Haiku-tier)
     const { model, provider } = await resolveAiModelAndProvider({ plan: 'FREE' });
 
+    // Fetch vocabulary entries for language learning podcasts
+    const vocabularyEntries = await prisma.vocabularyEntry.findMany({
+      where: { podcastId },
+      orderBy: { number: 'asc' },
+      select: { word: true, translation: true, partOfSpeech: true },
+    });
+
     const questionCount = turns.length < 10 ? 3 : turns.length < 20 ? 4 : 5;
     const mediumCount = questionCount - 2; // 1 easy + N medium + 1 hard
 
@@ -71,11 +78,15 @@ export async function processQuizGeneration(job: Job<GenerateQuizPayload>): Prom
       .map((t, i) => `[${i}] ${t.speaker}: ${t.text}`)
       .join('\n');
 
+    const vocabularySection = vocabularyEntries.length > 0
+      ? `\n\nThe podcast taught these vocabulary words:\n${vocabularyEntries.map((v) => `- ${v.word} (${v.translation}${v.partOfSpeech ? `, ${v.partOfSpeech}` : ''})`).join('\n')}\n\nInclude 1-2 questions testing vocabulary knowledge (e.g. "What does [word] mean?" or "Which word means [translation]?").`
+      : '';
+
     const prompt = loadAndRender('quiz/generate-quiz.md', {
       QUESTION_COUNT: String(questionCount),
       MEDIUM_COUNT: String(mediumCount),
       SCRIPT_TURNS: scriptTurns,
-      SCRIPT_CONTEXT: (script.context as string) || 'No additional context available.',
+      SCRIPT_CONTEXT: ((script.context as string) || 'No additional context available.') + vocabularySection,
     });
 
     await job.updateProgress(50);

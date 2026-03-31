@@ -65,6 +65,8 @@ export default async function SettingsPage() {
             contextEpisodes: true,
             visibility: true,
             useByokKeys: true,
+            targetLanguage: true,
+            languageMode: true,
             lastGeneratedAt: true,
             createdAt: true,
             briefingLogs: {

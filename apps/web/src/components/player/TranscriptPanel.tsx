@@ -3,17 +3,20 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Minus, Plus } from 'lucide-react';
 import { parseTextWithCitations } from '@/lib/citation-parser';
+import { parseTextWithVocabulary } from '@/lib/vocabulary-parser';
 import { useScrollFollow, isScrollable } from '@/lib/hooks/useScrollFollow';
 import { getSpeakerIndex, getUniqueSpeakers } from '@/lib/speaker-colors';
 import { SegmentQuestionBadge } from '@/components/player/SegmentQuestionBadge';
 import { ClaimFlagButton } from '@/components/player/ClaimFlagButton';
 import { SegmentData } from '@/types/podcast';
 import type { ReferenceData } from '@/types/reference';
+import type { VocabularyEntryData } from '@/types/vocabulary';
 import styles from './TranscriptPanel.module.css';
 
 interface TranscriptPanelProps {
   segments: SegmentData[];
   references?: ReferenceData[];
+  vocabularyEntries?: VocabularyEntryData[];
   currentTime: number;
   onSegmentClick?: (startTime: number) => void;
   questionCounts?: Map<number, number>;
@@ -34,6 +37,7 @@ function formatTimestamp(seconds: number): string {
 export function TranscriptPanel({
   segments,
   references = [],
+  vocabularyEntries = [],
   currentTime,
   onSegmentClick,
   questionCounts,
@@ -56,6 +60,7 @@ export function TranscriptPanel({
   }, [currentTime, isFollowing, scrollContainerRef]);
 
   const hasRefs = references.length > 0;
+  const hasVocab = vocabularyEntries.length > 0;
 
   return (
     <div className={styles.panel} style={{ '--font-scale': fontScale } as React.CSSProperties}>
@@ -108,7 +113,11 @@ export function TranscriptPanel({
                 {qCount > 0 && <SegmentQuestionBadge count={qCount} />}
               </span>
               <div className={styles.text}>
-                {hasRefs ? parseTextWithCitations(segment.text, references) : segment.text}
+                {hasRefs
+                  ? parseTextWithCitations(segment.text, references)
+                  : hasVocab
+                    ? parseTextWithVocabulary(segment.text, vocabularyEntries)
+                    : segment.text}
               </div>
               {podcastId && (
                 <ClaimFlagButton

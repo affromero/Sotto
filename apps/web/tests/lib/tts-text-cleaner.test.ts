@@ -27,6 +27,11 @@ describe('tts-text-cleaner', () => {
       .toBe('A study found results.');
   });
 
+  it('strips vocabulary markers', () => {
+    expect(cleanTextForTts('Das ist sprechen [V1] und lesen [V2] auf Deutsch.'))
+      .toBe('Das ist sprechen und lesen auf Deutsch.');
+  });
+
   it('strips parenthetical stage directions', () => {
     expect(cleanTextForTts('Hello (pause) world')).toBe('Hello world');
     expect(cleanTextForTts('Really? (dramatic pause) Yes.')).toBe('Really? Yes.');
