@@ -58,6 +58,19 @@ export function cleanCitationText(
     return `[${renumbered.join(',')}]`;
   });
 
+  // Collapse adjacent duplicate citation markers (e.g. "[3] [3]" → "[3]")
+  result = result.replace(
+    /\[(\d+(?:,\d+)*)\]\s*\[(\d+(?:,\d+)*)\]/g,
+    (fullMatch, first: string, second: string) => {
+      const firstSet = new Set(first.split(',').map(Number));
+      const secondNums = second.split(',').map(Number);
+      if (secondNums.every((n) => firstSet.has(n))) {
+        return `[${first}]`;
+      }
+      return fullMatch;
+    }
+  );
+
   // Clean up orphaned double spaces left by removed citations
   result = result.replace(/  +/g, ' ');
 
