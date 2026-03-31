@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
         take: 1,
         select: {
           podcastId: true,
-          podcast: { select: { status: true, title: true } },
+          podcast: { select: { status: true, title: true, deletedAt: true } },
         },
       },
     },
@@ -79,13 +79,14 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     briefings: briefings.map((b) => {
       const todayLog = b.briefingLogs[0] ?? null;
+      const podcastDeleted = todayLog?.podcast.deletedAt != null;
       return {
         ...b,
         briefingLogs: undefined,
         nextRunAt: b.nextRunAt?.toISOString() ?? null,
         lastGeneratedAt: b.lastGeneratedAt?.toISOString() ?? null,
         createdAt: b.createdAt.toISOString(),
-        todayPodcast: todayLog
+        todayPodcast: todayLog && !podcastDeleted
           ? { id: todayLog.podcastId, status: todayLog.podcast.status, title: todayLog.podcast.title }
           : null,
       };
