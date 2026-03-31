@@ -33,7 +33,6 @@ import { processCreativePlanning } from './creative-planning.worker';
 import { processScriptWriting } from './script-writing.worker';
 import { processCompileScript } from './compile-script.worker';
 import { processScriptGeneration } from './script-generation.worker';
-import { processReferenceValidation } from './reference-validation.worker';
 import { processAudioGeneration } from './audio-generation.worker';
 import { processAudioStitching } from './audio-stitching.worker';
 import { processInteraction } from './interaction.worker';
@@ -41,7 +40,6 @@ import { processSegmentRegeneration } from './segment-regeneration.worker';
 import { processNotification } from './notification.worker';
 import { processPdfGeneration } from './pdf-generation.worker';
 import { processTwitterMentions } from './twitter-mentions.worker';
-import { processScriptVerification } from './script-verification.worker';
 import { processTwitterReply } from './twitter-reply.worker';
 import { processEventIngestion } from './event-ingestion.worker';
 import { processFeatureComputation } from './feature-computation.worker';
@@ -138,8 +136,6 @@ const workers = [
   shouldRun('script-writing') && createWorker('script-writing', processScriptWriting, { concurrency: 2, lockDuration: 300000 }),
   shouldRun('compile-script') && createWorker('compile-script', processCompileScript, { concurrency: 2 }),
   shouldRun('script-generation') && createWorker('script-generation', processScriptGeneration, { concurrency: 2, lockDuration: 300000 }),
-  shouldRun('script-verification') && createWorker('script-verification', processScriptVerification, { concurrency: 2, lockDuration: 300000 }),
-  shouldRun('reference-validation') && createWorker('reference-validation', processReferenceValidation, { concurrency: 2, lockDuration: 300000 }),
   shouldRun('audio-generation') && createWorker('audio-generation', processAudioGeneration, { concurrency: 15 }),
   shouldRun('audio-stitching') && createWorker('audio-stitching', processAudioStitching, { concurrency: 1 }),
   shouldRun('interactions') && createWorker('interactions', processInteraction, { concurrency: 3 }),

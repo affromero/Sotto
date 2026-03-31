@@ -106,12 +106,10 @@ const mockAddJob = vi.fn().mockResolvedValue({ id: 'job-1' });
 vi.mock('@/lib/queue', () => ({
   addJob: (...args: unknown[]) => mockAddJob(...args),
   JobType: {
-    VERIFY_SCRIPT: 'verify_script',
-    VALIDATE_REFERENCES: 'validate_references',
+    COMPILE_SCRIPT: 'compile_script',
     GENERATE_AUDIO: 'generate_audio',
   },
-  scriptVerificationQueue: { name: 'script-verification' },
-  referenceValidationQueue: { name: 'reference-validation' },
+  compileScriptQueue: { name: 'compile-script' },
   audioGenerationQueue: { name: 'audio-generation' },
 }));
 
@@ -250,18 +248,16 @@ describe('processScriptGeneration', () => {
       expect(mockPrismaScriptCreate).not.toHaveBeenCalled();
       expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
         where: { id: 'podcast-001' },
-        data: { status: 'VERIFYING_SCRIPT' },
+        data: { status: 'COMPILING' },
       });
       expect(mockAddJob).toHaveBeenCalledWith(
-        { name: 'script-verification' },
-        'verify_script',
+        { name: 'compile-script' },
+        'compile_script',
         {
           podcastId: 'podcast-001',
           userId: 'user-001',
-          discoveryId: 'discovery-001',
-          useAdminCredits: undefined,
         },
-        { jobId: 'verify-podcast-001-1' }
+        { jobId: expect.stringMatching(/^compile-podcast-001-/) }
       );
     });
 
@@ -598,8 +594,8 @@ describe('processScriptGeneration', () => {
     });
   });
 
-  describe('pipeline routing: always routes to script verification', () => {
-    it('updates podcast status to VERIFYING_SCRIPT with references', async () => {
+  describe('pipeline routing: always routes to compile', () => {
+    it('updates podcast status to COMPILING with references', async () => {
       mockGenerateScript.mockResolvedValue({
         turns: [{ speaker: 'HOST', text: 'With refs [1]' }],
         soundCues: [],
@@ -626,11 +622,11 @@ describe('processScriptGeneration', () => {
 
       expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
         where: { id: 'podcast-001' },
-        data: expect.objectContaining({ status: 'VERIFYING_SCRIPT' }),
+        data: expect.objectContaining({ status: 'COMPILING' }),
       });
     });
 
-    it('queues script verification job with references', async () => {
+    it('queues compile job with references', async () => {
       mockGenerateScript.mockResolvedValue({
         turns: [{ speaker: 'HOST', text: 'With refs [1]' }],
         soundCues: [],
@@ -655,15 +651,15 @@ describe('processScriptGeneration', () => {
       const job = createMockJob(defaultPayload);
       await processScriptGeneration(job);
 
-      expect(mockAddJob).toHaveBeenCalledWith({ name: 'script-verification' }, 'verify_script', {
-        podcastId: 'podcast-001',
-        userId: 'user-001',
-        discoveryId: 'discovery-001',
-        useAdminCredits: undefined,
-      }, { jobId: 'verify-podcast-001-1' });
+      expect(mockAddJob).toHaveBeenCalledWith(
+        { name: 'compile-script' },
+        'compile_script',
+        { podcastId: 'podcast-001', userId: 'user-001' },
+        { jobId: expect.stringMatching(/^compile-podcast-001-/) }
+      );
     });
 
-    it('updates podcast status to VERIFYING_SCRIPT without references', async () => {
+    it('updates podcast status to COMPILING without references', async () => {
       mockGenerateScript.mockResolvedValue({
         turns: [
           { speaker: 'HOST', text: 'First turn' },
@@ -682,11 +678,11 @@ describe('processScriptGeneration', () => {
 
       expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
         where: { id: 'podcast-001' },
-        data: expect.objectContaining({ status: 'VERIFYING_SCRIPT' }),
+        data: expect.objectContaining({ status: 'COMPILING' }),
       });
     });
 
-    it('queues script verification job without references', async () => {
+    it('queues compile job without references', async () => {
       mockGenerateScript.mockResolvedValue({
         turns: [
           { speaker: 'HOST', text: 'First turn' },
@@ -703,12 +699,12 @@ describe('processScriptGeneration', () => {
       const job = createMockJob(defaultPayload);
       await processScriptGeneration(job);
 
-      expect(mockAddJob).toHaveBeenCalledWith({ name: 'script-verification' }, 'verify_script', {
-        podcastId: 'podcast-001',
-        userId: 'user-001',
-        discoveryId: 'discovery-001',
-        useAdminCredits: undefined,
-      }, { jobId: 'verify-podcast-001-1' });
+      expect(mockAddJob).toHaveBeenCalledWith(
+        { name: 'compile-script' },
+        'compile_script',
+        { podcastId: 'podcast-001', userId: 'user-001' },
+        { jobId: expect.stringMatching(/^compile-podcast-001-/) }
+      );
     });
 
   });
@@ -944,18 +940,18 @@ describe('processScriptGeneration', () => {
         ]),
       });
 
-      // Status updated to VERIFYING_SCRIPT
+      // Status updated to COMPILING
       expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
         where: { id: 'podcast-001' },
-        data: expect.objectContaining({ status: 'VERIFYING_SCRIPT' }),
+        data: expect.objectContaining({ status: 'COMPILING' }),
       });
 
-      // Script verification job queued
+      // Compile job queued
       expect(mockAddJob).toHaveBeenCalledWith(
-        { name: 'script-verification' },
-        'verify_script',
+        { name: 'compile-script' },
+        'compile_script',
         expect.objectContaining({ podcastId: 'podcast-001' }),
-        { jobId: 'verify-podcast-001-1' }
+        { jobId: expect.stringMatching(/^compile-podcast-001-/) }
       );
 
       // Usage logged
@@ -1000,18 +996,18 @@ describe('processScriptGeneration', () => {
       // No references saved
       expect(mockPrismaReferenceCreateMany).not.toHaveBeenCalled();
 
-      // Script verification job queued
+      // Compile job queued
       expect(mockAddJob).toHaveBeenCalledWith(
-        { name: 'script-verification' },
-        'verify_script',
+        { name: 'compile-script' },
+        'compile_script',
         expect.objectContaining({ podcastId: 'podcast-001' }),
-        { jobId: 'verify-podcast-001-1' }
+        { jobId: expect.stringMatching(/^compile-podcast-001-/) }
       );
 
-      // Status updated to VERIFYING_SCRIPT
+      // Status updated to COMPILING
       expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
         where: { id: 'podcast-001' },
-        data: expect.objectContaining({ status: 'VERIFYING_SCRIPT' }),
+        data: expect.objectContaining({ status: 'COMPILING' }),
       });
 
       // Usage logged

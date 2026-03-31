@@ -12,8 +12,8 @@ vi.mock('@/lib/redis', () => ({
   },
   getPodcastCacheTtl: vi.fn((status: string) => {
     const active = new Set([
-      'EXTRACTING', 'DISCOVERING', 'SCRIPTING', 'VERIFYING_SCRIPT',
-      'VALIDATING_REFERENCES', 'GENERATING_AUDIO', 'STITCHING',
+      'EXTRACTING', 'DISCOVERING', 'SCRIPTING', 'RESEARCHING',
+      'PLANNING', 'COMPILING', 'GENERATING_AUDIO', 'STITCHING',
     ]);
     return active.has(status) ? 2 : 30;
   }),
