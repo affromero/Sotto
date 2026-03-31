@@ -40,8 +40,8 @@ function extractFirstJsonObject(text: string): string {
   throw new Error('Unbalanced JSON object in response');
 }
 
-/** Token budget for verification output — must accommodate 30+ claims with detailed notes. */
-const VERIFICATION_MAX_TOKENS = 65536;
+/** Token budget for verification output. Typical output is ~3-5K tokens (30 claims × ~100 tokens each + feedback). */
+const VERIFICATION_MAX_TOKENS = 8192;
 
 const PARSE_FAILURE_FEEDBACK = 'PARSE_ERROR: Script verification failed: could not parse AI response. Will retry.';
 
@@ -542,7 +542,7 @@ Analyze ONLY the changed turns listed in the system instructions. Return JSON on
       maxTokens: VERIFICATION_MAX_TOKENS,
       apiKeyOverride: params.apiKeyOverride,
       model: params.model,
-      useWebSearch: true,
+      useWebSearch: false,
       skipModeration: true,
       jsonSchema: VERIFICATION_JSON_SCHEMA,
     });
@@ -639,7 +639,7 @@ Analyze every factual claim. Return JSON only.`;
     maxTokens: VERIFICATION_MAX_TOKENS,
     apiKeyOverride: params.apiKeyOverride,
     model: params.model,
-    useWebSearch: true,
+    useWebSearch: false,
     skipModeration: true,
     jsonSchema: VERIFICATION_JSON_SCHEMA,
   });
