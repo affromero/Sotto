@@ -137,7 +137,7 @@ const workers = [
   shouldRun('compile-script') && createWorker('compile-script', processCompileScript, { concurrency: 2 }),
   shouldRun('script-generation') && createWorker('script-generation', processScriptGeneration, { concurrency: 2, lockDuration: 300000 }),
   shouldRun('audio-generation') && createWorker('audio-generation', processAudioGeneration, { concurrency: 15 }),
-  shouldRun('audio-stitching') && createWorker('audio-stitching', processAudioStitching, { concurrency: 1 }),
+  shouldRun('audio-stitching') && createWorker('audio-stitching', processAudioStitching, { concurrency: 1, lockDuration: 120000 }),
   shouldRun('interactions') && createWorker('interactions', processInteraction, { concurrency: 3 }),
   shouldRun('segment-regeneration') && createWorker('segment-regeneration', processSegmentRegeneration, { concurrency: 2 }),
   shouldRun('notifications') && createWorker('notifications', processNotification, { concurrency: 5 }),

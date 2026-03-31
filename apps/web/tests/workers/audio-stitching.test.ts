@@ -25,6 +25,7 @@ const mockPrismaTwitterAutoTweetFindFirst = vi.fn().mockResolvedValue(null);
 const mockPrismaDiscoveryFindUnique = vi.fn().mockResolvedValue({ durationTarget: 5 });
 const mockPrismaPipelineEventCreate = vi.fn().mockResolvedValue({});
 const mockPrismaUserFindUniqueOrThrow = vi.fn().mockResolvedValue({ role: 'USER', plan: 'FREE' });
+const mockPrismaNotificationFindFirst = vi.fn().mockResolvedValue(null);
 
 vi.mock('@/lib/prisma', () => {
   const _mockPrisma = {
@@ -65,6 +66,9 @@ vi.mock('@/lib/prisma', () => {
     },
     audioFingerprint: {
       upsert: vi.fn().mockResolvedValue({}),
+    },
+    notification: {
+      findFirst: (...args: unknown[]) => mockPrismaNotificationFindFirst(...args),
     },
   };
   return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
