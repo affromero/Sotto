@@ -532,11 +532,14 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
     }
 
     if (detectedStarts.length === 0 || detectedStarts.length !== freshSegments.length) {
-      // Fallback: cumulative durations
+      // Fallback: cumulative durations adjusted for crossfade overlap.
+      // acrossfade=d=0.3 overlaps each pair of adjacent segments by 300ms,
+      // so each segment starts 0.3s earlier than naive cumulative sum.
+      const crossfadeSec = 0.3; // must match crossfadeMs: 300 in stitchWithEffectsAndMusic call
       let cum = 0;
       detectedStarts = freshSegments.map((seg) => {
         const t = cum;
-        cum += seg.duration ?? 0;
+        cum += (seg.duration ?? 0) - crossfadeSec;
         return t;
       });
     }

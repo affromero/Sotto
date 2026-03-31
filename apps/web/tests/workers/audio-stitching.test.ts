@@ -546,7 +546,7 @@ describe('processAudioStitching', () => {
   });
 
   describe('segment start times', () => {
-    it('updates each segment with cumulative start time', async () => {
+    it('updates each segment with crossfade-adjusted cumulative start time', async () => {
       // Reset and mock initial fetch
       mockPrismaSegmentFindMany.mockReset().mockResolvedValueOnce([
         { id: 'seg-1', audioUrl: 'https://r2.example.com/seg-1.mp3', order: 0, duration: 100 },
@@ -563,17 +563,19 @@ describe('processAudioStitching', () => {
       const job = createMockJob(defaultPayload);
       await processAudioStitching(job);
 
+      // Each segment start is shifted earlier by 0.3s per crossfade overlap:
+      // seg-1: 0, seg-2: 100 - 0.3 = 99.7, seg-3: 99.7 + (150 - 0.3) = 249.4
       expect(mockPrismaSegmentUpdate).toHaveBeenCalledWith({
         where: { id: 'seg-1' },
         data: { startTime: 0 },
       });
       expect(mockPrismaSegmentUpdate).toHaveBeenCalledWith({
         where: { id: 'seg-2' },
-        data: { startTime: 100 },
+        data: { startTime: expect.closeTo(99.7, 1) },
       });
       expect(mockPrismaSegmentUpdate).toHaveBeenCalledWith({
         where: { id: 'seg-3' },
-        data: { startTime: 250 },
+        data: { startTime: expect.closeTo(249.4, 1) },
       });
     });
 
@@ -594,9 +596,12 @@ describe('processAudioStitching', () => {
       const job = createMockJob(defaultPayload);
       await processAudioStitching(job);
 
+      // seg-1: 0, cum = 100 - 0.3 = 99.7
+      // seg-2: 99.7, cum = 99.7 + (0 - 0.3) = 99.4  (null treated as 0)
+      // seg-3: 99.4
       expect(mockPrismaSegmentUpdate).toHaveBeenCalledWith({
         where: { id: 'seg-3' },
-        data: { startTime: 100 }, // 100 + 0 (null treated as 0)
+        data: { startTime: expect.closeTo(99.4, 1) },
       });
     });
   });
