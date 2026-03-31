@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Minus, Plus } from 'lucide-react';
 import { parseTextWithCitations } from '@/lib/citation-parser';
-import { parseTextWithVocabulary } from '@/lib/vocabulary-parser';
+import { parseTextWithVocabulary, parseTextWithCitationsAndVocabulary } from '@/lib/vocabulary-parser';
 import { useScrollFollow, isScrollable } from '@/lib/hooks/useScrollFollow';
 import { getSpeakerIndex, getUniqueSpeakers } from '@/lib/speaker-colors';
 import { SegmentQuestionBadge } from '@/components/player/SegmentQuestionBadge';
@@ -113,11 +113,13 @@ export function TranscriptPanel({
                 {qCount > 0 && <SegmentQuestionBadge count={qCount} />}
               </span>
               <div className={styles.text}>
-                {hasRefs
-                  ? parseTextWithCitations(segment.text, references)
-                  : hasVocab
-                    ? parseTextWithVocabulary(segment.text, vocabularyEntries)
-                    : segment.text}
+                {hasRefs && hasVocab
+                  ? parseTextWithCitationsAndVocabulary(segment.text, references, vocabularyEntries)
+                  : hasRefs
+                    ? parseTextWithCitations(segment.text, references)
+                    : hasVocab
+                      ? parseTextWithVocabulary(segment.text, vocabularyEntries)
+                      : segment.text}
               </div>
               {podcastId && (
                 <ClaimFlagButton

@@ -3,16 +3,19 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Minus, Plus } from 'lucide-react';
 import { parseTextWithCitations } from '@/lib/citation-parser';
+import { parseTextWithVocabulary, parseTextWithCitationsAndVocabulary } from '@/lib/vocabulary-parser';
 import { findActiveIndex } from '@/lib/segment-utils';
 import { getSpeakerIndex, getUniqueSpeakers } from '@/lib/speaker-colors';
 import { STAGE_DIRECTION_PATTERN } from '@/lib/tts-text-cleaner';
 import type { SegmentData } from '@/types/podcast';
 import type { ReferenceData } from '@/types/reference';
+import type { VocabularyEntryData } from '@/types/vocabulary';
 import styles from './Teleprompter.module.css';
 
 interface TeleprompterProps {
   segments: SegmentData[];
   references: ReferenceData[];
+  vocabularyEntries?: VocabularyEntryData[];
   currentTime: number;
   onSegmentClick?: (startTime: number) => void;
 }
@@ -21,6 +24,7 @@ function SegmentBlock({
   segment,
   speakers,
   references,
+  vocabularyEntries = [],
   className,
   onClick,
   innerRef,
@@ -28,11 +32,24 @@ function SegmentBlock({
   segment: SegmentData;
   speakers: string[];
   references: ReferenceData[];
+  vocabularyEntries?: VocabularyEntryData[];
   className: string;
   onClick?: () => void;
   innerRef?: React.RefObject<HTMLDivElement | null>;
 }) {
   const idx = getSpeakerIndex(segment.speaker, speakers);
+  const cleanedText = segment.text.replace(STAGE_DIRECTION_PATTERN, '').replace(/\s{2,}/g, ' ').trim();
+  const hasRefs = references.length > 0;
+  const hasVocab = vocabularyEntries.length > 0;
+
+  const parsed = hasRefs && hasVocab
+    ? parseTextWithCitationsAndVocabulary(cleanedText, references, vocabularyEntries)
+    : hasRefs
+      ? parseTextWithCitations(cleanedText, references)
+      : hasVocab
+        ? parseTextWithVocabulary(cleanedText, vocabularyEntries)
+        : cleanedText;
+
   return (
     <div
       ref={innerRef}
@@ -46,7 +63,7 @@ function SegmentBlock({
         {segment.speaker}
       </span>
       <p className={styles.text}>
-        {parseTextWithCitations(segment.text.replace(STAGE_DIRECTION_PATTERN, '').replace(/\s{2,}/g, ' ').trim(), references)}
+        {parsed}
       </p>
     </div>
   );
@@ -55,6 +72,7 @@ function SegmentBlock({
 export function Teleprompter({
   segments,
   references,
+  vocabularyEntries = [],
   currentTime,
   onSegmentClick,
 }: TeleprompterProps) {
@@ -110,6 +128,7 @@ export function Teleprompter({
             segment={prevSegment}
             speakers={speakers}
             references={references}
+            vocabularyEntries={vocabularyEntries}
             className={`${styles.segment} ${styles.prev}`}
             onClick={() => handleClick(prevSegment.startTime)}
           />
@@ -120,6 +139,7 @@ export function Teleprompter({
             segment={currentSegment}
             speakers={speakers}
             references={references}
+            vocabularyEntries={vocabularyEntries}
             className={`${styles.segment} ${styles.active}`}
             onClick={() => handleClick(currentSegment.startTime)}
           />
@@ -130,6 +150,7 @@ export function Teleprompter({
             segment={nextSegment}
             speakers={speakers}
             references={references}
+            vocabularyEntries={vocabularyEntries}
             className={`${styles.segment} ${styles.next}`}
             onClick={() => handleClick(nextSegment.startTime)}
           />

@@ -403,8 +403,8 @@ function buildLanguageInstruction(lang: string | null | undefined, mode: string 
 
 This is a LANGUAGE LEARNING podcast. Speak primarily in English (~90%).
 - Introduce 8-12 high-frequency, everyday ${langName} words and phrases naturally in conversation
-- Mark each new vocabulary word with [V{N}] notation (e.g., [V1], [V2]) — place the marker AFTER the word
-- Use the ANTICIPATION technique: "How would you say 'good morning' in ${langName}?" [pause] "That's right — Guten Morgen! [V1]"
+- Wrap each vocabulary word with [V{N}:word] notation (e.g., [V1:Guten Morgen], [V2:sprechen]). The word inside the marker is the exact target-language text that should be highlighted.
+- Use the ANTICIPATION technique: "How would you say 'good morning' in ${langName}?" [pause] "That's right — [V1:Guten Morgen]!"
 - Explain meaning, pronunciation guide, and use each word in a short example sentence
 - Revisit key words 2-3 times later in the episode for graduated interval recall
 - Prioritize functional words: greetings, numbers, common verbs, polite phrases
@@ -414,7 +414,7 @@ This is a LANGUAGE LEARNING podcast. Speak primarily in English (~90%).
 
 This is a LANGUAGE LEARNING podcast. Mix ${langName} and English (~40% English / ~60% ${langName}).
 - Use ${langName} for full sentences and dialogue; English for explanations and transitions
-- Mark 10-15 vocabulary words with [V{N}] notation — place the marker AFTER the word
+- Wrap 10-15 vocabulary words with [V{N}:word] notation (e.g., [V1:Guten Morgen], [V2:sprechen]). The word inside the marker is the exact target-language text that should be highlighted.
 - Use anticipation prompts for new words before revealing them
 - Include brief inline translations when introducing new words
 - Build on vocabulary from previous episodes (spaced repetition)
@@ -424,7 +424,7 @@ This is a LANGUAGE LEARNING podcast. Mix ${langName} and English (~40% English /
     full_immersion: `## Language: ${langName} — Full Immersion Mode
 
 This is a LANGUAGE LEARNING podcast. Generate the ENTIRE script in ${langName} (~95%).
-- Mark 5-8 advanced or nuanced vocabulary items with [V{N}] notation — place the marker AFTER the word
+- Wrap 5-8 advanced or nuanced vocabulary items with [V{N}:word] notation (e.g., [V1:Guten Morgen], [V2:sprechen]). The word inside the marker is the exact target-language text that should be highlighted.
 - Speak naturally at near-native pace
 - Only use English for terms with no direct translation
 - Assume the listener knows basics from prior episodes
@@ -445,7 +445,7 @@ In addition to references, you MUST include a "vocabulary" array in your JSON ou
 \`\`\`
 
 Rules:
-- Each [V{N}] marker in the script MUST have a corresponding vocabulary entry
+- Each [V{N}:word] marker in the script MUST have a corresponding vocabulary entry
 - "word" is the ${langName} word/phrase
 - "translation" is the English translation
 - "pronunciation" is a phonetic guide using English approximation (e.g., "SHPREE-chen")
@@ -785,12 +785,17 @@ CRITICAL RULES:
 
   const repairSection = params.repairMode ? `\n${REPAIR_INSTRUCTIONS[params.repairMode]}\n` : '';
 
+  const revisionLangInstr = buildLanguageInstruction(params.targetLanguage, params.languageMode);
+  const languageSection = revisionLangInstr.languageInstruction
+    ? `\n${revisionLangInstr.languageInstruction}\n\n${revisionLangInstr.vocabularyInstruction}\n`
+    : '';
+
   const userMessage = `Topic: ${params.topic}
 Depth: ${params.depth}
 
 ## FACT-CHECKER FEEDBACK:
 ${params.verificationFeedback}
-${repairSection}${groundedSection}${bannedRefsSection}
+${repairSection}${groundedSection}${bannedRefsSection}${languageSection}
 ## PREVIOUS SCRIPT (to revise):
 ${previousScriptText}
 
