@@ -31,6 +31,7 @@ export const HEAVY_WORKERS = new Set([
 export const PIPELINE_WORKERS = new Set([
   'content-extraction',
   'deep-research',
+  'creative-planning',
   'script-generation',
   'script-verification',
   'reference-validation',
