@@ -586,7 +586,7 @@ describe('processScriptVerification', () => {
     });
   });
 
-  describe('verification fail — revision loop (attempt < 3)', () => {
+  describe('verification fail — revision loop (attempt < 4)', () => {
     beforeEach(() => {
       mockVerifyScript.mockResolvedValue(failedVerdict);
       mockPrismaScriptFindUniqueOrThrow.mockResolvedValue({ ...defaultScript, verificationAttempts: 0 });
@@ -723,19 +723,19 @@ describe('processScriptVerification', () => {
     });
   });
 
-  describe('verification fail — max attempts reached (attempt 3)', () => {
+  describe('verification fail — max attempts reached (attempt 4)', () => {
     beforeEach(() => {
       mockVerifyScript.mockResolvedValue(failedVerdict);
-      mockPrismaScriptFindUniqueOrThrow.mockResolvedValue({ ...defaultScript, verificationAttempts: 2 });
+      mockPrismaScriptFindUniqueOrThrow.mockResolvedValue({ ...defaultScript, verificationAttempts: 3 });
     });
 
-    it('marks podcast failed after 3 attempts', async () => {
+    it('marks podcast failed after 4 attempts', async () => {
       const job = createMockJob(defaultPayload);
       await processScriptVerification(job);
 
       expect(mockMarkPodcastFailed).toHaveBeenCalledWith('podcast-001', {
         failureReason: "Our fact-checker found issues that couldn't be resolved after 3 attempts. Please try again with a different topic or approach.",
-        technicalError: expect.stringContaining('Verification failed 3/3'),
+        technicalError: expect.stringContaining('Verification failed 4/4'),
       });
     });
 
@@ -746,7 +746,7 @@ describe('processScriptVerification', () => {
       expect(mockPrismaScriptUpdate).toHaveBeenCalledWith({
         where: { podcastId: 'podcast-001' },
         data: {
-          verificationAttempts: 3,
+          verificationAttempts: 4,
           verificationFeedback: failedVerdict.feedback,
         },
       });
@@ -772,9 +772,9 @@ describe('processScriptVerification', () => {
           podcastId: 'podcast-001',
           stage: 'script-verification',
           type: 'error',
-          message: expect.stringContaining('Verification failed after 3 attempts'),
+          message: expect.stringContaining('Verification failed after 4 attempts'),
           metadata: expect.objectContaining({
-            attemptNumber: 3,
+            attemptNumber: 4,
             score: failedVerdict.score,
           }),
         }),
@@ -934,7 +934,7 @@ describe('processScriptVerification', () => {
       await processScriptVerification(job);
 
       // Consecutive parse error → falls through to revision loop (not parse retry)
-      // The script should be regenerated since attemptNumber (1) < MAX_VERIFICATION_ATTEMPTS (3)
+      // The script should be regenerated since attemptNumber (1) < MAX_VERIFICATION_ATTEMPTS (4)
       expect(mockGenerateScriptWithFeedback).toHaveBeenCalled();
     });
 
@@ -942,7 +942,7 @@ describe('processScriptVerification', () => {
       mockVerifyScript.mockResolvedValue(parseErrorVerdict);
       mockPrismaScriptFindUniqueOrThrow.mockResolvedValue({
         ...defaultScript,
-        verificationAttempts: 2,
+        verificationAttempts: 3,
         verificationFeedback: 'PARSE_ERROR: previous parse failure',
       });
 
@@ -951,7 +951,7 @@ describe('processScriptVerification', () => {
 
       expect(mockMarkPodcastFailed).toHaveBeenCalledWith('podcast-001', {
         failureReason: 'We encountered a temporary processing issue while fact-checking your podcast. Please try generating again.',
-        technicalError: expect.stringContaining('Verification failed 3/3'),
+        technicalError: expect.stringContaining('Verification failed 4/4'),
       });
 
       expect(mockAddJob).toHaveBeenCalledWith(

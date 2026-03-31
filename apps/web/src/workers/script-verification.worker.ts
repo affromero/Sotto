@@ -33,7 +33,7 @@ import { getTierFeatures } from '@/lib/tier-features';
 import { logger } from '@/lib/logger';
 import { logPipelineStageComplete } from '@/lib/pipeline-events';
 
-const MAX_VERIFICATION_ATTEMPTS = 3;
+const MAX_VERIFICATION_ATTEMPTS = 4;
 
 /** Each attempt uses a progressively more aggressive repair strategy. */
 type RepairMode = 'replace_sources' | 'rewrite_to_sources' | 'drop_unverifiable';
