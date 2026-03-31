@@ -146,19 +146,20 @@ export async function processVoiceTrackStitching(job: Job<StitchVoiceTrackPayloa
 
     await job.updateProgress(90);
 
-    // 8. Compute per-segment startTimes
+    // 8. Compute per-segment startTimes (adjusted for crossfade overlap)
     const freshSegments = await prisma.voiceTrackSegment.findMany({
       where: { id: { in: voiceTrackSegmentIds } },
       orderBy: { order: 'asc' },
       select: { id: true, duration: true },
     });
+    const vtCrossfadeSec = 0.3; // must match crossfadeMs: 300 in stitchWithEffects call
     let cumulativeTime = 0;
     for (const seg of freshSegments) {
       await prisma.voiceTrackSegment.update({
         where: { id: seg.id },
         data: { startTime: cumulativeTime },
       });
-      cumulativeTime += seg.duration ?? 0;
+      cumulativeTime += (seg.duration ?? 0) - vtCrossfadeSec;
     }
 
     // 9. Update voice track record
