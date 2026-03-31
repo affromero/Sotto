@@ -457,6 +457,7 @@ model Podcast {
   landingShowcase     LandingShowcase?
   researchDossier     ResearchDossier?
   creativeOutline     CreativeOutline?
+  vocabularyEntries   VocabularyEntry[]
 
   @@unique([userId, slug])
   @@index([userId])
@@ -1671,6 +1672,24 @@ model Reference {
   @@index([podcastId])
 }
 
+model VocabularyEntry {
+  id              String   @id @default(cuid())
+  podcastId       String
+  number          Int      // [V1], [V2] marker index, 1-based
+  word            String   // target language word/phrase
+  translation     String   // native language translation
+  partOfSpeech    String?  // noun, verb, adjective, etc.
+  pronunciation   String?  // phonetic guide (e.g. "SHPREE-chen")
+  exampleSentence String?  @db.Text // usage in context
+  difficulty      String?  // beginner, intermediate, advanced
+  createdAt       DateTime @default(now())
+
+  podcast Podcast @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+
+  @@unique([podcastId, number])
+  @@index([podcastId])
+}
+
 enum ReferenceType {
   WEB
   PAPER
@@ -2654,12 +2673,14 @@ model UserBriefing {
   nextRunAt DateTime? // pre-computed next eligible run time
 
   // Content
-  prompt        String? @db.Text
-  depth         String? // eli5, quick_overview, standard, deep_dive
-  tone          String? // casual, professional, socratic, etc.
-  audienceLevel String? // beginner, intermediate, expert
-  duration      Int?    // target minutes 1-40
-  format        Int     @default(2) // 1=Solo 2=Dialogue 3=Panel 4=Roundtable
+  prompt         String? @db.Text
+  depth          String? // eli5, quick_overview, standard, deep_dive
+  tone           String? // casual, professional, socratic, etc.
+  audienceLevel  String? // beginner, intermediate, expert
+  duration       Int?    // target minutes 1-40
+  format         Int     @default(2) // 1=Solo 2=Dialogue 3=Panel 4=Roundtable
+  targetLanguage String? // ISO 639-1 code (e.g. "de") — null = English
+  languageMode   String? // vocabulary_intro | conversational_mix | full_immersion
 
   // Audio
   aiModel       String?
