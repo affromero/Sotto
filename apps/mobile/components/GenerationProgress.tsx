@@ -22,9 +22,10 @@ interface GenerationProgressProps {
 
 const STEPS = [
   { key: 'EXTRACTING', label: 'Extracting content...' },
+  { key: 'RESEARCHING', label: 'Researching the topic...' },
+  { key: 'PLANNING', label: 'Planning the narrative...' },
   { key: 'SCRIPTING', label: 'Writing script...' },
-  { key: 'VERIFYING_SCRIPT', label: 'Fact-checking claims...' },
-  { key: 'VALIDATING_REFERENCES', label: 'Validating sources...' },
+  { key: 'COMPILING', label: 'Verifying citations...' },
   { key: 'SCRIPT_READY', label: 'Script ready' },
   { key: 'GENERATING_AUDIO', label: 'Generating audio...' },
   { key: 'STITCHING', label: 'Assembling podcast...' },

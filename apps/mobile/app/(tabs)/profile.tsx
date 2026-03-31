@@ -44,9 +44,10 @@ function StatusBadge({ status }: { status: string }) {
     status === 'PENDING' ||
     status === 'DISCOVERING' ||
     status === 'EXTRACTING' ||
+    status === 'RESEARCHING' ||
+    status === 'PLANNING' ||
     status === 'SCRIPTING' ||
-    status === 'VERIFYING_SCRIPT' ||
-    status === 'VALIDATING_REFERENCES' ||
+    status === 'COMPILING' ||
     status === 'SCRIPT_READY' ||
     status === 'GENERATING_AUDIO' ||
     status === 'STITCHING';
