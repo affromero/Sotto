@@ -55,15 +55,22 @@ export async function POST(
     return errorResponse('No fresh articles available. Try again later.', 422);
   }
 
-  // Idempotency: check if already generated today for this briefing
+  // Idempotency: return existing podcast if it's still processing or ready
   const today = new Date().toISOString().slice(0, 10);
   const existing = await prisma.briefingLog.findUnique({
     where: { userBriefingId_scheduledDate: { userBriefingId: id, scheduledDate: today } },
-    select: { podcastId: true },
+    select: { podcastId: true, podcast: { select: { status: true } } },
   });
 
-  if (existing) {
+  if (existing && existing.podcast.status !== 'FAILED') {
     return NextResponse.json({ podcastId: existing.podcastId, alreadyGenerated: true });
+  }
+
+  // If previous attempt failed, delete the old log so a new one can be created
+  if (existing) {
+    await prisma.briefingLog.delete({
+      where: { userBriefingId_scheduledDate: { userBriefingId: id, scheduledDate: today } },
+    });
   }
 
   try {
