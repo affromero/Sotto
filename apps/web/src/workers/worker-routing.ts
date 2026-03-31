@@ -33,6 +33,7 @@ export const PIPELINE_WORKERS = new Set([
   'deep-research',
   'creative-planning',
   'script-writing',
+  'compile-script',
   'script-generation',
   'script-verification',
   'reference-validation',
