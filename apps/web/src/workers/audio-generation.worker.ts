@@ -53,7 +53,7 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
       await addJob(audioStitchingQueue, JobType.STITCH_AUDIO, {
         podcastId,
         segmentIds: segments.map((s) => s.id),
-      }, { jobId: `stitch-${podcastId}` });
+      }, { jobId: `stitch-${podcastId}-${Date.now()}` });
 
       // CAS status transition — only one worker wins
       const cas = await prisma.podcast.updateMany({
@@ -261,7 +261,7 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
     await addJob(audioStitchingQueue, JobType.STITCH_AUDIO, {
       podcastId,
       segmentIds: segments.map((s) => s.id),
-    }, { jobId: `stitch-${podcastId}` });
+    }, { jobId: `stitch-${podcastId}-${Date.now()}` });
 
     // CAS status transition — only one worker wins
     const cas = await prisma.podcast.updateMany({
