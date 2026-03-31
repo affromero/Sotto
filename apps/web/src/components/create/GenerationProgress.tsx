@@ -7,7 +7,7 @@ import { SottoSpinner } from '@/components/ui/SottoSpinner';
 import type { VerificationProgressSnapshot } from '@/types/podcast';
 import styles from './GenerationProgress.module.css';
 
-const VERIFICATION_STAGES = new Set(['VERIFYING_SCRIPT', 'VALIDATING_REFERENCES']);
+const COMPILE_STAGES = new Set(['COMPILING']);
 
 interface GenerationProgressProps {
   status: string;
@@ -19,9 +19,10 @@ interface GenerationProgressProps {
 
 const PIPELINE_STEPS = [
   { key: 'EXTRACTING', label: 'Reading your source material' },
+  { key: 'RESEARCHING', label: 'Researching the topic' },
+  { key: 'PLANNING', label: 'Planning the narrative' },
   { key: 'SCRIPTING', label: 'Writing your podcast script' },
-  { key: 'VERIFYING_SCRIPT', label: 'Fact-checking the content' },
-  { key: 'VALIDATING_REFERENCES', label: 'Verifying sources' },
+  { key: 'COMPILING', label: 'Verifying citations' },
   { key: 'SCRIPT_READY', label: 'Your script is ready for review' },
   { key: 'GENERATING_AUDIO', label: 'Recording the voices' },
   { key: 'STITCHING', label: 'Mixing the final audio' },
@@ -74,11 +75,11 @@ export function GenerationProgress({ status, progress, error, topic, verificatio
   });
 
   // Override sub-message and progress with real-time verification data
-  const vpMessage = verificationProgress && status === 'VALIDATING_REFERENCES'
+  const vpMessage = verificationProgress && status === 'COMPILING'
     ? getVerificationMessage(verificationProgress)
     : null;
   const subMessage = vpMessage ?? rotatingMessage;
-  const derivedProgress = verificationProgress && status === 'VALIDATING_REFERENCES' && verificationProgress.total > 0
+  const derivedProgress = verificationProgress && status === 'COMPILING' && verificationProgress.total > 0
     ? Math.round((verificationProgress.checked / verificationProgress.total) * 100)
     : progress;
 
@@ -159,7 +160,7 @@ export function GenerationProgress({ status, progress, error, topic, verificatio
             </span>
           )}
 
-          {isActive && VERIFICATION_STAGES.has(status) && (
+          {isActive && COMPILE_STAGES.has(status) && (
             <a
               href="https://github.com/SottoFM/reference-verification-standard"
               target="_blank"

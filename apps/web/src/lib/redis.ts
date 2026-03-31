@@ -249,8 +249,8 @@ const PODCAST_CACHE_PREFIX = 'podcast:public:';
 const PODCAST_CHANNEL_PREFIX = 'podcast:status:';
 
 const ACTIVE_STATUSES = new Set([
-  'EXTRACTING', 'DISCOVERING', 'SCRIPTING', 'VERIFYING_SCRIPT',
-  'VALIDATING_REFERENCES', 'GENERATING_AUDIO', 'STITCHING',
+  'EXTRACTING', 'DISCOVERING', 'RESEARCHING', 'PLANNING',
+  'SCRIPTING', 'COMPILING', 'GENERATING_AUDIO', 'STITCHING',
 ]);
 
 export function getPodcastCacheTtl(status: string): number {

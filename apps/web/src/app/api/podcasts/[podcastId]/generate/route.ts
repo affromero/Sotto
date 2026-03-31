@@ -5,9 +5,10 @@ import { requireAdmin } from '@/lib/auth-guards';
 import { errorResponse } from '@/lib/api-response';
 import {
   contentExtractionQueue,
-  scriptGenerationQueue,
-  scriptVerificationQueue,
-  referenceValidationQueue,
+  deepResearchQueue,
+  creativePlanningQueue,
+  scriptWritingQueue,
+  compileScriptQueue,
   audioGenerationQueue,
   audioStitchingQueue,
   audioImportQueue,
@@ -23,9 +24,6 @@ import { resolveSttProvider } from '@/lib/providers/stt';
 import type {
   ExtractContentPayload,
   ImportAudioPayload,
-  GenerateScriptPayload,
-  VerifyScriptPayload,
-  ValidateReferencesPayload,
   GenerateAudioPayload,
   StitchAudioPayload,
 } from '@/lib/queue';
@@ -275,89 +273,111 @@ async function routeResume(
       });
     }
 
-    case 'GENERATE_SCRIPT': {
-      // Delete bad script and refs before regenerating
+    case 'DEEP_RESEARCH': {
+      const discovery = await prisma.discovery.findUniqueOrThrow({
+        where: { podcastId },
+      });
+
+      const casResearch = await prisma.podcast.updateMany({
+        where: { id: podcastId, status: 'FAILED' },
+        data: { status: 'RESEARCHING', failedAtStatus: null, failureReason: null },
+      });
+      if (casResearch.count === 0) {
+        return errorResponse('Podcast is no longer in a resumable state', 409);
+      }
+
+      await addJob(deepResearchQueue, JobType.DEEP_RESEARCH, {
+        podcastId,
+        userId,
+        discoveryId: discovery.id,
+        useAdminCredits: useAdminCredits || undefined,
+      }, { jobId: `research-${podcastId}-${Date.now()}` });
+      return NextResponse.json({
+        success: true,
+        message: 'Generation resumed from deep research',
+        resumedAt: 'DEEP_RESEARCH',
+      });
+    }
+
+    case 'CREATIVE_PLANNING': {
+      const [discovery, dossier] = await Promise.all([
+        prisma.discovery.findUniqueOrThrow({ where: { podcastId } }),
+        prisma.researchDossier.findUniqueOrThrow({ where: { podcastId } }),
+      ]);
+
+      const casPlanning = await prisma.podcast.updateMany({
+        where: { id: podcastId, status: 'FAILED' },
+        data: { status: 'PLANNING', failedAtStatus: null, failureReason: null },
+      });
+      if (casPlanning.count === 0) {
+        return errorResponse('Podcast is no longer in a resumable state', 409);
+      }
+
+      await addJob(creativePlanningQueue, JobType.CREATIVE_PLANNING, {
+        podcastId,
+        userId,
+        discoveryId: discovery.id,
+        dossierId: dossier.id,
+        useAdminCredits: useAdminCredits || undefined,
+      }, { jobId: `plan-${podcastId}-${Date.now()}` });
+      return NextResponse.json({
+        success: true,
+        message: 'Generation resumed from creative planning',
+        resumedAt: 'CREATIVE_PLANNING',
+      });
+    }
+
+    case 'WRITE_SCRIPT': {
+      // Delete stale script and refs before rewriting
       await prisma.reference.deleteMany({ where: { podcastId } });
       await prisma.script.deleteMany({ where: { podcastId } });
 
-      const discovery = await prisma.discovery.findUniqueOrThrow({
-        where: { podcastId },
-      });
+      const [discovery, dossier, outline] = await Promise.all([
+        prisma.discovery.findUniqueOrThrow({ where: { podcastId } }),
+        prisma.researchDossier.findUniqueOrThrow({ where: { podcastId } }),
+        prisma.creativeOutline.findUniqueOrThrow({ where: { podcastId } }),
+      ]);
 
-      const casScript = await prisma.podcast.updateMany({
+      const casWrite = await prisma.podcast.updateMany({
         where: { id: podcastId, status: 'FAILED' },
         data: { status: 'SCRIPTING', failedAtStatus: null, failureReason: null },
       });
-      if (casScript.count === 0) {
+      if (casWrite.count === 0) {
         return errorResponse('Podcast is no longer in a resumable state', 409);
       }
 
-      const payload: GenerateScriptPayload = {
+      await addJob(scriptWritingQueue, JobType.WRITE_SCRIPT, {
         podcastId,
         userId,
         discoveryId: discovery.id,
-        sourceContent: discovery.sourceContent ?? undefined,
+        dossierId: dossier.id,
+        outlineId: outline.id,
         useAdminCredits: useAdminCredits || undefined,
-      };
-
-      await addJob(scriptGenerationQueue, JobType.GENERATE_SCRIPT, payload, { jobId: `script-${podcastId}-${Date.now()}` });
+      }, { jobId: `write-${podcastId}-${Date.now()}` });
       return NextResponse.json({
         success: true,
-        message: 'Generation resumed from script generation',
-        resumedAt: 'GENERATE_SCRIPT',
+        message: 'Generation resumed from script writing',
+        resumedAt: 'WRITE_SCRIPT',
       });
     }
 
-    case 'VERIFY_SCRIPT': {
-      const discovery = await prisma.discovery.findUniqueOrThrow({
-        where: { podcastId },
-      });
-
-      const casVerify = await prisma.podcast.updateMany({
+    case 'COMPILE_SCRIPT': {
+      const casCompile = await prisma.podcast.updateMany({
         where: { id: podcastId, status: 'FAILED' },
-        data: { status: 'VERIFYING_SCRIPT', failedAtStatus: null, failureReason: null },
+        data: { status: 'COMPILING', failedAtStatus: null, failureReason: null },
       });
-      if (casVerify.count === 0) {
+      if (casCompile.count === 0) {
         return errorResponse('Podcast is no longer in a resumable state', 409);
       }
 
-      const payload: VerifyScriptPayload = {
+      await addJob(compileScriptQueue, JobType.COMPILE_SCRIPT, {
         podcastId,
         userId,
-        discoveryId: discovery.id,
-        useAdminCredits: useAdminCredits || undefined,
-      };
-
-      await addJob(scriptVerificationQueue, JobType.VERIFY_SCRIPT, payload, {
-        jobId: `verify-${podcastId}-resume-${Date.now()}`,
-      });
+      }, { jobId: `compile-${podcastId}-${Date.now()}` });
       return NextResponse.json({
         success: true,
-        message: 'Generation resumed from script verification',
-        resumedAt: 'VERIFY_SCRIPT',
-      });
-    }
-
-    case 'VALIDATE_REFERENCES': {
-      const casRefs = await prisma.podcast.updateMany({
-        where: { id: podcastId, status: 'FAILED' },
-        data: { status: 'VALIDATING_REFERENCES', failedAtStatus: null, failureReason: null },
-      });
-      if (casRefs.count === 0) {
-        return errorResponse('Podcast is no longer in a resumable state', 409);
-      }
-
-      const payload: ValidateReferencesPayload = {
-        podcastId,
-        userId,
-        useAdminCredits: useAdminCredits || undefined,
-      };
-
-      await addJob(referenceValidationQueue, JobType.VALIDATE_REFERENCES, payload, { jobId: `validate-${podcastId}-${Date.now()}` });
-      return NextResponse.json({
-        success: true,
-        message: 'Generation resumed from reference validation',
-        resumedAt: 'VALIDATE_REFERENCES',
+        message: 'Generation resumed from script compilation',
+        resumedAt: 'COMPILE_SCRIPT',
       });
     }
 
