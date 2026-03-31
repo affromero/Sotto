@@ -791,7 +791,7 @@ Revise the script addressing ALL user feedback. Keep what works, change what the
  * Shared response parser: JSON extraction, Zod validation, coercion,
  * sound cue defaults, reference dedup, and markdown generation.
  */
-function parseScriptResponse(response: {
+export function parseScriptResponse(response: {
   content: string;
   inputTokens: number;
   outputTokens: number;

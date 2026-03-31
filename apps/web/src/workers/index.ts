@@ -30,6 +30,7 @@ import { closeRedis } from '@/lib/redis';
 import { processContentExtraction } from './content-extraction.worker';
 import { processDeepResearch } from './deep-research.worker';
 import { processCreativePlanning } from './creative-planning.worker';
+import { processScriptWriting } from './script-writing.worker';
 import { processScriptGeneration } from './script-generation.worker';
 import { processReferenceValidation } from './reference-validation.worker';
 import { processAudioGeneration } from './audio-generation.worker';
@@ -133,6 +134,7 @@ const workers = [
   shouldRun('content-extraction') && createWorker('content-extraction', processContentExtraction, { concurrency: 2 }),
   shouldRun('deep-research') && createWorker('deep-research', processDeepResearch, { concurrency: 2, lockDuration: 300000 }),
   shouldRun('creative-planning') && createWorker('creative-planning', processCreativePlanning, { concurrency: 2, lockDuration: 300000 }),
+  shouldRun('script-writing') && createWorker('script-writing', processScriptWriting, { concurrency: 2, lockDuration: 300000 }),
   shouldRun('script-generation') && createWorker('script-generation', processScriptGeneration, { concurrency: 2, lockDuration: 300000 }),
   shouldRun('script-verification') && createWorker('script-verification', processScriptVerification, { concurrency: 2, lockDuration: 300000 }),
   shouldRun('reference-validation') && createWorker('reference-validation', processReferenceValidation, { concurrency: 2, lockDuration: 300000 }),
