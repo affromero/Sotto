@@ -45,8 +45,8 @@ export default async function WaitlistedPage({ searchParams }: PageProps) {
           <Link href="/" className={styles.primaryLink}>
             Back to Homepage
           </Link>
-          <Link href="/auth/login" className={styles.secondaryLink}>
-            Try a different provider
+          <Link href="/auth/login?returning=1" className={styles.secondaryLink}>
+            Already have an account? Sign in
           </Link>
         </div>
       </div>
