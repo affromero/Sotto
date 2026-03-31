@@ -497,7 +497,8 @@ async function handleUnlinkedUser(tweet: TwitterTweet): Promise<void> {
     return;
   }
 
-  // Record the mention BEFORE replying — ensures dedup even if reply fails
+  // Record the mention as ignored — do NOT reply to unlinked users.
+  // CTA replies were disabled because they attracted bot spam.
   await prisma.tweetMention.upsert({
     where: { tweetId: tweet.id },
     update: {},
@@ -506,27 +507,14 @@ async function handleUnlinkedUser(tweet: TwitterTweet): Promise<void> {
       authorId: tweet.author_id,
       text: tweet.text,
       status: 'IGNORED',
-      errorMessage: 'Unlinked user — CTA reply sent',
+      errorMessage: 'Unlinked user — no reply (CTA disabled)',
     },
   });
 
-  try {
-    await replyToTweet(
-      tweet.id,
-      `Join Sotto at ${SOTTO_APP_URL} and turn any topic into a podcast. Already have an account? Connect your Twitter in Settings and just tag us to generate one.`
-    );
-    await redis.set(ctaKey, '1');
-
-    logger.info('Sent CTA reply to unlinked Twitter user', {
-      tweetId: tweet.id,
-      authorId: tweet.author_id,
-    });
-  } catch (err) {
-    logger.error('Failed to send CTA reply', {
-      tweetId: tweet.id,
-      error: err instanceof Error ? err.message : String(err),
-    });
-  }
+  logger.info('Skipped CTA reply for unlinked user (disabled)', {
+    tweetId: tweet.id,
+    authorId: tweet.author_id,
+  });
 }
 
 function getParentTweetId(tweet: TwitterTweet): string | undefined {
