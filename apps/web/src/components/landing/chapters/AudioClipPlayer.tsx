@@ -7,6 +7,8 @@ import type { VisualsInput } from '@sotto/video';
 import { buildVideoSegments, computeTotalFrames } from '@/lib/segment-utils';
 import type { SegmentVisualData } from '@/lib/segment-utils';
 import type { SegmentData } from '@/types/podcast';
+import type { VocabularyEntryData } from '@/types/vocabulary';
+import { parseTextWithVocabulary } from '@/lib/vocabulary-parser';
 import { useShowcaseToggles } from '../ShowcaseTogglesProvider';
 import styles from './AudioClipPlayer.module.css';
 
@@ -63,6 +65,7 @@ interface AudioClipPlayerProps {
   videoClip?: VideoClip | null;
   clipSegments?: ClipSegment[];
   clipVisuals?: ClipVisual[];
+  clipVocabulary?: VocabularyEntryData[];
   showVideoToggle?: boolean;
 }
 
@@ -94,6 +97,7 @@ export function AudioClipPlayer({
   videoClip,
   clipSegments = [],
   clipVisuals = [],
+  clipVocabulary,
   showVideoToggle = false,
 }: AudioClipPlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -398,6 +402,20 @@ export function AudioClipPlayer({
             </a>
           </div>
         </div>
+        {clipVocabulary && clipVocabulary.length > 0 && clipSegments.length > 0 && (
+          <div className={styles.transcriptArea}>
+            {clipSegments.map((seg) => (
+              <span key={seg.id}>
+                {parseTextWithVocabulary(
+                  seg.text,
+                  clipVocabulary,
+                  () => { if (audioRef.current && !audioRef.current.paused) audioRef.current.pause(); },
+                  () => { if (audioRef.current) audioRef.current.play(); },
+                )}{' '}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
       { }
       <audio ref={audioRef} src={activeUrl} preload="metadata" />
