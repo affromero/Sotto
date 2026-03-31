@@ -1,5 +1,13 @@
 <div align="center">
 
+# Sotto
+
+### Every voice. Every topic. One feed.
+
+Create AI podcasts, compare voices side-by-side, remix anything.
+
+[Getting Started](#getting-started) · [How It Works](#how-it-works) · [Architecture](#architecture) · [Documentation](#documentation)
+
 [![CI](https://img.shields.io/badge/CI-passing-brightgreen?logo=githubactions&logoColor=white)](https://github.com/SottoFM/Sotto/actions/workflows/ci.yml)
 [![Deploy](https://img.shields.io/badge/Deploy-live-brightgreen?logo=githubactions&logoColor=white)](https://github.com/SottoFM/Sotto/actions/workflows/deploy.yml)
 [![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](https://nextjs.org)
@@ -8,14 +16,6 @@
 [![BullMQ](https://img.shields.io/badge/BullMQ-Redis-DC382D?logo=redis&logoColor=white)](https://docs.bullmq.io)
 [![Socket](https://img.shields.io/badge/Socket-protected-blueviolet?logo=socket.dev)](https://socket.dev)
 [![min-release-age](https://img.shields.io/badge/min--release--age-7%20days-brightgreen)](https://docs.npmjs.com/cli/v10/using-npm/config#min-release-age)
-
-# Sotto
-
-### Every voice. Every topic. One feed.
-
-Create AI podcasts, compare voices side-by-side, remix anything.
-
-[Getting Started](#getting-started) · [How It Works](#how-it-works) · [Architecture](#architecture) · [Documentation](#documentation)
 
 ---
 
