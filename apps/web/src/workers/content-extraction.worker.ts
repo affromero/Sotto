@@ -1,6 +1,6 @@
 import { Job } from 'bullmq';
 import { Prisma } from '@prisma/client';
-import { ExtractContentPayload, addJob, JobType, scriptGenerationQueue } from '@/lib/queue';
+import { ExtractContentPayload, addJob, JobType, deepResearchQueue } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { extractContent } from '@/lib/extractors';
 import { assessTopicFeasibility } from '@/lib/topic-assessor';
@@ -26,22 +26,21 @@ export async function processContentExtraction(job: Job<ExtractContentPayload>):
   });
 
   if (existingDiscovery?.sourceContent) {
-    logger.info('Content already extracted, skipping to script generation', { podcastId });
+    logger.info('Content already extracted, skipping to deep research', { podcastId });
 
     await prisma.podcast.update({
       where: { id: podcastId },
-      data: { status: 'SCRIPTING' },
+      data: { status: 'RESEARCHING' },
     });
     await invalidatePodcastCache(podcastId);
-    await publishPodcastStatus(podcastId, { status: 'SCRIPTING' });
+    await publishPodcastStatus(podcastId, { status: 'RESEARCHING' });
 
-    await addJob(scriptGenerationQueue, JobType.GENERATE_SCRIPT, {
+    await addJob(deepResearchQueue, JobType.DEEP_RESEARCH, {
       podcastId,
       userId,
       discoveryId: existingDiscovery.id,
-      sourceContent: existingDiscovery.sourceContent,
       useAdminCredits,
-    }, { jobId: `script-${podcastId}-${Date.now()}` });
+    }, { jobId: `research-${podcastId}-${Date.now()}` });
 
     await job.updateProgress(100);
     return;
@@ -182,19 +181,18 @@ export async function processContentExtraction(job: Job<ExtractContentPayload>):
   // Update podcast status
   await prisma.podcast.update({
     where: { id: podcastId },
-    data: { status: 'SCRIPTING' },
+    data: { status: 'RESEARCHING' },
   });
   await invalidatePodcastCache(podcastId);
-  await publishPodcastStatus(podcastId, { status: 'SCRIPTING' });
+  await publishPodcastStatus(podcastId, { status: 'RESEARCHING' });
 
-  // Chain to script generation
-  await addJob(scriptGenerationQueue, JobType.GENERATE_SCRIPT, {
+  // Chain to deep research
+  await addJob(deepResearchQueue, JobType.DEEP_RESEARCH, {
     podcastId,
     userId,
     discoveryId: discovery.id,
-    sourceContent: content || undefined,
     useAdminCredits,
-  }, { jobId: `script-${podcastId}` });
+  }, { jobId: `research-${podcastId}` });
 
   await logPipelineStageComplete(podcastId, 'content-extraction');
   await job.updateProgress(100);

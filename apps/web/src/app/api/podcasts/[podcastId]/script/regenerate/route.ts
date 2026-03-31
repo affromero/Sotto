@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { authenticateRequest } from '@/lib/api-keys';
-import { addJob, JobType, scriptGenerationQueue } from '@/lib/queue';
+import { addJob, JobType, scriptWritingQueue } from '@/lib/queue';
 import { checkRateLimit, invalidatePodcastCache, publishPodcastStatus } from '@/lib/redis';
 import { checkGenerationGate } from '@/lib/generation-gate';
 import { regenerateWithFeedbackSchema } from '@/lib/validations';
-import { formatUserFeedback } from '@/lib/feedback-formatter';
 
 import { errorResponse } from '@/lib/api-response';
 type RouteParams = { params: Promise<{ podcastId: string }> };
@@ -72,47 +71,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return errorResponse('Discovery not found', 404);
   }
 
-  // Read current script + references BEFORE deleting (needed for feedback-based revision)
-  const hasFeedback = feedbackBody && (feedbackBody.feedback || feedbackBody.turnComments || feedbackBody.highlights);
-  let previousTurns: Array<{ speaker: string; text: string; direction?: string }> | undefined;
-  let previousReferences: Array<{ number: number; title: string; authors?: string; year?: number; url?: string; type: string; publisher?: string; doi?: string }> | undefined;
-  let formattedFeedback: string | undefined;
-
-  if (hasFeedback) {
-    const existingScript = await prisma.script.findUnique({
-      where: { podcastId },
-      select: { turns: true },
-    });
-    const existingRefs = await prisma.reference.findMany({
-      where: { podcastId },
-      orderBy: { number: 'asc' },
-    });
-
-    if (existingScript?.turns) {
-      previousTurns = existingScript.turns as Array<{ speaker: string; text: string; direction?: string }>;
-    }
-    if (existingRefs.length > 0) {
-      previousReferences = existingRefs.map((r) => ({
-        number: r.number,
-        title: r.title,
-        authors: (r.authors as string[])?.join(', '),
-        year: r.year ?? undefined,
-        url: r.url ?? undefined,
-        type: r.type,
-        publisher: r.publisher ?? undefined,
-        doi: r.doi ?? undefined,
-      }));
-    }
-
-    formattedFeedback = formatUserFeedback({
-      feedback: feedbackBody!.feedback,
-      turnComments: feedbackBody!.turnComments,
-      highlights: feedbackBody!.highlights,
-      turns: previousTurns,
-      sourceUrls: feedbackBody!.sourceUrls,
-    });
-  }
-
   // Delete existing script, segments, and references
   await prisma.$transaction([
     prisma.segment.deleteMany({ where: { podcastId } }),
@@ -120,26 +78,42 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     prisma.script.deleteMany({ where: { podcastId } }),
   ]);
 
-  // Set status back to SCRIPTING, reset lowReferences flag
-  await prisma.podcast.update({
-    where: { id: podcastId },
-    data: { status: 'SCRIPTING', lowReferences: false },
-  });
-  await invalidatePodcastCache(podcastId);
-  await publishPodcastStatus(podcastId, { status: 'SCRIPTING' });
+  // Re-enter pipeline at script-writing (dossier + outline already exist)
+  const dossier = await prisma.researchDossier.findUnique({ where: { podcastId } });
+  const outline = await prisma.creativeOutline.findUnique({ where: { podcastId } });
 
-  await addJob(scriptGenerationQueue, JobType.GENERATE_SCRIPT, {
-    podcastId,
-    userId,
-    discoveryId: discovery.id,
-    sourceContent: discovery.sourceContent ?? undefined,
-    ...(formattedFeedback && previousTurns ? {
-      userFeedback: formattedFeedback,
-      previousTurns,
-      previousReferences,
-    } : {}),
-    ...(feedbackBody?.sourceUrls?.length ? { sourceUrls: feedbackBody.sourceUrls } : {}),
-  });
+  if (!dossier || !outline) {
+    // If no dossier/outline (legacy podcast or data loss), restart from research
+    await prisma.podcast.update({
+      where: { id: podcastId },
+      data: { status: 'RESEARCHING', lowReferences: false },
+    });
+    await invalidatePodcastCache(podcastId);
+    await publishPodcastStatus(podcastId, { status: 'RESEARCHING' });
+
+    const { deepResearchQueue: researchQueue } = await import('@/lib/queue');
+    await addJob(researchQueue, JobType.DEEP_RESEARCH, {
+      podcastId,
+      userId,
+      discoveryId: discovery.id,
+    });
+  } else {
+    await prisma.podcast.update({
+      where: { id: podcastId },
+      data: { status: 'SCRIPTING', lowReferences: false },
+    });
+    await invalidatePodcastCache(podcastId);
+    await publishPodcastStatus(podcastId, { status: 'SCRIPTING' });
+
+    await addJob(scriptWritingQueue, JobType.WRITE_SCRIPT, {
+      podcastId,
+      userId,
+      discoveryId: discovery.id,
+      dossierId: dossier.id,
+      outlineId: outline.id,
+      ...(feedbackBody?.sourceUrls?.length ? { sourceUrls: feedbackBody.sourceUrls } : {}),
+    });
+  }
 
   return NextResponse.json({ success: true });
 }

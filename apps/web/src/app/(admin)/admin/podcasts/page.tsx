@@ -102,8 +102,9 @@ export default async function AdminPodcastsPage({ searchParams }: PageProps) {
           <option value="DISCOVERING">Discovering</option>
           <option value="EXTRACTING">Extracting</option>
           <option value="SCRIPTING">Scripting</option>
-          <option value="VERIFYING_SCRIPT">Verifying Script</option>
-          <option value="VALIDATING_REFERENCES">Validating References</option>
+          <option value="RESEARCHING">Researching</option>
+          <option value="PLANNING">Planning</option>
+          <option value="COMPILING">Compiling</option>
           <option value="GENERATING_AUDIO">Generating Audio</option>
           <option value="STITCHING">Stitching</option>
           <option value="READY">Ready</option>

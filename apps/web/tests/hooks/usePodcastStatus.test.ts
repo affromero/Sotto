@@ -110,7 +110,7 @@ describe('usePodcastStatus', () => {
     });
 
     it('does a reconciliation fetch on open', async () => {
-      mockFetchStatus('VERIFYING_SCRIPT');
+      mockFetchStatus('COMPILING');
       renderHook(() =>
         usePodcastStatus({ podcastId: 'pod-1', initialStatus: 'SCRIPTING' }),
       );

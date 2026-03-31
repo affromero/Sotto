@@ -5,8 +5,9 @@ import type { StageMessage } from '@sotto/shared';
 const ACTIVE_STAGES = [
   'EXTRACTING',
   'SCRIPTING',
-  'VERIFYING_SCRIPT',
-  'VALIDATING_REFERENCES',
+  'RESEARCHING',
+  'PLANNING',
+  'COMPILING',
   'GENERATING_AUDIO',
   'STITCHING',
 ];
