@@ -105,15 +105,19 @@ function checkAccountQuality(author: TwitterAuthorData): MentionFilterResult | n
   const accountAge = Date.now() - new Date(author.createdAt).getTime();
   const { followers_count, tweet_count } = author.publicMetrics;
 
-  // Brand-new account with no social proof — likely a bot
-  if (
-    accountAge < ACCOUNT_MIN_AGE_MS &&
-    followers_count < ACCOUNT_MIN_FOLLOWERS &&
-    tweet_count < ACCOUNT_MIN_TWEETS
-  ) {
+  // Brand-new account with low social proof
+  if (accountAge < ACCOUNT_MIN_AGE_MS && (followers_count < ACCOUNT_MIN_FOLLOWERS || tweet_count < ACCOUNT_MIN_TWEETS)) {
     return {
       verdict: 'skip_suspicious_account',
       reason: `Suspicious account — created ${Math.floor(accountAge / (24 * 60 * 60 * 1000))}d ago, ${followers_count} followers, ${tweet_count} tweets`,
+    };
+  }
+
+  // Zero-follower accounts regardless of age — likely bots
+  if (followers_count === 0) {
+    return {
+      verdict: 'skip_suspicious_account',
+      reason: `Zero-follower account — ${tweet_count} tweets, likely bot`,
     };
   }
 
@@ -171,7 +175,7 @@ async function classifyMentionIntent(
     }
 
     // Low confidence non-genuine → let it through (false positive > false negative)
-    if (parsed.confidence < 0.7) {
+    if (parsed.confidence < 0.5) {
       logger.info('Low-confidence non-genuine classification — letting through', {
         tweetId: tweet.id,
         classification: parsed.classification,
@@ -191,11 +195,11 @@ async function classifyMentionIntent(
       reason: parsed.reason,
     };
   } catch (err) {
-    // LLM failure should not block processing — let the mention through
-    logger.warn('Mention filter LLM call failed — allowing mention', {
+    // LLM failure should block by default — fail closed
+    logger.warn('Mention filter LLM call failed — blocking by default', {
       tweetId: tweet.id,
       error: err instanceof Error ? err.message : String(err),
     });
-    return { verdict: 'pass', reason: 'Filter error — allowing by default' };
+    return { verdict: 'skip_spam', reason: 'Filter error — blocking by default' };
   }
 }

@@ -5,7 +5,8 @@ import { replyToTweet } from '@/lib/twitter';
 import { podcastUrl as buildPodcastPath } from '@/lib/urls';
 import { logger } from '@/lib/logger';
 
-const SOTTO_APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://sotto.fm';
+// Always use production URL for public tweets — never inherit localhost from dev env
+const SOTTO_APP_URL = process.env.NEXT_PUBLIC_APP_URL?.startsWith('https://') ? process.env.NEXT_PUBLIC_APP_URL : 'https://sotto.fm';
 
 export async function processTwitterReply(job: Job<ReplyTwitterPayload>): Promise<void> {
   const { podcastId, tweetMentionId, originalTweetId } = job.data;
@@ -13,7 +14,7 @@ export async function processTwitterReply(job: Job<ReplyTwitterPayload>): Promis
 
   const podcast = await prisma.podcast.findUniqueOrThrow({
     where: { id: podcastId },
-    select: { title: true, duration: true, status: true, slug: true, user: { select: { handle: true } } },
+    select: { title: true, duration: true, status: true, slug: true, visibility: true, user: { select: { handle: true } } },
   });
 
   if (podcast.status === 'FAILED') {
@@ -45,6 +46,23 @@ export async function processTwitterReply(job: Job<ReplyTwitterPayload>): Promis
 
   await job.updateProgress(30);
 
+  if (podcast.visibility === 'private' || podcast.visibility === 'unlisted') {
+    const genericReplyText = 'Your podcast is ready! Check your dashboard to listen.';
+    const replyId = await replyToTweet(originalTweetId, genericReplyText);
+    await prisma.tweetMention.update({
+      where: { id: tweetMentionId },
+      data: { status: 'REPLIED', replyTweetId: replyId },
+    });
+    await job.updateProgress(100);
+    logger.info('Twitter reply posted (private/unlisted — no URL)', {
+      podcastId,
+      originalTweetId,
+      replyTweetId: replyId,
+      visibility: podcast.visibility,
+    });
+    return;
+  }
+
   // Compose reply (must be under 280 chars)
   const durationMin = podcast.duration ? Math.round(podcast.duration / 60) : 0;
   const durationStr = durationMin > 0 ? ` (${durationMin} min)` : '';
@@ -62,6 +80,16 @@ export async function processTwitterReply(job: Job<ReplyTwitterPayload>): Promis
   const replyText = `Your podcast is ready! "${title}"${durationStr}\n\nListen: ${podcastUrl}`;
 
   await job.updateProgress(50);
+
+  // Idempotency: skip if reply was already posted (prevents duplicates on BullMQ retry)
+  const mention = await prisma.tweetMention.findUnique({
+    where: { id: tweetMentionId },
+    select: { replyTweetId: true, status: true },
+  });
+  if (mention?.replyTweetId) {
+    logger.info('Reply already posted, skipping', { podcastId, replyTweetId: mention.replyTweetId });
+    return;
+  }
 
   const replyId = await replyToTweet(originalTweetId, replyText);
 

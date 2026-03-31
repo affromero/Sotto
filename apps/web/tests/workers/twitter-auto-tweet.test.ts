@@ -5,6 +5,7 @@ import type { AutoTweetPayload } from '@/lib/queue';
 // ---- Mocks ----
 
 const mockPrismaTwitterAutoTweetFindFirst = vi.fn();
+const mockPrismaTwitterAutoTweetUpdateMany = vi.fn();
 const mockPrismaTwitterAutoTweetUpdate = vi.fn();
 const mockPrismaPodcastFindUniqueOrThrow = vi.fn();
 
@@ -12,6 +13,7 @@ vi.mock('@/lib/prisma', () => {
   const _mockPrisma = {
     twitterAutoTweet: {
       findFirst: (...args: unknown[]) => mockPrismaTwitterAutoTweetFindFirst(...args),
+      updateMany: (...args: unknown[]) => mockPrismaTwitterAutoTweetUpdateMany(...args),
       update: (...args: unknown[]) => mockPrismaTwitterAutoTweetUpdate(...args),
     },
     podcast: {
@@ -58,10 +60,12 @@ describe('processAutoTweet', () => {
     mockGetTwitterConfig.mockResolvedValue({
       tweetTemplate: 'New on Sotto: {{title}}\n\n{{topic}}\n\nListen: {{url}}',
     });
+    // Default: CAS claim succeeds
+    mockPrismaTwitterAutoTweetUpdateMany.mockResolvedValue({ count: 1 });
   });
 
   it('skips when no pending auto-tweet record exists', async () => {
-    mockPrismaTwitterAutoTweetFindFirst.mockResolvedValue(null);
+    mockPrismaTwitterAutoTweetUpdateMany.mockResolvedValue({ count: 0 });
 
     const job = createMockJob({ podcastId: 'pod-1', trigger: 'threshold' });
     await processAutoTweet(job);

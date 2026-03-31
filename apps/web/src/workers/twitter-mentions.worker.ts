@@ -21,7 +21,8 @@ import type { ParticipantCredential } from '@/lib/credential-lookup';
 
 const REDIS_CURSOR_KEY = 'twitter:last_processed_tweet_id';
 const REDIS_CTA_PREFIX = 'twitter:cta_sent:';
-const SOTTO_APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://sotto.fm';
+// Always use production URL for public tweets — never inherit localhost from dev env
+const SOTTO_APP_URL = process.env.NEXT_PUBLIC_APP_URL?.startsWith('https://') ? process.env.NEXT_PUBLIC_APP_URL : 'https://sotto.fm';
 
 export async function processTwitterMentions(job: Job<PollTwitterMentionsPayload>): Promise<void> {
   const redis = getRedisClient();
