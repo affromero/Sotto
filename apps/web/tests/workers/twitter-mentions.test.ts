@@ -475,31 +475,31 @@ describe('processTwitterMentions', () => {
   });
 
   describe('unlinked users', () => {
-    it('sends CTA reply to unlinked users (first time only) and records mention', async () => {
+    it('records mention as IGNORED (no CTA reply) for unlinked users (first time)', async () => {
       const tweet = createMockTweet();
       mockGetMentions.mockResolvedValue({ tweets: [tweet], mediaByKey: new Map(), authorMap: new Map() });
       mockPrismaAccountFindFirst.mockResolvedValue(null);
       mockRedisExists.mockResolvedValue(0);
-      mockReplyToTweet.mockResolvedValue('reply-tweet-id');
 
       const job = createMockJob({});
       await processTwitterMentions(job);
 
+      expect(mockReplyToTweet).not.toHaveBeenCalled();
+      // Redis cursor is still updated at end of poll loop — only the CTA-specific set is skipped
+      expect(mockRedisSet).not.toHaveBeenCalledWith(
+        expect.stringContaining('cta_sent'),
+        expect.anything()
+      );
       expect(mockPrismaTweetMentionUpsert).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { tweetId: tweet.id },
           create: expect.objectContaining({
             tweetId: tweet.id,
             status: 'IGNORED',
-            errorMessage: 'Unlinked user — CTA reply sent',
+            errorMessage: 'Unlinked user — no reply (CTA disabled)',
           }),
         })
       );
-      expect(mockReplyToTweet).toHaveBeenCalledWith(
-        tweet.id,
-        expect.stringContaining('Join Sotto at')
-      );
-      expect(mockRedisSet).toHaveBeenCalledWith(`twitter:cta_sent:${tweet.author_id}`, '1');
     });
 
     it('does not send CTA to unlinked user if already sent but still records mention', async () => {
