@@ -164,7 +164,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
       });
       await addJob(scriptVerificationQueue, JobType.VERIFY_SCRIPT,
         { podcastId, userId, discoveryId, useAdminCredits },
-        { jobId: `verify-${podcastId}-parse-retry` });
+        { jobId: `verify-${podcastId}-parse-retry-${Date.now()}` });
       await job.updateProgress(100);
       return;
     }
@@ -267,7 +267,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
         podcastId,
         userId,
         useAdminCredits,
-      }, { jobId: `validate-${podcastId}` });
+      }, { jobId: `validate-${podcastId}-${Date.now()}` });
 
       logger.info('Script verified, routing to reference validation', { podcastId });
     } else {
@@ -573,7 +573,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
     userId,
     discoveryId,
     useAdminCredits,
-  }, { jobId: `verify-${podcastId}-${attemptNumber + 1}` });
+  }, { jobId: `verify-${podcastId}-${attemptNumber + 1}-${Date.now()}` });
 
   logger.info('Script revised and re-queued for verification', {
     podcastId,

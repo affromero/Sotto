@@ -40,7 +40,7 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
       userId,
       discoveryId,
       useAdminCredits,
-    }, { jobId: `verify-${podcastId}-1` });
+    }, { jobId: `verify-${podcastId}-1-${Date.now()}` });
 
     await job.updateProgress(100);
     return;
