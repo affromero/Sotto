@@ -46,7 +46,7 @@ export async function processTwitterReply(job: Job<ReplyTwitterPayload>): Promis
 
   await job.updateProgress(30);
 
-  if (podcast.visibility === 'private' || podcast.visibility === 'unlisted') {
+  if (podcast.visibility === 'PRIVATE' || podcast.visibility === 'UNLISTED') {
     const genericReplyText = 'Your podcast is ready! Check your dashboard to listen.';
     const replyId = await replyToTweet(originalTweetId, genericReplyText);
     await prisma.tweetMention.update({
