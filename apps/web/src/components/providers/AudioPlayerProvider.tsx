@@ -7,7 +7,7 @@ import { PlayerState, PlayerControls } from '@/types/player';
 
 type AudioPlayerContextType = PlayerState & PlayerControls & { lastSeekFrom?: number };
 
-const AudioPlayerContext = createContext<AudioPlayerContextType | null>(null);
+export const AudioPlayerContext = createContext<AudioPlayerContextType | null>(null);
 
 function PlaybackTelemetryBridge({ playerState }: { playerState: AudioPlayerContextType }) {
   usePlaybackTelemetry(playerState);

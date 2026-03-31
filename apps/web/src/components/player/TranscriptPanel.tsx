@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Minus, Plus } from 'lucide-react';
 import { parseTextWithCitations } from '@/lib/citation-parser';
 import { parseTextWithVocabulary, parseTextWithCitationsAndVocabulary } from '@/lib/vocabulary-parser';
@@ -8,6 +8,7 @@ import { useScrollFollow, isScrollable } from '@/lib/hooks/useScrollFollow';
 import { getSpeakerIndex, getUniqueSpeakers } from '@/lib/speaker-colors';
 import { SegmentQuestionBadge } from '@/components/player/SegmentQuestionBadge';
 import { ClaimFlagButton } from '@/components/player/ClaimFlagButton';
+import { AudioPlayerContext } from '@/components/providers/AudioPlayerProvider';
 import { SegmentData } from '@/types/podcast';
 import type { ReferenceData } from '@/types/reference';
 import type { VocabularyEntryData } from '@/types/vocabulary';
@@ -51,6 +52,15 @@ export function TranscriptPanel({
   const activeRef = useRef<HTMLDivElement>(null);
   const { scrollContainerRef, isFollowing, reengage } = useScrollFollow();
   const speakers = useMemo(() => getUniqueSpeakers(segments), [segments]);
+
+  // Audio pause/resume when vocabulary tooltips open — null-safe outside AudioPlayerProvider
+  const playerCtx = useContext(AudioPlayerContext);
+  const onVocabPause = useCallback(() => {
+    if (playerCtx?.isPlaying) playerCtx.pause();
+  }, [playerCtx]);
+  const onVocabResume = useCallback(() => {
+    playerCtx?.play();
+  }, [playerCtx]);
 
   useEffect(() => {
     const container = scrollContainerRef.current;
@@ -114,11 +124,11 @@ export function TranscriptPanel({
               </span>
               <div className={styles.text}>
                 {hasRefs && hasVocab
-                  ? parseTextWithCitationsAndVocabulary(segment.text, references, vocabularyEntries)
+                  ? parseTextWithCitationsAndVocabulary(segment.text, references, vocabularyEntries, onVocabPause, onVocabResume)
                   : hasRefs
                     ? parseTextWithCitations(segment.text, references)
                     : hasVocab
-                      ? parseTextWithVocabulary(segment.text, vocabularyEntries)
+                      ? parseTextWithVocabulary(segment.text, vocabularyEntries, onVocabPause, onVocabResume)
                       : segment.text}
               </div>
               {podcastId && (

@@ -1,3 +1,4 @@
+import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, act, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -6,6 +7,10 @@ import { SegmentData } from '@/types/podcast';
 
 vi.mock('@/lib/citation-parser', () => ({
   parseTextWithCitations: (text: string) => text,
+}));
+
+vi.mock('@/components/providers/AudioPlayerProvider', () => ({
+  AudioPlayerContext: React.createContext(null),
 }));
 
 describe('TranscriptPanel', () => {
