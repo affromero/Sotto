@@ -33,6 +33,8 @@ interface ResolvedConfig {
   prompt: string | null;
   useByokKeys: boolean;
   visibility: PodcastVisibility;
+  targetLanguage: string | null;
+  languageMode: string | null;
 }
 
 // ─── nextRunAt Computation ───────────────────────────────────────
@@ -94,6 +96,8 @@ export function resolveBriefingConfig(
     prompt: briefing.prompt,
     useByokKeys: briefing.useByokKeys,
     visibility: briefing.visibility,
+    targetLanguage: briefing.targetLanguage ?? null,
+    languageMode: briefing.languageMode ?? null,
   };
 }
 
@@ -266,6 +270,7 @@ export async function createBriefingPodcast(
       aiModel: resolved.aiModel,
       ttsProvider: resolved.ttsProvider,
       ttsModel: resolved.ttsModel,
+      language: resolved.targetLanguage ?? undefined,
       voices: {
         createMany: {
           data: voiceEntries.map((v) => ({
