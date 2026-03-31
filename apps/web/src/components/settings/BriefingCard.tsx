@@ -245,15 +245,25 @@ export function BriefingCard({
           />
 
           <div className={styles.cardActions}>
-            <button
-              type="button"
-              className={styles.generateBtn}
-              onClick={handleGenerate}
-              disabled={generating}
-              aria-label="Generate briefing now"
-            >
-              {generating ? 'Generating...' : 'Generate Now'}
-            </button>
+            {generatedPodcastId && !generating ? (
+              <a
+                href={`/podcast/${generatedPodcastId}`}
+                className={styles.generateBtnSuccess}
+                aria-label="View generated podcast"
+              >
+                View Podcast
+              </a>
+            ) : (
+              <button
+                type="button"
+                className={styles.generateBtn}
+                onClick={handleGenerate}
+                disabled={generating}
+                aria-label="Generate briefing now"
+              >
+                {generating ? 'Generating...' : 'Generate Now'}
+              </button>
+            )}
 
             {!confirmDelete ? (
               <button

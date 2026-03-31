@@ -200,6 +200,27 @@
   cursor: not-allowed;
 }
 
+.generateBtnSuccess {
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: none;
+  border-radius: var(--radius-lg);
+  background: var(--color-success, #22c55e);
+  color: var(--color-text-inverse);
+  font: var(--text-body-sm);
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 44px;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity var(--transition-fast);
+}
+
+.generateBtnSuccess:hover {
+  opacity: 0.9;
+}
+
 .deleteBtn {
   padding: var(--spacing-xs) var(--spacing-sm);
   border: none;
