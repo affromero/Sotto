@@ -59,8 +59,13 @@ const EXPECTED_FILES = [
   'generation/monologue-guidelines.md',
   'generation/dialogue-guidelines.md',
   'generation/eli5-section.md',
+  'generation/script-from-outline.md',
   'generation/script-revision-factcheck.md',
   'generation/script-revision-user.md',
+  'planning/creative-outline.md',
+  'research/angle-discovery.md',
+  'research/fact-extraction.md',
+  'research/source-discovery.md',
   'feeds/taste-quiz.md',
   'feeds/for-you.md',
   'feeds/curiosity.md',
@@ -135,6 +140,27 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
   'demo/walkthrough.md': [
     'APP_SELECTORS', 'DURATION_TARGET', 'FEATURES',
     'INTERCEPTOR_CATALOG', 'PRODUCT_CONTEXT', 'VOICE_COMPARISON',
+  ].sort(),
+  'generation/script-from-outline.md': [
+    'AUDIENCE_GUIDANCE', 'BEATS_JSON', 'CONTENT_SAFETY', 'DRIVING_QUESTION',
+    'DURATION_MINUTES', 'EVIDENCE_JSON', 'LISTENER_PROMISE', 'SOURCES_JSON',
+    'SPEAKERS_JSON', 'THESIS', 'TONE', 'TOPIC',
+    'VOICE_REALISM', 'WORD_COUNT_MAX', 'WORD_COUNT_MIN',
+  ].sort(),
+  'planning/creative-outline.md': [
+    'AUDIENCE_LEVEL', 'DURATION_MINUTES', 'EVIDENCE_COUNT', 'EVIDENCE_JSON',
+    'FRAMEWORK', 'FRAMEWORK_INSTRUCTIONS', 'RECOMMENDED_ANGLE',
+    'SOURCE_COUNT', 'SPEAKERS_JSON', 'TONE', 'TOPIC', 'WORD_COUNT',
+  ].sort(),
+  'research/angle-discovery.md': [
+    'EVIDENCE_JSON', 'TOPIC', 'TOPIC_SUMMARY',
+  ].sort(),
+  'research/fact-extraction.md': [
+    'SOURCES_JSON', 'TOPIC',
+  ].sort(),
+  'research/source-discovery.md': [
+    'DEPTH', 'DEPTH_DESCRIPTION', 'MIN_SERIOUS_COUNT',
+    'SOURCE_CONTENT', 'SOURCE_COUNT', 'TOPIC',
   ].sort(),
   'generation/briefing-script.md': [
     'CONTENT_SAFETY', 'DURATION_TARGET', 'EXPERT_SPEAKER', 'HOST_SPEAKER',

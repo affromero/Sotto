@@ -327,7 +327,7 @@ describe('processAudioGeneration', () => {
         { name: 'audio-stitching' },
         'stitch_audio',
         { podcastId: 'podcast-001', segmentIds: ['seg-1', 'seg-2'] },
-        { jobId: 'stitch-podcast-001' }
+        { jobId: expect.stringMatching(/^stitch-podcast-001-\d+$/) }
       );
       expect(mockPrismaPodcastUpdateMany).toHaveBeenCalledWith({
         where: { id: 'podcast-001', status: 'GENERATING_AUDIO' },
@@ -793,7 +793,7 @@ describe('processAudioGeneration', () => {
       expect(mockAddJob).toHaveBeenCalledWith({ name: 'audio-stitching' }, 'stitch_audio', {
         podcastId: 'podcast-001',
         segmentIds: ['seg-a', 'seg-b', 'seg-c'],
-      }, { jobId: 'stitch-podcast-001' });
+      }, { jobId: expect.stringMatching(/^stitch-podcast-001-\d+$/) });
     });
 
     it('CAS-updates podcast status to STITCHING', async () => {
@@ -815,7 +815,7 @@ describe('processAudioGeneration', () => {
         expect.anything(),
         'stitch_audio',
         expect.objectContaining({ segmentIds: ['only-segment'] }),
-        { jobId: 'stitch-podcast-001' }
+        { jobId: expect.stringMatching(/^stitch-podcast-001-\d+$/) }
       );
     });
   });

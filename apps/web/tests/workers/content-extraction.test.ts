@@ -47,9 +47,9 @@ const mockAddJob = vi.fn().mockResolvedValue({ id: 'script-job-1' });
 vi.mock('@/lib/queue', () => ({
   addJob: (...args: unknown[]) => mockAddJob(...args),
   JobType: {
-    GENERATE_SCRIPT: 'generate_script',
+    DEEP_RESEARCH: 'deep_research',
   },
-  scriptGenerationQueue: { name: 'script-generation' },
+  deepResearchQueue: { name: 'deep-research' },
 }));
 
 vi.mock('@/lib/pipeline-events', () => ({
@@ -98,6 +98,10 @@ vi.mock('@/lib/byok', () => ({
 
 vi.mock('@/lib/providers/ai-registry', () => ({
   resolveAiModelAndProvider: vi.fn().mockResolvedValue({ model: 'claude-sonnet-4-20250514', provider: 'anthropic' }),
+}));
+
+vi.mock('@/lib/media-bias', () => ({
+  analyzeBias: vi.fn().mockReturnValue({ biasLevel: 'low', confidence: 0.9 }),
 }));
 
 // ---- Import under test ----
@@ -421,7 +425,7 @@ describe('processContentExtraction', () => {
   });
 
   describe('database updates', () => {
-    it('updates podcast status to SCRIPTING', async () => {
+    it('updates podcast status to RESEARCHING', async () => {
       const job = createMockJob({
         ...defaultPayload,
         sourceText: 'Test content',
@@ -430,11 +434,11 @@ describe('processContentExtraction', () => {
 
       expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
         where: { id: 'podcast-001' },
-        data: { status: 'SCRIPTING' },
+        data: { status: 'RESEARCHING' },
       });
     });
 
-    it('invalidates podcast cache and publishes status after SCRIPTING transition', async () => {
+    it('invalidates podcast cache and publishes status after RESEARCHING transition', async () => {
       const job = createMockJob({
         ...defaultPayload,
         sourceText: 'Test content',
@@ -442,12 +446,12 @@ describe('processContentExtraction', () => {
       await processContentExtraction(job);
 
       expect(mockInvalidatePodcastCache).toHaveBeenCalledWith('podcast-001');
-      expect(mockPublishPodcastStatus).toHaveBeenCalledWith('podcast-001', { status: 'SCRIPTING' });
+      expect(mockPublishPodcastStatus).toHaveBeenCalledWith('podcast-001', { status: 'RESEARCHING' });
     });
   });
 
   describe('pipeline chaining', () => {
-    it('queues script generation job after extraction', async () => {
+    it('queues deep research job after extraction', async () => {
       mockPrismaDiscoveryUpdate.mockResolvedValue({
         id: 'discovery-abc',
         podcastId: 'podcast-001',
@@ -460,32 +464,12 @@ describe('processContentExtraction', () => {
       });
       await processContentExtraction(job);
 
-      expect(mockAddJob).toHaveBeenCalledWith({ name: 'script-generation' }, 'generate_script', {
+      expect(mockAddJob).toHaveBeenCalledWith({ name: 'deep-research' }, 'deep_research', {
         podcastId: 'podcast-001',
         userId: 'user-001',
         discoveryId: 'discovery-abc',
-        sourceContent: 'Test content',
+        useAdminCredits: undefined,
       }, { jobId: expect.any(String) });
-    });
-
-    it('passes undefined sourceContent when content is empty', async () => {
-      mockPrismaDiscoveryUpdate.mockResolvedValue({
-        id: 'discovery-empty',
-        podcastId: 'podcast-001',
-        sourceContent: '',
-      });
-
-      const job = createMockJob(defaultPayload);
-      await processContentExtraction(job);
-
-      expect(mockAddJob).toHaveBeenCalledWith(
-        expect.anything(),
-        'generate_script',
-        expect.objectContaining({
-          sourceContent: undefined,
-        }),
-        { jobId: expect.any(String) },
-      );
     });
   });
 
@@ -546,15 +530,14 @@ describe('processContentExtraction', () => {
       expect(mockPrismaDiscoveryUpdate).not.toHaveBeenCalled();
       expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
         where: { id: 'podcast-001' },
-        data: { status: 'SCRIPTING' },
+        data: { status: 'RESEARCHING' },
       });
       expect(mockAddJob).toHaveBeenCalledWith(
-        { name: 'script-generation' },
-        'generate_script',
+        { name: 'deep-research' },
+        'deep_research',
         expect.objectContaining({
           podcastId: 'podcast-001',
           discoveryId: 'discovery-existing',
-          sourceContent: 'Already extracted content',
         }),
         { jobId: expect.any(String) },
       );
@@ -573,7 +556,7 @@ describe('processContentExtraction', () => {
       await processContentExtraction(job);
 
       expect(mockInvalidatePodcastCache).toHaveBeenCalledWith('podcast-001');
-      expect(mockPublishPodcastStatus).toHaveBeenCalledWith('podcast-001', { status: 'SCRIPTING' });
+      expect(mockPublishPodcastStatus).toHaveBeenCalledWith('podcast-001', { status: 'RESEARCHING' });
     });
 
     it('proceeds normally when sourceContent is null', async () => {
