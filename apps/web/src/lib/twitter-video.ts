@@ -73,7 +73,19 @@ export async function transcribeVideoFromUrl(videoUrl: string): Promise<string |
       return null;
     }
 
+    // Size cap: reject videos over 100MB to prevent memory/cost abuse
+    const MAX_VIDEO_BYTES = 100 * 1024 * 1024;
+    const contentLength = parseInt(response.headers.get('content-length') || '0', 10);
+    if (contentLength > MAX_VIDEO_BYTES) {
+      logger.warn('Video too large for transcription', { bytes: String(contentLength), max: String(MAX_VIDEO_BYTES) });
+      return null;
+    }
+
     const buffer = Buffer.from(await response.arrayBuffer());
+    if (buffer.byteLength > MAX_VIDEO_BYTES) {
+      logger.warn('Video too large for transcription (post-download)', { bytes: String(buffer.byteLength) });
+      return null;
+    }
     await writeFile(videoPath, buffer);
 
     // Extract audio with FFmpeg
