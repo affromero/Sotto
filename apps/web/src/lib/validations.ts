@@ -886,6 +886,15 @@ export const generatedScriptSchema = z.object({
     yearHint: z.number().int().nullish(),
     significance: z.string().nullish(),
   })).catch([]),
+  vocabulary: z.array(z.object({
+    number: z.number().int().positive(),
+    word: z.string().min(1),
+    translation: z.string().min(1),
+    partOfSpeech: z.string().nullish(),
+    pronunciation: z.string().nullish(),
+    exampleSentence: z.string().nullish(),
+    difficulty: z.string().nullish(),
+  })).catch([]),
 });
 
 /**
