@@ -258,10 +258,10 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
     if (references.length > 0 && verificationMode !== 'showcase') {
       await prisma.podcast.update({
         where: { id: podcastId },
-        data: { status: 'VALIDATING_REFERENCES' },
+        data: { status: 'COMPILING' },
       });
       await invalidatePodcastCache(podcastId);
-      await publishPodcastStatus(podcastId, { status: 'VALIDATING_REFERENCES' });
+      await publishPodcastStatus(podcastId, { status: 'COMPILING' });
 
       await addJob(referenceValidationQueue, JobType.VALIDATE_REFERENCES, {
         podcastId,

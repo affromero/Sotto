@@ -28,6 +28,10 @@ async function getCachedAdminUsers(): Promise<Array<{ id: string; telegramChatId
  */
 export enum JobType {
   EXTRACT_CONTENT = 'extract_content',
+  DEEP_RESEARCH = 'deep_research',
+  CREATIVE_PLANNING = 'creative_planning',
+  WRITE_SCRIPT = 'write_script',
+  COMPILE_SCRIPT = 'compile_script',
   GENERATE_SCRIPT = 'generate_script',
   VERIFY_SCRIPT = 'verify_script',
   VALIDATE_REFERENCES = 'validate_references',
@@ -152,6 +156,36 @@ export interface ValidateReferencesPayload {
   referenceRetryAttempt?: number; // 0-based, undefined = first pass
   previousVerifiedCount?: number; // for early termination (going backward = stop)
   previouslyVerifiedRefIds?: string[]; // skip re-verification on retry
+}
+
+export interface DeepResearchPayload {
+  podcastId: string;
+  userId: string;
+  discoveryId: string;
+  useAdminCredits?: boolean;
+}
+
+export interface CreativePlanningPayload {
+  podcastId: string;
+  userId: string;
+  discoveryId: string;
+  dossierId: string;
+  useAdminCredits?: boolean;
+}
+
+export interface WriteScriptPayload {
+  podcastId: string;
+  userId: string;
+  discoveryId: string;
+  dossierId: string;
+  outlineId: string;
+  useAdminCredits?: boolean;
+  sourceUrls?: string[];
+}
+
+export interface CompileScriptPayload {
+  podcastId: string;
+  userId: string;
 }
 
 export interface VerifyVoicePayload {
@@ -1029,6 +1063,10 @@ export function createWorker<T>(
  * Predefined queues
  */
 export const contentExtractionQueue = createQueueReference('content-extraction');
+export const deepResearchQueue = createQueueReference('deep-research');
+export const creativePlanningQueue = createQueueReference('creative-planning');
+export const scriptWritingQueue = createQueueReference('script-writing');
+export const compileScriptQueue = createQueueReference('compile-script');
 export const scriptGenerationQueue = createQueueReference('script-generation');
 export const audioGenerationQueue = createQueueReference('audio-generation');
 export const audioStitchingQueue = createQueueReference('audio-stitching');

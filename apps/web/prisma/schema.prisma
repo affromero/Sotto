@@ -455,6 +455,8 @@ model Podcast {
   quiz                PodcastQuiz?
   briefingLogs        BriefingLog[]
   landingShowcase     LandingShowcase?
+  researchDossier     ResearchDossier?
+  creativeOutline     CreativeOutline?
 
   @@unique([userId, slug])
   @@index([userId])
@@ -471,9 +473,10 @@ enum PodcastStatus {
   PENDING
   DISCOVERING
   EXTRACTING
+  RESEARCHING
+  PLANNING
   SCRIPTING
-  VERIFYING_SCRIPT
-  VALIDATING_REFERENCES
+  COMPILING
   SCRIPT_READY
   GENERATING_AUDIO
   STITCHING
@@ -483,6 +486,51 @@ enum PodcastStatus {
   IMPORTING
   TRANSCRIBING
   DUPLICATE_REVIEW
+}
+
+model ResearchDossier {
+  id        String   @id @default(cuid())
+  podcastId String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  mode      String // 'source-bound' | 'curated' | 'open-web'
+  userBrief Json   // { topic, audienceLevel, tone, durationTarget, mustCover, mustAvoid, suppliedSourceUrls, discoverySummary }
+  sources   Json   // SourceRecord[]
+  evidence  Json   // EvidenceCard[]
+  gaps      Json?  // string[] — identified knowledge gaps
+  blockedClaims Json? // string[] — claims that couldn't be verified
+  recommendedAngle String? @db.Text
+
+  totalInputTokens  Int @default(0)
+  totalOutputTokens Int @default(0)
+  model             String?
+
+  podcast Podcast @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+}
+
+model CreativeOutline {
+  id        String   @id @default(cuid())
+  podcastId String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  drivingQuestion    String @db.Text
+  listenerPromise    String @db.Text
+  thesis             String @db.Text
+  narrativeFramework String // 'anecdote_reflection' | 'question_cascade' | 'problem_solution' | 'editorial_comedy'
+  hook               String @db.Text
+  beats              Json   // Beat[]
+  tensionCurve       Json?  // { beatOrder, tension }[]
+  bannedAngles       Json?  // string[]
+  unresolvedQuestions Json? // string[]
+  speakerRoles       Json?  // { speaker, role }[]
+
+  inputTokens  Int @default(0)
+  outputTokens Int @default(0)
+  model        String?
+
+  podcast Podcast @relation(fields: [podcastId], references: [id], onDelete: Cascade)
 }
 
 enum PodcastVisibility {

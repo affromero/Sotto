@@ -1,5 +1,5 @@
 import { Job } from 'bullmq';
-import { GenerateScriptPayload, addJob, JobType, scriptVerificationQueue } from '@/lib/queue';
+import { GenerateScriptPayload, addJob, JobType, compileScriptQueue } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { generateScript, generateScriptWithUserFeedback, type SourceMetadata } from '@/lib/script-generator';
 import { extractContent } from '@/lib/extractors';
@@ -26,21 +26,19 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
   });
 
   if (existingScript) {
-    logger.info('Script already exists, skipping to verification', { podcastId });
+    logger.info('Script already exists, skipping to compile', { podcastId });
 
     await prisma.podcast.update({
       where: { id: podcastId },
-      data: { status: 'VERIFYING_SCRIPT' },
+      data: { status: 'COMPILING' },
     });
     await invalidatePodcastCache(podcastId);
-    await publishPodcastStatus(podcastId, { status: 'VERIFYING_SCRIPT' });
+    await publishPodcastStatus(podcastId, { status: 'COMPILING' });
 
-    await addJob(scriptVerificationQueue, JobType.VERIFY_SCRIPT, {
+    await addJob(compileScriptQueue, JobType.COMPILE_SCRIPT, {
       podcastId,
       userId,
-      discoveryId,
-      useAdminCredits,
-    }, { jobId: `verify-${podcastId}-1-${Date.now()}` });
+    }, { jobId: `compile-${podcastId}-${Date.now()}` });
 
     await job.updateProgress(100);
     return;
@@ -292,27 +290,25 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
   }
   await Promise.all(tagUpserts);
 
-  // Route to script verification (handles both with and without references)
+  // Route to compile/QC step
   await prisma.podcast.update({
     where: { id: podcastId },
     data: {
-      status: 'VERIFYING_SCRIPT',
+      status: 'COMPILING',
       aiProvider: model.startsWith('claude-code:') ? 'claude-code' : provider,
       aiModel: model,
       language: detectedLanguage ?? undefined,
     },
   });
   await invalidatePodcastCache(podcastId);
-  await publishPodcastStatus(podcastId, { status: 'VERIFYING_SCRIPT' });
+  await publishPodcastStatus(podcastId, { status: 'COMPILING' });
 
-  await addJob(scriptVerificationQueue, JobType.VERIFY_SCRIPT, {
+  await addJob(compileScriptQueue, JobType.COMPILE_SCRIPT, {
     podcastId,
     userId,
-    discoveryId,
-    useAdminCredits,
-  }, { jobId: `verify-${podcastId}-1` });
+  }, { jobId: `compile-${podcastId}-${Date.now()}` });
 
-  logger.info('Script queued for verification', {
+  logger.info('Script queued for compilation', {
     podcastId,
     references: String(result.references.length),
   });
