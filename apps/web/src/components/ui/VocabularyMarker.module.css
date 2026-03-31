@@ -1,0 +1,129 @@
+.wrapper {
+  position: relative;
+  display: inline;
+}
+
+.marker {
+  /* Button reset */
+  appearance: none;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  line-height: inherit;
+  text-align: inherit;
+  /* Marker styles */
+  position: relative;
+  display: inline;
+  cursor: pointer;
+  color: var(--color-accent, #1E3A5F);
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--color-accent, #1E3A5F);
+  font-weight: 600;
+  transition: color var(--transition-fast), text-decoration-color var(--transition-fast);
+}
+
+.marker:hover {
+  color: var(--color-primary);
+  text-decoration-color: var(--color-primary);
+}
+
+.marker:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Expand touch target on coarse pointers */
+.marker::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 28px;
+  height: 28px;
+}
+
+@media (pointer: coarse) {
+  .marker::after {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+.tooltip {
+  position: fixed;
+  z-index: var(--z-dropdown);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: var(--spacing-md);
+  width: 320px;
+  max-width: calc(100vw - 16px);
+  animation: fadeIn 150ms ease;
+}
+
+.above {
+  transform: translateY(-100%);
+}
+
+.tooltipHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-xs);
+}
+
+.tooltipWord {
+  font-family: var(--font-heading);
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  color: var(--color-accent, #1E3A5F);
+  line-height: 1.3;
+}
+
+.posBadge {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-inverse);
+  background: var(--color-accent, #1E3A5F);
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+}
+
+.pronunciation {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  font-style: italic;
+  margin: 0 0 var(--spacing-xs);
+}
+
+.translation {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0 0 var(--spacing-xs);
+}
+
+.example {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  line-height: 1.5;
+  margin: 0;
+  padding-top: var(--spacing-xs);
+  border-top: 1px solid var(--color-border);
+}
+
+@media (max-width: 768px) {
+  .tooltip {
+    width: 280px;
+  }
+}

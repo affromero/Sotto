@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { LANGUAGE_DISPLAY } from '@sotto/shared';
 import styles from './BriefingSettings.module.css';
 
 export const DEPTH_OPTIONS = [
@@ -41,6 +42,12 @@ export const FORMAT_OPTIONS = [
   { value: 4, label: 'Roundtable (4 voices)' },
 ];
 
+export const LANGUAGE_MODE_OPTIONS = [
+  { value: 'vocabulary_intro', label: 'Vocabulary intro (mostly English)' },
+  { value: 'conversational_mix', label: 'Conversational mix' },
+  { value: 'full_immersion', label: 'Full immersion' },
+];
+
 interface VoiceOption {
   id: string;
   name: string;
@@ -68,6 +75,8 @@ export interface BriefingFormData {
   contextEpisodes: number;
   visibility: string;
   useByokKeys: boolean;
+  targetLanguage: string | null;
+  languageMode: string | null;
 }
 
 interface BriefingFormProps {
@@ -152,6 +161,8 @@ export function BriefingForm({
   const [continuousLearning, setContinuousLearning] = useState(initial?.continuousLearning ?? false);
   const [contextEpisodes, setContextEpisodes] = useState(initial?.contextEpisodes ?? 3);
   const [useByokKeys, setUseByokKeys] = useState(initial?.useByokKeys ?? false);
+  const [targetLanguage, setTargetLanguage] = useState(initial?.targetLanguage ?? '');
+  const [languageMode, setLanguageMode] = useState(initial?.languageMode ?? 'conversational_mix');
 
   const [voiceOptions, setVoiceOptions] = useState<VoiceOption[]>([]);
   const [voicesLoading, setVoicesLoading] = useState(false);
@@ -234,6 +245,8 @@ export function BriefingForm({
       contextEpisodes,
       visibility,
       useByokKeys,
+      targetLanguage: targetLanguage || null,
+      languageMode: targetLanguage && targetLanguage !== 'en' ? languageMode : null,
     };
   };
 
@@ -464,6 +477,50 @@ export function BriefingForm({
               <option key={o.value} value={String(o.value)}>{o.label}</option>
             ))}
           </select>
+        </div>
+        <div className={styles.fieldRow}>
+          <div className={styles.field}>
+            <label className={styles.label}>Language</label>
+            <select
+              className={styles.select}
+              value={targetLanguage}
+              onChange={(e) => {
+                const val = e.target.value;
+                setTargetLanguage(val);
+                if (!val || val === 'en') {
+                  setLanguageMode('conversational_mix');
+                  autoSave({ targetLanguage: val || null, languageMode: null });
+                } else {
+                  autoSave({ targetLanguage: val });
+                }
+              }}
+              aria-label="Briefing language"
+            >
+              <option value="">Auto (English)</option>
+              {Object.entries(LANGUAGE_DISPLAY).map(([code, name]) => (
+                <option key={code} value={code}>{name}</option>
+              ))}
+            </select>
+          </div>
+          {targetLanguage && targetLanguage !== 'en' && (
+            <div className={styles.field}>
+              <label className={styles.label}>Language Mode</label>
+              <select
+                className={styles.select}
+                value={languageMode}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setLanguageMode(val);
+                  autoSave({ languageMode: val });
+                }}
+                aria-label="Language learning mode"
+              >
+                {LANGUAGE_MODE_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
       </div>
 

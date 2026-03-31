@@ -322,6 +322,7 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
       ...r,
       verificationDetails: r.verificationDetails as Record<string, unknown> | null,
     })),
+    vocabularyEntries: podcast.vocabularyEntries,
     pdfUrl: podcast.pdfUrl,
     videoUrl: resolvedVideoUrl ?? null,
     musicUrl: resolvedMusicUrl ?? null,

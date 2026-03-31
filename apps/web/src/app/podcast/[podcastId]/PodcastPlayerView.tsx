@@ -34,6 +34,7 @@ import { AudioPlayer } from '@/components/player/AudioPlayer';
 import { TranscriptPanel } from '@/components/player/TranscriptPanel';
 import { Teleprompter } from '@/components/player/Teleprompter';
 import { ReferenceList } from '@/components/player/ReferenceList';
+import { VocabularyList } from '@/components/player/VocabularyList';
 import { InterruptChatPanel } from '@/components/player/InterruptChatPanel';
 import { ForkAttribution } from '@/components/player/ForkAttribution';
 import { ForkLineage } from '@/components/player/ForkLineage';
@@ -1504,6 +1505,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
                 <TranscriptPanel
                   segments={podcast.segments}
                   references={podcast.references}
+                  vocabularyEntries={podcast.vocabularyEntries}
                   currentTime={currentTime}
                   onSegmentClick={handleSegmentClick}
                   questionCounts={isOwner ? questionCounts : undefined}
@@ -1548,6 +1550,13 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
       {podcast.references.length > 0 && (
         <section className={styles.referencesSection}>
           <ReferenceList references={podcast.references} />
+        </section>
+      )}
+
+      {/* Vocabulary — after references (language learning podcasts) */}
+      {podcast.vocabularyEntries && podcast.vocabularyEntries.length > 0 && (
+        <section className={styles.referencesSection}>
+          <VocabularyList vocabularyEntries={podcast.vocabularyEntries} />
         </section>
       )}
 
