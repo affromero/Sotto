@@ -152,7 +152,7 @@ echo ""
 echo "=== Running database migrations ==="
 docker compose -f "$COMPOSE_APP" -p "sotto-${NEW_SLOT}" run --rm --no-deps \
   -e DATABASE_URL="${DIRECT_DATABASE_URL:-$DATABASE_URL}" \
-  web npx prisma@6 db push --skip-generate --schema=prisma/schema.prisma
+  web npx prisma@6 db push --skip-generate --schema=prisma/schema.prisma --accept-data-loss
 
 # --- Start new slot ---
 
