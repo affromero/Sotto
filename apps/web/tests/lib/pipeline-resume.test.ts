@@ -10,6 +10,8 @@ const mockDiscoveryFindUnique = vi.fn();
 const mockScriptFindUnique = vi.fn();
 const mockReferenceFindMany = vi.fn();
 const mockSegmentFindMany = vi.fn();
+const mockResearchDossierFindUnique = vi.fn();
+const mockCreativeOutlineFindUnique = vi.fn();
 
 vi.mock('@/lib/prisma', () => {
   const _mockPrisma = {
@@ -30,6 +32,12 @@ vi.mock('@/lib/prisma', () => {
     },
     segment: {
       findMany: (...args: unknown[]) => mockSegmentFindMany(...args),
+    },
+    researchDossier: {
+      findUnique: (...args: unknown[]) => mockResearchDossierFindUnique(...args),
+    },
+    creativeOutline: {
+      findUnique: (...args: unknown[]) => mockCreativeOutlineFindUnique(...args),
     },
   };
   return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
@@ -180,6 +188,8 @@ describe('determineResumePoint', () => {
     mockScriptFindUnique.mockResolvedValue(null);
     mockReferenceFindMany.mockResolvedValue([]);
     mockSegmentFindMany.mockResolvedValue([]);
+    mockResearchDossierFindUnique.mockResolvedValue(null);
+    mockCreativeOutlineFindUnique.mockResolvedValue(null);
   });
 
   it('returns IMPORT_AUDIO for import source podcasts', async () => {
@@ -216,7 +226,6 @@ describe('determineResumePoint', () => {
         { speaker: 'EXPERT', text: 'Hi' },
         { speaker: 'HOST', text: 'Bye' },
       ],
-      verificationAttempts: 1,
     });
     mockSegmentFindMany.mockResolvedValue([
       { id: 'seg-1', audioUrl: 'https://cdn.example.com/seg1.mp3' },
@@ -238,7 +247,6 @@ describe('determineResumePoint', () => {
         { speaker: 'HOST', text: 'Hello' },
         { speaker: 'EXPERT', text: 'Hi' },
       ],
-      verificationAttempts: 1,
     });
     // 3 segments but only 2 script turns → stale segments
     mockSegmentFindMany.mockResolvedValue([
@@ -252,109 +260,40 @@ describe('determineResumePoint', () => {
     expect(result).toEqual({ step: 'SCRIPT_READY' });
   });
 
-  it('returns SCRIPT_READY when all refs validated and no segments', async () => {
+  it('returns COMPILE_SCRIPT when script exists but no segments', async () => {
     mockScriptFindUnique.mockResolvedValue({
       turns: [{ speaker: 'HOST', text: 'Hello' }],
-      verificationAttempts: 1,
-    });
-    mockReferenceFindMany.mockResolvedValue([
-      { id: 'ref-1', verificationStatus: 'VERIFIED' },
-      { id: 'ref-2', verificationStatus: 'REPLACED' },
-    ]);
-
-    const result = await determineResumePoint('podcast-001');
-
-    expect(result).toEqual({ step: 'SCRIPT_READY' });
-  });
-
-  it('returns VALIDATE_REFERENCES when some refs still PENDING', async () => {
-    mockScriptFindUnique.mockResolvedValue({
-      turns: [{ speaker: 'HOST', text: 'Hello' }],
-      verificationAttempts: 1,
-    });
-    mockReferenceFindMany.mockResolvedValue([
-      { id: 'ref-1', verificationStatus: 'VERIFIED' },
-      { id: 'ref-2', verificationStatus: 'PENDING' },
-    ]);
-
-    const result = await determineResumePoint('podcast-001');
-
-    expect(result).toEqual({ step: 'VALIDATE_REFERENCES' });
-  });
-
-  it('returns GENERATE_SCRIPT when script failed verification 3x with no validated refs', async () => {
-    mockScriptFindUnique.mockResolvedValue({
-      turns: [{ speaker: 'HOST', text: 'Bad script' }],
-      verificationAttempts: 3,
-    });
-    // All refs still PENDING (or no refs at all)
-    mockReferenceFindMany.mockResolvedValue([]);
-
-    const result = await determineResumePoint('podcast-001');
-
-    expect(result).toEqual({ step: 'GENERATE_SCRIPT' });
-  });
-
-  it('preserves script that passed on 3rd attempt with validated refs', async () => {
-    mockScriptFindUnique.mockResolvedValue({
-      turns: [{ speaker: 'HOST', text: 'Good script on 3rd try' }],
-      verificationAttempts: 3,
-    });
-    mockReferenceFindMany.mockResolvedValue([
-      { id: 'ref-1', verificationStatus: 'VERIFIED' },
-    ]);
-
-    const result = await determineResumePoint('podcast-001');
-
-    // Should NOT return GENERATE_SCRIPT — the script was good
-    expect(result).toEqual({ step: 'SCRIPT_READY' });
-  });
-
-  it('returns VERIFY_SCRIPT when script exists but never verified', async () => {
-    mockScriptFindUnique.mockResolvedValue({
-      turns: [{ speaker: 'HOST', text: 'New script' }],
-      verificationAttempts: 0,
     });
 
     const result = await determineResumePoint('podcast-001');
 
-    expect(result).toEqual({ step: 'VERIFY_SCRIPT' });
+    expect(result).toEqual({ step: 'COMPILE_SCRIPT' });
   });
 
-  it('returns VERIFY_SCRIPT when mid-verification (1 attempt, all refs PENDING)', async () => {
-    mockScriptFindUnique.mockResolvedValue({
-      turns: [{ speaker: 'HOST', text: 'Script' }],
-      verificationAttempts: 1,
-    });
-    mockReferenceFindMany.mockResolvedValue([
-      { id: 'ref-1', verificationStatus: 'PENDING' },
-    ]);
+  it('returns WRITE_SCRIPT when creative outline exists but no script', async () => {
+    mockCreativeOutlineFindUnique.mockResolvedValue({ id: 'outline-001' });
 
     const result = await determineResumePoint('podcast-001');
 
-    expect(result).toEqual({ step: 'VERIFY_SCRIPT' });
+    expect(result).toEqual({ step: 'WRITE_SCRIPT' });
   });
 
-  it('returns VERIFY_SCRIPT when mid-verification (2 attempts)', async () => {
-    mockScriptFindUnique.mockResolvedValue({
-      turns: [{ speaker: 'HOST', text: 'Script' }],
-      verificationAttempts: 2,
-    });
-    mockReferenceFindMany.mockResolvedValue([]);
+  it('returns CREATIVE_PLANNING when research dossier exists but no outline', async () => {
+    mockResearchDossierFindUnique.mockResolvedValue({ id: 'dossier-001' });
 
     const result = await determineResumePoint('podcast-001');
 
-    expect(result).toEqual({ step: 'VERIFY_SCRIPT' });
+    expect(result).toEqual({ step: 'CREATIVE_PLANNING' });
   });
 
-  it('returns GENERATE_SCRIPT when discovery has sourceContent but no script', async () => {
+  it('returns DEEP_RESEARCH when discovery has sourceContent but no dossier', async () => {
     mockDiscoveryFindUnique.mockResolvedValue({
       sourceContent: 'Extracted article content...',
     });
 
     const result = await determineResumePoint('podcast-001');
 
-    expect(result).toEqual({ step: 'GENERATE_SCRIPT' });
+    expect(result).toEqual({ step: 'DEEP_RESEARCH' });
   });
 
   it('returns EXTRACT_CONTENT when nothing exists', async () => {

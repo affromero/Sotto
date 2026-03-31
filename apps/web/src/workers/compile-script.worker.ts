@@ -152,6 +152,14 @@ export async function processCompileScript(job: Job<CompileScriptPayload>): Prom
     const lateTtsKey = isByok ? ((await getByokKey(userId, lateProvider)) ?? undefined) : undefined;
     await assignVoicesForPodcast(podcastId, lateSpeakers, lateProvider, lateTtsKey ?? undefined);
 
+    // Set GENERATING_AUDIO before creating segments — audio worker expects this status
+    await prisma.podcast.update({
+      where: { id: podcastId },
+      data: { status: 'GENERATING_AUDIO' },
+    });
+    await invalidatePodcastCache(podcastId);
+    await publishPodcastStatus(podcastId, { status: 'GENERATING_AUDIO' });
+
     await createSegmentsAndQueueAudio(podcastId, result.turns);
 
     logger.info('Script compiled and auto-approved, audio generation queued', { podcastId });
