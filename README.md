@@ -1,5 +1,14 @@
 <div align="center">
 
+[![CI](https://github.com/SottoFM/Sotto/actions/workflows/ci.yml/badge.svg)](https://github.com/SottoFM/Sotto/actions/workflows/ci.yml)
+[![Deploy](https://github.com/SottoFM/Sotto/actions/workflows/deploy.yml/badge.svg)](https://github.com/SottoFM/Sotto/actions/workflows/deploy.yml)
+[![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](https://nextjs.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue?logo=typescript&logoColor=white)](https://typescriptlang.org)
+[![Prisma](https://img.shields.io/badge/Prisma-6-2D3748?logo=prisma)](https://prisma.io)
+[![BullMQ](https://img.shields.io/badge/BullMQ-Redis-DC382D?logo=redis&logoColor=white)](https://docs.bullmq.io)
+[![Socket Badge](https://socket.dev/api/badge/npm/package/@sotto/web)](https://socket.dev/npm/package/@sotto/web)
+[![min-release-age](https://img.shields.io/badge/min--release--age-7%20days-brightgreen)](https://docs.npmjs.com/cli/v10/using-npm/config#min-release-age)
+
 # Sotto
 
 ### Every voice. Every topic. One feed.
