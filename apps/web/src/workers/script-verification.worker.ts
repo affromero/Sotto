@@ -32,6 +32,7 @@ import type { TtsProviderId } from '@/lib/providers/tts-registry';
 import { getTierFeatures } from '@/lib/tier-features';
 import { logger } from '@/lib/logger';
 import { logPipelineStageComplete } from '@/lib/pipeline-events';
+import { buildRenumberMap, cleanAndRenumberCitations } from '@/lib/script-updater';
 
 const MAX_VERIFICATION_ATTEMPTS = 4;
 
@@ -575,7 +576,8 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
     apiKeyOverride: aiKey?.apiKey,
     model,
     provider,
-    webSearchEnabled: hasUncoveredClaims,
+    // Always enable web search in revision — misattributed and under-sourced claims need it too
+    webSearchEnabled: true,
   });
 
   await job.updateProgress(80);
@@ -622,9 +624,24 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
     // Filter banned refs from the kept set to avoid re-verifying the same bad sources
     const cleanedRefs = generatedRefs.filter((r) => !bannedRefNumbers.has(r.number));
     if (cleanedRefs.length > 0) {
+      // Clean stale citation markers from turns that reference removed refs
+      const allRefNumbers = generatedRefs.map((r) => r.number);
+      const renumberMap = buildRenumberMap(allRefNumbers, bannedRefNumbers);
+      const cleanedTurns = cleanAndRenumberCitations(
+        revised.turns as Array<{ speaker: string; text: string; direction?: string }>,
+        bannedRefNumbers,
+        renumberMap,
+      );
+
+      // Renumber the kept refs to match the cleaned citations
+      const renumberedRefs = cleanedRefs.map((ref) => ({
+        ...ref,
+        number: renumberMap.get(ref.number) ?? ref.number,
+      }));
+
       await prisma.reference.deleteMany({ where: { podcastId } });
       await prisma.reference.createMany({
-        data: cleanedRefs.map((ref) => ({
+        data: renumberedRefs.map((ref) => ({
           podcastId,
           number: ref.number,
           title: ref.title,
@@ -636,7 +653,14 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
           doi: ref.doi,
         })),
       });
-      logger.info('Filtered banned refs from kept set', {
+
+      // Update saved turns with cleaned citations
+      await prisma.script.update({
+        where: { podcastId },
+        data: { turns: cleanedTurns },
+      });
+
+      logger.info('Filtered banned refs and cleaned citations', {
         podcastId,
         removed: String(bannedRefNumbers.size),
         remaining: String(cleanedRefs.length),
