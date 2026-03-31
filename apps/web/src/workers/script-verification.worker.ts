@@ -12,9 +12,6 @@ import { Prisma } from '@prisma/client';
 import { markPodcastFailed } from '@/lib/pipeline-resume';
 import { invalidatePodcastCache, publishPodcastStatus } from '@/lib/redis';
 import { verifyScript, type ClaimAnalysis } from '@/lib/script-verifier';
-import { groundReferenceCandidates, type GroundingInput } from '@/lib/reference-verification';
-import { classifyReference } from '@sottofm/verification-standard';
-import type { ReferenceInput } from '@/lib/reference-validator';
 import {
   generateScriptWithFeedback,
   type ScriptTurn,
@@ -425,134 +422,32 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
     feedback: verdict.feedback.substring(0, 200),
   });
 
-  // --- Grounding: search for real replacements for flagged references ---
+  // --- Build repair context for the revision call ---
   const repairMode = getRepairMode(attemptNumber);
-  const flaggedRefNumbers = new Set<number>();
   const bannedRefNumbers = new Set<number>();
 
   for (const claim of verdict.unreliableSourceClaims) {
     const badCitations = claim.unreliableCitations?.length ? claim.unreliableCitations : (claim.existingCitations ?? []);
-    for (const n of badCitations) {
-      flaggedRefNumbers.add(n);
-      bannedRefNumbers.add(n);
-    }
+    for (const n of badCitations) bannedRefNumbers.add(n);
   }
 
-  // Build grounding inputs for ALL flagged refs (no cap)
-  const groundingInputs: GroundingInput[] = [];
+  await job.updateProgress(65);
 
-  for (const refNum of flaggedRefNumbers) {
-    const ref = generatedRefs.find((r) => r.number === refNum);
-    if (!ref) continue;
+  // Web search strategy: off for early retries (fast text-only revision),
+  // enabled only on the final retry and only when there are few unresolved claims.
+  const isLastRetry = attemptNumber >= MAX_VERIFICATION_ATTEMPTS - 1;
+  const fewUnresolved = (verdict.unsupportedClaims.length + verdict.unreliableSourceClaims.length) <= 3;
+  const useWebSearchForRevision = isLastRetry && fewUnresolved;
 
-    const refInput: ReferenceInput = {
-      id: `ref-${refNum}`,
-      number: ref.number,
-      title: ref.title,
-      authors: ref.authors ?? [],
-      year: ref.year ?? null,
-      url: ref.url ?? null,
-      doi: ref.doi ?? null,
-      type: ref.type,
-    };
-
-    const relatedClaims = [...verdict.unreliableSourceClaims, ...verdict.unsupportedClaims]
-      .filter((c) => c.existingCitations.includes(refNum) || c.unreliableCitations?.includes(refNum));
-    const claimContext = {
-      sentences: relatedClaims.map((c) => c.claimText),
-      speakerTurns: relatedClaims.map((c) => c.speaker),
-    };
-
-    const domain = classifyReference({ doi: ref.doi ?? null, url: ref.url ?? null, type: ref.type });
-    groundingInputs.push({
-      ref: refInput,
-      domain,
-      claimContext,
-      allChecks: [],
-      reason: 'unreliable_source',
-    });
-  }
-
-  // Synthetic grounding inputs for unsupported claims (0 citations) — these never
-  // had a ref to look up, so we create a synthetic one from the claim text itself.
-  for (const claim of verdict.unsupportedClaims) {
-    const syntheticId = `claim-${claim.turnIndex}`;
-    // Skip if we already have a grounding input for this claim via its citations
-    if (claim.existingCitations.some((n) => flaggedRefNumbers.has(n))) continue;
-
-    groundingInputs.push({
-      ref: {
-        id: syntheticId,
-        number: -claim.turnIndex, // Negative number signals synthetic
-        title: claim.claimText.slice(0, 120),
-        authors: [],
-        year: null,
-        url: null,
-        doi: null,
-        type: 'WEB',
-      },
-      domain: 'GENERAL',
-      claimContext: {
-        sentences: [claim.claimText],
-        speakerTurns: [claim.speaker],
-      },
-      allChecks: [],
-      reason: 'all_checks_failed',
-    });
-  }
-
-  type GroundedHint = NonNullable<Parameters<typeof generateScriptWithFeedback>[0]['groundedReferenceHints']>[number];
-  let groundedHints: GroundedHint[] | undefined;
-  let hasUncoveredClaims = verdict.unsupportedClaims.length > 0;
-
-  if (groundingInputs.length > 0) {
-    await job.updateProgress(63);
-
-    const groundingResults = await groundReferenceCandidates(
-      groundingInputs,
-      discovery.topic || '',
-      aiKey?.apiKey,
-      model,
-      provider,
-    );
-
-    await job.updateProgress(68);
-
-    groundedHints = groundingInputs
-      .map((input) => {
-        const result = groundingResults.get(input.ref.id);
-        const claimText = input.claimContext.sentences[0] ?? '';
-        if (result?.passed && result.replacement) {
-          return {
-            refNumber: input.ref.number,
-            originalTitle: input.ref.title,
-            originalUrl: input.ref.url,
-            found: true,
-            replacement: result.replacement,
-            claimText,
-            reasoning: result.detail ?? 'Verified replacement source found',
-          };
-        }
-        return {
-          refNumber: input.ref.number,
-          originalTitle: input.ref.title,
-          originalUrl: input.ref.url,
-          found: false,
-          claimText,
-          reasoning: 'Could not find a verifiable source — claim should be removed or rewritten',
-        };
-      });
-
-    hasUncoveredClaims = hasUncoveredClaims || groundedHints.some((h) => !h.found);
-
-    logger.info('Grounding complete for verification retry', {
-      podcastId,
-      repairMode,
-      flagged: String(groundingInputs.length),
-      grounded: String(groundedHints.filter((h) => h.found).length),
-      unverifiable: String(groundedHints.filter((h) => !h.found).length),
-    });
-  }
+  logger.info('Revision strategy', {
+    podcastId,
+    repairMode,
+    attempt: String(attemptNumber),
+    webSearch: String(useWebSearchForRevision),
+    unreliable: String(verdict.unreliableSourceClaims.length),
+    unsupported: String(verdict.unsupportedClaims.length),
+    banned: String(bannedRefNumbers.size),
+  });
 
   const sourceMetadata = discovery.sourceMetadata as SourceMetadata | null;
 
@@ -570,14 +465,12 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
     previousScript: turns,
     previousReferences: generatedRefs,
     verificationFeedback: verdict.feedback,
-    groundedReferenceHints: groundedHints,
     repairMode,
     bannedRefNumbers: [...bannedRefNumbers],
     apiKeyOverride: aiKey?.apiKey,
     model,
     provider,
-    // Always enable web search in revision — misattributed and under-sourced claims need it too
-    webSearchEnabled: true,
+    webSearchEnabled: useWebSearchForRevision,
   });
 
   await job.updateProgress(80);

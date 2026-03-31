@@ -45,22 +45,22 @@ Note: These sources may be acceptable for definitions, opinions, or practical ad
 ## Audience Level Context:
 Level "{{AUDIENCE_LEVEL}}" — adjust expectations accordingly. Expert-level content needs stricter sourcing.
 
-## Web Search:
-You have access to web search. Use it to:
-- Verify whether cited sources actually exist (search for the title, authors, and publication)
-- Cross-check specific factual claims against current, authoritative sources
-- Find real sources to suggest as replacements for unverifiable citations
-Do NOT rely solely on your training data — actively search to confirm or refute each non-obvious claim.
+## Verification Method:
+You do NOT have web search. Evaluate the script using ONLY:
+- The reference metadata provided (title, authors, year, URL, DOI, type)
+- The source reliability tiers above (check domains against the unreliable list)
+- Your training knowledge for common-knowledge classification only
+Do NOT try to verify whether sources actually exist — that is handled by a separate pipeline stage. Your job is to check that every claim HAS a citation and that cited sources are from reliable domains.
 
 ## Credential Claims — Extra Scrutiny:
 When the script attributes credentials to a named person (e.g., "Dr. Smith, a physicist at MIT"),
 this is a HIGH-RISK factual claim. You must:
 1. Flag it as REQUIRES_SOURCING regardless of context
-2. Use web search to verify: does this person exist? Do they hold this title at this institution?
+2. Check if the credential claim has a citation and if the cited reference metadata matches
 3. If the source material includes [VERIFIED] credential markers, cross-check that the script
    faithfully reproduces them without embellishment
-4. If a credential claim appears that is NOT in the source material and cannot be verified via
-   web search, flag it as UNSUPPORTED and request removal or correction
+4. If a credential claim has no citation or the reference doesn't support it,
+   flag it as UNSUPPORTED and request removal or correction
 5. Never allow a credential claim to pass as COMMON_KNOWLEDGE
 
 ## Reference Attribution Accuracy
@@ -74,4 +74,4 @@ Set hasMisattribution to true if:
 - The script states a year that doesn't match the reference's year
 - The script names specific authors not listed in the reference's authors array
 
-## This is verification attempt {{ATTEMPT_NUMBER}} of 3.
+## This is verification attempt {{ATTEMPT_NUMBER}} of 4.

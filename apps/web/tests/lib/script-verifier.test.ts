@@ -39,7 +39,7 @@ describe('verifyScript', () => {
     vi.clearAllMocks();
   });
 
-  it('passes useWebSearch to provider generateResponse', async () => {
+  it('disables web search for fast verification', async () => {
     mockGenerateResponse.mockResolvedValue({
       content: JSON.stringify({
         claims: [
@@ -74,12 +74,12 @@ describe('verifyScript', () => {
       expect.any(String),
       expect.any(Array),
       expect.objectContaining({
-        useWebSearch: true,
+        useWebSearch: false,
       })
     );
   });
 
-  it('includes web search instructions in system prompt', async () => {
+  it('includes no-search verification instructions in system prompt', async () => {
     mockGenerateResponse.mockResolvedValue({
       content: JSON.stringify({
         claims: [],
@@ -100,8 +100,7 @@ describe('verifyScript', () => {
     });
 
     const systemPrompt = mockGenerateResponse.mock.calls[0][0];
-    expect(systemPrompt).toContain('web search');
-    expect(systemPrompt).toContain('Verify whether cited sources actually exist');
+    expect(systemPrompt).toContain('do NOT have web search');
   });
 
   it('returns passed=true when all claims are common knowledge', async () => {
