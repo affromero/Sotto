@@ -178,9 +178,9 @@ function remapCitations(turns: ScriptTurn[], numberMap: Map<number, number>): Sc
   }
   if (!hasChanges) return turns;
 
-  return turns.map((turn) => ({
-    ...turn,
-    text: turn.text.replace(/\[(\d+(?:\s*,\s*\d+)*)\]/g, (_match, inner: string) => {
+  return turns.map((turn) => {
+    // Step 1: remap each citation marker
+    let text = turn.text.replace(/\[(\d+(?:\s*,\s*\d+)*)\]/g, (_match, inner: string) => {
       const remapped = inner
         .split(',')
         .map((s) => {
@@ -191,8 +191,31 @@ function remapCitations(turns: ScriptTurn[], numberMap: Map<number, number>): Sc
         .filter((v, i, arr) => arr.indexOf(v) === i)
         .sort((a, b) => a - b);
       return `[${remapped.join(',')}]`;
-    }),
-  }));
+    });
+    // Step 2: collapse adjacent duplicate markers (e.g. "[3] [3]" → "[3]")
+    text = collapseAdjacentCitations(text);
+    return { ...turn, text };
+  });
+}
+
+/**
+ * Collapse adjacent duplicate citation markers produced by remapping.
+ * Only collapses when the second group adds no new numbers:
+ * "[3] [3]" → "[3]", "[1,3] [3]" → "[1,3]", but "[1] [2]" stays as-is.
+ */
+function collapseAdjacentCitations(text: string): string {
+  return text.replace(
+    /\[(\d+(?:,\d+)*)\]\s*\[(\d+(?:,\d+)*)\]/g,
+    (match, first: string, second: string) => {
+      const firstSet = new Set(first.split(',').map(Number));
+      const secondNums = second.split(',').map(Number);
+      // Only collapse if every number in the second group is already in the first
+      if (secondNums.every((n) => firstSet.has(n))) {
+        return `[${first}]`;
+      }
+      return match;
+    }
+  );
 }
 
 const VALID_REF_TYPES = new Set(['WEB', 'PAPER', 'BOOK', 'ARTICLE', 'VIDEO', 'REPORT']);
