@@ -4,6 +4,7 @@ import { authenticateRequest } from '@/lib/api-keys';
 import { prisma } from '@/lib/prisma';
 import { errorResponse } from '@/lib/api-response';
 import { computeNextRunAt } from '@/lib/briefing-generator';
+import { SOTTO_LANGUAGE_CODES } from '@/lib/tts-language-support';
 
 const MAX_BRIEFINGS = 5;
 const MAX_ENABLED = 3;
@@ -20,6 +21,8 @@ const createBriefingSchema = z.object({
   audienceLevel: z.enum(['beginner', 'intermediate', 'expert']).nullable().optional(),
   duration: z.number().int().min(1).max(40).nullable().optional(),
   format: z.number().int().min(1).max(4).default(2),
+  targetLanguage: z.string().refine((v) => SOTTO_LANGUAGE_CODES.has(v), 'Unsupported language').nullable().optional(),
+  languageMode: z.enum(['vocabulary_intro', 'conversational_mix', 'full_immersion']).nullable().optional(),
   aiModel: z.string().max(100).nullable().optional(),
   ttsProvider: z.string().max(100).nullable().optional(),
   ttsModel: z.string().max(100).nullable().optional(),
@@ -54,6 +57,8 @@ export async function GET(request: NextRequest) {
       audienceLevel: true,
       duration: true,
       format: true,
+      targetLanguage: true,
+      languageMode: true,
       aiModel: true,
       ttsProvider: true,
       ttsModel: true,
@@ -125,6 +130,11 @@ export async function POST(request: NextRequest) {
 
   const data = parsed.data;
 
+  // Clear languageMode when targetLanguage is null or English
+  if (!data.targetLanguage || data.targetLanguage === 'en') {
+    data.languageMode = null;
+  }
+
   // If trying to create enabled and already at max enabled, force disabled
   const enabled = data.enabled && enabledCount >= MAX_ENABLED ? false : data.enabled;
 
@@ -147,6 +157,8 @@ export async function POST(request: NextRequest) {
       audienceLevel: data.audienceLevel ?? null,
       duration: data.duration ?? null,
       format: data.format,
+      targetLanguage: data.targetLanguage ?? null,
+      languageMode: data.languageMode ?? null,
       aiModel: data.aiModel ?? null,
       ttsProvider: data.ttsProvider ?? null,
       ttsModel: data.ttsModel ?? null,

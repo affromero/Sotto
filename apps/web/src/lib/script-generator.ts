@@ -7,6 +7,7 @@ import { getMinReferenceCount, getMinSeriousRatio } from './script-verifier';
 import { generatedScriptSchema } from './validations';
 import { logger } from './logger';
 import type { BiasAnalysis } from './media-bias';
+import { LANGUAGE_DISPLAY } from '@sotto/shared';
 
 
 /** Extract the first complete JSON object or array from a string containing surrounding text. */
@@ -88,6 +89,16 @@ export type GeneratedReference = {
   type: 'WEB' | 'PAPER' | 'BOOK' | 'ARTICLE' | 'VIDEO' | 'REPORT';
   publisher: string | null;
   doi: string | null;
+};
+
+export type GeneratedVocabularyEntry = {
+  number: number;
+  word: string;
+  translation: string;
+  partOfSpeech: string | null;
+  pronunciation: string | null;
+  exampleSentence: string | null;
+  difficulty: string | null;
 };
 
 export type ScriptPlace = {
@@ -296,6 +307,24 @@ function coerceScriptOutput(raw: Record<string, unknown>): Record<string, unknow
     }
   }
 
+  // --- vocabulary: coerce alternate key names ---
+  if (Array.isArray(result.vocabulary)) {
+    result.vocabulary = (result.vocabulary as Record<string, unknown>[])
+      .map((item) => {
+        if (!item || typeof item !== 'object') return null;
+        return {
+          number: item.number ?? item.num,
+          word: item.word ?? item.term ?? item.vocab,
+          translation: item.translation ?? item.meaning ?? item.definition,
+          partOfSpeech: item.partOfSpeech ?? item.part_of_speech ?? item.pos ?? null,
+          pronunciation: item.pronunciation ?? item.phonetic ?? null,
+          exampleSentence: item.exampleSentence ?? item.example_sentence ?? item.example ?? null,
+          difficulty: item.difficulty ?? item.level ?? null,
+        };
+      })
+      .filter((item) => item !== null && item.word && item.translation);
+  }
+
   return result;
 }
 
@@ -357,6 +386,81 @@ function renderBiasGuidance(sourceMetadata?: SourceMetadata): string {
   });
 }
 
+function buildLanguageInstruction(lang: string | null | undefined, mode: string | null | undefined): { languageInstruction: string; vocabularyInstruction: string; openingLine: string; closingLine: string } {
+  if (!lang || lang === 'en') {
+    return {
+      languageInstruction: '',
+      vocabularyInstruction: '',
+      openingLine: '"Good morning — here\'s what you need to know today."',
+      closingLine: '"That\'s your briefing for today. See you tomorrow."',
+    };
+  }
+
+  const langName = LANGUAGE_DISPLAY[lang as keyof typeof LANGUAGE_DISPLAY] ?? lang;
+
+  const modeInstructions: Record<string, string> = {
+    vocabulary_intro: `## Language: ${langName} — Vocabulary Introduction Mode
+
+This is a LANGUAGE LEARNING podcast. Speak primarily in English (~90%).
+- Introduce 8-12 high-frequency, everyday ${langName} words and phrases naturally in conversation
+- Wrap each vocabulary word with [V{N}:word] notation (e.g., [V1:Guten Morgen], [V2:sprechen]). The word inside the marker is the exact target-language text that should be highlighted.
+- Use the ANTICIPATION technique: "How would you say 'good morning' in ${langName}?" [pause] "That's right — [V1:Guten Morgen]!"
+- Explain meaning, pronunciation guide, and use each word in a short example sentence
+- Revisit key words 2-3 times later in the episode for graduated interval recall
+- Prioritize functional words: greetings, numbers, common verbs, polite phrases
+- Source articles are in English — use them as conversation topics while weaving in ${langName} vocabulary`,
+
+    conversational_mix: `## Language: ${langName} — Conversational Mix Mode
+
+This is a LANGUAGE LEARNING podcast. Mix ${langName} and English (~40% English / ~60% ${langName}).
+- Use ${langName} for full sentences and dialogue; English for explanations and transitions
+- Wrap 10-15 vocabulary words with [V{N}:word] notation (e.g., [V1:Guten Morgen], [V2:sprechen]). The word inside the marker is the exact target-language text that should be highlighted.
+- Use anticipation prompts for new words before revealing them
+- Include brief inline translations when introducing new words
+- Build on vocabulary from previous episodes (spaced repetition)
+- Introduce grammar patterns organically through usage, not explicit rules
+- Source articles may be in English — adapt and translate key content into ${langName}`,
+
+    full_immersion: `## Language: ${langName} — Full Immersion Mode
+
+This is a LANGUAGE LEARNING podcast. Generate the ENTIRE script in ${langName} (~95%).
+- Wrap 5-8 advanced or nuanced vocabulary items with [V{N}:word] notation (e.g., [V1:Guten Morgen], [V2:sprechen]). The word inside the marker is the exact target-language text that should be highlighted.
+- Speak naturally at near-native pace
+- Only use English for terms with no direct translation
+- Assume the listener knows basics from prior episodes
+- Source articles may be in English — translate and adapt ALL content into ${langName}`,
+  };
+
+  const instruction = modeInstructions[mode ?? 'conversational_mix'] ?? modeInstructions.conversational_mix;
+
+  const vocabularyInstruction = `## Vocabulary Output — REQUIRED when language learning mode is active
+
+In addition to references, you MUST include a "vocabulary" array in your JSON output:
+
+\`\`\`
+"vocabulary": [
+  {"number": 1, "word": "sprechen", "translation": "to speak", "partOfSpeech": "verb", "pronunciation": "SHPREE-chen", "exampleSentence": "Ich spreche Deutsch. (I speak German.)", "difficulty": "beginner"},
+  ...
+]
+\`\`\`
+
+Rules:
+- Each [V{N}:word] marker in the script MUST have a corresponding vocabulary entry
+- "word" is the ${langName} word/phrase
+- "translation" is the English translation
+- "pronunciation" is a phonetic guide using English approximation (e.g., "SHPREE-chen")
+- "partOfSpeech" is noun/verb/adjective/adverb/phrase/expression
+- "exampleSentence" shows the word used in a natural sentence with translation in parentheses
+- "difficulty" is beginner/intermediate/advanced`;
+
+  return {
+    languageInstruction: instruction,
+    vocabularyInstruction,
+    openingLine: `A culturally appropriate greeting in ${langName} (with English translation if in vocabulary_intro mode)`,
+    closingLine: `A culturally appropriate farewell in ${langName} (with English translation if in vocabulary_intro mode)`,
+  };
+}
+
 export async function generateScript(params: {
   topic: string;
   depth: string;
@@ -375,10 +479,13 @@ export async function generateScript(params: {
   mode?: 'standard' | 'demo';
   source?: string;
   previousEpisodesContext?: string;
+  targetLanguage?: string | null;
+  languageMode?: string | null;
 }): Promise<{
   turns: ScriptTurn[];
   soundCues: SoundCue[];
   references: GeneratedReference[];
+  vocabulary: GeneratedVocabularyEntry[];
   places: ScriptPlace[];
   markdown: string;
   inputTokens: number;
@@ -406,6 +513,7 @@ export async function generateScript(params: {
     // Briefings should cite most of their input articles
     Math.ceil((params.sourceContent?.match(/^\[\d+\]/gm)?.length ?? 5) * 0.6),
   );
+  const langInstr = buildLanguageInstruction(params.targetLanguage, params.languageMode);
   const systemPrompt = params.source === 'BRIEFING'
     ? loadAndRender('generation/briefing-script.md', {
         VOICE_REALISM: VOICE_REALISM_INSTRUCTIONS,
@@ -420,6 +528,10 @@ export async function generateScript(params: {
         SOURCE_ARTICLES: params.sourceContent || '',
         PREVIOUS_EPISODES: params.previousEpisodesContext || '',
         MIN_REFERENCE_COUNT: String(briefingMinRefs),
+        LANGUAGE_INSTRUCTION: langInstr.languageInstruction,
+        VOCABULARY_INSTRUCTION: langInstr.vocabularyInstruction,
+        OPENING_LINE: langInstr.openingLine,
+        CLOSING_LINE: langInstr.closingLine,
       })
     : loadAndRender('generation/script-generator.md', {
         SPEAKER_COUNT: String(speakerCount),
@@ -562,10 +674,13 @@ export async function generateScriptWithFeedback(params: {
   model?: string;
   provider?: string;
   webSearchEnabled?: boolean;
+  targetLanguage?: string | null;
+  languageMode?: string | null;
 }): Promise<{
   turns: ScriptTurn[];
   soundCues: SoundCue[];
   references: GeneratedReference[];
+  vocabulary: GeneratedVocabularyEntry[];
   places: ScriptPlace[];
   markdown: string;
   inputTokens: number;
@@ -670,12 +785,17 @@ CRITICAL RULES:
 
   const repairSection = params.repairMode ? `\n${REPAIR_INSTRUCTIONS[params.repairMode]}\n` : '';
 
+  const revisionLangInstr = buildLanguageInstruction(params.targetLanguage, params.languageMode);
+  const languageSection = revisionLangInstr.languageInstruction
+    ? `\n${revisionLangInstr.languageInstruction}\n\n${revisionLangInstr.vocabularyInstruction}\n`
+    : '';
+
   const userMessage = `Topic: ${params.topic}
 Depth: ${params.depth}
 
 ## FACT-CHECKER FEEDBACK:
 ${params.verificationFeedback}
-${repairSection}${groundedSection}${bannedRefsSection}
+${repairSection}${groundedSection}${bannedRefsSection}${languageSection}
 ## PREVIOUS SCRIPT (to revise):
 ${previousScriptText}
 
@@ -724,6 +844,7 @@ export async function generateScriptWithUserFeedback(params: {
   turns: ScriptTurn[];
   soundCues: SoundCue[];
   references: GeneratedReference[];
+  vocabulary: GeneratedVocabularyEntry[];
   places: ScriptPlace[];
   markdown: string;
   inputTokens: number;
@@ -800,6 +921,7 @@ export function parseScriptResponse(response: {
   turns: ScriptTurn[];
   soundCues: SoundCue[];
   references: GeneratedReference[];
+  vocabulary: GeneratedVocabularyEntry[];
   places: ScriptPlace[];
   markdown: string;
   inputTokens: number;
@@ -892,6 +1014,16 @@ export function parseScriptResponse(response: {
   const { references, numberMap } = deduplicateReferences(normalized);
   const turns = remapCitations(validated.turns, numberMap);
 
+  const vocabulary = ((validated.vocabulary ?? []) as Array<Record<string, unknown>>).map((v) => ({
+    number: v.number as number,
+    word: v.word as string,
+    translation: v.translation as string,
+    partOfSpeech: (v.partOfSpeech as string) ?? null,
+    pronunciation: (v.pronunciation as string) ?? null,
+    exampleSentence: (v.exampleSentence as string) ?? null,
+    difficulty: (v.difficulty as string) ?? null,
+  }));
+
   const markdown = turns
     .map((turn) => {
       const direction = turn.direction ? ` _(${turn.direction})_` : '';
@@ -903,6 +1035,7 @@ export function parseScriptResponse(response: {
     turns,
     soundCues: validated.soundCues as SoundCue[],
     references,
+    vocabulary,
     places: (validated.places ?? []) as ScriptPlace[],
     markdown,
     inputTokens: response.inputTokens,

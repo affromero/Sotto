@@ -56,6 +56,19 @@ export const getPodcastForDetailPage = cache(async (podcastId: string) => {
           contentDomain: true,
         },
       },
+      vocabularyEntries: {
+        orderBy: { number: 'asc' },
+        select: {
+          id: true,
+          number: true,
+          word: true,
+          translation: true,
+          partOfSpeech: true,
+          pronunciation: true,
+          exampleSentence: true,
+          difficulty: true,
+        },
+      },
       forkedFrom: {
         select: {
           id: true,
