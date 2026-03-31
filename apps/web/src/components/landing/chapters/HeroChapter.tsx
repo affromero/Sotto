@@ -1,15 +1,31 @@
 import type { LandingShowcaseData } from '@/lib/showcase';
+import type { VocabularyEntryData } from '@/types/vocabulary';
 import { BRAND } from '@sotto/shared';
 import { ScrollChapter } from '../ScrollChapter';
 import { AuthCTA } from '../AuthCTA';
 import { AudioClipPlayer } from './AudioClipPlayer';
 import styles from './HeroChapter.module.css';
 
+const DEMO_VOCABULARY: VocabularyEntryData[] = [
+  { id: 'demo-1', number: 1, word: 'Nachrichten', translation: 'news', partOfSpeech: 'noun', pronunciation: 'NAHKH-rikh-ten', exampleSentence: 'Die Nachrichten sind wichtig. (The news is important.)', difficulty: 'beginner' },
+  { id: 'demo-2', number: 2, word: 'Wirtschaft', translation: 'economy', partOfSpeech: 'noun', pronunciation: 'VIRT-shaft', exampleSentence: 'Die Wirtschaft wächst. (The economy is growing.)', difficulty: 'intermediate' },
+  { id: 'demo-3', number: 3, word: 'Verhandlungen', translation: 'negotiations', partOfSpeech: 'noun', pronunciation: 'fer-HAHND-loong-en', exampleSentence: 'Die Verhandlungen dauern an. (The negotiations continue.)', difficulty: 'advanced' },
+  { id: 'demo-4', number: 4, word: 'Bericht', translation: 'report', partOfSpeech: 'noun', pronunciation: 'beh-RIKHT', exampleSentence: 'Der Bericht zeigt neue Daten. (The report shows new data.)', difficulty: 'beginner' },
+];
+
+const DEMO_TRANSCRIPT_SEGMENTS = [
+  { id: 'demo-seg-1', order: 0, speaker: 'HOST', text: 'Willkommen zu den [V1:Nachrichten]. Heute sprechen wir über die [V2:Wirtschaft].', startTime: 0, duration: 8 },
+  { id: 'demo-seg-2', order: 1, speaker: 'EXPERT', text: 'Die [V3:Verhandlungen] sind ein wichtiges Thema. Laut dem neuesten [V4:Bericht] gibt es Fortschritte.', startTime: 8, duration: 10 },
+];
+
 interface HeroChapterProps {
   showcase: LandingShowcaseData | null;
 }
 
 export function HeroChapter({ showcase }: HeroChapterProps) {
+  const vocabEntries = showcase?.clipVocabulary ?? DEMO_VOCABULARY;
+  const vocabSegments = showcase?.clipVocabulary ? showcase.clipSegments : DEMO_TRANSCRIPT_SEGMENTS;
+
   return (
     <ScrollChapter dark>
       <div className={styles.root}>
@@ -47,8 +63,9 @@ export function HeroChapter({ showcase }: HeroChapterProps) {
                 podcastId={showcase.podcast.podcastId}
                 voiceTracks={showcase.voiceTracks}
                 videoClip={showcase.videoClip}
-                clipSegments={showcase.clipSegments}
+                clipSegments={vocabSegments}
                 clipVisuals={showcase.clipVisuals}
+                clipVocabulary={vocabEntries}
                 showVideoToggle={showcase.showVideo}
               />
               <div className={styles.proof}>

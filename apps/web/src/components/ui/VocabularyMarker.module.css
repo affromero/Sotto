@@ -26,6 +26,18 @@
   transition: color var(--transition-fast), text-decoration-color var(--transition-fast);
 }
 
+.marker[data-difficulty="beginner"] {
+  text-decoration-color: var(--color-success);
+}
+
+.marker[data-difficulty="intermediate"] {
+  text-decoration-color: var(--color-warning);
+}
+
+.marker[data-difficulty="advanced"] {
+  text-decoration-color: var(--color-accent);
+}
+
 .marker:hover {
   color: var(--color-primary);
   text-decoration-color: var(--color-primary);
@@ -120,6 +132,30 @@
   margin: 0;
   padding-top: var(--spacing-xs);
   border-top: 1px solid var(--color-border);
+}
+
+.difficultyBadge {
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+}
+
+.difficultyBadge[data-level="beginner"] {
+  background: var(--color-success-light);
+  color: var(--color-success);
+}
+
+.difficultyBadge[data-level="intermediate"] {
+  background: var(--color-warning-light);
+  color: var(--color-warning);
+}
+
+.difficultyBadge[data-level="advanced"] {
+  background: var(--color-accent-light);
+  color: var(--color-accent);
 }
 
 @media (max-width: 768px) {
