@@ -7,8 +7,8 @@ const mockPodcastUpdate = vi.fn();
 const mockDiscoveryFindUnique = vi.fn();
 const mockTransaction = vi.fn();
 const mockAddJob = vi.fn();
-const mockScriptFindUnique = vi.fn();
-const mockReferenceFindMany = vi.fn();
+const mockResearchDossierFindUnique = vi.fn();
+const mockCreativeOutlineFindUnique = vi.fn();
 
 vi.mock('@/lib/api-keys', () => ({
   authenticateRequest: (...args: unknown[]) => mockAuthenticateRequest(...args),
@@ -24,15 +24,19 @@ vi.mock('@/lib/prisma', () => {
       findUnique: (...args: unknown[]) => mockDiscoveryFindUnique(...args),
     },
     script: {
-      findUnique: (...args: unknown[]) => mockScriptFindUnique(...args),
       deleteMany: vi.fn().mockReturnValue({ then: vi.fn() }),
     },
     reference: {
-      findMany: (...args: unknown[]) => mockReferenceFindMany(...args),
       deleteMany: vi.fn().mockReturnValue({ then: vi.fn() }),
     },
     segment: {
       deleteMany: vi.fn().mockReturnValue({ then: vi.fn() }),
+    },
+    researchDossier: {
+      findUnique: (...args: unknown[]) => mockResearchDossierFindUnique(...args),
+    },
+    creativeOutline: {
+      findUnique: (...args: unknown[]) => mockCreativeOutlineFindUnique(...args),
     },
     $transaction: (...args: unknown[]) => mockTransaction(...args),
   };
@@ -40,9 +44,10 @@ vi.mock('@/lib/prisma', () => {
 });
 
 vi.mock('@/lib/queue', () => ({
-  scriptGenerationQueue: 'script-generation-queue',
+  scriptWritingQueue: 'script-writing-queue',
+  deepResearchQueue: 'deep-research-queue',
   addJob: (...args: unknown[]) => mockAddJob(...args),
-  JobType: { GENERATE_SCRIPT: 'GENERATE_SCRIPT' },
+  JobType: { WRITE_SCRIPT: 'WRITE_SCRIPT', DEEP_RESEARCH: 'DEEP_RESEARCH' },
 }));
 
 vi.mock('@/lib/redis', () => ({
@@ -82,6 +87,9 @@ async function createParams(podcastId: string) {
 describe('POST /api/podcasts/[podcastId]/script/regenerate', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default: dossier + outline exist (happy path goes to script-writing)
+    mockResearchDossierFindUnique.mockResolvedValue({ id: 'dossier-1' });
+    mockCreativeOutlineFindUnique.mockResolvedValue({ id: 'outline-1' });
   });
 
   it('returns 401 when unauthenticated', async () => {
@@ -149,7 +157,7 @@ describe('POST /api/podcasts/[podcastId]/script/regenerate', () => {
     expect(body).toMatchObject({ error: 'Discovery not found' });
   });
 
-  it('deletes old data, transitions to SCRIPTING, and queues regeneration job (no feedback)', async () => {
+  it('deletes old data, transitions to SCRIPTING, and queues script-writing job (no feedback)', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockPodcastFindUnique.mockResolvedValue({ userId: 'user-1', status: 'SCRIPT_READY' });
     mockDiscoveryFindUnique.mockResolvedValue({ id: 'disc-1', sourceContent: 'some content' });
@@ -163,68 +171,13 @@ describe('POST /api/podcasts/[podcastId]/script/regenerate', () => {
     expect(response.status).toBe(200);
     expect(body).toEqual({ success: true });
 
-    // Verify no feedback fields in payload
+    // Verify job payload includes dossierId and outlineId
     const payload = mockAddJob.mock.calls[0][2];
-    expect(payload.userFeedback).toBeUndefined();
-    expect(payload.previousTurns).toBeUndefined();
+    expect(payload.dossierId).toBe('dossier-1');
+    expect(payload.outlineId).toBe('outline-1');
   });
 
-  it('reads script before delete and passes feedback fields when body has feedback', async () => {
-    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
-    mockPodcastFindUnique.mockResolvedValue({ userId: 'user-1', status: 'SCRIPT_READY' });
-    mockDiscoveryFindUnique.mockResolvedValue({ id: 'disc-1', sourceContent: null });
-    mockScriptFindUnique.mockResolvedValue({
-      turns: [
-        { speaker: 'HOST', text: 'Hello' },
-        { speaker: 'EXPERT', text: 'Hi there' },
-      ],
-    });
-    mockReferenceFindMany.mockResolvedValue([
-      { number: 1, title: 'Ref 1', authors: ['A'], year: 2024, url: 'https://example.com', type: 'WEB', publisher: null, doi: null },
-    ]);
-    mockTransaction.mockResolvedValue(undefined);
-    mockPodcastUpdate.mockResolvedValue({});
-    mockAddJob.mockResolvedValue(undefined);
-
-    const response = await POST(
-      createRequest({ feedback: 'Make it more casual' }),
-      await createParams('pod-1'),
-    );
-    const body = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(body).toEqual({ success: true });
-
-    // Verify script was read before deletion
-    expect(mockScriptFindUnique).toHaveBeenCalled();
-
-    // Verify feedback fields in payload
-    const payload = mockAddJob.mock.calls[0][2];
-    expect(payload.userFeedback).toContain('Make it more casual');
-    expect(payload.previousTurns).toHaveLength(2);
-    expect(payload.previousReferences).toHaveLength(1);
-  });
-
-  it('handles empty body the same as no body (backward compat)', async () => {
-    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
-    mockPodcastFindUnique.mockResolvedValue({ userId: 'user-1', status: 'SCRIPT_READY' });
-    mockDiscoveryFindUnique.mockResolvedValue({ id: 'disc-1', sourceContent: null });
-    mockTransaction.mockResolvedValue(undefined);
-    mockPodcastUpdate.mockResolvedValue({});
-    mockAddJob.mockResolvedValue(undefined);
-
-    const response = await POST(createRequest({}), await createParams('pod-1'));
-    const body = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(body).toEqual({ success: true });
-
-    // No feedback fields since body was empty
-    const payload = mockAddJob.mock.calls[0][2];
-    expect(payload.userFeedback).toBeUndefined();
-  });
-
-  it('passes sourceUrls in job payload and resets lowReferences', async () => {
+  it('queues script-writing with sourceUrls when provided', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockPodcastFindUnique.mockResolvedValue({ userId: 'user-1', status: 'SCRIPT_READY' });
     mockDiscoveryFindUnique.mockResolvedValue({ id: 'disc-1', sourceContent: null });
@@ -251,6 +204,41 @@ describe('POST /api/podcasts/[podcastId]/script/regenerate', () => {
     // Verify lowReferences reset
     const updateData = mockPodcastUpdate.mock.calls[0][0].data;
     expect(updateData.lowReferences).toBe(false);
+  });
+
+  it('handles empty body the same as no body (backward compat)', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockPodcastFindUnique.mockResolvedValue({ userId: 'user-1', status: 'SCRIPT_READY' });
+    mockDiscoveryFindUnique.mockResolvedValue({ id: 'disc-1', sourceContent: null });
+    mockTransaction.mockResolvedValue(undefined);
+    mockPodcastUpdate.mockResolvedValue({});
+    mockAddJob.mockResolvedValue(undefined);
+
+    const response = await POST(createRequest({}), await createParams('pod-1'));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toEqual({ success: true });
+  });
+
+  it('falls back to deep research when dossier is missing', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockPodcastFindUnique.mockResolvedValue({ userId: 'user-1', status: 'SCRIPT_READY' });
+    mockDiscoveryFindUnique.mockResolvedValue({ id: 'disc-1', sourceContent: null });
+    mockTransaction.mockResolvedValue(undefined);
+    mockPodcastUpdate.mockResolvedValue({});
+    mockAddJob.mockResolvedValue(undefined);
+    mockResearchDossierFindUnique.mockResolvedValue(null);
+
+    const response = await POST(createRequest(), await createParams('pod-1'));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toEqual({ success: true });
+
+    // Verify status set to RESEARCHING
+    const updateData = mockPodcastUpdate.mock.calls[0][0].data;
+    expect(updateData.status).toBe('RESEARCHING');
   });
 
   it('returns 400 for invalid feedback body', async () => {

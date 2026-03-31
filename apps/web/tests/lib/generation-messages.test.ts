@@ -22,10 +22,10 @@ describe('STAGE_MESSAGES', () => {
     }
   });
 
-  it('SCRIPTING has the most messages (10 early + 5 late)', () => {
+  it('SCRIPTING has the most messages (6 early + 3 late)', () => {
     const pool = STAGE_MESSAGES['SCRIPTING']!;
-    expect(pool.early.length).toBe(10);
-    expect(pool.late.length).toBe(5);
+    expect(pool.early.length).toBe(6);
+    expect(pool.late.length).toBe(3);
   });
 
   it('every message has non-empty text', () => {

@@ -1406,7 +1406,7 @@ describe('getMinReferenceCount', () => {
   it('returns base count when no duration provided', () => {
     expect(getMinReferenceCount('standard')).toBe(5);
     expect(getMinReferenceCount('deep_dive')).toBe(10);
-    expect(getMinReferenceCount('eli5')).toBe(3);
+    expect(getMinReferenceCount('eli5')).toBe(2);
   });
 
   it('scales with duration', () => {
@@ -1420,7 +1420,7 @@ describe('getMinReferenceCount', () => {
   it('uses base as floor for short durations', () => {
     expect(getMinReferenceCount('standard', 3)).toBe(5);
     expect(getMinReferenceCount('deep_dive', 5)).toBe(10);
-    expect(getMinReferenceCount('eli5', 2)).toBe(3);
+    expect(getMinReferenceCount('eli5', 2)).toBe(2);
   });
 
   it('scales without cap', () => {
