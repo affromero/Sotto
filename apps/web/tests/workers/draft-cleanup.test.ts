@@ -103,8 +103,8 @@ describe('processDraftCleanup', () => {
       where: {
         status: {
           in: [
-            'EXTRACTING', 'SCRIPTING', 'VERIFYING_SCRIPT',
-            'VALIDATING_REFERENCES', 'GENERATING_AUDIO', 'STITCHING',
+            'EXTRACTING', 'SCRIPTING', 'RESEARCHING',
+            'PLANNING', 'COMPILING', 'GENERATING_AUDIO', 'STITCHING',
             'UPDATING', 'IMPORTING', 'TRANSCRIBING',
           ],
         },

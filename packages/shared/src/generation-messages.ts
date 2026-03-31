@@ -26,55 +26,55 @@ export const STAGE_MESSAGES: Partial<Record<string, StageMessagePool>> = {
       { text: 'Almost done reading through everything', topicAware: false },
     ],
   },
+  RESEARCHING: {
+    early: [
+      { text: 'Searching for the best sources on {topic}', topicAware: true },
+      { text: 'Finding peer-reviewed research and expert perspectives', topicAware: false },
+      { text: 'A real podcast starts with real research', topicAware: false },
+      { text: 'Digging into what the experts say about {topic}', topicAware: true },
+      { text: 'No hallucinated sources — only verified ones', topicAware: false },
+    ],
+    late: [
+      { text: 'Cross-referencing sources for accuracy', topicAware: false },
+      { text: 'Building a knowledge dossier for your hosts', topicAware: false },
+      { text: 'Most AI skips this. We don\u2019t.', topicAware: false },
+    ],
+  },
+  PLANNING: {
+    early: [
+      { text: 'Choosing the best angle for {topic}', topicAware: true },
+      { text: 'Designing the narrative arc', topicAware: false },
+      { text: 'Finding the hook that pulls listeners in', topicAware: false },
+      { text: 'Crafting the story structure', topicAware: false },
+    ],
+    late: [
+      { text: 'Mapping the tension curve beat by beat', topicAware: false },
+      { text: 'Assigning sources to each story beat', topicAware: false },
+      { text: 'Every great podcast starts with a great plan', topicAware: false },
+    ],
+  },
   SCRIPTING: {
     early: [
-      { text: 'Crafting the conversation flow', topicAware: false },
-      { text: 'Researching the latest findings on {topic}', topicAware: true },
-      { text: 'Building a natural dialogue between hosts', topicAware: false },
-      { text: 'Structuring the key takeaways', topicAware: false },
+      { text: 'Writing dialogue grounded in verified research', topicAware: false },
+      { text: 'Building a natural conversation between hosts', topicAware: false },
       { text: 'Making sure {topic} is explained clearly', topicAware: true },
-      { text: 'Writing engaging back-and-forth dialogue', topicAware: false },
-      { text: 'Finding the best way to introduce {topic}', topicAware: true },
+      { text: 'Turning research into engaging back-and-forth', topicAware: false },
       { text: 'Adding interesting examples and analogies', topicAware: false },
       { text: 'Weaving in different perspectives on {topic}', topicAware: true },
-      { text: 'Balancing depth with accessibility', topicAware: false },
     ],
     late: [
       { text: 'Complex topics need more thought — hang tight', topicAware: false },
-      { text: 'Almost there — good things take time', topicAware: false },
       { text: 'Polishing the final sections of the script', topicAware: false },
       { text: 'Adding finishing touches to the dialogue', topicAware: false },
-      { text: 'Wrapping up — just a bit longer', topicAware: false },
     ],
   },
-  VERIFYING_SCRIPT: {
+  COMPILING: {
     early: [
-      { text: 'Every claim is checked — not just trusted', topicAware: false },
-      { text: 'We verify what the AI writes', topicAware: false },
-      { text: 'Cross-referencing real sources on {topic}', topicAware: true },
-      { text: 'Nothing gets through without proof', topicAware: false },
-      { text: 'Most AI tools skip this step. We don\u2019t.', topicAware: false },
-      { text: 'Fact-checking every claim in the script', topicAware: false },
+      { text: 'Connecting citations to verified sources', topicAware: false },
+      { text: 'Final quality check on every reference', topicAware: false },
     ],
     late: [
-      { text: 'Still checking — accuracy is worth it', topicAware: false },
-      { text: 'A few more claims to verify', topicAware: false },
-    ],
-  },
-  VALIDATING_REFERENCES: {
-    early: [
-      { text: 'Every source is validated before it reaches you', topicAware: false },
-      { text: 'No broken links. No fake citations.', topicAware: false },
-      { text: 'Confirming every reference is real', topicAware: false },
-      { text: 'If a source doesn\u2019t check out, it gets replaced', topicAware: false },
-    ],
-    late: [
-      { text: 'A few more sources to validate', topicAware: false },
-      { text: 'Almost done — every reference accounted for', topicAware: false },
-      { text: 'Finding verified sources for every claim', topicAware: false },
-      { text: 'Replacing unverifiable references with real ones', topicAware: false },
-      { text: 'Cross-checking sources against databases', topicAware: false },
-      { text: 'Making sure every citation leads somewhere real', topicAware: false },
+      { text: 'Almost there — verifying every citation', topicAware: false },
     ],
   },
   GENERATING_AUDIO: {

@@ -64,8 +64,8 @@ export async function processDraftCleanup(_job: Job): Promise<void> {
     where: {
       status: {
         in: [
-          'EXTRACTING', 'SCRIPTING', 'VERIFYING_SCRIPT',
-          'VALIDATING_REFERENCES', 'GENERATING_AUDIO', 'STITCHING',
+          'EXTRACTING', 'RESEARCHING', 'PLANNING', 'SCRIPTING',
+          'COMPILING', 'GENERATING_AUDIO', 'STITCHING',
           'UPDATING', 'IMPORTING', 'TRANSCRIBING',
         ],
       },

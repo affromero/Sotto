@@ -30,9 +30,11 @@ export const HEAVY_WORKERS = new Set([
 /** Pipeline orchestration workers */
 export const PIPELINE_WORKERS = new Set([
   'content-extraction',
+  'deep-research',
+  'creative-planning',
+  'script-writing',
+  'compile-script',
   'script-generation',
-  'script-verification',
-  'reference-validation',
   'audio-import',
   'interactions',
   'segment-regeneration',

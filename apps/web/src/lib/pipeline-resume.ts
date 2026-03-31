@@ -9,9 +9,10 @@ import { invalidatePodcastCache, publishPodcastStatus } from './redis';
  */
 export type ResumePoint =
   | { step: 'EXTRACT_CONTENT' }
-  | { step: 'GENERATE_SCRIPT' }
-  | { step: 'VERIFY_SCRIPT' }
-  | { step: 'VALIDATE_REFERENCES' }
+  | { step: 'DEEP_RESEARCH' }
+  | { step: 'CREATIVE_PLANNING' }
+  | { step: 'WRITE_SCRIPT' }
+  | { step: 'COMPILE_SCRIPT' }
   | { step: 'SCRIPT_READY' }
   | { step: 'GENERATE_AUDIO'; pendingSegmentIds: string[] }
   | { step: 'STITCH_AUDIO'; segmentIds: string[] }
@@ -87,7 +88,7 @@ export async function markPodcastFailed(
  * Checks from the end of the pipeline backward to preserve the most work.
  */
 export async function determineResumePoint(podcastId: string): Promise<ResumePoint> {
-  const [podcast, discovery, script, references, segments] = await Promise.all([
+  const [podcast, discovery, script, segments, dossier, outline] = await Promise.all([
     prisma.podcast.findUniqueOrThrow({
       where: { id: podcastId },
       select: { source: true, failedAtStatus: true, importedAudioKey: true },
@@ -98,18 +99,19 @@ export async function determineResumePoint(podcastId: string): Promise<ResumePoi
     }),
     prisma.script.findUnique({
       where: { podcastId },
-      select: {
-        turns: true,
-        verificationAttempts: true,
-      },
-    }),
-    prisma.reference.findMany({
-      where: { podcastId },
-      select: { id: true, verificationStatus: true },
+      select: { turns: true },
     }),
     prisma.segment.findMany({
       where: { podcastId },
       select: { id: true, audioUrl: true },
+    }),
+    prisma.researchDossier.findUnique({
+      where: { podcastId },
+      select: { id: true },
+    }),
+    prisma.creativeOutline.findUnique({
+      where: { podcastId },
+      select: { id: true },
     }),
   ]);
 
@@ -125,56 +127,36 @@ export async function determineResumePoint(podcastId: string): Promise<ResumePoi
 
   // 3. Some segments exist, some lack audioUrl
   if (segments.length > 0 && segments.some((s) => s.audioUrl === null)) {
-    // Verify segment count matches script turns
     const scriptTurnCount = script ? (script.turns as unknown[]).length : 0;
     if (script && segments.length === scriptTurnCount) {
-      // Segments match script — resume audio generation for pending segments only
       const pendingSegmentIds = segments
         .filter((s) => s.audioUrl === null)
         .map((s) => s.id);
       return { step: 'GENERATE_AUDIO', pendingSegmentIds };
     }
-    // Segment count mismatch — stale segments, go back to SCRIPT_READY
     return { step: 'SCRIPT_READY' };
   }
 
-  // At this point: no segments exist
+  // 4. Script exists → compile step
   if (script) {
-    const hasValidatedRefs = references.some((r) => r.verificationStatus !== 'PENDING');
-
-    // 4. Script exists + some refs have been validated → refs were being processed
-    if (hasValidatedRefs) {
-      const allRefsValidated = references.every((r) => r.verificationStatus !== 'PENDING');
-      if (allRefsValidated) {
-        return { step: 'SCRIPT_READY' };
-      }
-      return { step: 'VALIDATE_REFERENCES' };
-    }
-
-    // 5. Script failed verification 3x with NO validated refs and no segments
-    //    → bad script, delete and regenerate
-    //    Note: checked AFTER step 4 so scripts that passed on the 3rd attempt
-    //    (and have validated refs) are preserved
-    if (script.verificationAttempts >= 3 && !hasValidatedRefs) {
-      return { step: 'GENERATE_SCRIPT' };
-    }
-
-    // 6. Script exists, never verified
-    if (script.verificationAttempts === 0) {
-      return { step: 'VERIFY_SCRIPT' };
-    }
-
-    // 7. Script exists, mid-verification (1-2 attempts), all refs still PENDING
-    if (script.verificationAttempts > 0 && script.verificationAttempts < 3) {
-      return { step: 'VERIFY_SCRIPT' };
-    }
+    return { step: 'COMPILE_SCRIPT' };
   }
 
-  // 8. Discovery has sourceContent but no script
+  // 5. Outline exists but no script → write script
+  if (outline) {
+    return { step: 'WRITE_SCRIPT' };
+  }
+
+  // 6. Dossier exists but no outline → creative planning
+  if (dossier) {
+    return { step: 'CREATIVE_PLANNING' };
+  }
+
+  // 7. Discovery has sourceContent but no dossier → research
   if (discovery?.sourceContent) {
-    return { step: 'GENERATE_SCRIPT' };
+    return { step: 'DEEP_RESEARCH' };
   }
 
-  // 9. Nothing exists → start from scratch
+  // 8. Nothing exists → start from scratch
   return { step: 'EXTRACT_CONTENT' };
 }

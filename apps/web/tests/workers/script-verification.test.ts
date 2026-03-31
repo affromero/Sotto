@@ -296,19 +296,19 @@ describe('processScriptVerification', () => {
   });
 
   describe('verification pass — with references', () => {
-    it('routes to reference validation when references exist', async () => {
+    it('routes to compile when references exist', async () => {
       const job = createMockJob(defaultPayload);
       await processScriptVerification(job);
 
       expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
         where: { id: 'podcast-001' },
-        data: { status: 'VALIDATING_REFERENCES' },
+        data: { status: 'COMPILING' },
       });
       expect(mockAddJob).toHaveBeenCalledWith(
         { name: 'reference-validation' },
         'validate_references',
-        { podcastId: 'podcast-001', userId: 'user-001' },
-        { jobId: 'validate-podcast-001' }
+        { podcastId: 'podcast-001', userId: 'user-001', useAdminCredits: undefined },
+        { jobId: expect.stringMatching(/^validate-podcast-001-/) }
       );
     });
 
@@ -427,13 +427,13 @@ describe('processScriptVerification', () => {
       );
     });
 
-    it('still routes to reference validation after adjustment', async () => {
+    it('still routes to compile after adjustment', async () => {
       const job = createMockJob(defaultPayload);
       await processScriptVerification(job);
 
       expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
         where: { id: 'podcast-001' },
-        data: { status: 'VALIDATING_REFERENCES' },
+        data: { status: 'COMPILING' },
       });
     });
 
