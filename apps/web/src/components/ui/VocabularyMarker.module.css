@@ -4,6 +4,16 @@
 }
 
 .marker {
+  /* Button reset */
+  appearance: none;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  line-height: inherit;
+  text-align: inherit;
+  /* Marker styles */
   position: relative;
   display: inline;
   cursor: pointer;

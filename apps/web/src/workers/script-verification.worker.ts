@@ -69,11 +69,27 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
     }),
     prisma.podcast.findUniqueOrThrow({
       where: { id: podcastId },
-      select: { aiModel: true, verificationMode: true },
+      select: { aiModel: true, verificationMode: true, language: true, source: true },
     }),
   ]);
 
   const verificationMode = podcastRecord.verificationMode;
+
+  // Look up languageMode from the briefing if this is a BRIEFING podcast
+  let briefingLanguageMode: string | null = null;
+  if (podcastRecord.source === 'BRIEFING') {
+    const briefingLog = await prisma.briefingLog.findFirst({
+      where: { podcastId },
+      select: { userBriefingId: true },
+    });
+    if (briefingLog?.userBriefingId) {
+      const briefing = await prisma.userBriefing.findUnique({
+        where: { id: briefingLog.userBriefingId },
+        select: { languageMode: true },
+      });
+      briefingLanguageMode = briefing?.languageMode ?? null;
+    }
+  }
 
   // Model + provider resolved together — prevents sending e.g. gpt-5-mini to Anthropic
   const { model, provider } = await resolveAiModelAndProvider({
@@ -208,6 +224,8 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
         model,
         provider,
         webSearchEnabled: false,
+        targetLanguage: podcastRecord.language,
+        languageMode: briefingLanguageMode,
       });
 
       await logUsage({
@@ -245,6 +263,23 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
             type: ref.type,
             publisher: ref.publisher,
             doi: ref.doi,
+          })),
+        });
+      }
+
+      // Sync vocabulary entries with the adjusted script
+      await prisma.vocabularyEntry.deleteMany({ where: { podcastId } });
+      if (adjusted.vocabulary.length > 0) {
+        await prisma.vocabularyEntry.createMany({
+          data: adjusted.vocabulary.map((v) => ({
+            podcastId,
+            number: v.number,
+            word: v.word,
+            translation: v.translation,
+            partOfSpeech: v.partOfSpeech,
+            pronunciation: v.pronunciation,
+            exampleSentence: v.exampleSentence,
+            difficulty: v.difficulty,
           })),
         });
       }
@@ -471,6 +506,8 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
     model,
     provider,
     webSearchEnabled: useWebSearchForRevision,
+    targetLanguage: podcastRecord.language,
+    languageMode: briefingLanguageMode,
   });
 
   await job.updateProgress(80);
@@ -563,6 +600,23 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
     }
   } else {
     logger.warn('Revision produced 0 references, keeping previous set', { podcastId });
+  }
+
+  // Sync vocabulary entries with the revised script
+  await prisma.vocabularyEntry.deleteMany({ where: { podcastId } });
+  if (revised.vocabulary.length > 0) {
+    await prisma.vocabularyEntry.createMany({
+      data: revised.vocabulary.map((v) => ({
+        podcastId,
+        number: v.number,
+        word: v.word,
+        translation: v.translation,
+        partOfSpeech: v.partOfSpeech,
+        pronunciation: v.pronunciation,
+        exampleSentence: v.exampleSentence,
+        difficulty: v.difficulty,
+      })),
+    });
   }
 
   await job.updateProgress(90);

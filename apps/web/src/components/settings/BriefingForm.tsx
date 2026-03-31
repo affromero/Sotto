@@ -487,7 +487,12 @@ export function BriefingForm({
               onChange={(e) => {
                 const val = e.target.value;
                 setTargetLanguage(val);
-                autoSave({ targetLanguage: val || null });
+                if (!val || val === 'en') {
+                  setLanguageMode('conversational_mix');
+                  autoSave({ targetLanguage: val || null, languageMode: null });
+                } else {
+                  autoSave({ targetLanguage: val });
+                }
               }}
               aria-label="Briefing language"
             >

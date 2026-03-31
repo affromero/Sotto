@@ -46,7 +46,7 @@ export function cleanTextForTts(text: string): string {
     .replace(AUDIENCE_REACTION_PATTERN, '')
     .replace(STAGE_DIRECTION_PATTERN, '')
     .replace(/\s*\[\d+(?:,\s*\d+)*\]/g, '')
-    .replace(/\s*\[V\d+\]/g, '')
+    .replace(/\[V\d+:([^\]]+)\]/g, '$1')
     .replace(/\s{2,}/g, ' ')
     .trim();
 }

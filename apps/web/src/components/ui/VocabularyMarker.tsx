@@ -7,6 +7,7 @@ import styles from './VocabularyMarker.module.css';
 
 interface VocabularyMarkerProps {
   entry: VocabularyEntryData;
+  children?: React.ReactNode;
 }
 
 const POS_LABELS: Record<string, string> = {
@@ -20,11 +21,11 @@ const POS_LABELS: Record<string, string> = {
 
 const TOOLTIP_WIDTH = 320;
 
-export function VocabularyMarker({ entry }: VocabularyMarkerProps) {
+export function VocabularyMarker({ entry, children }: VocabularyMarkerProps) {
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState<'above' | 'below'>('above');
   const [coords, setCoords] = useState({ top: 0, left: 0 });
-  const markerRef = useRef<HTMLSpanElement>(null);
+  const markerRef = useRef<HTMLButtonElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
   const closeTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -121,17 +122,22 @@ export function VocabularyMarker({ entry }: VocabularyMarkerProps) {
       onMouseEnter={() => { cancelClose(); updatePosition(); setOpen(true); }}
       onMouseLeave={scheduleClose}
     >
-      <span
+      <button
         ref={markerRef}
+        type="button"
         className={styles.marker}
         onClick={handleToggle}
-        role="button"
-        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            handleToggle();
+          }
+        }}
         aria-expanded={open}
         aria-label={`Vocabulary: ${entry.word}`}
       >
-        {entry.word}
-      </span>
+        {children ?? entry.word}
+      </button>
       {tooltip && createPortal(tooltip, document.body)}
     </span>
   );
