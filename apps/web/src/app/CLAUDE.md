@@ -28,7 +28,7 @@
 | `/invite/[code]` | `invite/[code]/page.tsx` | No | Invitation redemption (server validates, client form redeems) |
 | `/connect/telegram` | `connect/telegram/page.tsx` | Yes | Link Telegram account |
 | `/pitch` | `pitch/page.tsx` | Password | Investor pitch deck |
-| Static pages | `about`, `pricing`, `support`, `join`, `changelog`, `developers`, `privacy`, `terms`, `feedback`, `banned`, `briefings`, `quizzes` | No | Public info pages |
+| Static pages | `about`, `pricing`, `support`, `join`, `changelog`, `developers`, `privacy`, `terms`, `feedback`, `banned`, `briefings`, `quizzes`, `languages` | No | Public info pages |
 | `/admin/*` | `(admin)/admin/*.tsx` | ADMIN | 21 admin pages (overview, users, podcasts, revenue, costs, pricing, storage, engagement, playback, pipeline, retention, waitlist, analytics, moderation, handles, twitter, landing, inspire, ratings, quality, announcements, auto-models, models, video-tests) |
 | `/admin/video-tests` | `(admin)/admin/video-tests/page.tsx` | ADMIN | Video pipeline test bench: classify visuals, resolve places, generate map images, AI illustrations, stock footage search |
 | `/admin/storage/[podcastId]` | `(admin)/admin/storage/[podcastId]/page.tsx` | ADMIN | Per-podcast data inspector: 19 sections (provider info, R2 files, script, references, segments, Q&A, discovery, tags, engagement, ratings, API costs, pipeline, ML features, voice assignments, voice tracks, segment voice map, TTS providers, completeness) |

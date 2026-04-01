@@ -1,0 +1,32 @@
+.demoCard {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: var(--spacing-lg);
+}
+
+.demoHint {
+  font: var(--text-caption);
+  color: var(--color-primary);
+  margin-bottom: var(--spacing-md);
+  font-weight: 600;
+}
+
+.demoTranscript {
+  font: var(--text-body-lg);
+  line-height: 1.8;
+  color: var(--color-text-primary);
+}
+
+.demoPanels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-lg);
+}
+
+@media (max-width: 700px) {
+  .demoPanels {
+    grid-template-columns: 1fr;
+  }
+}

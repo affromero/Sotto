@@ -16,6 +16,7 @@ export function Footer() {
             <a href="/create">Create</a>
             <a href="/briefings">Daily Briefings</a>
             <a href="/quizzes">Quizzes</a>
+            <a href="/languages">Languages</a>
             <a href="/changelog">Changelog</a>
             <a href="/developers">Developers</a>
           </div>

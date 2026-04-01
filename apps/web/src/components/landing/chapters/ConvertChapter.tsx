@@ -66,45 +66,6 @@ const FAQ_ITEMS = [
 export function ConvertChapter() {
   return (
     <>
-      {/* Language Learning */}
-      <ScrollChapter alt>
-        <div className={styles.languageSection}>
-          <div className={styles.languageHeader} data-reveal>
-            <span className={styles.overline}>Language Learning</span>
-            <h2 className={styles.heading}>Learn a language while you listen.</h2>
-            <p className={styles.languageDesc}>
-              Generate any podcast in a foreign language and Sotto highlights key
-              vocabulary inline. Hover a word to see the translation, hear
-              pronunciation, and build your vocabulary — all without leaving the
-              episode. Learning happens naturally, one podcast at a time.
-            </p>
-          </div>
-          <div className={styles.languageFeatures} data-reveal>
-            <div className={styles.languageCard}>
-              <span className={styles.languageIcon} aria-hidden="true">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 8l6 6"/><path d="M4 14l6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/></svg>
-              </span>
-              <strong>Inline vocabulary</strong>
-              <p>Foreign words are highlighted in context. Hover to see meaning, pronunciation, and examples.</p>
-            </div>
-            <div className={styles.languageCard}>
-              <span className={styles.languageIcon} aria-hidden="true">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.376 3.622a1 1 0 0 1 3.002 3.002L7.368 18.635a2 2 0 0 1-.855.506l-2.872.838a.5.5 0 0 1-.62-.62l.838-2.872a2 2 0 0 1 .506-.854z"/></svg>
-              </span>
-              <strong>Post-listen quizzes</strong>
-              <p>Test your retention with auto-generated quizzes after each episode. Track your progress over time.</p>
-            </div>
-            <div className={styles.languageCard}>
-              <span className={styles.languageIcon} aria-hidden="true">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-              </span>
-              <strong>Any language, any topic</strong>
-              <p>Pick a language when you create. Sotto handles the rest — script, voices, and vocabulary are all generated together.</p>
-            </div>
-          </div>
-        </div>
-      </ScrollChapter>
-
       {/* FAQ section */}
       <ScrollChapter id="faq" alt>
         <div className={styles.faq}>
@@ -203,6 +164,7 @@ export function ConvertChapter() {
               <a href="#features">Features</a>
               <Link href="/briefings">Daily Briefings</Link>
               <Link href="/quizzes">Quizzes</Link>
+              <Link href="/languages">Languages</Link>
               <Link href="/voices">Voices</Link>
               <Link href="/feed">Feed</Link>
               <a href="#teams">Teams</a>
