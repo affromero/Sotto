@@ -144,6 +144,20 @@ export function AudioClipPlayer({
   const clipDuration = endTime - startTime;
   const progress = clipDuration > 0 ? Math.min(currentTime / clipDuration, 1) : 0;
 
+  const pauseAudio = useCallback(() => {
+    if (audioRef.current && !audioRef.current.paused) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    }
+  }, []);
+
+  const resumeAudio = useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.play();
+      setIsPlaying(true);
+    }
+  }, []);
+
   const syncVideo = useCallback((time: number, playing: boolean) => {
     // Sync MP4 <video> element
     const video = videoRef.current;
@@ -404,13 +418,15 @@ export function AudioClipPlayer({
         </div>
         {clipVocabulary && clipVocabulary.length > 0 && clipSegments.length > 0 && (
           <div className={styles.transcriptArea}>
+            <p className={styles.transcriptLabel}>Learn German while listening — hover the highlighted words</p>
+            {/* eslint-disable-next-line react-hooks/refs -- pauseAudio/resumeAudio are event handlers, not render-time ref reads */}
             {clipSegments.map((seg) => (
               <span key={seg.id}>
                 {parseTextWithVocabulary(
                   seg.text,
                   clipVocabulary,
-                  () => { if (audioRef.current && !audioRef.current.paused) audioRef.current.pause(); },
-                  () => { if (audioRef.current) audioRef.current.play(); },
+                  pauseAudio,
+                  resumeAudio,
                 )}{' '}
               </span>
             ))}

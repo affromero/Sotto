@@ -28,7 +28,7 @@ describe('tts-text-cleaner', () => {
   });
 
   it('strips vocabulary markers', () => {
-    expect(cleanTextForTts('Das ist sprechen [V1] und lesen [V2] auf Deutsch.'))
+    expect(cleanTextForTts('Das ist [V1:sprechen] und [V2:lesen] auf Deutsch.'))
       .toBe('Das ist sprechen und lesen auf Deutsch.');
   });
 

@@ -269,7 +269,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
 
       // Sync vocabulary entries with the adjusted script
       await prisma.vocabularyEntry.deleteMany({ where: { podcastId } });
-      if (adjusted.vocabulary.length > 0) {
+      if (adjusted.vocabulary && adjusted.vocabulary.length > 0) {
         await prisma.vocabularyEntry.createMany({
           data: adjusted.vocabulary.map((v) => ({
             podcastId,
@@ -604,7 +604,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
 
   // Sync vocabulary entries with the revised script
   await prisma.vocabularyEntry.deleteMany({ where: { podcastId } });
-  if (revised.vocabulary.length > 0) {
+  if (revised.vocabulary && revised.vocabulary.length > 0) {
     await prisma.vocabularyEntry.createMany({
       data: revised.vocabulary.map((v) => ({
         podcastId,

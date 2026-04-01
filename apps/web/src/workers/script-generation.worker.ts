@@ -199,7 +199,7 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
   await job.updateProgress(50);
 
   // Validate vocabulary markers match vocabulary entries before persisting
-  if (result.vocabulary.length > 0) {
+  if (result.vocabulary && result.vocabulary.length > 0) {
     const markerRegex = /\[V(\d+):[^\]]+\]/g;
     const markerNumbers = new Set<number>();
     for (const turn of result.turns) {
@@ -249,7 +249,7 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
       });
     }
 
-    if (result.vocabulary.length > 0) {
+    if (result.vocabulary && result.vocabulary.length > 0) {
       await tx.vocabularyEntry.createMany({
         data: result.vocabulary.map((v) => ({
           podcastId,
@@ -268,7 +268,7 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
   if (result.references.length > 0) {
     logger.info('References saved', { podcastId, count: String(result.references.length) });
   }
-  if (result.vocabulary.length > 0) {
+  if (result.vocabulary && result.vocabulary.length > 0) {
     logger.info('Vocabulary entries saved', { podcastId, count: String(result.vocabulary.length) });
   }
 
