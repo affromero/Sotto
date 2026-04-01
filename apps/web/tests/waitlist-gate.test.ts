@@ -12,6 +12,7 @@ const mockPrismaUser = {
 };
 const mockPrismaWaitlist = {
   findUnique: vi.fn(),
+  create: vi.fn().mockResolvedValue({}),
 };
 vi.mock('@/lib/prisma', () => ({
   prisma: {
@@ -99,13 +100,16 @@ describe('Waitlist Sign-Up Gate — signIn callback', () => {
     expect(result).toBe(true);
   });
 
-  it('redirects new user not on waitlist to waitlisted page', async () => {
+  it('redirects new user not on waitlist to waitlisted page and auto-adds to waitlist', async () => {
     const result = await signIn({
       user: { email: 'new@example.com' },
       profile: { email: 'new@example.com' },
     });
 
     expect(result).toBe('/auth/waitlisted?reason=not-on-list');
+    expect(mockPrismaWaitlist.create).toHaveBeenCalledWith({
+      data: { email: 'new@example.com', source: 'oauth-signin' },
+    });
   });
 
   it('redirects new user on waitlist with PENDING status', async () => {

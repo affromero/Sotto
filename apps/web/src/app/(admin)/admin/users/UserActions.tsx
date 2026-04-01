@@ -28,6 +28,7 @@ export function UserActions({
   const [isLoading, setIsLoading] = useState(false);
   const [isBanned, setIsBanned] = useState(initialBanned);
   const [isSuspended, setIsSuspended] = useState(initialSuspended);
+  const [isRemoved, setIsRemoved] = useState(false);
 
   async function handleRoleChange(newRole: string) {
     if (isOwnUser) {
@@ -168,6 +169,29 @@ export function UserActions({
     }
   }
 
+  async function handleRemove() {
+    if (!confirm('Remove this user and all their data? This cannot be undone.')) return;
+    setIsLoading(true);
+    try {
+      const response = await fetch(`/api/admin/users/${userId}/remove`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to remove user');
+      }
+      setIsRemoved(true);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Failed to remove user');
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  if (isRemoved) {
+    return <div className={styles.actionsCell}><span className={styles.removedLabel}>Removed</span></div>;
+  }
+
   const isAdmin = role === 'ADMIN';
   const limitSelectValue =
     override === null ? 'global' : override === 0 ? 'unlimited' : 'custom';
@@ -254,6 +278,13 @@ export function UserActions({
               Ban
             </button>
           )}
+          <button
+            className={`${styles.modBtn} ${styles.modBtnDanger}`}
+            onClick={handleRemove}
+            disabled={isLoading}
+          >
+            Remove
+          </button>
         </div>
       )}
     </div>

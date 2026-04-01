@@ -151,7 +151,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       // New user — check waitlist (bypassed when openSignup is enabled)
       if (!await isOpenSignup()) {
         const entry = await prisma.waitlist.findUnique({ where: { email } });
-        if (!entry) return '/auth/waitlisted?reason=not-on-list';
+        if (!entry) {
+          // Auto-add to waitlist so they don't have to sign up separately
+          await prisma.waitlist.create({
+            data: { email, source: 'oauth-signin' },
+          }).catch(() => {}); // ignore if duplicate race
+          return '/auth/waitlisted?reason=not-on-list';
+        }
         if (entry.status !== 'APPROVED') return '/auth/waitlisted?reason=pending';
       }
       return true;
