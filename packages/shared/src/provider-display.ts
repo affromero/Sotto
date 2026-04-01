@@ -15,6 +15,8 @@ export const TTS_PROVIDER_DISPLAY: Record<string, { label: string; shortLabel: s
   hume: { label: 'Hume AI', shortLabel: 'Hume' },
   fal: { label: 'Fal', shortLabel: 'Fal' },
   replicate: { label: 'Replicate', shortLabel: 'Replicate' },
+  minimax: { label: 'MiniMax', shortLabel: 'MiniMax' },
+  mistral: { label: 'Mistral (Voxtral)', shortLabel: 'Mistral' },
 };
 
 export const STT_PROVIDER_DISPLAY: Record<string, { label: string; shortLabel: string }> = {
@@ -127,6 +129,16 @@ export const TTS_MODEL_DISPLAY: Record<string, string> = {
   'qwen3-tts-1.7b': 'Qwen3 1.7B',
   'qwen3-tts-0.6b': 'Qwen3 0.6B',
   'qwen3-tts': 'Qwen3',
+  'voxtral-mini-tts-2603': 'Voxtral Mini',
+  'speech-02-hd': 'Speech-02 HD',
+  'speech-02-turbo': 'Speech-02 Turbo',
+  'octave-v2': 'Octave V2',
+  'eleven_flash_v2_5': 'Flash v2.5',
+  'eleven_turbo_v2': 'Turbo v2',
+  'tts-1': 'TTS-1',
+  'gpt-4o-mini-tts': 'GPT-4o Mini TTS',
+  'inworld-tts-1.5-max': 'Inworld 1.5 Max',
+  'inworld-tts-1.5-mini': 'Inworld 1.5 Mini',
 };
 
 export function getAiProviderLabel(id: string | null | undefined): string | null {

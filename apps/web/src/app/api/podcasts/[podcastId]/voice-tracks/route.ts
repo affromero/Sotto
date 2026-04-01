@@ -400,5 +400,14 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     },
   });
 
-  return NextResponse.json(tracks);
+  // Enrich voices with resolved names so the UI doesn't show raw UUIDs
+  const enriched = tracks.map((t) => ({
+    ...t,
+    voices: t.voices.map((v) => ({
+      ...v,
+      voiceName: findVoiceName(v.voiceId) ?? null,
+    })),
+  }));
+
+  return NextResponse.json(enriched);
 }

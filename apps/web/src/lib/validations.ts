@@ -274,7 +274,7 @@ export const voiceVerifyChallengeSchema = z.object({
 export const voicePreviewSchema = z.object({
   voiceId: z.string().min(1),
   text: z.string().min(1).max(500),
-  provider: z.enum(['elevenlabs', 'hume', 'cartesia', 'openai']).optional(),
+  provider: z.enum(['elevenlabs', 'hume', 'cartesia', 'openai', 'fal', 'replicate', 'minimax', 'mistral']).optional(),
 });
 
 /**
@@ -406,7 +406,7 @@ export const userSearchSchema = z.object({
  * BYOK API key validation (multi-provider)
  */
 export const byokSchema = z.object({
-  provider: z.enum(['elevenlabs', 'openai', 'cartesia', 'hume', 'fal', 'replicate', 'suno']),
+  provider: z.enum(['elevenlabs', 'openai', 'cartesia', 'hume', 'fal', 'replicate', 'minimax', 'mistral', 'suno']),
   apiKey: z.string().min(10).max(500),
 });
 

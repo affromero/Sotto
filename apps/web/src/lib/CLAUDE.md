@@ -172,3 +172,39 @@ All lib functions throw descriptive errors. API routes catch and return proper H
 2. Add types to `src/types/` if needed
 3. Update this CLAUDE.md with the file description
 4. If it's an external service, add env vars to `.env.example`
+
+## MANDATORY — Adding a New TTS Provider Voice Pool
+
+**Every new TTS provider with preset voices MUST touch all files below. Missing any causes silent fallbacks to ElevenLabs voices or raw UUIDs in the UI.**
+
+### Voice pool & registry (backend)
+
+- [ ] `providers/tts-voices.ts` — add `export const NEW_VOICE_POOL: ProviderVoice[]` + add entry to `PROVIDER_VOICE_POOLS` map
+- [ ] `providers/tts-registry.ts` — add to `TtsProviderId` union + add full `TtsProviderMeta` entry (languages, models, costs)
+- [ ] `providers/tts/new.provider.ts` — create provider class implementing `TtsProvider`
+- [ ] `providers/tts.ts` — add async import + `case` in `createTtsProviderAsync` + platform key resolution
+- [ ] `voice-pool.ts` → `findVoiceName()` — add pool to destructured import + `providerPools` array (otherwise UUIDs show in UI)
+- [ ] `voice-catalog.ts` → `getVoiceCatalog()` — add import + `case` in switch (otherwise falls to ElevenLabs catalog)
+- [ ] `voice-assigner.ts` → `getFallbackVoiceIds()` — add import + `case` in switch (otherwise assigns wrong ElevenLabs voice IDs)
+
+### Validation schemas & API routes
+
+- [ ] `validations.ts` → `byokSchema` — add to `provider` z.enum (otherwise BYOK key save returns 400)
+- [ ] `validations.ts` → `voicePreviewSchema` — add to `provider` z.enum (otherwise voice preview returns 400)
+- [ ] `api/settings/byok/route.ts` → DELETE `validProviders` array — add provider (otherwise key deletion falls back to elevenlabs)
+- [ ] `api/podcasts/[id]/voice-tracks/route.ts` → GET enrichment uses `findVoiceName()` — works automatically if voice pool is registered
+
+### Display names (shared + UI)
+
+- [ ] `packages/shared/src/provider-display.ts` — add to `TTS_PROVIDER_DISPLAY` + `TTS_MODEL_DISPLAY`
+- [ ] `components/player/VoiceTrackSelector.tsx` — add to local `PROVIDER_DISPLAY`
+- [ ] `components/player/VoiceTrackManager.tsx` — add to local `PROVIDER_DISPLAY`
+
+### Expression mapping (if provider supports SSML/tags)
+
+- [ ] `tts-expression-mapper.ts` — add type + direction map entries + `case` in `mapDirectionToExpression` and `convertInlineAudioTags`
+
+### Tests
+
+- [ ] `tests/smoke/connectivity.test.ts` — add provider smoke test block
+- [ ] `tests/api/admin-test-model.test.ts` — add to voice pool mock + `getProviderIds` mock

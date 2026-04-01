@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/api-keys';
 import { byokSchema } from '@/lib/validations';
 import { storeByokKey, removeByokKey, listByokProviders, validateByokKey } from '@/lib/byok';
+import type { TtsProviderId } from '@/lib/providers/tts-registry';
 
 import { errorResponse } from '@/lib/api-response';
 export async function GET(request: NextRequest) {
@@ -51,12 +52,12 @@ export async function DELETE(request: NextRequest) {
     // No body — legacy behavior removes elevenlabs
   }
 
-  const validProviders = ['elevenlabs', 'openai', 'cartesia', 'hume', 'fal', 'replicate', 'suno'];
+  const validProviders = ['elevenlabs', 'openai', 'cartesia', 'hume', 'fal', 'replicate', 'minimax', 'mistral', 'suno'];
   const targetProvider = provider && validProviders.includes(provider) ? provider : 'elevenlabs';
 
   await removeByokKey(
     authed.userId,
-    targetProvider as 'elevenlabs' | 'openai' | 'cartesia' | 'hume' | 'fal' | 'replicate' | 'suno'
+    targetProvider as TtsProviderId | 'suno'
   );
   return NextResponse.json({ success: true });
 }
