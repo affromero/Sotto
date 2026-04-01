@@ -4,7 +4,7 @@ import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import { Player, type PlayerRef } from '@remotion/player';
 import { PodcastVisuals, DEFAULT_RENDER_CONFIG, DEFAULT_BRANDING } from '@sotto/video';
 import type { VisualsInput } from '@sotto/video';
-import { buildVideoSegments, computeTotalFrames } from '@/lib/segment-utils';
+import { buildVideoSegments, computeTotalFrames, findActiveWordIndex } from '@/lib/segment-utils';
 import type { SegmentVisualData } from '@/lib/segment-utils';
 import type { SegmentData } from '@/types/podcast';
 import type { VocabularyEntryData } from '@/types/vocabulary';
@@ -32,6 +32,7 @@ interface ClipSegment {
   text: string;
   startTime: number;
   duration: number;
+  wordTimings?: Array<{ word: string; start: number; end: number }> | null;
 }
 
 interface ClipVisual {
@@ -420,16 +421,46 @@ export function AudioClipPlayer({
           <div className={styles.transcriptArea}>
             <p className={styles.transcriptLabel}>Learn German while listening — hover the highlighted words</p>
             {/* eslint-disable-next-line react-hooks/refs -- pauseAudio/resumeAudio are event handlers, not render-time ref reads */}
-            {clipSegments.map((seg) => (
-              <span key={seg.id}>
-                {parseTextWithVocabulary(
-                  seg.text,
-                  clipVocabulary,
-                  pauseAudio,
-                  resumeAudio,
-                )}{' '}
-              </span>
-            ))}
+            {clipSegments.map((seg) => {
+              const isActive = currentTime >= seg.startTime
+                && currentTime < seg.startTime + seg.duration;
+              const hasWordTimings = seg.wordTimings && seg.wordTimings.length > 0;
+
+              if (isActive && hasWordTimings) {
+                const timeInSegment = currentTime - seg.startTime;
+                const activeWordIdx = findActiveWordIndex(seg.wordTimings!, timeInSegment);
+                return (
+                  <span key={seg.id}>
+                    {seg.wordTimings!.map((wt, i) => {
+                      let cls = styles.karaokeWord;
+                      if (i < activeWordIdx || (activeWordIdx === -1 && timeInSegment >= wt.end)) {
+                        cls += ` ${styles.karaokeWordSpoken}`;
+                      } else if (i === activeWordIdx) {
+                        cls += ` ${styles.karaokeWordCurrent}`;
+                      } else {
+                        cls += ` ${styles.karaokeWordUpcoming}`;
+                      }
+                      return (
+                        <span key={i} className={cls}>
+                          {wt.word}{' '}
+                        </span>
+                      );
+                    })}
+                  </span>
+                );
+              }
+
+              return (
+                <span key={seg.id}>
+                  {parseTextWithVocabulary(
+                    seg.text,
+                    clipVocabulary,
+                    pauseAudio,
+                    resumeAudio,
+                  )}{' '}
+                </span>
+              );
+            })}
           </div>
         )}
       </div>
