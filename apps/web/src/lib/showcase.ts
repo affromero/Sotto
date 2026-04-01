@@ -41,7 +41,7 @@ export interface LandingShowcaseData {
   videoClip: { url: string; start: number; end: number } | null;
 
   // Clip-range segments + visuals for client-side Remotion Player
-  clipSegments: { id: string; order: number; speaker: string; text: string; startTime: number; duration: number }[];
+  clipSegments: { id: string; order: number; speaker: string; text: string; startTime: number; duration: number; wordTimings?: Array<{ word: string; start: number; end: number }> | null }[];
   clipVisuals: { id: string; segmentId: string; order: number; subOrder: number; startOffset: number; subDuration: number | null; visualType: string; visualMode: string | null; prompt: string | null; metadata: Record<string, unknown> | null; assetUrl: string | null; assetType: string | null; firstFrameUrl: string | null; status: string }[];
 
   // Vocabulary entries for clip transcript demo
@@ -196,7 +196,7 @@ export async function buildShowcaseData(config: LandingShowcaseConfig): Promise<
         },
         segments: {
           orderBy: { order: 'asc' },
-          select: { id: true, order: true, speaker: true, text: true, startTime: true, duration: true, ttsVoiceId: true },
+          select: { id: true, order: true, speaker: true, text: true, startTime: true, duration: true, wordTimings: true, ttsVoiceId: true },
         },
         voices: {
           select: { speaker: true, voiceId: true },
@@ -393,6 +393,7 @@ export async function buildShowcaseData(config: LandingShowcaseConfig): Promise<
         text: s.text,
         startTime: Math.max(0, (s.startTime ?? 0) - clipStart),
         duration: s.duration ?? 0,
+        wordTimings: s.wordTimings as Array<{ word: string; start: number; end: number }> | null,
       }));
     const clipSegmentIds = new Set(clipSegments.map((s) => s.id));
     const clipVisuals = allVisuals

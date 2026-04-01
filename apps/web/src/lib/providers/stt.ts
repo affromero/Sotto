@@ -14,6 +14,7 @@ export interface TranscriptionResult {
     text: string;
     speaker?: string;
   }>;
+  words?: Array<{ word: string; start: number; end: number }>;
   language?: string;
 }
 
@@ -95,7 +96,7 @@ class OpenAIWhisperProvider implements SttProvider {
         model: this.config.model,
         response_format: 'verbose_json',
         language: opts?.language,
-        timestamp_granularities: ['segment'],
+        timestamp_granularities: ['word', 'segment'],
       });
 
       const durationMs = Date.now() - startTime;
@@ -115,6 +116,11 @@ class OpenAIWhisperProvider implements SttProvider {
           end: number;
           text: string;
         }>;
+        words?: Array<{
+          word: string;
+          start: number;
+          end: number;
+        }>;
       };
 
       const segments =
@@ -124,9 +130,16 @@ class OpenAIWhisperProvider implements SttProvider {
           text: seg.text.trim(),
         })) ?? [];
 
+      const words = verboseResponse.words?.map((w) => ({
+        word: w.word,
+        start: w.start,
+        end: w.end,
+      }));
+
       return {
         text: verboseResponse.text,
         segments,
+        words,
         language: verboseResponse.language,
       };
     } catch (err) {
@@ -221,6 +234,11 @@ class ElevenLabsScribeProvider implements SttProvider {
     // Group words into segments by sentence boundaries
     const segments = this.groupWordsIntoSegments(data.words ?? [], data.text);
 
+    // Pass through word-level timestamps
+    const words = data.words
+      ?.filter((w) => !w.type || w.type === 'word')
+      .map((w) => ({ word: w.text, start: w.start, end: w.end }));
+
     logger.info('Scribe transcription complete', {
       language: data.language_code,
       wordCount: String(data.words?.length ?? 0),
@@ -231,6 +249,7 @@ class ElevenLabsScribeProvider implements SttProvider {
     return {
       text: data.text,
       segments,
+      words,
       language: data.language_code,
     };
   }
@@ -386,6 +405,13 @@ class DeepgramProvider implements SttProvider {
       segments = text ? [{ start: 0, end: 0, text }] : [];
     }
 
+    // Pass through word-level timestamps
+    const words = alt?.words?.map((w) => ({
+      word: w.punctuated_word ?? w.word,
+      start: w.start,
+      end: w.end,
+    }));
+
     logger.info('Deepgram transcription complete', {
       model: this.model,
       language: data.metadata?.language,
@@ -393,7 +419,7 @@ class DeepgramProvider implements SttProvider {
       durationMs: String(durationMs),
     });
 
-    return { text, segments, language: data.metadata?.language };
+    return { text, segments, words, language: data.metadata?.language };
   }
 }
 

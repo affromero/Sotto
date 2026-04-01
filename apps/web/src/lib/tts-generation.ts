@@ -8,6 +8,7 @@
  * Does NOT handle: DB reads/writes, provider resolution, voice assignment,
  * R2 upload, stitching queue — those stay in each worker.
  */
+import type { WordTiming } from '@sotto/shared';
 import type { TtsProvider } from '@/lib/providers/tts';
 import { getProviderMeta, type TtsProviderId } from '@/lib/providers/tts-registry';
 import { getElevenLabsConcurrencyLimit } from '@/lib/elevenlabs';
@@ -90,6 +91,8 @@ export interface TtsGenerationResult {
   service: string;
   /** Wall-clock time in ms. */
   durationMs: number;
+  /** Word-level timestamps from the TTS provider or STT fallback, null when unavailable. */
+  wordTimings: WordTiming[] | null;
 }
 
 /**
@@ -164,16 +167,26 @@ export async function generateTtsAudio(params: TtsGenerationParams): Promise<Tts
   }
 
   let audioBuffer: Buffer;
+  let wordTimings: WordTiming[] | null = null;
   let semaphoreReleased = false;
   const effectiveSource = source;
+  const supportsTimestamps = typeof provider.generateSpeechWithTimestamps === 'function';
   try {
     if (chunks.length === 1) {
       // Fast path — single chunk, no splitting needed
       const speechParams = { text: ttsText, voiceId, previousText, nextText, direction, speaker, language: langHint };
-      audioBuffer = await provider.generateSpeech(speechParams);
+      if (supportsTimestamps) {
+        const result = await provider.generateSpeechWithTimestamps!(speechParams);
+        audioBuffer = result.audio;
+        wordTimings = result.wordTimings;
+      } else {
+        audioBuffer = await provider.generateSpeech(speechParams);
+      }
     } else {
       // Multi-chunk: generate each with context bridging for voice continuity
       const chunkBuffers: Buffer[] = [];
+      const allWordTimings: WordTiming[] = [];
+      let cumulativeDuration = 0;
       const skipTextContext = meta.modelsWithoutTextContext.includes(
         provider.getModelId(),
       );
@@ -196,7 +209,27 @@ export async function generateTtsAudio(params: TtsGenerationParams): Promise<Tts
           continuityIds: continuityIds.length > 0 ? continuityIds.slice(-3) : undefined,
           language: langHint,
         };
-        chunkBuffers.push(await provider.generateSpeech(speechParams));
+
+        if (supportsTimestamps) {
+          const result = await provider.generateSpeechWithTimestamps!(speechParams);
+          chunkBuffers.push(result.audio);
+
+          // Offset word timings by cumulative duration of previous chunks
+          for (const wt of result.wordTimings) {
+            allWordTimings.push({
+              word: wt.word,
+              start: wt.start + cumulativeDuration,
+              end: wt.end + cumulativeDuration,
+            });
+          }
+
+          // Estimate chunk duration from word timings (last word's end time)
+          if (result.wordTimings.length > 0) {
+            cumulativeDuration = allWordTimings[allWordTimings.length - 1].end;
+          }
+        } else {
+          chunkBuffers.push(await provider.generateSpeech(speechParams));
+        }
 
         // Collect continuity ID for next chunk (if provider supports it)
         const contId = provider.getLastContinuityId?.();
@@ -205,6 +238,9 @@ export async function generateTtsAudio(params: TtsGenerationParams): Promise<Tts
 
       // Concatenate chunk audio via FFmpeg (lossless concat demuxer)
       audioBuffer = await concatAudioBuffers(chunkBuffers);
+      if (allWordTimings.length > 0) {
+        wordTimings = allWordTimings;
+      }
     }
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
@@ -262,7 +298,17 @@ export async function generateTtsAudio(params: TtsGenerationParams): Promise<Tts
     metadata: { voiceId, speaker, source: effectiveSource, ...extraMetadata },
   });
 
-  return { audioBuffer, segmentDuration, service, durationMs };
+  // 10. Forced-alignment fallback: if no word timings from TTS, try STT
+  if (!wordTimings && text.trim().length > 0) {
+    try {
+      const { getWordTimingsViaStt } = await import('@/lib/forced-alignment');
+      wordTimings = await getWordTimingsViaStt(audioBuffer, text, userId);
+    } catch {
+      // Forced alignment is best-effort — never fail the generation
+    }
+  }
+
+  return { audioBuffer, segmentDuration, service, durationMs, wordTimings };
 }
 
 // ---------------------------------------------------------------------------

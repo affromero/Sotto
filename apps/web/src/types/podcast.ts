@@ -2,7 +2,7 @@ import { PodcastSource, PodcastStatus, PodcastVisibility } from '@prisma/client'
 import { ReferenceData } from './reference';
 import type { VocabularyEntryData } from './vocabulary';
 import { PodcastVersionSummary } from './version';
-import type { VoiceTrackSummary } from '@sotto/shared';
+import type { VoiceTrackSummary, WordTiming } from '@sotto/shared';
 
 export type { VoiceTrackSummary };
 
@@ -105,6 +105,7 @@ export interface SegmentData {
   order: number;
   startTime: number | null;
   duration: number | null;
+  wordTimings?: WordTiming[] | null;
 }
 
 export interface InteractionSummary {

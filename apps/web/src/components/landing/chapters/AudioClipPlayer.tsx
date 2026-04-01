@@ -30,6 +30,7 @@ interface ClipSegment {
   text: string;
   startTime: number;
   duration: number;
+  wordTimings?: Array<{ word: string; start: number; end: number }> | null;
 }
 
 interface ClipVisual {

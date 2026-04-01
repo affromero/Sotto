@@ -336,6 +336,25 @@
   }
 }
 
+/* Karaoke word-level highlights */
+.karaokeWord {
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+
+.karaokeWordSpoken {
+  opacity: 0.5;
+}
+
+.karaokeWordCurrent {
+  opacity: 1;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.karaokeWordUpcoming {
+  opacity: 0.35;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .mockPlayer {
     transform: none;
@@ -356,6 +375,10 @@
   }
 
   .videoPlayOverlay {
+    transition: none;
+  }
+
+  .karaokeWord {
     transition: none;
   }
 }

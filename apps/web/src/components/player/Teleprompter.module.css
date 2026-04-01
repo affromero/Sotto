@@ -211,10 +211,33 @@
   50% { opacity: 0.6; }
 }
 
+/* Word-level timing highlights */
+.word {
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+
+.wordSpoken {
+  opacity: 0.5;
+}
+
+.wordCurrent {
+  opacity: 1;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.wordUpcoming {
+  opacity: 0.35;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .active[data-speaker-index="0"],
   .active[data-speaker-index="1"],
   .active[data-speaker-index="2"],
   .active[data-speaker-index="3"] { animation: none; }
   .active .speaker { animation: none; }
+
+  .word {
+    transition: none;
+  }
 }
