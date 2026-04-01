@@ -242,7 +242,7 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
     data: {
       audioUrl,
       duration: result.segmentDuration,
-      wordTimings: result.wordTimings ?? undefined,
+      wordTimings: result.wordTimings ? JSON.parse(JSON.stringify(result.wordTimings)) : undefined,
     },
   });
 

@@ -300,7 +300,7 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
             audioUrl,
             duration: seg.endTime && seg.startTime ? seg.endTime - seg.startTime : 0,
             startTime: seg.startTime ?? 0,
-            wordTimings: segmentWordTimings ?? undefined,
+            wordTimings: segmentWordTimings ? JSON.parse(JSON.stringify(segmentWordTimings)) : undefined,
           },
         });
       })

@@ -237,6 +237,7 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
           audioUrl: await resolveAudioUrl(s.audioUrl, visibility),
           startTime: s.startTime,
           duration: s.duration,
+          wordTimings: s.wordTimings as Array<{ word: string; start: number; end: number }> | null,
         }))
       ),
       Promise.all(
