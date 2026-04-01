@@ -26,8 +26,9 @@ const PROVIDER_DISPLAY: Record<string, string> = {
   cartesia: 'Cartesia',
   hume: 'Hume AI',
   fal: 'Fal',
-  minimax: 'MiniMax',
   replicate: 'Replicate',
+  minimax: 'MiniMax',
+  mistral: 'Mistral',
 };
 
 function buildVoiceTooltip(voices: VoiceTrackSummary['voices']): string | undefined {

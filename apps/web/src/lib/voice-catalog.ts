@@ -17,6 +17,7 @@ import {
   FAL_VOICE_POOL,
   INWORLD_VOICE_POOL,
   MINIMAX_VOICE_POOL,
+  MISTRAL_VOICE_POOL,
   type ProviderVoice,
 } from './providers/tts-voices';
 import { cache } from './redis';
@@ -244,6 +245,9 @@ export async function getVoiceCatalog(
 
     case 'minimax':
       return providerVoiceToCatalog(MINIMAX_VOICE_POOL);
+
+    case 'mistral':
+      return providerVoiceToCatalog(MISTRAL_VOICE_POOL);
 
     default:
       return voicePoolToCatalog(VOICE_POOL, 'elevenlabs');

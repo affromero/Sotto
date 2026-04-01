@@ -22,6 +22,8 @@ import {
   CARTESIA_VOICE_POOL,
   HUME_VOICE_POOL,
   FAL_VOICE_POOL,
+  MINIMAX_VOICE_POOL,
+  MISTRAL_VOICE_POOL,
 } from './providers/tts-voices';
 import type { TtsProviderId } from './providers/tts-registry';
 import { logger } from './logger';
@@ -276,6 +278,16 @@ function getFallbackVoiceIds(
     case 'fal':
     case 'replicate': {
       const voices = selectVoiceSetFromPool(FAL_VOICE_POOL, podcastId, speakerCount, metadata);
+      return voices.map((v) => v.id);
+    }
+
+    case 'minimax': {
+      const voices = selectVoiceSetFromPool(MINIMAX_VOICE_POOL, podcastId, speakerCount, metadata);
+      return voices.map((v) => v.id);
+    }
+
+    case 'mistral': {
+      const voices = selectVoiceSetFromPool(MISTRAL_VOICE_POOL, podcastId, speakerCount, metadata);
       return voices.map((v) => v.id);
     }
 

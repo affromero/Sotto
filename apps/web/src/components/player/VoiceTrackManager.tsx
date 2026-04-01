@@ -14,8 +14,9 @@ const PROVIDER_DISPLAY: Record<string, string> = {
   cartesia: 'Cartesia',
   hume: 'Hume AI',
   fal: 'Fal',
-  minimax: 'MiniMax',
   replicate: 'Replicate',
+  minimax: 'MiniMax',
+  mistral: 'Mistral',
 };
 
 function buildVoiceTooltip(voices: VoiceTrackSummary['voices']): string | undefined {
@@ -23,7 +24,7 @@ function buildVoiceTooltip(voices: VoiceTrackSummary['voices']): string | undefi
   return voices
     .map((v) => {
       const provider = v.provider ? (PROVIDER_DISPLAY[v.provider] ?? v.provider) : '';
-      const voice = v.voiceId || 'Auto';
+      const voice = v.voiceName || v.voiceId || 'Auto';
       return `${v.speaker}: ${voice}${provider ? ` [${provider}]` : ''}`;
     })
     .join('\n');
