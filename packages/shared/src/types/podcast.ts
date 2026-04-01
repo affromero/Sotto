@@ -107,6 +107,12 @@ export interface VoiceTrackSummary {
   proposalMessage: string | null;
 }
 
+export interface WordTiming {
+  word: string;
+  start: number;
+  end: number;
+}
+
 export interface SegmentData {
   id: string;
   speaker: Speaker;
@@ -115,6 +121,7 @@ export interface SegmentData {
   order: number;
   startTime: number | null;
   duration: number | null;
+  wordTimings?: WordTiming[] | null;
 }
 
 export interface InteractionSummary {

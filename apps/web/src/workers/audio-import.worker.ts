@@ -150,6 +150,7 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
     await job.updateProgress(30);
 
     let segments;
+    let transcriptionWords: Array<{ word: string; start: number; end: number }> | undefined;
 
     if (transcriptText) {
       logger.info('Parsing provided transcript');
@@ -173,6 +174,7 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
         fs.readFile(normalizedPath)
       );
       const transcription = await provider.transcribe(normalizedBuffer);
+      transcriptionWords = transcription.words;
 
       const sttId = sttProvider ?? 'openai';
       const sttMeta = getSttProviderMeta(sttId);
@@ -279,8 +281,17 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
     await job.updateProgress(85);
 
     const dbSegments = await Promise.all(
-      segments.map((seg) =>
-        prisma.segment.create({
+      segments.map((seg) => {
+        // Slice word-level timestamps for this segment's time range
+        let segmentWordTimings: Array<{ word: string; start: number; end: number }> | undefined;
+        if (transcriptionWords && transcriptionWords.length > 0 && seg.startTime != null && seg.endTime != null) {
+          segmentWordTimings = transcriptionWords.filter(
+            (w) => w.start >= seg.startTime! && w.end <= seg.endTime!
+          );
+          if (segmentWordTimings.length === 0) segmentWordTimings = undefined;
+        }
+
+        return prisma.segment.create({
           data: {
             podcastId,
             speaker: seg.speaker,
@@ -289,9 +300,10 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
             audioUrl,
             duration: seg.endTime && seg.startTime ? seg.endTime - seg.startTime : 0,
             startTime: seg.startTime ?? 0,
+            wordTimings: segmentWordTimings ?? undefined,
           },
-        })
-      )
+        });
+      })
     );
 
     const podcastVersion = await prisma.podcastVersion.create({

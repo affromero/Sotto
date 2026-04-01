@@ -2,9 +2,10 @@
 
 import { useCallback, useMemo, useState } from 'react';
 import { Minus, Plus } from 'lucide-react';
+import type { WordTiming } from '@sotto/shared';
 import { parseTextWithCitations } from '@/lib/citation-parser';
 import { parseTextWithVocabulary, parseTextWithCitationsAndVocabulary } from '@/lib/vocabulary-parser';
-import { findActiveIndex } from '@/lib/segment-utils';
+import { findActiveIndex, findActiveWordIndex } from '@/lib/segment-utils';
 import { getSpeakerIndex, getUniqueSpeakers } from '@/lib/speaker-colors';
 import { STAGE_DIRECTION_PATTERN } from '@/lib/tts-text-cleaner';
 import type { SegmentData } from '@/types/podcast';
@@ -20,11 +21,36 @@ interface TeleprompterProps {
   onSegmentClick?: (startTime: number) => void;
 }
 
+/** Render words with karaoke-style highlighting based on word timings */
+function renderWordTimings(
+  wordTimings: WordTiming[],
+  timeInSegment: number,
+): React.ReactNode {
+  const activeIdx = findActiveWordIndex(wordTimings, timeInSegment);
+  return wordTimings.map((wt, i) => {
+    let cls = styles.word;
+    if (i < activeIdx || (activeIdx === -1 && timeInSegment >= wt.end)) {
+      cls += ` ${styles.wordSpoken}`;
+    } else if (i === activeIdx) {
+      cls += ` ${styles.wordCurrent}`;
+    } else {
+      cls += ` ${styles.wordUpcoming}`;
+    }
+    return (
+      <span key={i} className={cls}>
+        {wt.word}{' '}
+      </span>
+    );
+  });
+}
+
 function SegmentBlock({
   segment,
   speakers,
   references,
   vocabularyEntries = [],
+  isActive = false,
+  currentTime = 0,
   className,
   onClick,
   innerRef,
@@ -33,22 +59,34 @@ function SegmentBlock({
   speakers: string[];
   references: ReferenceData[];
   vocabularyEntries?: VocabularyEntryData[];
+  isActive?: boolean;
+  currentTime?: number;
   className: string;
   onClick?: () => void;
   innerRef?: React.RefObject<HTMLDivElement | null>;
 }) {
   const idx = getSpeakerIndex(segment.speaker, speakers);
   const cleanedText = segment.text.replace(STAGE_DIRECTION_PATTERN, '').replace(/\s{2,}/g, ' ').trim();
-  const hasRefs = references.length > 0;
-  const hasVocab = vocabularyEntries.length > 0;
 
-  const parsed = hasRefs && hasVocab
-    ? parseTextWithCitationsAndVocabulary(cleanedText, references, vocabularyEntries)
-    : hasRefs
-      ? parseTextWithCitations(cleanedText, references)
-      : hasVocab
-        ? parseTextWithVocabulary(cleanedText, vocabularyEntries)
-        : cleanedText;
+  const useWordLevel = isActive
+    && segment.wordTimings
+    && segment.wordTimings.length > 0;
+
+  let content: React.ReactNode;
+  if (useWordLevel) {
+    const timeInSegment = currentTime - (segment.startTime ?? 0);
+    content = renderWordTimings(segment.wordTimings!, timeInSegment);
+  } else {
+    const hasRefs = references.length > 0;
+    const hasVocab = vocabularyEntries.length > 0;
+    content = hasRefs && hasVocab
+      ? parseTextWithCitationsAndVocabulary(cleanedText, references, vocabularyEntries)
+      : hasRefs
+        ? parseTextWithCitations(cleanedText, references)
+        : hasVocab
+          ? parseTextWithVocabulary(cleanedText, vocabularyEntries)
+          : cleanedText;
+  }
 
   return (
     <div
@@ -63,7 +101,7 @@ function SegmentBlock({
         {segment.speaker}
       </span>
       <p className={styles.text}>
-        {parsed}
+        {content}
       </p>
     </div>
   );
@@ -140,6 +178,8 @@ export function Teleprompter({
             speakers={speakers}
             references={references}
             vocabularyEntries={vocabularyEntries}
+            isActive
+            currentTime={currentTime}
             className={`${styles.segment} ${styles.active}`}
             onClick={() => handleClick(currentSegment.startTime)}
           />

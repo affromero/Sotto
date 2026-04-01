@@ -28,6 +28,7 @@ export type {
   ForkedFromInfo,
   ForkSummary,
   SegmentData,
+  WordTiming,
   InteractionSummary,
   CreatePodcastRequest,
   GeneratePodcastRequest,

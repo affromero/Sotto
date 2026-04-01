@@ -168,6 +168,150 @@ export async function generateSpeech(params: {
 }
 
 // ---------------------------------------------------------------------------
+// Text-to-Speech with Word Timestamps
+// ---------------------------------------------------------------------------
+
+interface ElevenLabsAlignment {
+  characters: string[];
+  character_start_times_seconds: number[];
+  character_end_times_seconds: number[];
+}
+
+interface WordTimingResult {
+  word: string;
+  start: number;
+  end: number;
+}
+
+/**
+ * Convert character-level alignment data to word-level timings.
+ * Groups consecutive non-whitespace characters into words and uses the
+ * first character's start time and last character's end time for each word.
+ */
+export function characterTimingsToWordTimings(alignment: ElevenLabsAlignment): WordTimingResult[] {
+  const { characters, character_start_times_seconds, character_end_times_seconds } = alignment;
+  const words: WordTimingResult[] = [];
+
+  let currentWord = '';
+  let wordStart = 0;
+  let wordEnd = 0;
+
+  for (let i = 0; i < characters.length; i++) {
+    const char = characters[i];
+
+    if (char === ' ' || char === '\n' || char === '\t') {
+      // Whitespace — flush current word
+      if (currentWord.length > 0) {
+        words.push({ word: currentWord, start: wordStart, end: wordEnd });
+        currentWord = '';
+      }
+    } else {
+      if (currentWord.length === 0) {
+        // Starting a new word
+        wordStart = character_start_times_seconds[i];
+      }
+      currentWord += char;
+      wordEnd = character_end_times_seconds[i];
+    }
+  }
+
+  // Flush final word
+  if (currentWord.length > 0) {
+    words.push({ word: currentWord, start: wordStart, end: wordEnd });
+  }
+
+  return words;
+}
+
+/**
+ * Generate speech with word-level timestamps using ElevenLabs' with-timestamps endpoint.
+ * Returns both the audio buffer and word timings.
+ */
+export async function generateSpeechWithTimestamps(params: {
+  text: string;
+  voiceId: string;
+  modelId?: string;
+  stability?: number;
+  similarityBoost?: number;
+  style?: number;
+  speed?: number;
+  seed?: number;
+  apiKeyOverride?: string;
+  previousText?: string;
+  nextText?: string;
+  previousRequestIds?: string[];
+  language?: string;
+}): Promise<{ audio: Buffer; wordTimings: WordTimingResult[]; requestId: string | null }> {
+  const apiKey = params.apiKeyOverride || getApiKey();
+  if (!apiKey) {
+    throw new Error('ElevenLabs API key not configured — set ELEVENLABS_API_KEY');
+  }
+
+  const meta = getProviderMeta('elevenlabs');
+  const modelId = params.modelId || meta.defaultModel;
+  const skipTextContext = meta.modelsWithoutTextContext.includes(modelId);
+
+  const stability = params.stability ?? 0.5;
+
+  const body: Record<string, unknown> = {
+    text: params.text,
+    model_id: modelId,
+    voice_settings: {
+      stability,
+      similarity_boost: params.similarityBoost ?? 0.85,
+      style: params.style ?? 0.0,
+      use_speaker_boost: true,
+      ...(params.speed && { speed: params.speed }),
+    },
+  };
+
+  if (params.seed != null) {
+    body.seed = params.seed;
+  }
+
+  if (params.language) {
+    body.language_code = params.language;
+  }
+
+  if (!skipTextContext) {
+    if (params.previousText) body.previous_text = params.previousText;
+    if (params.nextText) body.next_text = params.nextText;
+  }
+
+  const response = await fetch(
+    `${ELEVENLABS_BASE_URL}/text-to-speech/${params.voiceId}/with-timestamps?output_format=mp3_44100_192`,
+    {
+      method: 'POST',
+      headers: {
+        'xi-api-key': apiKey,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify(body),
+    },
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`ElevenLabs API error (${response.status}): ${errorText}`);
+  }
+
+  const data = await response.json() as {
+    audio_base64: string;
+    alignment: ElevenLabsAlignment;
+  };
+
+  const audio = Buffer.from(data.audio_base64, 'base64');
+  const wordTimings = characterTimingsToWordTimings(data.alignment);
+
+  return {
+    audio,
+    wordTimings,
+    requestId: response.headers.get('request-id'),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Sound Effects — generate ambient audio, transitions, intros
 // ---------------------------------------------------------------------------
 
