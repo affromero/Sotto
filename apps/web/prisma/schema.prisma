@@ -642,9 +642,10 @@ model Segment {
   text      String  @db.Text
   audioUrl  String?
   order     Int
-  startTime Float? // seconds
-  duration  Float? // seconds
-  version   Int     @default(1)
+  startTime    Float? // seconds
+  duration     Float? // seconds
+  wordTimings  Json?  // Array<{ word: string; start: number; end: number }>
+  version      Int     @default(1)
 
   ttsProvider String? // Per-segment override: 'elevenlabs' | 'openai' | 'cartesia' | etc.
   ttsModel    String? // Per-segment override: provider-specific model ID

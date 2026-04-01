@@ -11,6 +11,7 @@
  *
  * @tts-research-date 2026-03-12 — inline tag injection, context params, output quality
  */
+import type { WordTiming } from '@sotto/shared';
 import type { TtsProvider, SpeechParams, SfxParams } from '../tts';
 import { getProviderMeta, type TtsProviderId } from '../tts-registry';
 import { VOICE_POOL, selectVoicePair, resolveVoiceId, type VoiceMatchMetadata } from '../../voice-pool';
@@ -92,6 +93,48 @@ export class ElevenLabsProvider implements TtsProvider {
 
     this.lastRequestId = requestId;
     return audio;
+  }
+
+  async generateSpeechWithTimestamps(params: SpeechParams): Promise<{ audio: Buffer; wordTimings: WordTiming[] }> {
+    const el = await this.getClient();
+    const apiKeyOverride = params.apiKeyOverride || this.byokApiKey;
+    const modelId = params.modelId ?? this.model;
+    const meta = getProviderMeta('elevenlabs');
+    const skipTextContext = meta.modelsWithoutTextContext.includes(modelId);
+
+    // Map direction to ElevenLabs expression params
+    const expression = mapDirectionToExpression(params.direction, params.speaker, 'elevenlabs');
+    const elExpr = expression.elevenlabs;
+
+    // Apply pronunciation aliases before audio tag injection
+    const cleanText = applyPronunciationAliases(params.text);
+
+    // Apply audio tag
+    const prefix = elExpr?.audioTagPrefix;
+    const text = prefix
+      ? elExpr.sustainedDelivery
+        ? injectTagAtSentenceBoundaries(cleanText, prefix)
+        : prefix + cleanText
+      : cleanText;
+
+    const { audio, wordTimings, requestId } = await el.generateSpeechWithTimestamps({
+      text,
+      voiceId: params.voiceId,
+      modelId,
+      apiKeyOverride,
+      previousText: skipTextContext ? undefined : params.previousText,
+      nextText: skipTextContext ? undefined : params.nextText,
+      previousRequestIds: params.continuityIds?.slice(-3),
+      stability: elExpr?.stability ?? params.stability,
+      similarityBoost: params.similarityBoost,
+      style: 0.0,
+      speed: elExpr?.speed,
+      seed: params.seed,
+      language: params.language,
+    });
+
+    this.lastRequestId = requestId;
+    return { audio, wordTimings };
   }
 
   getLastContinuityId(): string | null {

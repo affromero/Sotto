@@ -30,6 +30,7 @@ export const getPodcastForDetailPage = cache(async (podcastId: string) => {
           order: true,
           startTime: true,
           duration: true,
+          wordTimings: true,
         },
       },
       tags: {
