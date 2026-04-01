@@ -236,10 +236,14 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
   // Upload to R2
   const audioUrl = await uploadSegmentAudio(podcastId, segmentId, result.audioBuffer);
 
-  // Update segment with audio URL and duration
+  // Update segment with audio URL, duration, and word timings
   await prisma.segment.update({
     where: { id: segmentId },
-    data: { audioUrl, duration: result.segmentDuration },
+    data: {
+      audioUrl,
+      duration: result.segmentDuration,
+      wordTimings: result.wordTimings ?? undefined,
+    },
   });
 
   await job.updateProgress(90);

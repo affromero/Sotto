@@ -78,6 +78,10 @@ vi.mock('@/lib/byok-errors', () => ({
   isModelAccessError: vi.fn((msg: string) => /\b404\b/.test(msg)),
 }));
 
+vi.mock('@/lib/forced-alignment', () => ({
+  getWordTimingsViaStt: vi.fn().mockResolvedValue(null),
+}));
+
 const mockResolveTtsProvider = vi.fn();
 vi.mock('@/lib/providers/tts', () => ({
   resolveTtsProvider: (...args: unknown[]) => mockResolveTtsProvider(...args),
@@ -138,6 +142,7 @@ describe('generateTtsAudio', () => {
     expect(result!.audioBuffer).toEqual(Buffer.from('audio-data'));
     expect(result!.segmentDuration).toBe(5.0);
     expect(result!.service).toBe('elevenlabs');
+    expect(result!.wordTimings).toBeNull();
   });
 
   it('passes all speech params to provider.generateSpeech', async () => {

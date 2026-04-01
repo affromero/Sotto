@@ -14,6 +14,7 @@
  * @tts-research-date 2026-03-21 — Added Octave v2 support (version param, skip description for v2)
  */
 import { logger } from '../../logger';
+import type { WordTiming } from '@sotto/shared';
 import type { TtsProvider, SpeechParams } from '../tts';
 import type { TtsProviderId } from '../tts-registry';
 import { HUME_VOICE_POOL, selectVoicePairFromPool } from '../tts-voices';
@@ -23,11 +24,18 @@ import { mapDirectionToExpression, convertInlineAudioTags } from '../../tts-expr
 const SPEAKER_VOICE_HOST_SET = new Set(['HOST', 'GUEST']);
 import type { VoiceMatchMetadata } from '../../voice-pool';
 
+interface HumeTimestamp {
+  word: string;
+  start: number;
+  end: number;
+}
+
 interface HumeTtsResponse {
   generations: Array<{
     audio: string; // base64
     duration: number;
     generation_id?: string;
+    timestamps?: HumeTimestamp[];
   }>;
 }
 
@@ -103,6 +111,74 @@ export class HumeProvider implements TtsProvider {
       description: description ?? 'none',
     });
     return Buffer.from(data.generations[0].audio, 'base64');
+  }
+
+  async generateSpeechWithTimestamps(params: SpeechParams): Promise<{ audio: Buffer; wordTimings: WordTiming[] }> {
+    const isV1 = this.octaveVersion === '1';
+
+    const expression = isV1
+      ? mapDirectionToExpression(params.direction, params.speaker, 'hume')
+      : undefined;
+    const description = expression?.hume?.description;
+
+    const utterance: Record<string, unknown> = {
+      text: convertInlineAudioTags(params.text, 'hume'),
+      voice: { id: params.voiceId },
+      speed: expression?.hume?.speed ?? 1,
+      trailing_silence: expression?.hume?.trailingSilence ?? 0.3,
+    };
+
+    if (description) {
+      utterance.description = description;
+    }
+
+    if (params.continuityIds?.[0]) {
+      utterance.previous_generation_id = params.continuityIds[0];
+    }
+
+    const response = await fetch('https://api.hume.ai/v0/tts', {
+      method: 'POST',
+      headers: {
+        'X-Hume-Api-Key': this.apiKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        utterances: [utterance],
+        format: { type: 'mp3' },
+        version: this.octaveVersion,
+        include_timestamp_types: ['word'],
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Hume AI API error (${response.status}): ${errorText}`);
+    }
+
+    const data: HumeTtsResponse = await response.json();
+    if (!data.generations?.length || !data.generations[0].audio) {
+      throw new Error('Hume AI returned no audio data');
+    }
+
+    this.lastGenerationId = data.generations[0].generation_id ?? null;
+
+    const wordTimings: WordTiming[] = (data.generations[0].timestamps ?? []).map((t) => ({
+      word: t.word,
+      start: t.start,
+      end: t.end,
+    }));
+
+    logger.info('Hume AI speech with timestamps generated', {
+      voiceId: params.voiceId,
+      chars: params.text.length,
+      version: this.octaveVersion,
+      wordCount: String(wordTimings.length),
+    });
+
+    return {
+      audio: Buffer.from(data.generations[0].audio, 'base64'),
+      wordTimings,
+    };
   }
 
   getLastContinuityId(): string | null {

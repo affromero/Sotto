@@ -7,6 +7,7 @@ import {
   type VoiceMatchMetadata,
 } from '../voice-pool';
 import type { TtsProviderId } from './tts-registry';
+import type { WordTiming } from '@sotto/shared';
 import { getProviderMeta, compareQuality } from './tts-registry';
 import { getByokKey, getByokExtraData, listByokProviders, hasByokKey } from '../byok';
 import { resolveAutoModel, getAutoModelConfig } from '../auto-model-config';
@@ -42,6 +43,7 @@ export interface SfxParams {
 
 export interface TtsProvider {
   generateSpeech(params: SpeechParams): Promise<Buffer>;
+  generateSpeechWithTimestamps?(params: SpeechParams): Promise<{ audio: Buffer; wordTimings: WordTiming[] }>;
   generateSoundEffect?(params: SfxParams): Promise<Buffer>;
   getVoiceId(speaker: string, podcastId?: string, metadata?: VoiceMatchMetadata, language?: string): string;
   getModelId(): string;
