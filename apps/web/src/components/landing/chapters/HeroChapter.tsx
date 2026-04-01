@@ -14,8 +14,8 @@ const DEMO_VOCABULARY: VocabularyEntryData[] = [
 ];
 
 const DEMO_TRANSCRIPT_SEGMENTS = [
-  { id: 'demo-seg-1', order: 0, speaker: 'HOST', text: 'Willkommen zu den [V1:Nachrichten]. Heute sprechen wir über die [V2:Wirtschaft].', startTime: 0, duration: 8 },
-  { id: 'demo-seg-2', order: 1, speaker: 'EXPERT', text: 'Die [V3:Verhandlungen] sind ein wichtiges Thema. Laut dem neuesten [V4:Bericht] gibt es Fortschritte.', startTime: 8, duration: 10 },
+  { id: 'demo-seg-1', order: 0, speaker: 'HOST', text: 'Today\'s top story — the latest [V1:Nachrichten] from the global [V2:Wirtschaft] summit.', startTime: 0, duration: 8 },
+  { id: 'demo-seg-2', order: 1, speaker: 'EXPERT', text: 'The [V3:Verhandlungen] between trade ministers produced a new [V4:Bericht] on climate targets.', startTime: 8, duration: 10 },
 ];
 
 interface HeroChapterProps {

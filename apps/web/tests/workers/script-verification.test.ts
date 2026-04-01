@@ -36,6 +36,13 @@ vi.mock('@/lib/prisma', () => {
     pipelineEvent: {
       create: (...args: unknown[]) => mockPrismaPipelineEventCreate(...args),
     },
+    vocabularyEntry: {
+      deleteMany: vi.fn().mockResolvedValue({}),
+      createMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
+    briefingLog: {
+      findFirst: vi.fn().mockResolvedValue(null),
+    },
   };
   return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
 });
@@ -228,6 +235,7 @@ const parseErrorVerdict = {
 const revisedScriptResult = {
   turns: [{ speaker: 'HOST', text: 'Revised welcome.' }, { speaker: 'EXPERT', text: 'Revised expert turn.' }],
   references: [],
+  vocabulary: [],
   soundCues: [],
   markdown: '**HOST:** Revised welcome.',
   model: 'claude-haiku-4-5-20251001',
