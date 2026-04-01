@@ -279,6 +279,7 @@ export function UserActions({
             </button>
           )}
           <button
+            type="button"
             className={`${styles.modBtn} ${styles.modBtnDanger}`}
             onClick={handleRemove}
             disabled={isLoading}

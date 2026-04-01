@@ -7,8 +7,6 @@ import type { VisualsInput } from '@sotto/video';
 import { buildVideoSegments, computeTotalFrames } from '@/lib/segment-utils';
 import type { SegmentVisualData } from '@/lib/segment-utils';
 import type { SegmentData } from '@/types/podcast';
-import type { VocabularyEntryData } from '@/types/vocabulary';
-import { parseTextWithVocabulary } from '@/lib/vocabulary-parser';
 import { useShowcaseToggles } from '../ShowcaseTogglesProvider';
 import styles from './AudioClipPlayer.module.css';
 
@@ -65,7 +63,6 @@ interface AudioClipPlayerProps {
   videoClip?: VideoClip | null;
   clipSegments?: ClipSegment[];
   clipVisuals?: ClipVisual[];
-  clipVocabulary?: VocabularyEntryData[];
   showVideoToggle?: boolean;
 }
 
@@ -97,7 +94,6 @@ export function AudioClipPlayer({
   videoClip,
   clipSegments = [],
   clipVisuals = [],
-  clipVocabulary,
   showVideoToggle = false,
 }: AudioClipPlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -144,19 +140,7 @@ export function AudioClipPlayer({
   const clipDuration = endTime - startTime;
   const progress = clipDuration > 0 ? Math.min(currentTime / clipDuration, 1) : 0;
 
-  const pauseAudio = useCallback(() => {
-    if (audioRef.current && !audioRef.current.paused) {
-      audioRef.current.pause();
-      setIsPlaying(false);
-    }
-  }, []);
 
-  const resumeAudio = useCallback(() => {
-    if (audioRef.current) {
-      audioRef.current.play();
-      setIsPlaying(true);
-    }
-  }, []);
 
   const syncVideo = useCallback((time: number, playing: boolean) => {
     // Sync MP4 <video> element
@@ -416,22 +400,6 @@ export function AudioClipPlayer({
             </a>
           </div>
         </div>
-        {clipVocabulary && clipVocabulary.length > 0 && clipSegments.length > 0 && (
-          <div className={styles.transcriptArea}>
-            <p className={styles.transcriptLabel}>Learn German while listening — hover the highlighted words</p>
-            {/* eslint-disable-next-line react-hooks/refs -- pauseAudio/resumeAudio are event handlers, not render-time ref reads */}
-            {clipSegments.map((seg) => (
-              <span key={seg.id}>
-                {parseTextWithVocabulary(
-                  seg.text,
-                  clipVocabulary,
-                  pauseAudio,
-                  resumeAudio,
-                )}{' '}
-              </span>
-            ))}
-          </div>
-        )}
       </div>
       { }
       <audio ref={audioRef} src={activeUrl} preload="metadata" />
