@@ -13,8 +13,8 @@ interface PageProps {
 
 const MESSAGES: Record<string, { title: string; body: string }> = {
   'not-on-list': {
-    title: 'Join the waitlist first',
-    body: 'Sign-up is currently invite-only. Join the waitlist on our homepage and we\'ll let you know when your spot is ready.',
+    title: 'You\'ve been added to the waitlist',
+    body: 'Sign-up is currently invite-only. We\'ve saved your spot and will email you when access is ready.',
   },
   pending: {
     title: 'You\'re on the waitlist!',

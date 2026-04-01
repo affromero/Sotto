@@ -326,6 +326,12 @@
   border-color: var(--color-error-hover);
 }
 
+.removedLabel {
+  font: var(--text-caption);
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
 .statusBadge {
   display: inline-block;
   padding: 1px var(--spacing-xs);
