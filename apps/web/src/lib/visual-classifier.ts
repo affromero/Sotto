@@ -101,6 +101,12 @@ const classificationSchema = z.object({
   transitionRecommendations: z.array(transitionRecommendationSchema).optional().default([]),
 });
 
+const ZERO_COST_CONSTRAINT = `
+IMPORTANT CONSTRAINT — ZERO-COST MODE:
+You MUST NOT use AI_ILLUSTRATION. It is not available. Use TEXT_CARD, STOCK_FOOTAGE, DATA_CHART, DATA_TABLE, QUOTE, COMPARISON, TIMELINE, DIAGRAM, MAP_OVERLAY, or SOURCE_FIGURE instead.
+For narrative/abstract moments that would normally be AI_ILLUSTRATION, use TEXT_CARD with a descriptive headline and bullets.
+`;
+
 const SYSTEM_PROMPT = `You are a video producer. Given podcast segments, assign each one visual types for a video overlay.
 
 VISUAL TYPES:
@@ -197,7 +203,7 @@ export async function classifySegmentVisuals(
   segments: SegmentInput[],
   podcastTitle: string,
   podcastTopic: string,
-  opts?: { provider?: string; model?: string; apiKeyOverride?: string; structuredData?: StructuredSourceData },
+  opts?: { provider?: string; model?: string; apiKeyOverride?: string; structuredData?: StructuredSourceData; zeroCostVideo?: boolean },
 ): Promise<{ classifications: ClassifiedSegment[]; transitionRecommendations: TransitionRecommendation[]; inputTokens: number; outputTokens: number; model: string }> {
   const segmentList = segments
     .map((s) => `[${s.order}] ${s.speaker}: ${s.text} (${s.duration.toFixed(1)}s)`)
@@ -237,9 +243,13 @@ ${segmentList}
 ${structuredBlock}
 Classify each segment with sub-visuals. Return JSON only.`;
 
+  const systemPrompt = opts?.zeroCostVideo
+    ? SYSTEM_PROMPT.replace(/- AI_ILLUSTRATION:.*?\n/, '').replace(/10\. Use AI_ILLUSTRATION.*?\n/, '10. Use TEXT_CARD for vivid narrative moments, abstract concepts, and scene-setting.\n') + ZERO_COST_CONSTRAINT
+    : SYSTEM_PROMPT;
+
   const ai = createAIProvider(opts?.provider);
   const result = await ai.generateResponse(
-    SYSTEM_PROMPT,
+    systemPrompt,
     [{ role: 'user', content: userMessage }],
     {
       maxTokens: 8192,
@@ -394,6 +404,21 @@ Classify each segment with sub-visuals. Return JSON only.`;
           endStatePrompt: null,
         }],
       });
+    }
+  }
+
+  // Defense-in-depth: strip AI_ILLUSTRATION in zero-cost mode
+  if (opts?.zeroCostVideo) {
+    for (const cls of classifications) {
+      for (const sv of cls.subVisuals) {
+        if (sv.visualType === 'AI_ILLUSTRATION') {
+          const seg = segments.find((s) => s.segmentId === cls.segmentId);
+          sv.visualType = 'TEXT_CARD';
+          sv.metadata = { headline: seg?.text.slice(0, 60) ?? podcastTitle, bullets: [] };
+          sv.prompt = null;
+          sv.endStatePrompt = null;
+        }
+      }
     }
   }
 

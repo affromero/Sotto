@@ -75,6 +75,7 @@ export interface BriefingFormData {
   contextEpisodes: number;
   visibility: string;
   useByokKeys: boolean;
+  zeroCostVideo: boolean;
   targetLanguage: string | null;
   languageMode: string | null;
 }
@@ -161,6 +162,7 @@ export function BriefingForm({
   const [continuousLearning, setContinuousLearning] = useState(initial?.continuousLearning ?? false);
   const [contextEpisodes, setContextEpisodes] = useState(initial?.contextEpisodes ?? 3);
   const [useByokKeys, setUseByokKeys] = useState(initial?.useByokKeys ?? false);
+  const [zeroCostVideo, setZeroCostVideo] = useState(initial?.zeroCostVideo ?? false);
   const [targetLanguage, setTargetLanguage] = useState(initial?.targetLanguage ?? '');
   const [languageMode, setLanguageMode] = useState(initial?.languageMode ?? 'conversational_mix');
 
@@ -245,6 +247,7 @@ export function BriefingForm({
       contextEpisodes,
       visibility,
       useByokKeys,
+      zeroCostVideo,
       targetLanguage: targetLanguage || null,
       languageMode: targetLanguage && targetLanguage !== 'en' ? languageMode : null,
     };
@@ -693,6 +696,19 @@ export function BriefingForm({
             <span className={styles.checkboxLabel}>Use my own API keys for briefings</span>
           </label>
         )}
+        <label className={styles.checkboxRow}>
+          <input
+            type="checkbox"
+            checked={zeroCostVideo}
+            onChange={(e) => {
+              const checked = e.target.checked;
+              setZeroCostVideo(checked);
+              autoSave({ zeroCostVideo: checked });
+            }}
+            aria-label="Free video (no AI images)"
+          />
+          <span className={styles.checkboxLabel}>Free video (no AI images, uses text cards and stock footage only)</span>
+        </label>
       </div>
 
       {/* Error display */}

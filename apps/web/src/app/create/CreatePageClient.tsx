@@ -99,6 +99,7 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
   const [durationTarget, setDurationTarget] = useState(
     draftData?.metadata?.durationTarget ?? Math.min(10, maxDuration)
   );
+  const [zeroCostVideo, setZeroCostVideo] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [failedPodcastId, setFailedPodcastId] = useState<string | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
@@ -208,7 +209,7 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
           body: JSON.stringify({
             title: metadata.topic,
             topic: metadata.topic,
-            metadata: { ...metadata, durationTarget, speakers: voiceSelection.speakers },
+            metadata: { ...metadata, durationTarget, speakers: voiceSelection.speakers, zeroCostVideo },
             ttsProvider,
             ttsModel,
             aiModel,
@@ -221,7 +222,7 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
           body: JSON.stringify({
             title: metadata.topic,
             topic: metadata.topic,
-            metadata: { ...metadata, durationTarget, speakers: voiceSelection.speakers },
+            metadata: { ...metadata, durationTarget, speakers: voiceSelection.speakers, zeroCostVideo },
             voices: voiceSelection.voices,
             ttsProvider,
             ttsModel,
@@ -251,7 +252,7 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
       setError(err instanceof Error ? err.message : 'Something went wrong');
       setStep('voice');
     }
-  }, [metadata, voiceSelection, ttsProvider, ttsModel, aiModel, durationTarget, createAsSotto, draftId]);
+  }, [metadata, voiceSelection, ttsProvider, ttsModel, aiModel, durationTarget, zeroCostVideo, createAsSotto, draftId]);
 
   const handleGenerate = useCallback(async () => {
     await createPodcast();
@@ -556,6 +557,15 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
             {(maxDuration > 5 || isAdmin) && (
               <DurationSelector value={durationTarget} onChange={setDurationTarget} max={maxDuration} isAdmin={isAdmin} />
             )}
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', color: 'var(--color-text-secondary)', cursor: 'pointer', marginTop: '0.5rem' }}>
+              <input
+                type="checkbox"
+                checked={zeroCostVideo}
+                onChange={(e) => setZeroCostVideo(e.target.checked)}
+                aria-label="Free video mode"
+              />
+              Free video (no AI images — uses text cards and stock footage only)
+            </label>
             <div className={styles.voiceActions}>
               <button
                 type="button"

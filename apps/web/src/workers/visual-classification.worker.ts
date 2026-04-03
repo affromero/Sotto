@@ -25,7 +25,7 @@ const STILL_FPS = 30;
 const STILL_CONCURRENCY = 4;
 
 export async function processVisualClassification(job: Job<ClassifyVisualsPayload>): Promise<void> {
-  const { podcastId, videoGenerationId, userId, voiceTrackId } = job.data;
+  const { podcastId, videoGenerationId, userId, voiceTrackId, zeroCostVideo: zeroCostFromPayload } = job.data;
 
   logger.info('Starting visual classification', { podcastId, videoGenerationId });
   await job.updateProgress(10);
@@ -59,6 +59,12 @@ export async function processVisualClassification(job: Job<ClassifyVisualsPayloa
         select: { sourceMetadata: true },
       }),
     ]);
+    // Resolve zeroCostVideo from payload or VideoGeneration record
+    const zeroCostVideo = zeroCostFromPayload ?? (await prisma.videoGeneration.findUnique({
+      where: { id: videoGenerationId },
+      select: { zeroCostVideo: true },
+    }))?.zeroCostVideo ?? false;
+
     const { model: aiModel, provider: aiProvider } = await resolveAiModelAndProvider({
       podcastAiModel: podcast.aiModel,
       aiKey,
@@ -100,7 +106,7 @@ export async function processVisualClassification(job: Job<ClassifyVisualsPayloa
       segmentInputs,
       podcast.title,
       podcast.topic,
-      { provider: aiProvider, model: aiModel, apiKeyOverride: aiKey?.apiKey, structuredData },
+      { provider: aiProvider, model: aiModel, apiKeyOverride: aiKey?.apiKey, structuredData, zeroCostVideo },
     );
 
     await job.updateProgress(60);
@@ -210,7 +216,8 @@ export async function processVisualClassification(job: Job<ClassifyVisualsPayloa
     }
 
     // Create SegmentTransition records for classifier-recommended boundaries
-    if (transitionRecommendations.length > 0) {
+    // Skip transitions in zero-cost mode — they use fal.ai video generation
+    if (transitionRecommendations.length > 0 && !zeroCostVideo) {
       const orderToId = new Map(segmentInputs.map((s) => [s.order, s.segmentId]));
       const transitionData = transitionRecommendations
         .filter((t) => orderToId.has(t.fromSegmentOrder) && orderToId.has(t.toSegmentOrder))

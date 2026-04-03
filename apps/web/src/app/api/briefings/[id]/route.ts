@@ -31,6 +31,7 @@ const updateBriefingSchema = z.object({
   contextEpisodes: z.number().int().min(1).max(5).optional(),
   visibility: z.enum(['PUBLIC', 'UNLISTED', 'PRIVATE']).optional(),
   useByokKeys: z.boolean().optional(),
+  zeroCostVideo: z.boolean().optional(),
 });
 
 export async function PATCH(
@@ -128,6 +129,7 @@ export async function PATCH(
       contextEpisodes: true,
       visibility: true,
       useByokKeys: true,
+      zeroCostVideo: true,
       lastGeneratedAt: true,
       createdAt: true,
     },

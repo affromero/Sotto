@@ -25,6 +25,7 @@ export interface TweetParseResult {
   requestedVideoModel?: string;
   requestedAvatarModel?: string;
   costPreference?: 'cheapest';
+  zeroCostVideo?: boolean;
 }
 
 export interface TwitterMediaVariant {
