@@ -43,7 +43,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
   const podcast = await prisma.podcast.findUnique({
     where: { id: podcastId },
-    select: { id: true, userId: true, status: true },
+    select: { id: true, userId: true, status: true, zeroCostVideo: true },
   });
 
   if (!podcast) {
@@ -244,12 +244,30 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       voiceTrackId: voiceTrackId ?? null,
       status: 'PENDING',
       imageModel: imageModel ?? null,
+      zeroCostVideo: podcast.zeroCostVideo,
       pipelineJson: pipeline ? (pipeline as unknown as Prisma.InputJsonValue) : undefined,
     },
   });
 
   if (pipeline) {
     // Pipeline-driven: create SegmentVisuals directly, skip classification
+    // Zero-cost guard: replace AI_ILLUSTRATION with TEXT_CARD in pipeline segments
+    if (podcast.zeroCostVideo) {
+      for (const seg of pipeline.segments) {
+        if (seg.visualType === 'AI_ILLUSTRATION') {
+          seg.visualType = 'TEXT_CARD';
+          seg.visualMode = 'programmatic';
+        }
+        if (seg.subVisuals) {
+          for (const sv of seg.subVisuals) {
+            if (sv.visualType === 'AI_ILLUSTRATION') {
+              sv.visualType = 'TEXT_CARD';
+              sv.visualMode = 'programmatic';
+            }
+          }
+        }
+      }
+    }
     const EXTERNAL_MODES = new Set(['image', 'video']);
 
     await prisma.segmentVisual.createMany({
@@ -350,6 +368,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       podcastId,
       videoGenerationId: videoGeneration.id,
       userId: authResult.userId,
+      zeroCostVideo: podcast.zeroCostVideo,
     });
   }
 

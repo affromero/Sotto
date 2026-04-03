@@ -69,7 +69,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
     }),
     prisma.podcast.findUniqueOrThrow({
       where: { id: podcastId },
-      select: { aiModel: true, verificationMode: true, language: true, source: true },
+      select: { aiModel: true, verificationMode: true, language: true, source: true, zeroCostVideo: true },
     }),
   ]);
 
@@ -121,6 +121,20 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
   const previousClaims = (script.verificationClaims as unknown as ClaimAnalysis[]) ?? [];
 
   await job.updateProgress(15);
+
+  // Zero-cost mode: skip verification entirely — treat script as passed
+  if (podcastRecord.zeroCostVideo) {
+    logger.info('Zero-cost mode: skipping script verification', { podcastId });
+    await prisma.script.update({
+      where: { podcastId },
+      data: { verificationFeedback: 'Skipped (zero-cost mode)' },
+    });
+    // Route to audio — same as auto-approve path
+    const { createSegmentsAndQueueAudio } = await import('@/lib/segment-creator');
+    await createSegmentsAndQueueAudio(podcastId, turns);
+    await job.updateProgress(100);
+    return;
+  }
 
   const verdict = await verifyScript({
     topic: discovery.topic || '',

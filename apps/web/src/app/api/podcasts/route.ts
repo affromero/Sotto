@@ -238,6 +238,7 @@ export async function POST(request: NextRequest) {
   }
 
   const verificationMode = parsed.data.metadata?.verificationMode ?? 'standard';
+  const zeroCostVideo = parsed.data.metadata?.zeroCostVideo ?? false;
 
   if (verificationMode === 'showcase' && !isAdmin) {
     return errorResponse('Showcase verification mode is admin-only.', 403);
@@ -260,6 +261,7 @@ export async function POST(request: NextRequest) {
     aiAutoResolved,
     ttsAutoResolved,
     verificationMode,
+    zeroCostVideo,
     ...(isApiKeyAuth && { source: 'API' as const }),
   };
 

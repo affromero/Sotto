@@ -79,6 +79,7 @@ function makeJob(data: Record<string, unknown>) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockPrisma.videoGeneration.findUnique.mockResolvedValue({ zeroCostVideo: false });
 });
 
 describe('visual-generation worker', () => {
@@ -112,7 +113,9 @@ describe('visual-generation worker', () => {
       .mockResolvedValueOnce({ visualMode: 'image', videoModel: null }); // mode check
     mockPrisma.podcast.findUniqueOrThrow.mockResolvedValue({ userId: 'user-1' });
     mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1' });
-    mockPrisma.videoGeneration.findUnique.mockResolvedValue({ imageModel: 'fal-flux-1-schnell' });
+    mockPrisma.videoGeneration.findUnique
+      .mockResolvedValueOnce({ zeroCostVideo: false })                    // zeroCostVideo check
+      .mockResolvedValueOnce({ imageModel: 'fal-flux-1-schnell' });       // generateAiImage
 
     const mockProvider = {
       generateImage: vi.fn().mockResolvedValue(Buffer.from('fake-image')),
@@ -154,7 +157,9 @@ describe('visual-generation worker', () => {
     mockSearchStockVideo.mockResolvedValue(null);
     mockPrisma.podcast.findUniqueOrThrow.mockResolvedValue({ userId: 'user-1' });
     mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1' });
-    mockPrisma.videoGeneration.findUnique.mockResolvedValue({ imageModel: 'fal-flux-1-schnell' });
+    mockPrisma.videoGeneration.findUnique
+      .mockResolvedValueOnce({ zeroCostVideo: false })                    // zeroCostVideo check
+      .mockResolvedValueOnce({ imageModel: 'fal-flux-1-schnell' });       // generateAiImage
 
     const mockProvider = {
       generateImage: vi.fn().mockResolvedValue(Buffer.from('fallback-image')),
@@ -241,7 +246,9 @@ describe('visual-generation worker', () => {
       .mockResolvedValueOnce({ visualMode: 'image', videoModel: null }); // mode check
     mockPrisma.podcast.findUniqueOrThrow.mockResolvedValue({ userId: 'user-1' });
     mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1' });
-    mockPrisma.videoGeneration.findUnique.mockResolvedValue({ imageModel: 'flux-schnell' });
+    mockPrisma.videoGeneration.findUnique
+      .mockResolvedValueOnce({ zeroCostVideo: false })                    // zeroCostVideo check
+      .mockResolvedValueOnce({ imageModel: 'flux-schnell' });             // generateAiImage
 
     const mockProvider = {
       generateImage: vi.fn().mockResolvedValue(Buffer.from('fallback')),
@@ -285,7 +292,9 @@ describe('visual-generation worker', () => {
     mockPrisma.segment.findUnique.mockResolvedValue({ duration: 8 });
     mockPrisma.podcast.findUniqueOrThrow.mockResolvedValue({ userId: 'user-1' });
     mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1' });
-    mockPrisma.videoGeneration.findUnique.mockResolvedValue({ imageModel: 'fal-flux-1-schnell' });
+    mockPrisma.videoGeneration.findUnique
+      .mockResolvedValueOnce({ zeroCostVideo: false })                    // zeroCostVideo check
+      .mockResolvedValue({ imageModel: 'fal-flux-1-schnell' });           // generateAiImage (called multiple times for video)
 
     const mockImageProvider = {
       generateImage: vi.fn().mockResolvedValue(Buffer.from('frame-img')),
@@ -364,7 +373,9 @@ describe('visual-generation worker', () => {
       .mockResolvedValueOnce({ visualMode: 'image', videoModel: null }); // mode check
     mockPrisma.podcast.findUniqueOrThrow.mockResolvedValue({ userId: 'user-1' });
     mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1' });
-    mockPrisma.videoGeneration.findUnique.mockResolvedValue({ imageModel: null });
+    mockPrisma.videoGeneration.findUnique
+      .mockResolvedValueOnce({ zeroCostVideo: false })
+      .mockResolvedValueOnce({ imageModel: null });
 
     mockResolveImageProvider.mockResolvedValue({
       provider: {
@@ -431,7 +442,9 @@ describe('visual-generation worker', () => {
 
     mockPrisma.podcast.findUniqueOrThrow.mockResolvedValue({ userId: 'user-1' });
     mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1' });
-    mockPrisma.videoGeneration.findUnique.mockResolvedValue({ imageModel: null });
+    mockPrisma.videoGeneration.findUnique
+      .mockResolvedValueOnce({ zeroCostVideo: false })
+      .mockResolvedValueOnce({ imageModel: null });
 
     mockResolveImageProvider.mockRejectedValue(new Error('USAGE_LIMIT_REACHED'));
 
