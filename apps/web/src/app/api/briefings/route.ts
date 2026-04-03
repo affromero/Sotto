@@ -32,6 +32,7 @@ const createBriefingSchema = z.object({
   contextEpisodes: z.number().int().min(1).max(5).default(3),
   visibility: z.enum(['PUBLIC', 'UNLISTED', 'PRIVATE']).default('PRIVATE'),
   useByokKeys: z.boolean().default(false),
+  zeroCostVideo: z.boolean().default(false),
 });
 
 export async function GET(request: NextRequest) {
@@ -68,6 +69,7 @@ export async function GET(request: NextRequest) {
       contextEpisodes: true,
       visibility: true,
       useByokKeys: true,
+      zeroCostVideo: true,
       lastGeneratedAt: true,
       createdAt: true,
       briefingLogs: {
@@ -168,6 +170,7 @@ export async function POST(request: NextRequest) {
       contextEpisodes: data.contextEpisodes,
       visibility: data.visibility,
       useByokKeys: data.useByokKeys,
+      zeroCostVideo: data.zeroCostVideo,
     },
     select: {
       id: true,

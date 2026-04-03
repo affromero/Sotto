@@ -29,6 +29,7 @@ export const createPodcastSchema = z.object({
       description: z.string().min(1).max(500),
     })).max(4).optional(),
     verificationMode: z.enum(['standard', 'relaxed', 'showcase']).optional(),
+    zeroCostVideo: z.boolean().optional(),
   }).optional(),
 });
 

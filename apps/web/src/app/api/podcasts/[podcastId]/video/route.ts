@@ -43,7 +43,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
   const podcast = await prisma.podcast.findUnique({
     where: { id: podcastId },
-    select: { id: true, userId: true, status: true },
+    select: { id: true, userId: true, status: true, zeroCostVideo: true },
   });
 
   if (!podcast) {
@@ -237,13 +237,35 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
   }
 
-  // Create VideoGeneration record
+  // Zero-cost guard: sanitize pipeline BEFORE persisting to DB
+  // so pipelineJson is stored clean and retries/editor won't resurrect AI_ILLUSTRATION
+  if (pipeline && podcast.zeroCostVideo) {
+    for (const seg of pipeline.segments) {
+      if (seg.visualType === 'AI_ILLUSTRATION') {
+        seg.visualType = 'TEXT_CARD';
+        seg.visualMode = 'programmatic';
+        seg.metadata = { headline: (seg.prompt ?? 'Key Point').slice(0, 60), bullets: [] };
+      }
+      if (seg.subVisuals) {
+        for (const sv of seg.subVisuals) {
+          if (sv.visualType === 'AI_ILLUSTRATION') {
+            sv.visualType = 'TEXT_CARD';
+            sv.visualMode = 'programmatic';
+            sv.metadata = { headline: (sv.prompt ?? 'Key Point').slice(0, 60), bullets: [] };
+          }
+        }
+      }
+    }
+  }
+
+  // Create VideoGeneration record (pipelineJson is already sanitized if zeroCostVideo)
   const videoGeneration = await prisma.videoGeneration.create({
     data: {
       podcastId,
       voiceTrackId: voiceTrackId ?? null,
       status: 'PENDING',
       imageModel: imageModel ?? null,
+      zeroCostVideo: podcast.zeroCostVideo,
       pipelineJson: pipeline ? (pipeline as unknown as Prisma.InputJsonValue) : undefined,
     },
   });
@@ -350,6 +372,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       podcastId,
       videoGenerationId: videoGeneration.id,
       userId: authResult.userId,
+      zeroCostVideo: podcast.zeroCostVideo,
     });
   }
 

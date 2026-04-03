@@ -8,6 +8,7 @@ export interface TweetParseResult {
   tone: 'casual' | 'professional' | 'socratic' | 'comedic' | 'satirical' | 'storytelling';
   focusAreas: string[];
   sourceUrl?: string;
+  zeroCostVideo?: boolean;
 }
 
 export interface TwitterTweet {

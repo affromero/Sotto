@@ -355,6 +355,7 @@ model Podcast {
   aiProvider       String? // 'anthropic' | 'openai'
   aiModel          String? // e.g. 'claude-sonnet-4-5-20250929', 'claude-opus-4-6'
   verificationMode String  @default("standard") // standard, relaxed, showcase
+  zeroCostVideo    Boolean @default(false) // skip AI illustrations + verification for $0 video
   aiAutoResolved   Boolean @default(false)
   ttsAutoResolved  Boolean @default(false)
   sttProvider      String? // null = auto; 'openai' | 'elevenlabs' | 'together' | 'deepgram' | 'assemblyai'
@@ -2339,6 +2340,7 @@ model VideoGeneration {
   videoModel     String? // e.g. 'fal-veo3-1080p', 'fal-kling3-1080p'
   pipelineJson   Json? // Approved pipeline editor state
   avatarsVisible Boolean     @default(true)
+  zeroCostVideo  Boolean     @default(false) // no AI illustrations, free visuals only
   failureReason  String?     @db.Text
   technicalError String?     @db.Text
   createdAt      DateTime    @default(now())
@@ -2695,8 +2697,9 @@ model UserBriefing {
   contextEpisodes    Int     @default(3) // 1-5: how many prior episodes to include as context
 
   // Advanced
-  visibility  PodcastVisibility @default(PRIVATE)
-  useByokKeys Boolean           @default(false)
+  visibility     PodcastVisibility @default(PRIVATE)
+  useByokKeys    Boolean           @default(false)
+  zeroCostVideo  Boolean           @default(false) // free visuals only, skip verification
 
   // State
   lastGeneratedAt DateTime?

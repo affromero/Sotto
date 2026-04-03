@@ -381,6 +381,7 @@ async function processSingleMention(tweet: TwitterTweet, mediaByKey: Map<string,
         aiAutoResolved: true,
         ttsAutoResolved: true,
         visibility,
+        zeroCostVideo: parsed.zeroCostVideo ?? false,
         discovery: {
           create: {
             userId,
