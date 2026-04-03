@@ -99,7 +99,9 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
   const [durationTarget, setDurationTarget] = useState(
     draftData?.metadata?.durationTarget ?? Math.min(10, maxDuration)
   );
-  const [zeroCostVideo, setZeroCostVideo] = useState(false);
+  const [zeroCostVideo, setZeroCostVideo] = useState(
+    !!(draftData?.draftData?.zeroCostVideo)
+  );
   const [error, setError] = useState<string | null>(null);
   const [failedPodcastId, setFailedPodcastId] = useState<string | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);

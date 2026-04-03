@@ -237,7 +237,28 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
   }
 
-  // Create VideoGeneration record
+  // Zero-cost guard: sanitize pipeline BEFORE persisting to DB
+  // so pipelineJson is stored clean and retries/editor won't resurrect AI_ILLUSTRATION
+  if (pipeline && podcast.zeroCostVideo) {
+    for (const seg of pipeline.segments) {
+      if (seg.visualType === 'AI_ILLUSTRATION') {
+        seg.visualType = 'TEXT_CARD';
+        seg.visualMode = 'programmatic';
+        seg.metadata = { headline: (seg.prompt ?? 'Key Point').slice(0, 60), bullets: [] };
+      }
+      if (seg.subVisuals) {
+        for (const sv of seg.subVisuals) {
+          if (sv.visualType === 'AI_ILLUSTRATION') {
+            sv.visualType = 'TEXT_CARD';
+            sv.visualMode = 'programmatic';
+            sv.metadata = { headline: (sv.prompt ?? 'Key Point').slice(0, 60), bullets: [] };
+          }
+        }
+      }
+    }
+  }
+
+  // Create VideoGeneration record (pipelineJson is already sanitized if zeroCostVideo)
   const videoGeneration = await prisma.videoGeneration.create({
     data: {
       podcastId,
@@ -251,23 +272,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
   if (pipeline) {
     // Pipeline-driven: create SegmentVisuals directly, skip classification
-    // Zero-cost guard: replace AI_ILLUSTRATION with TEXT_CARD in pipeline segments
-    if (podcast.zeroCostVideo) {
-      for (const seg of pipeline.segments) {
-        if (seg.visualType === 'AI_ILLUSTRATION') {
-          seg.visualType = 'TEXT_CARD';
-          seg.visualMode = 'programmatic';
-        }
-        if (seg.subVisuals) {
-          for (const sv of seg.subVisuals) {
-            if (sv.visualType === 'AI_ILLUSTRATION') {
-              sv.visualType = 'TEXT_CARD';
-              sv.visualMode = 'programmatic';
-            }
-          }
-        }
-      }
-    }
     const EXTERNAL_MODES = new Set(['image', 'video']);
 
     await prisma.segmentVisual.createMany({
