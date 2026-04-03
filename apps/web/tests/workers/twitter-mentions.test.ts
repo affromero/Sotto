@@ -363,6 +363,7 @@ describe('processTwitterMentions', () => {
           aiAutoResolved: true,
           ttsAutoResolved: true,
           visibility: 'PUBLIC',
+          zeroCostVideo: false,
           discovery: {
             create: {
               userId: 'user-001',

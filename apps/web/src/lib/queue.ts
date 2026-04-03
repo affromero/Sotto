@@ -346,6 +346,7 @@ export interface ClassifyVisualsPayload {
   videoGenerationId: string;
   userId: string;
   voiceTrackId?: string;
+  zeroCostVideo?: boolean;
 }
 
 export interface GenerateVisualPayload {

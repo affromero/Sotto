@@ -32,7 +32,7 @@ export async function processCompileScript(job: Job<CompileScriptPayload>): Prom
     }),
     prisma.podcast.findUniqueOrThrow({
       where: { id: podcastId },
-      select: { source: true },
+      select: { source: true, zeroCostVideo: true },
     }),
   ]);
 
@@ -112,7 +112,7 @@ export async function processCompileScript(job: Job<CompileScriptPayload>): Prom
   const tierFeatures = getTierFeatures(userRecord.plan as 'FREE' | 'PRO', isByok, userRecord.role);
 
   const isWebOrImport = podcast.source === 'WEB' || podcast.source === 'IMPORT';
-  const shouldAutoApprove = tierFeatures.autoApproveScript || !isWebOrImport;
+  const shouldAutoApprove = tierFeatures.autoApproveScript || !isWebOrImport || podcast.zeroCostVideo;
 
   if (!shouldAutoApprove) {
     // Pause for user review

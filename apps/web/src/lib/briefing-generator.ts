@@ -278,6 +278,7 @@ export async function createBriefingPodcast(
       status: 'EXTRACTING',
       source: 'BRIEFING',
       visibility: resolved.visibility,
+      zeroCostVideo: briefing.zeroCostVideo,
       aiModel: resolved.aiModel,
       ttsProvider: resolved.ttsProvider,
       ttsModel: resolved.ttsModel,

@@ -183,8 +183,35 @@ export async function processVisualGeneration(job: Job<GenerateVisualPayload>): 
     ? `${job.data.prompt}\n\nUser feedback: ${userFeedback}`
     : job.data.prompt;
 
-  logger.info('Generating visual asset', { podcastId, segmentVisualId, visualType, hasFeedback: !!userFeedback });
+  // Resolve zeroCostVideo from VideoGeneration
+  const videoGen = await prisma.videoGeneration.findUnique({
+    where: { id: videoGenerationId },
+    select: { zeroCostVideo: true },
+  });
+  const zeroCostVideo = videoGen?.zeroCostVideo ?? false;
+
+  logger.info('Generating visual asset', { podcastId, segmentVisualId, visualType, hasFeedback: !!userFeedback, zeroCostVideo });
   await job.updateProgress(10);
+
+  // Zero-cost guard: AI_ILLUSTRATION should never reach here, but defense-in-depth
+  if (zeroCostVideo && visualType === 'AI_ILLUSTRATION') {
+    logger.info('Zero-cost mode: converting AI_ILLUSTRATION to TEXT_CARD', { segmentVisualId });
+    const seg = await prisma.segment.findFirst({
+      where: { id: (await prisma.segmentVisual.findUnique({ where: { id: segmentVisualId }, select: { segmentId: true } }))?.segmentId ?? '' },
+      select: { text: true },
+    });
+    await prisma.segmentVisual.update({
+      where: { id: segmentVisualId },
+      data: {
+        visualType: 'TEXT_CARD',
+        metadata: { headline: seg?.text?.slice(0, 60) ?? 'Key Point', bullets: [] },
+        status: 'ready',
+      },
+    });
+    await checkAllReady(videoGenerationId, podcastId);
+    await job.updateProgress(100);
+    return;
+  }
 
   // Idempotency: skip if asset already generated
   const existing = await prisma.segmentVisual.findUnique({
@@ -221,7 +248,7 @@ export async function processVisualGeneration(job: Job<GenerateVisualPayload>): 
       select: { visualMode: true, videoModel: true, endStatePrompt: true },
     });
 
-    if (visual?.visualMode === 'video' && visual.videoModel) {
+    if (visual?.visualMode === 'video' && visual.videoModel && !zeroCostVideo) {
       const result = await generateAiVideo(podcastId, videoGenerationId, segmentVisualId, visual.videoModel, prompt, visual.endStatePrompt);
       assetBuffer = result.buffer;
       assetType = 'video/mp4';
@@ -246,6 +273,20 @@ export async function processVisualGeneration(job: Job<GenerateVisualPayload>): 
       const enrichedPlace = metadata?.places?.find((p) => p.coordinates);
 
       if (!enrichedPlace || !enrichedPlace.coordinates) {
+        if (zeroCostVideo) {
+          logger.info('Zero-cost mode: MAP_OVERLAY fallback → TEXT_CARD', { segmentVisualId });
+          await prisma.segmentVisual.update({
+            where: { id: segmentVisualId },
+            data: {
+              visualType: 'TEXT_CARD',
+              metadata: { headline: metadata?.places?.[0]?.name ?? prompt.slice(0, 60), bullets: [] },
+              status: 'ready',
+            },
+          });
+          await checkAllReady(videoGenerationId, podcastId);
+          await job.updateProgress(100);
+          return;
+        }
         const placeName = metadata?.places?.[0]?.name ?? prompt;
         logger.info('No enriched place with coordinates, falling back to AI illustration', { segmentVisualId, placeName });
         const aiResult = await generateAiImage(podcastId, videoGenerationId, prompt);
@@ -271,6 +312,20 @@ export async function processVisualGeneration(job: Job<GenerateVisualPayload>): 
     } else if (visualType === 'STOCK_FOOTAGE') {
       const result = await searchStockVideo(prompt);
       if (!result) {
+        if (zeroCostVideo) {
+          logger.info('Zero-cost mode: STOCK_FOOTAGE fallback → TEXT_CARD', { segmentVisualId });
+          await prisma.segmentVisual.update({
+            where: { id: segmentVisualId },
+            data: {
+              visualType: 'TEXT_CARD',
+              metadata: { headline: prompt.slice(0, 60), bullets: [] },
+              status: 'ready',
+            },
+          });
+          await checkAllReady(videoGenerationId, podcastId);
+          await job.updateProgress(100);
+          return;
+        }
         // Fallback: generate AI illustration instead of showing a text card
         logger.info('No stock footage found, falling back to AI illustration', { segmentVisualId, prompt });
         const aiResult = await generateAiImage(podcastId, videoGenerationId, prompt);
@@ -335,7 +390,21 @@ export async function processVisualGeneration(job: Job<GenerateVisualPayload>): 
         }
       }
 
-      // Fallback: convert to AI_ILLUSTRATION and re-queue a generation job
+      // Fallback: convert to TEXT_CARD (zero-cost) or AI_ILLUSTRATION
+      if (zeroCostVideo) {
+        logger.info('Zero-cost mode: SOURCE_FIGURE fallback → TEXT_CARD', { segmentVisualId });
+        await prisma.segmentVisual.update({
+          where: { id: segmentVisualId },
+          data: {
+            visualType: 'TEXT_CARD',
+            metadata: { headline: prompt?.slice(0, 60) ?? 'Source Figure', bullets: [] },
+            status: 'ready',
+          },
+        });
+        await checkAllReady(videoGenerationId, podcastId);
+        await job.updateProgress(100);
+        return;
+      }
       const fallbackPrompt = prompt || 'Editorial illustration for podcast segment';
       await prisma.segmentVisual.update({
         where: { id: segmentVisualId },

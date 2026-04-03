@@ -9,7 +9,7 @@ const {
   mockResolveMotionProvider,
 } = vi.hoisted(() => ({
   mockPrisma: {
-    videoGeneration: { update: vi.fn() },
+    videoGeneration: { update: vi.fn(), findUnique: vi.fn() },
     podcast: { findUniqueOrThrow: vi.fn() },
     segment: { findMany: vi.fn() },
     segmentVisual: { createMany: vi.fn(), findMany: vi.fn(), count: vi.fn(), update: vi.fn() },
@@ -62,6 +62,7 @@ beforeEach(() => {
   mockResolveAiModel.mockResolvedValue({ model: 'claude-haiku-4-5-20251001', provider: 'anthropic' });
   mockResolveMotionProvider.mockResolvedValue('remotion');
   mockPrisma.segmentVisual.count.mockResolvedValue(0);
+  mockPrisma.videoGeneration.findUnique.mockResolvedValue({ zeroCostVideo: false });
   mockPrisma.discovery.findUnique.mockResolvedValue(null);
 });
 
