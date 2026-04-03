@@ -59,11 +59,12 @@ export async function processVisualClassification(job: Job<ClassifyVisualsPayloa
         select: { sourceMetadata: true },
       }),
     ]);
-    // Resolve zeroCostVideo from payload or VideoGeneration record
-    const zeroCostVideo = zeroCostFromPayload ?? (await prisma.videoGeneration.findUnique({
+    // Resolve zeroCostVideo — DB record is source of truth, payload is convenience fallback
+    const videoGenRecord = await prisma.videoGeneration.findUnique({
       where: { id: videoGenerationId },
       select: { zeroCostVideo: true },
-    }))?.zeroCostVideo ?? false;
+    });
+    const zeroCostVideo = videoGenRecord?.zeroCostVideo ?? zeroCostFromPayload ?? false;
 
     const { model: aiModel, provider: aiProvider } = await resolveAiModelAndProvider({
       podcastAiModel: podcast.aiModel,
