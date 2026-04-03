@@ -17,6 +17,7 @@ import { getHumeConcurrencyLimit, updateHumeConcurrencyFromError } from '@/lib/p
 import { semaphore } from '@/lib/redis';
 import { getByokKey } from '@/lib/byok';
 import { cleanTextForTts, splitTextForTts } from '@/lib/tts-text-cleaner';
+import { convertInlineAudioTags } from '@/lib/tts-expression-mapper';
 import { getAudioDuration } from '@/lib/audio-stitcher';
 import { estimateDurationFromText } from '@/lib/duration';
 import { logUsage } from '@/lib/usage-logger';
@@ -299,10 +300,13 @@ export async function generateTtsAudio(params: TtsGenerationParams): Promise<Tts
   });
 
   // 10. Forced-alignment fallback: if no word timings from TTS, try STT
-  if (!wordTimings && text.trim().length > 0) {
+  // Use the same cleaned text that was sent to TTS (no brackets, citations, SFX)
+  // so STT words align against what was actually spoken.
+  if (!wordTimings && ttsText.trim().length > 0) {
     try {
       const { getWordTimingsViaStt } = await import('@/lib/forced-alignment');
-      wordTimings = await getWordTimingsViaStt(audioBuffer, text, userId);
+      const alignmentText = convertInlineAudioTags(ttsText, providerId);
+      wordTimings = await getWordTimingsViaStt(audioBuffer, alignmentText, userId);
     } catch {
       // Forced alignment is best-effort — never fail the generation
     }

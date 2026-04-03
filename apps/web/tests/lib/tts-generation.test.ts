@@ -78,8 +78,13 @@ vi.mock('@/lib/byok-errors', () => ({
   isModelAccessError: vi.fn((msg: string) => /\b404\b/.test(msg)),
 }));
 
+const mockGetWordTimingsViaStt = vi.fn().mockResolvedValue(null);
 vi.mock('@/lib/forced-alignment', () => ({
-  getWordTimingsViaStt: vi.fn().mockResolvedValue(null),
+  getWordTimingsViaStt: (...args: unknown[]) => mockGetWordTimingsViaStt(...args),
+}));
+
+vi.mock('@/lib/tts-expression-mapper', () => ({
+  convertInlineAudioTags: vi.fn((text: string) => text.replace(/\[([^\]]+)\]/g, '')),
 }));
 
 const mockResolveTtsProvider = vi.fn();
@@ -338,6 +343,27 @@ describe('generateTtsAudio', () => {
 
       expect(mockSemaphoreRelease).toHaveBeenCalled();
     });
+  });
+
+  it('passes cleaned text (no brackets) to forced alignment, not raw script text', async () => {
+    const rawText = 'Hello [laughs] world [pause] end [1,2]';
+    // cleanTextForTts mock is a passthrough, but convertInlineAudioTags strips brackets
+    mockGetWordTimingsViaStt.mockResolvedValue([
+      { word: 'Hello', start: 0, end: 0.5 },
+      { word: 'world', start: 0.6, end: 1.0 },
+      { word: 'end', start: 1.1, end: 1.5 },
+    ]);
+
+    const result = await generateTtsAudio(defaultParams({ text: rawText }));
+
+    expect(result).not.toBeNull();
+    // The text passed to forced alignment should have brackets stripped
+    expect(mockGetWordTimingsViaStt).toHaveBeenCalledWith(
+      expect.any(Buffer),
+      expect.not.stringContaining('[laughs]'),
+      'user-1',
+    );
+    expect(result!.wordTimings).toHaveLength(3);
   });
 
   describe('multi-chunk generation', () => {

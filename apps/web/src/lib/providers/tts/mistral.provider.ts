@@ -10,6 +10,7 @@
 import { logger } from '../../logger';
 import type { TtsProvider, SpeechParams } from '../tts';
 import { getProviderMeta, type TtsProviderId } from '../tts-registry';
+import { convertInlineAudioTags } from '../../tts-expression-mapper';
 import { MISTRAL_VOICE_POOL, selectVoicePairFromPool } from '../tts-voices';
 
 // HOST/GUEST → host voice slot; EXPERT/SKEPTIC → expert slot.
@@ -33,9 +34,11 @@ export class MistralProvider implements TtsProvider {
   async generateSpeech(params: SpeechParams): Promise<Buffer> {
     const isClonedVoice = params.voiceId.startsWith('data:') || params.voiceId.startsWith('http');
 
+    const cleanedText = convertInlineAudioTags(params.text, 'mistral');
+
     const body: Record<string, unknown> = {
       model: this.model,
-      input: params.text,
+      input: cleanedText,
       response_format: 'mp3',
     };
 
@@ -73,7 +76,7 @@ export class MistralProvider implements TtsProvider {
       throw new Error('Mistral returned no audio_data');
     }
 
-    logger.info('Mistral speech generated', { voiceId: params.voiceId, chars: params.text.length });
+    logger.info('Mistral speech generated', { voiceId: params.voiceId, chars: cleanedText.length });
     return Buffer.from(data.audio_data, 'base64');
   }
 
