@@ -114,40 +114,67 @@ describe('citation-parser', () => {
     });
   });
 
-  describe('consecutive citation markers', () => {
-    it('handles consecutive markers [1][2]', () => {
+  describe('consecutive citation markers (merged + deduplicated)', () => {
+    it('merges consecutive markers [1][2] into single CitationMarker', () => {
       const text = 'Multiple sources support this [1][2] claim.';
       const result = parseTextWithCitations(text, mockReferences);
 
-      expect(result).toHaveLength(4);
+      expect(result).toHaveLength(3);
       expect(result[0]).toBe('Multiple sources support this ');
       expect(React.isValidElement(result[1])).toBe(true);
-      expect(React.isValidElement(result[2])).toBe(true);
-      expect(result[3]).toBe(' claim.');
+      const marker = result[1] as React.ReactElement;
+      expect((marker.props as any).references).toHaveLength(2);
+      expect((marker.props as any).references[0].number).toBe(1);
+      expect((marker.props as any).references[1].number).toBe(2);
+      expect(result[2]).toBe(' claim.');
     });
 
-    it('handles three consecutive markers [1][2][3]', () => {
+    it('merges three consecutive markers [1][2][3] into single CitationMarker', () => {
       const text = 'Three sources [1][2][3] confirm.';
       const result = parseTextWithCitations(text, mockReferences);
 
-      expect(result).toHaveLength(5);
+      expect(result).toHaveLength(3);
       expect(result[0]).toBe('Three sources ');
       expect(React.isValidElement(result[1])).toBe(true);
-      expect(React.isValidElement(result[2])).toBe(true);
-      expect(React.isValidElement(result[3])).toBe(true);
-      expect(result[4]).toBe(' confirm.');
+      const marker = result[1] as React.ReactElement;
+      expect((marker.props as any).references).toHaveLength(3);
+      expect(result[2]).toBe(' confirm.');
     });
 
-    it('handles consecutive markers with no space between', () => {
+    it('merges consecutive markers with no space between', () => {
       const text = 'Studies[1][2][3]show results.';
       const result = parseTextWithCitations(text, mockReferences);
 
-      expect(result).toHaveLength(5);
+      expect(result).toHaveLength(3);
       expect(result[0]).toBe('Studies');
       expect(React.isValidElement(result[1])).toBe(true);
-      expect(React.isValidElement(result[2])).toBe(true);
-      expect(React.isValidElement(result[3])).toBe(true);
-      expect(result[4]).toBe('show results.');
+      const marker = result[1] as React.ReactElement;
+      expect((marker.props as any).references).toHaveLength(3);
+      expect(result[2]).toBe('show results.');
+    });
+
+    it('deduplicates repeated reference numbers [1] [2] [1]', () => {
+      const text = 'Facts [1] [2] [1] prove it.';
+      const result = parseTextWithCitations(text, mockReferences);
+
+      expect(result).toHaveLength(3);
+      expect(result[0]).toBe('Facts ');
+      const marker = result[1] as React.ReactElement;
+      expect((marker.props as any).references).toHaveLength(2);
+      expect((marker.props as any).references[0].number).toBe(1);
+      expect((marker.props as any).references[1].number).toBe(2);
+      expect(result[2]).toBe(' prove it.');
+    });
+
+    it('merges consecutive markers with spaces [1] [2]', () => {
+      const text = 'Sources [1] [2] agree.';
+      const result = parseTextWithCitations(text, mockReferences);
+
+      expect(result).toHaveLength(3);
+      expect(result[0]).toBe('Sources ');
+      const marker = result[1] as React.ReactElement;
+      expect((marker.props as any).references).toHaveLength(2);
+      expect(result[2]).toBe(' agree.');
     });
   });
 
@@ -292,7 +319,7 @@ describe('citation-parser', () => {
   });
 
   describe('complex scenarios', () => {
-    it('handles multiple citations throughout long text', () => {
+    it('keeps non-consecutive duplicate citations as separate markers', () => {
       const text = 'Start [1] middle [2] and another [3] plus more [1] end.';
       const result = parseTextWithCitations(text, mockReferences);
 
