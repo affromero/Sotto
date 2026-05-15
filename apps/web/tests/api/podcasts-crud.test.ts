@@ -7,8 +7,6 @@ const mockPodcastCount = vi.fn();
 const mockPodcastCreate = vi.fn();
 const mockPodcastFindUnique = vi.fn();
 const mockPodcastUpdate = vi.fn();
-const mockPodcastUpdateMany = vi.fn();
-const mockPodcastDelete = vi.fn();
 const mockSaveFindUnique = vi.fn();
 const mockDiscoveryCreate = vi.fn();
 const mockCheckGenerationGate = vi.fn();
@@ -31,8 +29,6 @@ const mockAuth = vi.fn();
 const mockUserFindUnique = vi.fn();
 const mockUserFindUniqueOrThrow = vi.fn();
 
-const mockTransaction = vi.fn();
-
 vi.mock('@/lib/prisma', () => {
   const txProxy = {
     podcast: {
@@ -41,8 +37,6 @@ vi.mock('@/lib/prisma', () => {
       create: (...args: unknown[]) => mockPodcastCreate(...args),
       findUnique: (...args: unknown[]) => mockPodcastFindUnique(...args),
       update: (...args: unknown[]) => mockPodcastUpdate(...args),
-      updateMany: (...args: unknown[]) => mockPodcastUpdateMany(...args),
-      delete: (...args: unknown[]) => mockPodcastDelete(...args),
     },
     save: {
       findUnique: (...args: unknown[]) => mockSaveFindUnique(...args),
@@ -57,7 +51,6 @@ vi.mock('@/lib/prisma', () => {
       findUnique: (...args: unknown[]) => mockUserFindUnique(...args),
       findUniqueOrThrow: (...args: unknown[]) => mockUserFindUniqueOrThrow(...args),
     },
-    $transaction: (...args: unknown[]) => mockTransaction(...args),
   };
   return { prisma: txProxy, prismaUnfiltered: txProxy };
 });
@@ -149,8 +142,6 @@ const mockPrisma = {
     create: mockPodcastCreate,
     findUnique: mockPodcastFindUnique,
     update: mockPodcastUpdate,
-    updateMany: mockPodcastUpdateMany,
-    delete: mockPodcastDelete,
   },
   save: {
     findUnique: mockSaveFindUnique,
@@ -208,7 +199,6 @@ const mockPodcast = {
   fileSize: 1024000,
   playCount: 42,
   saveCount: 5,
-  forkedFromId: null,
   hostVoiceId: 'voice-host-1',
   expertVoiceId: 'voice-expert-1',
   createdAt: new Date('2025-01-15T10:00:00Z'),
@@ -818,10 +808,6 @@ describe('PATCH /api/podcasts/[podcastId]', () => {
 describe('DELETE /api/podcasts/[podcastId]', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // $transaction executes the callback with a tx that delegates to the same mocks
-    mockTransaction.mockImplementation((fn: (tx: typeof mockPrisma) => Promise<unknown>) =>
-      fn(mockPrisma)
-    );
   });
 
   it('returns 401 when not authenticated', async () => {
@@ -853,7 +839,7 @@ describe('DELETE /api/podcasts/[podcastId]', () => {
 
   it('returns 403 when user is not the owner', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-2' });
-    mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1', forkedFromId: null });
+    mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1' });
 
     const request = createDeleteRequest('/api/podcasts/pod-1');
     const response = await deletePodcast(request, {
@@ -867,7 +853,7 @@ describe('DELETE /api/podcasts/[podcastId]', () => {
 
   it('soft-deletes podcast when user is owner', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
-    mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1', forkedFromId: null });
+    mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1' });
     mockPrisma.podcast.update.mockResolvedValue(mockPodcast);
 
     const request = createDeleteRequest('/api/podcasts/pod-1');
@@ -876,20 +862,9 @@ describe('DELETE /api/podcasts/[podcastId]', () => {
     });
 
     expect(response.status).toBe(204);
-  });
-
-  it('decrements parent forkCount when soft-deleting a forked podcast', async () => {
-    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
-    mockPrisma.podcast.findUnique
-      .mockResolvedValueOnce({ userId: 'user-1', forkedFromId: 'parent-1' })
-      .mockResolvedValueOnce({ id: 'parent-1' });
-    mockPrisma.podcast.update.mockResolvedValue(mockPodcast);
-
-    const request = createDeleteRequest('/api/podcasts/pod-1');
-    const response = await deletePodcast(request, {
-      params: Promise.resolve({ podcastId: 'pod-1' }),
+    expect(mockPodcastUpdate).toHaveBeenCalledWith({
+      where: { id: 'pod-1' },
+      data: { deletedAt: expect.any(Date) },
     });
-
-    expect(response.status).toBe(204);
   });
 });
