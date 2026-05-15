@@ -23,7 +23,6 @@ export function formatPodcastSummary(p: Podcast): string {
   if (p.user) lines.push(`Creator: ${p.user.name || 'Anonymous'}`);
   const tags = formatTags(p);
   if (tags) lines.push(`Tags: ${tags}`);
-  if (p.forkedFromId) lines.push(`Forked from: ${p.forkedFromId}`);
   lines.push(`Created: ${p.createdAt}`);
   return lines.join('\n');
 }

@@ -431,6 +431,39 @@ describe('private-first OSS surfaces', () => {
     expect(storageInspectorSources).not.toContain('Comments');
   });
 
+  it('keeps traffic report and MCP contracts private-activity scoped', () => {
+    const trafficReportSource = readSource('src/lib/traffic-report.ts');
+    const librarySource = readSource('src/app/(dashboard)/ideas/LibraryClient.tsx');
+    const collectionE2ESource = readFileSync(
+      resolve(repoRoot, 'e2e/playwright/tests/api/collections.api.spec.ts'),
+      'utf8'
+    );
+    const mcpSources = ['packages/mcp/src/types.ts', 'packages/mcp/src/format.ts']
+      .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
+      .join('\n');
+    const privateContractSources = [
+      trafficReportSource,
+      librarySource,
+      collectionE2ESource,
+      mcpSources,
+    ].join('\n');
+
+    expect(trafficReportSource).toContain('PrivateActivitySection');
+    expect(trafficReportSource).toContain('privateActivity');
+    expect(trafficReportSource).toContain('topSaved');
+    expect(trafficReportSource).toContain('largestByItems');
+    expect(privateContractSources).not.toContain('EngagementSection');
+    expect(privateContractSources).not.toContain('collectionFollow');
+    expect(privateContractSources).not.toContain('followerCount');
+    expect(privateContractSources).not.toContain('followingCount');
+    expect(privateContractSources).not.toContain('likeCount');
+    expect(privateContractSources).not.toContain('forkCount');
+    expect(privateContractSources).not.toContain('forkedFromId');
+    expect(privateContractSources).not.toContain('isLiked');
+    expect(privateContractSources).not.toContain('Forked from');
+    expect(collectionE2ESource).not.toContain('/follow');
+  });
+
   it('does not ship mobile podcast social actions or widgets', () => {
     const removedMobileComponents = [
       'apps/mobile/components/ForkModal.tsx',

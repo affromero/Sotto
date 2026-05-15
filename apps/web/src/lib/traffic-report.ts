@@ -97,12 +97,10 @@ export interface SourcesSection {
   humanVsAi: { human: number; ai: number };
 }
 
-export interface EngagementSection {
-  totals: { likes: number; saves: number; comments: number; forks: number; follows: number };
-  dailyTrend: Array<{ day: string; likes: number; saves: number; comments: number; forks: number }>;
-  mostLiked: Array<{ podcastId: string; title: string; creator: string; likeCount: number }>;
-  mostForked: Array<{ podcastId: string; title: string; creator: string; forkCount: number }>;
-  mostCommented: Array<{ podcastId: string; title: string; creator: string; commentCount: number }>;
+export interface PrivateActivitySection {
+  totals: { saves: number; questions: number; answered: number; incorporated: number; ratings: number };
+  dailyTrend: Array<{ day: string; saves: number; questions: number; ratings: number }>;
+  topSaved: Array<{ podcastId: string; title: string; creator: string; saveCount: number }>;
 }
 
 export interface InteractionsSection {
@@ -129,7 +127,6 @@ export interface ContentSection {
   avgSegmentsPerPodcast: number | null;
   avgFileSizeBytes: number | null;
   visibilityDistribution: Array<{ visibility: string; count: number }>;
-  podcastsWithForks: number;
   durationDistribution: Array<{ bucket: string; count: number }>;
   durationAccuracy: {
     total: number;
@@ -174,13 +171,12 @@ export interface RecommendationsSection {
 export interface CollectionsSection {
   total: number;
   totalItems: number;
-  totalFollows: number;
   newInPeriod: number;
-  mostFollowed: Array<{
+  largestByItems: Array<{
     collectionId: string;
     name: string;
     creator: string;
-    followerCount: number;
+    podcastCount: number;
   }>;
 }
 
@@ -209,7 +205,7 @@ export interface TrafficReport {
   providers: ProvidersSection;
   topics: TopicsSection;
   sources: SourcesSection;
-  engagement: EngagementSection;
+  privateActivity: PrivateActivitySection;
   interactions: InteractionsSection;
   playbackDetails: PlaybackDetailsSection;
   content: ContentSection;
@@ -291,16 +287,14 @@ export async function buildTrafficReport(
     sourcePlatformDistribution,
     humanVsAiRaw,
 
-    // === Engagement (9) ===
-    likesCount,
+    // === Private Activity (7) ===
     savesCount,
-    commentsCount,
-    forksCount,
-    followsCount,
-    dailyEngagement,
-    mostLiked,
-    mostForked,
-    mostCommented,
+    questionsCount,
+    answeredQuestionsCount,
+    incorporatedAnswersCount,
+    ratingsCount,
+    dailyPrivateActivity,
+    topSavedPodcasts,
 
     // === Interactions (5) ===
     totalQuestions,
@@ -314,11 +308,10 @@ export async function buildTrafficReport(
     speedBuckets,
     completionBuckets,
 
-    // === Content (8) ===
+    // === Content (7) ===
     contentAgg,
     avgSegments,
     visibilityDistribution,
-    podcastsWithForks,
     durationBuckets,
     durationAccuracyTotal,
     durationAccuracyWithinTarget,
@@ -340,12 +333,11 @@ export async function buildTrafficReport(
     recsAgg,
     recsBySurface,
 
-    // === Collections (5) ===
+    // === Collections (4) ===
     collectionsTotal,
     collectionItemsTotal,
-    collectionFollowsTotal,
     collectionsNewInPeriod,
-    mostFollowedCollections,
+    largestCollections,
 
     // === Voices (4) ===
     voiceClonesTotal,
@@ -552,43 +544,35 @@ export async function buildTrafficReport(
     }),
 
     // -----------------------------------------------------------------------
-    // Engagement
+    // Private Activity
     // -----------------------------------------------------------------------
-    prisma.like.count({ where: { createdAt: { gte: since } } }),
     prisma.save.count({ where: { createdAt: { gte: since } } }),
-    prisma.comment.count({ where: { createdAt: { gte: since } } }),
-    prisma.podcast.count({ where: { createdAt: { gte: since }, forkedFromId: { not: null } } }),
-    prisma.follow.count({ where: { createdAt: { gte: since } } }),
-    prisma.$queryRaw<Array<{ day: Date; likes: bigint; saves: bigint; comments: bigint; forks: bigint }>>`
+    prisma.interaction.count({ where: { createdAt: { gte: since } } }),
+    prisma.interaction.count({
+      where: {
+        createdAt: { gte: since },
+        status: { in: ['ANSWERED', 'INCORPORATED', 'RESOLVED'] },
+      },
+    }),
+    prisma.interaction.count({ where: { createdAt: { gte: since }, incorporated: true } }),
+    prisma.podcastRating.count({ where: { createdAt: { gte: since } } }),
+    prisma.$queryRaw<Array<{ day: Date; saves: bigint; questions: bigint; ratings: bigint }>>`
       WITH days AS (
         SELECT generate_series(${since}::date, NOW()::date, '1 day'::interval)::date AS day
       )
       SELECT
         d.day,
-        COALESCE((SELECT COUNT(*) FROM "Like" WHERE "createdAt"::date = d.day AND "createdAt" >= ${since}), 0)::bigint AS likes,
         COALESCE((SELECT COUNT(*) FROM "Save" WHERE "createdAt"::date = d.day AND "createdAt" >= ${since}), 0)::bigint AS saves,
-        COALESCE((SELECT COUNT(*) FROM "Comment" WHERE "createdAt"::date = d.day AND "createdAt" >= ${since}), 0)::bigint AS comments,
-        COALESCE((SELECT COUNT(*) FROM "Podcast" WHERE "forkedFromId" IS NOT NULL AND "deletedAt" IS NULL AND "createdAt"::date = d.day AND "createdAt" >= ${since}), 0)::bigint AS forks
+        COALESCE((SELECT COUNT(*) FROM "Interaction" WHERE "createdAt"::date = d.day AND "createdAt" >= ${since}), 0)::bigint AS questions,
+        COALESCE((SELECT COUNT(*) FROM "PodcastRating" WHERE "createdAt"::date = d.day AND "createdAt" >= ${since}), 0)::bigint AS ratings
       FROM days d
       ORDER BY d.day ASC
     `,
     prisma.podcast.findMany({
-      where: { likeCount: { gt: 0 } },
-      orderBy: { likeCount: 'desc' },
+      where: { deletedAt: null, saveCount: { gt: 0 } },
+      orderBy: { saveCount: 'desc' },
       take: 10,
-      select: { id: true, title: true, likeCount: true, user: { select: { name: true, handle: true } } },
-    }),
-    prisma.podcast.findMany({
-      where: { forkCount: { gt: 0 } },
-      orderBy: { forkCount: 'desc' },
-      take: 10,
-      select: { id: true, title: true, forkCount: true, user: { select: { name: true, handle: true } } },
-    }),
-    prisma.podcast.findMany({
-      where: { commentCount: { gt: 0 } },
-      orderBy: { commentCount: 'desc' },
-      take: 10,
-      select: { id: true, title: true, commentCount: true, user: { select: { name: true, handle: true } } },
+      select: { id: true, title: true, saveCount: true, user: { select: { name: true, handle: true } } },
     }),
 
     // -----------------------------------------------------------------------
@@ -678,7 +662,6 @@ export async function buildTrafficReport(
       by: ['visibility'],
       _count: true,
     }),
-    prisma.podcast.count({ where: { forkCount: { gt: 0 } } }),
     prisma.$queryRaw<Array<{ bucket: string; count: bigint }>>`
       SELECT
         CASE
@@ -800,16 +783,15 @@ export async function buildTrafficReport(
     // -----------------------------------------------------------------------
     prisma.collection.count(),
     prisma.collectionItem.count(),
-    prisma.collectionFollow.count(),
     prisma.collection.count({ where: { createdAt: { gte: since } } }),
     prisma.collection.findMany({
-      where: { followerCount: { gt: 0 } },
-      orderBy: { followerCount: 'desc' },
+      where: { podcastCount: { gt: 0 } },
+      orderBy: { podcastCount: 'desc' },
       take: 5,
       select: {
         id: true,
         name: true,
-        followerCount: true,
+        podcastCount: true,
         user: { select: { name: true, handle: true } },
       },
     }),
@@ -998,40 +980,27 @@ export async function buildTrafficReport(
       },
     },
 
-    engagement: {
+    privateActivity: {
       totals: {
-        likes: likesCount,
         saves: savesCount,
-        comments: commentsCount,
-        forks: forksCount,
-        follows: followsCount,
+        questions: questionsCount,
+        answered: answeredQuestionsCount,
+        incorporated: incorporatedAnswersCount,
+        ratings: ratingsCount,
       },
-      dailyTrend: dailyEngagement.map((d) => ({
+      dailyTrend: dailyPrivateActivity.map((d) => ({
         day: d.day instanceof Date
           ? d.day.toISOString().split('T')[0]
           : String(d.day),
-        likes: n(d.likes),
         saves: n(d.saves),
-        comments: n(d.comments),
-        forks: n(d.forks),
+        questions: n(d.questions),
+        ratings: n(d.ratings),
       })),
-      mostLiked: mostLiked.map((p) => ({
+      topSaved: topSavedPodcasts.map((p) => ({
         podcastId: p.id,
         title: p.title,
         creator: creatorLabel(p.user),
-        likeCount: p.likeCount,
-      })),
-      mostForked: mostForked.map((p) => ({
-        podcastId: p.id,
-        title: p.title,
-        creator: creatorLabel(p.user),
-        forkCount: p.forkCount,
-      })),
-      mostCommented: mostCommented.map((p) => ({
-        podcastId: p.id,
-        title: p.title,
-        creator: creatorLabel(p.user),
-        commentCount: p.commentCount,
+        saveCount: p.saveCount,
       })),
     },
 
@@ -1074,7 +1043,6 @@ export async function buildTrafficReport(
         visibility: r.visibility,
         count: r._count,
       })),
-      podcastsWithForks,
       durationDistribution: durationBuckets.map((r) => ({
         bucket: r.bucket,
         count: n(r.count),
@@ -1134,13 +1102,12 @@ export async function buildTrafficReport(
     collections: {
       total: collectionsTotal,
       totalItems: collectionItemsTotal,
-      totalFollows: collectionFollowsTotal,
       newInPeriod: collectionsNewInPeriod,
-      mostFollowed: mostFollowedCollections.map((c) => ({
+      largestByItems: largestCollections.map((c) => ({
         collectionId: c.id,
         name: c.name,
         creator: creatorLabel(c.user),
-        followerCount: c.followerCount,
+        podcastCount: c.podcastCount,
       })),
     },
 
