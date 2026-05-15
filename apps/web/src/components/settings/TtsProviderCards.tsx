@@ -16,6 +16,7 @@ interface ProviderStatus {
 interface TtsProviderCardsProps {
   initialConfigured: Array<ProviderStatus>;
   providerMeta: TtsProviderClientMeta[];
+  onReadyChange?: (ready: boolean) => void;
 }
 
 const QUALITY_LABELS: Record<string, string> = {
@@ -24,7 +25,11 @@ const QUALITY_LABELS: Record<string, string> = {
   ultra: 'Ultra',
 };
 
-export function TtsProviderCards({ initialConfigured, providerMeta }: TtsProviderCardsProps) {
+export function TtsProviderCards({
+  initialConfigured,
+  providerMeta,
+  onReadyChange,
+}: TtsProviderCardsProps) {
   const [configured, setConfigured] = useState<Map<string, boolean>>(
     new Map(initialConfigured.map((p) => [p.provider, p.isValid]))
   );
@@ -64,7 +69,11 @@ export function TtsProviderCards({ initialConfigured, providerMeta }: TtsProvide
         return;
       }
 
-      setConfigured((prev) => new Map(prev).set(providerId, true));
+      setConfigured((prev) => {
+        const next = new Map(prev).set(providerId, true);
+        onReadyChange?.(Array.from(next.values()).some(Boolean));
+        return next;
+      });
       setFieldValues((prev) => {
         const next = { ...prev };
         for (const field of authFields) {
@@ -94,6 +103,7 @@ export function TtsProviderCards({ initialConfigured, providerMeta }: TtsProvide
       setConfigured((prev) => {
         const next = new Map(prev);
         next.delete(providerId);
+        onReadyChange?.(Array.from(next.values()).some(Boolean));
         return next;
       });
       setStatus((prev) => ({ ...prev, [providerId]: 'removed' }));

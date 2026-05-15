@@ -39,7 +39,7 @@ export function NameStep() {
         return;
       }
 
-      // Server component will re-query user.name and show the taste quiz
+      // Server component re-queries user.name and shows setup readiness.
       router.refresh();
     } catch {
       setError('Something went wrong. Please try again.');
