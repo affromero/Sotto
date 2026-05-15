@@ -31,7 +31,6 @@ import type { FlowContext, FlowScenario, RecordingManifest, OutputFormat } from 
 // Flows
 import chatCreation from './flows/02-chat-creation';
 import playerInterrupt from './flows/03-player-interrupt';
-import forkFlow from './flows/04-fork-flow';
 import scriptReview from './flows/05-script-review';
 import landingPage from './flows/06-landing-page';
 import verificationGithub from './flows/07-verification-github';
@@ -45,7 +44,6 @@ const FORMATS: OutputFormat[] = ['mp4', 'webm', 'gif'];
 const ALL_FLOWS: FlowScenario[] = [
   chatCreation,
   playerInterrupt,
-  forkFlow,
   scriptReview,
   landingPage,
   verificationGithub,

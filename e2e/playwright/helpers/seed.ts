@@ -194,26 +194,6 @@ export async function seedTestUser() {
     },
   });
 
-  // Follow (otherUser → user)
-  await prisma.follow.upsert({
-    where: { followerId_followingId: { followerId: otherUser.id, followingId: user.id } },
-    update: {},
-    create: {
-      followerId: otherUser.id,
-      followingId: user.id,
-    },
-  });
-
-  // Like (otherUser → testPodcast)
-  await prisma.like.upsert({
-    where: { userId_podcastId: { userId: otherUser.id, podcastId: testPodcast.id } },
-    update: {},
-    create: {
-      userId: otherUser.id,
-      podcastId: testPodcast.id,
-    },
-  });
-
   // Save (user → otherPodcast)
   await prisma.save.upsert({
     where: { userId_podcastId: { userId: user.id, podcastId: otherPodcast.id } },

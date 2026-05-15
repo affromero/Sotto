@@ -393,11 +393,8 @@ export function AudioClipPlayer({
                 Video
               </button>
             )}
-            <a href={`/podcast/${podcastId}?fork=1`} className={styles.playerAction}>
-              Fork
-            </a>
             <a href={`/podcast/${podcastId}`} className={styles.playerAction}>
-              Share
+              Open
             </a>
           </div>
         </div>

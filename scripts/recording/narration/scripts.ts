@@ -35,10 +35,10 @@ const landingPage: FlowNarration = {
   sourceFlowName: '06-landing-page',
   videoDuration: 12.56,
   segments: [
-    { startAt: 0.0, text: 'Sotto. Where podcasts get social.' },
+    { startAt: 0.0, text: 'Sotto. Private podcasts with AI.' },
     { startAt: 2.5, text: 'Create from any topic.' },
     { startAt: 5.0, text: 'Interrupt to ask questions.' },
-    { startAt: 7.5, text: 'Fork and remix.' },
+    { startAt: 7.5, text: 'Keep it private.' },
     { startAt: 10.0, text: 'Bring your own keys.' },
   ],
 };
@@ -90,20 +90,6 @@ const playerInterrupt: FlowNarration = {
   ],
 };
 
-// ── 06: Fork Flow (10.28s) ───────────────────────────────────────
-// Windows: 0.3→3.5 (3.2s), 3.5→6.5 (3.0s), 6.5→10.28 (3.78s)
-
-const forkFlow: FlowNarration = {
-  flowName: '06-fork-flow',
-  sourceFlowName: '04-fork-flow',
-  videoDuration: 10.28,
-  segments: [
-    { startAt: 0.3, text: 'Fork any podcast.' },
-    { startAt: 3.5, text: 'Add your own angle.' },
-    { startAt: 6.5, text: 'A new podcast, from the original.' },
-  ],
-};
-
 // ── 07: Script Review (10.36s) ───────────────────────────────────
 // Windows: 0.3→3.5 (3.2s), 3.5→6.5 (3.0s), 6.5→10.36 (3.86s)
 
@@ -125,6 +111,5 @@ export const ALL_NARRATIONS: FlowNarration[] = [
   verificationGithub,
   chatCreation,
   playerInterrupt,
-  forkFlow,
   scriptReview,
 ];
