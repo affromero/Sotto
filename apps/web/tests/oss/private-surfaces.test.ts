@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -318,6 +318,69 @@ describe('private-first OSS surfaces', () => {
     expect(harnessSources).not.toContain('explore the feed');
     expect(harnessSources).not.toContain('likeToListenRatio');
     expect(harnessSources).not.toContain('forkToListenRatio');
+  });
+
+  it('keeps release docs aligned with private-first OSS strategy', () => {
+    const removedPitchDocs = [
+      'docs/02-ui-mockups.md',
+      'docs/03-market-analysis.md',
+      'docs/04-post-pivot-analysis.md',
+      'docs/06-discovery-chat-flow.md',
+      'docs/08-design-system.md',
+      'docs/09-unit-economics.md',
+      'docs/12-shipping-roadmap.md',
+      'docs/13-mvp-launch-guide.md',
+      'docs/14-mobile-strategy.md',
+      'docs/15-ios-app-strategy.md',
+      'docs/22-palette-brief.md',
+      'docs/data-moat-narrative.md',
+      'docs/data-moat-narrative.html',
+    ];
+    const docsDir = resolve(repoRoot, 'docs');
+    const releaseDocPaths = [
+      'README.md',
+      'CLAUDE.md',
+      'scripts/rebuild-pitch.sh',
+      ...readdirSync(docsDir)
+        .filter((name) => name.endsWith('.md'))
+        .map((name) => `docs/${name}`),
+    ];
+    const releaseDocsSource = releaseDocPaths
+      .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
+      .join('\n');
+    const staleClaims = [
+      'Every voice. Every topic. One feed',
+      'Where podcasts get social',
+      'social podcast network',
+      'GitHub for podcasts',
+      'public on a social feed',
+      'Public podcasts on a social feed',
+      'Social Discovery Feed',
+      'Fork & remix',
+      'fork & remix',
+      'fork and remix anyone',
+      'Trending to Fork',
+      'YouTube of AI podcasts',
+      'PODCAST_FORKED',
+      'NEW_FOLLOWER',
+      'Explore Feed',
+      'Public Feed',
+      '/api/feed',
+      '/profile/[userId]',
+      'All secrets via **Doppler**',
+      'Syncs prod DB + starts web + workers',
+    ];
+
+    for (const doc of removedPitchDocs) {
+      expect(existsSync(resolve(repoRoot, doc)), doc).toBe(false);
+    }
+    for (const claim of staleClaims) {
+      expect(releaseDocsSource, claim).not.toContain(claim);
+    }
+    expect(releaseDocsSource).toContain('Private audio briefings');
+    expect(releaseDocsSource).toContain('private RSS');
+    expect(releaseDocsSource).toContain('implicit provider fallback');
+    expect(releaseDocsSource).toContain('Managed hosting');
   });
 
   it('keeps Twitter auto-tweet thresholds scoped to private playback', () => {
