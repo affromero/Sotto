@@ -30,9 +30,9 @@ export default function TermsPage() {
 
           <h2>2. Description of Service</h2>
           <p>
-            Sotto is an open podcast network that enables users to generate AI-powered
-            conversational podcasts, interact with content during playback, fork and
-            remix existing podcasts, and share knowledge publicly.
+            Sotto is private AI podcast infrastructure that enables users to generate
+            conversational podcasts, interact with content during playback, organize a
+            private library, and share access when they choose.
           </p>
 
           <h2>3. BYOK Model and API Keys</h2>
@@ -68,10 +68,10 @@ export default function TermsPage() {
 
           <h2>5. User Content and Ownership</h2>
           <p>
-            You retain ownership of podcasts you create or import. By making content
-            public, you grant other users the right to listen, fork, and remix your
-            podcasts (with attribution). You may set podcasts to private or unlisted
-            at any time.
+            You retain ownership of podcasts you create or import. You control
+            whether podcasts are private, unlisted, or shared by link. Sharing a
+            podcast does not transfer ownership or grant other users rights beyond
+            the access you explicitly provide.
           </p>
 
           <h2>6. Acceptable Use</h2>
@@ -85,12 +85,12 @@ export default function TermsPage() {
             <li>Engage in harassment, hate speech, or discrimination</li>
           </ul>
 
-          <h2>7. Forking and Remixing</h2>
+          <h2>7. Private Library and Sharing</h2>
           <p>
-            Sotto allows users to fork public podcasts. Forks are attributed to the
-            original creator. Forking does not transfer ownership of the original
-            content. The original creator may make their podcast private at any time,
-            but existing forks remain accessible.
+            Sotto is designed for private libraries. You are responsible for sharing
+            podcasts only with people who are allowed to access the underlying
+            content. You may revoke access by changing visibility settings or
+            deleting the podcast.
           </p>
 
           <h2>8. Account Termination</h2>

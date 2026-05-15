@@ -110,14 +110,14 @@ const sections: Section[] = [
   },
   {
     title: 'Users',
-    description: 'User profiles and social features.',
+    description: 'Private account and library data.',
     endpoints: [
       {
         method: 'GET',
         path: '/api/users/:id',
         description: 'Get public user profile.',
         auth: false,
-        response: '{ id, name, handle, image, bio, podcastCount, followerCount }',
+        response: '{ id, name, handle, image, bio, podcastCount }',
       },
       {
         method: 'GET',

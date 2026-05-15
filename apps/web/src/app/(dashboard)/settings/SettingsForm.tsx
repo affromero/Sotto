@@ -990,14 +990,14 @@ export function SettingsForm({
         <h2 className={styles.sectionTitle}>Reset Recommendations</h2>
         <p className={styles.sectionDesc}>
           Start completely fresh. This clears your grid selections, quiz answers,
-          learned preferences, and recommendation history. Your podcasts, likes,
-          and follows are not affected.
+          learned preferences, and recommendation history. Your podcasts and saved
+          library are not affected.
         </p>
         <div className={styles.formActions}>
           <Button
             variant="danger"
             onClick={async () => {
-              if (!confirm('Reset all recommendation data? This clears grid selections, quiz answers, learned preferences, and recommendation history. Your podcasts, likes, and follows are not affected.')) return;
+              if (!confirm('Reset all recommendation data? This clears grid selections, quiz answers, learned preferences, and recommendation history. Your podcasts and saved library are not affected.')) return;
               setRecsResetting(true);
               try {
                 const res = await fetch('/api/users/me/recommendations', { method: 'DELETE' });

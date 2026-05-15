@@ -38,7 +38,7 @@ export default function ReferralScreen() {
       return;
     }
     await Share.share({
-      message: `Join me on Sotto — the social podcast network!\n${referralLink}`,
+      message: `Join me on Sotto — private AI podcast briefings.\n${referralLink}`,
       url: referralLink,
     });
   }, [referralLink]);

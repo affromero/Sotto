@@ -65,6 +65,42 @@ describe('private-first OSS surfaces', () => {
     expect(sharedPositioningSource).not.toContain('fork and remix anything');
   });
 
+  it('keeps public product copy private-first', () => {
+    const webCopySources = [
+      'src/app/about/page.tsx',
+      'src/app/join/page.tsx',
+      'src/app/pricing/page.tsx',
+      'src/app/developers/page.tsx',
+      'src/app/terms/page.tsx',
+      'src/app/privacy/page.tsx',
+      'src/app/support/page.tsx',
+      'src/app/layout.tsx',
+      'src/app/(admin)/admin/showcase/ActionEditor.tsx',
+      'src/app/(dashboard)/settings/SettingsForm.tsx',
+      'src/components/referral/JoinCTA.tsx',
+      'src/components/voices/VoicePaymentModal.tsx',
+    ]
+      .map(readSource)
+      .join('\n');
+    const mobileCopySources = ['apps/mobile/app/settings/referral.tsx']
+      .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
+      .join('\n');
+    const copySources = [webCopySources, mobileCopySources].join('\n');
+
+    expect(copySources).toContain('private');
+    expect(copySources).not.toContain('social podcast network');
+    expect(copySources).not.toContain('social feed');
+    expect(copySources).not.toContain('social features');
+    expect(copySources).not.toContain('social graph');
+    expect(copySources).not.toContain('open podcast network');
+    expect(copySources).not.toContain('Fork and remix');
+    expect(copySources).not.toContain('fork and remix');
+    expect(copySources).not.toContain('Forking');
+    expect(copySources).not.toContain('forked version');
+    expect(copySources).not.toContain('likes, and follows');
+    expect(copySources).not.toContain('followerCount');
+  });
+
   it('keeps dashboard data access scoped to private workspace metrics', () => {
     const dashboardSource = [
       'src/app/(dashboard)/dashboard/page.tsx',
