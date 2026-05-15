@@ -320,6 +320,32 @@ describe('private-first OSS surfaces', () => {
     expect(podcastAnalyticsSources).not.toContain("label: 'Comments'");
   });
 
+  it('keeps creator analytics scoped to private activity', () => {
+    const creatorAnalyticsSources = [
+      'src/lib/creator-metrics.ts',
+      'src/app/(dashboard)/analytics/AnalyticsClient.tsx',
+      'src/app/(dashboard)/analytics/page.tsx',
+      'src/app/api/creator-analytics/route.ts',
+      'src/types/analytics.ts',
+    ]
+      .map(readSource)
+      .concat(readFileSync(resolve(repoRoot, 'packages/shared/src/types/analytics.ts'), 'utf8'))
+      .join('\n');
+
+    expect(creatorAnalyticsSources).toContain('privateActivity');
+    expect(creatorAnalyticsSources).toContain('getCreatorPrivateActivity');
+    expect(creatorAnalyticsSources).not.toContain('getCreatorEngagement');
+    expect(creatorAnalyticsSources).not.toContain('CreatorEngagement');
+    expect(creatorAnalyticsSources).not.toContain('data.engagement');
+    expect(creatorAnalyticsSources).not.toContain('likeCount');
+    expect(creatorAnalyticsSources).not.toContain('forkCount');
+    expect(creatorAnalyticsSources).not.toContain('prisma.like');
+    expect(creatorAnalyticsSources).not.toContain('prisma.follow');
+    expect(creatorAnalyticsSources).not.toContain("label: 'Likes'");
+    expect(creatorAnalyticsSources).not.toContain("label: 'Forks'");
+    expect(creatorAnalyticsSources).not.toContain("label: 'Follows'");
+  });
+
   it('does not ship mobile podcast social actions or widgets', () => {
     const removedMobileComponents = [
       'apps/mobile/components/ForkModal.tsx',

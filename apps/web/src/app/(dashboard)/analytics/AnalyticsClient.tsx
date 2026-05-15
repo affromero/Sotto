@@ -43,23 +43,20 @@ export function AnalyticsClient({ hasPodcasts }: AnalyticsClientProps) {
   const [creatorData, setCreatorData] = useState<CreatorAnalyticsResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchData = useCallback(
-    async (p: string, t: Tab) => {
-      setLoading(true);
-      try {
-        if (t === 'api') {
-          const response = await fetch(`/api/analytics?period=${p}`);
-          if (response.ok) setApiData(await response.json());
-        } else {
-          const response = await fetch(`/api/creator-analytics?period=${p}`);
-          if (response.ok) setCreatorData(await response.json());
-        }
-      } finally {
-        setLoading(false);
+  const fetchData = useCallback(async (p: string, t: Tab) => {
+    setLoading(true);
+    try {
+      if (t === 'api') {
+        const response = await fetch(`/api/analytics?period=${p}`);
+        if (response.ok) setApiData(await response.json());
+      } else {
+        const response = await fetch(`/api/creator-analytics?period=${p}`);
+        if (response.ok) setCreatorData(await response.json());
       }
-    },
-    []
-  );
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     fetchData(period, tab);
@@ -131,7 +128,8 @@ function PodcastPerformanceTab({
       <div className={styles.upgradeCard}>
         <h2 className={styles.upgradeTitle}>No Podcasts Yet</h2>
         <p className={styles.upgradeText}>
-          Create your first podcast to see performance analytics, audience insights, and engagement data.
+          Create your first podcast to see performance analytics, audience insights, and private
+          activity.
         </p>
         <Link href="/create" className={styles.upgradeLink}>
           Create a Podcast
@@ -206,8 +204,8 @@ function PodcastPerformanceTab({
                   <th>Title</th>
                   <th>Plays</th>
                   <th>Completion</th>
-                  <th>Likes</th>
-                  <th>Forks</th>
+                  <th>Saves</th>
+                  <th>Questions</th>
                 </tr>
               </thead>
               <tbody>
@@ -220,8 +218,8 @@ function PodcastPerformanceTab({
                     </td>
                     <td>{p.plays.toLocaleString()}</td>
                     <td>{Math.round(p.completionPercent)}%</td>
-                    <td>{p.likes.toLocaleString()}</td>
-                    <td>{p.forks.toLocaleString()}</td>
+                    <td>{p.saves.toLocaleString()}</td>
+                    <td>{p.questions.toLocaleString()}</td>
                   </tr>
                 ))}
               </tbody>
@@ -231,15 +229,14 @@ function PodcastPerformanceTab({
       )}
 
       <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Engagement</h2>
+        <h2 className={styles.sectionTitle}>Private Activity</h2>
         <BarChart
           items={[
-            { label: 'Likes', value: data.engagement.likes },
-            { label: 'Saves', value: data.engagement.saves },
-            { label: 'Comments', value: data.engagement.comments },
-            { label: 'Forks', value: data.engagement.forks },
-            { label: 'Follows', value: data.engagement.follows },
-            { label: 'Q&A', value: data.engagement.interactions },
+            { label: 'Saves', value: data.privateActivity.saves },
+            { label: 'Questions', value: data.privateActivity.questions },
+            { label: 'Answered', value: data.privateActivity.answered },
+            { label: 'Incorporated', value: data.privateActivity.incorporated },
+            { label: 'Ratings', value: data.privateActivity.ratings },
           ].filter((i) => i.value > 0)}
           formatValue={(v) => v.toLocaleString()}
         />
