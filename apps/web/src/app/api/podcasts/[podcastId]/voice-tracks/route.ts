@@ -9,7 +9,6 @@ import { checkGenerationGate } from '@/lib/generation-gate';
 import { computeVoiceCharges } from '@/lib/voice-pricing';
 import { resolveTtsProvider } from '@/lib/providers';
 import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
-import { resolveAutoModel } from '@/lib/auto-model-config';
 import { checkRateLimit } from '@/lib/redis';
 import { checkSuspension } from '@/lib/auth-guards';
 import { getProviderMeta, type TtsProviderId } from '@/lib/providers/tts-registry';
@@ -173,24 +172,33 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       }
     : undefined;
 
-  // Resolve TTS provider per speaker — same priority system as from-scratch generation.
-  // Use selectFreeTierProviders() for free users (allocation-based) or resolveAutoModel() for PRO
-  // to get the correct provider+model pair, avoiding default model fallbacks that BYOK keys may lack.
+  // Resolve TTS provider per speaker. Providerless voices require a request-level provider
+  // or a platform-selected provider; BYOK users must choose one explicitly.
   const plan = gate.isProUser ? 'PRO' : 'FREE';
   const selected = gate.isByokUser
     ? null
     : await selectFreeTierProviders(userId);
-  const autoModel = selected
-    ? null
-    : await resolveAutoModel(plan);
-
-  const fallback = await resolveTtsProvider({
-    userId,
-    podcastId,
-    requestedProvider: (ttsProvider as TtsProviderId | null) ?? undefined,
-    requestedModel: ttsModel ?? selected?.ttsModel ?? autoModel?.ttsModel,
-    plan,
-  });
+  const selectedProviderId = selected?.ttsProvider as TtsProviderId | undefined;
+  const defaultProviderId = (ttsProvider as TtsProviderId | undefined) ?? selectedProviderId;
+  const defaultModel = ttsModel ?? (
+    selected && selectedProviderId === defaultProviderId ? selected.ttsModel : undefined
+  );
+  const hasProviderlessVoice = resolvedVoices.some((v) => !v.provider);
+  let defaultResolved: Awaited<ReturnType<typeof resolveTtsProvider>> | null = null;
+  if (hasProviderlessVoice) {
+    if (!defaultProviderId) {
+      return errorResponse('Choose a TTS provider before creating a voice track.', 400, {
+        code: 'tts_provider_required',
+      });
+    }
+    defaultResolved = await resolveTtsProvider({
+      userId,
+      podcastId,
+      requestedProvider: defaultProviderId,
+      requestedModel: defaultModel,
+      plan,
+    });
+  }
 
   // Resolve per-voice provider: parse "elevenlabs:eleven_v3" → provider "elevenlabs", model "eleven_v3"
   // When no explicit model suffix, use the allocation/config model for that provider.
@@ -201,8 +209,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         const explicitModel = modelParts.join(':') || undefined;
         // Use explicit model, or the model from the same priority system as from-scratch
         const modelForProvider = explicitModel
-          ?? (selected?.ttsProvider === providerKey ? selected.ttsModel : undefined)
-          ?? (autoModel?.ttsProvider === providerKey ? autoModel.ttsModel : undefined);
+          ?? (selected && selectedProviderId === providerKey ? selected.ttsModel : undefined)
+          ?? (defaultProviderId === providerKey ? defaultModel : undefined);
         const resolved = await resolveTtsProvider({
           userId,
           podcastId,
@@ -213,8 +221,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         const voiceId = v.voiceId || resolved.provider.getVoiceId(v.speaker, podcastId, voiceMetadata);
         return { speaker: v.speaker, voiceId, providerId: resolved.providerId, ttsModel: resolved.provider.getModelId() };
       }
-      const voiceId = v.voiceId || fallback.provider.getVoiceId(v.speaker, podcastId, voiceMetadata);
-      return { speaker: v.speaker, voiceId, providerId: fallback.providerId, ttsModel: fallback.provider.getModelId() };
+      if (!defaultResolved) {
+        throw new Error('Default TTS provider was not resolved for providerless voice');
+      }
+      const voiceId = v.voiceId || defaultResolved.provider.getVoiceId(v.speaker, podcastId, voiceMetadata);
+      return { speaker: v.speaker, voiceId, providerId: defaultResolved.providerId, ttsModel: defaultResolved.provider.getModelId() };
     }),
   );
 
@@ -250,12 +261,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   const uniqueProviders = [...new Set(resolvedVoiceProviders.map(v => v.providerId))];
   const trackProvider = uniqueProviders.length === 1 ? uniqueProviders[0] : 'mixed';
 
-  // Derive track-level model — match from-scratch pattern:
-  // BYOK users: null (worker resolves dynamically with BYOK→platform fallback)
-  // Free/Pro: use configured auto-model (same as selectFreeTierProviders)
-  const trackModel = gate.isByokUser
-    ? (ttsModel || null)
-    : (ttsModel || selected?.ttsModel || autoModel?.ttsModel || null);
+  const uniqueModels = [...new Set(resolvedVoiceProviders.map(v => v.ttsModel).filter(Boolean))];
+  const trackModel = uniqueModels.length === 1 ? uniqueModels[0] : null;
 
   // Create voice track, voice assignments, and segments in a transaction
   const voiceTrack = await prisma.$transaction(async (tx) => {
