@@ -299,6 +299,27 @@ describe('private-first OSS surfaces', () => {
     expect(activityMetricSources).not.toContain('prisma.follow');
   });
 
+  it('keeps podcast analytics scoped to private listener activity', () => {
+    const podcastAnalyticsSources = [
+      'src/lib/podcast-analytics.ts',
+      'src/app/podcast/[podcastId]/analytics/page.tsx',
+      'src/app/api/podcasts/[podcastId]/analytics/route.ts',
+    ]
+      .map(readSource)
+      .join('\n');
+
+    expect(podcastAnalyticsSources).toContain('getPodcastPrivateActivity');
+    expect(podcastAnalyticsSources).toContain('Private Activity');
+    expect(podcastAnalyticsSources).not.toContain('getPodcastEngagement');
+    expect(podcastAnalyticsSources).not.toContain('likeCount');
+    expect(podcastAnalyticsSources).not.toContain('forkCount');
+    expect(podcastAnalyticsSources).not.toContain('commentCount');
+    expect(podcastAnalyticsSources).not.toContain('Upvotes');
+    expect(podcastAnalyticsSources).not.toContain("label: 'Likes'");
+    expect(podcastAnalyticsSources).not.toContain("label: 'Forks'");
+    expect(podcastAnalyticsSources).not.toContain("label: 'Comments'");
+  });
+
   it('does not ship mobile podcast social actions or widgets', () => {
     const removedMobileComponents = [
       'apps/mobile/components/ForkModal.tsx',
