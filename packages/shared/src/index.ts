@@ -25,8 +25,6 @@ export type {
 export type {
   PodcastSummary,
   PodcastDetail,
-  ForkedFromInfo,
-  ForkSummary,
   SegmentData,
   WordTiming,
   InteractionSummary,

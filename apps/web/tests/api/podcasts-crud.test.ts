@@ -9,7 +9,6 @@ const mockPodcastFindUnique = vi.fn();
 const mockPodcastUpdate = vi.fn();
 const mockPodcastUpdateMany = vi.fn();
 const mockPodcastDelete = vi.fn();
-const mockLikeFindUnique = vi.fn();
 const mockSaveFindUnique = vi.fn();
 const mockDiscoveryCreate = vi.fn();
 const mockCheckGenerationGate = vi.fn();
@@ -44,9 +43,6 @@ vi.mock('@/lib/prisma', () => {
       update: (...args: unknown[]) => mockPodcastUpdate(...args),
       updateMany: (...args: unknown[]) => mockPodcastUpdateMany(...args),
       delete: (...args: unknown[]) => mockPodcastDelete(...args),
-    },
-    like: {
-      findUnique: (...args: unknown[]) => mockLikeFindUnique(...args),
     },
     save: {
       findUnique: (...args: unknown[]) => mockSaveFindUnique(...args),
@@ -156,9 +152,6 @@ const mockPrisma = {
     updateMany: mockPodcastUpdateMany,
     delete: mockPodcastDelete,
   },
-  like: {
-    findUnique: mockLikeFindUnique,
-  },
   save: {
     findUnique: mockSaveFindUnique,
   },
@@ -214,8 +207,6 @@ const mockPodcast = {
   duration: 600,
   fileSize: 1024000,
   playCount: 42,
-  likeCount: 10,
-  forkCount: 2,
   saveCount: 5,
   forkedFromId: null,
   hostVoiceId: 'voice-host-1',
@@ -499,7 +490,7 @@ describe('GET /api/podcasts/[podcastId]', () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.id).toBe('pod-1');
-    expect(body.isLiked).toBe(false);
+    expect(body).not.toHaveProperty('isLiked');
     expect(body.isSaved).toBe(false);
   });
 
@@ -541,7 +532,6 @@ describe('GET /api/podcasts/[podcastId]', () => {
       ...mockPodcastWithRelations,
       visibility: 'PRIVATE',
     });
-    mockLikeFindUnique.mockResolvedValue(null);
     mockSaveFindUnique.mockResolvedValue(null);
 
     const request = createGetRequest('/api/podcasts/pod-1');
@@ -560,7 +550,6 @@ describe('GET /api/podcasts/[podcastId]', () => {
       ...mockPodcastWithRelations,
       visibility: 'UNLISTED',
     });
-    mockLikeFindUnique.mockResolvedValue(null);
     mockSaveFindUnique.mockResolvedValue(null);
 
     const request = createGetRequest('/api/podcasts/pod-1');
@@ -571,30 +560,9 @@ describe('GET /api/podcasts/[podcastId]', () => {
     expect(response.status).toBe(200);
   });
 
-  it('includes isLiked=true when user has liked the podcast', async () => {
-    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
-    mockPrisma.podcast.findUnique.mockResolvedValue(mockPodcastWithRelations);
-    mockLikeFindUnique.mockResolvedValue({
-      userId: 'user-1',
-      podcastId: 'pod-1',
-      createdAt: new Date(),
-    });
-    mockSaveFindUnique.mockResolvedValue(null);
-
-    const request = createGetRequest('/api/podcasts/pod-1');
-    const response = await getPodcast(request, {
-      params: Promise.resolve({ podcastId: 'pod-1' }),
-    });
-    const body = await response.json();
-
-    expect(body.isLiked).toBe(true);
-    expect(body.isSaved).toBe(false);
-  });
-
   it('includes isSaved=true when user has saved the podcast', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockPrisma.podcast.findUnique.mockResolvedValue(mockPodcastWithRelations);
-    mockLikeFindUnique.mockResolvedValue(null);
     mockSaveFindUnique.mockResolvedValue({
       userId: 'user-1',
       podcastId: 'pod-1',
@@ -607,7 +575,7 @@ describe('GET /api/podcasts/[podcastId]', () => {
     });
     const body = await response.json();
 
-    expect(body.isLiked).toBe(false);
+    expect(body).not.toHaveProperty('isLiked');
     expect(body.isSaved).toBe(true);
   });
 

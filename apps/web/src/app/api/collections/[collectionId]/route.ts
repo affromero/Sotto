@@ -32,12 +32,9 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
               audioUrl: true,
               duration: true,
               playCount: true,
-              likeCount: true,
-              forkCount: true,
               createdAt: true,
               source: true,
               isHumanContent: true,
-              forkedFromId: true,
               user: {
                 select: { id: true, name: true, handle: true, image: true },
               },

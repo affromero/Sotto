@@ -500,6 +500,40 @@ describe('private-first OSS surfaces', () => {
     expect(featureSources).not.toContain('forked: pct');
   });
 
+  it('keeps podcast summary contracts free of social payload fields', () => {
+    const summaryContractSources = [
+      'src/types/podcast.ts',
+      'src/types/CLAUDE.md',
+      'src/lib/podcast-select.ts',
+      'src/lib/podcast-data.ts',
+      'src/app/api/saved/route.ts',
+      'src/app/api/queue/route.ts',
+      'src/app/api/users/me/podcasts/route.ts',
+      'src/app/api/collections/[collectionId]/route.ts',
+      'src/app/collections/[collectionId]/page.tsx',
+      'src/app/api/inspire/all/route.ts',
+      'src/components/feed/DailyPicks.tsx',
+      'src/app/podcast/[podcastId]/page.tsx',
+      'src/app/(dashboard)/dashboard/MyPodcastsSection.tsx',
+    ]
+      .map(readSource)
+      .concat(readFileSync(resolve(repoRoot, 'packages/shared/src/types/podcast.ts'), 'utf8'))
+      .join('\n');
+    const podcastRouteSource = readSource('src/app/api/podcasts/[podcastId]/route.ts');
+
+    expect(summaryContractSources).toContain('saveCount');
+    expect(summaryContractSources).not.toContain('likeCount');
+    expect(summaryContractSources).not.toContain('forkCount');
+    expect(summaryContractSources).not.toContain('forkedFromId');
+    expect(summaryContractSources).not.toContain('forkedFrom');
+    expect(summaryContractSources).not.toContain('forks');
+    expect(summaryContractSources).not.toContain('remixNote');
+    expect(summaryContractSources).not.toContain('isLiked');
+    expect(summaryContractSources).not.toContain('commentCount');
+    expect(podcastRouteSource).not.toContain('isLiked');
+    expect(podcastRouteSource).not.toContain('prisma.like');
+  });
+
   it('does not ship mobile podcast social actions or widgets', () => {
     const removedMobileComponents = [
       'apps/mobile/components/ForkModal.tsx',

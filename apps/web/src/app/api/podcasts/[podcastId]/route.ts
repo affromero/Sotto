@@ -56,20 +56,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   }
 
   // Per-user fields fetched separately (cheap, not cached)
-  let isLiked = false;
   let isSaved = false;
 
   if (authResult) {
-    const [like, save] = await Promise.all([
-      prisma.like.findUnique({
-        where: { userId_podcastId: { userId: authResult.userId, podcastId } },
-      }),
-      prisma.save.findUnique({
-        where: { userId_podcastId: { userId: authResult.userId, podcastId } },
-      }),
-    ]);
-
-    isLiked = !!like;
+    const save = await prisma.save.findUnique({
+      where: { userId_podcastId: { userId: authResult.userId, podcastId } },
+    });
     isSaved = !!save;
   }
 
@@ -99,7 +91,6 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     ...podcast,
     audioUrl: resolvedAudioUrl,
     segments: resolvedSegments,
-    isLiked,
     isSaved,
     ...(failureReason ? { failureReason } : {}),
   });

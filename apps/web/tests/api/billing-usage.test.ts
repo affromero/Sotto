@@ -115,7 +115,7 @@ describe('GET /api/billing/usage', () => {
       autoApproveScript: true,
       webSearchEnabled: false,
       maxQaInteractions: 3,
-      privateAllowed: false,
+      privateAllowed: true,
       priorityQueue: false,
       analyticsEnabled: false,
       voiceTracksEnabled: false,
@@ -133,7 +133,7 @@ describe('GET /api/billing/usage', () => {
     expect(body.byok.tts).toEqual([{ provider: 'elevenlabs', isValid: true }]);
     expect(body.freeTier.isByokUser).toBe(true);
     expect(body.limits.maxDurationMinutes).toBe(9999);
-    expect(body.limits.canMakePrivate).toBe(false);
+    expect(body.limits.canMakePrivate).toBe(true);
   });
 
   it('returns reduced limits for free tier user', async () => {
@@ -152,7 +152,7 @@ describe('GET /api/billing/usage', () => {
       autoApproveScript: true,
       webSearchEnabled: false,
       maxQaInteractions: 3,
-      privateAllowed: false,
+      privateAllowed: true,
       priorityQueue: false,
       analyticsEnabled: false,
       voiceTracksEnabled: false,
@@ -165,7 +165,7 @@ describe('GET /api/billing/usage', () => {
 
     expect(response.status).toBe(200);
     expect(body.limits.maxDurationMinutes).toBe(5);
-    expect(body.limits.canMakePrivate).toBe(false);
+    expect(body.limits.canMakePrivate).toBe(true);
   });
 
   it('returns 500 when an error occurs', async () => {

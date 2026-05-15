@@ -95,7 +95,6 @@ export async function MyPodcastsSection({ userId, userRole }: MyPodcastsSectionP
       sourcePlatform: true,
       isHumanContent: true,
       visibility: true,
-      forkedFromId: true,
       failureReason: true,
       user: {
         select: { id: true, name: true, image: true, handle: true, role: true },
