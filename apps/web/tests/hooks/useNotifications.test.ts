@@ -24,9 +24,9 @@ const mockNotifications: NotificationData[] = [
   },
   {
     id: 'notif-3',
-    type: 'PODCAST_LIKED',
-    title: 'Someone liked your podcast',
-    message: 'Jane liked "AI Ethics"',
+    type: 'SCRIPT_READY',
+    title: 'Script ready',
+    message: 'AI Ethics is ready for review',
     read: false,
     data: { podcastId: 'podcast-2' },
     createdAt: '2024-01-01T02:00:00Z',

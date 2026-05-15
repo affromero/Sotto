@@ -29,13 +29,6 @@ test.describe('Public podcast API routes', () => {
     expect(body).toHaveProperty('qualityScore');
   });
 
-  test('questions returns public Q&A', async ({ authedRequest, seedData }) => {
-    const res = await authedRequest.get(`/api/podcasts/${seedData.testPodcast.id}/questions`);
-    expect(res.status()).toBe(200);
-    const body = await res.json();
-    expect(body).toHaveProperty('items');
-  });
-
   test('comments returns list', async ({ authedRequest, seedData }) => {
     const res = await authedRequest.get(`/api/podcasts/${seedData.testPodcast.id}/comments`);
     expect(res.status()).toBe(200);

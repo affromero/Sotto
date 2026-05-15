@@ -44,8 +44,6 @@ export function getNotificationUrl(notification: NotificationData): string | nul
     case 'TWITTER_PODCAST_READY':
     case 'TELEGRAM_PODCAST_READY':
     case 'PODCAST_FAILED':
-    case 'PODCAST_LIKED':
-    case 'PODCAST_FORKED':
     case 'SCRIPT_READY':
     case 'VIDEO_READY':
     case 'VIDEO_FAILED':
@@ -54,10 +52,7 @@ export function getNotificationUrl(notification: NotificationData): string | nul
     case 'MUSIC_FAILED':
     case 'AVATAR_FAILED':
     case 'VOICE_TRACK_FAILED':
-    case 'COMMENT_ON_YOUR_PODCAST':
-    case 'COMMENT_REPLY':
     case 'QUESTION_ON_YOUR_PODCAST':
-    case 'QUESTION_UPVOTED':
     case 'CLAIM_REPORT_ON_YOUR_PODCAST':
     case 'RENDITION_PROPOSED':
     case 'RENDITION_ACCEPTED':

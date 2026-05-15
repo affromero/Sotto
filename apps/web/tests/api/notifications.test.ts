@@ -82,10 +82,10 @@ const mockNotification2 = {
 const mockNotification3 = {
   id: 'notif-3',
   userId: 'user-1',
-  type: 'PODCAST_LIKED',
-  title: 'Podcast liked',
-  message: 'Charlie liked your podcast "ML Basics"',
-  data: { podcastId: 'pod-2', userId: 'user-3' },
+  type: 'SCRIPT_READY',
+  title: 'Script ready',
+  message: 'Your script is ready for review',
+  data: { podcastId: 'pod-2' },
   read: false,
   createdAt: new Date('2025-01-13T10:00:00Z'),
 };
