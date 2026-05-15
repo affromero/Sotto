@@ -16,7 +16,6 @@ export async function findSimilarPodcasts(params: {
     title: string;
     topic: string;
     playCount: number;
-    likeCount: number;
     duration: number | null;
     user: { id: string; name: string | null; image: string | null };
   }>
@@ -43,7 +42,6 @@ export async function findSimilarPodcasts(params: {
           title: true,
           topic: true,
           playCount: true,
-          likeCount: true,
           duration: true,
           user: { select: { id: true, name: true, image: true } },
         },
@@ -84,13 +82,12 @@ export async function findSimilarPodcasts(params: {
       title: true,
       topic: true,
       playCount: true,
-      likeCount: true,
       duration: true,
       user: {
         select: { id: true, name: true, image: true },
       },
     },
-    orderBy: [{ playCount: 'desc' }, { likeCount: 'desc' }],
+    orderBy: [{ playCount: 'desc' }, { saveCount: 'desc' }, { createdAt: 'desc' }],
     take: limit,
   });
 
