@@ -50,10 +50,15 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
       });
 
       // Queue stitch with stable jobId (idempotent — BullMQ deduplicates)
-      await addJob(audioStitchingQueue, JobType.STITCH_AUDIO, {
-        podcastId,
-        segmentIds: segments.map((s) => s.id),
-      }, { jobId: `stitch-${podcastId}-${Date.now()}` });
+      await addJob(
+        audioStitchingQueue,
+        JobType.STITCH_AUDIO,
+        {
+          podcastId,
+          segmentIds: segments.map((s) => s.id),
+        },
+        { jobId: `stitch-${podcastId}-${Date.now()}` }
+      );
 
       // CAS status transition — only one worker wins
       const cas = await prisma.podcast.updateMany({
@@ -113,7 +118,8 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
         .join(' ');
       if (directions) {
         const casualPatterns = /excited|enthusiastic|laughing|playful|humorous|energetic|fun/;
-        const professionalPatterns = /serious|academic|formal|whispering|soft|calm|measured|thoughtful/;
+        const professionalPatterns =
+          /serious|academic|formal|whispering|soft|calm|measured|thoughtful/;
         const casualCount = (directions.match(casualPatterns) || []).length;
         const professionalCount = (directions.match(professionalPatterns) || []).length;
         if (casualCount > 0 || professionalCount > 0) {
@@ -133,11 +139,18 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
     // ---- Per-segment TTS override (admin showcase builder) ----
     const segProviderId = existingSegment.ttsProvider as TtsProviderId;
     const platformKey = getPlatformTtsKey(segProviderId);
-    provider = await createTtsProviderAsync(segProviderId, platformKey, undefined, existingSegment.ttsModel ?? undefined);
+    provider = await createTtsProviderAsync(
+      segProviderId,
+      platformKey,
+      undefined,
+      existingSegment.ttsModel ?? undefined
+    );
     providerId = segProviderId;
     source = 'platform';
 
-    voiceId = existingSegment.ttsVoiceId ?? provider.getVoiceId(speaker, podcastId, voiceMetadata, podcast.language ?? undefined);
+    voiceId =
+      existingSegment.ttsVoiceId ??
+      provider.getVoiceId(speaker, podcastId, voiceMetadata, podcast.language ?? undefined);
 
     // Persist resolved voice for consistency
     try {
@@ -148,15 +161,23 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
       });
     } catch (err) {
       logger.warn('Failed to persist voice assignment', {
-        podcastId, speaker, error: err instanceof Error ? err.message : String(err),
+        podcastId,
+        speaker,
+        error: err instanceof Error ? err.message : String(err),
       });
     }
   } else {
     // ---- Standard flow: resolve provider at podcast level ----
+    if (!podcast.ttsProvider) {
+      throw new Error(
+        `Podcast ${podcastId} is missing a TTS provider. Select a provider before generating audio.`
+      );
+    }
+
     const resolved = await resolveTtsProvider({
       userId: podcast.userId,
       podcastId,
-      requestedProvider: (podcast.ttsProvider as TtsProviderId | null) ?? undefined,
+      requestedProvider: podcast.ttsProvider as TtsProviderId,
       requestedModel: podcast.ttsModel,
       plan: podcast.user.plan as 'FREE' | 'PRO',
       language: podcast.language,
@@ -169,19 +190,25 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
 
     // Write back resolved provider and model if not already set
     if (!podcast.ttsProvider || !podcast.ttsModel) {
-      await prisma.podcast.update({
-        where: { id: podcastId },
-        data: { ttsProvider: providerId, ttsModel: ttsModelId },
-      }).catch((err) => {
-        logger.warn('Failed to write back TTS provider to podcast', { podcastId, error: err instanceof Error ? err.message : String(err) });
-      });
+      await prisma.podcast
+        .update({
+          where: { id: podcastId },
+          data: { ttsProvider: providerId, ttsModel: ttsModelId },
+        })
+        .catch((err) => {
+          logger.warn('Failed to write back TTS provider to podcast', {
+            podcastId,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        });
     }
 
     // Use custom voice ID if set and provider matches, otherwise let the provider pick from its pool
-    const podcastVoice = podcast.voices.find(v => v.speaker === speaker);
-    voiceId = (podcastVoice?.voiceId && podcastVoice.provider === providerId)
-      ? podcastVoice.voiceId
-      : provider.getVoiceId(speaker, podcastId, voiceMetadata, podcast.language ?? undefined);
+    const podcastVoice = podcast.voices.find((v) => v.speaker === speaker);
+    voiceId =
+      podcastVoice?.voiceId && podcastVoice.provider === providerId
+        ? podcastVoice.voiceId
+        : provider.getVoiceId(speaker, podcastId, voiceMetadata, podcast.language ?? undefined);
 
     // Persist resolved voice for retry consistency and analytics
     if (!podcastVoice || podcastVoice.provider !== providerId || podcastVoice.voiceId !== voiceId) {
@@ -193,7 +220,9 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
         });
       } catch (err) {
         logger.warn('Failed to persist voice assignment', {
-          podcastId, speaker, error: err instanceof Error ? err.message : String(err),
+          podcastId,
+          speaker,
+          error: err instanceof Error ? err.message : String(err),
         });
       }
     }
@@ -262,10 +291,15 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
     });
 
     // Queue stitch with stable jobId (idempotent — BullMQ deduplicates)
-    await addJob(audioStitchingQueue, JobType.STITCH_AUDIO, {
-      podcastId,
-      segmentIds: segments.map((s) => s.id),
-    }, { jobId: `stitch-${podcastId}-${Date.now()}` });
+    await addJob(
+      audioStitchingQueue,
+      JobType.STITCH_AUDIO,
+      {
+        podcastId,
+        segmentIds: segments.map((s) => s.id),
+      },
+      { jobId: `stitch-${podcastId}-${Date.now()}` }
+    );
 
     // CAS status transition — only one worker wins
     const cas = await prisma.podcast.updateMany({
@@ -281,5 +315,9 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
   }
 
   await job.updateProgress(100);
-  logger.info('Audio generation complete for segment', { podcastId, segmentId, service: result.service });
+  logger.info('Audio generation complete for segment', {
+    podcastId,
+    segmentId,
+    service: result.service,
+  });
 }
