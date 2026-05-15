@@ -102,7 +102,7 @@ async function main() {
     console.log(`Crypto podcast:    ${cryptoPodcast.id}`);
     console.log(`ScriptReady:       ${scriptReadyPodcast.id}\n`);
 
-    // Find a non-owner user for fork flow
+    // Find a second user for viewer-session recordings
     const viewerUser = await prisma.user.findUnique({ where: { email: 'maria.chen@example.com' } });
     if (!viewerUser) throw new Error('Viewer user (Maria Chen) not found — run seed:demo first');
 

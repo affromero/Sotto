@@ -295,6 +295,31 @@ describe('private-first OSS surfaces', () => {
     expect(notificationSources).not.toContain('COMMENT_REPLY');
   });
 
+  it('keeps demo and automation harnesses private-first', () => {
+    const harnessSources = [
+      'e2e/llmock/setup.ts',
+      'e2e/playwright/tests/podcast-player.spec.ts',
+      'scripts/launch-video/SYSTEM_PROMPT.md',
+      'scripts/launch-video/AUTHORING_GUIDE.md',
+      'scripts/recording/index.ts',
+      'scripts/ml/prepare-quality-training.ts',
+      'apps/web/src/app/changelog/page.tsx',
+      'apps/web/src/app/onboarding/KeySetupForm.tsx',
+      'apps/web/src/lib/CLAUDE.md',
+      'apps/web/src/lib/auth-guards.ts',
+      'apps/web/src/lib/demo-context.ts',
+    ]
+      .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
+      .join('\n');
+
+    expect(harnessSources).not.toMatch(/\bfork\b/i);
+    expect(harnessSources).not.toMatch(/\bremix\b/i);
+    expect(harnessSources).not.toContain('social feed');
+    expect(harnessSources).not.toContain('explore the feed');
+    expect(harnessSources).not.toContain('likeToListenRatio');
+    expect(harnessSources).not.toContain('forkToListenRatio');
+  });
+
   it('keeps Twitter auto-tweet thresholds scoped to private playback', () => {
     const twitterThresholdSources = [
       'src/lib/twitter-auto-tweet.ts',

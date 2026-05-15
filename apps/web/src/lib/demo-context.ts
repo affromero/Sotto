@@ -9,7 +9,7 @@ const FEATURE_CATALOG: Record<string, string> = {
   import:
     'Import any human-made podcast. Sotto transcribes it and turns it into a private, searchable listening workspace.',
   'private-rss':
-    'Create private RSS feed URLs for podcast apps without exposing podcasts to a public social feed.',
+    'Create private RSS feed URLs for podcast apps without exposing podcasts to public listings.',
   byok: 'Bring Your Own Keys — use your own API keys for LLM and TTS providers. All features become unlimited and free. No subscription required.',
   'voice-cloning':
     'Clone your voice and use it in podcasts. Other creators can request to use your voice, and you set the price. A voice marketplace.',

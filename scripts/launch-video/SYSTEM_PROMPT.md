@@ -67,7 +67,7 @@ interface LaunchVideoScene {
 { "type": "screenshot", "label": "debug" }
 ```
 
-Available interceptors: `discovery`, `interact`, `fork`, `scriptApprove`, `avatar`
+Available interceptors: `discovery`, `interact`, `scriptApprove`, `avatar`
 
 ### Selectors
 
