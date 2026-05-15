@@ -41,14 +41,6 @@ export interface PodcastDetail extends Podcast {
   isSaved?: boolean;
 }
 
-export interface FeedResponse {
-  podcasts: Podcast[];
-  total: number;
-  page?: number;
-  limit?: number;
-  hasMore?: boolean;
-}
-
 export interface UserProfile {
   id: string;
   name: string | null;
@@ -71,25 +63,6 @@ export interface CreatePodcastParams {
   duration_minutes?: number;
   focus_areas?: string;
   source_url?: string;
-}
-
-export interface FeedParams {
-  search?: string;
-  sort?: string;
-  tag?: string;
-  depth?: string;
-  audience?: string;
-  tone?: string;
-  page?: number;
-  limit?: number;
-}
-
-export interface ForkParams {
-  topic?: string;
-  remix_note?: string;
-  focus_areas?: string;
-  depth?: string;
-  tone?: string;
 }
 
 export interface UpdatePodcastParams {

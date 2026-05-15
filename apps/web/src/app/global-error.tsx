@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import * as Sentry from '@sentry/nextjs';
+import Link from 'next/link';
 import styles from './global-error.module.css';
 
 export default function GlobalError({
@@ -31,16 +32,15 @@ export default function GlobalError({
           </div>
           <h1 className={styles.title}>Something went wrong</h1>
           <p className={styles.description}>
-            An unexpected error occurred. You can try again or head back to the
-            feed.
+            An unexpected error occurred. You can try again or head home.
           </p>
           <div className={styles.actions}>
             <button className={styles.retry} onClick={reset}>
               Try Again
             </button>
-            <a href="/feed" className={styles.back}>
-              Back to Feed
-            </a>
+            <Link href="/" className={styles.back}>
+              Go Home
+            </Link>
           </div>
         </main>
       </body>

@@ -40,10 +40,7 @@ export function buildAnnouncementEmail(
 
 function generateUnsubscribeUrl(email: string): string {
   const secret = process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET || '';
-  const signature = crypto
-    .createHmac('sha256', secret)
-    .update(email)
-    .digest('hex');
+  const signature = crypto.createHmac('sha256', secret).update(email).digest('hex');
   return `${APP_URL}/api/waitlist/unsubscribe?email=${encodeURIComponent(email)}&sig=${signature}`;
 }
 
@@ -74,7 +71,7 @@ function footer(email: string): string {
 
 export function buildWaitlistWelcomeEmail(email: string): { subject: string; html: string } {
   return {
-    subject: 'Welcome to Sotto — you\'re on the list',
+    subject: "Welcome to Sotto — you're on the list",
     html: `${HEADER}
       <div style="padding:16px 32px 32px;">
         <h2 style="font-family:'DM Serif Display',Georgia,serif; font-size:20px; color:#1A1A1A; margin:0 0 12px;">
@@ -88,8 +85,8 @@ export function buildWaitlistWelcomeEmail(email: string): { subject: string; htm
           We&apos;ll send you updates as we launch new features. In the meantime, check out
           what&apos;s already live.
         </p>
-        <a href="${APP_URL}/feed" style="display:inline-block; background:#D97706; color:#fff; font-size:14px; font-weight:600; padding:10px 24px; border-radius:8px; text-decoration:none;">
-          Explore Sotto
+        <a href="${APP_URL}/create" style="display:inline-block; background:#D97706; color:#fff; font-size:14px; font-weight:600; padding:10px 24px; border-radius:8px; text-decoration:none;">
+          Create a Private Podcast
         </a>
       </div>
     ${footer(email)}`,
@@ -236,8 +233,8 @@ export function buildWeeklyDigestEmail(
           </tbody>
         </table>
         <div style="margin-top:24px;">
-          <a href="${APP_URL}/feed?utm_source=digest&utm_medium=email&utm_campaign=weekly" style="display:inline-block; background:#D97706; color:#fff; font-size:14px; font-weight:600; padding:10px 24px; border-radius:8px; text-decoration:none;">
-            Browse All
+          <a href="${APP_URL}/dashboard?utm_source=digest&utm_medium=email&utm_campaign=weekly" style="display:inline-block; background:#D97706; color:#fff; font-size:14px; font-weight:600; padding:10px 24px; border-radius:8px; text-decoration:none;">
+            Open Dashboard
           </a>
         </div>
       </div>

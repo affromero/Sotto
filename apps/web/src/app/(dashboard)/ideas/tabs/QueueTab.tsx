@@ -51,11 +51,9 @@ export function QueueTab({ items: initialItems }: QueueTabProps) {
       <div className={styles.emptyState}>
         <ListMusic size={48} className={styles.emptyIcon} aria-hidden="true" />
         <h3 className={styles.emptyTitle}>Your queue is empty</h3>
-        <p className={styles.emptyText}>
-          Add podcasts from any podcast page to listen later.
-        </p>
-        <Link href="/feed" className={styles.emptyLink}>
-          Browse the feed
+        <p className={styles.emptyText}>Add podcasts from any podcast page to listen later.</p>
+        <Link href="/create" className={styles.emptyLink}>
+          Create a podcast
         </Link>
       </div>
     );
@@ -74,9 +72,7 @@ export function QueueTab({ items: initialItems }: QueueTabProps) {
                 <span className={styles.itemTopic}>{item.podcast.topic}</span>
               </Link>
               <div className={styles.itemMeta}>
-                <span className={styles.itemCreator}>
-                  {item.podcast.user.name || 'Anonymous'}
-                </span>
+                <span className={styles.itemCreator}>{item.podcast.user.name || 'Anonymous'}</span>
                 {duration && <span className={styles.itemDuration}>{duration}</span>}
               </div>
             </div>

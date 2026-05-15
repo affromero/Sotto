@@ -19,7 +19,12 @@ interface KeySetupFormProps {
   ttsProviderMeta?: TtsProviderClientMeta[];
 }
 
-export function KeySetupForm({ initialAiConfigured, initialTtsConfigured, aiProviderMeta = [], ttsProviderMeta = [] }: KeySetupFormProps) {
+export function KeySetupForm({
+  initialAiConfigured,
+  initialTtsConfigured,
+  aiProviderMeta = [],
+  ttsProviderMeta = [],
+}: KeySetupFormProps) {
   const router = useRouter();
 
   const handleContinue = () => {
@@ -27,7 +32,7 @@ export function KeySetupForm({ initialAiConfigured, initialTtsConfigured, aiProv
   };
 
   const handleSkip = () => {
-    router.push('/feed');
+    router.push('/dashboard');
   };
 
   return (
@@ -50,9 +55,9 @@ export function KeySetupForm({ initialAiConfigured, initialTtsConfigured, aiProv
           <line x1="12" y1="8" x2="12.01" y2="8" />
         </svg>
         <p className={styles.tipText}>
-          <span className={styles.tipHighlight}>AI is free for everyone</span>
-          {' '}&mdash; add a voice provider key to remove the daily generation cap. BYOK gives you
-          unlimited generation and model choice. Pro adds private podcasts, analytics, and more.
+          <span className={styles.tipHighlight}>AI is free for everyone</span> &mdash; add a voice
+          provider key to remove the daily generation cap. BYOK gives you unlimited generation and
+          model choice. Pro adds private podcasts, analytics, and more.
         </p>
       </div>
 
@@ -63,8 +68,8 @@ export function KeySetupForm({ initialAiConfigured, initialTtsConfigured, aiProv
             <span className={styles.sectionBadgeFree}>Free &mdash; included</span>
           </div>
           <p className={styles.sectionDescription}>
-            AI is free for all users. Sotto handles script writing and Q&amp;A at no cost. Optionally
-            add your own key for faster models.
+            AI is free for all users. Sotto handles script writing and Q&amp;A at no cost.
+            Optionally add your own key for faster models.
           </p>
         </div>
         <AiProviderCards initialConfigured={initialAiConfigured} providerMeta={aiProviderMeta} />
@@ -87,11 +92,7 @@ export function KeySetupForm({ initialAiConfigured, initialTtsConfigured, aiProv
       </section>
 
       <div className={styles.actions}>
-        <button
-          type="button"
-          className={styles.continueButton}
-          onClick={handleContinue}
-        >
+        <button type="button" className={styles.continueButton} onClick={handleContinue}>
           Continue
           <svg
             width="18"
@@ -108,11 +109,7 @@ export function KeySetupForm({ initialAiConfigured, initialTtsConfigured, aiProv
             <polyline points="12 5 19 12 12 19" />
           </svg>
         </button>
-        <button
-          type="button"
-          className={styles.skipLink}
-          onClick={handleSkip}
-        >
+        <button type="button" className={styles.skipLink} onClick={handleSkip}>
           Maybe later &mdash; explore the feed first
         </button>
       </div>

@@ -9,7 +9,6 @@ Shared types used across the application. These mirror Prisma models but are sha
 | `podcast.ts`      | PodcastSummary, PodcastDetail (includes `references`, `pdfUrl`, `forkedFrom`, `forks`, `remixNote`, `versions`, `ttsProvider`), SegmentData, CreatePodcastRequest |
 | `player.ts`       | PlayerState, PlayerControls                                                                                                                                       |
 | `interaction.ts`  | InteractionRequest, InteractionResponse, ResolutionChoice                                                                                                         |
-| `feed.ts`         | FeedResponse, FeedSort (includes `most_forked`), FeedFilters (includes remixes mode)                                                                              |
 | `discovery.ts`    | DiscoveryMessage, DiscoveryMetadata, DiscoveryState                                                                                                               |
 | `notification.ts` | NotificationData, PushSubscriptionData                                                                                                                            |
 | `reference.ts`    | ReferenceData (id, number, title, authors, year, url, type, publisher, doi)                                                                                       |
@@ -20,7 +19,7 @@ Shared types used across the application. These mirror Prisma models but are sha
 | `events.ts`       | EventPayload (discriminated union of 23 event types), EventContext, BehavioralEventInput                                                                          |
 | `version.ts`      | PodcastVersionData, PodcastVersionSegmentData                                                                                                                     |
 | `import.ts`       | ImportPodcastRequest, ImportProgress, ImportStatus                                                                                                                |
-| `telegram.ts`     | TelegramParseResult, TelegramUpdate, TelegramMessageData, Telegram API payload types                                                            |
+| `telegram.ts`     | TelegramParseResult, TelegramUpdate, TelegramMessageData, Telegram API payload types                                                                              |
 | `pitch.ts`        | PitchVersion, PitchAsset types                                                                                                                                    |
 | `next-auth.d.ts`  | NextAuth module augmentation: adds `role: UserRole` to Session.user, User, JWT                                                                                    |
 
@@ -36,6 +35,7 @@ export type { DiscoveryMessage, DiscoveryMetadata, DiscoveryState } from '@sotto
 This means `@/types/*` imports throughout the web app don't change.
 
 **Exceptions** — these files still import from `@prisma/client` directly:
+
 - `podcast.ts` — uses `PodcastStatus`, `PodcastVisibility`, `PodcastSource`, `Speaker`
 - `reference.ts` — uses `ReferenceType`, `VerificationStatus`
 - `twitter.ts` — uses `TweetMentionStatus`

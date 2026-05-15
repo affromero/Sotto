@@ -7,9 +7,20 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = 'https://sotto.fm';
 
   const staticPages = [
-    '', '/feed', '/voices', '/about', '/join', '/terms',
-    '/privacy', '/changelog', '/developers', '/support', '/pricing', '/feedback',
-    '/languages', '/briefings', '/quizzes',
+    '',
+    '/voices',
+    '/about',
+    '/join',
+    '/terms',
+    '/privacy',
+    '/changelog',
+    '/developers',
+    '/support',
+    '/pricing',
+    '/feedback',
+    '/languages',
+    '/briefings',
+    '/quizzes',
   ].map((path) => ({
     url: `${baseUrl}${path}`,
     lastModified: new Date(),
@@ -26,9 +37,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     });
 
     const podcastPages = podcasts.map((p) => ({
-      url: p.slug && p.user.handle
-        ? `${baseUrl}/@${p.user.handle}/${p.slug}`
-        : `${baseUrl}/podcast/${p.id}`,
+      url:
+        p.slug && p.user.handle
+          ? `${baseUrl}/@${p.user.handle}/${p.slug}`
+          : `${baseUrl}/podcast/${p.id}`,
       lastModified: p.updatedAt,
       changeFrequency: 'monthly' as const,
       priority: 0.6,

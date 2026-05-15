@@ -1,6 +1,6 @@
 # @sotto/mcp
 
-MCP server for [Sotto](https://sotto.fm) — every voice, every topic, one feed. Create, manage, and discover AI podcasts from any MCP-compatible client (Claude Desktop, Claude Code, Cursor).
+MCP server for [Sotto](https://sotto.fm). Create and manage private AI podcasts from any MCP-compatible client (Claude Desktop, Claude Code, Cursor).
 
 ## Setup
 
@@ -67,30 +67,28 @@ Point at your local dev server:
 
 ## Environment Variables
 
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `SOTTO_API_KEY` | Yes | — | Your `sk_sotto_...` API key |
-| `SOTTO_API_URL` | No | `https://sotto.fm` | API base URL (for local dev) |
+| Variable        | Required | Default            | Description                  |
+| --------------- | -------- | ------------------ | ---------------------------- |
+| `SOTTO_API_KEY` | Yes      | —                  | Your `sk_sotto_...` API key  |
+| `SOTTO_API_URL` | No       | `https://sotto.fm` | API base URL (for local dev) |
 
 ## Tools
 
-| Tool | Description |
-|------|-------------|
-| `create_podcast` | Create an AI podcast from a topic |
-| `get_podcast` | Get podcast details + generation status |
-| `list_podcasts` | List your podcasts |
-| `browse_feed` | Search/filter the public podcast feed |
-| `fork_podcast` | Remix a public podcast with your angle |
-| `update_podcast` | Update title, topic, or visibility |
-| `delete_podcast` | Delete a podcast |
-| `get_me` | Get your Sotto profile |
+| Tool             | Description                             |
+| ---------------- | --------------------------------------- |
+| `create_podcast` | Create an AI podcast from a topic       |
+| `get_podcast`    | Get podcast details + generation status |
+| `list_podcasts`  | List your podcasts                      |
+| `update_podcast` | Update title, topic, or visibility      |
+| `delete_podcast` | Delete a podcast                        |
+| `get_me`         | Get your Sotto profile                  |
 
 ## Resources
 
-| Resource | URI | Description |
-|----------|-----|-------------|
-| Podcast | `sotto://podcasts/{id}` | Podcast detail (with list for discovery) |
-| Profile | `sotto://me` | Your profile |
+| Resource | URI                     | Description                              |
+| -------- | ----------------------- | ---------------------------------------- |
+| Podcast  | `sotto://podcasts/{id}` | Podcast detail (with list for discovery) |
+| Profile  | `sotto://me`            | Your profile                             |
 
 ## Development
 

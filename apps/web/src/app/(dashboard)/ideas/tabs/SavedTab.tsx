@@ -32,11 +32,9 @@ export function SavedTab({ podcasts: initialPodcasts }: SavedTabProps) {
       <div className={styles.emptyState}>
         <Bookmark size={48} className={styles.emptyIcon} aria-hidden="true" />
         <h3 className={styles.emptyTitle}>No saved podcasts</h3>
-        <p className={styles.emptyText}>
-          Save podcasts from any podcast page to find them here.
-        </p>
-        <Link href="/feed" className={styles.emptyLink}>
-          Discover podcasts
+        <p className={styles.emptyText}>Save podcasts from any podcast page to find them here.</p>
+        <Link href="/create" className={styles.emptyLink}>
+          Create a podcast
         </Link>
       </div>
     );

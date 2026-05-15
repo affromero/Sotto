@@ -20,7 +20,9 @@ export async function generateMetadata({ params }: CollectionPageProps): Promise
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://sotto.fm';
   const title = `${collection.name} — Sotto Collection`;
-  const description = collection.description || `A curated podcast collection by ${collection.user.name || 'Anonymous'}`;
+  const description =
+    collection.description ||
+    `A curated podcast collection by ${collection.user.name || 'Anonymous'}`;
   const canonicalUrl = `${appUrl}/collections/${collectionId}`;
 
   return {
@@ -132,7 +134,7 @@ export default async function CollectionPage({ params }: CollectionPageProps) {
     <main className={styles.main}>
       <div className={styles.container}>
         <nav className={styles.breadcrumb}>
-          <a href="/feed" className={styles.backLink}>
+          <a href="/dashboard" className={styles.backLink}>
             <svg
               width="16"
               height="16"
@@ -147,7 +149,7 @@ export default async function CollectionPage({ params }: CollectionPageProps) {
               <line x1="19" y1="12" x2="5" y2="12" />
               <polyline points="12 19 5 12 12 5" />
             </svg>
-            Feed
+            Dashboard
           </a>
         </nav>
 
