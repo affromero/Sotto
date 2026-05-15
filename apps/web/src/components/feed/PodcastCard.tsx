@@ -2,8 +2,7 @@
 
 import { useRef, useCallback, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { Play, Heart, GitFork } from 'lucide-react';
+import { Play } from 'lucide-react';
 import { OwnerOnlyBadge } from '@/components/ui/OwnerOnlyBadge';
 import { getContentBadgeLabel } from '@sotto/shared';
 import { useTrack } from '@/components/providers/EventProvider';
@@ -68,7 +67,6 @@ export function PodcastCard({
   searchQuery,
   observeRef,
 }: PodcastCardProps) {
-  const router = useRouter();
   const track = useTrack();
   const { user } = useAuth();
   const isOwner = user?.id === podcast.user.id;
@@ -120,11 +118,6 @@ export function PodcastCard({
       >
         <div className={styles.cover}>
           <div className={styles.coverContent}>
-            {podcast.forkedFromId && (
-              <p className={styles.remixSubline}>
-                Remix of {podcast.forkedFrom?.title || 'another podcast'}
-              </p>
-            )}
             <h3 className={styles.title}>{podcast.title}</h3>
             <p className={styles.topic}>{podcast.topic}</p>
           </div>
@@ -166,14 +159,6 @@ export function PodcastCard({
                   <Play size={10} aria-hidden="true" />
                   {formatCount(podcast.playCount)}
                 </span>
-                <span className={styles.coverStat} aria-label={`${podcast.likeCount} likes`}>
-                  <Heart size={10} aria-hidden="true" />
-                  {formatCount(podcast.likeCount)}
-                </span>
-                <span className={styles.coverStat} aria-label={`${podcast.forkCount} forks`}>
-                  <GitFork size={10} aria-hidden="true" />
-                  {formatCount(podcast.forkCount)}
-                </span>
                 <OwnerOnlyBadge className={styles.coverStatBadge} />
               </div>
             )}
@@ -195,20 +180,6 @@ export function PodcastCard({
           <Play size={18} aria-hidden="true" />
         </button>
       )}
-
-      <button
-        className={styles.forkButton}
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          router.push(`${podcastUrl(podcast, podcast.user.handle)}?fork=1`);
-        }}
-        aria-label={`Fork ${podcast.title}`}
-        type="button"
-      >
-        <GitFork size={14} strokeWidth={2.5} aria-hidden="true" />
-        <span>Fork</span>
-      </button>
     </article>
   );
 }

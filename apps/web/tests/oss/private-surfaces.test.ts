@@ -199,6 +199,13 @@ describe('private-first OSS surfaces', () => {
       'src/components/player/ProposeRenditionButton.tsx',
     ];
     const playerSource = readSource('src/app/podcast/[podcastId]/PodcastPlayerView.tsx');
+    const podcastCardSource = [
+      'src/components/feed/PodcastCard.tsx',
+      'src/components/feed/PodcastCard.module.css',
+      'src/components/landing/chapters/AudioClipPlayer.tsx',
+    ]
+      .map(readSource)
+      .join('\n');
 
     for (const route of removedRoutes) {
       expect(existsSync(resolve(webRoot, route)), route).toBe(false);
@@ -210,6 +217,12 @@ describe('private-first OSS surfaces', () => {
     expect(playerSource).not.toContain('/fork');
     expect(playerSource).not.toContain('/comments');
     expect(playerSource).not.toContain('ShareMenu');
+    expect(podcastCardSource).not.toContain('router.push');
+    expect(podcastCardSource).not.toContain('?fork=1');
+    expect(podcastCardSource).not.toContain('forkButton');
+    expect(podcastCardSource).not.toContain('Remix of');
+    expect(podcastCardSource).not.toContain('likeCount');
+    expect(podcastCardSource).not.toContain('forkCount');
   });
 
   it('does not keep social notification types or public Q&A voting tests', () => {
@@ -227,7 +240,11 @@ describe('private-first OSS surfaces', () => {
       .join('\n');
     const removedTests = [
       'apps/web/tests/api/podcasts-questions.test.ts',
+      'e2e/playwright/tests/api/podcast-social.api.spec.ts',
       'e2e/playwright/tests/api/feed-social.api.spec.ts',
+      'e2e/playwright/tests/api/users-public.api.spec.ts',
+      'e2e/playwright/tests/fork.spec.ts',
+      'scripts/recording/flows/04-fork-flow.ts',
     ];
 
     for (const testPath of removedTests) {
