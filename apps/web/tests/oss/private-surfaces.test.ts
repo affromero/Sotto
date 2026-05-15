@@ -114,6 +114,29 @@ describe('private-first OSS surfaces', () => {
     expect(existsSync(resolve(webRoot, 'src/types/feed.ts'))).toBe(false);
   });
 
+  it('does not ship the standalone social feed ranking workspace', () => {
+    const workspaceSources = [
+      'package.json',
+      'package-lock.json',
+      'apps/web/package.json',
+      'apps/web/next.config.js',
+      'apps/web/Dockerfile',
+      'apps/web/Dockerfile.workers',
+      'apps/web/src/lib/recommendation-engine.ts',
+      'apps/web/src/lib/providers/ml.ts',
+      'apps/web/src/workers/feature-computation.worker.ts',
+      'apps/web/src/lib/CLAUDE.md',
+    ]
+      .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
+      .join('\n');
+
+    expect(existsSync(resolve(repoRoot, 'packages/feed'))).toBe(false);
+    expect(workspaceSources).not.toContain('@sottofm/feed');
+    expect(workspaceSources).not.toContain('packages/feed');
+    expect(workspaceSources).not.toContain('From Your People');
+    expect(workspaceSources).not.toContain('followedCreatorIds');
+  });
+
   it('does not ship podcast social action routes or player widgets', () => {
     const removedRoutes = [
       'src/app/api/podcasts/[podcastId]/fork/route.ts',

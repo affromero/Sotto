@@ -15,7 +15,6 @@ COPY packages/shared/package.json ./packages/shared/
 COPY packages/video/package.json ./packages/video/
 COPY packages/verification-standard/package.json ./packages/verification-standard/
 COPY packages/maps/package.json ./packages/maps/
-COPY packages/feed/package.json ./packages/feed/
 COPY apps/web/prisma ./apps/web/prisma/
 
 RUN --mount=type=cache,target=/root/.npm npm ci --ignore-scripts
@@ -31,7 +30,6 @@ COPY packages/shared ./packages/shared/
 COPY packages/video ./packages/video/
 COPY packages/verification-standard ./packages/verification-standard/
 COPY packages/maps ./packages/maps/
-COPY packages/feed ./packages/feed/
 COPY apps/web ./apps/web/
 COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
 COPY tsconfig.base.json ./

@@ -4,6 +4,3 @@
 [submodule "packages/maps"]
 	path = packages/maps
 	url = https://github.com/SottoFM/maps.git
-[submodule "packages/feed"]
-	path = packages/feed
-	url = https://github.com/SottoFM/feed.git

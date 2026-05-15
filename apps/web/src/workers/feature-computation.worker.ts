@@ -4,7 +4,7 @@ import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { getEmbeddingProvider } from '@/lib/embeddings';
 import type { ComputeFeaturesPayload } from '@/lib/queue';
-import { classifyArchetype } from '@sottofm/feed';
+import { classifyArchetype } from '@/lib/private-recommendations';
 
 /**
  * Feature computation worker.
@@ -156,7 +156,7 @@ async function computeUserFeatures(userId: string): Promise<void> {
       }
     }
 
-    // Behavioral archetype (via @sottofm/feed)
+    // Behavioral archetype from private listening patterns.
     const archetype = classifyArchetype({
       avgCompletionRate,
       avgSpeed: avgListenSpeed,
@@ -186,7 +186,10 @@ async function computeUserFeatures(userId: string): Promise<void> {
       hourBuckets.set(hour, (hourBuckets.get(hour) || 0) + s.totalListenSeconds / 60);
     }
     const peakListeningHours = Array.from(hourBuckets.entries())
-      .map(([hour, listenMinutes]) => ({ hour, listenMinutes: Math.round(listenMinutes * 10) / 10 }))
+      .map(([hour, listenMinutes]) => ({
+        hour,
+        listenMinutes: Math.round(listenMinutes * 10) / 10,
+      }))
       .sort((a, b) => a.hour - b.hour);
 
     // Recency
@@ -411,7 +414,8 @@ async function computePodcastFeatures(podcastId: string): Promise<void> {
       const posLow = (pct / 100) * podcastDuration;
       const posHigh = ((pct + 10) / 100) * podcastDuration;
       const droppedHere = sessions.filter(
-        (s: PodcastSessionType) => s.maxPosition >= posLow && s.maxPosition < posHigh && s.completionPercent < 95
+        (s: PodcastSessionType) =>
+          s.maxPosition >= posLow && s.maxPosition < posHigh && s.completionPercent < 95
       ).length;
       dropoffPoints.push({
         position: pct,
@@ -462,7 +466,10 @@ async function computePodcastFeatures(podcastId: string): Promise<void> {
       where: { podcastId },
       select: { timestamp: true },
     });
-    const questionDensityByPosition: Array<{ percentBucket: number; questionsPerListener: number }> = [];
+    const questionDensityByPosition: Array<{
+      percentBucket: number;
+      questionsPerListener: number;
+    }> = [];
     for (let bucket = 0; bucket <= 95; bucket += 5) {
       const posLow = (bucket / 100) * podcastDuration;
       const posHigh = ((bucket + 5) / 100) * podcastDuration;
@@ -478,12 +485,17 @@ async function computePodcastFeatures(podcastId: string): Promise<void> {
     // Segment abandon rates: cross-reference maxPosition with segment positions
     const sortedSegments = [...podcast.segments].sort((a, b) => a.order - b.order);
     let cumulativeTime = 0;
-    const segmentAbandonRates: Array<{ segmentOrder: number; speaker: string; abandonRate: number }> = [];
+    const segmentAbandonRates: Array<{
+      segmentOrder: number;
+      speaker: string;
+      abandonRate: number;
+    }> = [];
     for (const seg of sortedSegments) {
       const segStart = cumulativeTime;
       const segEnd = cumulativeTime + (seg.duration || 0);
       const abandonedInSegment = sessions.filter(
-        (s: PodcastSessionType) => s.maxPosition >= segStart && s.maxPosition < segEnd && s.completionPercent < 95
+        (s: PodcastSessionType) =>
+          s.maxPosition >= segStart && s.maxPosition < segEnd && s.completionPercent < 95
       ).length;
       segmentAbandonRates.push({
         segmentOrder: seg.order,
@@ -523,7 +535,8 @@ async function computePodcastFeatures(podcastId: string): Promise<void> {
       speedDistribution,
       dropoffPoints,
       seekHotspots: seekHotspots.length > 0 ? seekHotspots : undefined,
-      completionBySource: Object.keys(completionBySource).length > 0 ? completionBySource : undefined,
+      completionBySource:
+        Object.keys(completionBySource).length > 0 ? completionBySource : undefined,
       questionDensityByPosition,
       segmentAbandonRates: segmentAbandonRates.length > 0 ? segmentAbandonRates : undefined,
       relistenRate,
@@ -602,4 +615,3 @@ async function computePodcastFeatures(podcastId: string): Promise<void> {
     });
   }
 }
-
