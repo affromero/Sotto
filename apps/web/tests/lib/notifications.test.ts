@@ -63,9 +63,9 @@ describe('getUserNotifications', () => {
       {
         id: 'notif2',
         userId: 'user1',
-        type: 'NEW_FOLLOWER',
-        title: 'New follower',
-        message: 'Alice followed you',
+        type: 'BRIEFING_READY',
+        title: 'Briefing ready',
+        message: 'Your daily briefing is ready',
         data: null,
         read: false,
         createdAt: new Date('2026-02-09T12:00:00Z'),
@@ -160,5 +160,4 @@ describe('getUnreadCount', () => {
 
     expect(count).toBe(0);
   });
-
 });

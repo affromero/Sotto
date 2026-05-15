@@ -2,33 +2,21 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
 const mockUserFindUnique = vi.fn();
-const mockFollowFindUnique = vi.fn();
-const mockAuth = vi.fn();
 
 vi.mock('@/lib/prisma', () => {
   const _mockPrisma = {
     user: {
       findUnique: (...args: unknown[]) => mockUserFindUnique(...args),
     },
-    follow: {
-      findUnique: (...args: unknown[]) => mockFollowFindUnique(...args),
-    },
   };
   return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
 });
-
-vi.mock('@/lib/auth', () => ({
-  auth: (...args: unknown[]) => mockAuth(...args),
-}));
 
 import { GET } from '@/app/api/users/[userId]/route';
 
 const mockPrisma = {
   user: {
     findUnique: mockUserFindUnique,
-  },
-  follow: {
-    findUnique: mockFollowFindUnique,
   },
 };
 
@@ -45,8 +33,6 @@ const mockUser = {
   createdAt: new Date('2025-01-10T10:00:00Z'),
   _count: {
     podcasts: 12,
-    followers: 150,
-    following: 45,
   },
 };
 
@@ -58,8 +44,6 @@ const mockUserWithoutImage = {
   createdAt: new Date('2025-01-15T10:00:00Z'),
   _count: {
     podcasts: 3,
-    followers: 10,
-    following: 20,
   },
 };
 
@@ -70,7 +54,6 @@ describe('GET /api/users/[userId]', () => {
 
   it('returns user profile data without authentication', async () => {
     mockPrisma.user.findUnique.mockResolvedValue(mockUser);
-    mockAuth.mockResolvedValue(null);
 
     const request = createRequest();
     const response = await GET(request, {
@@ -81,12 +64,14 @@ describe('GET /api/users/[userId]', () => {
     expect(response.status).toBe(200);
     expect(body.id).toBe('user-1');
     expect(body.name).toBe('Alice Johnson');
-    expect(body.isFollowing).toBe(false);
+    expect(body.podcastCount).toBe(12);
+    expect(body).not.toHaveProperty('isFollowing');
+    expect(body).not.toHaveProperty('followerCount');
+    expect(body).not.toHaveProperty('followingCount');
   });
 
   it('returns 404 when user not found', async () => {
     mockPrisma.user.findUnique.mockResolvedValue(null);
-    mockAuth.mockResolvedValue(null);
 
     const request = createRequest();
     const response = await GET(request, {
@@ -100,7 +85,6 @@ describe('GET /api/users/[userId]', () => {
 
   it('handles user with null image and bio', async () => {
     mockPrisma.user.findUnique.mockResolvedValue(mockUserWithoutImage);
-    mockAuth.mockResolvedValue(null);
 
     const request = createRequest();
     const response = await GET(request, {
@@ -113,57 +97,6 @@ describe('GET /api/users/[userId]', () => {
     expect(body.bio).toBeNull();
   });
 
-  it('checks isFollowing status when authenticated user views different profile', async () => {
-    mockPrisma.user.findUnique.mockResolvedValue(mockUser);
-    mockAuth.mockResolvedValue({
-      user: { id: 'viewer-id', name: 'Viewer', email: 'viewer@example.com' },
-    });
-    mockPrisma.follow.findUnique.mockResolvedValue({
-      followerId: 'viewer-id',
-      followingId: 'user-1',
-      createdAt: new Date(),
-    });
-
-    const request = createRequest();
-    const response = await GET(request, {
-      params: Promise.resolve({ userId: 'user-1' }),
-    });
-    const body = await response.json();
-
-    expect(body.isFollowing).toBe(true);
-  });
-
-  it('returns isFollowing false when authenticated user is not following', async () => {
-    mockPrisma.user.findUnique.mockResolvedValue(mockUser);
-    mockAuth.mockResolvedValue({
-      user: { id: 'viewer-id', name: 'Viewer', email: 'viewer@example.com' },
-    });
-    mockPrisma.follow.findUnique.mockResolvedValue(null);
-
-    const request = createRequest();
-    const response = await GET(request, {
-      params: Promise.resolve({ userId: 'user-1' }),
-    });
-    const body = await response.json();
-
-    expect(body.isFollowing).toBe(false);
-  });
-
-  it('does not check follow status when viewing own profile', async () => {
-    mockPrisma.user.findUnique.mockResolvedValue(mockUser);
-    mockAuth.mockResolvedValue({
-      user: { id: 'user-1', name: 'Alice Johnson', email: 'alice@example.com' },
-    });
-
-    const request = createRequest();
-    const response = await GET(request, {
-      params: Promise.resolve({ userId: 'user-1' }),
-    });
-    const body = await response.json();
-
-    expect(body.isFollowing).toBe(false);
-  });
-
   it('handles user with zero counts gracefully', async () => {
     const newUser = {
       id: 'user-3',
@@ -173,13 +106,10 @@ describe('GET /api/users/[userId]', () => {
       createdAt: new Date('2025-02-01T10:00:00Z'),
       _count: {
         podcasts: 0,
-        followers: 0,
-        following: 0,
       },
     };
 
     mockPrisma.user.findUnique.mockResolvedValue(newUser);
-    mockAuth.mockResolvedValue(null);
 
     const request = createRequest();
     const response = await GET(request, {
@@ -189,8 +119,7 @@ describe('GET /api/users/[userId]', () => {
 
     expect(response.status).toBe(200);
     expect(body.podcastCount).toBe(0);
-    expect(body.followerCount).toBe(0);
-    expect(body.followingCount).toBe(0);
+    expect(body).not.toHaveProperty('followerCount');
+    expect(body).not.toHaveProperty('followingCount');
   });
-
 });

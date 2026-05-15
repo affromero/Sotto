@@ -38,8 +38,6 @@ export function isPipelineNotification(type: string): boolean {
  */
 export function getNotificationUrl(notification: NotificationData): string | null {
   const podcastId = notification.data?.podcastId;
-  const userId = notification.data?.userId;
-
   switch (notification.type) {
     // Podcast-centric
     case 'PODCAST_READY':
@@ -65,10 +63,6 @@ export function getNotificationUrl(notification: NotificationData): string | nul
     case 'RENDITION_ACCEPTED':
     case 'RENDITION_REJECTED':
       return podcastId ? `/podcast/${podcastId}` : null;
-
-    // User-centric
-    case 'NEW_FOLLOWER':
-      return userId ? `/profile/${userId}` : null;
 
     // Settings / BYOK
     case 'KEY_INVALID':

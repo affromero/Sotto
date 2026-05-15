@@ -20,16 +20,24 @@ const updateUserSchema = z
     bio: z.string().max(500).optional(),
     image: z.string().url().optional(),
     handle: handleSchema.optional(),
-    voicePreferences: z.array(z.object({
-      speaker: z.string().min(1).max(50),
-      voiceId: z.string().min(1),
-    })).optional(),
+    voicePreferences: z
+      .array(
+        z.object({
+          speaker: z.string().min(1).max(50),
+          voiceId: z.string().min(1),
+        })
+      )
+      .optional(),
     preferredLanguage: z.string().max(5).nullable().optional(),
     preferredAiModel: z.string().nullable().optional(),
     emailNotifications: z.boolean().optional(),
     pushNotifications: z.boolean().optional(),
     briefingEnabled: z.boolean().optional(),
-    briefingTime: z.string().regex(/^\d{2}:\d{2}$/).nullable().optional(),
+    briefingTime: z
+      .string()
+      .regex(/^\d{2}:\d{2}$/)
+      .nullable()
+      .optional(),
     briefingTimezone: z.string().max(50).nullable().optional(),
     briefingDays: z.number().int().min(0).max(127).optional(),
     briefingVisibility: z.enum(['PUBLIC', 'UNLISTED', 'PRIVATE']).optional(),
@@ -38,8 +46,14 @@ const updateUserSchema = z
     briefingTtsModel: z.string().nullable().optional(),
     briefingHostVoiceId: z.string().nullable().optional(),
     briefingExpertVoiceId: z.string().nullable().optional(),
-    briefingDepth: z.enum(['eli5', 'quick_overview', 'standard', 'deep_dive']).nullable().optional(),
-    briefingTone: z.enum(['casual', 'professional', 'socratic', 'comedic', 'satirical', 'storytelling']).nullable().optional(),
+    briefingDepth: z
+      .enum(['eli5', 'quick_overview', 'standard', 'deep_dive'])
+      .nullable()
+      .optional(),
+    briefingTone: z
+      .enum(['casual', 'professional', 'socratic', 'comedic', 'satirical', 'storytelling'])
+      .nullable()
+      .optional(),
     briefingAudienceLevel: z.enum(['beginner', 'intermediate', 'expert']).nullable().optional(),
     briefingDuration: z.number().int().min(1).max(40).nullable().optional(),
     briefingFormat: z.number().int().min(1).max(4).optional(),
@@ -69,11 +83,9 @@ export async function GET(request: NextRequest) {
       return errorResponse('User not found', 404);
     }
 
-    const [podcastCount, followerCount, followingCount] = await Promise.all([
-      prisma.podcast.count({ where: { userId: authResult.userId } }),
-      prisma.follow.count({ where: { followingId: authResult.userId } }),
-      prisma.follow.count({ where: { followerId: authResult.userId } }),
-    ]);
+    const podcastCount = await prisma.podcast.count({
+      where: { userId: authResult.userId },
+    });
 
     return NextResponse.json({
       id: user.id,
@@ -83,8 +95,6 @@ export async function GET(request: NextRequest) {
       image: user.image,
       bio: user.bio,
       podcastCount,
-      followerCount,
-      followingCount,
       createdAt: user.createdAt.toISOString(),
       twitterHandle: user.twitterHandle,
       twitterEnabled: user.twitterEnabled,
@@ -110,7 +120,9 @@ export async function GET(request: NextRequest) {
       briefingUseByokKeys: user.briefingUseByokKeys,
     });
   } catch (error: unknown) {
-    logger.error('Failed to fetch user', { error: error instanceof Error ? error.message : String(error) });
+    logger.error('Failed to fetch user', {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return errorResponse('Failed to fetch user', 500);
   }
 }
@@ -129,12 +141,23 @@ export async function PATCH(request: NextRequest) {
       return errorResponse(validation.error.errors[0].message, 400);
     }
 
-    const { interests, customTags, handle, voicePreferences, preferredAiModel, briefingAiModel, ...data } = validation.data;
+    const {
+      interests,
+      customTags,
+      handle,
+      voicePreferences,
+      preferredAiModel,
+      briefingAiModel,
+      ...data
+    } = validation.data;
 
     // Validate preferredAiModel against registry (claude-code:* models are exempt)
     if (preferredAiModel && !preferredAiModel.startsWith('claude-code:')) {
       if (!isValidModelId(preferredAiModel)) {
-        return errorResponse(`Unknown AI model: "${preferredAiModel}". Check /api/ai-models for available models.`, 400);
+        return errorResponse(
+          `Unknown AI model: "${preferredAiModel}". Check /api/ai-models for available models.`,
+          400
+        );
       }
     }
 
@@ -149,7 +172,10 @@ export async function PATCH(request: NextRequest) {
     // Validate briefingAiModel against registry
     if (briefingAiModel && !briefingAiModel.startsWith('claude-code:')) {
       if (!isValidModelId(briefingAiModel)) {
-        return errorResponse(`Unknown AI model: "${briefingAiModel}". Check /api/ai-models for available models.`, 400);
+        return errorResponse(
+          `Unknown AI model: "${briefingAiModel}". Check /api/ai-models for available models.`,
+          400
+        );
       }
     }
     if (briefingAiModel !== undefined) {
@@ -301,7 +327,9 @@ export async function PATCH(request: NextRequest) {
       briefingUseByokKeys: updatedUser.briefingUseByokKeys,
     });
   } catch (error: unknown) {
-    logger.error('Failed to update user', { error: error instanceof Error ? error.message : String(error) });
+    logger.error('Failed to update user', {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return errorResponse('Failed to update user', 500);
   }
 }
@@ -384,7 +412,9 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
-    logger.error('Failed to delete account', { error: error instanceof Error ? error.message : String(error) });
+    logger.error('Failed to delete account', {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return errorResponse('Failed to delete account', 500);
   }
 }

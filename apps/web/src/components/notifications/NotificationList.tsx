@@ -5,7 +5,6 @@ import {
   Headphones,
   Heart,
   GitFork,
-  UserPlus,
   Bell,
   AlertTriangle,
   AlertOctagon,
@@ -60,7 +59,6 @@ const typeIcons: Record<string, typeof Bell> = {
   // Social
   PODCAST_LIKED: Heart,
   PODCAST_FORKED: GitFork,
-  NEW_FOLLOWER: UserPlus,
   COMMENT_ON_YOUR_PODCAST: MessageCircle,
   COMMENT_REPLY: Reply,
   QUESTION_ON_YOUR_PODCAST: HelpCircle,
