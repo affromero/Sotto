@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { absoluteProfileUrl } from '@/lib/urls';
 
 import { errorResponse } from '@/lib/api-response';
 export async function GET(request: NextRequest) {
@@ -23,7 +22,7 @@ export async function GET(request: NextRequest) {
       title: true,
       status: true,
       visibility: true,
-      user: { select: { id: true, name: true, handle: true } },
+      user: { select: { name: true } },
     },
   });
 
@@ -41,7 +40,6 @@ export async function GET(request: NextRequest) {
     provider_url: appUrl,
     title: podcast.title,
     author_name: podcast.user.name || 'Anonymous',
-    author_url: absoluteProfileUrl(podcast.user, appUrl),
     thumbnail_url: `${appUrl}/podcast/${podcastId}/opengraph-image`,
     html: `<iframe src="${embedUrl}" width="100%" height="160" frameborder="0" allow="autoplay" loading="lazy" style="border-radius:12px;max-width:600px"></iframe>`,
     width: 600,

@@ -271,8 +271,15 @@ describe('private-first OSS surfaces', () => {
     expect(userApiSources).not.toContain('NEW_FOLLOWER');
   });
 
-  it('does not ship profile follow UI or follower counts', () => {
-    const removedProfileComponents = [
+  it('does not ship public profile pages or creator RSS routes', () => {
+    const removedPublicProfileFiles = [
+      'src/app/profile/[userId]/ProfileClient.tsx',
+      'src/app/profile/[userId]/page.tsx',
+      'src/app/profile/[userId]/page.module.css',
+      'src/app/profile/[userId]/opengraph-image.tsx',
+      'src/app/profile/handle/[handle]/page.tsx',
+      'src/app/profile/handle/[handle]/page.module.css',
+      'src/app/profile/handle/[handle]/opengraph-image.tsx',
       'src/components/profile/FollowButton.tsx',
       'src/components/profile/FollowButton.module.css',
       'src/components/profile/FollowerCount.tsx',
@@ -281,34 +288,45 @@ describe('private-first OSS surfaces', () => {
       'src/components/profile/FollowListModal.module.css',
       'src/components/profile/UserCard.tsx',
       'src/components/profile/UserCard.module.css',
-    ];
-    const profileSources = [
-      'src/app/profile/[userId]/ProfileClient.tsx',
       'src/components/profile/ProfileHeader.tsx',
+      'src/components/profile/ProfileHeader.module.css',
       'src/components/profile/PodcastList.tsx',
-      'src/app/profile/[userId]/page.tsx',
-      'src/app/profile/handle/[handle]/page.tsx',
-      'src/app/profile/[userId]/opengraph-image.tsx',
-      'src/app/profile/handle/[handle]/opengraph-image.tsx',
+      'src/components/profile/PodcastList.module.css',
+      'src/app/api/users/[userId]/rss/route.ts',
+      'src/app/api/users/handle/[handle]/rss/route.ts',
+    ];
+    const publicProfileSources = [
+      'src/app/profile/page.tsx',
+      'src/lib/urls.ts',
+      'src/lib/rss.ts',
+      'src/lib/CLAUDE.md',
+      'src/app/api/oembed/route.ts',
+      'src/app/sitemap.ts',
+      'src/components/player/Contributors.tsx',
+      'src/components/voices/VoiceMarketplaceCard.tsx',
+      'src/components/feed/ActivityItem.tsx',
+      'src/app/CLAUDE.md',
       'src/components/CLAUDE.md',
     ]
       .map(readSource)
       .join('\n');
+    const nextConfigSource = readFileSync(resolve(webRoot, 'next.config.js'), 'utf8');
+    const profileShortcutSource = readSource('src/app/profile/page.tsx');
 
-    for (const component of removedProfileComponents) {
-      expect(existsSync(resolve(webRoot, component)), component).toBe(false);
+    for (const file of removedPublicProfileFiles) {
+      expect(existsSync(resolve(webRoot, file)), file).toBe(false);
     }
-    expect(profileSources).not.toContain('/follow');
-    expect(profileSources).not.toContain('followerCount');
-    expect(profileSources).not.toContain('followingCount');
-    expect(profileSources).not.toContain('isFollowing');
-    expect(profileSources).not.toContain('FollowButton');
-    expect(profileSources).not.toContain('FollowerCount');
-    expect(profileSources).not.toContain('FollowListModal');
-    expect(profileSources).not.toContain('UserCard');
-    expect(profileSources).not.toContain('liked');
-    expect(profileSources).not.toContain('remixes');
-    expect(profileSources).not.toContain('followers: true');
-    expect(profileSources).not.toContain('following: true');
+    expect(profileShortcutSource).toContain("redirect('/settings')");
+    expect(publicProfileSources).not.toContain('profileUrl');
+    expect(publicProfileSources).not.toContain('absoluteProfileUrl');
+    expect(publicProfileSources).not.toContain('generateCreatorRssFeed');
+    expect(publicProfileSources).not.toContain('/api/users/${user.id}/rss');
+    expect(publicProfileSources).not.toContain('ProfileClient');
+    expect(publicProfileSources).not.toContain('ProfileHeader');
+    expect(publicProfileSources).not.toContain('FollowerCount');
+    expect(publicProfileSources).not.toContain('FollowListModal');
+    expect(publicProfileSources).not.toContain('UserCard');
+    expect(nextConfigSource).not.toContain("source: '/@:handle'");
+    expect(nextConfigSource).not.toContain('/profile/handle/:handle');
   });
 });

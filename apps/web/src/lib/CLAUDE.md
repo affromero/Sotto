@@ -59,7 +59,7 @@ All shared business logic and external service integrations live here.
 | `taste-quiz.ts` | Taste quiz + Inspire Me: `generateQuestions()` for onboarding, `generateForYouQuestions()` (interest-based, no web search), `generateNewsQuestions()` (current events, newsletter-first with web search fallback), `generateCuriosityQuestions()` (fascinating facts + surprising connections) | Anthropic API + `redis.ts` |
 | `newsletter-fetcher.ts` | RSS fetcher for news: 26 curated feeds (balanced politics + aggregators + tech + international), JSDOM XML parsing. `fetchNewsletterArticles()` reads from `IngestedArticle` DB table (falls back to live RSS), `fetchFeed()` exported for news-ingest worker, `formatArticlesForPrompt()` | Fetch + JSDOM + `prisma.ts` |
 | `handles.ts` | Handle validation, availability checks, unique generation (reserved handles, format validation) | Uses `prisma.ts` |
-| `rss.ts` | `generateCreatorRssFeed(userId)`: RSS 2.0 XML with iTunes namespace for user's public podcasts | Uses `prisma.ts` |
+| `rss.ts` | Private feed token creation and token-scoped RSS 2.0 XML with iTunes namespace | Uses `prisma.ts` |
 | `auto-model-config.ts` | `getAutoModelConfig()` / `setAutoModelConfig()` for per-plan "Auto" model resolution + daily limits + provider allocations; `resolveAutoModel(plan)` returns AI/TTS/STT config for FREE or PRO | Uses `prisma.ts` |
 | `twitter-config.ts` | `getTwitterConfig()` reads singleton TwitterConfig row (auto-tweet thresholds, trend polling, template); `setTwitterConfig()` for admin updates | Uses `prisma.ts` |
 | `landing-showcase.ts` | `getLandingShowcaseConfig()` reads singleton LandingShowcase row; `setLandingShowcaseConfig()` for admin updates. Follows twitter-config singleton pattern | Uses `prisma.ts` |
