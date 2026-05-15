@@ -105,7 +105,7 @@
 
 /* 5-col engagement grid */
 @media (min-width: 640px) {
-  .engagementGrid {
+  .privateActivityGrid {
     grid-template-columns: repeat(5, 1fr);
   }
 }

@@ -376,6 +376,25 @@ describe('private-first OSS surfaces', () => {
     expect(trainingExportSources).not.toContain('prisma.like');
   });
 
+  it('keeps admin storage inspector private-activity scoped', () => {
+    const storageInspectorSources = [
+      'src/app/(admin)/admin/storage/[podcastId]/page.tsx',
+      'src/app/(admin)/admin/storage/[podcastId]/InspectorContent.tsx',
+      'src/app/(admin)/admin/storage/[podcastId]/page.module.css',
+    ]
+      .map(readSource)
+      .join('\n');
+
+    expect(storageInspectorSources).toContain('Private Activity');
+    expect(storageInspectorSources).toContain('privateActivityGrid');
+    expect(storageInspectorSources).not.toContain('likeCount');
+    expect(storageInspectorSources).not.toContain('forkCount');
+    expect(storageInspectorSources).not.toContain('commentCount');
+    expect(storageInspectorSources).not.toContain('Likes');
+    expect(storageInspectorSources).not.toContain('Forks');
+    expect(storageInspectorSources).not.toContain('Comments');
+  });
+
   it('does not ship mobile podcast social actions or widgets', () => {
     const removedMobileComponents = [
       'apps/mobile/components/ForkModal.tsx',

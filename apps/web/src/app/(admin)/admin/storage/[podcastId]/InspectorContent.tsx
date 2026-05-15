@@ -19,10 +19,7 @@ interface InspectorContentProps {
     sttProvider: string | null;
     sttModel: string | null;
     playCount: number;
-    likeCount: number;
-    forkCount: number;
     saveCount: number;
-    commentCount: number;
     user: { name: string | null; email: string | null } | null;
   };
   script: {
@@ -357,29 +354,25 @@ export function InspectorContent({
         )}
       </section>
 
-      {/* Engagement */}
+      {/* Private Activity */}
       <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Engagement</h2>
-        <div className={`${styles.grid} ${styles.engagementGrid}`}>
+        <h2 className={styles.sectionTitle}>Private Activity</h2>
+        <div className={`${styles.grid} ${styles.privateActivityGrid}`}>
           <div className={styles.card}>
             <span className={styles.cardLabel}>Plays</span>
             <span className={styles.cardValue}>{podcast.playCount.toLocaleString()}</span>
-          </div>
-          <div className={styles.card}>
-            <span className={styles.cardLabel}>Likes</span>
-            <span className={styles.cardValue}>{podcast.likeCount.toLocaleString()}</span>
-          </div>
-          <div className={styles.card}>
-            <span className={styles.cardLabel}>Forks</span>
-            <span className={styles.cardValue}>{podcast.forkCount.toLocaleString()}</span>
           </div>
           <div className={styles.card}>
             <span className={styles.cardLabel}>Saves</span>
             <span className={styles.cardValue}>{podcast.saveCount.toLocaleString()}</span>
           </div>
           <div className={styles.card}>
-            <span className={styles.cardLabel}>Comments</span>
-            <span className={styles.cardValue}>{podcast.commentCount.toLocaleString()}</span>
+            <span className={styles.cardLabel}>Questions</span>
+            <span className={styles.cardValue}>{interactions.total.toLocaleString()}</span>
+          </div>
+          <div className={styles.card}>
+            <span className={styles.cardLabel}>Ratings</span>
+            <span className={styles.cardValue}>{(ratings?.count ?? 0).toLocaleString()}</span>
           </div>
         </div>
       </section>
