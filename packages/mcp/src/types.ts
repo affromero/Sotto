@@ -8,9 +8,6 @@ export interface Podcast {
   duration: number | null;
   audioUrl: string | null;
   playCount: number;
-  likeCount: number;
-  forkCount: number;
-  forkedFromId: string | null;
   createdAt: string;
   updatedAt: string;
   user?: {
@@ -37,7 +34,6 @@ export interface PodcastDetail extends Podcast {
     status: string;
     createdAt: string;
   }>;
-  isLiked?: boolean;
   isSaved?: boolean;
 }
 
@@ -49,8 +45,6 @@ export interface UserProfile {
   image: string | null;
   bio: string | null;
   podcastCount: number;
-  followerCount: number;
-  followingCount: number;
   createdAt: string;
 }
 
