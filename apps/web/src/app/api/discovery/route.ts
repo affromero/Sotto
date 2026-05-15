@@ -137,9 +137,10 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Fetch the BYOK key for the resolved provider (falls back to any valid key if no match)
+  // Fetch the BYOK key for the resolved provider only. Explicit model choices must not
+  // silently switch to a different provider key.
   const aiKey = modelProvider
-    ? (await getAiKey(authed.userId, modelProvider)) ?? (await getAiKey(authed.userId))
+    ? await getAiKey(authed.userId, modelProvider)
     : await getAiKey(authed.userId);
 
   // Fetch user for plan gating and language detection

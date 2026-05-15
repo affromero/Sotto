@@ -709,6 +709,34 @@ describe('POST /api/discovery', () => {
       expect(response.status).toBe(200);
     });
 
+    it('does not substitute another BYOK provider for an explicit model provider', async () => {
+      mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+      mockGetAiKey.mockImplementation(async (_userId: string, provider?: string) =>
+        provider === 'openai'
+          ? null
+          : { apiKey: 'user-anthropic-key-123', provider: 'anthropic' }
+      );
+      mockStreamDiscoveryResponse.mockReturnValue(mockStreamGenerator(['Response']));
+      mockParseChips.mockReturnValue({ text: 'Response', chips: [] });
+      mockParseMetadata.mockReturnValue(null);
+
+      const request = createPostRequest({ message: 'Test', model: 'gpt-5-mini' });
+      const response = await POST(request);
+      await readSSEStream(response);
+
+      expect(response.status).toBe(200);
+      expect(mockGetAiKey).toHaveBeenCalledTimes(1);
+      expect(mockGetAiKey).toHaveBeenCalledWith('user-1', 'openai');
+      expect(mockStreamDiscoveryResponse).toHaveBeenCalledWith(
+        [{ role: 'user', content: 'Test' }],
+        undefined,
+        'gpt-5-mini',
+        expect.any(Function),
+        'openai',
+        undefined,
+      );
+    });
+
     it('passes undefined when user has no AI key', async () => {
       mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
       mockGetAiKey.mockResolvedValue(null);
