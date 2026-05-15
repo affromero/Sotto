@@ -289,6 +289,7 @@ describe('private-first OSS surfaces', () => {
     expect(notificationSources).not.toContain('PODCAST_LIKED');
     expect(notificationSources).not.toContain('PODCAST_FORKED');
     expect(notificationSources).not.toContain('NEW_FOLLOWER');
+    expect(notificationSources).not.toContain('SIMILAR_PODCAST_CREATED');
     expect(notificationSources).not.toContain('QUESTION_UPVOTED');
     expect(notificationSources).not.toContain('COMMENT_ON_YOUR_PODCAST');
     expect(notificationSources).not.toContain('COMMENT_REPLY');
@@ -531,6 +532,38 @@ describe('private-first OSS surfaces', () => {
     expect(featureSources).not.toContain('forkedFromId');
     expect(featureSources).not.toContain('liked: pct');
     expect(featureSources).not.toContain('forked: pct');
+  });
+
+  it('keeps Prisma schema and seeds free of social tables', () => {
+    const schemaSource = readFileSync(resolve(repoRoot, 'apps/web/prisma/schema.prisma'), 'utf8');
+    const seedSources = [
+      'apps/web/prisma/seed.ts',
+      'apps/web/prisma/seed-demo.ts',
+      'e2e/playwright/helpers/seed.ts',
+    ]
+      .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
+      .join('\n');
+    const prismaGuideSource = readFileSync(resolve(repoRoot, 'apps/web/prisma/CLAUDE.md'), 'utf8');
+    const databaseSources = [schemaSource, seedSources, prismaGuideSource].join('\n');
+
+    expect(databaseSources).not.toContain('model Follow');
+    expect(databaseSources).not.toContain('model Comment');
+    expect(databaseSources).not.toContain('model Like');
+    expect(databaseSources).not.toContain('model CollectionFollow');
+    expect(databaseSources).not.toContain('model Activity');
+    expect(databaseSources).not.toContain('model InteractionVote');
+    expect(databaseSources).not.toContain('prisma.follow');
+    expect(databaseSources).not.toContain('prisma.comment');
+    expect(databaseSources).not.toContain('prisma.like');
+    expect(databaseSources).not.toContain('likeCount');
+    expect(databaseSources).not.toContain('forkCount');
+    expect(databaseSources).not.toContain('commentCount');
+    expect(databaseSources).not.toContain('followerCount');
+    expect(databaseSources).not.toContain('forkedFromId');
+    expect(databaseSources).not.toContain('remixNote');
+    expect(databaseSources).not.toContain('upvoteCount');
+    expect(databaseSources).not.toContain('likeToListenRatio');
+    expect(databaseSources).not.toContain('prod-remix');
   });
 
   it('keeps podcast summary contracts free of social payload fields', () => {

@@ -58,7 +58,7 @@ export async function seedTestUser() {
     },
   });
 
-  // Second user for follow/profile tests
+  // Second user for access and ownership tests
   const otherUser = await prisma.user.upsert({
     where: { email: 'test-other@sotto.fm' },
     update: {},
@@ -72,14 +72,14 @@ export async function seedTestUser() {
     },
   });
 
-  // Other user's podcast for fork tests
+  // Other user's podcast for ownership-boundary tests
   const otherPodcast = await prisma.podcast.upsert({
     where: { id: 'e2e-other-podcast' },
     update: {},
     create: {
       id: 'e2e-other-podcast',
       title: 'E2E Other Podcast',
-      topic: 'Forkable Content',
+      topic: 'Independent ownership content',
       status: 'READY',
       audioUrl: 'https://sotto.fm/test-audio-other.mp3',
       duration: 240,
@@ -88,16 +88,16 @@ export async function seedTestUser() {
     },
   });
 
-  // Third podcast (otherUser) for fork-voice source
+  // Third podcast (otherUser) for alternate voice-track ownership
   const otherPodcast2 = await prisma.podcast.upsert({
     where: { id: 'e2e-other-podcast-2' },
     update: {},
     create: {
       id: 'e2e-other-podcast-2',
-      title: 'E2E Fork Voice Source',
-      topic: 'Voice fork testing',
+      title: 'E2E Voice Track Source',
+      topic: 'Voice track testing',
       status: 'READY',
-      audioUrl: 'https://sotto.fm/test-audio-fork.mp3',
+      audioUrl: 'https://sotto.fm/test-audio-voice-track.mp3',
       duration: 180,
       visibility: 'PUBLIC',
       userId: otherUser.id,
@@ -166,18 +166,6 @@ export async function seedTestUser() {
     },
   });
 
-  // Comment on testPodcast
-  const comment = await prisma.comment.upsert({
-    where: { id: 'e2e-comment' },
-    update: {},
-    create: {
-      id: 'e2e-comment',
-      content: 'Great episode about testing!',
-      userId: otherUser.id,
-      podcastId: testPodcast.id,
-    },
-  });
-
   // PodcastFeature for testPodcast (non-zero values for quality route)
   await prisma.podcastFeature.upsert({
     where: { podcastId: testPodcast.id },
@@ -188,7 +176,6 @@ export async function seedTestUser() {
       medianCompletionRate: 0.8,
       totalUniqueListeners: 10,
       totalListenMinutes: 50.0,
-      likeToListenRatio: 0.3,
       segmentCount: 2,
       durationSeconds: 300,
     },

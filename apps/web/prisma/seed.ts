@@ -270,7 +270,6 @@ async function main() {
         { name: 'Human-Created', slug: 'prod-human-created' },
         { name: 'AI-Assisted', slug: 'prod-ai-assisted' },
         { name: 'Imported', slug: 'prod-imported' },
-        { name: 'Remix', slug: 'prod-remix' },
       ],
     },
   ];
