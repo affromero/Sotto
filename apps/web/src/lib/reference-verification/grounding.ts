@@ -19,6 +19,16 @@ export interface GroundingInput {
   reason?: GroundingReason;
 }
 
+function requireReferenceGroundingRouting(
+  model?: string,
+  provider?: string,
+): { model: string; provider: string } {
+  if (!provider || !model) {
+    throw new Error('AI provider and model are required for reference grounding.');
+  }
+  return { model, provider };
+}
+
 /**
  * Returns true when NO check passed — external + AI all failed.
  * This means we have zero evidence the reference is real.
@@ -152,6 +162,8 @@ async function aiGroundBatch(
   model?: string,
   provider?: string,
 ): Promise<Map<string, VerificationCheck>> {
+  const routing = requireReferenceGroundingRouting(model, provider);
+
   const results = new Map<string, VerificationCheck>();
   const BATCH_TIMEOUT_MS = 20_000;
 
@@ -175,12 +187,12 @@ ${refsContext}
 Find one real, verifiable source per reference. Return JSON only.`;
 
   try {
-    const ai = createAIProvider(provider);
+    const ai = createAIProvider(routing.provider);
     const response = await Promise.race([
       ai.generateResponse(
         systemPrompt,
         [{ role: 'user', content: userMessage }],
-        { maxTokens: 4096, apiKeyOverride, model, useWebSearch: true },
+        { maxTokens: 4096, apiKeyOverride, model: routing.model, useWebSearch: true },
       ),
       new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error(`Grounding AI batch timed out after ${BATCH_TIMEOUT_MS / 1000}s`)), BATCH_TIMEOUT_MS),
@@ -188,7 +200,7 @@ Find one real, verifiable source per reference. Return JSON only.`;
     ]);
 
     logUsage({
-      service: provider ?? 'anthropic',
+      service: routing.provider,
       model: response.model,
       category: 'reference_grounding',
       inputTokens: response.inputTokens,
@@ -310,6 +322,7 @@ export async function groundReferenceCandidates(
   if (candidates.length === 0) {
     return new Map();
   }
+  requireReferenceGroundingRouting(model, provider);
 
   logger.info('Starting reference grounding', {
     total: String(inputs.length),
