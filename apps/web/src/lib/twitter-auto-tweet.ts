@@ -4,8 +4,8 @@ import { addJob, JobType, twitterAutoTweetQueue } from './queue';
 import { logger } from './logger';
 
 /**
- * Check if a podcast has crossed auto-tweet thresholds.
- * Called after like, fork, and play count increments (fire-and-forget).
+ * Check if a podcast has crossed the auto-tweet play threshold.
+ * Called after play count increments (fire-and-forget).
  * Must be called AFTER the transaction that increments the counter commits.
  */
 export async function checkAutoTweetThreshold(podcastId: string): Promise<void> {
@@ -20,8 +20,6 @@ export async function checkAutoTweetThreshold(podcastId: string): Promise<void> 
     select: {
       visibility: true,
       playCount: true,
-      likeCount: true,
-      forkCount: true,
     },
   });
 
@@ -38,11 +36,7 @@ export async function checkAutoTweetThreshold(podcastId: string): Promise<void> 
     return;
   }
 
-  // Check if any threshold is met (OR logic)
-  const meetsThreshold =
-    podcast.playCount >= config.minPlays ||
-    podcast.likeCount >= config.minLikes ||
-    podcast.forkCount >= config.minForks;
+  const meetsThreshold = podcast.playCount >= config.minPlays;
 
   if (!meetsThreshold) {
     return;
@@ -59,9 +53,7 @@ export async function checkAutoTweetThreshold(podcastId: string): Promise<void> 
 
   logger.info('Auto-tweet threshold met', {
     podcastId,
-    likes: String(podcast.likeCount),
     plays: String(podcast.playCount),
-    forks: String(podcast.forkCount),
   });
 }
 
