@@ -49,6 +49,7 @@ const defaultProps = {
   initialEmailNotifications: true,
   initialPushNotifications: true,
   briefings: [],
+  privateFeedTokens: [],
   hasByokKeys: false,
   initialQuizEnabled: false,
 };
