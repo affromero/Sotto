@@ -1,5 +1,13 @@
 import { Job } from 'bullmq';
-import { ImportAudioPayload, notificationQueue, featureComputationQueue, waveformGenerationQueue, quizGenerationQueue, addJob, JobType } from '@/lib/queue';
+import {
+  ImportAudioPayload,
+  notificationQueue,
+  featureComputationQueue,
+  waveformGenerationQueue,
+  quizGenerationQueue,
+  addJob,
+  JobType,
+} from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { markPodcastFailed } from '@/lib/pipeline-resume';
 import { downloadToFile, uploadPodcastAudio, deleteFile } from '@/lib/r2';
@@ -9,7 +17,11 @@ import { parseTranscript, diarizeSpeakers } from '@/lib/transcript-parser';
 import { generateImportMetadata, isMetadataDifferent } from '@/lib/import-metadata-generator';
 import { getAudioDuration } from '@/lib/audio-stitcher';
 import { getAiKey } from '@/lib/byok';
-import { resolveAiModelAndProvider, getCheapestModelForProvider, type AiProviderId } from '@/lib/providers/ai-registry';
+import {
+  resolveAiModelAndProvider,
+  getCheapestModelForProvider,
+  type AiProviderId,
+} from '@/lib/providers/ai-registry';
 import { detectLanguage } from '@/lib/language-detect';
 import { getSttProviderMeta } from '@/lib/providers/stt-registry';
 import { logUsage } from '@/lib/usage-logger';
@@ -31,14 +43,22 @@ const execFileAsync = promisify(execFile);
  * Handles the full pipeline for user-uploaded audio podcasts
  */
 export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<void> {
-  const { podcastId, userId, audioKey, transcriptText, sttProvider, sttModel, sttApiKey, generateMetadata } =
-    job.data;
+  const {
+    podcastId,
+    userId,
+    audioKey,
+    transcriptText,
+    sttProvider,
+    sttModel,
+    sttApiKey,
+    generateMetadata,
+  } = job.data;
 
   logger.info('Starting audio import', {
     podcastId,
     userId,
     hasTranscript: !!transcriptText,
-    sttProvider: sttProvider ?? 'openai',
+    sttProvider: sttProvider ?? null,
   });
 
   const tmpDir = path.join(os.tmpdir(), `sotto-import-${crypto.randomUUID()}`);
@@ -89,8 +109,14 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
 
     // Resolve user's BYOK AI key for diarization + metadata generation
     const aiKey = await getAiKey(userId);
-    const userPlan = await prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { plan: true } });
-    const { model: aiModel, provider: aiProvider } = await resolveAiModelAndProvider({ aiKey, plan: userPlan.plan as 'FREE' | 'PRO' });
+    const userPlan = await prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { plan: true },
+    });
+    const { model: aiModel, provider: aiProvider } = await resolveAiModelAndProvider({
+      aiKey,
+      plan: userPlan.plan as 'FREE' | 'PRO',
+    });
     const cheapModel = getCheapestModelForProvider(aiProvider as AiProviderId) ?? aiModel;
 
     await prisma.podcast.update({
@@ -168,7 +194,13 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
         segments = await diarizeSpeakers(whisperSegments, aiKey?.apiKey, cheapModel, aiProvider);
       }
     } else {
-      logger.info('Transcribing audio', { provider: sttProvider ?? 'openai', model: sttModel ?? 'default' });
+      if (!sttProvider || !sttApiKey) {
+        throw new Error(
+          'STT provider and API key are required when transcript text is not provided.'
+        );
+      }
+
+      logger.info('Transcribing audio', { provider: sttProvider, model: sttModel ?? 'default' });
       const provider = createSttProvider(sttProvider, sttApiKey, sttModel);
       const normalizedBuffer = await import('fs/promises').then((fs) =>
         fs.readFile(normalizedPath)
@@ -176,11 +208,10 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
       const transcription = await provider.transcribe(normalizedBuffer);
       transcriptionWords = transcription.words;
 
-      const sttId = sttProvider ?? 'openai';
-      const sttMeta = getSttProviderMeta(sttId);
+      const sttMeta = getSttProviderMeta(sttProvider);
       const durationMin = duration / 60;
       logUsage({
-        service: sttId,
+        service: sttProvider,
         model: sttModel ?? sttMeta.defaultModel,
         category: 'stt_transcription',
         totalCost: durationMin * sttMeta.platformCostPerMinute,
@@ -192,7 +223,12 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
       await job.updateProgress(70);
 
       logger.info('Running speaker diarization');
-      segments = await diarizeSpeakers(transcription.segments, aiKey?.apiKey, cheapModel, aiProvider);
+      segments = await diarizeSpeakers(
+        transcription.segments,
+        aiKey?.apiKey,
+        cheapModel,
+        aiProvider
+      );
     }
 
     await job.updateProgress(75);
@@ -200,7 +236,12 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
     // Always generate AI metadata from transcript
     try {
       const fullText = segments.map((s) => s.text).join(' ');
-      const metadata = await generateImportMetadata(fullText, aiKey?.apiKey, cheapModel, aiProvider);
+      const metadata = await generateImportMetadata(
+        fullText,
+        aiKey?.apiKey,
+        cheapModel,
+        aiProvider
+      );
 
       if (generateMetadata) {
         // User didn't provide title — apply AI metadata directly
@@ -284,7 +325,12 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
       segments.map((seg) => {
         // Slice word-level timestamps for this segment's time range
         let segmentWordTimings: Array<{ word: string; start: number; end: number }> | undefined;
-        if (transcriptionWords && transcriptionWords.length > 0 && seg.startTime != null && seg.endTime != null) {
+        if (
+          transcriptionWords &&
+          transcriptionWords.length > 0 &&
+          seg.startTime != null &&
+          seg.endTime != null
+        ) {
           segmentWordTimings = transcriptionWords.filter(
             (w) => w.start >= seg.startTime! && w.end <= seg.endTime!
           );
@@ -300,7 +346,9 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
             audioUrl,
             duration: seg.endTime && seg.startTime ? seg.endTime - seg.startTime : 0,
             startTime: seg.startTime ?? 0,
-            wordTimings: segmentWordTimings ? JSON.parse(JSON.stringify(segmentWordTimings)) : undefined,
+            wordTimings: segmentWordTimings
+              ? JSON.parse(JSON.stringify(segmentWordTimings))
+              : undefined,
           },
         });
       })
@@ -390,10 +438,18 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
       await prisma.audioFingerprint.upsert({
         where: { podcastId },
         update: { fingerprint: fingerprintData.fingerprint, duration: fingerprintData.duration },
-        create: { podcastId, fingerprint: fingerprintData.fingerprint, duration: fingerprintData.duration },
+        create: {
+          podcastId,
+          fingerprint: fingerprintData.fingerprint,
+          duration: fingerprintData.duration,
+        },
       });
 
-      const duplicates = await findDuplicates(fingerprintData.fingerprint, fingerprintData.duration, podcastId);
+      const duplicates = await findDuplicates(
+        fingerprintData.fingerprint,
+        fingerprintData.duration,
+        podcastId
+      );
       if (duplicates.length > 0) {
         logger.info('Duplicate matches found for import', {
           podcastId,

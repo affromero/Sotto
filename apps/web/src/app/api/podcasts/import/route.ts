@@ -3,7 +3,7 @@ import { Readable } from 'stream';
 import busboy from 'busboy';
 import { Prisma } from '@prisma/client';
 import { authenticateRequest } from '@/lib/api-keys';
-import { prisma, prismaUnfiltered } from '@/lib/prisma';
+import { prisma } from '@/lib/prisma';
 import { uploadFile } from '@/lib/r2';
 import { addJob, audioImportQueue, JobType } from '@/lib/queue';
 import { importPodcastSchema } from '@/lib/validations';
@@ -123,9 +123,10 @@ export async function POST(request: NextRequest) {
   // Generation gate: BYOK or free tier
   const gate = await checkGenerationGate(userId);
   if (!gate.allowed) {
-    const msg = gate.reason === 'generation_in_progress'
-      ? 'A podcast is already generating. Wait for it to finish before starting another.'
-      : 'No voice provider available. Add a TTS key in Settings for unlimited generation.';
+    const msg =
+      gate.reason === 'generation_in_progress'
+        ? 'A podcast is already generating. Wait for it to finish before starting another.'
+        : 'No voice provider available. Add a TTS key in Settings for unlimited generation.';
     return errorResponse(msg, 403, { code: gate.reason });
   }
 
@@ -168,7 +169,9 @@ export async function POST(request: NextRequest) {
       !ALLOWED_AUDIO_TYPES.includes(audioFile.mimeType) &&
       (!fileExt || !ALLOWED_AUDIO_EXTENSIONS.includes(fileExt))
     ) {
-      return errorResponse(`Unsupported audio type: ${audioFile.mimeType}`, 400, { allowed: ALLOWED_AUDIO_TYPES, });
+      return errorResponse(`Unsupported audio type: ${audioFile.mimeType}`, 400, {
+        allowed: ALLOWED_AUDIO_TYPES,
+      });
     }
 
     const {
@@ -181,6 +184,38 @@ export async function POST(request: NextRequest) {
     const validatedTitle = validation.data.title || 'Untitled Import';
     const validatedTopic = validation.data.topic || '';
     const generateMetadata = !validation.data.title;
+    let sttApiKey: string | undefined;
+    let effectiveSttProvider = validatedSttProvider;
+    let effectiveSttModel = validatedSttModel;
+
+    if (!transcriptFile) {
+      if (!validatedSttProvider) {
+        return errorResponse(
+          'Speech-to-text provider is required when uploading audio without a transcript.',
+          400,
+          { code: 'stt_provider_required' }
+        );
+      }
+
+      try {
+        const resolved = await resolveSttProvider({
+          userId,
+          requestedProvider: validatedSttProvider,
+          requestedModel: validatedSttModel ?? undefined,
+          plan: gate.isProUser ? 'PRO' : 'FREE',
+        });
+        sttApiKey = resolved.apiKey;
+        effectiveSttProvider = resolved.providerId;
+        effectiveSttModel = resolved.model;
+      } catch (err) {
+        return errorResponse(
+          err instanceof Error
+            ? err.message
+            : 'No API key available for selected speech-to-text provider.',
+          400
+        );
+      }
+    }
 
     // Validate draft ownership if resuming from a draft
     if (draftId) {
@@ -200,8 +235,8 @@ export async function POST(request: NextRequest) {
       source: 'IMPORT' as const,
       isHumanContent,
       sourcePlatform: validatedSourcePlatform,
-      sttProvider: validatedSttProvider,
-      sttModel: validatedSttModel,
+      sttProvider: effectiveSttProvider,
+      sttModel: effectiveSttModel,
       visibility: 'PRIVATE' as const,
     };
 
@@ -239,33 +274,6 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    let sttApiKey: string | undefined;
-    let effectiveSttProvider = validatedSttProvider;
-    let effectiveSttModel = validatedSttModel;
-
-    try {
-      const resolved = await resolveSttProvider({
-        userId,
-        requestedProvider: validatedSttProvider ?? undefined,
-        requestedModel: validatedSttModel ?? undefined,
-        plan: gate.isProUser ? 'PRO' : 'FREE',
-      });
-      sttApiKey = resolved.apiKey;
-      if (!effectiveSttProvider) effectiveSttProvider = resolved.providerId;
-      if (!effectiveSttModel) effectiveSttModel = resolved.model;
-    } catch {
-      // No STT key available — handled by check below
-    }
-
-    if (!sttApiKey && !transcriptText) {
-      await prismaUnfiltered.podcast.delete({ where: { id: podcast.id } });
-      const providerName = effectiveSttProvider ?? 'openai';
-      return errorResponse(
-        `No API key available for speech-to-text provider "${providerName}". Add a key in Settings → API Keys, or provide a transcript file.`,
-        400
-      );
-    }
-
     await addJob(audioImportQueue, JobType.IMPORT_AUDIO, {
       podcastId: podcast.id,
       userId,
@@ -285,7 +293,7 @@ export async function POST(request: NextRequest) {
       userId,
       audioSize: String(audioFile.buffer.length),
       hasTranscript: !!transcriptText,
-      sttProvider: effectiveSttProvider ?? 'auto',
+      sttProvider: effectiveSttProvider ?? null,
       generateMetadata: String(generateMetadata),
     });
 

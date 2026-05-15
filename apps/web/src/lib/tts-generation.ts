@@ -12,12 +12,17 @@ import type { WordTiming } from '@sotto/shared';
 import type { TtsProvider } from '@/lib/providers/tts';
 import { getProviderMeta, type TtsProviderId } from '@/lib/providers/tts-registry';
 import { getElevenLabsConcurrencyLimit } from '@/lib/elevenlabs';
-import { getCartesiaConcurrencyLimit, updateCartesiaConcurrencyFromError } from '@/lib/providers/tts/cartesia.provider';
-import { getHumeConcurrencyLimit, updateHumeConcurrencyFromError } from '@/lib/providers/tts/hume.provider';
+import {
+  getCartesiaConcurrencyLimit,
+  updateCartesiaConcurrencyFromError,
+} from '@/lib/providers/tts/cartesia.provider';
+import {
+  getHumeConcurrencyLimit,
+  updateHumeConcurrencyFromError,
+} from '@/lib/providers/tts/hume.provider';
 import { semaphore } from '@/lib/redis';
 import { getByokKey } from '@/lib/byok';
 import { cleanTextForTts, splitTextForTts } from '@/lib/tts-text-cleaner';
-import { convertInlineAudioTags } from '@/lib/tts-expression-mapper';
 import { getAudioDuration } from '@/lib/audio-stitcher';
 import { estimateDurationFromText } from '@/lib/duration';
 import { logUsage } from '@/lib/usage-logger';
@@ -34,14 +39,23 @@ import { writeFile, rm } from 'fs/promises';
 /** Return the platform API key for a given TTS provider (not BYOK). */
 export function getPlatformTtsKey(pid: TtsProviderId): string | undefined {
   switch (pid) {
-    case 'elevenlabs': return process.env.ELEVENLABS_API_KEY;
-    case 'openai': return process.env.OPENAI_API_KEY;
-    case 'cartesia': return process.env.CARTESIA_API_KEY;
-    case 'hume': return process.env.HUME_API_KEY;
-    case 'fal': case 'minimax': return process.env.FAL_KEY;
-    case 'replicate': return process.env.REPLICATE_API_TOKEN;
-    case 'mistral': return process.env.MISTRAL_API_KEY;
-    default: return undefined;
+    case 'elevenlabs':
+      return process.env.ELEVENLABS_API_KEY;
+    case 'openai':
+      return process.env.OPENAI_API_KEY;
+    case 'cartesia':
+      return process.env.CARTESIA_API_KEY;
+    case 'hume':
+      return process.env.HUME_API_KEY;
+    case 'fal':
+    case 'minimax':
+      return process.env.FAL_KEY;
+    case 'replicate':
+      return process.env.REPLICATE_API_TOKEN;
+    case 'mistral':
+      return process.env.MISTRAL_API_KEY;
+    default:
+      return undefined;
   }
 }
 
@@ -102,13 +116,26 @@ export interface TtsGenerationResult {
  *
  * Returns null if the job was aborted (parent entity failed during semaphore wait).
  */
-export async function generateTtsAudio(params: TtsGenerationParams): Promise<TtsGenerationResult | null> {
+export async function generateTtsAudio(
+  params: TtsGenerationParams
+): Promise<TtsGenerationResult | null> {
   const {
-    text, voiceId, speaker, previousText, nextText, direction, language,
-    provider, providerId, source,
-    userId, podcastId,
-    requestedModel: _requestedModel, plan: _plan,
-    usageCategory, extraMetadata,
+    text,
+    voiceId,
+    speaker,
+    previousText,
+    nextText,
+    direction,
+    language,
+    provider,
+    providerId,
+    source,
+    userId,
+    podcastId,
+    requestedModel: _requestedModel,
+    plan: _plan,
+    usageCategory,
+    extraMetadata,
     isAborted,
   } = params;
 
@@ -117,7 +144,7 @@ export async function generateTtsAudio(params: TtsGenerationParams): Promise<Tts
   const startTime = Date.now();
 
   // 1. Resolve raw API key for concurrency lookups
-  const resolvedApiKey = await getByokKey(userId, providerId) || getPlatformTtsKey(providerId);
+  const resolvedApiKey = (await getByokKey(userId, providerId)) || getPlatformTtsKey(providerId);
 
   // 2. Get provider-specific concurrency limit
   let concurrencyLimit = 5;
@@ -134,7 +161,12 @@ export async function generateTtsAudio(params: TtsGenerationParams): Promise<Tts
   const semaphoreKey = `tts:sem:${userId}:${providerId}`;
 
   logger.info('Using TTS provider', {
-    speaker, providerId, source, voiceId, podcastId, concurrencyLimit,
+    speaker,
+    providerId,
+    source,
+    voiceId,
+    podcastId,
+    concurrencyLimit,
   });
 
   // 3. Acquire semaphore slot with exponential backoff
@@ -152,7 +184,9 @@ export async function generateTtsAudio(params: TtsGenerationParams): Promise<Tts
   }
 
   if (!acquired) {
-    throw new Error(`Timed out waiting for TTS semaphore (${providerId}, limit ${concurrencyLimit})`);
+    throw new Error(
+      `Timed out waiting for TTS semaphore (${providerId}, limit ${concurrencyLimit})`
+    );
   }
 
   // 4. Clean text and split into chunks if it exceeds provider char limit
@@ -162,8 +196,11 @@ export async function generateTtsAudio(params: TtsGenerationParams): Promise<Tts
 
   if (chunks.length > 1) {
     logger.info('Text exceeds provider limit, splitting into chunks', {
-      podcastId, providerId, originalLength: ttsText.length,
-      maxSegmentChars: meta.maxSegmentChars, chunkCount: chunks.length,
+      podcastId,
+      providerId,
+      originalLength: ttsText.length,
+      maxSegmentChars: meta.maxSegmentChars,
+      chunkCount: chunks.length,
     });
   }
 
@@ -175,7 +212,15 @@ export async function generateTtsAudio(params: TtsGenerationParams): Promise<Tts
   try {
     if (chunks.length === 1) {
       // Fast path — single chunk, no splitting needed
-      const speechParams = { text: ttsText, voiceId, previousText, nextText, direction, speaker, language: langHint };
+      const speechParams = {
+        text: ttsText,
+        voiceId,
+        previousText,
+        nextText,
+        direction,
+        speaker,
+        language: langHint,
+      };
       if (supportsTimestamps) {
         const result = await provider.generateSpeechWithTimestamps!(speechParams);
         audioBuffer = result.audio;
@@ -188,9 +233,7 @@ export async function generateTtsAudio(params: TtsGenerationParams): Promise<Tts
       const chunkBuffers: Buffer[] = [];
       const allWordTimings: WordTiming[] = [];
       let cumulativeDuration = 0;
-      const skipTextContext = meta.modelsWithoutTextContext.includes(
-        provider.getModelId(),
-      );
+      const skipTextContext = meta.modelsWithoutTextContext.includes(provider.getModelId());
       const continuityIds: string[] = [];
 
       for (let i = 0; i < chunks.length; i++) {
@@ -200,11 +243,22 @@ export async function generateTtsAudio(params: TtsGenerationParams): Promise<Tts
         // Bridge context: first chunk uses the original previousText, last uses
         // original nextText, inner chunks use adjacent chunk text for continuity.
         // Skip text context for models that don't support it (e.g. eleven_v3).
-        const chunkPrev = skipTextContext ? undefined : (isFirst ? previousText : chunks[i - 1].slice(-500));
-        const chunkNext = skipTextContext ? undefined : (isLast ? nextText : chunks[i + 1].slice(0, 500));
+        const chunkPrev = skipTextContext
+          ? undefined
+          : isFirst
+            ? previousText
+            : chunks[i - 1].slice(-500);
+        const chunkNext = skipTextContext
+          ? undefined
+          : isLast
+            ? nextText
+            : chunks[i + 1].slice(0, 500);
 
         const speechParams = {
-          text: chunks[i], voiceId, direction, speaker,
+          text: chunks[i],
+          voiceId,
+          direction,
+          speaker,
           previousText: chunkPrev,
           nextText: chunkNext,
           continuityIds: continuityIds.length > 0 ? continuityIds.slice(-3) : undefined,
@@ -255,7 +309,10 @@ export async function generateTtsAudio(params: TtsGenerationParams): Promise<Tts
       } else if (providerId === 'hume') {
         await updateHumeConcurrencyFromError(resolvedApiKey, errMsg);
       }
-      logger.warn('TTS 429 — concurrency limit cached, BullMQ will retry', { providerId, podcastId });
+      logger.warn('TTS 429 — concurrency limit cached, BullMQ will retry', {
+        providerId,
+        podcastId,
+      });
     }
     throw err;
   } finally {
@@ -299,19 +356,6 @@ export async function generateTtsAudio(params: TtsGenerationParams): Promise<Tts
     metadata: { voiceId, speaker, source: effectiveSource, ...extraMetadata },
   });
 
-  // 10. Forced-alignment fallback: if no word timings from TTS, try STT
-  // Use the same cleaned text that was sent to TTS (no brackets, citations, SFX)
-  // so STT words align against what was actually spoken.
-  if (!wordTimings && ttsText.trim().length > 0) {
-    try {
-      const { getWordTimingsViaStt } = await import('@/lib/forced-alignment');
-      const alignmentText = convertInlineAudioTags(ttsText, providerId);
-      wordTimings = await getWordTimingsViaStt(audioBuffer, alignmentText, userId);
-    } catch {
-      // Forced alignment is best-effort — never fail the generation
-    }
-  }
-
   return { audioBuffer, segmentDuration, service, durationMs, wordTimings };
 }
 
@@ -351,17 +395,29 @@ async function concatAudioBuffers(buffers: Buffer[]): Promise<Buffer> {
 
     // Concatenate — re-encode to ensure consistent format across chunks
     await execFileAsync('ffmpeg', [
-      '-y', '-f', 'concat', '-safe', '0',
-      '-i', concatListPath,
-      '-c:a', 'libmp3lame', '-b:a', '128k', '-ar', '44100', '-ac', '1',
+      '-y',
+      '-f',
+      'concat',
+      '-safe',
+      '0',
+      '-i',
+      concatListPath,
+      '-c:a',
+      'libmp3lame',
+      '-b:a',
+      '128k',
+      '-ar',
+      '44100',
+      '-ac',
+      '1',
       outputPath,
     ]);
 
     return await readFile(outputPath);
   } finally {
     // Clean up all temp files
-    const cleanups = [...chunkPaths, concatListPath, outputPath].map(
-      (p) => rm(p, { force: true }).catch(() => {}),
+    const cleanups = [...chunkPaths, concatListPath, outputPath].map((p) =>
+      rm(p, { force: true }).catch(() => {})
     );
     await Promise.all(cleanups);
   }
