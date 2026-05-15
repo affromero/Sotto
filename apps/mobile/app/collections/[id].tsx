@@ -23,10 +23,8 @@ interface CollectionDetail {
   description: string | null;
   isPublic: boolean;
   podcastCount: number;
-  followerCount: number;
   user: { id: string; name: string | null; handle: string | null; image: string | null };
   items: PodcastSummary[];
-  isFollowing: boolean;
   isOwner: boolean;
 }
 
@@ -35,27 +33,16 @@ export default function CollectionDetailScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
 
-  const { data: collection, isLoading, isError, refetch } = useQuery<CollectionDetail>({
+  const {
+    data: collection,
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery<CollectionDetail>({
     queryKey: ['collection', id],
     queryFn: async () => {
       const res = await api.get(`/collections/${id}`);
       return res.data;
-    },
-  });
-
-  const followMutation = useMutation({
-    mutationFn: async () => {
-      if (collection?.isFollowing) {
-        await api.delete(`/collections/${id}/follow`);
-      } else {
-        await api.post(`/collections/${id}/follow`);
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['collection', id] });
-    },
-    onError: () => {
-      Alert.alert('Error', 'Failed to update follow status.');
     },
   });
 
@@ -73,18 +60,14 @@ export default function CollectionDetailScreen() {
   });
 
   const handleDelete = useCallback(() => {
-    Alert.alert(
-      'Delete Collection',
-      'This cannot be undone. Are you sure?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => deleteMutation.mutate(),
-        },
-      ],
-    );
+    Alert.alert('Delete Collection', 'This cannot be undone. Are you sure?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => deleteMutation.mutate(),
+      },
+    ]);
   }, [deleteMutation]);
 
   const removeMutation = useMutation({
@@ -104,7 +87,11 @@ export default function CollectionDetailScreen() {
   const renderItem = useCallback(
     ({ item }: { item: PodcastSummary }) => (
       <View>
-        <PodcastCard podcast={item} variant="compact" onPress={() => router.push(`/podcast/${item.id}`)} />
+        <PodcastCard
+          podcast={item}
+          variant="compact"
+          onPress={() => router.push(`/podcast/${item.id}`)}
+        />
         {collection?.isOwner && (
           <Pressable
             style={styles.removeButton}
@@ -117,7 +104,7 @@ export default function CollectionDetailScreen() {
         )}
       </View>
     ),
-    [collection?.isOwner, removeMutation],
+    [collection?.isOwner, removeMutation, router]
   );
 
   if (isLoading || !collection) {
@@ -136,7 +123,9 @@ export default function CollectionDetailScreen() {
   const listHeader = (
     <View style={styles.header}>
       <View style={styles.headerTop}>
-        <Text style={styles.headerName} testID="collection-detail-name">{collection.name}</Text>
+        <Text style={styles.headerName} testID="collection-detail-name">
+          {collection.name}
+        </Text>
         <Ionicons
           name={collection.isPublic ? 'globe-outline' : 'lock-closed-outline'}
           size={18}
@@ -150,42 +139,19 @@ export default function CollectionDetailScreen() {
         By {collection.user?.name ?? collection.user?.handle ?? 'Unknown'}
         {' \u00B7 '}
         {collection.podcastCount} podcast{collection.podcastCount !== 1 ? 's' : ''}
-        {' \u00B7 '}
-        {collection.followerCount} follower{collection.followerCount !== 1 ? 's' : ''}
       </Text>
 
-      <View style={styles.headerActions}>
-        {!collection.isOwner && (
+      {collection.isOwner && (
+        <View style={styles.headerActions}>
           <Pressable
-            style={[
-              styles.followButton,
-              collection.isFollowing && styles.followButtonActive,
-            ]}
-            onPress={() => followMutation.mutate()}
-            disabled={followMutation.isPending}
-            testID="collection-detail-follow-button"
+            style={styles.deleteCollectionButton}
+            onPress={handleDelete}
+            testID="collection-detail-delete-button"
           >
-            <Ionicons
-              name={collection.isFollowing ? 'checkmark' : 'add'}
-              size={18}
-              color={collection.isFollowing ? colors.primary : colors.textInverse}
-            />
-            <Text
-              style={[
-                styles.followButtonText,
-                collection.isFollowing && styles.followButtonTextActive,
-              ]}
-            >
-              {collection.isFollowing ? 'Following' : 'Follow'}
-            </Text>
-          </Pressable>
-        )}
-        {collection.isOwner && (
-          <Pressable style={styles.deleteCollectionButton} onPress={handleDelete} testID="collection-detail-delete-button">
             <Ionicons name="trash-outline" size={18} color={colors.error} />
           </Pressable>
-        )}
-      </View>
+        </View>
+      )}
     </View>
   );
 
@@ -257,29 +223,6 @@ const styles = StyleSheet.create({
   headerActions: {
     flexDirection: 'row',
     gap: spacing.sm,
-  },
-  followButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    backgroundColor: colors.primary,
-    borderRadius: borderRadius.full,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-  },
-  followButtonActive: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.primary,
-  },
-  followButtonText: {
-    fontFamily: typography.fontBody,
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.textInverse,
-  },
-  followButtonTextActive: {
-    color: colors.primary,
   },
   deleteCollectionButton: {
     padding: spacing.sm,

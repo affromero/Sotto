@@ -1,13 +1,5 @@
 import { useCallback, useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  Pressable,
-  Switch,
-  Alert,
-  ScrollView,
-  StyleSheet,
-} from 'react-native';
+import { View, Text, Pressable, Switch, Alert, ScrollView, StyleSheet } from 'react-native';
 import { useRouter, Stack } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { openBrowserAsync } from 'expo-web-browser';
@@ -94,18 +86,15 @@ export default function SettingsScreen() {
                       queryClient.clear();
                       router.replace('/auth/login');
                     } catch {
-                      Alert.alert(
-                        'Error',
-                        'Failed to delete account. Please try again.',
-                      );
+                      Alert.alert('Error', 'Failed to delete account. Please try again.');
                     }
                   },
                 },
-              ],
+              ]
             );
           },
         },
-      ],
+      ]
     );
   }, [queryClient, router]);
 
@@ -126,10 +115,7 @@ export default function SettingsScreen() {
           <Text style={[styles.sectionTitle, { color: colors.textTertiary }]}>Account</Text>
           <View style={[styles.card, { backgroundColor: colors.surface }]}>
             <Pressable
-              style={({ pressed }) => [
-                styles.row,
-                pressed && styles.rowPressed,
-              ]}
+              style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
               onPress={() => router.push('/settings/profile')}
               testID="settings-edit-profile"
             >
@@ -138,10 +124,7 @@ export default function SettingsScreen() {
             </Pressable>
             <View style={styles.rowSeparator} />
             <Pressable
-              style={({ pressed }) => [
-                styles.row,
-                pressed && styles.rowPressed,
-              ]}
+              style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
               onPress={() => router.push('/settings/api-keys')}
               testID="settings-api-keys"
             >
@@ -150,9 +133,7 @@ export default function SettingsScreen() {
                 <View
                   style={[
                     styles.keyStatusDot,
-                    allKeysConfigured
-                      ? styles.keyStatusDotGreen
-                      : styles.keyStatusDotAmber,
+                    allKeysConfigured ? styles.keyStatusDotGreen : styles.keyStatusDotAmber,
                   ]}
                 />
               </View>
@@ -160,22 +141,7 @@ export default function SettingsScreen() {
             </Pressable>
             <View style={styles.rowSeparator} />
             <Pressable
-              style={({ pressed }) => [
-                styles.row,
-                pressed && styles.rowPressed,
-              ]}
-              onPress={() => router.push('/settings/notifications')}
-              testID="settings-notifications"
-            >
-              <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>Notifications</Text>
-              <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
-            </Pressable>
-            <View style={styles.rowSeparator} />
-            <Pressable
-              style={({ pressed }) => [
-                styles.row,
-                pressed && styles.rowPressed,
-              ]}
+              style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
               onPress={() => router.push('/settings/interests')}
               testID="settings-interests"
             >
@@ -184,22 +150,18 @@ export default function SettingsScreen() {
             </Pressable>
             <View style={styles.rowSeparator} />
             <Pressable
-              style={({ pressed }) => [
-                styles.row,
-                pressed && styles.rowPressed,
-              ]}
+              style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
               onPress={() => router.push('/settings/accounts')}
               testID="settings-connected-accounts"
             >
-              <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>Connected Accounts</Text>
+              <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
+                Connected Accounts
+              </Text>
               <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
             </Pressable>
             <View style={styles.rowSeparator} />
             <Pressable
-              style={({ pressed }) => [
-                styles.row,
-                pressed && styles.rowPressed,
-              ]}
+              style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
               onPress={() => router.push('/settings/voices')}
               testID="settings-voice-clones"
             >
@@ -208,10 +170,7 @@ export default function SettingsScreen() {
             </Pressable>
             <View style={styles.rowSeparator} />
             <Pressable
-              style={({ pressed }) => [
-                styles.row,
-                pressed && styles.rowPressed,
-              ]}
+              style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
               onPress={() => router.push('/settings/briefings')}
               testID="settings-briefings"
             >
@@ -220,7 +179,9 @@ export default function SettingsScreen() {
             </Pressable>
             <View style={styles.rowSeparator} />
             <View style={styles.row}>
-              <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>Post-Listen Quizzes</Text>
+              <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
+                Post-Listen Quizzes
+              </Text>
               <Switch
                 value={quizEnabled}
                 onValueChange={(val) => {
@@ -240,10 +201,7 @@ export default function SettingsScreen() {
           <Text style={[styles.sectionTitle, { color: colors.textTertiary }]}>Creator</Text>
           <View style={[styles.card, { backgroundColor: colors.surface }]}>
             <Pressable
-              style={({ pressed }) => [
-                styles.row,
-                pressed && styles.rowPressed,
-              ]}
+              style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
               onPress={() => router.push('/analytics')}
               testID="settings-analytics"
             >
@@ -252,22 +210,18 @@ export default function SettingsScreen() {
             </Pressable>
             <View style={styles.rowSeparator} />
             <Pressable
-              style={({ pressed }) => [
-                styles.row,
-                pressed && styles.rowPressed,
-              ]}
+              style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
               onPress={() => router.push('/voices')}
               testID="settings-voice-marketplace"
             >
-              <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>Voice Marketplace</Text>
+              <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
+                Voice Marketplace
+              </Text>
               <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
             </Pressable>
             <View style={styles.rowSeparator} />
             <Pressable
-              style={({ pressed }) => [
-                styles.row,
-                pressed && styles.rowPressed,
-              ]}
+              style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
               onPress={() => router.push('/settings/billing')}
               testID="settings-billing"
             >
@@ -276,10 +230,7 @@ export default function SettingsScreen() {
             </Pressable>
             <View style={styles.rowSeparator} />
             <Pressable
-              style={({ pressed }) => [
-                styles.row,
-                pressed && styles.rowPressed,
-              ]}
+              style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
               onPress={() => router.push('/settings/referral')}
               testID="settings-referral"
             >
@@ -302,7 +253,10 @@ export default function SettingsScreen() {
                     style={[
                       styles.schemeChip,
                       { borderColor: colors.border },
-                      scheme === opt && { backgroundColor: colors.primary, borderColor: colors.primary },
+                      scheme === opt && {
+                        backgroundColor: colors.primary,
+                        borderColor: colors.primary,
+                      },
                     ]}
                     onPress={() => setScheme(opt)}
                     testID={`settings-theme-${opt}`}
@@ -328,10 +282,7 @@ export default function SettingsScreen() {
           <Text style={[styles.sectionTitle, { color: colors.textTertiary }]}>Legal</Text>
           <View style={[styles.card, { backgroundColor: colors.surface }]}>
             <Pressable
-              style={({ pressed }) => [
-                styles.row,
-                pressed && styles.rowPressed,
-              ]}
+              style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
               onPress={() => openBrowserAsync('https://sotto.fm/privacy')}
             >
               <Text style={styles.rowLabel}>Privacy Policy</Text>
@@ -339,10 +290,7 @@ export default function SettingsScreen() {
             </Pressable>
             <View style={styles.rowSeparator} />
             <Pressable
-              style={({ pressed }) => [
-                styles.row,
-                pressed && styles.rowPressed,
-              ]}
+              style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
               onPress={() => openBrowserAsync('https://sotto.fm/terms')}
             >
               <Text style={styles.rowLabel}>Terms of Service</Text>
@@ -350,10 +298,7 @@ export default function SettingsScreen() {
             </Pressable>
             <View style={styles.rowSeparator} />
             <Pressable
-              style={({ pressed }) => [
-                styles.row,
-                pressed && styles.rowPressed,
-              ]}
+              style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
               onPress={() => openBrowserAsync('https://sotto.fm/support')}
             >
               <Text style={styles.rowLabel}>Support</Text>
