@@ -75,8 +75,6 @@ const mockTrending = [
     duration: 300,
     audioUrl: 'https://example.com/audio.mp3',
     playCount: 100,
-    likeCount: 10,
-    forkCount: 2,
     createdAt: '2026-02-15T00:00:00Z',
     user: { id: 'u1', name: 'User', image: null },
     tags: [{ id: 't1', name: 'Tech', slug: 'tech' }],

@@ -31,8 +31,6 @@ export async function GET(request: NextRequest) {
     audioUrl: p.audioUrl,
     duration: p.duration,
     playCount: p.playCount,
-    likeCount: p.likeCount,
-    forkCount: p.forkCount,
     createdAt: p.createdAt.toISOString(),
     source: p.source,
     isHumanContent: p.isHumanContent,
@@ -43,7 +41,6 @@ export async function GET(request: NextRequest) {
     language: p.language,
     aiAutoResolved: p.aiAutoResolved,
     ttsAutoResolved: p.ttsAutoResolved,
-    forkedFromId: p.forkedFromId,
     user: p.user,
     tags: p.tags.map((pt) => pt.tag),
   }));

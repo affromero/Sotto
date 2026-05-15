@@ -6,7 +6,7 @@ Shared types used across the application. These mirror Prisma models but are sha
 
 | File              | Contents                                                                                                                                                          |
 | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `podcast.ts`      | PodcastSummary, PodcastDetail (includes `references`, `pdfUrl`, `forkedFrom`, `forks`, `remixNote`, `versions`, `ttsProvider`), SegmentData, CreatePodcastRequest |
+| `podcast.ts`      | PodcastSummary, PodcastDetail (includes `references`, `pdfUrl`, `versions`, `ttsProvider`), SegmentData, CreatePodcastRequest |
 | `player.ts`       | PlayerState, PlayerControls                                                                                                                                       |
 | `interaction.ts`  | InteractionRequest, InteractionResponse, ResolutionChoice                                                                                                         |
 | `discovery.ts`    | DiscoveryMessage, DiscoveryMetadata, DiscoveryState                                                                                                               |

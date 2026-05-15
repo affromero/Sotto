@@ -29,16 +29,11 @@ const mockPodcast: PodcastSummary = {
   duration: 600,
   audioUrl: 'https://example.com/audio.mp3',
   playCount: 1250,
-  likeCount: 89,
-  forkCount: 12,
   visibility: 'PUBLIC',
   status: 'READY',
   createdAt: '2026-02-08T10:00:00Z',
   source: 'WEB' as const,
   isHumanContent: false,
-  forkedFromId: null,
-  forkedFrom: null,
-  isVoiceOnlyFork: false,
   ownerIsPro: true,
   user: {
     id: 'user-1',
@@ -167,8 +162,8 @@ describe('PodcastCard', () => {
   it('shows private playback stats for Pro owner viewing own podcast', () => {
     render(<PodcastCard podcast={mockPodcast} />);
     expect(screen.getByLabelText('1250 plays')).toBeInTheDocument();
-    expect(screen.queryByLabelText('89 likes')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('12 forks')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/likes/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/forks/i)).not.toBeInTheDocument();
   });
 
   it("hides stats for Pro owner viewing someone else's podcast", () => {
@@ -181,15 +176,10 @@ describe('PodcastCard', () => {
     expect(screen.queryByLabelText('1250 plays')).not.toBeInTheDocument();
   });
 
-  it('does not render remix lineage or fork controls', () => {
-    const remixPodcast = {
-      ...mockPodcast,
-      forkedFromId: 'original-1',
-      forkedFrom: { id: 'original-1', title: 'Original Podcast' },
-    };
-    render(<PodcastCard podcast={remixPodcast} />);
-    expect(screen.queryByText(/Remix of/)).not.toBeInTheDocument();
+  it('does not render social controls', () => {
+    render(<PodcastCard podcast={mockPodcast} />);
+    expect(screen.queryByRole('button', { name: /Like/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Follow/ })).not.toBeInTheDocument();
     expect(screen.queryByText(/Original Podcast/)).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Fork/ })).not.toBeInTheDocument();
   });
 });

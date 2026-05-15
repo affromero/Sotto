@@ -305,10 +305,7 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
     audioUrl: resolvedAudioUrl,
     duration: podcast.duration,
     playCount: podcast.playCount,
-    likeCount: podcast.likeCount,
-    forkCount: podcast.forkCount,
     saveCount: podcast.saveCount,
-    commentCount: podcast.commentCount,
     createdAt: podcast.createdAt.toISOString(),
     source: podcast.source,
     isHumanContent: podcast.isHumanContent,
@@ -321,10 +318,7 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
     language: podcast.language,
     aiAutoResolved: podcast.aiAutoResolved,
     ttsAutoResolved: podcast.ttsAutoResolved,
-    forkedFromId: podcast.forkedFromId,
-    isVoiceOnlyFork: podcast.isVoiceOnlyFork,
     ownerIsPro: false,
-    remixNote: podcast.remixNote,
     failureReason: podcast.failureReason,
     failedAtStatus: podcast.failedAtStatus,
     errorId: podcast.errorId,
@@ -344,26 +338,10 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
     musicVolume: podcast.musicVolume,
     musicBaked: podcast.musicBaked,
     tags: podcast.tags.map((pt) => pt.tag),
-    forkedFrom: podcast.forkedFrom
-      ? {
-          id: podcast.forkedFrom.id,
-          title: podcast.forkedFrom.title,
-          user: podcast.forkedFrom.user,
-        }
-      : null,
-    forks: podcast.forks.map((f) => ({
-      id: f.id,
-      title: f.title,
-      remixNote: f.remixNote,
-      isVoiceOnlyFork: f.isVoiceOnlyFork,
-      createdAt: f.createdAt.toISOString(),
-      user: f.user,
-    })),
     versions: resolvedVersions,
     voiceTracks: resolvedVoiceTracks,
     defaultVoiceTrackId: podcast.defaultVoiceTrackId,
     originalTrackName,
-    isLiked: false,
     isSaved: false,
   };
 
