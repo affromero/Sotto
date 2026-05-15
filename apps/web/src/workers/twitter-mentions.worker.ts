@@ -311,11 +311,8 @@ async function processSingleMention(tweet: TwitterTweet, mediaByKey: Map<string,
       speakers = speakers.slice(0, tierFeatures.maxSpeakers);
     }
 
-    // Plan-gate visibility (private/unlisted require PRO or BYOK)
-    const requestedVisibility = parsed.visibility ?? 'public';
-    const visibility = (requestedVisibility !== 'public' && !tierFeatures.privateAllowed)
-      ? 'PUBLIC'
-      : requestedVisibility.toUpperCase() as 'PUBLIC' | 'UNLISTED' | 'PRIVATE';
+    const requestedVisibility = parsed.visibility ?? 'private';
+    const visibility = requestedVisibility.toUpperCase() as 'PUBLIC' | 'UNLISTED' | 'PRIVATE';
 
     // 8b. Determine voice IDs for each speaker
     const tempPodcastId = mention.id; // use mention ID as seed for voice selection
@@ -541,4 +538,3 @@ function extractPhotoUrls(tweet: TwitterTweet, mediaByKey: Map<string, TwitterMe
   }
   return urls;
 }
-

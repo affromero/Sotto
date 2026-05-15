@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma, prismaUnfiltered } from '@/lib/prisma';
 import { authenticateRequest } from '@/lib/api-keys';
 import { updatePodcastSchema } from '@/lib/validations';
-import { getTierFeatures } from '@/lib/tier-features';
-import { hasByokKey } from '@/lib/byok';
 import { PODCAST_PUBLIC_SELECT } from '@/lib/podcast-select';
 import { resolveAudioUrl } from '@/lib/r2';
 import { generatePodcastSlug } from '@/lib/slugify';
@@ -17,8 +15,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
   // Try Redis cache first (shared, non-user-specific data)
   const cacheKey = `podcast:public:${podcastId}`;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let podcast: Record<string, any> | null = await cache.get(cacheKey);
+  if (podcast?.visibility !== 'PUBLIC') {
+    podcast = null;
+  }
 
   if (!podcast) {
     podcast = await prisma.podcast.findUnique({
@@ -38,7 +38,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       },
     });
 
-    if (podcast) {
+    if (podcast?.visibility === 'PUBLIC') {
       const ttl = getPodcastCacheTtl(podcast.status);
       await cache.set(cacheKey, podcast, ttl);
     }
@@ -134,20 +134,6 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   }
 
   const { dismissSuggestion, ...updateData } = parsed.data;
-
-  if (updateData.visibility === 'PRIVATE' || updateData.visibility === 'UNLISTED') {
-    const [user, isByok] = await Promise.all([
-      prisma.user.findUniqueOrThrow({
-        where: { id: authResult.userId },
-        select: { plan: true, role: true },
-      }),
-      hasByokKey(authResult.userId),
-    ]);
-    const tierFeatures = getTierFeatures(user.plan as 'FREE' | 'PRO', isByok, user.role);
-    if (!tierFeatures.privateAllowed) {
-      return errorResponse('Private and unlisted podcasts require a Pro subscription.', 403);
-    }
-  }
 
   // Regenerate slug when title changes
   const slugData = updateData.title

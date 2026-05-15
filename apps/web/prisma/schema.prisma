@@ -113,7 +113,8 @@ model User {
   following Follow[] @relation("Follower")
 
   // API Keys
-  apiKeys ApiKey[]
+  apiKeys           ApiKey[]
+  privateFeedTokens PrivateFeedToken[]
 
   // Twitter mentions
   tweetMentions TweetMention[]
@@ -367,7 +368,7 @@ model Podcast {
   sourceTweetId String?
 
   // Visibility
-  visibility PodcastVisibility @default(PUBLIC)
+  visibility PodcastVisibility @default(PRIVATE)
   isDelisted Boolean           @default(false)
 
   // Fork tracking
@@ -1530,6 +1531,25 @@ model ApiKey {
 
   @@index([userId])
   @@index([keyHash])
+}
+
+// ============ PRIVATE RSS FEEDS ============
+
+model PrivateFeedToken {
+  id         String    @id @default(cuid())
+  userId     String
+  name       String    @default("Private Sotto Feed")
+  tokenHash  String    @unique
+  feedType   String    @default("all")
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([revokedAt])
 }
 
 // ============ VOICE CLONES ============

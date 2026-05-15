@@ -202,7 +202,7 @@ export async function POST(request: NextRequest) {
       sourcePlatform: validatedSourcePlatform,
       sttProvider: validatedSttProvider,
       sttModel: validatedSttModel,
-      visibility: gate.isProUser ? ('PRIVATE' as const) : ('PUBLIC' as const),
+      visibility: 'PRIVATE' as const,
     };
 
     const podcast = draftId

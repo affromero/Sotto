@@ -362,7 +362,7 @@ describe('processTwitterMentions', () => {
           aiModel: undefined,
           aiAutoResolved: true,
           ttsAutoResolved: true,
-          visibility: 'PUBLIC',
+          visibility: 'PRIVATE',
           zeroCostVideo: false,
           discovery: {
             create: {

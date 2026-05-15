@@ -139,7 +139,7 @@ export default function CreateScreen() {
   const [ttsModel, setTtsModel] = useState<string | undefined>();
   const [aiModel, setAiModel] = useState<string | undefined>();
   const [durationTarget, setDurationTarget] = useState(10);
-  const [visibility, setVisibility] = useState<'PUBLIC' | 'UNLISTED' | 'PRIVATE'>('PUBLIC');
+  const [visibility, setVisibility] = useState<'PUBLIC' | 'UNLISTED' | 'PRIVATE'>('PRIVATE');
 
   // User tier → maxSpeakers
   const { data: billingData } = useQuery<{ tier: string }>({

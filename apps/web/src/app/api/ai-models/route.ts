@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
   const isAdmin = user?.role === 'ADMIN';
   const [aiKeys, claudeAvailable] = await Promise.all([
     listAiProviders(authResult.userId),
-    isAdmin ? isClaudeAvailable() : Promise.resolve(false),
+    isClaudeAvailable(),
   ]);
   const validKeys = aiKeys.filter((k) => k.isValid);
   const claudeCodeModels = claudeAvailable ? CLAUDE_CODE_MODELS : [];
@@ -140,7 +140,7 @@ export async function GET(request: NextRequest) {
       readOnly: false,
       userPlan,
       isByok: false,
-      models: sortModels(platformModels),
+      models: sortModels([...platformModels, ...claudeCodeModels]),
     }, { headers: CACHE_HEADERS });
   }
 
@@ -207,6 +207,6 @@ export async function GET(request: NextRequest) {
     readOnly: false,
     userPlan,
     isByok: true,
-    models: sortModels(isAdmin ? [...byokModels, ...claudeCodeModels] : byokModels),
+    models: sortModels([...byokModels, ...claudeCodeModels]),
   }, { headers: CACHE_HEADERS });
 }

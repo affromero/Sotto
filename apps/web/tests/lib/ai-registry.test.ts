@@ -150,4 +150,13 @@ describe('resolveAiModelAndProvider — unknown model fallthrough', () => {
     expect(result.provider).toBe('openai');
     expect(result.model).toBe('gpt-5-mini');
   });
+
+  it('keeps claude-code composite models routed to local Claude Code', async () => {
+    const result = await resolveAiModelAndProvider({
+      podcastAiModel: 'claude-code:sonnet',
+    });
+
+    expect(result.provider).toBe('claude-code');
+    expect(result.model).toBe('claude-code:sonnet');
+  });
 });

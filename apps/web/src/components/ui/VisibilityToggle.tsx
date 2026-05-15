@@ -20,15 +20,13 @@ interface VisibilityToggleProps {
   canMakePrivate?: boolean;
 }
 
-export function VisibilityToggle({ podcastId, visibility, canMakePrivate }: VisibilityToggleProps) {
+export function VisibilityToggle({ podcastId, visibility }: VisibilityToggleProps) {
   const router = useRouter();
   const [current, setCurrent] = useState(visibility);
   const [updating, setUpdating] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const cycle = canMakePrivate !== false
-    ? ALL_VISIBILITIES
-    : ALL_VISIBILITIES.filter((v) => v !== 'PRIVATE' && v !== 'UNLISTED');
+  const cycle = ALL_VISIBILITIES;
 
   const handleClick = useCallback(
     async (e: React.MouseEvent) => {

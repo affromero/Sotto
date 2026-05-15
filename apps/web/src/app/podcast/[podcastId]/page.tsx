@@ -2,7 +2,6 @@ import { notFound, redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getFreeTierStatus } from '@/lib/generation-gate';
-import { getTierFeatures } from '@/lib/tier-features';
 import { getVideoGenerationStatus, getAvatarGenerationStatus } from '@/lib/video-gate';
 import { getMusicGenerationStatus } from '@/lib/music-gate';
 import { resolveAudioUrl } from '@/lib/r2';
@@ -182,8 +181,7 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
   let ownerIsByok = false;
   if (ownerData) {
     const [freeTier, vidStatus, avStatus, musStatus, costStats] = ownerData;
-    const plan = freeTier.isProUser ? 'PRO' as const : 'FREE' as const;
-    canMakePrivate = getTierFeatures(plan, freeTier.isByokUser, session?.user?.role as string | undefined).privateAllowed;
+    canMakePrivate = true;
     videoStatus = vidStatus;
     avatarStatus = avStatus;
     musicStatus = musStatus;

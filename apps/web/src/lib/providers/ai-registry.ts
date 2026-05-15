@@ -431,6 +431,10 @@ export async function resolveAiModelAndProvider(opts: {
 
   // 1. Podcast-level model override — only use if the model is in the registry
   if (opts.podcastAiModel) {
+    if (opts.podcastAiModel.startsWith('claude-code:')) {
+      return { model: opts.podcastAiModel, provider: 'claude-code' };
+    }
+
     const owner = getProviderForModel(opts.podcastAiModel);
     if (owner) {
       return { model: opts.podcastAiModel, provider: owner };
