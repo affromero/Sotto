@@ -120,26 +120,26 @@ describe('getModelMaxOutputTokens', () => {
   });
 });
 
-describe('resolveAiModelAndProvider — unknown model fallthrough', () => {
-  it('falls through to BYOK key when podcastAiModel is not in registry', async () => {
-    const result = await resolveAiModelAndProvider({
-      podcastAiModel: 'nonexistent-model-xyz',
-      aiKey: { provider: 'openai', apiKey: 'sk-test' },
-    });
-
-    // Should fall through to BYOK default model, NOT pair unknown model with 'anthropic'
-    expect(result.provider).toBe('openai');
-    expect(result.model).toBe('gpt-5.4');  // defaultModel changed to gpt-5.4
+describe('resolveAiModelAndProvider — explicit model routing', () => {
+  it('rejects an unknown podcast model before checking BYOK routing', async () => {
+    await expect(
+      resolveAiModelAndProvider({
+        podcastAiModel: 'nonexistent-model-xyz',
+        aiKey: { provider: 'openai', apiKey: 'sk-test' },
+      })
+    ).rejects.toThrow(
+      'Unknown AI model "nonexistent-model-xyz". Choose a registered model before generation.'
+    );
   });
 
-  it('falls through to auto-model when podcastAiModel is unknown and no BYOK key', async () => {
-    const result = await resolveAiModelAndProvider({
-      podcastAiModel: 'nonexistent-model-xyz',
-    });
-
-    // Should fall through to auto-model config
-    expect(result.provider).toBe('anthropic');
-    expect(result.model).toBe('claude-haiku-4-5-20251001');
+  it('rejects an unknown podcast model before checking auto-model routing', async () => {
+    await expect(
+      resolveAiModelAndProvider({
+        podcastAiModel: 'nonexistent-model-xyz',
+      })
+    ).rejects.toThrow(
+      'Unknown AI model "nonexistent-model-xyz". Choose a registered model before generation.'
+    );
   });
 
   it('returns known model with its provider when podcastAiModel is valid', async () => {

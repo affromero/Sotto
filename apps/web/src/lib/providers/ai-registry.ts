@@ -416,7 +416,7 @@ export function isValidModelId(modelId: string): boolean {
  * Resolve the AI model and its owning provider, keeping them in sync.
  *
  * Priority:
- * 1. podcast.aiModel (user's explicit choice) → look up provider from registry
+ * 1. podcast.aiModel (user's explicit choice) → look up provider from registry. Throws if unknown.
  * 2. BYOK key → provider default model
  * 3. Free tier admin config → aiAllocations[0] or aiModel
  *
@@ -439,9 +439,9 @@ export async function resolveAiModelAndProvider(opts: {
     if (owner) {
       return { model: opts.podcastAiModel, provider: owner };
     }
-    logger.warn('resolveAiModelAndProvider: unknown model, falling through', {
-      model: opts.podcastAiModel,
-    });
+    throw new Error(
+      `Unknown AI model "${opts.podcastAiModel}". Choose a registered model before generation.`
+    );
   }
 
   // 2. BYOK key → provider's default model
