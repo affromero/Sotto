@@ -40,6 +40,10 @@ export async function aiEvaluateWithDomainContext(
   model?: string,
   provider?: string
 ): Promise<Map<string, VerificationCheck>> {
+  if (!provider || !model) {
+    throw new Error('AI provider and model are required for reference verification.');
+  }
+
   const results = new Map<string, VerificationCheck>();
 
   const refsContext = refsWithDomain
@@ -99,7 +103,7 @@ Evaluate each reference according to its domain instructions. Return JSON only.`
     ]);
 
     logUsage({
-      service: provider ?? 'anthropic',
+      service: provider,
       model: response.model,
       category: 'reference_validation',
       inputTokens: response.inputTokens,
