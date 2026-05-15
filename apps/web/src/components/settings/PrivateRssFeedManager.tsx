@@ -16,6 +16,7 @@ export interface PrivateFeedTokenMetadata {
 
 interface PrivateRssFeedManagerProps {
   initialTokens: PrivateFeedTokenMetadata[];
+  onTokenCountChange?: (count: number) => void;
 }
 
 interface CreatePrivateFeedResponse {
@@ -35,7 +36,10 @@ function formatDate(value: string | null): string {
   });
 }
 
-export function PrivateRssFeedManager({ initialTokens }: PrivateRssFeedManagerProps) {
+export function PrivateRssFeedManager({
+  initialTokens,
+  onTokenCountChange,
+}: PrivateRssFeedManagerProps) {
   const [tokens, setTokens] = useState(initialTokens);
   const [name, setName] = useState('');
   const [createdFeed, setCreatedFeed] = useState<{
@@ -73,16 +77,20 @@ export function PrivateRssFeedManager({ initialTokens }: PrivateRssFeedManagerPr
       const data = (await response.json()) as CreatePrivateFeedResponse;
       const feedName = trimmedName || DEFAULT_FEED_NAME;
       setCreatedFeed({ id: data.id, name: feedName, feedUrl: data.feedUrl });
-      setTokens((current) => [
-        {
-          id: data.id,
-          name: feedName,
-          feedType: 'all',
-          createdAt: new Date().toISOString(),
-          lastUsedAt: null,
-        },
-        ...current,
-      ]);
+      setTokens((current) => {
+        const next = [
+          {
+            id: data.id,
+            name: feedName,
+            feedType: 'all',
+            createdAt: new Date().toISOString(),
+            lastUsedAt: null,
+          },
+          ...current,
+        ];
+        onTokenCountChange?.(next.length);
+        return next;
+      });
       setName('');
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to create private feed.');
@@ -100,7 +108,11 @@ export function PrivateRssFeedManager({ initialTokens }: PrivateRssFeedManagerPr
       if (!response.ok) {
         throw new Error('Unable to revoke private feed.');
       }
-      setTokens((current) => current.filter((token) => token.id !== tokenId));
+      setTokens((current) => {
+        const next = current.filter((token) => token.id !== tokenId);
+        onTokenCountChange?.(next.length);
+        return next;
+      });
       setCreatedFeed((current) => (current?.id === tokenId ? null : current));
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to revoke private feed.');
