@@ -47,11 +47,22 @@ describe('private-first OSS surfaces', () => {
     ]
       .map(readSource)
       .join('\n');
+    const sharedPositioningSource = [
+      'packages/shared/src/brand.ts',
+      'apps/web/src/lib/marketing-templates.ts',
+    ]
+      .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
+      .join('\n');
 
     expect(landingSource).not.toContain('social podcast network');
     expect(landingSource).not.toContain('social feed');
     expect(landingSource).not.toContain('social features');
     expect(landingSource).not.toContain('Fork and remix any public podcast');
+    expect(sharedPositioningSource).not.toContain('social podcast network');
+    expect(sharedPositioningSource).not.toContain('social feed');
+    expect(sharedPositioningSource).not.toContain('GitHub for podcasts');
+    expect(sharedPositioningSource).not.toContain('Create. Fork. Remix. Share.');
+    expect(sharedPositioningSource).not.toContain('fork and remix anything');
   });
 
   it('keeps dashboard data access scoped to private workspace metrics', () => {
