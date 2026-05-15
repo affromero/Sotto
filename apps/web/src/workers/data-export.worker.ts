@@ -223,7 +223,7 @@ async function exportPodcastFeatures(
 ): Promise<void> {
   if (format === 'csv') {
     writeLine(
-      'podcastId,avgCompletionRate,medianCompletionRate,totalUniqueListeners,totalListenMinutes,likeToListenRatio,saveToListenRatio,forkToListenRatio,interactionRate,relistenRate,avgListenSpeed,segmentCount,durationSeconds,referenceCount,verifiedReferenceRate'
+      'podcastId,avgCompletionRate,medianCompletionRate,totalUniqueListeners,totalListenMinutes,saveToListenRatio,interactionRate,relistenRate,avgListenSpeed,segmentCount,durationSeconds,referenceCount,verifiedReferenceRate'
     );
   }
 
@@ -244,9 +244,7 @@ async function exportPodcastFeatures(
             f.medianCompletionRate,
             f.totalUniqueListeners,
             f.totalListenMinutes,
-            f.likeToListenRatio,
             f.saveToListenRatio,
-            f.forkToListenRatio,
             f.interactionRate,
             f.relistenRate,
             f.avgListenSpeed,

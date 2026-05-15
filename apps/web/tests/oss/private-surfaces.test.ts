@@ -464,6 +464,42 @@ describe('private-first OSS surfaces', () => {
     expect(collectionE2ESource).not.toContain('/follow');
   });
 
+  it('keeps feature computation private-signal scoped', () => {
+    const schemaSource = readFileSync(resolve(repoRoot, 'apps/web/prisma/schema.prisma'), 'utf8');
+    const userFeatureModel = schemaSource.slice(
+      schemaSource.indexOf('model UserFeature'),
+      schemaSource.indexOf('model PodcastFeature')
+    );
+    const podcastFeatureModel = schemaSource.slice(
+      schemaSource.indexOf('model PodcastFeature'),
+      schemaSource.indexOf('model BehavioralEvent')
+    );
+    const featureSources = [
+      'src/workers/feature-computation.worker.ts',
+      'src/workers/data-export.worker.ts',
+      'src/app/api/podcasts/[podcastId]/quality/route.ts',
+      'src/workers/CLAUDE.md',
+    ]
+      .map(readSource)
+      .concat(userFeatureModel, podcastFeatureModel)
+      .join('\n');
+
+    expect(featureSources).toContain('Private activity');
+    expect(featureSources).toContain('saveToListenRatio');
+    expect(featureSources).toContain('interactionRate');
+    expect(featureSources).not.toContain('prisma.like');
+    expect(featureSources).not.toContain('prisma.follow');
+    expect(featureSources).not.toContain('followingCount');
+    expect(featureSources).not.toContain('followerCount');
+    expect(featureSources).not.toContain('likeRate');
+    expect(featureSources).not.toContain('forkRate');
+    expect(featureSources).not.toContain('likeToListenRatio');
+    expect(featureSources).not.toContain('forkToListenRatio');
+    expect(featureSources).not.toContain('forkedFromId');
+    expect(featureSources).not.toContain('liked: pct');
+    expect(featureSources).not.toContain('forked: pct');
+  });
+
   it('does not ship mobile podcast social actions or widgets', () => {
     const removedMobileComponents = [
       'apps/mobile/components/ForkModal.tsx',
