@@ -8,6 +8,15 @@ function textOf(content: ChatMessage['content']): string {
   return content.filter((p) => p.type === 'text').map((p) => (p as TextContentPart).text).join('\n');
 }
 
+function resolveClaudeCodeModel(model?: string): { cliModel: string; reportedModel: string } {
+  const defaultModel = getAiProviderMeta('claude-code').defaultModel;
+  const selected = model || process.env.CLAUDE_CODE_MODEL || defaultModel;
+  const cliModel = selected.startsWith('claude-code:')
+    ? selected.slice('claude-code:'.length) || defaultModel
+    : selected;
+  return { cliModel, reportedModel: `claude-code:${cliModel}` };
+}
+
 /**
  * Claude Code CLI provider — routes AI calls through `claude -p`.
  * Selected by prefixing the model name with "claude-code:", e.g. "claude-code:opus".
@@ -18,13 +27,13 @@ export class ClaudeCodeProvider implements AIProvider {
     messages: ChatMessage[],
     opts?: AIOptions
   ): Promise<AIResponse> {
-    const ccModel = opts?.model || process.env.CLAUDE_CODE_MODEL || getAiProviderMeta('claude-code').defaultModel;
+    const { cliModel, reportedModel } = resolveClaudeCodeModel(opts?.model);
     const textMessages = messages.map((m) => ({ role: m.role, content: textOf(m.content) }));
     const result = await executeClaudeCode(system, serializeMessages(textMessages), {
-      model: ccModel,
+      model: cliModel,
       useWebSearch: opts?.useWebSearch,
     });
-    return { ...result, model: ccModel };
+    return { ...result, model: reportedModel };
   }
 
   async *streamResponse(
@@ -32,9 +41,10 @@ export class ClaudeCodeProvider implements AIProvider {
     messages: ChatMessage[],
     opts?: AIOptions
   ): AsyncGenerator<string> {
+    const { cliModel } = resolveClaudeCodeModel(opts?.model);
     const textMessages = messages.map((m) => ({ role: m.role, content: textOf(m.content) }));
     yield* streamClaudeCode(system, serializeMessages(textMessages), {
-      model: opts?.model || process.env.CLAUDE_CODE_MODEL || getAiProviderMeta('claude-code').defaultModel,
+      model: cliModel,
       useWebSearch: opts?.useWebSearch,
     });
   }
