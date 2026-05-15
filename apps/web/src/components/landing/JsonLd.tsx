@@ -6,11 +6,6 @@ interface WebSiteSchema {
   name: string;
   url: string;
   description: string;
-  potentialAction: {
-    '@type': 'SearchAction';
-    target: { '@type': 'EntryPoint'; urlTemplate: string };
-    'query-input': string;
-  };
 }
 
 interface OrganizationSchema {
@@ -29,14 +24,6 @@ const websiteSchema: WebSiteSchema = {
   name: BRAND.name,
   url: BRAND.url,
   description: BRAND.description,
-  potentialAction: {
-    '@type': 'SearchAction',
-    target: {
-      '@type': 'EntryPoint',
-      urlTemplate: `${BRAND.url}/feed?q={search_term_string}`,
-    },
-    'query-input': 'required name=search_term_string',
-  },
 };
 
 const organizationSchema: OrganizationSchema = {
@@ -45,9 +32,7 @@ const organizationSchema: OrganizationSchema = {
   name: BRAND.name,
   url: BRAND.url,
   logo: `${BRAND.url}/icon-512.png`,
-  sameAs: [
-    'https://twitter.com/SottoFM',
-  ],
+  sameAs: ['https://twitter.com/SottoFM'],
   description: BRAND.elevatorPitch,
 };
 

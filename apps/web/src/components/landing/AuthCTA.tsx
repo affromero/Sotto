@@ -19,11 +19,11 @@ export function AuthCTA({ source }: AuthCTAProps) {
   if (mounted && isAuthenticated) {
     return (
       <div className={styles.ctas}>
-        <Link href="/feed" className={styles.btnPrimary}>
-          Explore the Feed
+        <Link href="/dashboard" className={styles.btnPrimary}>
+          Open Dashboard
         </Link>
-        <Link href="/dashboard" className={styles.btnGhost}>
-          Dashboard
+        <Link href="/create" className={styles.btnGhost}>
+          Create Podcast
         </Link>
       </div>
     );
@@ -41,8 +41,12 @@ export function AuthCTA({ source }: AuthCTAProps) {
     <div className={styles.wrap}>
       <WaitlistForm source={source} />
       <div className={styles.links}>
-        <Link href="/feed" className={styles.link}>Explore the Feed</Link>
-        <Link href="/auth/login" className={styles.link}>Sign In</Link>
+        <Link href="/create" className={styles.link}>
+          Create Private Feed
+        </Link>
+        <Link href="/auth/login" className={styles.link}>
+          Sign In
+        </Link>
       </div>
     </div>
   );

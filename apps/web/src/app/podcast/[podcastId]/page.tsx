@@ -172,7 +172,6 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
   const isSaved = !!save;
 
   // Owner data
-  let canMakePrivate: boolean | undefined;
   let videoStatus: { dailyUsed: number; dailyLimit: number; dailyRemaining: number; resetInSeconds?: number; isByokUser: boolean; isProUser: boolean } | undefined;
   let avatarStatus: { dailyUsed: number; dailyLimit: number; dailyRemaining: number; resetInSeconds?: number; isByokUser: boolean; isProUser: boolean } | undefined;
   let musicStatus: { dailyUsed: number; dailyLimit: number; dailyRemaining: number; resetInSeconds?: number; isByokUser: boolean; isProUser: boolean } | undefined;
@@ -181,7 +180,6 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
   let ownerIsByok = false;
   if (ownerData) {
     const [freeTier, vidStatus, avStatus, musStatus, costStats] = ownerData;
-    canMakePrivate = true;
     videoStatus = vidStatus;
     avatarStatus = avStatus;
     musicStatus = musStatus;
@@ -371,7 +369,7 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
         />
       )}
       <div className={styles.container}>
-        <PodcastPlayerView podcast={podcastData} isOwner={isOwner} isAdmin={isAdmin} isAuthenticated={!!userId} currentUserId={userId} canMakePrivate={canMakePrivate} videoStatus={videoStatus} avatarStatus={avatarStatus} musicStatus={musicStatus} hasQuiz={hasQuiz} quizStats={quizStats} />
+        <PodcastPlayerView podcast={podcastData} isOwner={isOwner} isAdmin={isAdmin} isAuthenticated={!!userId} currentUserId={userId} videoStatus={videoStatus} avatarStatus={avatarStatus} musicStatus={musicStatus} hasQuiz={hasQuiz} quizStats={quizStats} />
         {costBreakdown && costBreakdown.total > 0 && (
           <CostBreakdown breakdown={costBreakdown} isPro={ownerIsPro} isByok={ownerIsByok} />
         )}

@@ -8,16 +8,16 @@ import styles from './VisibilityToggle.module.css';
 
 const ALL_VISIBILITIES: PodcastVisibility[] = ['PUBLIC', 'UNLISTED', 'PRIVATE'];
 
-const config: Record<PodcastVisibility, { icon: typeof Globe; label: string; className: string }> = {
-  PUBLIC: { icon: Globe, label: 'Public', className: styles.public },
-  UNLISTED: { icon: Link2, label: 'Unlisted', className: styles.unlisted },
-  PRIVATE: { icon: Lock, label: 'Private', className: styles.private },
-};
+const config: Record<PodcastVisibility, { icon: typeof Globe; label: string; className: string }> =
+  {
+    PUBLIC: { icon: Globe, label: 'Public', className: styles.public },
+    UNLISTED: { icon: Link2, label: 'Unlisted', className: styles.unlisted },
+    PRIVATE: { icon: Lock, label: 'Private', className: styles.private },
+  };
 
 interface VisibilityToggleProps {
   podcastId: string;
   visibility: PodcastVisibility;
-  canMakePrivate?: boolean;
 }
 
 export function VisibilityToggle({ podcastId, visibility }: VisibilityToggleProps) {
@@ -65,7 +65,7 @@ export function VisibilityToggle({ podcastId, visibility }: VisibilityToggleProp
         setUpdating(false);
       }
     },
-    [current, updating, podcastId, router, cycle],
+    [current, updating, podcastId, router, cycle]
   );
 
   const { icon: Icon, label, className } = config[current];

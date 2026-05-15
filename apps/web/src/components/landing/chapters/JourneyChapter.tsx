@@ -8,7 +8,7 @@ interface JourneyChapterProps {
 }
 
 const FEATURES = [
-  'Fork and remix any public podcast',
+  'Generate private RSS feeds for any podcast app',
   'Import from Spotify, YouTube, Apple Podcasts, or audio files',
   'Ask follow-up questions mid-playback',
   'Daily briefings and comprehension quizzes',
@@ -37,8 +37,8 @@ export function JourneyChapter({ showcase }: JourneyChapterProps) {
                 <div className={styles.stepBody}>
                   <h3 className={styles.stepTitle}>Describe your topic</h3>
                   <p className={styles.stepDesc}>
-                    Chat with Sotto about what you want to learn. AI researches your topic,
-                    writes a script with citations, and verifies every claim.
+                    Chat with Sotto about what you want to learn. AI researches your topic, writes a
+                    script with citations, and verifies every claim.
                   </p>
                 </div>
               </div>
@@ -57,9 +57,7 @@ export function JourneyChapter({ showcase }: JourneyChapterProps) {
                           key={i}
                           className={`${styles.mockMsg} ${msg.role === 'user' ? styles.mockUser : styles.mockBot}`}
                         >
-                          {msg.role === 'assistant' && (
-                            <div className={styles.mockAvatar}>S</div>
-                          )}
+                          {msg.role === 'assistant' && <div className={styles.mockAvatar}>S</div>}
                           <div className={styles.mockBubble}>{msg.content}</div>
                         </div>
                       ))}
@@ -102,8 +100,7 @@ export function JourneyChapter({ showcase }: JourneyChapterProps) {
                       <div className={`${styles.mockMsg} ${styles.mockBot}`}>
                         <div className={styles.mockAvatar}>S</div>
                         <div className={styles.mockBubble}>
-                          Perfect. I&apos;ll use everyday analogies and build up
-                          from the basics.
+                          Perfect. I&apos;ll use everyday analogies and build up from the basics.
                         </div>
                       </div>
                       <div className={styles.typingIndicator} aria-hidden="true">
@@ -113,7 +110,9 @@ export function JourneyChapter({ showcase }: JourneyChapterProps) {
                       </div>
                       <div className={styles.mockChips}>
                         <span className={styles.chip}>Complete beginner</span>
-                        <span className={`${styles.chip} ${styles.chipFaded}`}>Some college bio</span>
+                        <span className={`${styles.chip} ${styles.chipFaded}`}>
+                          Some college bio
+                        </span>
                       </div>
                     </>
                   )}
@@ -130,19 +129,15 @@ export function JourneyChapter({ showcase }: JourneyChapterProps) {
                 <div className={styles.stepBody}>
                   <h3 className={styles.stepTitle}>Review &amp; choose voices</h3>
                   <p className={styles.stepDesc}>
-                    Edit every line of the script. Pick from 7 TTS providers
-                    (ElevenLabs, Cartesia, Hume, OpenAI, and more) or use your
-                    cloned voice.
+                    Edit every line of the script. Pick from 7 TTS providers (ElevenLabs, Cartesia,
+                    Hume, OpenAI, and more) or use your cloned voice.
                   </p>
                 </div>
               </div>
             </div>
             <div className={styles.splitVisual}>
               {showcase && showcase.scriptTurns.length > 0 ? (
-                <ScriptEditorMock
-                  turns={showcase.scriptTurns}
-                  references={showcase.references}
-                />
+                <ScriptEditorMock turns={showcase.scriptTurns} references={showcase.references} />
               ) : (
                 <div className={styles.mockScript}>
                   <div className={styles.mockHeader}>
@@ -154,7 +149,9 @@ export function JourneyChapter({ showcase }: JourneyChapterProps) {
                       <div className={styles.scriptLineRow}>
                         <span className={styles.lineNum}>1</span>
                         <div className={styles.scriptContent}>
-                          <span className={styles.scriptSpeaker} data-speaker="host">Host</span>
+                          <span className={styles.scriptSpeaker} data-speaker="host">
+                            Host
+                          </span>
                           <p>
                             Today we&apos;re diving into one of the most revolutionary technologies
                             of our time: CRISPR gene editing.{' '}
@@ -167,12 +164,13 @@ export function JourneyChapter({ showcase }: JourneyChapterProps) {
                       <div className={styles.scriptLineRow}>
                         <span className={styles.lineNum}>2</span>
                         <div className={styles.scriptContent}>
-                          <span className={styles.scriptSpeaker} data-speaker="expert">Expert</span>
+                          <span className={styles.scriptSpeaker} data-speaker="expert">
+                            Expert
+                          </span>
                           <p>
-                            Think of CRISPR as molecular scissors that can cut DNA at precisely
-                            the right spot. It&apos;s based on a natural defense system that
-                            bacteria use.{' '}
-                            <sup className={styles.citation}>[2]</sup>
+                            Think of CRISPR as molecular scissors that can cut DNA at precisely the
+                            right spot. It&apos;s based on a natural defense system that bacteria
+                            use. <sup className={styles.citation}>[2]</sup>
                           </p>
                         </div>
                       </div>

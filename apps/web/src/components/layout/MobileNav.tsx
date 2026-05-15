@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Home, PlusCircle, Radio, User } from 'lucide-react';
+import { Bookmark, Home, PlusCircle, Settings } from 'lucide-react';
 import styles from './MobileNav.module.css';
 
 interface MobileNavProps {
@@ -11,9 +11,9 @@ interface MobileNavProps {
 
 const tabs = [
   { href: '/dashboard', label: 'Home', icon: Home },
-  { href: '/feed', label: 'Discover', icon: Radio },
   { href: '/create', label: 'Create', icon: PlusCircle },
-  { href: '/profile', label: 'Profile', icon: User },
+  { href: '/ideas', label: 'Library', icon: Bookmark },
+  { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
 export function MobileNav({ currentPath, hasActivePlayer = false }: MobileNavProps) {
