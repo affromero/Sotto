@@ -46,7 +46,7 @@ Token lifecycle: SecureStore → Axios interceptor attaches Bearer → backend v
 app/
 ├── _layout.tsx            # Root (fonts, providers, QueryClient, auth gate)
 ├── (tabs)/
-│   ├── index.tsx          # Feed — infinite scroll, sort chips
+│   ├── index.tsx          # Private library
 │   ├── create.tsx         # 5-step: discovery → voice → scripting → preview → generating
 │   ├── notifications.tsx  # Notifications
 │   └── profile.tsx        # Current user profile
@@ -54,8 +54,7 @@ app/
 ├── ideas.tsx              # Saved ideas — swipe to dismiss, tap to generate
 ├── settings.tsx           # Settings hub — BYOK keys, logout
 ├── settings/api-keys.tsx  # BYOK key management
-├── podcast/[id].tsx       # Full-screen player
-└── user/[userId].tsx      # Public profile
+└── podcast/[id].tsx       # Full-screen player
 ```
 
 ## Lib Files

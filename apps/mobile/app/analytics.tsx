@@ -1,12 +1,5 @@
 import { useState, useCallback } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  Pressable,
-  ActivityIndicator,
-  StyleSheet,
-} from 'react-native';
+import { View, Text, ScrollView, Pressable, ActivityIndicator, StyleSheet } from 'react-native';
 import { Stack } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
@@ -30,15 +23,9 @@ interface AnalyticsData {
     title: string | null;
     plays: number;
     completionPercent: number;
-    likes: number;
-    forks: number;
   }[];
   engagement: {
-    likes: number;
     saves: number;
-    comments: number;
-    forks: number;
-    follows: number;
     interactions: number;
   };
   period: string;
@@ -92,17 +79,11 @@ export default function AnalyticsScreen() {
           <Pressable
             key={p.value}
             testID={`analytics-period-${p.value}`}
-            style={[
-              styles.periodChip,
-              period === p.value && styles.periodChipActive,
-            ]}
+            style={[styles.periodChip, period === p.value && styles.periodChipActive]}
             onPress={() => setPeriod(p.value)}
           >
             <Text
-              style={[
-                styles.periodChipText,
-                period === p.value && styles.periodChipTextActive,
-              ]}
+              style={[styles.periodChipText, period === p.value && styles.periodChipTextActive]}
             >
               {p.label}
             </Text>
@@ -110,7 +91,7 @@ export default function AnalyticsScreen() {
         ))}
       </View>
     ),
-    [period],
+    [period]
   );
 
   if (isError) {
@@ -158,12 +139,12 @@ export default function AnalyticsScreen() {
             <Text style={styles.sectionTitle}>Engagement</Text>
             <View style={styles.engagementCard} testID="analytics-engagement-card">
               {[
-                { label: 'Likes', value: data.engagement.likes, icon: 'heart-outline' },
                 { label: 'Saves', value: data.engagement.saves, icon: 'bookmark-outline' },
-                { label: 'Comments', value: data.engagement.comments, icon: 'chatbubble-outline' },
-                { label: 'Forks', value: data.engagement.forks, icon: 'git-branch-outline' },
-                { label: 'Follows', value: data.engagement.follows, icon: 'person-add-outline' },
-                { label: 'Questions', value: data.engagement.interactions, icon: 'help-circle-outline' },
+                {
+                  label: 'Questions',
+                  value: data.engagement.interactions,
+                  icon: 'help-circle-outline',
+                },
               ].map((item, i, arr) => (
                 <View key={item.label}>
                   <View style={styles.engagementRow}>
@@ -175,9 +156,7 @@ export default function AnalyticsScreen() {
                       />
                       <Text style={styles.engagementLabel}>{item.label}</Text>
                     </View>
-                    <Text style={styles.engagementValue}>
-                      {item.value.toLocaleString()}
-                    </Text>
+                    <Text style={styles.engagementValue}>{item.value.toLocaleString()}</Text>
                   </View>
                   {i < arr.length - 1 && <View style={styles.separator} />}
                 </View>
@@ -196,7 +175,7 @@ export default function AnalyticsScreen() {
                         {podcast.title ?? 'Untitled'}
                       </Text>
                       <Text style={styles.topPodcastMeta}>
-                        {podcast.plays} plays · {podcast.likes} likes · {podcast.completionPercent}% completion
+                        {podcast.plays} plays · {podcast.completionPercent}% completion
                       </Text>
                     </View>
                   </View>

@@ -178,4 +178,35 @@ describe('private-first OSS surfaces', () => {
     expect(mobilePodcastSurfaces).not.toContain('likeCount');
     expect(mobilePodcastSurfaces).not.toContain('forkCount');
   });
+
+  it('does not ship mobile follow surfaces or social notification settings', () => {
+    const removedMobileRoutes = [
+      'apps/mobile/app/user/[userId].tsx',
+      'apps/mobile/app/settings/notifications.tsx',
+    ];
+    const mobilePrivateSources = [
+      'apps/mobile/app/_layout.tsx',
+      'apps/mobile/app/settings.tsx',
+      'apps/mobile/app/collections/index.tsx',
+      'apps/mobile/app/collections/[id].tsx',
+      'apps/mobile/app/analytics.tsx',
+      'apps/mobile/app/(tabs)/notifications.tsx',
+      'apps/mobile/CLAUDE.md',
+    ]
+      .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
+      .join('\n');
+
+    for (const route of removedMobileRoutes) {
+      expect(existsSync(resolve(repoRoot, route)), route).toBe(false);
+    }
+    expect(mobilePrivateSources).not.toContain('/follow');
+    expect(mobilePrivateSources).not.toContain('followerCount');
+    expect(mobilePrivateSources).not.toContain('followingCount');
+    expect(mobilePrivateSources).not.toContain('followMutation');
+    expect(mobilePrivateSources).not.toContain('settings/notifications');
+    expect(mobilePrivateSources).not.toContain('NEW_FOLLOWER');
+    expect(mobilePrivateSources).not.toContain('NEW_LIKE');
+    expect(mobilePrivateSources).not.toContain('NEW_FORK');
+    expect(mobilePrivateSources).not.toContain('NEW_COMMENT');
+  });
 });
