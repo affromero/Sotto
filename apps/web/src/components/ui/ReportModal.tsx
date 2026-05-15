@@ -25,7 +25,7 @@ interface ReportContext {
 }
 
 interface ReportModalProps {
-  targetType: 'podcast' | 'comment' | 'user';
+  targetType: 'podcast' | 'user';
   targetId: string;
   onClose: () => void;
   context?: ReportContext;
@@ -89,7 +89,7 @@ export function ReportModal({ targetType, targetId, onClose, context }: ReportMo
         ) : (
           <form onSubmit={handleSubmit}>
             <h2 className={styles.title}>
-              Report {targetType === 'podcast' ? 'Podcast' : targetType === 'comment' ? 'Comment' : 'User'}
+              Report {targetType === 'podcast' ? 'Podcast' : 'User'}
             </h2>
 
             <fieldset className={styles.reasons}>

@@ -576,7 +576,7 @@ export const podcastRatingSchema = z.object({
  * Report creation validation
  */
 export const createReportSchema = z.object({
-  targetType: z.enum(['podcast', 'comment', 'user']),
+  targetType: z.enum(['podcast', 'user']),
   targetId: z.string().min(1),
   reason: z.enum([
     'HARASSMENT',

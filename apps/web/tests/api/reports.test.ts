@@ -4,7 +4,6 @@ import { NextRequest } from 'next/server';
 const mockAuth = vi.fn();
 const mockReportCreate = vi.fn();
 const mockPodcastFindUnique = vi.fn();
-const mockCommentFindUnique = vi.fn();
 const mockUserFindUnique = vi.fn();
 const mockCheckRateLimit = vi.fn();
 
@@ -19,9 +18,6 @@ vi.mock('@/lib/prisma', () => ({
     },
     podcast: {
       findUnique: (...args: unknown[]) => mockPodcastFindUnique(...args),
-    },
-    comment: {
-      findUnique: (...args: unknown[]) => mockCommentFindUnique(...args),
     },
     user: {
       findUnique: (...args: unknown[]) => mockUserFindUnique(...args),
@@ -91,6 +87,15 @@ describe('POST /api/reports', () => {
       createRequest({ targetType: 'podcast', targetId: 'pod-1', reason: 'INVALID_REASON' })
     );
     expect(response.status).toBe(400);
+  });
+
+  it('rejects legacy comment report targets', async () => {
+    const response = await POST(
+      createRequest({ targetType: 'comment', targetId: 'comment-1', reason: 'SPAM' })
+    );
+
+    expect(response.status).toBe(400);
+    expect(mockReportCreate).not.toHaveBeenCalled();
   });
 
   it('auto-escalates FALSE_HUMAN_BADGE reports to REVIEWING', async () => {

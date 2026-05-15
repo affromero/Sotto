@@ -5,7 +5,7 @@ import type { ModerateContentPayload } from '@/lib/queue';
 
 /**
  * Async content moderation worker.
- * Scans content (podcast scripts, comments) via the OpenAI Moderation API
+ * Scans podcast scripts via the OpenAI Moderation API
  * and creates ContentFlag records for flagged content. Admins can review
  * flags in the moderation dashboard.
  */
