@@ -4,7 +4,7 @@ test.describe('Podcast Player', () => {
   test('player page loads for a valid podcast', async ({ authedContext }) => {
     const page = await authedContext.newPage();
 
-    // Navigate to feed first, then click a podcast
+    // Navigate to the workspace first, then click a podcast
     await page.goto('/');
     const firstCard = page.locator('[data-testid="podcast-card"]').first();
 

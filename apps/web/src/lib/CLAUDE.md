@@ -65,7 +65,7 @@ All shared business logic and external service integrations live here.
 | `twitter-config.ts` | `getTwitterConfig()` reads singleton TwitterConfig row (auto-tweet thresholds, trend polling, template); `setTwitterConfig()` for admin updates | Uses `prisma.ts` |
 | `landing-showcase.ts` | `getLandingShowcaseConfig()` reads singleton LandingShowcase row; `setLandingShowcaseConfig()` for admin updates. Follows twitter-config singleton pattern | Uses `prisma.ts` |
 | `showcase.ts` | `getShowcasePodcast()` for HeroChapter embed; `getLandingShowcaseData()` fetches full showcase data (chat, script, refs, audio/video clips, bot overrides) for all landing chapters | Uses `prisma.ts`, `landing-showcase.ts` |
-| `twitter-auto-tweet.ts` | `checkAutoTweetThreshold(podcastId)` — fire-and-forget after like/fork/play; `manualTweet(podcastId)` — admin-triggered tweet | Uses `prisma.ts`, `twitter-config.ts`, `queue.ts` |
+| `twitter-auto-tweet.ts` | `checkAutoTweetThreshold(podcastId)` — fire-and-forget after private playback thresholds; `manualTweet(podcastId)` — admin-triggered tweet | Uses `prisma.ts`, `twitter-config.ts`, `queue.ts` |
 | `generation-gate.ts` | `checkGenerationGate(userId)`: BYOK check + free tier counter; `tryIncrementFreeGeneration()`: atomic SQL increment; `getFreeTierStatus()` for display | Uses `prisma.ts`, `byok.ts` |
 | `pricing.ts` | AI model pricing table + cost lookup: `getAiCost()`, `getAiPricing()`, `getCheapestModel()`, `refreshPricingFromDb()`, `getAllCurrentPricing()`, `startPricingRefreshInterval()` — centralized pricing with dynamic DB refresh | Pure utility + `pricing-fetcher.ts` |
 | `pricing-fetcher.ts` | Pricetoken API fetcher: `fetchPricingFromPricetoken()`, `savePricingSnapshots()`, `getLatestPricingFromDb()`, `getAdminOverriddenModels()`, `seedPricingFromRegistry()`, `filterToKnownModels()` | Uses `prisma.ts`, `pricetoken`, `ai-registry.ts` |
@@ -124,7 +124,7 @@ Client-side React hooks (`'use client'`).
 | `useNotifications` | Notification polling (30s interval): list, unread count, mark read, refresh |
 | `usePlaybackTelemetry` | Playback event tracking: heartbeats (30s), pause/seek/speed counts, abandon detection |
 | `useRotatingMessage` | Rotating sub-messages for generation progress: cycles through stage-specific pools every 9s, switches early→late after 2min |
-| `usePodcast` | Podcast detail fetcher: loading state, like/unlike, save/unsave, fork |
+| `usePodcast` | Podcast detail fetcher: loading state, save/unsave |
 | `useScrollFollow` | Auto-scroll follow with user-input detection (wheel/touch), scrollability guard, 3s debounce relock |
 | `useHasMounted` | Hydration-safe mount guard: returns `false` on server/initial render, `true` after client mount |
 

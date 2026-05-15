@@ -110,7 +110,7 @@ export function KeySetupForm({
           </svg>
         </button>
         <button type="button" className={styles.skipLink} onClick={handleSkip}>
-          Maybe later &mdash; explore the feed first
+          Maybe later &mdash; continue to my workspace
         </button>
       </div>
     </div>

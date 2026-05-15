@@ -108,13 +108,6 @@ const entries: ChangelogEntry[] = [
     tags: ['feature'],
   },
   {
-    date: '2026-01-22',
-    title: 'Fork & Remix',
-    description:
-      'Fork any public podcast and remix it with your own angle. Fork lineage is tracked with visual graphs showing the full ancestry chain.',
-    tags: ['feature'],
-  },
-  {
     date: '2026-01-18',
     title: 'Twitter Bot (@SottoFM)',
     description:

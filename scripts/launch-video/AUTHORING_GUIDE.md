@@ -102,7 +102,6 @@ Interceptors mock API responses so the video shows instant results instead of lo
 ```json
 { "type": "intercept", "name": "discovery", "options": { "podcastId": "abc123" } }
 { "type": "intercept", "name": "interact", "options": { "podcastId": "abc123" } }
-{ "type": "intercept", "name": "fork", "options": { "podcastId": "abc123" } }
 { "type": "intercept", "name": "scriptApprove", "options": { "podcastId": "abc123" } }
 { "type": "intercept", "name": "avatar", "options": { "videoUrl": "https://r2.sotto.fm/demos/avatars/clip.mp4" } }
 { "type": "clearIntercept", "name": "discovery" }
@@ -111,7 +110,6 @@ Interceptors mock API responses so the video shows instant results instead of lo
 Available interceptors:
 - `discovery` — mock topic discovery (instant podcast creation)
 - `interact` — mock chat interaction (instant AI responses)
-- `fork` — mock podcast forking
 - `scriptApprove` — mock script approval
 - `avatar` — mock avatar session (instant READY with pre-generated video)
 
