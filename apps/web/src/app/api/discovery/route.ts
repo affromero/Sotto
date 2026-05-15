@@ -128,7 +128,9 @@ export async function POST(request: NextRequest) {
   // Resolve which provider owns the requested model so we use the right BYOK key.
   // e.g. 'gpt-5-mini' → 'openai', 'claude-sonnet-4-6' → 'anthropic'
   let modelProvider: AiProviderId | undefined;
-  if (typeof model === 'string' && !model.startsWith('claude-code:')) {
+  if (typeof model === 'string' && model.startsWith('claude-code:')) {
+    modelProvider = 'claude-code';
+  } else if (typeof model === 'string') {
     for (const p of getAllAiProviderMeta()) {
       if (p.models.some((m) => m.id === model)) {
         modelProvider = p.id as AiProviderId;
@@ -139,9 +141,11 @@ export async function POST(request: NextRequest) {
 
   // Fetch the BYOK key for the resolved provider only. Explicit model choices must not
   // silently switch to a different provider key.
-  const aiKey = modelProvider
+  const aiKey = modelProvider && modelProvider !== 'claude-code'
     ? await getAiKey(authed.userId, modelProvider)
-    : await getAiKey(authed.userId);
+    : modelProvider === 'claude-code'
+      ? null
+      : await getAiKey(authed.userId);
 
   // Fetch user for plan gating and language detection
   const user = await prisma.user.findUnique({
@@ -226,7 +230,12 @@ export async function POST(request: NextRequest) {
 
   const messages = [...priorMessages, { role: 'user' as const, content: userMessage }];
 
-  const effectiveProvider = modelProvider ?? aiKey?.provider ?? 'anthropic';
+  const effectiveProvider = modelProvider ?? (aiKey?.provider as AiProviderId | undefined);
+  if (!effectiveProvider) {
+    return errorResponse('AI model is required when no AI key is configured.', 400, {
+      code: 'ai_model_required',
+    });
+  }
 
   // For free-tier users (maxDuration <= 5), tell the AI not to ask about duration
   const systemSuffix = typeof maxDuration === 'number' && maxDuration <= 5
@@ -246,7 +255,7 @@ export async function POST(request: NextRequest) {
           model || undefined,
           (usage) => {
             logUsage({
-              service: effectiveProvider as 'anthropic' | 'openai',
+              service: effectiveProvider,
               model: usage.model,
               category: 'discovery',
               inputTokens: usage.inputTokens,
@@ -313,7 +322,7 @@ export async function POST(request: NextRequest) {
               model || undefined,
               (usage) => {
                 logUsage({
-                  service: effectiveProvider as 'anthropic' | 'openai',
+                  service: effectiveProvider,
                   model: usage.model,
                   category: 'discovery',
                   inputTokens: usage.inputTokens,
