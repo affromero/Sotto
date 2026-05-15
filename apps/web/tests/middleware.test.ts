@@ -213,8 +213,8 @@ describe('Middleware Security Tests', () => {
       expect(isPassThrough(res)).toBe(true);
     });
 
-    it('passes through non-protected routes like /feed', async () => {
-      const res = await middleware(createRequest('/feed'));
+    it('passes through public feedback route', async () => {
+      const res = await middleware(createRequest('/feedback'));
       expect(isPassThrough(res)).toBe(true);
     });
   });

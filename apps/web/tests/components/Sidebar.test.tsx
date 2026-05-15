@@ -30,7 +30,6 @@ describe('Sidebar', () => {
 
     expect(screen.getByText('Dashboard')).toBeInTheDocument();
     expect(screen.getByText('Create')).toBeInTheDocument();
-    expect(screen.getByText('Discover')).toBeInTheDocument();
     expect(screen.getByText('API Keys')).toBeInTheDocument();
     expect(screen.getByText('Settings')).toBeInTheDocument();
     // Voices, Analytics require hasPodcasts or ADMIN
@@ -57,7 +56,6 @@ describe('Sidebar', () => {
 
     expect(screen.getByText('Dashboard').closest('a')).toHaveAttribute('href', '/dashboard');
     expect(screen.getByText('Create').closest('a')).toHaveAttribute('href', '/create');
-    expect(screen.getByText('Discover').closest('a')).toHaveAttribute('href', '/feed');
     expect(screen.getByText('API Keys').closest('a')).toHaveAttribute('href', '/billing');
     expect(screen.getByText('Settings').closest('a')).toHaveAttribute('href', '/settings');
   });

@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 const webRoot = existsSync(resolve(process.cwd(), 'src'))
   ? process.cwd()
   : resolve(process.cwd(), 'apps/web');
+const repoRoot = resolve(webRoot, '../..');
 
 function readSource(relativePath: string): string {
   return readFileSync(resolve(webRoot, relativePath), 'utf8');
@@ -77,5 +78,28 @@ describe('private-first OSS surfaces', () => {
     expect(readSource('src/app/(dashboard)/dashboard/MyPodcastsSection.tsx')).not.toContain(
       'getTierFeatures'
     );
+  });
+
+  it('does not ship the public feed page or feed API route', () => {
+    expect(existsSync(resolve(webRoot, 'src/app/feed/page.tsx'))).toBe(false);
+    expect(existsSync(resolve(webRoot, 'src/app/api/feed/route.ts'))).toBe(false);
+  });
+
+  it('does not keep public feed contracts in mobile, shared, or MCP packages', () => {
+    const mobileSources = ['apps/mobile/app/(tabs)/index.tsx', 'apps/mobile/app/(tabs)/search.tsx']
+      .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
+      .join('\n');
+    const mcpSources = ['packages/mcp/src/server.ts', 'packages/mcp/src/client.ts']
+      .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
+      .join('\n');
+
+    expect(mobileSources).not.toContain("'/feed'");
+    expect(mobileSources).not.toContain('"/feed"');
+    expect(mobileSources).not.toContain('/users/discover');
+    expect(mobileSources).not.toContain('/users/suggested');
+    expect(mcpSources).not.toContain('browse_feed');
+    expect(mcpSources).not.toContain('/api/feed');
+    expect(existsSync(resolve(repoRoot, 'packages/shared/src/types/feed.ts'))).toBe(false);
+    expect(existsSync(resolve(webRoot, 'src/types/feed.ts'))).toBe(false);
   });
 });

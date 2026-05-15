@@ -4,7 +4,6 @@ import {
   createPodcastSchema,
   interactionSchema,
   updatePodcastSchema,
-  feedQuerySchema,
   configureAvatarsSchema,
   updateAvatarPositionsSchema,
   regenerateWithFeedbackSchema,
@@ -312,98 +311,6 @@ describe('updatePodcastSchema', () => {
   });
 });
 
-describe('feedQuerySchema', () => {
-  it('applies defaults for empty input', () => {
-    const result = feedQuerySchema.safeParse({});
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.page).toBe(1);
-      expect(result.data.limit).toBe(20);
-      expect(result.data.sort).toBe('recent');
-    }
-  });
-
-  it('accepts valid pagination parameters', () => {
-    const result = feedQuerySchema.safeParse({ page: 3, limit: 10 });
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.page).toBe(3);
-      expect(result.data.limit).toBe(10);
-    }
-  });
-
-  it('coerces string numbers for page and limit', () => {
-    const result = feedQuerySchema.safeParse({ page: '2', limit: '15' });
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.page).toBe(2);
-      expect(result.data.limit).toBe(15);
-    }
-  });
-
-  it('rejects page less than 1', () => {
-    const result = feedQuerySchema.safeParse({ page: 0 });
-    expect(result.success).toBe(false);
-  });
-
-  it('rejects limit greater than 50', () => {
-    const result = feedQuerySchema.safeParse({ limit: 51 });
-    expect(result.success).toBe(false);
-  });
-
-  it('rejects limit less than 1', () => {
-    const result = feedQuerySchema.safeParse({ limit: 0 });
-    expect(result.success).toBe(false);
-  });
-
-  it('accepts search string', () => {
-    const result = feedQuerySchema.safeParse({ search: 'quantum physics' });
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.search).toBe('quantum physics');
-    }
-  });
-
-  it('rejects search exceeding 200 characters', () => {
-    const result = feedQuerySchema.safeParse({ search: 'a'.repeat(201) });
-    expect(result.success).toBe(false);
-  });
-
-  it('accepts tag parameter', () => {
-    const result = feedQuerySchema.safeParse({ tag: 'science' });
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.tag).toBe('science');
-    }
-  });
-
-  it('accepts sort by popular', () => {
-    const result = feedQuerySchema.safeParse({ sort: 'popular' });
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.sort).toBe('popular');
-    }
-  });
-
-  it('accepts sort by trending', () => {
-    const result = feedQuerySchema.safeParse({ sort: 'trending' });
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.sort).toBe('trending');
-    }
-  });
-
-  it('rejects invalid sort option', () => {
-    const result = feedQuerySchema.safeParse({ sort: 'alphabetical' });
-    expect(result.success).toBe(false);
-  });
-
-  it('rejects non-integer page', () => {
-    const result = feedQuerySchema.safeParse({ page: 1.5 });
-    expect(result.success).toBe(false);
-  });
-});
-
 describe('configureAvatarsSchema', () => {
   it('accepts valid avatar config with heygen provider', () => {
     const result = configureAvatarsSchema.safeParse({
@@ -414,7 +321,9 @@ describe('configureAvatarsSchema', () => {
 
   it('accepts valid avatar config with runway provider', () => {
     const result = configureAvatarsSchema.safeParse({
-      avatars: [{ speaker: 'Host', avatarId: 'influencer', avatarProvider: 'runway', isPreset: true }],
+      avatars: [
+        { speaker: 'Host', avatarId: 'influencer', avatarProvider: 'runway', isPreset: true },
+      ],
     });
     expect(result.success).toBe(true);
     if (result.success) {
@@ -448,7 +357,8 @@ describe('configureAvatarsSchema', () => {
 
   it('rejects more than 4 avatars', () => {
     const avatars = Array.from({ length: 5 }, (_, i) => ({
-      speaker: `Speaker ${i}`, avatarId: `av-${i}`,
+      speaker: `Speaker ${i}`,
+      avatarId: `av-${i}`,
     }));
     const result = configureAvatarsSchema.safeParse({ avatars });
     expect(result.success).toBe(false);
@@ -549,4 +459,3 @@ describe('regenerateWithFeedbackSchema — sourceUrls', () => {
     }
   });
 });
-

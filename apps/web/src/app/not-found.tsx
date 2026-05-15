@@ -14,8 +14,8 @@ export default function NotFound() {
       <p className={styles.description}>
         The page you&apos;re looking for doesn&apos;t exist or has been moved.
       </p>
-      <Link href="/feed" className={styles.cta}>
-        Back to Feed
+      <Link href="/" className={styles.cta}>
+        Go Home
       </Link>
     </main>
   );

@@ -1,18 +1,15 @@
 import type {
   Podcast,
   PodcastDetail,
-  FeedResponse,
   UserProfile,
   CreatePodcastParams,
-  FeedParams,
-  ForkParams,
   UpdatePodcastParams,
 } from './types.js';
 
 export class ApiError extends Error {
   constructor(
     public status: number,
-    message: string,
+    message: string
   ) {
     super(message);
     this.name = 'ApiError';
@@ -33,7 +30,7 @@ export class SottoClient {
     const res = await fetch(url, {
       ...options,
       headers: {
-        'Authorization': `Bearer ${this.apiKey}`,
+        Authorization: `Bearer ${this.apiKey}`,
         'Content-Type': 'application/json',
         ...options.headers,
       },
@@ -50,7 +47,10 @@ export class SottoClient {
 
   async createPodcast(params: CreatePodcastParams): Promise<{ id: string; status: string }> {
     const focusAreas = params.focus_areas
-      ? params.focus_areas.split(',').map((s) => s.trim()).filter(Boolean)
+      ? params.focus_areas
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
       : undefined;
 
     return this.request('/api/podcasts', {
@@ -77,38 +77,6 @@ export class SottoClient {
 
   async listPodcasts(): Promise<Podcast[]> {
     return this.request('/api/podcasts');
-  }
-
-  async browseFeed(params: FeedParams = {}): Promise<FeedResponse> {
-    const query = new URLSearchParams();
-    if (params.search) query.set('search', params.search);
-    if (params.sort) query.set('sort', params.sort);
-    if (params.tag) query.set('tag', params.tag);
-    if (params.depth) query.set('depth', params.depth);
-    if (params.audience) query.set('audience', params.audience);
-    if (params.tone) query.set('tone', params.tone);
-    if (params.page) query.set('page', String(params.page));
-    if (params.limit) query.set('limit', String(params.limit));
-
-    const qs = query.toString();
-    return this.request(`/api/feed${qs ? `?${qs}` : ''}`);
-  }
-
-  async forkPodcast(id: string, params: ForkParams = {}): Promise<{ id: string }> {
-    const focusAreas = params.focus_areas
-      ? params.focus_areas.split(',').map((s) => s.trim()).filter(Boolean)
-      : undefined;
-
-    return this.request(`/api/podcasts/${id}/fork`, {
-      method: 'POST',
-      body: JSON.stringify({
-        topic: params.topic,
-        remixNote: params.remix_note,
-        focusAreas: focusAreas,
-        depth: params.depth,
-        tone: params.tone,
-      }),
-    });
   }
 
   async updatePodcast(id: string, params: UpdatePodcastParams): Promise<Podcast> {

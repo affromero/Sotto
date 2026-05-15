@@ -2,17 +2,25 @@ import { BRAND } from '@sotto/shared';
 
 /** Feature catalog: slug → description for demo script generation */
 const FEATURE_CATALOG: Record<string, string> = {
-  'creation-flow': 'Chat with AI to create a podcast. Describe your topic, pick a tone and depth, and Sotto generates a full 2-voice conversational podcast with sound effects and citations.',
-  'interrupt': 'Interrupt mid-playback to ask questions. AI answers in context, and your Q&A can be baked back into the podcast as a new version.',
-  'fork': 'Fork any podcast — like GitHub for audio. Take someone else\'s podcast, remix it with your own angle, tone, or focus areas. The original is always credited.',
-  'import': 'Import any human-made podcast. Sotto transcribes it, adds social features (comments, Q&A, forking), and puts it on the feed alongside AI-generated content.',
-  'social-feed': 'A public feed of podcasts — AI and human, side by side. Search, filter by topic, discover new voices, follow creators, and build collections.',
-  'byok': 'Bring Your Own Keys — use your own API keys for LLM and TTS providers. All features become unlimited and free. No subscription required.',
-  'voice-cloning': 'Clone your voice and use it in podcasts. Other creators can request to use your voice, and you set the price. A voice marketplace.',
-  'script-review': 'Review AI-generated scripts before audio generation. Edit turns, approve, or regenerate with feedback. Full control over content.',
-  'video-generation': 'Turn any podcast into a video with AI-generated visuals, transitions, and avatars. Each segment gets matched with relevant imagery.',
-  'collections': 'Curate podcast playlists. Save podcasts to collections, share them publicly, and let others follow your curation.',
-  'multi-speaker': 'Up to 4 speakers per podcast. Custom speaker names and descriptions — not just Host and Expert.',
+  'creation-flow':
+    'Chat with AI to create a podcast. Describe your topic, pick a tone and depth, and Sotto generates a full 2-voice conversational podcast with sound effects and citations.',
+  interrupt:
+    'Interrupt mid-playback to ask questions. AI answers in context, and your Q&A can be baked back into the podcast as a new version.',
+  import:
+    'Import any human-made podcast. Sotto transcribes it and turns it into a private, searchable listening workspace.',
+  'private-rss':
+    'Create private RSS feed URLs for podcast apps without exposing podcasts to a public social feed.',
+  byok: 'Bring Your Own Keys — use your own API keys for LLM and TTS providers. All features become unlimited and free. No subscription required.',
+  'voice-cloning':
+    'Clone your voice and use it in podcasts. Other creators can request to use your voice, and you set the price. A voice marketplace.',
+  'script-review':
+    'Review AI-generated scripts before audio generation. Edit turns, approve, or regenerate with feedback. Full control over content.',
+  'video-generation':
+    'Turn any podcast into a video with AI-generated visuals, transitions, and avatars. Each segment gets matched with relevant imagery.',
+  collections:
+    'Curate private podcast playlists and keep related research, meetings, and news briefings organized.',
+  'multi-speaker':
+    'Up to 4 speakers per podcast. Custom speaker names and descriptions — not just Host and Expert.',
 };
 
 /**
@@ -30,9 +38,8 @@ export function getDemoProductContext(): string {
     '- AI podcast generation from natural language chat',
     '- 8+ TTS voice providers with side-by-side comparison',
     '- Interrupt mid-playback to ask questions',
-    '- Fork and remix any podcast',
-    '- Import human-made podcasts with social features',
-    '- Public social feed with discovery',
+    '- Import human-made podcasts into a private workspace',
+    '- Private RSS feeds for podcast apps',
     '- Bring Your Own Keys (BYOK) for unlimited free usage',
     '- Voice cloning marketplace',
     '- Video generation with AI visuals',
@@ -65,7 +72,10 @@ export function getDemoFeatureSlugs(): string[] {
 
 /** Get feature label from slug */
 export function getDemoFeatureLabel(slug: string): string {
-  return slug.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+  return slug
+    .split('-')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
 }
 
 /**
@@ -77,7 +87,6 @@ export function getAppSelectorReference(): string {
     '## Navigation & Layout',
     '- `nav` — main navigation bar',
     '- `a[href="/"]` — home/logo link (landing page only)',
-    '- `a[href="/feed"]` — feed link (landing nav + TopBar)',
     '- `a[href="/create"]` — create link (landing page nav + dashboard TopBar ONLY — NOT on /podcast/* or /profile/* pages)',
     '- `button[aria-label="User menu"]` — user avatar dropdown (dashboard TopBar only)',
     '- NOTE: /podcast/[id] and /profile/[id] pages have NO top nav — do not target nav selectors on those pages',
@@ -96,16 +105,10 @@ export function getAppSelectorReference(): string {
     '- `input[aria-label="Your question"]` — Q&A input field',
     '',
     '## Podcast Detail',
-    '- `button[aria-label="Fork podcast"]` — fork button',
     '- `button[aria-label="Share podcast"]` — share button',
     '- `button[aria-label="Save to collection"]` — save button',
     '- `[data-testid="script-section"]` — script review area',
     '- `button:has-text("Approve Script")` — script approval button',
-    '',
-    '## Feed & Explore',
-    '- `[data-testid="podcast-card"]` — podcast card in feed',
-    '- `input[aria-label="Search podcasts"]` — search input',
-    '- `[data-testid="filter-bar"]` — filter/sort bar',
     '',
     '## Voice Comparison',
     '- `[data-testid="voice-track-list"]` — voice track sidebar',
@@ -165,11 +168,6 @@ export function getInterceptorCatalog(): string {
     'Mocks POST /api/podcasts/{id}/interact + GET polling.',
     'Options: `{ podcastId: string, interactionId: string, answer: string, answerDelay?: number }`',
     'Use when: demo shows the interrupt/Q&A feature during playback.',
-    '',
-    '## fork',
-    'Mocks POST /api/podcasts/{id}/fork.',
-    'Options: `{ podcastId: string, forkId: string }`',
-    'Use when: demo shows forking a podcast.',
     '',
     '## scriptApprove',
     'Mocks POST /api/podcasts/{id}/script/approve.',
