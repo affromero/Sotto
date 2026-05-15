@@ -20,7 +20,7 @@ export default async function SettingsPage() {
     return null;
   }
 
-  const [user, accounts, voiceClones, userInterests, categories, byokKeys, aiKeys, quizAnswerCount, referredUsers] = await Promise.all([
+  const [user, accounts, voiceClones, userInterests, categories, byokKeys, aiKeys, quizAnswerCount, referredUsers, privateFeedTokens] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -120,6 +120,17 @@ export default async function SettingsPage() {
       orderBy: { createdAt: 'desc' },
       take: 10,
     }),
+    prisma.privateFeedToken.findMany({
+      where: { userId, revokedAt: null },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        name: true,
+        feedType: true,
+        createdAt: true,
+        lastUsedAt: true,
+      },
+    }),
   ]);
 
   if (!user) return null;
@@ -186,6 +197,13 @@ export default async function SettingsPage() {
               : null,
           };
         })}
+        privateFeedTokens={privateFeedTokens.map((token) => ({
+          id: token.id,
+          name: token.name,
+          feedType: token.feedType,
+          createdAt: token.createdAt.toISOString(),
+          lastUsedAt: token.lastUsedAt?.toISOString() ?? null,
+        }))}
         hasByokKeys={configuredProviders.some((p) => p.isValid) || configuredAiProviders.some((p) => p.isValid)}
         initialQuizEnabled={user.quizEnabled}
         quizAnswerCount={quizAnswerCount}

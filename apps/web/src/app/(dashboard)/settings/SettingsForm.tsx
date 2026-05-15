@@ -21,6 +21,7 @@ import { MusicProviderCards } from '@/components/settings/MusicProviderCards';
 import { AvatarImageManager } from '@/components/settings/AvatarImageManager';
 import { BriefingSection } from '@/components/settings/BriefingSection';
 import type { BriefingData } from '@/components/settings/BriefingCard';
+import { PrivateRssFeedManager, type PrivateFeedTokenMetadata } from '@/components/settings/PrivateRssFeedManager';
 import { ThemeSelector } from '@/components/settings/ThemeSelector';
 import { usePushSubscription } from '@/lib/hooks/usePushSubscription';
 import styles from './page.module.css';
@@ -72,6 +73,7 @@ interface SettingsFormProps {
   initialEmailNotifications: boolean;
   initialPushNotifications: boolean;
   briefings: BriefingData[];
+  privateFeedTokens: PrivateFeedTokenMetadata[];
   hasByokKeys: boolean;
   initialQuizEnabled: boolean;
   quizAnswerCount: number;
@@ -113,6 +115,7 @@ export function SettingsForm({
   initialEmailNotifications,
   initialPushNotifications,
   briefings,
+  privateFeedTokens,
   hasByokKeys,
   initialQuizEnabled,
   isTwitterProviderAvailable,
@@ -725,6 +728,11 @@ export function SettingsForm({
           aiModelOptions={aiModelOptions}
           ttsOptions={ttsOptions}
         />
+      </section>
+
+      {/* Private RSS Feed Section */}
+      <section className={styles.section}>
+        <PrivateRssFeedManager initialTokens={privateFeedTokens} />
       </section>
 
       {/* Quizzes Section */}
