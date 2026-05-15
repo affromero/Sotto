@@ -1,6 +1,14 @@
 // @vitest-environment node
 import { describe, it, expect } from 'vitest';
-import { isMetadataDifferent } from '@/lib/import-metadata-generator';
+import { generateImportMetadata, isMetadataDifferent } from '@/lib/import-metadata-generator';
+
+describe('generateImportMetadata', () => {
+  it('requires an explicit AI provider and model', async () => {
+    await expect(generateImportMetadata('Transcript text')).rejects.toThrow(
+      'AI provider and model are required for import metadata generation.'
+    );
+  });
+});
 
 describe('isMetadataDifferent', () => {
   it('returns false for identical strings', () => {

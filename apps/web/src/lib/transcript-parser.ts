@@ -213,6 +213,9 @@ export async function diarizeSpeakers(
   if (segments.length === 0) {
     return [];
   }
+  if (!provider || !model) {
+    throw new Error('AI provider and model are required for speaker diarization.');
+  }
 
   logger.info('Running speaker diarization via Claude', { segments: String(segments.length) });
 
@@ -228,7 +231,7 @@ export async function diarizeSpeakers(
   });
 
   logUsage({
-    service: provider ?? 'anthropic',
+    service: provider,
     model: response.model,
     category: 'diarization',
     inputTokens: response.inputTokens,
