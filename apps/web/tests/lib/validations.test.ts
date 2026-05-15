@@ -295,6 +295,11 @@ describe('updatePodcastSchema', () => {
     expect(result.success).toBe(false);
   });
 
+  it('rejects legacy remix fields', () => {
+    const result = updatePodcastSchema.safeParse({ remixNote: 'Different angle' });
+    expect(result.success).toBe(false);
+  });
+
   it('rejects empty title when provided', () => {
     const result = updatePodcastSchema.safeParse({ title: '' });
     expect(result.success).toBe(false);

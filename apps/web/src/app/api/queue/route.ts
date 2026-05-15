@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { errorResponse } from '@/lib/api-response';
 const addToQueueSchema = z.object({
   podcastId: z.string(),
-  source: z.enum(['picks', 'explore', 'following', 'search']).default('explore'),
+  source: z.enum(['picks', 'explore', 'search']).default('explore'),
 });
 
 const reorderSchema = z.object({

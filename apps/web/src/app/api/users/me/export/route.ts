@@ -19,10 +19,8 @@ export async function GET() {
     discoveries,
     discoveryMessages,
     interactions,
-    comments,
     collections,
     collectionItems,
-    likes,
     saves,
     ratings,
     userFeature,
@@ -65,7 +63,6 @@ export async function GET() {
         duration: true,
         createdAt: true,
         updatedAt: true,
-        forkedFromId: true,
       },
     }),
     prisma.script.findMany({
@@ -116,16 +113,6 @@ export async function GET() {
         createdAt: true,
       },
     }),
-    prisma.comment.findMany({
-      where: { userId },
-      select: {
-        podcastId: true,
-        content: true,
-        parentId: true,
-        timestamp: true,
-        createdAt: true,
-      },
-    }),
     prisma.collection.findMany({
       where: { userId },
       select: {
@@ -144,10 +131,6 @@ export async function GET() {
         order: true,
         addedAt: true,
       },
-    }),
-    prisma.like.findMany({
-      where: { userId },
-      select: { podcastId: true, createdAt: true },
     }),
     prisma.save.findMany({
       where: { userId },
@@ -257,10 +240,8 @@ export async function GET() {
     discoveries,
     discoveryMessages,
     interactions,
-    comments,
     collections,
     collectionItems,
-    likes,
     saves,
     ratings,
     behavioralProfile: userFeature,
