@@ -1,56 +1,22 @@
 /**
- * Engagement aggregation queries for the admin dashboard.
- * Extracted from traffic-report.ts for reuse.
+ * Private activity aggregation queries for the admin dashboard.
  */
 
 import { prisma } from './prisma';
 
-export interface EngagementOverview {
-  likes: number;
+export interface PrivateActivityOverview {
   saves: number;
-  comments: number;
-  forks: number;
-  follows: number;
+  questions: number;
+  answered: number;
+  incorporated: number;
+  ratings: number;
 }
 
-export async function getEngagementOverview(since: Date): Promise<EngagementOverview> {
-  const [likes, saves, comments, forks, follows] = await Promise.all([
-    prisma.like.count({ where: { createdAt: { gte: since } } }),
-    prisma.save.count({ where: { createdAt: { gte: since } } }),
-    prisma.comment.count({ where: { createdAt: { gte: since } } }),
-    prisma.podcast.count({ where: { createdAt: { gte: since }, forkedFromId: { not: null } } }),
-    prisma.follow.count({ where: { createdAt: { gte: since } } }),
-  ]);
-
-  return { likes, saves, comments, forks, follows };
-}
-
-export async function getDailyEngagementTrend(
-  since: Date
-): Promise<Array<{ day: string; likes: number; saves: number; comments: number; forks: number }>> {
-  const rows = await prisma.$queryRaw<
-    Array<{ day: Date; likes: bigint; saves: bigint; comments: bigint; forks: bigint }>
-  >`
-    WITH days AS (
-      SELECT generate_series(${since}::date, NOW()::date, '1 day'::interval)::date AS day
-    )
-    SELECT
-      d.day,
-      COALESCE((SELECT COUNT(*) FROM "Like" WHERE "createdAt"::date = d.day AND "createdAt" >= ${since}), 0)::bigint AS likes,
-      COALESCE((SELECT COUNT(*) FROM "Save" WHERE "createdAt"::date = d.day AND "createdAt" >= ${since}), 0)::bigint AS saves,
-      COALESCE((SELECT COUNT(*) FROM "Comment" WHERE "createdAt"::date = d.day AND "createdAt" >= ${since}), 0)::bigint AS comments,
-      COALESCE((SELECT COUNT(*) FROM "Podcast" WHERE "forkedFromId" IS NOT NULL AND "deletedAt" IS NULL AND "createdAt"::date = d.day AND "createdAt" >= ${since}), 0)::bigint AS forks
-    FROM days d
-    ORDER BY d.day ASC
-  `;
-
-  return rows.map((r) => ({
-    day: r.day.toISOString().split('T')[0],
-    likes: Number(r.likes),
-    saves: Number(r.saves),
-    comments: Number(r.comments),
-    forks: Number(r.forks),
-  }));
+export interface DailyPrivateActivity {
+  day: string;
+  saves: number;
+  questions: number;
+  ratings: number;
 }
 
 export interface TopContent {
@@ -61,60 +27,75 @@ export interface TopContent {
   count: number;
 }
 
-export async function getTopLiked(limit: number = 10): Promise<TopContent[]> {
-  const rows = await prisma.podcast.findMany({
-    where: { likeCount: { gt: 0 } },
-    orderBy: { likeCount: 'desc' },
-    take: limit,
-    select: { id: true, title: true, likeCount: true, user: { select: { name: true, handle: true } } },
-  });
-  return rows.map((r) => ({
-    id: r.id,
-    title: r.title,
-    ownerName: r.user.name,
-    ownerHandle: r.user.handle,
-    count: r.likeCount,
-  }));
-}
-
-export async function getTopForked(limit: number = 10): Promise<TopContent[]> {
-  const rows = await prisma.podcast.findMany({
-    where: { forkCount: { gt: 0 } },
-    orderBy: { forkCount: 'desc' },
-    take: limit,
-    select: { id: true, title: true, forkCount: true, user: { select: { name: true, handle: true } } },
-  });
-  return rows.map((r) => ({
-    id: r.id,
-    title: r.title,
-    ownerName: r.user.name,
-    ownerHandle: r.user.handle,
-    count: r.forkCount,
-  }));
-}
-
-export async function getTopCommented(limit: number = 10): Promise<TopContent[]> {
-  const rows = await prisma.podcast.findMany({
-    where: { commentCount: { gt: 0 } },
-    orderBy: { commentCount: 'desc' },
-    take: limit,
-    select: { id: true, title: true, commentCount: true, user: { select: { name: true, handle: true } } },
-  });
-  return rows.map((r) => ({
-    id: r.id,
-    title: r.title,
-    ownerName: r.user.name,
-    ownerHandle: r.user.handle,
-    count: r.commentCount,
-  }));
-}
-
 export interface InteractionStats {
   totalQuestions: number;
   answeredCount: number;
   incorporatedCount: number;
   helpfulCount: number;
   unhelpfulCount: number;
+}
+
+export async function getPrivateActivityOverview(since: Date): Promise<PrivateActivityOverview> {
+  const [saves, questions, answered, incorporated, ratings] = await Promise.all([
+    prisma.save.count({ where: { createdAt: { gte: since } } }),
+    prisma.interaction.count({ where: { createdAt: { gte: since } } }),
+    prisma.interaction.count({
+      where: {
+        createdAt: { gte: since },
+        status: { in: ['ANSWERED', 'INCORPORATED', 'RESOLVED'] },
+      },
+    }),
+    prisma.interaction.count({ where: { createdAt: { gte: since }, incorporated: true } }),
+    prisma.podcastRating.count({ where: { createdAt: { gte: since } } }),
+  ]);
+
+  return { saves, questions, answered, incorporated, ratings };
+}
+
+export async function getDailyPrivateActivityTrend(since: Date): Promise<DailyPrivateActivity[]> {
+  const rows = await prisma.$queryRaw<
+    Array<{ day: Date; saves: bigint; questions: bigint; ratings: bigint }>
+  >`
+    WITH days AS (
+      SELECT generate_series(${since}::date, NOW()::date, '1 day'::interval)::date AS day
+    )
+    SELECT
+      d.day,
+      COALESCE((SELECT COUNT(*) FROM "Save" WHERE "createdAt"::date = d.day AND "createdAt" >= ${since}), 0)::bigint AS saves,
+      COALESCE((SELECT COUNT(*) FROM "Interaction" WHERE "createdAt"::date = d.day AND "createdAt" >= ${since}), 0)::bigint AS questions,
+      COALESCE((SELECT COUNT(*) FROM "PodcastRating" WHERE "createdAt"::date = d.day AND "createdAt" >= ${since}), 0)::bigint AS ratings
+    FROM days d
+    ORDER BY d.day ASC
+  `;
+
+  return rows.map((r) => ({
+    day: r.day.toISOString().split('T')[0],
+    saves: Number(r.saves),
+    questions: Number(r.questions),
+    ratings: Number(r.ratings),
+  }));
+}
+
+export async function getTopSaved(limit: number = 10): Promise<TopContent[]> {
+  const rows = await prisma.podcast.findMany({
+    where: { deletedAt: null, saveCount: { gt: 0 } },
+    orderBy: { saveCount: 'desc' },
+    take: limit,
+    select: {
+      id: true,
+      title: true,
+      saveCount: true,
+      user: { select: { name: true, handle: true } },
+    },
+  });
+
+  return rows.map((r) => ({
+    id: r.id,
+    title: r.title,
+    ownerName: r.user.name,
+    ownerHandle: r.user.handle,
+    count: r.saveCount,
+  }));
 }
 
 export async function getInteractionStats(since: Date): Promise<InteractionStats> {
@@ -133,7 +114,9 @@ export async function getInteractionStats(since: Date): Promise<InteractionStats
   ]);
 
   const answeredCount = statusGroups
-    .filter((g) => g.status === 'ANSWERED' || g.status === 'INCORPORATED' || g.status === 'RESOLVED')
+    .filter(
+      (g) => g.status === 'ANSWERED' || g.status === 'INCORPORATED' || g.status === 'RESOLVED'
+    )
     .reduce((sum, g) => sum + g._count, 0);
   const incorporatedCount = statusGroups
     .filter((g) => g.status === 'INCORPORATED')
