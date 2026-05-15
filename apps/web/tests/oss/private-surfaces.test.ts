@@ -258,6 +258,27 @@ describe('private-first OSS surfaces', () => {
     expect(notificationSources).not.toContain('COMMENT_REPLY');
   });
 
+  it('keeps Twitter auto-tweet thresholds scoped to private playback', () => {
+    const twitterThresholdSources = [
+      'src/lib/twitter-auto-tweet.ts',
+      'src/lib/twitter-config.ts',
+      'src/types/twitter.ts',
+      'src/lib/validations.ts',
+      'src/app/(admin)/admin/twitter/AutoTweetSection.tsx',
+    ]
+      .map(readSource)
+      .concat(readFileSync(resolve(repoRoot, 'apps/web/prisma/schema.prisma'), 'utf8'))
+      .join('\n');
+
+    expect(twitterThresholdSources).toContain('minPlays');
+    expect(twitterThresholdSources).not.toContain('minLikes');
+    expect(twitterThresholdSources).not.toContain('minForks');
+    expect(twitterThresholdSources).not.toContain('likeCount >=');
+    expect(twitterThresholdSources).not.toContain('forkCount >=');
+    expect(twitterThresholdSources).not.toContain('Min Likes');
+    expect(twitterThresholdSources).not.toContain('Min Forks');
+  });
+
   it('does not ship mobile podcast social actions or widgets', () => {
     const removedMobileComponents = [
       'apps/mobile/components/ForkModal.tsx',

@@ -112,9 +112,7 @@ function makeSearchResult(tweets: ReturnType<typeof makeTweet>[]) {
 
 const DEFAULT_CONFIG = {
   autoTweetEnabled: false,
-  minLikes: 10,
   minPlays: 50,
-  minForks: 3,
   trendPollingEnabled: true,
   trendPollIntervalMs: 7200000,
   maxTrendPodcastsPerDay: 3,

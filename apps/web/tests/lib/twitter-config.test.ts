@@ -28,9 +28,7 @@ describe('getTwitterConfig', () => {
     const row = {
       id: 'singleton',
       autoTweetEnabled: true,
-      minLikes: 5,
       minPlays: 20,
-      minForks: 2,
       mentionPollIntervalMs: 30000,
       trendPollingEnabled: true,
       trendPollIntervalMs: 3600000,
@@ -49,9 +47,7 @@ describe('getTwitterConfig', () => {
 
     expect(result).toEqual({
       autoTweetEnabled: true,
-      minLikes: 5,
       minPlays: 20,
-      minForks: 2,
       mentionPollIntervalMs: 30000,
       trendPollingEnabled: true,
       trendPollIntervalMs: 3600000,
@@ -67,9 +63,7 @@ describe('getTwitterConfig', () => {
   it('upserts with singleton id and defaults', async () => {
     mockPrismaTwitterConfigUpsert.mockResolvedValue({
       autoTweetEnabled: false,
-      minLikes: 10,
       minPlays: 50,
-      minForks: 3,
       mentionPollIntervalMs: 60000,
       trendPollingEnabled: false,
       trendPollIntervalMs: 7200000,
@@ -90,7 +84,7 @@ describe('getTwitterConfig', () => {
         create: expect.objectContaining({
           id: 'singleton',
           autoTweetEnabled: false,
-          minLikes: 10,
+          minPlays: 50,
         }),
       })
     );
@@ -100,9 +94,7 @@ describe('getTwitterConfig', () => {
     mockPrismaTwitterConfigUpsert.mockResolvedValue({
       id: 'singleton',
       autoTweetEnabled: false,
-      minLikes: 10,
       minPlays: 50,
-      minForks: 3,
       mentionPollIntervalMs: 60000,
       trendPollingEnabled: false,
       trendPollIntervalMs: 7200000,
@@ -132,19 +124,19 @@ describe('setTwitterConfig', () => {
   it('upserts with partial data and adminId', async () => {
     mockPrismaTwitterConfigUpsert.mockResolvedValue({});
 
-    await setTwitterConfig({ minLikes: 25, autoTweetEnabled: true }, 'admin-456');
+    await setTwitterConfig({ minPlays: 25, autoTweetEnabled: true }, 'admin-456');
 
     expect(mockPrismaTwitterConfigUpsert).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: 'singleton' },
         update: expect.objectContaining({
-          minLikes: 25,
+          minPlays: 25,
           autoTweetEnabled: true,
           updatedBy: 'admin-456',
         }),
         create: expect.objectContaining({
           id: 'singleton',
-          minLikes: 25,
+          minPlays: 25,
           autoTweetEnabled: true,
           updatedBy: 'admin-456',
         }),
@@ -158,7 +150,6 @@ describe('setTwitterConfig', () => {
     await setTwitterConfig({ minPlays: 100 }, 'admin-789');
 
     const call = mockPrismaTwitterConfigUpsert.mock.calls[0][0];
-    expect(call.update).not.toHaveProperty('minLikes');
     expect(call.update).not.toHaveProperty('autoTweetEnabled');
     expect(call.update.minPlays).toBe(100);
     expect(call.update.updatedBy).toBe('admin-789');
@@ -167,12 +158,9 @@ describe('setTwitterConfig', () => {
   it('uses defaults for fields not provided in create', async () => {
     mockPrismaTwitterConfigUpsert.mockResolvedValue({});
 
-    await setTwitterConfig({ minForks: 7 }, 'admin-abc');
+    await setTwitterConfig({}, 'admin-abc');
 
     const call = mockPrismaTwitterConfigUpsert.mock.calls[0][0];
-    expect(call.create.minForks).toBe(7);
-    // Other fields should fall back to defaults
-    expect(call.create.minLikes).toBe(10);
     expect(call.create.minPlays).toBe(50);
     expect(call.create.autoTweetEnabled).toBe(false);
   });

@@ -191,7 +191,7 @@ describe('PATCH /api/admin/twitter/config', () => {
       (data: unknown) => realValidations.twitterConfigUpdateSchema.safeParse(data)
     );
 
-    const request = createRequest('/api/admin/twitter/config', { minLikes: -999, bad: 'data' });
+    const request = createRequest('/api/admin/twitter/config', { minPlays: -999, bad: 'data' });
     const response = await patchConfig(request);
     expect(response.status).toBe(400);
   });
