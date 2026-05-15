@@ -210,7 +210,7 @@ describe('POST /api/podcasts/[podcastId]/script/approve', () => {
       expect(mockSelectFreeTierProviders).not.toHaveBeenCalled();
     });
 
-    it('leaves ttsProvider null for BYOK user when no body provider', async () => {
+    it('uses existing ttsProvider for BYOK user when no body provider is provided', async () => {
       mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
       mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', isByokUser: true });
       mockPodcastFindUnique.mockResolvedValue({ userId: 'user-1', status: 'SCRIPT_READY' });
@@ -219,13 +219,38 @@ describe('POST /api/podcasts/[podcastId]/script/approve', () => {
       const response = await POST(createRequest(), await createParams('pod-1'));
 
       expect(response.status).toBe(200);
-      // Should NOT write ttsProvider for BYOK without explicit selection
       const providerUpdateCalls = mockPodcastUpdate.mock.calls.filter(
         (call: unknown[]) => (call[0] as Record<string, unknown>).data &&
           'ttsProvider' in ((call[0] as Record<string, Record<string, unknown>>).data)
       );
       expect(providerUpdateCalls).toHaveLength(0);
       expect(mockSelectFreeTierProviders).not.toHaveBeenCalled();
+      expect(mockAssignVoicesForPodcast).toHaveBeenCalledWith(
+        'pod-1',
+        expect.any(Array),
+        'elevenlabs',
+        undefined,
+      );
+    });
+
+    it('requires a ttsProvider for BYOK user when none is selected or persisted', async () => {
+      mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+      mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', isByokUser: true });
+      mockPodcastFindUnique.mockResolvedValue({ userId: 'user-1', status: 'SCRIPT_READY' });
+      mockPodcastFindUniqueOrThrow.mockResolvedValueOnce({ ttsProvider: null });
+
+      const response = await POST(createRequest(), await createParams('pod-1'));
+      const body = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(body).toMatchObject({
+        error: 'Choose a TTS provider before approving the script.',
+        code: 'tts_provider_required',
+      });
+      expect(mockSelectFreeTierProviders).not.toHaveBeenCalled();
+      expect(mockScriptFindUnique).not.toHaveBeenCalled();
+      expect(mockAssignVoicesForPodcast).not.toHaveBeenCalled();
+      expect(mockCreateSegmentsAndQueueAudio).not.toHaveBeenCalled();
     });
 
     it('auto-selects ttsProvider for free-tier user', async () => {

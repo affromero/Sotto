@@ -79,7 +79,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         data: { ttsProvider: bodyTtsProvider, ttsModel: bodyTtsModel ?? null },
       });
     }
-    // else: leave null — worker's resolveTtsProvider() picks best available
+    // Otherwise keep the existing provider. A missing provider is rejected below.
   } else {
     // Free-tier: auto-select provider (moved from generate route)
     const selected = await selectFreeTierProviders(userId);
@@ -95,7 +95,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     where: { id: podcastId },
     select: { ttsProvider: true },
   });
-  const resolvedProvider = (resolvedPodcast.ttsProvider ?? 'elevenlabs') as TtsProviderId;
+  if (!resolvedPodcast.ttsProvider) {
+    return errorResponse('Choose a TTS provider before approving the script.', 400, {
+      code: 'tts_provider_required',
+    });
+  }
+  const resolvedProvider = resolvedPodcast.ttsProvider as TtsProviderId;
 
   // Write explicit custom voice selections if provided; auto-assigned speakers are filled below.
   if (bodyVoices && bodyVoices.length > 0) {
@@ -137,9 +142,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
   // Convert TTS tags before creating segments
   const turnData = turns.map((t) => ({ speaker: t.speaker, text: t.text, direction: t.direction }));
-  const convertedTurns = resolvedPodcast.ttsProvider
-    ? await convertTurnsForProvider(turnData, resolvedProvider, podcastId)
-    : turnData;
+  const convertedTurns = await convertTurnsForProvider(turnData, resolvedProvider, podcastId);
 
   await createSegmentsAndQueueAudio(podcastId, convertedTurns);
 
