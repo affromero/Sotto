@@ -12,7 +12,6 @@ export function Footer() {
         <div className={styles.links}>
           <div>
             <h4>Product</h4>
-            <a href="/feed">Feed</a>
             <a href="/create">Create</a>
             <a href="/briefings">Daily Briefings</a>
             <a href="/quizzes">Quizzes</a>
@@ -22,8 +21,12 @@ export function Footer() {
           </div>
           <div>
             <h4>Community</h4>
-            <a href="https://discord.gg/Dm4T42RXa" target="_blank" rel="noopener noreferrer">Discord</a>
-            <a href="https://x.com/SottoFM" target="_blank" rel="noopener noreferrer">Twitter</a>
+            <a href="https://discord.gg/Dm4T42RXa" target="_blank" rel="noopener noreferrer">
+              Discord
+            </a>
+            <a href="https://x.com/SottoFM" target="_blank" rel="noopener noreferrer">
+              Twitter
+            </a>
             <a href="/feedback">Feedback</a>
           </div>
           <div>

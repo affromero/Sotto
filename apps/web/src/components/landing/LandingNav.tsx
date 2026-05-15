@@ -29,14 +29,15 @@ export function LandingNav() {
           Sotto
         </Link>
         <div className={styles.navRight}>
-          <Link href="/create" className={styles.navSign}>
-            Create
+          <Link href="/developers" className={styles.navSign}>
+            Developers
           </Link>
-          <Link href="/feed" className={styles.navCta}>
-            Explore Feed
+          <Link href="/create" className={styles.navCta}>
+            Create Private Feed
           </Link>
-          {mounted && !authLoading && (
-            isAuthenticated ? (
+          {mounted &&
+            !authLoading &&
+            (isAuthenticated ? (
               <Link href="/dashboard" className={styles.navSign}>
                 Dashboard
               </Link>
@@ -44,8 +45,7 @@ export function LandingNav() {
               <Link href="/auth/login" className={styles.navSign}>
                 Sign In
               </Link>
-            )
-          )}
+            ))}
           <button
             type="button"
             className={`${styles.burger} ${menuOpen ? styles.burgerOpen : ''}`}
@@ -59,24 +59,35 @@ export function LandingNav() {
           </button>
         </div>
       </div>
-      <div className={`${styles.mobileMenu} ${menuOpen ? styles.mobileMenuOpen : ''}`} aria-hidden={!menuOpen}>
+      <div
+        className={`${styles.mobileMenu} ${menuOpen ? styles.mobileMenuOpen : ''}`}
+        aria-hidden={!menuOpen}
+      >
+        <Link href="/developers" className={styles.mobileLink} onClick={() => setMenuOpen(false)}>
+          Developers
+        </Link>
         <Link href="/create" className={styles.mobileLink} onClick={() => setMenuOpen(false)}>
-          Create
+          Create Private Feed
         </Link>
-        <Link href="/feed" className={styles.mobileLink} onClick={() => setMenuOpen(false)}>
-          Explore Feed
-        </Link>
-        {mounted && !authLoading && (
-          isAuthenticated ? (
-            <Link href="/dashboard" className={styles.mobileLink} onClick={() => setMenuOpen(false)}>
+        {mounted &&
+          !authLoading &&
+          (isAuthenticated ? (
+            <Link
+              href="/dashboard"
+              className={styles.mobileLink}
+              onClick={() => setMenuOpen(false)}
+            >
               Dashboard
             </Link>
           ) : (
-            <Link href="/auth/login" className={styles.mobileLink} onClick={() => setMenuOpen(false)}>
+            <Link
+              href="/auth/login"
+              className={styles.mobileLink}
+              onClick={() => setMenuOpen(false)}
+            >
               Sign In
             </Link>
-          )
-        )}
+          ))}
       </div>
     </nav>
   );

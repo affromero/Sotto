@@ -4,7 +4,6 @@ import Link from 'next/link';
 import {
   LayoutDashboard,
   PlusCircle,
-  Radio,
   Settings,
   Key,
   BarChart2,
@@ -40,7 +39,6 @@ interface NavItem {
 function getNavItems(role: string, hasPodcasts: boolean): NavItem[] {
   const items: NavItem[] = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/feed', label: 'Discover', icon: Radio },
     { href: '/create', label: 'Create', icon: PlusCircle },
   ];
 
@@ -61,7 +59,14 @@ function getNavItems(role: string, hasPodcasts: boolean): NavItem[] {
   return items;
 }
 
-export function Sidebar({ currentPath, isOpen = false, onClose, hasPodcasts = false, hasActivePlayer = false, user }: SidebarProps) {
+export function Sidebar({
+  currentPath,
+  isOpen = false,
+  onClose,
+  hasPodcasts = false,
+  hasActivePlayer = false,
+  user,
+}: SidebarProps) {
   const role = user?.role || 'USER';
   const navItems = getNavItems(role, hasPodcasts);
 

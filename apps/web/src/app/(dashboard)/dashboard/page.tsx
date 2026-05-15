@@ -6,7 +6,6 @@ import { SectionErrorBoundary } from '@/components/ui/SectionErrorBoundary';
 import { ScrollReveal } from '@/components/ui/ScrollReveal';
 import { DashboardStats } from './DashboardStats';
 import { MyPodcastsSection } from './MyPodcastsSection';
-import { TrendingToForkSection } from './TrendingToForkSection';
 import styles from './page.module.css';
 
 export const dynamic = 'force-dynamic';
@@ -15,7 +14,15 @@ export const metadata = { title: 'Dashboard' };
 function StatsSkeleton() {
   return (
     <div className={styles.stats} aria-hidden="true">
-      <div className={styles.statCard} style={{ height: 80, background: 'var(--color-border)', borderRadius: 'var(--radius-xl)', animation: 'pulse 1.5s ease-in-out infinite' }} />
+      <div
+        className={styles.statCard}
+        style={{
+          height: 80,
+          background: 'var(--color-border)',
+          borderRadius: 'var(--radius-xl)',
+          animation: 'pulse 1.5s ease-in-out infinite',
+        }}
+      />
     </div>
   );
 }
@@ -23,23 +30,27 @@ function StatsSkeleton() {
 function PodcastsSkeleton() {
   return (
     <div className={styles.podcastsSection} aria-hidden="true">
-      <div style={{ width: 160, height: 28, background: 'var(--color-border)', borderRadius: 'var(--radius-md)', animation: 'pulse 1.5s ease-in-out infinite' }} />
+      <div
+        style={{
+          width: 160,
+          height: 28,
+          background: 'var(--color-border)',
+          borderRadius: 'var(--radius-md)',
+          animation: 'pulse 1.5s ease-in-out infinite',
+        }}
+      />
       <div className={styles.podcastGrid}>
         {[0, 1, 2].map((i) => (
-          <div key={i} style={{ height: 160, background: 'var(--color-border)', borderRadius: 'var(--radius-xl)', animation: 'pulse 1.5s ease-in-out infinite', animationDelay: `${i * 100}ms` }} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function TrendingSkeleton() {
-  return (
-    <div className={styles.trendingSection} aria-hidden="true">
-      <div style={{ width: 200, height: 28, background: 'var(--color-border)', borderRadius: 'var(--radius-md)', animation: 'pulse 1.5s ease-in-out infinite' }} />
-      <div className={styles.trendingScroll}>
-        {[0, 1, 2, 3].map((i) => (
-          <div key={i} className={styles.trendingCardWrapper} style={{ height: 180, background: 'var(--color-border)', borderRadius: 'var(--radius-xl)', animation: 'pulse 1.5s ease-in-out infinite', animationDelay: `${i * 100}ms` }} />
+          <div
+            key={i}
+            style={{
+              height: 160,
+              background: 'var(--color-border)',
+              borderRadius: 'var(--radius-xl)',
+              animation: 'pulse 1.5s ease-in-out infinite',
+              animationDelay: `${i * 100}ms`,
+            }}
+          />
         ))}
       </div>
     </div>
@@ -98,14 +109,6 @@ export default async function DashboardPage() {
         <SectionErrorBoundary sectionName="My Podcasts">
           <Suspense fallback={<PodcastsSkeleton />}>
             <MyPodcastsSection userId={userId} userRole={userRole} />
-          </Suspense>
-        </SectionErrorBoundary>
-      </div>
-
-      <div data-reveal style={{ '--reveal-index': 3 } as React.CSSProperties}>
-        <SectionErrorBoundary sectionName="Trending to Fork">
-          <Suspense fallback={<TrendingSkeleton />}>
-            <TrendingToForkSection userId={userId} />
           </Suspense>
         </SectionErrorBoundary>
       </div>

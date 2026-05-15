@@ -95,7 +95,6 @@ interface PodcastPlayerViewProps {
   isAdmin?: boolean;
   isAuthenticated: boolean;
   currentUserId?: string;
-  canMakePrivate?: boolean;
   videoStatus?: VideoGenerationStatus;
   avatarStatus?: VideoGenerationStatus;
   musicStatus?: VideoGenerationStatus;
@@ -172,7 +171,7 @@ function PlayerBridge({
   return null;
 }
 
-export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, currentUserId, canMakePrivate, videoStatus, avatarStatus, musicStatus, hasQuiz, quizStats }: PodcastPlayerViewProps) {
+export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, currentUserId, videoStatus, avatarStatus, musicStatus, hasQuiz, quizStats }: PodcastPlayerViewProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const player = usePlayer();
@@ -732,6 +731,9 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
     return () => document.body.removeAttribute('data-mini-player');
   }, [isReady, podcast.audioUrl]);
 
+  const backHref = isAuthenticated ? '/dashboard' : '/';
+  const backLabel = isAuthenticated ? 'Dashboard' : 'Home';
+
   return (
     <>
     <PlayerBridge
@@ -749,7 +751,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
     <div className={styles.playerView}>
       {/* Back nav */}
       <nav className={styles.breadcrumb}>
-        <Link href="/feed" className={styles.backLink}>
+        <Link href={backHref} className={styles.backLink}>
           <svg
             width="16"
             height="16"
@@ -764,7 +766,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
             <line x1="19" y1="12" x2="5" y2="12" />
             <polyline points="12 19 5 12 12 5" />
           </svg>
-          Feed
+          {backLabel}
         </Link>
       </nav>
 
@@ -811,7 +813,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
             </Badge>
           )}
           {isOwner && (
-            <VisibilityToggle podcastId={podcast.id} visibility={podcast.visibility} canMakePrivate={canMakePrivate} />
+            <VisibilityToggle podcastId={podcast.id} visibility={podcast.visibility} />
           )}
         </div>
 
@@ -820,9 +822,9 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
         {podcast.tags.length > 0 && (
           <div className={styles.tags}>
             {podcast.tags.map((tag) => (
-              <Link key={tag.id} href={`/feed?tag=${tag.slug}`} className={styles.tag}>
+              <span key={tag.id} className={styles.tag}>
                 {tag.name}
-              </Link>
+              </span>
             ))}
           </div>
         )}

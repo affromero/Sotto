@@ -2,7 +2,7 @@ import Link from 'next/link';
 import styles from './PublicNav.module.css';
 
 const NAV_LINKS = [
-  { href: '/feed', label: 'Feed' },
+  { href: '/create', label: 'Create' },
   { href: '/changelog', label: 'Changelog' },
   { href: '/developers', label: 'Developers' },
   { href: '/support', label: 'Support' },
