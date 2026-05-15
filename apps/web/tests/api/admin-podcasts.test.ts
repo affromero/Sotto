@@ -6,8 +6,6 @@ const mockUserFindUnique = vi.fn();
 const mockPodcastFindUnique = vi.fn();
 const mockPodcastCreate = vi.fn();
 const mockPodcastUpdate = vi.fn();
-const mockPodcastUpdateMany = vi.fn();
-const mockTransaction = vi.fn();
 const mockDiscoveryCreate = vi.fn();
 const mockAddJob = vi.fn();
 
@@ -33,20 +31,16 @@ vi.mock('@/lib/prisma', () => ({
       findUnique: (...args: unknown[]) => mockPodcastFindUnique(...args),
       create: (...args: unknown[]) => mockPodcastCreate(...args),
       update: (...args: unknown[]) => mockPodcastUpdate(...args),
-      updateMany: (...args: unknown[]) => mockPodcastUpdateMany(...args),
     },
     discovery: {
       create: (...args: unknown[]) => mockDiscoveryCreate(...args),
     },
-    $transaction: (...args: unknown[]) => mockTransaction(...args),
   },
   prismaUnfiltered: {
     podcast: {
       findUnique: (...args: unknown[]) => mockPodcastFindUnique(...args),
       update: (...args: unknown[]) => mockPodcastUpdate(...args),
-      updateMany: (...args: unknown[]) => mockPodcastUpdateMany(...args),
     },
-    $transaction: (...args: unknown[]) => mockTransaction(...args),
   },
 }));
 
@@ -167,7 +161,7 @@ describe('POST /api/admin/podcasts/create-as-sotto', () => {
       audience: 'New users',
       audienceLevel: 'beginner',
       tone: 'casual',
-      focusAreas: ['AI generation', 'Forking'],
+      focusAreas: ['AI generation', 'Private feeds'],
       durationTarget: 2,
       speakers: [
         { name: 'Host', description: 'Warm guide' },
@@ -255,7 +249,6 @@ describe('DELETE /api/admin/podcasts/[podcastId]', () => {
   it('returns 409 when podcast already deleted', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
     mockPodcastFindUnique.mockResolvedValue({
-      forkedFromId: null,
       deletedAt: new Date(),
     });
 
@@ -268,23 +261,11 @@ describe('DELETE /api/admin/podcasts/[podcastId]', () => {
     expect(body).toMatchObject({ error: 'Podcast already deleted' });
   });
 
-  it('soft-deletes podcast and unlinks forks', async () => {
+  it('soft-deletes podcast', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
     mockPodcastFindUnique.mockResolvedValue({
-      forkedFromId: null,
       deletedAt: null,
     });
-    mockTransaction.mockImplementation(async (callback) => {
-      const tx = {
-        podcast: {
-          updateMany: mockPodcastUpdateMany,
-          findUnique: vi.fn().mockResolvedValue(null),
-          update: mockPodcastUpdate,
-        },
-      };
-      return callback(tx);
-    });
-    mockPodcastUpdateMany.mockResolvedValue({ count: 0 });
     mockPodcastUpdate.mockResolvedValue({ id: 'pod-1' });
 
     const request = createDeleteRequest();
@@ -294,5 +275,9 @@ describe('DELETE /api/admin/podcasts/[podcastId]', () => {
 
     expect(response.status).toBe(200);
     expect(body).toEqual({ success: true });
+    expect(mockPodcastUpdate).toHaveBeenCalledWith({
+      where: { id: 'pod-1' },
+      data: { deletedAt: expect.any(Date) },
+    });
   });
 });

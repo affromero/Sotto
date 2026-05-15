@@ -520,6 +520,7 @@ describe('private-first OSS surfaces', () => {
       .concat(readFileSync(resolve(repoRoot, 'packages/shared/src/types/podcast.ts'), 'utf8'))
       .join('\n');
     const podcastRouteSource = readSource('src/app/api/podcasts/[podcastId]/route.ts');
+    const adminPodcastRouteSource = readSource('src/app/api/admin/podcasts/[podcastId]/route.ts');
 
     expect(summaryContractSources).toContain('saveCount');
     expect(summaryContractSources).not.toContain('likeCount');
@@ -532,6 +533,10 @@ describe('private-first OSS surfaces', () => {
     expect(summaryContractSources).not.toContain('commentCount');
     expect(podcastRouteSource).not.toContain('isLiked');
     expect(podcastRouteSource).not.toContain('prisma.like');
+    expect(podcastRouteSource).not.toContain('forkedFromId');
+    expect(podcastRouteSource).not.toContain('forkCount');
+    expect(adminPodcastRouteSource).not.toContain('forkedFromId');
+    expect(adminPodcastRouteSource).not.toContain('forkCount');
   });
 
   it('does not ship mobile podcast social actions or widgets', () => {

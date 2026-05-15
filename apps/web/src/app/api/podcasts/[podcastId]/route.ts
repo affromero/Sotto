@@ -159,7 +159,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
 
   const podcast = await prisma.podcast.findUnique({
     where: { id: podcastId },
-    select: { userId: true, forkedFromId: true },
+    select: { userId: true },
   });
 
   if (!podcast) {
@@ -170,31 +170,9 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     return errorResponse('Forbidden', 403);
   }
 
-  await prismaUnfiltered.$transaction(async (tx) => {
-    // Disconnect forks so child podcasts aren't orphaned
-    await tx.podcast.updateMany({
-      where: { forkedFromId: podcastId },
-      data: { forkedFromId: null },
-    });
-
-    // Decrement parent's forkCount if this podcast is a fork
-    if (podcast.forkedFromId) {
-      const parent = await tx.podcast.findUnique({
-        where: { id: podcast.forkedFromId },
-        select: { id: true },
-      });
-      if (parent) {
-        await tx.podcast.update({
-          where: { id: podcast.forkedFromId },
-          data: { forkCount: { decrement: 1 } },
-        });
-      }
-    }
-
-    await tx.podcast.update({
-      where: { id: podcastId },
-      data: { deletedAt: new Date() },
-    });
+  await prismaUnfiltered.podcast.update({
+    where: { id: podcastId },
+    data: { deletedAt: new Date() },
   });
   await invalidatePodcastCache(podcastId);
 
