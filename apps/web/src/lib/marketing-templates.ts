@@ -20,7 +20,8 @@ export const MARKETING_TEMPLATES: MarketingTemplate[] = [
     name: 'Sotto Features Overview',
     description: '2 min overview of all platform features',
     metadata: {
-      topic: 'Sotto: The Social Podcast Network — AI-powered podcast creation, voice selection, forking, Q&A interrupts, social feed, BYOK keys, and podcast importing',
+      topic:
+        'Sotto: open-source private podcast infrastructure for AI-generated briefings, BYOK keys, private RSS, Q&A interrupts, and podcast importing',
       depth: 'quick_overview',
       audience: 'Potential users discovering Sotto for the first time',
       audienceLevel: 'beginner',
@@ -28,16 +29,19 @@ export const MARKETING_TEMPLATES: MarketingTemplate[] = [
       focusAreas: [
         'AI podcast generation from any topic or URL',
         'Voice selection and multi-provider TTS',
-        'Fork any podcast with your own angle',
+        'Private RSS feeds for personal podcast apps',
         'Interrupt mid-playback to ask questions',
-        'Social feed — discover, listen, follow',
-        'Bring your own keys (BYOK) for free usage',
+        'Bring your own keys (BYOK) for self-hosted usage',
+        'Hosted infrastructure for users who do not want to operate AI services',
         'Import existing podcasts',
       ],
       durationTarget: 2,
       speakers: [
         { name: 'Host', description: 'Warm and enthusiastic guide who introduces Sotto' },
-        { name: 'Expert', description: 'Product expert who explains features with concrete examples' },
+        {
+          name: 'Expert',
+          description: 'Product expert who explains features with concrete examples',
+        },
       ],
     },
   },
@@ -46,7 +50,8 @@ export const MARKETING_TEMPLATES: MarketingTemplate[] = [
     name: "What's New",
     description: '1 min update on recent changes',
     metadata: {
-      topic: "What's New on Sotto — latest features, improvements, and updates to the social podcast network",
+      topic:
+        "What's New on Sotto — latest private podcast, briefing, BYOK, and self-hosting improvements",
       depth: 'quick_overview',
       audience: 'Existing Sotto users who want to stay up-to-date',
       audienceLevel: 'intermediate',
@@ -54,7 +59,7 @@ export const MARKETING_TEMPLATES: MarketingTemplate[] = [
       focusAreas: [
         'Recent feature releases',
         'Platform improvements',
-        'Community highlights',
+        'Private briefing workflow improvements',
       ],
       durationTarget: 1,
       speakers: [
@@ -68,7 +73,8 @@ export const MARKETING_TEMPLATES: MarketingTemplate[] = [
     name: 'How It Works',
     description: '3 min explainer of the generation pipeline',
     metadata: {
-      topic: 'How Sotto Creates Podcasts — from topic discovery through AI scripting, reference verification, multi-voice audio generation, and final stitching',
+      topic:
+        'How Sotto Creates Podcasts — from topic discovery through AI scripting, reference verification, multi-voice audio generation, and final stitching',
       depth: 'standard',
       audience: 'Tech-curious users and developers interested in the generation pipeline',
       audienceLevel: 'intermediate',
