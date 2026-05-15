@@ -19,7 +19,7 @@ interface VoicePaymentModalProps {
   onClose: () => void;
   voiceCharges: VoiceChargeItem[];
   onPaymentComplete: (paymentIntentIds: string[]) => void;
-  /** When true, show "Use free voices instead" option (for forks) */
+  /** When true, show "Use free voices instead" option for alternate voice tracks. */
   allowSkip?: boolean;
   onSkip?: () => void;
 }

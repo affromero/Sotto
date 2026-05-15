@@ -34,7 +34,7 @@ export const metadata: Metadata = {
     template: `%s | ${BRAND.name}`,
   },
   description: BRAND.description,
-  keywords: ['podcast', 'AI', 'social', 'remix', 'fork', 'import', 'interactive', 'learning'],
+  keywords: ['podcast', 'AI', 'private', 'briefing', 'BYOK', 'import', 'interactive', 'learning'],
   alternates: {
     canonical: '/',
   },

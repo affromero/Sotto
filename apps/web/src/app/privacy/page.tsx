@@ -34,7 +34,7 @@ export default function PrivacyPage() {
           <h3>Content You Create</h3>
           <p>
             We store podcasts you generate, discovery chat conversations, scripts,
-            comments, interactions (questions and answers), collections, voice clones,
+            interactions (questions and answers), collections, voice clones,
             and saved podcast ideas.
           </p>
 
@@ -61,12 +61,12 @@ export default function PrivacyPage() {
               abandon, heartbeat (periodic position updates)
             </li>
             <li>
-              <strong>Feed &amp; Discovery</strong> — feed impression, feed click,
+              <strong>Library &amp; Discovery</strong> — library impression, library click,
               search query, recommendation impression, recommendation click
             </li>
             <li>
-              <strong>Engagement</strong> — like, unlike, save, unsave, fork, comment,
-              share, follow, unfollow
+              <strong>Private Activity</strong> — save, unsave, rate, ask a question,
+              answer a question, incorporate an answer, share by link
             </li>
             <li>
               <strong>Creation</strong> — generation start, generation complete
@@ -130,7 +130,7 @@ export default function PrivacyPage() {
           <h2>4. How We Use Your Information</h2>
           <ul>
             <li>Generate and deliver podcasts you request</li>
-            <li>Provide the social feed, discovery, and recommendation features</li>
+            <li>Provide private library, discovery, and recommendation features</li>
             <li>Build and update your behavioral profile for personalized recommendations</li>
             <li>Send notifications about your podcasts and interactions</li>
             <li>Process voice marketplace payments via Stripe Connect</li>
@@ -255,7 +255,7 @@ export default function PrivacyPage() {
           <p>
             You can delete your account at any time from your profile settings. This
             permanently removes your profile, podcasts, scripts, interactions,
-            comments, behavioral data, voice clones, and all associated content.
+            behavioral data, voice clones, and all associated content.
             Audio files are deleted from storage. Data in models without a direct
             foreign key (behavioral events, sessions, playback sessions, content
             flags, feedback, recommendations, listening queue, and your behavioral
@@ -267,7 +267,7 @@ export default function PrivacyPage() {
             You can export all your data at any time from your account settings or by
             calling <code>GET /api/users/me/export</code>. The export includes your
             profile, podcasts, scripts, discovery conversations, interactions,
-            comments, collections, social graph, likes, saves, ratings, behavioral
+            collections, saves, ratings, behavioral
             profile, recent behavioral events, playback sessions, voice clones,
             feedback, taste quiz answers, and saved ideas — all in a single JSON file.
           </p>
