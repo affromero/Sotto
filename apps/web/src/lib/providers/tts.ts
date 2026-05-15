@@ -8,9 +8,8 @@ import {
 } from '../voice-pool';
 import type { TtsProviderId } from './tts-registry';
 import type { WordTiming } from '@sotto/shared';
-import { getProviderMeta, compareQuality } from './tts-registry';
-import { getByokKey, getByokExtraData, listByokProviders, hasByokKey } from '../byok';
-import { resolveAutoModel, getAutoModelConfig } from '../auto-model-config';
+import { getByokKey, getByokExtraData, hasByokKey } from '../byok';
+import { getAutoModelConfig } from '../auto-model-config';
 import { supportsLanguage, getDefaultModelForLanguage } from '../tts-language-support';
 import { logger } from '../logger';
 
@@ -198,12 +197,13 @@ export interface ResolvedProvider {
 }
 
 /**
- * Resolve the best TTS provider for a given generation context.
+ * Resolve a specific TTS provider for a given generation context.
  *
  * Resolution order:
  * 1. If `requestedProvider` is specific + user has BYOK key → BYOK
  * 2. If `requestedProvider` is specific + no BYOK + platform has key → platform
- * 3. If 'auto' or null: check user BYOK keys → pick highest quality tier. Fallback to platform default.
+ *
+ * Missing or `auto` providers are rejected so generation cannot silently switch providers.
  */
 export async function resolveTtsProvider(context: {
   userId: string;
@@ -217,6 +217,10 @@ export async function resolveTtsProvider(context: {
   language?: string | null;
 }): Promise<ResolvedProvider> {
   const { userId, requestedProvider, requestedModel, language } = context;
+
+  if (!requestedProvider || requestedProvider === 'auto') {
+    throw new Error('TTS provider is required. Choose a provider before generating audio.');
+  }
 
   if (!language) {
     logger.debug('No language provided, skipping language-aware provider selection', { podcastId: context.podcastId });
@@ -236,117 +240,73 @@ export async function resolveTtsProvider(context: {
     return model ?? undefined;
   };
 
-  // Case 1+2: Specific provider requested
-  if (requestedProvider && requestedProvider !== 'auto') {
-    const resolvedModel = resolveModelForLanguage(requestedProvider, requestedModel);
+  const resolvedModel = resolveModelForLanguage(requestedProvider, requestedModel);
 
-    const byokKey = context.skipByok ? null : await getByokKey(userId, requestedProvider);
-    if (byokKey) {
-      const extraData = await getByokExtraData(userId, requestedProvider);
-      const provider = await createTtsProviderAsync(
-        requestedProvider,
-        byokKey,
-        extraData ?? undefined,
-        resolvedModel
-      );
-      return { provider, source: 'byok', providerId: requestedProvider };
-    }
-
-    // Platform fallback for elevenlabs/openai (we have platform keys)
-    // Prefer user's requested model, fall back to admin-configured model
-    if (requestedProvider === 'elevenlabs' && process.env.ELEVENLABS_API_KEY) {
-      const config = await getAutoModelConfig();
-      const configModel = requestedModel ?? (config.free.ttsProvider === 'elevenlabs' ? config.free.ttsModel : undefined);
-      const model = resolveModelForLanguage('elevenlabs', configModel);
-      return {
-        provider: createPremiumTtsProvider(undefined, model),
-        source: 'platform',
-        providerId: 'elevenlabs',
-      };
-    }
-    if (requestedProvider === 'openai' && process.env.OPENAI_API_KEY) {
-      const config = await getAutoModelConfig();
-      const configModel = requestedModel ?? (config.free.ttsProvider === 'openai' ? config.free.ttsModel : undefined);
-      const model = resolveModelForLanguage('openai', configModel);
-      return {
-        provider: createTtsProvider('openai', undefined, model),
-        source: 'platform',
-        providerId: 'openai',
-      };
-    }
-    if (requestedProvider === 'cartesia' && process.env.CARTESIA_API_KEY) {
-      const config = await getAutoModelConfig();
-      const configModel = requestedModel ?? (config.free.ttsProvider === 'cartesia' ? config.free.ttsModel : undefined);
-      const model = resolveModelForLanguage('cartesia', configModel);
-      const provider = await createTtsProviderAsync('cartesia', undefined, undefined, model);
-      return { provider, source: 'platform', providerId: 'cartesia' };
-    }
-    if (requestedProvider === 'hume' && process.env.HUME_API_KEY) {
-      const provider = await createTtsProviderAsync('hume', process.env.HUME_API_KEY, undefined, resolvedModel);
-      return { provider, source: 'platform', providerId: 'hume' };
-    }
-    if (requestedProvider === 'fal' && process.env.FAL_KEY) {
-      const provider = await createTtsProviderAsync('fal', process.env.FAL_KEY, undefined, resolvedModel);
-      return { provider, source: 'platform', providerId: 'fal' };
-    }
-    if (requestedProvider === 'replicate' && process.env.REPLICATE_API_TOKEN) {
-      const provider = await createTtsProviderAsync('replicate', process.env.REPLICATE_API_TOKEN, undefined, resolvedModel);
-      return { provider, source: 'platform', providerId: 'replicate' };
-    }
-    if (requestedProvider === 'minimax' && process.env.FAL_KEY) {
-      const provider = await createTtsProviderAsync('minimax', process.env.FAL_KEY, undefined, resolvedModel);
-      return { provider, source: 'platform', providerId: 'minimax' };
-    }
-    if (requestedProvider === 'mistral' && process.env.MISTRAL_API_KEY) {
-      const provider = await createTtsProviderAsync('mistral', process.env.MISTRAL_API_KEY, undefined, resolvedModel);
-      return { provider, source: 'platform', providerId: 'mistral' };
-    }
-
-    // No key available for requested provider
-    throw new Error(
-      `No API key available for ${requestedProvider}. Please add a BYOK key in Settings.`
+  const byokKey = context.skipByok ? null : await getByokKey(userId, requestedProvider);
+  if (byokKey) {
+    const extraData = await getByokExtraData(userId, requestedProvider);
+    const provider = await createTtsProviderAsync(
+      requestedProvider,
+      byokKey,
+      extraData ?? undefined,
+      resolvedModel
     );
+    return { provider, source: 'byok', providerId: requestedProvider };
   }
 
-  // Case 3: Auto-select based on BYOK keys
-  const byokProviders = await listByokProviders(userId);
-  if (byokProviders.length > 0) {
-    // Sort by quality tier (highest first), filter by language support when set
-    const sorted = byokProviders
-      .filter((p) => p.isValid)
-      .map((p) => ({ ...p, meta: getProviderMeta(p.provider) }))
-      .filter((p) => {
-        if (!language) return true;
-        // At least one model on this provider must support the language
-        return p.meta.models.some((m) => m.supportedLanguages.has(language));
-      })
-      .sort((a, b) => compareQuality(a.meta, b.meta));
-
-    if (sorted.length > 0) {
-      const best = sorted[0];
-      const byokKey = await getByokKey(userId, best.provider);
-      if (byokKey) {
-        const extraData = await getByokExtraData(userId, best.provider);
-        const model = resolveModelForLanguage(best.provider, undefined);
-        const provider = await createTtsProviderAsync(
-          best.provider,
-          byokKey,
-          extraData ?? undefined,
-          model
-        );
-        return { provider, source: 'byok', providerId: best.provider };
-      }
-    }
+  // Platform key for the explicitly requested provider.
+  // Prefer the requested model, then the admin-configured model for the same provider.
+  if (requestedProvider === 'elevenlabs' && process.env.ELEVENLABS_API_KEY) {
+    const config = await getAutoModelConfig();
+    const configModel = requestedModel ?? (config.free.ttsProvider === 'elevenlabs' ? config.free.ttsModel : undefined);
+    const model = resolveModelForLanguage('elevenlabs', configModel);
+    return {
+      provider: createPremiumTtsProvider(undefined, model),
+      source: 'platform',
+      providerId: 'elevenlabs',
+    };
+  }
+  if (requestedProvider === 'openai' && process.env.OPENAI_API_KEY) {
+    const config = await getAutoModelConfig();
+    const configModel = requestedModel ?? (config.free.ttsProvider === 'openai' ? config.free.ttsModel : undefined);
+    const model = resolveModelForLanguage('openai', configModel);
+    return {
+      provider: createTtsProvider('openai', undefined, model),
+      source: 'platform',
+      providerId: 'openai',
+    };
+  }
+  if (requestedProvider === 'cartesia' && process.env.CARTESIA_API_KEY) {
+    const config = await getAutoModelConfig();
+    const configModel = requestedModel ?? (config.free.ttsProvider === 'cartesia' ? config.free.ttsModel : undefined);
+    const model = resolveModelForLanguage('cartesia', configModel);
+    const provider = await createTtsProviderAsync('cartesia', undefined, undefined, model);
+    return { provider, source: 'platform', providerId: 'cartesia' };
+  }
+  if (requestedProvider === 'hume' && process.env.HUME_API_KEY) {
+    const provider = await createTtsProviderAsync('hume', process.env.HUME_API_KEY, undefined, resolvedModel);
+    return { provider, source: 'platform', providerId: 'hume' };
+  }
+  if (requestedProvider === 'fal' && process.env.FAL_KEY) {
+    const provider = await createTtsProviderAsync('fal', process.env.FAL_KEY, undefined, resolvedModel);
+    return { provider, source: 'platform', providerId: 'fal' };
+  }
+  if (requestedProvider === 'replicate' && process.env.REPLICATE_API_TOKEN) {
+    const provider = await createTtsProviderAsync('replicate', process.env.REPLICATE_API_TOKEN, undefined, resolvedModel);
+    return { provider, source: 'platform', providerId: 'replicate' };
+  }
+  if (requestedProvider === 'minimax' && process.env.FAL_KEY) {
+    const provider = await createTtsProviderAsync('minimax', process.env.FAL_KEY, undefined, resolvedModel);
+    return { provider, source: 'platform', providerId: 'minimax' };
+  }
+  if (requestedProvider === 'mistral' && process.env.MISTRAL_API_KEY) {
+    const provider = await createTtsProviderAsync('mistral', process.env.MISTRAL_API_KEY, undefined, resolvedModel);
+    return { provider, source: 'platform', providerId: 'mistral' };
   }
 
-  // Platform path: auto model config for the user's plan tier, respecting language
-  const autoConfig = await resolveAutoModel(context.plan ?? 'FREE');
-  const autoModel = resolveModelForLanguage(autoConfig.ttsProvider as TtsProviderId, autoConfig.ttsModel);
-  return {
-    provider: createTtsProvider(autoConfig.ttsProvider as TtsProviderId, undefined, autoModel),
-    source: 'platform',
-    providerId: autoConfig.ttsProvider as TtsProviderId,
-  };
+  throw new Error(
+    `No API key available for ${requestedProvider}. Please add a BYOK key in Settings.`
+  );
 }
 
 /**
