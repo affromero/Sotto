@@ -106,11 +106,8 @@ model User {
   expoPushTokens      ExpoPushToken[]
   voiceClones         VoiceClone[]
 
-  // Social
-  likes     Like[]
-  saves     Save[]
-  followers Follow[] @relation("Following")
-  following Follow[] @relation("Follower")
+  // Saves
+  saves Save[]
 
   // API Keys
   apiKeys           ApiKey[]
@@ -129,8 +126,7 @@ model User {
   userAiKeys UserAiKey[]
 
   // Collections
-  collections       Collection[]
-  collectionFollows CollectionFollow[]
+  collections Collection[]
 
   // Interests (onboarding + settings)
   interests              UserInterest[]
@@ -143,17 +139,8 @@ model User {
   // Voice allowlist
   voiceAllowlistEntries VoiceAllowlist[] @relation("VoiceAllowlisted")
 
-  // Interaction votes
-  interactionVotes InteractionVote[]
-
-  // Comments
-  comments Comment[]
-
   // Podcast ratings
   podcastRatings PodcastRating[]
-
-  // Activity feed
-  activities Activity[]
 
   // Taste quiz
   tasteQuizAnswers TasteQuizAnswer[]
@@ -310,22 +297,6 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
-// ============ SOCIAL: FOLLOW ============
-
-model Follow {
-  id          String   @id @default(cuid())
-  followerId  String
-  followingId String
-  createdAt   DateTime @default(now())
-
-  follower  User @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade)
-  following User @relation("Following", fields: [followingId], references: [id], onDelete: Cascade)
-
-  @@unique([followerId, followingId])
-  @@index([followerId])
-  @@index([followingId])
-}
-
 // ============ PODCASTS ============
 
 model Podcast {
@@ -371,23 +342,12 @@ model Podcast {
   visibility PodcastVisibility @default(PRIVATE)
   isDelisted Boolean           @default(false)
 
-  // Fork tracking
-  forkedFromId    String?
-  forkedFrom      Podcast?  @relation("Forks", fields: [forkedFromId], references: [id], onDelete: SetNull)
-  forks           Podcast[] @relation("Forks")
-  remixNote       String?   @db.Text
-  parentDiscovery Json?
-  isVoiceOnlyFork Boolean   @default(false)
-
   // Versioning
   currentVersion Int @default(1)
 
   // Counters (denormalized for performance)
-  playCount    Int @default(0)
-  likeCount    Int @default(0)
-  forkCount    Int @default(0)
-  saveCount    Int @default(0)
-  commentCount Int @default(0)
+  playCount Int @default(0)
+  saveCount Int @default(0)
 
   // PDF export
   pdfUrl String?
@@ -426,7 +386,6 @@ model Podcast {
   script              Script?
   segments            Segment[]
   interactions        Interaction[]
-  likes               Like[]
   saves               Save[]
   tags                PodcastTag[]
   jobs                Job[]
@@ -438,7 +397,6 @@ model Podcast {
   playbackSessions    PlaybackSession[]
   podcastFeature      PodcastFeature?
   listeningQueues     ListeningQueue[]
-  comments            Comment[]
   collectionItems     CollectionItem[]
   savedIdea           SavedIdea?
   voices              PodcastVoice[]
@@ -467,7 +425,6 @@ model Podcast {
   @@index([visibility])
   @@index([createdAt])
   @@index([playCount])
-  @@index([likeCount])
   @@index([deletedAt])
 }
 
@@ -749,9 +706,8 @@ model Interaction {
   helpful      Boolean? // null = no feedback, true/false = user response
   segmentOrder Int? // computed by worker: which segment the question maps to
 
-  // Public Q&A
-  visibility  String @default("PUBLIC") // PUBLIC or PRIVATE
-  upvoteCount Int    @default(0)
+  // Interaction privacy
+  visibility String @default("PUBLIC") // PUBLIC or PRIVATE
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -759,24 +715,10 @@ model Interaction {
   podcast  Podcast           @relation(fields: [podcastId], references: [id], onDelete: Cascade)
   user     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   versions PodcastVersion[]
-  votes    InteractionVote[]
 
   @@index([podcastId])
   @@index([userId])
   @@index([status])
-}
-
-model InteractionVote {
-  id            String   @id @default(cuid())
-  userId        String
-  interactionId String
-  createdAt     DateTime @default(now())
-
-  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  interaction Interaction @relation(fields: [interactionId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, interactionId])
-  @@index([interactionId])
 }
 
 enum InteractionStatus {
@@ -788,42 +730,7 @@ enum InteractionStatus {
   INCORPORATED
 }
 
-// ============ COMMENTS (Threaded) ============
-
-model Comment {
-  id         String   @id @default(cuid())
-  content    String   @db.Text
-  userId     String
-  podcastId  String
-  parentId   String?
-  timestamp  Float? // optional podcast playback timestamp pin
-  replyCount Int      @default(0)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  user    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  podcast Podcast   @relation(fields: [podcastId], references: [id], onDelete: Cascade)
-  parent  Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
-  replies Comment[] @relation("CommentReplies")
-
-  @@index([podcastId, createdAt])
-  @@index([parentId])
-}
-
-// ============ SOCIAL: LIKES & SAVES ============
-
-model Like {
-  id        String   @id @default(cuid())
-  userId    String
-  podcastId String
-  createdAt DateTime @default(now())
-
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  podcast Podcast @relation(fields: [podcastId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, podcastId])
-  @@index([podcastId])
-}
+// ============ SAVES ============
 
 model Save {
   id        String   @id @default(cuid())
@@ -973,7 +880,6 @@ enum NotificationType {
   PODCAST_READY
   PODCAST_FAILED
   KEY_INVALID
-  SIMILAR_PODCAST_CREATED
   TWITTER_PODCAST_READY
   TELEGRAM_PODCAST_READY
   VOICE_REQUEST_RECEIVED
@@ -1279,7 +1185,7 @@ model ListeningQueue {
   podcastId String
   position  Int
   addedAt   DateTime @default(now())
-  source    String // picks, explore, following, search
+  source    String // picks, explore, search
 
   podcast Podcast @relation(fields: [podcastId], references: [id], onDelete: Cascade)
 
@@ -1803,13 +1709,11 @@ model Collection {
   userId        String
   isPublic      Boolean  @default(true)
   podcastCount  Int      @default(0)
-  followerCount Int      @default(0)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  items     CollectionItem[]
-  followers CollectionFollow[]
+  user  User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items CollectionItem[]
 
   @@index([userId])
 }
@@ -1826,36 +1730,6 @@ model CollectionItem {
 
   @@unique([collectionId, podcastId])
   @@index([collectionId])
-}
-
-model CollectionFollow {
-  id           String   @id @default(cuid())
-  userId       String
-  collectionId String
-  createdAt    DateTime @default(now())
-
-  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  collection Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, collectionId])
-  @@index([collectionId])
-}
-
-// ============ ACTIVITY FEED ============
-
-model Activity {
-  id         String   @id @default(cuid())
-  userId     String
-  type       String // PODCAST_CREATED, COLLECTION_CREATED
-  targetId   String? // The ID of the target entity (podcast, user, collection, comment)
-  targetType String? // 'podcast', 'user', 'collection', 'comment'
-  metadata   Json? // Any extra context (e.g., fork parent title, comment snippet)
-  createdAt  DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, createdAt])
-  @@index([createdAt])
 }
 
 // ============ AUTO MODEL CONFIG ============
