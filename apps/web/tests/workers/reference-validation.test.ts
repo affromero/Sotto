@@ -18,6 +18,7 @@ const mockPrismaPodcastFindUnique = vi.fn().mockResolvedValue({
 });
 const mockPrismaPodcastFindUniqueOrThrow = vi.fn().mockResolvedValue({
   source: 'TWITTER',
+  ttsProvider: 'elevenlabs',
 });
 const mockPrismaPodcastUpdate = vi.fn().mockResolvedValue({});
 const mockPrismaSegmentCreate = vi.fn().mockResolvedValue({ id: 'segment-001' });
@@ -940,7 +941,10 @@ describe('processReferenceValidation', () => {
         source: 'TWITTER',
         verificationMode: 'showcase',
       });
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({ source: 'TWITTER' });
+      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+        source: 'TWITTER',
+        ttsProvider: 'elevenlabs',
+      });
     });
 
     it('calls selectFreeTierProviders for free-tier user (no-refs path)', async () => {
@@ -961,7 +965,7 @@ describe('processReferenceValidation', () => {
       );
     });
 
-    it('skips selectFreeTierProviders for BYOK user (no-refs path)', async () => {
+    it('uses persisted ttsProvider for BYOK user (no-refs path)', async () => {
       const { hasByokKey } = await import('@/lib/byok');
       (hasByokKey as ReturnType<typeof vi.fn>).mockResolvedValue(true);
 
@@ -971,6 +975,33 @@ describe('processReferenceValidation', () => {
       await processReferenceValidation(job);
 
       expect(selectFreeTierProviders).not.toHaveBeenCalled();
+      expect(mockCreateSegmentsAndQueueAudio).toHaveBeenCalled();
+    });
+
+    it('pauses BYOK no-refs auto-approval when no ttsProvider is persisted', async () => {
+      const { hasByokKey } = await import('@/lib/byok');
+      (hasByokKey as ReturnType<typeof vi.fn>).mockResolvedValue(true);
+      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValueOnce({ ttsProvider: null });
+
+      const job = createMockJob(defaultPayload);
+      await processReferenceValidation(job);
+
+      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'podcast-001' },
+          data: expect.objectContaining({ status: 'SCRIPT_READY' }),
+        })
+      );
+      expect(mockAddJob).toHaveBeenCalledWith(
+        expect.anything(),
+        'send_notification',
+        expect.objectContaining({
+          userId: 'user-001',
+          type: 'SCRIPT_READY',
+          data: expect.objectContaining({ podcastId: 'podcast-001', missingTtsProvider: true }),
+        })
+      );
+      expect(mockCreateSegmentsAndQueueAudio).not.toHaveBeenCalled();
     });
 
     it('calls selectFreeTierProviders for free-tier at full-validation auto-approve', async () => {
@@ -986,7 +1017,10 @@ describe('processReferenceValidation', () => {
       });
       mockPrismaPodcastFindUnique.mockResolvedValue({ topic: 'Test', source: 'TWITTER', verificationMode: 'standard' });
       // TWITTER auto-approves + non-BYOK
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({ source: 'TWITTER' });
+      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+        source: 'TWITTER',
+        ttsProvider: 'elevenlabs',
+      });
       const { hasByokKey } = await import('@/lib/byok');
       (hasByokKey as ReturnType<typeof vi.fn>).mockResolvedValue(false);
 
@@ -1003,7 +1037,7 @@ describe('processReferenceValidation', () => {
       );
     });
 
-    it('skips selectFreeTierProviders for BYOK at full-validation auto-approve', async () => {
+    it('uses persisted ttsProvider for BYOK at full-validation auto-approve', async () => {
       mockPrismaReferenceFindMany.mockResolvedValue(
         Array.from({ length: 5 }, (_, i) => ({ id: `ref-00${i + 1}`, number: i + 1, title: 'Paper', authors: [], year: 2023, url: 'https://example.com', doi: null, type: 'article' }))
       );
@@ -1014,7 +1048,10 @@ describe('processReferenceValidation', () => {
         rejectedRefIds: new Set<string>(),
       });
       mockPrismaPodcastFindUnique.mockResolvedValue({ topic: 'Test', source: 'TWITTER', verificationMode: 'standard' });
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({ source: 'TWITTER' });
+      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+        source: 'TWITTER',
+        ttsProvider: 'elevenlabs',
+      });
       const { hasByokKey } = await import('@/lib/byok');
       (hasByokKey as ReturnType<typeof vi.fn>).mockResolvedValue(true);
 
@@ -1024,6 +1061,43 @@ describe('processReferenceValidation', () => {
       await processReferenceValidation(job);
 
       expect(selectFreeTierProviders).not.toHaveBeenCalled();
+      expect(mockCreateSegmentsAndQueueAudio).toHaveBeenCalled();
+    });
+
+    it('pauses BYOK full-validation auto-approval when no ttsProvider is persisted', async () => {
+      mockPrismaReferenceFindMany.mockResolvedValue(
+        Array.from({ length: 5 }, (_, i) => ({ id: `ref-00${i + 1}`, number: i + 1, title: 'Paper', authors: [], year: 2023, url: 'https://example.com', doi: null, type: 'article' }))
+      );
+      mockRunReferenceVerification.mockResolvedValue({
+        results: new Map(
+          Array.from({ length: 5 }, (_, i) => [`ref-00${i + 1}`, { domain: 'GENERAL', verdict: { status: 'VERIFIED' as const, confidence: 0.8 }, score: 0.8, checks: [], logOddsContributions: {} }])
+        ),
+        rejectedRefIds: new Set<string>(),
+      });
+      mockPrismaPodcastFindUnique.mockResolvedValue({ topic: 'Test', source: 'TWITTER', verificationMode: 'standard' });
+      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValueOnce({ ttsProvider: null });
+      const { hasByokKey } = await import('@/lib/byok');
+      (hasByokKey as ReturnType<typeof vi.fn>).mockResolvedValue(true);
+
+      const job = createMockJob(defaultPayload);
+      await processReferenceValidation(job);
+
+      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'podcast-001' },
+          data: expect.objectContaining({ status: 'SCRIPT_READY' }),
+        })
+      );
+      expect(mockAddJob).toHaveBeenCalledWith(
+        expect.anything(),
+        'send_notification',
+        expect.objectContaining({
+          userId: 'user-001',
+          type: 'SCRIPT_READY',
+          data: expect.objectContaining({ podcastId: 'podcast-001', missingTtsProvider: true }),
+        })
+      );
+      expect(mockCreateSegmentsAndQueueAudio).not.toHaveBeenCalled();
     });
   });
 
