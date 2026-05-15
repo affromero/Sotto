@@ -9,7 +9,11 @@ const mockPrismaDiscoveryUpdate = vi.fn().mockResolvedValue({
 });
 const mockPrismaDiscoveryFindUnique = vi.fn().mockResolvedValue(null);
 const mockPrismaPodcastUpdate = vi.fn().mockResolvedValue({});
-const mockPrismaPodcastFindUniqueOrThrow = vi.fn().mockResolvedValue({ source: 'WEB' });
+const mockPrismaPodcastFindUniqueOrThrow = vi.fn().mockResolvedValue({
+  source: 'WEB',
+  aiModel: 'gpt-5-mini',
+  user: { plan: 'FREE' },
+});
 
 vi.mock('@/lib/prisma', () => {
   const _mockPrisma = {
@@ -65,15 +69,17 @@ vi.mock('@/lib/logger', () => ({
   },
 }));
 
+const mockAssessTopicFeasibility = vi.fn().mockResolvedValue({
+  verdict: 'proceed',
+  reason: 'Topic is feasible',
+  suggestion: null,
+  inputTokens: 0,
+  outputTokens: 0,
+  model: 'test',
+});
+
 vi.mock('@/lib/topic-assessor', () => ({
-  assessTopicFeasibility: vi.fn().mockResolvedValue({
-    verdict: 'proceed',
-    reason: 'Topic is feasible',
-    suggestion: null,
-    inputTokens: 0,
-    outputTokens: 0,
-    model: 'test',
-  }),
+  assessTopicFeasibility: (...args: unknown[]) => mockAssessTopicFeasibility(...args),
 }));
 
 vi.mock('@/lib/pipeline-resume', () => ({
@@ -88,16 +94,25 @@ vi.mock('@/lib/redis', () => ({
   publishPodcastStatus: (...args: unknown[]) => mockPublishPodcastStatus(...args),
 }));
 
+const mockLogUsage = vi.fn().mockResolvedValue(undefined);
+
 vi.mock('@/lib/usage-logger', () => ({
-  logUsage: vi.fn().mockResolvedValue(undefined),
+  logUsage: (...args: unknown[]) => mockLogUsage(...args),
 }));
+
+const mockGetAiKey = vi.fn().mockResolvedValue({ apiKey: 'provider-key', provider: 'openai' });
 
 vi.mock('@/lib/byok', () => ({
-  getAiKey: vi.fn().mockResolvedValue(null),
+  getAiKey: (...args: unknown[]) => mockGetAiKey(...args),
 }));
 
+const mockResolveAiModelAndProvider = vi.fn().mockResolvedValue({
+  model: 'gpt-5-mini',
+  provider: 'openai',
+});
+
 vi.mock('@/lib/providers/ai-registry', () => ({
-  resolveAiModelAndProvider: vi.fn().mockResolvedValue({ model: 'claude-sonnet-4-20250514', provider: 'anthropic' }),
+  resolveAiModelAndProvider: (...args: unknown[]) => mockResolveAiModelAndProvider(...args),
 }));
 
 vi.mock('@/lib/media-bias', () => ({
@@ -137,7 +152,23 @@ describe('processContentExtraction', () => {
       sourceContent: '# Extracted\n\nContent from URL',
     });
     mockPrismaPodcastUpdate.mockResolvedValue({});
+    mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+      source: 'WEB',
+      aiModel: 'gpt-5-mini',
+      user: { plan: 'FREE' },
+    });
     mockAddJob.mockResolvedValue({ id: 'script-job-1' });
+    mockAssessTopicFeasibility.mockResolvedValue({
+      verdict: 'proceed',
+      reason: 'Topic is feasible',
+      suggestion: null,
+      inputTokens: 0,
+      outputTokens: 0,
+      model: 'test',
+    });
+    mockLogUsage.mockResolvedValue(undefined);
+    mockGetAiKey.mockResolvedValue({ apiKey: 'provider-key', provider: 'openai' });
+    mockResolveAiModelAndProvider.mockResolvedValue({ model: 'gpt-5-mini', provider: 'openai' });
     mockExtractContent.mockResolvedValue({
       text: 'Extracted content from URL',
       markdown: '# Extracted\n\nContent from URL',
@@ -420,6 +451,165 @@ describe('processContentExtraction', () => {
             sourceContent: '',
           }),
         })
+      );
+    });
+  });
+
+  describe('topic feasibility AI routing', () => {
+    beforeEach(() => {
+      mockPrismaDiscoveryFindUnique
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({
+          topic: 'Private podcast infrastructure',
+          depth: 'standard',
+          focusAreas: [],
+        });
+    });
+
+    it('uses the podcast model owner and matching provider key', async () => {
+      const job = createMockJob({
+        ...defaultPayload,
+        sourceText: 'Source material',
+      });
+      await processContentExtraction(job);
+
+      expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
+        podcastAiModel: 'gpt-5-mini',
+        aiKey: null,
+        plan: 'FREE',
+      });
+      expect(mockGetAiKey).toHaveBeenCalledTimes(1);
+      expect(mockGetAiKey).toHaveBeenCalledWith('user-001', 'openai');
+      expect(mockAssessTopicFeasibility).toHaveBeenCalledWith(
+        expect.objectContaining({
+          topic: 'Private podcast infrastructure',
+          apiKeyOverride: 'provider-key',
+          model: 'gpt-5-mini',
+          provider: 'openai',
+        }),
+      );
+      expect(mockLogUsage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          service: 'openai',
+          category: 'topic_assessment',
+          podcastId: 'podcast-001',
+          userId: 'user-001',
+        }),
+      );
+    });
+
+    it('rejects explicit non-local models without a matching provider key', async () => {
+      mockGetAiKey.mockResolvedValue(null);
+
+      await expect(processContentExtraction(createMockJob({
+        ...defaultPayload,
+        sourceText: 'Source material',
+      }))).rejects.toThrow(
+        'AI key for provider "openai" is required for topic feasibility assessment.',
+      );
+
+      expect(mockGetAiKey).toHaveBeenCalledWith('user-001', 'openai');
+      expect(mockAssessTopicFeasibility).not.toHaveBeenCalled();
+    });
+
+    it('uses platform credentials only for explicit admin-credit routes', async () => {
+      await processContentExtraction(createMockJob({
+        ...defaultPayload,
+        sourceText: 'Source material',
+        useAdminCredits: true,
+      }));
+
+      expect(mockGetAiKey).not.toHaveBeenCalled();
+      expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
+        podcastAiModel: 'gpt-5-mini',
+        aiKey: null,
+        plan: 'FREE',
+      });
+      expect(mockAssessTopicFeasibility).toHaveBeenCalledWith(
+        expect.objectContaining({
+          apiKeyOverride: undefined,
+          model: 'gpt-5-mini',
+          provider: 'openai',
+        }),
+      );
+    });
+
+    it('uses the configured BYOK provider when the podcast has no model', async () => {
+      const aiKey = { apiKey: 'anthropic-key', provider: 'anthropic' };
+      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+        source: 'WEB',
+        aiModel: null,
+        user: { plan: 'FREE' },
+      });
+      mockGetAiKey.mockResolvedValue(aiKey);
+      mockResolveAiModelAndProvider.mockResolvedValue({
+        model: 'claude-haiku-4-5-20251001',
+        provider: 'anthropic',
+      });
+
+      await processContentExtraction(createMockJob({
+        ...defaultPayload,
+        sourceText: 'Source material',
+      }));
+
+      expect(mockGetAiKey).toHaveBeenCalledTimes(1);
+      expect(mockGetAiKey).toHaveBeenCalledWith('user-001');
+      expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
+        podcastAiModel: null,
+        aiKey,
+        plan: 'FREE',
+      });
+      expect(mockAssessTopicFeasibility).toHaveBeenCalledWith(
+        expect.objectContaining({
+          apiKeyOverride: 'anthropic-key',
+          model: 'claude-haiku-4-5-20251001',
+          provider: 'anthropic',
+        }),
+      );
+    });
+
+    it('rejects WEB feasibility checks without an explicit model or AI key', async () => {
+      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+        source: 'WEB',
+        aiModel: null,
+        user: { plan: 'FREE' },
+      });
+      mockGetAiKey.mockResolvedValue(null);
+
+      await expect(processContentExtraction(createMockJob({
+        ...defaultPayload,
+        sourceText: 'Source material',
+      }))).rejects.toThrow(
+        'AI model is required for topic feasibility assessment when no AI key is configured.',
+      );
+
+      expect(mockResolveAiModelAndProvider).not.toHaveBeenCalled();
+      expect(mockAssessTopicFeasibility).not.toHaveBeenCalled();
+    });
+
+    it('routes explicit Claude Code models without fetching a provider key', async () => {
+      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+        source: 'WEB',
+        aiModel: 'claude-code:opus',
+        user: { plan: 'PRO' },
+      });
+      mockResolveAiModelAndProvider.mockResolvedValue({
+        model: 'claude-code:opus',
+        provider: 'claude-code',
+      });
+
+      await processContentExtraction(createMockJob({
+        ...defaultPayload,
+        sourceText: 'Source material',
+      }));
+
+      expect(mockGetAiKey).not.toHaveBeenCalled();
+      expect(mockAssessTopicFeasibility).toHaveBeenCalledWith(
+        expect.objectContaining({
+          apiKeyOverride: undefined,
+          model: 'claude-code:opus',
+          provider: 'claude-code',
+        }),
       );
     });
   });

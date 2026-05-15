@@ -50,6 +50,14 @@ vi.mock('@/lib/queue', () => ({
   JobType: { EXTRACT_CONTENT: 'extract_content' },
 }));
 
+const mockSelectFreeTierProviders = vi.fn().mockResolvedValue({
+  aiModel: 'gpt-5-mini',
+});
+
+vi.mock('@/lib/free-tier-provider-selector', () => ({
+  selectFreeTierProviders: (...args: unknown[]) => mockSelectFreeTierProviders(...args),
+}));
+
 import { POST } from '@/app/api/admin/podcasts/create-as-sotto/route';
 import { DELETE } from '@/app/api/admin/podcasts/[podcastId]/route';
 
@@ -179,6 +187,12 @@ describe('POST /api/admin/podcasts/create-as-sotto', () => {
 
     expect(response.status).toBe(201);
     expect(body).toMatchObject({ id: 'pod-2', status: 'EXTRACTING' });
+    expect(mockSelectFreeTierProviders).toHaveBeenCalledWith('sotto-id');
+    expect(mockPodcastCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        aiModel: 'gpt-5-mini',
+      }),
+    });
 
     // Discovery record created with sotto user ID
     expect(mockDiscoveryCreate).toHaveBeenCalledWith({
