@@ -16,7 +16,7 @@ Shared types used across the application. These mirror Prisma models but are sha
 | `api-key.ts`      | ApiKeyData, CreateKeyRequest, KeyListResponse                                                                                                                     |
 | `team.ts`         | TeamData, TeamInviteData, TeamMember                                                                                                                              |
 | `twitter.ts`      | TweetParseResult, TwitterTweet, TwitterMention, TwitterSettingsData, TweetMentionData                                                                             |
-| `events.ts`       | EventPayload (discriminated union of 23 event types), EventContext, BehavioralEventInput                                                                          |
+| `events.ts`       | EventPayload (discriminated union of 17 private workspace event types), EventContext, BehavioralEventInput                                                        |
 | `version.ts`      | PodcastVersionData, PodcastVersionSegmentData                                                                                                                     |
 | `import.ts`       | ImportPodcastRequest, ImportProgress, ImportStatus                                                                                                                |
 | `telegram.ts`     | TelegramParseResult, TelegramUpdate, TelegramMessageData, Telegram API payload types                                                                              |

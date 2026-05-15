@@ -89,27 +89,27 @@ export interface PlaybackAbandonEvent {
   sessionDuration: number;
 }
 
-// ============ FEED EVENTS ============
+// ============ PRIVATE LIBRARY EVENTS ============
 
-export interface FeedImpressionEvent {
-  eventType: 'feed.impression';
+export interface LibraryImpressionEvent {
+  eventType: 'library.impression';
   podcastId: string;
   position: number;
-  feedSort?: string;
+  surface?: string;
   searchQuery?: string;
 }
 
-export interface FeedClickEvent {
-  eventType: 'feed.click';
+export interface LibraryClickEvent {
+  eventType: 'library.click';
   podcastId: string;
   position: number;
-  feedSort?: string;
+  surface?: string;
   searchQuery?: string;
   dwellTimeMs: number;
 }
 
-export interface FeedSearchEvent {
-  eventType: 'feed.search';
+export interface LibrarySearchEvent {
+  eventType: 'library.search';
   query: string;
   resultCount: number;
   filters?: Record<string, string>;
@@ -148,43 +148,6 @@ export interface DiscoveryMetadataCompleteEvent {
   durationTarget: number;
 }
 
-// ============ SOCIAL EVENTS ============
-
-export interface SocialLikeEvent {
-  eventType: 'social.like';
-  podcastId: string;
-}
-
-export interface SocialUnlikeEvent {
-  eventType: 'social.unlike';
-  podcastId: string;
-}
-
-export interface SocialSaveEvent {
-  eventType: 'social.save';
-  podcastId: string;
-}
-
-export interface SocialUnsaveEvent {
-  eventType: 'social.unsave';
-  podcastId: string;
-}
-
-export interface SocialFollowEvent {
-  eventType: 'social.follow';
-  targetUserId: string;
-}
-
-export interface SocialUnfollowEvent {
-  eventType: 'social.unfollow';
-  targetUserId: string;
-}
-
-export interface SocialForkEvent {
-  eventType: 'social.fork';
-  podcastId: string;
-}
-
 // ============ NAVIGATION EVENTS ============
 
 export interface PageViewEvent {
@@ -213,20 +176,13 @@ export type EventPayload =
   | PlaybackCompleteEvent
   | PlaybackSegmentTransitionEvent
   | PlaybackAbandonEvent
-  | FeedImpressionEvent
-  | FeedClickEvent
-  | FeedSearchEvent
+  | LibraryImpressionEvent
+  | LibraryClickEvent
+  | LibrarySearchEvent
   | DiscoveryChipClickEvent
   | DiscoveryChipDismissEvent
   | DiscoveryMessageSentEvent
   | DiscoveryMetadataCompleteEvent
-  | SocialLikeEvent
-  | SocialUnlikeEvent
-  | SocialSaveEvent
-  | SocialUnsaveEvent
-  | SocialFollowEvent
-  | SocialUnfollowEvent
-  | SocialForkEvent
   | PageViewEvent
   | InteractionAskEvent;
 

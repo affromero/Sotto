@@ -18,13 +18,13 @@ interface PodcastCardProps {
   variant?: 'default' | 'compact';
   onPlay?: (id: string) => void;
   position?: number;
-  feedSort?: string;
+  surface?: string;
   searchQuery?: string;
   observeRef?: (
     el: HTMLElement | null,
     podcastId: string,
     position: number,
-    feedSort?: string,
+    surface?: string,
     searchQuery?: string
   ) => void;
 }
@@ -59,13 +59,12 @@ function formatDate(dateString: string): string {
   return `${Math.floor(diffDays / 365)}y ago`;
 }
 
-
 export function PodcastCard({
   podcast,
   variant = 'default',
   onPlay,
   position = 0,
-  feedSort,
+  surface,
   searchQuery,
   observeRef,
 }: PodcastCardProps) {
@@ -85,22 +84,22 @@ export function PodcastCard({
   const cardRef = useCallback(
     (el: HTMLElement | null) => {
       if (observeRef && el) {
-        observeRef(el, podcast.id, position, feedSort, searchQuery);
+        observeRef(el, podcast.id, position, surface, searchQuery);
       }
     },
-    [observeRef, podcast.id, position, feedSort, searchQuery]
+    [observeRef, podcast.id, position, surface, searchQuery]
   );
 
   const handleClick = useCallback(() => {
     track({
-      eventType: 'feed.click',
+      eventType: 'library.click',
       podcastId: podcast.id,
       position,
-      feedSort,
+      surface,
       searchQuery,
       dwellTimeMs: Date.now() - mountTimeRef.current,
     });
-  }, [track, podcast.id, position, feedSort, searchQuery]);
+  }, [track, podcast.id, position, surface, searchQuery]);
 
   const variantClass = variant !== 'default' ? styles[variant] : '';
   const cardClassName = `${styles.card} ${variantClass}`.trim();
@@ -142,14 +141,20 @@ export function PodcastCard({
 
           <div className={styles.coverMeta}>
             <div className={styles.coverMetaLeft}>
-              <time className={styles.coverDate} dateTime={podcast.createdAt} suppressHydrationWarning>
+              <time
+                className={styles.coverDate}
+                dateTime={podcast.createdAt}
+                suppressHydrationWarning
+              >
                 {formatDate(podcast.createdAt)}
               </time>
-              <span className={styles.contentBadge}>
-                {getContentBadgeLabel(podcast)}
-              </span>
+              <span className={styles.contentBadge}>{getContentBadgeLabel(podcast)}</span>
               {podcast.lowReferences && (
-                <span className={styles.limitedSourcesBadge} aria-label="Limited Sources" title="This podcast has fewer verified references than recommended. Some claims may not be backed by cited sources.">
+                <span
+                  className={styles.limitedSourcesBadge}
+                  aria-label="Limited Sources"
+                  title="This podcast has fewer verified references than recommended. Some claims may not be backed by cited sources."
+                >
                   Limited Sources
                 </span>
               )}

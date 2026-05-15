@@ -117,6 +117,16 @@ describe('private-first OSS surfaces', () => {
     const mcpSources = ['packages/mcp/src/server.ts', 'packages/mcp/src/client.ts']
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
+    const eventSources = [
+      'src/types/events.ts',
+      'src/lib/validations/events.ts',
+      'src/components/feed/PodcastCard.tsx',
+      'src/components/feed/SearchBar.tsx',
+      'src/lib/hooks/useImpressionTracker.ts',
+    ]
+      .map(readSource)
+      .concat(readFileSync(resolve(repoRoot, 'packages/shared/src/types/events.ts'), 'utf8'))
+      .join('\n');
 
     expect(mobileSources).not.toContain("'/feed'");
     expect(mobileSources).not.toContain('"/feed"');
@@ -124,6 +134,16 @@ describe('private-first OSS surfaces', () => {
     expect(mobileSources).not.toContain('/users/suggested');
     expect(mcpSources).not.toContain('browse_feed');
     expect(mcpSources).not.toContain('/api/feed');
+    expect(eventSources).not.toContain('feed.impression');
+    expect(eventSources).not.toContain('feed.click');
+    expect(eventSources).not.toContain('feed.search');
+    expect(eventSources).not.toContain('feedSort');
+    expect(eventSources).not.toContain('social.like');
+    expect(eventSources).not.toContain('social.follow');
+    expect(eventSources).not.toContain('social.fork');
+    expect(eventSources).toContain('library.impression');
+    expect(eventSources).toContain('library.click');
+    expect(eventSources).toContain('library.search');
     expect(existsSync(resolve(repoRoot, 'packages/shared/src/types/feed.ts'))).toBe(false);
     expect(existsSync(resolve(webRoot, 'src/types/feed.ts'))).toBe(false);
   });
