@@ -37,6 +37,25 @@ const MAX_REF_RETRY_ATTEMPTS: Record<string, number> = {
   eli5: 1,
 };
 
+async function pauseForTtsProviderSelection(podcastId: string, userId: string): Promise<void> {
+  await prisma.podcast.update({
+    where: { id: podcastId },
+    data: { status: 'SCRIPT_READY', verificationProgress: Prisma.DbNull },
+  });
+  await invalidatePodcastCache(podcastId);
+  await publishPodcastStatus(podcastId, { status: 'SCRIPT_READY' });
+
+  await addJob(notificationQueue, JobType.SEND_NOTIFICATION, {
+    userId,
+    type: 'SCRIPT_READY',
+    title: 'Choose a voice provider',
+    message: 'Your script is ready. Choose a TTS provider to start audio generation.',
+    data: { podcastId, missingTtsProvider: true },
+  });
+
+  logger.warn('Reference validation paused before audio: missing TTS provider', { podcastId, userId });
+}
+
 export async function processReferenceValidation(
   job: Job<ValidateReferencesPayload>
 ): Promise<void> {
@@ -140,15 +159,19 @@ export async function processReferenceValidation(
       where: { id: podcastId },
       select: { ttsProvider: true },
     });
-    const earlyProvider = (earlyPodcast.ttsProvider ?? 'elevenlabs') as TtsProviderId;
+    if (!earlyPodcast.ttsProvider) {
+      await pauseForTtsProviderSelection(podcastId, userId);
+      await job.updateProgress(100);
+      return;
+    }
+
+    const earlyProvider = earlyPodcast.ttsProvider as TtsProviderId;
     const earlySpeakers = [...new Set(earlyTurns.map((t) => t.speaker))].map((name) => ({ name }));
     const earlyTtsKey = isByokEarly ? ((await getByokKey(userId, earlyProvider)) ?? undefined) : undefined;
     await assignVoicesForPodcast(podcastId, earlySpeakers, earlyProvider, earlyTtsKey);
 
     // Convert TTS tags before creating segments
-    const convertedEarlyTurns = earlyPodcast.ttsProvider
-      ? await convertTurnsForProvider(earlyTurns, earlyProvider, podcastId)
-      : earlyTurns;
+    const convertedEarlyTurns = await convertTurnsForProvider(earlyTurns, earlyProvider, podcastId);
     await createSegmentsAndQueueAudio(podcastId, convertedEarlyTurns);
     await job.updateProgress(100);
     return;
@@ -670,22 +693,25 @@ export async function processReferenceValidation(
         data: { ttsProvider: selected.ttsProvider, ttsModel: selected.ttsModel },
       });
     }
-    // BYOK: leave null — worker's resolveTtsProvider() picks best available
+    // BYOK keeps the provider chosen at creation or script approval. Missing provider pauses below.
 
     // Assign voices for multi-speaker podcasts
     const latePodcast = await prisma.podcast.findUniqueOrThrow({
       where: { id: podcastId },
       select: { ttsProvider: true },
     });
-    const lateProvider = (latePodcast.ttsProvider ?? 'elevenlabs') as TtsProviderId;
+    if (!latePodcast.ttsProvider) {
+      await pauseForTtsProviderSelection(podcastId, userId);
+      return;
+    }
+
+    const lateProvider = latePodcast.ttsProvider as TtsProviderId;
     const lateSpeakers = [...new Set(turns.map((t) => t.speaker))].map((name) => ({ name }));
     const lateTtsKey = isByok ? ((await getByokKey(userId, lateProvider)) ?? undefined) : undefined;
     await assignVoicesForPodcast(podcastId, lateSpeakers, lateProvider, lateTtsKey);
 
     // Convert TTS tags before creating segments
-    const convertedTurns = latePodcast.ttsProvider
-      ? await convertTurnsForProvider(turns, lateProvider, podcastId)
-      : turns;
+    const convertedTurns = await convertTurnsForProvider(turns, lateProvider, podcastId);
     await createSegmentsAndQueueAudio(podcastId, convertedTurns);
 
     await prisma.podcast.update({
