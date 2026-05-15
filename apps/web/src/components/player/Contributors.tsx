@@ -1,8 +1,6 @@
 'use client';
 
-import Link from 'next/link';
 import Image from 'next/image';
-import { profileUrl } from '@/lib/urls';
 import type { VoiceTrackContributor } from '@sotto/shared';
 import styles from './Contributors.module.css';
 
@@ -23,11 +21,7 @@ export function Contributors({ contributors }: ContributorsProps) {
       <h3 className={styles.heading}>Contributors</h3>
       <div className={styles.list}>
         {contributors.map(({ contributor, count }) => (
-          <Link
-            key={contributor.id}
-            href={profileUrl(contributor)}
-            className={styles.contributor}
-          >
+          <div key={contributor.id} className={styles.contributor}>
             {contributor.image ? (
               <Image
                 src={contributor.image}
@@ -44,10 +38,8 @@ export function Contributors({ contributors }: ContributorsProps) {
             <span className={styles.name}>
               {contributor.handle ? `@${contributor.handle}` : contributor.name}
             </span>
-            {count > 1 && (
-              <span className={styles.count}>{count}</span>
-            )}
-          </Link>
+            {count > 1 && <span className={styles.count}>{count}</span>}
+          </div>
         ))}
       </div>
     </div>

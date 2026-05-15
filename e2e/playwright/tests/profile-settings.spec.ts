@@ -26,11 +26,13 @@ test.describe('Profile & Settings', () => {
     await expect(page.locator('body')).toBeVisible();
   });
 
-  test('profile page shows user podcasts', async ({ authedContext }) => {
+  test('profile shortcut opens settings', async ({ authedContext }) => {
     const page = await authedContext.newPage();
     await page.goto('/profile');
 
-    // Profile should show podcast count or list
-    await expect(page.locator('body')).toBeVisible();
+    await expect(page).toHaveURL(/\/settings$/);
+    await expect(page.locator('text=Settings, h1:has-text("Settings")').first()).toBeVisible({
+      timeout: 10_000,
+    });
   });
 });

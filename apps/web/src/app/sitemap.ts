@@ -46,25 +46,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.6,
     }));
 
-    const [users, collections] = await Promise.all([
-      prisma.user.findMany({
-        where: { handle: { not: null } },
-        select: { handle: true, updatedAt: true },
-        take: 5000,
-      }),
-      prisma.collection.findMany({
-        where: { isPublic: true },
-        select: { id: true, updatedAt: true },
-        take: 5000,
-      }),
-    ]);
-
-    const profilePages = users.map((u) => ({
-      url: `${baseUrl}/@${u.handle}`,
-      lastModified: u.updatedAt,
-      changeFrequency: 'weekly' as const,
-      priority: 0.5,
-    }));
+    const collections = await prisma.collection.findMany({
+      where: { isPublic: true },
+      select: { id: true, updatedAt: true },
+      take: 5000,
+    });
 
     const collectionPages = collections.map((c) => ({
       url: `${baseUrl}/collections/${c.id}`,
@@ -73,7 +59,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.5,
     }));
 
-    return [...staticPages, ...podcastPages, ...profilePages, ...collectionPages];
+    return [...staticPages, ...podcastPages, ...collectionPages];
   } catch (error) {
     console.error('[sitemap] DB query failed, returning static pages only:', error);
     return staticPages;

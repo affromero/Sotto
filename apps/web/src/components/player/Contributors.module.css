@@ -27,14 +27,7 @@
   border-radius: var(--radius-full);
   border: 1px solid var(--color-border);
   background: var(--color-surface);
-  text-decoration: none;
-  transition: all 0.15s ease;
   min-height: 36px;
-}
-
-.contributor:hover {
-  border-color: var(--color-primary);
-  background: var(--color-primary-lighter);
 }
 
 .avatar {
