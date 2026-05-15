@@ -1,4 +1,4 @@
-/* Admin Engagement Dashboard */
+/* Admin Private Activity Dashboard */
 
 .container { composes: container from '../admin.module.css'; }
 .headerRow { composes: headerRow from '../admin.module.css'; }

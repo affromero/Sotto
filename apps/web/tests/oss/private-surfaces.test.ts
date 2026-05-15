@@ -279,6 +279,26 @@ describe('private-first OSS surfaces', () => {
     expect(twitterThresholdSources).not.toContain('Min Forks');
   });
 
+  it('keeps admin activity metrics private instead of social', () => {
+    const activityMetricSources = [
+      'src/lib/engagement-metrics.ts',
+      'src/app/(admin)/admin/engagement/page.tsx',
+      'src/app/(admin)/AdminShell.tsx',
+    ]
+      .map(readSource)
+      .join('\n');
+
+    expect(activityMetricSources).toContain('Private Activity');
+    expect(activityMetricSources).toContain('getTopSaved');
+    expect(activityMetricSources).not.toContain('getTopLiked');
+    expect(activityMetricSources).not.toContain('getTopForked');
+    expect(activityMetricSources).not.toContain('likeCount');
+    expect(activityMetricSources).not.toContain('forkCount');
+    expect(activityMetricSources).not.toContain('followerCount');
+    expect(activityMetricSources).not.toContain('prisma.like');
+    expect(activityMetricSources).not.toContain('prisma.follow');
+  });
+
   it('does not ship mobile podcast social actions or widgets', () => {
     const removedMobileComponents = [
       'apps/mobile/components/ForkModal.tsx',

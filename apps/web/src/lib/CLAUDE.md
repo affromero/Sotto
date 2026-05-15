@@ -79,7 +79,7 @@ All shared business logic and external service integrations live here.
 | `data-completeness.ts` | Per-podcast ML readiness: 15-dimension completeness scoring (`computeCompletenessChecklist()`), corpus-wide aggregation (`getCorpusCompleteness()`), paginated podcast scores (`getPodcastCompletenessScores()`) | Uses `prisma.ts` |
 | `traffic-report.ts` | Traffic report builder: 70+ aggregation queries → structured JSON for `/api/admin/traffic-report` | Uses `prisma.ts`, `cost-monitor.ts`, `auto-model-config.ts` |
 | `revenue-metrics.ts` | Revenue aggregation: `getRevenueOverview()`, `getDailyRevenueTrend()`, `getTopSellingVoices()`, `getRevenueByStatus()`, `getMarketplaceHealth()` — voice marketplace | Uses `prisma.ts` |
-| `engagement-metrics.ts` | Engagement queries: `getEngagementOverview()`, `getDailyEngagementTrend()`, `getTopLiked/Forked/Commented()`, `getInteractionStats()` — social metrics | Uses `prisma.ts` |
+| `engagement-metrics.ts` | Private activity queries: `getPrivateActivityOverview()`, `getDailyPrivateActivityTrend()`, `getTopSaved()`, `getInteractionStats()` | Uses `prisma.ts` |
 | `playback-metrics.ts` | Playback analytics: `getPlaybackOverview()`, `getSpeedDistribution()`, `getCompletionDistribution()`, `getDailyListenHours()` — listening data | Uses `prisma.ts` |
 | `funnel-metrics.ts` | Conversion funnel: `getFreeTierFunnel()`, `getByokAdoption()`, `getPipelineHealth()` — BYOK conversion + pipeline health | Uses `prisma.ts` |
 | `retention-metrics.ts` | Retention: `getDAU_WAU_MAU()`, `getDailyActiveUsers()`, `getRetentionCohorts()` — active users + weekly cohort heatmap (filters null userId) | Uses `prisma.ts` |
