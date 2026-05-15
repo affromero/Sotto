@@ -2,19 +2,23 @@ import { prisma } from './prisma';
 import { createMLProvider, type ScoredPodcast, type RecommendationSignals } from './providers/ml';
 import { logger } from './logger';
 import {
-  applyDiversity as applyDiversityRaw,
-  categorizePicks as categorizePicksRaw,
-  DEFAULT_FEED_CONFIG,
-} from '@sottofm/feed';
-import type { ScoredCandidate, DiversityCandidate, CategorizationContext } from '@sottofm/feed';
+  applyDiversity,
+  categorizePicks,
+  PRIVATE_RECOMMENDATION_CONFIG,
+} from './private-recommendations';
+import type {
+  ScoredCandidate,
+  DiversityCandidate,
+  CategorizationContext,
+} from './private-recommendations';
 
-const CONFIDENCE_THRESHOLD = DEFAULT_FEED_CONFIG.confidenceThreshold;
-const DAILY_PICKS_MAX = DEFAULT_FEED_CONFIG.maxPicks;
+const CONFIDENCE_THRESHOLD = PRIVATE_RECOMMENDATION_CONFIG.confidenceThreshold;
+const DAILY_PICKS_MAX = PRIVATE_RECOMMENDATION_CONFIG.maxPicks;
 const EXPLORE_MAX = 10;
 const TRENDING_COUNT = 6;
 
 export interface PickCategory {
-  label: 'Continue Learning' | 'Fresh Perspective' | 'From Your People' | string;
+  label: 'Continue Learning' | 'Fresh Perspective' | 'High Signal' | string;
   podcasts: RecommendedPodcast[];
 }
 
@@ -29,7 +33,13 @@ export interface RecommendedPodcast {
   forkCount: number;
   lowReferences?: boolean;
   createdAt: string;
-  user: { id: string; name: string | null; image: string | null; handle?: string | null; role?: string };
+  user: {
+    id: string;
+    name: string | null;
+    image: string | null;
+    handle?: string | null;
+    role?: string;
+  };
   tags: Array<{ id: string; name: string; slug: string }>;
   ownerIsPro?: boolean;
   score: number;
@@ -46,7 +56,11 @@ export interface DailyPicksResult {
 }
 
 /** Compute ownerIsPro and strip plan from a Prisma user row. */
-function resolveOwnerPro(user: { plan?: string | null; role?: string | null; [key: string]: unknown }) {
+function resolveOwnerPro(user: {
+  plan?: string | null;
+  role?: string | null;
+  [key: string]: unknown;
+}) {
   const { plan, ...safeUser } = user;
   return {
     safeUser,
@@ -133,7 +147,7 @@ export async function getDailyPicks(
     .filter((s) => s.score >= CONFIDENCE_THRESHOLD)
     .sort((a, b) => b.score - a.score);
 
-  // Apply MMR diversity via @sottofm/feed
+  // Apply creator and topic diversity before assigning daily pick slots.
   const diversityCandidates: DiversityCandidate[] = candidates.map((c) => ({
     id: c.id,
     creatorId: c.userId,
@@ -145,23 +159,16 @@ export async function getDailyPicks(
     signals: s.signals,
     explanation: s.explanation,
   }));
-  const diverseResult = applyDiversityRaw(scoredCandidates, diversityCandidates, {
-    maxPerCreator: DEFAULT_FEED_CONFIG.maxPerCreator,
-    maxPerPrimaryTag: DEFAULT_FEED_CONFIG.maxPerPrimaryTag,
+  const diverseResult = applyDiversity(scoredCandidates, diversityCandidates, {
+    maxPerCreator: PRIVATE_RECOMMENDATION_CONFIG.maxPerCreator,
+    maxPerPrimaryTag: PRIVATE_RECOMMENDATION_CONFIG.maxPerPrimaryTag,
     maxPicks: DAILY_PICKS_MAX,
   });
 
-  // Build categorization context from Prisma data
-  const [followedIds, userInterests] = await Promise.all([
-    prisma.follow.findMany({
-      where: { followerId: userId },
-      select: { followingId: true },
-    }),
-    prisma.userInterest.findMany({
-      where: { userId },
-      include: { tag: { select: { id: true, name: true, parentId: true } } },
-    }),
-  ]);
+  const userInterests = await prisma.userInterest.findMany({
+    where: { userId },
+    include: { tag: { select: { id: true, name: true, parentId: true } } },
+  });
 
   // Build parentId → interest tag name map for sibling matching
   const interestParentToName = new Map<string, string>();
@@ -172,7 +179,6 @@ export async function getDailyPicks(
   }
 
   const catContext: CategorizationContext = {
-    followedCreatorIds: new Set(followedIds.map((f) => f.followingId)),
     interestTagIds: new Set(userInterests.map((i) => i.tag.id)),
     interestTagNames: new Map(userInterests.map((i) => [i.tag.id, i.tag.name])),
     interestParentIds: new Set(
@@ -181,15 +187,14 @@ export async function getDailyPicks(
     interestParentToName,
   };
 
-  // Categorize via @sottofm/feed
-  const feedCategories = categorizePicksRaw(diverseResult, diversityCandidates, catContext, {
-    continueLearningSlots: DEFAULT_FEED_CONFIG.continueLearningSlots,
-    freshPerspectiveSlots: DEFAULT_FEED_CONFIG.freshPerspectiveSlots,
-    fromYourPeopleSlots: DEFAULT_FEED_CONFIG.fromYourPeopleSlots,
+  const pickCategories = categorizePicks(diverseResult, diversityCandidates, catContext, {
+    continueLearningSlots: PRIVATE_RECOMMENDATION_CONFIG.continueLearningSlots,
+    freshPerspectiveSlots: PRIVATE_RECOMMENDATION_CONFIG.freshPerspectiveSlots,
+    highSignalSlots: PRIVATE_RECOMMENDATION_CONFIG.highSignalSlots,
   });
 
   // Map back to RecommendedPodcast / PickCategory
-  const categories: PickCategory[] = feedCategories.map((cat) => ({
+  const categories: PickCategory[] = pickCategories.map((cat) => ({
     label: cat.label,
     podcasts: cat.items.map((item) => {
       const candidate = candidates.find((c) => c.id === item.id);
@@ -212,7 +217,7 @@ export async function getDailyPicks(
         category: categoryLabel,
       };
     }),
-  }))
+  }));
 
   const allPicks = [
     ...categories[0].podcasts,
@@ -329,24 +334,7 @@ export async function searchPodcasts(
           category: 'explore',
         });
       } catch {
-        scored.push({
-          podcastId: p.id,
-          title: p.title,
-          topic: p.topic,
-          duration: p.duration,
-          audioUrl: p.audioUrl,
-          playCount: p.playCount,
-          likeCount: p.likeCount,
-          forkCount: p.forkCount,
-          createdAt: p.createdAt.toISOString(),
-          user: safeUser as RecommendedPodcast['user'],
-          tags: p.tags.map((pt) => pt.tag),
-          ownerIsPro,
-          score: 0.5,
-          signals: { relevance: 0, collaborative: 0, quality: 0.5, freshness: 0, novelty: 0 },
-          explanation: 'Popular in search results',
-          category: 'explore',
-        });
+        logger.warn('Failed to score search result', { podcastId: p.id });
       }
     }
 
@@ -393,48 +381,7 @@ export async function getTrending(): Promise<RecommendedPodcast[]> {
   });
 
   if (trendingIds.length === 0) {
-    // Fallback to most popular
-    const popular = await prisma.podcast.findMany({
-      where: { status: 'READY', visibility: 'PUBLIC' },
-      orderBy: { playCount: 'desc' },
-      take: TRENDING_COUNT,
-      select: {
-        id: true,
-        title: true,
-        topic: true,
-        duration: true,
-        audioUrl: true,
-        playCount: true,
-        likeCount: true,
-        forkCount: true,
-        lowReferences: true,
-        createdAt: true,
-        user: { select: { id: true, name: true, image: true, handle: true, role: true, plan: true } },
-        tags: { include: { tag: { select: { id: true, name: true, slug: true } } } },
-      },
-    });
-
-    return popular.map((p) => {
-      const { safeUser, ownerIsPro } = resolveOwnerPro(p.user);
-      return {
-        podcastId: p.id,
-        title: p.title,
-        topic: p.topic,
-        duration: p.duration,
-        audioUrl: p.audioUrl,
-        playCount: p.playCount,
-        likeCount: p.likeCount,
-        forkCount: p.forkCount,
-        createdAt: p.createdAt.toISOString(),
-        user: safeUser as RecommendedPodcast['user'],
-        tags: p.tags.map((pt) => pt.tag),
-        ownerIsPro,
-        score: 0,
-        signals: { relevance: 0, collaborative: 0, quality: 0, freshness: 0, novelty: 0 },
-        explanation: 'Trending this week',
-        category: 'trending',
-      };
-    });
+    return [];
   }
 
   const podcasts = await prisma.podcast.findMany({
@@ -494,4 +441,3 @@ export async function getTrending(): Promise<RecommendedPodcast[]> {
     };
   });
 }
-

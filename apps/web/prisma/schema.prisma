@@ -1328,7 +1328,7 @@ model UserFeature {
   creatorLoyalty  Float @default(0)
 
   // Behavioral
-  archetype           String? // deep_listener, skimmer, explorer, completer, social_learner
+  archetype           String? // deep_listener, skimmer, explorer, completer, active_learner
   speakerPreference   Float   @default(0) // -1 to 1
   noveltyResponseRate Float   @default(0)
 

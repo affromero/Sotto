@@ -37,7 +37,8 @@ All shared business logic and external service integrations live here.
 | `content-parser.ts` | Thin re-export wrapper (deprecated) — delegates to `extractors/` | — |
 | `extractors/` | Multi-layer content extraction: Readability + cheerio HTML, pdf-parse PDF, YouTube transcript, Pinchtab browser fallback. Facade via `extractContent(url)` and `extractFromPdfBuffer(buffer)`, returns `ExtractedContent` | jsdom, @mozilla/readability, cheerio, fetch |
 | `recommendations.ts` | Search similar public podcasts (PostgreSQL full-text) | Uses `prisma.ts` |
-| `recommendation-engine.ts` | ML-powered recommendation engine: daily picks, explore, trending. Delegates diversity + categorization to `@sottofm/feed` | Uses `prisma.ts`, `providers/ml.ts`, `@sottofm/feed` |
+| `recommendation-engine.ts` | ML-powered recommendation engine: daily picks, explore, trending with private categorization | Uses `prisma.ts`, `providers/ml.ts`, `private-recommendations.ts` |
+| `private-recommendations.ts` | Recommendation scoring, diversity, categorization, explanations, and listener archetypes | Pure utility |
 | `push-notifications.ts` | Web Push API: send to user devices, clean expired subs | web-push |
 | `subscription.ts` | (Simplified) Usage queries, generation counts — no tiers or credits | Uses `prisma.ts` |
 | `validations.ts` | Zod schemas for all API input validation (re-exports `createPodcastSchema` from `@sotto/shared`; includes addToAllowlistSchema, userSearchSchema) | Zod |
@@ -147,7 +148,7 @@ Modular provider architecture — swap external services via env vars.
 | `image/fal.provider.ts` | `ImageProvider` | Fal FLUX implementation: generate image from prompt, configurable model/resolution | Fal API |
 | `image/fal-video.ts` | — | Fal video generation (text-to-video) via async queue API with polling | Fal API |
 | `fal-endpoints.ts` | — | Pricetoken model ID → Fal REST API endpoint mapping (image + video + legacy) | Pure utility |
-| `ml.ts` | `MLProvider` | `SottoMLProvider`: pgvector similarity, delegates signal computation/scoring/archetypes/explain to `@sottofm/feed` | `@sottofm/feed` |
+| `ml.ts` | `MLProvider` | `SottoMLProvider`: pgvector similarity, delegates signal computation/scoring/archetypes/explain to private recommendation utilities | `private-recommendations.ts` |
 | `storage.ts` | `StorageProvider` | `R2Provider`, `S3Provider`, `LocalProvider` | `STORAGE_PROVIDER` |
 | `index.ts` | `Providers` | `getProviders()` singleton factory | — |
 | `openai.d.ts` | — | Type declarations for optional `openai` dependency | — |
