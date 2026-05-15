@@ -423,6 +423,28 @@ describe('private-first OSS surfaces', () => {
     expect(trainingExportSources).not.toContain('prisma.like');
   });
 
+  it('keeps reports and content moderation free of comment targets', () => {
+    const reportModerationSources = [
+      'src/app/api/reports/route.ts',
+      'src/lib/validations.ts',
+      'src/components/ui/ReportModal.tsx',
+      'src/components/ui/ReportButton.tsx',
+      'src/app/(admin)/admin/moderation/ReportQueue.tsx',
+      'src/lib/queue.ts',
+      'src/workers/content-moderation.worker.ts',
+    ]
+      .map(readSource)
+      .join('\n');
+
+    expect(reportModerationSources).not.toContain('prisma.comment');
+    expect(reportModerationSources).not.toContain("targetType === 'comment'");
+    expect(reportModerationSources).not.toContain("'podcast' | 'comment'");
+    expect(reportModerationSources).not.toContain("'podcast', 'comment', 'user'");
+    expect(reportModerationSources).not.toContain('value="comment"');
+    expect(reportModerationSources).not.toContain('Comment not found');
+    expect(reportModerationSources).not.toContain('(podcast scripts, comments)');
+  });
+
   it('keeps admin storage inspector private-activity scoped', () => {
     const storageInspectorSources = [
       'src/app/(admin)/admin/storage/[podcastId]/page.tsx',

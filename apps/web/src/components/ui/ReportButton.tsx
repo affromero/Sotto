@@ -6,7 +6,7 @@ import { ReportModal } from './ReportModal';
 import styles from './ReportButton.module.css';
 
 interface ReportButtonProps {
-  targetType: 'podcast' | 'comment' | 'user';
+  targetType: 'podcast' | 'user';
   targetId: string;
   variant?: 'icon' | 'text';
   context?: { isHumanContent?: boolean; source?: string };

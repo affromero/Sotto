@@ -36,9 +36,6 @@ export async function POST(request: NextRequest) {
   if (targetType === 'podcast') {
     const podcast = await prisma.podcast.findUnique({ where: { id: targetId }, select: { id: true } });
     if (!podcast) return errorResponse('Podcast not found', 404);
-  } else if (targetType === 'comment') {
-    const comment = await prisma.comment.findUnique({ where: { id: targetId }, select: { id: true } });
-    if (!comment) return errorResponse('Comment not found', 404);
   } else if (targetType === 'user') {
     const user = await prisma.user.findUnique({ where: { id: targetId }, select: { id: true } });
     if (!user) return errorResponse('User not found', 404);

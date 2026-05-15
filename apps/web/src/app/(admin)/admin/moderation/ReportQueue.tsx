@@ -228,7 +228,6 @@ export function ReportQueue() {
         >
           <option value="">All types</option>
           <option value="podcast">Podcast</option>
-          <option value="comment">Comment</option>
           <option value="user">User</option>
         </select>
 
@@ -409,8 +408,7 @@ export function ReportQueue() {
                           </button>
                         </>
                       )}
-                      {(report.targetType === 'podcast' ||
-                        report.targetType === 'comment') && (
+                      {report.targetType === 'podcast' && (
                         <button
                           className={`${styles.actionBtn} ${styles.actionBtnSuccess}`}
                           onClick={() =>

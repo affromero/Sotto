@@ -324,7 +324,7 @@ export interface AdminThreadToPodcastPayload {
 }
 
 export interface ModerateContentPayload {
-  targetType: 'podcast' | 'comment';
+  targetType: 'podcast';
   targetId: string;
   content: string;
   userId?: string;
