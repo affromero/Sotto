@@ -120,7 +120,7 @@ vi.mock('@/lib/logger', () => ({
 }));
 
 import { createAIProvider } from '@/lib/providers/ai';
-import { createTtsProvider } from '@/lib/providers/tts';
+import { createTtsProvider, resolveTtsProvider } from '@/lib/providers/tts';
 import { createStorageProvider } from '@/lib/providers/storage';
 
 describe('Provider Factories', () => {
@@ -150,6 +150,24 @@ describe('Provider Factories', () => {
       expect(hostVoice).not.toBe(expertVoice);
     });
 
+  });
+
+  describe('resolveTtsProvider', () => {
+    it('rejects missing provider instead of auto-selecting one', async () => {
+      await expect(
+        resolveTtsProvider({ userId: 'user-1', podcastId: 'podcast-1' })
+      ).rejects.toThrow('TTS provider is required');
+    });
+
+    it('rejects auto provider instead of choosing from configured keys', async () => {
+      await expect(
+        resolveTtsProvider({
+          userId: 'user-1',
+          podcastId: 'podcast-1',
+          requestedProvider: 'auto',
+        })
+      ).rejects.toThrow('TTS provider is required');
+    });
   });
 
   describe('createStorageProvider', () => {
