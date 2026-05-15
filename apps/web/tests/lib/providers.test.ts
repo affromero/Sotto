@@ -75,12 +75,35 @@ vi.mock('@/lib/providers/tts/openai.provider', () => ({
   OpenAITtsProvider: MockOpenAITtsProvider,
 }));
 
+const mockLlmGenerateResponse = vi.fn(
+  async (_system: unknown, _messages: unknown, _options?: unknown) => ({
+    content: 'test',
+    inputTokens: 10,
+    outputTokens: 20,
+  }),
+);
+const mockLlmStreamResponse = vi.fn((_system: unknown, _messages: unknown, _options?: unknown) => (async function* () {
+  yield 'chunk';
+})());
+
 // Mock the underlying service modules to prevent initialization errors
 vi.mock('@/lib/llm', () => ({
-  generateResponse: vi
-    .fn()
-    .mockResolvedValue({ content: 'test', inputTokens: 10, outputTokens: 20 }),
-  streamResponse: vi.fn(),
+  generateResponse: mockLlmGenerateResponse,
+  streamResponse: mockLlmStreamResponse,
+}));
+
+const mockExecuteClaudeCode = vi.fn(
+  async (_system: unknown, _prompt: unknown, _options?: unknown) => ({
+    content: 'claude-code',
+    inputTokens: 3,
+    outputTokens: 4,
+  }),
+);
+
+vi.mock('@/lib/claude-code-client', () => ({
+  executeClaudeCode: mockExecuteClaudeCode,
+  streamClaudeCode: vi.fn(),
+  serializeMessages: vi.fn((messages: unknown) => JSON.stringify(messages)),
 }));
 
 vi.mock('@/lib/elevenlabs', () => ({
@@ -131,6 +154,44 @@ describe('Provider Factories', () => {
         { role: 'user', content: 'hello' },
       ]);
       expect(result).toEqual({ content: 'test', inputTokens: 10, outputTokens: 20 });
+    });
+
+    it('anthropic stream provider forwards BYOK API key overrides', async () => {
+      const provider = createAIProvider('anthropic');
+      const chunks: string[] = [];
+      for await (const chunk of provider.streamResponse('system', [
+        { role: 'user', content: 'hello' },
+      ], { model: 'claude-haiku-4-5-20251001', apiKeyOverride: 'user-key' })) {
+        chunks.push(chunk);
+      }
+
+      expect(chunks).toEqual(['chunk']);
+      expect(mockLlmStreamResponse).toHaveBeenCalledWith(
+        'system',
+        [{ role: 'user', content: 'hello' }],
+        expect.objectContaining({
+          model: 'claude-haiku-4-5-20251001',
+          apiKeyOverride: 'user-key',
+        }),
+      );
+    });
+
+    it('claude-code provider delegates to the Claude Code client', async () => {
+      const provider = createAIProvider('claude-code');
+      const result = await provider.generateResponse('system', [
+        { role: 'user', content: 'hello' },
+      ], { model: 'claude-code:opus' });
+      expect(mockExecuteClaudeCode).toHaveBeenCalledWith(
+        'system',
+        JSON.stringify([{ role: 'user', content: 'hello' }]),
+        { model: 'opus', useWebSearch: undefined },
+      );
+      expect(result).toEqual({
+        content: 'claude-code',
+        inputTokens: 3,
+        outputTokens: 4,
+        model: 'claude-code:opus',
+      });
     });
   });
 

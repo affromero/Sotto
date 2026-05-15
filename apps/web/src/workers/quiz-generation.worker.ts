@@ -2,7 +2,8 @@ import { Job } from 'bullmq';
 import type { GenerateQuizPayload } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { createAIProvider } from '@/lib/providers/ai';
-import { resolveAiModelAndProvider } from '@/lib/providers/ai-registry';
+import { getAiKey } from '@/lib/byok';
+import { resolveAiModelAndProvider, type AiProviderId } from '@/lib/providers/ai-registry';
 import { loadAndRender } from '@/lib/prompt-loader';
 import { logUsage } from '@/lib/usage-logger';
 import { logger } from '@/lib/logger';
@@ -61,8 +62,30 @@ export async function processQuizGeneration(job: Job<GenerateQuizPayload>): Prom
   await job.updateProgress(30);
 
   try {
-    // Resolve cheapest AI model (platform operation, Haiku-tier)
-    const { model, provider } = await resolveAiModelAndProvider({ plan: 'FREE' });
+    const podcast = await prisma.podcast.findUniqueOrThrow({
+      where: { id: podcastId },
+      select: {
+        userId: true,
+        aiModel: true,
+        user: { select: { plan: true } },
+      },
+    });
+
+    const initialAiKey = podcast.aiModel ? null : await getAiKey(podcast.userId);
+    if (!podcast.aiModel && !initialAiKey) {
+      throw new Error('AI model is required for quiz generation when no AI key is configured.');
+    }
+
+    const { model, provider } = await resolveAiModelAndProvider({
+      podcastAiModel: podcast.aiModel,
+      aiKey: initialAiKey,
+      plan: podcast.user.plan as 'FREE' | 'PRO',
+    });
+
+    const providerAiKey =
+      podcast.aiModel && provider !== 'claude-code'
+        ? await getAiKey(podcast.userId, provider as AiProviderId)
+        : initialAiKey;
 
     // Fetch vocabulary entries for language learning podcasts
     const vocabularyEntries = await prisma.vocabularyEntry.findMany({
@@ -96,7 +119,7 @@ export async function processQuizGeneration(job: Job<GenerateQuizPayload>): Prom
     const response = await ai.generateResponse(
       'You are a quiz generation assistant. Return only valid JSON.',
       [{ role: 'user', content: prompt }],
-      { model },
+      { model, apiKeyOverride: providerAiKey?.apiKey },
     );
 
     await job.updateProgress(70);
