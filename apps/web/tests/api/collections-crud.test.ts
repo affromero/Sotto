@@ -5,7 +5,6 @@ const mockAuth = vi.fn();
 const mockCollectionFindUnique = vi.fn();
 const mockCollectionUpdate = vi.fn();
 const mockCollectionDelete = vi.fn();
-const mockCollectionFollowFindUnique = vi.fn();
 
 vi.mock('@/lib/auth', () => ({
   auth: (...args: unknown[]) => mockAuth(...args),
@@ -17,9 +16,6 @@ vi.mock('@/lib/prisma', () => ({
       findUnique: (...args: unknown[]) => mockCollectionFindUnique(...args),
       update: (...args: unknown[]) => mockCollectionUpdate(...args),
       delete: (...args: unknown[]) => mockCollectionDelete(...args),
-    },
-    collectionFollow: {
-      findUnique: (...args: unknown[]) => mockCollectionFollowFindUnique(...args),
     },
   },
 }));
@@ -70,7 +66,6 @@ describe('GET /api/collections/[collectionId]', () => {
       isPublic: false,
       userId: 'user-1',
       podcastCount: 0,
-      followerCount: 0,
       createdAt: new Date('2024-01-01T00:00:00.000Z'),
       user: { id: 'user-1', name: 'Owner', handle: 'owner', image: null },
       items: [],
@@ -95,7 +90,6 @@ describe('GET /api/collections/[collectionId]', () => {
       isPublic: true,
       userId: 'user-1',
       podcastCount: 1,
-      followerCount: 5,
       createdAt: now,
       user: { id: 'user-1', name: 'Owner', handle: 'owner', image: null },
       items: [
@@ -131,37 +125,9 @@ describe('GET /api/collections/[collectionId]', () => {
 
     expect(response.status).toBe(200);
     expect(body.name).toBe('Public Collection');
-    expect(body.isFollowing).toBe(false);
     expect(body.isOwner).toBe(false);
     expect(body.items).toHaveLength(1);
     expect(body.items[0].tags).toEqual([{ id: 'tag-1', name: 'Tech', slug: 'tech' }]);
-  });
-
-  it('shows isFollowing=true when user follows the collection', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-2' } });
-    const now = new Date('2024-01-01T00:00:00.000Z');
-    mockCollectionFindUnique.mockResolvedValue({
-      id: 'col-1',
-      name: 'Public',
-      description: null,
-      isPublic: true,
-      userId: 'user-1',
-      podcastCount: 0,
-      followerCount: 1,
-      createdAt: now,
-      user: { id: 'user-1', name: 'Owner', handle: 'owner', image: null },
-      items: [],
-    });
-    mockCollectionFollowFindUnique.mockResolvedValue({ userId: 'user-2', collectionId: 'col-1' });
-
-    const request = createRequest();
-    const params = await createParams('col-1');
-    const response = await GET(request, params);
-    const body = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(body.isFollowing).toBe(true);
-    expect(body.isOwner).toBe(false);
   });
 });
 
@@ -235,11 +201,14 @@ describe('PATCH /api/collections/[collectionId]', () => {
       description: 'Updated desc',
       isPublic: false,
       podcastCount: 3,
-      followerCount: 10,
       createdAt: now,
     });
 
-    const request = createRequest('PATCH', { name: 'Updated Name', description: 'Updated desc', isPublic: false });
+    const request = createRequest('PATCH', {
+      name: 'Updated Name',
+      description: 'Updated desc',
+      isPublic: false,
+    });
     const params = await createParams('col-1');
     const response = await PATCH(request, params);
     const body = await response.json();

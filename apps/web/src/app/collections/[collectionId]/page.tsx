@@ -102,17 +102,6 @@ export default async function CollectionPage({ params }: CollectionPageProps) {
     notFound();
   }
 
-  // Check if the current user follows this collection
-  let isFollowing = false;
-  if (userId) {
-    const follow = await prisma.collectionFollow.findUnique({
-      where: {
-        userId_collectionId: { userId, collectionId: collection.id },
-      },
-    });
-    isFollowing = !!follow;
-  }
-
   const isOwner = userId === collection.userId;
 
   // Filter non-ready/private podcasts for non-owners
@@ -157,15 +146,11 @@ export default async function CollectionPage({ params }: CollectionPageProps) {
           id={collection.id}
           name={collection.name}
           description={collection.description}
-          isPublic={collection.isPublic}
           podcastCount={collection.podcastCount}
-          followerCount={collection.followerCount}
           createdAt={collection.createdAt.toISOString()}
           user={collection.user}
           items={items}
-          isFollowing={isFollowing}
           isOwner={isOwner}
-          isAuthenticated={!!userId}
         />
       </div>
     </main>

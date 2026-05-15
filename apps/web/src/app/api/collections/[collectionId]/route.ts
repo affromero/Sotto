@@ -62,17 +62,6 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     return errorResponse('Collection not found', 404);
   }
 
-  // Check if current user follows this collection
-  let isFollowing = false;
-  if (userId) {
-    const follow = await prisma.collectionFollow.findUnique({
-      where: {
-        userId_collectionId: { userId, collectionId },
-      },
-    });
-    isFollowing = !!follow;
-  }
-
   // Filter out private/non-ready podcasts for non-owners
   const isOwner = collection.userId === userId;
   const items = collection.items
@@ -94,11 +83,9 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     description: collection.description,
     isPublic: collection.isPublic,
     podcastCount: collection.podcastCount,
-    followerCount: collection.followerCount,
     createdAt: collection.createdAt.toISOString(),
     user: collection.user,
     items,
-    isFollowing,
     isOwner,
   });
 }
@@ -145,7 +132,6 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       description: true,
       isPublic: true,
       podcastCount: true,
-      followerCount: true,
       createdAt: true,
     },
   });

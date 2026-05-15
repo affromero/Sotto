@@ -77,7 +77,6 @@ describe('GET /api/collections', () => {
         description: 'desc',
         isPublic: true,
         podcastCount: 3,
-        followerCount: 10,
         createdAt: now,
       },
     ]);
@@ -154,7 +153,6 @@ describe('POST /api/collections', () => {
       description: null,
       isPublic: true,
       podcastCount: 0,
-      followerCount: 0,
       createdAt: now,
     });
 
@@ -177,11 +175,14 @@ describe('POST /api/collections', () => {
       description: 'Secret stuff',
       isPublic: false,
       podcastCount: 0,
-      followerCount: 0,
       createdAt: now,
     });
 
-    const request = createPostRequest({ name: 'Private', description: 'Secret stuff', isPublic: false });
+    const request = createPostRequest({
+      name: 'Private',
+      description: 'Secret stuff',
+      isPublic: false,
+    });
     const response = await POST(request);
     const body = await response.json();
 

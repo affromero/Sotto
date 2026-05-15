@@ -23,7 +23,6 @@ export async function GET(request: NextRequest) {
       description: true,
       isPublic: true,
       podcastCount: true,
-      followerCount: true,
       createdAt: true,
     },
   });
@@ -72,7 +71,6 @@ export async function POST(request: NextRequest) {
       description: true,
       isPublic: true,
       podcastCount: true,
-      followerCount: true,
       createdAt: true,
     },
   });
@@ -80,14 +78,16 @@ export async function POST(request: NextRequest) {
   logger.info('Collection created', { collectionId: collection.id, userId });
 
   // Fire-and-forget activity record
-  prisma.activity.create({
-    data: {
-      userId,
-      type: 'COLLECTION_CREATED',
-      targetId: collection.id,
-      targetType: 'collection',
-    },
-  }).catch(() => {});
+  prisma.activity
+    .create({
+      data: {
+        userId,
+        type: 'COLLECTION_CREATED',
+        targetId: collection.id,
+        targetType: 'collection',
+      },
+    })
+    .catch(() => {});
 
   return NextResponse.json(
     { ...collection, createdAt: collection.createdAt.toISOString() },

@@ -209,4 +209,25 @@ describe('private-first OSS surfaces', () => {
     expect(mobilePrivateSources).not.toContain('NEW_FORK');
     expect(mobilePrivateSources).not.toContain('NEW_COMMENT');
   });
+
+  it('does not ship collection follow contracts', () => {
+    const collectionSources = [
+      'src/app/collections/[collectionId]/page.tsx',
+      'src/app/api/collections/route.ts',
+      'src/app/api/collections/[collectionId]/route.ts',
+      'src/app/api/users/[userId]/collections/route.ts',
+      'src/components/collections/CollectionDetail.tsx',
+      'src/components/collections/CollectionCard.tsx',
+    ]
+      .map(readSource)
+      .join('\n');
+
+    expect(
+      existsSync(resolve(webRoot, 'src/app/api/collections/[collectionId]/follow/route.ts'))
+    ).toBe(false);
+    expect(collectionSources).not.toContain('/follow');
+    expect(collectionSources).not.toContain('collectionFollow');
+    expect(collectionSources).not.toContain('followerCount');
+    expect(collectionSources).not.toContain('isFollowing');
+  });
 });
