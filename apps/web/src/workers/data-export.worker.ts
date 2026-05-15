@@ -315,7 +315,7 @@ async function exportTrainingPairs(
   writeLine: (line: string) => void
 ): Promise<void> {
   if (format === 'csv') {
-    writeLine('userId,podcastId,completionPercent,liked,saved,engagementLabel');
+    writeLine('userId,podcastId,completionPercent,saved,trainingLabel');
   }
 
   let cursor: string | undefined;
@@ -333,16 +333,11 @@ async function exportTrainingPairs(
     for (const session of sessions) {
       if (!session.userId) continue;
 
-      const [liked, saved] = await Promise.all([
-        prisma.like.findUnique({
-          where: { userId_podcastId: { userId: session.userId, podcastId: session.podcastId } },
-        }),
-        prisma.save.findUnique({
-          where: { userId_podcastId: { userId: session.userId, podcastId: session.podcastId } },
-        }),
-      ]);
+      const saved = await prisma.save.findUnique({
+        where: { userId_podcastId: { userId: session.userId, podcastId: session.podcastId } },
+      });
 
-      const label = session.completionPercent >= 50 || liked || saved ? 'positive' : 'negative';
+      const label = session.completionPercent >= 50 || saved ? 'positive' : 'negative';
 
       if (format === 'csv') {
         writeLine(
@@ -350,7 +345,6 @@ async function exportTrainingPairs(
             session.userId,
             session.podcastId,
             session.completionPercent,
-            liked ? 'true' : 'false',
             saved ? 'true' : 'false',
             label,
           ].join(',')
@@ -361,9 +355,8 @@ async function exportTrainingPairs(
             userId: session.userId,
             podcastId: session.podcastId,
             completionPercent: session.completionPercent,
-            liked: !!liked,
             saved: !!saved,
-            engagementLabel: label,
+            trainingLabel: label,
           })
         );
       }

@@ -1,8 +1,8 @@
 /**
- * Generate (user, podcast, label) training triples from PlaybackSession completion + like/save.
+ * Generate (user, podcast, label) training triples from private completion + save signals.
  *
  * Output: JSONL file with schema:
- *   { userId, podcastId, completionPercent, liked, saved, forked, engagementLabel, signals }
+ *   { userId, podcastId, completionPercent, saved, trainingLabel, signals }
  *
  * Usage: npx ts-node scripts/ml/prepare-recommendation-training.ts > data/recommendation-training.jsonl
  */
@@ -35,21 +35,13 @@ async function main() {
     for (const session of sessions) {
       if (!session.userId) continue;
 
-      const [liked, saved, forked] = await Promise.all([
-        prisma.like.findUnique({
-          where: { userId_podcastId: { userId: session.userId, podcastId: session.podcastId } },
-        }),
-        prisma.save.findUnique({
-          where: { userId_podcastId: { userId: session.userId, podcastId: session.podcastId } },
-        }),
-        prisma.podcast.findFirst({
-          where: { userId: session.userId, forkedFromId: session.podcastId },
-        }),
-      ]);
+      const saved = await prisma.save.findUnique({
+        where: { userId_podcastId: { userId: session.userId, podcastId: session.podcastId } },
+      });
 
-      // Multi-label engagement
+      // Private training label from completion and save behavior.
       const label =
-        session.completionPercent >= 80
+        session.completionPercent >= 80 || saved
           ? 'strong_positive'
           : session.completionPercent >= 50
             ? 'positive'
@@ -67,10 +59,8 @@ async function main() {
         speedChanges: session.speedChanges,
         lastSpeed: session.lastSpeed,
         interruptCount: session.interruptCount,
-        liked: !!liked,
         saved: !!saved,
-        forked: !!forked,
-        engagementLabel: label,
+        trainingLabel: label,
         tags: session.podcast.tags.map((pt: { tag: { name: string } }) => pt.tag.name),
       };
 
