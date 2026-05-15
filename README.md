@@ -1,313 +1,182 @@
-<div align="center">
-
 # Sotto
 
-### Every voice. Every topic. One feed.
+Private audio briefings from your agents, meetings, workflows, and trusted sources.
 
-Create AI podcasts, compare voices side-by-side, remix anything.
+Sotto is being moved from a social podcast network into open source infrastructure for people who want private, self-owned audio feeds. The goal is simple: point your agents and sources at Sotto, generate audio briefings, and listen in any podcast app through private RSS.
 
-[Getting Started](#getting-started) · [How It Works](#how-it-works) · [Architecture](#architecture) · [Documentation](#documentation)
+## What It Is
 
-[![CI](https://img.shields.io/badge/CI-passing-brightgreen?logo=githubactions&logoColor=white)](https://github.com/SottoFM/Sotto/actions/workflows/ci.yml)
-[![Deploy](https://img.shields.io/badge/Deploy-live-brightgreen?logo=githubactions&logoColor=white)](https://github.com/SottoFM/Sotto/actions/workflows/deploy.yml)
-[![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](https://nextjs.org)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue?logo=typescript&logoColor=white)](https://typescriptlang.org)
-[![Prisma](https://img.shields.io/badge/Prisma-6-2D3748?logo=prisma)](https://prisma.io)
-[![BullMQ](https://img.shields.io/badge/BullMQ-Redis-DC382D?logo=redis&logoColor=white)](https://docs.bullmq.io)
-[![Socket](https://img.shields.io/badge/Socket-protected-blueviolet?logo=socket.dev)](https://socket.dev)
-[![min-release-age](https://img.shields.io/badge/min--release--age-7%20days-brightgreen)](https://docs.npmjs.com/cli/v10/using-npm/config#min-release-age)
+Sotto turns structured work into private audio:
 
----
+- Agent outputs from Claude Code, Codex, OpenClaw, Hermes, or another local/hosted assistant.
+- Meeting recordings and transcripts that should feed a personal daily briefing.
+- News and source digests for a separate "what happened in the world" podcast.
+- Twitter, Telegram, or other bot-triggered workflows when self-hosted.
+- Manual topics and imported audio for people who still want direct podcast creation.
 
-</div>
+The default is private. New podcasts are private unless a user explicitly changes visibility, and private/unlisted visibility is not a paid feature.
 
-## What is Sotto?
+## What It Is Not
 
-**Sotto** (from Italian *"sotto voce"* — speaking in a soft, intimate voice) is the social podcast network. Create AI podcasts or import human ones, compare 8+ voice providers side-by-side, fork and remix anything. Bring your own API keys — unlimited and free.
+Sotto should not be another NotebookLM wrapper.
 
-Describe what you want to hear through a natural conversation. Sotto generates a personalized two-voice podcast — a warm Host and a grounding Expert — that you can listen to anywhere. The twist: you can **interrupt mid-playback** to ask questions, get contextual answers, and update the episode with those clarifications for all future listeners.
+NotebookLM-style generation starts from documents and produces a one-off synthetic conversation. Sotto's useful surface is the private delivery layer around recurring workflows: agents, meetings, news, bots, imported audio, verified references, scheduled briefings, and private RSS feeds owned by the user.
 
-### What makes Sotto different
+If hosted billing exists, it should charge for managed infrastructure and convenience: workers, storage, scheduled ingestion, TTS routing, bot hosting, monitoring, and updates. It should not pretend the core value is generic AI-generated podcast content.
 
-| | Sotto | Google NotebookLM | Traditional Podcasts |
-|---|---|---|---|
-| **Real-time Q&A** | Pause and ask questions mid-episode | No | No |
-| **Self-updating episodes** | Q&A gets baked into the podcast | No | No |
-| **Chat-based creation** | Conversational discovery with AI | Form-based | Manual recording |
-| **Voice diversity** | Unique voice pairs per podcast | Same 2 voices every time | Fixed hosts |
-| **Social feed** | Discover, fork, follow creators | No | Platform-dependent |
-| **Verified references** | 4-layer verified `[N]` citations with PDF export | Partial | Manual |
+## Status
 
-## How It Works
+This repository is mid-pivot.
 
-### 1. Chat with AI to design your podcast
+- The private RSS token model and API exist.
+- New podcasts and imports default to private.
+- Local storage is the default storage provider.
+- The default `npm run dev` path no longer requires Doppler or a production database sync.
+- Legacy social features, public feeds, likes, follows, comments, and remix surfaces still exist in the codebase and need a larger removal pass.
+- A public open source license still needs to be chosen before release.
 
-No forms, no wizards. Describe what you want to hear and Sotto's discovery agent asks smart follow-up questions — topic depth, audience background, preferred tone, duration — with tappable suggestion chips. Before generating, Sotto searches existing public podcasts and recommends relevant ones.
+## Quick Start
 
-### 2. AI generates a two-voice conversation
+Prerequisites:
 
-Sotto creates a structured script with a Host (warm, inviting) and an Expert (grounded, authoritative), complete with citations and emotional delivery cues. Each segment is synthesized with distinct voices via ElevenLabs, then stitched together with FFmpeg.
+- Node.js 18+
+- Docker
+- FFmpeg
 
-### 3. Listen and interrupt
-
-Play your podcast anywhere. When something sparks a question, tap **"Ask a Question"** — the episode pauses, and the AI answers in full context (it knows exactly where you are in the conversation). If you're satisfied, the episode can be updated with the clarification baked in.
-
-### 4. Share and discover
-
-Publish to the social feed. Other users can discover your podcast, follow you, fork episodes to create their own variations, and contribute questions that improve the content over time.
-
-## Verified References
-
-Every claim in a Sotto podcast is backed by real, verifiable sources. When the AI generates a script, it includes inline `[N]` citation markers — click any marker to see the full reference: title, authors, year, and URL.
-
-Before a podcast goes live, every reference passes through a **4-layer verification pipeline**:
-
-1. **URL Resolution** — HTTP HEAD request confirms the source URL is reachable
-2. **DOI via CrossRef** — Cross-references DOI against the CrossRef registry (250M+ works) to confirm title and author accuracy
-3. **Title Search via OpenAlex** — Fuzzy-matches titles against the OpenAlex academic database for independent confirmation
-4. **AI Verification Agent** — Claude critically evaluates plausibility and suggests real replacements for suspicious sources
-
-References that fail verification are either replaced with verified alternatives or removed entirely. Citation markers are automatically renumbered so the transcript stays clean.
-
-Export any podcast as an academic-style PDF with a full bibliography — every reference in it has been independently verified.
-
-## Tech Stack
-
-| Layer | Technology |
-|-------|-----------|
-| **Frontend** | Next.js 14+ (App Router), TypeScript, CSS Modules |
-| **Database** | PostgreSQL 16 + Prisma ORM |
-| **Auth** | NextAuth.js v5 (Email, Google, GitHub, Apple) |
-| **Queue** | Redis 7 + BullMQ (9 worker types) |
-| **AI** | Anthropic Claude (chat, scripts, Q&A) |
-| **Audio** | ElevenLabs (multi-voice TTS per segment) |
-| **Stitching** | FFmpeg (concatenation + normalization) |
-| **Storage** | Cloudflare R2 (S3-compatible) |
-| **Payments** | Stripe (Free / Pro / Team) |
-| **PDF** | pdfmake (academic-style transcript export) |
-| **Hosting** | Vercel (web) + Railway (workers) |
-
-All external services are **swappable** via environment variables (`AI_PROVIDER`, `TTS_PROVIDER`, `STORAGE_PROVIDER`, `PAYMENT_PROVIDER`).
-
-## Architecture
-
-### Generation Pipeline
-
-```
-User describes topic via chat
-        │
-        ▼
-┌─────────────────┐
-│   Discovery AI   │  Claude streaming + chip suggestions
-└────────┬────────┘
-         │  extracts: {topic, depth, audience, tone, focus, duration}
-         ▼
-┌─────────────────┐
-│    Content       │  Parse URL/PDF if user provided sources
-│   Extraction     │
-└────────┬────────┘
-         ▼
-┌─────────────────┐
-│     Script       │  Claude generates 2-voice script with [N] citations
-│   Generation     │
-└────────┬────────┘
-         ▼
-┌─────────────────┐
-│   Reference      │  4-layer verification: URL, CrossRef, OpenAlex, AI
-│   Validation     │
-└────────┬────────┘
-         ▼
-┌─────────────────┐
-│     Audio        │  ElevenLabs TTS per segment (5 concurrent)
-│   Generation     │
-└────────┬────────┘
-         ▼
-┌─────────────────┐
-│     Audio        │  FFmpeg concat + loudness normalization
-│    Stitching     │
-└────────┬────────┘
-         ▼
-┌─────────────────┐
-│   Notification   │  Push: "Your podcast is ready!"
-└─────────────────┘
-```
-
-### Interactive Playback
-
-```
-Listener taps "Ask a Question"  →  Podcast pauses
-        │
-        ▼
-┌─────────────────┐
-│   Interaction    │  Claude answers using script context + timestamp
-│     Worker       │
-└────────┬────────┘
-         │  "Was that clear?" → Yes → "Update podcast?" → Yes
-         ▼
-┌─────────────────┐
-│    Segment       │  Insert new segments, re-synthesize, re-stitch
-│  Regeneration    │
-└─────────────────┘
-```
-
-### Database Schema
-
-Key models: **User**, **Podcast**, **Discovery** + **DiscoveryMessage**, **Script**, **Segment**, **Reference**, **Interaction**, **Like/Save**, **Follow**, **Tag**, **Subscription**, **Notification**, **Job**, **ApiUsageLog**
-
-Status flow: `PENDING → DISCOVERING → EXTRACTING → SCRIPTING → VALIDATING_REFERENCES → GENERATING_AUDIO → STITCHING → READY → UPDATING`
-
-## Project Structure
-
-```
-src/
-├── app/                      Next.js App Router
-│   ├── page.tsx              Landing page
-│   ├── auth/                 Login, signup
-│   ├── (dashboard)/          Dashboard, billing, settings
-│   ├── create/               Chat discovery → generation
-│   ├── podcast/[podcastId]/  Player + interrupt + fork
-│   ├── feed/                 Public social feed
-│   ├── profile/[userId]/     Creator profiles
-│   ├── pricing/              Pricing tiers
-│   └── api/                  20+ API routes
-├── components/               50+ components
-│   ├── ui/                   Button, Card, Modal, Toast, Badge, Spinner...
-│   ├── player/               AudioPlayer, Waveform, Transcript, Teleprompter
-│   ├── chat/                 ChatContainer, ChatMessage, ChatChips
-│   ├── discovery/            DiscoveryChat, Recommendations
-│   ├── feed/                 PodcastCard, FeedGrid, TagFilter, SearchBar
-│   ├── profile/              ProfileHeader, FollowButton
-│   └── layout/               Sidebar, TopBar, Footer, MobileNav
-├── lib/                      Core libraries
-│   ├── claude.ts             Anthropic client (streaming + non-streaming)
-│   ├── elevenlabs.ts         Multi-voice TTS with voice pool
-│   ├── discovery-agent.ts    Chat agent + chip generation
-│   ├── script-generator.ts   Script generation with citations
-│   ├── audio-stitcher.ts     FFmpeg segment stitching
-│   ├── stripe.ts             Payments + subscription management
-│   ├── providers/            Swappable service providers
-│   └── hooks/                useAuth, useAudioPlayer, usePodcast...
-├── workers/                  9 BullMQ background workers
-├── styles/
-│   └── globals.css           Design system tokens
-└── types/                    TypeScript definitions
-```
-
-## Getting Started
-
-### Prerequisites
-
-- **Node.js** 18+
-- **Docker** (for PostgreSQL + Redis)
-- **FFmpeg** (for audio stitching)
-
-### Setup
+Recommended setup:
 
 ```bash
-# Clone the repository
-git clone https://github.com/affromero/Sotto.git
-cd Sotto
+npm run setup
+```
 
-# Install dependencies
-npm install
+`npm run setup` installs dependencies, starts PostgreSQL and Redis, creates `.env.local` with local defaults, pushes the Prisma schema, and generates the Prisma client.
 
-# Copy environment variables
-cp .env.example .env
-# → Fill in your API keys (see Environment Variables below)
+Then add provider credentials to `.env.local`. The smallest hosted-provider path is one OpenAI key:
 
-# Start PostgreSQL + Redis
-docker-compose up -d
+```bash
+OPENAI_API_KEY="sk-..."
+AI_PROVIDER="openai"
+TTS_PROVIDER="openai"
+STT_PROVIDER="openai"
+```
 
-# Set up the database
-npx prisma generate
-npx prisma db push
+For local-agent use, install and authenticate the agent CLI you want to use, then choose its model in the app when available. Claude Code models are exposed when the `claude` CLI is available locally.
 
-# Seed with sample data (optional)
-npx prisma db seed
+Start the app:
 
-# Start development (web + workers)
+```bash
 npm run dev
 ```
 
-### Environment Variables
-
-Copy `.env.example` and configure:
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `DATABASE_URL` | Yes | PostgreSQL connection string |
-| `REDIS_URL` | Yes | Redis connection string |
-| `NEXTAUTH_SECRET` | Yes | Auth encryption key |
-| `ANTHROPIC_API_KEY` | Yes | Claude API key |
-| `ELEVENLABS_API_KEY` | Yes | ElevenLabs TTS API key |
-| `STRIPE_SECRET_KEY` | For billing | Stripe secret key |
-| `STRIPE_WEBHOOK_SECRET` | For billing | Stripe webhook signing secret |
-| `R2_ACCESS_KEY_ID` | For storage | Cloudflare R2 credentials |
-| `AI_PROVIDER` | No | `anthropic` (default) or `openai` |
-| `TTS_PROVIDER` | No | `elevenlabs` (default) or `openai` |
-| `STORAGE_PROVIDER` | No | `r2` (default), `s3`, or `local` |
-| `PAYMENT_PROVIDER` | No | `stripe` (default) or `none` |
-| `OPENALEX_EMAIL` | No | Email for OpenAlex polite pool (higher rate limits) |
-
-### Commands
+Compatibility scripts are still available for the old hosted setup:
 
 ```bash
-npm run dev          # Web + workers concurrently
-npm run dev:web      # Web only
-npm run dev:workers  # Workers only
-npm run build        # Production build
-npm run lint         # ESLint
-npm run test         # Vitest
-npm run test:watch   # Vitest in watch mode
-npx tsc --noEmit     # Type checking
+npm run dev:doppler
+npm run dev:web:doppler
+npm run dev:workers:doppler
 ```
 
-## Design System
+## Manual Setup
 
-Sotto's visual language — **"Warm Intimacy"** — evokes sitting in a cozy room listening to two knowledgeable friends have a conversation.
+```bash
+npm install
+cp .env.oss.example .env.local
+docker compose up -d postgres redis
+npx prisma db push --schema=apps/web/prisma/schema.prisma
+npx prisma generate --schema=apps/web/prisma/schema.prisma
+npm run dev
+```
 
-| Token | Value | Usage |
-|-------|-------|-------|
-| Primary | `#D97706` Golden Amber | CTAs, Host speaker, highlights |
-| Accent | `#1E3A5F` Deep Navy | Expert speaker, secondary actions |
-| Background | `#FEFCF8` Soft Cream | Page background |
-| Surface | `#FFFFFF` White | Cards, panels |
-| Heading | DM Serif Display | Editorial warmth |
-| Body | Inter | Clean readability |
+Use `.env.oss.example` as the local onboarding template. It defaults to:
 
-CSS Modules only — no Tailwind, no inline styles, no styled-components. Mobile-first responsive design.
+- PostgreSQL on `localhost:5432`
+- Redis on `localhost:6379`
+- Local file storage under `.sotto/storage`
+- Payments disabled with `PAYMENT_PROVIDER=none`
+- Private podcast visibility
 
-## Pricing
+## Private RSS
 
-| | Free | Pro | Team |
-|---|---|---|---|
-| **Price** | $0 | $19/mo | $49/mo |
-| **Podcasts** | 3/month | 20/month | Unlimited |
-| **Duration** | 10 min | 30 min | 30 min |
-| **Interactions** | 3 per podcast | Unlimited | Unlimited |
-| **Visibility** | Public only | Public + Private | Team feed |
+Authenticated users can create private RSS tokens:
 
-## Documentation
+```http
+POST /api/rss/private
+```
 
-The `docs/` directory contains comprehensive documentation:
+The response includes the raw token and feed URL once. Tokens are stored only as SHA-256 hashes.
 
-| Document | Description |
-|----------|-------------|
-| [Product Vision](docs/01-product-vision.md) | Problem, solution, target personas |
-| [Market Analysis](docs/02-market-analysis.md) | TAM/SAM/SOM, competitive landscape |
-| [Technical Architecture](docs/03-technical-architecture.md) | System design, data flow |
-| [Design System](docs/04-design-system.md) | Colors, typography, spacing, components |
-| [UI Mockups](docs/05-ui-mockups.md) | Page-by-page specifications |
-| [Auth Setup](docs/06-authentication-setup.md) | NextAuth configuration |
-| [Stripe Billing](docs/07-stripe-billing.md) | Subscription lifecycle |
-| [AI Prompts](docs/08-ai-prompts.md) | System prompts for all AI features |
-| [Discovery Flow](docs/09-discovery-chat-flow.md) | Chat agent behavior |
-| [Mobile Strategy](docs/10-mobile-strategy.md) | PWA + React Native roadmap |
-| [Unit Economics](docs/11-unit-economics.md) | Cost analysis, revenue projections |
-| [Provider Pricing](docs/12-provider-pricing.md) | AI/TTS provider comparison |
-| [MVP Launch Guide](docs/13-mvp-launch-guide.md) | Deployment checklist |
-| [iOS Strategy](docs/14-ios-app-strategy.md) | Three-phase iOS roadmap |
+Manage tokens:
 
-## License
+```http
+GET /api/rss/private
+DELETE /api/rss/private/tokens/:tokenId
+```
 
-All rights reserved. This is proprietary software.
+Podcast apps consume:
+
+```http
+GET /api/rss/private/:token
+```
+
+That feed includes the user's ready, non-deleted podcasts, including private and unlisted episodes.
+
+## Architecture
+
+The current monorepo contains:
+
+- `apps/web` - Next.js app, API routes, workers, Prisma schema, Vitest tests.
+- `apps/mobile` - Expo React Native app.
+- `packages/shared` - shared validation and types.
+- `packages/mcp` - MCP integration surface.
+- `services/remotion` - video rendering service.
+- `docs` - architecture, deployment, and product planning documents.
+
+Generation pipeline:
+
+```text
+topic, source, meeting, agent output, or bot event
+  -> content extraction
+  -> script generation
+  -> reference validation
+  -> TTS
+  -> audio stitching
+  -> private RSS
+```
+
+## Provider Strategy
+
+Sotto should support three onboarding paths:
+
+- Local agent path: use a local CLI or self-hosted agent for script generation, plus a TTS provider.
+- One-key path: use a single provider such as OpenAI for script generation, TTS, and transcription.
+- Managed path: Sotto-hosted infrastructure with a short trial, then paid hosting for non-technical users.
+
+Provider families already in the codebase include Anthropic, OpenAI, Google, Claude Code, ElevenLabs, Cartesia, Hume, Fal, Replicate, Mistral, S3, R2, and local storage.
+
+## Development Commands
+
+```bash
+npm run dev           # web + workers, local defaults
+npm run dev:web       # web only
+npm run dev:workers   # workers only
+npm run build
+npm run lint
+npm run type-check
+npm run test
+```
+
+Before merging larger changes, run:
+
+```bash
+npm run ci
+```
+
+## Release Work Remaining
+
+- Choose and add an open source license.
+- Remove or feature-flag the remaining social layer.
+- Add a first-run onboarding screen for provider selection and private RSS setup.
+- Add meeting ingestion and agent webhook endpoints.
+- Add a scheduled news briefing source.
+- Add a managed-hosting trial path for users who do not want to run infra.
+- Update old docs that still describe Sotto as a social podcast network.

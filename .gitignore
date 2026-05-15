@@ -61,6 +61,7 @@ docs/99-app-showcase.md
 
 # Cache
 .cache/
+.sotto/
 
 # Snap
 snap/

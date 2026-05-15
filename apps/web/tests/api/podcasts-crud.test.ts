@@ -347,6 +347,11 @@ describe('POST /api/podcasts', () => {
     const result = await response.json();
     expect(result.id).toBe('pod-1');
     expect(result.status).toBe('EXTRACTING');
+    expect(mockPodcastCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ visibility: 'PRIVATE' }),
+      })
+    );
   });
 
   it('creates podcast with optional voice IDs', async () => {
@@ -743,23 +748,12 @@ describe('PATCH /api/podcasts/[podcastId]', () => {
     expect(body.visibility).toBe('PRIVATE');
   });
 
-  it('rejects PRIVATE visibility for free tier user', async () => {
+  it('updates podcast visibility to PRIVATE for free tier user', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockPodcastFindUnique.mockResolvedValue({ userId: 'user-1' });
-    mockUserFindUniqueOrThrow.mockResolvedValue({ plan: 'FREE', role: 'USER' });
-    const { getTierFeatures } = await import('@/lib/tier-features');
-    (getTierFeatures as ReturnType<typeof vi.fn>).mockReturnValue({
-      privateAllowed: false,
-      maxDurationMinutes: 5,
-      maxSpeakers: 2,
-      autoApproveScript: true,
-      webSearchEnabled: false,
-      maxQaInteractions: 3,
-      priorityQueue: false,
-      analyticsEnabled: false,
-      voiceTracksEnabled: false,
-      maxVoiceTracks: 0,
-      voiceCloningEnabled: false,
+    mockPodcastUpdate.mockResolvedValue({
+      ...mockPodcastWithRelations,
+      visibility: 'PRIVATE',
     });
 
     const request = createPatchRequest('/api/podcasts/pod-1', { visibility: 'PRIVATE' });
@@ -767,28 +761,17 @@ describe('PATCH /api/podcasts/[podcastId]', () => {
       params: Promise.resolve({ podcastId: 'pod-1' }),
     });
 
-    expect(response.status).toBe(403);
+    expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body.error).toContain('Private and unlisted podcasts require a Pro subscription');
+    expect(body.visibility).toBe('PRIVATE');
   });
 
-  it('rejects UNLISTED visibility for free tier user', async () => {
+  it('updates podcast visibility to UNLISTED for free tier user', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockPodcastFindUnique.mockResolvedValue({ userId: 'user-1' });
-    mockUserFindUniqueOrThrow.mockResolvedValue({ plan: 'FREE', role: 'USER' });
-    const { getTierFeatures } = await import('@/lib/tier-features');
-    (getTierFeatures as ReturnType<typeof vi.fn>).mockReturnValue({
-      privateAllowed: false,
-      maxDurationMinutes: 5,
-      maxSpeakers: 2,
-      autoApproveScript: true,
-      webSearchEnabled: false,
-      maxQaInteractions: 3,
-      priorityQueue: false,
-      analyticsEnabled: false,
-      voiceTracksEnabled: false,
-      maxVoiceTracks: 0,
-      voiceCloningEnabled: false,
+    mockPodcastUpdate.mockResolvedValue({
+      ...mockPodcastWithRelations,
+      visibility: 'UNLISTED',
     });
 
     const request = createPatchRequest('/api/podcasts/pod-1', { visibility: 'UNLISTED' });
@@ -796,9 +779,9 @@ describe('PATCH /api/podcasts/[podcastId]', () => {
       params: Promise.resolve({ podcastId: 'pod-1' }),
     });
 
-    expect(response.status).toBe(403);
+    expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body.error).toContain('Private and unlisted podcasts require a Pro subscription');
+    expect(body.visibility).toBe('UNLISTED');
   });
 
   it('returns 400 for invalid visibility value', async () => {

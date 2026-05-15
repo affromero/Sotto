@@ -76,7 +76,6 @@ class S3Provider implements StorageProvider {
     const { client } = await this.getS3Client();
     const { Upload } = await import('@aws-sdk/lib-storage');
     const upload = new Upload({
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       client: client as any,
       params: { Bucket: this.bucket, Key: key, Body: body, ContentType: contentType },
       queueSize: 4,
@@ -148,7 +147,7 @@ class LocalProvider implements StorageProvider {
 }
 
 export function createStorageProvider(type?: string): StorageProvider {
-  const providerType = type || process.env.STORAGE_PROVIDER || 'r2';
+  const providerType = type || process.env.STORAGE_PROVIDER || 'local';
   switch (providerType) {
     case 'r2':
       return new R2Provider();
@@ -157,7 +156,7 @@ export function createStorageProvider(type?: string): StorageProvider {
     case 'local':
       return new LocalProvider();
     default:
-      logger.warn(`Unknown STORAGE_PROVIDER "${providerType}", falling back to r2`);
-      return new R2Provider();
+      logger.warn(`Unknown STORAGE_PROVIDER "${providerType}", falling back to local`);
+      return new LocalProvider();
   }
 }

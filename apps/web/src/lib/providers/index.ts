@@ -15,7 +15,7 @@ let _providers: Providers | null = null;
 /**
  * Get the singleton provider instances, selected by environment variables:
  * - TTS_PROVIDER: elevenlabs (default) | openai
- * - STORAGE_PROVIDER: r2 (default) | s3 | local
+ * - STORAGE_PROVIDER: local (default) | r2 | s3
  */
 export function getProviders(): Providers {
   if (!_providers) {

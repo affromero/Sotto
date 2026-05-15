@@ -79,15 +79,6 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Block non-admins from using claude-code models
-  if (parsed.data.aiModel?.startsWith('claude-code:')) {
-    const { auth } = await import('@/lib/auth');
-    const sess = await auth();
-    if (sess?.user?.role !== 'ADMIN') {
-      return errorResponse('Forbidden', 403);
-    }
-  }
-
   // Validate model ID against registry (claude-code:* models are exempt)
   if (parsed.data.aiModel && !parsed.data.aiModel.startsWith('claude-code:')) {
     if (!isValidModelId(parsed.data.aiModel)) {
@@ -140,11 +131,6 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Gate private and unlisted podcast creation
-  if ((parsed.data.visibility === 'PRIVATE' || parsed.data.visibility === 'UNLISTED') && !tierFeatures.privateAllowed) {
-    return errorResponse('Private and unlisted podcasts require a Pro subscription.', 403);
-  }
-
   // Speaker count validation — enforce tier cap
   const requestedSpeakers = parsed.data.metadata?.speakers;
   if (requestedSpeakers && requestedSpeakers.length > tierFeatures.maxSpeakers) {
@@ -193,13 +179,10 @@ export async function POST(request: NextRequest) {
     });
     if (userPref?.preferredAiModel) {
       const prefModel = userPref.preferredAiModel;
-      const isClaudeCode = prefModel.startsWith('claude-code:');
-      if (!isClaudeCode || isAdmin) {
-        const prefPlan = getModelRequiredPlan(prefModel);
-        if (!prefPlan || isModelAllowedForUser(prefPlan, gate.isProUser ? 'PRO' : 'FREE', gate.isByokUser, isAdmin ? 'ADMIN' : undefined)) {
-          autoResolvedAiModel = prefModel;
-          autoResolvedAiProvider = getProviderForModel(prefModel) ?? autoResolvedAiProvider;
-        }
+      const prefPlan = getModelRequiredPlan(prefModel);
+      if (!prefPlan || isModelAllowedForUser(prefPlan, gate.isProUser ? 'PRO' : 'FREE', gate.isByokUser, isAdmin ? 'ADMIN' : undefined)) {
+        autoResolvedAiModel = prefModel;
+        autoResolvedAiProvider = getProviderForModel(prefModel) ?? autoResolvedAiProvider;
       }
     }
   }
@@ -258,6 +241,7 @@ export async function POST(request: NextRequest) {
       ? (getProviderForModel(parsed.data.aiModel) ?? null)
       : (autoResolvedAiProvider ?? null),
     aiModel: parsed.data.aiModel ?? autoResolvedAiModel ?? null,
+    visibility: parsed.data.visibility ?? ('PRIVATE' as const),
     aiAutoResolved,
     ttsAutoResolved,
     verificationMode,

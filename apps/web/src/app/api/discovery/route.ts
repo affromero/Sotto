@@ -103,14 +103,6 @@ export async function POST(request: NextRequest) {
   const body = await request.json();
   const { message, content, discoveryId, history, model, maxDuration } = body;
 
-  // Block non-admins from using claude-code models
-  if (typeof model === 'string' && model.startsWith('claude-code:')) {
-    const sess = await auth();
-    if (sess?.user?.role !== 'ADMIN') {
-      return errorResponse('Forbidden', 403);
-    }
-  }
-
   // Validate model ID against registry (claude-code:* models are exempt)
   if (typeof model === 'string' && !model.startsWith('claude-code:')) {
     if (!isValidModelId(model)) {
