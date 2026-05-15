@@ -92,8 +92,22 @@ describe('private-first OSS surfaces', () => {
   });
 
   it('does not ship the public feed page or feed API route', () => {
+    const creatorMetricsSource = readSource('src/lib/creator-metrics.ts');
+
     expect(existsSync(resolve(webRoot, 'src/app/feed/page.tsx'))).toBe(false);
     expect(existsSync(resolve(webRoot, 'src/app/api/feed/route.ts'))).toBe(false);
+    expect(existsSync(resolve(webRoot, 'src/app/api/activity/route.ts'))).toBe(false);
+    expect(existsSync(resolve(webRoot, 'src/components/feed/ActivityFeed.tsx'))).toBe(false);
+    expect(existsSync(resolve(webRoot, 'src/components/feed/ActivityItem.tsx'))).toBe(false);
+    expect(existsSync(resolve(repoRoot, 'e2e/playwright/tests/feed.spec.ts'))).toBe(false);
+    expect(existsSync(resolve(repoRoot, 'e2e/playwright/tests/api/feed-social.api.spec.ts'))).toBe(
+      false
+    );
+    expect(existsSync(resolve(repoRoot, 'scripts/recording/flows/01-feed-browsing.ts'))).toBe(
+      false
+    );
+    expect(creatorMetricsSource).not.toContain("LIKE '%/feed%'");
+    expect(creatorMetricsSource).not.toContain("THEN 'feed'");
   });
 
   it('does not keep public feed contracts in mobile, shared, or MCP packages', () => {
@@ -327,7 +341,6 @@ describe('private-first OSS surfaces', () => {
       'src/app/sitemap.ts',
       'src/components/player/Contributors.tsx',
       'src/components/voices/VoiceMarketplaceCard.tsx',
-      'src/components/feed/ActivityItem.tsx',
       'src/app/CLAUDE.md',
       'src/components/CLAUDE.md',
     ]

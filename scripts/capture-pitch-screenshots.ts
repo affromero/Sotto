@@ -89,7 +89,7 @@ interface ScreenshotDef {
   waitFor?: string;
 }
 
-function getScreenshotDefs(demoPodcastId: string, demoUserId: string): ScreenshotDef[] {
+function getScreenshotDefs(demoPodcastId: string): ScreenshotDef[] {
   return [
     // Desktop captures
     {
@@ -129,14 +129,6 @@ function getScreenshotDefs(demoPodcastId: string, demoUserId: string): Screensho
       fullPage: false,
     },
     {
-      name: 'feed',
-      path: '/feed',
-      viewport: { width: 1440, height: 900 },
-      auth: 'none',
-      fullPage: false,
-      waitFor: '[class*="card"], [class*="podcast"], [class*="grid"]',
-    },
-    {
       name: 'pricing',
       path: '/pricing',
       viewport: { width: 1440, height: 900 },
@@ -148,13 +140,6 @@ function getScreenshotDefs(demoPodcastId: string, demoUserId: string): Screensho
       path: '/billing',
       viewport: { width: 1440, height: 900 },
       auth: 'demo',
-      fullPage: false,
-    },
-    {
-      name: 'profile',
-      path: `/profile/${demoUserId}`,
-      viewport: { width: 1440, height: 900 },
-      auth: 'none',
       fullPage: false,
     },
     {
@@ -197,13 +182,6 @@ function getScreenshotDefs(demoPodcastId: string, demoUserId: string): Screensho
     {
       name: 'mobile-player',
       path: `/podcast/${demoPodcastId}`,
-      viewport: { width: 390, height: 844 },
-      auth: 'none',
-      fullPage: false,
-    },
-    {
-      name: 'mobile-feed',
-      path: '/feed',
       viewport: { width: 390, height: 844 },
       auth: 'none',
       fullPage: false,
@@ -321,7 +299,7 @@ async function main() {
     console.log('Browser launched\n');
 
     // Capture all screenshots
-    const defs = getScreenshotDefs(demoPodcast.id, demoUser.id);
+    const defs = getScreenshotDefs(demoPodcast.id);
     const captured: Record<string, string> = {};
 
     for (const def of defs) {

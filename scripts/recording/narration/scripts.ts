@@ -58,21 +58,6 @@ const verificationGithub: FlowNarration = {
   ],
 };
 
-// ── 03: Feed Browsing (8.28s) ────────────────────────────────────
-// Windows: 0→2.3 (2.3s), 2.3→5.0 (2.7s), 5.0→6.8 (1.8s), 6.8→8.28 (1.5s)
-
-const feedBrowsing: FlowNarration = {
-  flowName: '03-feed-browsing',
-  sourceFlowName: '01-feed-browsing',
-  videoDuration: 8.28,
-  segments: [
-    { startAt: 0.0, text: 'The Sotto feed.' },
-    { startAt: 2.3, text: 'Filter by topic.' },
-    { startAt: 5.0, text: 'Sort by popular.' },
-    { startAt: 6.8, text: 'Every card, at a glance.' },
-  ],
-};
-
 // ── 04: Chat Creation (13.76s) ───────────────────────────────────
 // Windows: 0.3→3.5 (3.2s), 3.5→7.0 (3.5s), 7.0→10.5 (3.5s), 10.5→13.76 (3.26s)
 
@@ -138,7 +123,6 @@ const scriptReview: FlowNarration = {
 export const ALL_NARRATIONS: FlowNarration[] = [
   landingPage,
   verificationGithub,
-  feedBrowsing,
   chatCreation,
   playerInterrupt,
   forkFlow,

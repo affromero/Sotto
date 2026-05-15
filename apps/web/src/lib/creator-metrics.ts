@@ -20,7 +20,13 @@ export async function getCreatorOverview(userId: string, since: Date): Promise<C
   const ids = podcastIds.map((p) => p.id);
 
   if (ids.length === 0) {
-    return { totalPlays: 0, uniqueListeners: 0, avgCompletion: 0, totalListenHours: 0, podcastCount: 0 };
+    return {
+      totalPlays: 0,
+      uniqueListeners: 0,
+      avgCompletion: 0,
+      totalListenHours: 0,
+      podcastCount: 0,
+    };
   }
 
   const [playCount, sessionAgg, uniqueListeners] = await Promise.all([
@@ -94,7 +100,10 @@ export async function getCreatorTopPodcasts(
   }));
 }
 
-export async function getCreatorDailyPlays(userId: string, since: Date): Promise<CreatorDailyPlays[]> {
+export async function getCreatorDailyPlays(
+  userId: string,
+  since: Date
+): Promise<CreatorDailyPlays[]> {
   const podcastIds = await prisma.podcast.findMany({
     where: { userId, deletedAt: null },
     select: { id: true },
@@ -120,7 +129,10 @@ export async function getCreatorDailyPlays(userId: string, since: Date): Promise
   }));
 }
 
-export async function getCreatorEngagement(userId: string, since: Date): Promise<CreatorEngagement> {
+export async function getCreatorEngagement(
+  userId: string,
+  since: Date
+): Promise<CreatorEngagement> {
   const podcastIds = await prisma.podcast.findMany({
     where: { userId, deletedAt: null },
     select: { id: true },
@@ -175,7 +187,6 @@ export async function getCreatorAudienceInsights(
       SELECT
         CASE
           WHEN rl.id IS NOT NULL THEN 'recommendation'
-          WHEN be."referrer" LIKE '%/feed%' THEN 'feed'
           WHEN be."referrer" LIKE '%/search%' OR be."referrer" LIKE '%q=%' THEN 'search'
           ELSE 'direct'
         END AS source,

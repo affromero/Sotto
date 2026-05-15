@@ -119,7 +119,6 @@ HEADER
     ["feed"]="Public Feed"
     ["pricing"]="Pricing"
     ["billing"]="Billing & Credits"
-    ["profile"]="Creator Profile"
     ["admin-overview"]="Admin Dashboard"
     ["admin-users"]="Admin — User Management"
     ["settings"]="Settings"
@@ -127,7 +126,7 @@ HEADER
 
   DESKTOP_ORDER=(
     "landing" "login" "dashboard" "create" "podcast-player"
-    "feed" "pricing" "billing" "profile"
+    "pricing" "billing"
     "admin-overview" "admin-users" "settings"
   )
 
@@ -145,8 +144,8 @@ EOF
   done
 
   # Mobile screenshots
-  MOBILE_NAMES=("mobile-landing" "mobile-dashboard" "mobile-player" "mobile-feed")
-  MOBILE_LABELS=("Landing" "Dashboard" "Player" "Feed")
+  MOBILE_NAMES=("mobile-landing" "mobile-dashboard" "mobile-player")
+  MOBILE_LABELS=("Landing" "Dashboard" "Player")
 
   has_mobile=false
   for name in "${MOBILE_NAMES[@]}"; do
@@ -160,8 +159,8 @@ EOF
   if $has_mobile; then
     echo "## Mobile Experience" >> "$SHOWCASE_FILE"
     echo "" >> "$SHOWCASE_FILE"
-    echo "| ${MOBILE_LABELS[0]} | ${MOBILE_LABELS[1]} | ${MOBILE_LABELS[2]} | ${MOBILE_LABELS[3]} |" >> "$SHOWCASE_FILE"
-    echo "|---------|-----------|--------|------|" >> "$SHOWCASE_FILE"
+    echo "| ${MOBILE_LABELS[0]} | ${MOBILE_LABELS[1]} | ${MOBILE_LABELS[2]} |" >> "$SHOWCASE_FILE"
+    echo "|---------|-----------|--------|" >> "$SHOWCASE_FILE"
 
     row="| "
     for i in "${!MOBILE_NAMES[@]}"; do

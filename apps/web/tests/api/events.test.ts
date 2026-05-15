@@ -27,10 +27,7 @@ import { POST } from '@/app/api/events/route';
 
 // ── Helpers ───────────────────────────────────────────────────────────
 
-function createRequest(
-  body: unknown,
-  headers?: Record<string, string>,
-): NextRequest {
+function createRequest(body: unknown, headers?: Record<string, string>): NextRequest {
   return new NextRequest(new URL('http://localhost:3000/api/events'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...headers },
@@ -96,7 +93,7 @@ describe('POST /api/events', () => {
     const res = await POST(
       createRequest({
         events: [{ context: { sessionId: 'x' }, payload: {} }],
-      }),
+      })
     );
     expect(res.status).toBe(400);
   });
@@ -224,12 +221,12 @@ describe('POST /api/events', () => {
       {
         context: {
           sessionId: 'sess-456',
-          pageUrl: '/feed',
+          pageUrl: '/dashboard',
           clientTs: Date.now(),
         },
         payload: {
           eventType: 'page.view' as const,
-          path: '/feed',
+          path: '/dashboard',
         },
       },
     ];
@@ -253,7 +250,7 @@ describe('POST /api/events', () => {
             payload: expect.objectContaining({ eventType: 'playback.play' }),
           }),
         ]),
-      }),
+      })
     );
   });
 });
