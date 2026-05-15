@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
                 displayName: m.displayName,
                 tier: m.tier,
                 requiredPlan: freeSet.has(m.id) ? ('FREE' as const) : ('PRO' as const),
-                isDefault: false,
+                isDefault: m.id === tierConfig.aiModel,
                 group: p.displayName,
                 hint: p.displayName,
               }))
@@ -98,7 +98,7 @@ export async function GET(request: NextRequest) {
             displayName: m.displayName,
             tier: m.tier,
             requiredPlan: m.requiredPlan,
-            isDefault: false,
+            isDefault: m.id === tierConfig.aiModel,
             group: p.displayName,
             hint: p.displayName,
           }))
@@ -129,7 +129,7 @@ export async function GET(request: NextRequest) {
             displayName: m.displayName,
             tier: m.tier,
             requiredPlan: freeSet.has(m.id) ? ('FREE' as const) : ('PRO' as const),
-            isDefault: false,
+            isDefault: m.id === tierConfig.aiModel,
             group: p.displayName,
             hint: p.displayName,
           }))
@@ -166,7 +166,7 @@ export async function GET(request: NextRequest) {
         displayName: m.displayName,
         tier: m.tier,
         requiredPlan: m.requiredPlan,
-        isDefault: false,
+        isDefault: key.provider === defaultProvider.id && m.id === defaultProvider.defaultModel,
         group: p.displayName,
         hint: p.displayName,
       }));
@@ -196,7 +196,7 @@ export async function GET(request: NextRequest) {
         displayName: m.displayName,
         tier: m.tier,
         requiredPlan: freeSet.has(m.id) ? ('FREE' as const) : ('PRO' as const),
-        isDefault: false,
+        isDefault: key.provider === defaultProvider.id && m.id === defaultProvider.defaultModel,
         group: p.displayName,
         hint: p.displayName,
       }));

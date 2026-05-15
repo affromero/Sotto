@@ -147,7 +147,7 @@ async function readSSEStream(response: Response): Promise<string[]> {
 describe('POST /api/discovery', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGetAiKey.mockResolvedValue({ apiKey: 'test-ai-key' });
+    mockGetAiKey.mockResolvedValue({ apiKey: 'test-ai-key', provider: 'anthropic' });
     mockUserFindUnique.mockResolvedValue({ plan: 'FREE', preferredLanguage: null });
     mockDetectLanguage.mockResolvedValue(null);
   });
@@ -698,7 +698,7 @@ describe('POST /api/discovery', () => {
   describe('BYOK key passthrough', () => {
     it('passes user AI key to streamDiscoveryResponse', async () => {
       mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-      mockGetAiKey.mockResolvedValue({ apiKey: 'user-anthropic-key-123' });
+      mockGetAiKey.mockResolvedValue({ apiKey: 'user-anthropic-key-123', provider: 'anthropic' });
       mockStreamDiscoveryResponse.mockReturnValue(mockStreamGenerator(['Response']));
       mockParseChips.mockReturnValue({ text: 'Response', chips: [] });
       mockParseMetadata.mockReturnValue(null);
@@ -737,17 +737,42 @@ describe('POST /api/discovery', () => {
       );
     });
 
-    it('passes undefined when user has no AI key', async () => {
+    it('uses explicit model routing when user has no AI key', async () => {
       mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
       mockGetAiKey.mockResolvedValue(null);
       mockStreamDiscoveryResponse.mockReturnValue(mockStreamGenerator(['Response']));
       mockParseChips.mockReturnValue({ text: 'Response', chips: [] });
       mockParseMetadata.mockReturnValue(null);
 
-      const request = createPostRequest({ message: 'Test' });
+      const request = createPostRequest({ message: 'Test', model: 'gpt-5-mini' });
       const response = await POST(request);
+      await readSSEStream(response);
 
       expect(response.status).toBe(200);
+      expect(mockStreamDiscoveryResponse).toHaveBeenCalledWith(
+        [{ role: 'user', content: 'Test' }],
+        undefined,
+        'gpt-5-mini',
+        expect.any(Function),
+        'openai',
+        undefined,
+      );
+    });
+
+    it('requires an explicit model when user has no AI key', async () => {
+      mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+      mockGetAiKey.mockResolvedValue(null);
+
+      const request = createPostRequest({ message: 'Test' });
+      const response = await POST(request);
+      const body = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(body).toMatchObject({
+        error: 'AI model is required when no AI key is configured.',
+        code: 'ai_model_required',
+      });
+      expect(mockStreamDiscoveryResponse).not.toHaveBeenCalled();
     });
   });
 
