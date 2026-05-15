@@ -144,23 +144,6 @@ export const setDefaultTrackSchema = z.object({
   voiceTrackId: z.string().nullable(),
 });
 
-export const voiceForkBodySchema = z.object({
-  name: z.string().min(1).max(100),
-  ttsProvider: z.string().optional(),
-  ttsModel: z.string().optional(),
-  voices: z
-    .array(
-      z.object({
-        speaker: z.string(),
-        voiceId: z.string(),
-        provider: z.string().optional(),
-      })
-    )
-    .min(1),
-  paymentIntentIds: z.array(z.string()).optional(),
-  skipPaidVoices: z.boolean().optional(),
-});
-
 /**
  * Discovery chat message validation
  */
@@ -200,12 +183,14 @@ export const interactionSchema = z.object({
 /**
  * Podcast update validation
  */
-export const updatePodcastSchema = z.object({
-  title: z.string().min(1).max(200).optional(),
-  topic: z.string().min(1).max(5000).optional(),
-  visibility: z.enum(['PUBLIC', 'UNLISTED', 'PRIVATE']).optional(),
-  dismissSuggestion: z.boolean().optional(),
-});
+export const updatePodcastSchema = z
+  .object({
+    title: z.string().min(1).max(200).optional(),
+    topic: z.string().min(1).max(5000).optional(),
+    visibility: z.enum(['PUBLIC', 'UNLISTED', 'PRIVATE']).optional(),
+    dismissSuggestion: z.boolean().optional(),
+  })
+  .strict();
 
 /**
  * User profile update validation
@@ -337,19 +322,6 @@ export const twitterSettingsSchema = z.object({
   preferredTtsModel: z.string().nullable().optional(),
   preferredAiProvider: z.string().nullable().optional(),
   preferredAiModel: z.string().nullable().optional(),
-});
-
-/**
- * Listening queue validation
- */
-export const addToQueueSchema = z.object({
-  podcastId: z.string(),
-  source: z.enum(['picks', 'explore', 'following', 'search']).default('explore'),
-});
-
-export const reorderQueueSchema = z.object({
-  podcastId: z.string(),
-  newPosition: z.number().int().min(0),
 });
 
 /**
@@ -500,32 +472,10 @@ export const importPodcastSchema = z.object({
 });
 
 /**
- * Fork body validation (optional remix parameters)
- */
-export const forkBodySchema = z.object({
-  topic: z.string().min(1).max(5000).optional(),
-  remixNote: z.string().max(2000).optional(),
-  focusAreas: z.array(z.string()).max(10).optional(),
-  depth: z.enum(['eli5', 'quick_overview', 'standard', 'deep_dive']).optional(),
-  tone: z
-    .enum(['casual', 'professional', 'socratic', 'comedic', 'satirical', 'storytelling'])
-    .optional(),
-});
-
-/**
  * Resolve interaction validation (helpful feedback)
  */
 export const resolveInteractionSchema = z.object({
   helpful: z.boolean(),
-});
-
-/**
- * Comment creation validation
- */
-export const createCommentSchema = z.object({
-  content: z.string().min(1).max(2000),
-  parentId: z.string().optional(),
-  timestamp: z.number().min(0).optional(),
 });
 
 /**

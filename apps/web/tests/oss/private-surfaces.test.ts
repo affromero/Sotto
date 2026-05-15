@@ -663,6 +663,12 @@ describe('private-first OSS surfaces', () => {
     ]
       .map(readSource)
       .join('\n');
+    const userValidationSources = [
+      'src/lib/validations.ts',
+      'src/app/api/queue/route.ts',
+    ]
+      .map(readSource)
+      .join('\n');
 
     for (const route of removedUserSocialRoutes) {
       expect(existsSync(resolve(webRoot, route)), route).toBe(false);
@@ -671,6 +677,9 @@ describe('private-first OSS surfaces', () => {
       expect(existsSync(resolve(webRoot, component)), component).toBe(false);
     }
     expect(userApiSources).not.toContain('prisma.follow');
+    expect(userApiSources).not.toContain('prisma.like');
+    expect(userApiSources).not.toContain('prisma.comment');
+    expect(userApiSources).not.toContain('forkedFromId');
     expect(userApiSources).not.toContain('followerCount');
     expect(userApiSources).not.toContain('followingCount');
     expect(userApiSources).not.toContain('isFollowing');
@@ -678,6 +687,11 @@ describe('private-first OSS surfaces', () => {
     expect(userApiSources).not.toContain('NEW_FOLLOWER');
     expect(userApiSources).not.toContain('CreatorSuggestion');
     expect(userApiSources).not.toContain('RecommendationCard');
+    expect(userValidationSources).not.toContain('voiceForkBodySchema');
+    expect(userValidationSources).not.toContain('forkBodySchema');
+    expect(userValidationSources).not.toContain('remixNote');
+    expect(userValidationSources).not.toContain('createCommentSchema');
+    expect(userValidationSources).not.toContain("'following'");
   });
 
   it('does not ship public profile pages or creator RSS routes', () => {
