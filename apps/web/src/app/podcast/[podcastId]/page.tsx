@@ -28,9 +28,10 @@ export async function generateMetadata({ params }: PodcastPageProps): Promise<Me
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://sotto.fm';
   // Use vanity URL as canonical when slug + handle exist
-  const vanityPath = podcast.slug && podcast.user.handle
-    ? `/@${podcast.user.handle}/${podcast.slug}`
-    : `/podcast/${podcastId}`;
+  const vanityPath =
+    podcast.slug && podcast.user.handle
+      ? `/@${podcast.user.handle}/${podcast.slug}`
+      : `/podcast/${podcastId}`;
   const podcastUrl = `${appUrl}${vanityPath}`;
   const creatorName = podcast.user.name || 'Anonymous';
 
@@ -45,9 +46,9 @@ export async function generateMetadata({ params }: PodcastPageProps): Promise<Me
       siteName: 'Sotto',
       ...(() => {
         if (podcast.visibility !== 'PUBLIC') return {};
-        const readyTracks = podcast.voiceTracks.filter(t => t.status === 'READY');
+        const readyTracks = podcast.voiceTracks.filter((t) => t.status === 'READY');
         const defaultTrack = podcast.defaultVoiceTrackId
-          ? readyTracks.find(t => t.id === podcast.defaultVoiceTrackId)
+          ? readyTracks.find((t) => t.id === podcast.defaultVoiceTrackId)
           : null;
         const ogAudioUrl = defaultTrack?.audioUrl || podcast.audioUrl;
         return ogAudioUrl ? { audio: ogAudioUrl } : {};
@@ -72,10 +73,7 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
   const { podcastId } = await params;
 
   // Parallel: auth + cached podcast fetch (cache hit if generateMetadata already ran)
-  const [session, podcast] = await Promise.all([
-    auth(),
-    getPodcastForDetailPage(podcastId),
-  ]);
+  const [session, podcast] = await Promise.all([auth(), getPodcastForDetailPage(podcastId)]);
   const userId = session?.user?.id;
 
   if (!podcast) {
@@ -99,12 +97,12 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
   const isAdmin = session?.user?.role === 'ADMIN';
 
   // Compute voiceIds needed for clone lookup (pure computation, no DB)
-  const allVoiceIds = [...new Set(
-    podcast.voiceTracks.flatMap((t) => t.voices.map((v) => v.voiceId)).filter(Boolean)
-  )];
+  const allVoiceIds = [
+    ...new Set(podcast.voiceTracks.flatMap((t) => t.voices.map((v) => v.voiceId)).filter(Boolean)),
+  ];
 
   // All secondary queries in parallel
-  const [interactions, quizData, likeAndSave, clones, ownerData] = await Promise.all([
+  const [interactions, quizData, clones, ownerData] = await Promise.all([
     // Interactions (separate from cached query because it depends on userId)
     userId
       ? prisma.interaction.findMany({
@@ -128,18 +126,6 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
       select: { status: true, attemptCount: true, avgScore: true },
     }),
 
-    // Like + Save
-    userId
-      ? Promise.all([
-          prisma.like.findUnique({
-            where: { userId_podcastId: { userId, podcastId: podcast.id } },
-          }),
-          prisma.save.findUnique({
-            where: { userId_podcastId: { userId, podcastId: podcast.id } },
-          }),
-        ])
-      : Promise.resolve([null, null] as const),
-
     // Voice clone names
     allVoiceIds.length > 0
       ? prisma.voiceClone.findMany({
@@ -155,26 +141,51 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
           getVideoGenerationStatus(userId),
           getAvatarGenerationStatus(userId),
           getMusicGenerationStatus(userId),
-          podcast.status === 'READY' ? getPodcastCostBreakdown(podcastId) : Promise.resolve(undefined),
+          podcast.status === 'READY'
+            ? getPodcastCostBreakdown(podcastId)
+            : Promise.resolve(undefined),
         ])
       : Promise.resolve(null),
   ]);
 
   // Quiz
   const hasQuiz = quizData?.status === 'READY';
-  const quizStats = hasQuiz && quizData.attemptCount > 0
-    ? { attemptCount: quizData.attemptCount, avgScore: quizData.avgScore }
-    : undefined;
-
-  // Like/Save
-  const [like, save] = likeAndSave;
-  const isLiked = !!like;
-  const isSaved = !!save;
+  const quizStats =
+    hasQuiz && quizData.attemptCount > 0
+      ? { attemptCount: quizData.attemptCount, avgScore: quizData.avgScore }
+      : undefined;
 
   // Owner data
-  let videoStatus: { dailyUsed: number; dailyLimit: number; dailyRemaining: number; resetInSeconds?: number; isByokUser: boolean; isProUser: boolean } | undefined;
-  let avatarStatus: { dailyUsed: number; dailyLimit: number; dailyRemaining: number; resetInSeconds?: number; isByokUser: boolean; isProUser: boolean } | undefined;
-  let musicStatus: { dailyUsed: number; dailyLimit: number; dailyRemaining: number; resetInSeconds?: number; isByokUser: boolean; isProUser: boolean } | undefined;
+  let videoStatus:
+    | {
+        dailyUsed: number;
+        dailyLimit: number;
+        dailyRemaining: number;
+        resetInSeconds?: number;
+        isByokUser: boolean;
+        isProUser: boolean;
+      }
+    | undefined;
+  let avatarStatus:
+    | {
+        dailyUsed: number;
+        dailyLimit: number;
+        dailyRemaining: number;
+        resetInSeconds?: number;
+        isByokUser: boolean;
+        isProUser: boolean;
+      }
+    | undefined;
+  let musicStatus:
+    | {
+        dailyUsed: number;
+        dailyLimit: number;
+        dailyRemaining: number;
+        resetInSeconds?: number;
+        isByokUser: boolean;
+        isProUser: boolean;
+      }
+    | undefined;
   let costBreakdown: Awaited<ReturnType<typeof getPodcastCostBreakdown>> | undefined;
   let ownerIsPro = false;
   let ownerIsByok = false;
@@ -219,63 +230,70 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
   const providerSuffix = providerLabel
     ? `[${modelLabel ? `${providerLabel} - ${modelLabel}` : providerLabel}]`
     : '';
-  const originalTrackName = originalVoiceNames.length > 0
-    ? `${originalVoiceNames.join(' + ')} ${providerSuffix}`.trim()
-    : providerSuffix || 'Original';
+  const originalTrackName =
+    originalVoiceNames.length > 0
+      ? `${originalVoiceNames.join(' + ')} ${providerSuffix}`.trim()
+      : providerSuffix || 'Original';
 
   // Resolve audio URLs: presigned for PRIVATE/UNLISTED, public CDN for PUBLIC
-  const [resolvedAudioUrl, resolvedSegments, resolvedVersions, resolvedVoiceTracks, resolvedVideoUrl, resolvedMusicUrl] =
-    await Promise.all([
-      resolveAudioUrl(podcast.audioUrl, visibility),
-      Promise.all(
-        podcast.segments.map(async (s) => ({
-          ...s,
-          audioUrl: await resolveAudioUrl(s.audioUrl, visibility),
-          startTime: s.startTime,
-          duration: s.duration,
-          wordTimings: s.wordTimings as Array<{ word: string; start: number; end: number }> | null,
-        }))
-      ),
-      Promise.all(
-        podcast.versions.map(async (v) => ({
-          id: v.id,
-          version: v.version,
-          audioUrl: (await resolveAudioUrl(v.audioUrl, visibility)) ?? v.audioUrl,
-          duration: v.duration,
-          changeType: v.changeType,
-          changeSummary: v.changeSummary,
-          interactionId: v.interactionId,
-          createdAt: v.createdAt.toISOString(),
-        }))
-      ),
-      Promise.all(
-        (isOwner
-          ? podcast.voiceTracks
-          : podcast.voiceTracks.filter((t) =>
-              t.status === 'READY' &&
-              (t.proposalStatus === null || t.proposalStatus === 'ACCEPTED')
-            )
-        ).map(async (t) => ({
-          id: t.id,
-          name: t.name,
-          status: t.status,
-          audioUrl: await resolveAudioUrl(t.audioUrl, visibility),
-          duration: t.duration,
-          ttsProvider: t.ttsProvider,
-          ttsModel: t.ttsModel,
-          failureReason: t.failureReason,
-          voices: t.voices.map((v) => ({
-            ...v,
-            voiceName: voiceNameMap.get(v.voiceId) ?? null,
-          })),
-          contributor: t.contributor,
-          proposalStatus: t.proposalStatus,
-          proposalMessage: t.proposalMessage,
-        }))
-      ),
-      podcast.videoUrl ? resolveAudioUrl(podcast.videoUrl, visibility) : Promise.resolve(null),
-      podcast.musicUrl ? resolveAudioUrl(podcast.musicUrl, visibility) : Promise.resolve(null),
-    ]);
+  const [
+    resolvedAudioUrl,
+    resolvedSegments,
+    resolvedVersions,
+    resolvedVoiceTracks,
+    resolvedVideoUrl,
+    resolvedMusicUrl,
+  ] = await Promise.all([
+    resolveAudioUrl(podcast.audioUrl, visibility),
+    Promise.all(
+      podcast.segments.map(async (s) => ({
+        ...s,
+        audioUrl: await resolveAudioUrl(s.audioUrl, visibility),
+        startTime: s.startTime,
+        duration: s.duration,
+        wordTimings: s.wordTimings as Array<{ word: string; start: number; end: number }> | null,
+      }))
+    ),
+    Promise.all(
+      podcast.versions.map(async (v) => ({
+        id: v.id,
+        version: v.version,
+        audioUrl: (await resolveAudioUrl(v.audioUrl, visibility)) ?? v.audioUrl,
+        duration: v.duration,
+        changeType: v.changeType,
+        changeSummary: v.changeSummary,
+        interactionId: v.interactionId,
+        createdAt: v.createdAt.toISOString(),
+      }))
+    ),
+    Promise.all(
+      (isOwner
+        ? podcast.voiceTracks
+        : podcast.voiceTracks.filter(
+            (t) =>
+              t.status === 'READY' && (t.proposalStatus === null || t.proposalStatus === 'ACCEPTED')
+          )
+      ).map(async (t) => ({
+        id: t.id,
+        name: t.name,
+        status: t.status,
+        audioUrl: await resolveAudioUrl(t.audioUrl, visibility),
+        duration: t.duration,
+        ttsProvider: t.ttsProvider,
+        ttsModel: t.ttsModel,
+        failureReason: t.failureReason,
+        voices: t.voices.map((v) => ({
+          ...v,
+          voiceName: voiceNameMap.get(v.voiceId) ?? null,
+        })),
+        contributor: t.contributor,
+        proposalStatus: t.proposalStatus,
+        proposalMessage: t.proposalMessage,
+      }))
+    ),
+    podcast.videoUrl ? resolveAudioUrl(podcast.videoUrl, visibility) : Promise.resolve(null),
+    podcast.musicUrl ? resolveAudioUrl(podcast.musicUrl, visibility) : Promise.resolve(null),
+  ]);
 
   const podcastData = {
     id: podcast.id,
@@ -345,14 +363,12 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
     voiceTracks: resolvedVoiceTracks,
     defaultVoiceTrackId: podcast.defaultVoiceTrackId,
     originalTrackName,
-    isLiked,
-    isSaved,
+    isLiked: false,
+    isSaved: false,
   };
 
   const showJsonLd =
-    podcast.visibility === 'PUBLIC' &&
-    podcast.status === 'READY' &&
-    resolvedAudioUrl;
+    podcast.visibility === 'PUBLIC' && podcast.status === 'READY' && resolvedAudioUrl;
 
   return (
     <main className={styles.main}>
@@ -369,7 +385,17 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
         />
       )}
       <div className={styles.container}>
-        <PodcastPlayerView podcast={podcastData} isOwner={isOwner} isAdmin={isAdmin} isAuthenticated={!!userId} currentUserId={userId} videoStatus={videoStatus} avatarStatus={avatarStatus} musicStatus={musicStatus} hasQuiz={hasQuiz} quizStats={quizStats} />
+        <PodcastPlayerView
+          podcast={podcastData}
+          isOwner={isOwner}
+          isAdmin={isAdmin}
+          isAuthenticated={!!userId}
+          videoStatus={videoStatus}
+          avatarStatus={avatarStatus}
+          musicStatus={musicStatus}
+          hasQuiz={hasQuiz}
+          quizStats={quizStats}
+        />
         {costBreakdown && costBreakdown.total > 0 && (
           <CostBreakdown breakdown={costBreakdown} isPro={ownerIsPro} isByok={ownerIsByok} />
         )}

@@ -102,4 +102,43 @@ describe('private-first OSS surfaces', () => {
     expect(existsSync(resolve(repoRoot, 'packages/shared/src/types/feed.ts'))).toBe(false);
     expect(existsSync(resolve(webRoot, 'src/types/feed.ts'))).toBe(false);
   });
+
+  it('does not ship podcast social action routes or player widgets', () => {
+    const removedRoutes = [
+      'src/app/api/podcasts/[podcastId]/fork/route.ts',
+      'src/app/api/podcasts/[podcastId]/fork-voice/route.ts',
+      'src/app/api/podcasts/[podcastId]/like/route.ts',
+      'src/app/api/podcasts/[podcastId]/comments/route.ts',
+      'src/app/api/podcasts/[podcastId]/comments/[commentId]/route.ts',
+      'src/app/api/podcasts/[podcastId]/comments/[commentId]/replies/route.ts',
+      'src/app/api/podcasts/[podcastId]/lineage/route.ts',
+      'src/app/api/podcasts/[podcastId]/voice-tracks/[trackId]/propose/route.ts',
+      'src/app/api/users/[userId]/liked/route.ts',
+    ];
+    const removedComponents = [
+      'src/components/player/ForkRemixModal.tsx',
+      'src/components/player/VoiceRenditionForkModal.tsx',
+      'src/components/player/ForkLineage.tsx',
+      'src/components/player/ForkGraph.tsx',
+      'src/components/player/ForkAttribution.tsx',
+      'src/components/player/CommunityQuestions.tsx',
+      'src/components/player/CommentSection.tsx',
+      'src/components/player/CommentCard.tsx',
+      'src/components/player/CommentCompose.tsx',
+      'src/components/player/ShareMenu.tsx',
+      'src/components/player/ProposeRenditionButton.tsx',
+    ];
+    const playerSource = readSource('src/app/podcast/[podcastId]/PodcastPlayerView.tsx');
+
+    for (const route of removedRoutes) {
+      expect(existsSync(resolve(webRoot, route)), route).toBe(false);
+    }
+    for (const component of removedComponents) {
+      expect(existsSync(resolve(webRoot, component)), component).toBe(false);
+    }
+    expect(playerSource).not.toContain('/like');
+    expect(playerSource).not.toContain('/fork');
+    expect(playerSource).not.toContain('/comments');
+    expect(playerSource).not.toContain('ShareMenu');
+  });
 });
