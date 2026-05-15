@@ -628,7 +628,7 @@ describe('private-first OSS surfaces', () => {
     expect(collectionSources).not.toContain('isFollowing');
   });
 
-  it('does not ship user follow or discovery API contracts', () => {
+  it('does not ship user follow or discovery social contracts', () => {
     const removedUserSocialRoutes = [
       'src/app/api/users/[userId]/follow/route.ts',
       'src/app/api/users/[userId]/followers/route.ts',
@@ -636,12 +636,19 @@ describe('private-first OSS surfaces', () => {
       'src/app/api/users/discover/route.ts',
       'src/app/api/users/suggested/route.ts',
     ];
+    const removedDiscoverySocialComponents = [
+      'src/components/discovery/CreatorSuggestion.tsx',
+      'src/components/discovery/CreatorSuggestion.module.css',
+      'src/components/discovery/RecommendationCard.tsx',
+      'src/components/discovery/RecommendationCard.module.css',
+    ];
     const userApiSources = [
       'src/app/api/users/[userId]/route.ts',
       'src/app/api/users/me/route.ts',
       'src/app/api/users/me/export/route.ts',
       'src/lib/notification-utils.ts',
       'src/components/notifications/NotificationList.tsx',
+      'src/components/CLAUDE.md',
     ]
       .map(readSource)
       .join('\n');
@@ -649,12 +656,17 @@ describe('private-first OSS surfaces', () => {
     for (const route of removedUserSocialRoutes) {
       expect(existsSync(resolve(webRoot, route)), route).toBe(false);
     }
+    for (const component of removedDiscoverySocialComponents) {
+      expect(existsSync(resolve(webRoot, component)), component).toBe(false);
+    }
     expect(userApiSources).not.toContain('prisma.follow');
     expect(userApiSources).not.toContain('followerCount');
     expect(userApiSources).not.toContain('followingCount');
     expect(userApiSources).not.toContain('isFollowing');
     expect(userApiSources).not.toContain('socialGraph');
     expect(userApiSources).not.toContain('NEW_FOLLOWER');
+    expect(userApiSources).not.toContain('CreatorSuggestion');
+    expect(userApiSources).not.toContain('RecommendationCard');
   });
 
   it('does not ship public profile pages or creator RSS routes', () => {
