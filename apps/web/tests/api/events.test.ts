@@ -98,6 +98,52 @@ describe('POST /api/events', () => {
     expect(res.status).toBe(400);
   });
 
+  it('accepts private library analytics events', async () => {
+    const res = await POST(
+      createRequest(
+        validBatch([
+          validEvent({
+            payload: {
+              eventType: 'library.search',
+              query: 'agent briefings',
+              resultCount: 4,
+              filters: { source: 'saved' },
+            },
+          }),
+        ])
+      )
+    );
+
+    expect(res.status).toBe(202);
+    const payload = mockAddJob.mock.calls[0][2];
+    expect(payload.events[0].payload.eventType).toBe('library.search');
+  });
+
+  it.each(['feed.search', 'feed.click', 'social.like', 'social.follow', 'social.fork'])(
+    'rejects legacy public event type %s',
+    async (eventType) => {
+      const res = await POST(
+        createRequest(
+          validBatch([
+            validEvent({
+              payload: {
+                eventType,
+                podcastId: 'pod-1',
+                query: 'legacy',
+                resultCount: 1,
+                position: 0,
+                targetUserId: 'user-2',
+                dwellTimeMs: 1,
+              },
+            }),
+          ])
+        )
+      );
+
+      expect(res.status).toBe(400);
+    }
+  );
+
   // ── Anonymous events ──────────────────────────────────────────────
 
   it('accepts anonymous events (no auth) and returns 202', async () => {

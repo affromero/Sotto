@@ -133,7 +133,7 @@ export function DailyPicks({ initialPicks, initialCategories, initialMessage }: 
                   <PodcastCard
                     podcast={pickToPodcastSummary(pick)}
                     position={idx}
-                    feedSort="picks"
+                    surface="picks"
                   />
                   <p className={styles.explanation}>{pick.explanation}</p>
                 </div>

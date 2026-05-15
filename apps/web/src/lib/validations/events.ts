@@ -89,27 +89,27 @@ const playbackAbandonSchema = z.object({
   sessionDuration: z.number().min(0),
 });
 
-// ============ FEED PAYLOADS ============
+// ============ PRIVATE LIBRARY PAYLOADS ============
 
-const feedImpressionSchema = z.object({
-  eventType: z.literal('feed.impression'),
+const libraryImpressionSchema = z.object({
+  eventType: z.literal('library.impression'),
   podcastId: z.string(),
   position: z.number().int().min(0),
-  feedSort: z.string().optional(),
+  surface: z.string().optional(),
   searchQuery: z.string().optional(),
 });
 
-const feedClickSchema = z.object({
-  eventType: z.literal('feed.click'),
+const libraryClickSchema = z.object({
+  eventType: z.literal('library.click'),
   podcastId: z.string(),
   position: z.number().int().min(0),
-  feedSort: z.string().optional(),
+  surface: z.string().optional(),
   searchQuery: z.string().optional(),
   dwellTimeMs: z.number().min(0),
 });
 
-const feedSearchSchema = z.object({
-  eventType: z.literal('feed.search'),
+const librarySearchSchema = z.object({
+  eventType: z.literal('library.search'),
   query: z.string().max(500),
   resultCount: z.number().int().min(0),
   filters: z.record(z.string()).optional(),
@@ -148,28 +148,6 @@ const discoveryMetadataCompleteSchema = z.object({
   durationTarget: z.number().min(0),
 });
 
-// ============ SOCIAL PAYLOADS ============
-
-const socialLikeSchema = z.object({ eventType: z.literal('social.like'), podcastId: z.string() });
-const socialUnlikeSchema = z.object({
-  eventType: z.literal('social.unlike'),
-  podcastId: z.string(),
-});
-const socialSaveSchema = z.object({ eventType: z.literal('social.save'), podcastId: z.string() });
-const socialUnsaveSchema = z.object({
-  eventType: z.literal('social.unsave'),
-  podcastId: z.string(),
-});
-const socialFollowSchema = z.object({
-  eventType: z.literal('social.follow'),
-  targetUserId: z.string(),
-});
-const socialUnfollowSchema = z.object({
-  eventType: z.literal('social.unfollow'),
-  targetUserId: z.string(),
-});
-const socialForkSchema = z.object({ eventType: z.literal('social.fork'), podcastId: z.string() });
-
 // ============ NAVIGATION PAYLOADS ============
 
 const pageViewSchema = z.object({
@@ -198,20 +176,13 @@ export const eventPayloadSchema = z.discriminatedUnion('eventType', [
   playbackCompleteSchema,
   playbackSegmentTransitionSchema,
   playbackAbandonSchema,
-  feedImpressionSchema,
-  feedClickSchema,
-  feedSearchSchema,
+  libraryImpressionSchema,
+  libraryClickSchema,
+  librarySearchSchema,
   discoveryChipClickSchema,
   discoveryChipDismissSchema,
   discoveryMessageSentSchema,
   discoveryMetadataCompleteSchema,
-  socialLikeSchema,
-  socialUnlikeSchema,
-  socialSaveSchema,
-  socialUnsaveSchema,
-  socialFollowSchema,
-  socialUnfollowSchema,
-  socialForkSchema,
   pageViewSchema,
   interactionAskSchema,
 ]);

@@ -6,7 +6,7 @@ import { useTrack } from '@/components/providers/EventProvider';
 interface ImpressionEntry {
   podcastId: string;
   position: number;
-  feedSort?: string;
+  surface?: string;
   searchQuery?: string;
 }
 
@@ -15,7 +15,7 @@ const DWELL_TIME_MS = 1000;
 
 /**
  * IntersectionObserver-based impression tracker.
- * Fires feed.impression when a card is 50% visible for 1+ second.
+ * Fires library.impression when a card is 50% visible for 1+ second.
  * Deduplicates per podcast per session.
  */
 export function useImpressionTracker() {
@@ -44,10 +44,10 @@ export function useImpressionTracker() {
 
               const meta = metadataRef.current.get(podcastId);
               track({
-                eventType: 'feed.impression',
+                eventType: 'library.impression',
                 podcastId,
                 position: meta?.position ?? 0,
-                feedSort: meta?.feedSort,
+                surface: meta?.surface,
                 searchQuery: meta?.searchQuery,
               });
             }, DWELL_TIME_MS);
@@ -79,13 +79,13 @@ export function useImpressionTracker() {
       element: HTMLElement | null,
       podcastId: string,
       position: number,
-      feedSort?: string,
+      surface?: string,
       searchQuery?: string
     ) => {
       if (!element || !observerRef.current) return;
 
       element.dataset.podcastId = podcastId;
-      metadataRef.current.set(podcastId, { podcastId, position, feedSort, searchQuery });
+      metadataRef.current.set(podcastId, { podcastId, position, surface, searchQuery });
       observerRef.current.observe(element);
     },
     []
