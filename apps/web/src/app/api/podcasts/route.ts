@@ -341,15 +341,5 @@ export async function POST(request: NextRequest) {
   const jobPriority = getJobPriority(gate.isProUser ? 'PRO' : 'FREE', gate.isByokUser);
   await addJob(contentExtractionQueue, JobType.EXTRACT_CONTENT, payload, { priority: jobPriority });
 
-  // Fire-and-forget activity record
-  prisma.activity.create({
-    data: {
-      userId: authResult.userId,
-      type: 'PODCAST_CREATED',
-      targetId: podcast.id,
-      targetType: 'podcast',
-    },
-  }).catch(() => {});
-
   return NextResponse.json({ id: podcast.id, status: podcast.status }, { status: 201 });
 }
