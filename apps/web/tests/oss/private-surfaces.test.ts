@@ -666,6 +666,7 @@ describe('private-first OSS surfaces', () => {
       'src/app/api/users/[userId]/follow/route.ts',
       'src/app/api/users/[userId]/followers/route.ts',
       'src/app/api/users/[userId]/following/route.ts',
+      'src/app/api/users/[userId]/activity/route.ts',
       'src/app/api/users/discover/route.ts',
       'src/app/api/users/suggested/route.ts',
     ];
@@ -691,6 +692,12 @@ describe('private-first OSS surfaces', () => {
     ]
       .map(readSource)
       .join('\n');
+    const activityWriteSources = [
+      'src/app/api/podcasts/route.ts',
+      'src/app/api/collections/route.ts',
+    ]
+      .map(readSource)
+      .join('\n');
 
     for (const route of removedUserSocialRoutes) {
       expect(existsSync(resolve(webRoot, route)), route).toBe(false);
@@ -706,6 +713,10 @@ describe('private-first OSS surfaces', () => {
     expect(userApiSources).not.toContain('followingCount');
     expect(userApiSources).not.toContain('isFollowing');
     expect(userApiSources).not.toContain('socialGraph');
+    expect(userApiSources).not.toContain('prisma.activity');
+    expect(activityWriteSources).not.toContain('prisma.activity');
+    expect(activityWriteSources).not.toContain('PODCAST_CREATED');
+    expect(activityWriteSources).not.toContain('COLLECTION_CREATED');
     expect(userApiSources).not.toContain('NEW_FOLLOWER');
     expect(userApiSources).not.toContain('CreatorSuggestion');
     expect(userApiSources).not.toContain('RecommendationCard');
