@@ -100,8 +100,6 @@ export default async function HandleProfilePage({ params }: HandleProfilePagePro
           podcasts: {
             where: { status: 'READY', visibility: 'PUBLIC', deletedAt: null },
           },
-          followers: true,
-          following: true,
         },
       },
     },
@@ -109,19 +107,6 @@ export default async function HandleProfilePage({ params }: HandleProfilePagePro
 
   if (!user) {
     notFound();
-  }
-
-  let isFollowing = false;
-  if (currentUserId && currentUserId !== user.id) {
-    const follow = await prisma.follow.findUnique({
-      where: {
-        followerId_followingId: {
-          followerId: currentUserId,
-          followingId: user.id,
-        },
-      },
-    });
-    isFollowing = !!follow;
   }
 
   const isOwnProfile = currentUserId === user.id;
@@ -164,13 +149,9 @@ export default async function HandleProfilePage({ params }: HandleProfilePagePro
           user={profileData}
           podcasts={podcastList}
           podcastCount={user._count.podcasts}
-          followerCount={user._count.followers}
-          followingCount={user._count.following}
           isOwnProfile={isOwnProfile}
-          initialIsFollowing={isFollowing}
           isAuthenticated={!!currentUserId}
           isEarlyAccess={isEarlyAccess}
-          currentUserId={currentUserId}
         />
       </div>
     </main>

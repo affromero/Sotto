@@ -17,7 +17,6 @@ export default async function OgImage({ params }: { params: Promise<{ handle: st
       _count: {
         select: {
           podcasts: { where: { status: 'READY', visibility: 'PUBLIC', deletedAt: null } },
-          followers: true,
         },
       },
     },
@@ -129,10 +128,6 @@ export default async function OgImage({ params }: { params: Promise<{ handle: st
       >
         <span style={{ fontSize: 24, color: '#6B7280' }}>
           {user._count.podcasts} podcast{user._count.podcasts !== 1 ? 's' : ''}
-        </span>
-        <span style={{ fontSize: 24, color: '#D1D5DB' }}>|</span>
-        <span style={{ fontSize: 24, color: '#6B7280' }}>
-          {user._count.followers} follower{user._count.followers !== 1 ? 's' : ''}
         </span>
       </div>
     </div>,

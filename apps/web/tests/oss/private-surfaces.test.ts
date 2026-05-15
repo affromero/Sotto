@@ -270,4 +270,45 @@ describe('private-first OSS surfaces', () => {
     expect(userApiSources).not.toContain('socialGraph');
     expect(userApiSources).not.toContain('NEW_FOLLOWER');
   });
+
+  it('does not ship profile follow UI or follower counts', () => {
+    const removedProfileComponents = [
+      'src/components/profile/FollowButton.tsx',
+      'src/components/profile/FollowButton.module.css',
+      'src/components/profile/FollowerCount.tsx',
+      'src/components/profile/FollowerCount.module.css',
+      'src/components/profile/FollowListModal.tsx',
+      'src/components/profile/FollowListModal.module.css',
+      'src/components/profile/UserCard.tsx',
+      'src/components/profile/UserCard.module.css',
+    ];
+    const profileSources = [
+      'src/app/profile/[userId]/ProfileClient.tsx',
+      'src/components/profile/ProfileHeader.tsx',
+      'src/components/profile/PodcastList.tsx',
+      'src/app/profile/[userId]/page.tsx',
+      'src/app/profile/handle/[handle]/page.tsx',
+      'src/app/profile/[userId]/opengraph-image.tsx',
+      'src/app/profile/handle/[handle]/opengraph-image.tsx',
+      'src/components/CLAUDE.md',
+    ]
+      .map(readSource)
+      .join('\n');
+
+    for (const component of removedProfileComponents) {
+      expect(existsSync(resolve(webRoot, component)), component).toBe(false);
+    }
+    expect(profileSources).not.toContain('/follow');
+    expect(profileSources).not.toContain('followerCount');
+    expect(profileSources).not.toContain('followingCount');
+    expect(profileSources).not.toContain('isFollowing');
+    expect(profileSources).not.toContain('FollowButton');
+    expect(profileSources).not.toContain('FollowerCount');
+    expect(profileSources).not.toContain('FollowListModal');
+    expect(profileSources).not.toContain('UserCard');
+    expect(profileSources).not.toContain('liked');
+    expect(profileSources).not.toContain('remixes');
+    expect(profileSources).not.toContain('followers: true');
+    expect(profileSources).not.toContain('following: true');
+  });
 });

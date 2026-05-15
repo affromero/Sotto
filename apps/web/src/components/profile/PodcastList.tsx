@@ -101,9 +101,7 @@ export function PodcastList({
               )}
             </div>
             <div className={styles.meta}>
-              <span className={styles.duration}>
-                {formatDuration(podcast.duration)}
-              </span>
+              <span className={styles.duration}>{formatDuration(podcast.duration)}</span>
               {user?.id === podcast.user.id && (
                 <>
                   <span className={styles.separator} aria-hidden="true">
@@ -112,22 +110,6 @@ export function PodcastList({
                   <span className={styles.stat} title="Plays">
                     {formatStat(podcast.playCount)} plays
                   </span>
-                  <span className={styles.separator} aria-hidden="true">
-                    ·
-                  </span>
-                  <span className={styles.stat} title="Likes">
-                    {formatStat(podcast.likeCount)} likes
-                  </span>
-                  {podcast.forkCount > 0 && (
-                    <>
-                      <span className={styles.separator} aria-hidden="true">
-                        ·
-                      </span>
-                      <span className={styles.stat} title="Forks">
-                        {formatStat(podcast.forkCount)} forks
-                      </span>
-                    </>
-                  )}
                 </>
               )}
               <span className={styles.separator} aria-hidden="true">

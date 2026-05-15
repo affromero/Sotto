@@ -173,6 +173,11 @@
   margin-bottom: var(--spacing-ms);
 }
 
+.statText {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+}
+
 @media (min-width: 768px) {
   .stats {
     justify-content: flex-start;
