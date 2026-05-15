@@ -32,14 +32,13 @@ describe('findSimilarPodcasts', () => {
     vi.clearAllMocks();
   });
 
-  it('returns podcasts ranked by playCount and likeCount', async () => {
+  it('returns podcasts ranked by plays and private save signal', async () => {
     const mockPodcasts = [
       {
         id: 'p1',
         title: 'Quantum Computing 101',
         topic: 'quantum physics',
         playCount: 150,
-        likeCount: 30,
         duration: 600,
         user: { id: 'u1', name: 'Alice', image: null },
       },
@@ -48,16 +47,20 @@ describe('findSimilarPodcasts', () => {
         title: 'Introduction to Quantum',
         topic: 'quantum computing',
         playCount: 120,
-        likeCount: 25,
         duration: 450,
         user: { id: 'u2', name: 'Bob', image: 'avatar.jpg' },
       },
     ];
 
-    vi.mocked(prisma.podcast.findMany).mockResolvedValue(mockPodcasts as any);
+    vi.mocked(prisma.podcast.findMany).mockResolvedValue(mockPodcasts as never);
 
     const result = await findSimilarPodcasts({ topic: 'quantum' });
 
+    expect(prisma.podcast.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderBy: [{ playCount: 'desc' }, { saveCount: 'desc' }, { createdAt: 'desc' }],
+      })
+    );
     expect(result).toEqual(mockPodcasts);
   });
 
@@ -68,7 +71,6 @@ describe('findSimilarPodcasts', () => {
         title: 'Quantum 101',
         topic: 'quantum',
         playCount: 50,
-        likeCount: 10,
         duration: 300,
         user: { id: 'u1', name: 'Alice', image: null },
       },
@@ -77,13 +79,12 @@ describe('findSimilarPodcasts', () => {
         title: 'Quantum 102',
         topic: 'quantum',
         playCount: 40,
-        likeCount: 8,
         duration: 350,
         user: { id: 'u1', name: 'Alice', image: null },
       },
     ];
 
-    vi.mocked(prisma.podcast.findMany).mockResolvedValue(mockPodcasts as any);
+    vi.mocked(prisma.podcast.findMany).mockResolvedValue(mockPodcasts as never);
 
     const result = await findSimilarPodcasts({ topic: 'quantum' });
 
@@ -125,13 +126,12 @@ describe('findSimilarPodcasts', () => {
         title: 'Test Podcast',
         topic: 'testing',
         playCount: 50,
-        likeCount: 5,
         duration: 300,
         user: { id: 'u1', name: 'Test User', image: 'avatar.jpg' },
       },
     ];
 
-    vi.mocked(prisma.podcast.findMany).mockResolvedValue(mockPodcasts as any);
+    vi.mocked(prisma.podcast.findMany).mockResolvedValue(mockPodcasts as never);
 
     const result = await findSimilarPodcasts({ topic: 'testing' });
 

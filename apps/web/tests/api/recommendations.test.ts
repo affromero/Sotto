@@ -52,7 +52,6 @@ const mockRecommendation1 = {
   title: 'Quantum Mechanics Deep Dive',
   topic: 'Advanced quantum physics concepts',
   playCount: 150,
-  likeCount: 30,
   duration: 720,
   user: { id: 'user-2', name: 'Bob', image: 'https://example.com/bob.jpg' },
 };
@@ -62,7 +61,6 @@ const mockRecommendation2 = {
   title: 'Introduction to Quantum Computing',
   topic: 'Quantum computing basics',
   playCount: 90,
-  likeCount: 18,
   duration: 600,
   user: { id: 'user-3', name: 'Charlie', image: null },
 };
@@ -72,7 +70,6 @@ const mockRecommendation3 = {
   title: 'Quantum Theory Explained',
   topic: 'Understanding quantum mechanics',
   playCount: 200,
-  likeCount: 45,
   duration: 900,
   user: { id: 'user-4', name: 'Diana', image: 'https://example.com/diana.jpg' },
 };
@@ -168,5 +165,4 @@ describe('GET /api/recommendations', () => {
     expect(body[1].id).toBe('pod-rec-1');
     expect(body[2].id).toBe('pod-rec-2');
   });
-
 });

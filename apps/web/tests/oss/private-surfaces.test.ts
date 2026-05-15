@@ -346,6 +346,19 @@ describe('private-first OSS surfaces', () => {
     expect(creatorAnalyticsSources).not.toContain("label: 'Follows'");
   });
 
+  it('keeps similar-podcast recommendations free of social ranking payloads', () => {
+    const recommendationSources = [
+      'src/lib/recommendations.ts',
+      'src/app/api/recommendations/route.ts',
+    ]
+      .map(readSource)
+      .join('\n');
+
+    expect(recommendationSources).toContain("saveCount: 'desc'");
+    expect(recommendationSources).not.toContain('likeCount');
+    expect(recommendationSources).not.toContain('forkCount');
+  });
+
   it('does not ship mobile podcast social actions or widgets', () => {
     const removedMobileComponents = [
       'apps/mobile/components/ForkModal.tsx',
