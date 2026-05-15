@@ -151,6 +151,24 @@ describe('processQuizGeneration AI routing', () => {
     });
   });
 
+  it('fails the quiz when an explicit model has no matching provider key', async () => {
+    mockGetAiKey.mockResolvedValue(null);
+
+    await processQuizGeneration(createJob());
+
+    expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
+      podcastAiModel: 'gpt-5-mini',
+      aiKey: null,
+      plan: 'FREE',
+    });
+    expect(mockGetAiKey).toHaveBeenCalledWith('user-1', 'openai');
+    expect(mockCreateAIProvider).not.toHaveBeenCalled();
+    expect(mockPodcastQuizUpdate).toHaveBeenCalledWith({
+      where: { id: 'quiz-1' },
+      data: { status: 'FAILED' },
+    });
+  });
+
   it('uses the configured BYOK provider when the podcast has no model', async () => {
     const aiKey = { apiKey: 'anthropic-key', provider: 'anthropic' };
     mockPodcastFindUniqueOrThrow.mockResolvedValue({

@@ -219,6 +219,17 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return errorResponse('Podcast is no longer in a startable state', 409);
   }
 
+  if (useAdminCredits || !gate.isByokUser) {
+    // Persist the concrete platform model before the extraction job can run.
+    const selected = await selectFreeTierProviders(
+      useAdminCredits ? podcast.userId : authResult.userId
+    );
+    await prisma.podcast.update({
+      where: { id: podcastId },
+      data: { aiModel: selected.aiModel },
+    });
+  }
+
   const payload: ExtractContentPayload = {
     podcastId,
     userId: authResult.userId,
@@ -230,17 +241,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   await addJob(contentExtractionQueue, JobType.EXTRACT_CONTENT, payload, {
     jobId: `extract-${podcastId}`,
   });
-
-  if (useAdminCredits || !gate.isByokUser) {
-    // Auto-resolve providers — quota consumed on success by workers
-    const selected = await selectFreeTierProviders(
-      useAdminCredits ? podcast.userId : authResult.userId
-    );
-    await prisma.podcast.update({
-      where: { id: podcastId },
-      data: { aiModel: selected.aiModel },
-    });
-  }
 
   return NextResponse.json({ success: true, message: 'Generation started' });
 }

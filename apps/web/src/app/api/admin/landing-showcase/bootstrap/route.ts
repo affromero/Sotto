@@ -7,6 +7,7 @@ import { contentExtractionQueue, addJob, JobType } from '@/lib/queue';
 import type { ExtractContentPayload } from '@/lib/queue';
 import { setLandingShowcaseConfig } from '@/lib/landing-showcase';
 import { errorResponse } from '@/lib/api-response';
+import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
 
 const SHOWCASE_TOPIC = `CRISPR gene editing — how it works, real-world applications, and what it means for the future of medicine. Cover the molecular mechanism (Cas9 as molecular scissors), current clinical trials, ethical considerations, and recent breakthroughs in treating genetic diseases.`;
 
@@ -37,6 +38,7 @@ export async function POST() {
 
   const title = 'CRISPR Gene Editing Explained';
   const slug = await generatePodcastSlug(title, sottoUser.id, prisma);
+  const selectedProviders = await selectFreeTierProviders(sottoUser.id);
 
   const podcast = await prisma.podcast.create({
     data: {
@@ -48,6 +50,7 @@ export async function POST() {
       visibility: 'PUBLIC',
       source: 'ADMIN',
       verificationMode: 'showcase',
+      aiModel: selectedProviders.aiModel,
     },
   });
 

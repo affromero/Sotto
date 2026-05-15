@@ -5,6 +5,7 @@ import { generatePodcastSlug } from '@/lib/slugify';
 import { errorResponse } from '@/lib/api-response';
 import { contentExtractionQueue, addJob, JobType } from '@/lib/queue';
 import type { ExtractContentPayload } from '@/lib/queue';
+import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
 
 export async function POST(request: NextRequest) {
   const adminId = await requireAdmin();
@@ -32,6 +33,9 @@ export async function POST(request: NextRequest) {
   // Create podcast owned by @sotto
   const slug = await generatePodcastSlug(title, sottoUser.id, prisma);
   const hasMetadata = metadata && typeof metadata === 'object';
+  const selectedProviders = hasMetadata && !aiModel
+    ? await selectFreeTierProviders(sottoUser.id)
+    : null;
 
   const podcast = await prisma.podcast.create({
     data: {
@@ -44,7 +48,7 @@ export async function POST(request: NextRequest) {
       source: 'WEB',
       ...(ttsProvider ? { ttsProvider } : {}),
       ...(ttsModel ? { ttsModel } : {}),
-      ...(aiModel ? { aiModel } : {}),
+      aiModel: aiModel ?? selectedProviders?.aiModel ?? null,
     },
   });
 

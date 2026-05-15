@@ -86,6 +86,9 @@ export async function processQuizGeneration(job: Job<GenerateQuizPayload>): Prom
       podcast.aiModel && provider !== 'claude-code'
         ? await getAiKey(podcast.userId, provider as AiProviderId)
         : initialAiKey;
+    if (podcast.aiModel && provider !== 'claude-code' && !providerAiKey) {
+      throw new Error(`AI key for provider "${provider}" is required for quiz generation.`);
+    }
 
     // Fetch vocabulary entries for language learning podcasts
     const vocabularyEntries = await prisma.vocabularyEntry.findMany({
