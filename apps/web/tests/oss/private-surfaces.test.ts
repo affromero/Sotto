@@ -395,6 +395,17 @@ describe('private-first OSS surfaces', () => {
     expect(recommendationSources).not.toContain('forkCount');
   });
 
+  it('keeps daily picks and trending free of social ranking payloads', () => {
+    const recommendationEngineSource = readSource('src/lib/recommendation-engine.ts');
+
+    expect(recommendationEngineSource).toContain("saveCount: 'desc'");
+    expect(recommendationEngineSource).toContain('Listen velocity');
+    expect(recommendationEngineSource).not.toContain('likeCount');
+    expect(recommendationEngineSource).not.toContain('forkCount');
+    expect(recommendationEngineSource).not.toContain('forkedFromId');
+    expect(recommendationEngineSource).not.toContain("likeCount: 'desc'");
+  });
+
   it('keeps recommendation training exports free of social labels', () => {
     const trainingExportSources = [
       'src/workers/data-export.worker.ts',

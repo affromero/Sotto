@@ -29,8 +29,6 @@ export interface RecommendedPodcast {
   duration: number | null;
   audioUrl: string | null;
   playCount: number;
-  likeCount: number;
-  forkCount: number;
   lowReferences?: boolean;
   createdAt: string;
   user: {
@@ -116,8 +114,6 @@ export async function getDailyPicks(
       duration: true,
       audioUrl: true,
       playCount: true,
-      likeCount: true,
-      forkCount: true,
       lowReferences: true,
       createdAt: true,
       userId: true,
@@ -206,8 +202,6 @@ export async function getDailyPicks(
         duration: candidate?.duration ?? null,
         audioUrl: candidate?.audioUrl ?? null,
         playCount: candidate?.playCount ?? 0,
-        likeCount: candidate?.likeCount ?? 0,
-        forkCount: candidate?.forkCount ?? 0,
         createdAt: candidate?.createdAt.toISOString() ?? '',
         user: candidate?.user ?? { id: '', name: null, image: null },
         tags: candidate?.tags.map((pt) => pt.tag) ?? [],
@@ -295,14 +289,12 @@ export async function searchPodcasts(
       duration: true,
       audioUrl: true,
       playCount: true,
-      likeCount: true,
-      forkCount: true,
       lowReferences: true,
       createdAt: true,
       user: { select: { id: true, name: true, image: true, handle: true, role: true, plan: true } },
       tags: { include: { tag: { select: { id: true, name: true, slug: true } } } },
     },
-    orderBy: [{ playCount: 'desc' }, { likeCount: 'desc' }],
+    orderBy: [{ playCount: 'desc' }, { saveCount: 'desc' }, { createdAt: 'desc' }],
     take: EXPLORE_MAX,
   });
 
@@ -322,8 +314,6 @@ export async function searchPodcasts(
           duration: p.duration,
           audioUrl: p.audioUrl,
           playCount: p.playCount,
-          likeCount: p.likeCount,
-          forkCount: p.forkCount,
           createdAt: p.createdAt.toISOString(),
           user: safeUser as RecommendedPodcast['user'],
           tags: p.tags.map((pt) => pt.tag),
@@ -350,8 +340,6 @@ export async function searchPodcasts(
       duration: p.duration,
       audioUrl: p.audioUrl,
       playCount: p.playCount,
-      likeCount: p.likeCount,
-      forkCount: p.forkCount,
       createdAt: p.createdAt.toISOString(),
       user: safeUser as RecommendedPodcast['user'],
       tags: p.tags.map((pt) => pt.tag),
@@ -366,10 +354,10 @@ export async function searchPodcasts(
 
 /**
  * Get trending podcasts.
- * Returns 6 podcasts based on engagement velocity (not raw popularity).
+ * Returns 6 podcasts based on listen velocity (not raw popularity).
  */
 export async function getTrending(): Promise<RecommendedPodcast[]> {
-  // Engagement velocity: podcasts with most new listens in last 7 days
+  // Listen velocity: podcasts with most new listens in last 7 days
   const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
   const trendingIds = await prisma.playbackSession.groupBy({
@@ -401,8 +389,6 @@ export async function getTrending(): Promise<RecommendedPodcast[]> {
       duration: true,
       audioUrl: true,
       playCount: true,
-      likeCount: true,
-      forkCount: true,
       lowReferences: true,
       createdAt: true,
       user: { select: { id: true, name: true, image: true, handle: true, role: true, plan: true } },
@@ -428,8 +414,6 @@ export async function getTrending(): Promise<RecommendedPodcast[]> {
       duration: p.duration,
       audioUrl: p.audioUrl,
       playCount: p.playCount,
-      likeCount: p.likeCount,
-      forkCount: p.forkCount,
       createdAt: p.createdAt.toISOString(),
       user: safeUser as RecommendedPodcast['user'],
       tags: p.tags.map((pt) => pt.tag),
