@@ -19,9 +19,7 @@ export async function GET(
       medianCompletionRate: true,
       totalUniqueListeners: true,
       totalListenMinutes: true,
-      likeToListenRatio: true,
       saveToListenRatio: true,
-      forkToListenRatio: true,
       interactionRate: true,
       relistenRate: true,
       avgListenSpeed: true,
@@ -38,8 +36,8 @@ export async function GET(
 
   // Compute composite quality score
   const qualityScore = Math.min(
-    (feature.avgCompletionRate / 100) * 0.4 +
-      feature.likeToListenRatio * 0.3 +
+    (feature.avgCompletionRate / 100) * 0.45 +
+      feature.saveToListenRatio * 0.25 +
       feature.interactionRate * 0.1 +
       feature.relistenRate * 0.2,
     1

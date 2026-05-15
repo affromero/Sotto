@@ -163,19 +163,8 @@ async function computeUserFeatures(userId: string): Promise<void> {
       sessions,
     });
 
-    // Social metrics
-    const [followingCount, followerCount, likeCount, forkCount, interactionCount] =
-      await Promise.all([
-        prisma.follow.count({ where: { followerId: userId } }),
-        prisma.follow.count({ where: { followingId: userId } }),
-        prisma.like.count({ where: { userId } }),
-        prisma.podcast.count({ where: { userId, forkedFromId: { not: null } } }),
-        prisma.interaction.count({ where: { userId } }),
-      ]);
-
     const totalPodcastsListened = sessions.length;
-    const likeRate = totalPodcastsListened > 0 ? likeCount / totalPodcastsListened : 0;
-    const forkRate = totalPodcastsListened > 0 ? forkCount / totalPodcastsListened : 0;
+    const interactionCount = await prisma.interaction.count({ where: { userId } });
     const interactionRate =
       totalPodcastsListened > 0 ? interactionCount / totalPodcastsListened : 0;
 
@@ -220,10 +209,6 @@ async function computeUserFeatures(userId: string): Promise<void> {
       optimalDuration,
       topicAffinity,
       archetype,
-      followingCount,
-      followerCount,
-      likeRate,
-      forkRate,
       interactionRate,
       daysSinceLastListen,
       peakListeningHours,
@@ -240,14 +225,12 @@ async function computeUserFeatures(userId: string): Promise<void> {
       await prisma.$executeRaw`
         INSERT INTO "UserFeature" (id, "userId", "totalListenMinutes", "totalPodcastsListened",
           "avgCompletionRate", "avgListenSpeed", "avgAbandonPercent", "optimalDuration",
-          "topicAffinity", archetype, "followingCount", "followerCount", "likeRate",
-          "forkRate", "interactionRate", "daysSinceLastListen", "peakListeningHours",
+          "topicAffinity", archetype, "interactionRate", "daysSinceLastListen", "peakListeningHours",
           "speakerPreference", "noveltyResponseRate", "creatorLoyalty", "listenFrequency",
           embedding, "computedAt", "updatedAt")
         VALUES (gen_random_uuid(), ${userId}, ${data.totalListenMinutes}, ${data.totalPodcastsListened},
           ${data.avgCompletionRate}, ${data.avgListenSpeed}, ${data.avgAbandonPercent}, ${data.optimalDuration},
-          ${JSON.stringify(data.topicAffinity)}::jsonb, ${data.archetype}, ${data.followingCount}, ${data.followerCount},
-          ${data.likeRate}, ${data.forkRate}, ${data.interactionRate}, ${data.daysSinceLastListen},
+          ${JSON.stringify(data.topicAffinity)}::jsonb, ${data.archetype}, ${data.interactionRate}, ${data.daysSinceLastListen},
           ${JSON.stringify(data.peakListeningHours)}::jsonb,
           ${data.speakerPreference}, ${data.noveltyResponseRate}, ${data.creatorLoyalty},
           ${data.listenFrequency}, ${`[${embedding.join(',')}]`}::vector, NOW(), NOW())
@@ -260,10 +243,6 @@ async function computeUserFeatures(userId: string): Promise<void> {
           "optimalDuration" = EXCLUDED."optimalDuration",
           "topicAffinity" = EXCLUDED."topicAffinity",
           archetype = EXCLUDED.archetype,
-          "followingCount" = EXCLUDED."followingCount",
-          "followerCount" = EXCLUDED."followerCount",
-          "likeRate" = EXCLUDED."likeRate",
-          "forkRate" = EXCLUDED."forkRate",
           "interactionRate" = EXCLUDED."interactionRate",
           "daysSinceLastListen" = EXCLUDED."daysSinceLastListen",
           "peakListeningHours" = EXCLUDED."peakListeningHours",
@@ -368,17 +347,13 @@ async function computePodcastFeatures(podcastId: string): Promise<void> {
     const usersWithMultiple = Array.from(userSessionCounts.values()).filter((c) => c > 1).length;
     const relistenRate = uniqueListeners > 0 ? usersWithMultiple / uniqueListeners : 0;
 
-    // Engagement ratios
-    const [likeCount, saveCount, forkCount, interactionCount] = await Promise.all([
-      prisma.like.count({ where: { podcastId } }),
+    // Private activity ratios
+    const [saveCount, interactionCount] = await Promise.all([
       prisma.save.count({ where: { podcastId } }),
-      prisma.podcast.count({ where: { forkedFromId: podcastId } }),
       prisma.interaction.count({ where: { podcastId } }),
     ]);
 
-    const likeToListenRatio = uniqueListeners > 0 ? likeCount / uniqueListeners : 0;
     const saveToListenRatio = uniqueListeners > 0 ? saveCount / uniqueListeners : 0;
-    const forkToListenRatio = uniqueListeners > 0 ? forkCount / uniqueListeners : 0;
     const interactionRate = uniqueListeners > 0 ? interactionCount / uniqueListeners : 0;
 
     // Abandonment curve: bucket completionPercent by 5% increments
@@ -526,9 +501,7 @@ async function computePodcastFeatures(podcastId: string): Promise<void> {
       medianCompletionRate,
       totalUniqueListeners: uniqueListeners,
       totalListenMinutes,
-      likeToListenRatio,
       saveToListenRatio,
-      forkToListenRatio,
       interactionRate,
       abandonmentCurve,
       avgListenSpeed,
@@ -554,15 +527,15 @@ async function computePodcastFeatures(podcastId: string): Promise<void> {
     if (embedding) {
       await prisma.$executeRaw`
         INSERT INTO "PodcastFeature" (id, "podcastId", "avgCompletionRate", "medianCompletionRate",
-          "totalUniqueListeners", "totalListenMinutes", "likeToListenRatio", "saveToListenRatio",
-          "forkToListenRatio", "interactionRate", "abandonmentCurve", "avgListenSpeed",
+          "totalUniqueListeners", "totalListenMinutes", "saveToListenRatio",
+          "interactionRate", "abandonmentCurve", "avgListenSpeed",
           "speedDistribution", "dropoffPoints", "seekHotspots", "completionBySource",
           "questionDensityByPosition", "segmentAbandonRates", "relistenRate",
           "segmentCount", "durationSeconds", "referenceCount", "verifiedReferenceRate",
           embedding, "computedAt", "updatedAt")
         VALUES (gen_random_uuid(), ${podcastId}, ${data.avgCompletionRate}, ${data.medianCompletionRate},
-          ${data.totalUniqueListeners}, ${data.totalListenMinutes}, ${data.likeToListenRatio},
-          ${data.saveToListenRatio}, ${data.forkToListenRatio}, ${data.interactionRate},
+          ${data.totalUniqueListeners}, ${data.totalListenMinutes}, ${data.saveToListenRatio},
+          ${data.interactionRate},
           ${JSON.stringify(data.abandonmentCurve)}::jsonb, ${data.avgListenSpeed},
           ${JSON.stringify(data.speedDistribution)}::jsonb,
           ${JSON.stringify(data.dropoffPoints)}::jsonb,
@@ -578,9 +551,7 @@ async function computePodcastFeatures(podcastId: string): Promise<void> {
           "medianCompletionRate" = EXCLUDED."medianCompletionRate",
           "totalUniqueListeners" = EXCLUDED."totalUniqueListeners",
           "totalListenMinutes" = EXCLUDED."totalListenMinutes",
-          "likeToListenRatio" = EXCLUDED."likeToListenRatio",
           "saveToListenRatio" = EXCLUDED."saveToListenRatio",
-          "forkToListenRatio" = EXCLUDED."forkToListenRatio",
           "interactionRate" = EXCLUDED."interactionRate",
           "abandonmentCurve" = EXCLUDED."abandonmentCurve",
           "avgListenSpeed" = EXCLUDED."avgListenSpeed",

@@ -1313,11 +1313,7 @@ model UserFeature {
   topicAffinity Json? // [{tagId, weight}]
   voiceAffinity Json? // [{voiceId, completionRate}]
 
-  // Social
-  followingCount  Int   @default(0)
-  followerCount   Int   @default(0)
-  likeRate        Float @default(0)
-  forkRate        Float @default(0)
+  // Private activity
   interactionRate Float @default(0)
   creatorLoyalty  Float @default(0)
 
@@ -1328,7 +1324,7 @@ model UserFeature {
 
   // Temporal
   peakListeningHours   Json? // [{hour, listenMinutes}]
-  postListenBehavior   Json? // {liked: pct, saved: pct, forked: pct, ...}
+  postListenBehavior   Json? // {saved: pct, asked: pct, rated: pct, ...}
   topicProgressionPath Json? // [{topic, depth, timestamp}]
 
   // Recency
@@ -1355,10 +1351,8 @@ model PodcastFeature {
   totalUniqueListeners Int   @default(0)
   totalListenMinutes   Float @default(0)
 
-  // Engagement
-  likeToListenRatio Float @default(0)
+  // Private activity
   saveToListenRatio Float @default(0)
-  forkToListenRatio Float @default(0)
   interactionRate   Float @default(0)
 
   // Abandonment
