@@ -179,7 +179,9 @@ describe('private-first OSS surfaces', () => {
       'src/app/api/podcasts/[podcastId]/comments/route.ts',
       'src/app/api/podcasts/[podcastId]/comments/[commentId]/route.ts',
       'src/app/api/podcasts/[podcastId]/comments/[commentId]/replies/route.ts',
+      'src/app/api/podcasts/[podcastId]/interact/[interactionId]/vote/route.ts',
       'src/app/api/podcasts/[podcastId]/lineage/route.ts',
+      'src/app/api/podcasts/[podcastId]/questions/route.ts',
       'src/app/api/podcasts/[podcastId]/voice-tracks/[trackId]/propose/route.ts',
       'src/app/api/users/[userId]/liked/route.ts',
     ];
@@ -208,6 +210,35 @@ describe('private-first OSS surfaces', () => {
     expect(playerSource).not.toContain('/fork');
     expect(playerSource).not.toContain('/comments');
     expect(playerSource).not.toContain('ShareMenu');
+  });
+
+  it('does not keep social notification types or public Q&A voting tests', () => {
+    const notificationSources = [
+      'src/lib/notification-utils.ts',
+      'src/components/notifications/NotificationList.tsx',
+    ]
+      .map(readSource)
+      .concat([
+        readFileSync(resolve(repoRoot, 'packages/shared/src/types/enums.ts'), 'utf8'),
+        readFileSync(resolve(repoRoot, 'apps/web/prisma/schema.prisma'), 'utf8'),
+        readFileSync(resolve(repoRoot, 'apps/web/prisma/CLAUDE.md'), 'utf8'),
+        readFileSync(resolve(repoRoot, 'e2e/playwright/helpers/seed.ts'), 'utf8'),
+      ])
+      .join('\n');
+    const removedTests = [
+      'apps/web/tests/api/podcasts-questions.test.ts',
+      'e2e/playwright/tests/api/feed-social.api.spec.ts',
+    ];
+
+    for (const testPath of removedTests) {
+      expect(existsSync(resolve(repoRoot, testPath)), testPath).toBe(false);
+    }
+    expect(notificationSources).not.toContain('PODCAST_LIKED');
+    expect(notificationSources).not.toContain('PODCAST_FORKED');
+    expect(notificationSources).not.toContain('NEW_FOLLOWER');
+    expect(notificationSources).not.toContain('QUESTION_UPVOTED');
+    expect(notificationSources).not.toContain('COMMENT_ON_YOUR_PODCAST');
+    expect(notificationSources).not.toContain('COMMENT_REPLY');
   });
 
   it('does not ship mobile podcast social actions or widgets', () => {

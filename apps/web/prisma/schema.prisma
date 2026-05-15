@@ -973,9 +973,6 @@ enum NotificationType {
   PODCAST_READY
   PODCAST_FAILED
   KEY_INVALID
-  PODCAST_LIKED
-  PODCAST_FORKED
-  NEW_FOLLOWER
   SIMILAR_PODCAST_CREATED
   TWITTER_PODCAST_READY
   TELEGRAM_PODCAST_READY
@@ -983,9 +980,6 @@ enum NotificationType {
   VOICE_REQUEST_APPROVED
   VOICE_REQUEST_DENIED
   QUESTION_ON_YOUR_PODCAST
-  QUESTION_UPVOTED
-  COMMENT_ON_YOUR_PODCAST
-  COMMENT_REPLY
   SCRIPT_READY
   ACCOUNT_WARNING
   ACCOUNT_SUSPENDED
@@ -1858,7 +1852,7 @@ model CollectionFollow {
 model Activity {
   id         String   @id @default(cuid())
   userId     String
-  type       String // PODCAST_CREATED, PODCAST_FORKED, PODCAST_LIKED, USER_FOLLOWED, COMMENT_POSTED, COLLECTION_CREATED
+  type       String // PODCAST_CREATED, COLLECTION_CREATED
   targetId   String? // The ID of the target entity (podcast, user, collection, comment)
   targetType String? // 'podcast', 'user', 'collection', 'comment'
   metadata   Json? // Any extra context (e.g., fork parent title, comment snippet)

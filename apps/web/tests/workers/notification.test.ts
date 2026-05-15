@@ -104,14 +104,9 @@ describe('processNotification', () => {
 
     it.each([
       { type: 'PODCAST_READY', title: 'Your podcast is ready!', message: 'Ready.' },
-      { type: 'PODCAST_LIKED', title: 'Someone liked your podcast', message: 'Liked.' },
-      { type: 'PODCAST_FORKED', title: 'Your podcast was forked', message: 'Forked.' },
       { type: 'BRIEFING_READY', title: 'Briefing ready!', message: 'Ready.' },
       { type: 'SIMILAR_PODCAST_CREATED', title: 'Similar podcast created', message: 'Similar.' },
-      { type: 'COMMENT_ON_YOUR_PODCAST', title: 'New comment', message: 'Commented.' },
-      { type: 'COMMENT_REPLY', title: 'Reply to your comment', message: 'Replied.' },
       { type: 'QUESTION_ON_YOUR_PODCAST', title: 'New question', message: 'Asked.' },
-      { type: 'QUESTION_UPVOTED', title: 'Question upvoted', message: 'Upvoted.' },
     ] as const)('creates notification with $type type', async ({ type, title, message }) => {
       const job = createMockJob({ ...defaultPayload, type, title, message });
       await processNotification(job);
