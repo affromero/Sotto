@@ -1,7 +1,5 @@
 import Image from 'next/image';
 import { Badge } from '@/components/ui/Badge';
-import { FollowButton } from './FollowButton';
-import { FollowerCount } from './FollowerCount';
 import { ReportButton } from '@/components/ui/ReportButton';
 import styles from './ProfileHeader.module.css';
 
@@ -18,16 +16,10 @@ interface ProfileUser {
 interface ProfileHeaderProps {
   user: ProfileUser;
   podcastCount: number;
-  followerCount: number;
-  followingCount: number;
   isOwnProfile: boolean;
-  isFollowing: boolean;
   isAuthenticated: boolean;
   isEarlyAccess?: boolean;
-  onFollow: () => void;
   onEdit?: () => void;
-  onFollowerClick?: () => void;
-  onFollowingClick?: () => void;
 }
 
 function getInitials(name: string | null, handle?: string | null): string {
@@ -53,16 +45,10 @@ function formatMemberSince(dateString: string): string {
 export function ProfileHeader({
   user,
   podcastCount,
-  followerCount,
-  followingCount,
   isOwnProfile,
-  isFollowing,
   isAuthenticated,
   isEarlyAccess,
-  onFollow,
   onEdit,
-  onFollowerClick,
-  onFollowingClick,
 }: ProfileHeaderProps) {
   return (
     <section className={styles.root} aria-label="User profile">
@@ -107,10 +93,7 @@ export function ProfileHeader({
                   </button>
                 )
               : isAuthenticated && (
-                  <>
-                    <FollowButton isFollowing={isFollowing} onClick={onFollow} />
-                    <ReportButton targetType="user" targetId={user.id} variant="icon" />
-                  </>
+                  <ReportButton targetType="user" targetId={user.id} variant="icon" />
                 )}
           </div>
         </div>
@@ -120,9 +103,9 @@ export function ProfileHeader({
         {user.bio && <p className={styles.bio}>{user.bio}</p>}
 
         <div className={styles.stats} role="group" aria-label="Profile statistics">
-          <FollowerCount count={podcastCount} label="podcasts" />
-          <FollowerCount count={followerCount} label="followers" onClick={onFollowerClick} />
-          <FollowerCount count={followingCount} label="following" onClick={onFollowingClick} />
+          <span className={styles.statText}>
+            {podcastCount.toLocaleString()} {podcastCount === 1 ? 'podcast' : 'podcasts'}
+          </span>
         </div>
 
         <p className={styles.memberSince}>
