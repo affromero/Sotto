@@ -9,7 +9,6 @@ import {
   TextInput,
   Alert,
   FlatList,
-  Share,
 } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -36,11 +35,8 @@ import { setupPlayer, loadTrack } from '../../lib/audio-player';
 import { formatTime } from '../../lib/formatters';
 import { usePlaybackTelemetry } from '../../lib/usePlaybackTelemetry';
 import type { PlaybackSnapshot } from '../../lib/usePlaybackTelemetry';
-import { ForkModal } from '../../components/ForkModal';
-import { CommentSection } from '../../components/CommentSection';
 import { ReferencesTab } from '../../components/ReferencesTab';
 import { VoiceTrackPicker } from '../../components/VoiceTrackPicker';
-import { ForkLineage } from '../../components/ForkLineage';
 import { VersionHistory } from '../../components/VersionHistory';
 import { AddToCollectionSheet } from '../../components/AddToCollectionSheet';
 import { usePlayerStore } from '../../lib/player-store';
@@ -48,10 +44,7 @@ import type { VoiceTrackSummary } from '@sotto/shared';
 
 const PLAYBACK_SPEEDS = [0.5, 1, 1.25, 1.5, 2] as const;
 
-function findCurrentSegmentIndex(
-  segments: SegmentData[],
-  positionSeconds: number,
-): number {
+function findCurrentSegmentIndex(segments: SegmentData[], positionSeconds: number): number {
   for (let i = segments.length - 1; i >= 0; i--) {
     const seg = segments[i];
     if (seg.startTime !== null && positionSeconds >= seg.startTime) {
@@ -75,7 +68,6 @@ export default function PodcastScreen() {
   const [questionText, setQuestionText] = useState('');
   const [progressBarWidth, setProgressBarWidth] = useState(0);
   const [teleprompterEnabled, setTeleprompterEnabled] = useState(false);
-  const [forkModalVisible, setForkModalVisible] = useState(false);
   const [voicePickerVisible, setVoicePickerVisible] = useState(false);
   const [versionHistoryVisible, setVersionHistoryVisible] = useState(false);
   const [collectionSheetVisible, setCollectionSheetVisible] = useState(false);
@@ -111,14 +103,9 @@ export default function PodcastScreen() {
 
   // Animation values for player buttons
   const playScale = useSharedValue(1);
-  const likeScale = useSharedValue(1);
 
   const playAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: playScale.value }],
-  }));
-
-  const likeAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: likeScale.value }],
   }));
 
   const saveScale = useSharedValue(1);
@@ -132,10 +119,10 @@ export default function PodcastScreen() {
     fabScale.value = withRepeat(
       withSequence(
         withTiming(1.05, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
-        withTiming(1.0, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
+        withTiming(1.0, { duration: 1500, easing: Easing.inOut(Easing.ease) })
       ),
       -1,
-      false,
+      false
     );
   }, [fabScale]);
   const fabAnimatedStyle = useAnimatedStyle(() => ({
@@ -155,34 +142,6 @@ export default function PodcastScreen() {
     enabled: !!id,
   });
 
-  const likeMutation = useMutation({
-    mutationFn: async () => {
-      await api.post(`/podcasts/${id}/like`);
-    },
-    onMutate: async () => {
-      await queryClient.cancelQueries({ queryKey: ['podcast', id] });
-      const previous = queryClient.getQueryData<PodcastDetail>(['podcast', id]);
-      if (previous) {
-        queryClient.setQueryData<PodcastDetail>(['podcast', id], {
-          ...previous,
-          isLiked: !previous.isLiked,
-          likeCount: previous.isLiked
-            ? previous.likeCount - 1
-            : previous.likeCount + 1,
-        });
-      }
-      return { previous };
-    },
-    onError: (_err, _vars, context) => {
-      if (context?.previous) {
-        queryClient.setQueryData(['podcast', id], context.previous);
-      }
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['podcast', id] });
-    },
-  });
-
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (podcast?.isSaved) {
@@ -198,9 +157,7 @@ export default function PodcastScreen() {
         queryClient.setQueryData<PodcastDetail>(['podcast', id], {
           ...previous,
           isSaved: !previous.isSaved,
-          saveCount: previous.isSaved
-            ? previous.saveCount - 1
-            : previous.saveCount + 1,
+          saveCount: previous.isSaved ? previous.saveCount - 1 : previous.saveCount + 1,
         });
       }
       return { previous };
@@ -246,25 +203,29 @@ export default function PodcastScreen() {
   // Load track when podcast data arrives and player is ready
   useEffect(() => {
     if (!playerReady || !podcast?.audioUrl) return;
-    loadTrack(
-      podcast.id,
-      podcast.audioUrl,
-      podcast.title,
-      podcast.user?.name ?? 'Sotto',
-    ).catch(() => {});
+    loadTrack(podcast.id, podcast.audioUrl, podcast.title, podcast.user?.name ?? 'Sotto').catch(
+      () => {}
+    );
     setCurrentPodcast({
       id: podcast.id,
       title: podcast.title,
       creator: podcast.user?.name ?? 'Sotto',
       audioUrl: podcast.audioUrl,
     });
-  }, [playerReady, podcast?.id, podcast?.audioUrl, podcast?.title, podcast?.user?.name, setCurrentPodcast]);
+  }, [
+    playerReady,
+    podcast?.id,
+    podcast?.audioUrl,
+    podcast?.title,
+    podcast?.user?.name,
+    setCurrentPodcast,
+  ]);
 
   const handlePlayPause = useCallback(async () => {
     if (!playerReady) return;
     playScale.value = withSequence(
       withSpring(0.9, { damping: 15, stiffness: 400 }),
-      withSpring(1.0, { damping: 10, stiffness: 200 }),
+      withSpring(1.0, { damping: 10, stiffness: 200 })
     );
     try {
       if (isPlaying) {
@@ -316,55 +277,55 @@ export default function PodcastScreen() {
       const totalDuration = podcast?.duration ?? trackDuration;
       if (totalDuration > 0) {
         lastSeekFromRef.current = position;
-        try { await TrackPlayer.seekTo(ratio * totalDuration); } catch {}
+        try {
+          await TrackPlayer.seekTo(ratio * totalDuration);
+        } catch {}
       }
     },
-    [podcast?.duration, trackDuration, position, playerReady],
+    [podcast?.duration, trackDuration, position, playerReady]
   );
 
   const handleAskQuestion = useCallback(async () => {
     if (!questionText.trim()) return;
-    try { await TrackPlayer.pause(); } catch {}
+    try {
+      await TrackPlayer.pause();
+    } catch {}
     interactMutation.mutate({
       question: questionText.trim(),
       timestamp: position,
     });
   }, [questionText, position, interactMutation]);
 
-  const handleVoiceTrackSelect = useCallback(async (track: VoiceTrackSummary) => {
-    if (!track.audioUrl) return;
-    setActiveVoiceTrackId(track.id);
-    setVoicePickerVisible(false);
-    try {
-      await loadTrack(
-        podcast?.id ?? id,
-        track.audioUrl,
-        podcast?.title ?? '',
-        track.contributor?.name ?? 'Sotto',
-      );
-    } catch {}
-  }, [podcast?.id, podcast?.title, id]);
-
-  const handleShare = useCallback(async () => {
-    if (!podcast) return;
-    try {
-      await Share.share({
-        message: `${podcast.title} — Listen on Sotto\nhttps://sotto.fm/podcast/${podcast.id}`,
-        url: `https://sotto.fm/podcast/${podcast.id}`,
-      });
-    } catch {}
-  }, [podcast]);
+  const handleVoiceTrackSelect = useCallback(
+    async (track: VoiceTrackSummary) => {
+      if (!track.audioUrl) return;
+      setActiveVoiceTrackId(track.id);
+      setVoicePickerVisible(false);
+      try {
+        await loadTrack(
+          podcast?.id ?? id,
+          track.audioUrl,
+          podcast?.title ?? '',
+          track.contributor?.name ?? 'Sotto'
+        );
+      } catch {}
+    },
+    [podcast?.id, podcast?.title, id]
+  );
 
   // Playback telemetry
-  const playbackSnapshot: PlaybackSnapshot = useMemo(() => ({
-    podcastId: id,
-    isPlaying,
-    position,
-    duration: podcast?.duration ?? trackDuration,
-    playbackRate: PLAYBACK_SPEEDS[speedIndex],
-    lastSeekFrom: lastSeekFromRef.current,
-    interactionCount: interactionCountRef.current,
-  }), [id, isPlaying, position, podcast?.duration, trackDuration, speedIndex]);
+  const playbackSnapshot: PlaybackSnapshot = useMemo(
+    () => ({
+      podcastId: id,
+      isPlaying,
+      position,
+      duration: podcast?.duration ?? trackDuration,
+      playbackRate: PLAYBACK_SPEEDS[speedIndex],
+      lastSeekFrom: lastSeekFromRef.current,
+      interactionCount: interactionCountRef.current,
+    }),
+    [id, isPlaying, position, podcast?.duration, trackDuration, speedIndex]
+  );
 
   const clearLastSeekFrom = useCallback(() => {
     lastSeekFromRef.current = undefined;
@@ -465,7 +426,7 @@ export default function PodcastScreen() {
                     }
                   },
                 },
-              ],
+              ]
             );
           }}
           testID="generation-delete-button"
@@ -491,9 +452,7 @@ export default function PodcastScreen() {
         <Text style={styles.title} numberOfLines={2}>
           {podcast.title}
         </Text>
-        <Text style={styles.creator}>
-          {podcast.user?.name ?? 'Unknown Creator'}
-        </Text>
+        <Text style={styles.creator}>{podcast.user?.name ?? 'Unknown Creator'}</Text>
         <View style={styles.podcastBadgeRow}>
           <View
             style={[
@@ -515,11 +474,7 @@ export default function PodcastScreen() {
             </Text>
           </View>
         </View>
-        {totalDuration > 0 && (
-          <Text style={styles.durationBadge}>
-            {formatTime(totalDuration)}
-          </Text>
-        )}
+        {totalDuration > 0 && <Text style={styles.durationBadge}>{formatTime(totalDuration)}</Text>}
       </View>
 
       {/* Player Controls */}
@@ -541,16 +496,10 @@ export default function PodcastScreen() {
         >
           <View style={styles.progressTrack}>
             <View
-              style={[
-                styles.progressFill,
-                { width: `${Math.min(progressRatio * 100, 100)}%` },
-              ]}
+              style={[styles.progressFill, { width: `${Math.min(progressRatio * 100, 100)}%` }]}
             />
             <View
-              style={[
-                styles.progressThumb,
-                { left: `${Math.min(progressRatio * 100, 100)}%` },
-              ]}
+              style={[styles.progressThumb, { left: `${Math.min(progressRatio * 100, 100)}%` }]}
             />
           </View>
         </Pressable>
@@ -579,7 +528,12 @@ export default function PodcastScreen() {
               accessibilityRole="button"
               testID="player-play-pause"
             >
-              <Ionicons name={isPlaying ? 'pause' : 'play'} size={28} color={colors.textInverse} style={!isPlaying && styles.playIconOffset} />
+              <Ionicons
+                name={isPlaying ? 'pause' : 'play'}
+                size={28}
+                color={colors.textInverse}
+                style={!isPlaying && styles.playIconOffset}
+              />
             </Pressable>
           </Animated.View>
 
@@ -594,7 +548,7 @@ export default function PodcastScreen() {
           </Pressable>
         </View>
 
-        {/* Action Row: Speed + Social Icons */}
+        {/* Private player actions */}
         <View style={styles.actionRow}>
           <Pressable
             onPress={handleSpeedToggle}
@@ -603,40 +557,15 @@ export default function PodcastScreen() {
             accessibilityRole="button"
             testID="player-speed-button"
           >
-            <Text style={styles.speedText}>
-              {PLAYBACK_SPEEDS[speedIndex]}x
-            </Text>
+            <Text style={styles.speedText}>{PLAYBACK_SPEEDS[speedIndex]}x</Text>
           </Pressable>
 
           <View style={styles.actionIcons}>
             <Pressable
               onPress={() => {
-                likeScale.value = withSequence(
-                  withSpring(1.3, { damping: 8, stiffness: 400 }),
-                  withSpring(1.0, { damping: 10, stiffness: 200 }),
-                );
-                likeMutation.mutate();
-              }}
-              style={styles.actionIcon}
-              accessibilityLabel={podcast.isLiked ? 'Unlike podcast' : 'Like podcast'}
-              accessibilityRole="button"
-              testID="player-like-button"
-            >
-              <Animated.View style={likeAnimatedStyle}>
-                <Ionicons
-                  name={podcast.isLiked ? 'heart' : 'heart-outline'}
-                  size={22}
-                  color={podcast.isLiked ? colors.error : colors.textSecondary}
-                />
-              </Animated.View>
-              {isOwner && <Text style={styles.actionCount}>{podcast.likeCount}</Text>}
-            </Pressable>
-
-            <Pressable
-              onPress={() => {
                 saveScale.value = withSequence(
                   withSpring(1.3, { damping: 8, stiffness: 400 }),
-                  withSpring(1.0, { damping: 10, stiffness: 200 }),
+                  withSpring(1.0, { damping: 10, stiffness: 200 })
                 );
                 saveMutation.mutate();
               }}
@@ -655,29 +584,6 @@ export default function PodcastScreen() {
                 />
               </Animated.View>
               {isOwner && <Text style={styles.actionCount}>{podcast.saveCount}</Text>}
-            </Pressable>
-
-            <Pressable
-              onPress={handleShare}
-              style={styles.actionIcon}
-              accessibilityLabel="Share podcast"
-              accessibilityRole="button"
-              testID="player-share-button"
-            >
-              <Ionicons name="share-outline" size={22} color={colors.textSecondary} />
-            </Pressable>
-
-            <Pressable
-              onPress={() => setForkModalVisible(true)}
-              style={styles.actionIcon}
-              accessibilityLabel="Fork podcast"
-              accessibilityRole="button"
-              testID="player-fork-button"
-            >
-              <Ionicons name="git-branch-outline" size={22} color={colors.textSecondary} />
-              {isOwner && podcast.forks?.length > 0 && (
-                <Text style={styles.actionCount}>{podcast.forks?.length}</Text>
-              )}
             </Pressable>
 
             {podcast.voiceTracks?.length > 1 && (
@@ -720,9 +626,7 @@ export default function PodcastScreen() {
       {/* Player Error */}
       {playerError && (
         <View style={styles.playerErrorContainer}>
-          <Text style={styles.playerErrorText}>
-            Audio unavailable: {playerError}
-          </Text>
+          <Text style={styles.playerErrorText}>Audio unavailable: {playerError}</Text>
         </View>
       )}
 
@@ -794,18 +698,8 @@ export default function PodcastScreen() {
               ]}
               accessibilityLabel={`${item.speaker} says: ${item.text}`}
             >
-              <View
-                style={[
-                  styles.speakerBadge,
-                  { backgroundColor: speakerColor.bg },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.speakerLabel,
-                    { color: speakerColor.color },
-                  ]}
-                >
+              <View style={[styles.speakerBadge, { backgroundColor: speakerColor.bg }]}>
+                <Text style={[styles.speakerLabel, { color: speakerColor.color }]}>
                   {item.speaker}
                 </Text>
               </View>
@@ -822,32 +716,19 @@ export default function PodcastScreen() {
           );
         }}
         ListFooterComponent={
-          <>
-            {podcast.references?.length > 0 && (
-              <ReferencesTab references={podcast.references} />
-            )}
-            <ForkLineage
-              podcastId={podcast.id}
-              forkedFromId={podcast.forkedFromId}
-              forkCount={podcast.forkCount}
-            />
-            <CommentSection
-              podcastId={podcast.id}
-              commentCount={podcast.commentCount}
-            />
-          </>
+          <>{podcast.references?.length > 0 && <ReferencesTab references={podcast.references} />}</>
         }
-        ListEmptyComponent={
-          <Text style={styles.emptyTranscript}>No transcript available.</Text>
-        }
+        ListEmptyComponent={<Text style={styles.emptyTranscript}>No transcript available.</Text>}
       />
 
       {/* Ask a Question FAB */}
-      <Animated.View style={[
-        styles.askButton,
-        { bottom: Math.max(spacing.lg, insets.bottom + spacing.sm) },
-        fabAnimatedStyle,
-      ]}>
+      <Animated.View
+        style={[
+          styles.askButton,
+          { bottom: Math.max(spacing.lg, insets.bottom + spacing.sm) },
+          fabAnimatedStyle,
+        ]}
+      >
         <Pressable
           onPress={() => setQuestionModalVisible(true)}
           style={styles.askButtonInner}
@@ -869,9 +750,7 @@ export default function PodcastScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Ask a Question</Text>
-            <Text style={styles.modalSubtitle}>
-              at {formatTime(position)}
-            </Text>
+            <Text style={styles.modalSubtitle}>at {formatTime(position)}</Text>
             <TextInput
               style={styles.questionInput}
               value={questionText}
@@ -920,13 +799,6 @@ export default function PodcastScreen() {
         </View>
       </Modal>
 
-      <ForkModal
-        visible={forkModalVisible}
-        onClose={() => setForkModalVisible(false)}
-        podcastId={podcast.id}
-        podcastTitle={podcast.title}
-      />
-
       <VoiceTrackPicker
         visible={voicePickerVisible}
         onClose={() => setVoicePickerVisible(false)}
@@ -953,13 +825,19 @@ export default function PodcastScreen() {
         visible={showRating}
         animationType="slide"
         transparent={false}
-        onRequestClose={() => { setShowRating(false); setShowQuiz(true); }}
+        onRequestClose={() => {
+          setShowRating(false);
+          setShowQuiz(true);
+        }}
       >
         <View style={styles.quizModal}>
           <PostListenRating
             podcastId={podcast.id}
             completionPercent={trackDuration > 0 ? (position / trackDuration) * 100 : undefined}
-            onDismiss={() => { setShowRating(false); setShowQuiz(true); }}
+            onDismiss={() => {
+              setShowRating(false);
+              setShowQuiz(true);
+            }}
           />
         </View>
       </Modal>
@@ -972,10 +850,7 @@ export default function PodcastScreen() {
         onRequestClose={() => setShowQuiz(false)}
       >
         <View style={styles.quizModal}>
-          <PostListenQuiz
-            podcastId={podcast.id}
-            onDismiss={() => setShowQuiz(false)}
-          />
+          <PostListenQuiz podcastId={podcast.id} onDismiss={() => setShowQuiz(false)} />
         </View>
       </Modal>
     </View>
@@ -1195,7 +1070,7 @@ const styles = StyleSheet.create({
     marginLeft: 3,
   },
 
-  // Speed + Like
+  // Private actions
   actionRow: {
     flexDirection: 'row',
     alignItems: 'center',

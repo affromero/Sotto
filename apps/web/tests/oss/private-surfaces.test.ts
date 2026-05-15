@@ -141,4 +141,41 @@ describe('private-first OSS surfaces', () => {
     expect(playerSource).not.toContain('/comments');
     expect(playerSource).not.toContain('ShareMenu');
   });
+
+  it('does not ship mobile podcast social actions or widgets', () => {
+    const removedMobileComponents = [
+      'apps/mobile/components/ForkModal.tsx',
+      'apps/mobile/components/ForkLineage.tsx',
+      'apps/mobile/components/CommentSection.tsx',
+      'apps/mobile/components/CommentItem.tsx',
+    ];
+    const mobilePlayerSource = readFileSync(
+      resolve(repoRoot, 'apps/mobile/app/podcast/[id].tsx'),
+      'utf8'
+    );
+    const mobileCardSource = readFileSync(
+      resolve(repoRoot, 'apps/mobile/components/PodcastCard.tsx'),
+      'utf8'
+    );
+    const mobileProfileSource = readFileSync(
+      resolve(repoRoot, 'apps/mobile/app/(tabs)/profile.tsx'),
+      'utf8'
+    );
+    const mobilePodcastSurfaces = [mobilePlayerSource, mobileCardSource, mobileProfileSource].join(
+      '\n'
+    );
+
+    for (const component of removedMobileComponents) {
+      expect(existsSync(resolve(repoRoot, component)), component).toBe(false);
+    }
+    expect(mobilePlayerSource).not.toContain('/like');
+    expect(mobilePlayerSource).not.toContain('/fork');
+    expect(mobilePlayerSource).not.toContain('/comments');
+    expect(mobilePlayerSource).not.toContain('Share.share');
+    expect(mobilePlayerSource).not.toContain('ForkModal');
+    expect(mobilePlayerSource).not.toContain('ForkLineage');
+    expect(mobilePlayerSource).not.toContain('CommentSection');
+    expect(mobilePodcastSurfaces).not.toContain('likeCount');
+    expect(mobilePodcastSurfaces).not.toContain('forkCount');
+  });
 });

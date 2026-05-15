@@ -1,5 +1,4 @@
 import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { useQueryClient } from '@tanstack/react-query';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography, borderRadius, getContentBadgeLabel } from '@sotto/shared';
@@ -8,7 +7,7 @@ import { Avatar } from './Avatar';
 import { AnimatedPressable } from './AnimatedPressable';
 import { getPodcastGradient } from '../lib/gradients';
 import { shadowLg, shadowSm } from '../lib/shadows';
-import { formatDuration, formatCount, timeAgo, formatDurationMinutes } from '../lib/formatters';
+import { formatDuration, timeAgo, formatDurationMinutes } from '../lib/formatters';
 
 interface PodcastCardFeedProps {
   podcast: PodcastSummary;
@@ -32,16 +31,7 @@ export function PodcastCard({ podcast, variant, onPress }: PodcastCardProps) {
   return <FeedCard podcast={podcast} onPress={onPress} />;
 }
 
-function FeedCard({
-  podcast,
-  onPress,
-}: {
-  podcast: PodcastSummary;
-  onPress: () => void;
-}) {
-  const queryClient = useQueryClient();
-  const currentUser = queryClient.getQueryData<{ id: string }>(['user', 'me']);
-  const isOwner = currentUser?.id === podcast.user?.id;
+function FeedCard({ podcast, onPress }: { podcast: PodcastSummary; onPress: () => void }) {
   const gradient = getPodcastGradient(podcast.id);
 
   return (
@@ -57,33 +47,19 @@ function FeedCard({
         style={styles.feedGradient}
       >
         {/* Bottom scrim for text readability */}
-        <LinearGradient
-          colors={['transparent', 'rgba(0,0,0,0.45)']}
-          style={styles.feedScrim}
-        />
+        <LinearGradient colors={['transparent', 'rgba(0,0,0,0.45)']} style={styles.feedScrim} />
 
         {/* Top row: avatar + badges */}
         <View style={styles.feedHeader}>
-          <Avatar
-            uri={podcast.user?.image}
-            name={podcast.user?.name}
-            size={32}
-          />
+          <Avatar uri={podcast.user?.image} name={podcast.user?.name} size={32} />
           <View style={styles.feedHeaderText}>
             <Text style={styles.creatorName} numberOfLines={1}>
               {podcast.user?.name ?? 'Unknown'}
             </Text>
           </View>
           <View style={styles.headerRight}>
-            {isOwner && (
-              <View style={styles.ownerBadge}>
-                <Text style={styles.ownerBadgeText}>Yours</Text>
-              </View>
-            )}
             <View style={styles.contentBadge}>
-              <Text style={styles.contentBadgeText}>
-                {getContentBadgeLabel(podcast)}
-              </Text>
+              <Text style={styles.contentBadgeText}>{getContentBadgeLabel(podcast)}</Text>
             </View>
             <Text style={styles.timeAgo}>{timeAgo(podcast.createdAt)}</Text>
           </View>
@@ -109,26 +85,8 @@ function FeedCard({
           ) : null}
 
           <View style={styles.feedFooter}>
-            {isOwner && (
-              <>
-                <View style={styles.statRow}>
-                  <Ionicons name="play" size={13} color="rgba(255,255,255,0.7)" />
-                  <Text style={styles.statText}>{formatCount(podcast.playCount)}</Text>
-                </View>
-                <View style={styles.statRow}>
-                  <Ionicons name="heart-outline" size={13} color="rgba(255,255,255,0.7)" />
-                  <Text style={styles.statText}>{formatCount(podcast.likeCount)}</Text>
-                </View>
-                <View style={styles.statRow}>
-                  <Ionicons name="git-branch-outline" size={13} color="rgba(255,255,255,0.7)" />
-                  <Text style={styles.statText}>{formatCount(podcast.forkCount)}</Text>
-                </View>
-              </>
-            )}
-            <View style={[styles.durationBadge, !isOwner && styles.durationBadgeOnly]}>
-              <Text style={styles.durationText}>
-                {formatDuration(podcast.duration)}
-              </Text>
+            <View style={styles.durationBadge}>
+              <Text style={styles.durationText}>{formatDuration(podcast.duration)}</Text>
             </View>
           </View>
         </View>
@@ -137,17 +95,7 @@ function FeedCard({
   );
 }
 
-function CompactCard({
-  podcast,
-  onPress,
-}: {
-  podcast: PodcastSummary;
-  onPress: () => void;
-}) {
-  const queryClient = useQueryClient();
-  const currentUser = queryClient.getQueryData<{ id: string }>(['user', 'me']);
-  const isOwner = currentUser?.id === podcast.user?.id;
-
+function CompactCard({ podcast, onPress }: { podcast: PodcastSummary; onPress: () => void }) {
   return (
     <Pressable
       onPress={onPress}
@@ -165,17 +113,7 @@ function CompactCard({
         </Text>
         <View style={styles.compactMeta}>
           {podcast.duration !== null && (
-            <Text style={styles.compactMetaText}>
-              {formatDurationMinutes(podcast.duration)}
-            </Text>
-          )}
-          {isOwner && (
-            <>
-              <Text style={styles.compactMetaDot}>{'\u00B7'}</Text>
-              <Text style={styles.compactMetaText}>
-                {podcast.likeCount} {podcast.likeCount === 1 ? 'like' : 'likes'}
-              </Text>
-            </>
+            <Text style={styles.compactMetaText}>{formatDurationMinutes(podcast.duration)}</Text>
           )}
           {podcast.status !== 'READY' && (
             <>
@@ -231,18 +169,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs + 2,
-  },
-  ownerBadge: {
-    paddingHorizontal: spacing.xs + 4,
-    paddingVertical: 3,
-    borderRadius: borderRadius.full,
-    backgroundColor: colors.primary,
-  },
-  ownerBadgeText: {
-    fontFamily: typography.fontBody,
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#FFFFFF',
   },
   contentBadge: {
     paddingHorizontal: spacing.xs + 4,
@@ -304,25 +230,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.md,
   },
-  statRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  statText: {
-    fontFamily: typography.fontBody,
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.7)',
-  },
   durationBadge: {
     marginLeft: 'auto',
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
     borderRadius: borderRadius.full,
     backgroundColor: 'rgba(255,255,255,0.2)',
-  },
-  durationBadgeOnly: {
-    marginLeft: 0,
   },
   durationText: {
     fontFamily: typography.fontBody,

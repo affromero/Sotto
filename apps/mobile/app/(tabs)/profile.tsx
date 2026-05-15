@@ -30,8 +30,6 @@ interface UserProfile {
   image: string | null;
   bio: string | null;
   podcastCount: number;
-  followerCount: number;
-  followingCount: number;
 }
 
 interface UserPodcastsResponse {
@@ -79,19 +77,10 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-function MyPodcastItem({
-  podcast,
-  onPress,
-}: {
-  podcast: PodcastSummary;
-  onPress: () => void;
-}) {
+function MyPodcastItem({ podcast, onPress }: { podcast: PodcastSummary; onPress: () => void }) {
   return (
     <Pressable
-      style={({ pressed }) => [
-        styles.podcastItem,
-        pressed && styles.podcastItemPressed,
-      ]}
+      style={({ pressed }) => [styles.podcastItem, pressed && styles.podcastItemPressed]}
       onPress={onPress}
     >
       <View style={styles.podcastItemContent}>
@@ -109,13 +98,7 @@ function MyPodcastItem({
             <Ionicons name="play" size={13} color={colors.textTertiary} />
             <Text style={styles.podcastItemStat}>{formatCount(podcast.playCount)}</Text>
           </View>
-          <View style={styles.podcastItemStatRow}>
-            <Ionicons name="heart" size={13} color={colors.textTertiary} />
-            <Text style={styles.podcastItemStat}>{formatCount(podcast.likeCount)}</Text>
-          </View>
-          <Text style={styles.podcastItemDuration}>
-            {formatDuration(podcast.duration)}
-          </Text>
+          <Text style={styles.podcastItemDuration}>{formatDuration(podcast.duration)}</Text>
         </View>
       </View>
     </Pressable>
@@ -149,8 +132,7 @@ export default function ProfileScreen() {
   } = useQuery<UserPodcastsResponse>({
     queryKey: ['user', 'me', 'podcasts'],
     queryFn: async () => {
-      const response =
-        await api.get<UserPodcastsResponse>('/users/me/podcasts');
+      const response = await api.get<UserPodcastsResponse>('/users/me/podcasts');
       return response.data;
     },
     enabled: !!profile,
@@ -199,18 +181,12 @@ export default function ProfileScreen() {
 
   const renderPodcastItem = useCallback(
     ({ item }: { item: PodcastSummary }) => (
-      <MyPodcastItem
-        podcast={item}
-        onPress={() => router.push(`/podcast/${item.id}`)}
-      />
+      <MyPodcastItem podcast={item} onPress={() => router.push(`/podcast/${item.id}`)} />
     ),
-    [router],
+    [router]
   );
 
-  const keyExtractor = useCallback(
-    (item: PodcastSummary) => item.id,
-    [],
-  );
+  const keyExtractor = useCallback((item: PodcastSummary) => item.id, []);
 
   const profileHeader = (
     <View style={styles.profileSection}>
@@ -226,61 +202,43 @@ export default function ProfileScreen() {
         </Pressable>
       </View>
 
-      <Text style={styles.profileName}>
-        {profile?.name ?? 'Anonymous'}
-      </Text>
-      {profile?.handle ? (
-        <Text style={styles.profileHandle}>@{profile.handle}</Text>
-      ) : null}
-      {profile?.bio ? (
-        <Text style={styles.profileBio}>{profile.bio}</Text>
-      ) : null}
+      <Text style={styles.profileName}>{profile?.name ?? 'Anonymous'}</Text>
+      {profile?.handle ? <Text style={styles.profileHandle}>@{profile.handle}</Text> : null}
+      {profile?.bio ? <Text style={styles.profileBio}>{profile.bio}</Text> : null}
 
       <View style={styles.statsRow}>
         <View style={styles.statItem}>
-          <Text style={styles.statNumber}>
-            {formatCount(profile?.podcastCount ?? 0)}
-          </Text>
+          <Text style={styles.statNumber}>{formatCount(profile?.podcastCount ?? 0)}</Text>
           <Text style={styles.statLabel}>Podcasts</Text>
-        </View>
-        <View style={styles.statDivider} />
-        <View style={styles.statItem}>
-          <Text style={styles.statNumber}>
-            {formatCount(profile?.followerCount ?? 0)}
-          </Text>
-          <Text style={styles.statLabel}>Followers</Text>
-        </View>
-        <View style={styles.statDivider} />
-        <View style={styles.statItem}>
-          <Text style={styles.statNumber}>
-            {formatCount(profile?.followingCount ?? 0)}
-          </Text>
-          <Text style={styles.statLabel}>Following</Text>
         </View>
       </View>
 
       <Pressable
-        style={({ pressed }) => [
-          styles.savedIdeasRow,
-          pressed && styles.savedIdeasRowPressed,
-        ]}
+        style={({ pressed }) => [styles.savedIdeasRow, pressed && styles.savedIdeasRowPressed]}
         onPress={() => router.push('/ideas')}
         testID="profile-saved-ideas-link"
       >
-        <Ionicons name="bookmark-outline" size={20} color={colors.primary} style={styles.savedIdeasIcon} />
+        <Ionicons
+          name="bookmark-outline"
+          size={20}
+          color={colors.primary}
+          style={styles.savedIdeasIcon}
+        />
         <Text style={styles.savedIdeasLabel}>Saved Ideas</Text>
         <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
       </Pressable>
 
       <Pressable
-        style={({ pressed }) => [
-          styles.savedIdeasRow,
-          pressed && styles.savedIdeasRowPressed,
-        ]}
+        style={({ pressed }) => [styles.savedIdeasRow, pressed && styles.savedIdeasRowPressed]}
         onPress={() => router.push('/collections')}
         testID="profile-collections-link"
       >
-        <Ionicons name="albums-outline" size={20} color={colors.primary} style={styles.savedIdeasIcon} />
+        <Ionicons
+          name="albums-outline"
+          size={20}
+          color={colors.primary}
+          style={styles.savedIdeasIcon}
+        />
         <Text style={styles.savedIdeasLabel}>Collections</Text>
         <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
       </Pressable>
@@ -288,12 +246,8 @@ export default function ProfileScreen() {
       {quizStats && quizStats.totalQuizzes > 0 && (
         <View style={styles.quizStatsCard}>
           <Ionicons name="school-outline" size={18} color={colors.primary} />
-          <Text style={styles.quizStatsLabel}>
-            {quizStats.totalQuizzes} quizzes taken
-          </Text>
-          <Text style={styles.quizStatsScore}>
-            {Math.round(quizStats.averageScore)}% avg
-          </Text>
+          <Text style={styles.quizStatsLabel}>{quizStats.totalQuizzes} quizzes taken</Text>
+          <Text style={styles.quizStatsScore}>{Math.round(quizStats.averageScore)}% avg</Text>
         </View>
       )}
 
@@ -328,17 +282,12 @@ export default function ProfileScreen() {
           ) : isProfileError ? (
             <ErrorState
               message={
-                profileError instanceof Error
-                  ? profileError.message
-                  : 'Failed to load profile'
+                profileError instanceof Error ? profileError.message : 'Failed to load profile'
               }
               onRetry={() => refetchProfile()}
             />
           ) : isPodcastsError ? (
-            <EmptyState
-              title="Error"
-              subtitle="Failed to load your podcasts"
-            />
+            <EmptyState title="Error" subtitle="Failed to load your podcasts" />
           ) : isPodcastsLoading ? (
             <View style={styles.emptyState}>
               <ActivityIndicator size="small" color={colors.primary} />
@@ -353,10 +302,7 @@ export default function ProfileScreen() {
         ListFooterComponent={
           <View style={styles.footer}>
             <Pressable
-              style={({ pressed }) => [
-                styles.logoutButton,
-                pressed && styles.logoutButtonPressed,
-              ]}
+              style={({ pressed }) => [styles.logoutButton, pressed && styles.logoutButtonPressed]}
               onPress={handleLogout}
               testID="profile-logout-button"
             >
@@ -446,11 +392,6 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontBody,
     fontSize: 13,
     color: colors.textSecondary,
-  },
-  statDivider: {
-    width: StyleSheet.hairlineWidth,
-    height: 32,
-    backgroundColor: colors.border,
   },
   savedIdeasRow: {
     flexDirection: 'row',
