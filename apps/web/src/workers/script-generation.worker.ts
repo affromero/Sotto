@@ -5,7 +5,7 @@ import { generateScript, generateScriptWithUserFeedback, type SourceMetadata } f
 import { extractContent } from '@/lib/extractors';
 import { logUsage } from '@/lib/usage-logger';
 import { getAiKey, hasByokKey } from '@/lib/byok';
-import { resolveAiModelAndProvider } from '@/lib/providers/ai-registry';
+import { resolveAiModelAndProvider, type AiProviderId } from '@/lib/providers/ai-registry';
 import { detectLanguage } from '@/lib/language-detect';
 import { invalidatePodcastCache, publishPodcastStatus } from '@/lib/redis';
 import { matchTopicTags, TAG_PARENT_MAP } from '@/lib/topic-tagger';
@@ -44,8 +44,7 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
     return;
   }
 
-  const [aiKey, hasTts, user, podcast, discovery] = await Promise.all([
-    useAdminCredits ? Promise.resolve(null) : getAiKey(userId),
+  const [hasTts, user, podcast, discovery] = await Promise.all([
     useAdminCredits ? Promise.resolve(true) : hasByokKey(userId),
     prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { plan: true, role: true } }),
     prisma.podcast.findUniqueOrThrow({ where: { id: podcastId }, select: { aiModel: true, verificationMode: true, source: true, language: true } }),
@@ -54,12 +53,25 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
 
   const tierFeatures = getTierFeatures(user.plan as 'FREE' | 'PRO', hasTts, user.role);
 
+  const aiKey = useAdminCredits || podcast.aiModel ? null : await getAiKey(userId);
+  if (!podcast.aiModel && !aiKey) {
+    throw new Error('AI model is required for script generation when no AI key is configured.');
+  }
+
   // Model + provider resolved together — prevents sending e.g. gpt-5-mini to Anthropic
   const { model, provider } = await resolveAiModelAndProvider({
     podcastAiModel: podcast.aiModel,
     aiKey,
     plan: user.plan as 'FREE' | 'PRO',
   });
+
+  const providerAiKey =
+    podcast.aiModel && provider !== 'claude-code' && !useAdminCredits
+      ? await getAiKey(userId, provider as AiProviderId)
+      : aiKey;
+  if (podcast.aiModel && provider !== 'claude-code' && !useAdminCredits && !providerAiKey) {
+    throw new Error(`AI key for provider "${provider}" is required for script generation.`);
+  }
 
   // Extract content from user-provided source URLs and append to discovery.sourceContent
   if (job.data.sourceUrls && job.data.sourceUrls.length > 0) {
@@ -169,7 +181,7 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
         previousScript: job.data.previousTurns!,
         previousReferences: job.data.previousReferences ?? [],
         userFeedback: job.data.userFeedback!,
-        apiKeyOverride: aiKey?.apiKey,
+        apiKeyOverride: providerAiKey?.apiKey,
         model,
         provider,
         webSearchEnabled: tierFeatures.webSearchEnabled,
@@ -185,7 +197,7 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
         sourceContent: discovery.sourceContent || undefined,
         sourceMetadata: sourceMetadata || undefined,
         speakers: cappedSpeakers ?? undefined,
-        apiKeyOverride: aiKey?.apiKey,
+        apiKeyOverride: providerAiKey?.apiKey,
         model,
         provider,
         webSearchEnabled: tierFeatures.webSearchEnabled,
