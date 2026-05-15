@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
 import { errorResponse } from '@/lib/api-response';
@@ -21,8 +20,6 @@ export async function GET(
       _count: {
         select: {
           podcasts: { where: { status: 'READY', visibility: 'PUBLIC', deletedAt: null } },
-          followers: true,
-          following: true,
         },
       },
     },
@@ -30,20 +27,6 @@ export async function GET(
 
   if (!user) {
     return errorResponse('User not found', 404);
-  }
-
-  let isFollowing = false;
-  const session = await auth();
-  if (session?.user?.id && session.user.id !== userId) {
-    const follow = await prisma.follow.findUnique({
-      where: {
-        followerId_followingId: {
-          followerId: session.user.id,
-          followingId: userId,
-        },
-      },
-    });
-    isFollowing = !!follow;
   }
 
   return NextResponse.json({
@@ -54,8 +37,5 @@ export async function GET(
     bio: user.bio,
     createdAt: user.createdAt,
     podcastCount: user._count.podcasts,
-    followerCount: user._count.followers,
-    followingCount: user._count.following,
-    isFollowing,
   });
 }

@@ -15,11 +15,11 @@ const mockNotifications: NotificationData[] = [
   },
   {
     id: 'notif-2',
-    type: 'NEW_FOLLOWER',
-    title: 'New follower',
-    message: 'John Doe is now following you',
+    type: 'BRIEFING_READY',
+    title: 'Briefing ready',
+    message: 'Your daily briefing is ready',
     read: true,
-    data: null,
+    data: { podcastId: 'podcast-briefing' },
     createdAt: '2024-01-01T01:00:00Z',
   },
   {

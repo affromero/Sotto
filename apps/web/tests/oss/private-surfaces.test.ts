@@ -241,4 +241,33 @@ describe('private-first OSS surfaces', () => {
     expect(collectionSources).not.toContain('followerCount');
     expect(collectionSources).not.toContain('isFollowing');
   });
+
+  it('does not ship user follow or discovery API contracts', () => {
+    const removedUserSocialRoutes = [
+      'src/app/api/users/[userId]/follow/route.ts',
+      'src/app/api/users/[userId]/followers/route.ts',
+      'src/app/api/users/[userId]/following/route.ts',
+      'src/app/api/users/discover/route.ts',
+      'src/app/api/users/suggested/route.ts',
+    ];
+    const userApiSources = [
+      'src/app/api/users/[userId]/route.ts',
+      'src/app/api/users/me/route.ts',
+      'src/app/api/users/me/export/route.ts',
+      'src/lib/notification-utils.ts',
+      'src/components/notifications/NotificationList.tsx',
+    ]
+      .map(readSource)
+      .join('\n');
+
+    for (const route of removedUserSocialRoutes) {
+      expect(existsSync(resolve(webRoot, route)), route).toBe(false);
+    }
+    expect(userApiSources).not.toContain('prisma.follow');
+    expect(userApiSources).not.toContain('followerCount');
+    expect(userApiSources).not.toContain('followingCount');
+    expect(userApiSources).not.toContain('isFollowing');
+    expect(userApiSources).not.toContain('socialGraph');
+    expect(userApiSources).not.toContain('NEW_FOLLOWER');
+  });
 });

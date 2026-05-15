@@ -71,10 +71,10 @@ const mockNotification1 = {
 const mockNotification2 = {
   id: 'notif-2',
   userId: 'user-1',
-  type: 'NEW_FOLLOWER',
-  title: 'New follower',
-  message: 'Bob started following you',
-  data: { followerId: 'user-2' },
+  type: 'BRIEFING_READY',
+  title: 'Briefing ready',
+  message: 'Your daily briefing is ready',
+  data: { podcastId: 'pod-briefing' },
   read: true,
   createdAt: new Date('2025-01-14T10:00:00Z'),
 };
@@ -252,7 +252,6 @@ describe('GET /api/notifications', () => {
     const body = await response.json();
     expect(body).toHaveProperty('error');
   });
-
 });
 
 describe('PATCH /api/notifications/[notificationId]', () => {
@@ -318,7 +317,6 @@ describe('PATCH /api/notifications/[notificationId]', () => {
     const body = await response.json();
     expect(body).toMatchObject({ error: 'Forbidden' });
   });
-
 });
 
 describe('POST /api/notifications/mark-all-read', () => {
@@ -360,5 +358,4 @@ describe('POST /api/notifications/mark-all-read', () => {
     expect(response.status).toBe(200);
     expect(body).toEqual({ success: true, count: 0 });
   });
-
 });

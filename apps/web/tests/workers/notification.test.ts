@@ -106,7 +106,7 @@ describe('processNotification', () => {
       { type: 'PODCAST_READY', title: 'Your podcast is ready!', message: 'Ready.' },
       { type: 'PODCAST_LIKED', title: 'Someone liked your podcast', message: 'Liked.' },
       { type: 'PODCAST_FORKED', title: 'Your podcast was forked', message: 'Forked.' },
-      { type: 'NEW_FOLLOWER', title: 'New follower!', message: 'Followed.' },
+      { type: 'BRIEFING_READY', title: 'Briefing ready!', message: 'Ready.' },
       { type: 'SIMILAR_PODCAST_CREATED', title: 'Similar podcast created', message: 'Similar.' },
       { type: 'COMMENT_ON_YOUR_PODCAST', title: 'New comment', message: 'Commented.' },
       { type: 'COMMENT_REPLY', title: 'Reply to your comment', message: 'Replied.' },
@@ -298,9 +298,9 @@ describe('processNotification', () => {
     it('sends push notification without data when not provided', async () => {
       const payload: SendNotificationPayload = {
         userId: 'user-001',
-        type: 'NEW_FOLLOWER',
-        title: 'New follower',
-        message: 'You have a new follower.',
+        type: 'BRIEFING_READY',
+        title: 'Briefing ready',
+        message: 'Your daily briefing is ready.',
       };
       const job = createMockJob(payload);
       await processNotification(job);
@@ -351,29 +351,29 @@ describe('processNotification', () => {
       });
     });
 
-    it('correctly processes a NEW_FOLLOWER notification without data', async () => {
+    it('correctly processes a BRIEFING_READY notification without data', async () => {
       const job = createMockJob({
-        userId: 'user-followed',
-        type: 'NEW_FOLLOWER',
-        title: 'New follower!',
-        message: 'Alice started following you.',
+        userId: 'user-briefing',
+        type: 'BRIEFING_READY',
+        title: 'Briefing ready!',
+        message: 'Your daily briefing is ready.',
       });
       await processNotification(job);
 
       expect(mockPrismaNotificationCreate).toHaveBeenCalledWith({
         data: {
-          userId: 'user-followed',
-          type: 'NEW_FOLLOWER',
-          title: 'New follower!',
-          message: 'Alice started following you.',
+          userId: 'user-briefing',
+          type: 'BRIEFING_READY',
+          title: 'Briefing ready!',
+          message: 'Your daily briefing is ready.',
           data: undefined,
         },
       });
 
       expect(mockSendPushNotification).toHaveBeenCalledWith({
-        userId: 'user-followed',
-        title: 'New follower!',
-        body: 'Alice started following you.',
+        userId: 'user-briefing',
+        title: 'Briefing ready!',
+        body: 'Your daily briefing is ready.',
         data: undefined,
       });
     });
@@ -396,7 +396,7 @@ describe('processNotification', () => {
       await expect(processNotification(job)).resolves.toBeUndefined();
       expect(logger.warn).toHaveBeenCalledWith(
         expect.stringContaining('Push notification channel failed'),
-        expect.objectContaining({ error: 'Push service unavailable' }),
+        expect.objectContaining({ error: 'Push service unavailable' })
       );
     });
 

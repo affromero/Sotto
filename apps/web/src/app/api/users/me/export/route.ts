@@ -22,8 +22,6 @@ export async function GET() {
     comments,
     collections,
     collectionItems,
-    followers,
-    following,
     likes,
     saves,
     ratings,
@@ -147,14 +145,6 @@ export async function GET() {
         addedAt: true,
       },
     }),
-    prisma.follow.findMany({
-      where: { followingId: userId },
-      select: { followerId: true, createdAt: true },
-    }),
-    prisma.follow.findMany({
-      where: { followerId: userId },
-      select: { followingId: true, createdAt: true },
-    }),
     prisma.like.findMany({
       where: { userId },
       select: { podcastId: true, createdAt: true },
@@ -270,7 +260,6 @@ export async function GET() {
     comments,
     collections,
     collectionItems,
-    socialGraph: { followers, following },
     likes,
     saves,
     ratings,
