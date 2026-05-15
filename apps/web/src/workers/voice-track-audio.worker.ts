@@ -1,5 +1,10 @@
 import { Job } from 'bullmq';
-import { GenerateVoiceTrackAudioPayload, addJob, JobType, voiceTrackStitchingQueue } from '@/lib/queue';
+import {
+  GenerateVoiceTrackAudioPayload,
+  addJob,
+  JobType,
+  voiceTrackStitchingQueue,
+} from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { resolveTtsProvider } from '@/lib/providers';
 import { type TtsProviderId } from '@/lib/providers/tts-registry';
@@ -8,10 +13,27 @@ import type { VoiceMatchMetadata } from '@/lib/voice-pool';
 import { generateTtsAudio } from '@/lib/tts-generation';
 import { logger } from '@/lib/logger';
 
-export async function processVoiceTrackAudio(job: Job<GenerateVoiceTrackAudioPayload>): Promise<void> {
-  const { podcastId, voiceTrackId, voiceTrackSegmentId, segmentId, speaker, text, previousText, nextText, direction } = job.data;
+export async function processVoiceTrackAudio(
+  job: Job<GenerateVoiceTrackAudioPayload>
+): Promise<void> {
+  const {
+    podcastId,
+    voiceTrackId,
+    voiceTrackSegmentId,
+    segmentId,
+    speaker,
+    text,
+    previousText,
+    nextText,
+    direction,
+  } = job.data;
 
-  logger.info('Generating voice track audio for segment', { podcastId, voiceTrackId, segmentId, speaker });
+  logger.info('Generating voice track audio for segment', {
+    podcastId,
+    voiceTrackId,
+    segmentId,
+    speaker,
+  });
   await job.updateProgress(10);
 
   // Fail-fast: skip if voice track already failed (another segment errored first)
@@ -93,8 +115,14 @@ export async function processVoiceTrackAudio(job: Job<GenerateVoiceTrackAudioPay
     : undefined;
 
   // Resolve provider per-speaker: use the speaker's VoiceTrackVoice.provider if set, else fall back to track-level
-  const trackVoice = voiceTrack.voices.find(v => v.speaker === speaker);
-  const requestedProvider = (trackVoice?.provider || voiceTrack.ttsProvider) as TtsProviderId | null;
+  const trackVoice = voiceTrack.voices.find((v) => v.speaker === speaker);
+  const requestedProvider = (trackVoice?.provider ??
+    voiceTrack.ttsProvider) as TtsProviderId | null;
+  if (!requestedProvider) {
+    throw new Error(
+      `Voice track ${voiceTrackId} is missing a TTS provider for speaker ${speaker}. Select a provider before generating audio.`
+    );
+  }
 
   // Use per-voice model (not track-level) — voice tracks have mixed providers,
   // so each speaker's model must match their provider.
@@ -103,7 +131,7 @@ export async function processVoiceTrackAudio(job: Job<GenerateVoiceTrackAudioPay
   const { provider, source, providerId } = await resolveTtsProvider({
     userId,
     podcastId,
-    requestedProvider: requestedProvider ?? undefined,
+    requestedProvider,
     requestedModel,
     plan: voiceTrack.podcast.user.plan as 'FREE' | 'PRO',
     language: podcastLanguage,
@@ -111,20 +139,26 @@ export async function processVoiceTrackAudio(job: Job<GenerateVoiceTrackAudioPay
 
   const ttsModelId = provider.getModelId();
 
-  // Write back resolved provider and model if not already set
-  if (!voiceTrack.ttsProvider || !voiceTrack.ttsModel) {
-    await prisma.voiceTrack.update({
-      where: { id: voiceTrackId },
-      data: { ttsProvider: providerId, ttsModel: ttsModelId },
-    }).catch((err) => {
-      logger.warn('Failed to write back TTS provider to voice track', { voiceTrackId, error: err instanceof Error ? err.message : String(err) });
-    });
+  // Write back the track model only when generation used the track-level provider.
+  if (voiceTrack.ttsProvider === providerId && !voiceTrack.ttsModel) {
+    await prisma.voiceTrack
+      .update({
+        where: { id: voiceTrackId },
+        data: { ttsModel: ttsModelId },
+      })
+      .catch((err) => {
+        logger.warn('Failed to write back TTS provider to voice track', {
+          voiceTrackId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
   }
 
   // Use voice track voice assignment if provider matches, otherwise let provider pick from pool
-  const voiceId = (trackVoice?.voiceId && trackVoice.provider === providerId)
-    ? trackVoice.voiceId
-    : provider.getVoiceId(speaker, podcastId, voiceMetadata, podcastLanguage ?? undefined);
+  const voiceId =
+    trackVoice?.voiceId && trackVoice.provider === providerId
+      ? trackVoice.voiceId
+      : provider.getVoiceId(speaker, podcastId, voiceMetadata, podcastLanguage ?? undefined);
 
   // Persist resolved voice for retry consistency
   if (!trackVoice || trackVoice.provider !== providerId || trackVoice.voiceId !== voiceId) {
@@ -136,7 +170,10 @@ export async function processVoiceTrackAudio(job: Job<GenerateVoiceTrackAudioPay
       });
     } catch (err) {
       logger.warn('Failed to persist voice track voice assignment', {
-        podcastId, voiceTrackId, speaker, error: err instanceof Error ? err.message : String(err),
+        podcastId,
+        voiceTrackId,
+        speaker,
+        error: err instanceof Error ? err.message : String(err),
       });
     }
   }
@@ -169,7 +206,10 @@ export async function processVoiceTrackAudio(job: Job<GenerateVoiceTrackAudioPay
   });
 
   if (!result) {
-    logger.info('Voice track failed while waiting for semaphore, skipping', { voiceTrackId, segmentId });
+    logger.info('Voice track failed while waiting for semaphore, skipping', {
+      voiceTrackId,
+      segmentId,
+    });
     await job.updateProgress(100);
     return;
   }
@@ -177,7 +217,12 @@ export async function processVoiceTrackAudio(job: Job<GenerateVoiceTrackAudioPay
   await job.updateProgress(60);
 
   // Upload to R2
-  const audioUrl = await uploadVoiceTrackSegmentAudio(podcastId, voiceTrackId, segmentId, result.audioBuffer);
+  const audioUrl = await uploadVoiceTrackSegmentAudio(
+    podcastId,
+    voiceTrackId,
+    segmentId,
+    result.audioBuffer
+  );
 
   // Update voice track segment with audio URL and duration
   await prisma.voiceTrackSegment.update({
@@ -212,5 +257,9 @@ export async function processVoiceTrackAudio(job: Job<GenerateVoiceTrackAudioPay
   }
 
   await job.updateProgress(100);
-  logger.info('Voice track audio generation complete for segment', { voiceTrackId, segmentId, service: result.service });
+  logger.info('Voice track audio generation complete for segment', {
+    voiceTrackId,
+    segmentId,
+    service: result.service,
+  });
 }
