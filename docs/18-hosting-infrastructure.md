@@ -250,7 +250,7 @@ Access monitoring dashboard at `https://sotto.fm:19999` (restrict via Caddy).
 
 ## Audio File Storage Strategy
 
-Podcasts must be **always accessible** — public ones for all users, private ones for the owner.
+Podcasts must be **always accessible** to authorized listeners. Private episodes are served through authenticated app routes or private RSS token access.
 
 ### Option A: Local Storage + CDN (Recommended for VPS)
 
@@ -284,14 +284,14 @@ Add Cloudflare (free tier) in front for CDN + DDoS protection.
 - SFTP/CIFS/NFS access
 - Good for backups, okay for serving (slower than CDN)
 
-### Access Control for Private Podcasts
+### Access Control for Podcast Audio
 
 ```
-Public podcasts:  /audio/public/{podcastId}/audio.mp3  → served directly, CDN cached
-Private podcasts: /api/podcasts/{id}/stream             → auth check → presigned URL or proxy
+Static audio object: /audio/{podcastId}/audio.mp3
+Private stream:      /api/podcasts/{id}/stream -> auth/token check -> presigned URL or proxy
 ```
 
-Private podcasts are served through the API, which verifies the user owns the podcast before streaming.
+Private podcasts are served through API-controlled access, which verifies the signed-in user or private RSS token before streaming.
 
 ---
 

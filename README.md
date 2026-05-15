@@ -2,7 +2,7 @@
 
 Private audio briefings from your agents, meetings, workflows, and trusted sources.
 
-Sotto is being moved from a social podcast network into open source infrastructure for people who want private, self-owned audio feeds. The goal is simple: point your agents and sources at Sotto, generate audio briefings, and listen in any podcast app through private RSS.
+Sotto is open source infrastructure for people who want private, self-owned audio feeds. The goal is simple: point your agents and sources at Sotto, generate audio briefings, and listen in any podcast app through private RSS.
 
 ## What It Is
 
@@ -32,7 +32,7 @@ This repository is mid-pivot.
 - New podcasts and imports default to private.
 - Local storage is the default storage provider.
 - The default `npm run dev` path no longer requires Doppler or a production database sync.
-- Legacy social features, public feeds, likes, follows, comments, and remix surfaces still exist in the codebase and need a larger removal pass.
+- Public social routes, social schema tables, follow/like/comment/fork flows, social counters, and legacy demo harnesses have been removed from the active code path.
 - A public open source license still needs to be chosen before release.
 
 ## Quick Start
@@ -174,9 +174,8 @@ npm run ci
 ## Release Work Remaining
 
 - Choose and add an open source license.
-- Remove or feature-flag the remaining social layer.
 - Add a first-run onboarding screen for provider selection and private RSS setup.
 - Add meeting ingestion and agent webhook endpoints.
 - Add a scheduled news briefing source.
 - Add a managed-hosting trial path for users who do not want to run infra.
-- Update old docs that still describe Sotto as a social podcast network.
+- Finish replacing old pitch-era docs with private-first OSS release docs.

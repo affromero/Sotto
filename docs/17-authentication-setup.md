@@ -489,9 +489,7 @@ export const config = {
 | `/billing`      | Yes                        | Redirect to `/auth/login?callbackUrl=/billing`                      |
 | `/auth/login`   | No (redirect if logged in) | Redirect to `/dashboard` if already authenticated                   |
 | `/auth/signup`  | No (redirect if logged in) | Redirect to `/dashboard` if already authenticated                   |
-| `/feed`         | No                         | Public access                                                       |
 | `/podcast/[id]` | Depends on visibility      | Public podcasts: no auth. Private/unlisted: checked in the page/API |
-| `/profile/[id]` | No                         | Public access                                                       |
 | `/pricing`      | No                         | Public access                                                       |
 | `/api/*`        | Varies                     | Auth checked per-route in the API handler                           |
 
@@ -513,7 +511,7 @@ export async function GET() {
 }
 ```
 
-This pattern allows fine-grained control: some API routes (like `/api/feed`) are public, while others (like `/api/podcasts` POST) require authentication.
+This pattern allows fine-grained control: public informational routes can stay unauthenticated, while private workspace routes such as `/api/podcasts` POST require authentication.
 
 ### Callback URL Preservation
 
@@ -594,7 +592,7 @@ For local development where you do not have Google or GitHub OAuth apps configur
 
 1. The app starts without errors (providers are conditionally loaded)
 2. The login page renders but shows no OAuth buttons
-3. You can test non-auth features (feed, public podcasts, pricing page)
+3. You can test non-auth features such as public informational pages and pricing
 4. To test authenticated features, set up at least one OAuth provider
 
 ### With Google OAuth (Recommended for Local Dev)

@@ -118,7 +118,7 @@ Safe-for-launch core flow:
 6. audio generation (parallel per segment) and stitching run
 7. notifications run
 
-Note: `PENDING`/`DISCOVERING` statuses are only used by BYOK resume, fork, and admin paths — standard web creation starts directly at `EXTRACTING`.
+Note: `PENDING`/`DISCOVERING` statuses are used by BYOK resume, agent/manual setup, and admin paths. Standard web creation starts directly at `EXTRACTING`.
 
 Everything outside that path should be considered optional for day one.
 
