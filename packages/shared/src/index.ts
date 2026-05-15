@@ -86,7 +86,7 @@ export type {
   CreatorOverview,
   CreatorTopPodcast,
   CreatorDailyPlays,
-  CreatorEngagement,
+  CreatorPrivateActivity,
   CreatorAudienceInsights,
   CreatorAnalyticsResponse,
 } from './types/analytics';
