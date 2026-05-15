@@ -22,7 +22,9 @@ vi.mock('fs/promises', () => {
 const mockExecFileAsync = vi.fn().mockResolvedValue({ stdout: '', stderr: '' });
 
 vi.mock('util', () => {
-  const mod = { promisify: vi.fn().mockReturnValue((...args: unknown[]) => mockExecFileAsync(...args)) };
+  const mod = {
+    promisify: vi.fn().mockReturnValue((...args: unknown[]) => mockExecFileAsync(...args)),
+  };
   return { ...mod, default: mod };
 });
 
@@ -179,7 +181,9 @@ vi.mock('@/lib/byok', () => ({
 }));
 
 vi.mock('@/lib/providers/ai-registry', () => ({
-  resolveAiModelAndProvider: vi.fn().mockResolvedValue({ model: 'claude-haiku-4-5-20251001', provider: 'anthropic' }),
+  resolveAiModelAndProvider: vi
+    .fn()
+    .mockResolvedValue({ model: 'claude-haiku-4-5-20251001', provider: 'anthropic' }),
   getCheapestModelForProvider: vi.fn().mockReturnValue('claude-haiku-4-5-20251001'),
 }));
 
@@ -191,7 +195,12 @@ vi.mock('@/lib/generation-gate', () => ({
 const mockAddJob = vi.fn().mockResolvedValue({ id: 'job-1' });
 vi.mock('@/lib/queue', () => ({
   addJob: (...args: unknown[]) => mockAddJob(...args),
-  JobType: { SEND_NOTIFICATION: 'send_notification', COMPUTE_FEATURES: 'compute_features', GENERATE_WAVEFORM: 'generate_waveform', GENERATE_QUIZ: 'generate_quiz' },
+  JobType: {
+    SEND_NOTIFICATION: 'send_notification',
+    COMPUTE_FEATURES: 'compute_features',
+    GENERATE_WAVEFORM: 'generate_waveform',
+    GENERATE_QUIZ: 'generate_quiz',
+  },
   notificationQueue: { name: 'notifications' },
   featureComputationQueue: { name: 'feature-computation' },
   waveformGenerationQueue: { name: 'waveform-generation' },
@@ -234,6 +243,9 @@ const defaultPayload: ImportAudioPayload = {
   audioKey: 'uploads/audio-001.mp3',
   isHumanContent: false,
   generateMetadata: true,
+  sttProvider: 'openai',
+  sttModel: 'whisper-1',
+  sttApiKey: 'sk-stt',
 };
 
 // ---- Tests ----
@@ -247,8 +259,8 @@ describe('processAudioImport', () => {
     mockPrismaPodcastUpdate.mockResolvedValue({});
     mockPrismaScriptFindUnique.mockResolvedValue(null);
     mockPrismaScriptCreate.mockResolvedValue({ id: 'script-001' });
-    mockPrismaSegmentCreate.mockImplementation(
-      ({ data }: { data: { order: number } }) => Promise.resolve({ id: `seg-${data.order}`, ...data })
+    mockPrismaSegmentCreate.mockImplementation(({ data }: { data: { order: number } }) =>
+      Promise.resolve({ id: `seg-${data.order}`, ...data })
     );
     mockPrismaSegmentUpdate.mockResolvedValue({});
     mockPrismaPodcastVersionCreate.mockResolvedValue({ id: 'version-001', version: 1 });
@@ -274,13 +286,21 @@ describe('processAudioImport', () => {
         { start: 10, end: 20, text: 'Welcome to the show.' },
       ],
     });
-    mockCreateSttProvider.mockReturnValue({ transcribe: (...args: unknown[]) => mockTranscribe(...args) });
-    mockGetSttProviderMeta.mockReturnValue({ defaultModel: 'whisper-1', platformCostPerMinute: 0.006 });
+    mockCreateSttProvider.mockReturnValue({
+      transcribe: (...args: unknown[]) => mockTranscribe(...args),
+    });
+    mockGetSttProviderMeta.mockReturnValue({
+      defaultModel: 'whisper-1',
+      platformCostPerMinute: 0.006,
+    });
 
     mockParseTranscript.mockResolvedValue(defaultSegments);
     mockDiarizeSpeakers.mockResolvedValue(defaultSegments);
 
-    mockGenerateImportMetadata.mockResolvedValue({ title: 'AI-Generated Title', topic: 'Quantum Computing Fundamentals' });
+    mockGenerateImportMetadata.mockResolvedValue({
+      title: 'AI-Generated Title',
+      topic: 'Quantum Computing Fundamentals',
+    });
     mockIsMetadataDifferent.mockReturnValue(true);
     mockDetectLanguage.mockResolvedValue('en');
     mockMatchTopicTags.mockReturnValue([]);
@@ -319,7 +339,13 @@ describe('processAudioImport', () => {
 
   describe('transcript path (transcriptText provided)', () => {
     it('calls parseTranscript and skips STT provider', async () => {
-      const job = createMockJob({ ...defaultPayload, transcriptText: 'Host: Hello.\nExpert: Hi.' });
+      const job = createMockJob({
+        ...defaultPayload,
+        transcriptText: 'Host: Hello.\nExpert: Hi.',
+        sttProvider: undefined,
+        sttModel: undefined,
+        sttApiKey: undefined,
+      });
       await processAudioImport(job);
 
       expect(mockParseTranscript).toHaveBeenCalledWith('Host: Hello.\nExpert: Hi.');
@@ -337,8 +363,8 @@ describe('processAudioImport', () => {
 
     it('runs diarization when parsed transcript has only one unique speaker', async () => {
       mockParseTranscript.mockResolvedValue([
-        { speaker: 'HOST' , text: 'First.', order: 0, startTime: 0, endTime: 5 },
-        { speaker: 'HOST' , text: 'Second.', order: 1, startTime: 5, endTime: 10 },
+        { speaker: 'HOST', text: 'First.', order: 0, startTime: 0, endTime: 5 },
+        { speaker: 'HOST', text: 'Second.', order: 1, startTime: 5, endTime: 10 },
       ]);
 
       const job = createMockJob({ ...defaultPayload, transcriptText: 'Monologue transcript' });
@@ -349,8 +375,31 @@ describe('processAudioImport', () => {
   });
 
   describe('STT path (no transcript)', () => {
+    it('requires a concrete STT provider and key before transcription', async () => {
+      const job = createMockJob({
+        ...defaultPayload,
+        sttProvider: undefined,
+        sttModel: undefined,
+        sttApiKey: undefined,
+      });
+
+      await expect(processAudioImport(job)).rejects.toThrow(
+        'STT provider and API key are required'
+      );
+      expect(mockCreateSttProvider).not.toHaveBeenCalled();
+      expect(mockMarkPodcastFailed).toHaveBeenCalledWith('podcast-001', {
+        technicalError:
+          'STT provider and API key are required when transcript text is not provided.',
+      });
+    });
+
     it('creates STT provider with specified provider and key', async () => {
-      const job = createMockJob({ ...defaultPayload, sttProvider: 'elevenlabs', sttApiKey: 'el-key-abc' });
+      const job = createMockJob({
+        ...defaultPayload,
+        sttProvider: 'elevenlabs',
+        sttModel: undefined,
+        sttApiKey: 'el-key-abc',
+      });
       await processAudioImport(job);
 
       expect(mockCreateSttProvider).toHaveBeenCalledWith('elevenlabs', 'el-key-abc', undefined);
@@ -366,7 +415,10 @@ describe('processAudioImport', () => {
 
     it('logs STT usage with cost proportional to audio duration', async () => {
       mockGetAudioDuration.mockResolvedValue(120); // 2 minutes
-      mockGetSttProviderMeta.mockReturnValue({ defaultModel: 'whisper-1', platformCostPerMinute: 0.006 });
+      mockGetSttProviderMeta.mockReturnValue({
+        defaultModel: 'whisper-1',
+        platformCostPerMinute: 0.006,
+      });
 
       const job = createMockJob(defaultPayload);
       await processAudioImport(job);
@@ -385,7 +437,10 @@ describe('processAudioImport', () => {
       const job = createMockJob(defaultPayload);
       await processAudioImport(job);
 
-      expect(mockDownloadToFile).toHaveBeenCalledWith('uploads/audio-001.mp3', expect.stringMatching(/original\.mp3$/));
+      expect(mockDownloadToFile).toHaveBeenCalledWith(
+        'uploads/audio-001.mp3',
+        expect.stringMatching(/original\.mp3$/)
+      );
     });
 
     it('runs FFmpeg loudnorm normalization', async () => {
@@ -446,7 +501,8 @@ describe('processAudioImport', () => {
       await processAudioImport(job);
 
       const suggestionCall = mockPrismaPodcastUpdate.mock.calls.find(
-        (c: unknown[]) => (c[0] as { data?: { suggestedTitle?: unknown } })?.data?.suggestedTitle !== undefined
+        (c: unknown[]) =>
+          (c[0] as { data?: { suggestedTitle?: unknown } })?.data?.suggestedTitle !== undefined
       );
       expect(suggestionCall).toBeUndefined();
     });
@@ -579,10 +635,10 @@ describe('processAudioImport', () => {
       const job = createMockJob(defaultPayload);
       await processAudioImport(job);
 
-      expect(mockRm).toHaveBeenCalledWith(
-        expect.stringContaining('sotto-import-'),
-        { recursive: true, force: true }
-      );
+      expect(mockRm).toHaveBeenCalledWith(expect.stringContaining('sotto-import-'), {
+        recursive: true,
+        force: true,
+      });
     });
   });
 
@@ -591,9 +647,7 @@ describe('processAudioImport', () => {
       const job = createMockJob(defaultPayload);
       await processAudioImport(job);
 
-      expect(mockDetectLanguage).toHaveBeenCalledWith(
-        expect.stringContaining('Hello world.')
-      );
+      expect(mockDetectLanguage).toHaveBeenCalledWith(expect.stringContaining('Hello world.'));
     });
 
     it('assigns language tag when detected language matches an existing tag', async () => {
@@ -604,7 +658,9 @@ describe('processAudioImport', () => {
       await processAudioImport(job);
 
       expect(mockPrismaPodcastTagUpsert).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { podcastId_tagId: { podcastId: 'podcast-001', tagId: 'tag-lang-en' } } })
+        expect.objectContaining({
+          where: { podcastId_tagId: { podcastId: 'podcast-001', tagId: 'tag-lang-en' } },
+        })
       );
     });
 
@@ -614,8 +670,8 @@ describe('processAudioImport', () => {
       const job = createMockJob(defaultPayload);
       await processAudioImport(job);
 
-      const langTagCalls = mockPrismaPodcastTagUpsert.mock.calls.filter(
-        (c: unknown[]) => JSON.stringify(c).includes('lang-')
+      const langTagCalls = mockPrismaPodcastTagUpsert.mock.calls.filter((c: unknown[]) =>
+        JSON.stringify(c).includes('lang-')
       );
       expect(langTagCalls).toHaveLength(0);
     });
@@ -682,10 +738,10 @@ describe('processAudioImport', () => {
       const job = createMockJob(defaultPayload);
 
       await expect(processAudioImport(job)).rejects.toThrow();
-      expect(mockRm).toHaveBeenCalledWith(
-        expect.stringContaining('sotto-import-'),
-        { recursive: true, force: true }
-      );
+      expect(mockRm).toHaveBeenCalledWith(expect.stringContaining('sotto-import-'), {
+        recursive: true,
+        force: true,
+      });
     });
   });
 });
