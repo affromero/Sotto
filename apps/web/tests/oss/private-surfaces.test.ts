@@ -359,6 +359,23 @@ describe('private-first OSS surfaces', () => {
     expect(recommendationSources).not.toContain('forkCount');
   });
 
+  it('keeps recommendation training exports free of social labels', () => {
+    const trainingExportSources = [
+      'src/workers/data-export.worker.ts',
+      '../../scripts/ml/prepare-recommendation-training.ts',
+    ]
+      .map(readSource)
+      .join('\n');
+
+    expect(trainingExportSources).toContain('trainingLabel');
+    expect(trainingExportSources).toContain('saved');
+    expect(trainingExportSources).not.toContain('liked');
+    expect(trainingExportSources).not.toContain('forked');
+    expect(trainingExportSources).not.toContain('forkedFromId');
+    expect(trainingExportSources).not.toContain('engagementLabel');
+    expect(trainingExportSources).not.toContain('prisma.like');
+  });
+
   it('does not ship mobile podcast social actions or widgets', () => {
     const removedMobileComponents = [
       'apps/mobile/components/ForkModal.tsx',
