@@ -58,7 +58,9 @@ export function ProfileClient({
   const router = useRouter();
   const [isFollowing, setIsFollowing] = useState(initialIsFollowing);
   const [followerCount, setFollowerCount] = useState(initialFollowerCount);
-  const [activeTab, setActiveTab] = useState<'podcasts' | 'remixes' | 'liked' | 'collections'>('podcasts');
+  const [activeTab, setActiveTab] = useState<'podcasts' | 'remixes' | 'liked' | 'collections'>(
+    'podcasts'
+  );
   const [followModal, setFollowModal] = useState<'followers' | 'following' | null>(null);
 
   const [likedPodcasts, setLikedPodcasts] = useState<PodcastSummary[]>([]);
@@ -155,7 +157,10 @@ export function ProfileClient({
         <button
           type="button"
           className={`${styles.tab} ${activeTab === 'liked' ? styles.tabActive : ''}`}
-          onClick={() => { setActiveTab('liked'); loadLikedPodcasts(); }}
+          onClick={() => {
+            setActiveTab('liked');
+            loadLikedPodcasts();
+          }}
           aria-pressed={activeTab === 'liked'}
         >
           Liked
@@ -163,7 +168,10 @@ export function ProfileClient({
         <button
           type="button"
           className={`${styles.tab} ${activeTab === 'collections' ? styles.tabActive : ''}`}
-          onClick={() => { setActiveTab('collections'); loadCollections(); }}
+          onClick={() => {
+            setActiveTab('collections');
+            loadCollections();
+          }}
           aria-pressed={activeTab === 'collections'}
         >
           Collections
@@ -204,8 +212,8 @@ export function ProfileClient({
         />
       )}
 
-      {activeTab === 'collections' && (
-        collectionsLoading ? (
+      {activeTab === 'collections' &&
+        (collectionsLoading ? (
           <div className={styles.collectionsLoading} role="status" aria-label="Loading collections">
             <div className={styles.collectionsSpinner} />
             <span>Loading collections...</span>
@@ -227,13 +235,11 @@ export function ProfileClient({
                 name={c.name}
                 description={c.description}
                 podcastCount={c.podcastCount}
-                followerCount={c.followerCount}
                 user={c.user}
               />
             ))}
           </div>
-        )
-      )}
+        ))}
 
       {followModal && (
         <FollowListModal

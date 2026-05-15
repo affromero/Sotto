@@ -28,7 +28,6 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
       description: true,
       isPublic: true,
       podcastCount: true,
-      followerCount: true,
       createdAt: true,
       user: {
         select: { id: true, name: true, handle: true, image: true },
