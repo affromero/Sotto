@@ -159,4 +159,19 @@ describe('resolveAiModelAndProvider — explicit model routing', () => {
     expect(result.provider).toBe('claude-code');
     expect(result.model).toBe('claude-code:sonnet');
   });
+
+  it('uses a BYOK provider default model when no explicit model is set', async () => {
+    const result = await resolveAiModelAndProvider({
+      aiKey: { provider: 'openai', apiKey: 'sk-test' },
+    });
+
+    expect(result.provider).toBe('openai');
+    expect(result.model).toBe('gpt-5.4');
+  });
+
+  it('rejects missing model and key instead of falling back to auto config', async () => {
+    await expect(resolveAiModelAndProvider({ plan: 'FREE' })).rejects.toThrow(
+      'AI model is required when no AI key is configured.'
+    );
+  });
 });
