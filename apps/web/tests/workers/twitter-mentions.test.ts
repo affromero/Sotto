@@ -139,6 +139,14 @@ vi.mock('@/lib/queue', () => ({
 
 vi.mock('@/lib/providers/ai-registry', () => ({
   getModelRequiredPlan: vi.fn().mockReturnValue('FREE'),
+  getProviderForModel: vi.fn((model: string) => {
+    if (model.startsWith('gpt-')) return 'openai';
+    if (model.startsWith('claude-')) return 'anthropic';
+    return null;
+  }),
+  getAiProviderMeta: vi.fn((provider: string) => ({
+    defaultModel: provider === 'openai' ? 'gpt-5-nano' : 'claude-haiku-4-5-20251001',
+  })),
 }));
 
 vi.mock('@/lib/logger', () => ({
@@ -867,6 +875,55 @@ describe('processTwitterMentions', () => {
           sourceText: expect.stringContaining('Twitter/X Thread Discussion'),
         })
       );
+    });
+
+    it('passes explicit AI runtime to participant credential lookup', async () => {
+      const tweet = createMockTweet({
+        id: 'reply-in-thread',
+        conversation_id: 'thread-root-id',
+      });
+      const verifiedParticipants = [
+        { authorUsername: 'alice', authorName: 'Alice', authorBio: 'Researcher' },
+      ];
+      mockGetMentions.mockResolvedValue({ tweets: [tweet], mediaByKey: new Map(), authorMap: new Map() });
+      setupLinkedUser();
+      mockGetAiKey.mockResolvedValue({ apiKey: 'anthropic-key', provider: 'anthropic' });
+      mockGetVerifiedParticipants.mockReturnValue(verifiedParticipants);
+      mockGetThread.mockResolvedValue({
+        rootTweet: {
+          id: 'thread-root-id',
+          text: 'Root post about AI research',
+          authorId: 'a1',
+          authorUsername: 'alice',
+          authorName: 'Alice',
+          urls: [],
+          createdAt: '2026-02-10T10:00:00Z',
+        },
+        replies: [
+          { id: 'r1', text: 'Reply 1', authorId: 'a2', authorUsername: 'bob', authorName: 'Bob', urls: [], createdAt: '2026-02-10T10:05:00Z' },
+          { id: 'r2', text: 'Reply 2', authorId: 'a3', authorUsername: 'carol', authorName: 'Carol', urls: [], createdAt: '2026-02-10T10:10:00Z' },
+          { id: 'r3', text: 'Reply 3', authorId: 'a4', authorUsername: 'dave', authorName: 'Dave', urls: [], createdAt: '2026-02-10T10:15:00Z' },
+        ],
+        participantCount: 4,
+        tweetCount: 4,
+        isSelfAuthored: false,
+      });
+      mockParseThreadIntent.mockResolvedValue({
+        topic: 'AI Research',
+        title: 'AI Research Thread',
+        depth: 'deep_dive',
+        audienceLevel: 'intermediate',
+        tone: 'professional',
+        focusAreas: [],
+      });
+
+      await processTwitterMentions(createMockJob({}));
+
+      expect(mockLookupParticipantCredentials).toHaveBeenCalledWith(verifiedParticipants, {
+        providerType: 'anthropic',
+        model: 'claude-haiku-4-5-20251001',
+        apiKeyOverride: 'anthropic-key',
+      });
     });
 
     it('sets tone to socratic when parsed.isDebate is true', async () => {

@@ -7,7 +7,7 @@ import { parseTweetIntent, parseThreadIntent, resolveModelFromTweet, resolveChea
 import { getAiKey, hasByokKey } from '@/lib/byok';
 import { checkGenerationGate, tryIncrementFreeGeneration } from '@/lib/generation-gate';
 import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
-import { getModelRequiredPlan } from '@/lib/providers/ai-registry';
+import { getAiProviderMeta, getModelRequiredPlan, getProviderForModel, type AiProviderId } from '@/lib/providers/ai-registry';
 import { selectVoicePair } from '@/lib/elevenlabs';
 import { getTierFeatures } from '@/lib/tier-features';
 import { lookupParticipantCredentials } from '@/lib/credential-lookup';
@@ -17,12 +17,61 @@ import { generatePodcastSlug } from '@/lib/slugify';
 import { filterMention } from '@/lib/mention-filter';
 import { logger } from '@/lib/logger';
 import type { TwitterTweet, TwitterMedia, TwitterAuthorData, TweetParseResult, ThreadData } from '@/types/twitter';
-import type { ParticipantCredential } from '@/lib/credential-lookup';
+import type { CredentialLookupAiOptions, ParticipantCredential } from '@/lib/credential-lookup';
 
 const REDIS_CURSOR_KEY = 'twitter:last_processed_tweet_id';
 const REDIS_CTA_PREFIX = 'twitter:cta_sent:';
 // Always use production URL for public tweets — never inherit localhost from dev env
 const SOTTO_APP_URL = process.env.NEXT_PUBLIC_APP_URL?.startsWith('https://') ? process.env.NEXT_PUBLIC_APP_URL : 'https://sotto.fm';
+const LOCAL_AI_PROVIDER: AiProviderId = 'claude-code';
+const LOCAL_MODEL_PREFIX = 'claude-code:';
+
+function providerForCredentialModel(model: string): AiProviderId | null {
+  if (model.startsWith(LOCAL_MODEL_PREFIX) && model.length > LOCAL_MODEL_PREFIX.length) {
+    return LOCAL_AI_PROVIDER;
+  }
+  return getProviderForModel(model);
+}
+
+async function resolveCredentialLookupAi(
+  userId: string,
+  preferredAiModel: string | null | undefined,
+  aiKey: { apiKey: string; provider: AiProviderId } | null,
+): Promise<CredentialLookupAiOptions> {
+  if (preferredAiModel) {
+    const provider = providerForCredentialModel(preferredAiModel);
+    if (!provider) {
+      throw new Error(`Unknown AI model for participant credential lookup: ${preferredAiModel}`);
+    }
+    if (provider === LOCAL_AI_PROVIDER) {
+      return { providerType: provider, model: preferredAiModel };
+    }
+
+    const providerKey = aiKey?.provider === provider ? aiKey : await getAiKey(userId, provider);
+    if (!providerKey) {
+      throw new Error(`AI key for provider "${provider}" is required for participant credential lookup.`);
+    }
+    return {
+      providerType: provider,
+      model: preferredAiModel,
+      apiKeyOverride: providerKey.apiKey,
+    };
+  }
+
+  if (!aiKey) {
+    throw new Error('AI key or explicit local AI model is required for participant credential lookup.');
+  }
+
+  const model = getAiProviderMeta(aiKey.provider).defaultModel;
+  if (!model) {
+    throw new Error(`No default AI model configured for provider "${aiKey.provider}".`);
+  }
+  return {
+    providerType: aiKey.provider,
+    model,
+    apiKeyOverride: aiKey.apiKey,
+  };
+}
 
 export async function processTwitterMentions(job: Job<PollTwitterMentionsPayload>): Promise<void> {
   const redis = getRedisClient();
@@ -223,7 +272,7 @@ async function processSingleMention(tweet: TwitterTweet, mediaByKey: Map<string,
       if (verifiedParticipants.length > 0) {
         participantCredentials = await lookupParticipantCredentials(
           verifiedParticipants,
-          aiKey?.apiKey
+          await resolveCredentialLookupAi(userId, user.preferredAiModel, aiKey)
         );
       }
     }

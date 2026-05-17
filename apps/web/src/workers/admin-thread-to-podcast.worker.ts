@@ -6,12 +6,56 @@ import { getTwitterConfig } from '@/lib/twitter-config';
 import { addJob, JobType, contentExtractionQueue } from '@/lib/queue';
 import { selectVoicePair } from '@/lib/elevenlabs';
 import { lookupParticipantCredentials } from '@/lib/credential-lookup';
+import { getAiKey } from '@/lib/byok';
+import { getAiProviderMeta, getProviderForModel, type AiProviderId } from '@/lib/providers/ai-registry';
 import { formatThreadAsSourceText, getVerifiedParticipants } from '@/lib/twitter-utils';
 import { generatePodcastSlug } from '@/lib/slugify';
 import { logger } from '@/lib/logger';
 import type { AdminThreadToPodcastPayload } from '@/lib/queue';
+import type { CredentialLookupAiOptions } from '@/lib/credential-lookup';
 
 const TWEET_URL_REGEX = /(?:twitter\.com|x\.com)\/\w+\/status\/(\d+)/;
+const LOCAL_AI_PROVIDER: AiProviderId = 'claude-code';
+const LOCAL_MODEL_PREFIX = 'claude-code:';
+
+function providerForAdminCredentialModel(model: string): AiProviderId | null {
+  if (model.startsWith(LOCAL_MODEL_PREFIX) && model.length > LOCAL_MODEL_PREFIX.length) {
+    return LOCAL_AI_PROVIDER;
+  }
+  return getProviderForModel(model);
+}
+
+async function resolveAdminCredentialLookupAi(
+  userId: string,
+  model: string | null,
+): Promise<CredentialLookupAiOptions> {
+  if (model) {
+    const provider = providerForAdminCredentialModel(model);
+    if (!provider) {
+      throw new Error(`Unknown AI model for participant credential lookup: ${model}`);
+    }
+    if (provider === LOCAL_AI_PROVIDER) {
+      return { providerType: provider, model };
+    }
+
+    const providerKey = await getAiKey(userId, provider);
+    if (!providerKey) {
+      throw new Error(`AI key for provider "${provider}" is required for participant credential lookup.`);
+    }
+    return { providerType: provider, model, apiKeyOverride: providerKey.apiKey };
+  }
+
+  const userKey = await getAiKey(userId);
+  if (!userKey) {
+    throw new Error('AI key or explicit local AI model is required for participant credential lookup.');
+  }
+  const provider = userKey.provider;
+  const defaultModel = getAiProviderMeta(provider).defaultModel;
+  if (!defaultModel) {
+    throw new Error(`No default AI model configured for provider "${provider}".`);
+  }
+  return { providerType: provider, model: defaultModel, apiKeyOverride: userKey.apiKey };
+}
 
 export async function processAdminThreadToPodcast(
   job: Job<AdminThreadToPodcastPayload>
@@ -101,7 +145,10 @@ export async function processAdminThreadToPodcast(
   if (isThreadPodcast && threadData) {
     const verifiedParticipants = getVerifiedParticipants(threadData);
     if (verifiedParticipants.length > 0) {
-      participantCredentials = await lookupParticipantCredentials(verifiedParticipants);
+      participantCredentials = await lookupParticipantCredentials(
+        verifiedParticipants,
+        await resolveAdminCredentialLookupAi(sottoUser.id, twitterConfig.defaultAiModel)
+      );
     }
   }
 

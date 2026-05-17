@@ -1,24 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mockGenerateResponse = vi.fn();
+const mockCreateAIProvider = vi.fn((_type?: string) => ({
+  generateResponse: mockGenerateResponse,
+}));
 
 vi.mock('@/lib/providers/ai', () => ({
-  createAIProvider: () => ({ generateResponse: (...args: unknown[]) => mockGenerateResponse(...args) }),
+  createAIProvider: (type?: string) => mockCreateAIProvider(type),
 }));
 
 vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
-}));
-
-vi.mock('@/lib/auto-model-config', () => ({
-  resolveAutoModel: vi.fn().mockResolvedValue({
-    aiProvider: 'anthropic',
-    aiModel: 'claude-test-model',
-    ttsProvider: 'openai',
-    ttsModel: 'tts-1-hd',
-    sttProvider: 'openai',
-    sttModel: 'whisper-1',
-  }),
 }));
 
 vi.mock('@/lib/usage-logger', () => ({
@@ -35,7 +27,14 @@ import type { ParticipantInput } from '@/lib/credential-lookup';
 describe('lookupParticipantCredentials', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockCreateAIProvider.mockReturnValue({ generateResponse: mockGenerateResponse });
   });
+
+  const ai = {
+    providerType: 'anthropic' as const,
+    model: 'claude-haiku-4-5-20251001',
+    apiKeyOverride: 'anthropic-key',
+  };
 
   // Test 1: Returns credentials for verified participants
   it('returns credentials for verified participants', async () => {
@@ -49,15 +48,28 @@ describe('lookupParticipantCredentials', () => {
       outputTokens: 300,
     });
 
-    const result = await lookupParticipantCredentials([
-      { authorUsername: 'drsmith', authorName: 'Dr. Smith', authorBio: 'Physics professor' },
-    ]);
+    const result = await lookupParticipantCredentials(
+      [{ authorUsername: 'drsmith', authorName: 'Dr. Smith', authorBio: 'Physics professor' }],
+      ai
+    );
 
     expect(result).toHaveLength(1);
     expect(result[0].username).toBe('drsmith');
     expect(result[0].credentials).toBe('Professor of Physics at MIT');
     expect(result[0].confidence).toBe(0.85); // capped
     expect(result[0].source).toBe('MIT faculty page');
+    expect(mockCreateAIProvider).toHaveBeenCalledWith('anthropic');
+    expect(mockGenerateResponse).toHaveBeenCalledWith(
+      'You are a credential lookup agent.',
+      [expect.objectContaining({ role: 'user' })],
+      {
+        maxTokens: 2048,
+        model: 'claude-haiku-4-5-20251001',
+        apiKeyOverride: 'anthropic-key',
+        useWebSearch: true,
+        skipModeration: true,
+      }
+    );
   });
 
   // Test 2: Filters out low-confidence results
@@ -73,10 +85,13 @@ describe('lookupParticipantCredentials', () => {
       outputTokens: 300,
     });
 
-    const result = await lookupParticipantCredentials([
-      { authorUsername: 'user1', authorName: 'User 1' },
-      { authorUsername: 'user2', authorName: 'User 2' },
-    ]);
+    const result = await lookupParticipantCredentials(
+      [
+        { authorUsername: 'user1', authorName: 'User 1' },
+        { authorUsername: 'user2', authorName: 'User 2' },
+      ],
+      ai
+    );
 
     expect(result).toHaveLength(1);
     expect(result[0].username).toBe('user2');
@@ -95,7 +110,7 @@ describe('lookupParticipantCredentials', () => {
       authorName: `User ${i}`,
     }));
 
-    await lookupParticipantCredentials(participants);
+    await lookupParticipantCredentials(participants, ai);
 
     const userMessage = mockGenerateResponse.mock.calls[0][1][0].content;
     // Should only contain 5 participants
@@ -115,10 +130,19 @@ describe('lookupParticipantCredentials', () => {
   it('handles Claude errors gracefully', async () => {
     mockGenerateResponse.mockRejectedValue(new Error('API rate limited'));
 
-    const result = await lookupParticipantCredentials([
-      { authorUsername: 'user1', authorName: 'User 1' },
-    ]);
+    const result = await lookupParticipantCredentials(
+      [{ authorUsername: 'user1', authorName: 'User 1' }],
+      ai
+    );
 
     expect(result).toEqual([]);
+  });
+
+  it('throws when non-empty lookup has no explicit AI runtime', async () => {
+    await expect(
+      lookupParticipantCredentials([{ authorUsername: 'user1', authorName: 'User 1' }])
+    ).rejects.toThrow('AI provider and model are required for participant credential lookup.');
+
+    expect(mockCreateAIProvider).not.toHaveBeenCalled();
   });
 });
