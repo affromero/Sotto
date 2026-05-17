@@ -48,7 +48,23 @@ export async function processAdminThreadToPodcast(
     (!threadData.isSelfAuthored && threadData.replies.length >= 2)
   );
 
-  // 5. Always parse thread/tweet for content first, then merge admin overrides
+  // 5. Resolve @sotto system user and admin-configured model defaults for parsing
+  const sottoUser = await prisma.user.findUnique({
+    where: { handle: 'sotto' },
+    select: { id: true },
+  });
+
+  if (!sottoUser) {
+    throw new Error('@sotto system account not found. Run prisma db seed.');
+  }
+
+  const twitterConfig = await getTwitterConfig();
+  const parseOptions = {
+    userId: sottoUser.id,
+    aiModel: twitterConfig.defaultAiModel ?? undefined,
+  };
+
+  // 6. Always parse thread/tweet for content first, then merge admin overrides
   let parsed;
   const mentionAsThreadTweet = {
     id: tweet.id,
@@ -61,11 +77,11 @@ export async function processAdminThreadToPodcast(
   };
 
   const contentParsed = isThreadPodcast && threadData
-    ? await parseThreadIntent(mentionAsThreadTweet, threadData)
-    : await parseTweetIntent(tweet.text);
+    ? await parseThreadIntent(mentionAsThreadTweet, threadData, parseOptions)
+    : await parseTweetIntent(tweet.text, undefined, parseOptions);
 
   if (message) {
-    const overrides = await parseTweetIntent(message);
+    const overrides = await parseTweetIntent(message, undefined, parseOptions);
     parsed = {
       ...contentParsed,
       depth: overrides.depth,
@@ -90,19 +106,6 @@ export async function processAdminThreadToPodcast(
   }
 
   await job.updateProgress(60);
-
-  // 6. Resolve @sotto system user
-  const sottoUser = await prisma.user.findUnique({
-    where: { handle: 'sotto' },
-    select: { id: true },
-  });
-
-  if (!sottoUser) {
-    throw new Error('@sotto system account not found. Run prisma db seed.');
-  }
-
-  // 7. Read admin-configured model defaults
-  const twitterConfig = await getTwitterConfig();
 
   // 8. Create podcast as @sotto
   const voicePair = selectVoicePair(tweetId);

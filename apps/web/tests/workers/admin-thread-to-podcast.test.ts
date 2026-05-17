@@ -188,7 +188,10 @@ describe('processAdminThreadToPodcast', () => {
       });
       await processAdminThreadToPodcast(job);
 
-      expect(mockParseTweetIntent).toHaveBeenCalledWith('Single tweet about AI');
+      expect(mockParseTweetIntent).toHaveBeenCalledWith('Single tweet about AI', undefined, {
+        userId: 'sotto-user-id',
+        aiModel: undefined,
+      });
       expect(mockParseThreadIntent).not.toHaveBeenCalled();
       expect(mockPrismaPodcastCreate).toHaveBeenCalledWith({
         data: expect.objectContaining({
@@ -391,7 +394,10 @@ describe('processAdminThreadToPodcast', () => {
       // parseThreadIntent should be called for content (thread qualifies)
       expect(mockParseThreadIntent).toHaveBeenCalled();
       // parseTweetIntent called for admin overrides
-      expect(mockParseTweetIntent).toHaveBeenCalledWith('eli5 for beginners');
+      expect(mockParseTweetIntent).toHaveBeenCalledWith('eli5 for beginners', undefined, {
+        userId: 'sotto-user-id',
+        aiModel: undefined,
+      });
 
       expect(mockPrismaPodcastCreate).toHaveBeenCalledWith({
         data: expect.objectContaining({

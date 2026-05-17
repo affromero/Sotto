@@ -113,7 +113,11 @@ export async function POST(request: NextRequest) {
     return errorResponse('@sotto system account not found', 404);
   }
 
-  const intent = await parseTweetIntent(parsed.data.tweetText);
+  const config = await getTwitterConfig();
+  const intent = await parseTweetIntent(parsed.data.tweetText, undefined, {
+    userId: sottoUser.id,
+    aiModel: config.defaultAiModel ?? undefined,
+  });
   const voicePair = selectVoicePair(parsed.data.tweetId || intent.title);
   const slug = await generatePodcastSlug(intent.title, sottoUser.id, prisma);
 
