@@ -39,6 +39,38 @@ const pipelineBodySchema = z.object({
 const classificationIdSchema = z.string().uuid();
 
 const REDIS_KEY_PREFIX = 'pipeline-classification:';
+const LOCAL_AI_PROVIDER: AiProviderId = 'claude-code';
+const LOCAL_MODEL_PREFIX = 'claude-code:';
+
+function isLocalAiModel(model: string): boolean {
+  return model.startsWith(LOCAL_MODEL_PREFIX) && model.length > LOCAL_MODEL_PREFIX.length;
+}
+
+function providerForModel(model: string): AiProviderId | null {
+  if (isLocalAiModel(model)) return LOCAL_AI_PROVIDER;
+  return getProviderForModel(model);
+}
+
+function isKnownModel(model: string): boolean {
+  return isLocalAiModel(model) || isValidModelId(model);
+}
+
+async function requireAiProviderKey(
+  userId: string,
+  provider: AiProviderId,
+): Promise<string | undefined | Response> {
+  if (provider === LOCAL_AI_PROVIDER) return undefined;
+
+  const aiKey = await getAiKey(userId, provider);
+  if (!aiKey) {
+    return errorResponse(`AI key for provider "${provider}" is required for video pipeline classification.`, 403, {
+      code: 'ai_key_required',
+      provider,
+    });
+  }
+
+  return aiKey.apiKey;
+}
 
 /**
  * POST — Queue visual classification and return a classificationId for polling.
@@ -107,16 +139,20 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     if (!isValidAiProviderId(body.aiProvider)) {
       return errorResponse(`Unknown AI provider: ${body.aiProvider}`, 400);
     }
-    if (!isValidModelId(body.aiModel)) {
+    if (!isKnownModel(body.aiModel)) {
       return errorResponse(`Unknown AI model: ${body.aiModel}`, 400);
     }
-    aiProvider = body.aiProvider;
+    const owningProvider = providerForModel(body.aiModel);
+    if (owningProvider !== body.aiProvider) {
+      return errorResponse(`AI model "${body.aiModel}" does not belong to provider "${body.aiProvider}".`, 400);
+    }
+    aiProvider = owningProvider;
     aiModel = body.aiModel;
   } else if (body?.aiModel) {
-    if (!isValidModelId(body.aiModel)) {
+    if (!isKnownModel(body.aiModel)) {
       return errorResponse(`Unknown AI model: ${body.aiModel}`, 400);
     }
-    const resolvedProvider = getProviderForModel(body.aiModel);
+    const resolvedProvider = providerForModel(body.aiModel);
     if (!resolvedProvider) {
       return errorResponse(`No provider found for model: ${body.aiModel}`, 400);
     }
@@ -132,16 +168,44 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
     aiProvider = body.aiProvider;
     aiModel = resolvedModel;
+  } else if (user.preferredAiModel) {
+    try {
+      const resolved = await resolveAiModelAndProvider({
+        podcastAiModel: user.preferredAiModel,
+        aiKey: null,
+        plan: tier,
+      });
+      aiModel = resolved.model;
+      aiProvider = resolved.provider;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to resolve AI model.';
+      return errorResponse(message, 400);
+    }
   } else {
     const aiKey = await getAiKey(auth.userId);
+    if (!aiKey) {
+      return errorResponse('AI model is required for video pipeline classification when no AI key is configured.', 403, {
+        code: 'ai_key_required',
+      });
+    }
     const resolved = await resolveAiModelAndProvider({
-      podcastAiModel: user.preferredAiModel,
+      podcastAiModel: null,
       aiKey,
       plan: tier,
     });
     aiModel = resolved.model;
     aiProvider = resolved.provider;
-    apiKeyOverride = aiKey?.apiKey;
+    apiKeyOverride = aiKey.apiKey;
+  }
+
+  if (!isValidAiProviderId(aiProvider)) {
+    return errorResponse(`Unknown AI provider: ${aiProvider}`, 400);
+  }
+
+  if (!apiKeyOverride) {
+    const keyOrResponse = await requireAiProviderKey(auth.userId, aiProvider as AiProviderId);
+    if (keyOrResponse instanceof Response) return keyOrResponse;
+    apiKeyOverride = keyOrResponse;
   }
 
   // Generate classificationId and queue the job
