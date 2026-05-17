@@ -57,7 +57,7 @@ function makeJob(data: Record<string, unknown>) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockGetAiKey.mockResolvedValue(null);
+  mockGetAiKey.mockResolvedValue({ apiKey: 'anthropic-key', provider: 'anthropic' });
   mockPrisma.user.findUniqueOrThrow.mockResolvedValue({ plan: 'FREE' });
   mockResolveAiModel.mockResolvedValue({ model: 'claude-haiku-4-5-20251001', provider: 'anthropic' });
   mockResolveMotionProvider.mockResolvedValue('remotion');
@@ -68,6 +68,145 @@ beforeEach(() => {
 
 describe('visual-classification worker', () => {
   const baseData = { podcastId: 'pod-1', videoGenerationId: 'vg-1', userId: 'user-1' };
+
+  function seedClassifiablePodcast(aiModel: string | null = null) {
+    const segments = [
+      { id: 'seg-1', order: 0, speaker: 'Host', text: 'Hello', startTime: 0, duration: 5 },
+    ];
+    mockPrisma.podcast.findUniqueOrThrow.mockResolvedValue({
+      aiModel,
+      title: 'Test Podcast',
+      topic: 'Test topic',
+      segments,
+    });
+    mockPrisma.segment.findMany.mockResolvedValue(segments);
+    mockClassify.mockResolvedValue({
+      classifications: [
+        {
+          segmentId: 'seg-1',
+          order: 0,
+          subVisuals: [{
+            subOrder: 0,
+            startOffsetFraction: 0,
+            durationFraction: 1,
+            visualType: 'TEXT_CARD',
+            prompt: null,
+            metadata: { headline: 'Test' },
+            endStatePrompt: null,
+          }],
+        },
+      ],
+      transitionRecommendations: [],
+      inputTokens: 50,
+      outputTokens: 30,
+      model: 'claude-haiku-4-5-20251001',
+    });
+  }
+
+  it('uses the configured BYOK provider when the podcast has no model', async () => {
+    const aiKey = { apiKey: 'anthropic-key', provider: 'anthropic' };
+    seedClassifiablePodcast(null);
+    mockGetAiKey.mockResolvedValue(aiKey);
+
+    await processVisualClassification(makeJob(baseData));
+
+    expect(mockGetAiKey).toHaveBeenCalledTimes(1);
+    expect(mockGetAiKey).toHaveBeenCalledWith('user-1');
+    expect(mockResolveAiModel).toHaveBeenCalledWith({
+      podcastAiModel: null,
+      aiKey,
+      plan: 'FREE',
+    });
+    expect(mockClassify).toHaveBeenCalledWith(
+      expect.any(Array),
+      'Test Podcast',
+      'Test topic',
+      expect.objectContaining({
+        provider: 'anthropic',
+        model: 'claude-haiku-4-5-20251001',
+        apiKeyOverride: 'anthropic-key',
+      }),
+    );
+  });
+
+  it('uses the explicit podcast model owner and matching provider key', async () => {
+    seedClassifiablePodcast('gpt-5-mini');
+    mockResolveAiModel.mockResolvedValue({ model: 'gpt-5-mini', provider: 'openai' });
+    mockGetAiKey.mockResolvedValue({ apiKey: 'openai-key', provider: 'openai' });
+
+    await processVisualClassification(makeJob(baseData));
+
+    expect(mockResolveAiModel).toHaveBeenCalledWith({
+      podcastAiModel: 'gpt-5-mini',
+      aiKey: null,
+      plan: 'FREE',
+    });
+    expect(mockGetAiKey).toHaveBeenCalledTimes(1);
+    expect(mockGetAiKey).toHaveBeenCalledWith('user-1', 'openai');
+    expect(mockClassify).toHaveBeenCalledWith(
+      expect.any(Array),
+      'Test Podcast',
+      'Test topic',
+      expect.objectContaining({
+        provider: 'openai',
+        model: 'gpt-5-mini',
+        apiKeyOverride: 'openai-key',
+      }),
+    );
+  });
+
+  it('rejects explicit non-local models without a matching provider key', async () => {
+    seedClassifiablePodcast('gpt-5-mini');
+    mockResolveAiModel.mockResolvedValue({ model: 'gpt-5-mini', provider: 'openai' });
+    mockGetAiKey.mockResolvedValue(null);
+
+    await expect(processVisualClassification(makeJob(baseData))).rejects.toThrow(
+      'AI key for provider "openai" is required for visual classification.',
+    );
+    expect(mockGetAiKey).toHaveBeenCalledWith('user-1', 'openai');
+    expect(mockClassify).not.toHaveBeenCalled();
+    expect(mockPrisma.videoGeneration.update).toHaveBeenCalledWith({
+      where: { id: 'vg-1' },
+      data: expect.objectContaining({
+        status: 'FAILED',
+        failureReason: expect.stringContaining('AI key for provider "openai" is required'),
+      }),
+    });
+  });
+
+  it('rejects missing model and missing BYOK key before classification', async () => {
+    seedClassifiablePodcast(null);
+    mockGetAiKey.mockResolvedValue(null);
+
+    await expect(processVisualClassification(makeJob(baseData))).rejects.toThrow(
+      'AI model is required for visual classification when no AI key is configured.',
+    );
+    expect(mockResolveAiModel).not.toHaveBeenCalled();
+    expect(mockClassify).not.toHaveBeenCalled();
+  });
+
+  it('allows local claude-code models without provider keys', async () => {
+    seedClassifiablePodcast('claude-code:sonnet');
+    mockResolveAiModel.mockResolvedValue({
+      model: 'claude-code:sonnet',
+      provider: 'claude-code',
+    });
+    mockGetAiKey.mockResolvedValue(null);
+
+    await processVisualClassification(makeJob(baseData));
+
+    expect(mockGetAiKey).not.toHaveBeenCalled();
+    expect(mockClassify).toHaveBeenCalledWith(
+      expect.any(Array),
+      'Test Podcast',
+      'Test topic',
+      expect.objectContaining({
+        provider: 'claude-code',
+        model: 'claude-code:sonnet',
+        apiKeyOverride: undefined,
+      }),
+    );
+  });
 
   it('classifies segments with sub-visuals and queues external asset jobs', async () => {
     mockPrisma.segmentVisual.count.mockResolvedValue(1); // 1 pending (AI_ILLUSTRATION)
