@@ -73,6 +73,26 @@ vi.mock('@/lib/twitter-config', () => ({
   }),
 }));
 
+const mockGetAiKey = vi.fn().mockResolvedValue({
+  apiKey: 'anthropic-key',
+  provider: 'anthropic',
+});
+
+vi.mock('@/lib/byok', () => ({
+  getAiKey: (...args: unknown[]) => mockGetAiKey(...args),
+}));
+
+vi.mock('@/lib/providers/ai-registry', () => ({
+  getProviderForModel: vi.fn((model: string) => {
+    if (model.startsWith('gpt-')) return 'openai';
+    if (model.startsWith('claude-')) return 'anthropic';
+    return null;
+  }),
+  getAiProviderMeta: vi.fn((provider: string) => ({
+    defaultModel: provider === 'openai' ? 'gpt-5-nano' : 'claude-haiku-4-5-20251001',
+  })),
+}));
+
 vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
@@ -122,6 +142,7 @@ describe('processAdminThreadToPodcast', () => {
     mockPrismaPodcastCreate.mockResolvedValue({ id: 'podcast-001' });
     mockGetVerifiedParticipants.mockReturnValue([]);
     mockLookupParticipantCredentials.mockResolvedValue([]);
+    mockGetAiKey.mockResolvedValue({ apiKey: 'anthropic-key', provider: 'anthropic' });
     mockFormatThreadAsSourceText.mockReturnValue('## Thread source text');
   });
 
@@ -264,6 +285,39 @@ describe('processAdminThreadToPodcast', () => {
             }),
           },
         }),
+      });
+    });
+
+    it('passes explicit AI runtime to participant credential lookup', async () => {
+      const verifiedParticipants = [
+        { authorUsername: 'alice', authorName: 'Alice', authorBio: 'Researcher' },
+      ];
+      mockGetTweet.mockResolvedValue({ tweet: {
+        id: '555',
+        text: 'Thread starter',
+        author_id: 'author-1',
+        conversation_id: '555',
+        created_at: '2025-01-01T00:00:00Z',
+      }, mediaByKey: new Map() });
+      mockGetThread.mockResolvedValue({
+        rootTweet: { text: 'Thread starter', authorUsername: 'user1' },
+        replies: [
+          { text: 'Reply 1', authorUsername: 'user2' },
+          { text: 'Reply 2', authorUsername: 'user3' },
+        ],
+        isSelfAuthored: false,
+      });
+      mockGetVerifiedParticipants.mockReturnValue(verifiedParticipants);
+
+      await processAdminThreadToPodcast(createMockJob({
+        tweetUrl: 'https://x.com/user/status/555',
+        adminUserId: 'admin-1',
+      }));
+
+      expect(mockLookupParticipantCredentials).toHaveBeenCalledWith(verifiedParticipants, {
+        providerType: 'anthropic',
+        model: 'claude-haiku-4-5-20251001',
+        apiKeyOverride: 'anthropic-key',
       });
     });
   });
