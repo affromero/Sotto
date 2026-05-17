@@ -24,7 +24,7 @@ import { getAiKey, getByokKey, hasByokKey } from '@/lib/byok';
 import { getTierFeatures } from '@/lib/tier-features';
 import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
 import { assignVoicesForPodcast } from '@/lib/voice-assigner';
-import { resolveAiModelAndProvider } from '@/lib/providers/ai-registry';
+import { resolveAiModelAndProvider, type AiProviderId } from '@/lib/providers/ai-registry';
 import type { TtsProviderId } from '@/lib/providers/tts-registry';
 import { logger } from '@/lib/logger';
 import { logPipelineStageComplete } from '@/lib/pipeline-events';
@@ -65,8 +65,6 @@ export async function processReferenceValidation(
   logger.info('Starting reference validation', { podcastId, attempt: String(attempt) });
   await job.updateProgress(5);
 
-  const aiKey = useAdminCredits ? null : await getAiKey(userId);
-
   // Load references and script
   const [references, script, podcast, userPlanRecord, discovery] = await Promise.all([
     prisma.reference.findMany({
@@ -97,14 +95,6 @@ export async function processReferenceValidation(
       },
     }),
   ]);
-
-  // Model + provider resolved together — prevents sending e.g. gpt-5-mini to Anthropic
-  const { model, provider } = await resolveAiModelAndProvider({
-    podcastAiModel: podcast?.aiModel,
-    aiKey,
-    plan: userPlanRecord.plan as 'FREE' | 'PRO',
-  });
-  const verificationModel = model;
 
   if (!script) {
     throw new Error(`Script not found for podcast ${podcastId}`);
@@ -177,6 +167,27 @@ export async function processReferenceValidation(
     return;
   }
 
+  const aiKey = useAdminCredits || podcast?.aiModel ? null : await getAiKey(userId);
+  if (!podcast?.aiModel && !aiKey) {
+    throw new Error('AI model is required for reference validation when no AI key is configured.');
+  }
+
+  // Model + provider resolved together — prevents sending e.g. gpt-5-mini to Anthropic
+  const { model, provider } = await resolveAiModelAndProvider({
+    podcastAiModel: podcast?.aiModel,
+    aiKey,
+    plan: userPlanRecord.plan as 'FREE' | 'PRO',
+  });
+  const verificationModel = model;
+
+  const providerAiKey =
+    podcast?.aiModel && provider !== 'claude-code' && !useAdminCredits
+      ? await getAiKey(userId, provider as AiProviderId)
+      : aiKey;
+  if (podcast?.aiModel && provider !== 'claude-code' && !useAdminCredits && !providerAiKey) {
+    throw new Error(`AI key for provider "${provider}" is required for reference validation.`);
+  }
+
   const refInputs: ReferenceInput[] = references.map((r) => ({
     id: r.id,
     number: r.number,
@@ -228,7 +239,7 @@ export async function processReferenceValidation(
     refsToVerify,
     scriptTurns,
     podcast?.topic || '',
-    aiKey?.apiKey,
+    providerAiKey?.apiKey,
     verificationModel,
     provider,
     requiredRefCount
@@ -469,7 +480,7 @@ export async function processReferenceValidation(
             doi: r.doi,
           })),
           verificationFeedback: feedback,
-          apiKeyOverride: aiKey?.apiKey,
+          apiKeyOverride: providerAiKey?.apiKey,
           model: verificationModel,
           provider,
           webSearchEnabled: true,

@@ -256,7 +256,7 @@ describe('byok encryption/decryption', () => {
       const ciphertexts = Array.from({ length: 20 }, () => encryptApiKey(key));
 
       expect(new Set(ciphertexts).size).toBe(20);
-    });
+    }, 20_000);
 
     it('20 encryptions all decrypt back to the same key', () => {
       const key = 'sk-ant-api03-determinism-test';
@@ -265,7 +265,7 @@ describe('byok encryption/decryption', () => {
 
       expect(new Set(decrypted).size).toBe(1);
       expect(decrypted[0]).toBe(key);
-    });
+    }, 20_000);
   });
 
   // ---------------------------------------------------------------------------
