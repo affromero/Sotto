@@ -9,7 +9,7 @@ import { loadAndRender } from '@/lib/prompt-loader';
 import { ContentModerationError } from '@/lib/moderation';
 import { getAiKey, hasByokKey } from '@/lib/byok';
 import { getTierFeatures } from '@/lib/tier-features';
-import { resolveAiModelAndProvider } from '@/lib/providers/ai-registry';
+import { resolveAiModelAndProvider, type AiProviderId } from '@/lib/providers/ai-registry';
 import { getLanguageLabel } from '@sotto/shared';
 import { CHARS_PER_SECOND } from '@/lib/duration';
 import { logger } from '@/lib/logger';
@@ -20,8 +20,7 @@ export async function processInteraction(job: Job<ProcessInteractionPayload>): P
   logger.info('Processing interaction', { podcastId, interactionId });
   await job.updateProgress(10);
 
-  const [aiKey, hasTts, podcast, user, userPlan] = await Promise.all([
-    getAiKey(userId),
+  const [hasTts, podcast, user, userPlan] = await Promise.all([
     hasByokKey(userId),
     prisma.podcast.findUnique({ where: { id: podcastId }, select: { language: true, aiModel: true } }),
     prisma.user.findUnique({ where: { id: userId }, select: { preferredLanguage: true } }),
@@ -49,12 +48,25 @@ export async function processInteraction(job: Job<ProcessInteractionPayload>): P
     }
   }
 
+  const aiKey = podcast?.aiModel ? null : await getAiKey(userId);
+  if (!podcast?.aiModel && !aiKey) {
+    throw new Error('AI model is required for interactions when no AI key is configured.');
+  }
+
   // Model + provider resolved together — prevents sending e.g. gpt-5-mini to Anthropic
   const { model, provider } = await resolveAiModelAndProvider({
     podcastAiModel: podcast?.aiModel,
     aiKey,
     plan: userPlan.plan as 'FREE' | 'PRO',
   });
+
+  const providerAiKey =
+    podcast?.aiModel && provider !== 'claude-code'
+      ? await getAiKey(userId, provider as AiProviderId)
+      : aiKey;
+  if (podcast?.aiModel && provider !== 'claude-code' && !providerAiKey) {
+    throw new Error(`AI key for provider "${provider}" is required for interactions.`);
+  }
 
   // Get podcast script context
   const script = await prisma.script.findUnique({ where: { podcastId } });
@@ -113,7 +125,7 @@ export async function processInteraction(job: Job<ProcessInteractionPayload>): P
         role: 'user',
         content: `Recent podcast context:\n${recentContext}\n\nUser's question: ${question}`,
       },
-    ], { apiKeyOverride: aiKey?.apiKey, model });
+    ], { apiKeyOverride: providerAiKey?.apiKey, model });
   } catch (err) {
     if (err instanceof ContentModerationError) {
       // Content policy violation — mark interaction failed, don't retry
