@@ -8,14 +8,14 @@ import type { Beat } from '@/lib/creative-director';
 import { invalidatePodcastCache, publishPodcastStatus } from '@/lib/redis';
 import { logUsage } from '@/lib/usage-logger';
 import { getAiKey } from '@/lib/byok';
-import { resolveAiModelAndProvider } from '@/lib/providers/ai-registry';
+import { resolveAiModelAndProvider, type AiProviderId } from '@/lib/providers/ai-registry';
 import { detectLanguage } from '@/lib/language-detect';
 import { matchTopicTags, TAG_PARENT_MAP } from '@/lib/topic-tagger';
 import { logger } from '@/lib/logger';
 import { logPipelineStageComplete } from '@/lib/pipeline-events';
 
 export async function processScriptWriting(job: Job<WriteScriptPayload>): Promise<void> {
-  const { podcastId, userId, discoveryId, dossierId, outlineId } = job.data;
+  const { podcastId, userId, discoveryId, dossierId, outlineId, useAdminCredits } = job.data;
 
   logger.info('Script writing starting', { podcastId });
   await job.updateProgress(5);
@@ -46,7 +46,7 @@ export async function processScriptWriting(job: Job<WriteScriptPayload>): Promis
   }
 
   // Load dossier, outline, discovery, podcast
-  const [dossier, outline, discovery, podcast, aiKey] = await Promise.all([
+  const [dossier, outline, discovery, podcast, user] = await Promise.all([
     prisma.researchDossier.findUniqueOrThrow({
       where: { id: dossierId },
       select: { sources: true, evidence: true },
@@ -66,15 +66,29 @@ export async function processScriptWriting(job: Job<WriteScriptPayload>): Promis
       where: { id: podcastId },
       select: { aiModel: true },
     }),
-    getAiKey(userId),
+    prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { plan: true } }),
   ]);
 
   await job.updateProgress(15);
 
+  const aiKey = useAdminCredits || podcast.aiModel ? null : await getAiKey(userId);
+  if (!podcast.aiModel && !aiKey) {
+    throw new Error('AI model is required for script writing when no AI key is configured.');
+  }
+
   const { model, provider } = await resolveAiModelAndProvider({
     podcastAiModel: podcast.aiModel,
     aiKey,
+    plan: user.plan as 'FREE' | 'PRO',
   });
+
+  const providerAiKey =
+    podcast.aiModel && provider !== 'claude-code' && !useAdminCredits
+      ? await getAiKey(userId, provider as AiProviderId)
+      : aiKey;
+  if (podcast.aiModel && provider !== 'claude-code' && !useAdminCredits && !providerAiKey) {
+    throw new Error(`AI key for provider "${provider}" is required for script writing.`);
+  }
 
   const speakers = (discovery.speakers as Array<{ name: string; description: string }>) || [
     { name: 'Host', description: 'Curious and engaging podcast host' },
@@ -100,7 +114,7 @@ export async function processScriptWriting(job: Job<WriteScriptPayload>): Promis
       thesis: outline.thesis,
       beats: outline.beats as unknown as Beat[],
     },
-    apiKeyOverride: aiKey?.apiKey,
+    apiKeyOverride: providerAiKey?.apiKey,
     model,
     provider,
   });
