@@ -8,7 +8,7 @@ import type { Beat } from '@/lib/creative-director';
 import { invalidatePodcastCache, publishPodcastStatus } from '@/lib/redis';
 import { logUsage } from '@/lib/usage-logger';
 import { getAiKey } from '@/lib/byok';
-import { resolveAiModelAndProvider, type AiProviderId } from '@/lib/providers/ai-registry';
+import { getCheapestModelForProvider, resolveAiModelAndProvider, type AiProviderId } from '@/lib/providers/ai-registry';
 import { detectLanguage } from '@/lib/language-detect';
 import { matchTopicTags, TAG_PARENT_MAP } from '@/lib/topic-tagger';
 import { logger } from '@/lib/logger';
@@ -186,7 +186,15 @@ export async function processScriptWriting(job: Job<WriteScriptPayload>): Promis
 
   // Detect language
   const sampleText = result.turns.slice(0, 5).map(t => t.text).join(' ');
-  const detectedLanguage = await detectLanguage(sampleText).catch(() => null);
+  const languageDetectionModel = getCheapestModelForProvider(provider as AiProviderId);
+  if (!languageDetectionModel) {
+    throw new Error(`Language detection model is not configured for provider "${provider}".`);
+  }
+  const detectedLanguage = await detectLanguage(sampleText, {
+    providerType: provider as AiProviderId,
+    model: languageDetectionModel,
+    apiKeyOverride: providerAiKey?.apiKey,
+  });
 
   await job.updateProgress(85);
 

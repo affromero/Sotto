@@ -5,7 +5,7 @@ import { generateScript, generateScriptWithUserFeedback, type SourceMetadata } f
 import { extractContent } from '@/lib/extractors';
 import { logUsage } from '@/lib/usage-logger';
 import { getAiKey, hasByokKey } from '@/lib/byok';
-import { resolveAiModelAndProvider, type AiProviderId } from '@/lib/providers/ai-registry';
+import { getCheapestModelForProvider, resolveAiModelAndProvider, type AiProviderId } from '@/lib/providers/ai-registry';
 import { detectLanguage } from '@/lib/language-detect';
 import { invalidatePodcastCache, publishPodcastStatus } from '@/lib/redis';
 import { matchTopicTags, TAG_PARENT_MAP } from '@/lib/topic-tagger';
@@ -303,7 +303,15 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
 
   // Detect language from script text
   const fullText = result.turns.map((t: { text: string }) => t.text).join(' ');
-  const detectedLanguage = await detectLanguage(fullText);
+  const languageDetectionModel = getCheapestModelForProvider(provider as AiProviderId);
+  if (!languageDetectionModel) {
+    throw new Error(`Language detection model is not configured for provider "${provider}".`);
+  }
+  const detectedLanguage = await detectLanguage(fullText, {
+    providerType: provider as AiProviderId,
+    model: languageDetectionModel,
+    apiKeyOverride: providerAiKey?.apiKey,
+  });
   if (detectedLanguage) allTagSlugs.add(`lang-${detectedLanguage}`);
 
   // Production tag

@@ -121,7 +121,7 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
     if (!podcastAiConfig.aiModel && !aiKey) {
       throw new Error('AI model is required for audio import when no AI key is configured.');
     }
-    const { model: aiModel, provider: aiProvider } = await resolveAiModelAndProvider({
+    const { provider: aiProvider } = await resolveAiModelAndProvider({
       podcastAiModel: podcastAiConfig.aiModel,
       aiKey,
       plan: userPlan.plan as 'FREE' | 'PRO',
@@ -133,7 +133,10 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
     if (podcastAiConfig.aiModel && aiProvider !== 'claude-code' && !providerAiKey) {
       throw new Error(`AI key for provider "${aiProvider}" is required for audio import.`);
     }
-    const cheapModel = getCheapestModelForProvider(aiProvider as AiProviderId) ?? aiModel;
+    const cheapModel = getCheapestModelForProvider(aiProvider as AiProviderId);
+    if (!cheapModel) {
+      throw new Error(`Fast AI model is not configured for provider "${aiProvider}".`);
+    }
 
     await prisma.podcast.update({
       where: { id: podcastId },
@@ -397,7 +400,11 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
 
     // Detect language from transcript text
     const importFullText = segments.map((s) => s.text).join(' ');
-    const detectedLanguage = await detectLanguage(importFullText);
+    const detectedLanguage = await detectLanguage(importFullText, {
+      providerType: aiProvider as AiProviderId,
+      model: cheapModel,
+      apiKeyOverride: providerAiKey?.apiKey,
+    });
 
     // Auto-assign language tag
     if (detectedLanguage) {

@@ -430,7 +430,7 @@ describe('processAudioImport', () => {
         model: 'claude-code:sonnet',
         provider: 'claude-code',
       });
-      mockGetCheapestModelForProvider.mockReturnValue(null);
+      mockGetCheapestModelForProvider.mockReturnValue('haiku');
       mockGetAiKey.mockResolvedValue(null);
 
       await processAudioImport(createMockJob(defaultPayload));
@@ -439,13 +439,13 @@ describe('processAudioImport', () => {
       expect(mockDiarizeSpeakers).toHaveBeenCalledWith(
         expect.any(Array),
         undefined,
-        'claude-code:sonnet',
+        'haiku',
         'claude-code',
       );
       expect(mockGenerateImportMetadata).toHaveBeenCalledWith(
         expect.any(String),
         undefined,
-        'claude-code:sonnet',
+        'haiku',
         'claude-code',
       );
     });
@@ -789,7 +789,14 @@ describe('processAudioImport', () => {
       const job = createMockJob(defaultPayload);
       await processAudioImport(job);
 
-      expect(mockDetectLanguage).toHaveBeenCalledWith(expect.stringContaining('Hello world.'));
+      expect(mockDetectLanguage).toHaveBeenCalledWith(
+        expect.stringContaining('Hello world.'),
+        {
+          providerType: 'anthropic',
+          model: 'claude-haiku-4-5-20251001',
+          apiKeyOverride: 'anthropic-key',
+        }
+      );
     });
 
     it('assigns language tag when detected language matches an existing tag', async () => {

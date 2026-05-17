@@ -63,9 +63,15 @@ const { mockResolveAiModelAndProvider } = vi.hoisted(() => ({
     provider: 'anthropic',
   }),
 }));
+const mockGetCheapestModelForProvider = vi.fn((provider: string) => {
+  if (provider === 'openai') return 'gpt-5-nano';
+  if (provider === 'claude-code') return 'haiku';
+  return 'claude-haiku-4-5-20251001';
+});
 
 vi.mock('@/lib/providers/ai-registry', () => ({
   resolveAiModelAndProvider: mockResolveAiModelAndProvider,
+  getCheapestModelForProvider: (provider: string) => mockGetCheapestModelForProvider(provider),
 }));
 
 const { mockWriteScript } = vi.hoisted(() => ({
@@ -112,8 +118,10 @@ vi.mock('@/lib/usage-logger', () => ({
   logUsage: (...args: unknown[]) => mockLogUsage(...args),
 }));
 
+const mockDetectLanguage = vi.fn().mockResolvedValue('en');
+
 vi.mock('@/lib/language-detect', () => ({
-  detectLanguage: vi.fn().mockResolvedValue('en'),
+  detectLanguage: (...args: unknown[]) => mockDetectLanguage(...args),
 }));
 
 vi.mock('@/lib/topic-tagger', () => ({
@@ -227,6 +235,14 @@ describe('processScriptWriting', () => {
           provider: 'anthropic',
         }),
       );
+      expect(mockDetectLanguage).toHaveBeenCalledWith(
+        expect.stringContaining('Hello world.'),
+        {
+          providerType: 'anthropic',
+          model: 'claude-haiku-4-5-20251001',
+          apiKeyOverride: 'anthropic-key',
+        },
+      );
     });
 
     it('uses the explicit podcast model owner and matching provider key', async () => {
@@ -249,6 +265,14 @@ describe('processScriptWriting', () => {
           model: 'gpt-5-mini',
           provider: 'openai',
         }),
+      );
+      expect(mockDetectLanguage).toHaveBeenCalledWith(
+        expect.stringContaining('Hello world.'),
+        {
+          providerType: 'openai',
+          model: 'gpt-5-nano',
+          apiKeyOverride: 'openai-key',
+        },
       );
     });
 
