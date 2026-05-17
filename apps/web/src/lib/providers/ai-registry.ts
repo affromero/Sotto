@@ -418,7 +418,6 @@ export function isValidModelId(modelId: string): boolean {
  * Priority:
  * 1. podcast.aiModel (user's explicit choice) → look up provider from registry. Throws if unknown.
  * 2. BYOK key → provider default model
- * 3. Free tier admin config → aiAllocations[0] or aiModel
  *
  * Returns both `model` and `provider` so callers never mismatch them.
  */
@@ -427,8 +426,6 @@ export async function resolveAiModelAndProvider(opts: {
   aiKey?: { provider: string; apiKey: string } | null;
   plan?: 'FREE' | 'PRO';
 }): Promise<{ model: string; provider: string }> {
-  const { resolveAutoModel } = await import('../auto-model-config');
-
   // 1. Podcast-level model override — only use if the model is in the registry
   if (opts.podcastAiModel) {
     if (opts.podcastAiModel.startsWith('claude-code:')) {
@@ -455,12 +452,7 @@ export async function resolveAiModelAndProvider(opts: {
     }
   }
 
-  // 3. Auto model config (plan-aware)
-  const autoConfig = await resolveAutoModel(opts.plan ?? 'FREE');
-  return {
-    model: autoConfig.aiModel,
-    provider: autoConfig.aiProvider,
-  };
+  throw new Error('AI model is required when no AI key is configured.');
 }
 
 /**
