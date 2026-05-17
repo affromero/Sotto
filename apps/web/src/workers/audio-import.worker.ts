@@ -107,16 +107,32 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
       return;
     }
 
-    // Resolve user's BYOK AI key for diarization + metadata generation
-    const aiKey = await getAiKey(userId);
-    const userPlan = await prisma.user.findUniqueOrThrow({
-      where: { id: userId },
-      select: { plan: true },
-    });
+    const [podcastAiConfig, userPlan] = await Promise.all([
+      prisma.podcast.findUniqueOrThrow({
+        where: { id: podcastId },
+        select: { aiModel: true },
+      }),
+      prisma.user.findUniqueOrThrow({
+        where: { id: userId },
+        select: { plan: true },
+      }),
+    ]);
+    const aiKey = podcastAiConfig.aiModel ? null : await getAiKey(userId);
+    if (!podcastAiConfig.aiModel && !aiKey) {
+      throw new Error('AI model is required for audio import when no AI key is configured.');
+    }
     const { model: aiModel, provider: aiProvider } = await resolveAiModelAndProvider({
+      podcastAiModel: podcastAiConfig.aiModel,
       aiKey,
       plan: userPlan.plan as 'FREE' | 'PRO',
     });
+    const providerAiKey =
+      podcastAiConfig.aiModel && aiProvider !== 'claude-code'
+        ? await getAiKey(userId, aiProvider as AiProviderId)
+        : aiKey;
+    if (podcastAiConfig.aiModel && aiProvider !== 'claude-code' && !providerAiKey) {
+      throw new Error(`AI key for provider "${aiProvider}" is required for audio import.`);
+    }
     const cheapModel = getCheapestModelForProvider(aiProvider as AiProviderId) ?? aiModel;
 
     await prisma.podcast.update({
@@ -191,7 +207,7 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
           end: s.endTime ?? 0,
           text: s.text,
         }));
-        segments = await diarizeSpeakers(whisperSegments, aiKey?.apiKey, cheapModel, aiProvider);
+        segments = await diarizeSpeakers(whisperSegments, providerAiKey?.apiKey, cheapModel, aiProvider);
       }
     } else {
       if (!sttProvider || !sttApiKey) {
@@ -225,7 +241,7 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
       logger.info('Running speaker diarization');
       segments = await diarizeSpeakers(
         transcription.segments,
-        aiKey?.apiKey,
+        providerAiKey?.apiKey,
         cheapModel,
         aiProvider
       );
@@ -238,7 +254,7 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
       const fullText = segments.map((s) => s.text).join(' ');
       const metadata = await generateImportMetadata(
         fullText,
-        aiKey?.apiKey,
+        providerAiKey?.apiKey,
         cheapModel,
         aiProvider
       );
