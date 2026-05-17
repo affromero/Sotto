@@ -256,10 +256,6 @@ vi.mock('@/lib/auto-model-config', () => ({
     dailyFreeLimit: 3,
     dailyProLimit: 50,
   }),
-  resolveAutoModel: vi.fn().mockResolvedValue({
-    aiProvider: 'anthropic',
-    aiModel: 'claude-haiku-4-5-20251001',
-  }),
 }));
 
 vi.mock('@/lib/llm', () => ({

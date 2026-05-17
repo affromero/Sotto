@@ -20,17 +20,6 @@ vi.mock('@/lib/byok', () => ({
   getAiKey: (...args: unknown[]) => mockGetAiKey(...args),
 }));
 
-vi.mock('@/lib/auto-model-config', () => ({
-  resolveAutoModel: vi.fn(async () => ({
-    aiProvider: 'anthropic',
-    aiModel: 'claude-haiku-4-5-20251001',
-    ttsProvider: 'openai',
-    ttsModel: 'tts-1-hd',
-    sttProvider: 'openai',
-    sttModel: 'whisper-1',
-  })),
-}));
-
 vi.mock('@/lib/providers/ai-registry', () => ({
   getAiProviderMeta: vi.fn((id: string) => {
     if (id === 'anthropic') return { defaultModel: 'claude-haiku-4-5-20251001', models: [{ id: 'claude-haiku-4-5-20251001', tier: 'fast' }, { id: 'claude-sonnet-4-6', tier: 'balanced' }, { id: 'claude-opus-4-6', tier: 'best' }] };

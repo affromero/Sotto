@@ -94,19 +94,6 @@ vi.mock('@/lib/auto-model-config', () => ({
   getAutoModelConfig: (...args: unknown[]) => mockGetAutoModelConfig(...args),
 }));
 
-const mockResolveAutoModel = vi.fn().mockResolvedValue({
-  aiProvider: 'anthropic',
-  aiModel: 'claude-haiku-4-5-20251001',
-  ttsProvider: 'openai',
-  ttsModel: 'tts-1-hd',
-  sttProvider: 'openai',
-  sttModel: 'whisper-1',
-});
-
-vi.mock('@/lib/auto-model-config', () => ({
-  resolveAutoModel: (...args: unknown[]) => mockResolveAutoModel(...args),
-}));
-
 const mockGetAiKey = vi.fn().mockResolvedValue(null);
 const mockHasByokKey = vi.fn().mockResolvedValue(false);
 

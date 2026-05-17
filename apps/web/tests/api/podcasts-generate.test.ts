@@ -118,14 +118,6 @@ vi.mock('@/lib/generation-gate', () => ({
 
 vi.mock('@/lib/auto-model-config', () => ({
   getAutoModelConfig: (...args: unknown[]) => mockGetAutoModelConfig(...args),
-  resolveAutoModel: vi.fn().mockResolvedValue({
-    aiProvider: 'anthropic',
-    aiModel: 'claude-haiku-4-5-20251001',
-    ttsProvider: 'openai',
-    ttsModel: 'tts-1-hd',
-    sttProvider: 'openai',
-    sttModel: 'whisper-1',
-  }),
 }));
 
 const mockSelectFreeTierProviders = vi.fn().mockResolvedValue({

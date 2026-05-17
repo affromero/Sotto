@@ -551,23 +551,6 @@ export function resolveIncludedVideoModels(config: AutoModelConfigData): {
 }
 
 /**
- * Resolve the auto model config for a specific plan tier.
- * 'PLATFORM' is a dedicated AI-only config for internal operations
- * (handle screening, credential lookup).
- */
-export async function resolveAutoModel(plan: 'FREE' | 'PRO' | 'PLATFORM'): Promise<PlanModelConfig> {
-  const config = await getAutoModelConfig();
-  if (plan === 'PLATFORM') {
-    return {
-      ...config.free,
-      aiProvider: config.platform.aiProvider,
-      aiModel: config.platform.aiModel,
-    };
-  }
-  return plan === 'PRO' ? config.pro : config.free;
-}
-
-/**
  * Resolve the image provider and model for video generation.
  */
 export async function resolveImageModel(plan: 'FREE' | 'PRO' = 'PRO'): Promise<{
