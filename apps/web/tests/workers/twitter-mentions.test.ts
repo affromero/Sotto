@@ -70,6 +70,16 @@ vi.mock('@/lib/tweet-parser', () => ({
   resolveCheapestModels: (...args: unknown[]) => mockResolveCheapestModels(...args),
 }));
 
+const mockGetTwitterConfig = vi.fn().mockResolvedValue({
+  defaultAiModel: null,
+  defaultTtsProvider: null,
+  defaultTtsModel: null,
+});
+
+vi.mock('@/lib/twitter-config', () => ({
+  getTwitterConfig: (...args: unknown[]) => mockGetTwitterConfig(...args),
+}));
+
 const mockCheckGenerationGate = vi.fn().mockResolvedValue({ allowed: true, reason: 'ok', isByokUser: true });
 const mockTryIncrementFreeGeneration = vi.fn().mockResolvedValue(true);
 
@@ -217,6 +227,11 @@ describe('processTwitterMentions', () => {
     mockLookupParticipantCredentials.mockResolvedValue([]);
     mockGetVerifiedParticipants.mockReturnValue([]);
     mockFilterMention.mockResolvedValue({ verdict: 'pass', reason: 'Test pass' });
+    mockGetTwitterConfig.mockResolvedValue({
+      defaultAiModel: null,
+      defaultTtsProvider: null,
+      defaultTtsModel: null,
+    });
   });
 
   describe('mention polling', () => {
@@ -267,6 +282,24 @@ describe('processTwitterMentions', () => {
 
       expect(mockPrismaTweetMentionFindUnique).toHaveBeenCalledWith({
         where: { tweetId: tweet.id },
+      });
+      expect(mockFilterMention).toHaveBeenCalledWith(tweet, undefined, false, false, { ai: null });
+    });
+
+    it('passes configured AI runtime to mention filtering', async () => {
+      const tweet = createMockTweet();
+      mockGetTwitterConfig.mockResolvedValue({
+        defaultAiModel: 'gpt-5-nano',
+        defaultTtsProvider: null,
+        defaultTtsModel: null,
+      });
+      mockGetMentions.mockResolvedValue({ tweets: [tweet], mediaByKey: new Map(), authorMap: new Map() });
+      mockPrismaAccountFindFirst.mockResolvedValue(null);
+
+      await processTwitterMentions(createMockJob({}));
+
+      expect(mockFilterMention).toHaveBeenCalledWith(tweet, undefined, false, false, {
+        ai: { providerType: 'openai', model: 'gpt-5-nano' },
       });
     });
 

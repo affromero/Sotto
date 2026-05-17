@@ -4,6 +4,7 @@ import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { getRedisClient } from '@/lib/redis';
 import { getMentions, getTweet, getThread, replyToTweet, sendDirectMessage } from '@/lib/twitter';
 import { parseTweetIntent, parseThreadIntent, resolveModelFromTweet, resolveCheapestModels } from '@/lib/tweet-parser';
+import { getTwitterConfig } from '@/lib/twitter-config';
 import { getAiKey, hasByokKey } from '@/lib/byok';
 import { checkGenerationGate, tryIncrementFreeGeneration } from '@/lib/generation-gate';
 import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
@@ -18,6 +19,7 @@ import { filterMention } from '@/lib/mention-filter';
 import { logger } from '@/lib/logger';
 import type { TwitterTweet, TwitterMedia, TwitterAuthorData, TweetParseResult, ThreadData } from '@/types/twitter';
 import type { CredentialLookupAiOptions, ParticipantCredential } from '@/lib/credential-lookup';
+import type { MentionFilterAiOptions } from '@/lib/mention-filter';
 
 const REDIS_CURSOR_KEY = 'twitter:last_processed_tweet_id';
 const REDIS_CTA_PREFIX = 'twitter:cta_sent:';
@@ -26,11 +28,20 @@ const SOTTO_APP_URL = process.env.NEXT_PUBLIC_APP_URL?.startsWith('https://') ? 
 const LOCAL_AI_PROVIDER: AiProviderId = 'claude-code';
 const LOCAL_MODEL_PREFIX = 'claude-code:';
 
-function providerForCredentialModel(model: string): AiProviderId | null {
+function providerForAiModel(model: string): AiProviderId | null {
   if (model.startsWith(LOCAL_MODEL_PREFIX) && model.length > LOCAL_MODEL_PREFIX.length) {
     return LOCAL_AI_PROVIDER;
   }
   return getProviderForModel(model);
+}
+
+function resolveMentionFilterAi(model: string | null | undefined): MentionFilterAiOptions | null {
+  if (!model) return null;
+  const provider = providerForAiModel(model);
+  if (!provider) {
+    throw new Error(`Unknown AI model for mention filtering: ${model}`);
+  }
+  return { providerType: provider, model };
 }
 
 async function resolveCredentialLookupAi(
@@ -39,7 +50,7 @@ async function resolveCredentialLookupAi(
   aiKey: { apiKey: string; provider: AiProviderId } | null,
 ): Promise<CredentialLookupAiOptions> {
   if (preferredAiModel) {
-    const provider = providerForCredentialModel(preferredAiModel);
+    const provider = providerForAiModel(preferredAiModel);
     if (!provider) {
       throw new Error(`Unknown AI model for participant credential lookup: ${preferredAiModel}`);
     }
@@ -120,7 +131,10 @@ async function processSingleMention(tweet: TwitterTweet, mediaByKey: Map<string,
   const author = authorMap.get(tweet.author_id);
   const hasParentTweet = !!getParentTweetId(tweet);
   const hasImages = !!(tweet.attachments?.media_keys?.length);
-  const filterResult = await filterMention(tweet, author, hasParentTweet, hasImages);
+  const twitterConfig = await getTwitterConfig();
+  const filterResult = await filterMention(tweet, author, hasParentTweet, hasImages, {
+    ai: resolveMentionFilterAi(twitterConfig.defaultAiModel),
+  });
 
   if (filterResult.verdict !== 'pass') {
     logger.info('Mention filtered out', {
