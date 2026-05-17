@@ -14,12 +14,6 @@ vi.mock('@/lib/byok', () => ({
   getByokKey: (...args: unknown[]) => mockGetByokKey(...args),
 }));
 
-const mockResolveAutoModel = vi.fn();
-
-vi.mock('@/lib/auto-model-config', () => ({
-  resolveAutoModel: (...args: unknown[]) => mockResolveAutoModel(...args),
-}));
-
 vi.mock('@/lib/prisma', () => ({
   prisma: {},
 }));
@@ -362,7 +356,6 @@ describe('resolveSttProvider', () => {
     vi.unstubAllEnvs();
     mockGetAiKey.mockReset();
     mockGetByokKey.mockReset();
-    mockResolveAutoModel.mockReset();
   });
 
   afterEach(() => {
@@ -422,7 +415,6 @@ describe('resolveSttProvider', () => {
     await expect(resolveSttProvider({ userId: 'user-1', plan: 'FREE' })).rejects.toThrow(
       'STT provider is required'
     );
-    expect(mockResolveAutoModel).not.toHaveBeenCalled();
     expect(mockGetAiKey).not.toHaveBeenCalled();
   });
 

@@ -161,7 +161,7 @@ source request
 
 Expected resolvers:
 
-- `resolveAutoModel()` for LLM/script generation.
+- Explicit LLM runtime resolution for script generation.
 - `resolveTtsProvider()` for TTS.
 - `resolveSttProvider()` for transcription.
 - Local-agent resolver for CLI-backed generation.

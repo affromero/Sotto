@@ -61,7 +61,7 @@ All shared business logic and external service integrations live here.
 | `newsletter-fetcher.ts` | RSS fetcher for news: 26 curated feeds (balanced politics + aggregators + tech + international), JSDOM XML parsing. `fetchNewsletterArticles()` reads from `IngestedArticle` DB table (falls back to live RSS), `fetchFeed()` exported for news-ingest worker, `formatArticlesForPrompt()` | Fetch + JSDOM + `prisma.ts` |
 | `handles.ts` | Handle validation, availability checks, unique generation (reserved handles, format validation) | Uses `prisma.ts` |
 | `rss.ts` | Private feed token creation and token-scoped RSS 2.0 XML with iTunes namespace | Uses `prisma.ts` |
-| `auto-model-config.ts` | `getAutoModelConfig()` / `setAutoModelConfig()` for per-plan "Auto" model resolution + daily limits + provider allocations; `resolveAutoModel(plan)` returns AI/TTS/STT config for FREE or PRO | Uses `prisma.ts` |
+| `auto-model-config.ts` | `getAutoModelConfig()` / `setAutoModelConfig()` for per-plan configured defaults, daily limits, and provider allocations | Uses `prisma.ts` |
 | `twitter-config.ts` | `getTwitterConfig()` reads singleton TwitterConfig row (auto-tweet thresholds, trend polling, template); `setTwitterConfig()` for admin updates | Uses `prisma.ts` |
 | `landing-showcase.ts` | `getLandingShowcaseConfig()` reads singleton LandingShowcase row; `setLandingShowcaseConfig()` for admin updates. Follows twitter-config singleton pattern | Uses `prisma.ts` |
 | `showcase.ts` | `getShowcasePodcast()` for HeroChapter embed; `getLandingShowcaseData()` fetches full showcase data (chat, script, refs, audio/video clips, bot overrides) for all landing chapters | Uses `prisma.ts`, `landing-showcase.ts` |
@@ -89,7 +89,7 @@ All shared business logic and external service integrations live here.
 | `embeddings.ts` | Embedding provider abstraction (384-dim): stub hash-based for dev, swap to `text-embedding-3-small` | Pure utility (swappable) |
 | `event-buffer.ts` | Client-side behavioral event buffer: 5s flush / 50-event cap, `sendBeacon` on unload | `'use client'` |
 | `import-metadata-generator.ts` | Claude-based title + topic generation from imported audio transcripts | Uses `llm.ts` |
-| `language-detect.ts` | Language detection via platform AI model (`resolveAutoModel('PLATFORM')`) → ISO 639-1 code | Uses `providers/ai.ts`, `auto-model-config.ts`, `tts-language-support.ts` |
+| `language-detect.ts` | Language detection via explicitly supplied AI runtime → ISO 639-1 code | Uses `providers/ai.ts`, `tts-language-support.ts` |
 | `tts-language-support.ts` | TTS language support lookups: `supportsLanguage()`, `getProvidersForLanguage()`, `getDefaultModelForLanguage()`, `SOTTO_LANGUAGE_CODES`, `VOICE_LANGUAGE_AFFINITIES` — thin query layer over registry language data | Uses `providers/tts-registry.ts` |
 | `moderation.ts` | OpenAI Moderation API client: per-category thresholds, Redis caching (10min TTL) | OpenAI Moderation API, `redis.ts` |
 | `user-moderation.ts` | Admin user moderation actions: warn, suspend, ban, unban, unsuspend, remove content | Uses `prisma.ts` |
@@ -104,7 +104,7 @@ All shared business logic and external service integrations live here.
 | `email-templates.ts` | Waitlist welcome + weekly digest HTML templates | Pure utility |
 | `tts-text-cleaner.ts` | TTS text safety net: strips `[SFX:]` markers and `[N]` citations before sending to TTS. Provider-specific tag conversion handled upstream by `tts-tag-converter.ts` | Pure utility |
 | `tts-generation.ts` | Shared TTS generation core used by `audio-generation` and `voice-track-audio` workers: semaphore-controlled concurrency, `generateSpeech` with full params, BYOK 404 fallback, 429 concurrency updates, FFprobe duration measurement, usage logging. Also exports `getPlatformTtsKey()` | Uses `providers/tts.ts`, `redis.ts`, `byok.ts`, `elevenlabs.ts`, `audio-stitcher.ts`, `usage-logger.ts` |
-| `tts-tag-converter.ts` | LLM-based TTS tag converter: converts script inline markup to provider-native format at approve time. Uses cheapest model via `pricing.ts`, fetches provider docs via `tts-doc-fetcher.ts` | Uses `llm.ts`, `pricing.ts`, `tts-doc-fetcher.ts` |
+| `tts-tag-converter.ts` | Explicit TTS tag converter: disabled by default; converts script inline markup to provider-native format only when a caller supplies an AI runtime | Uses `providers/ai.ts`, `tts-doc-fetcher.ts` |
 | `tts-doc-fetcher.ts` | TTS provider docs fetcher: fetches formatting docs from provider URL, Redis cache (24h TTL), HTML content extraction | Fetch + `redis.ts` |
 | `visual-classifier.ts` | Claude Haiku-based batch segment classification: assigns visual type + prompt/metadata + `endStatePrompt` per segment (8 types: ai-illustration, stock-footage, data-chart, quote, comparison, timeline, diagram, text-card). `endStatePrompt` describes how the scene should look after narration ends (used for last-frame image generation in video mode) | Uses `llm.ts` |
 | `stock-footage.ts` | Pexels Video API search + download: returns stock video clips for STOCK_FOOTAGE segments, falls back to TEXT_CARD if no results | Pexels API |

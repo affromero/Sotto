@@ -13,14 +13,6 @@ const mockCheckGenerationGate = vi.fn();
 
 const mockGetFreeTierStatus = vi.fn();
 const mockGetAutoModelConfig = vi.fn();
-const mockResolveAutoModel = vi.fn().mockResolvedValue({
-  aiProvider: 'anthropic',
-  aiModel: 'claude-haiku-4-5-20251001',
-  ttsProvider: 'openai',
-  ttsModel: 'tts-1-hd',
-  sttProvider: 'openai',
-  sttModel: 'whisper-1',
-});
 const mockAddJob = vi.fn();
 
 const mockAuthenticateRequest = vi.fn();
@@ -83,7 +75,6 @@ vi.mock('@/lib/generation-gate', () => ({
 
 vi.mock('@/lib/auto-model-config', () => ({
   getAutoModelConfig: (...args: unknown[]) => mockGetAutoModelConfig(...args),
-  resolveAutoModel: (...args: unknown[]) => mockResolveAutoModel(...args),
 }));
 
 vi.mock('@/lib/stripe', () => ({

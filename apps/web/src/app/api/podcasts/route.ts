@@ -7,7 +7,7 @@ import { checkRateLimit } from '@/lib/redis';
 import { contentExtractionQueue, addJob, JobType } from '@/lib/queue';
 import { checkGenerationGate } from '@/lib/generation-gate';
 import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
-import { resolveAutoModel } from '@/lib/auto-model-config';
+import { getAutoModelConfig } from '@/lib/auto-model-config';
 import { getTierFeatures, getJobPriority, isModelAllowedForUser } from '@/lib/tier-features';
 import { getModelRequiredPlan, getProviderForModel, isValidModelId } from '@/lib/providers/ai-registry';
 import { computeVoiceCharges } from '@/lib/voice-pricing';
@@ -164,7 +164,7 @@ export async function POST(request: NextRequest) {
 
   // Pro non-BYOK: resolve auto model for Pro tier
   if (!gate.isByokUser && gate.isProUser && !parsed.data.aiModel) {
-    const proConfig = await resolveAutoModel('PRO');
+    const proConfig = (await getAutoModelConfig()).pro;
     autoResolvedAiModel = proConfig.aiModel;
     autoResolvedAiProvider = proConfig.aiProvider;
     autoResolvedTtsProvider = proConfig.ttsProvider;

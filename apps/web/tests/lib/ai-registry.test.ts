@@ -5,17 +5,6 @@ vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
-vi.mock('@/lib/auto-model-config', () => ({
-  resolveAutoModel: vi.fn().mockResolvedValue({
-    aiProvider: 'anthropic',
-    aiModel: 'claude-haiku-4-5-20251001',
-    ttsProvider: 'openai',
-    ttsModel: 'tts-1-hd',
-    sttProvider: 'openai',
-    sttModel: 'whisper-1',
-  }),
-}));
-
 describe('getCheapestModelForProvider', () => {
   it('returns fast-tier model for anthropic', () => {
     expect(getCheapestModelForProvider('anthropic')).toBe('claude-haiku-4-5-20251001');
