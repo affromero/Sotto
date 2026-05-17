@@ -18,23 +18,6 @@ vi.mock('@/lib/prisma', () => {
   return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
 });
 
-vi.mock('@/lib/providers/ai', () => ({
-  createAIProvider: () => ({
-    generateResponse: vi.fn().mockResolvedValue({ content: 'OK', inputTokens: 5, outputTokens: 1, model: 'claude-haiku-4-5-20251001' }),
-  }),
-}));
-
-vi.mock('@/lib/redis', () => ({
-  cache: {
-    get: vi.fn().mockResolvedValue(null),
-    set: vi.fn().mockResolvedValue(undefined),
-  },
-}));
-
-vi.mock('@/lib/logger', () => ({
-  logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn(), debug: vi.fn() },
-}));
-
 // ---- Import under test ----
 
 import { GET } from '@/app/api/handles/check/route';

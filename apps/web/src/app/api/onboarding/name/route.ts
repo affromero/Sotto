@@ -39,7 +39,7 @@ export async function POST(request: Request) {
       return errorResponse(formatCheck.reason!, 400);
     }
 
-    // LLM-based obscenity check
+    // Local obscenity / impersonation check
     const moderationCheck = await moderateDisplayName(name);
     if (!moderationCheck.valid) {
       return errorResponse(moderationCheck.reason!, 400);
