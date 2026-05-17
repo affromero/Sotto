@@ -522,7 +522,7 @@ describe('POST /api/discovery', () => {
       expect(mockStreamDiscoveryResponse).toHaveBeenCalledWith(
         [{ role: 'user', content: 'Hello' }],
         'test-ai-key',
-        undefined,
+        'claude-haiku-4-5-20251001',
         expect.any(Function),
         'anthropic',
         undefined,
@@ -707,6 +707,35 @@ describe('POST /api/discovery', () => {
       const response = await POST(request);
 
       expect(response.status).toBe(200);
+    });
+
+    it('uses provider default for streaming and cheapest provider model for language detection', async () => {
+      mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+      mockGetAiKey.mockResolvedValue({ apiKey: 'user-openai-key-123', provider: 'openai' });
+      mockDetectLanguage.mockResolvedValue('es');
+      mockStreamDiscoveryResponse.mockReturnValue(mockStreamGenerator(['Response']));
+      mockParseChips.mockReturnValue({ text: 'Response', chips: [] });
+      mockParseMetadata.mockReturnValue(null);
+
+      const message = 'Quiero aprender sobre historia mediterranea y cultura espanola';
+      const request = createPostRequest({ message });
+      const response = await POST(request);
+      await readSSEStream(response);
+
+      expect(response.status).toBe(200);
+      expect(mockDetectLanguage).toHaveBeenCalledWith(message, {
+        providerType: 'openai',
+        model: 'gpt-5-nano',
+        apiKeyOverride: 'user-openai-key-123',
+      });
+      expect(mockStreamDiscoveryResponse).toHaveBeenCalledWith(
+        [{ role: 'user', content: message }],
+        'user-openai-key-123',
+        'gpt-5.4',
+        expect.any(Function),
+        'openai',
+        undefined,
+      );
     });
 
     it('does not substitute another BYOK provider for an explicit model provider', async () => {

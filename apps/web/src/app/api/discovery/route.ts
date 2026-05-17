@@ -5,7 +5,7 @@ import { logUsage } from '@/lib/usage-logger';
 import { extractContent } from '@/lib/extractors';
 import { checkRateLimit } from '@/lib/redis';
 import { getAiKey } from '@/lib/byok';
-import { getAllAiProviderMeta, getModelRequiredPlan, isValidModelId } from '@/lib/providers/ai-registry';
+import { getAiProviderMeta, getAllAiProviderMeta, getCheapestModelForProvider, getModelRequiredPlan, isValidModelId } from '@/lib/providers/ai-registry';
 import type { AiProviderId } from '@/lib/providers/ai-registry';
 import { isModelAllowedForUser } from '@/lib/tier-features';
 import { prisma } from '@/lib/prisma';
@@ -167,6 +167,18 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  const effectiveProvider = modelProvider ?? (aiKey?.provider as AiProviderId | undefined);
+  const effectiveModel = typeof model === 'string' && model.length > 0
+    ? model
+    : aiKey
+      ? getAiProviderMeta(aiKey.provider as AiProviderId).defaultModel
+      : undefined;
+  if (!effectiveProvider || !effectiveModel) {
+    return errorResponse('AI model is required when no AI key is configured.', 400, {
+      code: 'ai_model_required',
+    });
+  }
+
   // Inline URL extraction: detect URLs in the latest message and inject context
   const detectedUrls = detectUrls(userMessage);
   if (detectedUrls.length > 0) {
@@ -202,7 +214,17 @@ export async function POST(request: NextRequest) {
   if (isFirstMessage && !user?.preferredLanguage) {
     const rawMessage = message ?? content;
     if (typeof rawMessage === 'string') {
-      const lang = await detectLanguage(rawMessage);
+      const languageDetectionModel = getCheapestModelForProvider(effectiveProvider);
+      if (!languageDetectionModel) {
+        return errorResponse('Language detection model is not configured for the selected AI provider.', 400, {
+          code: 'ai_model_required',
+        });
+      }
+      const lang = await detectLanguage(rawMessage, {
+        providerType: effectiveProvider,
+        model: languageDetectionModel,
+        apiKeyOverride: aiKey?.apiKey,
+      });
       if (lang && lang !== 'en') {
         detectedLanguage = lang;
       }
@@ -230,13 +252,6 @@ export async function POST(request: NextRequest) {
 
   const messages = [...priorMessages, { role: 'user' as const, content: userMessage }];
 
-  const effectiveProvider = modelProvider ?? (aiKey?.provider as AiProviderId | undefined);
-  if (!effectiveProvider) {
-    return errorResponse('AI model is required when no AI key is configured.', 400, {
-      code: 'ai_model_required',
-    });
-  }
-
   // For free-tier users (maxDuration <= 5), tell the AI not to ask about duration
   const systemSuffix = typeof maxDuration === 'number' && maxDuration <= 5
     ? 'IMPORTANT: This user is on the free tier with a fixed 5-minute podcast duration. Do NOT ask about duration preference — skip step 7 entirely. Always set "duration_target": 5 in the metadata.'
@@ -252,7 +267,7 @@ export async function POST(request: NextRequest) {
         for await (const chunk of streamDiscoveryResponse(
           messages,
           aiKey?.apiKey,
-          model || undefined,
+          effectiveModel,
           (usage) => {
             logUsage({
               service: effectiveProvider,
@@ -319,7 +334,7 @@ export async function POST(request: NextRequest) {
             for await (const chunk of streamFallbackDiscoveryResponse(
               originalMessage,
               aiKey?.apiKey,
-              model || undefined,
+              effectiveModel,
               (usage) => {
                 logUsage({
                   service: effectiveProvider,
