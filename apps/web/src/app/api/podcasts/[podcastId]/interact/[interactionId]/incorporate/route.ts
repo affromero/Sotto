@@ -8,7 +8,7 @@ import { CONTENT_SAFETY_INSTRUCTIONS } from '@/lib/safety-prompts';
 import { VOICE_REALISM_SHORT } from '@/lib/voice-realism-prompts';
 import { loadAndRender } from '@/lib/prompt-loader';
 import { getAiKey } from '@/lib/byok';
-import { resolveAiModelAndProvider } from '@/lib/providers/ai-registry';
+import { resolveAiModelAndProvider, type AiProviderId } from '@/lib/providers/ai-registry';
 import { getLanguageLabel } from '@sotto/shared';
 import { checkGenerationGate } from '@/lib/generation-gate';
 
@@ -80,6 +80,35 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
     return errorResponse(`Podcast is currently "${interaction.podcast.status}", must be READY`, 409);
   }
 
+  const user = await prisma.user.findUniqueOrThrow({
+    where: { id: userId },
+    select: { plan: true },
+  });
+
+  const aiKey = interaction.podcast.aiModel ? null : await getAiKey(userId);
+  if (!interaction.podcast.aiModel && !aiKey) {
+    return errorResponse('AI model is required for incorporation when no AI key is configured.', 403, {
+      code: 'ai_key_required',
+    });
+  }
+
+  // Resolve model + provider from podcast's creation-time selection
+  const { model: resolvedModel, provider } = await resolveAiModelAndProvider({
+    podcastAiModel: interaction.podcast.aiModel,
+    aiKey,
+    plan: user.plan as 'FREE' | 'PRO',
+  });
+
+  const providerAiKey =
+    interaction.podcast.aiModel && provider !== 'claude-code'
+      ? await getAiKey(userId, provider as AiProviderId)
+      : aiKey;
+  if (interaction.podcast.aiModel && provider !== 'claude-code' && !providerAiKey) {
+    return errorResponse(`AI key for provider "${provider}" is required for incorporation.`, 403, {
+      code: 'ai_key_required',
+    });
+  }
+
   // Set interaction to INCORPORATING
   await prisma.interaction.update({
     where: { id: interactionId },
@@ -118,15 +147,6 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
     .map((s) => `${s.speaker}: ${s.text}`)
     .join('\n');
 
-  // Resolve user's AI key for BYOK passthrough
-  const aiKey = await getAiKey(userId);
-
-  // Resolve model + provider from podcast's creation-time selection
-  const { model: resolvedModel, provider } = await resolveAiModelAndProvider({
-    podcastAiModel: interaction.podcast.aiModel,
-    aiKey,
-  });
-
   // Generate the explanation segment text via Claude
   // Always use podcast language for incorporation (segment becomes part of the audio)
   const podcastLanguage = interaction.podcast.language || 'en';
@@ -140,7 +160,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
       role: 'user',
       content: `Podcast context around timestamp ${interaction.timestamp}s:\n${contextSegments}\n\nListener's question: ${interaction.question}\n\nAI's answer: ${interaction.answer}\n\nWrite a natural podcast segment that addresses this question and answer.`,
     },
-  ], { apiKeyOverride: aiKey?.apiKey, model: resolvedModel });
+  ], { apiKeyOverride: providerAiKey?.apiKey, model: resolvedModel });
 
   await logUsage({
     service: provider,
