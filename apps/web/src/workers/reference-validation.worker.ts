@@ -20,7 +20,7 @@ import {
 import { createSegmentsAndQueueAudio } from '@/lib/segment-creator';
 import { convertTurnsForProvider } from '@/lib/tts-tag-converter';
 import { getMinReferenceCount } from '@/lib/script-verifier';
-import { getAiKey, getByokKey, hasByokKey } from '@/lib/byok';
+import { getAiKey, hasByokKey } from '@/lib/byok';
 import { getTierFeatures } from '@/lib/tier-features';
 import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
 import { assignVoicesForPodcast } from '@/lib/voice-assigner';
@@ -157,11 +157,10 @@ export async function processReferenceValidation(
 
     const earlyProvider = earlyPodcast.ttsProvider as TtsProviderId;
     const earlySpeakers = [...new Set(earlyTurns.map((t) => t.speaker))].map((name) => ({ name }));
-    const earlyTtsKey = isByokEarly ? ((await getByokKey(userId, earlyProvider)) ?? undefined) : undefined;
-    await assignVoicesForPodcast(podcastId, earlySpeakers, earlyProvider, earlyTtsKey);
+    await assignVoicesForPodcast(podcastId, earlySpeakers, earlyProvider);
 
     // Convert TTS tags before creating segments
-    const convertedEarlyTurns = await convertTurnsForProvider(earlyTurns, earlyProvider, podcastId);
+    const convertedEarlyTurns = await convertTurnsForProvider(earlyTurns, earlyProvider, { mode: 'disabled' });
     await createSegmentsAndQueueAudio(podcastId, convertedEarlyTurns);
     await job.updateProgress(100);
     return;
@@ -718,11 +717,10 @@ export async function processReferenceValidation(
 
     const lateProvider = latePodcast.ttsProvider as TtsProviderId;
     const lateSpeakers = [...new Set(turns.map((t) => t.speaker))].map((name) => ({ name }));
-    const lateTtsKey = isByok ? ((await getByokKey(userId, lateProvider)) ?? undefined) : undefined;
-    await assignVoicesForPodcast(podcastId, lateSpeakers, lateProvider, lateTtsKey);
+    await assignVoicesForPodcast(podcastId, lateSpeakers, lateProvider);
 
     // Convert TTS tags before creating segments
-    const convertedTurns = await convertTurnsForProvider(turns, lateProvider, podcastId);
+    const convertedTurns = await convertTurnsForProvider(turns, lateProvider, { mode: 'disabled' });
     await createSegmentsAndQueueAudio(podcastId, convertedTurns);
 
     await prisma.podcast.update({

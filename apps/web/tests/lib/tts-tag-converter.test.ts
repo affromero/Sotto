@@ -1,22 +1,13 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { convertTurnsForProvider } from '@/lib/tts-tag-converter';
 
+const mockCreateAIProvider = vi.fn();
 const mockGenerateResponse = vi.fn();
 const mockFetchProviderDocs = vi.fn();
 const mockLogUsage = vi.fn();
 
 vi.mock('@/lib/providers/ai', () => ({
-  createAIProvider: () => ({ generateResponse: (...args: unknown[]) => mockGenerateResponse(...args) }),
-}));
-
-vi.mock('@/lib/auto-model-config', () => ({
-  resolveAutoModel: vi.fn().mockResolvedValue({
-    aiProvider: 'anthropic',
-    aiModel: 'claude-haiku-4-5-20251001',
-    ttsProvider: 'elevenlabs',
-    ttsModel: 'eleven_v3',
-    sttProvider: 'openai',
-    sttModel: 'whisper-1',
-  }),
+  createAIProvider: (provider: string) => mockCreateAIProvider(provider),
 }));
 
 vi.mock('@/lib/tts-doc-fetcher', () => ({
@@ -47,8 +38,6 @@ vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
-import { convertTurnsForProvider } from '@/lib/tts-tag-converter';
-
 const sampleTurns = [
   { speaker: 'HOST', text: 'Wait, really? [laughs] That is incredible.' },
   { speaker: 'EXPERT', text: 'Yes! [pause] Let me explain.' },
@@ -57,54 +46,87 @@ const sampleTurns = [
 describe('tts-tag-converter', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockCreateAIProvider.mockReturnValue({ generateResponse: mockGenerateResponse });
+    mockLogUsage.mockResolvedValue(undefined);
   });
 
-  it('converts turns when provider has docs (elevenlabs)', async () => {
+  it('defaults to disabled conversion without fetching docs or selecting AI', async () => {
+    const result = await convertTurnsForProvider(sampleTurns, 'elevenlabs');
+
+    expect(result).toEqual(sampleTurns);
+    expect(mockFetchProviderDocs).not.toHaveBeenCalled();
+    expect(mockCreateAIProvider).not.toHaveBeenCalled();
+  });
+
+  it('also skips conversion when mode is explicitly disabled', async () => {
+    const result = await convertTurnsForProvider(sampleTurns, 'elevenlabs', { mode: 'disabled' });
+
+    expect(result).toEqual(sampleTurns);
+    expect(mockFetchProviderDocs).not.toHaveBeenCalled();
+    expect(mockCreateAIProvider).not.toHaveBeenCalled();
+  });
+
+  it('requires an explicit AI provider and model for AI conversion', async () => {
+    await expect(
+      convertTurnsForProvider(sampleTurns, 'elevenlabs', { mode: 'ai', aiProvider: 'openai' })
+    ).rejects.toThrow('AI provider and model are required for TTS tag conversion.');
+
+    expect(mockCreateAIProvider).not.toHaveBeenCalled();
+  });
+
+  it('converts turns with the explicit AI runtime', async () => {
     mockFetchProviderDocs.mockResolvedValue('ElevenLabs supports [laughs], [sighs], etc.');
     mockGenerateResponse.mockResolvedValue({
       content: JSON.stringify([
-        { speaker: 'HOST', text: 'Wait, really? [laughs] That is incredible.' },
-        { speaker: 'EXPERT', text: 'Yes! [pause] Let me explain.' },
+        { speaker: 'HOST', text: 'Wait, really? <laughs/> That is incredible.' },
+        { speaker: 'EXPERT', text: 'Yes! <break time="0.5s" /> Let me explain.' },
       ]),
       inputTokens: 100,
       outputTokens: 50,
       model: 'gpt-5-mini',
     });
 
-    const result = await convertTurnsForProvider(sampleTurns, 'elevenlabs', 'pod-1');
+    const result = await convertTurnsForProvider(sampleTurns, 'elevenlabs', {
+      mode: 'ai',
+      aiProvider: 'openai',
+      aiModel: 'gpt-5-mini',
+      apiKeyOverride: 'openai-key',
+      podcastId: 'pod-1',
+    });
 
-    expect(mockGenerateResponse).toHaveBeenCalledOnce();
-    expect(result).toHaveLength(2);
-    expect(result[0].speaker).toBe('HOST');
+    expect(mockCreateAIProvider).toHaveBeenCalledWith('openai');
+    expect(mockGenerateResponse).toHaveBeenCalledWith(
+      'rendered prompt',
+      [{ role: 'user', content: 'Convert the turns above.' }],
+      {
+        model: 'gpt-5-mini',
+        maxTokens: 4096,
+        skipModeration: true,
+        apiKeyOverride: 'openai-key',
+      }
+    );
+    expect(result[0].text).toContain('<laughs/>');
+    expect(mockLogUsage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        service: 'openai',
+        category: 'tts-tag-conversion',
+        model: 'gpt-5-mini',
+        podcastId: 'pod-1',
+      })
+    );
   });
 
-  it('skips LLM call when provider has no docsUrl (openai)', async () => {
-    const result = await convertTurnsForProvider(sampleTurns, 'openai', 'pod-1');
-
-    expect(mockFetchProviderDocs).not.toHaveBeenCalled();
-    expect(mockGenerateResponse).not.toHaveBeenCalled();
-    expect(result).toEqual(sampleTurns);
+  it('throws in AI mode when provider docs are unavailable', async () => {
+    await expect(
+      convertTurnsForProvider(sampleTurns, 'openai', {
+        mode: 'ai',
+        aiProvider: 'openai',
+        aiModel: 'gpt-5-mini',
+      })
+    ).rejects.toThrow('Provider "openai" does not publish TTS formatting docs.');
   });
 
-  it('returns original turns when docs fetch fails', async () => {
-    mockFetchProviderDocs.mockResolvedValue(null);
-
-    const result = await convertTurnsForProvider(sampleTurns, 'elevenlabs', 'pod-1');
-
-    expect(mockGenerateResponse).not.toHaveBeenCalled();
-    expect(result).toEqual(sampleTurns);
-  });
-
-  it('returns original turns when LLM call throws', async () => {
-    mockFetchProviderDocs.mockResolvedValue('docs content');
-    mockGenerateResponse.mockRejectedValue(new Error('API timeout'));
-
-    const result = await convertTurnsForProvider(sampleTurns, 'elevenlabs', 'pod-1');
-
-    expect(result).toEqual(sampleTurns);
-  });
-
-  it('returns original turns when LLM returns malformed JSON', async () => {
+  it('throws on malformed AI output by default', async () => {
     mockFetchProviderDocs.mockResolvedValue('docs content');
     mockGenerateResponse.mockResolvedValue({
       content: 'not valid json at all',
@@ -113,42 +135,26 @@ describe('tts-tag-converter', () => {
       model: 'gpt-5-mini',
     });
 
-    const result = await convertTurnsForProvider(sampleTurns, 'elevenlabs', 'pod-1');
-
-    expect(result).toEqual(sampleTurns);
-  });
-
-  it('returns original turns when LLM returns wrong turn count', async () => {
-    mockFetchProviderDocs.mockResolvedValue('docs content');
-    mockGenerateResponse.mockResolvedValue({
-      content: JSON.stringify([{ speaker: 'HOST', text: 'Only one turn' }]),
-      inputTokens: 100,
-      outputTokens: 50,
-      model: 'gpt-5-mini',
-    });
-
-    const result = await convertTurnsForProvider(sampleTurns, 'elevenlabs', 'pod-1');
-
-    expect(result).toEqual(sampleTurns);
-  });
-
-  it('logs usage with tts-tag-conversion category', async () => {
-    mockFetchProviderDocs.mockResolvedValue('docs content');
-    mockGenerateResponse.mockResolvedValue({
-      content: JSON.stringify(sampleTurns),
-      inputTokens: 200,
-      outputTokens: 80,
-      model: 'gpt-5-mini',
-    });
-
-    await convertTurnsForProvider(sampleTurns, 'elevenlabs', 'pod-1');
-
-    expect(mockLogUsage).toHaveBeenCalledWith(
-      expect.objectContaining({
-        category: 'tts-tag-conversion',
-        model: 'gpt-5-mini',
-        podcastId: 'pod-1',
+    await expect(
+      convertTurnsForProvider(sampleTurns, 'elevenlabs', {
+        mode: 'ai',
+        aiProvider: 'openai',
+        aiModel: 'gpt-5-mini',
       })
-    );
+    ).rejects.toThrow();
+  });
+
+  it('preserves turns on conversion failure only when explicitly requested', async () => {
+    mockFetchProviderDocs.mockResolvedValue('docs content');
+    mockGenerateResponse.mockRejectedValue(new Error('API timeout'));
+
+    const result = await convertTurnsForProvider(sampleTurns, 'elevenlabs', {
+      mode: 'ai',
+      aiProvider: 'openai',
+      aiModel: 'gpt-5-mini',
+      onError: 'preserve',
+    });
+
+    expect(result).toEqual(sampleTurns);
   });
 });
