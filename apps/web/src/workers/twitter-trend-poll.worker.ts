@@ -119,7 +119,10 @@ export async function processTrendPoll(job: Job<PollTwitterTrendsPayload>): Prom
   // Create podcasts for selected topics
   for (const { tweet } of selected) {
     try {
-      const parsed = await parseTweetIntent(tweet.text);
+      const parsed = await parseTweetIntent(tweet.text, undefined, {
+        userId: sottoUser.id,
+        aiModel: config.defaultAiModel ?? undefined,
+      });
 
       const voicePair = selectVoicePair(tweet.id);
       const slug = await generatePodcastSlug(parsed.title, sottoUser.id, prisma);
