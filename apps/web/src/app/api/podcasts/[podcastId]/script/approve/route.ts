@@ -8,7 +8,6 @@ import { checkRateLimit, invalidatePodcastCache, publishPodcastStatus } from '@/
 import { checkGenerationGate } from '@/lib/generation-gate';
 import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
 import { assignVoicesForPodcast } from '@/lib/voice-assigner';
-import { getByokKey } from '@/lib/byok';
 import type { ScriptTurn } from '@/lib/script-generator';
 
 import { errorResponse } from '@/lib/api-response';
@@ -132,17 +131,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     ? discoverySpeakers
     : [...new Set(turns.map((t) => t.speaker))].map((name) => ({ name }));
 
-  // Resolve API key for catalog fetch
-  let ttsApiKey: string | undefined;
-  if (gate.isByokUser) {
-    ttsApiKey = (await getByokKey(userId, resolvedProvider)) ?? undefined;
-  }
-
-  await assignVoicesForPodcast(podcastId, speakers, resolvedProvider, ttsApiKey);
+  await assignVoicesForPodcast(podcastId, speakers, resolvedProvider);
 
   // Convert TTS tags before creating segments
   const turnData = turns.map((t) => ({ speaker: t.speaker, text: t.text, direction: t.direction }));
-  const convertedTurns = await convertTurnsForProvider(turnData, resolvedProvider, podcastId);
+  const convertedTurns = await convertTurnsForProvider(turnData, resolvedProvider, { mode: 'disabled' });
 
   await createSegmentsAndQueueAudio(podcastId, convertedTurns);
 

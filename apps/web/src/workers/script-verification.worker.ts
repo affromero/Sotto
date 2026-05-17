@@ -21,7 +21,7 @@ import {
 import { createSegmentsAndQueueAudio } from '@/lib/segment-creator';
 import { convertTurnsForProvider } from '@/lib/tts-tag-converter';
 import { logUsage } from '@/lib/usage-logger';
-import { getAiKey, getByokKey, hasByokKey } from '@/lib/byok';
+import { getAiKey, hasByokKey } from '@/lib/byok';
 import { resolveAiModelAndProvider, type AiProviderId } from '@/lib/providers/ai-registry';
 import { assignVoicesForPodcast } from '@/lib/voice-assigner';
 import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
@@ -381,13 +381,12 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
         const speakerList = svSpeakers && svSpeakers.length > 0
           ? svSpeakers
           : [...new Set(turns.map((t) => t.speaker))].map((name) => ({ name }));
-        const svTtsKey = hasTts ? ((await getByokKey(userId, svProvider)) ?? undefined) : undefined;
-        await assignVoicesForPodcast(podcastId, speakerList, svProvider, svTtsKey);
+        await assignVoicesForPodcast(podcastId, speakerList, svProvider);
 
         // Convert TTS tags before creating segments
         const scriptTurns = turns as Array<{ speaker: string; text: string; direction?: string }>;
         const convertedScriptTurns = svPodcast.ttsProvider
-          ? await convertTurnsForProvider(scriptTurns, svProvider, podcastId)
+          ? await convertTurnsForProvider(scriptTurns, svProvider, { mode: 'disabled' })
           : scriptTurns;
         await createSegmentsAndQueueAudio(podcastId, convertedScriptTurns);
 

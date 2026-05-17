@@ -1,15 +1,13 @@
 /**
- * LLM-based TTS tag converter — converts script inline markup to
- * provider-native format at approve time using the cheapest available model.
+ * Explicit TTS tag converter — converts script inline markup to provider-native
+ * format only when the caller supplies an AI runtime.
  *
  * Provider-specific formatting docs are fetched and cached (see tts-doc-fetcher.ts).
- * On any failure, returns original turns unchanged — the audio worker's
- * cleanTextForTts() strips remaining tags as a safety net.
  */
 import { createAIProvider } from './providers/ai';
 import { loadAndRender } from './prompt-loader';
-import { resolveAutoModel } from './auto-model-config';
 import { getProviderMeta, type TtsProviderId } from './providers/tts-registry';
+import type { AiProviderId } from './providers/ai-registry';
 import { fetchProviderDocs } from './tts-doc-fetcher';
 import { logUsage } from './usage-logger';
 import { logger } from './logger';
@@ -20,48 +18,66 @@ interface ScriptTurn {
   direction?: string;
 }
 
+export interface TtsTagConversionOptions {
+  mode?: 'disabled' | 'ai';
+  podcastId?: string;
+  aiProvider?: AiProviderId;
+  aiModel?: string;
+  apiKeyOverride?: string;
+  onError?: 'throw' | 'preserve';
+}
+
 export async function convertTurnsForProvider(
   turns: ScriptTurn[],
   providerId: TtsProviderId,
-  podcastId?: string
+  options: TtsTagConversionOptions = {}
 ): Promise<ScriptTurn[]> {
-  const meta = getProviderMeta(providerId);
-
-  // Skip LLM call for providers with no text markup docs — return as-is
-  // (audio worker's cleanTextForTts will strip tags)
-  if (!meta.docsUrl) return turns;
-
-  const docs = await fetchProviderDocs(providerId, meta.docsUrl);
-  if (!docs) {
-    logger.warn('No provider docs available, skipping LLM conversion', { providerId });
+  if (options.mode !== 'ai') {
     return turns;
   }
+  if (!options.aiProvider || !options.aiModel) {
+    throw new Error('AI provider and model are required for TTS tag conversion.');
+  }
 
-  const turnsJson = JSON.stringify(turns.map((t) => ({ speaker: t.speaker, text: t.text })));
-  const systemPrompt = loadAndRender('audio/tts-tag-converter.md', {
-    PROVIDER_NAME: meta.displayName,
-    PROVIDER_DOCS: docs,
-    TURNS_JSON: turnsJson,
-  });
-
-  const autoConfig = await resolveAutoModel('PLATFORM');
+  const meta = getProviderMeta(providerId);
 
   try {
-    const response = await createAIProvider(autoConfig.aiProvider).generateResponse(
+    if (!meta.docsUrl) {
+      throw new Error(`Provider "${providerId}" does not publish TTS formatting docs.`);
+    }
+
+    const docs = await fetchProviderDocs(providerId, meta.docsUrl);
+    if (!docs) {
+      throw new Error(`No TTS formatting docs available for provider "${providerId}".`);
+    }
+
+    const turnsJson = JSON.stringify(turns.map((t) => ({ speaker: t.speaker, text: t.text })));
+    const systemPrompt = loadAndRender('audio/tts-tag-converter.md', {
+      PROVIDER_NAME: meta.displayName,
+      PROVIDER_DOCS: docs,
+      TURNS_JSON: turnsJson,
+    });
+
+    const response = await createAIProvider(options.aiProvider).generateResponse(
       systemPrompt,
       [{ role: 'user', content: 'Convert the turns above.' }],
-      { model: autoConfig.aiModel, maxTokens: 4096, skipModeration: true }
+      {
+        model: options.aiModel,
+        maxTokens: 4096,
+        skipModeration: true,
+        apiKeyOverride: options.apiKeyOverride,
+      }
     );
 
-    if (podcastId) {
-      logUsage({
-        service: autoConfig.aiProvider,
+    if (options.podcastId) {
+      await logUsage({
+        service: options.aiProvider,
         model: response.model,
         category: 'tts-tag-conversion',
         inputTokens: response.inputTokens,
         outputTokens: response.outputTokens,
-        podcastId,
-      }).catch(() => {}); // fire-and-forget
+        podcastId: options.podcastId,
+      });
     }
 
     const parsed = JSON.parse(response.content);
@@ -74,10 +90,13 @@ export async function convertTurnsForProvider(
       text: typeof parsed[i].text === 'string' ? parsed[i].text : original.text,
     }));
   } catch (err) {
-    logger.error('LLM tag conversion failed, using original text', {
+    logger.error('TTS tag conversion failed', {
       providerId,
       error: err instanceof Error ? err.message : String(err),
     });
-    return turns; // Graceful fallback — audio worker's cleaner strips tags
+    if (options.onError === 'preserve') {
+      return turns;
+    }
+    throw err;
   }
 }

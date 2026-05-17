@@ -67,10 +67,6 @@ vi.mock('@/lib/tts-tag-converter', () => ({
   convertTurnsForProvider: (...args: unknown[]) => mockConvertTurnsForProvider(...args),
 }));
 
-vi.mock('@/lib/byok', () => ({
-  getByokKey: vi.fn().mockResolvedValue(null),
-}));
-
 vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
@@ -228,8 +224,7 @@ describe('POST /api/podcasts/[podcastId]/script/approve', () => {
       expect(mockAssignVoicesForPodcast).toHaveBeenCalledWith(
         'pod-1',
         expect.any(Array),
-        'elevenlabs',
-        undefined,
+        'elevenlabs'
       );
     });
 
@@ -321,8 +316,7 @@ describe('POST /api/podcasts/[podcastId]/script/approve', () => {
           expect.objectContaining({ name: 'HOST' }),
           expect.objectContaining({ name: 'EXPERT' }),
         ]),
-        'elevenlabs',
-        undefined,
+        'elevenlabs'
       );
       // Voice assignment must happen before segment creation
       const assignOrder = mockAssignVoicesForPodcast.mock.invocationCallOrder[0];
@@ -351,8 +345,7 @@ describe('POST /api/podcasts/[podcastId]/script/approve', () => {
           expect.objectContaining({ name: 'HOST' }),
           expect.objectContaining({ name: 'EXPERT' }),
         ]),
-        'elevenlabs',
-        undefined,
+        'elevenlabs'
       );
     });
 
@@ -380,8 +373,7 @@ describe('POST /api/podcasts/[podcastId]/script/approve', () => {
           expect.objectContaining({ name: 'HOST' }),
           expect.objectContaining({ name: 'EXPERT' }),
         ]),
-        'elevenlabs',
-        undefined,
+        'elevenlabs'
       );
     });
 
@@ -412,8 +404,7 @@ describe('POST /api/podcasts/[podcastId]/script/approve', () => {
       expect(mockAssignVoicesForPodcast).toHaveBeenCalledWith(
         'pod-1',
         [{ name: 'ALICE' }, { name: 'BOB' }],
-        'elevenlabs',
-        undefined,
+        'elevenlabs'
       );
     });
   });
