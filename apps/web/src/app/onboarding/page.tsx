@@ -8,6 +8,7 @@ import { getAllAiProviderClientMeta } from '@/lib/providers/ai-registry';
 import { getAllTtsProviderClientMeta } from '@/lib/providers/tts-registry';
 import { attributeReferral } from '@/lib/referrals';
 import { buildSetupReadiness, buildSttProviderStatuses } from '@/lib/setup-readiness';
+import { getPrivateSourceReadiness } from '@/lib/source-connectors';
 import { NameStep } from './NameStep';
 import { KeySetupForm } from './KeySetupForm';
 import styles from './page.module.css';
@@ -70,7 +71,7 @@ export default async function OnboardingPage() {
     );
   }
 
-  const [aiProviders, ttsProviders, privateFeedTokens] = await Promise.all([
+  const [aiProviders, ttsProviders, privateFeedTokens, sourceConnectors] = await Promise.all([
     listAiProviders(userId),
     listByokProviders(userId),
     prisma.privateFeedToken.findMany({
@@ -84,6 +85,7 @@ export default async function OnboardingPage() {
         lastUsedAt: true,
       },
     }),
+    getPrivateSourceReadiness(),
   ]);
   const selectedAiProvider = user.preferredAiModel || process.env.AI_PROVIDER;
   const claudeCodeAvailable = selectedAiProvider?.startsWith('claude-code')
@@ -117,6 +119,7 @@ export default async function OnboardingPage() {
 
         <KeySetupForm
           setupReadiness={setupReadiness}
+          sourceConnectors={sourceConnectors}
           initialAiConfigured={aiProviders}
           initialTtsConfigured={ttsProviders}
           initialPrivateFeedTokens={privateFeedTokens.map((token) => ({

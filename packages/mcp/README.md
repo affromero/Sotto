@@ -48,6 +48,17 @@ Add to `.mcp.json` in your project root:
 }
 ```
 
+#### Codex CLI
+
+Register the Sotto MCP server with Codex:
+
+```bash
+codex mcp add sotto \
+  --env SOTTO_API_KEY=sk_sotto_your_key_here \
+  --env SOTTO_API_URL=https://your-sotto.example.com \
+  -- npx -y @sotto/mcp
+```
+
 #### Local development
 
 Point at your local dev server:
@@ -105,6 +116,10 @@ Minimal fields:
 ```
 
 Optional fields include `topic`, `duration_minutes`, `focus_areas`, `source_url`, `agent_model`, `agent_run_id`, `ai_model`, and `tts_model`.
+
+### Workspace Source Connectors
+
+The web app exposes `/api/source-connectors/readiness` so self-hosted installs can verify private source setup before wiring workers. Slack is modeled as a user-owned Slack app with `SLACK_BOT_TOKEN` and `SLACK_SIGNING_SECRET`. Gmail is modeled through Google Workspace CLI (`gws`) so local and hosted installs can use the same owner-controlled command surface.
 
 ### Meeting Transcript Ingestion
 
