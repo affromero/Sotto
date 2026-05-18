@@ -28,12 +28,16 @@ interface KeySetupFormProps {
 }
 
 function rebuildReadiness(capabilities: SetupCapability[]): SetupReadiness {
-  const readyCount = capabilities.filter((capability) => capability.status === 'ready').length;
+  const requiredCapabilities = capabilities.filter((capability) => capability.required !== false);
+  const readyCount = requiredCapabilities.filter(
+    (capability) => capability.status === 'ready'
+  ).length;
   return {
-    ready: readyCount === capabilities.length,
+    ready: readyCount === requiredCapabilities.length,
     readyCount,
-    totalCount: capabilities.length,
-    nextAction: capabilities.find((capability) => capability.status === 'action_required') ?? null,
+    totalCount: requiredCapabilities.length,
+    nextAction:
+      requiredCapabilities.find((capability) => capability.status === 'action_required') ?? null,
     capabilities,
   };
 }
@@ -118,21 +122,29 @@ export function KeySetupForm({
         </div>
 
         <div className={styles.checkGrid}>
-          {readiness.capabilities.map((capability) => (
-            <div key={capability.id} className={styles.checkItem}>
-              <span
-                className={capability.status === 'ready' ? styles.checkReady : styles.checkNeeded}
-                aria-hidden="true"
-              >
-                {capability.status === 'ready' ? 'OK' : '!'}
-              </span>
-              <div className={styles.checkBody}>
-                <span className={styles.checkLabel}>{capability.label}</span>
-                <span className={styles.checkDescription}>{capability.description}</span>
-                <span className={styles.checkDetail}>{capability.detail}</span>
+          {readiness.capabilities.map((capability) => {
+            const statusClass =
+              capability.status === 'ready'
+                ? styles.checkReady
+                : capability.status === 'optional'
+                  ? styles.checkOptional
+                  : styles.checkNeeded;
+            const statusMarker =
+              capability.status === 'ready' ? 'OK' : capability.status === 'optional' ? 'OPT' : '!';
+
+            return (
+              <div key={capability.id} className={styles.checkItem}>
+                <span className={statusClass} aria-hidden="true">
+                  {statusMarker}
+                </span>
+                <div className={styles.checkBody}>
+                  <span className={styles.checkLabel}>{capability.label}</span>
+                  <span className={styles.checkDescription}>{capability.description}</span>
+                  <span className={styles.checkDetail}>{capability.detail}</span>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>
 

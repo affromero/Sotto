@@ -137,10 +137,13 @@ describe('GET /api/onboarding/readiness', () => {
 
   it('does not count an OpenAI TTS key as OpenAI transcription readiness', async () => {
     mockUserFindUnique.mockResolvedValue({
-      preferredAiModel: 'openai',
+      preferredAiModel: 'anthropic',
       preferredTtsProvider: 'openai',
     });
-    mockListAiProviders.mockResolvedValue([{ provider: 'openai', isValid: true }]);
+    mockListAiProviders.mockResolvedValue([
+      { provider: 'anthropic', isValid: true },
+      { provider: 'openai', isValid: true },
+    ]);
     mockListByokProviders.mockResolvedValue([{ provider: 'openai', isValid: true }]);
     mockPrivateFeedTokenCount.mockResolvedValue(1);
 
@@ -158,19 +161,20 @@ describe('GET /api/onboarding/readiness', () => {
       ])
     );
 
-    mockListAiProviders.mockResolvedValue([]);
+    mockListAiProviders.mockResolvedValue([{ provider: 'anthropic', isValid: true }]);
 
     const missingResponse = await getReadiness();
     const missingBody = await missingResponse.json();
 
     expect(missingResponse.status).toBe(200);
-    expect(missingBody.ready).toBe(false);
+    expect(missingBody.ready).toBe(true);
     expect(missingBody.capabilities).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           id: 'stt',
           status: 'action_required',
           detail: 'Add the openai STT key.',
+          required: false,
         }),
       ])
     );

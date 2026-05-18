@@ -4,10 +4,12 @@ export type SetupCapabilityId =
   | 'storage'
   | 'generation'
   | 'tts'
+  | 'agent-ingestion'
+  | 'meeting-transcripts'
   | 'stt'
   | 'private-rss';
 
-export type SetupCapabilityStatus = 'ready' | 'action_required';
+export type SetupCapabilityStatus = 'ready' | 'action_required' | 'optional';
 
 export interface ProviderStatus {
   provider: string;
@@ -22,6 +24,7 @@ export interface SetupCapability {
   actionLabel?: string;
   actionHref?: string;
   detail: string;
+  required?: boolean;
 }
 
 export interface SetupReadiness {
@@ -145,6 +148,8 @@ export function buildSetupReadiness(input: BuildSetupReadinessInput): SetupReadi
     storageProviderKnown &&
     (storageProvider === 'local' ||
       hasEnv(env, ['S3_BUCKET', 'S3_ENDPOINT', 'R2_BUCKET', 'R2_ENDPOINT', 'AWS_BUCKET_NAME']));
+  const privateSourceIngestionReady =
+    input.hasDatabase && input.hasQueue && storageReady && aiReady && ttsReady;
 
   const capabilities: SetupCapability[] = [
     {
@@ -204,11 +209,29 @@ export function buildSetupReadiness(input: BuildSetupReadinessInput): SetupReadi
         : 'Add a TTS provider key.',
     },
     {
+      id: 'agent-ingestion',
+      label: 'Agent inbox',
+      description: 'Accepts private outputs from local agents through API keys and MCP.',
+      status: privateSourceIngestionReady ? 'ready' : 'action_required',
+      detail: privateSourceIngestionReady
+        ? 'Agent ingestion endpoint ready'
+        : 'Complete database, queue, storage, generation, and text-to-speech first.',
+    },
+    {
+      id: 'meeting-transcripts',
+      label: 'Meeting transcripts',
+      description: 'Creates private recap episodes from recorder or agent transcripts.',
+      status: privateSourceIngestionReady ? 'ready' : 'action_required',
+      detail: privateSourceIngestionReady
+        ? 'Transcript ingestion ready; STT is optional for raw audio.'
+        : 'Complete database, queue, storage, generation, and text-to-speech first.',
+    },
+    {
       id: 'stt',
       label: 'Speech-to-text',
-      description: 'Transcribes meetings and imported audio before episode generation.',
-      status: sttReady ? 'ready' : 'action_required',
-      actionLabel: 'Add transcription provider',
+      description: 'Optional transcription for raw meeting audio and imports without transcripts.',
+      status: sttReady ? 'ready' : selectedSttProvider ? 'action_required' : 'optional',
+      actionLabel: 'Add optional transcription provider',
       actionHref: '/settings',
       detail: sttReady
         ? `${selectedSttProvider} selected`
@@ -216,7 +239,8 @@ export function buildSetupReadiness(input: BuildSetupReadinessInput): SetupReadi
           ? sttProviderKnown
             ? `Add the ${selectedSttProvider} STT key.`
             : `Unknown STT provider: ${selectedSttProvider}`
-          : 'Set STT_PROVIDER to the transcription provider you want to use.',
+          : 'Transcript ingestion works without STT. Add STT only for raw meeting audio.',
+      required: false,
     },
     {
       id: 'private-rss',
@@ -232,14 +256,17 @@ export function buildSetupReadiness(input: BuildSetupReadinessInput): SetupReadi
     },
   ];
 
-  const readyCount = capabilities.filter((capability) => capability.status === 'ready').length;
+  const requiredCapabilities = capabilities.filter((capability) => capability.required !== false);
+  const readyCount = requiredCapabilities.filter(
+    (capability) => capability.status === 'ready'
+  ).length;
   const nextAction =
-    capabilities.find((capability) => capability.status === 'action_required') ?? null;
+    requiredCapabilities.find((capability) => capability.status === 'action_required') ?? null;
 
   return {
-    ready: readyCount === capabilities.length,
+    ready: readyCount === requiredCapabilities.length,
     readyCount,
-    totalCount: capabilities.length,
+    totalCount: requiredCapabilities.length,
     nextAction,
     capabilities,
   };
