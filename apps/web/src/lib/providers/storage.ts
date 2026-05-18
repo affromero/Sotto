@@ -1,5 +1,4 @@
 import type { Readable } from 'stream';
-import { logger } from '../logger';
 
 export interface StorageProvider {
   uploadFile(key: string, data: Buffer, contentType: string): Promise<string>;
@@ -146,17 +145,24 @@ class LocalProvider implements StorageProvider {
   }
 }
 
-export function createStorageProvider(type?: string): StorageProvider {
+export type StorageProviderId = 'local' | 'r2' | 's3';
+
+function resolveStorageProviderType(type?: string): StorageProviderId {
   const providerType = type || process.env.STORAGE_PROVIDER || 'local';
+  if (providerType !== 'local' && providerType !== 'r2' && providerType !== 's3') {
+    throw new Error(`Unknown storage provider "${providerType}". Expected one of: local, r2, s3.`);
+  }
+  return providerType;
+}
+
+export function createStorageProvider(type?: string): StorageProvider {
+  const providerType = resolveStorageProviderType(type);
   switch (providerType) {
     case 'r2':
       return new R2Provider();
     case 's3':
       return new S3Provider();
     case 'local':
-      return new LocalProvider();
-    default:
-      logger.warn(`Unknown STORAGE_PROVIDER "${providerType}", falling back to local`);
       return new LocalProvider();
   }
 }
