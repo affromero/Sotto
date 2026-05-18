@@ -2,12 +2,9 @@ import { Job } from 'bullmq';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { postTweet } from '@/lib/twitter';
 import { getTwitterConfig } from '@/lib/twitter-config';
-import { podcastUrl as buildPodcastPath } from '@/lib/urls';
+import { getPublicAppBaseUrl, podcastUrl as buildPodcastPath } from '@/lib/urls';
 import { logger } from '@/lib/logger';
 import type { AutoTweetPayload } from '@/lib/queue';
-
-// Always use production URL for public tweets — never inherit localhost from dev env
-const SOTTO_APP_URL = process.env.NEXT_PUBLIC_APP_URL?.startsWith('https://') ? process.env.NEXT_PUBLIC_APP_URL : 'https://sotto.fm';
 
 function interpolateTemplate(
   template: string,
@@ -39,7 +36,10 @@ export async function processAutoTweet(job: Job<AutoTweetPayload>): Promise<void
   });
 
   if (claimed.count === 0) {
-    logger.info('No pending auto-tweet to claim (already claimed or posted)', { podcastId, trigger });
+    logger.info('No pending auto-tweet to claim (already claimed or posted)', {
+      podcastId,
+      trigger,
+    });
     return;
   }
 
@@ -59,11 +59,12 @@ export async function processAutoTweet(job: Job<AutoTweetPayload>): Promise<void
     });
 
     const config = await getTwitterConfig();
+    const appUrl = getPublicAppBaseUrl();
 
     const tweetText = interpolateTemplate(config.tweetTemplate, {
       title: podcast.title,
       topic: podcast.topic.length > 100 ? podcast.topic.slice(0, 97) + '...' : podcast.topic,
-      url: `${SOTTO_APP_URL}${buildPodcastPath({ id: podcastId, slug: podcast.slug }, podcast.user.handle)}`,
+      url: `${appUrl}${buildPodcastPath({ id: podcastId, slug: podcast.slug }, podcast.user.handle)}`,
     });
 
     const tweetId = await postTweet(tweetText);

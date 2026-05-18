@@ -3,6 +3,7 @@ import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { getRedisClient } from '@/lib/redis';
 import { sendMessage, answerCallbackQuery } from '@/lib/telegram';
 import { logger } from '@/lib/logger';
+import { getPublicAppBaseUrl } from '@/lib/urls';
 import type {
   TelegramUpdate,
   TelegramMessagePayload,
@@ -11,7 +12,6 @@ import type {
 
 const REDIS_LINK_PREFIX = 'telegram:link:';
 const LINK_CODE_TTL = 600; // 10 minutes
-const SOTTO_APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://sotto.fm';
 
 export async function routeUpdate(update: TelegramUpdate): Promise<void> {
   if (update.callback_query) {
@@ -48,7 +48,8 @@ async function handleTextMessage(msg: TelegramMessagePayload): Promise<void> {
   });
 
   if (!account) {
-    await sendMessage(chatId,
+    await sendMessage(
+      chatId,
       'You need to link your Sotto account first. Send /start to get a connection link.'
     );
     return;
@@ -63,7 +64,10 @@ async function handleTextMessage(msg: TelegramMessagePayload): Promise<void> {
   });
 
   if (!user.telegramEnabled) {
-    await sendMessage(chatId, 'Telegram integration is disabled for your account. Enable it in your Sotto settings.');
+    await sendMessage(
+      chatId,
+      'Telegram integration is disabled for your account. Enable it in your Sotto settings.'
+    );
     return;
   }
 
@@ -83,7 +87,8 @@ async function handleStart(msg: TelegramMessagePayload): Promise<void> {
   });
 
   if (existing) {
-    await sendMessage(chatId,
+    await sendMessage(
+      chatId,
       'Your Telegram account is already connected!\nSend me any topic or URL — including YouTube and video links — to save it as a podcast idea.'
     );
     return;
@@ -99,9 +104,10 @@ async function handleStart(msg: TelegramMessagePayload): Promise<void> {
     LINK_CODE_TTL
   );
 
-  const linkUrl = `${SOTTO_APP_URL}/connect/telegram?code=${code}`;
+  const linkUrl = `${getPublicAppBaseUrl()}/connect/telegram?code=${code}`;
 
-  await sendMessage(chatId,
+  await sendMessage(
+    chatId,
     `Welcome to Sotto! Let's link your Telegram account.\n\nTap the button below to connect:`,
     {
       reply_markup: {
@@ -112,15 +118,16 @@ async function handleStart(msg: TelegramMessagePayload): Promise<void> {
 }
 
 async function handleHelp(chatId: string): Promise<void> {
-  await sendMessage(chatId,
+  await sendMessage(
+    chatId,
     `*Sotto Bot* — Your podcast companion\n\n` +
-    `Send me any topic or URL — including YouTube and video links — and I'll save it as a podcast idea.\n` +
-    `Open Sotto to generate your podcast whenever you're ready!\n\n` +
-    `*Commands:*\n` +
-    `/start — Link your Sotto account\n` +
-    `/help — Show this message\n\n` +
-    `*Notifications:*\n` +
-    `I'll send you a message when your podcasts are ready.`,
+      `Send me any topic or URL — including YouTube and video links — and I'll save it as a podcast idea.\n` +
+      `Open Sotto to generate your podcast whenever you're ready!\n\n` +
+      `*Commands:*\n` +
+      `/start — Link your Sotto account\n` +
+      `/help — Show this message\n\n` +
+      `*Notifications:*\n` +
+      `I'll send you a message when your podcasts are ready.`,
     { parse_mode: 'Markdown' }
   );
 }
@@ -138,14 +145,11 @@ async function handleSaveIdea(chatId: string, userId: string, text: string): Pro
 
   logger.info('Telegram podcast idea saved', { chatId, userId, isUrl });
 
-  await sendMessage(chatId,
-    'Saved! Open Sotto to create your podcast.',
-    {
-      reply_markup: {
-        inline_keyboard: [[{ text: 'Open Sotto', url: `${SOTTO_APP_URL}/ideas` }]],
-      },
-    }
-  );
+  await sendMessage(chatId, 'Saved! Open Sotto to create your podcast.', {
+    reply_markup: {
+      inline_keyboard: [[{ text: 'Open Sotto', url: `${getPublicAppBaseUrl()}/ideas` }]],
+    },
+  });
 }
 
 // ─── Callback Queries ───────────────────────────────────────────────────

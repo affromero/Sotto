@@ -3,12 +3,22 @@ import { PollTwitterMentionsPayload, addJob, JobType, contentExtractionQueue } f
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { getRedisClient } from '@/lib/redis';
 import { getMentions, getTweet, getThread, replyToTweet, sendDirectMessage } from '@/lib/twitter';
-import { parseTweetIntent, parseThreadIntent, resolveModelFromTweet, resolveCheapestModels } from '@/lib/tweet-parser';
+import {
+  parseTweetIntent,
+  parseThreadIntent,
+  resolveModelFromTweet,
+  resolveCheapestModels,
+} from '@/lib/tweet-parser';
 import { getTwitterConfig } from '@/lib/twitter-config';
 import { getAiKey, hasByokKey } from '@/lib/byok';
 import { checkGenerationGate, tryIncrementFreeGeneration } from '@/lib/generation-gate';
 import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
-import { getAiProviderMeta, getModelRequiredPlan, getProviderForModel, type AiProviderId } from '@/lib/providers/ai-registry';
+import {
+  getAiProviderMeta,
+  getModelRequiredPlan,
+  getProviderForModel,
+  type AiProviderId,
+} from '@/lib/providers/ai-registry';
 import { selectVoicePair } from '@/lib/elevenlabs';
 import { getTierFeatures } from '@/lib/tier-features';
 import { lookupParticipantCredentials } from '@/lib/credential-lookup';
@@ -17,14 +27,19 @@ import { extractTwitterVideoTranscript } from '@/lib/twitter-video';
 import { generatePodcastSlug } from '@/lib/slugify';
 import { filterMention } from '@/lib/mention-filter';
 import { logger } from '@/lib/logger';
-import type { TwitterTweet, TwitterMedia, TwitterAuthorData, TweetParseResult, ThreadData } from '@/types/twitter';
+import { getPublicAppBaseUrl } from '@/lib/urls';
+import type {
+  TwitterTweet,
+  TwitterMedia,
+  TwitterAuthorData,
+  TweetParseResult,
+  ThreadData,
+} from '@/types/twitter';
 import type { CredentialLookupAiOptions, ParticipantCredential } from '@/lib/credential-lookup';
 import type { MentionFilterAiOptions } from '@/lib/mention-filter';
 
 const REDIS_CURSOR_KEY = 'twitter:last_processed_tweet_id';
 const REDIS_CTA_PREFIX = 'twitter:cta_sent:';
-// Always use production URL for public tweets — never inherit localhost from dev env
-const SOTTO_APP_URL = process.env.NEXT_PUBLIC_APP_URL?.startsWith('https://') ? process.env.NEXT_PUBLIC_APP_URL : 'https://sotto.fm';
 const LOCAL_AI_PROVIDER: AiProviderId = 'claude-code';
 const LOCAL_MODEL_PREFIX = 'claude-code:';
 
@@ -47,7 +62,7 @@ function resolveMentionFilterAi(model: string | null | undefined): MentionFilter
 async function resolveCredentialLookupAi(
   userId: string,
   preferredAiModel: string | null | undefined,
-  aiKey: { apiKey: string; provider: AiProviderId } | null,
+  aiKey: { apiKey: string; provider: AiProviderId } | null
 ): Promise<CredentialLookupAiOptions> {
   if (preferredAiModel) {
     const provider = providerForAiModel(preferredAiModel);
@@ -60,7 +75,9 @@ async function resolveCredentialLookupAi(
 
     const providerKey = aiKey?.provider === provider ? aiKey : await getAiKey(userId, provider);
     if (!providerKey) {
-      throw new Error(`AI key for provider "${provider}" is required for participant credential lookup.`);
+      throw new Error(
+        `AI key for provider "${provider}" is required for participant credential lookup.`
+      );
     }
     return {
       providerType: provider,
@@ -70,7 +87,9 @@ async function resolveCredentialLookupAi(
   }
 
   if (!aiKey) {
-    throw new Error('AI key or explicit local AI model is required for participant credential lookup.');
+    throw new Error(
+      'AI key or explicit local AI model is required for participant credential lookup.'
+    );
   }
 
   const model = getAiProviderMeta(aiKey.provider).defaultModel;
@@ -118,7 +137,11 @@ export async function processTwitterMentions(job: Job<PollTwitterMentionsPayload
   logger.info('Twitter mentions poll complete', { processed: String(sorted.length) });
 }
 
-async function processSingleMention(tweet: TwitterTweet, mediaByKey: Map<string, TwitterMedia>, authorMap: Map<string, TwitterAuthorData>): Promise<void> {
+async function processSingleMention(
+  tweet: TwitterTweet,
+  mediaByKey: Map<string, TwitterMedia>,
+  authorMap: Map<string, TwitterAuthorData>
+): Promise<void> {
   // 1. Dedup: skip if we already have this tweet
   const existing = await prisma.tweetMention.findUnique({
     where: { tweetId: tweet.id },
@@ -130,7 +153,7 @@ async function processSingleMention(tweet: TwitterTweet, mediaByKey: Map<string,
   // 2. Spam gate: structural filters, rate limit, account quality, LLM intent
   const author = authorMap.get(tweet.author_id);
   const hasParentTweet = !!getParentTweetId(tweet);
-  const hasImages = !!(tweet.attachments?.media_keys?.length);
+  const hasImages = !!tweet.attachments?.media_keys?.length;
   const twitterConfig = await getTwitterConfig();
   const filterResult = await filterMention(tweet, author, hasParentTweet, hasImages, {
     ai: resolveMentionFilterAi(twitterConfig.defaultAiModel),
@@ -243,10 +266,10 @@ async function processSingleMention(tweet: TwitterTweet, mediaByKey: Map<string,
       threadData = await getThread(conversationId);
     }
 
-    const isThreadPodcast = threadData !== null && (
-      (threadData.isSelfAuthored && threadData.replies.length >= 1) ||
-      (!threadData.isSelfAuthored && threadData.replies.length >= 3)
-    );
+    const isThreadPodcast =
+      threadData !== null &&
+      ((threadData.isSelfAuthored && threadData.replies.length >= 1) ||
+        (!threadData.isSelfAuthored && threadData.replies.length >= 3));
 
     const parseOptions = {
       userId,
@@ -300,7 +323,7 @@ async function processSingleMention(tweet: TwitterTweet, mediaByKey: Map<string,
     const tierFeatures = getTierFeatures(
       userRecord.plan === 'PRO' ? 'PRO' : 'FREE',
       isByok,
-      userRecord.role ?? undefined,
+      userRecord.role ?? undefined
     );
 
     // 7d. Resolve user-requested model preferences from tweet
@@ -318,7 +341,7 @@ async function processSingleMention(tweet: TwitterTweet, mediaByKey: Map<string,
       const requiredPlan = getModelRequiredPlan(tweetModels.aiModel);
 
       if (requiredPlan === 'PRO' && userRecord.plan !== 'PRO' && !isByok) {
-        modelWarning = `You asked for ${parsed.requestedAiModel} but it requires a Pro plan or BYOK key. Using your default model instead. Set up your API keys at ${SOTTO_APP_URL}/settings/api`;
+        modelWarning = `You asked for ${parsed.requestedAiModel} but it requires a Pro plan or BYOK key. Using your default model instead. Set up your API keys at ${getPublicAppBaseUrl()}/settings/api`;
       } else {
         effectiveAiModel = tweetModels.aiModel;
       }
@@ -354,21 +377,54 @@ async function processSingleMention(tweet: TwitterTweet, mediaByKey: Map<string,
     // 8. Resolve format, speakers, visibility
     const format = parsed.format ?? 2;
     const DEFAULT_SPEAKERS: Record<number, Array<{ name: string; description: string }>> = {
-      1: [{ name: 'HOST', description: 'Warm, insightful narrator who guides the listener through the topic with clarity and personality.' }],
+      1: [
+        {
+          name: 'HOST',
+          description:
+            'Warm, insightful narrator who guides the listener through the topic with clarity and personality.',
+        },
+      ],
       2: [
-        { name: 'HOST', description: 'Warm, curious, asks great questions, guides the conversation. Represents the listener.' },
-        { name: 'EXPERT', description: 'Knowledgeable, vivid storyteller, uses analogies and examples.' },
+        {
+          name: 'HOST',
+          description:
+            'Warm, curious, asks great questions, guides the conversation. Represents the listener.',
+        },
+        {
+          name: 'EXPERT',
+          description: 'Knowledgeable, vivid storyteller, uses analogies and examples.',
+        },
       ],
       3: [
-        { name: 'HOST', description: 'Moderates the discussion, asks probing questions, keeps the conversation flowing.' },
-        { name: 'EXPERT', description: 'Primary subject-matter expert, provides deep analysis and context.' },
-        { name: 'ANALYST', description: 'Offers alternative perspectives, challenges assumptions, adds nuance.' },
+        {
+          name: 'HOST',
+          description:
+            'Moderates the discussion, asks probing questions, keeps the conversation flowing.',
+        },
+        {
+          name: 'EXPERT',
+          description: 'Primary subject-matter expert, provides deep analysis and context.',
+        },
+        {
+          name: 'ANALYST',
+          description: 'Offers alternative perspectives, challenges assumptions, adds nuance.',
+        },
       ],
       4: [
-        { name: 'HOST', description: 'Moderates the roundtable, ensures all voices are heard, synthesizes key points.' },
-        { name: 'EXPERT', description: 'Primary subject-matter expert, provides foundational knowledge.' },
+        {
+          name: 'HOST',
+          description:
+            'Moderates the roundtable, ensures all voices are heard, synthesizes key points.',
+        },
+        {
+          name: 'EXPERT',
+          description: 'Primary subject-matter expert, provides foundational knowledge.',
+        },
         { name: 'ANALYST', description: 'Offers data-driven insights and alternative frameworks.' },
-        { name: 'CRITIC', description: 'Plays devil\'s advocate, challenges assumptions, represents the skeptic.' },
+        {
+          name: 'CRITIC',
+          description: "Plays devil's advocate, challenges assumptions, represents the skeptic.",
+        },
       ],
     };
 
@@ -387,7 +443,7 @@ async function processSingleMention(tweet: TwitterTweet, mediaByKey: Map<string,
     const voicePair = selectVoicePair(tempPodcastId);
     const voiceEntries = speakers.map((speaker, i) => {
       // Check user preferences first
-      const userPref = user.voicePreferences.find(v => v.speaker === speaker.name);
+      const userPref = user.voicePreferences.find((v) => v.speaker === speaker.name);
       if (userPref?.voiceId) {
         return { speaker: speaker.name, voiceId: userPref.voiceId };
       }
@@ -400,15 +456,19 @@ async function processSingleMention(tweet: TwitterTweet, mediaByKey: Map<string,
 
     // 9. Build podcast metadata — adjust for threads
     const tone = parsed.isDebate ? 'socratic' : parsed.tone;
-    const focusAreas = isThreadPodcast && parsed.viewpoints
-      ? [...parsed.focusAreas, ...parsed.viewpoints]
-      : parsed.focusAreas;
+    const focusAreas =
+      isThreadPodcast && parsed.viewpoints
+        ? [...parsed.focusAreas, ...parsed.viewpoints]
+        : parsed.focusAreas;
     const rawDuration = parsed.durationTarget ?? (isThreadPodcast ? 15 : 10);
-    const maxDuration = isFinite(tierFeatures.maxDurationMinutes) ? tierFeatures.maxDurationMinutes : 40;
+    const maxDuration = isFinite(tierFeatures.maxDurationMinutes)
+      ? tierFeatures.maxDurationMinutes
+      : 40;
     const durationTarget = Math.min(Math.max(rawDuration, 1), maxDuration);
-    let sourceText = isThreadPodcast && threadData
-      ? formatThreadAsSourceText(threadData, parsed, participantCredentials)
-      : undefined;
+    let sourceText =
+      isThreadPodcast && threadData
+        ? formatThreadAsSourceText(threadData, parsed, participantCredentials)
+        : undefined;
 
     // 9b. Extract video transcript if tweet has video attachments
     const videoTranscript = await extractTwitterVideoTranscript(tweet, mediaByKey);
@@ -434,7 +494,7 @@ async function processSingleMention(tweet: TwitterTweet, mediaByKey: Map<string,
         sourceTweetId: tweet.id,
         voices: {
           createMany: {
-            data: voiceEntries.map(v => ({
+            data: voiceEntries.map((v) => ({
               speaker: v.speaker,
               voiceId: v.voiceId,
             })),
@@ -505,7 +565,7 @@ async function processSingleMention(tweet: TwitterTweet, mediaByKey: Map<string,
         try {
           await replyToTweet(
             tweet.id,
-            `We'd love to use ${parsed.requestedAiModel || parsed.requestedTtsProvider} for you! To unlock premium models, add your API keys at ${SOTTO_APP_URL}/settings/api`
+            `We'd love to use ${parsed.requestedAiModel || parsed.requestedTtsProvider} for you! To unlock premium models, add your API keys at ${getPublicAppBaseUrl()}/settings/api`
           );
         } catch (replyErr) {
           logger.warn('Failed to send model warning reply', {
