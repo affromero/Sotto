@@ -29,6 +29,7 @@ export type PodcastSource =
   | 'TELEGRAM'
   | 'API'
   | 'AGENT'
+  | 'MEETING'
   | 'IMPORT'
   | 'ADMIN'
   | 'BRIEFING';

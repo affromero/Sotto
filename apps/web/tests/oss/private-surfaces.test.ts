@@ -1162,32 +1162,40 @@ describe('private-first OSS surfaces', () => {
     expect(livePodcastSources).not.toContain("visibility === 'PRIVATE'");
   });
 
-  it('keeps local agent ingestion authenticated and private-only', () => {
+  it('keeps local ingestion surfaces authenticated and private-only', () => {
     const agentIngestRouteSource = readSource('src/app/api/ingest/agent/route.ts');
+    const meetingIngestRouteSource = readSource('src/app/api/ingest/meeting/route.ts');
     const privateIngestionSource = readSource('src/lib/private-ingestion.ts');
     const schemaSource = readFileSync(resolve(repoRoot, 'apps/web/prisma/schema.prisma'), 'utf8');
     const sharedEnumsSource = readFileSync(
       resolve(repoRoot, 'packages/shared/src/types/enums.ts'),
       'utf8'
     );
+    const ingestionRouteSources = [agentIngestRouteSource, meetingIngestRouteSource].join('\n');
 
-    expect(agentIngestRouteSource).toContain('authenticateRequest(request)');
-    expect(agentIngestRouteSource).toContain("errorResponse('Unauthorized', 401)");
+    expect(ingestionRouteSources).toContain('authenticateRequest(request)');
+    expect(ingestionRouteSources).toContain("errorResponse('Unauthorized', 401)");
     expect(agentIngestRouteSource).toContain("source: 'AGENT'");
+    expect(meetingIngestRouteSource).toContain("source: 'MEETING'");
     expect(agentIngestRouteSource).toContain('createPrivateIngestionPodcast');
+    expect(meetingIngestRouteSource).toContain('createPrivateIngestionPodcast');
     expect(privateIngestionSource).toContain("visibility: 'PRIVATE'");
     expect(agentIngestRouteSource).toContain('agentIngestion.create');
-    expect(agentIngestRouteSource).toContain('idempotencyKey');
-    expect([agentIngestRouteSource, privateIngestionSource].join('\n')).not.toContain(
+    expect(meetingIngestRouteSource).toContain('meetingIngestion.create');
+    expect(ingestionRouteSources).toContain('idempotencyKey');
+    expect([ingestionRouteSources, privateIngestionSource].join('\n')).not.toContain(
       "visibility: 'PUBLIC'"
     );
-    expect([agentIngestRouteSource, privateIngestionSource].join('\n')).not.toContain(
+    expect([ingestionRouteSources, privateIngestionSource].join('\n')).not.toContain(
       "visibility: 'UNLISTED'"
     );
-    expect(agentIngestRouteSource).not.toContain('public feed');
+    expect(ingestionRouteSources).not.toContain('public feed');
     expect(schemaSource).toContain('model AgentIngestion');
+    expect(schemaSource).toContain('model MeetingIngestion');
     expect(schemaSource).toContain('AGENT');
+    expect(schemaSource).toContain('MEETING');
     expect(sharedEnumsSource).toContain("| 'AGENT'");
+    expect(sharedEnumsSource).toContain("| 'MEETING'");
   });
 
   it('requires explicit provider selection for BYOK key deletion', () => {
