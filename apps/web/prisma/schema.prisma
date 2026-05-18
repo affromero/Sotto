@@ -1825,8 +1825,8 @@ model PlanFeatureConfig {
   proVoiceTracksEnabled   Boolean  @default(true)
   freeMaxVoiceTracks      Int      @default(0)
   proMaxVoiceTracks       Int      @default(3)
-  // Voice marketplace (buying/selling voices globally)
-  voiceMarketplaceEnabled Boolean  @default(true)
+  // Optional voice marketplace (disabled by default for private-first installs)
+  voiceMarketplaceEnabled Boolean  @default(false)
   // Avatar image controls
   avatarUploadsEnabled    Boolean  @default(true)
   avatarGenerationEnabled Boolean  @default(false)
