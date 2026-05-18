@@ -26,7 +26,7 @@ describe('GET /api/users/unsubscribe', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://selfhost.example.com');
-    vi.stubEnv('NEXTAUTH_SECRET', 'test-secret');
+    vi.stubEnv('AUTH_SECRET', 'test-secret');
     mockUserUpdate.mockResolvedValue({});
   });
 

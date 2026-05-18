@@ -18,7 +18,7 @@ function createPitchToken(secret: string): string {
 }
 
 export async function POST(request: NextRequest) {
-  const secret = process.env.NEXTAUTH_SECRET;
+  const secret = process.env.AUTH_SECRET;
   const pitchPassword = process.env.PITCH_PASSWORD;
 
   if (!secret || !pitchPassword) {

@@ -7,10 +7,10 @@
  *
  * Prerequisites:
  *   - Graded recordings exist in /tmp/pitch-recordings/graded/
- *   - HUME_API_KEY set (via Doppler)
+ *   - HUME_API_KEY set
  *
  * Usage:
- *   doppler run -- npx tsx scripts/recording/narrate.ts
+ *   npx tsx scripts/recording/narrate.ts
  *
  * Output:
  *   /tmp/pitch-recordings/narrated/*.mp4
@@ -34,7 +34,7 @@ async function main() {
   // ── Validate prerequisites ──────────────────────────────────────
   const apiKey = process.env.HUME_API_KEY;
   if (!apiKey) {
-    throw new Error('HUME_API_KEY not set — run with: doppler run -- npx tsx scripts/recording/narrate.ts');
+    throw new Error('HUME_API_KEY not set');
   }
 
   if (!fs.existsSync(GRADED_DIR)) {

@@ -26,8 +26,7 @@ All auth-related environment variables required for the system to function:
 
 | Variable               | Required         | Description                                       | Example                             |
 | ---------------------- | ---------------- | ------------------------------------------------- | ----------------------------------- |
-| `AUTH_SECRET`          | Yes              | Primary encryption key (fallback: `NEXTAUTH_SECRET`) | `openssl rand -base64 32` output |
-| `NEXTAUTH_SECRET`      | Fallback         | Legacy name — `AUTH_SECRET` takes precedence      | `openssl rand -base64 32` output    |
+| `AUTH_SECRET`          | Yes              | Encryption key for Auth.js sessions and signed app tokens | `openssl rand -base64 32` output |
 | `NEXTAUTH_URL`         | Yes (production) | Canonical URL of the app                          | `https://your-domain.example`                  |
 | `GOOGLE_CLIENT_ID`     | No               | Google OAuth client ID                            | `123456.apps.googleusercontent.com` |
 | `GOOGLE_CLIENT_SECRET` | No               | Google OAuth client secret                        | `GOCSPX-xxxxxxxxxxxx`               |
@@ -41,7 +40,7 @@ All auth-related environment variables required for the system to function:
 
 OAuth providers are conditionally loaded. If the environment variables for a provider are not set, that provider is simply not available. The app will still start and function with no OAuth providers configured (useful for local development where you only need to test other features).
 
-### Generating NEXTAUTH_SECRET
+### Generating AUTH_SECRET
 
 ```bash
 openssl rand -base64 32
@@ -66,7 +65,7 @@ import { prisma } from './prisma';
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
-  secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
+  secret: process.env.AUTH_SECRET,
   adapter: PrismaAdapter(prisma),
   providers: [
     ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
@@ -143,7 +142,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 - Session data is available in middleware without a database call
 - The `Session` model in Prisma exists for NextAuth adapter compatibility but is not actively used for session storage
 
-**Secret fallback:** `AUTH_SECRET` is the primary secret. `NEXTAUTH_SECRET` is supported as a fallback for backward compatibility. The `trustHost: true` flag is required for Hetzner VPS deployment (non-Vercel).
+**Single auth secret:** `AUTH_SECRET` is the only supported session/signature secret. The `trustHost: true` flag is required for Hetzner VPS deployment (non-Vercel).
 
 **Conditional providers:** Providers are wrapped in conditional spread operators so the app starts even when OAuth credentials are missing. This is critical for local development where you might not have all OAuth apps configured.
 
@@ -606,7 +605,7 @@ For local development where you do not have Google or GitHub OAuth apps configur
 ```bash
 GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=GOCSPX-your-secret
-NEXTAUTH_SECRET=any-random-string-for-local-dev
+AUTH_SECRET=any-random-string-for-local-dev
 NEXTAUTH_URL=http://localhost:3000
 ```
 
@@ -663,7 +662,7 @@ export async function GET(request: NextRequest) {
 
 | Issue                           | Cause                                            | Solution                                                                                |
 | ------------------------------- | ------------------------------------------------ | --------------------------------------------------------------------------------------- |
-| "CSRF token mismatch"           | Missing or wrong `NEXTAUTH_SECRET`               | Ensure `NEXTAUTH_SECRET` is set and consistent                                          |
+| "CSRF token mismatch"           | Missing or wrong `AUTH_SECRET`                   | Ensure `AUTH_SECRET` is set and consistent                                              |
 | "OAuth redirect_uri mismatch"   | Callback URL in provider settings does not match | Verify the redirect URI is exactly `http://localhost:3000/api/auth/callback/{provider}` |
 | "Access denied" on Google       | Account not added as test user                   | Add your Google account in OAuth consent screen > Test users                            |
 | Session is `null` in API routes | Using wrong import                               | Use `import { auth } from '@/lib/auth'`, not from `next-auth` directly                  |

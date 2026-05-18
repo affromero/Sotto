@@ -34,7 +34,7 @@ async function verifyPitchCookie(value: string, secret: string): Promise<boolean
 }
 
 async function authenticate(request: NextRequest): Promise<boolean> {
-  const secret = process.env.NEXTAUTH_SECRET;
+  const secret = process.env.AUTH_SECRET;
   const pitchPassword = process.env.PITCH_PASSWORD;
   if (!secret || !pitchPassword) return false;
 

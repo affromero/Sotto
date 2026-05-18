@@ -10,7 +10,11 @@ export async function GET(request: NextRequest) {
     return new NextResponse('Missing parameters', { status: 400 });
   }
 
-  const secret = process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET || '';
+  const secret = process.env.AUTH_SECRET;
+  if (!secret) {
+    return new NextResponse('AUTH_SECRET is not configured', { status: 500 });
+  }
+
   const expected = crypto
     .createHmac('sha256', secret)
     .update(email)

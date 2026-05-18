@@ -83,7 +83,6 @@ if [ ! -f "$ENV_FILE" ]; then
 
   cp "$ENV_TEMPLATE" "$ENV_FILE"
   set_env_value AUTH_SECRET "$AUTH_SECRET"
-  set_env_value NEXTAUTH_SECRET "$AUTH_SECRET"
   set_env_value BYOK_ENCRYPTION_KEY "$BYOK_ENCRYPTION_KEY"
 
   echo "  Created .env.local with auto-generated secrets"

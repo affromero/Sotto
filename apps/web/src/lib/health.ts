@@ -210,7 +210,7 @@ export async function getHealthData(isAdmin: boolean): Promise<HealthData> {
   const vapid = !!(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);
 
   const envKeys = [
-    'DATABASE_URL', 'REDIS_URL', 'NEXTAUTH_SECRET', 'PITCH_PASSWORD',
+    'DATABASE_URL', 'REDIS_URL', 'AUTH_SECRET', 'PITCH_PASSWORD',
     'ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'ELEVENLABS_API_KEY',
     'R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET_NAME',
     'CF_API_TOKEN',

@@ -6,8 +6,16 @@ function appLinkLabel(appUrl: string): string {
   return new URL(appUrl).host;
 }
 
+function requireAuthSecret(): string {
+  const secret = process.env.AUTH_SECRET;
+  if (!secret) {
+    throw new Error('AUTH_SECRET is required to sign unsubscribe URLs');
+  }
+  return secret;
+}
+
 export function generateUserUnsubscribeUrl(userId: string, appUrl = getAppBaseUrl()): string {
-  const secret = process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET || '';
+  const secret = requireAuthSecret();
   const signature = crypto.createHmac('sha256', secret).update(userId).digest('hex');
   return `${appUrl}/api/users/unsubscribe?userId=${encodeURIComponent(userId)}&sig=${signature}`;
 }
@@ -43,7 +51,7 @@ export function buildAnnouncementEmail(
 }
 
 function generateUnsubscribeUrl(email: string, appUrl = getAppBaseUrl()): string {
-  const secret = process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET || '';
+  const secret = requireAuthSecret();
   const signature = crypto.createHmac('sha256', secret).update(email).digest('hex');
   return `${appUrl}/api/waitlist/unsubscribe?email=${encodeURIComponent(email)}&sig=${signature}`;
 }

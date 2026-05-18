@@ -325,10 +325,12 @@ describe('private-first OSS surfaces', () => {
     expect(setupSource).toContain('compose up -d postgres redis');
     expect(setupSource).toContain('bash "$SCRIPT_DIR/install-deps.sh" --node --docker --ffmpeg');
     expect(setupSource).toContain('Fastest path: set OPENAI_API_KEY');
+    expect(setupSource).toContain('set_env_value AUTH_SECRET "$AUTH_SECRET"');
     expect(setupSource).not.toContain('uv sync --group pitch');
     expect(setupSource).not.toContain('AI_PROVIDER="anthropic"');
     expect(setupSource).not.toContain('docker-compose up -d');
     expect(setupSource).not.toContain('doppler');
+    expect(setupSource).not.toContain('set_env_value NEXTAUTH_SECRET');
 
     expect(installDepsSource).toContain('install_ffmpeg');
     expect(localSetupDocs).toContain('EXPO_PUBLIC_API_URL="http://localhost:3000/api"');
@@ -366,6 +368,8 @@ describe('private-first OSS surfaces', () => {
     expect(envExample).toContain('Use your own secret manager');
     expect(envExample).toContain('copy .env.oss.example to .env.local');
     expect(envExample).toContain('Use the exact public host from NEXT_PUBLIC_APP_URL');
+    expect(envTemplateSources).toContain('AUTH_SECRET');
+    expect(envTemplateSources).not.toContain('NEXTAUTH_SECRET');
     expect(envTemplateSources).not.toContain('dashboard.doppler.com/workplace/projects/sotto');
     expect(envTemplateSources).not.toContain('doppler secrets download');
     expect(envTemplateSources).not.toContain('doppler secrets set');
@@ -373,6 +377,38 @@ describe('private-first OSS surfaces', () => {
     expect(envTemplateSources).not.toContain('Use the apex domain (sotto.fm)');
     expect(envTemplateSources).not.toContain('DNS domain verification for sotto.fm');
     expect(envTemplateSources).not.toContain('Doppler dev/prd configs');
+  });
+
+  it('uses AUTH_SECRET as the only runtime session secret', () => {
+    const authSecretSources = [
+      'apps/web/src/lib/auth.ts',
+      'apps/web/src/middleware.ts',
+      'apps/web/src/lib/email-templates.ts',
+      'apps/web/src/app/api/access/route.ts',
+      'apps/web/src/app/api/users/unsubscribe/route.ts',
+      'apps/web/src/app/api/waitlist/unsubscribe/route.ts',
+      'apps/web/src/app/api/pitch/[...path]/route.ts',
+      'apps/web/src/app/api/pitch/auth/route.ts',
+      'apps/web/src/workers/demo-recording.worker.ts',
+      'apps/web/src/lib/health.ts',
+      'scripts/capture-pitch-screenshots.ts',
+      'scripts/recording/index.ts',
+      'scripts/recording/lib/browser.ts',
+      'scripts/recording/narrate.ts',
+      'docs/17-authentication-setup.md',
+    ]
+      .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
+      .join('\n');
+
+    expect(authSecretSources).toContain('process.env.AUTH_SECRET');
+    expect(authSecretSources).toContain('AUTH_SECRET is required');
+    expect(authSecretSources).not.toContain('NEXTAUTH_SECRET');
+    expect(authSecretSources).not.toContain('AUTH_SECRET ??');
+    expect(authSecretSources).not.toContain('AUTH_SECRET ||');
+    expect(authSecretSources).not.toContain('Secret fallback');
+    expect(authSecretSources).not.toContain('Legacy name');
+    expect(authSecretSources).not.toContain('via Doppler');
+    expect(authSecretSources).not.toContain('doppler run --');
   });
 
   it('keeps server deployment self-hosted and env-file driven', () => {

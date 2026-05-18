@@ -83,7 +83,7 @@ Minimum required production categories:
 | Category | Variables |
 | --- | --- |
 | Public URL | `NEXT_PUBLIC_APP_URL`, `NEXTAUTH_URL` |
-| Auth | `AUTH_SECRET`, `NEXTAUTH_SECRET` |
+| Auth | `AUTH_SECRET` |
 | Database | `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `DATABASE_URL`, `DIRECT_DATABASE_URL` |
 | Redis | `REDIS_PASSWORD`, `REDIS_URL` |
 | Storage | `STORAGE_PROVIDER` plus the matching local or S3/R2 values |

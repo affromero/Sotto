@@ -75,7 +75,6 @@ Set these first:
 NEXT_PUBLIC_APP_URL=https://your-domain.example
 NEXTAUTH_URL=https://your-domain.example
 AUTH_SECRET=<openssl rand -base64 32>
-NEXTAUTH_SECRET=<same value as AUTH_SECRET>
 BYOK_ENCRYPTION_KEY=<openssl rand -base64 32>
 ```
 
