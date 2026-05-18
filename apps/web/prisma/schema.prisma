@@ -151,6 +151,9 @@ model User {
   // Podcast ideas (from Telegram bot)
   podcastIdeas PodcastIdea[]
 
+  // Private agent output ingestions
+  agentIngestions AgentIngestion[]
+
   // Free tier
   dailyGenerationOverride Int? // null = use global, 0 = unlimited, N = custom daily limit
 
@@ -206,31 +209,31 @@ model User {
   demoProjects DemoProject[]
 
   // Avatar images (lip-sync)
-  avatarImages AvatarImage[]
+  avatarImages         AvatarImage[]
   avatarSharesSent     AvatarImageShare[] @relation("AvatarShareRequester")
   avatarSharesReceived AvatarImageShare[] @relation("AvatarShareOwner")
 
   // Daily Briefings
-  briefingEnabled    Boolean           @default(false)
-  briefingTime       String? // "HH:mm" wall-clock
-  briefingTimezone   String? // IANA, e.g. "America/New_York"
-  briefingDays       Int               @default(127) // bitmask: Mon=1..Sun=64
-  briefingVisibility PodcastVisibility @default(PRIVATE)
-  lastBriefingAt     DateTime?
-  briefingLogs       BriefingLog[]
+  briefingEnabled       Boolean           @default(false)
+  briefingTime          String? // "HH:mm" wall-clock
+  briefingTimezone      String? // IANA, e.g. "America/New_York"
+  briefingDays          Int               @default(127) // bitmask: Mon=1..Sun=64
+  briefingVisibility    PodcastVisibility @default(PRIVATE)
+  lastBriefingAt        DateTime?
+  briefingLogs          BriefingLog[]
   // Briefing customization — null = use user's general pref → admin default → platform auto
-  briefingAiModel       String?           // AI model override for briefings
-  briefingTtsProvider   String?           // TTS provider override
-  briefingTtsModel      String?           // TTS model override
-  briefingHostVoiceId   String?           // Voice pool entry name (provider-agnostic)
-  briefingExpertVoiceId String?           // Voice pool entry name (provider-agnostic)
-  briefingDepth         String?           // eli5, quick_overview, standard, deep_dive
-  briefingTone          String?           // casual, professional, socratic, comedic, satirical, storytelling
-  briefingAudienceLevel String?           // beginner, intermediate, expert
-  briefingDuration      Int?              // target minutes (1-40)
+  briefingAiModel       String? // AI model override for briefings
+  briefingTtsProvider   String? // TTS provider override
+  briefingTtsModel      String? // TTS model override
+  briefingHostVoiceId   String? // Voice pool entry name (provider-agnostic)
+  briefingExpertVoiceId String? // Voice pool entry name (provider-agnostic)
+  briefingDepth         String? // eli5, quick_overview, standard, deep_dive
+  briefingTone          String? // casual, professional, socratic, comedic, satirical, storytelling
+  briefingAudienceLevel String? // beginner, intermediate, expert
+  briefingDuration      Int? // target minutes (1-40)
   briefingFormat        Int               @default(2) // 1=Solo, 2=Dialogue, 3=Panel, 4=Roundtable
-  briefingPrompt        String? @db.Text  // custom instructions/topic focus
-  briefingUseByokKeys   Boolean @default(false) // opt-in: when true + user has BYOK, use their keys
+  briefingPrompt        String?           @db.Text // custom instructions/topic focus
+  briefingUseByokKeys   Boolean           @default(false) // opt-in: when true + user has BYOK, use their keys
 
   // Multi-briefing configs
   userBriefings UserBriefing[]
@@ -365,13 +368,13 @@ model Podcast {
   musicBaked  Boolean @default(false)
 
   // Import fields
-  importedAudioKey   String?
-  originalFormat     String?
-  transcriptProvided Boolean @default(false)
-  isHumanContent     Boolean @default(false)
-  lowReferences          Boolean @default(false)
-  verificationProgress   Json? // transient progress during reference validation
-  sourcePlatform         String? // e.g. "notebooklm", "spotify", "apple_podcasts", "youtube"
+  importedAudioKey     String?
+  originalFormat       String?
+  transcriptProvided   Boolean @default(false)
+  isHumanContent       Boolean @default(false)
+  lowReferences        Boolean @default(false)
+  verificationProgress Json? // transient progress during reference validation
+  sourcePlatform       String? // e.g. "notebooklm", "spotify", "apple_podcasts", "youtube"
 
   // AI-suggested metadata (for imports where user provided their own)
   suggestedTitle String?
@@ -414,6 +417,7 @@ model Podcast {
   duplicateMatches    DuplicateMatch[]   @relation("DuplicateMatch")
   quiz                PodcastQuiz?
   briefingLogs        BriefingLog[]
+  agentIngestion      AgentIngestion?
   landingShowcase     LandingShowcase?
   researchDossier     ResearchDossier?
   creativeOutline     CreativeOutline?
@@ -454,16 +458,16 @@ model ResearchDossier {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  mode      String // 'source-bound' | 'curated' | 'open-web'
-  userBrief Json   // { topic, audienceLevel, tone, durationTarget, mustCover, mustAvoid, suppliedSourceUrls, discoverySummary }
-  sources   Json   // SourceRecord[]
-  evidence  Json   // EvidenceCard[]
-  gaps      Json?  // string[] — identified knowledge gaps
-  blockedClaims Json? // string[] — claims that couldn't be verified
+  mode             String // 'source-bound' | 'curated' | 'open-web'
+  userBrief        Json // { topic, audienceLevel, tone, durationTarget, mustCover, mustAvoid, suppliedSourceUrls, discoverySummary }
+  sources          Json // SourceRecord[]
+  evidence         Json // EvidenceCard[]
+  gaps             Json? // string[] — identified knowledge gaps
+  blockedClaims    Json? // string[] — claims that couldn't be verified
   recommendedAngle String? @db.Text
 
-  totalInputTokens  Int @default(0)
-  totalOutputTokens Int @default(0)
+  totalInputTokens  Int     @default(0)
+  totalOutputTokens Int     @default(0)
   model             String?
 
   podcast Podcast @relation(fields: [podcastId], references: [id], onDelete: Cascade)
@@ -475,19 +479,19 @@ model CreativeOutline {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  drivingQuestion    String @db.Text
-  listenerPromise    String @db.Text
-  thesis             String @db.Text
-  narrativeFramework String // 'anecdote_reflection' | 'question_cascade' | 'problem_solution' | 'editorial_comedy'
-  hook               String @db.Text
-  beats              Json   // Beat[]
-  tensionCurve       Json?  // { beatOrder, tension }[]
-  bannedAngles       Json?  // string[]
+  drivingQuestion     String @db.Text
+  listenerPromise     String @db.Text
+  thesis              String @db.Text
+  narrativeFramework  String // 'anecdote_reflection' | 'question_cascade' | 'problem_solution' | 'editorial_comedy'
+  hook                String @db.Text
+  beats               Json // Beat[]
+  tensionCurve        Json? // { beatOrder, tension }[]
+  bannedAngles        Json? // string[]
   unresolvedQuestions Json? // string[]
-  speakerRoles       Json?  // { speaker, role }[]
+  speakerRoles        Json? // { speaker, role }[]
 
-  inputTokens  Int @default(0)
-  outputTokens Int @default(0)
+  inputTokens  Int     @default(0)
+  outputTokens Int     @default(0)
   model        String?
 
   podcast Podcast @relation(fields: [podcastId], references: [id], onDelete: Cascade)
@@ -504,6 +508,7 @@ enum PodcastSource {
   TWITTER
   TELEGRAM
   API
+  AGENT
   IMPORT
   ADMIN
   BRIEFING
@@ -543,6 +548,27 @@ model Discovery {
   userId   String
 
   @@index([userId])
+}
+
+model AgentIngestion {
+  id             String   @id @default(cuid())
+  userId         String
+  podcastId      String   @unique
+  idempotencyKey String?
+  provider       String
+  agentName      String
+  runId          String?
+  contentHash    String
+  metadata       Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  podcast Podcast @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, idempotencyKey])
+  @@index([userId, createdAt])
+  @@index([contentHash])
 }
 
 model DiscoveryMessage {
@@ -595,16 +621,16 @@ model Script {
 // ============ AUDIO SEGMENTS ============
 
 model Segment {
-  id        String  @id @default(cuid())
-  podcastId String
-  speaker   String
-  text      String  @db.Text
-  audioUrl  String?
-  order     Int
-  startTime    Float? // seconds
-  duration     Float? // seconds
-  wordTimings  Json?  // Array<{ word: string; start: number; end: number }>
-  version      Int     @default(1)
+  id          String  @id @default(cuid())
+  podcastId   String
+  speaker     String
+  text        String  @db.Text
+  audioUrl    String?
+  order       Int
+  startTime   Float? // seconds
+  duration    Float? // seconds
+  wordTimings Json? // Array<{ word: string; start: number; end: number }>
+  version     Int     @default(1)
 
   ttsProvider String? // Per-segment override: 'elevenlabs' | 'openai' | 'cartesia' | etc.
   ttsModel    String? // Per-segment override: provider-specific model ID
@@ -712,8 +738,8 @@ model Interaction {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  podcast  Podcast           @relation(fields: [podcastId], references: [id], onDelete: Cascade)
-  user     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  podcast  Podcast          @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   versions PodcastVersion[]
 
   @@index([podcastId])
@@ -1591,13 +1617,13 @@ model Reference {
 model VocabularyEntry {
   id              String   @id @default(cuid())
   podcastId       String
-  number          Int      // [V1], [V2] marker index, 1-based
-  word            String   // target language word/phrase
-  translation     String   // native language translation
-  partOfSpeech    String?  // noun, verb, adjective, etc.
-  pronunciation   String?  // phonetic guide (e.g. "SHPREE-chen")
+  number          Int // [V1], [V2] marker index, 1-based
+  word            String // target language word/phrase
+  translation     String // native language translation
+  partOfSpeech    String? // noun, verb, adjective, etc.
+  pronunciation   String? // phonetic guide (e.g. "SHPREE-chen")
   exampleSentence String?  @db.Text // usage in context
-  difficulty      String?  // beginner, intermediate, advanced
+  difficulty      String? // beginner, intermediate, advanced
   createdAt       DateTime @default(now())
 
   podcast Podcast @relation(fields: [podcastId], references: [id], onDelete: Cascade)
@@ -1703,14 +1729,14 @@ model UserAiKey {
 // ============ COLLECTIONS (Curated Playlists) ============
 
 model Collection {
-  id            String   @id @default(cuid())
-  name          String
-  description   String?  @db.Text
-  userId        String
-  isPublic      Boolean  @default(true)
-  podcastCount  Int      @default(0)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id           String   @id @default(cuid())
+  name         String
+  description  String?  @db.Text
+  userId       String
+  isPublic     Boolean  @default(true)
+  podcastCount Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   user  User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   items CollectionItem[]
@@ -1909,34 +1935,34 @@ model TwitterAutoTweet {
 // ============ LANDING SHOWCASE CONFIG (Admin Dashboard) ============
 
 model LandingShowcase {
-  id              String   @id @default("singleton")
-  podcastId       String   @unique
+  id        String @id @default("singleton")
+  podcastId String @unique
 
   // JourneyChapter Step 2 — Script excerpt range
-  scriptTurnStart Int      @default(0)
-  scriptTurnCount Int      @default(2)
+  scriptTurnStart Int @default(0)
+  scriptTurnCount Int @default(2)
 
   // JourneyChapter Step 3 — Audio clip range (seconds)
-  audioClipStart  Float    @default(0)
-  audioClipEnd    Float?   // null = 30s from start
+  audioClipStart Float  @default(0)
+  audioClipEnd   Float? // null = 30s from start
 
   // ShowcaseChapter — Video segment range
-  videoSegmentStart Int    @default(0)
-  videoSegmentCount Int    @default(4)
+  videoSegmentStart Int @default(0)
+  videoSegmentCount Int @default(4)
 
   // Feature toggles — controls whether landing page shows interactive toggles
-  showAvatar      Boolean  @default(false)
-  showVideo       Boolean  @default(false)
+  showAvatar Boolean @default(false)
+  showVideo  Boolean @default(false)
 
   // BotChapter — Twitter/Telegram overrides
-  twitterHandle   String   @default("andres")
-  twitterName     String   @default("Andres")
-  telegramTopic   String?  // null = derive from podcast topic
+  twitterHandle String  @default("andres")
+  twitterName   String  @default("Andres")
+  telegramTopic String? // null = derive from podcast topic
 
-  updatedAt       DateTime @updatedAt
-  updatedBy       String?
+  updatedAt DateTime @updatedAt
+  updatedBy String?
 
-  podcast         Podcast  @relation(fields: [podcastId], references: [id])
+  podcast Podcast @relation(fields: [podcastId], references: [id])
 
   @@index([podcastId])
 }
@@ -2310,9 +2336,9 @@ model SegmentVisual {
   motionProvider    String? // 'remotion' | 'hera' — which motion provider rendered this visual
   status            String     @default("pending") // pending | generating | ready | failed
   failureReason     String?    @db.Text
-  previewUrl        String?    // R2 URL of per-segment preview MP4
-  previewStatus     String?    // pending | rendering | ready | failed
-  previewQuality    String?    // 'preview' | 'full'
+  previewUrl        String? // R2 URL of per-segment preview MP4
+  previewStatus     String? // pending | rendering | ready | failed
+  previewQuality    String? // 'preview' | 'full'
   createdAt         DateTime   @default(now())
   updatedAt         DateTime   @updatedAt
 
@@ -2374,16 +2400,16 @@ enum AvatarImageSource {
 }
 
 model AvatarImage {
-  id                   String            @id @default(cuid())
-  userId               String
-  user                 User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name                 String
-  imageUrl             String
-  sourceType           AvatarImageSource
-  prompt               String?           @db.Text
+  id                    String            @id @default(cuid())
+  userId                String
+  user                  User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name                  String
+  imageUrl              String
+  sourceType            AvatarImageSource
+  prompt                String?           @db.Text
   consentAcknowledgedAt DateTime?
-  shareable            Boolean           @default(false)
-  createdAt            DateTime          @default(now())
+  shareable             Boolean           @default(false)
+  createdAt             DateTime          @default(now())
 
   shares AvatarImageShare[]
 
@@ -2544,15 +2570,15 @@ model DemoScene {
 model UserBriefing {
   id        String   @id @default(cuid())
   userId    String
-  name      String   // "Morning Tech News", "Evening Finance"
+  name      String // "Morning Tech News", "Evening Finance"
   enabled   Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Schedule
-  time      String   // "HH:mm" (required)
-  timezone  String   // IANA timezone (required)
-  days      Int      @default(127) // bitmask Mon=1..Sun=64
+  time      String // "HH:mm" (required)
+  timezone  String // IANA timezone (required)
+  days      Int       @default(127) // bitmask Mon=1..Sun=64
   nextRunAt DateTime? // pre-computed next eligible run time
 
   // Content
@@ -2560,7 +2586,7 @@ model UserBriefing {
   depth          String? // eli5, quick_overview, standard, deep_dive
   tone           String? // casual, professional, socratic, etc.
   audienceLevel  String? // beginner, intermediate, expert
-  duration       Int?    // target minutes 1-40
+  duration       Int? // target minutes 1-40
   format         Int     @default(2) // 1=Solo 2=Dialogue 3=Panel 4=Roundtable
   targetLanguage String? // ISO 639-1 code (e.g. "de") — null = English
   languageMode   String? // vocabulary_intro | conversational_mix | full_immersion
@@ -2577,15 +2603,15 @@ model UserBriefing {
   contextEpisodes    Int     @default(3) // 1-5: how many prior episodes to include as context
 
   // Advanced
-  visibility     PodcastVisibility @default(PRIVATE)
-  useByokKeys    Boolean           @default(false)
-  zeroCostVideo  Boolean           @default(false) // free visuals only, skip verification
+  visibility    PodcastVisibility @default(PRIVATE)
+  useByokKeys   Boolean           @default(false)
+  zeroCostVideo Boolean           @default(false) // free visuals only, skip verification
 
   // State
   lastGeneratedAt DateTime?
 
   // Relations
-  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   briefingLogs BriefingLog[]
 
   @@index([userId])
@@ -2607,18 +2633,18 @@ model BriefingConfig {
 }
 
 model BriefingLog {
-  id              String   @id @default(cuid())
-  userId          String
-  podcastId       String
-  topicSlugs      String[]
-  articleUrls     String[]
-  generatedAt     DateTime @default(now())
-  userBriefingId  String?
-  scheduledDate   String?  // "YYYY-MM-DD" for idempotency
+  id             String   @id @default(cuid())
+  userId         String
+  podcastId      String
+  topicSlugs     String[]
+  articleUrls    String[]
+  generatedAt    DateTime @default(now())
+  userBriefingId String?
+  scheduledDate  String? // "YYYY-MM-DD" for idempotency
 
-  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  podcast        Podcast        @relation(fields: [podcastId], references: [id], onDelete: Cascade)
-  userBriefing   UserBriefing?  @relation(fields: [userBriefingId], references: [id], onDelete: SetNull)
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  podcast      Podcast       @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+  userBriefing UserBriefing? @relation(fields: [userBriefingId], references: [id], onDelete: SetNull)
 
   @@unique([userBriefingId, scheduledDate])
   @@index([userId, generatedAt])
@@ -2699,7 +2725,7 @@ model QuizAnswer {
 model ShowcaseSet {
   id        String   @id @default(cuid())
   name      String
-  items     Json     // Array of ShowcaseItem: { visualType, label, description, url, mediaType, credits? }
+  items     Json // Array of ShowcaseItem: { visualType, label, description, url, mediaType, credits? }
   active    Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
