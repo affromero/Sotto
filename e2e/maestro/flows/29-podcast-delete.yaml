@@ -4,56 +4,56 @@ tags:
   - edit
   - critical
 ---
-# Podcast Delete — Edit podcast, delete with confirmation, verify navigation back to feed
+# Podcast Delete — Edit podcast, delete with confirmation, verify navigation back to library
 
 - runFlow: ../helpers/login.yaml
 
 # Navigate to own podcast from profile
 - tapOn:
-    id: "profile-settings-button"
+    id: 'profile-settings-button'
     optional: true
 - tapOn:
-    text: "Profile"
+    text: 'Profile'
 - extendedWaitUntil:
     visible:
-      id: "profile-podcast-list"
+      id: 'profile-podcast-list'
     timeout: 5000
 
 - scrollUntilVisible:
     element:
-      id: "podcast-card-${E2E_PODCAST_ID}"
+      id: 'podcast-card-${E2E_PODCAST_ID}'
     direction: DOWN
     timeout: 10000
 - tapOn:
-    id: "podcast-card-${E2E_PODCAST_ID}"
+    id: 'podcast-card-${E2E_PODCAST_ID}'
 
 # Open edit screen
 - extendedWaitUntil:
     visible:
-      id: "player-edit-button"
+      id: 'player-edit-button'
     timeout: 5000
 - tapOn:
-    id: "player-edit-button"
+    id: 'player-edit-button'
 - extendedWaitUntil:
     visible:
-      id: "podcast-edit-title-input"
+      id: 'podcast-edit-title-input'
     timeout: 5000
 
 # Scroll to delete button and tap
 - scrollUntilVisible:
     element:
-      id: "podcast-edit-delete-button"
+      id: 'podcast-edit-delete-button'
     direction: DOWN
     timeout: 5000
 - tapOn:
-    id: "podcast-edit-delete-button"
+    id: 'podcast-edit-delete-button'
 
 # Dismiss the confirmation alert (Cancel — don't actually delete the seeded podcast)
 - tapOn:
-    text: "Cancel"
+    text: 'Cancel'
 
 # Verify still on edit screen
 - assertVisible:
-    id: "podcast-edit-delete-button"
+    id: 'podcast-edit-delete-button'
 
 - takeScreenshot: podcast-delete-guard

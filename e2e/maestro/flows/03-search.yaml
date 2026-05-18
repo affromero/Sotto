@@ -1,29 +1,23 @@
 appId: fm.sotto.app
-name: Search - Podcasts and People
+name: Search - Private Library
 tags: [search, smoke]
 ---
 - runFlow: ../helpers/login.yaml
 
 # Navigate to Search tab
 - tapOn:
-    text: "Search"
+    text: 'Search'
 
 # Type a search query
 - tapOn:
-    id: "search-input"
-- inputText: "artificial intelligence"
+    id: 'search-input'
+- inputText: 'artificial intelligence'
 - extendedWaitUntil:
     visible:
-      id: "search-mode-podcasts"
+      id: 'search-results-list'
     timeout: 3000
-
-# Switch between segments
-- tapOn:
-    id: "search-mode-people"
-- tapOn:
-    id: "search-mode-podcasts"
 
 # Terminal assertion: search results visible
 - assertVisible:
-    id: "search-results-list"
+    id: 'search-results-list'
 - takeScreenshot: search-results

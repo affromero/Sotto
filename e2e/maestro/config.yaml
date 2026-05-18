@@ -1,5 +1,5 @@
 flows:
-  - "flows/**"
+  - 'flows/**'
 executionOrder:
   continueOnFailure: true
 onFlowStart:
@@ -7,10 +7,8 @@ onFlowStart:
 onFlowComplete:
   file: hooks/onFlowComplete.yaml
 env:
-  TEST_EMAIL: "test-e2e@example.com"
-  E2E_PODCAST_ID: "e2e-podcast"
-  E2E_EMPTY_EMAIL: "test-empty@example.com"
-  E2E_FAILED_PODCAST_ID: "e2e-failed-podcast"
-  E2E_OTHER_USER_HANDLE: "e2e-other"
-  E2E_OTHER_USER_NAME: "E2E Other User"
-  E2E_DRAFT_NAME: "Draft Podcast"
+  TEST_EMAIL: 'test-e2e@example.com'
+  E2E_PODCAST_ID: 'e2e-podcast'
+  E2E_EMPTY_EMAIL: 'test-empty@example.com'
+  E2E_FAILED_PODCAST_ID: 'e2e-failed-podcast'
+  E2E_DRAFT_NAME: 'Draft Podcast'
