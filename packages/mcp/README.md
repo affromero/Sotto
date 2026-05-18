@@ -1,12 +1,12 @@
 # @sotto/mcp
 
-MCP server for [Sotto](https://sotto.fm). Create and manage private AI podcasts from any MCP-compatible client (Claude Desktop, Claude Code, Cursor).
+MCP server for Sotto. Create and manage private AI podcasts from any MCP-compatible client (Claude Desktop, Claude Code, Cursor).
 
 ## Setup
 
 ### 1. Get an API key
 
-Go to [sotto.fm/settings/api](https://sotto.fm/settings/api) and create a new API key. Keys start with `sk_sotto_`.
+Create an API key from your Sotto deployment at `/settings/api`. Keys start with `sk_sotto_`.
 
 ### 2. Configure your client
 
@@ -21,7 +21,8 @@ Add to `claude_desktop_config.json`:
       "command": "npx",
       "args": ["-y", "@sotto/mcp"],
       "env": {
-        "SOTTO_API_KEY": "sk_sotto_your_key_here"
+        "SOTTO_API_KEY": "sk_sotto_your_key_here",
+        "SOTTO_API_URL": "https://your-sotto.example.com"
       }
     }
   }
@@ -39,7 +40,8 @@ Add to `.mcp.json` in your project root:
       "command": "npx",
       "args": ["-y", "@sotto/mcp"],
       "env": {
-        "SOTTO_API_KEY": "sk_sotto_your_key_here"
+        "SOTTO_API_KEY": "sk_sotto_your_key_here",
+        "SOTTO_API_URL": "https://your-sotto.example.com"
       }
     }
   }
@@ -67,10 +69,10 @@ Point at your local dev server:
 
 ## Environment Variables
 
-| Variable        | Required | Default            | Description                  |
-| --------------- | -------- | ------------------ | ---------------------------- |
-| `SOTTO_API_KEY` | Yes      | —                  | Your `sk_sotto_...` API key  |
-| `SOTTO_API_URL` | No       | `https://sotto.fm` | API base URL (for local dev) |
+| Variable        | Required | Default | Description                      |
+| --------------- | -------- | ------- | -------------------------------- |
+| `SOTTO_API_KEY` | Yes      | —       | Your `sk_sotto_...` API key      |
+| `SOTTO_API_URL` | Yes      | —       | API base URL for your deployment |
 
 ## Tools
 
@@ -100,7 +102,7 @@ npm run build --workspace=@sotto/mcp
 npx tsc --noEmit --project packages/mcp/tsconfig.json
 
 # Test startup
-SOTTO_API_KEY=test node packages/mcp/dist/index.js
+SOTTO_API_KEY=test SOTTO_API_URL=http://localhost:3000 node packages/mcp/dist/index.js
 
 # Inspect with MCP Inspector
 npx @modelcontextprotocol/inspector node packages/mcp/dist/index.js

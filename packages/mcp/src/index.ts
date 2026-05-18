@@ -10,8 +10,23 @@ if (!apiKey) {
   process.exit(1);
 }
 
-const baseUrl = process.env.SOTTO_API_URL || 'https://sotto.fm';
-const client = new SottoClient(apiKey, baseUrl);
+const baseUrl = process.env.SOTTO_API_URL;
+if (!baseUrl) {
+  process.stderr.write('Error: SOTTO_API_URL environment variable is required\n');
+  process.exit(1);
+}
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+let client: SottoClient;
+try {
+  client = new SottoClient(apiKey, baseUrl);
+} catch (error) {
+  process.stderr.write(`Error: ${getErrorMessage(error)}\n`);
+  process.exit(1);
+}
 const server = createServer(client);
 
 const transport = new StdioServerTransport();

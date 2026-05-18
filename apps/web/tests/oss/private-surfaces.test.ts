@@ -184,6 +184,22 @@ describe('private-first OSS surfaces', () => {
     expect(existsSync(resolve(webRoot, 'src/types/feed.ts'))).toBe(false);
   });
 
+  it('requires MCP clients to target an explicit Sotto deployment URL', () => {
+    const mcpIndexSource = readFileSync(resolve(repoRoot, 'packages/mcp/src/index.ts'), 'utf8');
+    const mcpClientSource = readFileSync(resolve(repoRoot, 'packages/mcp/src/client.ts'), 'utf8');
+    const mcpReadme = readFileSync(resolve(repoRoot, 'packages/mcp/README.md'), 'utf8');
+    const mcpRuntimeSources = [mcpIndexSource, mcpClientSource].join('\n');
+
+    expect(mcpIndexSource).toContain('SOTTO_API_URL environment variable is required');
+    expect(mcpClientSource).toContain('constructor(apiKey: string, baseUrl: string)');
+    expect(mcpRuntimeSources).not.toContain('https://sotto.fm');
+    expect(mcpRuntimeSources).not.toMatch(/SOTTO_API_URL\s*\|\|/);
+    expect(mcpClientSource).not.toMatch(/baseUrl:\s*string\s*=/);
+    expect(mcpReadme).toContain('| `SOTTO_API_URL` | Yes');
+    expect(mcpReadme).not.toContain('| `SOTTO_API_URL` | No');
+    expect(mcpReadme).not.toContain('`https://sotto.fm`');
+  });
+
   it('does not ship the standalone social feed ranking workspace', () => {
     const workspaceSources = [
       'package.json',
