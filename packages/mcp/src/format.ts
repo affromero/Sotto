@@ -1,4 +1,10 @@
-import type { AgentIngestResult, Podcast, PodcastDetail, UserProfile } from './types.js';
+import type {
+  AgentIngestResult,
+  MeetingIngestResult,
+  Podcast,
+  PodcastDetail,
+  UserProfile,
+} from './types.js';
 
 function formatDuration(seconds: number | null): string {
   if (!seconds) return 'N/A';
@@ -75,6 +81,13 @@ export function formatCreated(result: { id: string; status?: string }): string {
 export function formatAgentIngested(result: AgentIngestResult): string {
   const action = result.idempotent ? 'Agent output already ingested.' : 'Agent output ingested.';
   return `${action}\nID: ${result.id}\nStatus: ${result.status}\n\nThe private podcast is now in your library pipeline. Use get_podcast to check progress.`;
+}
+
+export function formatMeetingIngested(result: MeetingIngestResult): string {
+  const action = result.idempotent
+    ? 'Meeting transcript already ingested.'
+    : 'Meeting transcript ingested.';
+  return `${action}\nID: ${result.id}\nStatus: ${result.status}\n\nThe private recap is now in your library pipeline. Use get_podcast to check progress.`;
 }
 
 export function formatDeleted(): string {
