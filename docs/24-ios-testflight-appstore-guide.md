@@ -188,8 +188,8 @@ Go to App Store Connect → My Apps → Sotto → App Store tab:
 **Version Information** (for each localization):
 - Description (see `docs/15-ios-app-strategy.md` for copy)
 - Keywords: `podcast, AI, learning, education, audio, interactive, voice`
-- Support URL: `https://sotto.fm/support`
-- Marketing URL: `https://sotto.fm`
+- Support URL: `https://your-domain.example/support`
+- Marketing URL: `https://your-domain.example`
 
 **Screenshots** (required sizes):
 - 6.7" (iPhone 15 Pro Max): 1290 x 2796 px
@@ -204,7 +204,7 @@ Capture screenshots on simulators matching each size, or use a tool like [shots.
 - Notes: "This is an AI podcast app. All AI-generated content is labeled with an 'AI-Generated' badge."
 
 **Privacy**:
-- Privacy policy URL: `https://sotto.fm/privacy`
+- Privacy policy URL: `https://your-domain.example/privacy`
 - Privacy nutrition label:
   - Data Linked to You: email, user content (podcasts), identifiers (push token)
   - Data Not Linked to You: diagnostics
@@ -266,7 +266,7 @@ eas update --branch preview --message "feat: add share button to player"
 | TestFlight build stuck "Processing" | Wait up to 30 min; Apple processes the binary |
 | "Missing compliance" warning | Go to App Store Connect → TestFlight → click the build → fill export compliance (select "No" for encryption if you only use HTTPS) |
 | Rejection: "AI content not labeled" | Add "AI-Generated" badge on all podcast cards |
-| Rejection: "missing privacy policy" | Publish at `sotto.fm/privacy` and link in App Store Connect |
+| Rejection: "missing privacy policy" | Publish at `your-domain.example/privacy` and link in App Store Connect |
 | Rejection: "app is a repackaged website" | Emphasize native features: background audio, push notifications, offline playback |
 | Push notifications not working on TestFlight | Ensure push notification key is configured: `eas credentials --platform ios` |
 | Background audio stops after 30s | Verify `UIBackgroundModes: ["audio"]` in `app.json` and that `react-native-track-player` is properly initialized |
@@ -322,8 +322,8 @@ Or let EAS auto-increment in `eas.json`:
 - [ ] API calls work against staging/production backend
 
 ### Pre-App Store
-- [ ] Privacy policy live at `sotto.fm/privacy`
-- [ ] Terms of service live at `sotto.fm/terms`
+- [ ] Privacy policy live at `your-domain.example/privacy`
+- [ ] Terms of service live at `your-domain.example/terms`
 - [ ] App Store screenshots captured (3 device sizes)
 - [ ] App description + keywords written
 - [ ] Privacy nutrition label filled out

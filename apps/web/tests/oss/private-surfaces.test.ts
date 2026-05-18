@@ -402,6 +402,36 @@ describe('private-first OSS surfaces', () => {
     expect(deploymentSources).not.toContain('.env.workers.local');
   });
 
+  it('keeps release deployment docs self-host neutral', () => {
+    const releaseDocs = [
+      'docs/17-authentication-setup.md',
+      'docs/18-hosting-infrastructure.md',
+      'docs/19-self-host-deployment.md',
+      'docs/24-ios-testflight-appstore-guide.md',
+    ]
+      .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
+      .join('\n');
+    const releaseIndexSources = [
+      'docs/CLAUDE.md',
+      'scripts/rebuild-pitch.sh',
+    ]
+      .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
+      .join('\n');
+
+    expect(releaseDocs).toContain('your-domain.example');
+    expect(releaseDocs).toContain('SOTTO_ENV_FILE=~/sotto/.env.production bash scripts/deploy.sh');
+    expect(releaseDocs).toContain('docker-compose.infra.yml');
+    expect(releaseDocs).toContain('docker-compose.app.yml');
+    expect(releaseDocs).toContain('docker-compose.workers.yml');
+    expect(releaseDocs).not.toContain('https://sotto.fm');
+    expect(releaseDocs).not.toContain('sotto.fm');
+    expect(releaseDocs).not.toContain('dashboard.doppler.com');
+    expect(releaseDocs).not.toContain('doppler secrets');
+    expect(releaseDocs).not.toContain('docker-compose.prod.yml');
+    expect(releaseIndexSources).toContain('19-self-host-deployment.md');
+    expect(releaseIndexSources).not.toContain('19-deploy-sotto-fm.md');
+  });
+
   it('does not ship the standalone social feed ranking workspace', () => {
     const workspaceSources = [
       'package.json',

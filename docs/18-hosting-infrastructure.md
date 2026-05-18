@@ -1,412 +1,185 @@
-# Hosting & Infrastructure Guide
+# Hosting Infrastructure
 
-> Self-hosting alternatives, deployment options, and infrastructure decisions.
-> Assumes no prior DevOps experience.
+**Date:** 2026-05-18
 
----
-
-## Hosting Options Compared
-
-### Option 1: Vercel + Railway (Deprecated)
-
-> **Note**: Sotto currently runs on Hetzner VPS (Option 2). This section is kept for reference but is not the active deployment.
-
-| Component | Service       | Cost/Month    | Pros                              | Cons                               |
-| --------- | ------------- | ------------- | --------------------------------- | ---------------------------------- |
-| Web app   | Vercel Pro    | $20           | Zero config, auto-scaling, CDN    | Vendor lock-in, expensive at scale |
-| Workers   | Railway       | $5-20         | Easy deploy, auto-restart         | Limited GPU support                |
-| Database  | Neon          | $0-25         | Serverless Postgres, auto-scaling | Cold starts on free tier           |
-| Redis     | Upstash       | $0-10         | Serverless Redis, pay-per-request | Higher latency than self-hosted    |
-| Storage   | Cloudflare R2 | $0-5          | No egress fees, S3-compatible     | Less tooling than AWS S3           |
-| **Total** |               | **$25-80/mo** |                                   |                                    |
-
-**Best for**: MVP, first 500 users, solo developer.
-
-### Option 2: VPS (Hetzner/DigitalOcean) — Recommended for Sotto
-
-Run everything on a single VPS. Cheapest at scale, full control.
-
-| Component     | Setup                                   | Cost/Month           | Notes                           |
-| ------------- | --------------------------------------- | -------------------- | ------------------------------- |
-| VPS           | Hetzner CX32 (4 vCPU, 8GB RAM)          | **€7/mo (~$8)**      | Runs web + workers + DB + Redis |
-| VPS (bigger)  | Hetzner CPX41 (8 vCPU, 16GB RAM)        | **€19/mo (~$21)**    | For 1K+ users                   |
-| VPS (scaling) | Hetzner CCX33 (8 vCPU, 32GB, dedicated) | **€50/mo (~$55)**    | For 5K+ users                   |
-| Storage       | Hetzner Storage Box 1TB                 | **€4/mo**            | For podcast audio files         |
-| Backups       | Hetzner automated backups               | **20% of VPS price** | Automatic daily snapshots       |
-| Domain        | Any registrar                           | **$12/year**         | sotto.fm                        |
-| SSL           | Let's Encrypt                           | **$0**               | Auto-renewed via Caddy/Certbot  |
-| **Total**     |                                         | **~$17-75/mo**       |                                 |
-
-**Hetzner pricing**: [hetzner.com/cloud](https://www.hetzner.com/cloud/)
-**DigitalOcean pricing**: [digitalocean.com/pricing](https://www.digitalocean.com/pricing)
-
-### Option 3: AWS/GCP/Azure (Enterprise)
-
-| Component     | Service            | Cost/Month     | Notes                         |
-| ------------- | ------------------ | -------------- | ----------------------------- |
-| Web app       | AWS EC2 t3.medium  | $30            | Or ECS/Fargate for containers |
-| Workers       | AWS EC2 t3.small   | $15            | Or Lambda for serverless      |
-| Database      | AWS RDS PostgreSQL | $15-50         | Managed, auto-backups         |
-| Redis         | AWS ElastiCache    | $13-25         | Managed Redis                 |
-| Storage       | AWS S3             | $1-10          | Egress fees apply             |
-| Load balancer | AWS ALB            | $16            | Required for HTTPS            |
-| **Total**     |                    | **$90-150/mo** |                               |
-
-**Best for**: Enterprise, compliance requirements, multi-region.
+**Summary:** Self-hosting options, the recommended single-VPS topology, and the production services Sotto expects when released as private-first open source software.
 
 ---
 
-## Recommended Setup: Hetzner VPS (Step-by-Step)
+## Goals
 
-### Why Hetzner?
+The open source deployment should be boring to operate:
 
-- **50-80% cheaper** than AWS/DigitalOcean for equivalent specs
-- EU-based (GDPR compliant by default)
-- Excellent uptime (99.9%+ SLA)
-- Simple pricing, no surprise bills
-- 20TB/month bandwidth included
+- one Linux server is enough for an initial private deployment;
+- operators bring their own domain, AI provider, TTS provider, and storage choice;
+- secrets live in the operator's own env file or secret manager;
+- the app does not depend on hosted Sotto infrastructure;
+- the same repository commands work locally and on the server.
 
-### Step 1: Create VPS
+## Hosting Options
 
-1. Sign up at [hetzner.com](https://www.hetzner.com/)
-2. Create a Cloud Server:
-   - **Image**: Ubuntu 24.04
-   - **Type**: CX32 (4 vCPU, 8GB RAM, 80GB SSD) — €7/mo
-   - **Location**: Ashburn, VA (closest to US users) or Nuremberg (EU)
-   - **Networking**: Enable IPv4 + IPv6
-   - **SSH Key**: Add your public key (more secure than password)
-3. Note the IP address
+| Option | Best For | Tradeoff |
+| --- | --- | --- |
+| Single VPS | Most self-hosters and small teams | Lowest operational complexity; vertical scaling first |
+| Managed app + managed Postgres/Redis | Teams that want less server maintenance | More vendor-specific setup and higher monthly cost |
+| Multi-node container platform | Larger managed-hosting operators | More moving pieces; useful only after load requires it |
 
-### Step 2: Initial Server Setup
+The default documentation assumes a single Ubuntu 24.04 VPS. Hetzner, DigitalOcean, Fly Machines, EC2, or any Docker-capable host can work.
+
+## Production Topology
+
+The repository ships the production services as three compose files:
+
+| File | Services | Lifecycle |
+| --- | --- | --- |
+| `docker-compose.infra.yml` | Postgres, PgBouncer, Redis, Pinchtab, Remotion | Long-lived, rarely restarted |
+| `docker-compose.app.yml` | Web app and maps app | Blue-green deployment slots |
+| `docker-compose.workers.yml` | BullMQ worker groups | Recreated after the new app slot passes health checks |
+
+`scripts/deploy.sh` coordinates those files. It loads `.env.production` by default, copies it to `.env` for Docker Compose, renders `Caddyfile` with the operator's domain, starts infra, builds the next app slot, runs Prisma, smoke-tests the new slot, restarts workers, and stops the old slot.
+
+## Recommended Server Setup
+
+Run the server bootstrap as root on a fresh Ubuntu VPS:
 
 ```bash
-# SSH into server
 ssh root@YOUR_SERVER_IP
-
-# Update system
-apt update && apt upgrade -y
-
-# Create non-root user
-adduser sotto
-usermod -aG sudo sotto
-
-# Setup SSH for new user
-mkdir -p /home/sotto/.ssh
-cp ~/.ssh/authorized_keys /home/sotto/.ssh/
-chown -R sotto:sotto /home/sotto/.ssh
-
-# Install essentials
-apt install -y curl git unzip build-essential
-
-# Install Docker + Docker Compose
-curl -fsSL https://get.docker.com | sh
-usermod -aG docker sotto
-
-# Install Node.js 22 LTS
-curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
-apt install -y nodejs
-
-# Install Caddy (reverse proxy + auto HTTPS)
-apt install -y debian-keyring debian-archive-keyring apt-transport-https
-curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list
-apt update && apt install caddy
-
-# Enable firewall
-ufw allow OpenSSH
-ufw allow 80
-ufw allow 443
-ufw enable
+bash -s < /path/to/local/scripts/setup-server.sh
 ```
 
-### Step 3: Deploy with Docker Compose
-
-Create `/home/sotto/sotto/docker-compose.prod.yml`:
-
-```yaml
-version: '3.8'
-
-services:
-  web:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    ports:
-      - '3000:3000'
-    environment:
-      - NODE_ENV=production
-      - DATABASE_URL=postgresql://sotto:SECURE_PASSWORD@postgres:5432/sotto
-      - REDIS_URL=redis://redis:6379
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
-
-  workers:
-    build:
-      context: .
-      dockerfile: Dockerfile.workers
-    environment:
-      - NODE_ENV=production
-      - DATABASE_URL=postgresql://sotto:SECURE_PASSWORD@postgres:5432/sotto
-      - REDIS_URL=redis://redis:6379
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
-
-  postgres:
-    image: postgres:16-alpine
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    environment:
-      POSTGRES_USER: sotto
-      POSTGRES_PASSWORD: SECURE_PASSWORD
-      POSTGRES_DB: sotto
-    healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U sotto']
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-
-  redis:
-    image: redis:7-alpine
-    volumes:
-      - redis_data:/data
-    command: redis-server --appendonly yes
-    healthcheck:
-      test: ['CMD', 'redis-cli', 'ping']
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-
-volumes:
-  postgres_data:
-  redis_data:
-```
-
-### Step 4: Configure Caddy (HTTPS + Reverse Proxy)
-
-Edit `/etc/caddy/Caddyfile`:
-
-```
-sotto.fm {
-    reverse_proxy localhost:3000
-    encode gzip
-
-    header {
-        Strict-Transport-Security "max-age=31536000; includeSubDomains"
-        X-Content-Type-Options nosniff
-        X-Frame-Options DENY
-        Referrer-Policy strict-origin-when-cross-origin
-    }
-}
-```
-
-Caddy automatically obtains and renews HTTPS certificates from Let's Encrypt.
-
-### Step 5: DNS Setup
-
-Point your domain to the server:
-
-- `A record`: `sotto.fm` → `YOUR_SERVER_IP`
-- `AAAA record`: `sotto.fm` → `YOUR_SERVER_IPV6`
-- `CNAME record`: `www.sotto.fm` → `sotto.fm`
-
-### Step 6: Automated Backups
+Or after cloning the repo on the server:
 
 ```bash
-# Daily PostgreSQL backup to Hetzner Storage Box
-cat > /home/sotto/backup.sh << 'EOF'
-#!/bin/bash
-DATE=$(date +%Y%m%d_%H%M%S)
-docker exec sotto-postgres pg_dump -U sotto sotto | gzip > /backup/sotto_${DATE}.sql.gz
-# Keep only last 30 days
-find /backup -name "sotto_*.sql.gz" -mtime +30 -delete
-EOF
-chmod +x /home/sotto/backup.sh
-
-# Add to crontab (runs daily at 3 AM)
-(crontab -l 2>/dev/null; echo "0 3 * * * /home/sotto/backup.sh") | crontab -
+sudo bash scripts/setup-server.sh
 ```
 
-### Step 7: Monitoring
+The script installs Docker, Caddy, core utilities, configures a `sotto` user, enables the firewall for SSH/HTTP/HTTPS, and hardens SSH password/root login.
+
+## DNS
+
+Point your own domain at the VPS:
+
+| Record | Host | Value |
+| --- | --- | --- |
+| `A` | `@` | `YOUR_SERVER_IPV4` |
+| `AAAA` | `@` | `YOUR_SERVER_IPV6` if enabled |
+| `CNAME` | `www` | your apex domain, if you want a www redirect |
+| `A` or `CNAME` | `maps` | your server or apex domain, if exposing the maps app |
+
+Use the exact public URL in both `NEXT_PUBLIC_APP_URL` and `NEXTAUTH_URL`.
+
+## Environment File
+
+Create the production env file on the server:
 
 ```bash
-# Install Netdata (free, real-time monitoring)
-curl https://get.netdata.cloud/kickstart.sh > /tmp/netdata-kickstart.sh
-bash /tmp/netdata-kickstart.sh
-```
-
-Access monitoring dashboard at `https://sotto.fm:19999` (restrict via Caddy).
-
----
-
-## Audio File Storage Strategy
-
-Podcasts must be **always accessible** to authorized listeners. Private episodes are served through authenticated app routes or private RSS token access.
-
-### Option A: Local Storage + CDN (Recommended for VPS)
-
-Store audio files on the VPS, serve via Caddy with caching headers:
-
-```
-sotto.fm {
-    handle /audio/* {
-        root * /data/sotto/audio
-        file_server
-        header Cache-Control "public, max-age=31536000, immutable"
-    }
-    handle {
-        reverse_proxy localhost:3000
-    }
-}
-```
-
-Add Cloudflare (free tier) in front for CDN + DDoS protection.
-
-### Option B: Cloudflare R2 (S3-compatible, no egress fees)
-
-- $0.015/GB/month storage
-- **$0 egress** (no bandwidth charges, unlike S3)
-- S3-compatible API
-- Perfect for audio serving at scale
-
-### Option C: Hetzner Storage Box
-
-- €4/month for 1TB
-- SFTP/CIFS/NFS access
-- Good for backups, okay for serving (slower than CDN)
-
-### Access Control for Podcast Audio
-
-```
-Static audio object: /audio/{podcastId}/audio.mp3
-Private stream:      /api/podcasts/{id}/stream -> auth/token check -> presigned URL or proxy
-```
-
-Private podcasts are served through API-controlled access, which verifies the signed-in user or private RSS token before streaming.
-
----
-
-## Scaling Roadmap
-
-| Users  | Infrastructure                          | Monthly Cost | Action                          |
-| ------ | --------------------------------------- | ------------ | ------------------------------- |
-| 0-100  | Hetzner CX32 (4 vCPU, 8GB)              | ~$14         | Single server, everything       |
-| 100-1K | Hetzner CPX41 (8 vCPU, 16GB)            | ~$27         | Upgrade VPS                     |
-| 1K-5K  | Hetzner CCX33 (dedicated) + Storage Box | ~$60         | Dedicated CPU, separate storage |
-| 5K-10K | 2 servers (web + workers) + managed DB  | ~$150        | Split web and workers           |
-| 10K+   | Kubernetes or managed containers        | ~$300+       | Auto-scaling, multi-region      |
-
----
-
-## Deployment Workflow
-
-### CI/CD with GitHub Actions
-
-```yaml
-# .github/workflows/deploy.yml
-name: Deploy
-on:
-  push:
-    branches: [main]
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Deploy to server
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.SERVER_IP }}
-          username: sotto
-          key: ${{ secrets.SSH_KEY }}
-          script: |
-            cd ~/sotto
-            git pull origin main
-            docker compose -f docker-compose.prod.yml build
-            docker compose -f docker-compose.prod.yml up -d
-            docker compose exec web npx prisma db push
-```
-
-### Zero-Downtime Deploys
-
-Use Docker's rolling update strategy:
-
-```yaml
-deploy:
-  update_config:
-    parallelism: 1
-    order: start-first
-```
-
-Or use Caddy's load balancing to run two instances during deployment.
-
----
-
-## Quick-Start Deployment Checklist
-
-Everything you need is in the repo. Here's the shortest path from bare VPS to live site:
-
-```bash
-# 1. On your LOCAL machine — set up the server
-ssh root@YOUR_SERVER_IP "bash -s" < scripts/setup-server.sh
-
-# 2. SSH in as sotto user
-ssh sotto@YOUR_SERVER_IP
-
-# 3. Clone and configure
-git clone https://github.com/YOUR_USERNAME/sotto.git ~/sotto
 cd ~/sotto
-cp .env.example .env
-nano .env  # Fill in all required values (see .env.example comments)
+cp .env.example .env.production
+chmod 600 .env.production
+```
 
-# 4. Deploy
-docker compose -f docker-compose.prod.yml up -d --build
-docker compose -f docker-compose.prod.yml run --rm web npx prisma db push
+Minimum required production categories:
 
-# 5. Set up Caddy (edit domain first)
-sudo cp Caddyfile /etc/caddy/Caddyfile
-sudo nano /etc/caddy/Caddyfile  # Replace sotto.fm with your domain
-sudo systemctl reload caddy
+| Category | Variables |
+| --- | --- |
+| Public URL | `NEXT_PUBLIC_APP_URL`, `NEXTAUTH_URL` |
+| Auth | `AUTH_SECRET`, `NEXTAUTH_SECRET` |
+| Database | `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `DATABASE_URL`, `DIRECT_DATABASE_URL` |
+| Redis | `REDIS_PASSWORD`, `REDIS_URL` |
+| Storage | `STORAGE_PROVIDER` plus the matching local or S3/R2 values |
+| AI | explicit `AI_PROVIDER` and provider credentials |
+| TTS | explicit `TTS_PROVIDER` and provider credentials |
+| BYOK | `BYOK_ENCRYPTION_KEY` |
 
-# 6. Set up daily backups
+Optional Caddy hosts:
+
+```bash
+SOTTO_MAPS_DOMAIN=maps.your-domain.example
+SOTTO_WWW_DOMAIN=www.your-domain.example
+```
+
+Leave those unset if you do not want the optional Caddy blocks rendered.
+
+## Caddy
+
+Ensure the system Caddyfile imports site fragments:
+
+```caddyfile
+{
+	email admin@your-domain.example
+}
+
+import /etc/caddy/conf.d/*
+```
+
+`scripts/deploy.sh` renders the repository `Caddyfile` template and installs it to `/etc/caddy/conf.d/sotto.conf` by default. Override with `CADDY_SITE_PATH` only if your server uses a different Caddy layout.
+
+## Deploy
+
+```bash
+cd ~/sotto
+SOTTO_ENV_FILE=~/sotto/.env.production bash scripts/deploy.sh
+```
+
+Expected deploy phases:
+
+1. Pull latest code and submodules.
+2. Load `.env.production` into `.env` for Docker Compose.
+3. Render and validate Caddy config.
+4. Start infra services and wait for Postgres, Redis, and PgBouncer.
+5. Build the inactive blue-green app slot.
+6. Run Prisma schema sync against `DIRECT_DATABASE_URL` when present.
+7. Start and health-check the new slot.
+8. Run production smoke checks.
+9. Build and restart workers.
+10. Stop the previous app slot.
+
+## Storage
+
+Use local storage for the simplest self-hosted install:
+
+```bash
+STORAGE_PROVIDER=local
+LOCAL_STORAGE_DIR=./.sotto/storage
+```
+
+For internet-facing deployments, prefer an S3-compatible bucket such as Cloudflare R2, MinIO, AWS S3, or another provider. Configure CORS for your exact `NEXT_PUBLIC_APP_URL`; do not use wildcard origins for private podcast audio.
+
+Private playback paths go through authenticated app routes or private RSS tokens:
+
+```text
+/api/podcasts/{podcastId}/stream
+/api/rss/private/{token}
+```
+
+## Backups
+
+At minimum, back up Postgres and the selected storage backend.
+
+```bash
 mkdir -p ~/backups
 (crontab -l 2>/dev/null; echo "0 3 * * * ~/sotto/scripts/backup.sh") | crontab -
-
-# 7. Verify
-curl -s https://YOUR_DOMAIN/api/health | jq .
 ```
 
-### Project Files Reference
+For single-VPS deployments, also enable provider snapshots or equivalent block-volume backups. Test restore before treating the deployment as production.
 
-| File                           | Purpose                                                             |
-| ------------------------------ | ------------------------------------------------------------------- |
-| `Dockerfile`                   | Multi-stage Next.js web container (standalone output)               |
-| `Dockerfile.workers`           | Workers container with FFmpeg                                       |
-| `docker-compose.prod.yml`      | Full production stack (web, workers, postgres, redis)               |
-| `Caddyfile`                    | Reverse proxy template (HTTPS + security headers)                   |
-| `.env.example`                 | All environment variables documented                                |
-| `scripts/setup-server.sh`      | Automated VPS provisioning (Docker, Caddy, firewall, SSH hardening) |
-| `scripts/backup.sh`            | Daily PostgreSQL backup with 30-day retention                       |
-| `.github/workflows/ci.yml`     | CI pipeline (lint, typecheck, test, build)                          |
-| `.github/workflows/deploy.yml` | Auto-deploy to production on push to main                           |
+## Scaling Path
 
-### Hosted Services
+| Stage | Move |
+| --- | --- |
+| Initial private install | Single VPS, local or S3-compatible storage |
+| Worker pressure | Increase worker presets or move workers to a separate host |
+| Database pressure | Move Postgres to managed Postgres or a dedicated database host |
+| Media pressure | Use object storage plus CDN in front of generated media |
+| Managed-hosting business | Split customer deployments by environment, not by shared data plane |
 
-| Service | Description | Env Vars |
-| ------- | ----------- | -------- |
-| Next.js web app | App Router + API routes | `DATABASE_URL`, `REDIS_URL`, `NEXTAUTH_*` |
-| BullMQ workers (15 types) | Background job processing | Same as web + provider keys |
-| PostgreSQL 16 | Primary database | `DATABASE_URL` |
-| Redis 7 | Queues, caching, rate limiting | `REDIS_URL` |
-| Caddy | Reverse proxy + auto HTTPS | Caddyfile |
-| Telegram bot | `@SottoFMDevBot` — dev notifications | `TELEGRAM_BOT_TOKEN` |
+## Release Checklist
+
+- `NEXT_PUBLIC_APP_URL` and `NEXTAUTH_URL` use the operator's domain.
+- `.env.production` exists on the server and is mode `600`.
+- Caddy imports `/etc/caddy/conf.d/*`.
+- DNS points to the server.
+- Provider keys are set only for the explicit providers selected.
+- `SOTTO_ENV_FILE=~/sotto/.env.production bash scripts/deploy.sh` completes.
+- `https://your-domain.example/api/health` returns healthy JSON.
+- Backups have been restored in a test path at least once.

@@ -100,7 +100,7 @@ else
   cat > "$SHOWCASE_FILE" << 'HEADER'
 ---
 title: App Showcase
-subtitle: Live screenshots from sotto.fm
+subtitle: Live screenshots from a configured Sotto deployment
 ---
 
 # App Showcase
@@ -200,7 +200,7 @@ DOCS=(
   "16-technical-architecture.md:Technical Architecture"
   "17-authentication-setup.md:Authentication Setup"
   "18-hosting-infrastructure.md:Hosting Infrastructure"
-  "19-deploy-sotto-fm.md:Deployment Guide"
+  "19-self-host-deployment.md:Deployment Guide"
   "20-roles-and-dashboards.md:Roles & Dashboards"
   "21-logo-brief.md:Logo Brief"
   "23-local-development.md:Local Development"
