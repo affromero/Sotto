@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { ReferenceData } from '@/types/reference';
+import { getVerificationStandardUrl } from '@/lib/public-links';
 import styles from './ReferenceList.module.css';
 
 interface ReferenceListProps {
@@ -112,6 +113,7 @@ function VerificationDetails({ details }: { details: Record<string, unknown> | n
 export function ReferenceList({ references }: ReferenceListProps) {
   const [expanded, setExpanded] = useState(references.length <= 10);
   const [expandedRef, setExpandedRef] = useState<string | null>(null);
+  const verificationStandardUrl = getVerificationStandardUrl();
 
   if (references.length === 0) return null;
 
@@ -210,16 +212,21 @@ export function ReferenceList({ references }: ReferenceListProps) {
             })}
           </ol>
           <p className={styles.disclaimer}>
-            References verified using the{' '}
-            <a
-              href="https://github.com/SottoFM/reference-verification-standard"
-              target="_blank"
-              rel="noopener noreferrer"
-              className={styles.disclaimerLink}
-            >
-              Sotto Open Verification Standard
-            </a>{' '}
-            — domain-aware scoring for academic, news, government, educational, and general sources.
+            References verified using domain-aware scoring for academic, news, government,
+            educational, and general sources.
+            {verificationStandardUrl && (
+              <>
+                {' '}
+                <a
+                  href={verificationStandardUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={styles.disclaimerLink}
+                >
+                  View the verification standard.
+                </a>
+              </>
+            )}
           </p>
         </div>
       )}

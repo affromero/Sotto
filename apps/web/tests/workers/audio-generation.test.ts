@@ -701,14 +701,14 @@ describe('processAudioGeneration', () => {
 
   describe('database updates', () => {
     it('updates the segment with the audio URL and duration', async () => {
-      mockUploadSegmentAudio.mockResolvedValue('https://cdn.sotto.fm/segments/seg-001.mp3');
+      mockUploadSegmentAudio.mockResolvedValue('https://media.example.com/segments/seg-001.mp3');
       mockGetAudioDuration.mockResolvedValue(7.89);
       const job = createMockJob(defaultPayload);
       await processAudioGeneration(job);
 
       expect(mockPrismaSegmentUpdate).toHaveBeenCalledWith({
         where: { id: 'segment-001' },
-        data: { audioUrl: 'https://cdn.sotto.fm/segments/seg-001.mp3', duration: 7.89 },
+        data: { audioUrl: 'https://media.example.com/segments/seg-001.mp3', duration: 7.89 },
       });
     });
 
