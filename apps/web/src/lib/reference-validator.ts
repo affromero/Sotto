@@ -218,9 +218,13 @@ export async function verifyDoi(ref: ReferenceInput): Promise<VerificationCheck>
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
 
+    const contactEmail = process.env.OPENALEX_EMAIL?.trim();
+    const userAgent = contactEmail
+      ? `Sotto/1.0 (mailto:${contactEmail})`
+      : 'Sotto/1.0 (reference-validator)';
     const response = await fetch(`https://api.crossref.org/works/${encodeURIComponent(cleanDoi)}`, {
       signal: controller.signal,
-      headers: { 'User-Agent': 'Sotto/1.0 (mailto:hello@sotto.fm)' },
+      headers: { 'User-Agent': userAgent },
     });
 
     clearTimeout(timeout);

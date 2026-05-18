@@ -5,7 +5,7 @@
 export const BRAND = {
   name: 'Sotto',
   origin: 'From Italian "sotto voce" — speaking in a soft, intimate voice',
-  url: 'https://sotto.fm',
+  url: '/',
   twitter: '@SottoFM',
 
   // Consumer-facing
