@@ -651,7 +651,7 @@ export function VoiceManager() {
                                 setEditingDescription(null);
                               }
                             }}
-                            placeholder="Add a description for the marketplace..."
+                            placeholder="Add a description for shared voice access..."
                             maxLength={200}
                             rows={2}
                             autoFocus
@@ -667,7 +667,7 @@ export function VoiceManager() {
                           className={styles.descriptionBtn}
                           onClick={() => handleStartEditDescription(voice)}
                         >
-                          {voice.description || 'Add a description for the marketplace...'}
+                          {voice.description || 'Add a description for shared voice access...'}
                         </button>
                       )
                     )}

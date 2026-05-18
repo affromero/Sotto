@@ -264,7 +264,7 @@ export async function PATCH(request: NextRequest) {
   if (enablesMarketplaceListing) {
     const voiceConfig = await getPlanFeatureConfig();
     if (!voiceConfig.voiceMarketplaceEnabled) {
-      return errorResponse('Voice marketplace is currently unavailable.', 503);
+      return errorResponse('Paid voice sharing is currently unavailable.', 503);
     }
   }
 

@@ -1672,7 +1672,7 @@ describe('private-first OSS surfaces', () => {
     );
     expect(voiceCloneRouteSource).toContain('const enablesMarketplaceListing');
     expect(voiceCloneRouteSource).toContain('requestable === true');
-    expect(voiceMarketplaceSources).toContain('Voice marketplace is currently unavailable.');
+    expect(voiceMarketplaceSources).toContain('Paid voice sharing is currently unavailable.');
     expect(voiceMarketplaceSources).toContain('disabled by default');
     expect(existsSync(resolve(repoRoot, 'apps/mobile/app/voices.tsx'))).toBe(false);
     expect(existsSync(resolve(repoRoot, 'e2e/maestro/flows/21-voice-marketplace.yaml'))).toBe(

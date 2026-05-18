@@ -120,7 +120,7 @@ describe('GET /api/voices/browse', () => {
     const body = await response.json();
 
     expect(response.status).toBe(503);
-    expect(body).toMatchObject({ error: 'Voice marketplace is currently unavailable.' });
+    expect(body).toMatchObject({ error: 'Paid voice sharing is currently unavailable.' });
     expect(mockVoiceCloneFindMany).not.toHaveBeenCalled();
   });
 
