@@ -13,7 +13,13 @@ export async function GET(request: NextRequest) {
   }
 
   const providerParam = request.nextUrl.searchParams.get('provider');
-  const provider: TtsProviderId = (providerParam && isValidProviderId(providerParam)) ? providerParam : 'elevenlabs';
+  let provider: TtsProviderId = 'elevenlabs';
+  if (providerParam) {
+    if (!isValidProviderId(providerParam)) {
+      return errorResponse('Invalid provider', 400);
+    }
+    provider = providerParam;
+  }
 
   const [user, catalogVoices, userClones, approvedRequests, allowlistEntries] = await Promise.all([
     prisma.user.findUniqueOrThrow({

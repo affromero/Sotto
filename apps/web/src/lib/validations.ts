@@ -414,6 +414,8 @@ export const byokSchema = z.object({
   apiKey: z.string().min(10).max(500),
 });
 
+export const byokProviderSchema = byokSchema.pick({ provider: true });
+
 /**
  * Draft creation validation
  */

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/api-keys';
-import { byokSchema } from '@/lib/validations';
+import { byokProviderSchema, byokSchema } from '@/lib/validations';
 import { storeByokKey, removeByokKey, listByokProviders, validateByokKey } from '@/lib/byok';
 import type { TtsProviderId } from '@/lib/providers/tts-registry';
 
@@ -44,20 +44,18 @@ export async function DELETE(request: NextRequest) {
     return errorResponse('Unauthorized', 401);
   }
 
-  let provider: string | undefined;
+  let body: unknown;
   try {
-    const body = await request.json();
-    provider = body.provider;
+    body = await request.json();
   } catch {
-    // No body — legacy behavior removes elevenlabs
+    return errorResponse('Provider is required', 400);
   }
 
-  const validProviders = ['elevenlabs', 'openai', 'cartesia', 'hume', 'fal', 'replicate', 'minimax', 'mistral', 'suno'];
-  const targetProvider = provider && validProviders.includes(provider) ? provider : 'elevenlabs';
+  const parsed = byokProviderSchema.safeParse(body);
+  if (!parsed.success) {
+    return errorResponse('Invalid request', 400, { details: parsed.error.flatten() });
+  }
 
-  await removeByokKey(
-    authed.userId,
-    targetProvider as TtsProviderId | 'suno'
-  );
+  await removeByokKey(authed.userId, parsed.data.provider as TtsProviderId | 'suno');
   return NextResponse.json({ success: true });
 }

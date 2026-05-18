@@ -70,7 +70,9 @@ describe('POST /api/settings/byok', () => {
   it('returns 401 when unauthenticated', async () => {
     mockAuthenticateRequest.mockResolvedValue(null);
 
-    const response = await POST(createRequest('POST', { provider: 'elevenlabs', apiKey: 'sk-test-123456' }));
+    const response = await POST(
+      createRequest('POST', { provider: 'elevenlabs', apiKey: 'sk-test-123456' })
+    );
     const body = await response.json();
 
     expect(response.status).toBe(401);
@@ -80,7 +82,9 @@ describe('POST /api/settings/byok', () => {
   it('returns 400 when provider is invalid', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
 
-    const response = await POST(createRequest('POST', { provider: 'bad-provider', apiKey: 'sk-test-123456' }));
+    const response = await POST(
+      createRequest('POST', { provider: 'bad-provider', apiKey: 'sk-test-123456' })
+    );
     const body = await response.json();
 
     expect(response.status).toBe(400);
@@ -101,7 +105,9 @@ describe('POST /api/settings/byok', () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockValidateByokKey.mockResolvedValue(false);
 
-    const response = await POST(createRequest('POST', { provider: 'elevenlabs', apiKey: 'sk-eleven-test-123456' }));
+    const response = await POST(
+      createRequest('POST', { provider: 'elevenlabs', apiKey: 'sk-eleven-test-123456' })
+    );
     const body = await response.json();
 
     expect(response.status).toBe(422);
@@ -113,7 +119,9 @@ describe('POST /api/settings/byok', () => {
     mockValidateByokKey.mockResolvedValue(true);
     mockStoreByokKey.mockResolvedValue(undefined);
 
-    const response = await POST(createRequest('POST', { provider: 'elevenlabs', apiKey: 'sk-eleven-test-123456' }));
+    const response = await POST(
+      createRequest('POST', { provider: 'elevenlabs', apiKey: 'sk-eleven-test-123456' })
+    );
     const body = await response.json();
 
     expect(response.status).toBe(200);
@@ -136,7 +144,7 @@ describe('DELETE /api/settings/byok', () => {
     expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
-  it('defaults to elevenlabs when no body provided', async () => {
+  it('requires an explicit provider', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockRemoveByokKey.mockResolvedValue(undefined);
 
@@ -145,8 +153,9 @@ describe('DELETE /api/settings/byok', () => {
     const response = await DELETE(request);
     const body = await response.json();
 
-    expect(response.status).toBe(200);
-    expect(body).toEqual({ success: true });
+    expect(response.status).toBe(400);
+    expect(body).toMatchObject({ error: 'Provider is required' });
+    expect(mockRemoveByokKey).not.toHaveBeenCalled();
   });
 
   it('removes specific provider key', async () => {
@@ -158,16 +167,18 @@ describe('DELETE /api/settings/byok', () => {
 
     expect(response.status).toBe(200);
     expect(body).toEqual({ success: true });
+    expect(mockRemoveByokKey).toHaveBeenCalledWith('user-1', 'openai');
   });
 
-  it('defaults to elevenlabs for unknown provider', async () => {
+  it('rejects unknown provider', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockRemoveByokKey.mockResolvedValue(undefined);
 
     const response = await DELETE(createRequest('DELETE', { provider: 'unknown' }));
     const body = await response.json();
 
-    expect(response.status).toBe(200);
-    expect(body).toEqual({ success: true });
+    expect(response.status).toBe(400);
+    expect(body).toMatchObject({ error: 'Invalid request' });
+    expect(mockRemoveByokKey).not.toHaveBeenCalled();
   });
 });
