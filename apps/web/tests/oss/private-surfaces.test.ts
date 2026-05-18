@@ -200,6 +200,26 @@ describe('private-first OSS surfaces', () => {
     expect(mcpReadme).not.toContain('`https://sotto.fm`');
   });
 
+  it('requires bot and shared URL helpers to use an explicit deployment URL', () => {
+    const runtimeUrlSources = [
+      'src/lib/urls.ts',
+      'src/lib/telegram-handler.ts',
+      'src/workers/twitter-reply.worker.ts',
+      'src/workers/telegram-reply.worker.ts',
+      'src/workers/twitter-auto-tweet.worker.ts',
+      'src/workers/twitter-mentions.worker.ts',
+    ]
+      .map(readSource)
+      .join('\n');
+
+    expect(runtimeUrlSources).toContain('NEXT_PUBLIC_APP_URL or NEXTAUTH_URL is required');
+    expect(runtimeUrlSources).toContain('getPublicAppBaseUrl');
+    expect(runtimeUrlSources).not.toContain('https://sotto.fm');
+    expect(runtimeUrlSources).not.toContain("|| 'https://sotto.fm'");
+    expect(runtimeUrlSources).not.toContain("?? 'https://sotto.fm'");
+    expect(runtimeUrlSources).not.toMatch(/startsWith\(['"]https:\/\/['"]\)\s*\?/);
+  });
+
   it('does not ship the standalone social feed ranking workspace', () => {
     const workspaceSources = [
       'package.json',
@@ -823,10 +843,7 @@ describe('private-first OSS surfaces', () => {
     ]
       .map(readSource)
       .join('\n');
-    const userValidationSources = [
-      'src/lib/validations.ts',
-      'src/app/api/queue/route.ts',
-    ]
+    const userValidationSources = ['src/lib/validations.ts', 'src/app/api/queue/route.ts']
       .map(readSource)
       .join('\n');
     const activityWriteSources = [

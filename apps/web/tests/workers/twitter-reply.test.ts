@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ---- Mocks ----
 
@@ -53,10 +53,15 @@ function createMockJob(data: ReplyTwitterPayload): Job<ReplyTwitterPayload> {
 describe('processTwitterReply', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://selfhost.example.com');
     mockReplyToTweet.mockResolvedValue('reply-tweet-id-123');
     // Default: no reply already posted (idempotency check passes)
     mockPrismaTweetMentionFindUnique.mockResolvedValue({ replyTweetId: null, status: 'PENDING' });
     mockPrismaTweetMentionUpdate.mockResolvedValue({});
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   describe('successful podcast replies', () => {
@@ -93,7 +98,7 @@ describe('processTwitterReply', () => {
       );
       expect(mockReplyToTweet).toHaveBeenCalledWith(
         'tweet-123',
-        expect.stringContaining('/podcast/podcast-001')
+        expect.stringContaining('https://selfhost.example.com/podcast/podcast-001')
       );
     });
 
@@ -389,7 +394,8 @@ describe('processTwitterReply', () => {
       const replyCall = mockReplyToTweet.mock.calls[0];
       const replyText = replyCall[1] as string;
 
-      expect(replyText).toMatch(/https?:\/\/\S+/i);
+      expect(replyText).toContain('https://selfhost.example.com');
+      expect(replyText).not.toContain('https://sotto.fm');
     });
   });
 
@@ -438,7 +444,9 @@ describe('processTwitterReply', () => {
       const job = createMockJob(payload);
       await processTwitterReply(job);
 
-      const calls = (job.updateProgress as ReturnType<typeof vi.fn>).mock.calls.map((c: any[]) => c[0]);
+      const calls = (job.updateProgress as ReturnType<typeof vi.fn>).mock.calls.map(
+        (c: any[]) => c[0]
+      );
       for (let i = 1; i < calls.length; i++) {
         expect(calls[i]).toBeGreaterThanOrEqual(calls[i - 1]);
       }

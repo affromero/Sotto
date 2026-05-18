@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ---- Mocks ----
 
@@ -60,7 +60,19 @@ vi.mock('@/lib/twitter', () => ({
 const mockParseTweetIntent = vi.fn();
 const mockParseThreadIntent = vi.fn();
 
-const mockResolveModelFromTweet = vi.fn().mockReturnValue({ aiModel: null, ttsProvider: null, ttsModel: null, imageModel: null, videoModel: null, avatarModel: null, wantsVideo: false, wantsAvatar: false, costPreference: null });
+const mockResolveModelFromTweet = vi
+  .fn()
+  .mockReturnValue({
+    aiModel: null,
+    ttsProvider: null,
+    ttsModel: null,
+    imageModel: null,
+    videoModel: null,
+    avatarModel: null,
+    wantsVideo: false,
+    wantsAvatar: false,
+    costPreference: null,
+  });
 const mockResolveCheapestModels = vi.fn();
 
 vi.mock('@/lib/tweet-parser', () => ({
@@ -80,7 +92,9 @@ vi.mock('@/lib/twitter-config', () => ({
   getTwitterConfig: (...args: unknown[]) => mockGetTwitterConfig(...args),
 }));
 
-const mockCheckGenerationGate = vi.fn().mockResolvedValue({ allowed: true, reason: 'ok', isByokUser: true });
+const mockCheckGenerationGate = vi
+  .fn()
+  .mockResolvedValue({ allowed: true, reason: 'ok', isByokUser: true });
 const mockTryIncrementFreeGeneration = vi.fn().mockResolvedValue(true);
 
 vi.mock('@/lib/generation-gate', () => ({
@@ -88,7 +102,26 @@ vi.mock('@/lib/generation-gate', () => ({
   tryIncrementFreeGeneration: (...args: unknown[]) => mockTryIncrementFreeGeneration(...args),
 }));
 
-const mockGetAutoModelConfig = vi.fn().mockResolvedValue({ free: { aiProvider: 'anthropic', aiModel: 'claude-haiku-4-5-20251001', ttsProvider: 'openai', ttsModel: 'tts-1-hd', sttProvider: 'openai', sttModel: 'whisper-1' }, dailyGenerationLimit: 3, dailyGenerationLimitPro: 5, dailyVideoLimit: 1, dailyVideoLimitPro: 2, dailyAvatarLimit: 1, dailyAvatarLimitPro: 1, ttsAllocations: [], aiAllocations: [] });
+const mockGetAutoModelConfig = vi
+  .fn()
+  .mockResolvedValue({
+    free: {
+      aiProvider: 'anthropic',
+      aiModel: 'claude-haiku-4-5-20251001',
+      ttsProvider: 'openai',
+      ttsModel: 'tts-1-hd',
+      sttProvider: 'openai',
+      sttModel: 'whisper-1',
+    },
+    dailyGenerationLimit: 3,
+    dailyGenerationLimitPro: 5,
+    dailyVideoLimit: 1,
+    dailyVideoLimitPro: 2,
+    dailyAvatarLimit: 1,
+    dailyAvatarLimitPro: 1,
+    ttsAllocations: [],
+    aiAllocations: [],
+  });
 
 vi.mock('@/lib/auto-model-config', () => ({
   getAutoModelConfig: (...args: unknown[]) => mockGetAutoModelConfig(...args),
@@ -134,8 +167,10 @@ vi.mock('@/lib/queue', () => ({
   },
 }));
 
+const mockGetModelRequiredPlan = vi.fn().mockReturnValue('FREE');
+
 vi.mock('@/lib/providers/ai-registry', () => ({
-  getModelRequiredPlan: vi.fn().mockReturnValue('FREE'),
+  getModelRequiredPlan: (...args: unknown[]) => mockGetModelRequiredPlan(...args),
   getProviderForModel: vi.fn((model: string) => {
     if (model.startsWith('gpt-')) return 'openai';
     if (model.startsWith('claude-')) return 'anthropic';
@@ -160,7 +195,11 @@ vi.mock('@/lib/credential-lookup', () => ({
   lookupParticipantCredentials: (...args: unknown[]) => mockLookupParticipantCredentials(...args),
 }));
 
-const mockFormatThreadAsSourceText = vi.fn().mockReturnValue('## Twitter/X Thread Discussion\n\n### Thread Conversation:\n**Original post by @alice:** Root post');
+const mockFormatThreadAsSourceText = vi
+  .fn()
+  .mockReturnValue(
+    '## Twitter/X Thread Discussion\n\n### Thread Conversation:\n**Original post by @alice:** Root post'
+  );
 const mockGetVerifiedParticipants = vi.fn().mockReturnValue([]);
 vi.mock('@/lib/twitter-utils', () => ({
   formatThreadAsSourceText: (...args: unknown[]) => mockFormatThreadAsSourceText(...args),
@@ -206,6 +245,7 @@ function createMockTweet(overrides?: Partial<TwitterTweet>): TwitterTweet {
 describe('processTwitterMentions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://selfhost.example.com');
     mockRedisGet.mockResolvedValue(null);
     mockRedisExists.mockResolvedValue(0);
     mockGetMentions.mockResolvedValue({ tweets: [], mediaByKey: new Map(), authorMap: new Map() });
@@ -214,16 +254,38 @@ describe('processTwitterMentions', () => {
     mockLookupParticipantCredentials.mockResolvedValue([]);
     mockGetVerifiedParticipants.mockReturnValue([]);
     mockFilterMention.mockResolvedValue({ verdict: 'pass', reason: 'Test pass' });
+    mockGetAiKey.mockResolvedValue(null);
+    mockHasByokKey.mockResolvedValue(false);
+    mockResolveModelFromTweet.mockReturnValue({
+      aiModel: null,
+      ttsProvider: null,
+      ttsModel: null,
+      imageModel: null,
+      videoModel: null,
+      avatarModel: null,
+      wantsVideo: false,
+      wantsAvatar: false,
+      costPreference: null,
+    });
     mockGetTwitterConfig.mockResolvedValue({
       defaultAiModel: null,
       defaultTtsProvider: null,
       defaultTtsModel: null,
     });
+    mockGetModelRequiredPlan.mockReturnValue('FREE');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   describe('mention polling', () => {
     it('skips processing when no new mentions', async () => {
-      mockGetMentions.mockResolvedValue({ tweets: [], mediaByKey: new Map(), authorMap: new Map() });
+      mockGetMentions.mockResolvedValue({
+        tweets: [],
+        mediaByKey: new Map(),
+        authorMap: new Map(),
+      });
       const job = createMockJob({});
 
       await processTwitterMentions(job);
@@ -234,7 +296,11 @@ describe('processTwitterMentions', () => {
 
     it('processes new mentions', async () => {
       const tweet = createMockTweet();
-      mockGetMentions.mockResolvedValue({ tweets: [tweet], mediaByKey: new Map(), authorMap: new Map() });
+      mockGetMentions.mockResolvedValue({
+        tweets: [tweet],
+        mediaByKey: new Map(),
+        authorMap: new Map(),
+      });
       mockPrismaAccountFindFirst.mockResolvedValue({ userId: 'user-001' });
       mockPrismaUserFindUniqueOrThrow.mockResolvedValue({
         plan: 'FREE',
@@ -280,7 +346,11 @@ describe('processTwitterMentions', () => {
         defaultTtsProvider: null,
         defaultTtsModel: null,
       });
-      mockGetMentions.mockResolvedValue({ tweets: [tweet], mediaByKey: new Map(), authorMap: new Map() });
+      mockGetMentions.mockResolvedValue({
+        tweets: [tweet],
+        mediaByKey: new Map(),
+        authorMap: new Map(),
+      });
       mockPrismaAccountFindFirst.mockResolvedValue(null);
 
       await processTwitterMentions(createMockJob({}));
@@ -293,7 +363,11 @@ describe('processTwitterMentions', () => {
     it('updates Redis cursor after processing', async () => {
       const tweet1 = createMockTweet({ id: '100', created_at: '2026-01-15T10:00:00Z' });
       const tweet2 = createMockTweet({ id: '200', created_at: '2026-01-15T11:00:00Z' });
-      mockGetMentions.mockResolvedValue({ tweets: [tweet1, tweet2], mediaByKey: new Map(), authorMap: new Map() });
+      mockGetMentions.mockResolvedValue({
+        tweets: [tweet1, tweet2],
+        mediaByKey: new Map(),
+        authorMap: new Map(),
+      });
       mockPrismaAccountFindFirst.mockResolvedValue({ userId: 'user-001' });
       mockPrismaUserFindUniqueOrThrow.mockResolvedValue({
         plan: 'FREE',
@@ -333,7 +407,11 @@ describe('processTwitterMentions', () => {
   describe('linked user with enabled Twitter', () => {
     it('creates podcast for linked user with enabled Twitter', async () => {
       const tweet = createMockTweet();
-      mockGetMentions.mockResolvedValue({ tweets: [tweet], mediaByKey: new Map(), authorMap: new Map() });
+      mockGetMentions.mockResolvedValue({
+        tweets: [tweet],
+        mediaByKey: new Map(),
+        authorMap: new Map(),
+      });
       mockPrismaAccountFindFirst.mockResolvedValue({ userId: 'user-001' });
       mockPrismaUserFindUniqueOrThrow.mockResolvedValue({
         plan: 'FREE',
@@ -415,12 +493,79 @@ describe('processTwitterMentions', () => {
 
       expect(mockAddJob).toHaveBeenCalled();
     });
+
+    it('uses the configured deployment URL in premium model warning links', async () => {
+      const tweet = createMockTweet();
+      mockGetMentions.mockResolvedValue({
+        tweets: [tweet],
+        mediaByKey: new Map(),
+        authorMap: new Map(),
+      });
+      mockPrismaAccountFindFirst.mockResolvedValue({ userId: 'user-001' });
+      mockPrismaUserFindUniqueOrThrow.mockResolvedValue({
+        plan: 'FREE',
+        twitterEnabled: true,
+        voicePreferences: [],
+        preferredTtsProvider: null,
+        preferredTtsModel: null,
+        preferredAiProvider: null,
+        preferredAiModel: null,
+      });
+      mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', isByokUser: true });
+      mockHasByokKey.mockResolvedValue(false);
+      mockGetModelRequiredPlan.mockReturnValue('PRO');
+      mockResolveModelFromTweet.mockReturnValue({
+        aiModel: 'gpt-5-pro',
+        ttsProvider: null,
+        ttsModel: null,
+        imageModel: null,
+        videoModel: null,
+        avatarModel: null,
+        wantsVideo: false,
+        wantsAvatar: false,
+        costPreference: null,
+      });
+      mockParseTweetIntent.mockResolvedValue({
+        topic: 'Quantum Physics',
+        title: 'Understanding Quantum Mechanics',
+        depth: 'standard',
+        audienceLevel: 'beginner',
+        tone: 'professional',
+        focusAreas: [],
+        requestedAiModel: 'gpt-5-pro',
+      });
+      mockSelectVoicePair.mockReturnValue({
+        host: { id: 'voice-host-1' },
+        expert: { id: 'voice-expert-1' },
+      });
+      mockPrismaTweetMentionCreate.mockResolvedValue({ id: 'mention-001' });
+      mockPrismaPodcastCreate.mockResolvedValue({
+        id: 'podcast-001',
+        discovery: { id: 'discovery-001' },
+      });
+
+      await processTwitterMentions(createMockJob({}));
+
+      expect(mockSendDirectMessage).toHaveBeenCalledWith(
+        tweet.author_id,
+        expect.stringContaining('https://selfhost.example.com/settings/api')
+      );
+      expect(mockReplyToTweet).toHaveBeenCalledWith(
+        tweet.id,
+        expect.stringContaining('https://selfhost.example.com/settings/api')
+      );
+      expect(mockReplyToTweet.mock.calls[0][1]).not.toContain('https://sotto.fm');
+    });
   });
 
   describe('user restrictions', () => {
     it('ignores mention when user has twitterEnabled=false', async () => {
       const tweet = createMockTweet();
-      mockGetMentions.mockResolvedValue({ tweets: [tweet], mediaByKey: new Map(), authorMap: new Map() });
+      mockGetMentions.mockResolvedValue({
+        tweets: [tweet],
+        mediaByKey: new Map(),
+        authorMap: new Map(),
+      });
       mockPrismaAccountFindFirst.mockResolvedValue({ userId: 'user-001' });
       mockPrismaUserFindUniqueOrThrow.mockResolvedValue({
         plan: 'FREE',
@@ -452,7 +597,11 @@ describe('processTwitterMentions', () => {
 
     it('ignores mention when no AI provider is configured', async () => {
       const tweet = createMockTweet();
-      mockGetMentions.mockResolvedValue({ tweets: [tweet], mediaByKey: new Map(), authorMap: new Map() });
+      mockGetMentions.mockResolvedValue({
+        tweets: [tweet],
+        mediaByKey: new Map(),
+        authorMap: new Map(),
+      });
       mockPrismaAccountFindFirst.mockResolvedValue({ userId: 'user-001' });
       mockPrismaUserFindUniqueOrThrow.mockResolvedValue({
         plan: 'FREE',
@@ -463,7 +612,11 @@ describe('processTwitterMentions', () => {
         preferredAiProvider: null,
         preferredAiModel: null,
       });
-      mockCheckGenerationGate.mockResolvedValue({ allowed: false, reason: 'no_provider', isByokUser: false });
+      mockCheckGenerationGate.mockResolvedValue({
+        allowed: false,
+        reason: 'no_provider',
+        isByokUser: false,
+      });
       mockPrismaTweetMentionCreate.mockResolvedValue({ id: 'mention-001' });
 
       const job = createMockJob({});
@@ -487,7 +640,11 @@ describe('processTwitterMentions', () => {
   describe('deduplication', () => {
     it('deduplicates already-processed tweets', async () => {
       const tweet = createMockTweet();
-      mockGetMentions.mockResolvedValue({ tweets: [tweet], mediaByKey: new Map(), authorMap: new Map() });
+      mockGetMentions.mockResolvedValue({
+        tweets: [tweet],
+        mediaByKey: new Map(),
+        authorMap: new Map(),
+      });
       mockPrismaTweetMentionFindUnique.mockResolvedValue({
         id: 'existing-mention',
         tweetId: tweet.id,
@@ -506,7 +663,11 @@ describe('processTwitterMentions', () => {
   describe('unlinked users', () => {
     it('records mention as IGNORED (no CTA reply) for unlinked users (first time)', async () => {
       const tweet = createMockTweet();
-      mockGetMentions.mockResolvedValue({ tweets: [tweet], mediaByKey: new Map(), authorMap: new Map() });
+      mockGetMentions.mockResolvedValue({
+        tweets: [tweet],
+        mediaByKey: new Map(),
+        authorMap: new Map(),
+      });
       mockPrismaAccountFindFirst.mockResolvedValue(null);
       mockRedisExists.mockResolvedValue(0);
 
@@ -533,7 +694,11 @@ describe('processTwitterMentions', () => {
 
     it('does not send CTA to unlinked user if already sent but still records mention', async () => {
       const tweet = createMockTweet();
-      mockGetMentions.mockResolvedValue({ tweets: [tweet], mediaByKey: new Map(), authorMap: new Map() });
+      mockGetMentions.mockResolvedValue({
+        tweets: [tweet],
+        mediaByKey: new Map(),
+        authorMap: new Map(),
+      });
       mockPrismaAccountFindFirst.mockResolvedValue(null);
       mockRedisExists.mockResolvedValue(1);
 
@@ -561,7 +726,11 @@ describe('processTwitterMentions', () => {
         text: '@sottofm explain this',
         referenced_tweets: [{ type: 'replied_to', id: 'parent-123' }],
       });
-      mockGetMentions.mockResolvedValue({ tweets: [tweet], mediaByKey: new Map(), authorMap: new Map() });
+      mockGetMentions.mockResolvedValue({
+        tweets: [tweet],
+        mediaByKey: new Map(),
+        authorMap: new Map(),
+      });
       mockPrismaAccountFindFirst.mockResolvedValue({ userId: 'user-001' });
       mockPrismaUserFindUniqueOrThrow.mockResolvedValue({
         plan: 'FREE',
@@ -596,14 +765,22 @@ describe('processTwitterMentions', () => {
       await processTwitterMentions(job);
 
       expect(mockGetTweet).toHaveBeenCalledWith('parent-123');
-      expect(mockParseTweetIntent).toHaveBeenCalledWith(tweet.text, parentTweet.text, { userId: 'user-001', apiKeyOverride: undefined, imageUrls: [] });
+      expect(mockParseTweetIntent).toHaveBeenCalledWith(tweet.text, parentTweet.text, {
+        userId: 'user-001',
+        apiKeyOverride: undefined,
+        imageUrls: [],
+      });
     });
   });
 
   describe('voice preferences', () => {
     it('uses user preferred voices when set', async () => {
       const tweet = createMockTweet();
-      mockGetMentions.mockResolvedValue({ tweets: [tweet], mediaByKey: new Map(), authorMap: new Map() });
+      mockGetMentions.mockResolvedValue({
+        tweets: [tweet],
+        mediaByKey: new Map(),
+        authorMap: new Map(),
+      });
       mockPrismaAccountFindFirst.mockResolvedValue({ userId: 'user-001' });
       mockPrismaUserFindUniqueOrThrow.mockResolvedValue({
         plan: 'FREE',
@@ -685,7 +862,11 @@ describe('processTwitterMentions', () => {
       const tweet = createMockTweet({
         conversation_id: '1234567890', // same as default tweet id
       });
-      mockGetMentions.mockResolvedValue({ tweets: [tweet], mediaByKey: new Map(), authorMap: new Map() });
+      mockGetMentions.mockResolvedValue({
+        tweets: [tweet],
+        mediaByKey: new Map(),
+        authorMap: new Map(),
+      });
       setupLinkedUser();
       mockParseTweetIntent.mockResolvedValue({
         topic: 'Test',
@@ -706,7 +887,11 @@ describe('processTwitterMentions', () => {
 
     it('uses single-tweet path when conversation_id is missing', async () => {
       const tweet = createMockTweet(); // no conversation_id
-      mockGetMentions.mockResolvedValue({ tweets: [tweet], mediaByKey: new Map(), authorMap: new Map() });
+      mockGetMentions.mockResolvedValue({
+        tweets: [tweet],
+        mediaByKey: new Map(),
+        authorMap: new Map(),
+      });
       setupLinkedUser();
       mockParseTweetIntent.mockResolvedValue({
         topic: 'Test',
@@ -729,7 +914,11 @@ describe('processTwitterMentions', () => {
         id: 'reply-in-thread',
         conversation_id: 'thread-root-id',
       });
-      mockGetMentions.mockResolvedValue({ tweets: [tweet], mediaByKey: new Map(), authorMap: new Map() });
+      mockGetMentions.mockResolvedValue({
+        tweets: [tweet],
+        mediaByKey: new Map(),
+        authorMap: new Map(),
+      });
       setupLinkedUser();
       mockGetThread.mockResolvedValue({
         rootTweet: {
@@ -742,9 +931,33 @@ describe('processTwitterMentions', () => {
           createdAt: '2026-02-10T10:00:00Z',
         },
         replies: [
-          { id: 'r1', text: 'Reply 1', authorId: 'a2', authorUsername: 'bob', authorName: 'Bob', urls: [], createdAt: '2026-02-10T10:05:00Z' },
-          { id: 'r2', text: 'Reply 2', authorId: 'a3', authorUsername: 'carol', authorName: 'Carol', urls: [], createdAt: '2026-02-10T10:10:00Z' },
-          { id: 'r3', text: 'Reply 3', authorId: 'a4', authorUsername: 'dave', authorName: 'Dave', urls: [], createdAt: '2026-02-10T10:15:00Z' },
+          {
+            id: 'r1',
+            text: 'Reply 1',
+            authorId: 'a2',
+            authorUsername: 'bob',
+            authorName: 'Bob',
+            urls: [],
+            createdAt: '2026-02-10T10:05:00Z',
+          },
+          {
+            id: 'r2',
+            text: 'Reply 2',
+            authorId: 'a3',
+            authorUsername: 'carol',
+            authorName: 'Carol',
+            urls: [],
+            createdAt: '2026-02-10T10:10:00Z',
+          },
+          {
+            id: 'r3',
+            text: 'Reply 3',
+            authorId: 'a4',
+            authorUsername: 'dave',
+            authorName: 'Dave',
+            urls: [],
+            createdAt: '2026-02-10T10:15:00Z',
+          },
         ],
         participantCount: 4,
         tweetCount: 4,
@@ -774,7 +987,11 @@ describe('processTwitterMentions', () => {
         id: 'reply-in-thread',
         conversation_id: 'thread-root-id',
       });
-      mockGetMentions.mockResolvedValue({ tweets: [tweet], mediaByKey: new Map(), authorMap: new Map() });
+      mockGetMentions.mockResolvedValue({
+        tweets: [tweet],
+        mediaByKey: new Map(),
+        authorMap: new Map(),
+      });
       setupLinkedUser();
       mockGetThread.mockResolvedValue(null);
       mockParseTweetIntent.mockResolvedValue({
@@ -799,7 +1016,11 @@ describe('processTwitterMentions', () => {
         id: 'reply-in-thread',
         conversation_id: 'thread-root-id',
       });
-      mockGetMentions.mockResolvedValue({ tweets: [tweet], mediaByKey: new Map(), authorMap: new Map() });
+      mockGetMentions.mockResolvedValue({
+        tweets: [tweet],
+        mediaByKey: new Map(),
+        authorMap: new Map(),
+      });
       setupLinkedUser();
       mockGetThread.mockResolvedValue({
         rootTweet: {
@@ -812,7 +1033,15 @@ describe('processTwitterMentions', () => {
           createdAt: '2026-02-10T10:00:00Z',
         },
         replies: [
-          { id: 'r1', text: 'Only reply', authorId: 'a2', authorUsername: 'bob', authorName: 'Bob', urls: [], createdAt: '2026-02-10T10:05:00Z' },
+          {
+            id: 'r1',
+            text: 'Only reply',
+            authorId: 'a2',
+            authorUsername: 'bob',
+            authorName: 'Bob',
+            urls: [],
+            createdAt: '2026-02-10T10:05:00Z',
+          },
         ],
         participantCount: 2,
         tweetCount: 2,
@@ -839,7 +1068,11 @@ describe('processTwitterMentions', () => {
         id: 'reply-in-thread',
         conversation_id: 'thread-root-id',
       });
-      mockGetMentions.mockResolvedValue({ tweets: [tweet], mediaByKey: new Map(), authorMap: new Map() });
+      mockGetMentions.mockResolvedValue({
+        tweets: [tweet],
+        mediaByKey: new Map(),
+        authorMap: new Map(),
+      });
       setupLinkedUser();
       mockGetThread.mockResolvedValue({
         rootTweet: {
@@ -852,9 +1085,33 @@ describe('processTwitterMentions', () => {
           createdAt: '2026-02-10T10:00:00Z',
         },
         replies: [
-          { id: 'r1', text: 'Reply 1', authorId: 'a2', authorUsername: 'bob', authorName: 'Bob', urls: [], createdAt: '2026-02-10T10:05:00Z' },
-          { id: 'r2', text: 'Reply 2', authorId: 'a3', authorUsername: 'carol', authorName: 'Carol', urls: [], createdAt: '2026-02-10T10:10:00Z' },
-          { id: 'r3', text: 'Reply 3', authorId: 'a4', authorUsername: 'dave', authorName: 'Dave', urls: [], createdAt: '2026-02-10T10:15:00Z' },
+          {
+            id: 'r1',
+            text: 'Reply 1',
+            authorId: 'a2',
+            authorUsername: 'bob',
+            authorName: 'Bob',
+            urls: [],
+            createdAt: '2026-02-10T10:05:00Z',
+          },
+          {
+            id: 'r2',
+            text: 'Reply 2',
+            authorId: 'a3',
+            authorUsername: 'carol',
+            authorName: 'Carol',
+            urls: [],
+            createdAt: '2026-02-10T10:10:00Z',
+          },
+          {
+            id: 'r3',
+            text: 'Reply 3',
+            authorId: 'a4',
+            authorUsername: 'dave',
+            authorName: 'Dave',
+            urls: [],
+            createdAt: '2026-02-10T10:15:00Z',
+          },
         ],
         participantCount: 4,
         tweetCount: 4,
@@ -905,7 +1162,11 @@ describe('processTwitterMentions', () => {
       const verifiedParticipants = [
         { authorUsername: 'alice', authorName: 'Alice', authorBio: 'Researcher' },
       ];
-      mockGetMentions.mockResolvedValue({ tweets: [tweet], mediaByKey: new Map(), authorMap: new Map() });
+      mockGetMentions.mockResolvedValue({
+        tweets: [tweet],
+        mediaByKey: new Map(),
+        authorMap: new Map(),
+      });
       setupLinkedUser();
       mockGetAiKey.mockResolvedValue({ apiKey: 'anthropic-key', provider: 'anthropic' });
       mockGetVerifiedParticipants.mockReturnValue(verifiedParticipants);
@@ -920,9 +1181,33 @@ describe('processTwitterMentions', () => {
           createdAt: '2026-02-10T10:00:00Z',
         },
         replies: [
-          { id: 'r1', text: 'Reply 1', authorId: 'a2', authorUsername: 'bob', authorName: 'Bob', urls: [], createdAt: '2026-02-10T10:05:00Z' },
-          { id: 'r2', text: 'Reply 2', authorId: 'a3', authorUsername: 'carol', authorName: 'Carol', urls: [], createdAt: '2026-02-10T10:10:00Z' },
-          { id: 'r3', text: 'Reply 3', authorId: 'a4', authorUsername: 'dave', authorName: 'Dave', urls: [], createdAt: '2026-02-10T10:15:00Z' },
+          {
+            id: 'r1',
+            text: 'Reply 1',
+            authorId: 'a2',
+            authorUsername: 'bob',
+            authorName: 'Bob',
+            urls: [],
+            createdAt: '2026-02-10T10:05:00Z',
+          },
+          {
+            id: 'r2',
+            text: 'Reply 2',
+            authorId: 'a3',
+            authorUsername: 'carol',
+            authorName: 'Carol',
+            urls: [],
+            createdAt: '2026-02-10T10:10:00Z',
+          },
+          {
+            id: 'r3',
+            text: 'Reply 3',
+            authorId: 'a4',
+            authorUsername: 'dave',
+            authorName: 'Dave',
+            urls: [],
+            createdAt: '2026-02-10T10:15:00Z',
+          },
         ],
         participantCount: 4,
         tweetCount: 4,
@@ -951,7 +1236,11 @@ describe('processTwitterMentions', () => {
         id: 'reply-in-thread',
         conversation_id: 'thread-root-id',
       });
-      mockGetMentions.mockResolvedValue({ tweets: [tweet], mediaByKey: new Map(), authorMap: new Map() });
+      mockGetMentions.mockResolvedValue({
+        tweets: [tweet],
+        mediaByKey: new Map(),
+        authorMap: new Map(),
+      });
       setupLinkedUser();
       mockGetThread.mockResolvedValue({
         rootTweet: {
@@ -964,9 +1253,33 @@ describe('processTwitterMentions', () => {
           createdAt: '2026-02-10T10:00:00Z',
         },
         replies: [
-          { id: 'r1', text: 'Disagree', authorId: 'a2', authorUsername: 'bob', authorName: 'Bob', urls: [], createdAt: '2026-02-10T10:05:00Z' },
-          { id: 'r2', text: 'Agree', authorId: 'a3', authorUsername: 'carol', authorName: 'Carol', urls: [], createdAt: '2026-02-10T10:10:00Z' },
-          { id: 'r3', text: '@sottofm podcast this', authorId: 'a4', authorUsername: 'dave', authorName: 'Dave', urls: [], createdAt: '2026-02-10T10:15:00Z' },
+          {
+            id: 'r1',
+            text: 'Disagree',
+            authorId: 'a2',
+            authorUsername: 'bob',
+            authorName: 'Bob',
+            urls: [],
+            createdAt: '2026-02-10T10:05:00Z',
+          },
+          {
+            id: 'r2',
+            text: 'Agree',
+            authorId: 'a3',
+            authorUsername: 'carol',
+            authorName: 'Carol',
+            urls: [],
+            createdAt: '2026-02-10T10:10:00Z',
+          },
+          {
+            id: 'r3',
+            text: '@sottofm podcast this',
+            authorId: 'a4',
+            authorUsername: 'dave',
+            authorName: 'Dave',
+            urls: [],
+            createdAt: '2026-02-10T10:15:00Z',
+          },
         ],
         participantCount: 4,
         tweetCount: 4,
@@ -1005,13 +1318,41 @@ describe('processTwitterMentions', () => {
         conversation_id: '1234567890', // same as tweet id = root mention
         public_metrics: { retweet_count: 0, reply_count: 5, like_count: 10, quote_count: 0 },
       });
-      mockGetMentions.mockResolvedValue({ tweets: [tweet], mediaByKey: new Map(), authorMap: new Map() });
+      mockGetMentions.mockResolvedValue({
+        tweets: [tweet],
+        mediaByKey: new Map(),
+        authorMap: new Map(),
+      });
       setupLinkedUser();
       mockGetThread.mockResolvedValue({
-        rootTweet: { id: '1234567890', text: 'My thread', authorId: 'twitter-user-123', authorUsername: 'me', authorName: 'Me', urls: [], createdAt: '2026-02-10T10:00:00Z' },
+        rootTweet: {
+          id: '1234567890',
+          text: 'My thread',
+          authorId: 'twitter-user-123',
+          authorUsername: 'me',
+          authorName: 'Me',
+          urls: [],
+          createdAt: '2026-02-10T10:00:00Z',
+        },
         replies: [
-          { id: 'r1', text: 'Part 2', authorId: 'twitter-user-123', authorUsername: 'me', authorName: 'Me', urls: [], createdAt: '2026-02-10T10:01:00Z' },
-          { id: 'r2', text: 'Part 3', authorId: 'twitter-user-123', authorUsername: 'me', authorName: 'Me', urls: [], createdAt: '2026-02-10T10:02:00Z' },
+          {
+            id: 'r1',
+            text: 'Part 2',
+            authorId: 'twitter-user-123',
+            authorUsername: 'me',
+            authorName: 'Me',
+            urls: [],
+            createdAt: '2026-02-10T10:01:00Z',
+          },
+          {
+            id: 'r2',
+            text: 'Part 3',
+            authorId: 'twitter-user-123',
+            authorUsername: 'me',
+            authorName: 'Me',
+            urls: [],
+            createdAt: '2026-02-10T10:02:00Z',
+          },
         ],
         participantCount: 1,
         tweetCount: 3,
@@ -1038,7 +1379,11 @@ describe('processTwitterMentions', () => {
         conversation_id: '1234567890',
         public_metrics: { retweet_count: 5, reply_count: 0, like_count: 10, quote_count: 0 },
       });
-      mockGetMentions.mockResolvedValue({ tweets: [tweet], mediaByKey: new Map(), authorMap: new Map() });
+      mockGetMentions.mockResolvedValue({
+        tweets: [tweet],
+        mediaByKey: new Map(),
+        authorMap: new Map(),
+      });
       setupLinkedUser();
       mockParseTweetIntent.mockResolvedValue({
         topic: 'Test',
@@ -1061,12 +1406,32 @@ describe('processTwitterMentions', () => {
         id: 'reply-in-thread',
         conversation_id: 'thread-root-id',
       });
-      mockGetMentions.mockResolvedValue({ tweets: [tweet], mediaByKey: new Map(), authorMap: new Map() });
+      mockGetMentions.mockResolvedValue({
+        tweets: [tweet],
+        mediaByKey: new Map(),
+        authorMap: new Map(),
+      });
       setupLinkedUser();
       mockGetThread.mockResolvedValue({
-        rootTweet: { id: 'thread-root-id', text: 'My thoughts on AI', authorId: 'a1', authorUsername: 'alice', authorName: 'Alice', urls: [], createdAt: '2026-02-10T10:00:00Z' },
+        rootTweet: {
+          id: 'thread-root-id',
+          text: 'My thoughts on AI',
+          authorId: 'a1',
+          authorUsername: 'alice',
+          authorName: 'Alice',
+          urls: [],
+          createdAt: '2026-02-10T10:00:00Z',
+        },
         replies: [
-          { id: 'r1', text: 'Continued...', authorId: 'a1', authorUsername: 'alice', authorName: 'Alice', urls: [], createdAt: '2026-02-10T10:01:00Z' },
+          {
+            id: 'r1',
+            text: 'Continued...',
+            authorId: 'a1',
+            authorUsername: 'alice',
+            authorName: 'Alice',
+            urls: [],
+            createdAt: '2026-02-10T10:01:00Z',
+          },
         ],
         participantCount: 1,
         tweetCount: 2,
@@ -1090,7 +1455,11 @@ describe('processTwitterMentions', () => {
 
     it('stores video prefs on TweetMention when tweet requests video', async () => {
       const tweet = createMockTweet();
-      mockGetMentions.mockResolvedValue({ tweets: [tweet], mediaByKey: new Map(), authorMap: new Map() });
+      mockGetMentions.mockResolvedValue({
+        tweets: [tweet],
+        mediaByKey: new Map(),
+        authorMap: new Map(),
+      });
       setupLinkedUser();
       mockParseTweetIntent.mockResolvedValue({
         topic: 'Test',
@@ -1134,7 +1503,11 @@ describe('processTwitterMentions', () => {
 
     it('calls resolveCheapestModels when costPreference is cheapest', async () => {
       const tweet = createMockTweet();
-      mockGetMentions.mockResolvedValue({ tweets: [tweet], mediaByKey: new Map(), authorMap: new Map() });
+      mockGetMentions.mockResolvedValue({
+        tweets: [tweet],
+        mediaByKey: new Map(),
+        authorMap: new Map(),
+      });
       setupLinkedUser();
       mockParseTweetIntent.mockResolvedValue({
         topic: 'Test',
@@ -1173,13 +1546,41 @@ describe('processTwitterMentions', () => {
         id: 'reply-in-thread',
         conversation_id: 'thread-root-id',
       });
-      mockGetMentions.mockResolvedValue({ tweets: [tweet], mediaByKey: new Map(), authorMap: new Map() });
+      mockGetMentions.mockResolvedValue({
+        tweets: [tweet],
+        mediaByKey: new Map(),
+        authorMap: new Map(),
+      });
       setupLinkedUser();
       mockGetThread.mockResolvedValue({
-        rootTweet: { id: 'thread-root-id', text: 'Discussion', authorId: 'a1', authorUsername: 'alice', authorName: 'Alice', urls: [], createdAt: '2026-02-10T10:00:00Z' },
+        rootTweet: {
+          id: 'thread-root-id',
+          text: 'Discussion',
+          authorId: 'a1',
+          authorUsername: 'alice',
+          authorName: 'Alice',
+          urls: [],
+          createdAt: '2026-02-10T10:00:00Z',
+        },
         replies: [
-          { id: 'r1', text: 'Reply 1', authorId: 'a2', authorUsername: 'bob', authorName: 'Bob', urls: [], createdAt: '2026-02-10T10:05:00Z' },
-          { id: 'r2', text: 'Reply 2', authorId: 'a3', authorUsername: 'carol', authorName: 'Carol', urls: [], createdAt: '2026-02-10T10:10:00Z' },
+          {
+            id: 'r1',
+            text: 'Reply 1',
+            authorId: 'a2',
+            authorUsername: 'bob',
+            authorName: 'Bob',
+            urls: [],
+            createdAt: '2026-02-10T10:05:00Z',
+          },
+          {
+            id: 'r2',
+            text: 'Reply 2',
+            authorId: 'a3',
+            authorUsername: 'carol',
+            authorName: 'Carol',
+            urls: [],
+            createdAt: '2026-02-10T10:10:00Z',
+          },
         ],
         participantCount: 3,
         tweetCount: 3,

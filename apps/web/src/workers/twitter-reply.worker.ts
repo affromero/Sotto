@@ -2,24 +2,29 @@ import { Job } from 'bullmq';
 import { ReplyTwitterPayload } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { replyToTweet } from '@/lib/twitter';
-import { podcastUrl as buildPodcastPath } from '@/lib/urls';
+import { getPublicAppBaseUrl, podcastUrl as buildPodcastPath } from '@/lib/urls';
 import { logger } from '@/lib/logger';
-
-// Always use production URL for public tweets — never inherit localhost from dev env
-const SOTTO_APP_URL = process.env.NEXT_PUBLIC_APP_URL?.startsWith('https://') ? process.env.NEXT_PUBLIC_APP_URL : 'https://sotto.fm';
 
 export async function processTwitterReply(job: Job<ReplyTwitterPayload>): Promise<void> {
   const { podcastId, tweetMentionId, originalTweetId } = job.data;
   await job.updateProgress(10);
+  const appUrl = getPublicAppBaseUrl();
 
   const podcast = await prisma.podcast.findUniqueOrThrow({
     where: { id: podcastId },
-    select: { title: true, duration: true, status: true, slug: true, visibility: true, user: { select: { handle: true } } },
+    select: {
+      title: true,
+      duration: true,
+      status: true,
+      slug: true,
+      visibility: true,
+      user: { select: { handle: true } },
+    },
   });
 
   if (podcast.status === 'FAILED') {
     // Notify the user their generation failed
-    const failureText = `Sorry, we couldn't generate your podcast. Try again or visit ${SOTTO_APP_URL} to create one manually.`;
+    const failureText = `Sorry, we couldn't generate your podcast. Try again or visit ${appUrl} to create one manually.`;
 
     try {
       const replyId = await replyToTweet(originalTweetId, failureText);
@@ -39,7 +44,8 @@ export async function processTwitterReply(job: Job<ReplyTwitterPayload>): Promis
   if (podcast.status !== 'READY') {
     // Podcast is mid-generation (retry in progress) — skip, reply will be queued when done
     logger.info('Skipping Twitter reply — podcast not in terminal state', {
-      podcastId, status: podcast.status,
+      podcastId,
+      status: podcast.status,
     });
     return;
   }
@@ -66,11 +72,15 @@ export async function processTwitterReply(job: Job<ReplyTwitterPayload>): Promis
   // Compose reply (must be under 280 chars)
   const durationMin = podcast.duration ? Math.round(podcast.duration / 60) : 0;
   const durationStr = durationMin > 0 ? ` (${durationMin} min)` : '';
-  const podcastUrl = `${SOTTO_APP_URL}${buildPodcastPath({ id: podcastId, slug: podcast.slug }, podcast.user.handle)}`;
+  const podcastUrl = `${appUrl}${buildPodcastPath({ id: podcastId, slug: podcast.slug }, podcast.user.handle)}`;
 
   // Template: 'Your podcast is ready! "TITLE"DURATION\n\nListen: URL'
   // Reserve space for fixed parts + URL + duration, then fit the title
-  const fixedLength = 'Your podcast is ready! ""'.length + durationStr.length + '\n\nListen: '.length + podcastUrl.length;
+  const fixedLength =
+    'Your podcast is ready! ""'.length +
+    durationStr.length +
+    '\n\nListen: '.length +
+    podcastUrl.length;
   const maxTitleLength = 280 - fixedLength;
   const title =
     podcast.title.length > maxTitleLength
@@ -87,7 +97,10 @@ export async function processTwitterReply(job: Job<ReplyTwitterPayload>): Promis
     select: { replyTweetId: true, status: true },
   });
   if (mention?.replyTweetId) {
-    logger.info('Reply already posted, skipping', { podcastId, replyTweetId: mention.replyTweetId });
+    logger.info('Reply already posted, skipping', {
+      podcastId,
+      replyTweetId: mention.replyTweetId,
+    });
     return;
   }
 
