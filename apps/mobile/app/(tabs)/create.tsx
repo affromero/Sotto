@@ -27,6 +27,7 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 import { api } from '../../lib/api';
+import { getApiBaseUrl } from '../../lib/config';
 import { getToken } from '../../lib/auth';
 import { InspireMe } from '../../components/InspireMe';
 import { AiModelSelector } from '../../components/AiModelSelector';
@@ -81,7 +82,7 @@ const GREETING: ChatMessage = {
   chips: ['AI & Technology', 'Science', 'History', 'Business', 'Philosophy'],
 };
 
-const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'https://sotto.fm/api';
+const API_BASE = getApiBaseUrl();
 
 function MessageBubble({ message }: { message: ChatMessage }) {
   const isUser = message.role === 'user';
@@ -93,17 +94,9 @@ function MessageBubble({ message }: { message: ChatMessage }) {
         isUser ? styles.bubbleContainerUser : styles.bubbleContainerAssistant,
       ]}
     >
-      <View
-        style={[
-          styles.bubble,
-          isUser ? styles.bubbleUser : styles.bubbleAssistant,
-        ]}
-      >
+      <View style={[styles.bubble, isUser ? styles.bubbleUser : styles.bubbleAssistant]}>
         <Text
-          style={[
-            styles.bubbleText,
-            isUser ? styles.bubbleTextUser : styles.bubbleTextAssistant,
-          ]}
+          style={[styles.bubbleText, isUser ? styles.bubbleTextUser : styles.bubbleTextAssistant]}
         >
           {message.content}
         </Text>
@@ -121,7 +114,9 @@ export default function CreateScreen() {
   const [step, setStep] = useState<Step>('discovery');
   const [podcastId, setPodcastId] = useState<string | null>(null);
   const [scriptEditorVisible, setScriptEditorVisible] = useState(false);
-  const [scriptTurns, setScriptTurns] = useState<{ speaker: string; text: string; direction?: string }[]>([]);
+  const [scriptTurns, setScriptTurns] = useState<
+    { speaker: string; text: string; direction?: string }[]
+  >([]);
 
   // Discovery state
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -185,7 +180,7 @@ export default function CreateScreen() {
                   setStep(state.step);
                 },
               },
-            ],
+            ]
           );
         }
       } catch {
@@ -336,9 +331,7 @@ export default function CreateScreen() {
                 accumulated += parsed.text;
                 const text = accumulated;
                 setMessages((prev) =>
-                  prev.map((m) =>
-                    m.id === assistantId ? { ...m, content: text } : m,
-                  ),
+                  prev.map((m) => (m.id === assistantId ? { ...m, content: text } : m))
                 );
               }
 
@@ -347,9 +340,7 @@ export default function CreateScreen() {
                 const chips: string[] = parsed.chips ?? [];
                 setLatestChips(chips);
                 setMessages((prev) =>
-                  prev.map((m) =>
-                    m.id === assistantId ? { ...m, chips } : m,
-                  ),
+                  prev.map((m) => (m.id === assistantId ? { ...m, chips } : m))
                 );
               }
             } catch {
@@ -360,20 +351,16 @@ export default function CreateScreen() {
       } catch (err: unknown) {
         if (err instanceof Error && err.name === 'AbortError') {
           // Intentional cancel — remove empty placeholder
-          setMessages((prev) =>
-            prev.filter((m) => m.id !== assistantId || m.content),
-          );
+          setMessages((prev) => prev.filter((m) => m.id !== assistantId || m.content));
           return;
         }
-        setDiscoveryError(
-          err instanceof Error ? err.message : 'Something went wrong',
-        );
+        setDiscoveryError(err instanceof Error ? err.message : 'Something went wrong');
       } finally {
         setIsDiscoveringSSE(false);
         abortRef.current = null;
       }
     },
-    [messages, aiModel],
+    [messages, aiModel]
   );
 
   // Create mutation — full payload matching web
@@ -410,7 +397,7 @@ export default function CreateScreen() {
         Alert.alert(
           'Voice Payment Required',
           'This voice requires payment. Please use the web app to complete the purchase.',
-          [{ text: 'OK' }],
+          [{ text: 'OK' }]
         );
       }
     },
@@ -458,7 +445,7 @@ export default function CreateScreen() {
       setLatestChips([]);
       streamDiscovery(trimmed);
     },
-    [isDiscoveringSSE, streamDiscovery],
+    [isDiscoveringSSE, streamDiscovery]
   );
 
   useEffect(() => {
@@ -477,7 +464,7 @@ export default function CreateScreen() {
     (chip: string) => {
       sendMessage(chip);
     },
-    [sendMessage],
+    [sendMessage]
   );
 
   const handleNextToVoice = useCallback(() => {
@@ -492,13 +479,10 @@ export default function CreateScreen() {
 
   const renderMessage = useCallback(
     ({ item }: { item: ChatMessage }) => <MessageBubble message={item} />,
-    [],
+    []
   );
 
-  const keyExtractor = useCallback(
-    (item: ChatMessage) => item.id,
-    [],
-  );
+  const keyExtractor = useCallback((item: ChatMessage) => item.id, []);
 
   const isReady = metadata?.ready === true;
   const isDiscovering = isDiscoveringSSE;
@@ -510,10 +494,10 @@ export default function CreateScreen() {
     inspirePulse.value = withRepeat(
       withSequence(
         withTiming(1, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
-        withTiming(0, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0, { duration: 1500, easing: Easing.inOut(Easing.ease) })
       ),
       -1,
-      false,
+      false
     );
   }, [inspirePulse]);
 
@@ -543,79 +527,76 @@ export default function CreateScreen() {
           renderItem={renderMessage}
           keyExtractor={keyExtractor}
           contentContainerStyle={styles.messageList}
-          onContentSizeChange={() =>
-            flatListRef.current?.scrollToEnd({ animated: true })
-          }
+          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
           ListHeaderComponent={
             messages.length === 0 ? (
               <>
-              <DraftsList
-                onResume={async (draftId) => {
-                  try {
-                    const res = await api.get(`/drafts/${draftId}`);
-                    const draft = res.data;
-                    if (draft.discovery?.messages) {
-                      setMessages(
-                        draft.discovery.messages.map((m: { role: string; content: string; chips?: string[] }) => ({
-                          id: m.role + Math.random(),
-                          role: m.role as 'user' | 'assistant',
-                          content: m.content,
-                          chips: m.chips,
-                        })),
-                      );
+                <DraftsList
+                  onResume={async (draftId) => {
+                    try {
+                      const res = await api.get(`/drafts/${draftId}`);
+                      const draft = res.data;
+                      if (draft.discovery?.messages) {
+                        setMessages(
+                          draft.discovery.messages.map(
+                            (m: { role: string; content: string; chips?: string[] }) => ({
+                              id: m.role + Math.random(),
+                              role: m.role as 'user' | 'assistant',
+                              content: m.content,
+                              chips: m.chips,
+                            })
+                          )
+                        );
+                      }
+                      if (draft.discovery) {
+                        setMetadata({
+                          topic: draft.discovery.topic,
+                          depth: draft.discovery.depth,
+                          audienceLevel: draft.discovery.audienceLevel,
+                          audience: draft.discovery.audience,
+                          focusAreas: draft.discovery.focusAreas,
+                          tone: draft.discovery.tone,
+                          durationTarget: draft.discovery.durationTarget,
+                          speakers: draft.discovery.speakers,
+                        } as DiscoveryMetadata);
+                      }
+                      setPodcastId(draftId);
+                    } catch {
+                      Alert.alert('Error', 'Failed to load draft.');
                     }
-                    if (draft.discovery) {
-                      setMetadata({
-                        topic: draft.discovery.topic,
-                        depth: draft.discovery.depth,
-                        audienceLevel: draft.discovery.audienceLevel,
-                        audience: draft.discovery.audience,
-                        focusAreas: draft.discovery.focusAreas,
-                        tone: draft.discovery.tone,
-                        durationTarget: draft.discovery.durationTarget,
-                        speakers: draft.discovery.speakers,
-                      } as DiscoveryMetadata);
-                    }
-                    setPodcastId(draftId);
-                  } catch {
-                    Alert.alert('Error', 'Failed to load draft.');
-                  }
-                }}
-              />
-              <View style={styles.greetingChipsContainer}>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.chipScrollContent}
-                >
-                  {GREETING.chips.map((chip) => (
-                    <Pressable
-                      key={chip}
-                      testID={`create-chip-${chip}`}
-                      style={({ pressed }) => [
-                        styles.chip,
-                        pressed && styles.chipPressed,
-                      ]}
-                      onPress={() => handleChipPress(chip)}
-                    >
-                      <Text style={styles.chipText}>{chip}</Text>
-                    </Pressable>
-                  ))}
-                </ScrollView>
-                <Animated.View style={[styles.inspireMeGlow, inspireAnimatedStyle]}>
-                  <Pressable
-                    style={({ pressed }) => [
-                      styles.inspireMeButton,
-                      pressed && styles.inspireMeButtonPressed,
-                    ]}
-                    onPress={() => setShowInspire(true)}
-                    testID="create-inspire-button"
+                  }}
+                />
+                <View style={styles.greetingChipsContainer}>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.chipScrollContent}
                   >
-                    <Ionicons name="sparkles" size={16} color={colors.primary} />
-                    <Text style={styles.inspireMeButtonText}>Inspire me</Text>
-                  </Pressable>
-                </Animated.View>
-              </View>
+                    {GREETING.chips.map((chip) => (
+                      <Pressable
+                        key={chip}
+                        testID={`create-chip-${chip}`}
+                        style={({ pressed }) => [styles.chip, pressed && styles.chipPressed]}
+                        onPress={() => handleChipPress(chip)}
+                      >
+                        <Text style={styles.chipText}>{chip}</Text>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                  <Animated.View style={[styles.inspireMeGlow, inspireAnimatedStyle]}>
+                    <Pressable
+                      style={({ pressed }) => [
+                        styles.inspireMeButton,
+                        pressed && styles.inspireMeButtonPressed,
+                      ]}
+                      onPress={() => setShowInspire(true)}
+                      testID="create-inspire-button"
+                    >
+                      <Ionicons name="sparkles" size={16} color={colors.primary} />
+                      <Text style={styles.inspireMeButtonText}>Inspire me</Text>
+                    </Pressable>
+                  </Animated.View>
+                </View>
               </>
             ) : null
           }
@@ -639,10 +620,7 @@ export default function CreateScreen() {
                   {latestChips.map((chip) => (
                     <Pressable
                       key={chip}
-                      style={({ pressed }) => [
-                        styles.chip,
-                        pressed && styles.chipPressed,
-                      ]}
+                      style={({ pressed }) => [styles.chip, pressed && styles.chipPressed]}
                       onPress={() => handleChipPress(chip)}
                     >
                       <Text style={styles.chipText}>{chip}</Text>
@@ -655,9 +633,7 @@ export default function CreateScreen() {
                 <View style={styles.readyContainer}>
                   <View style={styles.readyCard} testID="create-ready-card">
                     <Text style={styles.readyTitle}>Ready to create</Text>
-                    <Text style={styles.readySubtitle}>
-                      {metadata?.topic ?? 'Your podcast'}
-                    </Text>
+                    <Text style={styles.readySubtitle}>{metadata?.topic ?? 'Your podcast'}</Text>
                     <Pressable
                       style={({ pressed }) => [
                         styles.createButton,
@@ -665,16 +641,12 @@ export default function CreateScreen() {
                         missingKeys && styles.createButtonDisabled,
                       ]}
                       onPress={
-                        missingKeys
-                          ? () => router.push('/settings/api-keys')
-                          : handleNextToVoice
+                        missingKeys ? () => router.push('/settings/api-keys') : handleNextToVoice
                       }
                       testID="create-next-voices-button"
                     >
                       <Text style={styles.createButtonText}>
-                        {missingKeys
-                          ? 'Add API Keys to Create'
-                          : 'Next: Choose Voices'}
+                        {missingKeys ? 'Add API Keys to Create' : 'Next: Choose Voices'}
                       </Text>
                     </Pressable>
                   </View>
@@ -688,9 +660,7 @@ export default function CreateScreen() {
                     style={styles.retryLink}
                     onPress={() => {
                       setDiscoveryError(null);
-                      const lastUserMsg = messages
-                        .filter((m) => m.role === 'user')
-                        .pop();
+                      const lastUserMsg = messages.filter((m) => m.role === 'user').pop();
                       if (lastUserMsg) streamDiscovery(lastUserMsg.content);
                     }}
                   >
@@ -745,15 +715,13 @@ export default function CreateScreen() {
           style={styles.voiceScrollView}
           contentContainerStyle={styles.voiceScrollContent}
         >
-          <Text style={styles.sectionTitle}>
-            {metadata?.topic ?? 'Your Podcast'}
-          </Text>
+          <Text style={styles.sectionTitle}>{metadata?.topic ?? 'Your Podcast'}</Text>
 
           {metadata && (
             <View style={styles.voiceSection}>
               <DiscoveryParamsCard
                 metadata={metadata}
-                onUpdate={(patch) => setMetadata((prev) => prev ? { ...prev, ...patch } : prev)}
+                onUpdate={(patch) => setMetadata((prev) => (prev ? { ...prev, ...patch } : prev))}
               />
             </View>
           )}
@@ -789,7 +757,11 @@ export default function CreateScreen() {
         </ScrollView>
 
         <View style={styles.voiceFooter}>
-          <Pressable style={styles.backButton} onPress={handleBack} testID="create-voice-back-button">
+          <Pressable
+            style={styles.backButton}
+            onPress={handleBack}
+            testID="create-voice-back-button"
+          >
             <Text style={styles.backButtonText}>Back</Text>
           </Pressable>
           <Pressable
@@ -825,10 +797,11 @@ export default function CreateScreen() {
   function renderScriptingStep() {
     return (
       <View style={styles.pipelineContainer}>
-        <Text style={styles.pipelineTitle}>
-          {metadata?.topic ?? 'Your Podcast'}
-        </Text>
-        <GenerationProgress status={pipelineStatus?.status ?? 'EXTRACTING'} topic={metadata?.topic} />
+        <Text style={styles.pipelineTitle}>{metadata?.topic ?? 'Your Podcast'}</Text>
+        <GenerationProgress
+          status={pipelineStatus?.status ?? 'EXTRACTING'}
+          topic={metadata?.topic}
+        />
         <Text style={styles.pipelineHint}>
           This usually takes 1-2 minutes. You can leave this screen and come back.
         </Text>
@@ -864,13 +837,12 @@ export default function CreateScreen() {
   function renderGeneratingStep() {
     return (
       <View style={styles.pipelineContainer}>
-        <Text style={styles.pipelineTitle}>
-          {metadata?.topic ?? 'Your Podcast'}
-        </Text>
-        <GenerationProgress status={pipelineStatus?.status ?? 'GENERATING_AUDIO'} topic={metadata?.topic} />
-        <Text style={styles.pipelineHint}>
-          Generating audio for each segment. Almost there!
-        </Text>
+        <Text style={styles.pipelineTitle}>{metadata?.topic ?? 'Your Podcast'}</Text>
+        <GenerationProgress
+          status={pipelineStatus?.status ?? 'GENERATING_AUDIO'}
+          topic={metadata?.topic}
+        />
+        <Text style={styles.pipelineHint}>Generating audio for each segment. Almost there!</Text>
       </View>
     );
   }
@@ -878,10 +850,7 @@ export default function CreateScreen() {
   function renderKeyWarning() {
     if (!missingKeys) return null;
     return (
-      <Pressable
-        style={styles.keyWarning}
-        onPress={() => router.push('/settings/api-keys')}
-      >
+      <Pressable style={styles.keyWarning} onPress={() => router.push('/settings/api-keys')}>
         <Text style={styles.keyWarningText}>
           {!hasAiKey && !hasTtsKey
             ? 'Add AI and TTS API keys to create podcasts'

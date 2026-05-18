@@ -9,6 +9,7 @@ import { colors as defaultColors, spacing, typography, borderRadius } from '@sot
 import { shadowSm } from '../lib/shadows';
 import { useThemeColors, useThemeStore } from '../lib/useThemeColors';
 import { api } from '../lib/api';
+import { appUrl } from '../lib/config';
 import { deleteToken } from '../lib/auth';
 
 interface KeyStatus {
@@ -283,7 +284,7 @@ export default function SettingsScreen() {
           <View style={[styles.card, { backgroundColor: colors.surface }]}>
             <Pressable
               style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-              onPress={() => openBrowserAsync('https://sotto.fm/privacy')}
+              onPress={() => openBrowserAsync(appUrl('/privacy'))}
             >
               <Text style={styles.rowLabel}>Privacy Policy</Text>
               <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
@@ -291,7 +292,7 @@ export default function SettingsScreen() {
             <View style={styles.rowSeparator} />
             <Pressable
               style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-              onPress={() => openBrowserAsync('https://sotto.fm/terms')}
+              onPress={() => openBrowserAsync(appUrl('/terms'))}
             >
               <Text style={styles.rowLabel}>Terms of Service</Text>
               <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
@@ -299,7 +300,7 @@ export default function SettingsScreen() {
             <View style={styles.rowSeparator} />
             <Pressable
               style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-              onPress={() => openBrowserAsync('https://sotto.fm/support')}
+              onPress={() => openBrowserAsync(appUrl('/support'))}
             >
               <Text style={styles.rowLabel}>Support</Text>
               <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />

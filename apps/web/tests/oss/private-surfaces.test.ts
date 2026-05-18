@@ -257,6 +257,58 @@ describe('private-first OSS surfaces', () => {
     expect(generatedUrlSources).not.toContain("|| 'http://localhost:3000'");
   });
 
+  it('requires mobile and extension clients to use explicit deployment URLs', () => {
+    const mobileRuntimeSources = [
+      'apps/mobile/lib/config.ts',
+      'apps/mobile/lib/api.ts',
+      'apps/mobile/lib/event-buffer.ts',
+      'apps/mobile/app/(tabs)/create.tsx',
+      'apps/mobile/app/settings/billing.tsx',
+      'apps/mobile/app/settings/referral.tsx',
+      'apps/mobile/app/auth/login.tsx',
+      'apps/mobile/app/settings.tsx',
+    ]
+      .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
+      .join('\n');
+    const mobileBuildConfigSources = [
+      'apps/mobile/app.config.js',
+      'apps/mobile/app.json',
+      'apps/mobile/eas.json',
+    ]
+      .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
+      .join('\n');
+    const extensionSources = [
+      'extension/background.js',
+      'extension/popup.js',
+      'extension/popup.html',
+      'extension/manifest.json',
+      'extension/ADAPTATION.md',
+    ]
+      .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
+      .join('\n');
+
+    expect(mobileRuntimeSources).toContain(
+      'is required. Set it to your Sotto deployment API URL',
+    );
+    expect(mobileRuntimeSources).toContain('getApiBaseUrl');
+    expect(mobileRuntimeSources).not.toContain('https://sotto.fm');
+    expect(mobileRuntimeSources).not.toContain("?? 'https://sotto.fm/api'");
+    expect(mobileRuntimeSources).not.toContain("|| 'https://sotto.fm/api'");
+
+    expect(mobileBuildConfigSources).toContain('EXPO_PUBLIC_API_URL is required for mobile builds');
+    expect(mobileBuildConfigSources).not.toContain('applinks:sotto.fm');
+    expect(mobileBuildConfigSources).not.toContain('"host": "sotto.fm"');
+    expect(mobileBuildConfigSources).not.toContain('https://sotto.fm/api');
+
+    expect(extensionSources).toContain('Sotto deployment URL is required');
+    expect(extensionSources).toContain('SET_CONFIG');
+    expect(extensionSources).toContain('"https://*/*"');
+    expect(extensionSources).not.toContain('https://sotto.fm');
+    expect(extensionSources).not.toContain('sotto.fm/api');
+    expect(extensionSources).not.toContain('SET_API_KEY');
+    expect(extensionSources).not.toContain('CLEAR_API_KEY');
+  });
+
   it('does not ship the standalone social feed ranking workspace', () => {
     const workspaceSources = [
       'package.json',

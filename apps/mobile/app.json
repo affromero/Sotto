@@ -17,13 +17,8 @@
       "bundleIdentifier": "fm.sotto.app",
       "supportsTablet": true,
       "buildNumber": "4",
-      "associatedDomains": [
-        "applinks:sotto.fm"
-      ],
       "infoPlist": {
-        "UIBackgroundModes": [
-          "audio"
-        ],
+        "UIBackgroundModes": ["audio"],
         "ITSAppUsesNonExemptEncryption": false
       }
     },
@@ -34,22 +29,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#D97706"
       },
-      "permissions": [
-        "FOREGROUND_SERVICE",
-        "FOREGROUND_SERVICE_MEDIA_PLAYBACK",
-        "WAKE_LOCK"
-      ],
-      "intentFilters": [
-        {
-          "action": "VIEW",
-          "autoVerify": true,
-          "data": [
-            { "scheme": "https", "host": "sotto.fm", "pathPrefix": "/podcast" },
-            { "scheme": "https", "host": "sotto.fm", "pathPrefix": "/user" }
-          ],
-          "category": ["BROWSABLE", "DEFAULT"]
-        }
-      ]
+      "permissions": ["FOREGROUND_SERVICE", "FOREGROUND_SERVICE_MEDIA_PLAYBACK", "WAKE_LOCK"]
     },
     "plugins": [
       "expo-router",

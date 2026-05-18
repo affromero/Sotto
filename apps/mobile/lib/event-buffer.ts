@@ -1,11 +1,12 @@
 import { AppState, type AppStateStatus } from 'react-native';
 import * as Crypto from 'expo-crypto';
 import { getToken } from './auth';
+import { getApiBaseUrl } from './config';
 import type { EventPayload, EventContext, BehavioralEventInput } from '@sotto/shared';
 
 const FLUSH_INTERVAL_MS = 5000;
 const MAX_BUFFER_SIZE = 50;
-const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://sotto.fm/api';
+const API_URL = getApiBaseUrl();
 
 export class EventBuffer {
   private buffer: BehavioralEventInput[] = [];
@@ -20,14 +21,11 @@ export class EventBuffer {
 
     this.flushTimer = setInterval(() => this.flush(), FLUSH_INTERVAL_MS);
 
-    this.appStateSubscription = AppState.addEventListener(
-      'change',
-      (state: AppStateStatus) => {
-        if (state === 'background' || state === 'inactive') {
-          this.flush();
-        }
-      },
-    );
+    this.appStateSubscription = AppState.addEventListener('change', (state: AppStateStatus) => {
+      if (state === 'background' || state === 'inactive') {
+        this.flush();
+      }
+    });
   }
 
   setUserId(userId: string | undefined): void {
