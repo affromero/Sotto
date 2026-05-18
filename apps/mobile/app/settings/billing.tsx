@@ -13,6 +13,7 @@ import { openBrowserAsync } from 'expo-web-browser';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography, borderRadius } from '@sotto/shared';
 import { api } from '../../lib/api';
+import { appUrl } from '../../lib/config';
 import { shadowSm, shadowMd } from '../../lib/shadows';
 import { ErrorState } from '../../components/ErrorState';
 
@@ -40,8 +41,8 @@ export default function BillingScreen() {
   const handleUpgrade = async () => {
     try {
       const res = await api.post('/billing/checkout', {
-        successUrl: 'https://sotto.fm/settings?upgraded=true',
-        cancelUrl: 'https://sotto.fm/settings',
+        successUrl: appUrl('/settings?upgraded=true'),
+        cancelUrl: appUrl('/settings'),
       });
       await openBrowserAsync(res.data.url);
     } catch {
@@ -52,7 +53,7 @@ export default function BillingScreen() {
   const handleManage = async () => {
     try {
       const res = await api.post('/billing/portal', {
-        returnUrl: 'https://sotto.fm/settings',
+        returnUrl: appUrl('/settings'),
       });
       await openBrowserAsync(res.data.url);
     } catch {
@@ -84,7 +85,9 @@ export default function BillingScreen() {
                   size={24}
                   color={isPro ? colors.primary : colors.textSecondary}
                 />
-                <Text style={styles.planName} testID="billing-plan-name">{isPro ? 'Pro' : 'Free'}</Text>
+                <Text style={styles.planName} testID="billing-plan-name">
+                  {isPro ? 'Pro' : 'Free'}
+                </Text>
               </View>
               <Text style={styles.planDescription}>
                 {isPro
@@ -145,11 +148,19 @@ export default function BillingScreen() {
 
             {/* Actions */}
             {isPro ? (
-              <Pressable style={styles.manageButton} onPress={handleManage} testID="billing-manage-button">
+              <Pressable
+                style={styles.manageButton}
+                onPress={handleManage}
+                testID="billing-manage-button"
+              >
                 <Text style={styles.manageButtonText}>Manage Subscription</Text>
               </Pressable>
             ) : (
-              <Pressable style={styles.upgradeButton} onPress={handleUpgrade} testID="billing-upgrade-button">
+              <Pressable
+                style={styles.upgradeButton}
+                onPress={handleUpgrade}
+                testID="billing-upgrade-button"
+              >
                 <Ionicons name="diamond" size={18} color={colors.textInverse} />
                 <Text style={styles.upgradeButtonText}>Upgrade to Pro</Text>
               </Pressable>
