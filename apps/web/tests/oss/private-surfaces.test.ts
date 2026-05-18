@@ -433,6 +433,55 @@ describe('private-first OSS surfaces', () => {
     expect(runtimeInfraSources).not.toContain("service: 'maps.sotto.fm'");
   });
 
+  it('keeps public contact and demo surfaces self-host neutral', () => {
+    const publicContactSources = [
+      'apps/web/src/app/about/page.tsx',
+      'apps/web/src/app/banned/page.tsx',
+      'apps/web/src/app/support/page.tsx',
+      'apps/web/src/app/terms/page.tsx',
+      'apps/web/src/app/privacy/page.tsx',
+      'apps/web/src/app/feedback/page.tsx',
+      'apps/web/src/app/join/page.tsx',
+      'apps/web/src/app/api/auth/mobile/route.ts',
+      'apps/web/src/app/opengraph-image.tsx',
+      'apps/web/src/app/(admin)/admin/showcase/AvatarPrep.tsx',
+      'apps/web/src/components/landing/chapters/ConvertChapter.tsx',
+      'apps/web/prisma/seed.ts',
+      'apps/web/prisma/seed-demo.ts',
+      'packages/maps/README.md',
+      'packages/video/src/compositions/shared/SottoWatermark.tsx',
+      'packages/verification-standard/package.json',
+      'packages/verification-standard/README.md',
+      'packages/verification-standard/CONTRIBUTING.md',
+      'scripts/capture-pitch-screenshots.ts',
+      'scripts/launch-video/AUTHORING_GUIDE.md',
+      'scripts/launch-video/SYSTEM_PROMPT.md',
+      'scripts/launch-video/sotto-launch.json',
+      'scripts/recording/index.ts',
+      'scripts/recording/lib/browser.ts',
+    ]
+      .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
+      .join('\n');
+
+    expect(publicContactSources).toContain('support@example.com');
+    expect(publicContactSources).toContain('https://your-domain.example');
+    expect(publicContactSources).toContain('https://media.example.com/demos/');
+    expect(publicContactSources).toContain('Your voices. Your topics. Private by default.');
+    expect(publicContactSources).not.toContain('sotto.fm');
+    expect(publicContactSources).not.toContain('r2.sotto.fm');
+    expect(publicContactSources).not.toContain('maps.sotto.fm');
+    expect(publicContactSources).not.toContain('hello@sotto.fm');
+    expect(publicContactSources).not.toContain('support@sotto.fm');
+    expect(publicContactSources).not.toContain('dmca@sotto.fm');
+    expect(publicContactSources).not.toContain('jobs@sotto.fm');
+    expect(publicContactSources).not.toContain('teams@sotto.fm');
+    expect(publicContactSources).not.toContain('demo@sotto.fm');
+    expect(publicContactSources).not.toContain('admin@sotto.fm');
+    expect(publicContactSources).not.toContain('system@sotto.fm');
+    expect(publicContactSources).not.toContain('social podcast network');
+    expect(publicContactSources).not.toContain('Every voice. Every topic. One feed.');
+  });
+
   it('keeps server deployment self-hosted and env-file driven', () => {
     const deploySource = readFileSync(resolve(repoRoot, 'scripts/deploy.sh'), 'utf8');
     const setupServerSource = readFileSync(resolve(repoRoot, 'scripts/setup-server.sh'), 'utf8');

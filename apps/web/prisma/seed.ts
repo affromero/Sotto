@@ -296,7 +296,7 @@ async function main() {
 
   // Upsert @sotto system account
   await prisma.user.upsert({
-    where: { email: 'system@sotto.fm' },
+    where: { email: 'system@example.com' },
     update: {
       handle: 'sotto',
       role: 'SYSTEM',
@@ -305,7 +305,7 @@ async function main() {
       image: '/brand/profile?v=amber',
     },
     create: {
-      email: 'system@sotto.fm',
+      email: 'system@example.com',
       handle: 'sotto',
       role: 'SYSTEM',
       name: 'Sotto',

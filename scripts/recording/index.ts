@@ -67,7 +67,7 @@ async function main() {
     // Use the real admin account for recordings, fallback to seeded demo user
     const demoUser =
       (await prisma.user.findFirst({ where: { email: 'andres2912@gmail.com' } })) ??
-      (await prisma.user.findUnique({ where: { email: 'demo@sotto.fm' } }));
+      (await prisma.user.findUnique({ where: { email: 'demo@example.com' } }));
     if (!demoUser) throw new Error('No admin or demo user found — run seed:demo first');
 
     // Find key podcasts (by title, regardless of owner)

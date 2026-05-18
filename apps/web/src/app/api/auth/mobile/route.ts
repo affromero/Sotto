@@ -222,7 +222,7 @@ async function handleOAuthLogin(body: unknown) {
   if (!isAdminEmail(email) && !await isOpenSignup()) {
     const waitlistEntry = await prisma.waitlist.findUnique({ where: { email } });
     if (!waitlistEntry || waitlistEntry.status !== 'APPROVED') {
-      return errorResponse('Your email is not on the approved waitlist. Join at sotto.fm', 403);
+      return errorResponse('Your email is not on the approved waitlist. Sign up from the configured web app first.', 403);
     }
   }
 
@@ -531,4 +531,3 @@ async function verifyGithubToken(
     return null;
   }
 }
-

@@ -8,7 +8,7 @@ async function main() {
 
   // ── 1. Demo user ───────────────────────────────────────────────
   const demoUser = await prisma.user.upsert({
-    where: { email: 'demo@sotto.fm' },
+    where: { email: 'demo@example.com' },
     update: {
       name: 'Nico Valerio',
       role: 'USER',
@@ -16,7 +16,7 @@ async function main() {
       image: 'https://ui-avatars.com/api/?name=K+B&background=D97706&color=fff&size=256&bold=true&format=png',
     },
     create: {
-      email: 'demo@sotto.fm',
+      email: 'demo@example.com',
       name: 'Nico Valerio',
       role: 'USER',
       bio: 'Curious mind, lifelong learner. I make podcasts about the things that keep me up at night — from quantum mechanics to ancient philosophy.',
@@ -27,10 +27,10 @@ async function main() {
 
   // ── 2. Admin user ───────────────────────────────────────────────
   const adminUser = await prisma.user.upsert({
-    where: { email: 'admin@sotto.fm' },
+    where: { email: 'admin@example.com' },
     update: { name: 'Sotto Admin', role: 'ADMIN' },
     create: {
-      email: 'admin@sotto.fm',
+      email: 'admin@example.com',
       name: 'Sotto Admin',
       role: 'ADMIN',
       image: 'https://api.dicebear.com/9.x/notionists/svg?seed=admin&backgroundColor=1E3A5F',

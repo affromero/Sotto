@@ -140,7 +140,7 @@ export function ConvertChapter() {
               partners on internal audio briefings, video explainers, and avatar-hosted
               presentations from company docs and updates.
             </p>
-            <a href="mailto:teams@sotto.fm" className={styles.teamsLink}>
+            <a href="mailto:teams@example.com" className={styles.teamsLink}>
               Let&apos;s talk &rarr;
             </a>
           </aside>

@@ -313,7 +313,7 @@ export default function PrivacyPage() {
           <p>
             Questions about this policy or to exercise your data rights? Email us
             at{' '}
-            <a href="mailto:support@sotto.fm">support@sotto.fm</a>.
+            <a href="mailto:support@example.com">support@example.com</a>.
           </p>
         </div>
       </div>
