@@ -63,7 +63,7 @@ Trial expiration can pause managed workers or scheduled source execution. It mus
 | Checkout | start managed hosting subscription |
 | Customer Portal | update payment method, cancel, view invoices |
 | Webhooks | sync subscription status and trial state |
-| Connect | optional voice marketplace or payouts if retained |
+| Connect | optional paid voice sharing or payouts if retained |
 
 Environment variables:
 

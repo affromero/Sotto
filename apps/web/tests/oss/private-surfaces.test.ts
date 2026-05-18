@@ -1621,6 +1621,20 @@ describe('private-first OSS surfaces', () => {
     ]
       .map(readSource)
       .join('\n');
+    const internalVoiceSharingCopySources = [
+      'src/app/(admin)/admin/revenue/page.tsx',
+      'src/app/(admin)/admin/plan-features/PlanFeaturesForm.tsx',
+      'src/app/(admin)/admin/queues/queue-metadata.ts',
+      'src/lib/revenue-metrics.ts',
+      'src/lib/CLAUDE.md',
+      'src/components/CLAUDE.md',
+    ]
+      .map(readSource)
+      .concat(
+        readFileSync(resolve(repoRoot, 'docs/10-stripe-billing.md'), 'utf8'),
+        readFileSync(resolve(repoRoot, 'docs/20-roles-and-dashboards.md'), 'utf8')
+      )
+      .join('\n');
     const mobileSettingsSource = readFileSync(
       resolve(repoRoot, 'apps/mobile/app/settings.tsx'),
       'utf8'
@@ -1675,6 +1689,13 @@ describe('private-first OSS surfaces', () => {
     expect(defaultVoiceSharingCopySources).not.toContain('voice marketplace');
     expect(defaultVoiceSharingCopySources).not.toContain('marketplace transactions');
     expect(defaultVoiceSharingCopySources).not.toContain('live on the marketplace');
+    expect(internalVoiceSharingCopySources).toContain('Paid Voice Sharing');
+    expect(internalVoiceSharingCopySources).toContain('optional paid voice sharing');
+    expect(internalVoiceSharingCopySources).not.toContain('Voice Marketplace');
+    expect(internalVoiceSharingCopySources).not.toContain('voice marketplace');
+    expect(internalVoiceSharingCopySources).not.toContain('community marketplace');
+    expect(internalVoiceSharingCopySources).not.toContain('marketplace revenue');
+    expect(internalVoiceSharingCopySources).not.toContain('voice marketplace tracks');
     expect(voiceMarketplaceSources).not.toContain(
       'voiceMarketplaceEnabled Boolean  @default(true)'
     );

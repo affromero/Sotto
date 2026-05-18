@@ -73,7 +73,7 @@ Analytics should stay private and operational:
 | Inspire | `/admin/inspire` | private inspiration/source management |
 | Ratings | `/admin/ratings` | quality/rating oversight |
 | Twitter | `/admin/twitter` | owner-scoped Twitter source health |
-| Revenue | `/admin/revenue` | managed hosting and marketplace revenue |
+| Revenue | `/admin/revenue` | managed hosting and optional paid voice-sharing revenue |
 | Costs | `/admin/costs` | provider and infrastructure cost tracking |
 | Pipeline | `/admin/pipeline` | queue status, failures, retries |
 | Engagement | `/admin/engagement` | private activity metrics |
