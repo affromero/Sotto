@@ -86,7 +86,7 @@ describe('GET /api/admin/handles', () => {
     mockAdmin();
     const mockHandles = [
       { id: '1', handle: 'admin', reason: 'reserved', createdBy: 'admin-1' },
-      { id: '2', handle: 'sotto', reason: 'system', createdBy: 'admin-1' },
+      { id: '2', handle: 'system', reason: 'system', createdBy: 'admin-1' },
     ];
     mockReservedHandleFindMany.mockResolvedValue(mockHandles);
 

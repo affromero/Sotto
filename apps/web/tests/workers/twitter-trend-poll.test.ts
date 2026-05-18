@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Job } from 'bullmq';
 import type { PollTwitterTrendsPayload } from '@/lib/queue';
 
@@ -125,9 +125,10 @@ const DEFAULT_CONFIG = {
 describe('processTrendPoll', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubEnv('SYSTEM_USER_HANDLE', 'system');
     mockGetTwitterConfig.mockResolvedValue(DEFAULT_CONFIG);
     mockPrismaTwitterAutoTweetCount.mockResolvedValue(0);
-    mockPrismaUserFindUnique.mockResolvedValue({ id: 'sotto-user-id' });
+    mockPrismaUserFindUnique.mockResolvedValue({ id: 'system-owner-id' });
     mockSelectVoicePair.mockReturnValue({
       host: { id: 'host-v1' },
       expert: { id: 'expert-v1' },
@@ -143,6 +144,10 @@ describe('processTrendPoll', () => {
     });
     mockPrismaPodcastCreate.mockResolvedValue({ id: 'podcast-001' });
     mockPrismaTwitterAutoTweetCreate.mockResolvedValue({ id: 'at-1' });
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it('skips when trend polling is disabled', async () => {
@@ -169,7 +174,7 @@ describe('processTrendPoll', () => {
     expect(mockPrismaPodcastCreate).not.toHaveBeenCalled();
   });
 
-  it('bails when @sotto user is not found', async () => {
+  it('bails when configured system owner user is not found', async () => {
     mockSearchPopularTweets.mockResolvedValue(makeSearchResult([makeTweet('t1', 'AI is amazing')]));
     mockPrismaUserFindUnique.mockResolvedValue(null);
 
@@ -185,7 +190,7 @@ describe('processTrendPoll', () => {
 
     expect(mockPrismaPodcastCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({
-        userId: 'sotto-user-id',
+        userId: 'system-owner-id',
         source: 'TWITTER',
         sourceTweetId: 't1',
         status: 'EXTRACTING',
@@ -198,7 +203,7 @@ describe('processTrendPoll', () => {
     expect(mockAddJob).toHaveBeenCalledWith(
       'content-extraction-queue',
       'EXTRACT_CONTENT',
-      expect.objectContaining({ podcastId: 'podcast-001', userId: 'sotto-user-id' })
+      expect.objectContaining({ podcastId: 'podcast-001', userId: 'system-owner-id' })
     );
   });
 

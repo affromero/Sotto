@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
 const mockAuth = vi.fn();
@@ -125,6 +125,14 @@ import { GET as getAutoTweet, POST as postAutoTweet } from '@/app/api/admin/twit
 import { GET as getAnalytics } from '@/app/api/admin/twitter/analytics/route';
 import { GET as getTrends, POST as postTrends } from '@/app/api/admin/twitter/trends/route';
 import { GET as getMentions } from '@/app/api/admin/twitter/mentions/route';
+
+beforeEach(() => {
+  vi.stubEnv('SYSTEM_USER_HANDLE', 'system');
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 function mockAdmin() {
   mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
@@ -507,7 +515,7 @@ describe('POST /api/admin/twitter/trends', () => {
     expect(response.status).toBe(400);
   });
 
-  it('returns 404 when @sotto account not found', async () => {
+  it('returns 404 when system owner account is not found', async () => {
     mockAdmin();
     mockTrendGenerateSafeParse.mockReturnValue({
       success: true,
@@ -518,6 +526,9 @@ describe('POST /api/admin/twitter/trends', () => {
     const request = createRequest('/api/admin/twitter/trends', { tweetText: 'AI trends' });
     const response = await postTrends(request);
     expect(response.status).toBe(404);
+    expect(await response.json()).toMatchObject({
+      error: expect.stringContaining('Configured system owner @system was not found'),
+    });
   });
 
   it('creates podcast from trend successfully', async () => {
@@ -526,7 +537,7 @@ describe('POST /api/admin/twitter/trends', () => {
       success: true,
       data: { tweetText: 'AI trends', tweetId: 't1' },
     });
-    mockUserFindUnique.mockResolvedValueOnce({ id: 'sotto-id' });
+    mockUserFindUnique.mockResolvedValueOnce({ id: 'system-owner-id' });
     mockParseTweetIntent.mockResolvedValue({
       title: 'AI Trends',
       topic: 'AI',

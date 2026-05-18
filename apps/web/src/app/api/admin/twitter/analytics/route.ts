@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth-guards';
 import { prisma } from '@/lib/prisma';
 import { subDays, startOfDay } from 'date-fns';
+import { getSystemUserHandle } from '@/lib/system-user';
 
 import { errorResponse } from '@/lib/api-response';
 export async function GET() {
@@ -9,6 +10,7 @@ export async function GET() {
   if (!adminId) {
     return errorResponse('Forbidden', 403);
   }
+  const systemUserHandle = getSystemUserHandle();
 
   const thirtyDaysAgo = subDays(startOfDay(new Date()), 30);
 
@@ -49,11 +51,10 @@ export async function GET() {
     prisma.podcast.count({
       where: { source: 'TWITTER', status: 'READY' },
     }),
-    // Thread podcasts are owned by @sotto system user
     prisma.podcast.findMany({
       where: {
         source: 'TWITTER',
-        user: { handle: 'sotto' },
+        user: { handle: systemUserHandle },
       },
       orderBy: { createdAt: 'desc' },
       take: 20,

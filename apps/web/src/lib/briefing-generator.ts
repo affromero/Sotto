@@ -6,6 +6,7 @@ import { generatePodcastSlug } from '@/lib/slugify';
 import { hasByokKey, hasAiKey } from '@/lib/byok';
 import { getBriefingConfig, type BriefingConfigData } from '@/lib/briefing-config';
 import { logger } from '@/lib/logger';
+import { requireSystemUser } from '@/lib/system-user';
 import type { UserBriefing, PodcastVisibility } from '@prisma/client';
 
 // ─── Types ───────────────────────────────────────────────────────
@@ -264,10 +265,9 @@ export async function createBriefingPodcast(
     : false;
   const useAdminCredits = !userHasByok;
 
-  const systemUser = await prisma.user.findFirst({
-    where: { handle: 'sotto' },
-    select: { id: true },
-  });
+  const adminCreditUserId = useAdminCredits
+    ? (await requireSystemUser(prisma)).id
+    : briefing.userId;
 
   const podcast = await prisma.podcast.create({
     data: {
@@ -331,7 +331,7 @@ export async function createBriefingPodcast(
   // Enqueue content extraction
   await addJob(contentExtractionQueue, JobType.EXTRACT_CONTENT, {
     podcastId: podcast.id,
-    userId: useAdminCredits ? (systemUser?.id ?? briefing.userId) : briefing.userId,
+    userId: adminCreditUserId,
     sourceText: sourceContent,
     useAdminCredits,
   });

@@ -6,7 +6,7 @@ import { MARKETING_TEMPLATES } from '@/lib/marketing-templates';
 import type { MarketingTemplate } from '@/lib/marketing-templates';
 import styles from './page.module.css';
 
-export function CreateAsSottoButton() {
+export function CreateAsSystemOwnerButton() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState<string | null>(null);
@@ -27,7 +27,7 @@ export function CreateAsSottoButton() {
   const handleTemplate = useCallback(async (template: MarketingTemplate) => {
     setLoading(template.id);
     try {
-      const res = await fetch('/api/admin/podcasts/create-as-sotto', {
+      const res = await fetch('/api/admin/podcasts/create-as-system-owner', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -49,7 +49,7 @@ export function CreateAsSottoButton() {
   }, [router]);
 
   return (
-    <div className={styles.sottoDropdownWrapper} ref={menuRef}>
+    <div className={styles.systemOwnerDropdownWrapper} ref={menuRef}>
       <button
         type="button"
         className={styles.searchButton}
@@ -57,38 +57,38 @@ export function CreateAsSottoButton() {
         aria-expanded={open}
         aria-haspopup="menu"
       >
-        Create as @sotto {open ? '▴' : '▾'}
+        Create as System Owner {open ? '▴' : '▾'}
       </button>
 
       {open && (
-        <div className={styles.sottoDropdownMenu} role="menu">
+        <div className={styles.systemOwnerDropdownMenu} role="menu">
           <button
             type="button"
             role="menuitem"
-            className={styles.sottoDropdownItem}
+            className={styles.systemOwnerDropdownItem}
             onClick={() => {
               setOpen(false);
-              router.push('/create?as=sotto');
+              router.push('/create?as=system-owner');
             }}
           >
-            <span className={styles.sottoDropdownItemName}>Custom (chat flow)</span>
-            <span className={styles.sottoDropdownItemDesc}>Full discovery chat</span>
+            <span className={styles.systemOwnerDropdownItemName}>Custom (chat flow)</span>
+            <span className={styles.systemOwnerDropdownItemDesc}>Full discovery chat</span>
           </button>
-          <div className={styles.sottoDropdownDivider} />
+          <div className={styles.systemOwnerDropdownDivider} />
           {MARKETING_TEMPLATES.map((t) => (
             <button
               key={t.id}
               type="button"
               role="menuitem"
-              className={styles.sottoDropdownItem}
+              className={styles.systemOwnerDropdownItem}
               onClick={() => handleTemplate(t)}
               disabled={loading !== null}
             >
-              <span className={styles.sottoDropdownItemName}>
+              <span className={styles.systemOwnerDropdownItemName}>
                 {t.name}
                 {loading === t.id && ' …'}
               </span>
-              <span className={styles.sottoDropdownItemDesc}>{t.description}</span>
+              <span className={styles.systemOwnerDropdownItemDesc}>{t.description}</span>
             </button>
           ))}
         </div>
