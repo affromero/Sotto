@@ -1603,7 +1603,7 @@ describe('private-first OSS surfaces', () => {
     expect(userLookupSources).not.toContain('Search by @handle');
   });
 
-  it('keeps the optional voice marketplace disabled by default', () => {
+  it('keeps optional paid voice sharing disabled by default', () => {
     const voiceSettingsRouteSource = readSource('src/app/api/voices/route.ts');
     const voiceCloneRouteSource = readSource('src/app/api/voices/clone/route.ts');
     const voiceManagerSource = readSource(

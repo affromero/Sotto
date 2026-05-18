@@ -109,9 +109,9 @@ export function VoicesClient({
   return (
     <div className={cardStyles.wrapper}>
       <header className={cardStyles.header}>
-        <h1 className={cardStyles.title}>Voice Marketplace</h1>
+        <h1 className={cardStyles.title}>Shared Voices</h1>
         <p className={cardStyles.subtitle}>
-          Browse community voices and request access to use them in your podcasts.
+          Browse verified voices and request explicit access to use them in your podcasts.
         </p>
       </header>
 

@@ -105,7 +105,7 @@ describe('GET /api/voices/browse', () => {
     });
   });
 
-  it('returns 503 when the optional voice marketplace is disabled', async () => {
+  it('returns 503 when optional paid voice sharing is disabled', async () => {
     mockGetPlanFeatureConfig.mockResolvedValue({
       freeVoiceCloningEnabled: false,
       proVoiceCloningEnabled: true,
