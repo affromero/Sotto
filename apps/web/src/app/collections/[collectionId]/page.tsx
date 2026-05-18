@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { CollectionDetail } from '@/components/collections/CollectionDetail';
+import { getAppBaseUrl } from '@/lib/urls';
 import styles from './page.module.css';
 
 interface CollectionPageProps {
@@ -18,7 +19,7 @@ export async function generateMetadata({ params }: CollectionPageProps): Promise
 
   if (!collection) return { title: 'Collection Not Found' };
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://sotto.fm';
+  const appUrl = getAppBaseUrl();
   const title = `${collection.name} — Sotto Collection`;
   const description =
     collection.description ||

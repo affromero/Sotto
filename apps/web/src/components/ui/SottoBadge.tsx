@@ -1,9 +1,10 @@
+import { BRAND } from '@sotto/shared';
 import styles from './SottoBadge.module.css';
 
 export function SottoBadge() {
   return (
     <a
-      href="https://sotto.fm?utm_source=badge&utm_medium=badge&utm_campaign=made_with"
+      href={`${BRAND.url}?utm_source=badge&utm_medium=badge&utm_campaign=made_with`}
       target="_blank"
       rel="noopener noreferrer"
       className={styles.badge}

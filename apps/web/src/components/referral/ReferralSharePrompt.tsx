@@ -36,13 +36,21 @@ function setDismissed() {
 }
 
 export function ReferralSharePrompt({ handle, hasFirstReadyPodcast }: ReferralSharePromptProps) {
-  const dismissed = useSyncExternalStore(subscribeDismissed, getDismissedSnapshot, getDismissedServerSnapshot);
+  const dismissed = useSyncExternalStore(
+    subscribeDismissed,
+    getDismissedSnapshot,
+    getDismissedServerSnapshot
+  );
   const [copied, setCopied] = useState(false);
 
   if (!hasFirstReadyPodcast || dismissed) return null;
 
-  const referralUrl = `https://sotto.fm/ref/${handle}`;
-  const twitterText = encodeURIComponent(`I just created my first podcast on ${BRAND.twitter} — ${BRAND.tagline} Check it out:`);
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  const referralUrl = `${origin}/ref/${handle}`;
+  const referralDisplayUrl = origin ? referralUrl.replace(/^https?:\/\//, '') : `/ref/${handle}`;
+  const twitterText = encodeURIComponent(
+    `I just created my first podcast on ${BRAND.twitter} — ${BRAND.tagline} Check it out:`
+  );
   const twitterShareUrl = `https://twitter.com/intent/tweet?text=${twitterText}&url=${encodeURIComponent(referralUrl)}`;
 
   function dismiss() {
@@ -58,7 +66,17 @@ export function ReferralSharePrompt({ handle, hasFirstReadyPodcast }: ReferralSh
   return (
     <div className={styles.banner} role="complementary" aria-label="Share Sotto">
       <button className={styles.close} onClick={dismiss} aria-label="Dismiss">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
           <line x1="18" y1="6" x2="6" y2="18" />
           <line x1="6" y1="6" x2="18" y2="18" />
         </svg>
@@ -67,12 +85,13 @@ export function ReferralSharePrompt({ handle, hasFirstReadyPodcast }: ReferralSh
       <div className={styles.content}>
         <h3 className={styles.title}>Share Sotto, earn more podcasts</h3>
         <p className={styles.description}>
-          Each friend who creates their first podcast earns you +1 daily generation for 7 days (up to +5).
+          Each friend who creates their first podcast earns you +1 daily generation for 7 days (up
+          to +5).
         </p>
 
         <div className={styles.actions}>
           <div className={styles.linkRow}>
-            <Input value={`sotto.fm/ref/${handle}`} readOnly />
+            <Input value={referralDisplayUrl} readOnly />
             <Button variant="secondary" onClick={copyLink}>
               {copied ? 'Copied!' : 'Copy'}
             </Button>

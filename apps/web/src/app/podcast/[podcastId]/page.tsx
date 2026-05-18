@@ -14,6 +14,7 @@ import { CostBreakdown } from '@/components/player/CostBreakdown';
 import { getPodcastCostBreakdown } from '@/lib/podcast-cost-stats';
 import { JoinCTA } from '@/components/referral/JoinCTA';
 import { getPodcastForDetailPage } from '@/lib/podcast-data';
+import { absolutePodcastUrl, getAppBaseUrl } from '@/lib/urls';
 import styles from './page.module.css';
 
 interface PodcastPageProps {
@@ -26,13 +27,12 @@ export async function generateMetadata({ params }: PodcastPageProps): Promise<Me
 
   if (!podcast) return { title: 'Podcast Not Found' };
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://sotto.fm';
-  // Use vanity URL as canonical when slug + handle exist
-  const vanityPath =
-    podcast.slug && podcast.user.handle
-      ? `/@${podcast.user.handle}/${podcast.slug}`
-      : `/podcast/${podcastId}`;
-  const podcastUrl = `${appUrl}${vanityPath}`;
+  const appUrl = getAppBaseUrl();
+  const podcastUrl = absolutePodcastUrl(
+    { id: podcast.id, slug: podcast.slug },
+    podcast.user.handle,
+    appUrl
+  );
   const creatorName = podcast.user.name || 'Anonymous';
 
   return {

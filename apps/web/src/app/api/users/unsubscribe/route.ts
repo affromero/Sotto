@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
+import { getAppBaseUrl } from '@/lib/urls';
 
 export async function GET(request: NextRequest) {
   const userId = request.nextUrl.searchParams.get('userId');
@@ -22,7 +23,7 @@ export async function GET(request: NextRequest) {
     data: { emailNotifications: false },
   });
 
-  const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://sotto.fm';
+  const appUrl = getAppBaseUrl();
 
   return new NextResponse(
     `<html><head><meta charset="utf-8"><title>Unsubscribed — Sotto</title></head>
@@ -35,7 +36,7 @@ export async function GET(request: NextRequest) {
         <p style="font-size:14px;color:#6B7280;line-height:1.6;margin:0 0 24px;">
           You&apos;ve been unsubscribed from Sotto announcements. You&apos;ll no longer receive platform news by email.
         </p>
-        <a href="${APP_URL}/settings" style="font-size:13px;color:#D97706;text-decoration:none;">
+        <a href="${appUrl}/settings" style="font-size:13px;color:#D97706;text-decoration:none;">
           Manage notification preferences
         </a>
       </div>

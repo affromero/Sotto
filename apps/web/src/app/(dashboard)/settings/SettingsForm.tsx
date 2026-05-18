@@ -21,7 +21,10 @@ import { MusicProviderCards } from '@/components/settings/MusicProviderCards';
 import { AvatarImageManager } from '@/components/settings/AvatarImageManager';
 import { BriefingSection } from '@/components/settings/BriefingSection';
 import type { BriefingData } from '@/components/settings/BriefingCard';
-import { PrivateRssFeedManager, type PrivateFeedTokenMetadata } from '@/components/settings/PrivateRssFeedManager';
+import {
+  PrivateRssFeedManager,
+  type PrivateFeedTokenMetadata,
+} from '@/components/settings/PrivateRssFeedManager';
 import { ThemeSelector } from '@/components/settings/ThemeSelector';
 import { usePushSubscription } from '@/lib/hooks/usePushSubscription';
 import styles from './page.module.css';
@@ -77,8 +80,15 @@ interface SettingsFormProps {
   hasByokKeys: boolean;
   initialQuizEnabled: boolean;
   quizAnswerCount: number;
-  referredUsers: Array<{ name: string | null; handle: string | null; image: string | null; joinedAt: string; verified: boolean }>;
+  referredUsers: Array<{
+    name: string | null;
+    handle: string | null;
+    image: string | null;
+    joinedAt: string;
+    verified: boolean;
+  }>;
   referralBonus: number;
+  appBaseUrl: string;
 }
 
 const providerLabels: Record<string, string> = {
@@ -122,6 +132,7 @@ export function SettingsForm({
   quizAnswerCount,
   referredUsers,
   referralBonus,
+  appBaseUrl,
 }: SettingsFormProps) {
   const [name, setName] = useState(initialName);
   const [bio, setBio] = useState(initialBio);
@@ -169,14 +180,20 @@ export function SettingsForm({
   const [emailNotifications, setEmailNotifications] = useState(initialEmailNotifications);
   const [pushNotifications, setPushNotifications] = useState(initialPushNotifications);
   const [quizEnabled, setQuizEnabled] = useState(initialQuizEnabled);
-  const { pushState, subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } = usePushSubscription();
+  const {
+    pushState,
+    subscribe: pushSubscribe,
+    unsubscribe: pushUnsubscribe,
+  } = usePushSubscription();
 
   const [avatarUrl, setAvatarUrl] = useState(image);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Language preference state
-  const [preferredLanguage, setPreferredLanguage] = useState<string | null>(initialPreferredLanguage);
+  const [preferredLanguage, setPreferredLanguage] = useState<string | null>(
+    initialPreferredLanguage
+  );
   const [languageSaving, setLanguageSaving] = useState(false);
   const [languageSaved, setLanguageSaved] = useState(false);
 
@@ -197,17 +214,24 @@ export function SettingsForm({
       ? `${initialPreferredTtsProvider}:${initialPreferredTtsModel}`
       : ''
   );
-  const [aiModelOptions, setAiModelOptions] = useState<Array<{ id: string; displayName: string; tier: string; group?: string }>>([]);
-  const [ttsOptions, setTtsOptions] = useState<Array<{ id: string; displayName: string; badge?: string; group?: string }>>([]);
+  const [aiModelOptions, setAiModelOptions] = useState<
+    Array<{ id: string; displayName: string; tier: string; group?: string }>
+  >([]);
+  const [ttsOptions, setTtsOptions] = useState<
+    Array<{ id: string; displayName: string; badge?: string; group?: string }>
+  >([]);
 
   useEffect(() => {
     Promise.all([
-      fetch('/api/ai-models').then((r) => r.ok ? r.json() : null),
-      fetch('/api/tts-options').then((r) => r.ok ? r.json() : null),
-    ]).then(([aiData, ttsData]) => {
-      if (aiData?.models) setAiModelOptions(aiData.models);
-      if (ttsData?.options) setTtsOptions(ttsData.options.filter((o: { id: string }) => o.id !== 'auto'));
-    }).catch(() => {});
+      fetch('/api/ai-models').then((r) => (r.ok ? r.json() : null)),
+      fetch('/api/tts-options').then((r) => (r.ok ? r.json() : null)),
+    ])
+      .then(([aiData, ttsData]) => {
+        if (aiData?.models) setAiModelOptions(aiData.models);
+        if (ttsData?.options)
+          setTtsOptions(ttsData.options.filter((o: { id: string }) => o.id !== 'auto'));
+      })
+      .catch(() => {});
   }, []);
 
   // Taste quiz state
@@ -294,7 +318,9 @@ export function SettingsForm({
           twitterEnabled,
           voicePreferences: voicePrefs,
           preferredTtsProvider: preferredTtsOption ? preferredTtsOption.split(':')[0] : null,
-          preferredTtsModel: preferredTtsOption ? preferredTtsOption.split(':').slice(1).join(':') : null,
+          preferredTtsModel: preferredTtsOption
+            ? preferredTtsOption.split(':').slice(1).join(':')
+            : null,
         }),
       });
       if (response.ok) {
@@ -395,7 +421,9 @@ export function SettingsForm({
               <p className={styles.avatarEmail}>
                 {email}
                 {role !== 'USER' && (
-                  <Badge variant={role === 'ADMIN' ? 'admin' : role === 'SYSTEM' ? 'system' : 'creator'}>
+                  <Badge
+                    variant={role === 'ADMIN' ? 'admin' : role === 'SYSTEM' ? 'system' : 'creator'}
+                  >
                     {role}
                   </Badge>
                 )}
@@ -541,7 +569,8 @@ export function SettingsForm({
         <h2 className={styles.sectionTitle}>Taste Quiz</h2>
         <p className={styles.sectionDesc}>
           Answer quick yes/no questions to improve your recommendations.
-          {quizCount > 0 && ` You\u2019ve answered ${quizCount} question${quizCount !== 1 ? 's' : ''}.`}
+          {quizCount > 0 &&
+            ` You\u2019ve answered ${quizCount} question${quizCount !== 1 ? 's' : ''}.`}
         </p>
 
         {quizActive ? (
@@ -591,7 +620,10 @@ export function SettingsForm({
               <Button
                 variant="ghost"
                 onClick={async () => {
-                  if (!confirm('Reset all quiz answers? This will remove quiz-based interest data.')) return;
+                  if (
+                    !confirm('Reset all quiz answers? This will remove quiz-based interest data.')
+                  )
+                    return;
                   setQuizResetting(true);
                   try {
                     const res = await fetch('/api/taste-quiz', { method: 'DELETE' });
@@ -618,7 +650,12 @@ export function SettingsForm({
         <p className={styles.interestsDescription}>
           Select topics you&apos;re curious about. This helps us recommend better podcasts for you.
         </p>
-        <InterestGrid categories={interestCategories} selectedTagIds={interestIds} customTags={customTags} onChange={handleInterestsChange} />
+        <InterestGrid
+          categories={interestCategories}
+          selectedTagIds={interestIds}
+          customTags={customTags}
+          onChange={handleInterestsChange}
+        />
         <div className={styles.formActions}>
           <Button
             onClick={handleSaveInterests}
@@ -631,7 +668,12 @@ export function SettingsForm({
             <Button
               variant="ghost"
               onClick={async () => {
-                if (!confirm('Clear all grid selections? This only removes manually picked interests — quiz answers are kept.')) return;
+                if (
+                  !confirm(
+                    'Clear all grid selections? This only removes manually picked interests — quiz answers are kept.'
+                  )
+                )
+                  return;
                 setInterestsResetting(true);
                 try {
                   const res = await fetch('/api/users/me', {
@@ -790,8 +832,8 @@ export function SettingsForm({
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>AI Preferences</h2>
           <p className={styles.sectionDesc}>
-            Choose your default AI model for new podcasts. You can override this per-podcast
-            in the creation flow.
+            Choose your default AI model for new podcasts. You can override this per-podcast in the
+            creation flow.
           </p>
           <div className={styles.form}>
             <div className={styles.fieldGroup}>
@@ -808,7 +850,8 @@ export function SettingsForm({
                 <option value="">System default (Auto)</option>
                 {aiModelOptions.map((m) => (
                   <option key={m.id} value={m.id}>
-                    {m.displayName}{m.group ? ` (${m.group})` : ''} &mdash; {m.tier}
+                    {m.displayName}
+                    {m.group ? ` (${m.group})` : ''} &mdash; {m.tier}
                   </option>
                 ))}
               </select>
@@ -856,7 +899,9 @@ export function SettingsForm({
                 your DMs, or see private data. You can disconnect anytime from this page.
               </p>
               <div className={styles.formActions}>
-                <Button onClick={() => signIn('twitter', { callbackUrl: '/settings' })}>Connect Twitter</Button>
+                <Button onClick={() => signIn('twitter', { callbackUrl: '/settings' })}>
+                  Connect Twitter
+                </Button>
               </div>
             </div>
           ) : (
@@ -887,9 +932,7 @@ export function SettingsForm({
                   onChange={(voiceId) => {
                     setVoicePrefs((prev) => {
                       const filtered = prev.filter((v) => v.speaker !== speaker);
-                      return voiceId
-                        ? [...filtered, { speaker, voiceId }]
-                        : filtered;
+                      return voiceId ? [...filtered, { speaker, voiceId }] : filtered;
                     });
                   }}
                   voiceClones={voiceClones}
@@ -916,7 +959,8 @@ export function SettingsForm({
                       <option value="">System default</option>
                       {ttsOptions.map((o) => (
                         <option key={o.id} value={o.id}>
-                          {o.displayName}{o.badge ? ` — ${o.badge}` : ''}
+                          {o.displayName}
+                          {o.badge ? ` — ${o.badge}` : ''}
                         </option>
                       ))}
                     </select>
@@ -960,27 +1004,34 @@ export function SettingsForm({
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Voice Providers</h2>
         <p className={styles.sectionDesc}>
-          Add a voice provider key to remove the daily generation cap and unlock your choice of
-          7 TTS providers. Keys are encrypted with AES-256-GCM.
+          Add a voice provider key to remove the daily generation cap and unlock your choice of 7
+          TTS providers. Keys are encrypted with AES-256-GCM.
         </p>
-        <TtsProviderCards initialConfigured={configuredTtsProviders} providerMeta={ttsProviderMeta} />
+        <TtsProviderCards
+          initialConfigured={configuredTtsProviders}
+          providerMeta={ttsProviderMeta}
+        />
       </section>
 
       {/* Music Providers */}
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Music Providers</h2>
         <p className={styles.sectionDesc}>
-          Add a music provider key to generate AI background music for your podcasts.
-          Keys are encrypted with AES-256-GCM.
+          Add a music provider key to generate AI background music for your podcasts. Keys are
+          encrypted with AES-256-GCM.
         </p>
-        <MusicProviderCards initialConfigured={configuredMusicProviders} providerMeta={musicProviderMeta} />
+        <MusicProviderCards
+          initialConfigured={configuredMusicProviders}
+          providerMeta={musicProviderMeta}
+        />
       </section>
 
       {/* Avatar Images */}
       <section className={styles.section} id="avatar-images">
         <h2 className={styles.sectionTitle}>Avatar Images</h2>
         <p className={styles.sectionDesc}>
-          Manage portrait images for lip-sync models. Verified users can upload their own photos with consent. Share images with other users for collaborative projects.
+          Manage portrait images for lip-sync models. Verified users can upload their own photos
+          with consent. Share images with other users for collaborative projects.
         </p>
         <AvatarImageManager />
       </section>
@@ -989,15 +1040,19 @@ export function SettingsForm({
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Reset Recommendations</h2>
         <p className={styles.sectionDesc}>
-          Start completely fresh. This clears your grid selections, quiz answers,
-          learned preferences, and recommendation history. Your podcasts and saved
-          library are not affected.
+          Start completely fresh. This clears your grid selections, quiz answers, learned
+          preferences, and recommendation history. Your podcasts and saved library are not affected.
         </p>
         <div className={styles.formActions}>
           <Button
             variant="danger"
             onClick={async () => {
-              if (!confirm('Reset all recommendation data? This clears grid selections, quiz answers, learned preferences, and recommendation history. Your podcasts and saved library are not affected.')) return;
+              if (
+                !confirm(
+                  'Reset all recommendation data? This clears grid selections, quiz answers, learned preferences, and recommendation history. Your podcasts and saved library are not affected.'
+                )
+              )
+                return;
               setRecsResetting(true);
               try {
                 const res = await fetch('/api/users/me/recommendations', { method: 'DELETE' });
@@ -1023,24 +1078,23 @@ export function SettingsForm({
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>Referrals</h2>
           <p className={styles.sectionDescription}>
-            Invite friends, get more podcasts. Each verified referral earns you +1 daily generation for 7 days (up to +5).
+            Invite friends, get more podcasts. Each verified referral earns you +1 daily generation
+            for 7 days (up to +5).
           </p>
 
           {referralBonus > 0 && (
             <div className={styles.referralBonus}>
-              +{referralBonus} bonus daily {referralBonus === 1 ? 'generation' : 'generations'} earned
+              +{referralBonus} bonus daily {referralBonus === 1 ? 'generation' : 'generations'}{' '}
+              earned
             </div>
           )}
 
           <div className={styles.referralRow}>
-            <Input
-              value={`sotto.fm/ref/${handle}`}
-              readOnly
-            />
+            <Input value={`${new URL(appBaseUrl).host}/ref/${handle}`} readOnly />
             <Button
               variant="secondary"
               onClick={() => {
-                navigator.clipboard.writeText(`https://sotto.fm/ref/${handle}`);
+                navigator.clipboard.writeText(`${appBaseUrl}/ref/${handle}`);
               }}
             >
               Copy
@@ -1050,7 +1104,8 @@ export function SettingsForm({
           {referredUsers.length > 0 && (
             <div className={styles.referralList}>
               <h3 className={styles.referralListTitle}>
-                {referredUsers.length} {referredUsers.length === 1 ? 'person' : 'people'} joined via your link
+                {referredUsers.length} {referredUsers.length === 1 ? 'person' : 'people'} joined via
+                your link
               </h3>
               <ul className={styles.referralUsers}>
                 {referredUsers.map((user) => (
@@ -1068,14 +1123,15 @@ export function SettingsForm({
                         {(user.name || user.handle || '?')[0].toUpperCase()}
                       </span>
                     )}
-                    <span className={styles.referralName}>
-                      {user.name || `@${user.handle}`}
-                    </span>
+                    <span className={styles.referralName}>{user.name || `@${user.handle}`}</span>
                     <Badge variant={user.verified ? 'success' : 'default'}>
                       {user.verified ? 'Verified' : 'Pending'}
                     </Badge>
                     <span className={styles.referralDate}>
-                      {new Date(user.joinedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                      {new Date(user.joinedAt).toLocaleDateString(undefined, {
+                        month: 'short',
+                        day: 'numeric',
+                      })}
                     </span>
                   </li>
                 ))}

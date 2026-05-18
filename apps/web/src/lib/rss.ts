@@ -1,11 +1,12 @@
 import { createHash, randomBytes } from 'crypto';
 import { prisma } from './prisma';
 import { resolveAudioUrl } from './r2';
+import { getAppBaseUrl } from './urls';
 
 const PRIVATE_FEED_TOKEN_BYTES = 32;
 
 function getAppUrl(): string {
-  return process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || 'http://localhost:3000';
+  return getAppBaseUrl();
 }
 
 function escapeXml(text: string): string {

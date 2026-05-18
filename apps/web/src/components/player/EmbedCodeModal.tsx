@@ -15,7 +15,7 @@ interface EmbedCodeModalProps {
 export function EmbedCodeModal({ isOpen, onClose, podcastId, slug, handle }: EmbedCodeModalProps) {
   const [copied, setCopied] = useState(false);
 
-  const appUrl = typeof window !== 'undefined' ? window.location.origin : 'https://sotto.fm';
+  const appUrl = typeof window !== 'undefined' ? window.location.origin : '';
   const embedPath = slug && handle ? `/@${handle}/${slug}/embed` : `/podcast/${podcastId}/embed`;
 
   const embedCode = `<iframe src="${appUrl}${embedPath}" width="100%" height="160" frameborder="0" allow="autoplay" loading="lazy" style="border-radius:12px;max-width:600px"></iframe>`;

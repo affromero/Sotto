@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { stripe } from '@/lib/stripe';
+import { getAppBaseUrl } from '@/lib/urls';
 
 /**
  * Stripe Connect return URL handler.
@@ -9,7 +10,7 @@ import { stripe } from '@/lib/stripe';
  */
 export async function GET(request: NextRequest) {
   const accountId = request.nextUrl.searchParams.get('account_id');
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://sotto.fm';
+  const baseUrl = getAppBaseUrl();
 
   if (!accountId || !stripe) {
     return NextResponse.redirect(`${baseUrl}/settings/voices?stripe=error`);

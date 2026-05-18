@@ -4,12 +4,17 @@ import { prisma } from '@/lib/prisma';
 import { requireAdmin } from '@/lib/auth-guards';
 import { toggleInvitationSchema } from '@/lib/validations';
 import { errorResponse } from '@/lib/api-response';
+import { getAppBaseUrl } from '@/lib/urls';
 
 function generateInviteCode(): string {
   return crypto.randomBytes(9).toString('base64url').slice(0, 12);
 }
 
-function getInvitationStatus(inv: { usedAt: Date | null; enabled: boolean; expiresAt: Date }): string {
+function getInvitationStatus(inv: {
+  usedAt: Date | null;
+  enabled: boolean;
+  expiresAt: Date;
+}): string {
   if (inv.usedAt) return 'used';
   if (!inv.enabled) return 'disabled';
   if (inv.expiresAt < new Date()) return 'expired';
@@ -33,7 +38,7 @@ export async function POST() {
     },
   });
 
-  const baseUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_URL || 'https://sotto.fm';
+  const baseUrl = getAppBaseUrl();
   const url = `${baseUrl}/invite/${code}`;
 
   return NextResponse.json({ invitation, url }, { status: 201 });
