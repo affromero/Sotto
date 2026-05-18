@@ -223,6 +223,19 @@ describe('private-first OSS surfaces', () => {
     expect(mcpReadme).not.toContain('`https://sotto.fm`');
   });
 
+  it('exposes local agent ingestion through MCP without public visibility controls', () => {
+    const mcpSources = ['packages/mcp/src/server.ts', 'packages/mcp/src/client.ts', 'packages/mcp/README.md']
+      .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
+      .join('\n');
+
+    expect(mcpSources).toContain('ingest_agent_output');
+    expect(mcpSources).toContain('/api/ingest/agent');
+    expect(mcpSources).toContain('tts_provider');
+    expect(mcpSources).toContain('idempotency_key');
+    expect(mcpSources).toContain('never publishes the result publicly');
+    expect(mcpSources).not.toContain('agent_visibility');
+  });
+
   it('requires bot and shared URL helpers to use an explicit deployment URL', () => {
     const runtimeUrlSources = [
       'src/lib/urls.ts',

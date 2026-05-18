@@ -59,6 +59,34 @@ export interface CreatePodcastParams {
   source_url?: string;
 }
 
+export interface IngestAgentOutputParams {
+  title: string;
+  content: string;
+  tts_provider: string;
+  topic?: string;
+  idempotency_key?: string;
+  source_url?: string;
+  duration_minutes?: number;
+  depth?: string;
+  audience_level?: string;
+  tone?: string;
+  focus_areas?: string;
+  agent_provider: string;
+  agent_name: string;
+  agent_model?: string;
+  agent_run_id?: string;
+  ai_model?: string;
+  tts_model?: string;
+}
+
+export interface AgentIngestResult {
+  id: string;
+  status: string;
+  source: 'AGENT';
+  discoveryId?: string;
+  idempotent?: boolean;
+}
+
 export interface UpdatePodcastParams {
   title?: string;
   topic?: string;

@@ -1,4 +1,4 @@
-import type { Podcast, PodcastDetail, UserProfile } from './types.js';
+import type { AgentIngestResult, Podcast, PodcastDetail, UserProfile } from './types.js';
 
 function formatDuration(seconds: number | null): string {
   if (!seconds) return 'N/A';
@@ -70,6 +70,11 @@ export function formatProfile(u: UserProfile): string {
 
 export function formatCreated(result: { id: string; status?: string }): string {
   return `Podcast created!\nID: ${result.id}\nStatus: ${result.status || 'EXTRACTING'}\n\nThe podcast is now being generated. Use get_podcast to check progress.`;
+}
+
+export function formatAgentIngested(result: AgentIngestResult): string {
+  const action = result.idempotent ? 'Agent output already ingested.' : 'Agent output ingested.';
+  return `${action}\nID: ${result.id}\nStatus: ${result.status}\n\nThe private podcast is now in your library pipeline. Use get_podcast to check progress.`;
 }
 
 export function formatDeleted(): string {
