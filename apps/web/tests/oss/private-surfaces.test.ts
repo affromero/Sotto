@@ -1230,6 +1230,38 @@ describe('private-first OSS surfaces', () => {
     expect(sharedEnumsSource).toContain("| 'MEETING'");
   });
 
+  it('keeps workspace connector onboarding private and explicit', () => {
+    const sourceConnectorSource = readSource('src/lib/source-connectors.ts');
+    const sourceConnectorRouteSource = readSource(
+      'src/app/api/source-connectors/readiness/route.ts'
+    );
+    const onboardingSources = [
+      readSource('src/app/onboarding/page.tsx'),
+      readSource('src/app/onboarding/KeySetupForm.tsx'),
+      sourceConnectorSource,
+      sourceConnectorRouteSource,
+      readFileSync(resolve(repoRoot, '.env.example'), 'utf8'),
+    ].join('\n');
+
+    expect(sourceConnectorRouteSource).toContain('authenticateRequest(request)');
+    expect(sourceConnectorRouteSource).toContain("errorResponse('Unauthorized', 401)");
+    expect(sourceConnectorSource).toContain("id: 'slack'");
+    expect(sourceConnectorSource).toContain("id: 'gmail'");
+    expect(sourceConnectorSource).toContain("id: 'claude-code'");
+    expect(sourceConnectorSource).toContain("id: 'codex'");
+    expect(sourceConnectorSource).toContain('google-workspace-cli');
+    expect(sourceConnectorSource).toContain("command: 'gws'");
+    expect(sourceConnectorSource).toContain("command: 'claude'");
+    expect(sourceConnectorSource).toContain("command: 'codex'");
+    expect(sourceConnectorSource).toContain('SLACK_BOT_TOKEN');
+    expect(sourceConnectorSource).toContain('GOOGLE_WORKSPACE_CLI_CREDENTIALS_FILE');
+    expect(onboardingSources).toContain('Private Sources');
+    expect(onboardingSources).toContain('privateOnly: true');
+    expect(onboardingSources).not.toContain("visibility: 'PUBLIC'");
+    expect(onboardingSources).not.toContain('shared content feed');
+    expect(onboardingSources).not.toContain('public workspace connector');
+  });
+
   it('requires explicit provider selection for BYOK key deletion', () => {
     const byokSources = [
       'src/app/api/settings/byok/route.ts',
@@ -1687,9 +1719,7 @@ describe('private-first OSS surfaces', () => {
   it('keeps optional paid voice sharing disabled by default', () => {
     const voiceSettingsRouteSource = readSource('src/app/api/voices/route.ts');
     const voiceCloneRouteSource = readSource('src/app/api/voices/clone/route.ts');
-    const voiceManagerSource = readSource(
-      'src/app/(dashboard)/settings/voices/VoiceManager.tsx'
-    );
+    const voiceManagerSource = readSource('src/app/(dashboard)/settings/voices/VoiceManager.tsx');
     const voiceNotificationSource = readSource('src/lib/notification-utils.ts');
     const defaultVoiceSharingCopySources = [
       'src/app/terms/page.tsx',

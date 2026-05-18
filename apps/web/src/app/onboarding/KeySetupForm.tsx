@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import type { AiProviderClientMeta } from '@/lib/providers/ai-registry';
 import type { TtsProviderClientMeta } from '@/lib/providers/tts-registry';
 import type { SetupCapability, SetupCapabilityId, SetupReadiness } from '@/lib/setup-readiness';
+import type { PrivateSourceConnectorReadiness } from '@/lib/source-connectors';
 import { AiProviderCards } from '@/components/settings/AiProviderCards';
 import {
   PrivateRssFeedManager,
@@ -20,6 +21,7 @@ interface ProviderStatus {
 
 interface KeySetupFormProps {
   setupReadiness: SetupReadiness;
+  sourceConnectors: PrivateSourceConnectorReadiness[];
   initialAiConfigured: Array<ProviderStatus>;
   initialTtsConfigured: Array<ProviderStatus>;
   initialPrivateFeedTokens: PrivateFeedTokenMetadata[];
@@ -44,6 +46,7 @@ function rebuildReadiness(capabilities: SetupCapability[]): SetupReadiness {
 
 export function KeySetupForm({
   setupReadiness,
+  sourceConnectors,
   initialAiConfigured,
   initialTtsConfigured,
   initialPrivateFeedTokens,
@@ -147,6 +150,42 @@ export function KeySetupForm({
           })}
         </div>
       </section>
+
+      <section className={styles.section}>
+        <div className={styles.sectionHeader}>
+          <div className={styles.sectionLabel}>
+            <h2 className={styles.sectionTitle}>Private Sources</h2>
+            <span className={styles.sectionBadgeFree}>Optional</span>
+          </div>
+          <p className={styles.sectionDescription}>
+            Connect user-owned workspace sources and local coding agents without turning Sotto into
+            a shared content network.
+          </p>
+        </div>
+        <div className={styles.connectorGrid}>
+          {sourceConnectors.map((connector) => (
+            <div key={connector.id} className={styles.connectorItem}>
+              <div className={styles.connectorHeader}>
+                <span className={styles.connectorKind}>
+                  {connector.kind === 'local-agent' ? 'Agent' : 'Workspace'}
+                </span>
+                <span
+                  className={
+                    connector.status === 'ready' ? styles.connectorReady : styles.connectorNeeded
+                  }
+                >
+                  {connector.status === 'ready' ? 'Ready' : 'Setup needed'}
+                </span>
+              </div>
+              <span className={styles.connectorTitle}>{connector.label}</span>
+              <span className={styles.connectorDescription}>{connector.description}</span>
+              <span className={styles.connectorDetail}>{connector.detail}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <div className={styles.divider} role="separator" />
 
       <section className={styles.section}>
         <div className={styles.sectionHeader}>
