@@ -15,7 +15,7 @@ const nextConfig = {
     '@auth/prisma-adapter',
     '@auth/core',
     '@sotto/shared',
-    '@sottofm/verification-standard',
+    '@sotto/verification-standard',
     '@sotto/maps',
   ],
   turbopack: {

@@ -37,7 +37,7 @@
     "@sentry/nextjs": "^10.40.0",
     "@sotto/shared": "*",
     "@sotto/video": "*",
-    "@sottofm/verification-standard": "*",
+    "@sotto/verification-standard": "*",
     "@steipete/summarize-core": "^0.11.1",
     "@stripe/react-stripe-js": "^5.6.0",
     "@stripe/stripe-js": "^8.7.0",

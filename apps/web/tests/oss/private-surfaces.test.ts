@@ -626,6 +626,33 @@ describe('private-first OSS surfaces', () => {
     expect(publicLinkSources).not.toContain('https://discord.gg/sotto');
   });
 
+  it('uses the neutral verification workspace namespace', () => {
+    const verificationNamespaceSources = [
+      'apps/web/package.json',
+      'apps/web/next.config.js',
+      'apps/web/src/lib/CLAUDE.md',
+      'apps/web/src/lib/reference-verification/ai-layer.ts',
+      'apps/web/src/lib/reference-verification/grounding.ts',
+	      'apps/web/src/lib/reference-verification/pipeline.ts',
+	      'CLAUDE.md',
+	      'package-lock.json',
+	      'packages/verification-standard/package.json',
+	      'packages/verification-standard/package-lock.json',
+	      'packages/verification-standard/.github/workflows/release.yml',
+	      'packages/verification-standard/README.md',
+      'packages/verification-standard/CONTRIBUTING.md',
+      'packages/verification-standard/CHANGELOG.md',
+      'packages/verification-standard/LICENSE',
+    ]
+      .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
+      .join('\n');
+
+    expect(verificationNamespaceSources).toContain('@sotto/verification-standard');
+    expect(verificationNamespaceSources).not.toContain('@sottofm/verification-standard');
+    expect(verificationNamespaceSources).not.toContain('github.com/SottoFM');
+    expect(verificationNamespaceSources).not.toContain('SottoFM');
+  });
+
   it('keeps security and operations guidance self-host neutral', () => {
     const releaseHygieneSources = [
       'SECURITY.md',
