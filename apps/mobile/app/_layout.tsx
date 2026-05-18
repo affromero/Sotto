@@ -161,7 +161,6 @@ export default function RootLayout() {
                 <Stack.Screen name="podcast/[id]" options={{ headerShown: false }} />
                 <Stack.Screen name="podcast/[id]/edit" options={{ title: 'Edit Podcast' }} />
                 <Stack.Screen name="analytics" options={{ title: 'Analytics' }} />
-                <Stack.Screen name="voices" options={{ title: 'Voice Marketplace' }} />
                 <Stack.Screen name="collections/index" options={{ title: 'Collections' }} />
                 <Stack.Screen name="collections/[id]" options={{ title: '' }} />
               </Stack>
