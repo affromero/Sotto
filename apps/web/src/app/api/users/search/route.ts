@@ -10,26 +10,23 @@ export async function GET(request: NextRequest) {
     return errorResponse('Unauthorized', 401);
   }
 
-  const handle = request.nextUrl.searchParams.get('handle') ?? '';
+  const handle = (request.nextUrl.searchParams.get('handle') ?? '').trim().replace(/^@/, '');
   const parsed = userSearchSchema.safeParse({ handle });
   if (!parsed.success) {
     return errorResponse(parsed.error.errors[0].message, 400);
   }
 
-  const users = await prisma.user.findMany({
-    where: {
-      handle: { contains: parsed.data.handle, mode: 'insensitive' },
-      id: { not: session.user.id },
-    },
+  const user = await prisma.user.findUnique({
+    where: { handle: parsed.data.handle },
     select: {
       id: true,
       handle: true,
-      name: true,
-      image: true,
     },
-    take: 10,
-    orderBy: { handle: 'asc' },
   });
 
-  return NextResponse.json(users);
+  if (!user || user.id === session.user.id) {
+    return NextResponse.json([]);
+  }
+
+  return NextResponse.json([user]);
 }
