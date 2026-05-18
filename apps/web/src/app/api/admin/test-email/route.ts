@@ -4,6 +4,10 @@ import { requireAdmin } from '@/lib/auth-guards';
 import { sendEmail } from '@/lib/email';
 import { errorResponse } from '@/lib/api-response';
 
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 export async function POST() {
   const adminId = await requireAdmin();
   if (!adminId) {
@@ -19,14 +23,14 @@ export async function POST() {
     return errorResponse('Admin email not found', 404);
   }
 
-  const sent = await sendEmail({
-    to: admin.email,
-    subject: 'Sotto — Test Email',
-    html: `<p>This is a test email from Sotto admin panel. If you received this, email delivery is working.</p><p>Sent at: ${new Date().toISOString()}</p>`,
-  });
-
-  if (!sent) {
-    return errorResponse('Email send failed — check RESEND_API_KEY and server logs', 500);
+  try {
+    await sendEmail({
+      to: admin.email,
+      subject: 'Sotto - Test Email',
+      html: `<p>This is a test email from Sotto admin panel. If you received this, email delivery is working.</p><p>Sent at: ${new Date().toISOString()}</p>`,
+    });
+  } catch (error) {
+    return errorResponse(`Email send failed: ${getErrorMessage(error)}`, 502);
   }
 
   return NextResponse.json({ sent: true, to: admin.email });

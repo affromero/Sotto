@@ -1,10 +1,20 @@
 import type { Job } from 'bullmq';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
-import { sendEmail } from '@/lib/email';
+import { EmailDeliveryError, assertEmailDeliveryConfigured, sendEmail } from '@/lib/email';
 import { buildWeeklyDigestEmail } from '@/lib/email-templates';
 import { logger } from '@/lib/logger';
 
-export async function processEmailDigest(job: Job): Promise<{ sent: number; skipped: number }> {
+export interface EmailDigestResult {
+  sent: number;
+  failed: number;
+  total: number;
+}
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+export async function processEmailDigest(job: Job): Promise<EmailDigestResult> {
   logger.info('Starting weekly email digest');
 
   // Get top 5 podcasts from last 7 days by play count
@@ -28,7 +38,7 @@ export async function processEmailDigest(job: Job): Promise<{ sent: number; skip
 
   if (topPodcasts.length === 0) {
     logger.info('No podcasts to include in digest — skipping');
-    return { sent: 0, skipped: 0 };
+    return { sent: 0, failed: 0, total: 0 };
   }
 
   const digestPodcasts = topPodcasts.map((p) => ({
@@ -47,30 +57,57 @@ export async function processEmailDigest(job: Job): Promise<{ sent: number; skip
   });
 
   let sent = 0;
-  let skipped = 0;
+  let failed = 0;
+  const failures: Array<{ email: string; error: string }> = [];
+
+  if (waitlistEntries.length > 0) {
+    assertEmailDeliveryConfigured();
+  }
 
   // Send in batches of 10
   for (let i = 0; i < waitlistEntries.length; i += 10) {
     const batch = waitlistEntries.slice(i, i + 10);
-    const results = await Promise.allSettled(
+    const results = await Promise.all(
       batch.map(async (entry) => {
         const { subject, html } = buildWeeklyDigestEmail(entry.email, digestPodcasts);
-        const success = await sendEmail({ to: entry.email, subject, html });
-        return success;
+        try {
+          await sendEmail({ to: entry.email, subject, html });
+          return { email: entry.email, status: 'sent' as const };
+        } catch (error) {
+          return {
+            email: entry.email,
+            status: 'failed' as const,
+            error: getErrorMessage(error),
+          };
+        }
       })
     );
 
     for (const result of results) {
-      if (result.status === 'fulfilled' && result.value) {
+      if (result.status === 'sent') {
         sent++;
       } else {
-        skipped++;
+        failed++;
+        failures.push({ email: result.email, error: result.error });
       }
     }
 
     await job.updateProgress(Math.round(((i + batch.length) / waitlistEntries.length) * 100));
   }
 
-  logger.info('Weekly email digest complete', { sent, skipped, total: waitlistEntries.length });
-  return { sent, skipped };
+  if (failures.length > 0) {
+    logger.error('Weekly email digest failed for one or more recipients', {
+      sent,
+      failed,
+      total: waitlistEntries.length,
+      failures,
+    });
+    throw new EmailDeliveryError(
+      `Weekly email digest failed for ${failures.length} recipient(s)`,
+      failures
+    );
+  }
+
+  logger.info('Weekly email digest complete', { sent, failed, total: waitlistEntries.length });
+  return { sent, failed, total: waitlistEntries.length };
 }
