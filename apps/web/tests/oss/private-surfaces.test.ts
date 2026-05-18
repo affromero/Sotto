@@ -1603,6 +1603,28 @@ describe('private-first OSS surfaces', () => {
     expect(userLookupSources).not.toContain('Search by @handle');
   });
 
+  it('keeps the optional voice marketplace disabled by default', () => {
+    const voiceMarketplaceSources = [
+      'src/app/voices/page.tsx',
+      'src/app/api/voices/browse/route.ts',
+      'src/app/api/voices/request/route.ts',
+      'src/app/CLAUDE.md',
+    ]
+      .map(readSource)
+      .concat(readFileSync(resolve(repoRoot, 'apps/web/prisma/schema.prisma'), 'utf8'))
+      .join('\n');
+
+    expect(voiceMarketplaceSources).toContain('voiceMarketplaceEnabled Boolean  @default(false)');
+    expect(voiceMarketplaceSources).toContain('getPlanFeatureConfig');
+    expect(voiceMarketplaceSources).toContain("redirect(currentUserId ? '/settings/voices' : '/')");
+    expect(voiceMarketplaceSources).toContain('Voice marketplace is currently unavailable.');
+    expect(voiceMarketplaceSources).toContain('disabled by default');
+    expect(voiceMarketplaceSources).not.toContain(
+      'voiceMarketplaceEnabled Boolean  @default(true)'
+    );
+    expect(voiceMarketplaceSources).not.toContain('Voice marketplace |');
+  });
+
   it('does not ship public profile pages or creator RSS routes', () => {
     const removedPublicProfileFiles = [
       'src/app/profile/[userId]/ProfileClient.tsx',
