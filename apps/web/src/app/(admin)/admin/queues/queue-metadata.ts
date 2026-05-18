@@ -77,7 +77,7 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
     stage: 'Interactions',
   },
   'twitter-mentions': {
-    description: 'Polls Twitter for @SottoFM mentions',
+    description: 'Polls Twitter for configured bot mentions',
     stage: 'Social',
   },
   'twitter-reply': {

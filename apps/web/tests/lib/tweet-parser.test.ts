@@ -125,7 +125,7 @@ describe('parseTweetIntent', () => {
       model: 'claude-haiku-4-5-20251001',
     });
 
-    await parseTweetIntent('@sottofm test topic');
+    await parseTweetIntent('@podbot test topic');
 
     expect(mockGenerateResponse).toHaveBeenCalledWith(
       expect.any(String),
@@ -140,7 +140,7 @@ describe('parseTweetIntent', () => {
   it('requires a user AI key when no local model is selected', async () => {
     mockGetAiKey.mockResolvedValue(null);
 
-    await expect(parseTweetIntent('@sottofm test topic')).rejects.toThrow(
+    await expect(parseTweetIntent('@podbot test topic')).rejects.toThrow(
       'AI key or explicit local AI model is required to parse tweets.'
     );
   });
@@ -162,7 +162,7 @@ describe('parseTweetIntent', () => {
       model: 'gpt-5-mini',
     });
 
-    await parseTweetIntent('@sottofm test topic', undefined, { aiModel: 'gpt-5-mini' });
+    await parseTweetIntent('@podbot test topic', undefined, { aiModel: 'gpt-5-mini' });
 
     expect(mockGetAiKey).toHaveBeenCalledWith('user-1', 'openai');
     expect(mockGenerateResponse).toHaveBeenCalledWith(
@@ -193,7 +193,7 @@ describe('parseTweetIntent', () => {
       model: 'claude-code:sonnet',
     });
 
-    await parseTweetIntentRaw('@sottofm test topic', undefined, { aiModel: 'claude-code:sonnet' });
+    await parseTweetIntentRaw('@podbot test topic', undefined, { aiModel: 'claude-code:sonnet' });
 
     expect(mockGetAiKey).not.toHaveBeenCalled();
     expect(mockGenerateResponse).toHaveBeenCalledWith(
@@ -228,7 +228,7 @@ describe('parseTweetIntent', () => {
       });
 
       const result = await parseTweetIntent(
-        '@sottofm explain quantum computing basics'
+        '@podbot explain quantum computing basics'
       );
 
       expect(result).toEqual(mockResult);
@@ -253,7 +253,7 @@ describe('parseTweetIntent', () => {
         model: 'test-model',
       });
 
-      const tweetText = '@sottofm can you elaborate on this?';
+      const tweetText = '@podbot can you elaborate on this?';
       const parentTweetText = 'AI is changing healthcare rapidly';
 
       const result = await parseTweetIntent(tweetText, parentTweetText);
@@ -282,7 +282,7 @@ describe('parseTweetIntent', () => {
         model: 'test-model',
       });
 
-      const result = await parseTweetIntent('@sottofm blockchain basics');
+      const result = await parseTweetIntent('@podbot blockchain basics');
 
       expect(result).toEqual(mockResult);
     });
@@ -306,7 +306,7 @@ describe('parseTweetIntent', () => {
         model: 'test-model',
       });
 
-      const result = await parseTweetIntent('@sottofm machine learning intro');
+      const result = await parseTweetIntent('@podbot machine learning intro');
 
       expect(result).toEqual(mockResult);
     });
@@ -330,7 +330,7 @@ describe('parseTweetIntent', () => {
         model: 'test-model',
       });
 
-      const result = await parseTweetIntent('@sottofm mars mission details');
+      const result = await parseTweetIntent('@podbot mars mission details');
 
       expect(result).toEqual(mockResult);
     });
@@ -346,7 +346,7 @@ describe('parseTweetIntent', () => {
       });
 
       await expect(
-        parseTweetIntent('@sottofm some topic')
+        parseTweetIntent('@podbot some topic')
       ).rejects.toThrow('Failed to parse tweet intent — LLM returned invalid JSON');
     });
 
@@ -367,7 +367,7 @@ describe('parseTweetIntent', () => {
       });
 
       await expect(
-        parseTweetIntent('@sottofm some topic')
+        parseTweetIntent('@podbot some topic')
       ).rejects.toThrow('Failed to extract topic and title from tweet');
     });
 
@@ -388,7 +388,7 @@ describe('parseTweetIntent', () => {
       });
 
       await expect(
-        parseTweetIntent('@sottofm some topic')
+        parseTweetIntent('@podbot some topic')
       ).rejects.toThrow('Failed to extract topic and title from tweet');
     });
 
@@ -408,7 +408,7 @@ describe('parseTweetIntent', () => {
       });
 
       await expect(
-        parseTweetIntent('@sottofm some topic')
+        parseTweetIntent('@podbot some topic')
       ).rejects.toThrow('Failed to extract topic and title from tweet');
     });
   });
@@ -435,7 +435,7 @@ describe('parseTweetIntent', () => {
       });
 
       const result = await parseTweetIntent(
-        '@sottofm https://example.com/solar-power discuss this article'
+        '@podbot https://example.com/solar-power discuss this article'
       );
 
       expect(result.sourceUrl).toBe('https://example.com/solar-power');
@@ -461,7 +461,7 @@ describe('parseTweetIntent', () => {
       });
 
       const result = await parseTweetIntent(
-        '@sottofm teach me cooking basics 🍳👨‍🍳'
+        '@podbot teach me cooking basics 🍳👨‍🍳'
       );
 
       expect(result.tone).toBe('casual');
@@ -487,7 +487,7 @@ describe('parseTweetIntent', () => {
       });
 
       const result = await parseTweetIntent(
-        '@sottofm deep dive into quantum field theory renormalization and gauge symmetry breaking'
+        '@podbot deep dive into quantum field theory renormalization and gauge symmetry breaking'
       );
 
       expect(result.depth).toBe('deep_dive');
@@ -533,7 +533,7 @@ function createMockThread(overrides?: Partial<ThreadData>): ThreadData {
       },
       {
         id: 'reply-3',
-        text: '@sottofm make a podcast about this debate',
+        text: '@podbot make a podcast about this debate',
         authorId: 'author-4',
         authorUsername: 'dave',
         authorName: 'Dave',
@@ -552,7 +552,7 @@ function createMockThread(overrides?: Partial<ThreadData>): ThreadData {
 function createMockMentionTweet(overrides?: Partial<ThreadTweet>): ThreadTweet {
   return {
     id: 'reply-3',
-    text: '@sottofm make a podcast about this debate',
+    text: '@podbot make a podcast about this debate',
     authorId: 'author-4',
     authorUsername: 'dave',
     authorName: 'Dave',
@@ -649,7 +649,7 @@ describe('parseThreadIntent', () => {
         },
         {
           id: 'r3',
-          text: '@sottofm make this a podcast',
+          text: '@podbot make this a podcast',
           authorId: 'a4',
           authorUsername: 'dave',
           authorName: 'Dave',

@@ -13,6 +13,7 @@ import { CommandPaletteLoader } from '@/components/ui/CommandPaletteLoader';
 import { ImpersonationBanner } from '@/components/layout/ImpersonationBanner';
 import { THEME_INIT_SCRIPT } from '@/lib/theme-script';
 import { getAppBaseUrl } from '@/lib/urls';
+import { getTwitterBotHandle } from '@/lib/bot-identity';
 import '@/styles/globals.css';
 
 const dmSerifDisplay = DM_Serif_Display({
@@ -29,6 +30,7 @@ const inter = Inter({
 });
 
 const appBaseUrl = getAppBaseUrl();
+const twitterSite = getTwitterBotHandle();
 
 export const metadata: Metadata = {
   metadataBase: new URL(appBaseUrl),
@@ -51,7 +53,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    site: BRAND.twitter,
+    ...(twitterSite ? { site: twitterSite } : {}),
     title: BRAND.title,
     description: BRAND.description,
   },

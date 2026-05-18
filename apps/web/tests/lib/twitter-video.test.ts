@@ -20,7 +20,7 @@ import type { TwitterTweet, TwitterMedia } from '@/types/twitter';
 function makeTweet(overrides: Partial<TwitterTweet> = {}): TwitterTweet {
   return {
     id: 'tweet-1',
-    text: '@sottofm check this out',
+    text: '@podbot check this out',
     author_id: 'user-1',
     created_at: '2026-02-26T00:00:00Z',
     ...overrides,

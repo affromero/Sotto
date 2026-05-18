@@ -5,9 +5,9 @@ import type { AiProviderId } from './providers/ai-registry';
 import { logUsage } from './usage-logger';
 import { logger } from './logger';
 import { isRetweet } from './twitter-utils';
+import { stripTwitterBotMentions } from './bot-identity';
 import type { TwitterTweet, TwitterAuthorData } from '@/types/twitter';
 
-const SOTTO_HANDLE_RE = /@sottofm/gi;
 const REDIS_RATE_PREFIX = 'twitter:mention_rate:';
 const RATE_LIMIT_MAX = 5;
 const RATE_LIMIT_WINDOW_S = 3600; // 1 hour
@@ -34,7 +34,7 @@ export interface MentionFilterOptions {
  *
  * Layer 1 — Structural (free, no API calls):
  *   - Skip retweets
- *   - Skip empty mentions (just "@sottofm" with no content, no parent tweet, no images)
+ *   - Skip empty mentions with no content, no parent tweet, and no images
  *
  * Layer 2 — Rate limit (Redis):
  *   - Max 5 mentions per author per hour (prevents bot floods)
@@ -58,7 +58,7 @@ export async function filterMention(
     return { verdict: 'skip_retweet', reason: 'Retweet — not a direct mention' };
   }
 
-  const stripped = tweet.text.replace(SOTTO_HANDLE_RE, '').trim();
+  const stripped = stripTwitterBotMentions(tweet.text);
   if (stripped.length === 0 && !hasParentTweet && !hasImages) {
     return { verdict: 'skip_empty', reason: 'Empty mention — no topic, no parent tweet, no images' };
   }

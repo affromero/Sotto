@@ -16,7 +16,7 @@ BullMQ workers that process async jobs. Each worker runs in a separate thread wi
 | `segment-regeneration` | `segment-regeneration` | 2           | Text → TTS via `resolveTtsProvider` (matches podcast voice + provider config) → transactional insert → re-stitch | Queues audio-stitching (`skipSfx`), marks INCORPORATED                                 |
 | `notification`         | `notifications`        | 5           | User + message → in-app + push                                                                                   | Creates Notification + sends push                                                      |
 | `pdf-generation`       | `pdf-generation`       | 2           | Podcast → pdfmake PDF → R2 upload                                                                                | Sets Podcast.pdfUrl                                                                    |
-| `twitter-mentions`     | `twitter-mentions`     | 1           | Poll @sottofm mentions → parse intent → create podcast                                                           | Creates TweetMention + Podcast, kicks off pipeline                                     |
+| `twitter-mentions`     | `twitter-mentions`     | 1           | Poll configured Twitter bot mentions → parse intent → create podcast                                             | Creates TweetMention + Podcast, kicks off pipeline                                     |
 | `twitter-reply`        | `twitter-reply`        | 2           | Podcast ready → compose reply → post to Twitter                                                                  | Updates TweetMention.status to REPLIED                                                 |
 | `twitter-auto-tweet`   | `twitter-auto-tweet`   | 1           | Podcast ID + trigger → interpolate template → post tweet                                                         | Updates TwitterAutoTweet record (tweetId, status)                                      |
 | `twitter-trend-poll`   | `twitter-trend-poll`   | 1           | Poll trending tweets → score + deduplicate → create podcast as @sotto                                            | Creates Podcast + TwitterAutoTweet, kicks off pipeline                                 |
@@ -58,7 +58,7 @@ content-extraction → script-generation → script-verification ──→ refer
                                               └───────┘                            for user review         (on-demand)            telegram-reply (if TELEGRAM)
                                                                                    TWITTER/API/TELEGRAM: auto-approve
 
-twitter-mentions (repeatable, every 60s) → polls @sottofm → creates Podcast → kicks off pipeline above
+twitter-mentions (repeatable, every 60s) → polls configured bot mentions → creates Podcast → kicks off pipeline above
 twitter-trend-poll (repeatable, every 2hrs) → searches trending tweets → creates Podcast as @sotto → kicks off pipeline above
 admin-thread-to-podcast (on-demand) → fetches thread → creates Podcast as @sotto → kicks off pipeline above
 twitter-auto-tweet (on-demand) → interpolates template → posts tweet → updates TwitterAutoTweet record

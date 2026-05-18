@@ -97,7 +97,7 @@ const entries: ChangelogEntry[] = [
     date: '2026-01-28',
     title: 'Telegram Bot',
     description:
-      'Generate podcasts by messaging @SottoFMBot on Telegram. Send a topic or a URL and get a podcast link back — the full pipeline runs automatically.',
+      'Generate podcasts by messaging your configured Telegram bot. Send a topic or a URL and get a podcast link back — the full pipeline runs automatically.',
     tags: ['feature'],
   },
   {
@@ -109,9 +109,9 @@ const entries: ChangelogEntry[] = [
   },
   {
     date: '2026-01-18',
-    title: 'Twitter Bot (@SottoFM)',
+    title: 'Twitter Bot',
     description:
-      'Tag @sottofm on Twitter to generate a podcast from any tweet or thread. Automatic replies with the podcast link once generation completes.',
+      'Tag your configured Twitter bot to generate a podcast from any tweet or thread. Automatic replies with the podcast link once generation completes.',
     tags: ['feature'],
   },
   {

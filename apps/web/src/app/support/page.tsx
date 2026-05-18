@@ -99,7 +99,7 @@ export default function SupportPage() {
               <p>
                 You can create a podcast from any topic, article URL, or YouTube video.
                 Sotto automatically extracts transcripts from YouTube — even from videos
-                without captions. If you tweet a video at @sottofm, we&apos;ll transcribe
+                without captions. If you tweet a video at your configured Twitter bot, we&apos;ll transcribe
                 the video and use it as source material too.
               </p>
             </div>

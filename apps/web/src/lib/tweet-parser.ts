@@ -97,7 +97,7 @@ async function getProviderForParsing(
 const SYSTEM_PROMPT = loadPrompt('social/tweet-parser.md');
 
 /**
- * Parse a tweet mentioning @sottofm into structured podcast generation metadata.
+ * Parse a tweet mentioning the configured Twitter bot into structured podcast generation metadata.
  * Uses the user's configured AI provider or an explicitly selected local model.
  */
 export async function parseTweetIntent(
@@ -181,7 +181,7 @@ function formatThreadForParsing(thread: ThreadData): string {
 }
 
 /**
- * Parse a full thread mentioning @sottofm into structured podcast metadata.
+ * Parse a full thread mentioning the configured Twitter bot into structured podcast metadata.
  * Analyzes the entire conversation for viewpoints, URLs, and debate detection.
  */
 export async function parseThreadIntent(
