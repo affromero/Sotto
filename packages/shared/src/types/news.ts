@@ -1,4 +1,11 @@
-export const NEWS_CATEGORIES = ['tech', 'science', 'politics', 'business', 'world', 'culture'] as const;
+export const NEWS_CATEGORIES = [
+  'tech',
+  'science',
+  'politics',
+  'business',
+  'world',
+  'culture',
+] as const;
 export type NewsCategory = (typeof NEWS_CATEGORIES)[number];
 
 export const NEWS_CATEGORY_LABELS: Record<NewsCategory, string> = {
@@ -19,8 +26,6 @@ export interface NewsArticle {
   category: string | null;
   pubDate: string | null;
   relatedPodcastId?: string;
-  relatedPodcastSlug?: string;
-  relatedUserHandle?: string;
 }
 
 export interface NewsMeta {

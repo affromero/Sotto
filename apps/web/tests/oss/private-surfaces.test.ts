@@ -149,6 +149,26 @@ describe('private-first OSS surfaces', () => {
     expect(creatorMetricsSource).not.toContain("THEN 'feed'");
   });
 
+  it('keeps news briefing links authenticated and owner-scoped', () => {
+    const newsRouteSource = readSource('src/app/api/news/route.ts');
+    const newsCardSource = readSource('src/components/feed/NewsCard.tsx');
+    const newsTypesSource = readFileSync(
+      resolve(repoRoot, 'packages/shared/src/types/news.ts'),
+      'utf8'
+    );
+    const newsSources = [newsRouteSource, newsCardSource, newsTypesSource].join('\n');
+
+    expect(newsRouteSource).toContain('authenticateRequest(request)');
+    expect(newsRouteSource).toContain("errorResponse('Unauthorized', 401)");
+    expect(newsRouteSource).toContain('userId: authResult.userId');
+    expect(newsRouteSource).toContain('podcastId: true');
+    expect(newsRouteSource).toContain('checkRateLimit(`news:${authResult.userId}`');
+    expect(newsRouteSource).not.toContain('Public browsable news feed');
+    expect(newsRouteSource).not.toContain('user: { select: { handle: true } }');
+    expect(newsSources).not.toContain('relatedUserHandle');
+    expect(newsSources).not.toContain('relatedPodcastSlug');
+  });
+
   it('does not keep public feed contracts in mobile, shared, or MCP packages', () => {
     const mobileSources = ['apps/mobile/app/(tabs)/index.tsx', 'apps/mobile/app/(tabs)/search.tsx']
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
