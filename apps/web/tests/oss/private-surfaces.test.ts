@@ -567,12 +567,14 @@ describe('private-first OSS surfaces', () => {
       'SECURITY.md',
       'scripts/generate-apple-secret.mjs',
       'docs/05-plan.md',
+      'docs/10-stripe-billing.md',
       'docs/23-local-development.md',
       'docs/27-launch-readiness-status.md',
       'apps/maps/CLAUDE.md',
       'apps/web/scripts/test-runway-browser.ts',
       'apps/web/scripts/test-runway-native.ts',
       'apps/web/src/app/(admin)/admin/storage/page.tsx',
+      'apps/web/src/lib/CLAUDE.md',
       'apps/web/src/lib/providers/video.ts',
       'packages/maps/CLAUDE.md',
       'packages/maps/README.md',
@@ -584,6 +586,8 @@ describe('private-first OSS surfaces', () => {
     expect(releaseHygieneSources).toContain('AUTH_SECRET="<generated>"');
     expect(releaseHygieneSources).toContain('SOTTO_ENV_FILE');
     expect(releaseHygieneSources).toContain('scripts/run-with-env.sh');
+    expect(releaseHygieneSources).toContain('deployment secret manager or env file');
+    expect(releaseHygieneSources).toContain('| Environment |');
     expect(releaseHygieneSources).not.toContain('security@sotto.fm');
     expect(releaseHygieneSources).not.toContain('sotto.fm/api');
     expect(releaseHygieneSources).not.toContain('NEXTAUTH_SECRET');
@@ -595,6 +599,8 @@ describe('private-first OSS surfaces', () => {
     expect(releaseHygieneSources).not.toContain('maps.sotto.fm');
     expect(releaseHygieneSources).not.toContain('All managed via Doppler');
     expect(releaseHygieneSources).not.toContain('Env vars (Doppler)');
+    expect(releaseHygieneSources).not.toContain('through Doppler');
+    expect(releaseHygieneSources).not.toContain('| Doppler |');
   });
 
   it('keeps server deployment self-hosted and env-file driven', () => {
