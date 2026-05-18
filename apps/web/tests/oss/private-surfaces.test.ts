@@ -1604,19 +1604,40 @@ describe('private-first OSS surfaces', () => {
   });
 
   it('keeps the optional voice marketplace disabled by default', () => {
+    const voiceSettingsRouteSource = readSource('src/app/api/voices/route.ts');
+    const voiceCloneRouteSource = readSource('src/app/api/voices/clone/route.ts');
+    const voiceManagerSource = readSource(
+      'src/app/(dashboard)/settings/voices/VoiceManager.tsx'
+    );
     const voiceMarketplaceSources = [
       'src/app/voices/page.tsx',
-      'src/app/api/voices/browse/route.ts',
       'src/app/api/voices/request/route.ts',
       'src/app/CLAUDE.md',
     ]
       .map(readSource)
-      .concat(readFileSync(resolve(repoRoot, 'apps/web/prisma/schema.prisma'), 'utf8'))
+      .concat(
+        voiceSettingsRouteSource,
+        voiceCloneRouteSource,
+        voiceManagerSource,
+        readSource('src/app/api/voices/browse/route.ts'),
+        readFileSync(resolve(repoRoot, 'apps/web/prisma/schema.prisma'), 'utf8')
+      )
       .join('\n');
 
     expect(voiceMarketplaceSources).toContain('voiceMarketplaceEnabled Boolean  @default(false)');
     expect(voiceMarketplaceSources).toContain('getPlanFeatureConfig');
     expect(voiceMarketplaceSources).toContain("redirect(currentUserId ? '/settings/voices' : '/')");
+    expect(voiceSettingsRouteSource).toContain(
+      'voiceMarketplaceEnabled: voiceConfig.voiceMarketplaceEnabled'
+    );
+    expect(voiceManagerSource).toContain(
+      'setVoiceMarketplaceEnabled(voiceData.voiceMarketplaceEnabled ?? false)'
+    );
+    expect(voiceManagerSource.indexOf('{voiceMarketplaceEnabled && (')).toBeLessThan(
+      voiceManagerSource.indexOf('Stripe Payouts')
+    );
+    expect(voiceCloneRouteSource).toContain('const enablesMarketplaceListing');
+    expect(voiceCloneRouteSource).toContain('requestable === true');
     expect(voiceMarketplaceSources).toContain('Voice marketplace is currently unavailable.');
     expect(voiceMarketplaceSources).toContain('disabled by default');
     expect(voiceMarketplaceSources).not.toContain(
