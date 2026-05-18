@@ -75,7 +75,7 @@ STRIPE_WEBHOOK_SECRET=
 STRIPE_MANAGED_HOSTING_PRICE_ID=
 ```
 
-Hosted deployments may manage these through Doppler or another secret manager. Local OSS setup should keep `PAYMENT_PROVIDER=none`.
+Managed or self-hosted deployments can provide these through any deployment secret manager or env file. Local OSS setup should keep `PAYMENT_PROVIDER=none`.
 
 ---
 
