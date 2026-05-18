@@ -1583,6 +1583,26 @@ describe('private-first OSS surfaces', () => {
     expect(userValidationSources).not.toContain("'following'");
   });
 
+  it('keeps voice sharing user lookup explicit instead of directory-style search', () => {
+    const userSearchRouteSource = readSource('src/app/api/users/search/route.ts');
+    const voiceManagerSource = readSource('src/app/(dashboard)/settings/voices/VoiceManager.tsx');
+    const validationSource = readSource('src/lib/validations.ts');
+    const userLookupSources = [userSearchRouteSource, voiceManagerSource, validationSource].join(
+      '\n'
+    );
+
+    expect(userSearchRouteSource).toContain('prisma.user.findUnique');
+    expect(userSearchRouteSource).toContain('where: { handle: parsed.data.handle }');
+    expect(userSearchRouteSource).toContain('select: {');
+    expect(userSearchRouteSource).toContain('handle: true');
+    expect(validationSource).toContain('handle: handleSchema');
+    expect(voiceManagerSource).toContain('Enter exact handle');
+    expect(userLookupSources).not.toContain('prisma.user.findMany');
+    expect(userLookupSources).not.toContain('contains: parsed.data.handle');
+    expect(userLookupSources).not.toContain("mode: 'insensitive'");
+    expect(userLookupSources).not.toContain('Search by @handle');
+  });
+
   it('does not ship public profile pages or creator RSS routes', () => {
     const removedPublicProfileFiles = [
       'src/app/profile/[userId]/ProfileClient.tsx',

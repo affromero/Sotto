@@ -39,8 +39,6 @@ interface AllowlistEntry {
 interface UserSearchResult {
   id: string;
   handle: string | null;
-  name: string | null;
-  image: string | null;
 }
 
 export function VoiceManager() {
@@ -140,7 +138,7 @@ export function VoiceManager() {
   async function handleSearchUsers(query: string) {
     setSearchQuery(query);
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
-    if (query.length < 2) {
+    if (query.replace(/^@/, '').length < 3) {
       setSearchResults([]);
       return;
     }
@@ -823,7 +821,7 @@ export function VoiceManager() {
                         className={styles.nameInput}
                         value={searchQuery}
                         onChange={(e) => handleSearchUsers(e.target.value)}
-                        placeholder="Search by @handle..."
+                        placeholder="Enter exact handle..."
                         disabled={addingToAllowlist}
                       />
                       {searching && <span className={styles.spinnerSmall} />}
@@ -841,7 +839,6 @@ export function VoiceManager() {
                             disabled={addingToAllowlist || !user.handle}
                           >
                             <span className={styles.searchHandle}>@{user.handle}</span>
-                            {user.name && <span className={styles.searchName}>{user.name}</span>}
                           </button>
                         ))}
                       </div>

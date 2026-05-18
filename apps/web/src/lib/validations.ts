@@ -386,14 +386,14 @@ export const updateVoiceRequestSchema = z.object({
  */
 export const addToAllowlistSchema = z.object({
   voiceCloneId: z.string().min(1),
-  handle: z.string().min(3).max(30),
+  handle: handleSchema,
 });
 
 /**
- * User search validation
+ * Explicit user handle lookup validation
  */
 export const userSearchSchema = z.object({
-  handle: z.string().min(2).max(30),
+  handle: handleSchema,
 });
 
 /**
