@@ -1,4 +1,10 @@
-export type SetupCapabilityId = 'database' | 'queue' | 'storage' | 'generation' | 'tts' | 'private-rss';
+export type SetupCapabilityId =
+  | 'database'
+  | 'queue'
+  | 'storage'
+  | 'generation'
+  | 'tts'
+  | 'private-rss';
 
 export type SetupCapabilityStatus = 'ready' | 'action_required';
 
@@ -34,6 +40,7 @@ interface BuildSetupReadinessInput {
   privateFeedTokenCount: number;
   selectedAiProvider?: string | null;
   selectedTtsProvider?: string | null;
+  claudeCodeAvailable?: boolean;
   env?: Record<string, string | undefined>;
 }
 
@@ -96,8 +103,9 @@ export function buildSetupReadiness(input: BuildSetupReadinessInput): SetupReadi
   const storageProviderKnown = isKnownStorageProvider(storageProvider);
   const selectedAiProvider = normalizeAiProvider(input.selectedAiProvider || env.AI_PROVIDER);
   const selectedTtsProvider = input.selectedTtsProvider || env.TTS_PROVIDER || null;
+  const claudeCodeSelected = selectedAiProvider === 'claude-code';
   const aiReady =
-    selectedAiProvider === 'claude-code' ||
+    (claudeCodeSelected && input.claudeCodeAvailable === true) ||
     hasValidProvider(input.aiProviders, selectedAiProvider) ||
     hasPlatformProvider(env, AI_PLATFORM_KEYS, selectedAiProvider);
   const ttsReady =
@@ -148,7 +156,9 @@ export function buildSetupReadiness(input: BuildSetupReadinessInput): SetupReadi
         ? selectedAiProvider
           ? `${selectedAiProvider} selected`
           : 'Generation provider configured'
-        : 'Add an AI key or choose a local agent.',
+        : claudeCodeSelected
+          ? "Install and authenticate the 'claude' CLI for Claude Code."
+          : 'Add an AI key or choose a local agent.',
     },
     {
       id: 'tts',
@@ -178,7 +188,8 @@ export function buildSetupReadiness(input: BuildSetupReadinessInput): SetupReadi
   ];
 
   const readyCount = capabilities.filter((capability) => capability.status === 'ready').length;
-  const nextAction = capabilities.find((capability) => capability.status === 'action_required') ?? null;
+  const nextAction =
+    capabilities.find((capability) => capability.status === 'action_required') ?? null;
 
   return {
     ready: readyCount === capabilities.length,

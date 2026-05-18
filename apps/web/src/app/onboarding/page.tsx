@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { auth } from '@/lib/auth';
 import { listAiProviders, listByokProviders } from '@/lib/byok';
+import { isClaudeAvailable } from '@/lib/claude-code-client';
 import { prisma } from '@/lib/prisma';
 import { getAllAiProviderClientMeta } from '@/lib/providers/ai-registry';
 import { getAllTtsProviderClientMeta } from '@/lib/providers/tts-registry';
@@ -60,9 +61,7 @@ export default async function OnboardingPage() {
         <div className={styles.container}>
           <header className={styles.header}>
             <h1 className={styles.title}>What should we call you?</h1>
-            <p className={styles.subtitle}>
-              This is how you&apos;ll appear on Sotto.
-            </p>
+            <p className={styles.subtitle}>This is how you&apos;ll appear on Sotto.</p>
           </header>
 
           <NameStep />
@@ -86,6 +85,10 @@ export default async function OnboardingPage() {
       },
     }),
   ]);
+  const selectedAiProvider = user.preferredAiModel || process.env.AI_PROVIDER;
+  const claudeCodeAvailable = selectedAiProvider?.startsWith('claude-code')
+    ? await isClaudeAvailable()
+    : false;
 
   const setupReadiness = buildSetupReadiness({
     hasDatabase: true,
@@ -96,6 +99,7 @@ export default async function OnboardingPage() {
     privateFeedTokenCount: privateFeedTokens.length,
     selectedAiProvider: user.preferredAiModel,
     selectedTtsProvider: user.preferredTtsProvider,
+    claudeCodeAvailable,
   });
 
   return (
