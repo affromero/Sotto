@@ -70,6 +70,7 @@ export async function GET(request: NextRequest) {
         priceInCents: true,
         createdAt: true,
         externalVoiceId: true,
+        provider: true,
         verificationStatus: true,
         user: {
           select: {
@@ -139,6 +140,7 @@ export async function GET(request: NextRequest) {
       priceInCents: v.priceInCents,
       createdAt: v.createdAt.toISOString(),
       externalVoiceId: v.externalVoiceId,
+      provider: v.provider,
       owner: {
         id: v.user.id,
         name: v.user.name,

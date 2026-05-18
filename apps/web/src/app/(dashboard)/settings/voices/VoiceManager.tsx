@@ -8,6 +8,7 @@ import { useAudioRecorder } from '@/lib/hooks/useAudioRecorder';
 interface VoiceClone {
   id: string;
   name: string;
+  provider: string;
   description: string | null;
   externalVoiceId: string;
   sourceType: 'UPLOAD' | 'RECORD' | 'IMPORT';
@@ -416,7 +417,7 @@ export function VoiceManager() {
     }
   }
 
-  async function handlePreviewById(voiceId: string) {
+  async function handlePreviewById(voiceId: string, provider: string) {
     const trimmedId = voiceId.trim();
     const trimmedText = previewText.trim();
     if (!trimmedId || !trimmedText) return;
@@ -430,7 +431,7 @@ export function VoiceManager() {
       const res = await fetch('/api/voices/preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ voiceId: trimmedId, text: trimmedText }),
+        body: JSON.stringify({ voiceId: trimmedId, text: trimmedText, provider }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -473,7 +474,7 @@ export function VoiceManager() {
     }
   }
 
-  async function handlePlayPreview(externalVoiceId: string) {
+  async function handlePlayPreview(externalVoiceId: string, provider: string) {
     try {
       if (audioRef.current) {
         audioRef.current.pause();
@@ -489,6 +490,7 @@ export function VoiceManager() {
         body: JSON.stringify({
           voiceId: externalVoiceId,
           text: 'Hello, this is a preview of my cloned voice on Sotto.',
+          provider,
         }),
       });
 
@@ -766,7 +768,7 @@ export function VoiceManager() {
                     <button
                       type="button"
                       className={styles.playButton}
-                      onClick={() => handlePlayPreview(voice.externalVoiceId)}
+                      onClick={() => handlePlayPreview(voice.externalVoiceId, voice.provider)}
                       disabled={playing === voice.externalVoiceId}
                       aria-label={`Preview ${voice.name}`}
                     >
@@ -1154,7 +1156,7 @@ export function VoiceManager() {
                   <button
                     type="button"
                     className={styles.previewButton}
-                    onClick={() => handlePreviewById(elImportVoiceId)}
+                    onClick={() => handlePreviewById(elImportVoiceId, 'elevenlabs')}
                     disabled={previewing || !elImportVoiceId.trim() || !previewText.trim()}
                     aria-label="Preview voice"
                   >
