@@ -1424,6 +1424,7 @@ describe('private-first OSS surfaces', () => {
     expect(maestroSources).not.toContain('feed-sort-');
     expect(maestroSources).not.toContain('search-mode-people');
     expect(maestroSources).not.toContain('comments-section');
+    expect(maestroSources).not.toContain('player-like-button');
     expect(maestroSources).not.toContain('player-fork-button');
     expect(maestroSources).not.toContain('fork-angle-input');
     expect(maestroSources).not.toContain('user-profile-follow-button');
