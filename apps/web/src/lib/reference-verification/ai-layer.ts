@@ -2,8 +2,8 @@ import { createAIProvider } from '@/lib/providers/ai';
 import { loadPrompt } from '@/lib/prompt-loader';
 import { logUsage } from '@/lib/usage-logger';
 import { logger } from '@/lib/logger';
-import type { ContentDomain } from '@sottofm/verification-standard';
-import { DOMAIN_CONFIGS } from '@sottofm/verification-standard';
+import type { ContentDomain } from '@sotto/verification-standard';
+import { DOMAIN_CONFIGS } from '@sotto/verification-standard';
 import type { ReferenceInput, VerificationCheck } from '@/lib/reference-validator';
 import type { ClaimContext } from './claim-extractor';
 

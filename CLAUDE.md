@@ -38,7 +38,7 @@ npm workspaces:
 - `@sotto/shared` in `packages/shared/`
 - `@sotto/maps` in `packages/maps/`
 - `@sotto/mcp` in `packages/mcp/`
-- `@sottofm/verification-standard` in `packages/verification-standard/`
+- `@sotto/verification-standard` in `packages/verification-standard/`
 - `@sotto/remotion-service` in `services/remotion/`
 
 Root `package.json` proxies the main web commands to `@sotto/web`. Each major directory has its own `CLAUDE.md`; follow the closest applicable file.
