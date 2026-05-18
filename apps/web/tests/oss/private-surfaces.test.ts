@@ -50,6 +50,8 @@ describe('private-first OSS surfaces', () => {
     const sharedPositioningSource = [
       'packages/shared/src/brand.ts',
       'apps/web/src/lib/marketing-templates.ts',
+      'apps/web/prompts/demo/walkthrough.md',
+      'apps/web/public/manifest.json',
     ]
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
@@ -63,6 +65,7 @@ describe('private-first OSS surfaces', () => {
     expect(sharedPositioningSource).not.toContain('GitHub for podcasts');
     expect(sharedPositioningSource).not.toContain('Create. Fork. Remix. Share.');
     expect(sharedPositioningSource).not.toContain('fork and remix anything');
+    expect(sharedPositioningSource).not.toContain('Every voice. Every topic. One feed.');
   });
 
   it('keeps public product copy private-first', () => {
@@ -353,6 +356,8 @@ describe('private-first OSS surfaces', () => {
 
     expect(packageJson).toContain('"dev": "scripts/run-with-env.sh');
     expect(packageJson).toContain('"record": "scripts/run-with-env.sh');
+    expect(packageJson).not.toContain('"db:sync"');
+    expect(existsSync(resolve(repoRoot, 'scripts/sync-prod-db.sh'))).toBe(false);
     expect(envRunner).toContain('SOTTO_ENV_FILE');
     expect(e2eSources).toContain('scripts/run-with-env.sh');
     expect(e2eSources).toContain('test-e2e@example.com');
@@ -481,6 +486,7 @@ describe('private-first OSS surfaces', () => {
       'apps/web/src/app/opengraph-image.tsx',
       'apps/web/src/app/(admin)/admin/showcase/AvatarPrep.tsx',
       'apps/web/src/components/landing/chapters/ConvertChapter.tsx',
+      'apps/web/public/manifest.json',
       'apps/web/prisma/seed.ts',
       'apps/web/prisma/seed-demo.ts',
       'accounting/TODO.md',
