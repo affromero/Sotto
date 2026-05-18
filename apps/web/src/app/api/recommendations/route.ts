@@ -13,16 +13,21 @@ export async function GET(request: NextRequest) {
   }
 
   const session = await auth();
+  const userId = session?.user?.id;
+
+  if (!userId) {
+    return errorResponse('Unauthorized', 401);
+  }
 
   let searchTopic = topic || '';
 
   if (podcastId) {
     const podcast = await prisma.podcast.findUnique({
       where: { id: podcastId },
-      select: { topic: true, title: true },
+      select: { topic: true, title: true, userId: true },
     });
 
-    if (!podcast) {
+    if (!podcast || podcast.userId !== userId) {
       return errorResponse('Podcast not found', 404);
     }
 
@@ -31,7 +36,7 @@ export async function GET(request: NextRequest) {
 
   const recommendations = await findSimilarPodcasts({
     topic: searchTopic,
-    excludeUserId: session?.user?.id,
+    userId,
     limit: 10,
   });
 

@@ -692,7 +692,7 @@ describe('private-first OSS surfaces', () => {
     expect(releaseHygieneSources).toContain('SOTTO_ENV_FILE');
     expect(releaseHygieneSources).toContain('scripts/run-with-env.sh');
     expect(releaseHygieneSources).toContain('deployment secret manager or env file');
-    expect(releaseHygieneSources).toContain('| Environment |');
+	    expect(releaseHygieneSources).toContain('Environment variables:');
     expect(releaseHygieneSources).not.toContain('security@sotto.fm');
     expect(releaseHygieneSources).not.toContain('sotto.fm/api');
     expect(releaseHygieneSources).not.toContain('NEXTAUTH_SECRET');
@@ -1066,8 +1066,28 @@ describe('private-first OSS surfaces', () => {
       .join('\n');
 
     expect(recommendationSources).toContain("saveCount: 'desc'");
+    expect(recommendationSources).toContain('userId: params.userId');
+    expect(recommendationSources).toContain("errorResponse('Unauthorized', 401)");
     expect(recommendationSources).not.toContain('likeCount');
     expect(recommendationSources).not.toContain('forkCount');
+    expect(recommendationSources).not.toContain("visibility: 'PUBLIC'");
+    expect(recommendationSources).not.toContain('excludeUserId');
+  });
+
+  it('keeps live podcast status and voice tracks owner-gated', () => {
+    const livePodcastSources = [
+      'src/app/api/podcasts/[podcastId]/stream/route.ts',
+      'src/app/api/podcasts/[podcastId]/voice-tracks/route.ts',
+    ]
+      .map(readSource)
+      .join('\n');
+
+    expect(livePodcastSources).toContain("errorResponse('Unauthorized', 401)");
+    expect(livePodcastSources).toContain('podcast.userId !== userId');
+    expect(livePodcastSources).not.toContain('No auth required');
+    expect(livePodcastSources).not.toContain('Auth is optional');
+    expect(livePodcastSources).not.toContain('public podcasts visible to all');
+    expect(livePodcastSources).not.toContain("visibility === 'PRIVATE'");
   });
 
   it('keeps daily picks and trending free of social ranking payloads', () => {

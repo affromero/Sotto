@@ -78,6 +78,11 @@ const mockPodcast = {
   id: 'pod-1',
   topic: 'quantum physics introduction',
   title: 'Quantum Physics 101',
+  userId: 'user-1',
+};
+
+const ownerSession = {
+  user: { id: 'user-1', email: 'owner@example.com', name: 'Owner' },
 };
 
 describe('GET /api/recommendations', () => {
@@ -94,8 +99,20 @@ describe('GET /api/recommendations', () => {
     expect(body.error).toContain('podcastId');
   });
 
-  it('returns recommendations when topic is provided', async () => {
+  it('returns 401 when unauthenticated', async () => {
     mockAuth.mockResolvedValue(null);
+
+    const request = createRequest({ topic: 'quantum physics' });
+    const response = await GET(request);
+    const body = await response.json();
+
+    expect(response.status).toBe(401);
+    expect(body.error).toBe('Unauthorized');
+    expect(mockFindSimilarPodcasts).not.toHaveBeenCalled();
+  });
+
+  it('returns recommendations when topic is provided', async () => {
+    mockAuth.mockResolvedValue(ownerSession);
     mockFindSimilarPodcasts.mockResolvedValue([mockRecommendation1, mockRecommendation2]);
 
     const request = createRequest({ topic: 'quantum physics' });
@@ -107,10 +124,15 @@ describe('GET /api/recommendations', () => {
     expect(body).toHaveLength(2);
     expect(body[0]).toEqual(mockRecommendation1);
     expect(body[1]).toEqual(mockRecommendation2);
+    expect(mockFindSimilarPodcasts).toHaveBeenCalledWith({
+      topic: 'quantum physics',
+      userId: 'user-1',
+      limit: 10,
+    });
   });
 
   it('returns recommendations when podcastId is provided and podcast exists', async () => {
-    mockAuth.mockResolvedValue(null);
+    mockAuth.mockResolvedValue(ownerSession);
     mockPrisma.podcast.findUnique.mockResolvedValue(mockPodcast);
     mockFindSimilarPodcasts.mockResolvedValue([mockRecommendation1]);
 
@@ -125,7 +147,7 @@ describe('GET /api/recommendations', () => {
   });
 
   it('returns 404 when podcastId is provided but podcast not found', async () => {
-    mockAuth.mockResolvedValue(null);
+    mockAuth.mockResolvedValue(ownerSession);
     mockPrisma.podcast.findUnique.mockResolvedValue(null);
 
     const request = createRequest({ podcastId: 'nonexistent' });
@@ -136,8 +158,21 @@ describe('GET /api/recommendations', () => {
     expect(body.error).toBe('Podcast not found');
   });
 
+  it('returns 404 when podcastId belongs to another user', async () => {
+    mockAuth.mockResolvedValue(ownerSession);
+    mockPrisma.podcast.findUnique.mockResolvedValue({ ...mockPodcast, userId: 'other-user' });
+
+    const request = createRequest({ podcastId: 'pod-1' });
+    const response = await GET(request);
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe('Podcast not found');
+    expect(mockFindSimilarPodcasts).not.toHaveBeenCalled();
+  });
+
   it('returns empty array when no recommendations found', async () => {
-    mockAuth.mockResolvedValue(null);
+    mockAuth.mockResolvedValue(ownerSession);
     mockFindSimilarPodcasts.mockResolvedValue([]);
 
     const request = createRequest({ topic: 'very specific niche topic' });
@@ -149,7 +184,7 @@ describe('GET /api/recommendations', () => {
   });
 
   it('returns multiple recommendations ordered by findSimilarPodcasts result', async () => {
-    mockAuth.mockResolvedValue(null);
+    mockAuth.mockResolvedValue(ownerSession);
     mockFindSimilarPodcasts.mockResolvedValue([
       mockRecommendation3,
       mockRecommendation1,

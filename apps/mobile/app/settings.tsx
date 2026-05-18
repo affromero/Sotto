@@ -63,7 +63,7 @@ export default function SettingsScreen() {
   const handleDeleteAccount = useCallback(() => {
     Alert.alert(
       'Delete Account',
-      'This will permanently delete your account, all your podcasts, comments, and data. This cannot be undone.',
+      'This will permanently delete your account, all your podcasts, settings, and data. This cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
