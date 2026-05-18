@@ -24,7 +24,7 @@
 - [x] `public/manifest.json` — PWA manifest
 - [x] `Dockerfile` — multi-stage production web container (Node 20 Alpine)
 - [x] `Dockerfile.workers` — production workers container with FFmpeg
-- [x] `docker-compose.prod.yml` — production compose (postgres, redis, web, workers)
+- [x] `docker-compose.app.yml` / `docker-compose.workers.yml` — production web and worker compose files
 - [x] `.dockerignore` — Docker build exclusions
 - [x] `.github/workflows/ci.yml` — CI/CD pipeline (lint, typecheck, test, build)
 - [x] `public/sw.js` — PWA service worker (offline + push notifications, 414 lines)

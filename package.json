@@ -11,7 +11,6 @@
   "scripts": {
     "build": "npm run build --workspace=@sotto/web",
     "ci": "npm run ci --workspace=@sotto/web",
-    "db:sync": "bash scripts/sync-prod-db.sh",
     "dev": "scripts/run-with-env.sh env REMOTION_URL=http://localhost:3100 npm run dev --workspace=@sotto/web",
     "dev:web": "scripts/run-with-env.sh npm run dev:web --workspace=@sotto/web",
     "dev:workers": "scripts/run-with-env.sh env REMOTION_URL=http://localhost:3100 npm run dev:workers --workspace=@sotto/web",
