@@ -9,6 +9,7 @@ const mockVoiceCloneCount = vi.fn();
 const mockVoiceCloneFindUnique = vi.fn();
 const mockVoiceCloneCreate = vi.fn();
 const mockVoiceCloneDelete = vi.fn();
+const mockVoiceCloneUpdate = vi.fn();
 const mockVoiceAllowlistFindMany = vi.fn();
 const mockVoiceRequestFindMany = vi.fn();
 const mockVoiceRequestDeleteMany = vi.fn();
@@ -20,6 +21,7 @@ const mockCheckRateLimit = vi.fn();
 const mockGetVoiceCatalog = vi.fn();
 const mockGetByokKey = vi.fn();
 const mockCreateTtsProviderAsync = vi.fn();
+const mockGetPlanFeatureConfig = vi.fn();
 
 vi.mock('@/lib/auth', () => ({
   auth: (...args: unknown[]) => mockAuth(...args),
@@ -40,6 +42,7 @@ vi.mock('@/lib/prisma', () => {
       findUnique: (...args: unknown[]) => mockVoiceCloneFindUnique(...args),
       create: (...args: unknown[]) => mockVoiceCloneCreate(...args),
       delete: (...args: unknown[]) => mockVoiceCloneDelete(...args),
+      update: (...args: unknown[]) => mockVoiceCloneUpdate(...args),
     },
     voiceAllowlist: {
       findMany: (...args: unknown[]) => mockVoiceAllowlistFindMany(...args),
@@ -118,15 +121,7 @@ vi.mock('@/lib/tier-features', () => ({
 }));
 
 vi.mock('@/lib/plan-feature-config', () => ({
-  getPlanFeatureConfig: vi.fn().mockResolvedValue({
-    freeVoiceCloningEnabled: false,
-    proVoiceCloningEnabled: true,
-    freeVoiceTracksEnabled: false,
-    proVoiceTracksEnabled: true,
-    freeMaxVoiceTracks: 0,
-    proMaxVoiceTracks: 3,
-    voiceMarketplaceEnabled: true,
-  }),
+  getPlanFeatureConfig: (...args: unknown[]) => mockGetPlanFeatureConfig(...args),
 }));
 
 vi.mock('@/lib/fal-voice-clone', () => ({
@@ -146,7 +141,11 @@ vi.mock('@/lib/logger', () => ({
 }));
 
 import { GET } from '@/app/api/voices/route';
-import { POST as POST_CLONE, DELETE as DELETE_CLONE } from '@/app/api/voices/clone/route';
+import {
+  POST as POST_CLONE,
+  PATCH as PATCH_CLONE,
+  DELETE as DELETE_CLONE,
+} from '@/app/api/voices/clone/route';
 import { POST as POST_PREVIEW } from '@/app/api/voices/preview/route';
 
 function createRequest(
@@ -164,6 +163,20 @@ const mockSession = {
   },
   expires: '2025-12-31',
 };
+
+const defaultPlanFeatureConfig = {
+  freeVoiceCloningEnabled: false,
+  proVoiceCloningEnabled: true,
+  freeVoiceTracksEnabled: false,
+  proVoiceTracksEnabled: true,
+  freeMaxVoiceTracks: 0,
+  proMaxVoiceTracks: 3,
+  voiceMarketplaceEnabled: true,
+};
+
+beforeEach(() => {
+  mockGetPlanFeatureConfig.mockResolvedValue(defaultPlanFeatureConfig);
+});
 
 const mockVoiceClone = {
   id: 'clone-1',
@@ -247,6 +260,7 @@ describe('GET /api/voices', () => {
     expect(body).toHaveProperty('userClones');
     expect(body).toHaveProperty('maxVoiceClones');
     expect(body.maxVoiceClones).toBe(10);
+    expect(body.voiceMarketplaceEnabled).toBe(true);
     expect(Array.isArray(body.poolVoices)).toBe(true);
     expect(body.poolVoices).toHaveLength(2);
   });
@@ -614,6 +628,75 @@ describe('POST /api/voices/clone', () => {
 
       expect(response.status).toBe(409);
       expect(body.error).toMatch(/already in your library/);
+    });
+  });
+});
+
+describe('PATCH /api/voices/clone', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetPlanFeatureConfig.mockResolvedValue(defaultPlanFeatureConfig);
+  });
+
+  it('returns 503 when enabling marketplace sharing while marketplace is disabled', async () => {
+    mockAuth.mockResolvedValue(mockSession);
+    mockGetPlanFeatureConfig.mockResolvedValue({
+      ...defaultPlanFeatureConfig,
+      voiceMarketplaceEnabled: false,
+    });
+    mockVoiceCloneFindUnique.mockResolvedValue({
+      ...mockVoiceClone,
+      userId: 'user-1',
+      verificationStatus: 'VERIFIED',
+    });
+
+    const request = createRequest('http://localhost:3000/api/voices/clone', {
+      method: 'PATCH',
+      body: JSON.stringify({ voiceCloneId: 'clone-1', requestable: true }),
+    });
+    const response = await PATCH_CLONE(request);
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body).toMatchObject({ error: 'Voice marketplace is currently unavailable.' });
+    expect(mockVoiceCloneUpdate).not.toHaveBeenCalled();
+  });
+
+  it('allows privacy-preserving cleanup while marketplace is disabled', async () => {
+    mockAuth.mockResolvedValue(mockSession);
+    mockGetPlanFeatureConfig.mockResolvedValue({
+      ...defaultPlanFeatureConfig,
+      voiceMarketplaceEnabled: false,
+    });
+    mockVoiceCloneFindUnique.mockResolvedValue({
+      ...mockVoiceClone,
+      userId: 'user-1',
+      requestable: true,
+      priceInCents: 500,
+    });
+    mockVoiceCloneUpdate.mockResolvedValue({
+      ...mockVoiceClone,
+      requestable: false,
+      priceInCents: null,
+    });
+
+    const request = createRequest('http://localhost:3000/api/voices/clone', {
+      method: 'PATCH',
+      body: JSON.stringify({
+        voiceCloneId: 'clone-1',
+        requestable: false,
+        priceInCents: null,
+      }),
+    });
+    const response = await PATCH_CLONE(request);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.requestable).toBe(false);
+    expect(body.priceInCents).toBeNull();
+    expect(mockVoiceCloneUpdate).toHaveBeenCalledWith({
+      where: { id: 'clone-1' },
+      data: { requestable: false, priceInCents: null },
     });
   });
 });

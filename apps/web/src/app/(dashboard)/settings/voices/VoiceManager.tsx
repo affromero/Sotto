@@ -68,6 +68,7 @@ export function VoiceManager() {
   const [descriptionDraft, setDescriptionDraft] = useState('');
   const [savingDescription, setSavingDescription] = useState(false);
   const [stripeOnboarded, setStripeOnboarded] = useState(false);
+  const [voiceMarketplaceEnabled, setVoiceMarketplaceEnabled] = useState(false);
   const [connectingStripe, setConnectingStripe] = useState(false);
   const [editingPrice, setEditingPrice] = useState<string | null>(null);
   const [priceDraft, setPriceDraft] = useState('');
@@ -104,6 +105,7 @@ export function VoiceManager() {
       const voiceData = await response.json();
       setUserClones(voiceData.userClones ?? []);
       setStripeOnboarded(voiceData.stripeOnboarded ?? false);
+      setVoiceMarketplaceEnabled(voiceData.voiceMarketplaceEnabled ?? false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load voices');
     } finally {
@@ -543,32 +545,34 @@ export function VoiceManager() {
         </div>
       )}
 
-      <section className={styles.section}>
-        <h3 className={styles.sectionTitle}>Stripe Payouts</h3>
-        {stripeOnboarded ? (
-          <div className={styles.stripeConnected}>
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-              <polyline points="3 8 7 12 13 4" />
-            </svg>
-            <span>Stripe Connected</span>
-            <a href="/api/stripe/connect" className={styles.stripeDashboardLink}>Dashboard</a>
-          </div>
-        ) : (
-          <div className={styles.stripePrompt}>
-            <p className={styles.stripePromptText}>
-              Connect your Stripe account to set prices on your voices and receive payouts (90% of each sale).
-            </p>
-            <button
-              type="button"
-              className={styles.cloneButton}
-              onClick={handleConnectStripe}
-              disabled={connectingStripe}
-            >
-              {connectingStripe ? 'Connecting...' : 'Connect Stripe'}
-            </button>
-          </div>
-        )}
-      </section>
+      {voiceMarketplaceEnabled && (
+        <section className={styles.section}>
+          <h3 className={styles.sectionTitle}>Stripe Payouts</h3>
+          {stripeOnboarded ? (
+            <div className={styles.stripeConnected}>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                <polyline points="3 8 7 12 13 4" />
+              </svg>
+              <span>Stripe Connected</span>
+              <a href="/api/stripe/connect" className={styles.stripeDashboardLink}>Dashboard</a>
+            </div>
+          ) : (
+            <div className={styles.stripePrompt}>
+              <p className={styles.stripePromptText}>
+                Connect your Stripe account to set prices on your voices and receive payouts (90% of each sale).
+              </p>
+              <button
+                type="button"
+                className={styles.cloneButton}
+                onClick={handleConnectStripe}
+                disabled={connectingStripe}
+              >
+                {connectingStripe ? 'Connecting...' : 'Connect Stripe'}
+              </button>
+            </div>
+          )}
+        </section>
+      )}
 
       <section className={styles.section}>
         <h3 className={styles.sectionTitle}>Cloned Voices</h3>
@@ -630,7 +634,7 @@ export function VoiceManager() {
                         </span>
                       )}
                     </div>
-                    {voice.requestable && (
+                    {voiceMarketplaceEnabled && voice.requestable && (
                       editingDescription === voice.id ? (
                         <div className={styles.descriptionEdit}>
                           <textarea
@@ -667,52 +671,54 @@ export function VoiceManager() {
                         </button>
                       )
                     )}
-                    <div className={styles.priceRow}>
-                      {editingPrice === voice.id ? (
-                        <div className={styles.priceEdit}>
-                          <span className={styles.priceCurrency}>$</span>
-                          <input
-                            type="number"
-                            className={styles.priceInput}
-                            value={priceDraft}
-                            onChange={(e) => setPriceDraft(e.target.value)}
-                            onBlur={() => handleSavePrice(voice.id)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault();
-                                handleSavePrice(voice.id);
-                              }
-                              if (e.key === 'Escape') setEditingPrice(null);
-                            }}
-                            placeholder="0.00"
-                            min="0"
-                            max="100"
-                            step="0.01"
-                            autoFocus
-                            disabled={savingPrice}
-                          />
-                          <span className={styles.priceUnit}>/ podcast</span>
-                          <span className={styles.priceFee}>10% platform fee</span>
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          className={styles.priceBtn}
-                          onClick={() => handleStartEditPrice(voice)}
-                          disabled={!stripeOnboarded && !voice.priceInCents}
-                          title={stripeOnboarded ? 'Set price' : 'Connect Stripe to set prices'}
-                        >
-                          {voice.priceInCents && voice.priceInCents > 0
-                            ? `$${(voice.priceInCents / 100).toFixed(2)} / podcast`
-                            : 'Free — set a price'}
-                        </button>
-                      )}
-                      {voice.salesCount > 0 && (
-                        <span className={styles.earnings}>
-                          {voice.salesCount} {voice.salesCount === 1 ? 'sale' : 'sales'} — ${(voice.totalEarningsCents / 100).toFixed(2)} earned
-                        </span>
-                      )}
-                    </div>
+                    {voiceMarketplaceEnabled && (
+                      <div className={styles.priceRow}>
+                        {editingPrice === voice.id ? (
+                          <div className={styles.priceEdit}>
+                            <span className={styles.priceCurrency}>$</span>
+                            <input
+                              type="number"
+                              className={styles.priceInput}
+                              value={priceDraft}
+                              onChange={(e) => setPriceDraft(e.target.value)}
+                              onBlur={() => handleSavePrice(voice.id)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  handleSavePrice(voice.id);
+                                }
+                                if (e.key === 'Escape') setEditingPrice(null);
+                              }}
+                              placeholder="0.00"
+                              min="0"
+                              max="100"
+                              step="0.01"
+                              autoFocus
+                              disabled={savingPrice}
+                            />
+                            <span className={styles.priceUnit}>/ podcast</span>
+                            <span className={styles.priceFee}>10% platform fee</span>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            className={styles.priceBtn}
+                            onClick={() => handleStartEditPrice(voice)}
+                            disabled={!stripeOnboarded && !voice.priceInCents}
+                            title={stripeOnboarded ? 'Set price' : 'Connect Stripe to set prices'}
+                          >
+                            {voice.priceInCents && voice.priceInCents > 0
+                              ? `$${(voice.priceInCents / 100).toFixed(2)} / podcast`
+                              : 'Free — set a price'}
+                          </button>
+                        )}
+                        {voice.salesCount > 0 && (
+                          <span className={styles.earnings}>
+                            {voice.salesCount} {voice.salesCount === 1 ? 'sale' : 'sales'} — ${(voice.totalEarningsCents / 100).toFixed(2)} earned
+                          </span>
+                        )}
+                      </div>
+                    )}
                     <div className={styles.voiceMeta}>
                       <span
                         className={`${styles.voiceBadge} ${voice.sourceType === 'RECORD' ? styles.badgeRecord : styles.badgeUpload}`}
@@ -723,24 +729,24 @@ export function VoiceManager() {
                     </div>
                   </div>
                   <div className={styles.voiceActions}>
-                    {isVoiceVerified && (
-                    <label
-                      className={styles.requestableToggle}
-                      title={
-                        voice.requestable ? 'Shared: others can request' : 'Private: not shared'
-                      }
-                    >
-                      <input
-                        type="checkbox"
-                        checked={voice.requestable}
-                        onChange={() => handleToggleRequestable(voice.id, voice.requestable)}
-                        disabled={togglingRequestable === voice.id}
-                        aria-label={`Toggle sharing for ${voice.name}`}
-                      />
-                      <span className={styles.requestableLabel}>
-                        {voice.requestable ? 'Shared' : 'Private'}
-                      </span>
-                    </label>
+                    {voiceMarketplaceEnabled && isVoiceVerified && (
+                      <label
+                        className={styles.requestableToggle}
+                        title={
+                          voice.requestable ? 'Shared: others can request' : 'Private: not shared'
+                        }
+                      >
+                        <input
+                          type="checkbox"
+                          checked={voice.requestable}
+                          onChange={() => handleToggleRequestable(voice.id, voice.requestable)}
+                          disabled={togglingRequestable === voice.id}
+                          aria-label={`Toggle sharing for ${voice.name}`}
+                        />
+                        <span className={styles.requestableLabel}>
+                          {voice.requestable ? 'Shared' : 'Private'}
+                        </span>
+                      </label>
                     )}
                     <button
                       type="button"
