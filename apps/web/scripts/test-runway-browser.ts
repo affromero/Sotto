@@ -5,7 +5,7 @@
  * the entire session in headless Chrome, which has native H264 decode.
  *
  * Run from apps/web/:
- *   doppler run --project sotto --config dev -- npx tsx scripts/test-runway-browser.ts
+ *   ../../scripts/run-with-env.sh npx tsx scripts/test-runway-browser.ts
  */
 import { chromium } from 'playwright';
 import { writeFile, rm, mkdir, readFile } from 'fs/promises';
