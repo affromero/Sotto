@@ -57,8 +57,6 @@ npm run dev:workers            # Workers only
 npm run ci                     # lint + type-check + test + build
 ```
 
-Compatibility scripts for the old hosted setup still exist as `npm run dev:doppler`, `npm run dev:web:doppler`, and `npm run dev:workers:doppler`. Do not make Doppler a requirement for local OSS onboarding.
-
 ## Subdirectory CLAUDE.md Index
 
 | Directory | What Is Documented |
@@ -162,9 +160,9 @@ Run `npm run ci` before every commit. No exceptions.
 
 ## Environment Variables
 
-Local OSS development uses `.env.oss.example` copied to `.env.local`. Hosted deployments may still use Doppler, but Doppler must stay optional for local onboarding.
+Local OSS development uses `.env.oss.example` copied to `.env.local`. Root npm scripts source `.env.local` through `scripts/run-with-env.sh`; set `SOTTO_ENV_FILE` to point them at a different env file.
 
-Critical local variables: `DATABASE_URL`, `REDIS_URL`, `NEXTAUTH_SECRET`, `BYOK_ENCRYPTION_KEY`, `STORAGE_PROVIDER`, `PAYMENT_PROVIDER`.
+Critical local variables: `DATABASE_URL`, `REDIS_URL`, `AUTH_SECRET`, `BYOK_ENCRYPTION_KEY`, `STORAGE_PROVIDER`, `PAYMENT_PROVIDER`.
 
 Provider variables are optional until the selected workflow needs them. Common examples: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `ELEVENLABS_API_KEY`, `R2_*`, `AI_PROVIDER`, `TTS_PROVIDER`, `STT_PROVIDER`.
 

@@ -13,7 +13,7 @@ This is an npm workspaces monorepo. Key areas:
 ## Build, Test, and Development Commands
 Run from repo root unless noted.
 - `npm run setup` bootstrap local tooling.
-- `npm run dev` start web + workers (uses Doppler, syncs prod DB by default).
+- `npm run dev` start web + workers using `.env.local`.
 - `SKIP_DB_SYNC=1 npm run dev` faster start without DB sync.
 - `npm run dev:web` or `npm run dev:workers` for scoped dev.
 - `npm run build`, `npm run lint`, `npm run type-check`, `npm run test` proxy to `@sotto/web`.
@@ -38,7 +38,7 @@ Run from repo root unless noted.
 - Run `npm run ci` before merging when possible.
 
 ## Security & Configuration Tips
-- Secrets are managed via Doppler. Do not add `.env` files or hardcode keys.
+- Secrets are loaded from `.env.local` for local OSS development. Do not commit `.env` files or hardcode keys.
 - If you add a new env var, update `.env.example` and relevant docs.
 
 ## Agent-Specific Instructions

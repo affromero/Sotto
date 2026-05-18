@@ -3,7 +3,7 @@ import { randomUUID } from 'crypto';
 
 const prisma = new PrismaClient();
 
-const TEST_USER_EMAIL = 'test-e2e@sotto.fm';
+const TEST_USER_EMAIL = 'test-e2e@example.com';
 const TEST_USER_NAME = 'E2E Test User';
 
 /**
@@ -51,7 +51,7 @@ export async function seedTestUser() {
       title: 'E2E Test Podcast',
       topic: 'Testing',
       status: 'READY',
-      audioUrl: 'https://sotto.fm/test-audio.mp3',
+      audioUrl: 'https://media.example.com/e2e/test-audio.mp3',
       duration: 300,
       visibility: 'PUBLIC',
       userId: user.id,
@@ -60,11 +60,11 @@ export async function seedTestUser() {
 
   // Second user for access and ownership tests
   const otherUser = await prisma.user.upsert({
-    where: { email: 'test-other@sotto.fm' },
+    where: { email: 'test-other@example.com' },
     update: {},
     create: {
       id: `e2e-other-${randomUUID().slice(0, 8)}`,
-      email: 'test-other@sotto.fm',
+      email: 'test-other@example.com',
       name: 'E2E Other User',
       handle: 'e2e-other',
       role: 'USER',
@@ -81,7 +81,7 @@ export async function seedTestUser() {
       title: 'E2E Other Podcast',
       topic: 'Independent ownership content',
       status: 'READY',
-      audioUrl: 'https://sotto.fm/test-audio-other.mp3',
+      audioUrl: 'https://media.example.com/e2e/test-audio-other.mp3',
       duration: 240,
       visibility: 'PUBLIC',
       userId: otherUser.id,
@@ -97,7 +97,7 @@ export async function seedTestUser() {
       title: 'E2E Voice Track Source',
       topic: 'Voice track testing',
       status: 'READY',
-      audioUrl: 'https://sotto.fm/test-audio-voice-track.mp3',
+      audioUrl: 'https://media.example.com/e2e/test-audio-voice-track.mp3',
       duration: 180,
       visibility: 'PUBLIC',
       userId: otherUser.id,
@@ -212,7 +212,7 @@ export async function seedTestUser() {
       podcastId: testPodcast.id,
       name: 'E2E Voice Track',
       status: 'READY',
-      audioUrl: 'https://sotto.fm/test-voice-track.mp3',
+      audioUrl: 'https://media.example.com/e2e/test-voice-track.mp3',
       duration: 300,
     },
   });
@@ -328,11 +328,11 @@ export async function seedTestUser() {
 
   // Empty-feed user (no follows, no content) for empty-state E2E tests
   const emptyUser = await prisma.user.upsert({
-    where: { email: 'test-empty@sotto.fm' },
+    where: { email: 'test-empty@example.com' },
     update: {},
     create: {
       id: `e2e-empty-${randomUUID().slice(0, 8)}`,
-      email: 'test-empty@sotto.fm',
+      email: 'test-empty@example.com',
       name: 'E2E Empty User',
       handle: 'e2e-empty',
       role: 'USER',

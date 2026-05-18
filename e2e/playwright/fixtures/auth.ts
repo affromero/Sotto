@@ -7,7 +7,7 @@ import { seedTestUser } from '../helpers/seed';
  * Seeds a test user in the DB and sets a NextAuth-compatible session cookie
  * directly on the browser context. This avoids driving OAuth flows in tests.
  *
- * The JWT is generated using the same NEXTAUTH_SECRET the dev server uses.
+ * The session token is created against the same database the dev server uses.
  */
 
 // Store seed data at module level so it's shared across fixtures

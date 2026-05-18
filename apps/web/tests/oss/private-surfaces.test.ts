@@ -339,6 +339,40 @@ describe('private-first OSS surfaces', () => {
     expect(localSetupDocs).not.toContain('LOCAL_STORAGE_ROOT');
   });
 
+  it('keeps root and e2e commands env-file driven without hosted secret tooling', () => {
+    const packageJson = readFileSync(resolve(repoRoot, 'package.json'), 'utf8');
+    const envRunner = readFileSync(resolve(repoRoot, 'scripts/run-with-env.sh'), 'utf8');
+    const e2eSources = [
+      'e2e/playwright/playwright.config.ts',
+      'e2e/playwright/fixtures/auth.ts',
+      'e2e/playwright/helpers/seed.ts',
+      'e2e/maestro/config.yaml',
+      'e2e/maestro/run.sh',
+    ]
+      .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
+      .join('\n');
+    const agentDocs = readFileSync(resolve(repoRoot, 'AGENTS.md'), 'utf8');
+    const rootClaude = readFileSync(resolve(repoRoot, 'CLAUDE.md'), 'utf8');
+    const commandSources = [packageJson, envRunner, e2eSources].join('\n');
+
+    expect(packageJson).toContain('"dev": "scripts/run-with-env.sh');
+    expect(packageJson).toContain('"record": "scripts/run-with-env.sh');
+    expect(envRunner).toContain('SOTTO_ENV_FILE');
+    expect(e2eSources).toContain('scripts/run-with-env.sh');
+    expect(e2eSources).toContain('test-e2e@example.com');
+    expect(e2eSources).toContain('https://media.example.com/e2e/test-audio.mp3');
+    expect(commandSources).not.toContain('doppler run');
+    expect(commandSources).not.toContain(':doppler');
+    expect(commandSources).not.toContain('@sotto.fm');
+    expect(commandSources).not.toContain('https://sotto.fm');
+    expect(commandSources).not.toContain('NEXTAUTH_SECRET');
+    expect(agentDocs).not.toContain('uses Doppler, syncs prod DB by default');
+    expect(agentDocs).not.toContain('Secrets are managed via Doppler');
+    expect(rootClaude).not.toContain('Compatibility scripts for the old hosted setup');
+    expect(rootClaude).not.toContain('Hosted deployments may still use Doppler');
+    expect(rootClaude).toContain('Critical local variables: `DATABASE_URL`, `REDIS_URL`, `AUTH_SECRET`');
+  });
+
   it('keeps mobile env sync local and Doppler-free by default', () => {
     const packageJson = readFileSync(resolve(repoRoot, 'package.json'), 'utf8');
     const syncMobileEnv = readFileSync(resolve(repoRoot, 'scripts/sync-mobile-env.sh'), 'utf8');
