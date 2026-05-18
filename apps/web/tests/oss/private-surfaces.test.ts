@@ -784,6 +784,11 @@ describe('private-first OSS surfaces', () => {
     expect(workspaceSources).not.toContain('@sottofm/feed');
     expect(workspaceSources).not.toContain('@sottofm');
     expect(workspaceSources).not.toContain('packages/feed');
+    expect(workspaceSources).not.toContain('public podcast feed');
+    expect(workspaceSources).not.toContain('FollowButton');
+    expect(workspaceSources).not.toContain('users/[userId]/follow');
+    expect(workspaceSources).not.toContain('podcasts/[podcastId]/like');
+    expect(workspaceSources).not.toContain('podcasts/[podcastId]/fork');
     expect(workspaceSources).not.toContain('From Your People');
     expect(workspaceSources).not.toContain('followedCreatorIds');
   });
