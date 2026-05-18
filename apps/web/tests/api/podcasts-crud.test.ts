@@ -53,7 +53,11 @@ vi.mock('@/lib/api-keys', () => ({
 
 vi.mock('@/lib/redis', () => ({
   checkRateLimit: (...args: unknown[]) => mockCheckRateLimit(...args),
-  cache: { get: vi.fn().mockResolvedValue(null), set: vi.fn().mockResolvedValue(undefined), delete: vi.fn().mockResolvedValue(undefined) },
+  cache: {
+    get: vi.fn().mockResolvedValue(null),
+    set: vi.fn().mockResolvedValue(undefined),
+    delete: vi.fn().mockResolvedValue(undefined),
+  },
   getPodcastCacheTtl: vi.fn().mockReturnValue(30),
   invalidatePodcastCache: vi.fn().mockResolvedValue(undefined),
 }));
@@ -204,6 +208,11 @@ const mockPodcast = {
   ],
 };
 
+const explicitTtsSelection = {
+  ttsProvider: 'openai',
+  ttsModel: 'tts-1-hd',
+};
+
 const mockPodcastWithRelations = {
   ...mockPodcast,
   user: { id: 'user-1', name: 'Alice', image: 'https://example.com/alice.jpg' },
@@ -310,6 +319,7 @@ describe('POST /api/podcasts', () => {
     const body = {
       title: 'Quantum Physics 101',
       topic: 'An introduction to quantum mechanics',
+      ...explicitTtsSelection,
     };
 
     const request = createPostRequest('/api/podcasts', body);
@@ -321,9 +331,27 @@ describe('POST /api/podcasts', () => {
     expect(result.status).toBe('EXTRACTING');
     expect(mockPodcastCreate).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ visibility: 'PRIVATE' }),
+        data: expect.objectContaining({ visibility: 'PRIVATE', ...explicitTtsSelection }),
       })
     );
+  });
+
+  it('returns 400 for BYOK creation without an explicit TTS provider', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 59, resetAt: Date.now() });
+    mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', isByokUser: true });
+
+    const request = createPostRequest('/api/podcasts', {
+      title: 'Quantum Physics 101',
+      topic: 'An introduction to quantum mechanics',
+    });
+    const response = await createPodcast(request);
+    const result = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(result).toMatchObject({ code: 'tts_provider_required' });
+    expect(mockPodcastCreate).not.toHaveBeenCalled();
+    expect(mockAddJob).not.toHaveBeenCalled();
   });
 
   it('creates podcast with optional voice IDs', async () => {
@@ -337,6 +365,7 @@ describe('POST /api/podcasts', () => {
     const body = {
       title: 'Test Podcast',
       topic: 'Test topic',
+      ...explicitTtsSelection,
       hostVoiceId: 'voice-host-custom',
       expertVoiceId: 'voice-expert-custom',
     };
@@ -437,7 +466,6 @@ describe('POST /api/podcasts', () => {
     expect(result).toHaveProperty('error', 'Rate limit exceeded');
     expect(result).toHaveProperty('resetAt');
   });
-
 });
 
 describe('GET /api/podcasts/[podcastId]', () => {

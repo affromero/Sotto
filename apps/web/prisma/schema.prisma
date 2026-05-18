@@ -322,7 +322,7 @@ model Podcast {
   fileSize          Int? // bytes
 
   // Voice selection
-  ttsProvider      String? // null = auto; 'elevenlabs' | 'openai' | 'cartesia' | 'hume' | 'fal' | 'replicate'
+  ttsProvider      String? // explicit or platform-resolved provider required before audio generation
   ttsModel         String? // e.g. 'eleven_v3', 'tts-1-hd', 'sonic-2', 'premium', 'octave'
   aiProvider       String? // 'anthropic' | 'openai'
   aiModel          String? // e.g. 'claude-sonnet-4-5-20250929', 'claude-opus-4-6'
