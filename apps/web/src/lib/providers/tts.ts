@@ -102,12 +102,13 @@ async function importMistral() {
 /**
  * Create a TTS provider instance by ID, optionally with a BYOK API key.
  */
-export function createTtsProvider(type?: string, byokApiKey?: string, model?: string): TtsProvider {
-  const providerType = type || process.env.TTS_PROVIDER || 'openai';
-  // Use lazy-loaded classes synchronously via pre-instantiated inline classes
-  // that delegate to the async providers. For backward compat, we keep
-  // ElevenLabs and OpenAI as synchronous constructors.
-  switch (providerType) {
+export function createTtsProvider(type: string, byokApiKey?: string, model?: string): TtsProvider {
+  if (!type) {
+    throw new Error('TTS provider type is required. Pass an explicit provider from the TTS registry.');
+  }
+
+  // Use lazy-loaded classes synchronously via pre-instantiated inline classes.
+  switch (type) {
     case 'elevenlabs': {
       const { ElevenLabsProvider } = require('./tts/elevenlabs.provider');
       return new ElevenLabsProvider(byokApiKey, model);
@@ -121,7 +122,7 @@ export function createTtsProvider(type?: string, byokApiKey?: string, model?: st
       return new CartesiaProvider(byokApiKey, model);
     }
     default:
-      throw new Error(`Unknown TTS_PROVIDER "${providerType}"`);
+      throw new Error(`Unknown TTS provider "${type}"`);
   }
 }
 

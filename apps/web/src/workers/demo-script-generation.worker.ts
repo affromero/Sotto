@@ -3,6 +3,7 @@ import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { loadAndRender } from '@/lib/prompt-loader';
 import { createAIProvider } from '@/lib/providers/ai';
+import { getProviderForModel } from '@/lib/providers/ai-registry';
 import {
   getDemoProductContext,
   getDemoFeatureDescriptions,
@@ -70,11 +71,20 @@ export async function processDemoScriptGeneration(
     `Features to showcase: ${project.features.join(', ')}`,
   ].filter(Boolean).join('\n');
 
-  const ai = createAIProvider();
+  if (!project.aiModel) {
+    throw new Error(`Demo project ${project.id} is missing an explicit AI model for script generation.`);
+  }
+
+  const aiProvider = getProviderForModel(project.aiModel);
+  if (!aiProvider) {
+    throw new Error(`Demo project ${project.id} uses unknown AI model "${project.aiModel}".`);
+  }
+
+  const ai = createAIProvider(aiProvider);
   const response = await ai.generateResponse(
     systemPrompt,
     [{ role: 'user', content: userMessage }],
-    { maxTokens: 8192, model: project.aiModel ?? undefined },
+    { maxTokens: 8192, model: project.aiModel },
   );
 
   await job.updateProgress(60);

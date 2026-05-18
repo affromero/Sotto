@@ -85,7 +85,7 @@ export const VERIFICATION_JSON_SCHEMA = {
 async function retryParseWithStricterPrompt(
   systemPrompt: string,
   userMessage: string,
-  opts: { maxTokens: number; apiKeyOverride?: string; model?: string; provider?: string },
+  opts: { maxTokens: number; apiKeyOverride?: string; model?: string; provider: string },
 ): Promise<{ parsed: Record<string, unknown>; inputTokens: number; outputTokens: number; model: string } | null> {
   try {
     const ai = createAIProvider(opts.provider);
@@ -436,7 +436,7 @@ export async function verifyScript(params: {
   previousFeedback?: string;
   apiKeyOverride?: string;
   model?: string;
-  provider?: string;
+  provider: string;
   previousClaims?: ClaimAnalysis[];
   verificationMode?: string;
 }): Promise<VerificationVerdict> {

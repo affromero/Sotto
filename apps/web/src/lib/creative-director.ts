@@ -53,7 +53,7 @@ export interface CreateOutlineParams {
   recommendedAngle: string | null;
   apiKeyOverride?: string;
   model?: string;
-  provider?: string;
+  provider: string;
 }
 
 // ---- Framework Selection ----
