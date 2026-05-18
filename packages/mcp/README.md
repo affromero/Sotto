@@ -76,15 +76,16 @@ Point at your local dev server:
 
 ## Tools
 
-| Tool                  | Description                                      |
-| --------------------- | ------------------------------------------------ |
-| `create_podcast`      | Create an AI podcast from a topic                |
-| `ingest_agent_output` | Create a private podcast from local agent output |
-| `get_podcast`         | Get podcast details + generation status          |
-| `list_podcasts`       | List your podcasts                               |
-| `update_podcast`      | Update title, topic, or visibility               |
-| `delete_podcast`      | Delete a podcast                                 |
-| `get_me`              | Get your Sotto profile                           |
+| Tool                        | Description                                             |
+| --------------------------- | ------------------------------------------------------- |
+| `create_podcast`            | Create an AI podcast from a topic                       |
+| `ingest_agent_output`       | Create a private podcast from local agent output        |
+| `ingest_meeting_transcript` | Create a private meeting recap from transcript material |
+| `get_podcast`               | Get podcast details + generation status                 |
+| `list_podcasts`             | List your podcasts                                      |
+| `update_podcast`            | Update title, topic, or visibility                      |
+| `delete_podcast`            | Delete a podcast                                        |
+| `get_me`                    | Get your Sotto profile                                  |
 
 ### Local Agent Ingestion
 
@@ -104,6 +105,24 @@ Minimal fields:
 ```
 
 Optional fields include `topic`, `duration_minutes`, `focus_areas`, `source_url`, `agent_model`, `agent_run_id`, `ai_model`, and `tts_model`.
+
+### Meeting Transcript Ingestion
+
+Use `ingest_meeting_transcript` when a recorder, calendar bot, or invited local agent has produced transcript material for a private meeting recap. The tool requires an explicit `tts_provider`, accepts optional participants and action items, and never exposes the meeting in a public feed.
+
+Minimal fields:
+
+```json
+{
+  "title": "Product planning review",
+  "transcript": "Alex: We will ship private RSS first.\nSam: I will document the setup path.",
+  "tts_provider": "openai",
+  "platform": "zoom",
+  "idempotency_key": "zoom:2026-05-18:planning"
+}
+```
+
+Optional fields include `topic`, `meeting_url`, `started_at`, `ended_at`, `participants`, `action_items`, `duration_minutes`, `focus_areas`, `ai_model`, and `tts_model`.
 
 ## Resources
 

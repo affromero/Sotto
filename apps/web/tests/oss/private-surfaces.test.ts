@@ -223,17 +223,28 @@ describe('private-first OSS surfaces', () => {
     expect(mcpReadme).not.toContain('`https://sotto.fm`');
   });
 
-  it('exposes local agent ingestion through MCP without public visibility controls', () => {
-    const mcpSources = ['packages/mcp/src/server.ts', 'packages/mcp/src/client.ts', 'packages/mcp/README.md']
+  it('exposes local ingestion through MCP without public visibility controls', () => {
+    const mcpSources = [
+      'packages/mcp/src/server.ts',
+      'packages/mcp/src/client.ts',
+      'packages/mcp/src/format.ts',
+      'packages/mcp/README.md',
+    ]
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
 
     expect(mcpSources).toContain('ingest_agent_output');
+    expect(mcpSources).toContain('ingest_meeting_transcript');
     expect(mcpSources).toContain('/api/ingest/agent');
+    expect(mcpSources).toContain('/api/ingest/meeting');
     expect(mcpSources).toContain('tts_provider');
     expect(mcpSources).toContain('idempotency_key');
     expect(mcpSources).toContain('never publishes the result publicly');
+    expect(mcpSources).toContain('never exposes the meeting in a public feed');
+    expect(mcpSources).toContain('formatAgentIngested');
+    expect(mcpSources).toContain('formatMeetingIngested');
     expect(mcpSources).not.toContain('agent_visibility');
+    expect(mcpSources).not.toContain('meeting_visibility');
   });
 
   it('requires bot and shared URL helpers to use an explicit deployment URL', () => {

@@ -87,6 +87,41 @@ export interface AgentIngestResult {
   idempotent?: boolean;
 }
 
+export interface MeetingParticipant {
+  name: string;
+  email?: string;
+  role?: string;
+}
+
+export interface IngestMeetingTranscriptParams {
+  title: string;
+  transcript: string;
+  tts_provider: string;
+  topic?: string;
+  idempotency_key?: string;
+  meeting_url?: string;
+  platform?: string;
+  started_at?: string;
+  ended_at?: string;
+  participants?: MeetingParticipant[];
+  action_items?: string[];
+  duration_minutes?: number;
+  depth?: string;
+  audience_level?: string;
+  tone?: string;
+  focus_areas?: string;
+  ai_model?: string;
+  tts_model?: string;
+}
+
+export interface MeetingIngestResult {
+  id: string;
+  status: string;
+  source: 'MEETING';
+  discoveryId?: string;
+  idempotent?: boolean;
+}
+
 export interface UpdatePodcastParams {
   title?: string;
   topic?: string;
