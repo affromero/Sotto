@@ -1164,6 +1164,7 @@ describe('private-first OSS surfaces', () => {
 
   it('keeps local agent ingestion authenticated and private-only', () => {
     const agentIngestRouteSource = readSource('src/app/api/ingest/agent/route.ts');
+    const privateIngestionSource = readSource('src/lib/private-ingestion.ts');
     const schemaSource = readFileSync(resolve(repoRoot, 'apps/web/prisma/schema.prisma'), 'utf8');
     const sharedEnumsSource = readFileSync(
       resolve(repoRoot, 'packages/shared/src/types/enums.ts'),
@@ -1173,11 +1174,16 @@ describe('private-first OSS surfaces', () => {
     expect(agentIngestRouteSource).toContain('authenticateRequest(request)');
     expect(agentIngestRouteSource).toContain("errorResponse('Unauthorized', 401)");
     expect(agentIngestRouteSource).toContain("source: 'AGENT'");
-    expect(agentIngestRouteSource).toContain("visibility: 'PRIVATE'");
+    expect(agentIngestRouteSource).toContain('createPrivateIngestionPodcast');
+    expect(privateIngestionSource).toContain("visibility: 'PRIVATE'");
     expect(agentIngestRouteSource).toContain('agentIngestion.create');
     expect(agentIngestRouteSource).toContain('idempotencyKey');
-    expect(agentIngestRouteSource).not.toContain("visibility: 'PUBLIC'");
-    expect(agentIngestRouteSource).not.toContain("visibility: 'UNLISTED'");
+    expect([agentIngestRouteSource, privateIngestionSource].join('\n')).not.toContain(
+      "visibility: 'PUBLIC'"
+    );
+    expect([agentIngestRouteSource, privateIngestionSource].join('\n')).not.toContain(
+      "visibility: 'UNLISTED'"
+    );
     expect(agentIngestRouteSource).not.toContain('public feed');
     expect(schemaSource).toContain('model AgentIngestion');
     expect(schemaSource).toContain('AGENT');

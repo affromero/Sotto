@@ -8,14 +8,11 @@ import { checkRateLimit } from '@/lib/redis';
 import { checkGenerationGate } from '@/lib/generation-gate';
 import { checkSuspension, requireAdmin } from '@/lib/auth-guards';
 import { getJobPriority, isModelAllowedForUser } from '@/lib/tier-features';
+import { getModelRequiredPlan, isValidModelId } from '@/lib/providers/ai-registry';
 import {
-  getModelRequiredPlan,
-  getProviderForModel,
-  isValidModelId,
-} from '@/lib/providers/ai-registry';
-import { addJob, contentExtractionQueue, JobType } from '@/lib/queue';
-import type { ExtractContentPayload } from '@/lib/queue';
-import { generatePodcastSlug } from '@/lib/slugify';
+  createPrivateIngestionPodcast,
+  type PrivateIngestionTransaction,
+} from '@/lib/private-ingestion';
 import { errorResponse } from '@/lib/api-response';
 
 function contentHash(content: string): string {
@@ -203,11 +200,6 @@ export async function POST(request: NextRequest) {
   }
 
   const hash = contentHash(input.content);
-  const aiProvider = input.aiModel?.startsWith('claude-code:')
-    ? 'claude-code'
-    : input.aiModel
-      ? (getProviderForModel(input.aiModel) ?? null)
-      : null;
   const sourceContent = formatAgentSourceContent({
     provider: input.agent.provider,
     name: input.agent.name,
@@ -228,77 +220,49 @@ export async function POST(request: NextRequest) {
   const topic = input.topic ?? input.title;
 
   try {
-    const created = await prisma.$transaction(async (tx) => {
-      const podcast = await tx.podcast.create({
-        data: {
-          userId: authResult.userId,
-          title: input.title,
-          topic,
-          status: 'EXTRACTING',
-          source: 'AGENT',
-          sourcePlatform: input.agent.provider,
-          visibility: 'PRIVATE',
-          aiProvider,
-          aiModel: input.aiModel ?? null,
-          ttsProvider: input.ttsProvider,
-          ttsModel: input.ttsModel ?? null,
-        },
-      });
-
-      const discovery = await tx.discovery.create({
-        data: {
-          podcastId: podcast.id,
-          userId: authResult.userId,
-          topic,
-          depth: input.depth ?? 'standard',
-          audienceLevel: input.audienceLevel ?? 'general',
-          focusAreas: input.focusAreas ?? [],
-          tone: input.tone ?? 'casual',
-          durationTarget: input.durationTarget ?? 10,
-          sourceUrl: input.sourceUrl,
-          sourceContent,
-          sourceMetadata,
-        },
-      });
-
-      await tx.agentIngestion.create({
-        data: {
-          userId: authResult.userId,
-          podcastId: podcast.id,
-          idempotencyKey: input.idempotencyKey ?? null,
-          provider: input.agent.provider,
-          agentName: input.agent.name,
-          runId: input.agent.runId ?? null,
-          contentHash: hash,
-          metadata: sourceMetadata,
-        },
-      });
-
-      return { podcast, discovery };
-    });
-
-    const slug = await generatePodcastSlug(input.title, authResult.userId, prisma);
-    if (slug) {
-      await prisma.podcast.update({ where: { id: created.podcast.id }, data: { slug } });
-    }
-
-    const payload: ExtractContentPayload = {
-      podcastId: created.podcast.id,
+    const created = await createPrivateIngestionPodcast({
       userId: authResult.userId,
-      sourceText: sourceContent,
-    };
-    const jobPriority = getJobPriority(gate.isProUser ? 'PRO' : 'FREE', gate.isByokUser);
-    await addJob(contentExtractionQueue, JobType.EXTRACT_CONTENT, payload, {
-      priority: jobPriority,
-      jobId: `agent-ingest-${created.podcast.id}`,
+      title: input.title,
+      topic,
+      source: 'AGENT',
+      sourcePlatform: input.agent.provider,
+      aiModel: input.aiModel,
+      ttsProvider: input.ttsProvider,
+      ttsModel: input.ttsModel,
+      discovery: {
+        depth: input.depth,
+        audienceLevel: input.audienceLevel,
+        focusAreas: input.focusAreas,
+        tone: input.tone,
+        durationTarget: input.durationTarget,
+        sourceUrl: input.sourceUrl,
+        sourceContent,
+        sourceMetadata,
+      },
+      jobPriority: getJobPriority(gate.isProUser ? 'PRO' : 'FREE', gate.isByokUser),
+      jobIdPrefix: 'agent-ingest',
+      writeIngestionRecord: async (tx: PrivateIngestionTransaction, podcastId: string) => {
+        await tx.agentIngestion.create({
+          data: {
+            userId: authResult.userId,
+            podcastId,
+            idempotencyKey: input.idempotencyKey ?? null,
+            provider: input.agent.provider,
+            agentName: input.agent.name,
+            runId: input.agent.runId ?? null,
+            contentHash: hash,
+            metadata: sourceMetadata,
+          },
+        });
+      },
     });
 
     return NextResponse.json(
       {
-        id: created.podcast.id,
-        status: created.podcast.status,
-        source: 'AGENT',
-        discoveryId: created.discovery.id,
+        id: created.id,
+        status: created.status,
+        source: created.source,
+        discoveryId: created.discoveryId,
       },
       { status: 201 }
     );
