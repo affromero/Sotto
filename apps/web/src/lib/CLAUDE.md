@@ -193,7 +193,7 @@ All lib functions throw descriptive errors. API routes catch and return proper H
 
 - [ ] `validations.ts` → `byokSchema` — add to `provider` z.enum (otherwise BYOK key save returns 400)
 - [ ] `validations.ts` → `voicePreviewSchema` — add to `provider` z.enum (otherwise voice preview returns 400)
-- [ ] `api/settings/byok/route.ts` → DELETE `validProviders` array — add provider (otherwise key deletion falls back to elevenlabs)
+- [ ] `api/settings/byok/route.ts` → DELETE uses `byokProviderSchema`; add providers through `byokSchema` so save/delete validation stays aligned
 - [ ] `api/podcasts/[id]/voice-tracks/route.ts` → GET enrichment uses `findVoiceName()` — works automatically if voice pool is registered
 
 ### Display names (shared + UI)

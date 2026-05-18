@@ -195,8 +195,22 @@ describe('GET /api/voices', () => {
     mockVoiceAllowlistFindMany.mockResolvedValue([]);
     mockVoiceRequestFindMany.mockResolvedValue([]);
     mockGetVoiceCatalog.mockResolvedValue([
-      { id: 'voice-1', name: 'Adam', gender: 'male', accent: 'american', age: 'middle', description: 'warm narrator' },
-      { id: 'voice-2', name: 'Bella', gender: 'female', accent: 'american', age: 'young', description: 'engaging storyteller' },
+      {
+        id: 'voice-1',
+        name: 'Adam',
+        gender: 'male',
+        accent: 'american',
+        age: 'middle',
+        description: 'warm narrator',
+      },
+      {
+        id: 'voice-2',
+        name: 'Bella',
+        gender: 'female',
+        accent: 'american',
+        age: 'young',
+        description: 'engaging storyteller',
+      },
     ]);
   });
 
@@ -214,7 +228,14 @@ describe('GET /api/voices', () => {
   it('returns voice pool, user clones, and maxVoiceClones for authenticated user', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockVoiceCloneFindMany.mockResolvedValue([
-      { ...mockVoiceClone, provider: 'elevenlabs', description: null, requestable: false, priceInCents: null, voicePurchases: [] },
+      {
+        ...mockVoiceClone,
+        provider: 'elevenlabs',
+        description: null,
+        requestable: false,
+        priceInCents: null,
+        voicePurchases: [],
+      },
     ]);
 
     const request = createRequest();
@@ -305,7 +326,14 @@ describe('GET /api/voices', () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockVoiceCloneFindMany.mockResolvedValue([]);
     mockGetVoiceCatalog.mockResolvedValue([
-      { id: 'cartesia-1', name: 'Cartesia Voice', gender: 'female', accent: 'british', age: 'young', description: 'clear speaker' },
+      {
+        id: 'cartesia-1',
+        name: 'Cartesia Voice',
+        gender: 'female',
+        accent: 'british',
+        age: 'young',
+        description: 'clear speaker',
+      },
     ]);
 
     const request = createRequest('http://localhost:3000/api/voices?provider=cartesia');
@@ -333,14 +361,17 @@ describe('GET /api/voices', () => {
     expect(mockGetVoiceCatalog).toHaveBeenCalledWith('elevenlabs');
   });
 
-  it('falls back to elevenlabs for invalid provider param', async () => {
+  it('rejects invalid provider param', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockVoiceCloneFindMany.mockResolvedValue([]);
 
     const request = createRequest('http://localhost:3000/api/voices?provider=invalid');
-    await GET(request);
+    const response = await GET(request);
+    const body = await response.json();
 
-    expect(mockGetVoiceCatalog).toHaveBeenCalledWith('elevenlabs');
+    expect(response.status).toBe(400);
+    expect(body).toMatchObject({ error: 'Invalid provider' });
+    expect(mockGetVoiceCatalog).not.toHaveBeenCalled();
   });
 });
 
@@ -822,7 +853,11 @@ describe('POST /api/voices/preview', () => {
 
     const request = createRequest('http://localhost:3000/api/voices/preview', {
       method: 'POST',
-      body: JSON.stringify({ voiceId: 'voice-1', text: 'Hello world, this is a preview.', provider: 'elevenlabs' }),
+      body: JSON.stringify({
+        voiceId: 'voice-1',
+        text: 'Hello world, this is a preview.',
+        provider: 'elevenlabs',
+      }),
     });
     const response = await POST_PREVIEW(request);
 
@@ -830,7 +865,9 @@ describe('POST /api/voices/preview', () => {
     expect(response.headers.get('Content-Type')).toBe('audio/mpeg');
     expect(response.headers.get('Content-Length')).toBe(mockAudioBuffer.length.toString());
     expect(mockCreateTtsProviderAsync).toHaveBeenCalledWith('elevenlabs', 'user-elevenlabs-key');
-    expect(generateSpeech).toHaveBeenCalledWith({ text: 'Hello world, this is a preview.', voiceId: 'voice-1' });
+    expect(generateSpeech).toHaveBeenCalledWith({
+      text: 'Hello world, this is a preview.',
+      voiceId: 'voice-1',
+    });
   });
-
 });

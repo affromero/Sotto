@@ -692,7 +692,7 @@ describe('private-first OSS surfaces', () => {
     expect(releaseHygieneSources).toContain('SOTTO_ENV_FILE');
     expect(releaseHygieneSources).toContain('scripts/run-with-env.sh');
     expect(releaseHygieneSources).toContain('deployment secret manager or env file');
-	    expect(releaseHygieneSources).toContain('Environment variables:');
+    expect(releaseHygieneSources).toContain('Environment variables:');
     expect(releaseHygieneSources).not.toContain('security@sotto.fm');
     expect(releaseHygieneSources).not.toContain('sotto.fm/api');
     expect(releaseHygieneSources).not.toContain('NEXTAUTH_SECRET');
@@ -1088,6 +1088,36 @@ describe('private-first OSS surfaces', () => {
     expect(livePodcastSources).not.toContain('Auth is optional');
     expect(livePodcastSources).not.toContain('public podcasts visible to all');
     expect(livePodcastSources).not.toContain("visibility === 'PRIVATE'");
+  });
+
+  it('requires explicit provider selection for BYOK key deletion', () => {
+    const byokSources = [
+      'src/app/api/settings/byok/route.ts',
+      'src/lib/validations.ts',
+      'src/lib/CLAUDE.md',
+    ]
+      .map(readSource)
+      .join('\n');
+
+    expect(byokSources).toContain('byokProviderSchema');
+    expect(byokSources).toContain("errorResponse('Provider is required', 400)");
+    expect(byokSources).not.toContain('legacy behavior removes elevenlabs');
+    expect(byokSources).not.toContain('validProviders');
+    expect(byokSources).not.toContain('targetProvider');
+    expect(byokSources).not.toContain("?'elevenlabs'");
+    expect(byokSources).not.toContain("|| 'elevenlabs'");
+  });
+
+  it('rejects invalid voice provider selection instead of switching providers', () => {
+    const voiceProviderSources = ['src/app/api/voices/route.ts', 'tests/api/voices.test.ts']
+      .map(readSource)
+      .join('\n');
+
+    expect(voiceProviderSources).toContain("errorResponse('Invalid provider', 400)");
+    expect(voiceProviderSources).toContain('rejects invalid provider param');
+    expect(voiceProviderSources).not.toContain(
+      'falls back to elevenlabs for invalid provider param'
+    );
   });
 
   it('keeps daily picks and trending free of social ranking payloads', () => {
