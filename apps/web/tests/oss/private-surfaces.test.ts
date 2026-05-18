@@ -1609,6 +1609,14 @@ describe('private-first OSS surfaces', () => {
     const voiceManagerSource = readSource(
       'src/app/(dashboard)/settings/voices/VoiceManager.tsx'
     );
+    const mobileSettingsSource = readFileSync(
+      resolve(repoRoot, 'apps/mobile/app/settings.tsx'),
+      'utf8'
+    );
+    const mobileLayoutSource = readFileSync(
+      resolve(repoRoot, 'apps/mobile/app/_layout.tsx'),
+      'utf8'
+    );
     const voiceMarketplaceSources = [
       'src/app/voices/page.tsx',
       'src/app/api/voices/request/route.ts',
@@ -1640,6 +1648,14 @@ describe('private-first OSS surfaces', () => {
     expect(voiceCloneRouteSource).toContain('requestable === true');
     expect(voiceMarketplaceSources).toContain('Voice marketplace is currently unavailable.');
     expect(voiceMarketplaceSources).toContain('disabled by default');
+    expect(existsSync(resolve(repoRoot, 'apps/mobile/app/voices.tsx'))).toBe(false);
+    expect(existsSync(resolve(repoRoot, 'e2e/maestro/flows/21-voice-marketplace.yaml'))).toBe(
+      false
+    );
+    expect(mobileSettingsSource).not.toContain('settings-voice-marketplace');
+    expect(mobileSettingsSource).not.toContain("router.push('/voices')");
+    expect(mobileSettingsSource).not.toContain('Voice Marketplace');
+    expect(mobileLayoutSource).not.toContain('Stack.Screen name="voices"');
     expect(voiceMarketplaceSources).not.toContain(
       'voiceMarketplaceEnabled Boolean  @default(true)'
     );

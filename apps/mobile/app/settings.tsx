@@ -212,17 +212,6 @@ export default function SettingsScreen() {
             <View style={styles.rowSeparator} />
             <Pressable
               style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-              onPress={() => router.push('/voices')}
-              testID="settings-voice-marketplace"
-            >
-              <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
-                Voice Marketplace
-              </Text>
-              <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
-            </Pressable>
-            <View style={styles.rowSeparator} />
-            <Pressable
-              style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
               onPress={() => router.push('/settings/billing')}
               testID="settings-billing"
             >
