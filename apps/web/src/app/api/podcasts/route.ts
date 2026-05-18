@@ -9,7 +9,11 @@ import { checkGenerationGate } from '@/lib/generation-gate';
 import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
 import { getAutoModelConfig } from '@/lib/auto-model-config';
 import { getTierFeatures, getJobPriority, isModelAllowedForUser } from '@/lib/tier-features';
-import { getModelRequiredPlan, getProviderForModel, isValidModelId } from '@/lib/providers/ai-registry';
+import {
+  getModelRequiredPlan,
+  getProviderForModel,
+  isValidModelId,
+} from '@/lib/providers/ai-registry';
 import { computeVoiceCharges } from '@/lib/voice-pricing';
 import { checkSuspension, requireAdmin } from '@/lib/auth-guards';
 import { generatePodcastSlug } from '@/lib/slugify';
@@ -82,7 +86,10 @@ export async function POST(request: NextRequest) {
   // Validate model ID against registry (claude-code:* models are exempt)
   if (parsed.data.aiModel && !parsed.data.aiModel.startsWith('claude-code:')) {
     if (!isValidModelId(parsed.data.aiModel)) {
-      return errorResponse(`Unknown AI model: "${parsed.data.aiModel}". Check /api/ai-models for available models.`, 400);
+      return errorResponse(
+        `Unknown AI model: "${parsed.data.aiModel}". Check /api/ai-models for available models.`,
+        400
+      );
     }
   }
 
@@ -106,14 +113,25 @@ export async function POST(request: NextRequest) {
   const gate = await checkGenerationGate(authResult.userId);
   if (!gate.allowed) {
     if (gate.reason === 'generation_in_progress') {
-      return errorResponse('You already have a podcast being generated. Please wait for it to finish.', 403, { code: gate.reason });
+      return errorResponse(
+        'You already have a podcast being generated. Please wait for it to finish.',
+        403,
+        { code: gate.reason }
+      );
     }
     if (gate.reason === 'daily_limit_reached') {
       const resetH = gate.resetInSeconds ? Math.ceil(gate.resetInSeconds / 3600) : 24;
-      return errorResponse(`Daily podcast limit reached. Next podcast available in ~${resetH}h. Upgrade to Pro for unlimited generation.`, 403, { code: gate.reason,
-          resetInSeconds: gate.resetInSeconds, });
+      return errorResponse(
+        `Daily podcast limit reached. Next podcast available in ~${resetH}h. Upgrade to Pro for unlimited generation.`,
+        403,
+        { code: gate.reason, resetInSeconds: gate.resetInSeconds }
+      );
     }
-    return errorResponse('No voice provider available. Add a TTS key in Settings for unlimited generation.', 403, { code: gate.reason });
+    return errorResponse(
+      'No voice provider available. Add a TTS key in Settings for unlimited generation.',
+      403,
+      { code: gate.reason }
+    );
   }
 
   // Get tier features for this user
@@ -126,15 +144,28 @@ export async function POST(request: NextRequest) {
   // Model plan gating — block expensive models for free non-BYOK users
   if (parsed.data.aiModel) {
     const requiredPlan = getModelRequiredPlan(parsed.data.aiModel);
-    if (requiredPlan && !isModelAllowedForUser(requiredPlan, gate.isProUser ? 'PRO' : 'FREE', gate.isByokUser, isAdmin ? 'ADMIN' : undefined)) {
-      return errorResponse('This model requires a Pro subscription.', 403, { code: 'model_requires_pro' });
+    if (
+      requiredPlan &&
+      !isModelAllowedForUser(
+        requiredPlan,
+        gate.isProUser ? 'PRO' : 'FREE',
+        gate.isByokUser,
+        isAdmin ? 'ADMIN' : undefined
+      )
+    ) {
+      return errorResponse('This model requires a Pro subscription.', 403, {
+        code: 'model_requires_pro',
+      });
     }
   }
 
   // Speaker count validation — enforce tier cap
   const requestedSpeakers = parsed.data.metadata?.speakers;
   if (requestedSpeakers && requestedSpeakers.length > tierFeatures.maxSpeakers) {
-    return errorResponse(`Speaker count (${requestedSpeakers.length}) exceeds your plan limit of ${tierFeatures.maxSpeakers}.`, 403);
+    return errorResponse(
+      `Speaker count (${requestedSpeakers.length}) exceeds your plan limit of ${tierFeatures.maxSpeakers}.`,
+      403
+    );
   }
 
   // Duration validation — enforce tier cap (before incrementing counter)
@@ -143,11 +174,24 @@ export async function POST(request: NextRequest) {
     : 9999;
   const durationTarget = parsed.data.metadata?.durationTarget;
   if (durationTarget && durationTarget > effectiveMaxDuration) {
-    return errorResponse(`Requested duration (${durationTarget} min) exceeds your plan limit of ${effectiveMaxDuration} min.`, 400, {  });
+    return errorResponse(
+      `Requested duration (${durationTarget} min) exceeds your plan limit of ${effectiveMaxDuration} min.`,
+      400,
+      {}
+    );
   }
 
   // Track whether the user explicitly chose a model in this request
   const requestedAiModel = parsed.data.aiModel;
+  if (gate.isByokUser && !parsed.data.ttsProvider) {
+    return errorResponse(
+      'TTS provider is required. Choose a provider before creating a podcast.',
+      400,
+      {
+        code: 'tts_provider_required',
+      }
+    );
+  }
 
   // Auto-resolve providers for free-tier users (quota consumed on success by workers)
   let autoResolvedTtsProvider: string | undefined;
@@ -180,7 +224,15 @@ export async function POST(request: NextRequest) {
     if (userPref?.preferredAiModel) {
       const prefModel = userPref.preferredAiModel;
       const prefPlan = getModelRequiredPlan(prefModel);
-      if (!prefPlan || isModelAllowedForUser(prefPlan, gate.isProUser ? 'PRO' : 'FREE', gate.isByokUser, isAdmin ? 'ADMIN' : undefined)) {
+      if (
+        !prefPlan ||
+        isModelAllowedForUser(
+          prefPlan,
+          gate.isProUser ? 'PRO' : 'FREE',
+          gate.isByokUser,
+          isAdmin ? 'ADMIN' : undefined
+        )
+      ) {
         autoResolvedAiModel = prefModel;
         autoResolvedAiProvider = getProviderForModel(prefModel) ?? autoResolvedAiProvider;
       }
@@ -194,10 +246,7 @@ export async function POST(request: NextRequest) {
     (v): v is { speaker: string; voiceId: string } => !!v.voiceId
   );
   if (!paymentIntentIds) {
-    const voiceCharges = await computeVoiceCharges(
-      authResult.userId,
-      voicesWithIds
-    );
+    const voiceCharges = await computeVoiceCharges(authResult.userId, voicesWithIds);
 
     if (voiceCharges.length > 0) {
       return NextResponse.json(
@@ -229,7 +278,8 @@ export async function POST(request: NextRequest) {
 
   // Compute auto-resolution flags
   const aiAutoResolved = !parsed.data.aiModel && !!autoResolvedAiModel;
-  const ttsAutoResolved = !parsed.data.ttsProvider && !parsed.data.ttsModel && !!autoResolvedTtsProvider;
+  const ttsAutoResolved =
+    !parsed.data.ttsProvider && !parsed.data.ttsModel && !!autoResolvedTtsProvider;
 
   const podcastData = {
     title: parsed.data.title,
@@ -267,7 +317,7 @@ export async function POST(request: NextRequest) {
   // Create PodcastVoice records from the voices array
   if (voiceEntries.length > 0) {
     await prisma.podcastVoice.createMany({
-      data: voiceEntries.map(v => ({
+      data: voiceEntries.map((v) => ({
         podcastId: podcast.id,
         speaker: v.speaker,
         voiceId: v.voiceId ?? null,

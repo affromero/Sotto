@@ -928,6 +928,23 @@ describe('private-first OSS surfaces', () => {
     expect(setupSources).not.toContain('sttProvider      String? // null = auto');
   });
 
+  it('keeps BYOK voice generation explicit instead of submitting Auto', () => {
+    const ttsSources = [
+      'apps/web/src/app/api/podcasts/route.ts',
+      'apps/web/src/app/api/tts-options/route.ts',
+      'apps/web/src/components/create/TtsModelDropdown.tsx',
+      'apps/web/prisma/schema.prisma',
+    ]
+      .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
+      .join('\n');
+
+    expect(ttsSources).toContain('tts_provider_required');
+    expect(ttsSources).toContain('const options: TtsOption[] = [];');
+    expect(ttsSources).toContain("mapped[0].id !== 'auto'");
+    expect(ttsSources).toContain('explicit or platform-resolved provider required');
+    expect(ttsSources).not.toContain('ttsProvider      String? // null = auto');
+  });
+
   it('keeps release docs aligned with private-first OSS strategy', () => {
     const removedPitchDocs = [
       'docs/02-ui-mockups.md',
