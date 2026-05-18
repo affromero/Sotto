@@ -5,11 +5,11 @@
 ```bash
 npm install                    # From repo root
 npm run dev                    # Start web backend (mobile is a thin client)
-npm run mobile:ios             # iOS Simulator (auto-syncs env from Doppler)
-npm run mobile:android         # Android emulator (auto-syncs env from Doppler)
+npm run mobile:ios             # iOS Simulator (syncs EXPO_PUBLIC_* from .env.local)
+npm run mobile:android         # Android emulator (syncs EXPO_PUBLIC_* from .env.local)
 ```
 
-Env managed via Doppler. `mobile:ios` auto-pulls `EXPO_PUBLIC_*` vars and replaces `LAN_IP` with `en0` address.
+Env is synced from the repo root `.env.local` by `npm run mobile:env`. `EXPO_PUBLIC_API_URL` is required and may be derived from `NEXT_PUBLIC_APP_URL`.
 
 ## Tech Stack
 
@@ -102,11 +102,11 @@ Preferences persist via SecureStore: `sotto:aiModel`, `sotto:ttsOption`.
 
 ## Environment Variables
 
-All `EXPO_PUBLIC_*` via **Doppler**. `npm run mobile:env` writes `apps/mobile/.env` with auto-detected LAN IP.
+All `EXPO_PUBLIC_*` values come from the repo root `.env.local`. `npm run mobile:env` writes `apps/mobile/.env` for Expo.
 
 | Variable | Purpose |
 |----------|---------|
-| `EXPO_PUBLIC_API_URL` | Backend base URL (LAN IP auto-detected) |
+| `EXPO_PUBLIC_API_URL` | Backend API base URL |
 | `EXPO_PUBLIC_EAS_PROJECT_ID` | EAS Build project ID |
 | `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` | Google sign-in web client ID |
 | `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` | Google sign-in iOS client ID |
@@ -149,7 +149,7 @@ npm run mobile:android:build:production  # Play Store AAB (EAS)
 
 | Problem | Solution |
 |---------|----------|
-| "Network request failed" | `npm run mobile:env` to re-sync. Check `en0` IP |
+| "Network request failed" | `npm run mobile:env` to re-sync. Check `EXPO_PUBLIC_API_URL` reaches the web backend from the simulator/device |
 | Stale JS bundle | `npx expo start --clear` |
 | Auth redirect loop | Check `useProtectedRoute()` in `_layout.tsx` |
 | 401 on all calls | Clear SecureStore, re-login |

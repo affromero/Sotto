@@ -337,6 +337,27 @@ describe('private-first OSS surfaces', () => {
     expect(localSetupDocs).not.toContain('LOCAL_STORAGE_ROOT');
   });
 
+  it('keeps mobile env sync local and Doppler-free by default', () => {
+    const packageJson = readFileSync(resolve(repoRoot, 'package.json'), 'utf8');
+    const syncMobileEnv = readFileSync(resolve(repoRoot, 'scripts/sync-mobile-env.sh'), 'utf8');
+    const mobileEnvExample = readFileSync(resolve(repoRoot, 'apps/mobile/.env.example'), 'utf8');
+    const mobileInstructions = readFileSync(resolve(repoRoot, 'apps/mobile/CLAUDE.md'), 'utf8');
+    const mobileSetupSources = [packageJson, syncMobileEnv, mobileEnvExample, mobileInstructions].join(
+      '\n',
+    );
+
+    expect(packageJson).toContain('"mobile:env": "bash scripts/sync-mobile-env.sh"');
+    expect(syncMobileEnv).toContain('ENV_SOURCE="$REPO_ROOT/.env.local"');
+    expect(syncMobileEnv).toContain('EXPO_PUBLIC_API_URL="${NEXT_PUBLIC_APP_URL%/}/api"');
+    expect(syncMobileEnv).toContain('MOBILE_ENV_OUTPUT');
+    expect(mobileSetupSources).toContain('EXPO_PUBLIC_API_URL');
+    expect(mobileSetupSources).not.toContain('LAN_IP');
+    expect(mobileSetupSources).not.toContain('auto-syncs env from Doppler');
+    expect(mobileSetupSources).not.toContain("grep '^EXPO_PUBLIC_'");
+    expect(mobileSetupSources).not.toContain('doppler secrets download');
+    expect(mobileSetupSources).not.toContain('All `EXPO_PUBLIC_*` via **Doppler**');
+  });
+
   it('does not ship the standalone social feed ranking workspace', () => {
     const workspaceSources = [
       'package.json',
