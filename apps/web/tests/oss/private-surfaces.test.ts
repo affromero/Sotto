@@ -562,6 +562,41 @@ describe('private-first OSS surfaces', () => {
     expect(botIdentitySources).not.toContain('https://twitter.com/SottoFM');
   });
 
+  it('keeps security and operations guidance self-host neutral', () => {
+    const releaseHygieneSources = [
+      'SECURITY.md',
+      'scripts/generate-apple-secret.mjs',
+      'docs/05-plan.md',
+      'docs/23-local-development.md',
+      'docs/27-launch-readiness-status.md',
+      'apps/maps/CLAUDE.md',
+      'apps/web/scripts/test-runway-browser.ts',
+      'apps/web/scripts/test-runway-native.ts',
+      'apps/web/src/app/(admin)/admin/storage/page.tsx',
+      'apps/web/src/lib/providers/video.ts',
+      'packages/maps/CLAUDE.md',
+      'packages/maps/README.md',
+    ]
+      .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
+      .join('\n');
+
+    expect(releaseHygieneSources).toContain('security@example.com');
+    expect(releaseHygieneSources).toContain('AUTH_SECRET="<generated>"');
+    expect(releaseHygieneSources).toContain('SOTTO_ENV_FILE');
+    expect(releaseHygieneSources).toContain('scripts/run-with-env.sh');
+    expect(releaseHygieneSources).not.toContain('security@sotto.fm');
+    expect(releaseHygieneSources).not.toContain('sotto.fm/api');
+    expect(releaseHygieneSources).not.toContain('NEXTAUTH_SECRET');
+    expect(releaseHygieneSources).not.toContain('.env.workers.local');
+    expect(releaseHygieneSources).not.toContain('Set in Doppler');
+    expect(releaseHygieneSources).not.toContain('doppler run --project');
+    expect(releaseHygieneSources).not.toContain('add <code>CF_API_TOKEN</code> to Doppler');
+    expect(releaseHygieneSources).not.toContain('Set HERA_API_KEY in Doppler');
+    expect(releaseHygieneSources).not.toContain('maps.sotto.fm');
+    expect(releaseHygieneSources).not.toContain('All managed via Doppler');
+    expect(releaseHygieneSources).not.toContain('Env vars (Doppler)');
+  });
+
   it('keeps server deployment self-hosted and env-file driven', () => {
     const deploySource = readFileSync(resolve(repoRoot, 'scripts/deploy.sh'), 'utf8');
     const setupServerSource = readFileSync(resolve(repoRoot, 'scripts/setup-server.sh'), 'utf8');

@@ -79,7 +79,7 @@ The setup script should:
 - Install dependencies.
 - Start PostgreSQL and Redis.
 - Write `.env.local` from `.env.oss.example`.
-- Generate `NEXTAUTH_SECRET` and `BYOK_ENCRYPTION_KEY` when absent.
+- Generate `AUTH_SECRET` and `BYOK_ENCRYPTION_KEY` when absent.
 - Set `STORAGE_PROVIDER=local`.
 - Set `PAYMENT_PROVIDER=none`.
 - Push the Prisma schema.

@@ -4,7 +4,7 @@
 
 If you discover a security vulnerability in Sotto, please report it responsibly.
 
-**Email**: [security@sotto.fm](mailto:security@sotto.fm)
+**Email**: [security@example.com](mailto:security@example.com)
 
 Please include:
 
@@ -23,8 +23,8 @@ Please include:
 
 The following are in scope:
 
-- sotto.fm web application
-- Sotto API endpoints (`sotto.fm/api/*`)
+- Self-hosted Sotto web applications
+- Sotto API endpoints (`/api/*` on your configured deployment URL)
 - Authentication and authorization flows
 - Data handling and encryption (BYOK keys, user data)
 - Voice marketplace payment processing

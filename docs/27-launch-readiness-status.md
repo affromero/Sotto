@@ -122,7 +122,7 @@ Note: `PENDING`/`DISCOVERING` statuses are used by BYOK resume, agent/manual set
 
 Everything outside that path should be considered optional for day one.
 
-`deploy.sh` supports `.env.workers.local` for per-server preset overrides without touching Doppler — useful for launch-day flexibility (e.g., temporarily enabling a single non-core queue on one server).
+`deploy.sh` reads the env file selected by `SOTTO_ENV_FILE`, so launch-day queue and worker preset changes can be made without changing repository files.
 
 ## Required Next Steps Before Launch
 
