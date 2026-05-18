@@ -12,7 +12,7 @@ const FEATURE_CATALOG: Record<string, string> = {
     'Create private RSS feed URLs for podcast apps without exposing podcasts to public listings.',
   byok: 'Bring Your Own Keys — use your own API keys for LLM and TTS providers. All features become unlimited and free. No subscription required.',
   'voice-cloning':
-    'Clone your voice and use it in podcasts. Other creators can request to use your voice, and you set the price. A voice marketplace.',
+    'Clone voices for private podcasts, keep usage under your control, and grant access only to specific users when needed.',
   'script-review':
     'Review AI-generated scripts before audio generation. Edit turns, approve, or regenerate with feedback. Full control over content.',
   'video-generation':
@@ -41,7 +41,7 @@ export function getDemoProductContext(): string {
     '- Import human-made podcasts into a private workspace',
     '- Private RSS feeds for podcast apps',
     '- Bring Your Own Keys (BYOK) for unlimited free usage',
-    '- Voice cloning marketplace',
+    '- Private voice cloning and allowlisted access',
     '- Video generation with AI visuals',
   ].join('\n');
 }

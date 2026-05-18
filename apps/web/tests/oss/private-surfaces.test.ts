@@ -1609,6 +1609,18 @@ describe('private-first OSS surfaces', () => {
     const voiceManagerSource = readSource(
       'src/app/(dashboard)/settings/voices/VoiceManager.tsx'
     );
+    const voiceNotificationSource = readSource('src/lib/notification-utils.ts');
+    const defaultVoiceSharingCopySources = [
+      'src/app/terms/page.tsx',
+      'src/app/privacy/page.tsx',
+      'src/app/changelog/page.tsx',
+      'src/lib/demo-context.ts',
+      'src/lib/notification-utils.ts',
+      'src/components/notifications/NotificationList.tsx',
+      'src/workers/voice-verification.worker.ts',
+    ]
+      .map(readSource)
+      .join('\n');
     const mobileSettingsSource = readFileSync(
       resolve(repoRoot, 'apps/mobile/app/settings.tsx'),
       'utf8'
@@ -1656,6 +1668,13 @@ describe('private-first OSS surfaces', () => {
     expect(mobileSettingsSource).not.toContain("router.push('/voices')");
     expect(mobileSettingsSource).not.toContain('Voice Marketplace');
     expect(mobileLayoutSource).not.toContain('Stack.Screen name="voices"');
+    expect(defaultVoiceSharingCopySources).toContain('paid voice sharing disabled by default');
+    expect(voiceNotificationSource).toContain("return '/settings/voices'");
+    expect(voiceNotificationSource).not.toContain("return '/voices'");
+    expect(defaultVoiceSharingCopySources).not.toContain('Voice Marketplace');
+    expect(defaultVoiceSharingCopySources).not.toContain('voice marketplace');
+    expect(defaultVoiceSharingCopySources).not.toContain('marketplace transactions');
+    expect(defaultVoiceSharingCopySources).not.toContain('live on the marketplace');
     expect(voiceMarketplaceSources).not.toContain(
       'voiceMarketplaceEnabled Boolean  @default(true)'
     );

@@ -133,7 +133,7 @@ export default function PrivacyPage() {
             <li>Provide private library, discovery, and recommendation features</li>
             <li>Build and update your behavioral profile for personalized recommendations</li>
             <li>Send notifications about your podcasts and interactions</li>
-            <li>Process voice marketplace payments via Stripe Connect</li>
+            <li>Process optional paid voice-sharing payments via Stripe Connect</li>
             <li>Moderate content for safety and policy compliance</li>
             <li>Improve service quality, fix bugs, and analyze usage patterns</li>
             <li>Prevent abuse, enforce rate limits, and detect fraudulent activity</li>
@@ -166,8 +166,8 @@ export default function PrivacyPage() {
               and user avatars
             </li>
             <li>
-              <strong>Payments</strong> (Stripe) — voice marketplace transactions
-              via Stripe Connect (10% platform fee)
+              <strong>Payments</strong> (Stripe) — optional paid voice-sharing
+              transactions via Stripe Connect when enabled
             </li>
             <li>
               <strong>Authentication</strong> (Google, GitHub, Apple) — OAuth sign-in

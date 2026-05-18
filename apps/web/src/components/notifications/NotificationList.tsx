@@ -61,7 +61,7 @@ const typeIcons: Record<string, typeof Bell> = {
   VOICE_BLOCKED_DUPLICATE: ShieldAlert,
   VOICE_OWNERSHIP_ALERT: ShieldAlert,
 
-  // Voice marketplace
+  // Voice access requests
   VOICE_REQUEST_RECEIVED: Mic,
   VOICE_REQUEST_APPROVED: Mic,
   VOICE_REQUEST_DENIED: Mic,

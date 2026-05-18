@@ -102,9 +102,9 @@ const entries: ChangelogEntry[] = [
   },
   {
     date: '2026-01-25',
-    title: 'Voice Marketplace',
+    title: 'Paid Voice Sharing',
     description:
-      'Voice owners can now set per-podcast pricing via Stripe Connect. Buyers pay once per podcast, with a 10% platform fee. Includes allowlists, access requests, and free voice paths.',
+      'Operators can enable paid access requests for verified voice clones via Stripe Connect. The feature stays disabled by default for private-first and self-hosted installs.',
     tags: ['feature'],
   },
   {

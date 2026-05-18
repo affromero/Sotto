@@ -153,13 +153,14 @@ export default function TermsPage() {
             infringers.
           </p>
 
-          <h2>12. Voice Marketplace and Payments</h2>
+          <h2>12. Optional Paid Voice Sharing and Payments</h2>
           <p>
-            Sotto operates a voice marketplace where voice owners can set
-            per-podcast pricing for their voice clones.
+            Private-first installs keep paid voice sharing disabled by default.
+            If an operator enables it, voice owners may set per-podcast pricing
+            for access to their voice clones.
           </p>
 
-          <h3>Purchases</h3>
+          <h3>Paid Access</h3>
           <ul>
             <li>Payments are processed securely via Stripe</li>
             <li>Voice access is granted per podcast &mdash; one purchase covers one podcast generation</li>
@@ -169,8 +170,9 @@ export default function TermsPage() {
 
           <h3>Platform Fee</h3>
           <p>
-            Sotto charges a 10% platform fee on voice marketplace transactions.
-            The remaining 90% is transferred to the voice owner via Stripe Connect.
+            Sotto charges a 10% platform fee on paid voice-sharing transactions
+            when this optional feature is enabled. The remaining 90% is
+            transferred to the voice owner via Stripe Connect.
           </p>
 
           <h3>Refunds</h3>
@@ -183,7 +185,7 @@ export default function TermsPage() {
 
           <h3>Voice Owner Responsibilities</h3>
           <p>
-            Voice owners who sell access to their voices must comply with
+            Voice owners who enable paid access to their voices must comply with
             Stripe&apos;s terms of service and are responsible for any applicable
             taxes on their earnings.
           </p>
