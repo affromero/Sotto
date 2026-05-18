@@ -52,7 +52,7 @@ interface LaunchVideoScene {
 ### Action types (13 total)
 
 ```json
-{ "type": "navigate", "url": "https://sotto.fm/create" }
+{ "type": "navigate", "url": "https://your-domain.example/create" }
 { "type": "click", "selector": "button.cta" }
 { "type": "type", "selector": "textarea", "text": "...", "speed": { "min": 25, "max": 70 } }
 { "type": "wait", "ms": 1500 }

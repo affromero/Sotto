@@ -89,7 +89,7 @@ export function AvatarPrep({ project }: { project: DemoProject }) {
             className={styles.input}
             value={manualUrl}
             onChange={(e) => setManualUrl(e.target.value)}
-            placeholder="https://r2.sotto.fm/demos/avatars/..."
+            placeholder="https://media.example.com/demos/avatars/..."
           />
           <button
             className={styles.btn}

@@ -30,7 +30,7 @@ export default function SupportPage() {
                 <strong>Email Support</strong>
                 <p>
                   Reach us at{' '}
-                  <a href="mailto:support@sotto.fm">support@sotto.fm</a>.
+                  <a href="mailto:support@example.com">support@example.com</a>.
                   We typically respond within 24 hours.
                 </p>
               </div>

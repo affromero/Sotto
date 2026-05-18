@@ -17,7 +17,7 @@ export async function createSessionToken(
   if (!secret) throw new Error('AUTH_SECRET not set');
 
   return encode({
-    token: { sub: userId, role, name, email: `${role.toLowerCase()}@sotto.fm` },
+    token: { sub: userId, role, name, email: `${role.toLowerCase()}@example.com` },
     secret,
     salt: APP_URL.startsWith('https')
       ? '__Secure-authjs.session-token'

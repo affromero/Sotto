@@ -135,7 +135,7 @@ export default function TermsPage() {
           <h3>Designated Agent</h3>
           <p>
             Send DMCA notices to:{' '}
-            <a href="mailto:dmca@sotto.fm">dmca@sotto.fm</a>
+            <a href="mailto:dmca@example.com">dmca@example.com</a>
           </p>
 
           <h3>Counter-Notice</h3>
@@ -178,7 +178,7 @@ export default function TermsPage() {
             Since payment is only captured on successful podcast generation, refunds
             are generally not applicable. If you experience issues with a completed
             purchase, contact{' '}
-            <a href="mailto:support@sotto.fm">support@sotto.fm</a>.
+            <a href="mailto:support@example.com">support@example.com</a>.
           </p>
 
           <h3>Voice Owner Responsibilities</h3>
@@ -197,7 +197,7 @@ export default function TermsPage() {
           <h2>14. Contact</h2>
           <p>
             Questions about these terms? Email us at{' '}
-            <a href="mailto:support@sotto.fm">support@sotto.fm</a>.
+            <a href="mailto:support@example.com">support@example.com</a>.
           </p>
         </div>
       </div>

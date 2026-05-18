@@ -66,7 +66,7 @@ async function createSessionToken(userId: string, role: string, name: string): P
   if (!secret) throw new Error('AUTH_SECRET not set');
 
   const token = await encode({
-    token: { sub: userId, role, name, email: `${role.toLowerCase()}@sotto.fm` },
+    token: { sub: userId, role, name, email: `${role.toLowerCase()}@example.com` },
     secret,
     salt: APP_URL.startsWith('https') ? '__Secure-authjs.session-token' : 'authjs.session-token',
   });
@@ -265,8 +265,8 @@ async function main() {
   // Look up demo data from database
   const prisma = new PrismaClient();
   try {
-    const demoUser = await prisma.user.findUnique({ where: { email: 'demo@sotto.fm' } });
-    const adminUser = await prisma.user.findUnique({ where: { email: 'admin@sotto.fm' } });
+    const demoUser = await prisma.user.findUnique({ where: { email: 'demo@example.com' } });
+    const adminUser = await prisma.user.findUnique({ where: { email: 'admin@example.com' } });
 
     if (!demoUser) throw new Error('Demo user not found — run `npx tsx prisma/seed-demo.ts` first');
     if (!adminUser)

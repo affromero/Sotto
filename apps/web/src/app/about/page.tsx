@@ -103,7 +103,7 @@ export default function AboutPage() {
             <h2 className={styles.sectionTitle}>Get in Touch</h2>
             <p className={styles.sectionText}>
               Questions, feedback, or just want to say hello? Reach out at{' '}
-              <a href="mailto:support@sotto.fm">support@sotto.fm</a>.
+              <a href="mailto:support@example.com">support@example.com</a>.
             </p>
           </section>
         </div>

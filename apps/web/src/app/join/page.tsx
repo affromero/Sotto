@@ -88,8 +88,8 @@ export default function JoinPage() {
               infrastructure excites you — whether you&apos;re an engineer, designer,
               or something else entirely — we want to hear from you.
             </p>
-            <a href="mailto:jobs@sotto.fm" className={styles.ctaButton}>
-              Reach out at jobs@sotto.fm
+            <a href="mailto:jobs@example.com" className={styles.ctaButton}>
+              Reach out at jobs@example.com
             </a>
           </section>
         </div>

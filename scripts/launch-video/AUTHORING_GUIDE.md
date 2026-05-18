@@ -19,7 +19,7 @@ Always set `"version": 1`.
     "ttsProvider": "elevenlabs",
     "ttsModel": "eleven_v3",
     "ttsVoiceId": "<voice-id>",
-    "backgroundMusicUrl": "https://r2.sotto.fm/demos/music/bg.mp3",
+    "backgroundMusicUrl": "https://media.example.com/demos/music/bg.mp3",
     "backgroundMusicVolume": 0.08,
     "subtitles": { "enabled": true, "style": "cinematic", "position": "bottom" }
   },
@@ -66,7 +66,7 @@ Actions choreograph the browser recording. They execute sequentially via Playwri
 ### Navigation & Waiting
 
 ```json
-{ "type": "navigate", "url": "https://sotto.fm" }
+{ "type": "navigate", "url": "https://your-domain.example" }
 { "type": "wait", "ms": 1500 }
 { "type": "waitForSelector", "selector": ".hero-title", "timeout": 5000 }
 ```
@@ -103,7 +103,7 @@ Interceptors mock API responses so the video shows instant results instead of lo
 { "type": "intercept", "name": "discovery", "options": { "podcastId": "abc123" } }
 { "type": "intercept", "name": "interact", "options": { "podcastId": "abc123" } }
 { "type": "intercept", "name": "scriptApprove", "options": { "podcastId": "abc123" } }
-{ "type": "intercept", "name": "avatar", "options": { "videoUrl": "https://r2.sotto.fm/demos/avatars/clip.mp4" } }
+{ "type": "intercept", "name": "avatar", "options": { "videoUrl": "https://media.example.com/demos/avatars/clip.mp4" } }
 { "type": "clearIntercept", "name": "discovery" }
 ```
 
@@ -128,10 +128,10 @@ Takes a screenshot for debugging. Not included in final video.
   "sfx": {
     "clickSounds": true,
     "typingSounds": true,
-    "ambientUrl": "https://r2.sotto.fm/demos/sfx/ambient-soft.mp3",
+    "ambientUrl": "https://media.example.com/demos/sfx/ambient-soft.mp3",
     "ambientVolume": 0.1,
     "cues": [
-      { "atSeconds": 3.5, "sfxUrl": "https://r2.sotto.fm/demos/sfx/whoosh.mp3", "volume": 0.4 }
+      { "atSeconds": 3.5, "sfxUrl": "https://media.example.com/demos/sfx/whoosh.mp3", "volume": 0.4 }
     ]
   }
 }
@@ -169,7 +169,7 @@ Overlays a pre-generated avatar video clip as a floating window.
 ```json
 {
   "avatar": {
-    "videoUrl": "https://r2.sotto.fm/demos/avatars/mina-speaking.mp4",
+    "videoUrl": "https://media.example.com/demos/avatars/mina-speaking.mp4",
     "posX": 0.72,
     "posY": 0.05,
     "width": 0.25,
@@ -193,7 +193,7 @@ Timed text that appears over the video.
 {
   "overlays": [
     {
-      "text": "Every voice. Every topic. One feed.",
+      "text": "Your voices. Your topics. Private by default.",
       "position": "center",
       "showAtSeconds": 1,
       "hideAtSeconds": 4,
