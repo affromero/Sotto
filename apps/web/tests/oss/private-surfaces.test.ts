@@ -309,6 +309,34 @@ describe('private-first OSS surfaces', () => {
     expect(extensionSources).not.toContain('CLEAR_API_KEY');
   });
 
+  it('keeps the local setup script OSS-first and template-driven', () => {
+    const setupSource = readFileSync(resolve(repoRoot, 'scripts/setup.sh'), 'utf8');
+    const installDepsSource = readFileSync(resolve(repoRoot, 'scripts/install-deps.sh'), 'utf8');
+    const localSetupDocs = [
+      'README.md',
+      'docs/23-local-development.md',
+      '.env.oss.example',
+    ]
+      .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
+      .join('\n');
+
+    expect(setupSource).toContain('ENV_TEMPLATE="$REPO_ROOT/.env.oss.example"');
+    expect(setupSource).toContain('cp "$ENV_TEMPLATE" "$ENV_FILE"');
+    expect(setupSource).toContain('compose up -d postgres redis');
+    expect(setupSource).toContain('bash "$SCRIPT_DIR/install-deps.sh" --node --docker --ffmpeg');
+    expect(setupSource).toContain('Fastest path: set OPENAI_API_KEY');
+    expect(setupSource).not.toContain('uv sync --group pitch');
+    expect(setupSource).not.toContain('AI_PROVIDER="anthropic"');
+    expect(setupSource).not.toContain('docker-compose up -d');
+    expect(setupSource).not.toContain('doppler');
+
+    expect(installDepsSource).toContain('install_ffmpeg');
+    expect(localSetupDocs).toContain('EXPO_PUBLIC_API_URL="http://localhost:3000/api"');
+    expect(localSetupDocs).toContain('LOCAL_STORAGE_DIR="./.sotto/storage"');
+    expect(localSetupDocs).not.toContain('Compatibility scripts are still available for the old hosted setup');
+    expect(localSetupDocs).not.toContain('LOCAL_STORAGE_ROOT');
+  });
+
   it('does not ship the standalone social feed ranking workspace', () => {
     const workspaceSources = [
       'package.json',

@@ -68,14 +68,6 @@ Start the app:
 npm run dev
 ```
 
-Compatibility scripts are still available for the old hosted setup:
-
-```bash
-npm run dev:doppler
-npm run dev:web:doppler
-npm run dev:workers:doppler
-```
-
 ## Manual Setup
 
 ```bash
