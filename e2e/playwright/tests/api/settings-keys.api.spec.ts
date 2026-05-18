@@ -61,6 +61,6 @@ test.describe('Settings, keys, voices, models API routes', () => {
     const res = await authedRequest.get('/api/voices/browse');
     expect(res.status()).toBe(503);
     const body = await res.json();
-    expect(body.error).toBe('Voice marketplace is currently unavailable.');
+    expect(body.error).toBe('Paid voice sharing is currently unavailable.');
   });
 });

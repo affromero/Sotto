@@ -638,7 +638,7 @@ describe('PATCH /api/voices/clone', () => {
     mockGetPlanFeatureConfig.mockResolvedValue(defaultPlanFeatureConfig);
   });
 
-  it('returns 503 when enabling marketplace sharing while marketplace is disabled', async () => {
+  it('returns 503 when enabling paid voice sharing while sharing is disabled', async () => {
     mockAuth.mockResolvedValue(mockSession);
     mockGetPlanFeatureConfig.mockResolvedValue({
       ...defaultPlanFeatureConfig,
@@ -658,7 +658,7 @@ describe('PATCH /api/voices/clone', () => {
     const body = await response.json();
 
     expect(response.status).toBe(503);
-    expect(body).toMatchObject({ error: 'Voice marketplace is currently unavailable.' });
+    expect(body).toMatchObject({ error: 'Paid voice sharing is currently unavailable.' });
     expect(mockVoiceCloneUpdate).not.toHaveBeenCalled();
   });
 

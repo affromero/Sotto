@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
   const currentUserId = session?.user?.id ?? null;
 
   if (!voiceConfig.voiceMarketplaceEnabled) {
-    return errorResponse('Voice marketplace is currently unavailable.', 503);
+    return errorResponse('Paid voice sharing is currently unavailable.', 503);
   }
 
   const params = Object.fromEntries(request.nextUrl.searchParams);
