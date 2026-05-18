@@ -287,9 +287,7 @@ describe('private-first OSS surfaces', () => {
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
 
-    expect(mobileRuntimeSources).toContain(
-      'is required. Set it to your Sotto deployment API URL',
-    );
+    expect(mobileRuntimeSources).toContain('is required. Set it to your Sotto deployment API URL');
     expect(mobileRuntimeSources).toContain('getApiBaseUrl');
     expect(mobileRuntimeSources).not.toContain('https://sotto.fm');
     expect(mobileRuntimeSources).not.toContain("?? 'https://sotto.fm/api'");
@@ -312,11 +310,7 @@ describe('private-first OSS surfaces', () => {
   it('keeps the local setup script OSS-first and template-driven', () => {
     const setupSource = readFileSync(resolve(repoRoot, 'scripts/setup.sh'), 'utf8');
     const installDepsSource = readFileSync(resolve(repoRoot, 'scripts/install-deps.sh'), 'utf8');
-    const localSetupDocs = [
-      'README.md',
-      'docs/23-local-development.md',
-      '.env.oss.example',
-    ]
+    const localSetupDocs = ['README.md', 'docs/23-local-development.md', '.env.oss.example']
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
 
@@ -335,7 +329,9 @@ describe('private-first OSS surfaces', () => {
     expect(installDepsSource).toContain('install_ffmpeg');
     expect(localSetupDocs).toContain('EXPO_PUBLIC_API_URL="http://localhost:3000/api"');
     expect(localSetupDocs).toContain('LOCAL_STORAGE_DIR="./.sotto/storage"');
-    expect(localSetupDocs).not.toContain('Compatibility scripts are still available for the old hosted setup');
+    expect(localSetupDocs).not.toContain(
+      'Compatibility scripts are still available for the old hosted setup'
+    );
     expect(localSetupDocs).not.toContain('LOCAL_STORAGE_ROOT');
   });
 
@@ -370,7 +366,9 @@ describe('private-first OSS surfaces', () => {
     expect(agentDocs).not.toContain('Secrets are managed via Doppler');
     expect(rootClaude).not.toContain('Compatibility scripts for the old hosted setup');
     expect(rootClaude).not.toContain('Hosted deployments may still use Doppler');
-    expect(rootClaude).toContain('Critical local variables: `DATABASE_URL`, `REDIS_URL`, `AUTH_SECRET`');
+    expect(rootClaude).toContain(
+      'Critical local variables: `DATABASE_URL`, `REDIS_URL`, `AUTH_SECRET`'
+    );
   });
 
   it('keeps mobile env sync local and Doppler-free by default', () => {
@@ -378,9 +376,12 @@ describe('private-first OSS surfaces', () => {
     const syncMobileEnv = readFileSync(resolve(repoRoot, 'scripts/sync-mobile-env.sh'), 'utf8');
     const mobileEnvExample = readFileSync(resolve(repoRoot, 'apps/mobile/.env.example'), 'utf8');
     const mobileInstructions = readFileSync(resolve(repoRoot, 'apps/mobile/CLAUDE.md'), 'utf8');
-    const mobileSetupSources = [packageJson, syncMobileEnv, mobileEnvExample, mobileInstructions].join(
-      '\n',
-    );
+    const mobileSetupSources = [
+      packageJson,
+      syncMobileEnv,
+      mobileEnvExample,
+      mobileInstructions,
+    ].join('\n');
 
     expect(packageJson).toContain('"mobile:env": "bash scripts/sync-mobile-env.sh"');
     expect(syncMobileEnv).toContain('ENV_SOURCE="$REPO_ROOT/.env.local"');
@@ -463,7 +464,7 @@ describe('private-first OSS surfaces', () => {
     expect(runtimeInfraSources).not.toContain('sotto.fm');
     expect(runtimeInfraSources).not.toContain('maps.sotto.fm');
     expect(runtimeInfraSources).not.toContain('mailto:hello@sotto.fm');
-    expect(runtimeInfraSources).not.toContain("process.env.VAPID_SUBJECT ||");
+    expect(runtimeInfraSources).not.toContain('process.env.VAPID_SUBJECT ||');
     expect(runtimeInfraSources).not.toContain("service: 'maps.sotto.fm'");
   });
 
@@ -482,6 +483,12 @@ describe('private-first OSS surfaces', () => {
       'apps/web/src/components/landing/chapters/ConvertChapter.tsx',
       'apps/web/prisma/seed.ts',
       'apps/web/prisma/seed-demo.ts',
+      'accounting/TODO.md',
+      'accounting/docs/manual-setup.md',
+      'accounting/docs/monthly-close-procedure.md',
+      'accounting/ledger/main.beancount',
+      'accounting/ledger/opening.beancount',
+      'accounting/ledger/2026/02-february.beancount',
       'packages/maps/README.md',
       'packages/video/src/compositions/shared/SottoWatermark.tsx',
       'packages/verification-standard/package.json',
@@ -502,6 +509,7 @@ describe('private-first OSS surfaces', () => {
     expect(publicContactSources).toContain('https://media.example.com/demos/');
     expect(publicContactSources).toContain('Your voices. Your topics. Private by default.');
     expect(publicContactSources).not.toContain('sotto.fm');
+    expect(publicContactSources).not.toContain('@sottofm');
     expect(publicContactSources).not.toContain('r2.sotto.fm');
     expect(publicContactSources).not.toContain('maps.sotto.fm');
     expect(publicContactSources).not.toContain('hello@sotto.fm');
@@ -591,9 +599,9 @@ describe('private-first OSS surfaces', () => {
     expect(systemOwnerSources).toContain('SYSTEM_USER_EMAIL');
     expect(systemOwnerSources).toContain('create-as-system-owner');
     expect(systemOwnerSources).toContain('configured system owner');
-    expect(existsSync(resolve(repoRoot, 'apps/web/src/app/api/admin/podcasts/create-as-sotto'))).toBe(
-      false,
-    );
+    expect(
+      existsSync(resolve(repoRoot, 'apps/web/src/app/api/admin/podcasts/create-as-sotto'))
+    ).toBe(false);
     expect(systemOwnerSources).not.toContain("handle: 'sotto'");
     expect(systemOwnerSources).not.toContain('create-as-sotto');
     expect(systemOwnerSources).not.toContain('as=sotto');
@@ -633,13 +641,13 @@ describe('private-first OSS surfaces', () => {
       'apps/web/src/lib/CLAUDE.md',
       'apps/web/src/lib/reference-verification/ai-layer.ts',
       'apps/web/src/lib/reference-verification/grounding.ts',
-	      'apps/web/src/lib/reference-verification/pipeline.ts',
-	      'CLAUDE.md',
-	      'package-lock.json',
-	      'packages/verification-standard/package.json',
-	      'packages/verification-standard/package-lock.json',
-	      'packages/verification-standard/.github/workflows/release.yml',
-	      'packages/verification-standard/README.md',
+      'apps/web/src/lib/reference-verification/pipeline.ts',
+      'CLAUDE.md',
+      'package-lock.json',
+      'packages/verification-standard/package.json',
+      'packages/verification-standard/package-lock.json',
+      'packages/verification-standard/.github/workflows/release.yml',
+      'packages/verification-standard/README.md',
       'packages/verification-standard/CONTRIBUTING.md',
       'packages/verification-standard/CHANGELOG.md',
       'packages/verification-standard/LICENSE',
@@ -704,11 +712,11 @@ describe('private-first OSS surfaces', () => {
     expect(deploySource).toContain('require_env NEXT_PUBLIC_APP_URL');
     expect(deploySource).toContain('render_caddy_config');
     expect(deploySource).toContain(
-      'CADDY_SITE_PATH="${CADDY_SITE_PATH:-/etc/caddy/conf.d/sotto.conf}"',
+      'CADDY_SITE_PATH="${CADDY_SITE_PATH:-/etc/caddy/conf.d/sotto.conf}"'
     );
     expect(setupServerSource).toContain('cp .env.example .env.production');
     expect(setupServerSource).toContain(
-      'SOTTO_ENV_FILE=~/sotto/.env.production bash scripts/deploy.sh',
+      'SOTTO_ENV_FILE=~/sotto/.env.production bash scripts/deploy.sh'
     );
     expect(caddyTemplate).toContain('__SOTTO_APP_DOMAIN__');
     expect(caddyTemplate).toContain('# BEGIN_OPTIONAL_MAPS');
@@ -730,10 +738,7 @@ describe('private-first OSS surfaces', () => {
     ]
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
-    const releaseIndexSources = [
-      'docs/CLAUDE.md',
-      'scripts/rebuild-pitch.sh',
-    ]
+    const releaseIndexSources = ['docs/CLAUDE.md', 'scripts/rebuild-pitch.sh']
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
 
@@ -763,12 +768,15 @@ describe('private-first OSS surfaces', () => {
       'apps/web/src/lib/providers/ml.ts',
       'apps/web/src/workers/feature-computation.worker.ts',
       'apps/web/src/lib/CLAUDE.md',
+      'CHANGELOG.md',
+      'TODO.md',
     ]
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
 
     expect(existsSync(resolve(repoRoot, 'packages/feed'))).toBe(false);
     expect(workspaceSources).not.toContain('@sottofm/feed');
+    expect(workspaceSources).not.toContain('@sottofm');
     expect(workspaceSources).not.toContain('packages/feed');
     expect(workspaceSources).not.toContain('From Your People');
     expect(workspaceSources).not.toContain('followedCreatorIds');
