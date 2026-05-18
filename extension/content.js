@@ -1,5 +1,5 @@
 /**
- * Content script (ISOLATED world) — runs on notebooklm.google.com
+ * Content script (ISOLATED world) for the optional NotebookLM import adapter.
  *
  * Responsibilities:
  * 1. Inject injected.js into the page (MAIN world) for audio capture
@@ -9,10 +9,10 @@
  */
 
 // ─── Centralized DOM selectors ───────────────────────────────────────────────
-// These are the fragile adaptation points. When Google changes NotebookLM's UI,
+// These are the fragile adaptation points. When the source UI changes,
 // update these selectors. See ADAPTATION.md for instructions.
 const SELECTORS = {
-  // Audio player / Audio Overview container
+  // Source audio player container
   audioPlayerContainer: [
     '[data-testid="audio-overview-player"]',
     '[data-testid="audio-player"]',
@@ -35,11 +35,7 @@ const SELECTORS = {
   audioElement: 'audio[src], audio source[src]',
 
   // Notebook title
-  notebookTitle: [
-    '[data-testid="notebook-title"]',
-    '.notebook-title',
-    'h1',
-  ].join(', '),
+  notebookTitle: ['[data-testid="notebook-title"]', '.notebook-title', 'h1'].join(', '),
 
   // Action bar where we inject our button (near download/share buttons)
   actionBar: [
@@ -194,7 +190,9 @@ function tryInjectButton() {
   const audioContainer = document.querySelector(SELECTORS.audioPlayerContainer);
   if (audioContainer) {
     // Look for any toolbar/button area within the container
-    const toolbars = audioContainer.querySelectorAll('[role="toolbar"], [class*="action"], [class*="button-group"]');
+    const toolbars = audioContainer.querySelectorAll(
+      '[role="toolbar"], [class*="action"], [class*="button-group"]'
+    );
     if (toolbars.length > 0) {
       const btn = createSottoButton();
       toolbars[toolbars.length - 1].appendChild(btn);
@@ -212,7 +210,9 @@ function tryInjectButton() {
   // Strategy 3: Find audio element and inject button near its closest container
   const audioEl = document.querySelector(SELECTORS.audioElement);
   if (audioEl) {
-    const container = audioEl.closest('[class*="player"], [class*="audio"], [role="region"]') || audioEl.parentElement;
+    const container =
+      audioEl.closest('[class*="player"], [class*="audio"], [role="region"]') ||
+      audioEl.parentElement;
     if (container && !container.querySelector('#sotto-send-btn')) {
       const btn = createSottoButton();
       container.appendChild(btn);

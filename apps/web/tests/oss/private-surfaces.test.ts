@@ -304,8 +304,11 @@ describe('private-first OSS surfaces', () => {
     expect(extensionSources).toContain('Sotto deployment URL is required');
     expect(extensionSources).toContain('SET_CONFIG');
     expect(extensionSources).toContain('"https://*/*"');
+    expect(extensionSources).toContain('optional import adapter');
     expect(extensionSources).not.toContain('https://sotto.fm');
     expect(extensionSources).not.toContain('sotto.fm/api');
+    expect(extensionSources).not.toContain('Send NotebookLM to Sotto');
+    expect(extensionSources).not.toContain('Send NotebookLM audio overviews');
     expect(extensionSources).not.toContain('SET_API_KEY');
     expect(extensionSources).not.toContain('CLEAR_API_KEY');
   });

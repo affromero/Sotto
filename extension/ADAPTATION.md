@@ -1,6 +1,6 @@
-# Adaptation Guide — NotebookLM Selector Maintenance
+# Optional Import Adapter — Selector Maintenance
 
-This extension injects a "Send to Sotto" button into Google's NotebookLM UI. Because NotebookLM has no public API, we rely on DOM selectors that **will break** when Google updates their UI.
+This optional import adapter injects a "Send to Sotto" button into Google's NotebookLM UI. It is one source adapter for imported audio, not the core product surface. Because NotebookLM has no public API, we rely on DOM selectors that **will break** when Google updates their UI.
 
 All fragile selectors are centralized in a single `SELECTORS` object at the top of `content.js`. When the extension stops working, this is the only place you need to update.
 

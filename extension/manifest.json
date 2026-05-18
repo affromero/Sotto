@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Send to Sotto",
   "version": "1.0.0",
-  "description": "Send NotebookLM audio overviews to Sotto with one click.",
+  "description": "Import audio into your private Sotto library with one click.",
   "permissions": ["storage"],
   "host_permissions": [
     "https://*/*",
