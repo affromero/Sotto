@@ -30,7 +30,7 @@ const createBriefingSchema = z.object({
   expertVoiceId: z.string().max(200).nullable().optional(),
   continuousLearning: z.boolean().default(false),
   contextEpisodes: z.number().int().min(1).max(5).default(3),
-  visibility: z.enum(['PUBLIC', 'UNLISTED', 'PRIVATE']).default('PRIVATE'),
+  visibility: z.literal('PRIVATE').default('PRIVATE'),
   useByokKeys: z.boolean().default(false),
   zeroCostVideo: z.boolean().default(false),
 });
