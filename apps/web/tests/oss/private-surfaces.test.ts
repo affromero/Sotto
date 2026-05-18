@@ -358,6 +358,23 @@ describe('private-first OSS surfaces', () => {
     expect(mobileSetupSources).not.toContain('All `EXPO_PUBLIC_*` via **Doppler**');
   });
 
+  it('keeps environment templates deployment-neutral', () => {
+    const envExample = readFileSync(resolve(repoRoot, '.env.example'), 'utf8');
+    const envOssExample = readFileSync(resolve(repoRoot, '.env.oss.example'), 'utf8');
+    const envTemplateSources = [envExample, envOssExample].join('\n');
+
+    expect(envExample).toContain('Use your own secret manager');
+    expect(envExample).toContain('copy .env.oss.example to .env.local');
+    expect(envExample).toContain('Use the exact public host from NEXT_PUBLIC_APP_URL');
+    expect(envTemplateSources).not.toContain('dashboard.doppler.com/workplace/projects/sotto');
+    expect(envTemplateSources).not.toContain('doppler secrets download');
+    expect(envTemplateSources).not.toContain('doppler secrets set');
+    expect(envTemplateSources).not.toContain('hello@sotto.fm');
+    expect(envTemplateSources).not.toContain('Use the apex domain (sotto.fm)');
+    expect(envTemplateSources).not.toContain('DNS domain verification for sotto.fm');
+    expect(envTemplateSources).not.toContain('Doppler dev/prd configs');
+  });
+
   it('does not ship the standalone social feed ranking workspace', () => {
     const workspaceSources = [
       'package.json',
