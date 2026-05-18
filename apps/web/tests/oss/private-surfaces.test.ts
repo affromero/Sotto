@@ -220,6 +220,43 @@ describe('private-first OSS surfaces', () => {
     expect(runtimeUrlSources).not.toMatch(/startsWith\(['"]https:\/\/['"]\)\s*\?/);
   });
 
+  it('requires generated absolute URLs to use explicit deployment configuration', () => {
+    const generatedUrlSources = [
+      'src/app/layout.tsx',
+      'src/app/robots.ts',
+      'src/app/sitemap.ts',
+      'src/app/podcast/[podcastId]/page.tsx',
+      'src/app/collections/[collectionId]/page.tsx',
+      'src/components/player/PodcastJsonLd.tsx',
+      'src/components/landing/JsonLd.tsx',
+      'src/app/api/oembed/route.ts',
+      'src/app/api/billing/checkout/route.ts',
+      'src/app/api/billing/portal/route.ts',
+      'src/app/api/stripe/connect/route.ts',
+      'src/app/api/stripe/connect/callback/route.ts',
+      'src/app/api/admin/invitations/route.ts',
+      'src/app/api/users/unsubscribe/route.ts',
+      'src/lib/rss.ts',
+      'src/lib/providers/music/suno.provider.ts',
+      'src/lib/extractors/index.ts',
+      'src/lib/extractors/html.ts',
+      'src/lib/email-templates.ts',
+      'src/components/player/EmbedCodeModal.tsx',
+      'src/components/player/EmbedPlayer.tsx',
+      'src/app/(dashboard)/settings/SettingsForm.tsx',
+      'src/components/referral/ReferralSharePrompt.tsx',
+    ]
+      .map(readSource)
+      .join('\n');
+
+    expect(generatedUrlSources).toContain('getAppBaseUrl');
+    expect(generatedUrlSources).not.toContain('https://sotto.fm');
+    expect(generatedUrlSources).not.toContain("|| 'https://sotto.fm'");
+    expect(generatedUrlSources).not.toContain("?? 'https://sotto.fm'");
+    expect(generatedUrlSources).not.toContain('NEXT_PUBLIC_URL');
+    expect(generatedUrlSources).not.toContain("|| 'http://localhost:3000'");
+  });
+
   it('does not ship the standalone social feed ranking workspace', () => {
     const workspaceSources = [
       'package.json',

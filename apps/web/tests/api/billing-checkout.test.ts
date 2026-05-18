@@ -46,7 +46,7 @@ describe('POST /api/billing/checkout', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.STRIPE_PRO_PRICE_ID = 'price_test_123';
-    vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://sotto.fm');
+    vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://selfhost.example.com');
   });
 
   afterEach(() => {
@@ -170,14 +170,14 @@ describe('POST /api/billing/checkout', () => {
 
     await POST(
       createRequest({
-        successUrl: 'https://sotto.fm/success',
-        cancelUrl: 'https://sotto.fm/cancel',
+        successUrl: 'https://selfhost.example.com/success',
+        cancelUrl: 'https://selfhost.example.com/cancel',
       })
     );
 
     const callArgs = mockCheckoutSessionsCreate.mock.calls[0][0];
-    expect(callArgs.success_url).toBe('https://sotto.fm/success');
-    expect(callArgs.cancel_url).toBe('https://sotto.fm/cancel');
+    expect(callArgs.success_url).toBe('https://selfhost.example.com/success');
+    expect(callArgs.cancel_url).toBe('https://selfhost.example.com/cancel');
   });
 
   it('embeds userId in session metadata', async () => {

@@ -4,6 +4,7 @@ import { stripe } from '@/lib/stripe';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { errorResponse } from '@/lib/api-response';
+import { getAppBaseUrl } from '@/lib/urls';
 
 /**
  * Create a Stripe Checkout session for the Pro subscription.
@@ -46,7 +47,7 @@ export async function POST(request: NextRequest) {
     // allow empty body
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://sotto.fm';
+  const appUrl = getAppBaseUrl();
 
   function isSameOrigin(url: string): boolean {
     try {
@@ -56,12 +57,12 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const successUrl = body.successUrl && isSameOrigin(body.successUrl)
-    ? body.successUrl
-    : `${appUrl}/billing?upgrade=success`;
-  const cancelUrl = body.cancelUrl && isSameOrigin(body.cancelUrl)
-    ? body.cancelUrl
-    : `${appUrl}/pricing`;
+  const successUrl =
+    body.successUrl && isSameOrigin(body.successUrl)
+      ? body.successUrl
+      : `${appUrl}/billing?upgrade=success`;
+  const cancelUrl =
+    body.cancelUrl && isSameOrigin(body.cancelUrl) ? body.cancelUrl : `${appUrl}/pricing`;
 
   try {
     const checkoutSession = await stripe.checkout.sessions.create({

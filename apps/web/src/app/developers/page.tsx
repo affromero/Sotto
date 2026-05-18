@@ -162,7 +162,7 @@ const sections: Section[] = [
             name: 'url',
             type: 'string',
             required: true,
-            description: 'Podcast URL (e.g., https://sotto.fm/podcast/abc123)',
+            description: 'Podcast URL (e.g., https://your-sotto.example/podcast/abc123)',
           },
         ],
         response:
@@ -209,7 +209,7 @@ export default function DevelopersPage() {
           <section className={styles.authSection}>
             <h2 className={styles.sectionTitle}>Base URL</h2>
             <pre className={styles.codeBlock}>
-              <code>https://sotto.fm</code>
+              <code>https://your-sotto.example</code>
             </pre>
           </section>
 

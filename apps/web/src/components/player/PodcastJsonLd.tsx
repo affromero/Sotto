@@ -1,3 +1,5 @@
+import { absolutePodcastUrl, getAppBaseUrl } from '@/lib/urls';
+
 interface PodcastJsonLdProps {
   id: string;
   title: string;
@@ -33,13 +35,10 @@ export function PodcastJsonLd({
   audioUrl,
   creator,
 }: PodcastJsonLdProps) {
-  const podcastUrl = slug && creator.handle
-    ? `https://sotto.fm/@${creator.handle}/${slug}`
-    : `https://sotto.fm/podcast/${id}`;
+  const appUrl = getAppBaseUrl();
+  const podcastUrl = absolutePodcastUrl({ id, slug }, creator.handle, appUrl);
   const creatorName = creator.name || 'Anonymous';
-  const creatorUrl = creator.handle
-    ? `https://sotto.fm/@${creator.handle}`
-    : undefined;
+  const creatorUrl = creator.handle ? `${appUrl}/@${creator.handle}` : undefined;
 
   const schema: Record<string, unknown> = {
     '@context': 'https://schema.org',

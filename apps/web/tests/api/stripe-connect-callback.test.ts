@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
 const mockAccountsRetrieve = vi.fn();
@@ -39,6 +39,11 @@ function createRequest(accountId?: string): NextRequest {
 describe('GET /api/stripe/connect/callback', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://selfhost.example.com');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it('redirects to error when account_id is missing', async () => {
@@ -47,7 +52,7 @@ describe('GET /api/stripe/connect/callback', () => {
 
     expect(response.status).toBe(307);
     const location = response.headers.get('location');
-    expect(location).toContain('/settings/voices?stripe=error');
+    expect(location).toBe('https://selfhost.example.com/settings/voices?stripe=error');
   });
 
   it('redirects to success when account is fully onboarded', async () => {
@@ -62,7 +67,7 @@ describe('GET /api/stripe/connect/callback', () => {
 
     expect(response.status).toBe(307);
     const location = response.headers.get('location');
-    expect(location).toContain('/settings/voices?stripe=success');
+    expect(location).toBe('https://selfhost.example.com/settings/voices?stripe=success');
   });
 
   it('redirects to pending when account is not yet fully onboarded', async () => {
@@ -76,7 +81,7 @@ describe('GET /api/stripe/connect/callback', () => {
 
     expect(response.status).toBe(307);
     const location = response.headers.get('location');
-    expect(location).toContain('/settings/voices?stripe=pending');
+    expect(location).toBe('https://selfhost.example.com/settings/voices?stripe=pending');
   });
 
   it('redirects to error when Stripe API throws', async () => {
@@ -87,6 +92,6 @@ describe('GET /api/stripe/connect/callback', () => {
 
     expect(response.status).toBe(307);
     const location = response.headers.get('location');
-    expect(location).toContain('/settings/voices?stripe=error');
+    expect(location).toBe('https://selfhost.example.com/settings/voices?stripe=error');
   });
 });

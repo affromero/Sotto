@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { getAppBaseUrl } from '@/lib/urls';
 
 import { errorResponse } from '@/lib/api-response';
 export async function GET(request: NextRequest) {
@@ -8,8 +9,20 @@ export async function GET(request: NextRequest) {
     return errorResponse('Missing url parameter', 400);
   }
 
+  const appUrl = getAppBaseUrl();
+  let requestedUrl: URL;
+  try {
+    requestedUrl = new URL(url);
+  } catch {
+    return errorResponse('Invalid podcast URL', 400);
+  }
+
+  if (requestedUrl.origin !== new URL(appUrl).origin) {
+    return errorResponse('Invalid podcast URL', 400);
+  }
+
   // Parse podcast ID from URL: .../podcast/{id}
-  const match = url.match(/\/podcast\/([a-zA-Z0-9_-]+)/);
+  const match = requestedUrl.pathname.match(/^\/podcast\/([a-zA-Z0-9_-]+)/);
   if (!match) {
     return errorResponse('Invalid podcast URL', 400);
   }
@@ -30,7 +43,6 @@ export async function GET(request: NextRequest) {
     return errorResponse('Podcast not found', 404);
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://sotto.fm';
   const embedUrl = `${appUrl}/podcast/${podcastId}/embed`;
 
   const oembedResponse = {

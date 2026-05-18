@@ -1,4 +1,5 @@
 import type { MetadataRoute } from 'next';
+import { getAppBaseUrl } from '@/lib/urls';
 
 const AI_CRAWLERS = [
   'GPTBot',
@@ -55,6 +56,8 @@ const DISALLOWED_PATHS = [
 ];
 
 export default function robots(): MetadataRoute.Robots {
+  const appUrl = getAppBaseUrl();
+
   return {
     rules: [
       {
@@ -66,6 +69,6 @@ export default function robots(): MetadataRoute.Robots {
         disallow: ['/'],
       })),
     ],
-    sitemap: 'https://sotto.fm/sitemap.xml',
+    sitemap: `${appUrl}/sitemap.xml`,
   };
 }

@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { EmbedPlayer } from '@/components/player/EmbedPlayer';
+import { getAppBaseUrl } from '@/lib/urls';
 import type { Metadata } from 'next';
 
 interface EmbedPageProps {
@@ -42,6 +43,7 @@ export default async function EmbedPage({ params }: EmbedPageProps) {
         creatorName={podcast.user.name || 'Anonymous'}
         audioUrl={podcast.audioUrl}
         duration={podcast.duration}
+        appBaseUrl={getAppBaseUrl()}
       />
     </div>
   );

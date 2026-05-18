@@ -1,12 +1,15 @@
 import crypto from 'crypto';
 import { BRAND } from '@sotto/shared';
+import { getAppBaseUrl, podcastUrl } from './urls';
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || BRAND.url;
+function appLinkLabel(appUrl: string): string {
+  return new URL(appUrl).host;
+}
 
-export function generateUserUnsubscribeUrl(userId: string): string {
+export function generateUserUnsubscribeUrl(userId: string, appUrl = getAppBaseUrl()): string {
   const secret = process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET || '';
   const signature = crypto.createHmac('sha256', secret).update(userId).digest('hex');
-  return `${APP_URL}/api/users/unsubscribe?userId=${encodeURIComponent(userId)}&sig=${signature}`;
+  return `${appUrl}/api/users/unsubscribe?userId=${encodeURIComponent(userId)}&sig=${signature}`;
 }
 
 export function buildAnnouncementEmail(
@@ -14,12 +17,13 @@ export function buildAnnouncementEmail(
   body: string,
   unsubscribeUrl: string
 ): { subject: string; html: string } {
+  const appUrl = getAppBaseUrl();
   const announcementFooter = `
       <div style="padding:24px 32px; border-top:1px solid #f3f4f6; text-align:center;">
         <p style="font-size:12px; color:#9ca3af; margin:0;">
           <a href="${unsubscribeUrl}" style="color:#9ca3af; text-decoration:underline;">Unsubscribe from announcements</a>
           &nbsp;·&nbsp;
-          <a href="${APP_URL}" style="color:#9ca3af; text-decoration:underline;">sotto.fm</a>
+          <a href="${appUrl}" style="color:#9ca3af; text-decoration:underline;">${appLinkLabel(appUrl)}</a>
         </p>
       </div>
     </div>
@@ -38,10 +42,10 @@ export function buildAnnouncementEmail(
   };
 }
 
-function generateUnsubscribeUrl(email: string): string {
+function generateUnsubscribeUrl(email: string, appUrl = getAppBaseUrl()): string {
   const secret = process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET || '';
   const signature = crypto.createHmac('sha256', secret).update(email).digest('hex');
-  return `${APP_URL}/api/waitlist/unsubscribe?email=${encodeURIComponent(email)}&sig=${signature}`;
+  return `${appUrl}/api/waitlist/unsubscribe?email=${encodeURIComponent(email)}&sig=${signature}`;
 }
 
 const HEADER = `
@@ -55,13 +59,14 @@ const HEADER = `
 `;
 
 function footer(email: string): string {
-  const unsubUrl = generateUnsubscribeUrl(email);
+  const appUrl = getAppBaseUrl();
+  const unsubUrl = generateUnsubscribeUrl(email, appUrl);
   return `
       <div style="padding:24px 32px; border-top:1px solid #f3f4f6; text-align:center;">
         <p style="font-size:12px; color:#9ca3af; margin:0;">
           <a href="${unsubUrl}" style="color:#9ca3af; text-decoration:underline;">Unsubscribe</a>
           &nbsp;·&nbsp;
-          <a href="${APP_URL}" style="color:#9ca3af; text-decoration:underline;">sotto.fm</a>
+          <a href="${appUrl}" style="color:#9ca3af; text-decoration:underline;">${appLinkLabel(appUrl)}</a>
         </p>
       </div>
     </div>
@@ -70,6 +75,7 @@ function footer(email: string): string {
 }
 
 export function buildWaitlistWelcomeEmail(email: string): { subject: string; html: string } {
+  const appUrl = getAppBaseUrl();
   return {
     subject: "Welcome to Sotto — you're on the list",
     html: `${HEADER}
@@ -85,7 +91,7 @@ export function buildWaitlistWelcomeEmail(email: string): { subject: string; htm
           We&apos;ll send you updates as we launch new features. In the meantime, check out
           what&apos;s already live.
         </p>
-        <a href="${APP_URL}/create" style="display:inline-block; background:#D97706; color:#fff; font-size:14px; font-weight:600; padding:10px 24px; border-radius:8px; text-decoration:none;">
+        <a href="${appUrl}/create" style="display:inline-block; background:#D97706; color:#fff; font-size:14px; font-weight:600; padding:10px 24px; border-radius:8px; text-decoration:none;">
           Create a Private Podcast
         </a>
       </div>
@@ -94,6 +100,7 @@ export function buildWaitlistWelcomeEmail(email: string): { subject: string; htm
 }
 
 export function buildMagicLinkEmail(url: string): { subject: string; html: string } {
+  const appUrl = getAppBaseUrl();
   return {
     subject: 'Sign in to Sotto',
     html: `${HEADER}
@@ -113,7 +120,7 @@ export function buildMagicLinkEmail(url: string): { subject: string; html: strin
       </div>
       <div style="padding:24px 32px; border-top:1px solid #f3f4f6; text-align:center;">
         <p style="font-size:12px; color:#9ca3af; margin:0;">
-          <a href="${APP_URL}" style="color:#9ca3af; text-decoration:underline;">sotto.fm</a>
+          <a href="${appUrl}" style="color:#9ca3af; text-decoration:underline;">${appLinkLabel(appUrl)}</a>
         </p>
       </div>
     </div>
@@ -122,6 +129,7 @@ export function buildMagicLinkEmail(url: string): { subject: string; html: strin
 }
 
 export function buildWaitlistApprovalEmail(email: string): { subject: string; html: string } {
+  const appUrl = getAppBaseUrl();
   return {
     subject: 'Your early access to Sotto is ready',
     html: `${HEADER}
@@ -133,7 +141,7 @@ export function buildWaitlistApprovalEmail(email: string): { subject: string; ht
           We&apos;re opening Sotto to a small group of early members, and you made the cut.
           Your account is ready &mdash; claim it before your invitation expires.
         </p>
-        <a href="${APP_URL}/auth/signup" style="display:inline-block; background:#D97706; color:#fff; font-size:14px; font-weight:600; padding:12px 28px; border-radius:8px; text-decoration:none; margin:0 0 24px;">
+        <a href="${appUrl}/auth/signup" style="display:inline-block; background:#D97706; color:#fff; font-size:14px; font-weight:600; padding:12px 28px; border-radius:8px; text-decoration:none; margin:0 0 24px;">
           Claim Your Spot
         </a>
         <div style="background:#FEFCF8; border:1px solid #f3f4f6; border-radius:8px; padding:16px; margin-top:24px;">
@@ -146,7 +154,7 @@ export function buildWaitlistApprovalEmail(email: string): { subject: string; ht
             Try it: <em>&ldquo;@sottofm explain how black holes emit radiation&rdquo;</em>
           </p>
           <p style="font-size:12px; line-height:1.5; color:#9ca3af; margin:0;">
-            Just <a href="${APP_URL}/settings" style="color:#D97706; text-decoration:none;">link your X account</a> in settings after signing up.
+            Just <a href="${appUrl}/settings" style="color:#D97706; text-decoration:none;">link your X account</a> in settings after signing up.
           </p>
         </div>
       </div>
@@ -155,10 +163,11 @@ export function buildWaitlistApprovalEmail(email: string): { subject: string; ht
 }
 
 export function buildWelcomeEmail(name: string): { subject: string; html: string } {
+  const appUrl = getAppBaseUrl();
   const simpleFooter = `
       <div style="padding:24px 32px; border-top:1px solid #f3f4f6; text-align:center;">
         <p style="font-size:12px; color:#9ca3af; margin:0;">
-          <a href="${APP_URL}" style="color:#9ca3af; text-decoration:underline;">sotto.fm</a>
+          <a href="${appUrl}" style="color:#9ca3af; text-decoration:underline;">${appLinkLabel(appUrl)}</a>
         </p>
       </div>
     </div>
@@ -180,7 +189,7 @@ export function buildWelcomeEmail(name: string): { subject: string; html: string
           Create your first podcast in minutes &mdash; just describe what you want to learn
           and we&apos;ll handle the rest.
         </p>
-        <a href="${APP_URL}/create" style="display:inline-block; background:#D97706; color:#fff; font-size:14px; font-weight:600; padding:10px 24px; border-radius:8px; text-decoration:none;">
+        <a href="${appUrl}/create" style="display:inline-block; background:#D97706; color:#fff; font-size:14px; font-weight:600; padding:10px 24px; border-radius:8px; text-decoration:none;">
           Create Your First Podcast
         </a>
       </div>
@@ -201,12 +210,13 @@ export function buildWeeklyDigestEmail(
   email: string,
   podcasts: DigestPodcast[]
 ): { subject: string; html: string } {
+  const appUrl = getAppBaseUrl();
   const podcastRows = podcasts
     .map(
       (p) => `
       <tr>
         <td style="padding:12px 0; border-bottom:1px solid #f3f4f6;">
-          <a href="${APP_URL}${p.slug && p.creatorHandle ? `/@${p.creatorHandle}/${p.slug}` : `/podcast/${p.id}`}?utm_source=digest&utm_medium=email&utm_campaign=weekly" style="font-size:14px; font-weight:600; color:#1A1A1A; text-decoration:none;">
+          <a href="${appUrl}${podcastUrl({ id: p.id, slug: p.slug }, p.creatorHandle)}?utm_source=digest&utm_medium=email&utm_campaign=weekly" style="font-size:14px; font-weight:600; color:#1A1A1A; text-decoration:none;">
             ${p.title}
           </a>
           <p style="font-size:12px; color:#6B7280; margin:4px 0 0;">
@@ -233,7 +243,7 @@ export function buildWeeklyDigestEmail(
           </tbody>
         </table>
         <div style="margin-top:24px;">
-          <a href="${APP_URL}/dashboard?utm_source=digest&utm_medium=email&utm_campaign=weekly" style="display:inline-block; background:#D97706; color:#fff; font-size:14px; font-weight:600; padding:10px 24px; border-radius:8px; text-decoration:none;">
+          <a href="${appUrl}/dashboard?utm_source=digest&utm_medium=email&utm_campaign=weekly" style="display:inline-block; background:#D97706; color:#fff; font-size:14px; font-weight:600; padding:10px 24px; border-radius:8px; text-decoration:none;">
             Open Dashboard
           </a>
         </div>

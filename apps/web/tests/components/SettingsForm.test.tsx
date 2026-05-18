@@ -52,6 +52,7 @@ const defaultProps = {
   privateFeedTokens: [],
   hasByokKeys: false,
   initialQuizEnabled: false,
+  appBaseUrl: 'https://selfhost.example.com',
 };
 
 describe('SettingsForm', () => {

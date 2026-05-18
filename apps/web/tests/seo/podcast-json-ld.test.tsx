@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from '@testing-library/react';
 import { PodcastJsonLd } from '@/components/player/PodcastJsonLd';
 
@@ -20,6 +20,14 @@ const BASE_PROPS = {
 };
 
 describe('PodcastJsonLd', () => {
+  beforeEach(() => {
+    vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://selfhost.example.com');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it('renders correct schema type and context', () => {
     const data = renderAndParse(BASE_PROPS);
     expect(data['@context']).toBe('https://schema.org');
@@ -30,7 +38,7 @@ describe('PodcastJsonLd', () => {
     const data = renderAndParse(BASE_PROPS);
     expect(data.name).toBe('Test Podcast');
     expect(data.description).toBe('A topic about testing');
-    expect(data.url).toBe('https://sotto.fm/podcast/pod-123');
+    expect(data.url).toBe('https://selfhost.example.com/podcast/pod-123');
     expect(data.datePublished).toBe('2026-01-15T10:00:00.000Z');
   });
 
@@ -73,7 +81,7 @@ describe('PodcastJsonLd', () => {
     expect(data.partOfSeries).toEqual({
       '@type': 'PodcastSeries',
       name: "Jane Doe's Sotto Podcasts",
-      url: 'https://sotto.fm/@janedoe',
+      url: 'https://selfhost.example.com/@janedoe',
     });
   });
 
@@ -90,7 +98,7 @@ describe('PodcastJsonLd', () => {
     expect(data.creator).toEqual({
       '@type': 'Person',
       name: 'Jane Doe',
-      url: 'https://sotto.fm/@janedoe',
+      url: 'https://selfhost.example.com/@janedoe',
     });
   });
 

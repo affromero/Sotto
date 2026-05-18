@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { stripe } from '@/lib/stripe';
 
 import { errorResponse } from '@/lib/api-response';
+import { getAppBaseUrl } from '@/lib/urls';
 /**
  * POST: Create Stripe Connect Express account + onboarding link.
  * GET: Check onboarding status and return dashboard URL.
@@ -46,7 +47,7 @@ export async function POST() {
   }
 
   // Create onboarding link
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://sotto.fm';
+  const baseUrl = getAppBaseUrl();
   const accountLink = await stripe.accountLinks.create({
     account: accountId,
     refresh_url: `${baseUrl}/settings/voices?stripe=refresh`,
