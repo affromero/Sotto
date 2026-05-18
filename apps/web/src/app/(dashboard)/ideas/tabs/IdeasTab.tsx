@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Trash2, Sparkles, Lightbulb } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { getTelegramBotLabel } from '@/lib/bot-identity';
 import styles from './IdeasTab.module.css';
 
 export interface SerializedSavedIdea {
@@ -85,6 +86,7 @@ export function IdeasTab({ ideas: initialIdeas, podcastIdeas: initialPodcastIdea
   };
 
   const totalCount = ideas.length + podcastIdeas.length;
+  const telegramBotLabel = getTelegramBotLabel();
 
   if (totalCount === 0) {
     return (
@@ -93,7 +95,7 @@ export function IdeasTab({ ideas: initialIdeas, podcastIdeas: initialPodcastIdea
         <h3 className={styles.emptyTitle}>No ideas saved yet</h3>
         <p className={styles.emptyText}>
           Tap the bookmark icon on quiz questions or browse Inspire Me to save
-          podcast ideas. You can also send any topic or URL to @SottoFMBot on Telegram.
+          podcast ideas. You can also send any topic or URL to {telegramBotLabel} on Telegram.
         </p>
         <Link href="/create" className={styles.emptyLink}>
           <Sparkles size={16} aria-hidden="true" />

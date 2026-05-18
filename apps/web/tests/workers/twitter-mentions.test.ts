@@ -233,7 +233,7 @@ function createMockJob(data: PollTwitterMentionsPayload): Job<PollTwitterMention
 function createMockTweet(overrides?: Partial<TwitterTweet>): TwitterTweet {
   return {
     id: '1234567890',
-    text: '@sottofm explain quantum physics',
+    text: '@podbot explain quantum physics',
     author_id: 'twitter-user-123',
     created_at: '2026-01-15T10:00:00Z',
     ...overrides,
@@ -723,7 +723,7 @@ describe('processTwitterMentions', () => {
       const parentTweet = createMockTweet({ id: 'parent-123', text: 'Original tweet about AI' });
       const tweet = createMockTweet({
         id: 'reply-456',
-        text: '@sottofm explain this',
+        text: '@podbot explain this',
         referenced_tweets: [{ type: 'replied_to', id: 'parent-123' }],
       });
       mockGetMentions.mockResolvedValue({
@@ -1273,7 +1273,7 @@ describe('processTwitterMentions', () => {
           },
           {
             id: 'r3',
-            text: '@sottofm podcast this',
+            text: '@podbot podcast this',
             authorId: 'a4',
             authorUsername: 'dave',
             authorName: 'Dave',

@@ -578,7 +578,7 @@ describe('GET /api/admin/twitter/mentions', () => {
         id: 'tm-1',
         tweetId: '123456',
         authorId: 'author-1',
-        text: '@sottofm make a podcast about AI',
+        text: '@podbot make a podcast about AI',
         parsedTopic: 'AI',
         status: 'READY',
         podcastId: 'pod-1',

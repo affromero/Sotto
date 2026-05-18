@@ -4,6 +4,7 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { CollectionDetail } from '@/components/collections/CollectionDetail';
 import { getAppBaseUrl } from '@/lib/urls';
+import { getTwitterBotHandle } from '@/lib/bot-identity';
 import styles from './page.module.css';
 
 interface CollectionPageProps {
@@ -25,6 +26,7 @@ export async function generateMetadata({ params }: CollectionPageProps): Promise
     collection.description ||
     `A curated podcast collection by ${collection.user.name || 'Anonymous'}`;
   const canonicalUrl = `${appUrl}/collections/${collectionId}`;
+  const twitterSite = getTwitterBotHandle();
 
   return {
     title,
@@ -40,7 +42,7 @@ export async function generateMetadata({ params }: CollectionPageProps): Promise
       card: 'summary_large_image',
       title,
       description,
-      site: '@SottoFM',
+      ...(twitterSite ? { site: twitterSite } : {}),
     },
     alternates: {
       canonical: canonicalUrl,

@@ -49,7 +49,7 @@ export function ReferralSharePrompt({ handle, hasFirstReadyPodcast }: ReferralSh
   const referralUrl = `${origin}/ref/${handle}`;
   const referralDisplayUrl = origin ? referralUrl.replace(/^https?:\/\//, '') : `/ref/${handle}`;
   const twitterText = encodeURIComponent(
-    `I just created my first podcast on ${BRAND.twitter} — ${BRAND.tagline} Check it out:`
+    `I just created my first podcast on ${BRAND.name} — ${BRAND.tagline} Check it out:`
   );
   const twitterShareUrl = `https://twitter.com/intent/tweet?text=${twitterText}&url=${encodeURIComponent(referralUrl)}`;
 

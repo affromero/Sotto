@@ -15,6 +15,7 @@ import { getPodcastCostBreakdown } from '@/lib/podcast-cost-stats';
 import { JoinCTA } from '@/components/referral/JoinCTA';
 import { getPodcastForDetailPage } from '@/lib/podcast-data';
 import { absolutePodcastUrl, getAppBaseUrl } from '@/lib/urls';
+import { getTwitterBotHandle } from '@/lib/bot-identity';
 import styles from './page.module.css';
 
 interface PodcastPageProps {
@@ -34,6 +35,7 @@ export async function generateMetadata({ params }: PodcastPageProps): Promise<Me
     appUrl
   );
   const creatorName = podcast.user.name || 'Anonymous';
+  const twitterSite = getTwitterBotHandle();
 
   return {
     title: podcast.title,
@@ -58,7 +60,7 @@ export async function generateMetadata({ params }: PodcastPageProps): Promise<Me
       card: 'summary_large_image',
       title: `${podcast.title} — by ${creatorName}`,
       description: podcast.topic,
-      site: '@SottoFM',
+      ...(twitterSite ? { site: twitterSite } : {}),
     },
     alternates: {
       canonical: podcastUrl,

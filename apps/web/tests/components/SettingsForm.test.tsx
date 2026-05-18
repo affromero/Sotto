@@ -77,13 +77,13 @@ describe('SettingsForm', () => {
           {...defaultProps}
           isTwitterProviderAvailable={true}
           connectedProviders={['twitter']}
-          twitterHandle="sottofm"
+          twitterHandle="podbot"
         />
       );
 
       expect(screen.getByText('Twitter Integration')).toBeInTheDocument();
       expect(screen.queryByText('Connect Twitter')).not.toBeInTheDocument();
-      expect(screen.getByText('@sottofm')).toBeInTheDocument();
+      expect(screen.getByText('@podbot')).toBeInTheDocument();
       expect(screen.getByText('Save Twitter Settings')).toBeInTheDocument();
     });
   });

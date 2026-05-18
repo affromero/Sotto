@@ -27,6 +27,7 @@ import {
 } from '@/components/settings/PrivateRssFeedManager';
 import { ThemeSelector } from '@/components/settings/ThemeSelector';
 import { usePushSubscription } from '@/lib/hooks/usePushSubscription';
+import { getTwitterBotLabel } from '@/lib/bot-identity';
 import styles from './page.module.css';
 
 interface VoiceCloneData {
@@ -134,6 +135,7 @@ export function SettingsForm({
   referralBonus,
   appBaseUrl,
 }: SettingsFormProps) {
+  const twitterBotLabel = getTwitterBotLabel();
   const [name, setName] = useState(initialName);
   const [bio, setBio] = useState(initialBio);
   const [handle, setHandle] = useState(initialHandle);
@@ -892,7 +894,7 @@ export function SettingsForm({
           {!isTwitterConnected ? (
             <div>
               <p className={styles.twitterDescription}>
-                Connect your Twitter account to generate podcasts by tweeting at @sottofm.
+                Connect your Twitter account to generate podcasts by tweeting at {twitterBotLabel}.
               </p>
               <p className={styles.twitterDisclaimer}>
                 We only read your username to link your account. Sotto can&apos;t post tweets, read
@@ -912,7 +914,7 @@ export function SettingsForm({
                 <div className={styles.toggleInfo}>
                   <span className={styles.toggleLabel}>Enable Tweet-to-Podcast</span>
                   <span className={styles.toggleDescription}>
-                    Generate podcasts when you tweet at @sottofm
+                    Generate podcasts when you tweet at {twitterBotLabel}
                   </span>
                 </div>
                 <input

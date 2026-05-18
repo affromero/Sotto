@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { BRAND } from '@sotto/shared';
 import { getAppBaseUrl, podcastUrl } from './urls';
+import { getTwitterBotHandle, getTwitterProfileUrl } from './bot-identity';
 
 function appLinkLabel(appUrl: string): string {
   return new URL(appUrl).host;
@@ -138,6 +139,24 @@ export function buildMagicLinkEmail(url: string): { subject: string; html: strin
 
 export function buildWaitlistApprovalEmail(email: string): { subject: string; html: string } {
   const appUrl = getAppBaseUrl();
+  const twitterBotHandle = getTwitterBotHandle();
+  const twitterBotUrl = getTwitterProfileUrl(twitterBotHandle);
+  const twitterTip =
+    twitterBotHandle && twitterBotUrl
+      ? `<div style="background:#FEFCF8; border:1px solid #f3f4f6; border-radius:8px; padding:16px; margin-top:24px;">
+          <p style="font-size:13px; line-height:1.6; color:#6B7280; margin:0 0 8px;">
+            <strong style="color:#1A1A1A;">Quick tip:</strong> Tag
+            <a href="${twitterBotUrl}" style="color:#D97706; text-decoration:none; font-weight:600;">${twitterBotHandle}</a>
+            on X with any topic and your bot will turn it into a podcast for you.
+          </p>
+          <p style="font-size:12px; line-height:1.5; color:#9ca3af; margin:0 0 8px;">
+            Try it: <em>&ldquo;${twitterBotHandle} explain how black holes emit radiation&rdquo;</em>
+          </p>
+          <p style="font-size:12px; line-height:1.5; color:#9ca3af; margin:0;">
+            Just <a href="${appUrl}/settings" style="color:#D97706; text-decoration:none;">link your X account</a> in settings after signing up.
+          </p>
+        </div>`
+      : '';
   return {
     subject: 'Your early access to Sotto is ready',
     html: `${HEADER}
@@ -152,19 +171,7 @@ export function buildWaitlistApprovalEmail(email: string): { subject: string; ht
         <a href="${appUrl}/auth/signup" style="display:inline-block; background:#D97706; color:#fff; font-size:14px; font-weight:600; padding:12px 28px; border-radius:8px; text-decoration:none; margin:0 0 24px;">
           Claim Your Spot
         </a>
-        <div style="background:#FEFCF8; border:1px solid #f3f4f6; border-radius:8px; padding:16px; margin-top:24px;">
-          <p style="font-size:13px; line-height:1.6; color:#6B7280; margin:0 0 8px;">
-            <strong style="color:#1A1A1A;">Quick tip:</strong> Tag
-            <a href="https://x.com/sottofm" style="color:#D97706; text-decoration:none; font-weight:600;">@sottofm</a>
-            on X with any topic and our bot will turn it into a podcast for you.
-          </p>
-          <p style="font-size:12px; line-height:1.5; color:#9ca3af; margin:0 0 8px;">
-            Try it: <em>&ldquo;@sottofm explain how black holes emit radiation&rdquo;</em>
-          </p>
-          <p style="font-size:12px; line-height:1.5; color:#9ca3af; margin:0;">
-            Just <a href="${appUrl}/settings" style="color:#D97706; text-decoration:none;">link your X account</a> in settings after signing up.
-          </p>
-        </div>
+        ${twitterTip}
       </div>
     ${footer(email)}`,
   };

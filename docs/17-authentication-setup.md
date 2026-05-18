@@ -150,7 +150,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
 **User ID + role in session:** The `jwt` callback copies the database user ID, role, ban state, and suspension state into the JWT token. The `session` callback propagates these to `session.user`. This ensures every API route and server component can access the authenticated user's role and moderation status.
 
-**Twitter handle sync:** The `events.linkAccount` hook automatically syncs the user's Twitter handle when they link their Twitter account, enabling the @sottofm bot integration.
+**Twitter handle sync:** The `events.linkAccount` hook automatically syncs the user's Twitter handle when they link their Twitter account, enabling the configured bot integration.
 
 ---
 
@@ -310,7 +310,7 @@ TWITTER_CLIENT_SECRET=xxxxxxxxxxxxxxxxxxxx
 **Important notes:**
 
 - Twitter uses OAuth 2.0 with PKCE for NextAuth v5 (not OAuth 1.0a)
-- The `events.linkAccount` hook automatically syncs the user's Twitter handle to enable @sottofm bot features
+- The `events.linkAccount` hook automatically syncs the user's Twitter handle to enable configured bot features
 - Users who sign in with Twitter get `twitterEnabled: true` set on their User record
 
 ### Apple Sign In

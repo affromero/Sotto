@@ -47,7 +47,7 @@ vi.mock('@/lib/logger', () => ({
 function tweet(overrides: Partial<TwitterTweet> = {}): TwitterTweet {
   return {
     id: 'tweet-1',
-    text: '@sottofm make this a private podcast about AI',
+    text: '@podbot make this a private podcast about AI',
     author_id: 'author-1',
     created_at: '2026-05-01T00:00:00Z',
     ...overrides,

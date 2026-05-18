@@ -7,7 +7,7 @@ export default function AdminTwitterPage() {
       <div className={styles.header}>
         <h1 className={styles.title}>Twitter Dashboard</h1>
         <p className={styles.subtitle}>
-          Manage @sottofm auto-tweets, trending topics, thread imports, and analytics
+          Manage bot auto-tweets, trending topics, thread imports, and analytics
         </p>
       </div>
 
