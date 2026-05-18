@@ -157,6 +157,56 @@ export const discoveryMessageSchema = z.object({
  */
 export { createPodcastSchema } from '@sotto/shared';
 
+const explicitTtsProviderSchema = z.enum([
+  'elevenlabs',
+  'openai',
+  'cartesia',
+  'hume',
+  'fal',
+  'replicate',
+  'minimax',
+  'mistral',
+]);
+
+const agentProviderSchema = z.enum(['claude-code', 'codex', 'openclaw', 'hermes', 'custom']);
+
+/**
+ * Private agent-output ingestion. This is intentionally separate from generic
+ * podcast creation so local agents can post source material without exposing a
+ * social or public sharing surface.
+ */
+export const agentIngestionSchema = z
+  .object({
+    title: z.string().trim().min(1).max(200),
+    topic: z.string().trim().min(1).max(5000).optional(),
+    content: z.string().trim().min(1).max(120000),
+    idempotencyKey: z
+      .string()
+      .trim()
+      .min(1)
+      .max(200)
+      .regex(/^[A-Za-z0-9._:-]+$/)
+      .optional(),
+    sourceUrl: z.string().url().optional(),
+    durationTarget: z.number().int().min(1).max(40).optional(),
+    depth: z.enum(['eli5', 'quick_overview', 'standard', 'deep_dive']).optional(),
+    audienceLevel: z.enum(['beginner', 'intermediate', 'expert', 'general']).optional(),
+    tone: z.string().trim().min(1).max(80).optional(),
+    focusAreas: z.array(z.string().trim().min(1).max(80)).max(12).optional(),
+    agent: z
+      .object({
+        provider: agentProviderSchema,
+        name: z.string().trim().min(1).max(80),
+        model: z.string().trim().min(1).max(120).optional(),
+        runId: z.string().trim().min(1).max(200).optional(),
+      })
+      .strict(),
+    aiModel: z.string().trim().min(1).max(160).optional(),
+    ttsProvider: explicitTtsProviderSchema,
+    ttsModel: z.string().trim().min(1).max(120).optional(),
+  })
+  .strict();
+
 /**
  * Script turn update validation
  */
