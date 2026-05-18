@@ -4,7 +4,7 @@ import { errorResponse } from '@/lib/api-response';
 import { listAiProviders, listByokProviders } from '@/lib/byok';
 import { isClaudeAvailable } from '@/lib/claude-code-client';
 import { prisma } from '@/lib/prisma';
-import { buildSetupReadiness } from '@/lib/setup-readiness';
+import { buildSetupReadiness, buildSttProviderStatuses } from '@/lib/setup-readiness';
 
 export async function GET() {
   const session = await auth();
@@ -38,9 +38,11 @@ export async function GET() {
     storageProvider: process.env.STORAGE_PROVIDER,
     aiProviders,
     ttsProviders,
+    sttProviders: buildSttProviderStatuses(aiProviders, ttsProviders),
     privateFeedTokenCount,
     selectedAiProvider: user?.preferredAiModel,
     selectedTtsProvider: user?.preferredTtsProvider,
+    selectedSttProvider: process.env.STT_PROVIDER,
     claudeCodeAvailable,
   });
 

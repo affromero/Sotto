@@ -7,7 +7,7 @@ import { prisma } from '@/lib/prisma';
 import { getAllAiProviderClientMeta } from '@/lib/providers/ai-registry';
 import { getAllTtsProviderClientMeta } from '@/lib/providers/tts-registry';
 import { attributeReferral } from '@/lib/referrals';
-import { buildSetupReadiness } from '@/lib/setup-readiness';
+import { buildSetupReadiness, buildSttProviderStatuses } from '@/lib/setup-readiness';
 import { NameStep } from './NameStep';
 import { KeySetupForm } from './KeySetupForm';
 import styles from './page.module.css';
@@ -96,9 +96,11 @@ export default async function OnboardingPage() {
     storageProvider: process.env.STORAGE_PROVIDER,
     aiProviders,
     ttsProviders,
+    sttProviders: buildSttProviderStatuses(aiProviders, ttsProviders),
     privateFeedTokenCount: privateFeedTokens.length,
     selectedAiProvider: user.preferredAiModel,
     selectedTtsProvider: user.preferredTtsProvider,
+    selectedSttProvider: process.env.STT_PROVIDER,
     claudeCodeAvailable,
   });
 

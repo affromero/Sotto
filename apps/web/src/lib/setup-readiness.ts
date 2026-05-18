@@ -4,6 +4,7 @@ export type SetupCapabilityId =
   | 'storage'
   | 'generation'
   | 'tts'
+  | 'stt'
   | 'private-rss';
 
 export type SetupCapabilityStatus = 'ready' | 'action_required';
@@ -37,9 +38,11 @@ interface BuildSetupReadinessInput {
   storageProvider?: string | null;
   aiProviders: ProviderStatus[];
   ttsProviders: ProviderStatus[];
+  sttProviders: ProviderStatus[];
   privateFeedTokenCount: number;
   selectedAiProvider?: string | null;
   selectedTtsProvider?: string | null;
+  selectedSttProvider?: string | null;
   claudeCodeAvailable?: boolean;
   env?: Record<string, string | undefined>;
 }
@@ -61,6 +64,27 @@ const TTS_PLATFORM_KEYS: Record<string, string[]> = {
   minimax: ['MINIMAX_API_KEY'],
   mistral: ['MISTRAL_API_KEY'],
 };
+
+const STT_PLATFORM_KEYS: Record<string, string[]> = {
+  openai: ['OPENAI_API_KEY'],
+  elevenlabs: ['ELEVENLABS_API_KEY'],
+  together: ['TOGETHER_API_KEY'],
+  deepgram: ['DEEPGRAM_API_KEY'],
+  assemblyai: ['ASSEMBLYAI_API_KEY'],
+};
+
+const STT_AI_KEY_PROVIDERS = new Set(['openai', 'together', 'deepgram', 'assemblyai']);
+const STT_TTS_KEY_PROVIDERS = new Set(['elevenlabs']);
+
+export function buildSttProviderStatuses(
+  aiProviders: ProviderStatus[],
+  ttsProviders: ProviderStatus[]
+): ProviderStatus[] {
+  return [
+    ...aiProviders.filter((provider) => STT_AI_KEY_PROVIDERS.has(provider.provider)),
+    ...ttsProviders.filter((provider) => STT_TTS_KEY_PROVIDERS.has(provider.provider)),
+  ];
+}
 
 function hasEnv(env: Record<string, string | undefined>, keys: string[]): boolean {
   return keys.some((key) => Boolean(env[key]?.trim()));
@@ -103,6 +127,7 @@ export function buildSetupReadiness(input: BuildSetupReadinessInput): SetupReadi
   const storageProviderKnown = isKnownStorageProvider(storageProvider);
   const selectedAiProvider = normalizeAiProvider(input.selectedAiProvider || env.AI_PROVIDER);
   const selectedTtsProvider = input.selectedTtsProvider || env.TTS_PROVIDER || null;
+  const selectedSttProvider = input.selectedSttProvider || env.STT_PROVIDER || null;
   const claudeCodeSelected = selectedAiProvider === 'claude-code';
   const aiReady =
     (claudeCodeSelected && input.claudeCodeAvailable === true) ||
@@ -111,6 +136,11 @@ export function buildSetupReadiness(input: BuildSetupReadinessInput): SetupReadi
   const ttsReady =
     hasValidProvider(input.ttsProviders, selectedTtsProvider) ||
     hasPlatformProvider(env, TTS_PLATFORM_KEYS, selectedTtsProvider);
+  const sttProviderKnown = selectedSttProvider ? selectedSttProvider in STT_PLATFORM_KEYS : false;
+  const sttReady =
+    sttProviderKnown &&
+    (hasValidProvider(input.sttProviders, selectedSttProvider) ||
+      hasPlatformProvider(env, STT_PLATFORM_KEYS, selectedSttProvider));
   const storageReady =
     storageProviderKnown &&
     (storageProvider === 'local' ||
@@ -172,6 +202,21 @@ export function buildSetupReadiness(input: BuildSetupReadinessInput): SetupReadi
           ? `${selectedTtsProvider} selected`
           : 'Voice provider configured'
         : 'Add a TTS provider key.',
+    },
+    {
+      id: 'stt',
+      label: 'Speech-to-text',
+      description: 'Transcribes meetings and imported audio before episode generation.',
+      status: sttReady ? 'ready' : 'action_required',
+      actionLabel: 'Add transcription provider',
+      actionHref: '/settings',
+      detail: sttReady
+        ? `${selectedSttProvider} selected`
+        : selectedSttProvider
+          ? sttProviderKnown
+            ? `Add the ${selectedSttProvider} STT key.`
+            : `Unknown STT provider: ${selectedSttProvider}`
+          : 'Set STT_PROVIDER to the transcription provider you want to use.',
     },
     {
       id: 'private-rss',

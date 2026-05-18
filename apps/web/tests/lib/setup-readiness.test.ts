@@ -1,17 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { buildSetupReadiness } from '@/lib/setup-readiness';
+import { buildSetupReadiness, buildSttProviderStatuses } from '@/lib/setup-readiness';
 
 describe('buildSetupReadiness', () => {
-  it('marks the one-key OpenAI path ready when OpenAI is explicitly selected for generation and TTS', () => {
+  it('marks the one-key OpenAI path ready when OpenAI is explicitly selected for generation, TTS, and STT', () => {
     const readiness = buildSetupReadiness({
       hasDatabase: true,
       hasQueue: true,
       storageProvider: 'local',
       aiProviders: [],
       ttsProviders: [],
+      sttProviders: [],
       privateFeedTokenCount: 1,
       selectedAiProvider: 'openai',
       selectedTtsProvider: 'openai',
+      selectedSttProvider: 'openai',
       env: { OPENAI_API_KEY: 'sk-test' },
     });
 
@@ -26,9 +28,11 @@ describe('buildSetupReadiness', () => {
       storageProvider: 'local',
       aiProviders: [{ provider: 'openai', isValid: true }],
       ttsProviders: [{ provider: 'openai', isValid: true }],
+      sttProviders: [{ provider: 'openai', isValid: true }],
       privateFeedTokenCount: 1,
       selectedAiProvider: 'anthropic',
       selectedTtsProvider: 'openai',
+      selectedSttProvider: 'openai',
       env: {},
     });
     const generation = readiness.capabilities.find((capability) => capability.id === 'generation');
@@ -45,9 +49,11 @@ describe('buildSetupReadiness', () => {
       storageProvider: 'local',
       aiProviders: [{ provider: 'anthropic', isValid: true }],
       ttsProviders: [{ provider: 'elevenlabs', isValid: true }],
+      sttProviders: [{ provider: 'elevenlabs', isValid: true }],
       privateFeedTokenCount: 0,
       selectedAiProvider: 'anthropic',
       selectedTtsProvider: 'elevenlabs',
+      selectedSttProvider: 'elevenlabs',
       env: {},
     });
     const privateRss = readiness.capabilities.find((capability) => capability.id === 'private-rss');
@@ -64,9 +70,11 @@ describe('buildSetupReadiness', () => {
       storageProvider: 'local',
       aiProviders: [],
       ttsProviders: [{ provider: 'openai', isValid: true }],
+      sttProviders: [{ provider: 'openai', isValid: true }],
       privateFeedTokenCount: 1,
       selectedAiProvider: 'claude-code:sonnet',
       selectedTtsProvider: 'openai',
+      selectedSttProvider: 'openai',
       claudeCodeAvailable: true,
       env: {},
     });
@@ -83,9 +91,11 @@ describe('buildSetupReadiness', () => {
       storageProvider: 'local',
       aiProviders: [],
       ttsProviders: [{ provider: 'openai', isValid: true }],
+      sttProviders: [{ provider: 'openai', isValid: true }],
       privateFeedTokenCount: 1,
       selectedAiProvider: 'claude-code:sonnet',
       selectedTtsProvider: 'openai',
+      selectedSttProvider: 'openai',
       claudeCodeAvailable: false,
       env: {},
     });
@@ -103,9 +113,11 @@ describe('buildSetupReadiness', () => {
       storageProvider: 'mystery',
       aiProviders: [{ provider: 'anthropic', isValid: true }],
       ttsProviders: [{ provider: 'elevenlabs', isValid: true }],
+      sttProviders: [{ provider: 'elevenlabs', isValid: true }],
       privateFeedTokenCount: 1,
       selectedAiProvider: 'anthropic',
       selectedTtsProvider: 'elevenlabs',
+      selectedSttProvider: 'elevenlabs',
       env: {},
     });
     const storage = readiness.capabilities.find((capability) => capability.id === 'storage');
@@ -113,5 +125,67 @@ describe('buildSetupReadiness', () => {
     expect(readiness.ready).toBe(false);
     expect(storage?.status).toBe('action_required');
     expect(storage?.detail).toBe('Unknown storage provider: mystery');
+  });
+
+  it('requires an explicit STT provider before marking transcription ready', () => {
+    const readiness = buildSetupReadiness({
+      hasDatabase: true,
+      hasQueue: true,
+      storageProvider: 'local',
+      aiProviders: [{ provider: 'openai', isValid: true }],
+      ttsProviders: [{ provider: 'openai', isValid: true }],
+      sttProviders: [{ provider: 'openai', isValid: true }],
+      privateFeedTokenCount: 1,
+      selectedAiProvider: 'openai',
+      selectedTtsProvider: 'openai',
+      env: {},
+    });
+    const stt = readiness.capabilities.find((capability) => capability.id === 'stt');
+
+    expect(readiness.ready).toBe(false);
+    expect(stt?.status).toBe('action_required');
+    expect(stt?.detail).toBe('Set STT_PROVIDER to the transcription provider you want to use.');
+    expect(readiness.nextAction?.id).toBe('stt');
+  });
+
+  it('requires the selected STT provider key instead of accepting another configured STT key', () => {
+    const readiness = buildSetupReadiness({
+      hasDatabase: true,
+      hasQueue: true,
+      storageProvider: 'local',
+      aiProviders: [{ provider: 'openai', isValid: true }],
+      ttsProviders: [{ provider: 'openai', isValid: true }],
+      sttProviders: [{ provider: 'openai', isValid: true }],
+      privateFeedTokenCount: 1,
+      selectedAiProvider: 'openai',
+      selectedTtsProvider: 'openai',
+      selectedSttProvider: 'deepgram',
+      env: {},
+    });
+    const stt = readiness.capabilities.find((capability) => capability.id === 'stt');
+
+    expect(readiness.ready).toBe(false);
+    expect(stt?.status).toBe('action_required');
+    expect(stt?.detail).toBe('Add the deepgram STT key.');
+    expect(readiness.nextAction?.id).toBe('stt');
+  });
+
+  it('maps STT readiness to the key store the resolver actually reads', () => {
+    const sttProviders = buildSttProviderStatuses(
+      [
+        { provider: 'openai', isValid: true },
+        { provider: 'deepgram', isValid: true },
+      ],
+      [
+        { provider: 'openai', isValid: true },
+        { provider: 'elevenlabs', isValid: true },
+      ]
+    );
+
+    expect(sttProviders).toEqual([
+      { provider: 'openai', isValid: true },
+      { provider: 'deepgram', isValid: true },
+      { provider: 'elevenlabs', isValid: true },
+    ]);
   });
 });
