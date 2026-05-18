@@ -375,6 +375,33 @@ describe('private-first OSS surfaces', () => {
     expect(envTemplateSources).not.toContain('Doppler dev/prd configs');
   });
 
+  it('keeps server deployment self-hosted and env-file driven', () => {
+    const deploySource = readFileSync(resolve(repoRoot, 'scripts/deploy.sh'), 'utf8');
+    const setupServerSource = readFileSync(resolve(repoRoot, 'scripts/setup-server.sh'), 'utf8');
+    const caddyTemplate = readFileSync(resolve(repoRoot, 'Caddyfile'), 'utf8');
+    const deploymentSources = [deploySource, setupServerSource, caddyTemplate].join('\n');
+
+    expect(deploySource).toContain('ENV_FILE="${SOTTO_ENV_FILE:-$REPO_ROOT/.env.production}"');
+    expect(deploySource).toContain('require_env NEXT_PUBLIC_APP_URL');
+    expect(deploySource).toContain('render_caddy_config');
+    expect(deploySource).toContain(
+      'CADDY_SITE_PATH="${CADDY_SITE_PATH:-/etc/caddy/conf.d/sotto.conf}"',
+    );
+    expect(setupServerSource).toContain('cp .env.example .env.production');
+    expect(setupServerSource).toContain(
+      'SOTTO_ENV_FILE=~/sotto/.env.production bash scripts/deploy.sh',
+    );
+    expect(caddyTemplate).toContain('__SOTTO_APP_DOMAIN__');
+    expect(caddyTemplate).toContain('# BEGIN_OPTIONAL_MAPS');
+    expect(caddyTemplate).toContain('# BEGIN_OPTIONAL_WWW');
+    expect(deploymentSources).not.toContain('doppler');
+    expect(deploymentSources).not.toContain('Doppler');
+    expect(deploymentSources).not.toContain('dashboard.doppler.com');
+    expect(deploymentSources).not.toContain('sotto.fm');
+    expect(deploymentSources).not.toContain('/etc/caddy/conf.d/sotto.fm');
+    expect(deploymentSources).not.toContain('.env.workers.local');
+  });
+
   it('does not ship the standalone social feed ranking workspace', () => {
     const workspaceSources = [
       'package.json',
