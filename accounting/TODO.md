@@ -4,7 +4,7 @@
 
 ## Now (before first monthly close)
 
-- [ ] **Fix domain cost in `docs/11-unit-economics.md`** — Says "$12/year" but sotto.fm is actually $70/yr. Update the bootstrapping budget table.
+- [ ] **Fix domain cost in `docs/11-unit-economics.md`** — Says "$12/year" but the project domain is actually $70/yr. Update the bootstrapping budget table.
 
 - [ ] **Add accounting section to root `CLAUDE.md`** — Brief mention of the Beancount system: where ledger files live, how to record expenses, how to validate.
 

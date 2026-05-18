@@ -71,7 +71,7 @@
 - [x] `interaction.worker.ts`
 - [x] `segment-regeneration.worker.ts`
 - [x] `notification.worker.ts`
-- [x] `twitter-mentions.worker.ts` — poll @sottofm mentions, parse intent, create podcast
+- [x] `twitter-mentions.worker.ts` — poll configured bot mentions, parse intent, create podcast
 - [x] `twitter-reply.worker.ts` — reply to tweet when podcast is ready
 - [x] `CLAUDE.md` — documentation
 
@@ -336,7 +336,7 @@
 - [x] **API access tier** — ApiKey model, `sk_sotto_` keys with SHA-256, Bearer token auth on podcast routes
 - [x] **Analytics dashboard** — Period selector, stat cards, CSS-only BarChart + TimeSeriesChart
 - [x] **Advanced discovery filters** — FilterPanel with depth, audience, tone, duration range, date range
-- [x] **Twitter @sottofm integration** — Tweet-to-podcast pipeline (mention polling, intent parsing, reply posting, settings UI, OAuth)
+- [x] **Twitter bot integration** — Tweet-to-podcast pipeline (mention polling, intent parsing, reply posting, settings UI, OAuth)
 
 ## 27. Test Backlog
 
