@@ -6,6 +6,7 @@ const mockListAiProviders = vi.fn();
 const mockListByokProviders = vi.fn();
 const mockUserFindUnique = vi.fn();
 const mockPrivateFeedTokenCount = vi.fn();
+const mockIsClaudeAvailable = vi.fn();
 
 vi.mock('@/lib/auth', () => ({
   auth: (...args: unknown[]) => mockAuth(...args),
@@ -14,6 +15,10 @@ vi.mock('@/lib/auth', () => ({
 vi.mock('@/lib/byok', () => ({
   listAiProviders: (...args: unknown[]) => mockListAiProviders(...args),
   listByokProviders: (...args: unknown[]) => mockListByokProviders(...args),
+}));
+
+vi.mock('@/lib/claude-code-client', () => ({
+  isClaudeAvailable: (...args: unknown[]) => mockIsClaudeAvailable(...args),
 }));
 
 vi.mock('@/lib/prisma', () => ({
@@ -41,6 +46,7 @@ describe('GET /api/onboarding/readiness', () => {
     mockListAiProviders.mockResolvedValue([]);
     mockListByokProviders.mockResolvedValue([]);
     mockPrivateFeedTokenCount.mockResolvedValue(0);
+    mockIsClaudeAvailable.mockResolvedValue(false);
   });
 
   it('returns 401 when unauthenticated', async () => {
@@ -73,6 +79,7 @@ describe('GET /api/onboarding/readiness', () => {
     expect(mockPrivateFeedTokenCount).toHaveBeenCalledWith({
       where: { userId: 'user-1', revokedAt: null },
     });
+    expect(mockIsClaudeAvailable).not.toHaveBeenCalled();
   });
 
   it('reports the first missing setup action without using another configured provider', async () => {
@@ -95,6 +102,33 @@ describe('GET /api/onboarding/readiness', () => {
         expect.objectContaining({
           id: 'generation',
           status: 'action_required',
+        }),
+      ])
+    );
+  });
+
+  it('reports Claude Code setup as missing when the selected CLI is unavailable', async () => {
+    mockUserFindUnique.mockResolvedValue({
+      preferredAiModel: 'claude-code:sonnet',
+      preferredTtsProvider: 'openai',
+    });
+    mockListByokProviders.mockResolvedValue([{ provider: 'openai', isValid: true }]);
+    mockPrivateFeedTokenCount.mockResolvedValue(1);
+    mockIsClaudeAvailable.mockResolvedValue(false);
+
+    const response = await getReadiness();
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(mockIsClaudeAvailable).toHaveBeenCalledOnce();
+    expect(body.ready).toBe(false);
+    expect(body.nextAction.id).toBe('generation');
+    expect(body.capabilities).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'generation',
+          status: 'action_required',
+          detail: "Install and authenticate the 'claude' CLI for Claude Code.",
         }),
       ])
     );

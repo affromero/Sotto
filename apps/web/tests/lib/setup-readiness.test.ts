@@ -57,7 +57,7 @@ describe('buildSetupReadiness', () => {
     expect(readiness.nextAction?.id).toBe('private-rss');
   });
 
-  it('treats Claude Code as a local generation provider without requiring a platform key', () => {
+  it('treats Claude Code as a local generation provider when its CLI is available', () => {
     const readiness = buildSetupReadiness({
       hasDatabase: true,
       hasQueue: true,
@@ -67,12 +67,33 @@ describe('buildSetupReadiness', () => {
       privateFeedTokenCount: 1,
       selectedAiProvider: 'claude-code:sonnet',
       selectedTtsProvider: 'openai',
+      claudeCodeAvailable: true,
       env: {},
     });
     const generation = readiness.capabilities.find((capability) => capability.id === 'generation');
 
     expect(generation?.status).toBe('ready');
     expect(readiness.ready).toBe(true);
+  });
+
+  it('requires the Claude Code CLI when Claude Code is selected', () => {
+    const readiness = buildSetupReadiness({
+      hasDatabase: true,
+      hasQueue: true,
+      storageProvider: 'local',
+      aiProviders: [],
+      ttsProviders: [{ provider: 'openai', isValid: true }],
+      privateFeedTokenCount: 1,
+      selectedAiProvider: 'claude-code:sonnet',
+      selectedTtsProvider: 'openai',
+      claudeCodeAvailable: false,
+      env: {},
+    });
+    const generation = readiness.capabilities.find((capability) => capability.id === 'generation');
+
+    expect(generation?.status).toBe('action_required');
+    expect(generation?.detail).toBe("Install and authenticate the 'claude' CLI for Claude Code.");
+    expect(readiness.nextAction?.id).toBe('generation');
   });
 
   it('marks unknown storage providers as action required', () => {
