@@ -411,6 +411,28 @@ describe('private-first OSS surfaces', () => {
     expect(authSecretSources).not.toContain('doppler run --');
   });
 
+  it('keeps runtime infrastructure surfaces free of hosted defaults', () => {
+    const runtimeInfraSources = [
+      'packages/shared/src/brand.ts',
+      'apps/maps/src/components/SottoLogo.tsx',
+      'apps/maps/src/app/api/health/route.ts',
+      'apps/web/src/lib/push-notifications.ts',
+      'apps/web/src/lib/reference-validator.ts',
+    ]
+      .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
+      .join('\n');
+
+    expect(runtimeInfraSources).toContain("url: '/'");
+    expect(runtimeInfraSources).toContain('process.env.VAPID_SUBJECT');
+    expect(runtimeInfraSources).toContain('OPENALEX_EMAIL');
+    expect(runtimeInfraSources).not.toContain('https://sotto.fm');
+    expect(runtimeInfraSources).not.toContain('sotto.fm');
+    expect(runtimeInfraSources).not.toContain('maps.sotto.fm');
+    expect(runtimeInfraSources).not.toContain('mailto:hello@sotto.fm');
+    expect(runtimeInfraSources).not.toContain("process.env.VAPID_SUBJECT ||");
+    expect(runtimeInfraSources).not.toContain("service: 'maps.sotto.fm'");
+  });
+
   it('keeps server deployment self-hosted and env-file driven', () => {
     const deploySource = readFileSync(resolve(repoRoot, 'scripts/deploy.sh'), 'utf8');
     const setupServerSource = readFileSync(resolve(repoRoot, 'scripts/setup-server.sh'), 'utf8');
