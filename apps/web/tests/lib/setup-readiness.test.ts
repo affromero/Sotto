@@ -21,6 +21,42 @@ describe('buildSetupReadiness', () => {
     expect(readiness.nextAction).toBeNull();
   });
 
+  it('marks agent and transcript ingestion ready without requiring STT', () => {
+    const readiness = buildSetupReadiness({
+      hasDatabase: true,
+      hasQueue: true,
+      storageProvider: 'local',
+      aiProviders: [{ provider: 'openai', isValid: true }],
+      ttsProviders: [{ provider: 'openai', isValid: true }],
+      sttProviders: [],
+      privateFeedTokenCount: 1,
+      selectedAiProvider: 'openai',
+      selectedTtsProvider: 'openai',
+      env: {},
+    });
+
+    expect(readiness.ready).toBe(true);
+    expect(readiness.nextAction).toBeNull();
+    expect(readiness.capabilities).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'agent-ingestion',
+          status: 'ready',
+        }),
+        expect.objectContaining({
+          id: 'meeting-transcripts',
+          status: 'ready',
+          detail: 'Transcript ingestion ready; STT is optional for raw audio.',
+        }),
+        expect.objectContaining({
+          id: 'stt',
+          status: 'optional',
+          required: false,
+        }),
+      ])
+    );
+  });
+
   it('does not mark another configured AI key ready when an explicit provider is selected', () => {
     const readiness = buildSetupReadiness({
       hasDatabase: true,
@@ -127,7 +163,7 @@ describe('buildSetupReadiness', () => {
     expect(storage?.detail).toBe('Unknown storage provider: mystery');
   });
 
-  it('requires an explicit STT provider before marking transcription ready', () => {
+  it('does not require STT before marking transcript-based onboarding ready', () => {
     const readiness = buildSetupReadiness({
       hasDatabase: true,
       hasQueue: true,
@@ -142,13 +178,16 @@ describe('buildSetupReadiness', () => {
     });
     const stt = readiness.capabilities.find((capability) => capability.id === 'stt');
 
-    expect(readiness.ready).toBe(false);
-    expect(stt?.status).toBe('action_required');
-    expect(stt?.detail).toBe('Set STT_PROVIDER to the transcription provider you want to use.');
-    expect(readiness.nextAction?.id).toBe('stt');
+    expect(readiness.ready).toBe(true);
+    expect(stt?.status).toBe('optional');
+    expect(stt?.detail).toBe(
+      'Transcript ingestion works without STT. Add STT only for raw meeting audio.'
+    );
+    expect(stt?.required).toBe(false);
+    expect(readiness.nextAction).toBeNull();
   });
 
-  it('requires the selected STT provider key instead of accepting another configured STT key', () => {
+  it('flags a selected STT provider key without blocking transcript-only onboarding', () => {
     const readiness = buildSetupReadiness({
       hasDatabase: true,
       hasQueue: true,
@@ -164,10 +203,11 @@ describe('buildSetupReadiness', () => {
     });
     const stt = readiness.capabilities.find((capability) => capability.id === 'stt');
 
-    expect(readiness.ready).toBe(false);
+    expect(readiness.ready).toBe(true);
     expect(stt?.status).toBe('action_required');
     expect(stt?.detail).toBe('Add the deepgram STT key.');
-    expect(readiness.nextAction?.id).toBe('stt');
+    expect(stt?.required).toBe(false);
+    expect(readiness.nextAction).toBeNull();
   });
 
   it('maps STT readiness to the key store the resolver actually reads', () => {

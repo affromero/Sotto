@@ -77,7 +77,8 @@
 }
 
 .checkReady,
-.checkNeeded {
+.checkNeeded,
+.checkOptional {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -97,6 +98,11 @@
 .checkNeeded {
   color: var(--color-primary);
   background: var(--color-primary-lighter);
+}
+
+.checkOptional {
+  color: var(--color-text-tertiary);
+  background: var(--color-surface-hover);
 }
 
 .checkBody {
