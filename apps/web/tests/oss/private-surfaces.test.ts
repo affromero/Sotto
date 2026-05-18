@@ -976,6 +976,23 @@ describe('private-first OSS surfaces', () => {
     expect(setupSources).not.toContain('sttProvider      String? // null = auto');
   });
 
+  it('keeps scheduled news briefings private-only', () => {
+    const briefingSources = [
+      'src/app/api/briefings/route.ts',
+      'src/app/api/briefings/[id]/route.ts',
+      'src/lib/briefing-generator.ts',
+      'src/components/settings/BriefingForm.tsx',
+    ]
+      .map(readSource)
+      .join('\n');
+
+    expect(briefingSources).toContain("visibility: z.literal('PRIVATE')");
+    expect(briefingSources).toContain("visibility: 'PRIVATE'");
+    expect(briefingSources).not.toContain("z.enum(['PUBLIC', 'UNLISTED', 'PRIVATE'])");
+    expect(briefingSources).not.toContain('<option value="PUBLIC">Public</option>');
+    expect(briefingSources).not.toContain('<option value="UNLISTED">Unlisted</option>');
+  });
+
   it('keeps BYOK voice generation explicit instead of submitting Auto', () => {
     const ttsSources = [
       'apps/web/src/app/api/podcasts/route.ts',

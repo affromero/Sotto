@@ -107,7 +107,7 @@ export function resolveBriefingConfig(
     format: briefing.format ?? 2,
     prompt: briefing.prompt,
     useByokKeys: briefing.useByokKeys,
-    visibility: briefing.visibility,
+    visibility: 'PRIVATE',
     targetLanguage: briefing.targetLanguage ?? null,
     languageMode: briefing.languageMode ?? null,
   };
