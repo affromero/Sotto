@@ -25,11 +25,13 @@ vi.mock('@/lib/prisma', () => ({
 
 // Mock email
 const mockSendEmail = vi.fn().mockResolvedValue(undefined);
+const mockAssertEmailDeliveryConfigured = vi.fn();
 const mockBuildWaitlistApprovalEmail = vi.fn().mockReturnValue({
-  subject: 'You\'re in!',
+  subject: "You're in!",
   html: '<p>approved</p>',
 });
 vi.mock('@/lib/email', () => ({
+  assertEmailDeliveryConfigured: () => mockAssertEmailDeliveryConfigured(),
   sendEmail: (...args: unknown[]) => mockSendEmail(...args),
 }));
 vi.mock('@/lib/email-templates', () => ({
@@ -61,6 +63,8 @@ describe('Admin Waitlist PATCH — approve/reject', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    mockAssertEmailDeliveryConfigured.mockReturnValue(undefined);
+    mockSendEmail.mockResolvedValue(undefined);
     handler = await getHandler();
   });
 
@@ -77,6 +81,7 @@ describe('Admin Waitlist PATCH — approve/reject', () => {
       id: 'wl-1',
       email: 'user@example.com',
       status: 'PENDING',
+      unsubscribed: false,
     });
     mockPrismaWaitlist.update.mockResolvedValue({
       id: 'wl-1',
@@ -102,9 +107,54 @@ describe('Admin Waitlist PATCH — approve/reject', () => {
       }),
     });
 
-    // Give fire-and-forget email time to dispatch
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(mockAssertEmailDeliveryConfigured).toHaveBeenCalled();
     expect(mockBuildWaitlistApprovalEmail).toHaveBeenCalledWith('user@example.com');
+    expect(mockSendEmail).toHaveBeenCalledWith({
+      to: 'user@example.com',
+      subject: "You're in!",
+      html: '<p>approved</p>',
+    });
+  });
+
+  it('does not approve a waitlist entry when approval email is not configured', async () => {
+    mockRequireAdmin.mockResolvedValue('admin-1');
+    mockPrismaWaitlist.findUnique.mockResolvedValue({
+      id: 'wl-1',
+      email: 'user@example.com',
+      status: 'PENDING',
+      unsubscribed: false,
+    });
+    mockAssertEmailDeliveryConfigured.mockImplementation(() => {
+      throw new Error('EMAIL_FROM is required');
+    });
+
+    const res = await handler(createPatchRequest({ id: 'wl-1', status: 'APPROVED' }));
+    expect(res.status).toBe(503);
+    expect(mockPrismaWaitlist.update).not.toHaveBeenCalled();
+    expect(mockSendEmail).not.toHaveBeenCalled();
+  });
+
+  it('returns an error when approval email delivery fails', async () => {
+    mockRequireAdmin.mockResolvedValue('admin-1');
+    mockPrismaWaitlist.findUnique.mockResolvedValue({
+      id: 'wl-1',
+      email: 'user@example.com',
+      status: 'PENDING',
+      unsubscribed: false,
+    });
+    mockPrismaWaitlist.update.mockResolvedValue({
+      id: 'wl-1',
+      email: 'user@example.com',
+      status: 'APPROVED',
+      approvedAt: new Date(),
+      approvedBy: 'admin-1',
+    });
+    mockSendEmail.mockRejectedValue(new Error('resend unavailable'));
+
+    const res = await handler(createPatchRequest({ id: 'wl-1', status: 'APPROVED' }));
+    expect(res.status).toBe(502);
+    expect(mockPrismaWaitlist.update).toHaveBeenCalled();
+    expect(mockSendEmail).toHaveBeenCalled();
   });
 
   it('rejects a waitlist entry without sending email', async () => {
@@ -113,6 +163,7 @@ describe('Admin Waitlist PATCH — approve/reject', () => {
       id: 'wl-2',
       email: 'reject@example.com',
       status: 'PENDING',
+      unsubscribed: false,
     });
     mockPrismaWaitlist.update.mockResolvedValue({
       id: 'wl-2',
@@ -126,8 +177,7 @@ describe('Admin Waitlist PATCH — approve/reject', () => {
     const body = await res.json();
     expect(body.entry.status).toBe('REJECTED');
 
-    // No email should be sent for rejection
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(mockAssertEmailDeliveryConfigured).not.toHaveBeenCalled();
     expect(mockBuildWaitlistApprovalEmail).not.toHaveBeenCalled();
   });
 

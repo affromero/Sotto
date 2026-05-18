@@ -9,6 +9,10 @@ import { logger } from '@/lib/logger';
 
 const BATCH_SIZE = 100;
 
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 export async function processAnnouncement(job: Job<AnnouncementPayload>): Promise<void> {
   const { subject, message } = job.data;
 
@@ -17,6 +21,7 @@ export async function processAnnouncement(job: Job<AnnouncementPayload>): Promis
   const total = await prisma.user.count();
   let processed = 0;
   let cursor: string | undefined;
+  const failures: Array<{ userId: string; error: string }> = [];
 
   while (true) {
     const users = await prisma.user.findMany({
@@ -61,9 +66,11 @@ export async function processAnnouncement(job: Job<AnnouncementPayload>): Promis
           await sendEmail({ to: user.email, subject: emailSubject, html });
         }
       } catch (err) {
+        const error = getErrorMessage(err);
+        failures.push({ userId: user.id, error });
         logger.error('Failed to send announcement to user', {
           userId: user.id,
-          error: err instanceof Error ? err.message : String(err),
+          error,
         });
       }
     }
@@ -73,6 +80,16 @@ export async function processAnnouncement(job: Job<AnnouncementPayload>): Promis
 
     cursor = users[users.length - 1].id;
     if (users.length < BATCH_SIZE) break;
+  }
+
+  if (failures.length > 0) {
+    logger.error('Platform announcement fan-out failed', {
+      subject,
+      processed,
+      total,
+      failures,
+    });
+    throw new Error(`Platform announcement failed for ${failures.length} recipient(s)`);
   }
 
   logger.info('Platform announcement fan-out complete', { subject, processed, total });

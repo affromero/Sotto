@@ -100,7 +100,7 @@ All shared business logic and external service integrations live here.
 | `topic-tagger.ts` | Keyword-based topic tag matcher: maps topics to tag slugs (deterministic, no AI) | Pure utility |
 | `media-bias.ts` | MBFC media bias detection: domain lookup, alias resolution, political topic detection, `analyzeBias()` for source bias analysis | Filesystem (static JSON) |
 | `transcript-parser.ts` | Transcript parser (SRT, VTT, plain text) → `ParsedSegment[]` with speaker diarization | Uses `llm.ts` |
-| `email.ts` | Resend email client (graceful no-op if key missing) | Resend API |
+| `email.ts` | Resend email client (requires explicit `RESEND_API_KEY` + `EMAIL_FROM`; throws on delivery failure) | Resend API |
 | `email-templates.ts` | Waitlist welcome + weekly digest HTML templates | Pure utility |
 | `tts-text-cleaner.ts` | TTS text safety net: strips `[SFX:]` markers and `[N]` citations before sending to TTS. Provider-specific tag conversion handled upstream by `tts-tag-converter.ts` | Pure utility |
 | `tts-generation.ts` | Shared TTS generation core used by `audio-generation` and `voice-track-audio` workers: semaphore-controlled concurrency, `generateSpeech` with full params, BYOK 404 fallback, 429 concurrency updates, FFprobe duration measurement, usage logging. Also exports `getPlatformTtsKey()` | Uses `providers/tts.ts`, `redis.ts`, `byok.ts`, `elevenlabs.ts`, `audio-stitcher.ts`, `usage-logger.ts` |
