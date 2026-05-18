@@ -28,7 +28,7 @@ All auth-related environment variables required for the system to function:
 | ---------------------- | ---------------- | ------------------------------------------------- | ----------------------------------- |
 | `AUTH_SECRET`          | Yes              | Primary encryption key (fallback: `NEXTAUTH_SECRET`) | `openssl rand -base64 32` output |
 | `NEXTAUTH_SECRET`      | Fallback         | Legacy name — `AUTH_SECRET` takes precedence      | `openssl rand -base64 32` output    |
-| `NEXTAUTH_URL`         | Yes (production) | Canonical URL of the app                          | `https://sotto.fm`                  |
+| `NEXTAUTH_URL`         | Yes (production) | Canonical URL of the app                          | `https://your-domain.example`                  |
 | `GOOGLE_CLIENT_ID`     | No               | Google OAuth client ID                            | `123456.apps.googleusercontent.com` |
 | `GOOGLE_CLIENT_SECRET` | No               | Google OAuth client secret                        | `GOCSPX-xxxxxxxxxxxx`               |
 | `GOOGLE_IOS_CLIENT_ID` | No               | Google OAuth client ID for iOS app                | `123456.apps.googleusercontent.com` |
@@ -242,17 +242,17 @@ The `Account` model stores OAuth provider tokens. A user can have multiple accou
 5. Configure the OAuth consent screen:
    - App name: `Sotto`
    - User support email: your email
-   - Authorized domains: `sotto.fm` (production) or `localhost` (development)
+   - Authorized domains: `your-domain.example` (production) or `localhost` (development)
    - Scopes: `email`, `profile`, `openid`
 6. Create the OAuth client:
    - Application type: **Web application**
    - Name: `Sotto Web`
    - Authorized JavaScript origins:
      - `http://localhost:3000` (development)
-     - `https://sotto.fm` (production)
+     - `https://your-domain.example` (production)
    - Authorized redirect URIs:
      - `http://localhost:3000/api/auth/callback/google` (development)
-     - `https://sotto.fm/api/auth/callback/google` (production)
+     - `https://your-domain.example/api/auth/callback/google` (production)
 7. Copy the **Client ID** and **Client Secret** into your `.env` file:
 
 ```bash
@@ -273,8 +273,8 @@ GOOGLE_CLIENT_SECRET=GOCSPX-xxxxxxxxxxxxxxxx
 2. Click **New OAuth App**
 3. Fill in the application details:
    - Application name: `Sotto`
-   - Homepage URL: `http://localhost:3000` (development) or `https://sotto.fm` (production)
-   - Authorization callback URL: `http://localhost:3000/api/auth/callback/github` (development) or `https://sotto.fm/api/auth/callback/github` (production)
+   - Homepage URL: `http://localhost:3000` (development) or `https://your-domain.example` (production)
+   - Authorization callback URL: `http://localhost:3000/api/auth/callback/github` (development) or `https://your-domain.example/api/auth/callback/github` (production)
 4. Click **Register application**
 5. On the app page, copy the **Client ID**
 6. Click **Generate a new client secret** and copy it immediately (shown only once)
@@ -298,8 +298,8 @@ GITHUB_CLIENT_SECRET=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 3. Navigate to **User authentication settings** → **Set up**
 4. Configure OAuth 2.0:
    - Type of app: **Web App**
-   - Callback URI: `http://localhost:3000/api/auth/callback/twitter` (development) or `https://sotto.fm/api/auth/callback/twitter` (production)
-   - Website URL: `https://sotto.fm`
+   - Callback URI: `http://localhost:3000/api/auth/callback/twitter` (development) or `https://your-domain.example/api/auth/callback/twitter` (production)
+   - Website URL: `https://your-domain.example`
 5. Copy the **Client ID** and **Client Secret**
 6. Add to `.env`:
 
@@ -337,8 +337,8 @@ Apple Sign In is more involved than Google or GitHub. It requires an Apple Devel
    - Enable **Sign In with Apple**
    - Click **Configure** next to Sign In with Apple:
      - Primary App ID: select `com.sotto.app`
-     - Domains: `sotto.fm` (production), `localhost` (development)
-     - Return URLs: `https://sotto.fm/api/auth/callback/apple`
+     - Domains: `your-domain.example` (production), `localhost` (development)
+     - Return URLs: `https://your-domain.example/api/auth/callback/apple`
    - Click **Save**, then **Continue**, then **Save**
 
 4. **Create a Key for Sign In with Apple:**
@@ -678,10 +678,10 @@ Sotto is deployed on a Hetzner VPS with Docker Compose + Caddy reverse proxy:
 
 1. Set all environment variables in the production `.env` file on the VPS:
    - `AUTH_SECRET` (generate a strong random string — primary secret)
-   - `NEXTAUTH_URL` = `https://sotto.fm`
+   - `NEXTAUTH_URL` = `https://your-domain.example`
    - All OAuth provider credentials with production redirect URIs
 2. The `trustHost: true` flag in the NextAuth config is required for non-Vercel deployments (Caddy proxies HTTPS)
-3. Update all OAuth provider callback URIs to use `https://sotto.fm/api/auth/callback/{provider}`
+3. Update all OAuth provider callback URIs to use `https://your-domain.example/api/auth/callback/{provider}`
 4. For Google: submit the app for verification to remove the "unverified app" warning
 5. For Apple: ensure the Services ID is configured with the production domain
 

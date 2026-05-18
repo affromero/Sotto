@@ -13,8 +13,8 @@ Docs are part of the product surface for the open source release. They must desc
 | `11-provider-pricing.md` | Provider pricing reference |
 | `16-technical-architecture.md` | System architecture and private data model |
 | `17-authentication-setup.md` | OAuth and auth setup |
-| `18-hosting-infrastructure.md` | Hosted infrastructure guide |
-| `19-deploy-sotto-fm.md` | Deployment guide |
+| `18-hosting-infrastructure.md` | Self-hosting infrastructure guide |
+| `19-self-host-deployment.md` | Deployment guide |
 | `20-roles-and-dashboards.md` | Role/admin behavior |
 | `21-logo-brief.md` | Logo design reference |
 | `23-local-development.md` | Local OSS setup without Doppler |
