@@ -15,7 +15,7 @@ const BASE_PROPS = {
   topic: 'A topic about testing',
   createdAt: '2026-01-15T10:00:00.000Z',
   duration: 3661,
-  audioUrl: 'https://cdn.sotto.fm/audio/pod-123.mp3',
+  audioUrl: 'https://media.example.com/audio/pod-123.mp3',
   creator: { name: 'Jane Doe', handle: 'janedoe' },
 };
 
@@ -66,7 +66,7 @@ describe('PodcastJsonLd', () => {
     const data = renderAndParse(BASE_PROPS);
     expect(data.associatedMedia).toEqual({
       '@type': 'MediaObject',
-      contentUrl: 'https://cdn.sotto.fm/audio/pod-123.mp3',
+      contentUrl: 'https://media.example.com/audio/pod-123.mp3',
       encodingFormat: 'audio/mpeg',
     });
   });

@@ -506,14 +506,14 @@ describe('processAudioStitching', () => {
     });
 
     it('updates podcast with audioUrl from R2', async () => {
-      mockUploadPodcastAudio.mockResolvedValue('https://cdn.sotto.fm/final.mp3');
+      mockUploadPodcastAudio.mockResolvedValue('https://media.example.com/final.mp3');
       const job = createMockJob(defaultPayload);
       await processAudioStitching(job);
 
       expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
         where: { id: 'podcast-001' },
         data: expect.objectContaining({
-          audioUrl: 'https://cdn.sotto.fm/final.mp3',
+          audioUrl: 'https://media.example.com/final.mp3',
         }),
       });
     });
@@ -927,7 +927,7 @@ describe('processAudioStitching', () => {
       // Reset mocks and set up fresh data
       mockStitchWithEffectsAndMusic.mockReset().mockResolvedValue({ duration: 305.5 });
       mockReadFile.mockReset().mockResolvedValue(Buffer.alloc(1024 * 256));
-      mockUploadPodcastAudio.mockReset().mockResolvedValue('https://cdn.sotto.fm/final.mp3');
+      mockUploadPodcastAudio.mockReset().mockResolvedValue('https://media.example.com/final.mp3');
       mockPrismaSegmentFindMany
         .mockReset()
         .mockResolvedValueOnce([
@@ -967,7 +967,7 @@ describe('processAudioStitching', () => {
         where: { id: 'podcast-001' },
         data: {
           status: 'READY',
-          audioUrl: 'https://cdn.sotto.fm/final.mp3',
+          audioUrl: 'https://media.example.com/final.mp3',
           duration: 306, // rounded
           durationDeviation: 6, // 306 - 5*60 = 6
           fileSize: 1024 * 256,

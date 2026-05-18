@@ -605,6 +605,27 @@ describe('private-first OSS surfaces', () => {
     expect(systemOwnerSources).not.toContain('sottoDropdown');
   });
 
+  it('keeps public project and verification links configurable', () => {
+    const publicLinkSources = [
+      '.env.example',
+      '.env.oss.example',
+      'apps/web/src/lib/public-links.ts',
+      'apps/web/src/components/player/ReferenceList.tsx',
+      'apps/web/src/components/create/GenerationProgress.tsx',
+      'apps/web/src/components/landing/chapters/TrustChapter.tsx',
+      'apps/web/src/components/landing/chapters/ConvertChapter.tsx',
+      'scripts/recording/flows/07-verification-github.ts',
+    ]
+      .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
+      .join('\n');
+
+    expect(publicLinkSources).toContain('NEXT_PUBLIC_GITHUB_URL');
+    expect(publicLinkSources).toContain('NEXT_PUBLIC_DISCORD_URL');
+    expect(publicLinkSources).toContain('NEXT_PUBLIC_VERIFICATION_STANDARD_URL');
+    expect(publicLinkSources).not.toContain('https://github.com/SottoFM');
+    expect(publicLinkSources).not.toContain('https://discord.gg/sotto');
+  });
+
   it('keeps security and operations guidance self-host neutral', () => {
     const releaseHygieneSources = [
       'SECURITY.md',

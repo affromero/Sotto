@@ -285,7 +285,7 @@ describe('useAuth', () => {
           user: {
             id: 'sotto-id',
             name: 'Sotto',
-            email: 'sotto@sotto.fm',
+            email: 'user@example.com',
             image: null,
             role: 'ADMIN' as UserRole,
             isImpersonating: true,
@@ -312,7 +312,7 @@ describe('useAuth', () => {
           user: {
             id: 'sotto-id',
             name: 'Sotto',
-            email: 'sotto@sotto.fm',
+            email: 'user@example.com',
             image: null,
             role: 'ADMIN' as UserRole,
             isImpersonating: true,
