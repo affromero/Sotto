@@ -20,9 +20,14 @@ export class SottoClient {
   private baseUrl: string;
   private apiKey: string;
 
-  constructor(apiKey: string, baseUrl: string = 'https://sotto.fm') {
-    this.apiKey = apiKey;
-    this.baseUrl = baseUrl.replace(/\/+$/, '');
+  constructor(apiKey: string, baseUrl: string) {
+    const normalizedApiKey = apiKey.trim();
+    if (!normalizedApiKey) {
+      throw new Error('SottoClient requires a non-empty API key');
+    }
+
+    this.apiKey = normalizedApiKey;
+    this.baseUrl = normalizeBaseUrl(baseUrl);
   }
 
   private async request<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -93,4 +98,24 @@ export class SottoClient {
   async getMe(): Promise<UserProfile> {
     return this.request('/api/users/me');
   }
+}
+
+function normalizeBaseUrl(baseUrl: string): string {
+  const trimmed = baseUrl.trim();
+  if (!trimmed) {
+    throw new Error('SottoClient requires an explicit API base URL');
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    throw new Error(`Invalid SOTTO_API_URL: ${trimmed}`);
+  }
+
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error('SOTTO_API_URL must use http or https');
+  }
+
+  return parsed.toString().replace(/\/+$/, '');
 }
