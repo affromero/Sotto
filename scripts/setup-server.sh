@@ -18,10 +18,10 @@ if [ "$(id -u)" -ne 0 ]; then
   exit 1
 fi
 
-echo "[1/7] Updating system..."
+echo "[1/6] Updating system..."
 apt update && apt upgrade -y
 
-echo "[2/7] Creating sotto user..."
+echo "[2/6] Creating sotto user..."
 if ! id -u sotto &>/dev/null; then
   adduser --disabled-password --gecos "Sotto" sotto
   usermod -aG sudo sotto
@@ -41,7 +41,7 @@ else
   echo "  User 'sotto' already exists, skipping"
 fi
 
-echo "[3/7] Installing Docker..."
+echo "[3/6] Installing Docker..."
 if ! command -v docker &>/dev/null; then
   curl -fsSL https://get.docker.com | sh
   usermod -aG docker sotto
@@ -50,7 +50,7 @@ else
   echo "  Docker already installed, skipping"
 fi
 
-echo "[4/7] Installing Caddy..."
+echo "[4/6] Installing Caddy..."
 if ! command -v caddy &>/dev/null; then
   apt install -y debian-keyring debian-archive-keyring apt-transport-https curl
   curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
@@ -61,19 +61,10 @@ else
   echo "  Caddy already installed, skipping"
 fi
 
-echo "[5/7] Installing utilities..."
+echo "[5/6] Installing utilities..."
 apt install -y git curl unzip htop
 
-echo "[5b/7] Installing Doppler CLI..."
-if ! command -v doppler &>/dev/null; then
-  curl -Ls --tlsv1.2 --proto "=https" --retry 3 \
-    https://cli.doppler.com/install.sh | sh
-  echo "  Doppler CLI installed ($(doppler --version))"
-else
-  echo "  Doppler CLI already installed ($(doppler --version)), skipping"
-fi
-
-echo "[6/7] Configuring firewall..."
+echo "[6/6] Configuring firewall and SSH..."
 ufw --force reset
 ufw default deny incoming
 ufw default allow outgoing
@@ -83,7 +74,6 @@ ufw allow 443/tcp
 ufw --force enable
 echo "  Firewall enabled (SSH, HTTP, HTTPS)"
 
-echo "[7/7] Hardening SSH..."
 # Disable password authentication
 if grep -q "^PasswordAuthentication" /etc/ssh/sshd_config; then
   sed -i 's/^PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
@@ -105,11 +95,10 @@ echo ""
 echo "Next steps:"
 echo "  1. Log in as sotto:    ssh sotto@$(hostname -I | awk '{print $1}')"
 echo "  2. Clone the repo:     git clone <repo-url> ~/sotto"
-echo "  3. Authenticate Doppler (service token from dashboard.doppler.com):"
-echo "     doppler configure set token <SERVICE_TOKEN> --scope ~/sotto"
-echo "  4. Verify secrets:     cd ~/sotto && doppler secrets"
-echo "  5. First deploy:       cd ~/sotto && doppler run -- docker compose -f docker-compose.prod.yml up -d --build"
-echo "  6. Push schema:        docker compose -f docker-compose.prod.yml run --rm web npx prisma db push"
-echo "  7. Set up Caddy:       sudo cp ~/sotto/Caddyfile /etc/caddy/conf.d/sotto.fm && sudo systemctl reload caddy"
-echo "  8. Set up backups:     (crontab -l 2>/dev/null; echo \"0 3 * * * ~/sotto/scripts/backup.sh\") | crontab -"
+echo "  3. Create prod env:    cd ~/sotto && cp .env.example .env.production"
+echo "  4. Fill required env:  NEXT_PUBLIC_APP_URL, NEXTAUTH_URL, AUTH_SECRET, database, Redis, storage, AI, and TTS keys"
+echo "  5. Optional hosts:     set SOTTO_MAPS_DOMAIN and SOTTO_WWW_DOMAIN in .env.production if you want those Caddy blocks"
+echo "  6. Enable Caddy import: ensure /etc/caddy/Caddyfile imports /etc/caddy/conf.d/*"
+echo "  7. Deploy:            cd ~/sotto && SOTTO_ENV_FILE=~/sotto/.env.production bash scripts/deploy.sh"
+echo "  8. Set up backups:    (crontab -l 2>/dev/null; echo \"0 3 * * * ~/sotto/scripts/backup.sh\") | crontab -"
 echo ""
