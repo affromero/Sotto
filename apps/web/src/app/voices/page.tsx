@@ -29,6 +29,7 @@ export default async function VoicesPage() {
         priceInCents: true,
         createdAt: true,
         externalVoiceId: true,
+        provider: true,
         user: {
           select: {
             id: true,
@@ -95,6 +96,7 @@ export default async function VoicesPage() {
       priceInCents: v.priceInCents,
       createdAt: v.createdAt.toISOString(),
       externalVoiceId: v.externalVoiceId,
+      provider: v.provider,
       owner: {
         id: v.user.id,
         name: v.user.name,

@@ -322,6 +322,7 @@ export function VoicePicker({ onSelectionChange, maxSpeakers = 2, suggestedForma
                                 badge={clone.sourceType === 'IMPORT' ? 'Imported' : undefined}
                                 isSelected={selectedVoiceId === clone.externalVoiceId}
                                 onSelect={() => handleSelectVoice(speaker.name, clone.externalVoiceId)}
+                                provider={clone.provider}
                               />
                             ))}
                           </div>
@@ -341,6 +342,7 @@ export function VoicePicker({ onSelectionChange, maxSpeakers = 2, suggestedForma
                                 character={`by ${voice.owner.name || 'Unknown'}`}
                                 isSelected={selectedVoiceId === voice.externalVoiceId}
                                 onSelect={() => handleSelectVoice(speaker.name, voice.externalVoiceId)}
+                                provider={voice.provider}
                               />
                             ))}
                           </div>
@@ -383,6 +385,7 @@ export function VoicePicker({ onSelectionChange, maxSpeakers = 2, suggestedForma
                             character={voice.character}
                             isSelected={selectedVoiceId === voice.id}
                             onSelect={() => handleSelectVoice(speaker.name, voice.id)}
+                            provider={ttsProvider ?? 'elevenlabs'}
                           />
                         ))}
                       </div>

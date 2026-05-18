@@ -271,7 +271,7 @@ export const voicePreviewSchema = z.object({
   text: z.string().min(1).max(500),
   provider: z
     .enum(['elevenlabs', 'hume', 'cartesia', 'openai', 'fal', 'replicate', 'minimax', 'mistral'])
-    .optional(),
+    .refine((value) => value.length > 0),
 });
 
 /**

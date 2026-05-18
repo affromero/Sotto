@@ -13,6 +13,7 @@ export interface BrowseVoice {
   priceInCents: number | null;
   createdAt: string;
   externalVoiceId: string;
+  provider: string;
   isVerified?: boolean;
   owner: {
     id: string;
@@ -68,6 +69,7 @@ export function VoiceMarketplaceCard({
         body: JSON.stringify({
           voiceId: voice.externalVoiceId,
           text: 'Welcome to Sotto. Let me tell you something fascinating today.',
+          provider: voice.provider,
         }),
       });
 

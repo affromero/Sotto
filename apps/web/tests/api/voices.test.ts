@@ -18,6 +18,8 @@ const mockGenerateSpeech = vi.fn();
 const mockGetVoiceById = vi.fn();
 const mockCheckRateLimit = vi.fn();
 const mockGetVoiceCatalog = vi.fn();
+const mockGetByokKey = vi.fn();
+const mockCreateTtsProviderAsync = vi.fn();
 
 vi.mock('@/lib/auth', () => ({
   auth: (...args: unknown[]) => mockAuth(...args),
@@ -92,7 +94,11 @@ vi.mock('@/lib/queue', () => ({
 
 vi.mock('@/lib/byok', () => ({
   hasByokKey: vi.fn().mockResolvedValue(false),
-  getByokKey: vi.fn().mockResolvedValue(null),
+  getByokKey: (...args: unknown[]) => mockGetByokKey(...args),
+}));
+
+vi.mock('@/lib/providers/tts', () => ({
+  createTtsProviderAsync: (...args: unknown[]) => mockCreateTtsProviderAsync(...args),
 }));
 
 vi.mock('@/lib/tier-features', () => ({
@@ -695,6 +701,17 @@ describe('DELETE /api/voices/clone', () => {
 describe('POST /api/voices/preview', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetByokKey.mockResolvedValue('user-elevenlabs-key');
+    mockCreateTtsProviderAsync.mockResolvedValue({
+      generateSpeech: vi.fn().mockResolvedValue(Buffer.from('fake-audio-data')),
+    });
+    delete process.env.ELEVENLABS_API_KEY;
+    delete process.env.OPENAI_API_KEY;
+    delete process.env.CARTESIA_API_KEY;
+    delete process.env.HUME_API_KEY;
+    delete process.env.FAL_KEY;
+    delete process.env.REPLICATE_API_TOKEN;
+    delete process.env.MISTRAL_API_KEY;
   });
 
   it('returns 401 when user is not authenticated', async () => {
@@ -765,23 +782,55 @@ describe('POST /api/voices/preview', () => {
     expect(response.status).toBe(400);
   });
 
+  it('returns 400 when provider is missing', async () => {
+    mockAuth.mockResolvedValue(mockSession);
+    mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 9 });
+
+    const request = createRequest('http://localhost:3000/api/voices/preview', {
+      method: 'POST',
+      body: JSON.stringify({ voiceId: 'voice-1', text: 'Hello world' }),
+    });
+    const response = await POST_PREVIEW(request);
+
+    expect(response.status).toBe(400);
+  });
+
+  it('returns 400 when no provider key is available', async () => {
+    mockAuth.mockResolvedValue(mockSession);
+    mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 9 });
+    mockGetByokKey.mockResolvedValue(null);
+
+    const request = createRequest('http://localhost:3000/api/voices/preview', {
+      method: 'POST',
+      body: JSON.stringify({ voiceId: 'voice-1', text: 'Hello world', provider: 'elevenlabs' }),
+    });
+    const response = await POST_PREVIEW(request);
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error).toBe('No elevenlabs API key available');
+  });
+
   it('successfully generates voice preview audio', async () => {
     mockAuth.mockResolvedValue(mockSession);
     mockUserFindUniqueOrThrow.mockResolvedValue({ role: 'ADMIN' });
     mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 9 });
     mockUserFindUniqueOrThrow.mockResolvedValue({ role: 'ADMIN' });
     const mockAudioBuffer = Buffer.from('fake-audio-data');
-    mockGenerateSpeech.mockResolvedValue({ audio: mockAudioBuffer, requestId: 'req-1' });
+    const generateSpeech = vi.fn().mockResolvedValue(mockAudioBuffer);
+    mockCreateTtsProviderAsync.mockResolvedValue({ generateSpeech });
 
     const request = createRequest('http://localhost:3000/api/voices/preview', {
       method: 'POST',
-      body: JSON.stringify({ voiceId: 'voice-1', text: 'Hello world, this is a preview.' }),
+      body: JSON.stringify({ voiceId: 'voice-1', text: 'Hello world, this is a preview.', provider: 'elevenlabs' }),
     });
     const response = await POST_PREVIEW(request);
 
     expect(response.status).toBe(200);
     expect(response.headers.get('Content-Type')).toBe('audio/mpeg');
     expect(response.headers.get('Content-Length')).toBe(mockAudioBuffer.length.toString());
+    expect(mockCreateTtsProviderAsync).toHaveBeenCalledWith('elevenlabs', 'user-elevenlabs-key');
+    expect(generateSpeech).toHaveBeenCalledWith({ text: 'Hello world, this is a preview.', voiceId: 'voice-1' });
   });
 
 });
