@@ -8,10 +8,10 @@
  *   - App running at APP_URL (default http://localhost:3000)
  *   - Demo data seeded: cd apps/web && npx tsx prisma/seed-demo.ts
  *   - Playwright browsers installed: npx playwright install chromium
- *   - NEXTAUTH_SECRET set (via Doppler)
+ *   - AUTH_SECRET set
  *
  * Usage:
- *   doppler run -- npx tsx scripts/recording/index.ts
+ *   npx tsx scripts/recording/index.ts
  */
 
 import { PrismaClient } from '@prisma/client';

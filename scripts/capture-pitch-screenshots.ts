@@ -9,7 +9,7 @@
  *   - App running at APP_URL (default http://localhost:3000)
  *   - Demo data seeded (prisma/seed-demo.ts)
  *   - R2 env vars set
- *   - NEXTAUTH_SECRET set
+ *   - AUTH_SECRET set
  *   - Playwright browsers installed: npx playwright install chromium
  *
  * Usage:
@@ -62,8 +62,8 @@ async function uploadToR2(client: S3Client, key: string, body: Buffer): Promise<
 // ── Session Token ─────────────────────────────────────────────────
 
 async function createSessionToken(userId: string, role: string, name: string): Promise<string> {
-  const secret = process.env.NEXTAUTH_SECRET;
-  if (!secret) throw new Error('NEXTAUTH_SECRET not set');
+  const secret = process.env.AUTH_SECRET;
+  if (!secret) throw new Error('AUTH_SECRET not set');
 
   const token = await encode({
     token: { sub: userId, role, name, email: `${role.toLowerCase()}@sotto.fm` },

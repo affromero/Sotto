@@ -46,13 +46,13 @@ describe('Middleware Security Tests', () => {
   beforeEach(async () => {
     vi.resetModules();
     vi.clearAllMocks();
-    process.env.NEXTAUTH_SECRET = TEST_SECRET;
+    process.env.AUTH_SECRET = TEST_SECRET;
     mockGetToken.mockResolvedValue(null);
     middleware = await getMiddleware();
   });
 
   afterEach(() => {
-    delete process.env.NEXTAUTH_SECRET;
+    delete process.env.AUTH_SECRET;
   });
 
   // =====================================================================
