@@ -86,9 +86,14 @@ function normalizeAiProvider(value?: string | null): string | null {
   return value;
 }
 
+function isKnownStorageProvider(value: string): value is 'local' | 'r2' | 's3' {
+  return value === 'local' || value === 'r2' || value === 's3';
+}
+
 export function buildSetupReadiness(input: BuildSetupReadinessInput): SetupReadiness {
   const env = input.env ?? process.env;
   const storageProvider = input.storageProvider || env.STORAGE_PROVIDER || 'local';
+  const storageProviderKnown = isKnownStorageProvider(storageProvider);
   const selectedAiProvider = normalizeAiProvider(input.selectedAiProvider || env.AI_PROVIDER);
   const selectedTtsProvider = input.selectedTtsProvider || env.TTS_PROVIDER || null;
   const aiReady =
@@ -99,8 +104,9 @@ export function buildSetupReadiness(input: BuildSetupReadinessInput): SetupReadi
     hasValidProvider(input.ttsProviders, selectedTtsProvider) ||
     hasPlatformProvider(env, TTS_PLATFORM_KEYS, selectedTtsProvider);
   const storageReady =
-    storageProvider === 'local' ||
-    hasEnv(env, ['S3_BUCKET', 'S3_ENDPOINT', 'R2_BUCKET', 'R2_ENDPOINT', 'AWS_BUCKET_NAME']);
+    storageProviderKnown &&
+    (storageProvider === 'local' ||
+      hasEnv(env, ['S3_BUCKET', 'S3_ENDPOINT', 'R2_BUCKET', 'R2_ENDPOINT', 'AWS_BUCKET_NAME']));
 
   const capabilities: SetupCapability[] = [
     {
@@ -125,7 +131,11 @@ export function buildSetupReadiness(input: BuildSetupReadinessInput): SetupReadi
       status: storageReady ? 'ready' : 'action_required',
       actionLabel: 'Open setup guide',
       actionHref: '/settings',
-      detail: storageReady ? `${storageProvider} storage selected` : 'Select local or hosted storage.',
+      detail: storageReady
+        ? `${storageProvider} storage selected`
+        : storageProviderKnown
+          ? 'Select local or hosted storage.'
+          : `Unknown storage provider: ${storageProvider}`,
     },
     {
       id: 'generation',

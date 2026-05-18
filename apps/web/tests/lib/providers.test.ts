@@ -245,6 +245,10 @@ describe('Provider Factories', () => {
       const url = await provider.uploadFile('key', Buffer.from('data'), 'text/plain');
       expect(url).toBe('https://r2.example.com/file');
     });
+
+    it('rejects unknown storage providers instead of switching to local storage', () => {
+      expect(() => createStorageProvider('unknown')).toThrow('Unknown storage provider "unknown"');
+    });
   });
 
 });

@@ -74,4 +74,23 @@ describe('buildSetupReadiness', () => {
     expect(generation?.status).toBe('ready');
     expect(readiness.ready).toBe(true);
   });
+
+  it('marks unknown storage providers as action required', () => {
+    const readiness = buildSetupReadiness({
+      hasDatabase: true,
+      hasQueue: true,
+      storageProvider: 'mystery',
+      aiProviders: [{ provider: 'anthropic', isValid: true }],
+      ttsProviders: [{ provider: 'elevenlabs', isValid: true }],
+      privateFeedTokenCount: 1,
+      selectedAiProvider: 'anthropic',
+      selectedTtsProvider: 'elevenlabs',
+      env: {},
+    });
+    const storage = readiness.capabilities.find((capability) => capability.id === 'storage');
+
+    expect(readiness.ready).toBe(false);
+    expect(storage?.status).toBe('action_required');
+    expect(storage?.detail).toBe('Unknown storage provider: mystery');
+  });
 });
