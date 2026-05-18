@@ -5,39 +5,39 @@ tags: [onboarding, smoke]
 # Assumes a fresh user state (no prior login)
 - extendedWaitUntil:
     visible:
-      id: "onboarding-name-input"
+      id: 'onboarding-name-input'
     timeout: 10000
 
 # Step 1: Enter name
 - tapOn:
-    id: "onboarding-name-input"
-- inputText: "Test User"
+    id: 'onboarding-name-input'
+- inputText: 'Test User'
 - tapOn:
-    id: "onboarding-name-continue"
+    id: 'onboarding-name-continue'
 
 # Step 2: Select interests (pick first chip)
 - extendedWaitUntil:
     visible:
-      id: "onboarding-interests-continue"
+      id: 'onboarding-interests-continue'
     timeout: 5000
 - tapOn:
-    id: "onboarding-interest-chip-0"
+    id: 'onboarding-interest-chip-0'
 - tapOn:
-    id: "onboarding-interests-continue"
+    id: 'onboarding-interests-continue'
 
-# Step 3: Done — go to feed
+# Step 3: Done — go to library
 - extendedWaitUntil:
     visible:
-      id: "onboarding-done-button"
+      id: 'onboarding-done-button'
     timeout: 5000
 - tapOn:
-    id: "onboarding-done-button"
+    id: 'onboarding-done-button'
 
-# Terminal assertion: landed on feed
+# Terminal assertion: landed on library
 - extendedWaitUntil:
     visible:
-      id: "feed-podcast-list"
+      id: 'library-podcast-list'
     timeout: 10000
 - assertVisible:
-    id: "feed-podcast-list"
+    id: 'library-podcast-list'
 - takeScreenshot: post-onboarding

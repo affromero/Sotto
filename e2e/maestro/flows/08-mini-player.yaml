@@ -7,40 +7,40 @@ tags: [player, smoke]
 # Scroll to and play seeded podcast
 - scrollUntilVisible:
     element:
-      id: "podcast-card-${E2E_PODCAST_ID}"
+      id: 'podcast-card-${E2E_PODCAST_ID}'
     direction: DOWN
     timeout: 10000
 - tapOn:
-    id: "podcast-card-${E2E_PODCAST_ID}"
+    id: 'podcast-card-${E2E_PODCAST_ID}'
 - extendedWaitUntil:
     visible:
-      id: "player-play-pause"
+      id: 'player-play-pause'
     timeout: 5000
 - tapOn:
-    id: "player-play-pause"
+    id: 'player-play-pause'
 
-# Navigate back to Feed tab
+# Navigate back to Library tab
 - back
 - extendedWaitUntil:
     visible:
-      id: "feed-podcast-list"
+      id: 'library-podcast-list'
     timeout: 5000
 
 # MiniPlayer should be visible
 - assertVisible:
-    id: "mini-player"
+    id: 'mini-player'
 - assertVisible:
-    id: "mini-player-play-pause"
+    id: 'mini-player-play-pause'
 
 # Tap MiniPlayer to return to player
 - tapOn:
-    id: "mini-player"
+    id: 'mini-player'
 
 # Terminal assertion: player visible
 - extendedWaitUntil:
     visible:
-      id: "player-play-pause"
+      id: 'player-play-pause'
     timeout: 5000
 - assertVisible:
-    id: "player-play-pause"
+    id: 'player-play-pause'
 - takeScreenshot: mini-player-return

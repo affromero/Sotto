@@ -272,9 +272,9 @@ async function main() {
     if (!adminUser)
       throw new Error('Admin user not found — run `npx tsx prisma/seed-demo.ts` first');
 
-    // Find a READY public podcast for player screenshots
+    // Find a READY demo podcast for player screenshots
     const demoPodcast = await prisma.podcast.findFirst({
-      where: { userId: demoUser.id, status: 'READY', visibility: 'PUBLIC' },
+      where: { userId: demoUser.id, status: 'READY' },
       orderBy: { playCount: 'desc' },
     });
 

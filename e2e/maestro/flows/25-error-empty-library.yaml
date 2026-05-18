@@ -1,0 +1,23 @@
+appId: fm.sotto.app
+name: Error - Empty Library State
+tags: [error]
+---
+# Login as user with no podcasts
+- extendedWaitUntil:
+    visible:
+      id: 'login-email-input'
+    timeout: 10000
+- tapOn:
+    id: 'login-email-input'
+- inputText: '${E2E_EMPTY_EMAIL}'
+- tapOn:
+    id: 'login-sign-in-button'
+
+# Verify empty-state UI renders
+- extendedWaitUntil:
+    visible:
+      id: 'library-empty-state'
+    timeout: 10000
+- assertVisible:
+    id: 'library-empty-state'
+- takeScreenshot: empty-library

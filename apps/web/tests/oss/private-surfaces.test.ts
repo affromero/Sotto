@@ -1397,6 +1397,50 @@ describe('private-first OSS surfaces', () => {
     expect(mobilePrivateSources).not.toContain('NEW_COMMENT');
   });
 
+  it('keeps mobile e2e flows aligned to private library contracts', () => {
+    const maestroFlowDir = resolve(repoRoot, 'e2e/maestro/flows');
+    const removedSocialFlows = [
+      '02-feed-browse.yaml',
+      '09-fork.yaml',
+      '15-user-profile.yaml',
+      '25-error-empty-feed.yaml',
+      '30-comments.yaml',
+    ];
+    const maestroSources = [
+      ...readdirSync(maestroFlowDir)
+        .filter((file) => file.endsWith('.yaml'))
+        .map((file) => readFileSync(resolve(maestroFlowDir, file), 'utf8')),
+      readFileSync(resolve(repoRoot, 'e2e/maestro/config.yaml'), 'utf8'),
+      readFileSync(resolve(repoRoot, 'e2e/maestro/helpers/login.yaml'), 'utf8'),
+    ].join('\n');
+
+    for (const flow of removedSocialFlows) {
+      expect(existsSync(resolve(maestroFlowDir, flow)), flow).toBe(false);
+    }
+    expect(maestroSources).toContain('library-podcast-list');
+    expect(maestroSources).toContain('library-filter-all');
+    expect(maestroSources).not.toContain('feed-podcast-list');
+    expect(maestroSources).not.toContain('feed-mode-');
+    expect(maestroSources).not.toContain('feed-sort-');
+    expect(maestroSources).not.toContain('search-mode-people');
+    expect(maestroSources).not.toContain('comments-section');
+    expect(maestroSources).not.toContain('player-fork-button');
+    expect(maestroSources).not.toContain('fork-angle-input');
+    expect(maestroSources).not.toContain('user-profile-follow-button');
+    expect(maestroSources).not.toContain('collection-detail-follow-button');
+    expect(maestroSources).not.toContain('E2E_OTHER_USER_HANDLE');
+  });
+
+  it('does not require public demo podcasts for screenshot capture', () => {
+    const pitchScreenshotSource = readFileSync(
+      resolve(repoRoot, 'scripts/capture-pitch-screenshots.ts'),
+      'utf8'
+    );
+
+    expect(pitchScreenshotSource).toContain('Find a READY demo podcast');
+    expect(pitchScreenshotSource).not.toContain("visibility: 'PUBLIC'");
+  });
+
   it('does not ship collection follow contracts', () => {
     const collectionSources = [
       'src/app/collections/[collectionId]/page.tsx',
