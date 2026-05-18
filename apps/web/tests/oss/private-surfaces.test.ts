@@ -1506,7 +1506,6 @@ describe('private-first OSS surfaces', () => {
       'src/app/collections/[collectionId]/page.tsx',
       'src/app/api/collections/route.ts',
       'src/app/api/collections/[collectionId]/route.ts',
-      'src/app/api/users/[userId]/collections/route.ts',
       'src/components/collections/CollectionDetail.tsx',
       'src/components/collections/CollectionCard.tsx',
     ]
@@ -1538,7 +1537,6 @@ describe('private-first OSS surfaces', () => {
       'src/components/discovery/RecommendationCard.module.css',
     ];
     const userApiSources = [
-      'src/app/api/users/[userId]/route.ts',
       'src/app/api/users/me/route.ts',
       'src/app/api/users/me/export/route.ts',
       'src/lib/notification-utils.ts',
@@ -1606,9 +1604,12 @@ describe('private-first OSS surfaces', () => {
       'src/components/profile/ProfileHeader.module.css',
       'src/components/profile/PodcastList.tsx',
       'src/components/profile/PodcastList.module.css',
+      'src/app/api/users/[userId]/route.ts',
+      'src/app/api/users/[userId]/collections/route.ts',
       'src/app/api/users/[userId]/rss/route.ts',
       'src/app/api/users/handle/[handle]/rss/route.ts',
     ];
+    const removedPublicProfileTests = ['apps/web/tests/api/users-profile.test.ts'];
     const publicProfileSources = [
       'src/app/profile/page.tsx',
       'src/lib/urls.ts',
@@ -1629,7 +1630,13 @@ describe('private-first OSS surfaces', () => {
     for (const file of removedPublicProfileFiles) {
       expect(existsSync(resolve(webRoot, file)), file).toBe(false);
     }
+    for (const file of removedPublicProfileTests) {
+      expect(existsSync(resolve(repoRoot, file)), file).toBe(false);
+    }
     expect(profileShortcutSource).toContain("redirect('/settings')");
+    expect(publicProfileSources).not.toContain('/api/users/[id]');
+    expect(publicProfileSources).not.toContain('/api/users/[id]/collections');
+    expect(publicProfileSources).not.toContain('/api/users/[id]/activity');
     expect(publicProfileSources).not.toContain('profileUrl');
     expect(publicProfileSources).not.toContain('absoluteProfileUrl');
     expect(publicProfileSources).not.toContain('generateCreatorRssFeed');
