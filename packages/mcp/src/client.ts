@@ -3,6 +3,8 @@ import type {
   PodcastDetail,
   UserProfile,
   CreatePodcastParams,
+  IngestAgentOutputParams,
+  AgentIngestResult,
   UpdatePodcastParams,
 } from './types.js';
 
@@ -72,6 +74,40 @@ export class SottoClient {
           durationTarget: params.duration_minutes,
           sourceUrl: params.source_url,
         },
+      }),
+    });
+  }
+
+  async ingestAgentOutput(params: IngestAgentOutputParams): Promise<AgentIngestResult> {
+    const focusAreas = params.focus_areas
+      ? params.focus_areas
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : undefined;
+
+    return this.request('/api/ingest/agent', {
+      method: 'POST',
+      body: JSON.stringify({
+        title: params.title,
+        topic: params.topic,
+        content: params.content,
+        idempotencyKey: params.idempotency_key,
+        sourceUrl: params.source_url,
+        durationTarget: params.duration_minutes,
+        depth: params.depth,
+        audienceLevel: params.audience_level,
+        tone: params.tone,
+        focusAreas,
+        agent: {
+          provider: params.agent_provider,
+          name: params.agent_name,
+          model: params.agent_model,
+          runId: params.agent_run_id,
+        },
+        aiModel: params.ai_model,
+        ttsProvider: params.tts_provider,
+        ttsModel: params.tts_model,
       }),
     });
   }

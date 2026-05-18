@@ -76,14 +76,34 @@ Point at your local dev server:
 
 ## Tools
 
-| Tool             | Description                             |
-| ---------------- | --------------------------------------- |
-| `create_podcast` | Create an AI podcast from a topic       |
-| `get_podcast`    | Get podcast details + generation status |
-| `list_podcasts`  | List your podcasts                      |
-| `update_podcast` | Update title, topic, or visibility      |
-| `delete_podcast` | Delete a podcast                        |
-| `get_me`         | Get your Sotto profile                  |
+| Tool                  | Description                                      |
+| --------------------- | ------------------------------------------------ |
+| `create_podcast`      | Create an AI podcast from a topic                |
+| `ingest_agent_output` | Create a private podcast from local agent output |
+| `get_podcast`         | Get podcast details + generation status          |
+| `list_podcasts`       | List your podcasts                               |
+| `update_podcast`      | Update title, topic, or visibility               |
+| `delete_podcast`      | Delete a podcast                                 |
+| `get_me`              | Get your Sotto profile                           |
+
+### Local Agent Ingestion
+
+Use `ingest_agent_output` when Claude Code, Codex, OpenClaw, Hermes, or another local agent has produced a report you want in your private podcast feed. The tool requires an explicit `tts_provider` and never publishes the result publicly.
+
+Minimal fields:
+
+```json
+{
+  "title": "Daily engineering notes",
+  "content": "Paste or pass the local agent output here.",
+  "tts_provider": "openai",
+  "agent_provider": "claude-code",
+  "agent_name": "Claude Code",
+  "idempotency_key": "claude-code:2026-05-18:daily-notes"
+}
+```
+
+Optional fields include `topic`, `duration_minutes`, `focus_areas`, `source_url`, `agent_model`, `agent_run_id`, `ai_model`, and `tts_model`.
 
 ## Resources
 

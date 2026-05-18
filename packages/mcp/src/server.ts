@@ -6,6 +6,7 @@ import {
   formatPodcastList,
   formatProfile,
   formatCreated,
+  formatAgentIngested,
   formatDeleted,
 } from './format.js';
 
@@ -56,6 +57,55 @@ export function createServer(client: SottoClient): McpServer {
       try {
         const result = await client.createPodcast(params);
         return { content: [{ type: 'text', text: formatCreated(result) }] };
+      } catch (err) {
+        return errorResult(err);
+      }
+    }
+  );
+
+  server.tool(
+    'ingest_agent_output',
+    'Create a private Sotto podcast from output produced by a local agent run.',
+    {
+      title: z.string().describe('Podcast title'),
+      content: z.string().describe('Raw agent output, transcript, notes, or report to turn into audio'),
+      tts_provider: z
+        .enum(['elevenlabs', 'openai', 'cartesia', 'hume', 'fal', 'replicate', 'minimax', 'mistral'])
+        .describe('Explicit TTS provider configured in Sotto'),
+      topic: z.string().optional().describe('Optional topic override; defaults to title'),
+      idempotency_key: z
+        .string()
+        .optional()
+        .describe('Stable run key so retries do not create duplicate podcasts'),
+      source_url: z.string().optional().describe('Optional URL for the source run or report'),
+      duration_minutes: z.number().min(1).max(40).optional().describe('Target duration in minutes'),
+      depth: z
+        .enum(['eli5', 'quick_overview', 'standard', 'deep_dive'])
+        .optional()
+        .describe('Content depth level'),
+      audience_level: z
+        .enum(['beginner', 'intermediate', 'expert', 'general'])
+        .optional()
+        .describe('Target audience expertise'),
+      tone: z.string().optional().describe('Conversation tone'),
+      focus_areas: z
+        .string()
+        .optional()
+        .describe('Comma-separated focus areas, e.g. "bugs, tests, deployment"'),
+      agent_provider: z
+        .enum(['claude-code', 'codex', 'openclaw', 'hermes', 'custom'])
+        .default('custom')
+        .describe('Agent runtime that produced the output'),
+      agent_name: z.string().default('Local agent').describe('Display name for the agent run'),
+      agent_model: z.string().optional().describe('Agent model or local profile'),
+      agent_run_id: z.string().optional().describe('Provider-specific run ID'),
+      ai_model: z.string().optional().describe('Optional Sotto AI model for script generation'),
+      tts_model: z.string().optional().describe('Optional provider-specific TTS model'),
+    },
+    async (params) => {
+      try {
+        const result = await client.ingestAgentOutput(params);
+        return { content: [{ type: 'text', text: formatAgentIngested(result) }] };
       } catch (err) {
         return errorResult(err);
       }
