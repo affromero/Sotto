@@ -330,7 +330,7 @@ model Podcast {
   zeroCostVideo    Boolean @default(false) // skip AI illustrations + verification for $0 video
   aiAutoResolved   Boolean @default(false)
   ttsAutoResolved  Boolean @default(false)
-  sttProvider      String? // null = auto; 'openai' | 'elevenlabs' | 'together' | 'deepgram' | 'assemblyai'
+  sttProvider      String? // required for imported audio without transcript; 'openai' | 'elevenlabs' | 'together' | 'deepgram' | 'assemblyai'
   sttModel         String? // e.g. 'whisper-1', 'whisper-large-v3-turbo', 'scribe_v1'
   language         String? // ISO 639-1, e.g. 'en', 'es', 'ja'
 

@@ -909,6 +909,25 @@ describe('private-first OSS surfaces', () => {
     expect(harnessSources).not.toContain('forkToListenRatio');
   });
 
+  it('keeps onboarding setup explicit about transcription readiness', () => {
+    const setupSources = [
+      'apps/web/src/lib/setup-readiness.ts',
+      'apps/web/src/app/onboarding/page.tsx',
+      'apps/web/src/app/api/onboarding/readiness/route.ts',
+      'apps/web/src/components/create/SttModelDropdown.tsx',
+      'apps/web/prisma/schema.prisma',
+    ]
+      .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
+      .join('\n');
+
+    expect(setupSources).toContain("id: 'stt'");
+    expect(setupSources).toContain('STT_PROVIDER');
+    expect(setupSources).toContain('buildSttProviderStatuses');
+    expect(setupSources).toContain('required for imported audio without transcript');
+    expect(setupSources).not.toContain("stored === 'openai' ? undefined");
+    expect(setupSources).not.toContain('sttProvider      String? // null = auto');
+  });
+
   it('keeps release docs aligned with private-first OSS strategy', () => {
     const removedPitchDocs = [
       'docs/02-ui-mockups.md',

@@ -4,11 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { AiProviderClientMeta } from '@/lib/providers/ai-registry';
 import type { TtsProviderClientMeta } from '@/lib/providers/tts-registry';
-import type {
-  SetupCapability,
-  SetupCapabilityId,
-  SetupReadiness,
-} from '@/lib/setup-readiness';
+import type { SetupCapability, SetupCapabilityId, SetupReadiness } from '@/lib/setup-readiness';
 import { AiProviderCards } from '@/components/settings/AiProviderCards';
 import {
   PrivateRssFeedManager,
@@ -75,6 +71,17 @@ export function KeySetupForm({
     );
   };
 
+  const refreshReadiness = async () => {
+    try {
+      const response = await fetch('/api/onboarding/readiness');
+      if (!response.ok) return;
+      const nextReadiness = (await response.json()) as SetupReadiness;
+      setReadiness(nextReadiness);
+    } catch {
+      // Keep the current optimistic checklist state if the readiness refresh fails.
+    }
+  };
+
   const completeOnboarding = async (nextPath: string) => {
     setSubmitting(true);
     try {
@@ -136,21 +143,16 @@ export function KeySetupForm({
             <span className={styles.sectionBadge}>Required for scripts</span>
           </div>
           <p className={styles.sectionDescription}>
-            Select one explicit provider path. OpenAI is the shortest one-key path. Claude Code
-            uses your local CLI when configured.
+            Select one explicit provider path. OpenAI is the shortest one-key path. Claude Code uses
+            your local CLI when configured.
           </p>
         </div>
         <AiProviderCards
           initialConfigured={initialAiConfigured}
           providerMeta={aiProviderMeta}
-          onReadyChange={(ready) =>
-            updateCapability(
-              'generation',
-              ready,
-              'Generation provider configured',
-              'Add an AI key or choose a local agent.'
-            )
-          }
+          onReadyChange={() => {
+            void refreshReadiness();
+          }}
         />
       </section>
 
@@ -170,9 +172,9 @@ export function KeySetupForm({
         <TtsProviderCards
           initialConfigured={initialTtsConfigured}
           providerMeta={ttsProviderMeta}
-          onReadyChange={(ready) =>
-            updateCapability('tts', ready, 'Voice provider configured', 'Add a TTS provider key.')
-          }
+          onReadyChange={() => {
+            void refreshReadiness();
+          }}
         />
       </section>
 
@@ -201,7 +203,12 @@ export function KeySetupForm({
         >
           Continue to Create
         </button>
-        <button type="button" className={styles.skipLink} onClick={handleSkip} disabled={submitting}>
+        <button
+          type="button"
+          className={styles.skipLink}
+          onClick={handleSkip}
+          disabled={submitting}
+        >
           Continue to my workspace
         </button>
       </div>
