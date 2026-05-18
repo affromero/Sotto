@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Job } from 'bullmq';
 import type { AdminThreadToPodcastPayload } from '@/lib/queue';
 
@@ -132,7 +132,8 @@ const DEFAULT_PARSED = {
 describe('processAdminThreadToPodcast', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockPrismaUserFindUnique.mockResolvedValue({ id: 'sotto-user-id' });
+    vi.stubEnv('SYSTEM_USER_HANDLE', 'system');
+    mockPrismaUserFindUnique.mockResolvedValue({ id: 'system-owner-id' });
     mockSelectVoicePair.mockReturnValue({
       host: { id: 'host-v1' },
       expert: { id: 'expert-v1' },
@@ -144,6 +145,10 @@ describe('processAdminThreadToPodcast', () => {
     mockLookupParticipantCredentials.mockResolvedValue([]);
     mockGetAiKey.mockResolvedValue({ apiKey: 'anthropic-key', provider: 'anthropic' });
     mockFormatThreadAsSourceText.mockReturnValue('## Thread source text');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   describe('URL parsing', () => {
@@ -210,13 +215,13 @@ describe('processAdminThreadToPodcast', () => {
       await processAdminThreadToPodcast(job);
 
       expect(mockParseTweetIntent).toHaveBeenCalledWith('Single tweet about AI', undefined, {
-        userId: 'sotto-user-id',
+        userId: 'system-owner-id',
         aiModel: undefined,
       });
       expect(mockParseThreadIntent).not.toHaveBeenCalled();
       expect(mockPrismaPodcastCreate).toHaveBeenCalledWith({
         data: expect.objectContaining({
-          userId: 'sotto-user-id',
+          userId: 'system-owner-id',
           source: 'TWITTER',
           sourceTweetId: '111',
           status: 'EXTRACTING',
@@ -334,7 +339,7 @@ describe('processAdminThreadToPodcast', () => {
       await expect(processAdminThreadToPodcast(job)).rejects.toThrow('Tweet not found');
     });
 
-    it('throws when @sotto user is missing', async () => {
+    it('throws when configured system owner user is missing', async () => {
       mockGetTweet.mockResolvedValue({ tweet: {
         id: '444',
         text: 'Test',
@@ -349,7 +354,9 @@ describe('processAdminThreadToPodcast', () => {
         adminUserId: 'admin-1',
       });
 
-      await expect(processAdminThreadToPodcast(job)).rejects.toThrow('@sotto system account not found');
+      await expect(processAdminThreadToPodcast(job)).rejects.toThrow(
+        'Configured system owner @system was not found',
+      );
     });
   });
 
@@ -449,7 +456,7 @@ describe('processAdminThreadToPodcast', () => {
       expect(mockParseThreadIntent).toHaveBeenCalled();
       // parseTweetIntent called for admin overrides
       expect(mockParseTweetIntent).toHaveBeenCalledWith('eli5 for beginners', undefined, {
-        userId: 'sotto-user-id',
+        userId: 'system-owner-id',
         aiModel: undefined,
       });
 
@@ -490,7 +497,7 @@ describe('processAdminThreadToPodcast', () => {
         'EXTRACT_CONTENT',
         expect.objectContaining({
           podcastId: 'podcast-001',
-          userId: 'sotto-user-id',
+          userId: 'system-owner-id',
         })
       );
     });

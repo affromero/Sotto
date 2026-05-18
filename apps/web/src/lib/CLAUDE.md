@@ -11,6 +11,7 @@ All shared business logic and external service integrations live here.
 | `queue.ts` | BullMQ job queues (27 types), worker creation | BullMQ + Redis |
 | `auth.ts` | NextAuth config, OAuth providers (Google, GitHub, Apple for login; Twitter for account linking only), role system (USER/ADMIN), `ADMIN_EMAILS` auto-assignment | NextAuth v5 |
 | `admin-emails.ts` | Admin email list from `ADMIN_EMAILS` env var, `isAdminEmail()` check | Environment |
+| `system-user.ts` | Explicit system owner identity from `SYSTEM_USER_*` env vars for admin-generated podcasts | Environment |
 | `auth-guards.ts` | Suspension check for write-path API routes (`checkSuspension()`) | Pure utility |
 | `llm.ts` | Anthropic LLM client (streaming + non-streaming), with auto-routing guardrail for non-Anthropic models | Anthropic API / Claude CLI |
 | `claude-code-client.ts` | Claude Code CLI wrapper (`claude -p`): serialize messages, execute, stream | Claude CLI (`claude`) |

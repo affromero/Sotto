@@ -8,7 +8,7 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { Badge } from '@/components/ui/Badge';
 import styles from './AccountSwitcher.module.css';
 
-interface SottoTarget {
+interface SystemOwnerTarget {
   id: string;
   name: string | null;
   image: string | null;
@@ -23,7 +23,7 @@ interface AccountSwitcherProps {
 export function AccountSwitcher({ variant = 'dashboard', hasActivePlayer = false }: AccountSwitcherProps) {
   const { user, impersonate, stopImpersonating } = useAuth();
   const [open, setOpen] = useState(false);
-  const [sotto, setSotto] = useState<SottoTarget | null>(null);
+  const [systemOwner, setSystemOwner] = useState<SystemOwnerTarget | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
   const isAdmin = user?.role === 'ADMIN';
@@ -34,7 +34,7 @@ export function AccountSwitcher({ variant = 'dashboard', hasActivePlayer = false
     fetch('/api/admin/impersonate/targets')
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
-        if (data?.sotto) setSotto(data.sotto);
+        if (data?.systemOwner) setSystemOwner(data.systemOwner);
       })
       .catch(() => {});
   }, [isAdmin]);
@@ -151,29 +151,31 @@ export function AccountSwitcher({ variant = 'dashboard', hasActivePlayer = false
             {!isImpersonating && <Check size={16} className={styles.check} aria-hidden="true" />}
           </button>
 
-          {sotto && (
+          {systemOwner && (
             <button
               className={styles.accountOption}
               onClick={() => {
-                impersonate(sotto.id);
+                impersonate(systemOwner.id);
                 setOpen(false);
               }}
               type="button"
               role="option"
-              aria-selected={isImpersonating && user.id === sotto.id}
+              aria-selected={isImpersonating && user.id === systemOwner.id}
             >
               <div className={styles.optionAvatar}>
-                {sotto.image ? (
-                  <Image src={sotto.image} alt="" width={28} height={28} />
+                {systemOwner.image ? (
+                  <Image src={systemOwner.image} alt="" width={28} height={28} />
                 ) : (
-                  'S'
+                  (systemOwner.name ?? systemOwner.handle ?? 'System').charAt(0).toUpperCase()
                 )}
               </div>
               <div className={styles.optionInfo}>
-                <span className={styles.optionName}>{sotto.name ?? '@sotto'}</span>
-                <span className={styles.optionRole}>System account</span>
+                <span className={styles.optionName}>
+                  {systemOwner.name ?? `@${systemOwner.handle ?? 'system'}`}
+                </span>
+                <span className={styles.optionRole}>System owner</span>
               </div>
-              {isImpersonating && user.id === sotto.id && (
+              {isImpersonating && user.id === systemOwner.id && (
                 <Check size={16} className={styles.check} aria-hidden="true" />
               )}
             </button>

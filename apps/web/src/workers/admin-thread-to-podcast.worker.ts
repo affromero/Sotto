@@ -11,6 +11,7 @@ import { getAiProviderMeta, getProviderForModel, type AiProviderId } from '@/lib
 import { formatThreadAsSourceText, getVerifiedParticipants } from '@/lib/twitter-utils';
 import { generatePodcastSlug } from '@/lib/slugify';
 import { logger } from '@/lib/logger';
+import { requireSystemUser } from '@/lib/system-user';
 import type { AdminThreadToPodcastPayload } from '@/lib/queue';
 import type { CredentialLookupAiOptions } from '@/lib/credential-lookup';
 
@@ -92,19 +93,12 @@ export async function processAdminThreadToPodcast(
     (!threadData.isSelfAuthored && threadData.replies.length >= 2)
   );
 
-  // 5. Resolve @sotto system user and admin-configured model defaults for parsing
-  const sottoUser = await prisma.user.findUnique({
-    where: { handle: 'sotto' },
-    select: { id: true },
-  });
-
-  if (!sottoUser) {
-    throw new Error('@sotto system account not found. Run prisma db seed.');
-  }
+  // 5. Resolve configured system owner and admin-configured model defaults for parsing
+  const systemUser = await requireSystemUser(prisma);
 
   const twitterConfig = await getTwitterConfig();
   const parseOptions = {
-    userId: sottoUser.id,
+    userId: systemUser.id,
     aiModel: twitterConfig.defaultAiModel ?? undefined,
   };
 
@@ -147,14 +141,14 @@ export async function processAdminThreadToPodcast(
     if (verifiedParticipants.length > 0) {
       participantCredentials = await lookupParticipantCredentials(
         verifiedParticipants,
-        await resolveAdminCredentialLookupAi(sottoUser.id, twitterConfig.defaultAiModel)
+        await resolveAdminCredentialLookupAi(systemUser.id, twitterConfig.defaultAiModel)
       );
     }
   }
 
   await job.updateProgress(60);
 
-  // 8. Create podcast as @sotto
+  // 8. Create podcast owned by the configured system owner
   const voicePair = selectVoicePair(tweetId);
 
   const tone = parsed.isDebate ? 'socratic' : parsed.tone;
@@ -165,10 +159,10 @@ export async function processAdminThreadToPodcast(
     ? formatThreadAsSourceText(threadData, parsed, participantCredentials)
     : undefined;
 
-  const slug = await generatePodcastSlug(parsed.title, sottoUser.id, prisma);
+  const slug = await generatePodcastSlug(parsed.title, systemUser.id, prisma);
   const podcast = await prisma.podcast.create({
     data: {
-      userId: sottoUser.id,
+      userId: systemUser.id,
       title: parsed.title,
       topic: parsed.topic,
       slug,
@@ -191,7 +185,7 @@ export async function processAdminThreadToPodcast(
       visibility: 'PUBLIC',
       discovery: {
         create: {
-          userId: sottoUser.id,
+          userId: systemUser.id,
           topic: parsed.topic,
           depth: parsed.depth,
           audienceLevel: parsed.audienceLevel,
@@ -211,7 +205,7 @@ export async function processAdminThreadToPodcast(
   // 8. Kick off generation pipeline
   await addJob(contentExtractionQueue, JobType.EXTRACT_CONTENT, {
     podcastId: podcast.id,
-    userId: sottoUser.id,
+    userId: systemUser.id,
     sourceUrl: parsed.sourceUrl,
     sourceText,
   });

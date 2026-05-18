@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
 const mockAuth = vi.fn();
@@ -58,11 +58,11 @@ vi.mock('@/lib/free-tier-provider-selector', () => ({
   selectFreeTierProviders: (...args: unknown[]) => mockSelectFreeTierProviders(...args),
 }));
 
-import { POST } from '@/app/api/admin/podcasts/create-as-sotto/route';
+import { POST } from '@/app/api/admin/podcasts/create-as-system-owner/route';
 import { DELETE } from '@/app/api/admin/podcasts/[podcastId]/route';
 
 function createPostRequest(body: Record<string, unknown>): NextRequest {
-  return new NextRequest(new URL('http://localhost:3000/api/admin/podcasts/create-as-sotto'), {
+  return new NextRequest(new URL('http://localhost:3000/api/admin/podcasts/create-as-system-owner'), {
     method: 'POST',
     body: JSON.stringify(body),
     headers: { 'Content-Type': 'application/json' },
@@ -79,9 +79,14 @@ async function createParams(podcastId: string) {
   return { params: Promise.resolve({ podcastId }) };
 }
 
-describe('POST /api/admin/podcasts/create-as-sotto', () => {
+describe('POST /api/admin/podcasts/create-as-system-owner', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubEnv('SYSTEM_USER_HANDLE', 'system');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it('returns 403 when unauthenticated', async () => {
@@ -106,7 +111,7 @@ describe('POST /api/admin/podcasts/create-as-sotto', () => {
     expect(body).toMatchObject({ error: 'Forbidden' });
   });
 
-  it('returns 404 when @sotto account not found', async () => {
+  it('returns 404 when system owner account is not found', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
     mockUserFindUnique.mockResolvedValueOnce(null);
 
@@ -115,12 +120,12 @@ describe('POST /api/admin/podcasts/create-as-sotto', () => {
     const body = await response.json();
 
     expect(response.status).toBe(404);
-    expect(body.error).toContain('@sotto system account not found');
+    expect(body.error).toContain('Configured system owner @system was not found');
   });
 
   it('returns 400 when title or topic missing', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
-    mockUserFindUnique.mockResolvedValueOnce({ id: 'sotto-id' });
+    mockUserFindUnique.mockResolvedValueOnce({ id: 'system-owner-id' });
 
     const request = createPostRequest({ title: 'Test' });
     const response = await POST(request);
@@ -130,12 +135,12 @@ describe('POST /api/admin/podcasts/create-as-sotto', () => {
     expect(body).toMatchObject({ error: 'title and topic are required' });
   });
 
-  it('creates podcast owned by @sotto successfully (no metadata)', async () => {
+  it('creates podcast owned by the system owner successfully (no metadata)', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
-    mockUserFindUnique.mockResolvedValueOnce({ id: 'sotto-id' });
+    mockUserFindUnique.mockResolvedValueOnce({ id: 'system-owner-id' });
     mockPodcastCreate.mockResolvedValue({
       id: 'pod-1',
-      userId: 'sotto-id',
+      userId: 'system-owner-id',
       title: 'Test Podcast',
       topic: 'AI',
       status: 'PENDING',
@@ -155,7 +160,7 @@ describe('POST /api/admin/podcasts/create-as-sotto', () => {
 
   it('creates podcast with metadata, Discovery, and queues pipeline', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
-    mockUserFindUnique.mockResolvedValueOnce({ id: 'sotto-id' });
+    mockUserFindUnique.mockResolvedValueOnce({ id: 'system-owner-id' });
     mockPodcastCreate.mockResolvedValue({
       id: 'pod-2',
       status: 'EXTRACTING',
@@ -187,18 +192,18 @@ describe('POST /api/admin/podcasts/create-as-sotto', () => {
 
     expect(response.status).toBe(201);
     expect(body).toMatchObject({ id: 'pod-2', status: 'EXTRACTING' });
-    expect(mockSelectFreeTierProviders).toHaveBeenCalledWith('sotto-id');
+    expect(mockSelectFreeTierProviders).toHaveBeenCalledWith('system-owner-id');
     expect(mockPodcastCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({
         aiModel: 'gpt-5-mini',
       }),
     });
 
-    // Discovery record created with sotto user ID
+    // Discovery record created with system owner user ID
     expect(mockDiscoveryCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({
         podcastId: 'pod-2',
-        userId: 'sotto-id',
+        userId: 'system-owner-id',
         topic: 'Sotto Features',
         durationTarget: 2,
       }),
@@ -210,7 +215,7 @@ describe('POST /api/admin/podcasts/create-as-sotto', () => {
       'extract_content',
       expect.objectContaining({
         podcastId: 'pod-2',
-        userId: 'sotto-id',
+        userId: 'system-owner-id',
         useAdminCredits: true,
       }),
       { priority: 1 },

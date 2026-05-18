@@ -19,7 +19,7 @@ BullMQ workers that process async jobs. Each worker runs in a separate thread wi
 | `twitter-mentions`     | `twitter-mentions`     | 1           | Poll configured Twitter bot mentions → parse intent → create podcast                                             | Creates TweetMention + Podcast, kicks off pipeline                                     |
 | `twitter-reply`        | `twitter-reply`        | 2           | Podcast ready → compose reply → post to Twitter                                                                  | Updates TweetMention.status to REPLIED                                                 |
 | `twitter-auto-tweet`   | `twitter-auto-tweet`   | 1           | Podcast ID + trigger → interpolate template → post tweet                                                         | Updates TwitterAutoTweet record (tweetId, status)                                      |
-| `twitter-trend-poll`   | `twitter-trend-poll`   | 1           | Poll trending tweets → score + deduplicate → create podcast as @sotto                                            | Creates Podcast + TwitterAutoTweet, kicks off pipeline                                 |
+| `twitter-trend-poll`   | `twitter-trend-poll`   | 1           | Poll trending tweets → score + deduplicate → create podcast as configured system owner                           | Creates Podcast + TwitterAutoTweet, kicks off pipeline                                 |
 | `audio-import`         | `audio-import`         | 2           | Uploaded audio → FFmpeg normalize → STT transcribe → diarize → create segments + version                         | Transcribes, creates Script + Segments + PodcastVersion, auto-tags, sets READY         |
 | `event-ingestion`      | `event-ingestion`      | 5           | Batch of behavioral events → upsert sessions + insert events + update playback aggregates                        | Creates UserSession + BehavioralEvent records, updates PlaybackSession                 |
 | `feature-computation`  | `feature-computation`  | 2           | Scope (user/podcast/all) → aggregate sessions + private activity into feature vectors                            | Upserts UserFeature / PodcastFeature with embeddings, runs hourly or on-demand         |
@@ -28,7 +28,7 @@ BullMQ workers that process async jobs. Each worker runs in a separate thread wi
 | `telegram-bot`         | `telegram-bot`         | 1           | Dual-mode: webhook (prod) or 5s polling (dev). Handler logic in `lib/telegram-handler.ts` | Saves topic/URL as PodcastIdea, sends confirmation reply; notifies user when podcast is ready |
 | `telegram-reply`       | `telegram-reply`       | 2           | Podcast ready/failed → send Telegram message with "Listen Now" link                                              | Sends 'Listen Now' notification to any user with telegramEnabled + telegramChatId (not just TELEGRAM-source podcasts) |
 | `content-moderation`   | `content-moderation`   | 3           | Content text → OpenAI Moderation API scan                                                                        | Creates ContentFlag records for flagged content                                        |
-| `admin-thread-to-podcast` | `admin-thread-to-podcast` | 1      | Tweet URL → fetch thread → parse intent → create podcast as @sotto                                               | Creates Podcast, kicks off pipeline                                                    |
+| `admin-thread-to-podcast` | `admin-thread-to-podcast` | 1      | Tweet URL → fetch thread → parse intent → create podcast as configured system owner                              | Creates Podcast, kicks off pipeline                                                    |
 | `email-digest`            | `email-digest`            | 1      | Sunday 10:00 UTC cron → query new podcasts + stats → send weekly digest to subscribed waitlist emails            | Sends digest emails via Resend                                                         |
 | `announcement`            | `announcements`           | 1      | Announcement payload (subject + message) → fan-out to all users in batches of 100                                | Creates in-app Notification + push (if pushNotifications=true) + email (if emailNotifications=true) per user |
 | `r2-usage`                | `r2-usage`                | 1      | Scheduled (every 24h) → fetch R2 bucket usage + operation counts from Cloudflare API                            | Creates R2UsageSnapshot with storage size, ops counts, and cost estimates               |
@@ -59,8 +59,8 @@ content-extraction → script-generation → script-verification ──→ refer
                                                                                    TWITTER/API/TELEGRAM: auto-approve
 
 twitter-mentions (repeatable, every 60s) → polls configured bot mentions → creates Podcast → kicks off pipeline above
-twitter-trend-poll (repeatable, every 2hrs) → searches trending tweets → creates Podcast as @sotto → kicks off pipeline above
-admin-thread-to-podcast (on-demand) → fetches thread → creates Podcast as @sotto → kicks off pipeline above
+twitter-trend-poll (repeatable, every 2hrs) → searches trending tweets → creates Podcast as configured system owner → kicks off pipeline above
+admin-thread-to-podcast (on-demand) → fetches thread → creates Podcast as configured system owner → kicks off pipeline above
 twitter-auto-tweet (on-demand) → interpolates template → posts tweet → updates TwitterAutoTweet record
 telegram-bot (webhook in prod, 5s polling in dev) → routes Telegram updates → saves topic/URL as PodcastIdea → sends confirmation reply
 telegram-reply (on completion) → sends "Listen Now" notification to any user with telegramEnabled + telegramChatId

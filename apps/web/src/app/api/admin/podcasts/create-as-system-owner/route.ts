@@ -6,6 +6,12 @@ import { errorResponse } from '@/lib/api-response';
 import { contentExtractionQueue, addJob, JobType } from '@/lib/queue';
 import type { ExtractContentPayload } from '@/lib/queue';
 import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
+import {
+  getSystemUserErrorMessage,
+  getSystemUserErrorStatus,
+  requireSystemUser,
+} from '@/lib/system-user';
+import type { SystemUserRecord } from '@/lib/system-user';
 
 export async function POST(request: NextRequest) {
   const adminId = await requireAdmin();
@@ -13,14 +19,11 @@ export async function POST(request: NextRequest) {
     return errorResponse('Forbidden', 403);
   }
 
-  // Find the @sotto system user
-  const sottoUser = await prisma.user.findUnique({
-    where: { handle: 'sotto' },
-    select: { id: true },
-  });
-
-  if (!sottoUser) {
-    return errorResponse('@sotto system account not found. Run prisma db seed.', 404);
+  let systemUser: SystemUserRecord;
+  try {
+    systemUser = await requireSystemUser(prisma);
+  } catch (error) {
+    return errorResponse(getSystemUserErrorMessage(error), getSystemUserErrorStatus(error));
   }
 
   const body = await request.json();
@@ -30,16 +33,15 @@ export async function POST(request: NextRequest) {
     return errorResponse('title and topic are required', 400);
   }
 
-  // Create podcast owned by @sotto
-  const slug = await generatePodcastSlug(title, sottoUser.id, prisma);
+  const slug = await generatePodcastSlug(title, systemUser.id, prisma);
   const hasMetadata = metadata && typeof metadata === 'object';
   const selectedProviders = hasMetadata && !aiModel
-    ? await selectFreeTierProviders(sottoUser.id)
+    ? await selectFreeTierProviders(systemUser.id)
     : null;
 
   const podcast = await prisma.podcast.create({
     data: {
-      userId: sottoUser.id,
+      userId: systemUser.id,
       title,
       topic,
       slug,
@@ -57,7 +59,7 @@ export async function POST(request: NextRequest) {
     await prisma.discovery.create({
       data: {
         podcastId: podcast.id,
-        userId: sottoUser.id,
+        userId: systemUser.id,
         topic: metadata.topic || topic,
         depth: metadata.depth,
         audienceLevel: metadata.audienceLevel,
@@ -71,7 +73,7 @@ export async function POST(request: NextRequest) {
 
     const payload: ExtractContentPayload = {
       podcastId: podcast.id,
-      userId: sottoUser.id,
+      userId: systemUser.id,
       useAdminCredits: true,
     };
     await addJob(contentExtractionQueue, JobType.EXTRACT_CONTENT, payload, { priority: 1 });

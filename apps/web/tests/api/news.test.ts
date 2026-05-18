@@ -132,7 +132,7 @@ describe('GET /api/news', () => {
     mockBriefingLogFindMany.mockResolvedValue([
       {
         articleUrls: ['https://reuters.com/ai-protein', 'https://other.com/x'],
-        podcast: { id: 'pod-1', slug: 'ai-briefing', user: { handle: 'sotto' } },
+        podcast: { id: 'pod-1', slug: 'ai-briefing', user: { handle: 'system' } },
       },
     ]);
 
@@ -142,7 +142,7 @@ describe('GET /api/news', () => {
     const article = body.articles[0];
     expect(article.relatedPodcastId).toBe('pod-1');
     expect(article.relatedPodcastSlug).toBe('ai-briefing');
-    expect(article.relatedUserHandle).toBe('sotto');
+    expect(article.relatedUserHandle).toBe('system');
   });
 
   it('does not attach podcast fields when no BriefingLog matches', async () => {
