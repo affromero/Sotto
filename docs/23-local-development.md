@@ -32,7 +32,7 @@ npm run dev
 
 Open `http://localhost:3000`.
 
-`npm run setup` should:
+`npm run setup`:
 
 1. install dependencies
 2. start PostgreSQL and Redis
@@ -68,12 +68,13 @@ DATABASE_URL="postgresql://postgres:postgres@localhost:5432/sotto?schema=public"
 DIRECT_DATABASE_URL="postgresql://postgres:postgres@localhost:5432/sotto?schema=public"
 REDIS_URL="redis://localhost:6379"
 NEXTAUTH_URL="http://localhost:3000"
+NEXT_PUBLIC_APP_URL="http://localhost:3000"
+EXPO_PUBLIC_API_URL="http://localhost:3000/api"
 NEXTAUTH_SECRET="<generated>"
 BYOK_ENCRYPTION_KEY="<generated>"
 STORAGE_PROVIDER="local"
-LOCAL_STORAGE_ROOT=".sotto/storage"
+LOCAL_STORAGE_DIR="./.sotto/storage"
 PAYMENT_PROVIDER="none"
-DEFAULT_PODCAST_VISIBILITY="PRIVATE"
 ```
 
 Add provider settings only for the workflow you are testing.
@@ -213,7 +214,7 @@ Confirm:
 
 ```env
 STORAGE_PROVIDER="local"
-LOCAL_STORAGE_ROOT=".sotto/storage"
+LOCAL_STORAGE_DIR="./.sotto/storage"
 ```
 
 Then ensure the process can create the storage directory.
