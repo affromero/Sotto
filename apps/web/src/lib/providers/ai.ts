@@ -418,10 +418,13 @@ class ClaudeCodeLazyProvider implements AIProvider {
   }
 }
 
-export function createAIProvider(type?: string): AIProvider {
+export function createAIProvider(type: string): AIProvider {
+  if (!type) {
+    throw new Error('AI provider type is required. Pass an explicit provider from the AI registry.');
+  }
+
   switch (type) {
     case 'anthropic':
-    case undefined:          // getProviders() singleton — default to Anthropic
       return new AnthropicProvider();
     case 'openai':
       return new OpenAIProvider();

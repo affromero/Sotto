@@ -148,6 +148,10 @@ import { createStorageProvider } from '@/lib/providers/storage';
 
 describe('Provider Factories', () => {
   describe('createAIProvider', () => {
+    it('rejects missing provider instead of defaulting to hosted AI', () => {
+      expect(() => createAIProvider(undefined as unknown as string)).toThrow('AI provider type is required');
+    });
+
     it('anthropic provider delegates to claude.ts', async () => {
       const provider = createAIProvider('anthropic');
       const result = await provider.generateResponse('system', [
@@ -196,6 +200,10 @@ describe('Provider Factories', () => {
   });
 
   describe('createTtsProvider', () => {
+    it('rejects missing provider instead of defaulting to hosted TTS', () => {
+      expect(() => createTtsProvider(undefined as unknown as string)).toThrow('TTS provider type is required');
+    });
+
     it('elevenlabs provider delegates to elevenlabs.ts', async () => {
       const provider = createTtsProvider('elevenlabs');
       const result = await provider.generateSpeech({ text: 'hello', voiceId: 'test' });

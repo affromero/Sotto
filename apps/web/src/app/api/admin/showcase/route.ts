@@ -3,10 +3,12 @@ import { requireAdmin } from '@/lib/auth-guards';
 import { errorResponse } from '@/lib/api-response';
 import { generateShowcaseClips, getShowcaseCostPreview, regenerateShowcaseItem, type ShowcaseItem } from '@/lib/showcase-generator';
 import { prisma } from '@/lib/prisma';
+import { isValidModelId } from '@/lib/providers/ai-registry';
 import { z } from 'zod';
 
 const generateSchema = z.object({
   name: z.string().min(1).max(100),
+  aiModel: z.string().min(1).max(100),
   imageModel: z.string().optional(),
 });
 
@@ -51,11 +53,14 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
   const parsed = generateSchema.safeParse(body);
   if (!parsed.success) {
-    return errorResponse('Name is required', 400, { errors: parsed.error.flatten() });
+    return errorResponse(parsed.error.issues[0].message, 400, { errors: parsed.error.flatten() });
   }
 
-  const { name, imageModel } = parsed.data;
-  const { items, failures } = await generateShowcaseClips({ imageModel, topic: name });
+  const { name, aiModel, imageModel } = parsed.data;
+  if (!isValidModelId(aiModel)) {
+    return errorResponse(`Unknown AI model: "${aiModel}"`, 400);
+  }
+  const { items, failures } = await generateShowcaseClips({ aiModel, imageModel, topic: name });
 
   // New set is active by default — deactivate others
   await prisma.showcaseSet.updateMany({
@@ -96,7 +101,11 @@ export async function PATCH(request: NextRequest) {
     const existing = await prisma.showcaseSet.findUnique({ where: { id } });
     if (!existing) return errorResponse('Set not found', 404);
 
-    const { items: newItems, failures } = await generateShowcaseClips({ imageModel: body?.imageModel, topic: existing.name });
+    const aiModel = typeof body?.aiModel === 'string' ? body.aiModel : null;
+    if (!aiModel) return errorResponse('aiModel is required for showcase regeneration', 400);
+    if (!isValidModelId(aiModel)) return errorResponse(`Unknown AI model: "${aiModel}"`, 400);
+
+    const { items: newItems, failures } = await generateShowcaseClips({ aiModel, imageModel: body?.imageModel, topic: existing.name });
 
     const set = await prisma.showcaseSet.update({
       where: { id },
@@ -112,7 +121,11 @@ export async function PATCH(request: NextRequest) {
     const existing = await prisma.showcaseSet.findUnique({ where: { id } });
     if (!existing) return errorResponse('Set not found', 404);
 
-    const newItem = await regenerateShowcaseItem(regenerateType, { imageModel: body?.imageModel, topic: existing.name });
+    const aiModel = typeof body?.aiModel === 'string' ? body.aiModel : null;
+    if (!aiModel) return errorResponse('aiModel is required for showcase regeneration', 400);
+    if (!isValidModelId(aiModel)) return errorResponse(`Unknown AI model: "${aiModel}"`, 400);
+
+    const newItem = await regenerateShowcaseItem(regenerateType, { aiModel, imageModel: body?.imageModel, topic: existing.name });
     const items = (existing.items as unknown as ShowcaseItem[]).map((item) =>
       item.visualType === regenerateType ? newItem : item,
     );

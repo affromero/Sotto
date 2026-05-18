@@ -38,7 +38,7 @@ export interface WriteScriptParams {
   };
   apiKeyOverride?: string;
   model?: string;
-  provider?: string;
+  provider: string;
 }
 
 export interface WriteScriptResult {

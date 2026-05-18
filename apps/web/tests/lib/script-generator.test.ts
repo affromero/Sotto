@@ -11,7 +11,19 @@ vi.mock('@/lib/providers/ai', () => ({
 }));
 
 // ---- Import under test ----
-import { generateScript, generateScriptWithFeedback } from '@/lib/script-generator';
+import { generateScript as generateScriptImpl, generateScriptWithFeedback as generateScriptWithFeedbackImpl } from '@/lib/script-generator';
+
+const AI_RUNTIME = { provider: 'anthropic', model: 'claude-haiku-4-5-20251001' };
+type GenerateScriptParams = Parameters<typeof generateScriptImpl>[0];
+type GenerateScriptWithFeedbackParams = Parameters<typeof generateScriptWithFeedbackImpl>[0];
+
+function generateScript(params: Omit<GenerateScriptParams, 'provider' | 'model'> & Partial<Pick<GenerateScriptParams, 'provider' | 'model'>>) {
+  return generateScriptImpl({ ...AI_RUNTIME, ...params });
+}
+
+function generateScriptWithFeedback(params: Omit<GenerateScriptWithFeedbackParams, 'provider' | 'model'> & Partial<Pick<GenerateScriptWithFeedbackParams, 'provider' | 'model'>>) {
+  return generateScriptWithFeedbackImpl({ ...AI_RUNTIME, ...params });
+}
 
 // ---- Tests ----
 

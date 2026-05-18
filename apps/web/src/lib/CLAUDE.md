@@ -137,7 +137,7 @@ Modular provider architecture — swap external services via env vars.
 | `ai.ts` | `AIProvider` | `AnthropicProvider`, `OpenAIProvider`, `GoogleProvider`, `ClaudeCodeLazyProvider` | `AI_PROVIDER` |
 | `ai-registry.ts` | `AiProviderMeta` | Declarative AI provider metadata: validation functions for Anthropic + OpenAI keys | — |
 | `claude-code.ts` | `AIProvider` | `ClaudeCodeProvider` (standalone) | `AI_PROVIDER` |
-| `tts.ts` | `TtsProvider` | `ElevenLabsProvider`, `OpenAITtsProvider`, `CartesiaProvider`, `HumeProvider`, `FalProvider`, `ReplicateProvider`, `MinimaxProvider` + `FallbackTtsProvider`, `resolveTtsProvider()`, `canResolveTts()` | `TTS_PROVIDER` |
+| `tts.ts` | `TtsProvider` | Explicit TTS provider factories (`createTtsProvider()`, `createTtsProviderAsync()`), `resolveTtsProvider()`, `canResolveTts()`; missing/auto providers are rejected | Provider-specific keys |
 | `tts-registry.ts` | `TtsProviderMeta` | Declarative provider metadata: quality tiers, costs, auth validation, capabilities, models | — |
 | `tts-voices.ts` | `ProviderVoice` | Per-provider voice pools (Cartesia, Hume, Fal/Replicate, MiniMax) with curated voices + deterministic hash selection | — |
 | `tts/*.provider.ts` | `TtsProvider` | Per-provider implementations: `elevenlabs`, `openai`, `cartesia`, `hume`, `fal`, `replicate`, `minimax` | Various TTS APIs |
@@ -150,7 +150,7 @@ Modular provider architecture — swap external services via env vars.
 | `fal-endpoints.ts` | — | Pricetoken model ID → Fal REST API endpoint mapping (image + video + legacy) | Pure utility |
 | `ml.ts` | `MLProvider` | `SottoMLProvider`: pgvector similarity, delegates signal computation/scoring/archetypes/explain to private recommendation utilities | `private-recommendations.ts` |
 | `storage.ts` | `StorageProvider` | `R2Provider`, `S3Provider`, `LocalProvider` | `STORAGE_PROVIDER` |
-| `index.ts` | `Providers` | `getProviders()` singleton factory | — |
+| `index.ts` | `Providers` | Singleton factory for providers that are safe without user runtime choices (`storage`, `ml`) | — |
 | `openai.d.ts` | — | Type declarations for optional `openai` dependency | — |
 
 ## Patterns
@@ -161,7 +161,7 @@ BullMQ requires **dedicated Redis connections** per worker/queue. Never share th
 
 ### External Service Initialization
 
-All external clients check for API keys on module load and log warnings if missing. This allows the app to start in development without all services configured.
+Provider factories require explicit runtime choices. External clients may log missing-key warnings on module load, but generation paths must not silently choose AI/TTS providers.
 
 ### Error Handling
 
@@ -176,7 +176,7 @@ All lib functions throw descriptive errors. API routes catch and return proper H
 
 ## MANDATORY — Adding a New TTS Provider Voice Pool
 
-**Every new TTS provider with preset voices MUST touch all files below. Missing any causes silent fallbacks to ElevenLabs voices or raw UUIDs in the UI.**
+**Every new TTS provider with preset voices MUST touch all files below. Missing any causes wrong voice labels, wrong catalog coverage, or rejected voice preview requests.**
 
 ### Voice pool & registry (backend)
 

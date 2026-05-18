@@ -161,6 +161,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
     previousFeedback: script.verificationFeedback || undefined,
     apiKeyOverride: providerAiKey?.apiKey,
     model: verificationModel,
+    provider,
     previousClaims: previousClaims.length > 0 ? previousClaims : undefined,
     verificationMode,
   });
