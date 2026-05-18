@@ -115,15 +115,15 @@ const sections: Section[] = [
       {
         method: 'GET',
         path: '/api/users/:id',
-        description: 'Get public user profile.',
+        description: 'Get account metadata.',
         auth: false,
         response: '{ id, name, handle, image, bio, podcastCount }',
       },
       {
         method: 'GET',
-        path: '/api/users/:id/podcasts',
-        description: 'List public podcasts by a user.',
-        auth: false,
+        path: '/api/users/me/podcasts',
+        description: 'List podcasts in the signed-in account library.',
+        auth: true,
         params: [
           {
             name: 'page',

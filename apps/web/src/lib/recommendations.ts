@@ -3,12 +3,12 @@ import { createMLProvider } from './providers/ml';
 import { logger } from './logger';
 
 /**
- * Search for similar existing public podcasts based on topic.
- * Uses pgvector embedding similarity when available, falls back to text search.
+ * Search for similar existing podcasts in the signed-in user's library.
+ * Uses pgvector embedding similarity when available, then narrows to owned podcasts.
  */
 export async function findSimilarPodcasts(params: {
   topic: string;
-  excludeUserId?: string;
+  userId: string;
   limit?: number;
 }): Promise<
   Array<{
@@ -33,9 +33,9 @@ export async function findSimilarPodcasts(params: {
       const podcasts = await prisma.podcast.findMany({
         where: {
           id: { in: podcastIds },
+          userId: params.userId,
           status: 'READY',
-          visibility: 'PUBLIC',
-          ...(params.excludeUserId && { userId: { not: params.excludeUserId } }),
+          deletedAt: null,
         },
         select: {
           id: true,
@@ -61,17 +61,17 @@ export async function findSimilarPodcasts(params: {
       }
     }
   } catch (err) {
-    logger.warn('Embedding similarity search failed, falling back to text', {
+    logger.warn('Embedding similarity search unavailable; using private text search', {
       error: (err as Error).message,
     });
   }
 
-  // Fallback: text search
+  // Text search when vector search is unavailable.
   const podcasts = await prisma.podcast.findMany({
     where: {
+      userId: params.userId,
       status: 'READY',
-      visibility: 'PUBLIC',
-      ...(params.excludeUserId && { userId: { not: params.excludeUserId } }),
+      deletedAt: null,
       OR: [
         { title: { contains: params.topic, mode: 'insensitive' } },
         { topic: { contains: params.topic, mode: 'insensitive' } },

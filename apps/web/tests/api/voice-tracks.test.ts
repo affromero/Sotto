@@ -77,7 +77,9 @@ vi.mock('@/lib/plan-feature-config', () => ({
 }));
 
 vi.mock('@/lib/generation-gate', () => ({
-  checkGenerationGate: vi.fn().mockResolvedValue({ allowed: true, reason: 'ok', isProUser: false, isByokUser: true }),
+  checkGenerationGate: vi
+    .fn()
+    .mockResolvedValue({ allowed: true, reason: 'ok', isProUser: false, isByokUser: true }),
 }));
 
 vi.mock('@/lib/tier-features', () => ({
@@ -128,9 +130,46 @@ const otherSession = {
 };
 
 const mockTracks = [
-  { id: 'track-1', name: 'Default', status: 'READY', audioUrl: 'https://example.com/t1.mp3', duration: 300, ttsProvider: 'elevenlabs', ttsModel: null, voices: [], proposalStatus: null, proposalMessage: null, contributor: null },
-  { id: 'track-2', name: 'Failed', status: 'FAILED', audioUrl: null, duration: null, ttsProvider: 'elevenlabs', ttsModel: null, failureReason: 'TTS provider error', voices: [], proposalStatus: null, proposalMessage: null, contributor: null },
-  { id: 'track-3', name: 'Proposed', status: 'READY', audioUrl: 'https://example.com/t3.mp3', duration: 250, ttsProvider: 'elevenlabs', ttsModel: null, voices: [], proposalStatus: 'PENDING', proposalMessage: 'Great version!', contributor: { id: 'contrib-1', name: 'Contrib', handle: null, image: null } },
+  {
+    id: 'track-1',
+    name: 'Default',
+    status: 'READY',
+    audioUrl: 'https://example.com/t1.mp3',
+    duration: 300,
+    ttsProvider: 'elevenlabs',
+    ttsModel: null,
+    voices: [],
+    proposalStatus: null,
+    proposalMessage: null,
+    contributor: null,
+  },
+  {
+    id: 'track-2',
+    name: 'Failed',
+    status: 'FAILED',
+    audioUrl: null,
+    duration: null,
+    ttsProvider: 'elevenlabs',
+    ttsModel: null,
+    failureReason: 'TTS provider error',
+    voices: [],
+    proposalStatus: null,
+    proposalMessage: null,
+    contributor: null,
+  },
+  {
+    id: 'track-3',
+    name: 'Proposed',
+    status: 'READY',
+    audioUrl: 'https://example.com/t3.mp3',
+    duration: 250,
+    ttsProvider: 'elevenlabs',
+    ttsModel: null,
+    voices: [],
+    proposalStatus: 'PENDING',
+    proposalMessage: 'Great version!',
+    contributor: { id: 'contrib-1', name: 'Contrib', handle: null, image: null },
+  },
 ];
 
 function createGetRequest(): NextRequest {
@@ -163,9 +202,9 @@ describe('GET /api/podcasts/[podcastId]/voice-tracks', () => {
     expect(body).toHaveProperty('error', 'Podcast not found');
   });
 
-  it('returns 403 for private podcast when user is not owner', async () => {
+  it('returns 403 when user is not owner', async () => {
     mockAuth.mockResolvedValue(otherSession);
-    mockPodcastFindUnique.mockResolvedValue({ userId: 'owner-1', visibility: 'PRIVATE' });
+    mockPodcastFindUnique.mockResolvedValue({ userId: 'owner-1' });
 
     const response = await GET(createGetRequest(), {
       params: Promise.resolve({ podcastId: 'pod-1' }),
@@ -178,7 +217,7 @@ describe('GET /api/podcasts/[podcastId]/voice-tracks', () => {
 
   it('returns all tracks with failureReason when user is owner', async () => {
     mockAuth.mockResolvedValue(ownerSession);
-    mockPodcastFindUnique.mockResolvedValue({ userId: 'owner-1', visibility: 'PUBLIC' });
+    mockPodcastFindUnique.mockResolvedValue({ userId: 'owner-1' });
     mockVoiceTrackFindMany.mockResolvedValue(mockTracks);
 
     const response = await GET(createGetRequest(), {
@@ -194,58 +233,50 @@ describe('GET /api/podcasts/[podcastId]/voice-tracks', () => {
       expect.objectContaining({
         where: expect.objectContaining({ podcastId: 'pod-1' }),
         select: expect.objectContaining({ failureReason: true }),
-      }),
+      })
     );
   });
 
-  it('filters tracks for non-owner (only READY + non-pending proposals)', async () => {
+  it('returns 403 for non-owner public tracks', async () => {
     mockAuth.mockResolvedValue(otherSession);
-    mockPodcastFindUnique.mockResolvedValue({ userId: 'owner-1', visibility: 'PUBLIC' });
+    mockPodcastFindUnique.mockResolvedValue({ userId: 'owner-1' });
     mockVoiceTrackFindMany.mockResolvedValue([mockTracks[0]]);
-
-    const response = await GET(createGetRequest(), {
-      params: Promise.resolve({ podcastId: 'pod-1' }),
-    });
-
-    expect(response.status).toBe(200);
-
-    // Verify non-owner query includes status and proposalStatus filters
-    expect(mockVoiceTrackFindMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          podcastId: 'pod-1',
-          status: 'READY',
-        }),
-        select: expect.objectContaining({ failureReason: false }),
-      }),
-    );
-  });
-
-  it('allows unauthenticated access to public podcast tracks', async () => {
-    mockAuth.mockResolvedValue(null);
-    mockPodcastFindUnique.mockResolvedValue({ userId: 'owner-1', visibility: 'PUBLIC' });
-    mockVoiceTrackFindMany.mockResolvedValue([mockTracks[0]]);
-
-    const response = await GET(createGetRequest(), {
-      params: Promise.resolve({ podcastId: 'pod-1' }),
-    });
-
-    expect(response.status).toBe(200);
-    const body = await response.json();
-    expect(body).toHaveLength(1);
-  });
-
-  it('returns 403 for private podcast when unauthenticated', async () => {
-    mockAuth.mockResolvedValue(null);
-    mockPodcastFindUnique.mockResolvedValue({ userId: 'owner-1', visibility: 'PRIVATE' });
 
     const response = await GET(createGetRequest(), {
       params: Promise.resolve({ podcastId: 'pod-1' }),
     });
 
     expect(response.status).toBe(403);
+    expect(mockVoiceTrackFindMany).not.toHaveBeenCalled();
+  });
+
+  it('returns 401 when unauthenticated', async () => {
+    mockAuth.mockResolvedValue(null);
+    mockPodcastFindUnique.mockResolvedValue({ userId: 'owner-1' });
+    mockVoiceTrackFindMany.mockResolvedValue([mockTracks[0]]);
+
+    const response = await GET(createGetRequest(), {
+      params: Promise.resolve({ podcastId: 'pod-1' }),
+    });
+
+    expect(response.status).toBe(401);
     const body = await response.json();
-    expect(body).toHaveProperty('error', 'Forbidden');
+    expect(body).toHaveProperty('error', 'Unauthorized');
+    expect(mockPodcastFindUnique).not.toHaveBeenCalled();
+  });
+
+  it('does not query podcast when unauthenticated', async () => {
+    mockAuth.mockResolvedValue(null);
+    mockPodcastFindUnique.mockResolvedValue({ userId: 'owner-1' });
+
+    const response = await GET(createGetRequest(), {
+      params: Promise.resolve({ podcastId: 'pod-1' }),
+    });
+
+    expect(response.status).toBe(401);
+    const body = await response.json();
+    expect(body).toHaveProperty('error', 'Unauthorized');
+    expect(mockPodcastFindUnique).not.toHaveBeenCalled();
   });
 });
 
@@ -295,7 +326,7 @@ describe('POST /api/podcasts/[podcastId]/voice-tracks', () => {
       createPostRequest({
         voices: [{ speaker: 'HOST', voiceId: '' }],
       }),
-      { params: Promise.resolve({ podcastId: 'pod-1' }) },
+      { params: Promise.resolve({ podcastId: 'pod-1' }) }
     );
     const body = await response.json();
 
@@ -320,7 +351,7 @@ describe('POST /api/podcasts/[podcastId]/voice-tracks', () => {
       createPostRequest({
         voices: [{ speaker: 'HOST', voiceId: '' }],
       }),
-      { params: Promise.resolve({ podcastId: 'pod-1' }) },
+      { params: Promise.resolve({ podcastId: 'pod-1' }) }
     );
 
     expect(response.status).toBe(201);
@@ -328,7 +359,7 @@ describe('POST /api/podcasts/[podcastId]/voice-tracks', () => {
       expect.objectContaining({
         requestedProvider: 'openai',
         requestedModel: 'tts-1-hd',
-      }),
+      })
     );
   });
 });
