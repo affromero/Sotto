@@ -68,6 +68,13 @@ Start the app:
 npm run dev
 ```
 
+Optional mobile app:
+
+```bash
+npm run mobile:env
+npm run mobile:ios
+```
+
 ## Manual Setup
 
 ```bash
