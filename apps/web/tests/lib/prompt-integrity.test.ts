@@ -70,6 +70,8 @@ const EXPECTED_FILES = [
   'audio/voice-assigner.md',
   'audio/tts-tag-converter.md',
   'demo/walkthrough.md',
+  'speaking/pronunciation-rubric.md',
+  'speaking/generate-speaking-prompts.md',
 ];
 
 // ── Variable contracts: template → expected placeholder names ──
@@ -120,6 +122,12 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
   'audio/voice-assigner.md': [
     'SPEAKERS', 'SPEAKER_COUNT', 'VOICE_CATALOG',
   ].sort(),
+  'speaking/pronunciation-rubric.md': [
+    'ALIGNMENT_SUMMARY', 'TARGET', 'TARGET_PHRASE', 'TRANSCRIPT',
+  ].sort(),
+  'speaking/generate-speaking-prompts.md': [
+    'COUNT', 'LEVEL', 'NATIVE', 'OBJECTIVE', 'TARGET', 'VOCAB',
+  ].sort(),
   'audio/tts-tag-converter.md': [
     'PROVIDER_DOCS', 'PROVIDER_NAME', 'TURNS_JSON',
   ].sort(),
@@ -165,7 +173,7 @@ const STATIC_TEMPLATES = EXPECTED_FILES.filter((f) => !VARIABLE_CONTRACTS[f]);
 // ── Tests ─────────────────────────────────────────────────────
 
 describe('prompt file existence', () => {
-  it(`prompts directory contains exactly ${EXPECTED_FILES.length} .md files`, () => {
+  it(`prompts directory contains exactly ${EXPECTED_FILES.length} .md files`, () => { // bumped +2 for speaking/pronunciation-rubric.md and speaking/generate-speaking-prompts.md
     const actual = glob.sync('**/*.md', { cwd: PROMPTS_DIR }).sort();
     expect(actual).toHaveLength(EXPECTED_FILES.length);
     expect(actual).toEqual(EXPECTED_FILES.sort());

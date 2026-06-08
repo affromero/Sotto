@@ -5,6 +5,7 @@ import { prisma } from './prisma';
 import { generateSectionQuestions } from './class-generation';
 import { seedLessonItems, getDueItems, applyReviewOutcome } from './knowledge-graph';
 import { generateClassListening } from './class-listening-generator';
+import { generateClassSpeaking } from './class-speaking-generator';
 import { logger } from './logger';
 import type { SkillType, CefrLevel } from '@sotto/shared';
 
@@ -133,6 +134,24 @@ export async function createNextClass(courseId: string, userId: string): Promise
     });
   }
 
+  // Speaking section — non-blocking, same rationale as the listening section.
+  try {
+    await generateClassSpeaking({
+      userId,
+      classId: cls.id,
+      level: lesson.level,
+      nativeLang: course.nativeLang,
+      targetLang: course.targetLang,
+      objective: lesson.objective,
+      targetVocab,
+    });
+  } catch (err) {
+    logger.warn('generateClassSpeaking failed; continuing without speaking section', {
+      classId: cls.id,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+
   await prisma.courseClass.update({
     where: { id: cls.id },
     data: {
@@ -152,7 +171,13 @@ export async function getClassForUser(classId: string, userId: string) {
   return prisma.courseClass.findFirst({
     where: { id: classId, course: { userId } },
     include: {
-      sections: { orderBy: { skill: 'asc' }, include: { questions: { orderBy: { order: 'asc' } } } },
+      sections: {
+        orderBy: { skill: 'asc' },
+        include: {
+          questions: { orderBy: { order: 'asc' } },
+          prompts: { orderBy: { order: 'asc' } },
+        },
+      },
       lesson: { select: { title: true, level: true, objective: true } },
       submission: { select: { passed: true, overallScore: true, submittedAt: true } },
     },
@@ -174,7 +199,15 @@ export async function submitClass(
 ): Promise<SubmitResult | null> {
   const cls = await prisma.courseClass.findFirst({
     where: { id: classId, course: { userId } },
-    include: { sections: { include: { questions: true } }, lesson: true },
+    include: {
+      sections: {
+        include: {
+          questions: true,
+          prompts: { include: { recordings: { orderBy: { createdAt: 'desc' } } } },
+        },
+      },
+      lesson: true,
+    },
   });
   if (!cls) return null;
 
@@ -184,14 +217,24 @@ export async function submitClass(
   let passedSections = 0;
 
   for (const s of cls.sections) {
-    let correct = 0;
-    for (const q of s.questions) {
-      const sel = answerMap.get(q.id) ?? -1;
-      const isCorrect = sel === q.correctIndex;
-      if (isCorrect) correct += 1;
-      graded.push({ sectionId: s.id, questionId: q.id, selectedIndex: sel, isCorrect });
+    let score: number;
+    if (s.skill === 'SPEAKING') {
+      // Average the latest scored recording per prompt; unscored prompts count as 0.
+      const promptScores = s.prompts.map((p) => {
+        const scored = p.recordings.find((r) => r.status === 'SCORED' && r.overallScore != null);
+        return scored?.overallScore ?? 0;
+      });
+      score = promptScores.length > 0 ? promptScores.reduce((a, b) => a + b, 0) / promptScores.length : 0;
+    } else {
+      let correct = 0;
+      for (const q of s.questions) {
+        const sel = answerMap.get(q.id) ?? -1;
+        const isCorrect = sel === q.correctIndex;
+        if (isCorrect) correct += 1;
+        graded.push({ sectionId: s.id, questionId: q.id, selectedIndex: sel, isCorrect });
+      }
+      score = s.questions.length > 0 ? correct / s.questions.length : 0;
     }
-    const score = s.questions.length > 0 ? correct / s.questions.length : 0;
     const passed = score >= s.passThreshold;
     if (passed) passedSections += 1;
     sectionResults.push({ id: s.id, skill: s.skill, score, passed });
@@ -271,6 +314,22 @@ export async function regenerateFailedSections(classId: string, userId: string):
   for (const s of cls.sections) {
     const attempt = s.attempt + 1;
     const seed = `${classId}-${s.skill}-${attempt}`;
+
+    // Non-MC sections (listening, speaking) have no MC answers to memorize, so
+    // there is nothing to regenerate for anti-copy — reset them in place for
+    // another attempt. Speaking also clears prior recordings so the learner
+    // re-records from scratch.
+    if (!MC_SKILLS.includes(s.skill)) {
+      if (s.skill === 'SPEAKING') {
+        await prisma.speakingRecording.deleteMany({ where: { sectionId: s.id } });
+      }
+      await prisma.classSection.update({
+        where: { id: s.id },
+        data: { attempt, seed, status: 'READY', score: null, passed: null },
+      });
+      continue;
+    }
+
     await prisma.classSection.update({
       where: { id: s.id },
       data: { attempt, seed, status: 'GENERATING', score: null, passed: null },

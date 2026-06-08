@@ -71,6 +71,7 @@ MODERATE_CONTENT = 'moderate_content',
   CLASSIFY_PIPELINE = 'classify_pipeline',
   MONITOR_TTS_PROVIDERS = 'monitor_tts_providers',
   RENDER_SEGMENT_PREVIEW = 'render_segment_preview',
+  SPEAKING_GRADING = 'speaking_grading',
 }
 
 /**
@@ -458,6 +459,7 @@ const QUEUE_DEFINITIONS: Record<string, QueueDefinition> = {
   'waveform-generation': { attempts: 2, skipEvents: true },
   'pipeline-classification': { attempts: 2, skipEvents: true },
   'tts-provider-monitor': { attempts: 2, skipEvents: true },
+  'speaking-grading': { attempts: 3 },
 };
 
 const queueInstances = new Map<string, Queue>();
@@ -1026,6 +1028,10 @@ export interface LipSyncTestPayload {
   avatarImageUrl: string;
   avatarModelId: string;
 }
+
+export interface SpeakingGradingPayload {
+  recordingId: string;
+}
 export const lipSyncTestQueue = createQueueReference('lip-sync-test');
 export const placeEnrichmentQueue = createQueueReference('place-enrichment');
 export const demoScriptQueue = createQueueReference('demo-script');
@@ -1040,6 +1046,7 @@ export const waveformGenerationQueue = createQueueReference('waveform-generation
 export const pipelineClassificationQueue = createQueueReference('pipeline-classification');
 export const ttsProviderMonitorQueue = createQueueReference('tts-provider-monitor');
 export const segmentPreviewQueue = createQueueReference('segment-preview');
+export const speakingGradingQueue = createQueueReference('speaking-grading');
 
 /** All queue names — single source of truth for admin and health endpoints */
 export const ALL_QUEUE_NAMES = Object.freeze(Object.keys(QUEUE_DEFINITIONS));

@@ -44,6 +44,7 @@ export const PIPELINE_WORKERS = new Set([
   'demo-script',
   'voice-track-stitching',
   'pipeline-classification',
+  'speaking-grading',
 ]);
 
 /**

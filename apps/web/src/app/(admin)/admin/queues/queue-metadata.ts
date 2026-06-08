@@ -58,6 +58,10 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
     description: 'Concatenates audio segments with crossfades and SFX',
     stage: 'Audio Pipeline',
   },
+  'speaking-grading': {
+    description: 'Transcribes learner speaking recordings and scores pronunciation',
+    stage: 'Audio Pipeline',
+  },
   'segment-regeneration': {
     description: 'Re-generates individual audio segments after edits',
     stage: 'Audio Pipeline',

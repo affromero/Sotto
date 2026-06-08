@@ -12,6 +12,7 @@ const mockClassSectionCreate = vi.fn();
 const mockClassSectionUpdate = vi.fn();
 const mockLessonQuestionCreate = vi.fn();
 const mockLessonQuestionDeleteMany = vi.fn();
+const mockSpeakingRecordingDeleteMany = vi.fn();
 const mockClassSubmissionUpsert = vi.fn();
 const mockCourseUpdate = vi.fn();
 const mockTransaction = vi.fn();
@@ -36,6 +37,9 @@ vi.mock('@/lib/prisma', () => ({
     lessonQuestion: {
       create: (...args: unknown[]) => mockLessonQuestionCreate(...args),
       deleteMany: (...args: unknown[]) => mockLessonQuestionDeleteMany(...args),
+    },
+    speakingRecording: {
+      deleteMany: (...args: unknown[]) => mockSpeakingRecordingDeleteMany(...args),
     },
     classSubmission: {
       upsert: (...args: unknown[]) => mockClassSubmissionUpsert(...args),
@@ -62,6 +66,10 @@ vi.mock('@/lib/knowledge-graph', () => ({
 
 vi.mock('@/lib/class-listening-generator', () => ({
   generateClassListening: vi.fn().mockResolvedValue({ sectionId: 'section-listening', podcastId: 'podcast-listening' }),
+}));
+
+vi.mock('@/lib/class-speaking-generator', () => ({
+  generateClassSpeaking: vi.fn().mockResolvedValue({ sectionId: 'section-speaking' }),
 }));
 
 // ---- Import under test ----
@@ -366,6 +374,46 @@ describe('submitClass', () => {
     expect(result!.passed).toBe(false);
     expect(result!.passedSections).toBe(0);
   });
+
+  function makeSpeakingClass(prompts: Array<{ id: string; recordings: Array<{ status: string; overallScore: number | null }> }>) {
+    return {
+      id: 'class-1',
+      courseId: 'course-1',
+      passThreshold: 0.5,
+      lesson: SAMPLE_LESSON,
+      sections: [{ id: 'sec-speaking', skill: 'SPEAKING', passThreshold: 0.6, questions: [], prompts }],
+    };
+  }
+
+  it('scores a SPEAKING section as the average of each prompt latest scored recording', async () => {
+    mockCourseClassFindFirst.mockResolvedValue(
+      makeSpeakingClass([
+        { id: 'p1', recordings: [{ status: 'SCORED', overallScore: 0.9 }] },
+        { id: 'p2', recordings: [{ status: 'SCORED', overallScore: 0.7 }] },
+      ]),
+    );
+
+    const result = await submitClass('class-1', 'u1', []);
+
+    const speaking = result!.sections.find((s) => s.skill === 'SPEAKING')!;
+    expect(speaking.score).toBeCloseTo(0.8, 5); // (0.9 + 0.7) / 2
+    expect(speaking.passed).toBe(true); // 0.8 >= 0.6
+  });
+
+  it('counts an unrecorded SPEAKING prompt as 0 in the average', async () => {
+    mockCourseClassFindFirst.mockResolvedValue(
+      makeSpeakingClass([
+        { id: 'p1', recordings: [{ status: 'SCORED', overallScore: 0.9 }] },
+        { id: 'p2', recordings: [] },
+      ]),
+    );
+
+    const result = await submitClass('class-1', 'u1', []);
+
+    const speaking = result!.sections.find((s) => s.skill === 'SPEAKING')!;
+    expect(speaking.score).toBeCloseTo(0.45, 5); // (0.9 + 0) / 2
+    expect(speaking.passed).toBe(false);
+  });
 });
 
 // ---- regenerateFailedSections ----
@@ -479,6 +527,27 @@ describe('regenerateFailedSections', () => {
     );
     expect(mockClassSectionUpdate).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ attempt: 3, seed: 'class-1-READING-3' }) }),
+    );
+  });
+
+  it('resets a failed SPEAKING section in place: clears recordings, no MC regeneration', async () => {
+    mockCourseClassFindFirst.mockResolvedValue({
+      ...SAMPLE_CLASS_WITH_FAILED,
+      sections: [{ id: 'sec-speaking', skill: 'SPEAKING', attempt: 1, passed: false }],
+    });
+
+    const result = await regenerateFailedSections('class-1', 'u1');
+
+    expect(result).toBe(true);
+    expect(mockSpeakingRecordingDeleteMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { sectionId: 'sec-speaking' } }),
+    );
+    // A speaking section has no MC questions to regenerate.
+    expect(mockGenerateSectionQuestions).not.toHaveBeenCalled();
+    expect(mockClassSectionUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ attempt: 2, seed: 'class-1-SPEAKING-2', status: 'READY' }),
+      }),
     );
   });
 });

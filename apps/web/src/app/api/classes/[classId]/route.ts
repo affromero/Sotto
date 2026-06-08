@@ -32,6 +32,14 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         passageRef: q.passageRef,
         ...(submitted ? { correctIndex: q.correctIndex, explanation: q.explanation } : {}),
       })),
+      prompts: s.prompts.map((p) => ({
+        id: p.id,
+        order: p.order,
+        targetPhrase: p.targetPhrase,
+        translation: p.translation,
+        ipa: p.ipa,
+        referenceTtsUrl: p.referenceTtsUrl,
+      })),
     }));
 
     return NextResponse.json({
