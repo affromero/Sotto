@@ -27,7 +27,6 @@ export type PodcastSource =
   | 'WEB'
   | 'API'
   | 'AGENT'
-  | 'MEETING'
   | 'IMPORT'
   | 'ADMIN';
 

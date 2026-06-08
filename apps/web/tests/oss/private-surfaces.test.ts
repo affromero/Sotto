@@ -214,17 +214,12 @@ describe('private-first OSS surfaces', () => {
       .join('\n');
 
     expect(mcpSources).toContain('ingest_agent_output');
-    expect(mcpSources).toContain('ingest_meeting_transcript');
     expect(mcpSources).toContain('/api/ingest/agent');
-    expect(mcpSources).toContain('/api/ingest/meeting');
     expect(mcpSources).toContain('tts_provider');
     expect(mcpSources).toContain('idempotency_key');
     expect(mcpSources).toContain('never publishes the result publicly');
-    expect(mcpSources).toContain('never exposes the meeting in a public feed');
     expect(mcpSources).toContain('formatAgentIngested');
-    expect(mcpSources).toContain('formatMeetingIngested');
     expect(mcpSources).not.toContain('agent_visibility');
-    expect(mcpSources).not.toContain('meeting_visibility');
   });
 
   it('requires bot and shared URL helpers to use an explicit deployment URL', () => {
@@ -926,7 +921,6 @@ describe('private-first OSS surfaces', () => {
 
     expect(setupSources).toContain("id: 'stt'");
     expect(setupSources).toContain("id: 'agent-ingestion'");
-    expect(setupSources).toContain("id: 'meeting-transcripts'");
     expect(setupSources).toContain('STT_PROVIDER');
     expect(setupSources).toContain('buildSttProviderStatuses');
     expect(setupSources).toContain('Transcript ingestion works without STT');
@@ -1118,38 +1112,30 @@ describe('private-first OSS surfaces', () => {
 
   it('keeps local ingestion surfaces authenticated and private-only', () => {
     const agentIngestRouteSource = readSource('src/app/api/ingest/agent/route.ts');
-    const meetingIngestRouteSource = readSource('src/app/api/ingest/meeting/route.ts');
     const privateIngestionSource = readSource('src/lib/private-ingestion.ts');
     const schemaSource = readFileSync(resolve(repoRoot, 'apps/web/prisma/schema.prisma'), 'utf8');
     const sharedEnumsSource = readFileSync(
       resolve(repoRoot, 'packages/shared/src/types/enums.ts'),
       'utf8'
     );
-    const ingestionRouteSources = [agentIngestRouteSource, meetingIngestRouteSource].join('\n');
 
-    expect(ingestionRouteSources).toContain('authenticateRequest(request)');
-    expect(ingestionRouteSources).toContain("errorResponse('Unauthorized', 401)");
+    expect(agentIngestRouteSource).toContain('authenticateRequest(request)');
+    expect(agentIngestRouteSource).toContain("errorResponse('Unauthorized', 401)");
     expect(agentIngestRouteSource).toContain("source: 'AGENT'");
-    expect(meetingIngestRouteSource).toContain("source: 'MEETING'");
     expect(agentIngestRouteSource).toContain('createPrivateIngestionPodcast');
-    expect(meetingIngestRouteSource).toContain('createPrivateIngestionPodcast');
     expect(privateIngestionSource).toContain("visibility: 'PRIVATE'");
     expect(agentIngestRouteSource).toContain('agentIngestion.create');
-    expect(meetingIngestRouteSource).toContain('meetingIngestion.create');
-    expect(ingestionRouteSources).toContain('idempotencyKey');
-    expect([ingestionRouteSources, privateIngestionSource].join('\n')).not.toContain(
+    expect(agentIngestRouteSource).toContain('idempotencyKey');
+    expect([agentIngestRouteSource, privateIngestionSource].join('\n')).not.toContain(
       "visibility: 'PUBLIC'"
     );
-    expect([ingestionRouteSources, privateIngestionSource].join('\n')).not.toContain(
+    expect([agentIngestRouteSource, privateIngestionSource].join('\n')).not.toContain(
       "visibility: 'UNLISTED'"
     );
-    expect(ingestionRouteSources).not.toContain('public feed');
+    expect(agentIngestRouteSource).not.toContain('public feed');
     expect(schemaSource).toContain('model AgentIngestion');
-    expect(schemaSource).toContain('model MeetingIngestion');
     expect(schemaSource).toContain('AGENT');
-    expect(schemaSource).toContain('MEETING');
     expect(sharedEnumsSource).toContain("| 'AGENT'");
-    expect(sharedEnumsSource).toContain("| 'MEETING'");
   });
 
   it('keeps workspace connector onboarding private and explicit', () => {

@@ -5,7 +5,6 @@ export type SetupCapabilityId =
   | 'generation'
   | 'tts'
   | 'agent-ingestion'
-  | 'meeting-transcripts'
   | 'stt'
   | 'private-rss';
 
@@ -215,15 +214,6 @@ export function buildSetupReadiness(input: BuildSetupReadinessInput): SetupReadi
       status: privateSourceIngestionReady ? 'ready' : 'action_required',
       detail: privateSourceIngestionReady
         ? 'Agent ingestion endpoint ready'
-        : 'Complete database, queue, storage, generation, and text-to-speech first.',
-    },
-    {
-      id: 'meeting-transcripts',
-      label: 'Meeting transcripts',
-      description: 'Creates private recap episodes from recorder or agent transcripts.',
-      status: privateSourceIngestionReady ? 'ready' : 'action_required',
-      detail: privateSourceIngestionReady
-        ? 'Transcript ingestion ready; STT is optional for raw audio.'
         : 'Complete database, queue, storage, generation, and text-to-speech first.',
     },
     {

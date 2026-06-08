@@ -5,8 +5,6 @@ import type {
   CreatePodcastParams,
   IngestAgentOutputParams,
   AgentIngestResult,
-  IngestMeetingTranscriptParams,
-  MeetingIngestResult,
   UpdatePodcastParams,
 } from './types.js';
 
@@ -107,41 +105,6 @@ export class SottoClient {
           model: params.agent_model,
           runId: params.agent_run_id,
         },
-        aiModel: params.ai_model,
-        ttsProvider: params.tts_provider,
-        ttsModel: params.tts_model,
-      }),
-    });
-  }
-
-  async ingestMeetingTranscript(
-    params: IngestMeetingTranscriptParams
-  ): Promise<MeetingIngestResult> {
-    const focusAreas = params.focus_areas
-      ? params.focus_areas
-          .split(',')
-          .map((s) => s.trim())
-          .filter(Boolean)
-      : undefined;
-
-    return this.request('/api/ingest/meeting', {
-      method: 'POST',
-      body: JSON.stringify({
-        title: params.title,
-        topic: params.topic,
-        transcript: params.transcript,
-        idempotencyKey: params.idempotency_key,
-        meetingUrl: params.meeting_url,
-        platform: params.platform,
-        startedAt: params.started_at,
-        endedAt: params.ended_at,
-        participants: params.participants,
-        actionItems: params.action_items,
-        durationTarget: params.duration_minutes,
-        depth: params.depth,
-        audienceLevel: params.audience_level,
-        tone: params.tone,
-        focusAreas,
         aiModel: params.ai_model,
         ttsProvider: params.tts_provider,
         ttsModel: params.tts_model,
