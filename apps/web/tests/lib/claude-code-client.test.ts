@@ -343,4 +343,55 @@ describe('claude-code-client', () => {
       expect(proc.kill).toHaveBeenCalledWith('SIGTERM');
     });
   });
+
+  describe('remote agent (SSH)', () => {
+    it('shellQuote single-quotes and escapes embedded quotes', async () => {
+      const { shellQuote } = await import('@/lib/claude-code-client');
+      expect(shellQuote('hello world')).toBe("'hello world'");
+      expect(shellQuote("it's")).toBe("'it'\\''s'");
+    });
+
+    it('getClaudeSshHost trims the env; blank becomes undefined', async () => {
+      const { getClaudeSshHost } = await import('@/lib/claude-code-client');
+      process.env.CLAUDE_CODE_SSH_HOST = '  me@vps  ';
+      expect(getClaudeSshHost()).toBe('me@vps');
+      process.env.CLAUDE_CODE_SSH_HOST = '';
+      expect(getClaudeSshHost()).toBeUndefined();
+    });
+
+    it('runs the CLI directly when no host is set', async () => {
+      const { buildAgentInvocation } = await import('@/lib/claude-code-client');
+      expect(buildAgentInvocation('claude', ['-p', '--model', 'm'])).toEqual({
+        command: 'claude',
+        args: ['-p', '--model', 'm'],
+      });
+    });
+
+    it('wraps the CLI in ssh and quotes every arg when a host is set', async () => {
+      const { buildAgentInvocation } = await import('@/lib/claude-code-client');
+      const inv = buildAgentInvocation('claude', ['-p', '--system-prompt', 'be nice'], 'me@vps');
+      expect(inv.command).toBe('ssh');
+      expect(inv.args).toContain('BatchMode=yes');
+      expect(inv.args[inv.args.length - 2]).toBe('me@vps');
+      expect(inv.args[inv.args.length - 1]).toBe("'claude' '-p' '--system-prompt' 'be nice'");
+    });
+
+    it('executeClaudeCode spawns ssh (not claude) with the prompt still on stdin', async () => {
+      process.env.CLAUDE_CODE_SSH_HOST = 'me@vps';
+      const { executeClaudeCode } = await import('@/lib/claude-code-client');
+      const proc = createMockProcess();
+      mockSpawn.mockReturnValue(proc);
+
+      const promise = executeClaudeCode('System', 'the user prompt');
+      proc._stdout.emit('data', Buffer.from('ok'));
+      proc.emit('close', 0);
+      await promise;
+
+      const [command, spawnArgs] = mockSpawn.mock.calls[0] as [string, string[]];
+      expect(command).toBe('ssh');
+      expect(spawnArgs[spawnArgs.length - 2]).toBe('me@vps');
+      expect(spawnArgs[spawnArgs.length - 1]).toContain("'claude'");
+      expect(proc._stdin.write).toHaveBeenCalledWith('the user prompt');
+    });
+  });
 });

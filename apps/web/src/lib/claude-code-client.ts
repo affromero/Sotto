@@ -7,7 +7,39 @@ import { getAiProviderMeta } from './providers/ai-registry';
 
 const CLAUDE_CODE_DEFAULT_MODEL = getAiProviderMeta('claude-code').defaultModel;
 
+const SSH_OPTS = ['-o', 'BatchMode=yes', '-T'];
+
+/** Single-quote a value for safe interpolation into a remote shell command. */
+export function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
+/** Trimmed CLAUDE_CODE_SSH_HOST, or undefined when the CLI runs locally. */
+export function getClaudeSshHost(): string | undefined {
+  const host = process.env.CLAUDE_CODE_SSH_HOST?.trim();
+  return host ? host : undefined;
+}
+
+/**
+ * Resolve how to invoke an agent CLI. Locally this is the CLI directly; when an
+ * SSH host is configured (the user's agent lives on a VPS) it becomes
+ * `ssh <host> '<cli> <quoted args>'`. The prompt is still piped over stdin,
+ * which ssh forwards to the remote process transparently.
+ */
+export function buildAgentInvocation(
+  cli: string,
+  args: string[],
+  sshHost?: string,
+): { command: string; args: string[] } {
+  if (!sshHost) return { command: cli, args };
+  const remote = [cli, ...args].map(shellQuote).join(' ');
+  return { command: 'ssh', args: [...SSH_OPTS, sshHost, remote] };
+}
+
 export function isClaudeAvailable(): Promise<boolean> {
+  // With a remote agent (VPS), "available" means the local ssh client exists;
+  // the remote `claude` is validated on first execution.
+  if (getClaudeSshHost()) return isCommandAvailable('ssh');
   return isCommandAvailable('claude');
 }
 
@@ -120,7 +152,8 @@ export async function executeClaudeCode(
   const cleanEnv = claudeHome ? { ...baseEnv, HOME: claudeHome } : baseEnv;
 
   return new Promise((resolve, reject) => {
-    const child = spawn('claude', args, {
+    const { command, args: spawnArgs } = buildAgentInvocation('claude', args, getClaudeSshHost());
+    const child = spawn(command, spawnArgs, {
       stdio: ['pipe', 'pipe', 'pipe'],
       env: cleanEnv,
     });
@@ -204,7 +237,8 @@ export async function* streamClaudeCode(
   const claudeHome = ensureClaudeHome();
   const cleanEnv = claudeHome ? { ...baseEnv, HOME: claudeHome } : baseEnv;
 
-  const child = spawn('claude', args, {
+  const { command, args: spawnArgs } = buildAgentInvocation('claude', args, getClaudeSshHost());
+  const child = spawn(command, spawnArgs, {
     stdio: ['pipe', 'pipe', 'pipe'],
     env: cleanEnv,
   });
