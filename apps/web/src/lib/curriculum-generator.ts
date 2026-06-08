@@ -5,8 +5,7 @@
 import { z } from 'zod';
 import { Prisma } from '@prisma/client';
 import { prisma } from './prisma';
-import { getAiKey } from './byok';
-import { getAiProviderMeta } from './providers/ai-registry';
+import { resolveLearningAi } from './learning-ai';
 import { createAIProvider } from './providers/ai';
 import { loadAndRender } from './prompt-loader';
 import { logUsage } from './usage-logger';
@@ -57,25 +56,20 @@ export async function getOrCreateCurriculum(
   });
   if (existing) return existing;
 
-  const aiKey = await getAiKey(userId);
-  if (!aiKey) {
-    throw new Error('An AI provider (or a configured local Claude/Codex) is required to compose this course.');
-  }
-  const model = getAiProviderMeta(aiKey.provider).defaultModel;
-  if (!model) throw new Error(`No default AI model configured for provider "${aiKey.provider}".`);
+  const ai = await resolveLearningAi(userId);
 
   const systemPrompt = loadAndRender('curriculum/generate-curriculum.md', {
     NATIVE: langName(nativeLang),
     TARGET: langName(targetLang),
   });
-  const ai = createAIProvider(aiKey.provider);
-  const res = await ai.generateResponse(
+  const client = createAIProvider(ai.provider);
+  const res = await client.generateResponse(
     systemPrompt,
     [{ role: 'user', content: `Compose the ${langName(targetLang)} curriculum skeleton.` }],
-    { model, apiKeyOverride: aiKey.apiKey, maxTokens: 8000, temperature: 0.6 },
+    { model: ai.model, apiKeyOverride: ai.apiKey, maxTokens: 8000, temperature: 0.6 },
   );
   logUsage({
-    service: aiKey.provider,
+    service: ai.provider,
     model: res.model,
     category: 'curriculum-generation',
     inputTokens: res.inputTokens,

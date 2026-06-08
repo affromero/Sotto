@@ -271,11 +271,17 @@ describe('processSpeakingGrading', () => {
       );
     });
 
-    it('sets status FAILED and rethrows when no AI key available', async () => {
+    it('sets status FAILED and rethrows when no AI provider is available', async () => {
       mockGetAiKey.mockResolvedValue(null);
+      const prev = process.env.AI_PROVIDER;
+      process.env.AI_PROVIDER = '';
       const job = makeJob({ recordingId: 'rec-001' });
 
-      await expect(processSpeakingGrading(job)).rejects.toThrow('No AI key available');
+      try {
+        await expect(processSpeakingGrading(job)).rejects.toThrow(/AI provider/i);
+      } finally {
+        process.env.AI_PROVIDER = prev;
+      }
       expect(mockSpeakingRecordingUpdate).toHaveBeenCalledWith(
         expect.objectContaining({ data: { status: 'FAILED' } })
       );

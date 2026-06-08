@@ -381,10 +381,15 @@ describe('generateClassListening', () => {
   });
 
   describe('error paths', () => {
-    it('throws when getAiKey returns null', async () => {
+    it('throws when there is no BYOK key and no local agent configured', async () => {
       mockGetAiKey.mockResolvedValue(null);
-
-      await expect(generateClassListening(PARAMS)).rejects.toThrow(/AI provider key/);
+      const prev = process.env.AI_PROVIDER;
+      process.env.AI_PROVIDER = '';
+      try {
+        await expect(generateClassListening(PARAMS)).rejects.toThrow(/AI provider/i);
+      } finally {
+        process.env.AI_PROVIDER = prev;
+      }
     });
 
     it('throws when the provider has no default model', async () => {
