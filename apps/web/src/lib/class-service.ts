@@ -6,6 +6,7 @@ import { generateSectionQuestions } from './class-generation';
 import { seedLessonItems, getDueItems, applyReviewOutcome } from './knowledge-graph';
 import { generateClassListening } from './class-listening-generator';
 import { generateClassSpeaking } from './class-speaking-generator';
+import { getCourseNote } from './course-notes';
 import { logger } from './logger';
 import type { SkillType, CefrLevel } from '@sotto/shared';
 
@@ -37,6 +38,7 @@ async function buildSection(
   lesson: LessonLike,
   nativeLang: string,
   targetLang: string,
+  note: string,
 ): Promise<void> {
   const { grammarPoints, targetVocab } = lessonInputs(lesson);
   const section = await prisma.classSection.create({
@@ -52,6 +54,7 @@ async function buildSection(
     grammarPoints,
     targetVocab,
     seed: section.seed,
+    note,
   });
   await prisma.$transaction([
     ...questions.map((q, i) =>
@@ -100,9 +103,11 @@ export async function createNextClass(courseId: string, userId: string): Promise
     data: { courseId, lessonId: lesson.id, order: lesson.order, status: 'GENERATING' },
   });
 
+  const note = await getCourseNote(courseId);
+
   try {
     for (const skill of MC_SKILLS) {
-      await buildSection(cls.id, userId, skill, lesson, course.nativeLang, course.targetLang);
+      await buildSection(cls.id, userId, skill, lesson, course.nativeLang, course.targetLang, note);
     }
   } catch (err) {
     // Roll back the half-built class so the learner can retry cleanly.
@@ -126,6 +131,7 @@ export async function createNextClass(courseId: string, userId: string): Promise
       targetLang: course.targetLang,
       objective: lesson.objective,
       mustIncludeVocab: due.vocab.map((v) => ({ word: v.lemma, translation: v.translation })),
+      note,
     });
   } catch (err) {
     logger.warn('generateClassListening failed; continuing without listening section', {
@@ -144,6 +150,7 @@ export async function createNextClass(courseId: string, userId: string): Promise
       targetLang: course.targetLang,
       objective: lesson.objective,
       targetVocab,
+      note,
     });
   } catch (err) {
     logger.warn('generateClassSpeaking failed; continuing without speaking section', {

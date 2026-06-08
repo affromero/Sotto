@@ -52,6 +52,7 @@ vi.mock('@/lib/class-generation', () => ({
 
 vi.mock('@/lib/class-listening-generator', () => ({ composeListeningContent: vi.fn() }));
 vi.mock('@/lib/class-speaking-generator', () => ({ composeSpeakingPrompts: vi.fn() }));
+vi.mock('@/lib/course-notes', () => ({ getCourseNote: vi.fn().mockResolvedValue('') }));
 vi.mock('@/lib/logger', () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 
 import { startPractice, submitPractice, PracticeCourseNotFoundError } from '@/lib/practice-service';

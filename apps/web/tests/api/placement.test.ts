@@ -11,6 +11,7 @@ const mockScorePlacement = vi.fn();
 const mockGetOrCreateCurriculum = vi.fn();
 const mockToPublic = vi.fn();
 const mockCourseUpsert = vi.fn();
+const mockCourseFindUnique = vi.fn();
 const mockPlacementResultUpsert = vi.fn();
 
 vi.mock('@/lib/api-keys', () => ({
@@ -40,6 +41,7 @@ vi.mock('@/lib/prisma', () => ({
   prisma: {
     course: {
       upsert: (...args: unknown[]) => mockCourseUpsert(...args),
+      findUnique: (...args: unknown[]) => mockCourseFindUnique(...args),
     },
     placementResult: {
       upsert: (...args: unknown[]) => mockPlacementResultUpsert(...args),

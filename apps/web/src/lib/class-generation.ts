@@ -3,6 +3,7 @@
 import { resolveLearningAi } from './learning-ai';
 import { createAIProvider } from './providers/ai';
 import { loadAndRender } from './prompt-loader';
+import { formatNotesForPrompt } from './course-notes';
 import { logUsage } from './usage-logger';
 import { logger } from './logger';
 import type { SkillType } from '@sotto/shared';
@@ -27,6 +28,7 @@ export interface SectionGenParams {
   grammarPoints: string[];
   targetVocab: Array<{ lemma: string; gloss: string }>;
   seed: string;
+  note?: string;
 }
 
 export async function generateSectionQuestions(p: SectionGenParams): Promise<GeneratedQuestion[]> {
@@ -42,6 +44,7 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
     GRAMMAR_POINTS: p.grammarPoints.join(', '),
     VOCAB: p.targetVocab.map((v) => `${v.lemma} (${v.gloss})`).join('; '),
     SEED: p.seed,
+    NOTES: formatNotesForPrompt(p.note ?? ''),
   });
 
   const provider = createAIProvider(ai.provider);

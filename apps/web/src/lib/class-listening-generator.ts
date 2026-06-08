@@ -10,6 +10,7 @@ import { prisma } from './prisma';
 import { resolveLearningAi } from './learning-ai';
 import { createAIProvider } from './providers/ai';
 import { loadAndRender } from './prompt-loader';
+import { formatNotesForPrompt } from './course-notes';
 import { generateScript } from './script-generator';
 import { createSegmentsAndQueueAudio } from './segment-creator';
 import { logUsage } from './usage-logger';
@@ -26,6 +27,7 @@ export interface ClassListeningParams {
   targetLang: string;
   objective: string;
   mustIncludeVocab: Array<{ word: string; translation: string }>;
+  note?: string;
 }
 
 export interface ClassListeningResult {
@@ -54,6 +56,7 @@ export interface ListeningContentParams {
   mustIncludeVocab: Array<{ word: string; translation: string }>;
   /** Provenance for graph vocab (a class id). Undefined for practice sessions. */
   firstSeenClassId?: string;
+  note?: string;
 }
 
 export interface ListeningContent {
@@ -166,6 +169,7 @@ export async function composeListeningContent(p: ListeningContentParams): Promis
       NATIVE: p.nativeLang,
       TARGET: p.targetLang,
       TRANSCRIPT: transcript,
+      NOTES: formatNotesForPrompt(p.note ?? ''),
     });
 
     const provider = createAIProvider(ai.provider);
@@ -237,6 +241,7 @@ export async function generateClassListening(p: ClassListeningParams): Promise<C
     objective: p.objective,
     mustIncludeVocab: p.mustIncludeVocab,
     firstSeenClassId: p.classId,
+    note: p.note,
   });
 
   try {

@@ -12,6 +12,7 @@ import {
   type PlacementQuestion,
 } from '@/lib/placement-test';
 import { getOrCreateCurriculum } from '@/lib/curriculum-generator';
+import { getCourseNote } from '@/lib/course-notes';
 
 const langCode = z.string().trim().toLowerCase().length(2);
 const submitSchema = z.object({
@@ -45,7 +46,16 @@ export async function GET(request: NextRequest) {
       return errorResponse('Rate limit exceeded. Try again later.', 429, { resetAt: rate.resetAt });
     }
 
-    const { questions } = await generatePlacement(userId, native, target);
+    // Best-effort: if the learner already has a course + note for this pair,
+    // let it inform the placement emphasis. Placement often precedes the course,
+    // in which case there is simply no note yet.
+    const existingCourse = await prisma.course.findUnique({
+      where: { userId_nativeLang_targetLang: { userId, nativeLang: native, targetLang: target } },
+      select: { id: true },
+    });
+    const note = existingCourse ? await getCourseNote(existingCourse.id) : '';
+
+    const { questions } = await generatePlacement(userId, native, target, note);
 
     // Cache the full questions (with answers) for grading; return public versions.
     await cache.set(cacheKey(userId, native, target), questions, 3600);

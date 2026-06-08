@@ -8,6 +8,7 @@ import { getDueItems, applyReviewOutcome } from './knowledge-graph';
 import { generateSectionQuestions } from './class-generation';
 import { composeListeningContent } from './class-listening-generator';
 import { composeSpeakingPrompts } from './class-speaking-generator';
+import { getCourseNote } from './course-notes';
 import { logger } from './logger';
 import type { CefrLevel, PracticeKind, SkillType } from '@sotto/shared';
 
@@ -136,15 +137,16 @@ export async function startPractice(
 
   if (kind === 'VOCAB') return startVocab(course, seedToken);
 
+  const note = await getCourseNote(courseId);
   const due = await getDueItems(courseId, MC_COUNT);
   const seed = await resolveSeed(course, due);
   if (!seed) return { status: 'unavailable', reason: 'no_content' };
 
   if (kind === 'GRAMMAR' || kind === 'READING') {
-    return startMc(course, kind, seed, seedToken);
+    return startMc(course, kind, seed, seedToken, note);
   }
-  if (kind === 'LISTENING') return startListening(course, seed, seedToken);
-  return startSpeaking(course, seed, seedToken);
+  if (kind === 'LISTENING') return startListening(course, seed, seedToken, note);
+  return startSpeaking(course, seed, seedToken, note);
 }
 
 async function startVocab(course: CourseCtx, seedToken: string): Promise<StartPracticeResult> {
@@ -216,6 +218,7 @@ async function startMc(
   kind: 'GRAMMAR' | 'READING',
   seed: PracticeSeed,
   seedToken: string,
+  note: string,
 ): Promise<StartPracticeResult> {
   const questions = await generateSectionQuestions({
     userId: course.userId,
@@ -227,6 +230,7 @@ async function startMc(
     grammarPoints: seed.grammarPoints,
     targetVocab: seed.targetVocab,
     seed: seedToken,
+    note,
   });
   const items: PracticeMcItem[] = questions.map((q, i) => ({
     id: `q${i}`,
@@ -253,6 +257,7 @@ async function startListening(
   course: CourseCtx,
   seed: PracticeSeed,
   seedToken: string,
+  note: string,
 ): Promise<StartPracticeResult> {
   const { podcastId, comprehensionQuestions } = await composeListeningContent({
     userId: course.userId,
@@ -262,6 +267,7 @@ async function startListening(
     targetLang: course.targetLang,
     objective: seed.objective,
     mustIncludeVocab: seed.targetVocab.map((v) => ({ word: v.lemma, translation: v.gloss })),
+    note,
   });
   const items: PracticeMcItem[] = comprehensionQuestions.map((q, i) => ({
     id: `l${i}`,
@@ -289,6 +295,7 @@ async function startSpeaking(
   course: CourseCtx,
   seed: PracticeSeed,
   seedToken: string,
+  note: string,
 ): Promise<StartPracticeResult> {
   // Speaking prompts hang off the session, so create it first to namespace them.
   const session = await prisma.practiceSession.create({
@@ -310,6 +317,7 @@ async function startSpeaking(
     objective: seed.objective,
     targetVocab: seed.targetVocab,
     refId: session.id,
+    note,
   });
 
   await prisma.speakingPrompt.createMany({

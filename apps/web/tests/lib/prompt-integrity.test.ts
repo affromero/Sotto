@@ -127,7 +127,7 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
     'ALIGNMENT_SUMMARY', 'TARGET', 'TARGET_PHRASE', 'TRANSCRIPT',
   ].sort(),
   'speaking/generate-speaking-prompts.md': [
-    'COUNT', 'LEVEL', 'NATIVE', 'OBJECTIVE', 'TARGET', 'VOCAB',
+    'COUNT', 'LEVEL', 'NATIVE', 'NOTES', 'OBJECTIVE', 'TARGET', 'VOCAB',
   ].sort(),
   'audio/tts-tag-converter.md': [
     'PROVIDER_DOCS', 'PROVIDER_NAME', 'TURNS_JSON',
@@ -158,13 +158,13 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
     'SOURCE_CONTENT', 'SOURCE_COUNT', 'TOPIC',
   ].sort(),
   'placement/placement-probe.md': [
-    'COUNT', 'LEVELS', 'NATIVE', 'PER_BAND', 'SKILLS', 'TARGET',
+    'COUNT', 'LEVELS', 'NATIVE', 'NOTES', 'PER_BAND', 'SKILLS', 'TARGET',
   ].sort(),
   'class/generate-listening-quiz.md': [
-    'COUNT', 'LEVEL', 'NATIVE', 'TARGET', 'TRANSCRIPT',
+    'COUNT', 'LEVEL', 'NATIVE', 'NOTES', 'TARGET', 'TRANSCRIPT',
   ].sort(),
   'class/generate-section-quiz.md': [
-    'COUNT', 'GRAMMAR_POINTS', 'LEVEL', 'NATIVE', 'OBJECTIVE', 'SEED', 'SKILL', 'TARGET', 'VOCAB',
+    'COUNT', 'GRAMMAR_POINTS', 'LEVEL', 'NATIVE', 'NOTES', 'OBJECTIVE', 'SEED', 'SKILL', 'TARGET', 'VOCAB',
   ].sort(),
   'curriculum/generate-curriculum.md': ['NATIVE', 'TARGET'].sort(),
 };
