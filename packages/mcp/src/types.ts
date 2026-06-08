@@ -8,9 +8,6 @@ export interface Podcast {
   duration: number | null;
   audioUrl: string | null;
   playCount: number;
-  likeCount: number;
-  forkCount: number;
-  forkedFromId: string | null;
   createdAt: string;
   updatedAt: string;
   user?: {
@@ -37,16 +34,7 @@ export interface PodcastDetail extends Podcast {
     status: string;
     createdAt: string;
   }>;
-  isLiked?: boolean;
   isSaved?: boolean;
-}
-
-export interface FeedResponse {
-  podcasts: Podcast[];
-  total: number;
-  page?: number;
-  limit?: number;
-  hasMore?: boolean;
 }
 
 export interface UserProfile {
@@ -57,8 +45,6 @@ export interface UserProfile {
   image: string | null;
   bio: string | null;
   podcastCount: number;
-  followerCount: number;
-  followingCount: number;
   createdAt: string;
 }
 
@@ -73,23 +59,67 @@ export interface CreatePodcastParams {
   source_url?: string;
 }
 
-export interface FeedParams {
-  search?: string;
-  sort?: string;
-  tag?: string;
+export interface IngestAgentOutputParams {
+  title: string;
+  content: string;
+  tts_provider: string;
+  topic?: string;
+  idempotency_key?: string;
+  source_url?: string;
+  duration_minutes?: number;
   depth?: string;
-  audience?: string;
+  audience_level?: string;
   tone?: string;
-  page?: number;
-  limit?: number;
+  focus_areas?: string;
+  agent_provider: string;
+  agent_name: string;
+  agent_model?: string;
+  agent_run_id?: string;
+  ai_model?: string;
+  tts_model?: string;
 }
 
-export interface ForkParams {
+export interface AgentIngestResult {
+  id: string;
+  status: string;
+  source: 'AGENT';
+  discoveryId?: string;
+  idempotent?: boolean;
+}
+
+export interface MeetingParticipant {
+  name: string;
+  email?: string;
+  role?: string;
+}
+
+export interface IngestMeetingTranscriptParams {
+  title: string;
+  transcript: string;
+  tts_provider: string;
   topic?: string;
-  remix_note?: string;
-  focus_areas?: string;
+  idempotency_key?: string;
+  meeting_url?: string;
+  platform?: string;
+  started_at?: string;
+  ended_at?: string;
+  participants?: MeetingParticipant[];
+  action_items?: string[];
+  duration_minutes?: number;
   depth?: string;
+  audience_level?: string;
   tone?: string;
+  focus_areas?: string;
+  ai_model?: string;
+  tts_model?: string;
+}
+
+export interface MeetingIngestResult {
+  id: string;
+  status: string;
+  source: 'MEETING';
+  discoveryId?: string;
+  idempotent?: boolean;
 }
 
 export interface UpdatePodcastParams {

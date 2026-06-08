@@ -4,10 +4,10 @@ import { SottoClient, ApiError } from './client.js';
 import {
   formatPodcastDetail,
   formatPodcastList,
-  formatFeed,
   formatProfile,
   formatCreated,
-  formatForked,
+  formatAgentIngested,
+  formatMeetingIngested,
   formatDeleted,
 } from './format.js';
 
@@ -30,17 +30,28 @@ export function createServer(client: SottoClient): McpServer {
     {
       title: z.string().describe('Podcast title'),
       topic: z.string().describe('What the podcast should be about'),
-      depth: z.enum(['eli5', 'quick_overview', 'standard', 'deep_dive']).optional()
+      depth: z
+        .enum(['eli5', 'quick_overview', 'standard', 'deep_dive'])
+        .optional()
         .describe('Content depth level'),
-      audience_level: z.enum(['beginner', 'intermediate', 'expert']).optional()
+      audience_level: z
+        .enum(['beginner', 'intermediate', 'expert'])
+        .optional()
         .describe('Target audience expertise'),
-      tone: z.enum(['casual', 'professional', 'socratic']).optional()
-        .describe('Conversation tone'),
-      duration_minutes: z.number().min(5).max(40).optional()
+      tone: z.enum(['casual', 'professional', 'socratic']).optional().describe('Conversation tone'),
+      duration_minutes: z
+        .number()
+        .min(5)
+        .max(40)
+        .optional()
         .describe('Target duration in minutes (5-40)'),
-      focus_areas: z.string().optional()
+      focus_areas: z
+        .string()
+        .optional()
         .describe('Comma-separated focus areas, e.g. "neural networks, backpropagation"'),
-      source_url: z.string().optional()
+      source_url: z
+        .string()
+        .optional()
         .describe('URL to use as source material (article, paper, etc.)'),
     },
     async (params) => {
@@ -50,7 +61,118 @@ export function createServer(client: SottoClient): McpServer {
       } catch (err) {
         return errorResult(err);
       }
+    }
+  );
+
+  server.tool(
+    'ingest_agent_output',
+    'Create a private Sotto podcast from output produced by a local agent run.',
+    {
+      title: z.string().describe('Podcast title'),
+      content: z.string().describe('Raw agent output, transcript, notes, or report to turn into audio'),
+      tts_provider: z
+        .enum(['elevenlabs', 'openai', 'cartesia', 'hume', 'fal', 'replicate', 'minimax', 'mistral'])
+        .describe('Explicit TTS provider configured in Sotto'),
+      topic: z.string().optional().describe('Optional topic override; defaults to title'),
+      idempotency_key: z
+        .string()
+        .optional()
+        .describe('Stable run key so retries do not create duplicate podcasts'),
+      source_url: z.string().optional().describe('Optional URL for the source run or report'),
+      duration_minutes: z.number().min(1).max(40).optional().describe('Target duration in minutes'),
+      depth: z
+        .enum(['eli5', 'quick_overview', 'standard', 'deep_dive'])
+        .optional()
+        .describe('Content depth level'),
+      audience_level: z
+        .enum(['beginner', 'intermediate', 'expert', 'general'])
+        .optional()
+        .describe('Target audience expertise'),
+      tone: z.string().optional().describe('Conversation tone'),
+      focus_areas: z
+        .string()
+        .optional()
+        .describe('Comma-separated focus areas, e.g. "bugs, tests, deployment"'),
+      agent_provider: z
+        .enum(['claude-code', 'codex', 'openclaw', 'hermes', 'custom'])
+        .default('custom')
+        .describe('Agent runtime that produced the output'),
+      agent_name: z.string().default('Local agent').describe('Display name for the agent run'),
+      agent_model: z.string().optional().describe('Agent model or local profile'),
+      agent_run_id: z.string().optional().describe('Provider-specific run ID'),
+      ai_model: z.string().optional().describe('Optional Sotto AI model for script generation'),
+      tts_model: z.string().optional().describe('Optional provider-specific TTS model'),
     },
+    async (params) => {
+      try {
+        const result = await client.ingestAgentOutput(params);
+        return { content: [{ type: 'text', text: formatAgentIngested(result) }] };
+      } catch (err) {
+        return errorResult(err);
+      }
+    }
+  );
+
+  server.tool(
+    'ingest_meeting_transcript',
+    'Create a private Sotto recap podcast from a meeting transcript or recorder output.',
+    {
+      title: z.string().describe('Meeting title'),
+      transcript: z.string().describe('Meeting transcript, diarized notes, or recorder output'),
+      tts_provider: z
+        .enum(['elevenlabs', 'openai', 'cartesia', 'hume', 'fal', 'replicate', 'minimax', 'mistral'])
+        .describe('Explicit TTS provider configured in Sotto'),
+      topic: z
+        .string()
+        .optional()
+        .describe('Optional topic override; defaults to a meeting recap topic'),
+      idempotency_key: z
+        .string()
+        .optional()
+        .describe('Stable meeting key so retries do not create duplicate podcasts'),
+      meeting_url: z.string().optional().describe('Optional meeting recording or calendar URL'),
+      platform: z.string().optional().describe('Meeting platform, e.g. zoom, meet, teams, or custom'),
+      started_at: z.string().optional().describe('ISO-8601 meeting start time'),
+      ended_at: z.string().optional().describe('ISO-8601 meeting end time'),
+      participants: z
+        .array(
+          z.object({
+            name: z.string(),
+            email: z.string().optional(),
+            role: z.string().optional(),
+          })
+        )
+        .optional()
+        .describe('Meeting participants to include in the private source record'),
+      action_items: z
+        .array(z.string())
+        .optional()
+        .describe('Action items extracted by the recorder or local agent'),
+      duration_minutes: z.number().min(1).max(40).optional().describe('Target duration in minutes'),
+      depth: z
+        .enum(['eli5', 'quick_overview', 'standard', 'deep_dive'])
+        .optional()
+        .describe('Content depth level'),
+      audience_level: z
+        .enum(['beginner', 'intermediate', 'expert', 'general'])
+        .optional()
+        .describe('Target audience expertise'),
+      tone: z.string().optional().describe('Conversation tone'),
+      focus_areas: z
+        .string()
+        .optional()
+        .describe('Comma-separated focus areas, e.g. "decisions, blockers, action items"'),
+      ai_model: z.string().optional().describe('Optional Sotto AI model for script generation'),
+      tts_model: z.string().optional().describe('Optional provider-specific TTS model'),
+    },
+    async (params) => {
+      try {
+        const result = await client.ingestMeetingTranscript(params);
+        return { content: [{ type: 'text', text: formatMeetingIngested(result) }] };
+      } catch (err) {
+        return errorResult(err);
+      }
+    }
   );
 
   server.tool(
@@ -66,7 +188,7 @@ export function createServer(client: SottoClient): McpServer {
       } catch (err) {
         return errorResult(err);
       }
-    },
+    }
   );
 
   server.tool(
@@ -80,68 +202,19 @@ export function createServer(client: SottoClient): McpServer {
       } catch (err) {
         return errorResult(err);
       }
-    },
-  );
-
-  server.tool(
-    'browse_feed',
-    'Search and filter the public podcast feed. Discover podcasts by topic, tag, depth, audience, or tone.',
-    {
-      search: z.string().optional().describe('Search by title or topic'),
-      sort: z.enum(['recent', 'popular', 'trending', 'most_forked']).optional()
-        .describe('Sort order'),
-      tag: z.string().optional().describe('Filter by tag slug'),
-      depth: z.enum(['eli5', 'quick_overview', 'standard', 'deep_dive']).optional()
-        .describe('Filter by depth'),
-      audience: z.enum(['beginner', 'intermediate', 'expert']).optional()
-        .describe('Filter by audience level'),
-      tone: z.enum(['casual', 'professional', 'socratic']).optional()
-        .describe('Filter by tone'),
-      page: z.number().int().min(1).optional().describe('Page number'),
-      limit: z.number().int().min(1).max(50).optional().describe('Results per page (max 50)'),
-    },
-    async (params) => {
-      try {
-        const feed = await client.browseFeed(params);
-        return { content: [{ type: 'text', text: formatFeed(feed) }] };
-      } catch (err) {
-        return errorResult(err);
-      }
-    },
-  );
-
-  server.tool(
-    'fork_podcast',
-    'Fork (remix) a public podcast with your own angle. Creates a new podcast based on the original.',
-    {
-      podcast_id: z.string().describe('ID of the podcast to fork'),
-      topic: z.string().optional().describe('New topic angle for the fork'),
-      remix_note: z.string().optional().describe('Note about what you changed'),
-      focus_areas: z.string().optional()
-        .describe('Comma-separated focus areas for the fork'),
-      depth: z.enum(['eli5', 'quick_overview', 'standard', 'deep_dive']).optional()
-        .describe('Content depth for the fork'),
-      tone: z.enum(['casual', 'professional', 'socratic']).optional()
-        .describe('Tone for the fork'),
-    },
-    async ({ podcast_id, ...params }) => {
-      try {
-        const result = await client.forkPodcast(podcast_id, params);
-        return { content: [{ type: 'text', text: formatForked(result) }] };
-      } catch (err) {
-        return errorResult(err);
-      }
-    },
+    }
   );
 
   server.tool(
     'update_podcast',
-    'Update a podcast\'s title, topic, or visibility.',
+    "Update a podcast's title, topic, or visibility.",
     {
       podcast_id: z.string().describe('The podcast ID'),
       title: z.string().optional().describe('New title'),
       topic: z.string().optional().describe('New topic description'),
-      visibility: z.enum(['PUBLIC', 'UNLISTED', 'PRIVATE']).optional()
+      visibility: z
+        .enum(['PUBLIC', 'UNLISTED', 'PRIVATE'])
+        .optional()
         .describe('Visibility setting'),
     },
     async ({ podcast_id, ...params }) => {
@@ -151,7 +224,7 @@ export function createServer(client: SottoClient): McpServer {
       } catch (err) {
         return errorResult(err);
       }
-    },
+    }
   );
 
   server.tool(
@@ -167,22 +240,17 @@ export function createServer(client: SottoClient): McpServer {
       } catch (err) {
         return errorResult(err);
       }
-    },
+    }
   );
 
-  server.tool(
-    'get_me',
-    'Get your Sotto profile including podcast count, followers, and following.',
-    {},
-    async () => {
-      try {
-        const profile = await client.getMe();
-        return { content: [{ type: 'text', text: formatProfile(profile) }] };
-      } catch (err) {
-        return errorResult(err);
-      }
-    },
-  );
+  server.tool('get_me', 'Get your Sotto profile and private podcast count.', {}, async () => {
+    try {
+      const profile = await client.getMe();
+      return { content: [{ type: 'text', text: formatProfile(profile) }] };
+    } catch (err) {
+      return errorResult(err);
+    }
+  });
 
   // --- Resources ---
 
@@ -208,29 +276,29 @@ export function createServer(client: SottoClient): McpServer {
     async (uri, { id }) => {
       const podcast = await client.getPodcast(id as string);
       return {
-        contents: [{
-          uri: uri.href,
-          mimeType: 'application/json',
-          text: JSON.stringify(podcast, null, 2),
-        }],
+        contents: [
+          {
+            uri: uri.href,
+            mimeType: 'application/json',
+            text: JSON.stringify(podcast, null, 2),
+          },
+        ],
       };
-    },
+    }
   );
 
-  server.resource(
-    'profile',
-    'sotto://me',
-    async (uri) => {
-      const profile = await client.getMe();
-      return {
-        contents: [{
+  server.resource('profile', 'sotto://me', async (uri) => {
+    const profile = await client.getMe();
+    return {
+      contents: [
+        {
           uri: uri.href,
           mimeType: 'application/json',
           text: JSON.stringify(profile, null, 2),
-        }],
-      };
-    },
-  );
+        },
+      ],
+    };
+  });
 
   return server;
 }

@@ -33,10 +33,7 @@ export default async function PodcastInspectorPage({ params }: PageProps) {
       sttProvider: true,
       sttModel: true,
       playCount: true,
-      likeCount: true,
-      forkCount: true,
       saveCount: true,
-      commentCount: true,
       user: { select: { name: true, email: true } },
     },
   });

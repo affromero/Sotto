@@ -101,7 +101,7 @@ async function resolveHeraVideo(model: string): Promise<ResolvedVideoProvider> {
   }
 
   logger.error('No Hera API key available for video generation');
-  throw new Error('No Hera API key available. Set HERA_API_KEY in Doppler.');
+  throw new Error('No Hera API key available. Set HERA_API_KEY in your deployment environment.');
 }
 
 async function resolveReplicateVideo(userId: string, model: string): Promise<ResolvedVideoProvider> {

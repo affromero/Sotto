@@ -1,5 +1,5 @@
 /**
- * Revenue aggregation queries for the voice marketplace admin dashboard.
+ * Revenue aggregation queries for paid voice-sharing admin reporting.
  */
 
 import { prisma } from './prisma';

@@ -23,7 +23,7 @@ function formatRelativeTime(dateStr: string): string {
 
 export function NewsCard({ article, isAuthenticated }: NewsCardProps) {
   const categoryLabel = article.category
-    ? NEWS_CATEGORY_LABELS[article.category as NewsCategory] ?? article.category
+    ? (NEWS_CATEGORY_LABELS[article.category as NewsCategory] ?? article.category)
     : null;
 
   const createUrl = `/create?topic=${encodeURIComponent(article.title)}`;
@@ -31,11 +31,9 @@ export function NewsCard({ article, isAuthenticated }: NewsCardProps) {
     ? createUrl
     : `/auth/login?callbackUrl=${encodeURIComponent(createUrl)}`;
 
-  const briefingHref = article.relatedPodcastSlug && article.relatedUserHandle
-    ? podcastUrl({ id: article.relatedPodcastId!, slug: article.relatedPodcastSlug }, article.relatedUserHandle)
-    : article.relatedPodcastId
-      ? podcastUrl({ id: article.relatedPodcastId })
-      : null;
+  const briefingHref = article.relatedPodcastId
+    ? podcastUrl({ id: article.relatedPodcastId })
+    : null;
 
   return (
     <article className={styles.card}>

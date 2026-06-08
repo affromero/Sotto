@@ -11,9 +11,16 @@ vi.mock('@/lib/providers/ai', () => ({
 }));
 
 // ---- Import under test ----
-import { verifyScript, assessReferenceQuality, getMinReferenceCount, getMinSeriousRatio, type ClaimAnalysis } from '@/lib/script-verifier';
+import { verifyScript as verifyScriptImpl, assessReferenceQuality, getMinReferenceCount, getMinSeriousRatio, type ClaimAnalysis } from '@/lib/script-verifier';
 import { hashTurn } from '@/lib/turn-diff';
 import type { GeneratedReference } from '@/lib/script-generator';
+
+const AI_RUNTIME = { provider: 'anthropic', model: 'claude-haiku-4-5-20251001' };
+type VerifyScriptParams = Parameters<typeof verifyScriptImpl>[0];
+
+function verifyScript(params: Omit<VerifyScriptParams, 'provider' | 'model'> & Partial<Pick<VerifyScriptParams, 'provider' | 'model'>>) {
+  return verifyScriptImpl({ ...AI_RUNTIME, ...params });
+}
 
 function makeRef(num: number, type: GeneratedReference['type']): GeneratedReference {
   return {

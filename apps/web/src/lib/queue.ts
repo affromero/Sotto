@@ -11,7 +11,9 @@ import type { SttProviderId } from '@sotto/shared';
 import { sendMessage as sendTelegram, isTelegramBotConfigured } from './telegram';
 
 /** Cached admin user lookup — avoids hitting DB on every worker failure. */
-async function getCachedAdminUsers(): Promise<Array<{ id: string; telegramChatId: string | null }>> {
+async function getCachedAdminUsers(): Promise<
+  Array<{ id: string; telegramChatId: string | null }>
+> {
   const cacheKey = 'admin_users';
   const cached = await cache.get<Array<{ id: string; telegramChatId: string | null }>>(cacheKey);
   if (cached) return cached;
@@ -105,7 +107,16 @@ export interface GenerateScriptPayload {
   useAdminCredits?: boolean;
   userFeedback?: string;
   previousTurns?: Array<{ speaker: string; text: string; direction?: string }>;
-  previousReferences?: Array<{ number: number; title: string; authors?: string; year?: number; url?: string; type: string; publisher?: string; doi?: string }>;
+  previousReferences?: Array<{
+    number: number;
+    title: string;
+    authors?: string;
+    year?: number;
+    url?: string;
+    type: string;
+    publisher?: string;
+    doi?: string;
+  }>;
   sourceUrls?: string[];
 }
 
@@ -324,7 +335,7 @@ export interface AdminThreadToPodcastPayload {
 }
 
 export interface ModerateContentPayload {
-  targetType: 'podcast' | 'comment';
+  targetType: 'podcast';
   targetId: string;
   content: string;
   userId?: string;
@@ -535,10 +546,7 @@ function getQueueDefinition(name: string, config?: QueueDefinition): QueueDefini
 /**
  * Create or get existing job queue
  */
-export function createQueue(
-  name: string,
-  config?: QueueDefinition
-): Queue {
+export function createQueue(name: string, config?: QueueDefinition): Queue {
   if (queueInstances.has(name)) {
     return queueInstances.get(name)!;
   }
@@ -587,33 +595,46 @@ async function handleWorkerFailure(
   const jobId = job?.id != null ? String(job.id) : undefined;
 
   try {
-    const podcastId = (job?.data as Record<string, unknown> | undefined)?.podcastId as string | undefined;
+    const podcastId = (job?.data as Record<string, unknown> | undefined)?.podcastId as
+      | string
+      | undefined;
     if (!podcastId) {
       return;
     }
 
-    await prisma.pipelineEvent.create({
-      data: {
-        podcastId,
-        stage: queueName,
-        type: job?.attemptsMade != null && job.attemptsMade < (job.opts?.attempts ?? 3) ? 'retry' : 'error',
-        message: failedReason || 'Unknown failure',
-        metadata: {
-          jobId,
-          attemptNumber: job?.attemptsMade,
-          maxAttempts: job?.opts?.attempts,
-          segmentId: (job?.data as Record<string, unknown> | undefined)?.segmentId as string | undefined,
-          errorKind: classifyError(failedReason || ''),
+    await prisma.pipelineEvent
+      .create({
+        data: {
+          podcastId,
+          stage: queueName,
+          type:
+            job?.attemptsMade != null && job.attemptsMade < (job.opts?.attempts ?? 3)
+              ? 'retry'
+              : 'error',
+          message: failedReason || 'Unknown failure',
+          metadata: {
+            jobId,
+            attemptNumber: job?.attemptsMade,
+            maxAttempts: job?.opts?.attempts,
+            segmentId: (job?.data as Record<string, unknown> | undefined)?.segmentId as
+              | string
+              | undefined,
+            errorKind: classifyError(failedReason || ''),
+          },
         },
-      },
-    }).catch(err => logger.error('Failed to write PipelineEvent', {
-      jobId,
-      error: err instanceof Error ? err.message : String(err),
-    }));
+      })
+      .catch((err) =>
+        logger.error('Failed to write PipelineEvent', {
+          jobId,
+          error: err instanceof Error ? err.message : String(err),
+        })
+      );
 
     const VOICE_TRACK_QUEUES = ['voice-track-audio', 'voice-track-stitching'];
     if (VOICE_TRACK_QUEUES.includes(queueName)) {
-      const voiceTrackId = (job?.data as Record<string, unknown> | undefined)?.voiceTrackId as string | undefined;
+      const voiceTrackId = (job?.data as Record<string, unknown> | undefined)?.voiceTrackId as
+        | string
+        | undefined;
       if (!voiceTrackId) {
         return;
       }
@@ -666,8 +687,12 @@ async function handleWorkerFailure(
     const podcast = await prisma.podcast.findUnique({
       where: { id: podcastId },
       select: {
-        status: true, userId: true, title: true, ttsProvider: true,
-        source: true, sourceTweetId: true,
+        status: true,
+        userId: true,
+        title: true,
+        ttsProvider: true,
+        source: true,
+        sourceTweetId: true,
         user: { select: { name: true, email: true, telegramEnabled: true, telegramChatId: true } },
       },
     });
@@ -682,9 +707,16 @@ async function handleWorkerFailure(
     const TTS_QUEUES = ['audio-generation', 'segment-regeneration', 'voice-track-audio'];
     const AI_QUEUES = ['script-generation', 'script-verification', 'reference-validation'];
 
-    const VIDEO_QUEUES = ['visual-classification', 'visual-generation', 'transition-generation', 'video-composition', 'place-enrichment'];
+    const VIDEO_QUEUES = [
+      'visual-classification',
+      'visual-generation',
+      'transition-generation',
+      'video-composition',
+      'place-enrichment',
+    ];
     if (VIDEO_QUEUES.includes(queueName)) {
-      const videoGenerationId = (job?.data as Record<string, unknown> | undefined)?.videoGenerationId as string | undefined;
+      const videoGenerationId = (job?.data as Record<string, unknown> | undefined)
+        ?.videoGenerationId as string | undefined;
       if (!videoGenerationId) {
         return;
       }
@@ -725,13 +757,15 @@ async function handleWorkerFailure(
       const adminUsers = allAdmins.filter((a) => a.id !== podcast.userId);
       for (const admin of adminUsers) {
         if (notifQueue) {
-          notifQueue.add('send_notification', {
-            userId: admin.id,
-            type: 'PIPELINE_FAILURE',
-            title: 'Avatar Pipeline Failure',
-            message: `[avatar-generation] ${podcastLabel} (by ${ownerLabel}) — ${errorKind}`,
-            data: { podcastId },
-          }).catch(() => {});
+          notifQueue
+            .add('send_notification', {
+              userId: admin.id,
+              type: 'PIPELINE_FAILURE',
+              title: 'Avatar Pipeline Failure',
+              message: `[avatar-generation] ${podcastLabel} (by ${ownerLabel}) — ${errorKind}`,
+              data: { podcastId },
+            })
+            .catch(() => {});
         }
         if (admin.telegramChatId && isTelegramBotConfigured()) {
           const telegramText = [
@@ -741,7 +775,9 @@ async function handleWorkerFailure(
             `*Error:* ${errorKind}`,
             `\`${(failedReason || 'Unknown').substring(0, 500)}\``,
           ].join('\n');
-          sendTelegram(admin.telegramChatId, telegramText, { parse_mode: 'Markdown' }).catch(() => {});
+          sendTelegram(admin.telegramChatId, telegramText, { parse_mode: 'Markdown' }).catch(
+            () => {}
+          );
         }
       }
       return;
@@ -749,7 +785,8 @@ async function handleWorkerFailure(
 
     const MUSIC_QUEUES = ['music-generation'];
     if (MUSIC_QUEUES.includes(queueName)) {
-      const musicGenerationId = (job?.data as Record<string, unknown> | undefined)?.musicGenerationId as string | undefined;
+      const musicGenerationId = (job?.data as Record<string, unknown> | undefined)
+        ?.musicGenerationId as string | undefined;
       if (!musicGenerationId) {
         return;
       }
@@ -761,12 +798,17 @@ async function handleWorkerFailure(
       }
 
       const descriptive = `[${queueName}] ${failedReason || 'Unknown error'}`;
-      await prisma.musicGeneration.update({
-        where: { id: musicGenerationId },
-        data: { status: 'FAILED', failureReason: descriptive },
-      }).catch((err: unknown) => {
-        logger.error('Failed to mark MusicGeneration FAILED', { musicGenerationId, error: err instanceof Error ? err.message : String(err) });
-      });
+      await prisma.musicGeneration
+        .update({
+          where: { id: musicGenerationId },
+          data: { status: 'FAILED', failureReason: descriptive },
+        })
+        .catch((err: unknown) => {
+          logger.error('Failed to mark MusicGeneration FAILED', {
+            musicGenerationId,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        });
 
       if (notifQueue) {
         await notifQueue.add('send_notification', {
@@ -801,7 +843,12 @@ async function handleWorkerFailure(
       return;
     }
 
-    if (podcast.status === 'READY' || podcast.status === 'FAILED' || podcast.status === 'SCRIPT_READY' || podcast.status === 'DRAFT') {
+    if (
+      podcast.status === 'READY' ||
+      podcast.status === 'FAILED' ||
+      podcast.status === 'SCRIPT_READY' ||
+      podcast.status === 'DRAFT'
+    ) {
       return;
     }
 
@@ -832,7 +879,10 @@ async function handleWorkerFailure(
       let didInvalidateKey = false;
 
       if (TTS_QUEUES.includes(queueName) && podcast.ttsProvider) {
-        didInvalidateKey = await markTtsKeyInvalid(podcast.userId, podcast.ttsProvider as TtsProviderId);
+        didInvalidateKey = await markTtsKeyInvalid(
+          podcast.userId,
+          podcast.ttsProvider as TtsProviderId
+        );
         failureReason = userMessage(errorKind, podcast.ttsProvider);
         await prisma.podcast.update({
           where: { id: podcastId },
@@ -847,11 +897,13 @@ async function handleWorkerFailure(
           failureReason = userMessage(errorKind, aiKey.provider);
         }
       } else if (queueName === 'audio-import') {
-        const sttProvider = ((job?.data as Record<string, unknown> | undefined)?.sttProvider ?? 'openai') as SttProviderId;
+        const sttProvider = (job?.data as Record<string, unknown> | undefined)?.sttProvider as
+          | SttProviderId
+          | undefined;
         if (sttProvider === 'elevenlabs') {
           didInvalidateKey = await markTtsKeyInvalid(podcast.userId, 'elevenlabs');
           failureReason = userMessage(errorKind, 'ElevenLabs');
-        } else {
+        } else if (sttProvider) {
           didInvalidateKey = await markAiKeyInvalid(podcast.userId, sttProvider as AiProviderId);
           failureReason = userMessage(errorKind, sttProvider);
         }
@@ -869,7 +921,8 @@ async function handleWorkerFailure(
     }
 
     const errorId = `err_${Array.from(crypto.getRandomValues(new Uint8Array(6)))
-      .map(b => b.toString(16).padStart(2, '0')).join('')}`;
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('')}`;
 
     const didTransition = await markPodcastFailed(podcastId, {
       failureReason,
@@ -901,15 +954,20 @@ async function handleWorkerFailure(
     const adminMessage = `[${queueName}] ${podcastLabel} (by ${ownerLabel}) — ${errorKind}`;
     for (const admin of adminUsers) {
       if (notifQueue) {
-        notifQueue.add('send_notification', {
-          userId: admin.id,
-          type: 'PIPELINE_FAILURE',
-          title: 'Pipeline Failure',
-          message: adminMessage,
-          data: { podcastId },
-        }).catch((err: unknown) => {
-          logger.warn('Failed to queue admin pipeline-failure notification', { adminId: admin.id, error: err instanceof Error ? err.message : String(err) });
-        });
+        notifQueue
+          .add('send_notification', {
+            userId: admin.id,
+            type: 'PIPELINE_FAILURE',
+            title: 'Pipeline Failure',
+            message: adminMessage,
+            data: { podcastId },
+          })
+          .catch((err: unknown) => {
+            logger.warn('Failed to queue admin pipeline-failure notification', {
+              adminId: admin.id,
+              error: err instanceof Error ? err.message : String(err),
+            });
+          });
       }
       if (admin.telegramChatId && isTelegramBotConfigured()) {
         const telegramText = [
@@ -921,25 +979,38 @@ async function handleWorkerFailure(
           `*Ref:* \`${errorId}\``,
           `\`${techError.substring(0, 500)}\``,
         ].join('\n');
-        sendTelegram(admin.telegramChatId, telegramText, { parse_mode: 'Markdown' }).catch((err: unknown) => {
-          logger.warn('Failed to send admin pipeline-failure Telegram', { adminId: admin.id, error: err instanceof Error ? err.message : String(err) });
-        });
+        sendTelegram(admin.telegramChatId, telegramText, { parse_mode: 'Markdown' }).catch(
+          (err: unknown) => {
+            logger.warn('Failed to send admin pipeline-failure Telegram', {
+              adminId: admin.id,
+              error: err instanceof Error ? err.message : String(err),
+            });
+          }
+        );
       }
     }
 
     if (podcast.source === 'TWITTER' && podcast.sourceTweetId) {
       const twitterReplyQ = createQueue('twitter-reply');
       if (twitterReplyQ) {
-        const mention = await prisma.tweetMention.findFirst({
-          where: { podcastId, status: { in: ['GENERATING', 'READY'] } },
-          select: { id: true, tweetId: true },
-        }).catch(() => null);
+        const mention = await prisma.tweetMention
+          .findFirst({
+            where: { podcastId, status: { in: ['GENERATING', 'READY'] } },
+            select: { id: true, tweetId: true },
+          })
+          .catch(() => null);
         if (mention) {
-          await twitterReplyQ.add('reply_twitter', {
-            podcastId,
-            tweetMentionId: mention.id,
-            originalTweetId: mention.tweetId,
-          }, { jobId: `twitter-fail-${podcastId}-${Date.now()}` }).catch(() => {});
+          await twitterReplyQ
+            .add(
+              'reply_twitter',
+              {
+                podcastId,
+                tweetMentionId: mention.id,
+                originalTweetId: mention.tweetId,
+              },
+              { jobId: `twitter-fail-${podcastId}-${Date.now()}` }
+            )
+            .catch(() => {});
         }
       }
     }
@@ -947,15 +1018,23 @@ async function handleWorkerFailure(
     if (podcast.user?.telegramEnabled && podcast.user?.telegramChatId) {
       const telegramReplyQ = createQueue('telegram-reply');
       if (telegramReplyQ) {
-        const tgMsg = await prisma.telegramMessage.findFirst({
-          where: { podcastId, status: { in: ['GENERATING', 'READY'] } },
-          select: { id: true, chatId: true },
-        }).catch(() => null);
-        await telegramReplyQ.add('reply_telegram', {
-          podcastId,
-          telegramMessageId: tgMsg?.id,
-          chatId: tgMsg?.chatId ?? podcast.user.telegramChatId,
-        }, { jobId: `telegram-fail-${podcastId}-${Date.now()}` }).catch(() => {});
+        const tgMsg = await prisma.telegramMessage
+          .findFirst({
+            where: { podcastId, status: { in: ['GENERATING', 'READY'] } },
+            select: { id: true, chatId: true },
+          })
+          .catch(() => null);
+        await telegramReplyQ
+          .add(
+            'reply_telegram',
+            {
+              podcastId,
+              telegramMessageId: tgMsg?.id,
+              chatId: tgMsg?.chatId ?? podcast.user.telegramChatId,
+            },
+            { jobId: `telegram-fail-${podcastId}-${Date.now()}` }
+          )
+          .catch(() => {});
       }
     }
 

@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ gated: false });
   }
 
-  const secret = process.env.NEXTAUTH_SECRET;
+  const secret = process.env.AUTH_SECRET;
   const cookie = request.cookies.get('sotto_access');
 
   if (!cookie?.value || !secret) {
@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const secret = process.env.NEXTAUTH_SECRET;
+  const secret = process.env.AUTH_SECRET;
   if (!secret || !process.env.SITE_PASSWORD) {
     return errorResponse('Password gate not configured', 500);
   }

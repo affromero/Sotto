@@ -3,7 +3,7 @@ import { randomUUID } from 'crypto';
 
 const prisma = new PrismaClient();
 
-const TEST_USER_EMAIL = 'test-e2e@sotto.fm';
+const TEST_USER_EMAIL = 'test-e2e@example.com';
 const TEST_USER_NAME = 'E2E Test User';
 
 /**
@@ -51,20 +51,20 @@ export async function seedTestUser() {
       title: 'E2E Test Podcast',
       topic: 'Testing',
       status: 'READY',
-      audioUrl: 'https://sotto.fm/test-audio.mp3',
+      audioUrl: 'https://media.example.com/e2e/test-audio.mp3',
       duration: 300,
       visibility: 'PUBLIC',
       userId: user.id,
     },
   });
 
-  // Second user for follow/profile tests
+  // Second user for access and ownership tests
   const otherUser = await prisma.user.upsert({
-    where: { email: 'test-other@sotto.fm' },
+    where: { email: 'test-other@example.com' },
     update: {},
     create: {
       id: `e2e-other-${randomUUID().slice(0, 8)}`,
-      email: 'test-other@sotto.fm',
+      email: 'test-other@example.com',
       name: 'E2E Other User',
       handle: 'e2e-other',
       role: 'USER',
@@ -72,32 +72,32 @@ export async function seedTestUser() {
     },
   });
 
-  // Other user's podcast for fork tests
+  // Other user's podcast for ownership-boundary tests
   const otherPodcast = await prisma.podcast.upsert({
     where: { id: 'e2e-other-podcast' },
     update: {},
     create: {
       id: 'e2e-other-podcast',
       title: 'E2E Other Podcast',
-      topic: 'Forkable Content',
+      topic: 'Independent ownership content',
       status: 'READY',
-      audioUrl: 'https://sotto.fm/test-audio-other.mp3',
+      audioUrl: 'https://media.example.com/e2e/test-audio-other.mp3',
       duration: 240,
       visibility: 'PUBLIC',
       userId: otherUser.id,
     },
   });
 
-  // Third podcast (otherUser) for fork-voice source
+  // Third podcast (otherUser) for alternate voice-track ownership
   const otherPodcast2 = await prisma.podcast.upsert({
     where: { id: 'e2e-other-podcast-2' },
     update: {},
     create: {
       id: 'e2e-other-podcast-2',
-      title: 'E2E Fork Voice Source',
-      topic: 'Voice fork testing',
+      title: 'E2E Voice Track Source',
+      topic: 'Voice track testing',
       status: 'READY',
-      audioUrl: 'https://sotto.fm/test-audio-fork.mp3',
+      audioUrl: 'https://media.example.com/e2e/test-audio-voice-track.mp3',
       duration: 180,
       visibility: 'PUBLIC',
       userId: otherUser.id,
@@ -166,18 +166,6 @@ export async function seedTestUser() {
     },
   });
 
-  // Comment on testPodcast
-  const comment = await prisma.comment.upsert({
-    where: { id: 'e2e-comment' },
-    update: {},
-    create: {
-      id: 'e2e-comment',
-      content: 'Great episode about testing!',
-      userId: otherUser.id,
-      podcastId: testPodcast.id,
-    },
-  });
-
   // PodcastFeature for testPodcast (non-zero values for quality route)
   await prisma.podcastFeature.upsert({
     where: { podcastId: testPodcast.id },
@@ -188,29 +176,8 @@ export async function seedTestUser() {
       medianCompletionRate: 0.8,
       totalUniqueListeners: 10,
       totalListenMinutes: 50.0,
-      likeToListenRatio: 0.3,
       segmentCount: 2,
       durationSeconds: 300,
-    },
-  });
-
-  // Follow (otherUser → user)
-  await prisma.follow.upsert({
-    where: { followerId_followingId: { followerId: otherUser.id, followingId: user.id } },
-    update: {},
-    create: {
-      followerId: otherUser.id,
-      followingId: user.id,
-    },
-  });
-
-  // Like (otherUser → testPodcast)
-  await prisma.like.upsert({
-    where: { userId_podcastId: { userId: otherUser.id, podcastId: testPodcast.id } },
-    update: {},
-    create: {
-      userId: otherUser.id,
-      podcastId: testPodcast.id,
     },
   });
 
@@ -245,7 +212,7 @@ export async function seedTestUser() {
       podcastId: testPodcast.id,
       name: 'E2E Voice Track',
       status: 'READY',
-      audioUrl: 'https://sotto.fm/test-voice-track.mp3',
+      audioUrl: 'https://media.example.com/e2e/test-voice-track.mp3',
       duration: 300,
     },
   });
@@ -291,14 +258,14 @@ export async function seedTestUser() {
       },
     }),
     prisma.notification.upsert({
-      where: { id: 'e2e-notif-follower' },
+      where: { id: 'e2e-notif-script' },
       update: {},
       create: {
-        id: 'e2e-notif-follower',
+        id: 'e2e-notif-script',
         userId: user.id,
-        type: 'NEW_FOLLOWER',
-        title: 'New follower',
-        message: 'e2e-other started following you.',
+        type: 'SCRIPT_READY',
+        title: 'Script ready',
+        message: 'Your script is ready for review.',
         read: false,
       },
     }),
@@ -361,11 +328,11 @@ export async function seedTestUser() {
 
   // Empty-feed user (no follows, no content) for empty-state E2E tests
   const emptyUser = await prisma.user.upsert({
-    where: { email: 'test-empty@sotto.fm' },
+    where: { email: 'test-empty@example.com' },
     update: {},
     create: {
       id: `e2e-empty-${randomUUID().slice(0, 8)}`,
-      email: 'test-empty@sotto.fm',
+      email: 'test-empty@example.com',
       name: 'E2E Empty User',
       handle: 'e2e-empty',
       role: 'USER',

@@ -98,7 +98,7 @@ export interface BuildDossierParams {
   curatedArticles?: string; // pre-formatted briefing articles
   apiKeyOverride?: string;
   model?: string;
-  provider?: string;
+  provider: string;
 }
 
 // ---- Helpers ----

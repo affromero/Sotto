@@ -52,7 +52,7 @@ export default function FeedbackPage() {
         <footer className={styles.footer}>
           <p>
             Prefer a conversation? Email us directly at{' '}
-            <a href="mailto:hello@sotto.fm">hello@sotto.fm</a>
+            <a href="mailto:hello@example.com">hello@example.com</a>
           </p>
         </footer>
       </div>

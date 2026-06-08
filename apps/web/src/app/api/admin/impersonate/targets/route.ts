@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth-guards';
 import { prisma } from '@/lib/prisma';
+import { findSystemUser } from '@/lib/system-user';
 
 import { errorResponse } from '@/lib/api-response';
 export async function GET() {
@@ -9,10 +10,7 @@ export async function GET() {
     return errorResponse('Forbidden', 403);
   }
 
-  const sotto = await prisma.user.findUnique({
-    where: { handle: 'sotto' },
-    select: { id: true, name: true, image: true, handle: true },
-  });
+  const systemOwner = await findSystemUser(prisma);
 
-  return NextResponse.json({ sotto: sotto ?? null });
+  return NextResponse.json({ systemOwner });
 }

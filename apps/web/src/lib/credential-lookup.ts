@@ -2,7 +2,7 @@ import { createAIProvider } from './providers/ai';
 import { loadPrompt } from './prompt-loader';
 import { logger } from './logger';
 import { logUsage } from './usage-logger';
-import { resolveAutoModel } from './auto-model-config';
+import type { AiProviderId } from './providers/ai-registry';
 
 export interface ParticipantInput {
   authorUsername: string;
@@ -19,6 +19,12 @@ export interface ParticipantCredential {
   source: string;
 }
 
+export interface CredentialLookupAiOptions {
+  providerType: AiProviderId;
+  model: string;
+  apiKeyOverride?: string;
+}
+
 const MAX_PARTICIPANTS = 5;
 const MIN_CONFIDENCE = 0.8;
 const MAX_CONFIDENCE = 0.85;
@@ -32,9 +38,12 @@ const SYSTEM_PROMPT = loadPrompt('credential-lookup.md');
  */
 export async function lookupParticipantCredentials(
   participants: ParticipantInput[],
-  apiKeyOverride?: string
+  ai?: CredentialLookupAiOptions
 ): Promise<ParticipantCredential[]> {
   if (participants.length === 0) return [];
+  if (!ai?.providerType || !ai.model) {
+    throw new Error('AI provider and model are required for participant credential lookup.');
+  }
 
   const capped = participants.slice(0, MAX_PARTICIPANTS);
 
@@ -48,22 +57,20 @@ export async function lookupParticipantCredentials(
   const userMessage = `Verify the credentials of these Twitter/X participants:\n\n${participantDescriptions.join('\n\n')}`;
 
   try {
-    const autoConfig = await resolveAutoModel('PLATFORM');
-
-    const response = await createAIProvider(autoConfig.aiProvider).generateResponse(
+    const response = await createAIProvider(ai.providerType).generateResponse(
       SYSTEM_PROMPT,
       [{ role: 'user', content: userMessage }],
       {
         maxTokens: 2048,
-        model: autoConfig.aiModel,
-        apiKeyOverride,
+        model: ai.model,
+        apiKeyOverride: ai.apiKeyOverride,
         useWebSearch: true,
         skipModeration: true,
       }
     );
 
     logUsage({
-      service: autoConfig.aiProvider,
+      service: ai.providerType,
       model: response.model,
       category: 'credential_lookup',
       inputTokens: response.inputTokens,

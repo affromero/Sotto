@@ -3,9 +3,7 @@ import type { TwitterConfigData } from '@/types/twitter';
 
 const DEFAULTS: TwitterConfigData = {
   autoTweetEnabled: false,
-  minLikes: 10,
   minPlays: 50,
-  minForks: 3,
   mentionPollIntervalMs: 60000,
   trendPollingEnabled: false,
   trendPollIntervalMs: 7200000,
@@ -28,9 +26,7 @@ export async function getTwitterConfig(): Promise<TwitterConfigData> {
     create: {
       id: 'singleton',
       autoTweetEnabled: DEFAULTS.autoTweetEnabled,
-      minLikes: DEFAULTS.minLikes,
       minPlays: DEFAULTS.minPlays,
-      minForks: DEFAULTS.minForks,
       mentionPollIntervalMs: DEFAULTS.mentionPollIntervalMs,
       trendPollingEnabled: DEFAULTS.trendPollingEnabled,
       trendPollIntervalMs: DEFAULTS.trendPollIntervalMs,
@@ -42,9 +38,7 @@ export async function getTwitterConfig(): Promise<TwitterConfigData> {
 
   return {
     autoTweetEnabled: row.autoTweetEnabled,
-    minLikes: row.minLikes,
     minPlays: row.minPlays,
-    minForks: row.minForks,
     mentionPollIntervalMs: row.mentionPollIntervalMs,
     trendPollingEnabled: row.trendPollingEnabled,
     trendPollIntervalMs: row.trendPollIntervalMs,
@@ -68,9 +62,7 @@ export async function setTwitterConfig(
     where: { id: 'singleton' },
     update: {
       ...(data.autoTweetEnabled !== undefined && { autoTweetEnabled: data.autoTweetEnabled }),
-      ...(data.minLikes !== undefined && { minLikes: data.minLikes }),
       ...(data.minPlays !== undefined && { minPlays: data.minPlays }),
-      ...(data.minForks !== undefined && { minForks: data.minForks }),
       ...(data.mentionPollIntervalMs !== undefined && {
         mentionPollIntervalMs: data.mentionPollIntervalMs,
       }),
@@ -95,9 +87,7 @@ export async function setTwitterConfig(
     create: {
       id: 'singleton',
       autoTweetEnabled: data.autoTweetEnabled ?? DEFAULTS.autoTweetEnabled,
-      minLikes: data.minLikes ?? DEFAULTS.minLikes,
       minPlays: data.minPlays ?? DEFAULTS.minPlays,
-      minForks: data.minForks ?? DEFAULTS.minForks,
       mentionPollIntervalMs: data.mentionPollIntervalMs ?? DEFAULTS.mentionPollIntervalMs,
       trendPollingEnabled: data.trendPollingEnabled ?? DEFAULTS.trendPollingEnabled,
       trendPollIntervalMs: data.trendPollIntervalMs ?? DEFAULTS.trendPollIntervalMs,

@@ -54,7 +54,7 @@ Use templates in `accounting/templates/` or ask Claude Code to record them.
 If not already recorded, add the monthly domain amortization entry:
 
 ```beancount
-YYYY-MM-28 * "Domain amortization" "sotto.fm — Month YYYY (N/12)"
+YYYY-MM-28 * "Domain amortization" "Project domain - Month YYYY (N/12)"
   Expenses:Infrastructure:Domain  5.42 USD
   Assets:Prepaid:Domain  -5.42 USD
 ```

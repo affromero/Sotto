@@ -1,11 +1,16 @@
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { auth } from '@/lib/auth';
+import { listAiProviders, listByokProviders } from '@/lib/byok';
+import { isClaudeAvailable } from '@/lib/claude-code-client';
 import { prisma } from '@/lib/prisma';
-import { generateQuestions } from '@/lib/taste-quiz';
+import { getAllAiProviderClientMeta } from '@/lib/providers/ai-registry';
+import { getAllTtsProviderClientMeta } from '@/lib/providers/tts-registry';
 import { attributeReferral } from '@/lib/referrals';
+import { buildSetupReadiness, buildSttProviderStatuses } from '@/lib/setup-readiness';
+import { getPrivateSourceReadiness } from '@/lib/source-connectors';
 import { NameStep } from './NameStep';
-import { QuizStep } from './QuizStep';
+import { KeySetupForm } from './KeySetupForm';
 import styles from './page.module.css';
 
 export const dynamic = 'force-dynamic';
@@ -38,23 +43,26 @@ export default async function OnboardingPage() {
   // Check if already onboarded — skip to keys step or create
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { hasCompletedOnboarding: true, name: true },
+    select: {
+      hasCompletedOnboarding: true,
+      name: true,
+      preferredAiModel: true,
+      preferredTtsProvider: true,
+    },
   });
 
   if (user?.hasCompletedOnboarding) {
     redirect('/create');
   }
 
-  // Name step — required before taste quiz for email signups (no OAuth name)
+  // Name step is required for email signups without an OAuth display name.
   if (!user?.name?.trim()) {
     return (
       <main className={styles.main}>
         <div className={styles.container}>
           <header className={styles.header}>
             <h1 className={styles.title}>What should we call you?</h1>
-            <p className={styles.subtitle}>
-              This is how you&apos;ll appear on Sotto.
-            </p>
+            <p className={styles.subtitle}>This is how you&apos;ll appear on Sotto.</p>
           </header>
 
           <NameStep />
@@ -63,26 +71,67 @@ export default async function OnboardingPage() {
     );
   }
 
-  // Taste quiz step (default) — generate initial questions
-  let initialQuestions: Awaited<ReturnType<typeof generateQuestions>> = [];
-  try {
-    initialQuestions = await generateQuestions(userId, 10);
-  } catch {
-    // If question generation fails (no LLM configured), show empty quiz
-    // which will show loading state and user can skip
-  }
+  const [aiProviders, ttsProviders, privateFeedTokens, sourceConnectors] = await Promise.all([
+    listAiProviders(userId),
+    listByokProviders(userId),
+    prisma.privateFeedToken.findMany({
+      where: { userId, revokedAt: null },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        name: true,
+        feedType: true,
+        createdAt: true,
+        lastUsedAt: true,
+      },
+    }),
+    getPrivateSourceReadiness(),
+  ]);
+  const selectedAiProvider = user.preferredAiModel || process.env.AI_PROVIDER;
+  const claudeCodeAvailable = selectedAiProvider?.startsWith('claude-code')
+    ? await isClaudeAvailable()
+    : false;
+
+  const setupReadiness = buildSetupReadiness({
+    hasDatabase: true,
+    hasQueue: Boolean(process.env.REDIS_URL),
+    storageProvider: process.env.STORAGE_PROVIDER,
+    aiProviders,
+    ttsProviders,
+    sttProviders: buildSttProviderStatuses(aiProviders, ttsProviders),
+    privateFeedTokenCount: privateFeedTokens.length,
+    selectedAiProvider: user.preferredAiModel,
+    selectedTtsProvider: user.preferredTtsProvider,
+    selectedSttProvider: process.env.STT_PROVIDER,
+    claudeCodeAvailable,
+  });
 
   return (
     <main className={styles.main}>
-      <div className={styles.container}>
+      <div className={styles.containerWide}>
         <header className={styles.header}>
-          <h1 className={styles.title}>Let&apos;s find podcasts you&apos;ll love</h1>
+          <h1 className={styles.title}>Set up your private audio workspace</h1>
           <p className={styles.subtitle}>
-            Just say yes or no — it takes 30 seconds.
+            Connect the pieces Sotto needs to generate private episodes and deliver them to your
+            podcast app.
           </p>
         </header>
 
-        <QuizStep initialQuestions={initialQuestions} />
+        <KeySetupForm
+          setupReadiness={setupReadiness}
+          sourceConnectors={sourceConnectors}
+          initialAiConfigured={aiProviders}
+          initialTtsConfigured={ttsProviders}
+          initialPrivateFeedTokens={privateFeedTokens.map((token) => ({
+            id: token.id,
+            name: token.name,
+            feedType: token.feedType,
+            createdAt: token.createdAt.toISOString(),
+            lastUsedAt: token.lastUsedAt?.toISOString() ?? null,
+          }))}
+          aiProviderMeta={getAllAiProviderClientMeta()}
+          ttsProviderMeta={getAllTtsProviderClientMeta()}
+        />
       </div>
     </main>
   );

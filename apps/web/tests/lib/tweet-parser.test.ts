@@ -3,6 +3,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // ---- Mocks ----
 
 const mockGenerateResponse = vi.fn();
+const { mockGetAiKey } = vi.hoisted(() => ({
+  mockGetAiKey: vi.fn(),
+}));
 
 const mockProvider = {
   generateResponse: (...args: unknown[]) => mockGenerateResponse(...args),
@@ -14,29 +17,27 @@ vi.mock('@/lib/providers/ai', () => ({
 }));
 
 vi.mock('@/lib/byok', () => ({
-  getAiKey: vi.fn(async () => null),
-}));
-
-vi.mock('@/lib/auto-model-config', () => ({
-  resolveAutoModel: vi.fn(async () => ({
-    aiProvider: 'anthropic',
-    aiModel: 'claude-haiku-4-5-20251001',
-    ttsProvider: 'openai',
-    ttsModel: 'tts-1-hd',
-    sttProvider: 'openai',
-    sttModel: 'whisper-1',
-  })),
+  getAiKey: (...args: unknown[]) => mockGetAiKey(...args),
 }));
 
 vi.mock('@/lib/providers/ai-registry', () => ({
   getAiProviderMeta: vi.fn((id: string) => {
     if (id === 'anthropic') return { defaultModel: 'claude-haiku-4-5-20251001', models: [{ id: 'claude-haiku-4-5-20251001', tier: 'fast' }, { id: 'claude-sonnet-4-6', tier: 'balanced' }, { id: 'claude-opus-4-6', tier: 'best' }] };
     if (id === 'openai') return { defaultModel: 'gpt-5', models: [{ id: 'gpt-5-mini', tier: 'fast' }, { id: 'gpt-5', tier: 'balanced' }] };
+    if (id === 'claude-code') return { defaultModel: 'opus', models: [{ id: 'sonnet', tier: 'balanced' }, { id: 'opus', tier: 'best' }] };
     return { defaultModel: '', models: [] };
   }),
+  getProviderForModel: vi.fn((id: string) => {
+    if (['claude-haiku-4-5-20251001', 'claude-sonnet-4-6', 'claude-opus-4-6'].includes(id)) return 'anthropic';
+    if (['gpt-5-mini', 'gpt-5'].includes(id)) return 'openai';
+    if (['sonnet', 'opus'].includes(id)) return 'claude-code';
+    return null;
+  }),
+  isValidAiProviderId: vi.fn((id: string) => ['anthropic', 'openai', 'google', 'claude-code'].includes(id)),
   getAllAiProviderMeta: vi.fn(() => [
     { id: 'anthropic', models: [{ id: 'claude-haiku-4-5-20251001', displayName: 'Claude Haiku 4.5' }, { id: 'claude-sonnet-4-6', displayName: 'Claude Sonnet 4.6' }, { id: 'claude-opus-4-6', displayName: 'Claude Opus 4.6' }] },
     { id: 'openai', models: [{ id: 'gpt-5-mini', displayName: 'GPT-5 Mini' }, { id: 'gpt-5', displayName: 'GPT-5' }] },
+    { id: 'claude-code', models: [{ id: 'sonnet', displayName: 'Sonnet' }, { id: 'opus', displayName: 'Opus' }] },
   ]),
 }));
 
@@ -68,17 +69,46 @@ vi.mock('@/lib/providers/avatar-registry', () => ({
 }));
 
 // ---- Import under test ----
-import { parseTweetIntent, parseThreadIntent, resolveModelFromTweet } from '@/lib/tweet-parser';
+import {
+  parseTweetIntent as parseTweetIntentRaw,
+  parseThreadIntent as parseThreadIntentRaw,
+  resolveModelFromTweet,
+} from '@/lib/tweet-parser';
 import type { TweetParseResult, ThreadData, ThreadTweet } from '@/types/twitter';
+
+function parseTweetIntent(
+  tweetText: string,
+  parentTweetText?: string,
+  opts: Parameters<typeof parseTweetIntentRaw>[2] = {},
+) {
+  return parseTweetIntentRaw(tweetText, parentTweetText, { userId: 'user-1', ...opts });
+}
+
+function parseThreadIntent(
+  mentionTweet: ThreadTweet,
+  thread: ThreadData,
+  opts: Parameters<typeof parseThreadIntentRaw>[2] = {},
+) {
+  return parseThreadIntentRaw(mentionTweet, thread, { userId: 'user-1', ...opts });
+}
+
+function mockDefaultAiKeys() {
+  mockGetAiKey.mockImplementation(async (_userId: string, provider?: string) => {
+    if (provider === 'openai') return { apiKey: 'openai-key', provider: 'openai' };
+    if (provider === 'anthropic') return { apiKey: 'anthropic-key', provider: 'anthropic' };
+    return { apiKey: 'anthropic-key', provider: 'anthropic' };
+  });
+}
 
 // ---- Tests ----
 
 describe('parseTweetIntent', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockDefaultAiKeys();
   });
 
-  it('passes PLATFORM model to generateResponse', async () => {
+  it('passes the user BYOK default model to generateResponse', async () => {
     const mockResult: TweetParseResult = {
       topic: 'Test',
       title: 'Test',
@@ -95,12 +125,84 @@ describe('parseTweetIntent', () => {
       model: 'claude-haiku-4-5-20251001',
     });
 
-    await parseTweetIntent('@sottofm test topic');
+    await parseTweetIntent('@podbot test topic');
 
     expect(mockGenerateResponse).toHaveBeenCalledWith(
       expect.any(String),
       expect.any(Array),
-      expect.objectContaining({ model: 'claude-haiku-4-5-20251001' })
+      expect.objectContaining({
+        model: 'claude-haiku-4-5-20251001',
+        apiKeyOverride: 'anthropic-key',
+      })
+    );
+  });
+
+  it('requires a user AI key when no local model is selected', async () => {
+    mockGetAiKey.mockResolvedValue(null);
+
+    await expect(parseTweetIntent('@podbot test topic')).rejects.toThrow(
+      'AI key or explicit local AI model is required to parse tweets.'
+    );
+  });
+
+  it('uses the requested hosted model with the matching provider key', async () => {
+    const mockResult: TweetParseResult = {
+      topic: 'Test',
+      title: 'Test',
+      depth: 'standard',
+      audienceLevel: 'beginner',
+      tone: 'casual',
+      focusAreas: [],
+    };
+
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify(mockResult),
+      inputTokens: 50,
+      outputTokens: 50,
+      model: 'gpt-5-mini',
+    });
+
+    await parseTweetIntent('@podbot test topic', undefined, { aiModel: 'gpt-5-mini' });
+
+    expect(mockGetAiKey).toHaveBeenCalledWith('user-1', 'openai');
+    expect(mockGenerateResponse).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Array),
+      expect.objectContaining({
+        model: 'gpt-5-mini',
+        apiKeyOverride: 'openai-key',
+      })
+    );
+  });
+
+  it('uses local Claude Code models without an AI key', async () => {
+    const mockResult: TweetParseResult = {
+      topic: 'Test',
+      title: 'Test',
+      depth: 'standard',
+      audienceLevel: 'beginner',
+      tone: 'casual',
+      focusAreas: [],
+    };
+
+    mockGetAiKey.mockResolvedValue(null);
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify(mockResult),
+      inputTokens: 50,
+      outputTokens: 50,
+      model: 'claude-code:sonnet',
+    });
+
+    await parseTweetIntentRaw('@podbot test topic', undefined, { aiModel: 'claude-code:sonnet' });
+
+    expect(mockGetAiKey).not.toHaveBeenCalled();
+    expect(mockGenerateResponse).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Array),
+      expect.objectContaining({
+        model: 'claude-code:sonnet',
+        apiKeyOverride: undefined,
+      })
     );
   });
 
@@ -126,7 +228,7 @@ describe('parseTweetIntent', () => {
       });
 
       const result = await parseTweetIntent(
-        '@sottofm explain quantum computing basics'
+        '@podbot explain quantum computing basics'
       );
 
       expect(result).toEqual(mockResult);
@@ -151,7 +253,7 @@ describe('parseTweetIntent', () => {
         model: 'test-model',
       });
 
-      const tweetText = '@sottofm can you elaborate on this?';
+      const tweetText = '@podbot can you elaborate on this?';
       const parentTweetText = 'AI is changing healthcare rapidly';
 
       const result = await parseTweetIntent(tweetText, parentTweetText);
@@ -180,7 +282,7 @@ describe('parseTweetIntent', () => {
         model: 'test-model',
       });
 
-      const result = await parseTweetIntent('@sottofm blockchain basics');
+      const result = await parseTweetIntent('@podbot blockchain basics');
 
       expect(result).toEqual(mockResult);
     });
@@ -204,7 +306,7 @@ describe('parseTweetIntent', () => {
         model: 'test-model',
       });
 
-      const result = await parseTweetIntent('@sottofm machine learning intro');
+      const result = await parseTweetIntent('@podbot machine learning intro');
 
       expect(result).toEqual(mockResult);
     });
@@ -228,7 +330,7 @@ describe('parseTweetIntent', () => {
         model: 'test-model',
       });
 
-      const result = await parseTweetIntent('@sottofm mars mission details');
+      const result = await parseTweetIntent('@podbot mars mission details');
 
       expect(result).toEqual(mockResult);
     });
@@ -244,7 +346,7 @@ describe('parseTweetIntent', () => {
       });
 
       await expect(
-        parseTweetIntent('@sottofm some topic')
+        parseTweetIntent('@podbot some topic')
       ).rejects.toThrow('Failed to parse tweet intent — LLM returned invalid JSON');
     });
 
@@ -265,7 +367,7 @@ describe('parseTweetIntent', () => {
       });
 
       await expect(
-        parseTweetIntent('@sottofm some topic')
+        parseTweetIntent('@podbot some topic')
       ).rejects.toThrow('Failed to extract topic and title from tweet');
     });
 
@@ -286,7 +388,7 @@ describe('parseTweetIntent', () => {
       });
 
       await expect(
-        parseTweetIntent('@sottofm some topic')
+        parseTweetIntent('@podbot some topic')
       ).rejects.toThrow('Failed to extract topic and title from tweet');
     });
 
@@ -306,7 +408,7 @@ describe('parseTweetIntent', () => {
       });
 
       await expect(
-        parseTweetIntent('@sottofm some topic')
+        parseTweetIntent('@podbot some topic')
       ).rejects.toThrow('Failed to extract topic and title from tweet');
     });
   });
@@ -333,7 +435,7 @@ describe('parseTweetIntent', () => {
       });
 
       const result = await parseTweetIntent(
-        '@sottofm https://example.com/solar-power discuss this article'
+        '@podbot https://example.com/solar-power discuss this article'
       );
 
       expect(result.sourceUrl).toBe('https://example.com/solar-power');
@@ -359,7 +461,7 @@ describe('parseTweetIntent', () => {
       });
 
       const result = await parseTweetIntent(
-        '@sottofm teach me cooking basics 🍳👨‍🍳'
+        '@podbot teach me cooking basics 🍳👨‍🍳'
       );
 
       expect(result.tone).toBe('casual');
@@ -385,7 +487,7 @@ describe('parseTweetIntent', () => {
       });
 
       const result = await parseTweetIntent(
-        '@sottofm deep dive into quantum field theory renormalization and gauge symmetry breaking'
+        '@podbot deep dive into quantum field theory renormalization and gauge symmetry breaking'
       );
 
       expect(result.depth).toBe('deep_dive');
@@ -431,7 +533,7 @@ function createMockThread(overrides?: Partial<ThreadData>): ThreadData {
       },
       {
         id: 'reply-3',
-        text: '@sottofm make a podcast about this debate',
+        text: '@podbot make a podcast about this debate',
         authorId: 'author-4',
         authorUsername: 'dave',
         authorName: 'Dave',
@@ -450,7 +552,7 @@ function createMockThread(overrides?: Partial<ThreadData>): ThreadData {
 function createMockMentionTweet(overrides?: Partial<ThreadTweet>): ThreadTweet {
   return {
     id: 'reply-3',
-    text: '@sottofm make a podcast about this debate',
+    text: '@podbot make a podcast about this debate',
     authorId: 'author-4',
     authorUsername: 'dave',
     authorName: 'Dave',
@@ -463,6 +565,7 @@ function createMockMentionTweet(overrides?: Partial<ThreadTweet>): ThreadTweet {
 describe('parseThreadIntent', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockDefaultAiKeys();
   });
 
   it('parses a debate thread with viewpoints', async () => {
@@ -546,7 +649,7 @@ describe('parseThreadIntent', () => {
         },
         {
           id: 'r3',
-          text: '@sottofm make this a podcast',
+          text: '@podbot make this a podcast',
           authorId: 'a4',
           authorUsername: 'dave',
           authorName: 'Dave',
@@ -562,7 +665,7 @@ describe('parseThreadIntent', () => {
     expect(result.isDebate).toBe(false);
   });
 
-  it('passes PLATFORM model to generateResponse', async () => {
+  it('passes the user BYOK default model to generateResponse', async () => {
     const mockResult: TweetParseResult = {
       topic: 'Test',
       title: 'Test Thread',
@@ -587,7 +690,10 @@ describe('parseThreadIntent', () => {
     expect(mockGenerateResponse).toHaveBeenCalledWith(
       expect.any(String),
       expect.any(Array),
-      expect.objectContaining({ model: 'claude-haiku-4-5-20251001' })
+      expect.objectContaining({
+        model: 'claude-haiku-4-5-20251001',
+        apiKeyOverride: 'anthropic-key',
+      })
     );
   });
 

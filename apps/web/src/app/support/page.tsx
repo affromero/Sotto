@@ -30,7 +30,7 @@ export default function SupportPage() {
                 <strong>Email Support</strong>
                 <p>
                   Reach us at{' '}
-                  <a href="mailto:support@sotto.fm">support@sotto.fm</a>.
+                  <a href="mailto:support@example.com">support@example.com</a>.
                   We typically respond within 24 hours.
                 </p>
               </div>
@@ -99,7 +99,7 @@ export default function SupportPage() {
               <p>
                 You can create a podcast from any topic, article URL, or YouTube video.
                 Sotto automatically extracts transcripts from YouTube — even from videos
-                without captions. If you tweet a video at @sottofm, we&apos;ll transcribe
+                without captions. If you tweet a video at your configured Twitter bot, we&apos;ll transcribe
                 the video and use it as source material too.
               </p>
             </div>
@@ -107,7 +107,7 @@ export default function SupportPage() {
               <h3>Can I delete my account?</h3>
               <p>
                 Yes. Go to your profile settings and select &quot;Delete Account&quot;. This
-                permanently removes all your data including podcasts, comments, and
+                permanently removes all your data including podcasts, interactions, and
                 API keys. This action cannot be undone.
               </p>
             </div>
@@ -121,11 +121,11 @@ export default function SupportPage() {
               </p>
             </div>
             <div className={styles.faqItem}>
-              <h3>What happens when I fork a podcast?</h3>
+              <h3>Can I revise a podcast after it is generated?</h3>
               <p>
-                Forking creates a new version of a public podcast that you can customize.
-                The original creator is always attributed. You can change the topic focus,
-                tone, or depth of the forked version.
+                Yes. Ask follow-up questions during playback, save the useful answers,
+                and generate a new private briefing when you want a different focus,
+                tone, or depth.
               </p>
             </div>
             <div className={styles.faqItem}>

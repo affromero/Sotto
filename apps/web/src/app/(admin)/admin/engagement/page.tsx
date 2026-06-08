@@ -1,9 +1,7 @@
 import {
-  getEngagementOverview,
-  getDailyEngagementTrend,
-  getTopLiked,
-  getTopForked,
-  getTopCommented,
+  getPrivateActivityOverview,
+  getDailyPrivateActivityTrend,
+  getTopSaved,
   getInteractionStats,
 } from '@/lib/engagement-metrics';
 import { subDays, startOfDay } from 'date-fns';
@@ -29,26 +27,21 @@ export default async function AdminEngagementPage({ searchParams }: PageProps) {
     return subDays(today, days);
   })();
 
-  const [overview, dailyTrend, topLiked, topForked, topCommented, interactions] = await Promise.all([
-    getEngagementOverview(since),
-    getDailyEngagementTrend(since),
-    getTopLiked(5),
-    getTopForked(5),
-    getTopCommented(5),
+  const [overview, dailyTrend, topSaved, interactions] = await Promise.all([
+    getPrivateActivityOverview(since),
+    getDailyPrivateActivityTrend(since),
+    getTopSaved(5),
     getInteractionStats(since),
   ]);
 
-  const maxDaily = Math.max(
-    ...dailyTrend.map((d) => d.likes + d.saves + d.comments + d.forks),
-    1
-  );
+  const maxDaily = Math.max(...dailyTrend.map((d) => d.saves + d.questions + d.ratings), 1);
 
   return (
     <div className={styles.container}>
       <div className={styles.headerRow}>
         <div className={styles.header}>
-          <h1 className={styles.title}>Engagement Dashboard</h1>
-          <p className={styles.subtitle}>Social engagement, top content, and Q&A metrics</p>
+          <h1 className={styles.title}>Private Activity</h1>
+          <p className={styles.subtitle}>Saves, in-player questions, and creator feedback</p>
         </div>
         <nav className={styles.rangeNav} aria-label="Time range">
           {[
@@ -73,42 +66,46 @@ export default async function AdminEngagementPage({ searchParams }: PageProps) {
       {/* Top cards */}
       <div className={styles.grid}>
         <div className={styles.card}>
-          <span className={styles.cardLabel}>Likes</span>
-          <span className={styles.cardValue}>{overview.likes.toLocaleString()}</span>
-        </div>
-        <div className={styles.card}>
           <span className={styles.cardLabel}>Saves</span>
           <span className={styles.cardValue}>{overview.saves.toLocaleString()}</span>
         </div>
         <div className={styles.card}>
-          <span className={styles.cardLabel}>Comments</span>
-          <span className={styles.cardValue}>{overview.comments.toLocaleString()}</span>
+          <span className={styles.cardLabel}>Questions</span>
+          <span className={styles.cardValue}>{overview.questions.toLocaleString()}</span>
         </div>
         <div className={styles.card}>
-          <span className={styles.cardLabel}>Forks</span>
-          <span className={styles.cardValue}>{overview.forks.toLocaleString()}</span>
+          <span className={styles.cardLabel}>Answered</span>
+          <span className={styles.cardValue}>{overview.answered.toLocaleString()}</span>
         </div>
         <div className={styles.card}>
-          <span className={styles.cardLabel}>Follows</span>
-          <span className={styles.cardValue}>{overview.follows.toLocaleString()}</span>
+          <span className={styles.cardLabel}>Incorporated</span>
+          <span className={styles.cardValue}>{overview.incorporated.toLocaleString()}</span>
+        </div>
+        <div className={styles.card}>
+          <span className={styles.cardLabel}>Ratings</span>
+          <span className={styles.cardValue}>{overview.ratings.toLocaleString()}</span>
         </div>
       </div>
 
-      {/* Daily engagement trend */}
+      {/* Daily private activity trend */}
       <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Daily Engagement</h2>
+        <h2 className={styles.sectionTitle}>Daily Private Activity</h2>
         {dailyTrend.length === 0 ? (
-          <p className={styles.empty}>No engagement data yet.</p>
+          <p className={styles.empty}>No private activity data yet.</p>
         ) : (
-          <div className={styles.chartContainer} role="img" aria-label="Daily engagement bar chart">
+          <div
+            className={styles.chartContainer}
+            role="img"
+            aria-label="Daily private activity bar chart"
+          >
             {dailyTrend.map((d) => {
-              const total = d.likes + d.saves + d.comments + d.forks;
+              const total = d.saves + d.questions + d.ratings;
               return (
                 <div key={d.day} className={styles.chartBar}>
                   <div
                     className={styles.chartBarFill}
                     style={{ height: `${(total / maxDaily) * 100}%` }}
-                    title={`${d.day}: ${d.likes} likes, ${d.saves} saves, ${d.comments} comments, ${d.forks} forks`}
+                    title={`${d.day}: ${d.saves} saves, ${d.questions} questions, ${d.ratings} ratings`}
                   />
                   <span className={styles.chartLabel}>
                     {new Date(d.day + 'T00:00:00').toLocaleDateString('en-US', {
@@ -124,83 +121,33 @@ export default async function AdminEngagementPage({ searchParams }: PageProps) {
       </section>
 
       {/* Top content tables */}
-      <div className={styles.columns}>
-        <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>Most Liked</h2>
-          {topLiked.length === 0 ? (
-            <p className={styles.empty}>No liked podcasts yet.</p>
-          ) : (
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th>Podcast</th>
-                  <th>Likes</th>
-                </tr>
-              </thead>
-              <tbody>
-                {topLiked.map((p) => (
-                  <tr key={p.id}>
-                    <td>{p.title ?? 'Untitled'}</td>
-                    <td>{p.count.toLocaleString()}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </section>
-
-        <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>Most Forked</h2>
-          {topForked.length === 0 ? (
-            <p className={styles.empty}>No forked podcasts yet.</p>
-          ) : (
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th>Podcast</th>
-                  <th>Forks</th>
-                </tr>
-              </thead>
-              <tbody>
-                {topForked.map((p) => (
-                  <tr key={p.id}>
-                    <td>{p.title ?? 'Untitled'}</td>
-                    <td>{p.count.toLocaleString()}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </section>
-
-        <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>Most Commented</h2>
-          {topCommented.length === 0 ? (
-            <p className={styles.empty}>No commented podcasts yet.</p>
-          ) : (
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th>Podcast</th>
-                  <th>Comments</th>
-                </tr>
-              </thead>
-              <tbody>
-                {topCommented.map((p) => (
-                  <tr key={p.id}>
-                    <td>{p.title ?? 'Untitled'}</td>
-                    <td>{p.count.toLocaleString()}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </section>
-      </div>
-
-      {/* Q&A stats */}
       <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Q&A Interactions</h2>
+        <h2 className={styles.sectionTitle}>Most Saved</h2>
+        {topSaved.length === 0 ? (
+          <p className={styles.empty}>No saved podcasts yet.</p>
+        ) : (
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th>Podcast</th>
+                <th>Saves</th>
+              </tr>
+            </thead>
+            <tbody>
+              {topSaved.map((p) => (
+                <tr key={p.id}>
+                  <td>{p.title ?? 'Untitled'}</td>
+                  <td>{p.count.toLocaleString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
+
+      {/* Private question stats */}
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>Private Questions</h2>
         <div className={styles.qaGrid}>
           <div className={styles.card}>
             <span className={styles.cardLabel}>Total Questions</span>
@@ -221,7 +168,10 @@ export default async function AdminEngagementPage({ searchParams }: PageProps) {
           <div className={styles.card}>
             <span className={styles.cardLabel}>Helpful Rate</span>
             <span className={styles.cardValue}>
-              {pct(interactions.helpfulCount, interactions.helpfulCount + interactions.unhelpfulCount)}
+              {pct(
+                interactions.helpfulCount,
+                interactions.helpfulCount + interactions.unhelpfulCount
+              )}
             </span>
           </div>
         </div>

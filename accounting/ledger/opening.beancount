@@ -10,16 +10,16 @@
   Equity:Opening                                   -70.00 USD
 
 ; ============================================================
-; Domain purchase — sotto.fm
+; Domain purchase - project domain
 ; ============================================================
 
-; sotto.fm purchased from Namecheap — $70/yr, prepaid
+; Project domain purchased from Namecheap - $70/yr, prepaid
 ; Amortized at $5.83/mo over 12 months
-2026-02-01 * "Namecheap" "Domain registration: sotto.fm (1 year)"
+2026-02-01 * "Namecheap" "Domain registration: project domain (1 year)"
   Assets:Prepaid:Domain                             70.00 USD
   Assets:Current:Cash:Bank                         -70.00 USD
 
 ; February amortization of domain cost
-2026-02-28 * "Domain amortization" "sotto.fm — February 2026 (1/12)"
+2026-02-28 * "Domain amortization" "Project domain - February 2026 (1/12)"
   Expenses:Infrastructure:Domain                     5.83 USD
   Assets:Prepaid:Domain                             -5.83 USD

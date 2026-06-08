@@ -2,10 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAdmin } from '@/lib/auth-guards';
 import { adminWaitlistActionSchema, adminWaitlistDeleteSchema } from '@/lib/validations';
-import { sendEmail } from '@/lib/email';
+import { assertEmailDeliveryConfigured, sendEmail } from '@/lib/email';
 import { buildWaitlistApprovalEmail } from '@/lib/email-templates';
 import { logger } from '@/lib/logger';
 import { errorResponse } from '@/lib/api-response';
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
 
 export async function PATCH(request: NextRequest) {
   const adminId = await requireAdmin();
@@ -26,6 +30,20 @@ export async function PATCH(request: NextRequest) {
     return errorResponse('Waitlist entry not found', 404);
   }
 
+  const shouldSendApprovalEmail = status === 'APPROVED' && !entry.unsubscribed;
+  if (shouldSendApprovalEmail) {
+    try {
+      assertEmailDeliveryConfigured();
+    } catch (error) {
+      logger.error('Waitlist approval email is not configured', {
+        email: entry.email,
+        waitlistId: id,
+        error: getErrorMessage(error),
+      });
+      return errorResponse('Email delivery is not configured', 503);
+    }
+  }
+
   const updated = await prisma.waitlist.update({
     where: { id },
     data: {
@@ -35,11 +53,17 @@ export async function PATCH(request: NextRequest) {
   });
 
   // Send approval email
-  if (status === 'APPROVED' && !entry.unsubscribed) {
+  if (shouldSendApprovalEmail) {
     const { subject, html } = buildWaitlistApprovalEmail(entry.email);
-    const sent = await sendEmail({ to: entry.email, subject, html });
-    if (!sent) {
-      logger.warn('Waitlist approval email failed', { email: entry.email, waitlistId: id });
+    try {
+      await sendEmail({ to: entry.email, subject, html });
+    } catch (error) {
+      logger.error('Waitlist approval email failed', {
+        email: entry.email,
+        waitlistId: id,
+        error: getErrorMessage(error),
+      });
+      return errorResponse('Waitlist approval email failed', 502);
     }
   }
 

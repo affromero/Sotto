@@ -3,7 +3,6 @@
 import { useState, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { profileUrl } from '@/lib/urls';
 import styles from './VoiceMarketplaceCard.module.css';
 
 export interface BrowseVoice {
@@ -14,6 +13,7 @@ export interface BrowseVoice {
   priceInCents: number | null;
   createdAt: string;
   externalVoiceId: string;
+  provider: string;
   isVerified?: boolean;
   owner: {
     id: string;
@@ -48,7 +48,6 @@ export function VoiceMarketplaceCard({
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const isOwner = currentUserId === voice.owner.id;
-  const ownerUrl = profileUrl(voice.owner);
 
   async function handlePreview() {
     if (!isAuthenticated) return;
@@ -70,6 +69,7 @@ export function VoiceMarketplaceCard({
         body: JSON.stringify({
           voiceId: voice.externalVoiceId,
           text: 'Welcome to Sotto. Let me tell you something fascinating today.',
+          provider: voice.provider,
         }),
       });
 
@@ -138,7 +138,7 @@ export function VoiceMarketplaceCard({
   return (
     <div className={styles.card}>
       <div className={styles.cardHeader}>
-        <Link href={ownerUrl} className={styles.ownerLink}>
+        <div className={styles.ownerIdentity}>
           {voice.owner.image ? (
             <Image
               src={voice.owner.image}
@@ -158,7 +158,7 @@ export function VoiceMarketplaceCard({
               <span className={styles.ownerHandle}>@{voice.owner.handle}</span>
             )}
           </div>
-        </Link>
+        </div>
       </div>
 
       <div className={styles.cardBody}>
@@ -168,15 +168,19 @@ export function VoiceMarketplaceCard({
             <span className={styles.verifiedBadge} title="Verified Voice">
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
                 <circle cx="7" cy="7" r="7" fill="#16a34a" />
-                <path d="M4 7l2 2 4-4" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                <path
+                  d="M4 7l2 2 4-4"
+                  stroke="white"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
               </svg>
               Verified
             </span>
           )}
         </h3>
-        {voice.description && (
-          <p className={styles.voiceDescription}>{voice.description}</p>
-        )}
+        {voice.description && <p className={styles.voiceDescription}>{voice.description}</p>}
 
         <div className={styles.meta}>
           <span
@@ -203,7 +207,9 @@ export function VoiceMarketplaceCard({
       </div>
 
       {error && (
-        <div className={styles.error} role="alert">{error}</div>
+        <div className={styles.error} role="alert">
+          {error}
+        </div>
       )}
 
       <div className={styles.cardFooter}>

@@ -7,6 +7,7 @@
 #   bash install-deps.sh --pitch  # Only uv + pandoc (for pitch rebuild)
 #   bash install-deps.sh --node   # Only Node.js check
 #   bash install-deps.sh --docker # Only Docker check
+#   bash install-deps.sh --ffmpeg # Only FFmpeg check
 #   bash install-deps.sh --uv     # Only uv
 #   bash install-deps.sh --pandoc # Only pandoc
 set -euo pipefail
@@ -49,6 +50,23 @@ install_docker() {
   fi
 }
 
+install_ffmpeg() {
+  if command -v ffmpeg &> /dev/null; then
+    echo "ffmpeg: $(ffmpeg -version | head -1)"
+  else
+    echo "Installing FFmpeg..."
+    if command -v apt-get &> /dev/null; then
+      sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+    elif command -v brew &> /dev/null; then
+      brew install ffmpeg
+    else
+      echo "Error: please install FFmpeg manually: https://ffmpeg.org/download.html"
+      return 1
+    fi
+    echo "ffmpeg: $(ffmpeg -version | head -1)"
+  fi
+}
+
 install_uv() {
   if command -v uv &> /dev/null; then
     echo "uv: $(uv --version)"
@@ -85,6 +103,7 @@ for arg in $ARGS; do
     --all)
       install_node
       install_docker
+      install_ffmpeg
       install_uv
       install_pandoc
       ;;
@@ -94,11 +113,12 @@ for arg in $ARGS; do
       ;;
     --node)   install_node ;;
     --docker) install_docker ;;
+    --ffmpeg) install_ffmpeg ;;
     --uv)     install_uv ;;
     --pandoc) install_pandoc ;;
     *)
       echo "Unknown flag: $arg"
-      echo "Usage: install-deps.sh [--all|--pitch|--node|--docker|--uv|--pandoc]"
+      echo "Usage: install-deps.sh [--all|--pitch|--node|--docker|--ffmpeg|--uv|--pandoc]"
       exit 1
       ;;
   esac

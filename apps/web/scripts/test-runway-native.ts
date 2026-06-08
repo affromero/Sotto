@@ -2,7 +2,7 @@
 /**
  * Manual end-to-end test of the new @livekit/rtc-node recording implementation.
  * Run from apps/web/:
- *   doppler run --project sotto --config dev -- npx tsx scripts/test-runway-native.ts
+ *   ../../scripts/run-with-env.sh npx tsx scripts/test-runway-native.ts
  */
 import { writeFile, rm, mkdir } from 'fs/promises';
 import { join } from 'path';

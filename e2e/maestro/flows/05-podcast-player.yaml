@@ -7,52 +7,46 @@ tags: [player, smoke]
 # Scroll to and tap seeded podcast
 - scrollUntilVisible:
     element:
-      id: "podcast-card-${E2E_PODCAST_ID}"
+      id: 'podcast-card-${E2E_PODCAST_ID}'
     direction: DOWN
     timeout: 10000
 - tapOn:
-    id: "podcast-card-${E2E_PODCAST_ID}"
+    id: 'podcast-card-${E2E_PODCAST_ID}'
 - extendedWaitUntil:
     visible:
-      id: "player-play-pause"
+      id: 'player-play-pause'
     timeout: 5000
-- assertWithAI: "An audio player with playback controls is visible"
+- assertWithAI: 'An audio player with playback controls is visible'
 
 # Play / Pause
 - tapOn:
-    id: "player-play-pause"
+    id: 'player-play-pause'
 - tapOn:
-    id: "player-play-pause"
+    id: 'player-play-pause'
 
 # Skip controls
 - tapOn:
-    id: "player-skip-forward"
+    id: 'player-skip-forward'
 - tapOn:
-    id: "player-skip-back"
+    id: 'player-skip-back'
 
 # Speed cycling
 - tapOn:
-    id: "player-speed-button"
+    id: 'player-speed-button'
 - tapOn:
-    id: "player-speed-button"
-
-# Like toggle
-- tapOn:
-    id: "player-like-button"
-- tapOn:
-    id: "player-like-button"
+    id: 'player-speed-button'
 
 # Save toggle
 - tapOn:
-    id: "player-save-button"
+    id: 'player-save-button'
 - tapOn:
-    id: "player-save-button"
+    id: 'player-save-button'
 
 # Share
 - tapOn:
-    id: "player-share-button"
+    id: 'player-share-button'
 
 # Terminal assertion: player still functional
 - assertVisible:
-    id: "player-play-pause"
+    id: 'player-play-pause'
 - takeScreenshot: player-controls

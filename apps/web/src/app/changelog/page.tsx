@@ -97,28 +97,21 @@ const entries: ChangelogEntry[] = [
     date: '2026-01-28',
     title: 'Telegram Bot',
     description:
-      'Generate podcasts by messaging @SottoFMBot on Telegram. Send a topic or a URL and get a podcast link back — the full pipeline runs automatically.',
+      'Generate podcasts by messaging your configured Telegram bot. Send a topic or a URL and get a podcast link back — the full pipeline runs automatically.',
     tags: ['feature'],
   },
   {
     date: '2026-01-25',
-    title: 'Voice Marketplace',
+    title: 'Paid Voice Sharing',
     description:
-      'Voice owners can now set per-podcast pricing via Stripe Connect. Buyers pay once per podcast, with a 10% platform fee. Includes allowlists, access requests, and free voice paths.',
-    tags: ['feature'],
-  },
-  {
-    date: '2026-01-22',
-    title: 'Fork & Remix',
-    description:
-      'Fork any public podcast and remix it with your own angle. Fork lineage is tracked with visual graphs showing the full ancestry chain.',
+      'Operators can enable paid access requests for verified voice clones via Stripe Connect. The feature stays disabled by default for private-first and self-hosted installs.',
     tags: ['feature'],
   },
   {
     date: '2026-01-18',
-    title: 'Twitter Bot (@SottoFM)',
+    title: 'Twitter Bot',
     description:
-      'Tag @sottofm on Twitter to generate a podcast from any tweet or thread. Automatic replies with the podcast link once generation completes.',
+      'Tag your configured Twitter bot to generate a podcast from any tweet or thread. Automatic replies with the podcast link once generation completes.',
     tags: ['feature'],
   },
   {

@@ -19,20 +19,18 @@ import {
 } from '@react-native-google-signin/google-signin';
 import { BRAND, colors, spacing, typography, borderRadius } from '@sotto/shared';
 import { api } from '../../lib/api';
+import { appUrl } from '../../lib/config';
 import { setToken, notifyAuthSuccess } from '../../lib/auth';
 
 const IS_DEV = __DEV__;
 const GOOGLE_CONFIGURED = !!(
-  process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
-  process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID
+  process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID
 );
 const GITHUB_CONFIGURED = !!process.env.EXPO_PUBLIC_GITHUB_CLIENT_ID;
 
 GoogleSignin.configure({
   webClientId:
-    process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
-    process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ||
-    '',
+    process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || '',
   iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || undefined,
   offlineAccess: false,
 });
@@ -83,9 +81,7 @@ export default function LoginScreen() {
       const message = axiosError.response?.data?.error;
 
       if (status === 404) {
-        setErrorMessage(
-          message ?? 'No account found. Sign up on sotto.fm first.',
-        );
+        setErrorMessage(message ?? 'No account found. Sign up on the web app first.');
       } else if (status === 429) {
         setErrorMessage('Too many attempts. Please wait and try again.');
       } else {
@@ -124,10 +120,7 @@ export default function LoginScreen() {
       notifyAuthSuccess();
     } catch (err: unknown) {
       if (isErrorWithCode(err)) {
-        if (
-          err.code === statusCodes.SIGN_IN_CANCELLED ||
-          err.code === statusCodes.IN_PROGRESS
-        ) {
+        if (err.code === statusCodes.SIGN_IN_CANCELLED || err.code === statusCodes.IN_PROGRESS) {
           setErrorMessage('Sign in was cancelled.');
           return;
         }
@@ -142,93 +135,84 @@ export default function LoginScreen() {
     }
   }, []);
 
-  const handleOAuthSignIn = useCallback(
-    async (provider: 'apple' | 'github') => {
-      setErrorMessage('');
-      setLoading(true);
+  const handleOAuthSignIn = useCallback(async (provider: 'apple' | 'github') => {
+    setErrorMessage('');
+    setLoading(true);
 
-      try {
-        let res: { data: AuthResponse };
+    try {
+      let res: { data: AuthResponse };
 
-        if (provider === 'apple') {
-          const AppleAuthentication = await import('expo-apple-authentication');
-          const credential =
-            await AppleAuthentication.signInAsync({
-              requestedScopes: [
-                AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
-                AppleAuthentication.AppleAuthenticationScope.EMAIL,
-              ],
-            });
-          if (!credential.identityToken) {
-            setErrorMessage('Apple Sign In failed — no identity token.');
-            return;
-          }
-          const { fullName } = credential;
-          const userName = fullName
-            ? [fullName.givenName, fullName.familyName]
-                .filter(Boolean)
-                .join(' ') || undefined
-            : undefined;
-          res = await api.post<AuthResponse>('/auth/mobile', {
-            provider,
-            idToken: credential.identityToken,
-            userName,
-          });
-        } else {
-          const AuthSession = await import('expo-auth-session');
-          const WebBrowser = await import('expo-web-browser');
-          WebBrowser.maybeCompleteAuthSession();
-
-          const clientId = process.env.EXPO_PUBLIC_GITHUB_CLIENT_ID ?? '';
-          const redirectUri = AuthSession.makeRedirectUri({ scheme: 'sotto' });
-
-          const request = new AuthSession.AuthRequest({
-            clientId,
-            redirectUri,
-            scopes: ['read:user', 'user:email'],
-            responseType: AuthSession.ResponseType.Code,
-            usePKCE: true,
-          });
-
-          const result = await request.promptAsync({
-            authorizationEndpoint:
-              'https://github.com/login/oauth/authorize',
-          });
-
-          if (result.type !== 'success' || !result.params.code) {
-            setErrorMessage('Sign in was cancelled.');
-            return;
-          }
-
-          res = await api.post<AuthResponse>('/auth/mobile', {
-            provider,
-            code: result.params.code,
-            codeVerifier: request.codeVerifier ?? undefined,
-            redirectUri,
-          });
-        }
-
-        const { token } = res.data;
-        if (!token) {
-          setErrorMessage('Invalid response from server.');
+      if (provider === 'apple') {
+        const AppleAuthentication = await import('expo-apple-authentication');
+        const credential = await AppleAuthentication.signInAsync({
+          requestedScopes: [
+            AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+            AppleAuthentication.AppleAuthenticationScope.EMAIL,
+          ],
+        });
+        if (!credential.identityToken) {
+          setErrorMessage('Apple Sign In failed — no identity token.');
           return;
         }
-        await setToken(token);
-        notifyAuthSuccess();
-      } catch (err: unknown) {
-        const axiosError = err as {
-          response?: { data?: { error?: string }; status?: number };
-        };
-        const message = axiosError.response?.data?.error;
-        setErrorMessage(
-          message ?? 'Sign in failed. Please try again.',
-        );
-      } finally {
-        setLoading(false);
+        const { fullName } = credential;
+        const userName = fullName
+          ? [fullName.givenName, fullName.familyName].filter(Boolean).join(' ') || undefined
+          : undefined;
+        res = await api.post<AuthResponse>('/auth/mobile', {
+          provider,
+          idToken: credential.identityToken,
+          userName,
+        });
+      } else {
+        const AuthSession = await import('expo-auth-session');
+        const WebBrowser = await import('expo-web-browser');
+        WebBrowser.maybeCompleteAuthSession();
+
+        const clientId = process.env.EXPO_PUBLIC_GITHUB_CLIENT_ID ?? '';
+        const redirectUri = AuthSession.makeRedirectUri({ scheme: 'sotto' });
+
+        const request = new AuthSession.AuthRequest({
+          clientId,
+          redirectUri,
+          scopes: ['read:user', 'user:email'],
+          responseType: AuthSession.ResponseType.Code,
+          usePKCE: true,
+        });
+
+        const result = await request.promptAsync({
+          authorizationEndpoint: 'https://github.com/login/oauth/authorize',
+        });
+
+        if (result.type !== 'success' || !result.params.code) {
+          setErrorMessage('Sign in was cancelled.');
+          return;
+        }
+
+        res = await api.post<AuthResponse>('/auth/mobile', {
+          provider,
+          code: result.params.code,
+          codeVerifier: request.codeVerifier ?? undefined,
+          redirectUri,
+        });
       }
-    },
-    [],
-  );
+
+      const { token } = res.data;
+      if (!token) {
+        setErrorMessage('Invalid response from server.');
+        return;
+      }
+      await setToken(token);
+      notifyAuthSuccess();
+    } catch (err: unknown) {
+      const axiosError = err as {
+        response?: { data?: { error?: string }; status?: number };
+      };
+      const message = axiosError.response?.data?.error;
+      setErrorMessage(message ?? 'Sign in failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   return (
     <KeyboardAvoidingView
@@ -236,10 +220,7 @@ export default function LoginScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <Stack.Screen options={{ headerShown: false }} />
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-      >
+      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         {/* Branding */}
         <View style={styles.brandSection}>
           <Text style={styles.logo}>{BRAND.name}</Text>
@@ -282,10 +263,7 @@ export default function LoginScreen() {
 
             <Pressable
               onPress={handleDevSignIn}
-              style={[
-                styles.signInButton,
-                loading && styles.signInButtonDisabled,
-              ]}
+              style={[styles.signInButton, loading && styles.signInButtonDisabled]}
               disabled={loading}
               accessibilityLabel="Sign in"
               accessibilityRole="button"
@@ -331,9 +309,7 @@ export default function LoginScreen() {
                 accessibilityRole="button"
                 testID="login-google-button"
               >
-                <Text style={styles.oauthButtonText}>
-                  Sign in with Google
-                </Text>
+                <Text style={styles.oauthButtonText}>Sign in with Google</Text>
               </Pressable>
             )}
 
@@ -353,11 +329,7 @@ export default function LoginScreen() {
             )}
 
             {loading && (
-              <ActivityIndicator
-                size="small"
-                color={colors.primary}
-                style={styles.oauthLoader}
-              />
+              <ActivityIndicator size="small" color={colors.primary} style={styles.oauthLoader} />
             )}
           </View>
         )}
@@ -368,15 +340,15 @@ export default function LoginScreen() {
             By signing in, you agree to our{' '}
             <Text
               style={styles.footerLink}
-              onPress={() => openBrowserAsync('https://sotto.fm/terms')}
+              onPress={() => openBrowserAsync(appUrl('/terms'))}
               accessibilityRole="link"
             >
               Terms of Service
-            </Text>
-            {' '}and{' '}
+            </Text>{' '}
+            and{' '}
             <Text
               style={styles.footerLink}
-              onPress={() => openBrowserAsync('https://sotto.fm/privacy')}
+              onPress={() => openBrowserAsync(appUrl('/privacy'))}
               accessibilityRole="link"
             >
               Privacy Policy

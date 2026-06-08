@@ -78,7 +78,7 @@ export function CreatePageClient({ freeTier, isByokUser, isProUser, maxDurationM
 function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes: maxDurationProp, maxSpeakers, isAdmin, draftData }: CreatePageClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const createAsSotto = searchParams.get('as') === 'sotto';
+  const createAsSystemOwner = searchParams.get('as') === 'system-owner';
 
   const [tabMode, setTabMode] = useState<TabMode>(draftData?.tabMode ?? 'create');
   const [step, setStep] = useState<Step>('discovery');
@@ -204,8 +204,8 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
     try {
       let response: Response;
 
-      if (createAsSotto) {
-        response = await fetch('/api/admin/podcasts/create-as-sotto', {
+      if (createAsSystemOwner) {
+        response = await fetch('/api/admin/podcasts/create-as-system-owner', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -254,7 +254,7 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
       setError(err instanceof Error ? err.message : 'Something went wrong');
       setStep('voice');
     }
-  }, [metadata, voiceSelection, ttsProvider, ttsModel, aiModel, durationTarget, zeroCostVideo, createAsSotto, draftId]);
+  }, [metadata, voiceSelection, ttsProvider, ttsModel, aiModel, durationTarget, zeroCostVideo, createAsSystemOwner, draftId]);
 
   const handleGenerate = useCallback(async () => {
     await createPodcast();
@@ -349,8 +349,8 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
   };
 
   const getSubtitle = () => {
-    if (createAsSotto && tabMode === 'create') {
-      return 'Creating as @sotto — this podcast will be owned by the official Sotto account.';
+    if (createAsSystemOwner && tabMode === 'create') {
+      return 'Creating as the configured system owner.';
     }
     if (tabMode === 'import') {
       return importStep === 'importing'

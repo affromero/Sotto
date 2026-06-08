@@ -16,7 +16,6 @@ import {
   Sparkles,
   DollarSign,
   Wallet,
-  Heart,
   Headphones,
   Activity,
   TrendingUp,
@@ -90,7 +89,7 @@ const navGroups: NavGroup[] = [
   {
     label: 'Metrics',
     items: [
-      { href: '/admin/engagement', label: 'Engagement', icon: Heart },
+      { href: '/admin/engagement', label: 'Activity', icon: Activity },
       { href: '/admin/playback', label: 'Playback', icon: Headphones },
       { href: '/admin/pipeline', label: 'Pipeline', icon: Activity },
       { href: '/admin/retention', label: 'Retention', icon: TrendingUp },

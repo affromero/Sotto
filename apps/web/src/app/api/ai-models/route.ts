@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
   const isAdmin = user?.role === 'ADMIN';
   const [aiKeys, claudeAvailable] = await Promise.all([
     listAiProviders(authResult.userId),
-    isAdmin ? isClaudeAvailable() : Promise.resolve(false),
+    isClaudeAvailable(),
   ]);
   const validKeys = aiKeys.filter((k) => k.isValid);
   const claudeCodeModels = claudeAvailable ? CLAUDE_CODE_MODELS : [];
@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
                 displayName: m.displayName,
                 tier: m.tier,
                 requiredPlan: freeSet.has(m.id) ? ('FREE' as const) : ('PRO' as const),
-                isDefault: false,
+                isDefault: m.id === tierConfig.aiModel,
                 group: p.displayName,
                 hint: p.displayName,
               }))
@@ -98,7 +98,7 @@ export async function GET(request: NextRequest) {
             displayName: m.displayName,
             tier: m.tier,
             requiredPlan: m.requiredPlan,
-            isDefault: false,
+            isDefault: m.id === tierConfig.aiModel,
             group: p.displayName,
             hint: p.displayName,
           }))
@@ -129,7 +129,7 @@ export async function GET(request: NextRequest) {
             displayName: m.displayName,
             tier: m.tier,
             requiredPlan: freeSet.has(m.id) ? ('FREE' as const) : ('PRO' as const),
-            isDefault: false,
+            isDefault: m.id === tierConfig.aiModel,
             group: p.displayName,
             hint: p.displayName,
           }))
@@ -140,7 +140,7 @@ export async function GET(request: NextRequest) {
       readOnly: false,
       userPlan,
       isByok: false,
-      models: sortModels(platformModels),
+      models: sortModels([...platformModels, ...claudeCodeModels]),
     }, { headers: CACHE_HEADERS });
   }
 
@@ -166,7 +166,7 @@ export async function GET(request: NextRequest) {
         displayName: m.displayName,
         tier: m.tier,
         requiredPlan: m.requiredPlan,
-        isDefault: false,
+        isDefault: key.provider === defaultProvider.id && m.id === defaultProvider.defaultModel,
         group: p.displayName,
         hint: p.displayName,
       }));
@@ -196,7 +196,7 @@ export async function GET(request: NextRequest) {
         displayName: m.displayName,
         tier: m.tier,
         requiredPlan: freeSet.has(m.id) ? ('FREE' as const) : ('PRO' as const),
-        isDefault: false,
+        isDefault: key.provider === defaultProvider.id && m.id === defaultProvider.defaultModel,
         group: p.displayName,
         hint: p.displayName,
       }));
@@ -207,6 +207,6 @@ export async function GET(request: NextRequest) {
     readOnly: false,
     userPlan,
     isByok: true,
-    models: sortModels(isAdmin ? [...byokModels, ...claudeCodeModels] : byokModels),
+    models: sortModels([...byokModels, ...claudeCodeModels]),
   }, { headers: CACHE_HEADERS });
 }

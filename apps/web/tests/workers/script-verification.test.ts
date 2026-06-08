@@ -87,10 +87,14 @@ vi.mock('@/lib/queue', () => ({
   notificationQueue: { name: 'notifications' },
 }));
 
+const mockGetAiKey = vi.fn().mockResolvedValue({ apiKey: 'anthropic-key', provider: 'anthropic' });
+const mockHasByokKey = vi.fn().mockResolvedValue(false);
+const mockGetByokKey = vi.fn().mockResolvedValue(null);
+
 vi.mock('@/lib/byok', () => ({
-  getAiKey: vi.fn().mockResolvedValue(null),
-  hasByokKey: vi.fn().mockResolvedValue(false),
-  getByokKey: vi.fn().mockResolvedValue(null),
+  getAiKey: (...args: unknown[]) => mockGetAiKey(...args),
+  hasByokKey: (...args: unknown[]) => mockHasByokKey(...args),
+  getByokKey: (...args: unknown[]) => mockGetByokKey(...args),
 }));
 
 vi.mock('@/lib/tier-features', () => ({
@@ -109,8 +113,10 @@ vi.mock('@/lib/tier-features', () => ({
   }),
 }));
 
+const mockResolveAiModelAndProvider = vi.fn().mockResolvedValue({ model: 'claude-sonnet-4-6', provider: 'anthropic' });
+
 vi.mock('@/lib/providers/ai-registry', () => ({
-  resolveAiModelAndProvider: vi.fn().mockResolvedValue({ model: 'claude-sonnet-4-6', provider: 'anthropic' }),
+  resolveAiModelAndProvider: (...args: unknown[]) => mockResolveAiModelAndProvider(...args),
   getCheapestModelForProvider: vi.fn().mockReturnValue('claude-haiku-4-5-20251001'),
 }));
 
@@ -253,14 +259,17 @@ describe('processScriptVerification', () => {
     mockPrismaDiscoveryFindUniqueOrThrow.mockResolvedValue(defaultDiscovery);
     mockPrismaReferenceFindMany.mockResolvedValue(defaultReferences);
     mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({ aiModel: null, source: 'WEB' });
+    mockGetAiKey.mockResolvedValue({ apiKey: 'anthropic-key', provider: 'anthropic' });
+    mockHasByokKey.mockResolvedValue(false);
+    mockGetByokKey.mockResolvedValue(null);
+    mockResolveAiModelAndProvider.mockResolvedValue({ model: 'claude-sonnet-4-6', provider: 'anthropic' });
     mockVerifyScript.mockResolvedValue(passedVerdict);
     mockGenerateScriptWithFeedback.mockResolvedValue(revisedScriptResult);
   });
 
   describe('model resolution', () => {
     it('uses the resolved model for verification', async () => {
-      const { resolveAiModelAndProvider } = await import('@/lib/providers/ai-registry');
-      vi.mocked(resolveAiModelAndProvider).mockResolvedValueOnce({ model: 'claude-opus-4-6-20251101', provider: 'anthropic' });
+      mockResolveAiModelAndProvider.mockResolvedValueOnce({ model: 'claude-opus-4-6-20251101', provider: 'anthropic' });
 
       const job = createMockJob(defaultPayload);
       await processScriptVerification(job);
@@ -270,16 +279,196 @@ describe('processScriptVerification', () => {
       );
     });
 
-    it('passes podcastAiModel and aiKey to resolveAiModelAndProvider', async () => {
+    it('passes explicit podcastAiModel to resolveAiModelAndProvider', async () => {
       mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({ aiModel: 'claude-haiku-4-5-20251001', source: 'WEB' });
-      const { resolveAiModelAndProvider } = await import('@/lib/providers/ai-registry');
 
       const job = createMockJob(defaultPayload);
       await processScriptVerification(job);
 
-      expect(resolveAiModelAndProvider).toHaveBeenCalledWith(
+      expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith(
         expect.objectContaining({ podcastAiModel: 'claude-haiku-4-5-20251001' })
       );
+    });
+  });
+
+  describe('AI routing', () => {
+    it('uses the configured BYOK provider when the podcast has no model', async () => {
+      const aiKey = { apiKey: 'anthropic-key', provider: 'anthropic' };
+      mockGetAiKey.mockResolvedValue(aiKey);
+
+      const job = createMockJob(defaultPayload);
+      await processScriptVerification(job);
+
+      expect(mockGetAiKey).toHaveBeenCalledTimes(1);
+      expect(mockGetAiKey).toHaveBeenCalledWith('user-001');
+      expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
+        podcastAiModel: null,
+        aiKey,
+        plan: 'FREE',
+      });
+      expect(mockVerifyScript).toHaveBeenCalledWith(
+        expect.objectContaining({
+          apiKeyOverride: 'anthropic-key',
+          model: 'claude-sonnet-4-6',
+        })
+      );
+    });
+
+    it('uses the explicit podcast model owner and matching provider key', async () => {
+      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+        aiModel: 'gpt-5-mini',
+        verificationMode: 'standard',
+        language: null,
+        source: 'WEB',
+        zeroCostVideo: false,
+      });
+      mockResolveAiModelAndProvider.mockResolvedValue({
+        model: 'gpt-5-mini',
+        provider: 'openai',
+      });
+      mockGetAiKey.mockResolvedValue({ apiKey: 'openai-key', provider: 'openai' });
+
+      const job = createMockJob(defaultPayload);
+      await processScriptVerification(job);
+
+      expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
+        podcastAiModel: 'gpt-5-mini',
+        aiKey: null,
+        plan: 'FREE',
+      });
+      expect(mockGetAiKey).toHaveBeenCalledTimes(1);
+      expect(mockGetAiKey).toHaveBeenCalledWith('user-001', 'openai');
+      expect(mockVerifyScript).toHaveBeenCalledWith(
+        expect.objectContaining({
+          apiKeyOverride: 'openai-key',
+          model: 'gpt-5-mini',
+        })
+      );
+    });
+
+    it('rejects explicit non-local models without a matching provider key', async () => {
+      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+        aiModel: 'gpt-5-mini',
+        verificationMode: 'standard',
+        language: null,
+        source: 'WEB',
+        zeroCostVideo: false,
+      });
+      mockResolveAiModelAndProvider.mockResolvedValue({
+        model: 'gpt-5-mini',
+        provider: 'openai',
+      });
+      mockGetAiKey.mockResolvedValue(null);
+
+      const job = createMockJob(defaultPayload);
+      await expect(processScriptVerification(job)).rejects.toThrow(
+        'AI key for provider "openai" is required for script verification.'
+      );
+      expect(mockVerifyScript).not.toHaveBeenCalled();
+    });
+
+    it('rejects missing model and missing BYOK key before verification', async () => {
+      mockGetAiKey.mockResolvedValue(null);
+
+      const job = createMockJob(defaultPayload);
+      await expect(processScriptVerification(job)).rejects.toThrow(
+        'AI model is required for script verification when no AI key is configured.'
+      );
+      expect(mockResolveAiModelAndProvider).not.toHaveBeenCalled();
+      expect(mockVerifyScript).not.toHaveBeenCalled();
+    });
+
+    it('uses platform credentials only for explicit admin-credit routes', async () => {
+      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+        aiModel: 'gpt-5-mini',
+        verificationMode: 'standard',
+        language: null,
+        source: 'WEB',
+        zeroCostVideo: false,
+      });
+      mockResolveAiModelAndProvider.mockResolvedValue({
+        model: 'gpt-5-mini',
+        provider: 'openai',
+      });
+
+      const job = createMockJob({ ...defaultPayload, useAdminCredits: true });
+      await processScriptVerification(job);
+
+      expect(mockGetAiKey).not.toHaveBeenCalled();
+      expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
+        podcastAiModel: 'gpt-5-mini',
+        aiKey: null,
+        plan: 'FREE',
+      });
+      expect(mockVerifyScript).toHaveBeenCalledWith(
+        expect.objectContaining({
+          apiKeyOverride: undefined,
+          model: 'gpt-5-mini',
+        })
+      );
+    });
+
+    it('rejects admin-credit routes without an explicit model', async () => {
+      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+        aiModel: null,
+        verificationMode: 'standard',
+        language: null,
+        source: 'WEB',
+        zeroCostVideo: false,
+      });
+
+      const job = createMockJob({ ...defaultPayload, useAdminCredits: true });
+      await expect(processScriptVerification(job)).rejects.toThrow(
+        'AI model is required for script verification when no AI key is configured.'
+      );
+      expect(mockGetAiKey).not.toHaveBeenCalled();
+      expect(mockResolveAiModelAndProvider).not.toHaveBeenCalled();
+      expect(mockVerifyScript).not.toHaveBeenCalled();
+    });
+
+    it('allows local claude-code models without provider keys', async () => {
+      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+        aiModel: 'claude-code:sonnet',
+        verificationMode: 'standard',
+        language: null,
+        source: 'WEB',
+        zeroCostVideo: false,
+      });
+      mockResolveAiModelAndProvider.mockResolvedValue({
+        model: 'claude-code:sonnet',
+        provider: 'claude-code',
+      });
+      mockGetAiKey.mockResolvedValue(null);
+
+      const job = createMockJob(defaultPayload);
+      await processScriptVerification(job);
+
+      expect(mockGetAiKey).not.toHaveBeenCalled();
+      expect(mockVerifyScript).toHaveBeenCalledWith(
+        expect.objectContaining({
+          apiKeyOverride: undefined,
+          model: 'claude-code:sonnet',
+        })
+      );
+    });
+
+    it('skips AI routing for zero-cost verification skips', async () => {
+      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+        aiModel: null,
+        verificationMode: 'standard',
+        language: null,
+        source: 'WEB',
+        zeroCostVideo: true,
+      });
+      mockGetAiKey.mockResolvedValue(null);
+
+      const job = createMockJob(defaultPayload);
+      await processScriptVerification(job);
+
+      expect(mockGetAiKey).not.toHaveBeenCalled();
+      expect(mockResolveAiModelAndProvider).not.toHaveBeenCalled();
+      expect(mockVerifyScript).not.toHaveBeenCalled();
+      expect(mockCreateSegmentsAndQueueAudio).toHaveBeenCalledWith('podcast-001', defaultScript.turns);
     });
   });
 

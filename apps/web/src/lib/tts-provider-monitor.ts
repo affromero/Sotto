@@ -12,6 +12,7 @@
 import { cache } from './redis';
 import { logger } from './logger';
 import { createAIProvider } from './providers/ai';
+import { isValidAiProviderId, type AiProviderId } from './providers/ai-registry';
 import { getVoiceCatalog } from './voice-catalog';
 import { getProviderMeta, type TtsProviderId } from './providers/tts-registry';
 
@@ -178,6 +179,20 @@ export function diffSnapshots(
 // Claude analysis
 // ---------------------------------------------------------------------------
 
+function getMonitorAiRuntime(): { provider: AiProviderId; model: string } {
+  const provider = process.env.TTS_MONITOR_AI_PROVIDER;
+  const model = process.env.TTS_MONITOR_AI_MODEL;
+
+  if (!provider || !model) {
+    throw new Error('TTS provider monitor requires TTS_MONITOR_AI_PROVIDER and TTS_MONITOR_AI_MODEL.');
+  }
+  if (!isValidAiProviderId(provider)) {
+    throw new Error(`Unknown TTS monitor AI provider: "${provider}".`);
+  }
+
+  return { provider, model };
+}
+
 async function analyzeChangesWithLlm(diffs: SnapshotDiff[]): Promise<string> {
   const diffSummary = diffs.map((d) => {
     const parts: string[] = [`### ${d.provider}`];
@@ -213,19 +228,13 @@ Structure your response as:
 ## Priority
 [High/Medium/Low] — [one sentence reasoning]`;
 
-  try {
-    const ai = createAIProvider();
-    const response = await ai.generateResponse(systemPrompt, [
-      { role: 'user', content: `TTS provider changes detected:\n\n${diffSummary}` },
-    ], { maxTokens: 1500, skipModeration: true });
+  const runtime = getMonitorAiRuntime();
+  const ai = createAIProvider(runtime.provider);
+  const response = await ai.generateResponse(systemPrompt, [
+    { role: 'user', content: `TTS provider changes detected:\n\n${diffSummary}` },
+  ], { maxTokens: 1500, model: runtime.model, skipModeration: true });
 
-    return response.content;
-  } catch (err) {
-    logger.warn('LLM analysis failed, using raw diff', {
-      error: err instanceof Error ? err.message : String(err),
-    });
-    return `## Changes Detected\n\n${diffSummary}\n\n_LLM analysis unavailable — raw diff above._`;
-  }
+  return response.content;
 }
 
 // ---------------------------------------------------------------------------

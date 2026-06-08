@@ -1,7 +1,7 @@
 {
-  "name": "Sotto — Every voice. Every topic. One feed.",
+  "name": "Sotto - Private audio briefings",
   "short_name": "Sotto",
-  "description": "Every voice. Every topic. One feed. Create AI podcasts, compare voices side-by-side, remix anything.",
+  "description": "Private audio briefings from your agents, meetings, workflows, and trusted sources.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#FEFCF8",

@@ -77,7 +77,7 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
     stage: 'Interactions',
   },
   'twitter-mentions': {
-    description: 'Polls Twitter for @SottoFM mentions',
+    description: 'Polls Twitter for configured bot mentions',
     stage: 'Social',
   },
   'twitter-reply': {
@@ -145,7 +145,7 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
     stage: 'Voice Features',
   },
   'voice-track-audio': {
-    description: 'Generates audio for voice marketplace tracks',
+    description: 'Generates audio for paid voice-sharing tracks',
     stage: 'Voice Features',
   },
   'voice-track-stitching': {

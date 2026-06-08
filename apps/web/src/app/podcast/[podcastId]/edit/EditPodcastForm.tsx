@@ -11,7 +11,6 @@ interface EditPodcastFormProps {
   initialTitle: string;
   initialTopic: string;
   initialVisibility: string;
-  canMakePrivate?: boolean;
 }
 
 export function EditPodcastForm({
@@ -19,7 +18,6 @@ export function EditPodcastForm({
   initialTitle,
   initialTopic,
   initialVisibility,
-  canMakePrivate,
 }: EditPodcastFormProps) {
   const router = useRouter();
   const [title, setTitle] = useState(initialTitle);
@@ -94,7 +92,7 @@ export function EditPodcastForm({
         >
           <option value="PUBLIC">Public</option>
           <option value="UNLISTED">Unlisted</option>
-          {canMakePrivate !== false && <option value="PRIVATE">Private</option>}
+          <option value="PRIVATE">Private</option>
         </select>
       </div>
 

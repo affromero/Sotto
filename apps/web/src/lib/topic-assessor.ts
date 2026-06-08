@@ -21,7 +21,7 @@ export async function assessTopicFeasibility(params: {
   depth?: string;
   apiKeyOverride?: string;
   model?: string;
-  provider?: string;
+  provider: string;
 }): Promise<FeasibilityAssessment> {
   const { topic, sourceContent, depth } = params;
 

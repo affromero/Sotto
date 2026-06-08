@@ -50,16 +50,6 @@ test.describe('Collections API routes', () => {
     expect(res.status()).toBe(200);
   });
 
-  test('POST follow collection', async ({ authedRequest, seedData }) => {
-    const res = await authedRequest.post(`/api/collections/${seedData.collection.id}/follow`);
-    expect(res.status()).toBe(200);
-  });
-
-  test('DELETE unfollow collection', async ({ authedRequest, seedData }) => {
-    const res = await authedRequest.delete(`/api/collections/${seedData.collection.id}/follow`);
-    expect(res.status()).toBe(200);
-  });
-
   test('DELETE collection', async ({ authedRequest }) => {
     const res = await authedRequest.delete(`/api/collections/${newCollectionId}`);
     expect(res.status()).toBe(200);

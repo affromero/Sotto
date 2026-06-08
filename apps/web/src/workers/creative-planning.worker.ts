@@ -7,7 +7,7 @@ import type { SourceRecord, EvidenceCard } from '@/lib/research-agent';
 import { invalidatePodcastCache, publishPodcastStatus } from '@/lib/redis';
 import { logUsage } from '@/lib/usage-logger';
 import { getAiKey } from '@/lib/byok';
-import { resolveAiModelAndProvider } from '@/lib/providers/ai-registry';
+import { resolveAiModelAndProvider, type AiProviderId } from '@/lib/providers/ai-registry';
 import { logger } from '@/lib/logger';
 import { logPipelineStageComplete } from '@/lib/pipeline-events';
 
@@ -47,7 +47,7 @@ export async function processCreativePlanning(job: Job<CreativePlanningPayload>)
   }
 
   // Load dossier + discovery metadata
-  const [dossier, discovery, podcast, aiKey] = await Promise.all([
+  const [dossier, discovery, podcast, user] = await Promise.all([
     prisma.researchDossier.findUniqueOrThrow({
       where: { id: dossierId },
       select: { sources: true, evidence: true, recommendedAngle: true },
@@ -68,15 +68,29 @@ export async function processCreativePlanning(job: Job<CreativePlanningPayload>)
       where: { id: podcastId },
       select: { aiModel: true },
     }),
-    getAiKey(userId),
+    prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { plan: true } }),
   ]);
 
   await job.updateProgress(15);
 
+  const aiKey = useAdminCredits || podcast.aiModel ? null : await getAiKey(userId);
+  if (!podcast.aiModel && !aiKey) {
+    throw new Error('AI model is required for creative planning when no AI key is configured.');
+  }
+
   const { model, provider } = await resolveAiModelAndProvider({
     podcastAiModel: podcast.aiModel,
     aiKey,
+    plan: user.plan as 'FREE' | 'PRO',
   });
+
+  const providerAiKey =
+    podcast.aiModel && provider !== 'claude-code' && !useAdminCredits
+      ? await getAiKey(userId, provider as AiProviderId)
+      : aiKey;
+  if (podcast.aiModel && provider !== 'claude-code' && !useAdminCredits && !providerAiKey) {
+    throw new Error(`AI key for provider "${provider}" is required for creative planning.`);
+  }
 
   const sources = dossier.sources as unknown as SourceRecord[];
   const evidence = dossier.evidence as unknown as EvidenceCard[];
@@ -98,7 +112,7 @@ export async function processCreativePlanning(job: Job<CreativePlanningPayload>)
     sources,
     evidence,
     recommendedAngle: dossier.recommendedAngle,
-    apiKeyOverride: aiKey?.apiKey,
+    apiKeyOverride: providerAiKey?.apiKey,
     model,
     provider,
   });

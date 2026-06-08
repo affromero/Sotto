@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
 const mockAuth = vi.fn();
-const mockUserFindMany = vi.fn();
+const mockUserFindUnique = vi.fn();
 
 vi.mock('@/lib/auth', () => ({
   auth: (...args: unknown[]) => mockAuth(...args),
@@ -11,7 +11,7 @@ vi.mock('@/lib/auth', () => ({
 vi.mock('@/lib/prisma', () => {
   const _mockPrisma = {
     user: {
-      findMany: (...args: unknown[]) => mockUserFindMany(...args),
+      findUnique: (...args: unknown[]) => mockUserFindUnique(...args),
     },
   };
   return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
@@ -40,20 +40,10 @@ const mockSession = {
   expires: '2025-12-31',
 };
 
-const mockUsers = [
-  {
-    id: 'user-2',
-    handle: 'alice',
-    name: 'Alice',
-    image: 'https://example.com/alice.jpg',
-  },
-  {
-    id: 'user-3',
-    handle: 'alicewonder',
-    name: 'Alice Wonder',
-    image: null,
-  },
-];
+const mockUser = {
+  id: 'user-2',
+  handle: 'alice',
+};
 
 describe('GET /api/users/search', () => {
   beforeEach(() => {
@@ -106,7 +96,7 @@ describe('GET /api/users/search', () => {
 
   it('returns empty array when no matches', async () => {
     mockAuth.mockResolvedValue(mockSession);
-    mockUserFindMany.mockResolvedValue([]);
+    mockUserFindUnique.mockResolvedValue(null);
 
     const request = createRequest('http://localhost:3000/api/users/search?handle=nonexistent');
     const response = await GET(request);
@@ -116,16 +106,61 @@ describe('GET /api/users/search', () => {
     expect(body).toEqual([]);
   });
 
-  it('returns matching users', async () => {
+  it('returns an exact matching user without profile metadata', async () => {
     mockAuth.mockResolvedValue(mockSession);
-    mockUserFindMany.mockResolvedValue(mockUsers);
+    mockUserFindUnique.mockResolvedValue(mockUser);
 
     const request = createRequest('http://localhost:3000/api/users/search?handle=alice');
     const response = await GET(request);
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(body).toEqual(mockUsers);
+    expect(body).toEqual([mockUser]);
+    expect(body[0]).not.toHaveProperty('name');
+    expect(body[0]).not.toHaveProperty('image');
+    expect(mockUserFindUnique).toHaveBeenCalledWith({
+      where: { handle: 'alice' },
+      select: { id: true, handle: true },
+    });
   });
 
+  it('accepts a leading @ but still does an exact lookup', async () => {
+    mockAuth.mockResolvedValue(mockSession);
+    mockUserFindUnique.mockResolvedValue(mockUser);
+
+    const request = createRequest('http://localhost:3000/api/users/search?handle=%40alice');
+    const response = await GET(request);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toEqual([mockUser]);
+    expect(mockUserFindUnique).toHaveBeenCalledWith({
+      where: { handle: 'alice' },
+      select: { id: true, handle: true },
+    });
+  });
+
+  it('returns empty array for the current user handle', async () => {
+    mockAuth.mockResolvedValue(mockSession);
+    mockUserFindUnique.mockResolvedValue({ id: 'user-1', handle: 'testuser' });
+
+    const request = createRequest('http://localhost:3000/api/users/search?handle=testuser');
+    const response = await GET(request);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toEqual([]);
+  });
+
+  it('rejects mixed-case directory-style queries', async () => {
+    mockAuth.mockResolvedValue(mockSession);
+
+    const request = createRequest('http://localhost:3000/api/users/search?handle=Alice');
+    const response = await GET(request);
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body).toHaveProperty('error');
+    expect(mockUserFindUnique).not.toHaveBeenCalled();
+  });
 });

@@ -346,13 +346,13 @@ describe('processPdfGeneration', () => {
 
   describe('database updates', () => {
     it('updates podcast with pdfUrl from R2', async () => {
-      mockUploadFile.mockResolvedValue('https://cdn.sotto.fm/podcasts/001/transcript.md');
+      mockUploadFile.mockResolvedValue('https://media.example.com/podcasts/001/transcript.md');
       const job = createMockJob(defaultPayload);
       await processPdfGeneration(job);
 
       expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
         where: { id: 'podcast-001' },
-        data: { pdfUrl: 'https://cdn.sotto.fm/podcasts/001/transcript.md' },
+        data: { pdfUrl: 'https://media.example.com/podcasts/001/transcript.md' },
       });
     });
 

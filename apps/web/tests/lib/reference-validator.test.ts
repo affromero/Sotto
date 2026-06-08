@@ -303,7 +303,7 @@ describe('reference-validator', () => {
       expect(mockFetch).toHaveBeenCalledWith(
         'https://api.crossref.org/works/10.1234%2Ftest',
         expect.objectContaining({
-          headers: { 'User-Agent': 'Sotto/1.0 (mailto:hello@sotto.fm)' },
+          headers: { 'User-Agent': 'Sotto/1.0 (reference-validator)' },
         })
       );
     });
@@ -473,7 +473,7 @@ describe('reference-validator', () => {
 
     it('includes mailto parameter when OPENALEX_EMAIL is set', async () => {
       const originalEnv = process.env.OPENALEX_EMAIL;
-      process.env.OPENALEX_EMAIL = 'test@sotto.fm';
+      process.env.OPENALEX_EMAIL = 'test@example.com';
 
       const ref = createMockReference({ title: 'Email Test Paper' });
 
@@ -485,7 +485,7 @@ describe('reference-validator', () => {
       await searchTitle(ref);
 
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('mailto=test%40sotto.fm'),
+        expect.stringContaining('mailto=test%40example.com'),
         expect.any(Object)
       );
 

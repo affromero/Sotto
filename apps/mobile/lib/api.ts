@@ -1,7 +1,8 @@
 import axios from 'axios';
 import { getToken, deleteToken } from './auth';
+import { getApiBaseUrl } from './config';
 
-const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://sotto.fm/api';
+const BASE_URL = getApiBaseUrl();
 
 export const api = axios.create({
   baseURL: BASE_URL,
@@ -51,5 +52,5 @@ api.interceptors.response.use(
       }
     }
     return Promise.reject(error);
-  },
+  }
 );

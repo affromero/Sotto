@@ -10,7 +10,7 @@ import {
 } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { classifySegmentVisuals, type StructuredSourceData } from '@/lib/visual-classifier';
-import { resolveAiModelAndProvider } from '@/lib/providers/ai-registry';
+import { resolveAiModelAndProvider, type AiProviderId } from '@/lib/providers/ai-registry';
 import { resolveMotionProvider } from '@/lib/auto-model-config';
 import { getAiKey } from '@/lib/byok';
 import { uploadFile } from '@/lib/r2';
@@ -38,7 +38,7 @@ export async function processVisualClassification(job: Job<ClassifyVisualsPayloa
 
   try {
     // Fetch podcast metadata + resolve AI model + segment timing + source data
-    const [podcast, aiKey, user, segmentTimings, discovery] = await Promise.all([
+    const [podcast, user, segmentTimings, discovery] = await Promise.all([
       prisma.podcast.findUniqueOrThrow({
         where: { id: podcastId },
         select: {
@@ -51,7 +51,6 @@ export async function processVisualClassification(job: Job<ClassifyVisualsPayloa
           },
         },
       }),
-      getAiKey(userId),
       prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { plan: true } }),
       resolveSegmentTiming(podcastId, voiceTrackId),
       prisma.discovery.findUnique({
@@ -66,11 +65,24 @@ export async function processVisualClassification(job: Job<ClassifyVisualsPayloa
     });
     const zeroCostVideo = videoGenRecord?.zeroCostVideo ?? zeroCostFromPayload ?? false;
 
+    const aiKey = podcast.aiModel ? null : await getAiKey(userId);
+    if (!podcast.aiModel && !aiKey) {
+      throw new Error('AI model is required for visual classification when no AI key is configured.');
+    }
+
     const { model: aiModel, provider: aiProvider } = await resolveAiModelAndProvider({
       podcastAiModel: podcast.aiModel,
       aiKey,
       plan: user.plan as 'FREE' | 'PRO',
     });
+
+    const providerAiKey =
+      podcast.aiModel && aiProvider !== 'claude-code'
+        ? await getAiKey(userId, aiProvider as AiProviderId)
+        : aiKey;
+    if (podcast.aiModel && aiProvider !== 'claude-code' && !providerAiKey) {
+      throw new Error(`AI key for provider "${aiProvider}" is required for visual classification.`);
+    }
 
     if (segmentTimings.length === 0) {
       throw new Error('No segments found for podcast');
@@ -107,7 +119,7 @@ export async function processVisualClassification(job: Job<ClassifyVisualsPayloa
       segmentInputs,
       podcast.title,
       podcast.topic,
-      { provider: aiProvider, model: aiModel, apiKeyOverride: aiKey?.apiKey, structuredData, zeroCostVideo },
+      { provider: aiProvider, model: aiModel, apiKeyOverride: providerAiKey?.apiKey, structuredData, zeroCostVideo },
     );
 
     await job.updateProgress(60);

@@ -1,4 +1,5 @@
 import { ScrollChapter } from '../ScrollChapter';
+import { getVerificationStandardUrl } from '@/lib/public-links';
 import styles from './TrustChapter.module.css';
 
 const DOMAINS = [
@@ -9,6 +10,8 @@ const DOMAINS = [
 ] as const;
 
 export function TrustChapter() {
+  const verificationStandardUrl = getVerificationStandardUrl();
+
   return (
     <ScrollChapter id="verification" alt>
       <div className={styles.root}>
@@ -55,17 +58,19 @@ export function TrustChapter() {
               content that actually teaches you something.
             </p>
 
-            <p className={styles.footer}>
-              Scoring logic is open source.{' '}
-              <a
-                href="https://github.com/SottoFM/reference-verification-standard"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                view on GitHub
-              </a>
-              . Community improvements welcome.
-            </p>
+            {verificationStandardUrl && (
+              <p className={styles.footer}>
+                Scoring logic is open source.{' '}
+                <a
+                  href={verificationStandardUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  view on GitHub
+                </a>
+                . Community improvements welcome.
+              </p>
+            )}
           </div>
 
           <div className={styles.colVisual} data-reveal>

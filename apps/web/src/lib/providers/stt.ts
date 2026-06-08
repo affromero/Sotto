@@ -1,7 +1,6 @@
 import { logger } from '../logger';
 import { getSttProviderMeta } from './stt-registry';
 import { getAiKey, getByokKey } from '../byok';
-import { resolveAutoModel } from '../auto-model-config';
 
 /**
  * Speech-to-text transcription result
@@ -155,9 +154,8 @@ class OpenAIWhisperProvider implements SttProvider {
           language: opts?.language,
         });
 
-        const text = typeof textResponse === 'string'
-          ? textResponse
-          : (textResponse as { text: string }).text;
+        const text =
+          typeof textResponse === 'string' ? textResponse : (textResponse as { text: string }).text;
 
         return {
           text,
@@ -282,7 +280,10 @@ class ElevenLabsScribeProvider implements SttProvider {
         segments.push({
           start: currentWords[0].start,
           end: word.end,
-          text: currentWords.map((w) => w.text).join(' ').trim(),
+          text: currentWords
+            .map((w) => w.text)
+            .join(' ')
+            .trim(),
         });
         currentWords = [];
       }
@@ -293,7 +294,10 @@ class ElevenLabsScribeProvider implements SttProvider {
       segments.push({
         start: currentWords[0].start,
         end: currentWords[currentWords.length - 1].end,
-        text: currentWords.map((w) => w.text).join(' ').trim(),
+        text: currentWords
+          .map((w) => w.text)
+          .join(' ')
+          .trim(),
       });
     }
 
@@ -330,17 +334,14 @@ class DeepgramProvider implements SttProvider {
     });
     if (opts?.language) params.set('language', opts.language);
 
-    const response = await fetch(
-      `https://api.deepgram.com/v1/listen?${params.toString()}`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Token ${this.apiKey}`,
-          'Content-Type': 'audio/mpeg',
-        },
-        body: new Uint8Array(audio),
-      }
-    );
+    const response = await fetch(`https://api.deepgram.com/v1/listen?${params.toString()}`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Token ${this.apiKey}`,
+        'Content-Type': 'audio/mpeg',
+      },
+      body: new Uint8Array(audio),
+    });
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => 'Unknown error');
@@ -526,12 +527,13 @@ class AssemblyAIProvider implements SttProvider {
         const durationMs = Date.now() - startTime;
         const text = result.text ?? '';
 
-        const segments = result.utterances?.map((u) => ({
-          start: u.start / 1000,
-          end: u.end / 1000,
-          text: u.text,
-          speaker: u.speaker,
-        })) ?? (text ? [{ start: 0, end: 0, text }] : []);
+        const segments =
+          result.utterances?.map((u) => ({
+            start: u.start / 1000,
+            end: u.end / 1000,
+            text: u.text,
+            speaker: u.speaker,
+          })) ?? (text ? [{ start: 0, end: 0, text }] : []);
 
         logger.info('AssemblyAI transcription complete', {
           model: this.speechModel,
@@ -554,16 +556,18 @@ import type { SttProviderId } from '@sotto/shared';
 /**
  * Create an STT provider instance
  */
-export function createSttProvider(provider?: SttProviderId, apiKey?: string, model?: string): SttProvider {
+export function createSttProvider(
+  provider?: SttProviderId,
+  apiKey?: string,
+  model?: string
+): SttProvider {
   const target = provider ?? 'openai';
 
   switch (target) {
     case 'elevenlabs':
       return new ElevenLabsScribeProvider(apiKey, model);
     case 'together': {
-      const config = model
-        ? { ...TOGETHER_WHISPER_CONFIG, model }
-        : TOGETHER_WHISPER_CONFIG;
+      const config = model ? { ...TOGETHER_WHISPER_CONFIG, model } : TOGETHER_WHISPER_CONFIG;
       return new OpenAIWhisperProvider(apiKey, config);
     }
     case 'deepgram':
@@ -571,9 +575,7 @@ export function createSttProvider(provider?: SttProviderId, apiKey?: string, mod
     case 'assemblyai':
       return new AssemblyAIProvider(apiKey, model);
     case 'openai': {
-      const config = model
-        ? { ...OPENAI_WHISPER_CONFIG, model }
-        : OPENAI_WHISPER_CONFIG;
+      const config = model ? { ...OPENAI_WHISPER_CONFIG, model } : OPENAI_WHISPER_CONFIG;
       return new OpenAIWhisperProvider(apiKey, config);
     }
     default:
@@ -608,7 +610,7 @@ export interface ResolvedSttProvider {
   providerId: SttProviderId;
   apiKey: string;
   model: string;
-  source: 'byok' | 'platform' | 'auto';
+  source: 'byok' | 'platform';
 }
 
 /**
@@ -616,9 +618,8 @@ export interface ResolvedSttProvider {
  *
  * Resolution order:
  *   1. If `requestedProvider` given → BYOK key → platform key. Throws if neither.
- *   2. Otherwise → DB-configured provider via `resolveAutoModel(plan)` → BYOK → platform. Throws if no key.
  *
- * Always returns `model` from either `requestedModel` or the DB config's sttModel.
+ * Missing providers are rejected so transcription cannot silently switch providers.
  */
 export async function resolveSttProvider(context: {
   userId: string;
@@ -628,33 +629,25 @@ export async function resolveSttProvider(context: {
 }): Promise<ResolvedSttProvider> {
   const { userId, requestedProvider, requestedModel } = context;
 
-  if (requestedProvider) {
-    // Explicit provider — try BYOK then platform
-    const key = await resolveKeyForProvider(userId, requestedProvider);
-    if (!key) {
-      throw new Error(
-        `No API key available for STT provider "${requestedProvider}". ` +
-        'Add a key in Settings or configure a platform key.'
-      );
-    }
-    const model = requestedModel ?? getSttProviderMeta(requestedProvider).defaultModel;
-    return { providerId: requestedProvider, apiKey: key, model, source: key === getSttPlatformKey(requestedProvider) ? 'platform' : 'byok' };
+  if (!requestedProvider) {
+    throw new Error('STT provider is required. Choose a provider before transcribing audio.');
   }
 
-  // Auto-resolve from DB config
-  const autoConfig = await resolveAutoModel(context.plan ?? 'FREE');
-  const provider = autoConfig.sttProvider as SttProviderId;
-  const model = requestedModel ?? autoConfig.sttModel;
-
-  const key = await resolveKeyForProvider(userId, provider);
+  const key = await resolveKeyForProvider(userId, requestedProvider);
   if (!key) {
     throw new Error(
-      `No API key available for auto-configured STT provider "${provider}". ` +
-      'Add a key in Settings or configure a platform key.'
+      `No API key available for STT provider "${requestedProvider}". ` +
+        'Add a key in Settings or configure a platform key.'
     );
   }
 
-  return { providerId: provider, apiKey: key, model, source: 'auto' };
+  const model = requestedModel ?? getSttProviderMeta(requestedProvider).defaultModel;
+  return {
+    providerId: requestedProvider,
+    apiKey: key,
+    model,
+    source: key === getSttPlatformKey(requestedProvider) ? 'platform' : 'byok',
+  };
 }
 
 /**

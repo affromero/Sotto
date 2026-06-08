@@ -39,47 +39,48 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
   const features = getTierFeatures(user.plan as 'FREE' | 'PRO', hasTts, user.role);
 
   if (!features.analyticsEnabled && !isPrivileged) {
-    return errorResponse('Analytics are a Pro feature. Upgrade to Pro to access creator analytics.', 403, { code: 'pro_required', });
+    return errorResponse(
+      'Analytics are a Pro feature. Upgrade to Pro to access creator analytics.',
+      403,
+      { code: 'pro_required' }
+    );
   }
 
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
   // Gather all analytics in parallel
-  const [playEvents, completeEvents, qaCount, forkCount, dailyPlays] = await Promise.all([
-    // Total play events (unique sessions = unique listeners estimate)
-    prisma.behavioralEvent.findMany({
-      where: { podcastId, eventType: 'playback.play' },
-      select: { sessionId: true, userId: true },
-    }),
+  const [playEvents, completeEvents, questionCount, answeredQuestionCount, dailyPlays] =
+    await Promise.all([
+      // Total play events (unique sessions = unique listeners estimate)
+      prisma.behavioralEvent.findMany({
+        where: { podcastId, eventType: 'playback.play' },
+        select: { sessionId: true, userId: true },
+      }),
 
-    // Completion events with progress data
-    prisma.behavioralEvent.findMany({
-      where: { podcastId, eventType: 'playback.complete' },
-      select: { eventData: true },
-    }),
+      // Completion events with progress data
+      prisma.behavioralEvent.findMany({
+        where: { podcastId, eventType: 'playback.complete' },
+        select: { eventData: true },
+      }),
 
-    // Q&A interaction count
-    prisma.interaction.count({
-      where: { podcastId, answer: { not: null } },
-    }),
+      // Private question count
+      prisma.interaction.count({ where: { podcastId } }),
 
-    // Fork count
-    prisma.podcast.count({
-      where: { forkedFromId: podcastId },
-    }),
+      // Answered private question count
+      prisma.interaction.count({ where: { podcastId, answer: { not: null } } }),
 
-    // Daily plays over last 30 days
-    prisma.behavioralEvent.groupBy({
-      by: ['createdAt'],
-      where: {
-        podcastId,
-        eventType: 'playback.play',
-        createdAt: { gte: thirtyDaysAgo },
-      },
-      _count: { id: true },
-      orderBy: { createdAt: 'asc' },
-    }),
-  ]);
+      // Daily plays over last 30 days
+      prisma.behavioralEvent.groupBy({
+        by: ['createdAt'],
+        where: {
+          podcastId,
+          eventType: 'playback.play',
+          createdAt: { gte: thirtyDaysAgo },
+        },
+        _count: { id: true },
+        orderBy: { createdAt: 'asc' },
+      }),
+    ]);
 
   const uniqueListeners = new Set(playEvents.map((e) => e.sessionId)).size;
   const totalPlays = podcast.playCount ?? playEvents.length;
@@ -121,8 +122,8 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
       completeEvents.length > 0 && totalPlays > 0
         ? Math.round((completeEvents.length / totalPlays) * 100)
         : 0,
-    qaCount,
-    forkCount,
+    questionCount,
+    answeredQuestionCount,
     playsByDay,
   });
 }

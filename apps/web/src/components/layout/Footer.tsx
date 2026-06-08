@@ -1,7 +1,10 @@
 import { BRAND } from '@sotto/shared';
+import { getTwitterBotHandle, getTwitterProfileUrl } from '@/lib/bot-identity';
 import styles from './Footer.module.css';
 
 export function Footer() {
+  const twitterUrl = getTwitterProfileUrl(getTwitterBotHandle());
+
   return (
     <footer className={styles.footer}>
       <div className={styles.inner}>
@@ -12,7 +15,6 @@ export function Footer() {
         <div className={styles.links}>
           <div>
             <h4>Product</h4>
-            <a href="/feed">Feed</a>
             <a href="/create">Create</a>
             <a href="/briefings">Daily Briefings</a>
             <a href="/quizzes">Quizzes</a>
@@ -22,8 +24,14 @@ export function Footer() {
           </div>
           <div>
             <h4>Community</h4>
-            <a href="https://discord.gg/Dm4T42RXa" target="_blank" rel="noopener noreferrer">Discord</a>
-            <a href="https://x.com/SottoFM" target="_blank" rel="noopener noreferrer">Twitter</a>
+            <a href="https://discord.gg/Dm4T42RXa" target="_blank" rel="noopener noreferrer">
+              Discord
+            </a>
+            {twitterUrl && (
+              <a href={twitterUrl} target="_blank" rel="noopener noreferrer">
+                Twitter
+              </a>
+            )}
             <a href="/feedback">Feedback</a>
           </div>
           <div>

@@ -1,66 +1,73 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="stylesheet" href="popup.css">
-  <title>Send to Sotto</title>
-</head>
-<body>
-  <div class="popup">
-    <header class="header">
-      <h1 class="logo">Sotto</h1>
-      <p class="tagline">Send NotebookLM to Sotto</p>
-    </header>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="popup.css" />
+    <title>Send to Sotto</title>
+  </head>
+  <body>
+    <div class="popup">
+      <header class="header">
+        <h1 class="logo">Sotto</h1>
+        <p class="tagline">Import audio to your private library</p>
+      </header>
 
-    <!-- Not connected state -->
-    <div id="setup-view" class="view" hidden>
-      <div class="field">
-        <label for="api-key-input">API Key</label>
-        <input
-          id="api-key-input"
-          type="password"
-          placeholder="sk_sotto_..."
-          spellcheck="false"
-          autocomplete="off"
+      <!-- Not connected state -->
+      <div id="setup-view" class="view" hidden>
+        <div class="field">
+          <label for="app-url-input">Sotto URL</label>
+          <input
+            id="app-url-input"
+            type="url"
+            placeholder="https://your-sotto.example"
+            spellcheck="false"
+            autocomplete="url"
+          />
+        </div>
+        <div class="field">
+          <label for="api-key-input">API Key</label>
+          <input
+            id="api-key-input"
+            type="password"
+            placeholder="sk_sotto_..."
+            spellcheck="false"
+            autocomplete="off"
+          />
+        </div>
+        <button id="connect-btn" class="btn btn-primary">Connect</button>
+        <p id="setup-error" class="error" hidden></p>
+        <a id="api-key-link" href="#" target="_blank" rel="noopener" class="link" hidden
+          >Get your API key &rarr;</a
         >
       </div>
-      <button id="connect-btn" class="btn btn-primary">Connect</button>
-      <p id="setup-error" class="error" hidden></p>
-      <a
-        href="https://sotto.fm/settings/api"
-        target="_blank"
-        rel="noopener"
-        class="link"
-      >Get your API key &rarr;</a>
-    </div>
 
-    <!-- Connected state -->
-    <div id="connected-view" class="view" hidden>
-      <div class="status-row">
-        <span class="status-dot"></span>
-        <span id="user-name" class="user-name"></span>
+      <!-- Connected state -->
+      <div id="connected-view" class="view" hidden>
+        <div class="status-row">
+          <span class="status-dot"></span>
+          <span id="user-name" class="user-name"></span>
+        </div>
+
+        <div id="last-import" class="last-import" hidden>
+          <p class="last-import-label">Last import</p>
+          <p id="last-import-title" class="last-import-title"></p>
+          <p id="last-import-time" class="last-import-time"></p>
+          <a id="last-import-link" href="#" target="_blank" rel="noopener" class="link">
+            View in Sotto &rarr;
+          </a>
+        </div>
+
+        <button id="disconnect-btn" class="btn btn-secondary">Disconnect</button>
       </div>
 
-      <div id="last-import" class="last-import" hidden>
-        <p class="last-import-label">Last import</p>
-        <p id="last-import-title" class="last-import-title"></p>
-        <p id="last-import-time" class="last-import-time"></p>
-        <a id="last-import-link" href="#" target="_blank" rel="noopener" class="link">
-          View in Sotto &rarr;
-        </a>
+      <!-- Loading state -->
+      <div id="loading-view" class="view" hidden>
+        <div class="spinner"></div>
+        <p class="loading-text">Connecting...</p>
       </div>
-
-      <button id="disconnect-btn" class="btn btn-secondary">Disconnect</button>
     </div>
 
-    <!-- Loading state -->
-    <div id="loading-view" class="view" hidden>
-      <div class="spinner"></div>
-      <p class="loading-text">Connecting...</p>
-    </div>
-  </div>
-
-  <script src="popup.js"></script>
-</body>
+    <script src="popup.js"></script>
+  </body>
 </html>

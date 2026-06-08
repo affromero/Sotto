@@ -1,4 +1,10 @@
-import type { Podcast, PodcastDetail, FeedResponse, UserProfile } from './types.js';
+import type {
+  AgentIngestResult,
+  MeetingIngestResult,
+  Podcast,
+  PodcastDetail,
+  UserProfile,
+} from './types.js';
 
 function formatDuration(seconds: number | null): string {
   if (!seconds) return 'N/A';
@@ -19,12 +25,10 @@ export function formatPodcastSummary(p: Podcast): string {
     `Status: ${p.status}`,
     `Visibility: ${p.visibility}`,
     `Duration: ${formatDuration(p.duration)}`,
-    `Plays: ${p.playCount} | Likes: ${p.likeCount} | Forks: ${p.forkCount}`,
   ];
   if (p.user) lines.push(`Creator: ${p.user.name || 'Anonymous'}`);
   const tags = formatTags(p);
   if (tags) lines.push(`Tags: ${tags}`);
-  if (p.forkedFromId) lines.push(`Forked from: ${p.forkedFromId}`);
   lines.push(`Created: ${p.createdAt}`);
   return lines.join('\n');
 }
@@ -59,23 +63,12 @@ export function formatPodcastList(podcasts: Podcast[]): string {
   return podcasts.map((p, i) => `${i + 1}. ${formatPodcastSummary(p)}`).join('\n\n');
 }
 
-export function formatFeed(feed: FeedResponse): string {
-  const header = `Found ${feed.total} podcast(s)`;
-  const pagination = feed.page ? ` (page ${feed.page})` : '';
-  const more = feed.hasMore ? ' — more available' : '';
-
-  if (feed.podcasts.length === 0) return `${header}${pagination}. No results.`;
-
-  const items = feed.podcasts.map((p, i) => `${i + 1}. ${formatPodcastSummary(p)}`).join('\n\n');
-  return `${header}${pagination}${more}\n\n${items}`;
-}
-
 export function formatProfile(u: UserProfile): string {
   const lines = [
     `**${u.name || 'Anonymous'}**`,
     u.handle ? `@${u.handle}` : null,
     u.bio ? `Bio: ${u.bio}` : null,
-    `Podcasts: ${u.podcastCount} | Followers: ${u.followerCount} | Following: ${u.followingCount}`,
+    `Podcasts: ${u.podcastCount}`,
     `Member since: ${u.createdAt}`,
   ];
   return lines.filter(Boolean).join('\n');
@@ -85,8 +78,16 @@ export function formatCreated(result: { id: string; status?: string }): string {
   return `Podcast created!\nID: ${result.id}\nStatus: ${result.status || 'EXTRACTING'}\n\nThe podcast is now being generated. Use get_podcast to check progress.`;
 }
 
-export function formatForked(result: { id: string }): string {
-  return `Podcast forked!\nID: ${result.id}\n\nThe forked podcast is now being generated. Use get_podcast to check progress.`;
+export function formatAgentIngested(result: AgentIngestResult): string {
+  const action = result.idempotent ? 'Agent output already ingested.' : 'Agent output ingested.';
+  return `${action}\nID: ${result.id}\nStatus: ${result.status}\n\nThe private podcast is now in your library pipeline. Use get_podcast to check progress.`;
+}
+
+export function formatMeetingIngested(result: MeetingIngestResult): string {
+  const action = result.idempotent
+    ? 'Meeting transcript already ingested.'
+    : 'Meeting transcript ingested.';
+  return `${action}\nID: ${result.id}\nStatus: ${result.status}\n\nThe private recap is now in your library pipeline. Use get_podcast to check progress.`;
 }
 
 export function formatDeleted(): string {

@@ -16,8 +16,6 @@ export interface PodcastSummary {
   audioUrl: string | null;
   duration: number | null;
   playCount: number;
-  likeCount: number;
-  forkCount: number;
   createdAt: string;
   source: PodcastSource;
   isHumanContent: boolean;
@@ -30,9 +28,6 @@ export interface PodcastSummary {
   language?: string | null;
   aiAutoResolved?: boolean | null;
   ttsAutoResolved?: boolean | null;
-  forkedFromId: string | null;
-  forkedFrom?: { id: string; title: string } | null;
-  isVoiceOnlyFork?: boolean;
   ownerIsPro: boolean;
   user: {
     id: string;
@@ -44,41 +39,12 @@ export interface PodcastSummary {
   tags: Array<{ id: string; name: string; slug: string }>;
 }
 
-export interface ForkedFromInfo {
-  id: string;
-  title: string;
-  user: {
-    id: string;
-    name: string | null;
-    handle: string | null;
-    image: string | null;
-  };
-}
-
-export interface ForkSummary {
-  id: string;
-  title: string;
-  remixNote: string | null;
-  isVoiceOnlyFork?: boolean;
-  createdAt: string;
-  user: {
-    id: string;
-    name: string | null;
-    handle: string | null;
-    image: string | null;
-  };
-}
-
 export interface PodcastDetail extends PodcastSummary {
   saveCount: number;
-  commentCount: number;
-  remixNote: string | null;
   failureReason: string | null;
   failedAtStatus?: string | null;
   errorId?: string | null;
   verificationMode?: string;
-  forkedFrom: ForkedFromInfo | null;
-  forks: ForkSummary[];
   currentVersion: number;
   versions: PodcastVersionSummary[];
   segments: SegmentData[];
@@ -90,7 +56,6 @@ export interface PodcastDetail extends PodcastSummary {
   musicUrl: string | null;
   musicVolume: number;
   musicBaked: boolean;
-  isLiked: boolean;
   isSaved: boolean;
   voiceTracks: VoiceTrackSummary[];
   defaultVoiceTrackId: string | null;

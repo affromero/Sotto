@@ -1,10 +1,15 @@
 import { logUsage } from './usage-logger';
 import { loadPrompt } from './prompt-loader';
 import { logger } from './logger';
-import { getAiProviderMeta, getAllAiProviderMeta, type AiProviderId } from './providers/ai-registry';
+import {
+  getAiProviderMeta,
+  getAllAiProviderMeta,
+  getProviderForModel,
+  isValidAiProviderId,
+  type AiProviderId,
+} from './providers/ai-registry';
 import { createAIProvider, type AIProvider, type ContentPart } from './providers/ai';
 import { getAiKey } from './byok';
-import { resolveAutoModel } from './auto-model-config';
 import { getAllProviderMeta } from './providers/tts-registry';
 import { FAL_IMAGE_MODEL_IDS, FAL_VIDEO_MODEL_IDS } from './providers/fal-endpoints';
 import { getAllAvatarModelIds } from './providers/avatar-registry';
@@ -12,40 +17,88 @@ import type { TweetParseResult, ThreadData, ThreadTweet } from '@/types/twitter'
 
 export interface ParseOptions {
   userId?: string;
+  aiProvider?: string;
+  aiModel?: string;
   apiKeyOverride?: string;
   imageUrls?: string[];
 }
 
-async function getProviderForParsing(opts?: ParseOptions): Promise<{ provider: AIProvider; providerName: string; model: string }> {
-  if (opts?.userId) {
-    try {
-      const userKey = await getAiKey(opts.userId);
-      if (userKey) {
-        const meta = getAiProviderMeta(userKey.provider as AiProviderId);
-        return {
-          provider: createAIProvider(userKey.provider),
-          providerName: userKey.provider,
-          model: meta.defaultModel,
-        };
-      }
-    } catch {
-      // Fall through to defaults
+const LOCAL_AI_PROVIDER: AiProviderId = 'claude-code';
+const LOCAL_MODEL_PREFIX = 'claude-code:';
+
+function providerForParseModel(model: string): AiProviderId | null {
+  if (model.startsWith(LOCAL_MODEL_PREFIX) && model.length > LOCAL_MODEL_PREFIX.length) {
+    return LOCAL_AI_PROVIDER;
+  }
+  return getProviderForModel(model);
+}
+
+async function getProviderForParsing(
+  opts?: ParseOptions,
+): Promise<{ provider: AIProvider; providerName: AiProviderId; model: string; apiKeyOverride?: string }> {
+  let providerName: AiProviderId | null = null;
+  let model: string | null = null;
+  let apiKeyOverride = opts?.apiKeyOverride;
+
+  if (opts?.aiModel) {
+    const modelProvider = providerForParseModel(opts.aiModel);
+    if (!modelProvider) {
+      throw new Error(`Unknown AI model: ${opts.aiModel}`);
     }
+    if (opts.aiProvider && opts.aiProvider !== modelProvider) {
+      throw new Error(`AI model "${opts.aiModel}" does not belong to provider "${opts.aiProvider}".`);
+    }
+    providerName = modelProvider;
+    model = opts.aiModel;
+  } else if (opts?.aiProvider) {
+    if (!isValidAiProviderId(opts.aiProvider)) {
+      throw new Error(`Unknown AI provider: ${opts.aiProvider}`);
+    }
+    providerName = opts.aiProvider;
+    model = getAiProviderMeta(providerName).defaultModel;
+    if (!model) {
+      throw new Error(`No default AI model configured for provider "${providerName}".`);
+    }
+  } else if (opts?.userId) {
+    const userKey = await getAiKey(opts.userId);
+    if (!userKey) {
+      throw new Error('AI key or explicit local AI model is required to parse tweets.');
+    }
+    providerName = userKey.provider;
+    model = getAiProviderMeta(userKey.provider).defaultModel;
+    apiKeyOverride ??= userKey.apiKey;
+  } else {
+    throw new Error('AI key or explicit local AI model is required to parse tweets.');
   }
 
-  const { aiProvider, aiModel } = await resolveAutoModel('PLATFORM');
+  if (!providerName || !model) {
+    throw new Error('Unable to resolve AI provider for tweet parsing.');
+  }
+
+  if (providerName !== LOCAL_AI_PROVIDER && !apiKeyOverride) {
+    if (!opts?.userId) {
+      throw new Error(`AI key for provider "${providerName}" is required to parse tweets.`);
+    }
+    const providerKey = await getAiKey(opts.userId, providerName);
+    if (!providerKey) {
+      throw new Error(`AI key for provider "${providerName}" is required to parse tweets.`);
+    }
+    apiKeyOverride = providerKey.apiKey;
+  }
+
   return {
-    provider: createAIProvider(aiProvider),
-    providerName: aiProvider,
-    model: aiModel,
+    provider: createAIProvider(providerName),
+    providerName,
+    model,
+    apiKeyOverride,
   };
 }
 
 const SYSTEM_PROMPT = loadPrompt('social/tweet-parser.md');
 
 /**
- * Parse a tweet mentioning @sottofm into structured podcast generation metadata.
- * Uses the user's configured AI provider (or platform default) for fast extraction.
+ * Parse a tweet mentioning the configured Twitter bot into structured podcast generation metadata.
+ * Uses the user's configured AI provider or an explicitly selected local model.
  */
 export async function parseTweetIntent(
   tweetText: string,
@@ -65,12 +118,12 @@ export async function parseTweetIntent(
       ]
     : textMessage;
 
-  const { provider, providerName, model } = await getProviderForParsing(opts);
+  const { provider, providerName, model, apiKeyOverride } = await getProviderForParsing(opts);
 
   const response = await provider.generateResponse(
     SYSTEM_PROMPT,
     [{ role: 'user', content }],
-    { maxTokens: 512, model, apiKeyOverride: opts?.apiKeyOverride }
+    { maxTokens: 512, model, apiKeyOverride }
   );
 
   logUsage({
@@ -128,7 +181,7 @@ function formatThreadForParsing(thread: ThreadData): string {
 }
 
 /**
- * Parse a full thread mentioning @sottofm into structured podcast metadata.
+ * Parse a full thread mentioning the configured Twitter bot into structured podcast metadata.
  * Analyzes the entire conversation for viewpoints, URLs, and debate detection.
  */
 export async function parseThreadIntent(
@@ -144,11 +197,11 @@ Thread (${thread.tweetCount} tweets, ${thread.participantCount} participants, ty
 
 ${threadText}`;
 
-  const { provider, providerName, model } = await getProviderForParsing(opts);
+  const { provider, providerName, model, apiKeyOverride } = await getProviderForParsing(opts);
   const response = await provider.generateResponse(
     THREAD_SYSTEM_PROMPT,
     [{ role: 'user', content: userMessage }],
-    { maxTokens: 1024, model, apiKeyOverride: opts?.apiKeyOverride }
+    { maxTokens: 1024, model, apiKeyOverride }
   );
 
   logUsage({

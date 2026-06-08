@@ -45,7 +45,7 @@ function createRequest(body?: object): NextRequest {
 describe('POST /api/billing/portal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://sotto.fm');
+    vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://selfhost.example.com');
   });
 
   afterEach(() => {
@@ -129,10 +129,10 @@ describe('POST /api/billing/portal', () => {
       url: 'https://billing.stripe.com/session/custom',
     });
 
-    await POST(createRequest({ returnUrl: 'https://sotto.fm/settings' }));
+    await POST(createRequest({ returnUrl: 'https://selfhost.example.com/settings' }));
 
     expect(mockPortalSessionsCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ return_url: 'https://sotto.fm/settings' })
+      expect.objectContaining({ return_url: 'https://selfhost.example.com/settings' })
     );
   });
 

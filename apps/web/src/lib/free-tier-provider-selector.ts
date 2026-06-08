@@ -1,5 +1,5 @@
 import { prisma } from './prisma';
-import { getAutoModelConfig, resolveAutoModel, type PlanModelConfig, type ProviderAllocation } from './auto-model-config';
+import { getAutoModelConfig, type PlanModelConfig, type ProviderAllocation } from './auto-model-config';
 import { getProviderMeta, compareQuality, type TtsProviderId } from './providers/tts-registry';
 import { getAiProviderMeta, type AiProviderId } from './providers/ai-registry';
 import { supportsLanguage, getDefaultModelForLanguage } from './tts-language-support';
@@ -31,16 +31,14 @@ export interface SelectedFreeTierProviders {
  * Select the best available free tier providers for a user.
  *
  * When per-provider allocations are configured, picks the highest-quality
- * provider with remaining quota. Falls back to auto model config
- * when no allocations exist.
+ * provider with remaining quota. Otherwise uses the configured free-tier
+ * defaults from AutoModelConfig.
  */
 export async function selectFreeTierProviders(userId: string, language?: string | null): Promise<SelectedFreeTierProviders> {
-  const [config, autoFree] = await Promise.all([
-    getAutoModelConfig(),
-    resolveAutoModel('FREE'),
-  ]);
+  const config = await getAutoModelConfig();
+  const autoFree = config.free;
 
-  // No allocations → use auto model config for providers, config for quotas
+  // No allocations -> use configured free-tier defaults for providers and quotas.
   if (config.ttsAllocations.length === 0 && config.aiAllocations.length === 0) {
     // When language is set, check if the auto-selected TTS model supports it
     let ttsModel = autoFree.ttsModel;
@@ -118,13 +116,13 @@ function selectTtsProvider(
     return { provider: available[0].provider, model: available[0].model, quota: available[0].quota };
   }
 
-  // All allocations exhausted — fall back to auto model config, respecting language
-  let fallbackModel = autoFree.ttsModel;
-  if (language && !supportsLanguage(autoFree.ttsProvider as TtsProviderId, fallbackModel, language)) {
-    const compatible = getDefaultModelForLanguage(autoFree.ttsProvider as TtsProviderId, language, fallbackModel);
-    if (compatible) fallbackModel = compatible;
+  // All allocations exhausted -> use configured free-tier default, respecting language.
+  let defaultModel = autoFree.ttsModel;
+  if (language && !supportsLanguage(autoFree.ttsProvider as TtsProviderId, defaultModel, language)) {
+    const compatible = getDefaultModelForLanguage(autoFree.ttsProvider as TtsProviderId, language, defaultModel);
+    if (compatible) defaultModel = compatible;
   }
-  return { provider: autoFree.ttsProvider, model: fallbackModel, quota: config.dailyGenerationLimit };
+  return { provider: autoFree.ttsProvider, model: defaultModel, quota: config.dailyGenerationLimit };
 }
 
 function selectAiProvider(
@@ -154,7 +152,7 @@ function selectAiProvider(
     return { provider: available[0].provider, model: available[0].model, quota: available[0].quota };
   }
 
-  // All allocations exhausted — fall back to auto model config
+  // All allocations exhausted -> use configured free-tier default.
   return { provider: autoFree.aiProvider, model: autoFree.aiModel, quota: config.dailyGenerationLimit };
 }
 

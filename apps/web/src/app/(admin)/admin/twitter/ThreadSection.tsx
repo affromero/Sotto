@@ -198,7 +198,7 @@ export function ThreadSection() {
             Tweet / Thread URL
           </label>
           <span className={styles.hint}>
-            Paste a tweet or thread URL to generate a podcast as @sotto
+            Paste a tweet or thread URL to generate a podcast as the configured system owner
           </span>
         </div>
 
@@ -224,7 +224,7 @@ export function ThreadSection() {
 
         <div>
           <label className={styles.label} htmlFor="adminMessage">
-            Your message (as if tagging @sotto)
+            Your message to the podcast bot
           </label>
           <span className={styles.hint}>
             Optional — controls duration, depth, audience. Leave blank to infer from the tweet.
@@ -235,7 +235,7 @@ export function ThreadSection() {
           className={styles.messageTextarea}
           value={message}
           onChange={(e) => setMessage(e.target.value)}
-          placeholder="@sotto make a 5min eli5 about this for nerds"
+          placeholder="Make a 5min ELI5 about this for technical listeners"
           rows={3}
           maxLength={1000}
         />

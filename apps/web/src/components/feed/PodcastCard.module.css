@@ -4,7 +4,9 @@
   position: relative;
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-sm);
-  transition: box-shadow 350ms var(--ease-out-expo), transform 350ms var(--ease-out-expo);
+  transition:
+    box-shadow 350ms var(--ease-out-expo),
+    transform 350ms var(--ease-out-expo);
   overflow: hidden;
 }
 
@@ -108,19 +110,6 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-}
-
-.remixSubline {
-  font: var(--text-caption);
-  font-size: var(--font-size-xs);
-  color: rgba(255, 255, 255, 0.7);
-  font-style: italic;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-  margin: 0;
-  display: -webkit-box;
-  -webkit-line-clamp: 1;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
 }
 
 .title {
@@ -263,53 +252,6 @@
   transform: translate(-50%, -50%) scale(0.96);
 }
 
-/* ── Fork Button (bottom-right, above coverMeta) */
-
-.forkButton {
-  position: absolute;
-  top: var(--spacing-ms);
-  right: var(--spacing-ms);
-  z-index: 2;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  border-radius: var(--radius-full);
-  border: none;
-  background: rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  color: #fff;
-  cursor: pointer;
-  opacity: 0;
-  transition: all var(--transition-fast);
-}
-
-.forkButton span {
-  display: none;
-}
-
-.card:hover .forkButton {
-  opacity: 1;
-}
-
-.forkButton:hover {
-  background: rgba(255, 255, 255, 0.4);
-}
-
-.forkButton:active {
-  transform: scale(0.9);
-}
-
-/* Always show fork button on touch devices */
-@media (hover: none) {
-  .forkButton {
-    opacity: 1;
-  }
-}
-
 /* ── Variant: Compact ───────────────────────── */
 
 .compact {
@@ -319,7 +261,6 @@
 .compact .cover {
   border-radius: var(--radius-xl);
 }
-
 
 /* ── Mobile ─────────────────────────────────── */
 
@@ -332,7 +273,6 @@
   .cover {
     height: 120px;
   }
-
 }
 
 /* ── Reduced motion ─────────────────────────── */
@@ -360,9 +300,5 @@
 
   .playButton:active {
     transform: translate(-50%, -50%) scale(1);
-  }
-
-  .forkButton {
-    transition: opacity var(--transition-fast);
   }
 }

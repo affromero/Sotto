@@ -7,23 +7,12 @@ const mockPodcastCount = vi.fn();
 const mockPodcastCreate = vi.fn();
 const mockPodcastFindUnique = vi.fn();
 const mockPodcastUpdate = vi.fn();
-const mockPodcastUpdateMany = vi.fn();
-const mockPodcastDelete = vi.fn();
-const mockLikeFindUnique = vi.fn();
 const mockSaveFindUnique = vi.fn();
 const mockDiscoveryCreate = vi.fn();
 const mockCheckGenerationGate = vi.fn();
 
 const mockGetFreeTierStatus = vi.fn();
 const mockGetAutoModelConfig = vi.fn();
-const mockResolveAutoModel = vi.fn().mockResolvedValue({
-  aiProvider: 'anthropic',
-  aiModel: 'claude-haiku-4-5-20251001',
-  ttsProvider: 'openai',
-  ttsModel: 'tts-1-hd',
-  sttProvider: 'openai',
-  sttModel: 'whisper-1',
-});
 const mockAddJob = vi.fn();
 
 const mockAuthenticateRequest = vi.fn();
@@ -31,8 +20,6 @@ const mockCheckRateLimit = vi.fn();
 const mockAuth = vi.fn();
 const mockUserFindUnique = vi.fn();
 const mockUserFindUniqueOrThrow = vi.fn();
-
-const mockTransaction = vi.fn();
 
 vi.mock('@/lib/prisma', () => {
   const txProxy = {
@@ -42,11 +29,6 @@ vi.mock('@/lib/prisma', () => {
       create: (...args: unknown[]) => mockPodcastCreate(...args),
       findUnique: (...args: unknown[]) => mockPodcastFindUnique(...args),
       update: (...args: unknown[]) => mockPodcastUpdate(...args),
-      updateMany: (...args: unknown[]) => mockPodcastUpdateMany(...args),
-      delete: (...args: unknown[]) => mockPodcastDelete(...args),
-    },
-    like: {
-      findUnique: (...args: unknown[]) => mockLikeFindUnique(...args),
     },
     save: {
       findUnique: (...args: unknown[]) => mockSaveFindUnique(...args),
@@ -61,7 +43,6 @@ vi.mock('@/lib/prisma', () => {
       findUnique: (...args: unknown[]) => mockUserFindUnique(...args),
       findUniqueOrThrow: (...args: unknown[]) => mockUserFindUniqueOrThrow(...args),
     },
-    $transaction: (...args: unknown[]) => mockTransaction(...args),
   };
   return { prisma: txProxy, prismaUnfiltered: txProxy };
 });
@@ -72,7 +53,11 @@ vi.mock('@/lib/api-keys', () => ({
 
 vi.mock('@/lib/redis', () => ({
   checkRateLimit: (...args: unknown[]) => mockCheckRateLimit(...args),
-  cache: { get: vi.fn().mockResolvedValue(null), set: vi.fn().mockResolvedValue(undefined), delete: vi.fn().mockResolvedValue(undefined) },
+  cache: {
+    get: vi.fn().mockResolvedValue(null),
+    set: vi.fn().mockResolvedValue(undefined),
+    delete: vi.fn().mockResolvedValue(undefined),
+  },
   getPodcastCacheTtl: vi.fn().mockReturnValue(30),
   invalidatePodcastCache: vi.fn().mockResolvedValue(undefined),
 }));
@@ -94,7 +79,6 @@ vi.mock('@/lib/generation-gate', () => ({
 
 vi.mock('@/lib/auto-model-config', () => ({
   getAutoModelConfig: (...args: unknown[]) => mockGetAutoModelConfig(...args),
-  resolveAutoModel: (...args: unknown[]) => mockResolveAutoModel(...args),
 }));
 
 vi.mock('@/lib/stripe', () => ({
@@ -153,11 +137,6 @@ const mockPrisma = {
     create: mockPodcastCreate,
     findUnique: mockPodcastFindUnique,
     update: mockPodcastUpdate,
-    updateMany: mockPodcastUpdateMany,
-    delete: mockPodcastDelete,
-  },
-  like: {
-    findUnique: mockLikeFindUnique,
   },
   save: {
     findUnique: mockSaveFindUnique,
@@ -214,10 +193,7 @@ const mockPodcast = {
   duration: 600,
   fileSize: 1024000,
   playCount: 42,
-  likeCount: 10,
-  forkCount: 2,
   saveCount: 5,
-  forkedFromId: null,
   hostVoiceId: 'voice-host-1',
   expertVoiceId: 'voice-expert-1',
   createdAt: new Date('2025-01-15T10:00:00Z'),
@@ -230,6 +206,11 @@ const mockPodcast = {
       tag: { id: 'tag-1', name: 'Science', slug: 'science' },
     },
   ],
+};
+
+const explicitTtsSelection = {
+  ttsProvider: 'openai',
+  ttsModel: 'tts-1-hd',
 };
 
 const mockPodcastWithRelations = {
@@ -338,6 +319,7 @@ describe('POST /api/podcasts', () => {
     const body = {
       title: 'Quantum Physics 101',
       topic: 'An introduction to quantum mechanics',
+      ...explicitTtsSelection,
     };
 
     const request = createPostRequest('/api/podcasts', body);
@@ -347,6 +329,29 @@ describe('POST /api/podcasts', () => {
     const result = await response.json();
     expect(result.id).toBe('pod-1');
     expect(result.status).toBe('EXTRACTING');
+    expect(mockPodcastCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ visibility: 'PRIVATE', ...explicitTtsSelection }),
+      })
+    );
+  });
+
+  it('returns 400 for BYOK creation without an explicit TTS provider', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 59, resetAt: Date.now() });
+    mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', isByokUser: true });
+
+    const request = createPostRequest('/api/podcasts', {
+      title: 'Quantum Physics 101',
+      topic: 'An introduction to quantum mechanics',
+    });
+    const response = await createPodcast(request);
+    const result = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(result).toMatchObject({ code: 'tts_provider_required' });
+    expect(mockPodcastCreate).not.toHaveBeenCalled();
+    expect(mockAddJob).not.toHaveBeenCalled();
   });
 
   it('creates podcast with optional voice IDs', async () => {
@@ -360,6 +365,7 @@ describe('POST /api/podcasts', () => {
     const body = {
       title: 'Test Podcast',
       topic: 'Test topic',
+      ...explicitTtsSelection,
       hostVoiceId: 'voice-host-custom',
       expertVoiceId: 'voice-expert-custom',
     };
@@ -460,7 +466,6 @@ describe('POST /api/podcasts', () => {
     expect(result).toHaveProperty('error', 'Rate limit exceeded');
     expect(result).toHaveProperty('resetAt');
   });
-
 });
 
 describe('GET /api/podcasts/[podcastId]', () => {
@@ -494,7 +499,7 @@ describe('GET /api/podcasts/[podcastId]', () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.id).toBe('pod-1');
-    expect(body.isLiked).toBe(false);
+    expect(body).not.toHaveProperty('isLiked');
     expect(body.isSaved).toBe(false);
   });
 
@@ -536,7 +541,6 @@ describe('GET /api/podcasts/[podcastId]', () => {
       ...mockPodcastWithRelations,
       visibility: 'PRIVATE',
     });
-    mockLikeFindUnique.mockResolvedValue(null);
     mockSaveFindUnique.mockResolvedValue(null);
 
     const request = createGetRequest('/api/podcasts/pod-1');
@@ -555,7 +559,6 @@ describe('GET /api/podcasts/[podcastId]', () => {
       ...mockPodcastWithRelations,
       visibility: 'UNLISTED',
     });
-    mockLikeFindUnique.mockResolvedValue(null);
     mockSaveFindUnique.mockResolvedValue(null);
 
     const request = createGetRequest('/api/podcasts/pod-1');
@@ -566,30 +569,9 @@ describe('GET /api/podcasts/[podcastId]', () => {
     expect(response.status).toBe(200);
   });
 
-  it('includes isLiked=true when user has liked the podcast', async () => {
-    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
-    mockPrisma.podcast.findUnique.mockResolvedValue(mockPodcastWithRelations);
-    mockLikeFindUnique.mockResolvedValue({
-      userId: 'user-1',
-      podcastId: 'pod-1',
-      createdAt: new Date(),
-    });
-    mockSaveFindUnique.mockResolvedValue(null);
-
-    const request = createGetRequest('/api/podcasts/pod-1');
-    const response = await getPodcast(request, {
-      params: Promise.resolve({ podcastId: 'pod-1' }),
-    });
-    const body = await response.json();
-
-    expect(body.isLiked).toBe(true);
-    expect(body.isSaved).toBe(false);
-  });
-
   it('includes isSaved=true when user has saved the podcast', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockPrisma.podcast.findUnique.mockResolvedValue(mockPodcastWithRelations);
-    mockLikeFindUnique.mockResolvedValue(null);
     mockSaveFindUnique.mockResolvedValue({
       userId: 'user-1',
       podcastId: 'pod-1',
@@ -602,7 +584,7 @@ describe('GET /api/podcasts/[podcastId]', () => {
     });
     const body = await response.json();
 
-    expect(body.isLiked).toBe(false);
+    expect(body).not.toHaveProperty('isLiked');
     expect(body.isSaved).toBe(true);
   });
 
@@ -743,23 +725,12 @@ describe('PATCH /api/podcasts/[podcastId]', () => {
     expect(body.visibility).toBe('PRIVATE');
   });
 
-  it('rejects PRIVATE visibility for free tier user', async () => {
+  it('updates podcast visibility to PRIVATE for free tier user', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockPodcastFindUnique.mockResolvedValue({ userId: 'user-1' });
-    mockUserFindUniqueOrThrow.mockResolvedValue({ plan: 'FREE', role: 'USER' });
-    const { getTierFeatures } = await import('@/lib/tier-features');
-    (getTierFeatures as ReturnType<typeof vi.fn>).mockReturnValue({
-      privateAllowed: false,
-      maxDurationMinutes: 5,
-      maxSpeakers: 2,
-      autoApproveScript: true,
-      webSearchEnabled: false,
-      maxQaInteractions: 3,
-      priorityQueue: false,
-      analyticsEnabled: false,
-      voiceTracksEnabled: false,
-      maxVoiceTracks: 0,
-      voiceCloningEnabled: false,
+    mockPodcastUpdate.mockResolvedValue({
+      ...mockPodcastWithRelations,
+      visibility: 'PRIVATE',
     });
 
     const request = createPatchRequest('/api/podcasts/pod-1', { visibility: 'PRIVATE' });
@@ -767,28 +738,17 @@ describe('PATCH /api/podcasts/[podcastId]', () => {
       params: Promise.resolve({ podcastId: 'pod-1' }),
     });
 
-    expect(response.status).toBe(403);
+    expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body.error).toContain('Private and unlisted podcasts require a Pro subscription');
+    expect(body.visibility).toBe('PRIVATE');
   });
 
-  it('rejects UNLISTED visibility for free tier user', async () => {
+  it('updates podcast visibility to UNLISTED for free tier user', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockPodcastFindUnique.mockResolvedValue({ userId: 'user-1' });
-    mockUserFindUniqueOrThrow.mockResolvedValue({ plan: 'FREE', role: 'USER' });
-    const { getTierFeatures } = await import('@/lib/tier-features');
-    (getTierFeatures as ReturnType<typeof vi.fn>).mockReturnValue({
-      privateAllowed: false,
-      maxDurationMinutes: 5,
-      maxSpeakers: 2,
-      autoApproveScript: true,
-      webSearchEnabled: false,
-      maxQaInteractions: 3,
-      priorityQueue: false,
-      analyticsEnabled: false,
-      voiceTracksEnabled: false,
-      maxVoiceTracks: 0,
-      voiceCloningEnabled: false,
+    mockPodcastUpdate.mockResolvedValue({
+      ...mockPodcastWithRelations,
+      visibility: 'UNLISTED',
     });
 
     const request = createPatchRequest('/api/podcasts/pod-1', { visibility: 'UNLISTED' });
@@ -796,9 +756,9 @@ describe('PATCH /api/podcasts/[podcastId]', () => {
       params: Promise.resolve({ podcastId: 'pod-1' }),
     });
 
-    expect(response.status).toBe(403);
+    expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body.error).toContain('Private and unlisted podcasts require a Pro subscription');
+    expect(body.visibility).toBe('UNLISTED');
   });
 
   it('returns 400 for invalid visibility value', async () => {
@@ -867,10 +827,6 @@ describe('PATCH /api/podcasts/[podcastId]', () => {
 describe('DELETE /api/podcasts/[podcastId]', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // $transaction executes the callback with a tx that delegates to the same mocks
-    mockTransaction.mockImplementation((fn: (tx: typeof mockPrisma) => Promise<unknown>) =>
-      fn(mockPrisma)
-    );
   });
 
   it('returns 401 when not authenticated', async () => {
@@ -902,7 +858,7 @@ describe('DELETE /api/podcasts/[podcastId]', () => {
 
   it('returns 403 when user is not the owner', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-2' });
-    mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1', forkedFromId: null });
+    mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1' });
 
     const request = createDeleteRequest('/api/podcasts/pod-1');
     const response = await deletePodcast(request, {
@@ -916,7 +872,7 @@ describe('DELETE /api/podcasts/[podcastId]', () => {
 
   it('soft-deletes podcast when user is owner', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
-    mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1', forkedFromId: null });
+    mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1' });
     mockPrisma.podcast.update.mockResolvedValue(mockPodcast);
 
     const request = createDeleteRequest('/api/podcasts/pod-1');
@@ -925,20 +881,9 @@ describe('DELETE /api/podcasts/[podcastId]', () => {
     });
 
     expect(response.status).toBe(204);
-  });
-
-  it('decrements parent forkCount when soft-deleting a forked podcast', async () => {
-    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
-    mockPrisma.podcast.findUnique
-      .mockResolvedValueOnce({ userId: 'user-1', forkedFromId: 'parent-1' })
-      .mockResolvedValueOnce({ id: 'parent-1' });
-    mockPrisma.podcast.update.mockResolvedValue(mockPodcast);
-
-    const request = createDeleteRequest('/api/podcasts/pod-1');
-    const response = await deletePodcast(request, {
-      params: Promise.resolve({ podcastId: 'pod-1' }),
+    expect(mockPodcastUpdate).toHaveBeenCalledWith({
+      where: { id: 'pod-1' },
+      data: { deletedAt: expect.any(Date) },
     });
-
-    expect(response.status).toBe(204);
   });
 });

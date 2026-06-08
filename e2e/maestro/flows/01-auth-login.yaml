@@ -1,15 +1,15 @@
 appId: fm.sotto.app
-name: Auth - Login and Verify Feed
+name: Auth - Login and Verify Library
 tags: [auth, critical]
 ---
 - extendedWaitUntil:
     visible:
-      id: "login-email-input"
+      id: 'login-email-input'
     timeout: 10000
 - runFlow: ../helpers/login.yaml
 - assertVisible:
-    id: "feed-mode-foryou"
+    id: 'library-filter-all'
 - assertVisible:
-    id: "feed-podcast-list"
+    id: 'library-podcast-list'
 - takeScreenshot: after-login
-- assertWithAI: "A podcast feed with at least one podcast card is visible"
+- assertWithAI: 'A private podcast library with at least one podcast card is visible'

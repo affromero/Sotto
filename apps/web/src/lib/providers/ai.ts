@@ -125,6 +125,7 @@ class AnthropicProvider implements AIProvider {
     yield* claude.streamResponse(system, messages, {
       maxTokens: opts?.maxTokens,
       model: opts?.model,
+      apiKeyOverride: opts?.apiKeyOverride,
       ...(tools ? { tools } : {}),
     });
   }
@@ -392,17 +393,47 @@ class GoogleProvider implements AIProvider {
   }
 }
 
-export function createAIProvider(type?: string): AIProvider {
+class ClaudeCodeLazyProvider implements AIProvider {
+  private async createProvider(): Promise<AIProvider> {
+    const { ClaudeCodeProvider } = await import('./claude-code');
+    return new ClaudeCodeProvider();
+  }
+
+  async generateResponse(
+    system: string,
+    messages: ChatMessage[],
+    opts?: AIOptions
+  ): Promise<AIResponse> {
+    const provider = await this.createProvider();
+    return provider.generateResponse(system, messages, opts);
+  }
+
+  async *streamResponse(
+    system: string,
+    messages: ChatMessage[],
+    opts?: AIOptions
+  ): AsyncGenerator<string> {
+    const provider = await this.createProvider();
+    yield* provider.streamResponse(system, messages, opts);
+  }
+}
+
+export function createAIProvider(type: string): AIProvider {
+  if (!type) {
+    throw new Error('AI provider type is required. Pass an explicit provider from the AI registry.');
+  }
+
   switch (type) {
     case 'anthropic':
-    case undefined:          // getProviders() singleton — default to Anthropic
       return new AnthropicProvider();
     case 'openai':
       return new OpenAIProvider();
     case 'google':
       return new GoogleProvider();
+    case 'claude-code':
+      return new ClaudeCodeLazyProvider();
     default:
-      throw new Error(`Unknown AI provider type: "${type}". Registered providers: anthropic, openai, google`);
+      throw new Error(`Unknown AI provider type: "${type}". Registered providers: anthropic, openai, google, claude-code`);
   }
 }
 
@@ -412,4 +443,3 @@ export interface ResolvedAiProvider {
   apiKey?: string;
   model?: string;
 }
-

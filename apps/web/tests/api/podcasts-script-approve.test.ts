@@ -67,10 +67,6 @@ vi.mock('@/lib/tts-tag-converter', () => ({
   convertTurnsForProvider: (...args: unknown[]) => mockConvertTurnsForProvider(...args),
 }));
 
-vi.mock('@/lib/byok', () => ({
-  getByokKey: vi.fn().mockResolvedValue(null),
-}));
-
 vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
@@ -210,7 +206,7 @@ describe('POST /api/podcasts/[podcastId]/script/approve', () => {
       expect(mockSelectFreeTierProviders).not.toHaveBeenCalled();
     });
 
-    it('leaves ttsProvider null for BYOK user when no body provider', async () => {
+    it('uses existing ttsProvider for BYOK user when no body provider is provided', async () => {
       mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
       mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', isByokUser: true });
       mockPodcastFindUnique.mockResolvedValue({ userId: 'user-1', status: 'SCRIPT_READY' });
@@ -219,13 +215,37 @@ describe('POST /api/podcasts/[podcastId]/script/approve', () => {
       const response = await POST(createRequest(), await createParams('pod-1'));
 
       expect(response.status).toBe(200);
-      // Should NOT write ttsProvider for BYOK without explicit selection
       const providerUpdateCalls = mockPodcastUpdate.mock.calls.filter(
         (call: unknown[]) => (call[0] as Record<string, unknown>).data &&
           'ttsProvider' in ((call[0] as Record<string, Record<string, unknown>>).data)
       );
       expect(providerUpdateCalls).toHaveLength(0);
       expect(mockSelectFreeTierProviders).not.toHaveBeenCalled();
+      expect(mockAssignVoicesForPodcast).toHaveBeenCalledWith(
+        'pod-1',
+        expect.any(Array),
+        'elevenlabs'
+      );
+    });
+
+    it('requires a ttsProvider for BYOK user when none is selected or persisted', async () => {
+      mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+      mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', isByokUser: true });
+      mockPodcastFindUnique.mockResolvedValue({ userId: 'user-1', status: 'SCRIPT_READY' });
+      mockPodcastFindUniqueOrThrow.mockResolvedValueOnce({ ttsProvider: null });
+
+      const response = await POST(createRequest(), await createParams('pod-1'));
+      const body = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(body).toMatchObject({
+        error: 'Choose a TTS provider before approving the script.',
+        code: 'tts_provider_required',
+      });
+      expect(mockSelectFreeTierProviders).not.toHaveBeenCalled();
+      expect(mockScriptFindUnique).not.toHaveBeenCalled();
+      expect(mockAssignVoicesForPodcast).not.toHaveBeenCalled();
+      expect(mockCreateSegmentsAndQueueAudio).not.toHaveBeenCalled();
     });
 
     it('auto-selects ttsProvider for free-tier user', async () => {
@@ -296,8 +316,7 @@ describe('POST /api/podcasts/[podcastId]/script/approve', () => {
           expect.objectContaining({ name: 'HOST' }),
           expect.objectContaining({ name: 'EXPERT' }),
         ]),
-        'elevenlabs',
-        undefined,
+        'elevenlabs'
       );
       // Voice assignment must happen before segment creation
       const assignOrder = mockAssignVoicesForPodcast.mock.invocationCallOrder[0];
@@ -326,8 +345,7 @@ describe('POST /api/podcasts/[podcastId]/script/approve', () => {
           expect.objectContaining({ name: 'HOST' }),
           expect.objectContaining({ name: 'EXPERT' }),
         ]),
-        'elevenlabs',
-        undefined,
+        'elevenlabs'
       );
     });
 
@@ -355,8 +373,7 @@ describe('POST /api/podcasts/[podcastId]/script/approve', () => {
           expect.objectContaining({ name: 'HOST' }),
           expect.objectContaining({ name: 'EXPERT' }),
         ]),
-        'elevenlabs',
-        undefined,
+        'elevenlabs'
       );
     });
 
@@ -387,8 +404,7 @@ describe('POST /api/podcasts/[podcastId]/script/approve', () => {
       expect(mockAssignVoicesForPodcast).toHaveBeenCalledWith(
         'pod-1',
         [{ name: 'ALICE' }, { name: 'BOB' }],
-        'elevenlabs',
-        undefined,
+        'elevenlabs'
       );
     });
   });

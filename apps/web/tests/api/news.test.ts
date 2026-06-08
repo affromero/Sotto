@@ -7,6 +7,7 @@ const mockArticleFindFirst = vi.fn();
 const mockArticleGroupBy = vi.fn();
 const mockBriefingLogFindMany = vi.fn();
 const mockCheckRateLimit = vi.fn();
+const mockAuthenticateRequest = vi.fn();
 
 vi.mock('@/lib/prisma', () => {
   const _mockPrisma = {
@@ -24,6 +25,10 @@ vi.mock('@/lib/prisma', () => {
 
 vi.mock('@/lib/redis', () => ({
   checkRateLimit: (...args: unknown[]) => mockCheckRateLimit(...args),
+}));
+
+vi.mock('@/lib/api-keys', () => ({
+  authenticateRequest: (...args: unknown[]) => mockAuthenticateRequest(...args),
 }));
 
 import { GET } from '@/app/api/news/route';
@@ -47,6 +52,7 @@ const mockArticle = {
 };
 
 function setupDefaultMocks() {
+  mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
   mockCheckRateLimit.mockResolvedValue({ allowed: true });
   mockArticleFindMany.mockResolvedValue([mockArticle]);
   mockArticleFindFirst.mockResolvedValue({ fetchedAt: new Date('2026-03-18T06:00:00Z') });
@@ -67,6 +73,19 @@ function setupDefaultMocks() {
 describe('GET /api/news', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+  });
+
+  it('returns 401 when unauthenticated', async () => {
+    mockAuthenticateRequest.mockResolvedValue(null);
+
+    const response = await GET(createRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(401);
+    expect(body).toHaveProperty('error');
+    expect(mockCheckRateLimit).not.toHaveBeenCalled();
+    expect(mockArticleFindMany).not.toHaveBeenCalled();
   });
 
   it('returns articles with correct NewsResponse shape', async () => {
@@ -82,6 +101,7 @@ describe('GET /api/news', () => {
     expect(body.meta).toHaveProperty('latestFetchedAt');
     expect(body.meta).toHaveProperty('sourceCount');
     expect(body.meta).toHaveProperty('categoryCounts');
+    expect(mockCheckRateLimit).toHaveBeenCalledWith('news:user-1', 30, 60);
   });
 
   it('returns article data with serialized pubDate', async () => {
@@ -124,7 +144,7 @@ describe('GET /api/news', () => {
     expect(body.meta.sourceCount).toBe(0);
   });
 
-  it('attaches related briefing podcast when BriefingLog matches article URL', async () => {
+  it('attaches only owner-scoped related briefing podcast ids', async () => {
     mockCheckRateLimit.mockResolvedValue({ allowed: true });
     mockArticleFindMany.mockResolvedValue([mockArticle]);
     mockArticleFindFirst.mockResolvedValue({ fetchedAt: new Date() });
@@ -132,7 +152,7 @@ describe('GET /api/news', () => {
     mockBriefingLogFindMany.mockResolvedValue([
       {
         articleUrls: ['https://reuters.com/ai-protein', 'https://other.com/x'],
-        podcast: { id: 'pod-1', slug: 'ai-briefing', user: { handle: 'sotto' } },
+        podcastId: 'pod-1',
       },
     ]);
 
@@ -141,8 +161,12 @@ describe('GET /api/news', () => {
 
     const article = body.articles[0];
     expect(article.relatedPodcastId).toBe('pod-1');
-    expect(article.relatedPodcastSlug).toBe('ai-briefing');
-    expect(article.relatedUserHandle).toBe('sotto');
+    expect(article).not.toHaveProperty('relatedPodcastSlug');
+    expect(article).not.toHaveProperty('relatedUserHandle');
+    expect(mockBriefingLogFindMany).toHaveBeenCalledWith({
+      where: { userId: 'user-1', articleUrls: { hasSome: ['https://reuters.com/ai-protein'] } },
+      select: { articleUrls: true, podcastId: true },
+    });
   });
 
   it('does not attach podcast fields when no BriefingLog matches', async () => {

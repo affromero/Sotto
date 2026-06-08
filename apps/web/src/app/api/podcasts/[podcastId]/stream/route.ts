@@ -1,4 +1,7 @@
 import { NextRequest } from 'next/server';
+import { errorResponse } from '@/lib/api-response';
+import { auth } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
 import { createPodcastStatusSubscriber } from '@/lib/redis';
 import { logger } from '@/lib/logger';
 
@@ -10,14 +13,33 @@ export const runtime = 'nodejs';
  * Subscribes to a Redis pub/sub channel for the given podcast
  * and streams status change events as they arrive.
  *
- * No auth required — podcast status is public for public podcasts.
- * (Private podcast access is gated at the data level, not the stream.)
+ * Access is owner-only so generation status cannot leak across tenants.
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ podcastId: string }> },
+  { params }: { params: Promise<{ podcastId: string }> }
 ) {
   const { podcastId } = await params;
+  const session = await auth();
+  const userId = session?.user?.id;
+
+  if (!userId) {
+    return errorResponse('Unauthorized', 401);
+  }
+
+  const podcast = await prisma.podcast.findUnique({
+    where: { id: podcastId },
+    select: { userId: true },
+  });
+
+  if (!podcast) {
+    return errorResponse('Podcast not found', 404);
+  }
+
+  if (podcast.userId !== userId) {
+    return errorResponse('Forbidden', 403);
+  }
+
   const subscriber = createPodcastStatusSubscriber(podcastId);
 
   const stream = new ReadableStream({

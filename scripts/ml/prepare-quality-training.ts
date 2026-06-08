@@ -1,11 +1,11 @@
 /**
- * Generate (podcast_features, quality_label) pairs from aggregate engagement.
+ * Generate (podcast_features, quality_label) pairs from private activity.
  *
  * Output: JSONL file with schema:
  *   { podcastId, features: {...}, qualityLabel }
  *
  * Quality labels:
- *   - excellent: avgCompletionRate >= 80%, likeToListenRatio >= 0.3
+ *   - excellent: avgCompletionRate >= 80%, saveToListenRatio >= 0.15
  *   - good: avgCompletionRate >= 60%
  *   - average: avgCompletionRate >= 40%
  *   - poor: avgCompletionRate < 40%
@@ -34,7 +34,7 @@ async function main() {
 
   for (const f of features) {
     const label =
-      f.avgCompletionRate >= 80 && f.likeToListenRatio >= 0.3
+      f.avgCompletionRate >= 80 && f.saveToListenRatio >= 0.15
         ? 'excellent'
         : f.avgCompletionRate >= 60
           ? 'good'
@@ -49,9 +49,7 @@ async function main() {
         medianCompletionRate: f.medianCompletionRate,
         totalUniqueListeners: f.totalUniqueListeners,
         totalListenMinutes: f.totalListenMinutes,
-        likeToListenRatio: f.likeToListenRatio,
         saveToListenRatio: f.saveToListenRatio,
-        forkToListenRatio: f.forkToListenRatio,
         interactionRate: f.interactionRate,
         relistenRate: f.relistenRate,
         avgListenSpeed: f.avgListenSpeed,

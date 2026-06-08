@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import robots from '@/app/robots';
 
 interface Rule {
@@ -7,8 +7,18 @@ interface Rule {
 }
 
 describe('robots.ts', () => {
-  const result = robots();
-  const rules = result.rules as Rule[];
+  let result: ReturnType<typeof robots>;
+  let rules: Rule[];
+
+  beforeEach(() => {
+    vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://selfhost.example.com');
+    result = robots();
+    rules = result.rules as Rule[];
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
 
   it('returns a default rule for all user agents', () => {
     const defaultRule = rules.find((r) => r.userAgent === '*');
@@ -58,6 +68,6 @@ describe('robots.ts', () => {
   });
 
   it('references the sitemap', () => {
-    expect(result.sitemap).toBe('https://sotto.fm/sitemap.xml');
+    expect(result.sitemap).toBe('https://selfhost.example.com/sitemap.xml');
   });
 });

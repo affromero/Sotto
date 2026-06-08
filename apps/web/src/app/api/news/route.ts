@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { NEWS_CATEGORIES } from '@sotto/shared';
 import { prisma } from '@/lib/prisma';
+import { authenticateRequest } from '@/lib/api-keys';
 import { errorResponse } from '@/lib/api-response';
 import { checkRateLimit } from '@/lib/redis';
 import type { NewsResponse } from '@/types/news';
@@ -22,13 +23,16 @@ const TIME_RANGE_MS: Record<string, number> = {
 };
 
 /**
- * GET /api/news — Public browsable news feed
+ * GET /api/news — Authenticated news source feed
  * Query params: category, timeRange, limit, cursor
  */
 export async function GET(request: NextRequest) {
-  // Rate limit: 30 req/min per IP
-  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
-  const { allowed } = await checkRateLimit(`news:${ip}`, 30, 60);
+  const authResult = await authenticateRequest(request);
+  if (!authResult) {
+    return errorResponse('Unauthorized', 401);
+  }
+
+  const { allowed } = await checkRateLimit(`news:${authResult.userId}`, 30, 60);
   if (!allowed) {
     return errorResponse('Too many requests', 429);
   }
@@ -36,7 +40,10 @@ export async function GET(request: NextRequest) {
   const searchParams = Object.fromEntries(request.nextUrl.searchParams);
   const parsed = newsQuerySchema.safeParse(searchParams);
   if (!parsed.success) {
-    return errorResponse(`Invalid query: ${parsed.error.issues.map((i) => i.message).join(', ')}`, 400);
+    return errorResponse(
+      `Invalid query: ${parsed.error.issues.map((i) => i.message).join(', ')}`,
+      400
+    );
   }
 
   const { category, timeRange, limit, cursor } = parsed.data;
@@ -82,27 +89,24 @@ export async function GET(request: NextRequest) {
   const results = hasMore ? articles.slice(0, limit) : articles;
   const nextCursor = hasMore ? results[results.length - 1].id : null;
 
-  // Look up related briefing podcasts by article URL
+  // Look up this user's related briefing podcasts by article URL.
   const articleUrls = results.map((a) => a.url);
-  const briefingLogs = articleUrls.length > 0
-    ? await prisma.briefingLog.findMany({
-        where: { articleUrls: { hasSome: articleUrls } },
-        select: {
-          articleUrls: true,
-          podcast: { select: { id: true, slug: true, user: { select: { handle: true } } } },
-        },
-      })
-    : [];
+  const briefingLogs =
+    articleUrls.length > 0
+      ? await prisma.briefingLog.findMany({
+          where: { userId: authResult.userId, articleUrls: { hasSome: articleUrls } },
+          select: {
+            articleUrls: true,
+            podcastId: true,
+          },
+        })
+      : [];
 
-  const urlToPodcast = new Map<string, { id: string; slug: string | null; handle: string | null }>();
+  const urlToPodcastId = new Map<string, string>();
   for (const log of briefingLogs) {
     for (const url of log.articleUrls) {
-      if (!urlToPodcast.has(url)) {
-        urlToPodcast.set(url, {
-          id: log.podcast.id,
-          slug: log.podcast.slug,
-          handle: log.podcast.user.handle,
-        });
+      if (!urlToPodcastId.has(url)) {
+        urlToPodcastId.set(url, log.podcastId);
       }
     }
   }
@@ -117,15 +121,11 @@ export async function GET(request: NextRequest) {
 
   const response: NewsResponse = {
     articles: results.map((a) => {
-      const related = urlToPodcast.get(a.url);
+      const relatedPodcastId = urlToPodcastId.get(a.url);
       return {
         ...a,
         pubDate: a.pubDate?.toISOString() ?? null,
-        ...(related ? {
-          relatedPodcastId: related.id,
-          relatedPodcastSlug: related.slug ?? undefined,
-          relatedUserHandle: related.handle ?? undefined,
-        } : {}),
+        ...(relatedPodcastId ? { relatedPodcastId } : {}),
       };
     }),
     nextCursor,

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
 // ---- Mocks ----
@@ -90,8 +90,27 @@ vi.mock('@/lib/pipeline-resume', () => ({
   determineResumePoint: (...args: unknown[]) => mockDetermineResumePoint(...args),
 }));
 
-const mockCheckGenerationGate = vi.fn().mockResolvedValue({ allowed: true, reason: 'ok', isByokUser: true });
-const mockGetAutoModelConfig = vi.fn().mockResolvedValue({ free: { aiProvider: 'anthropic', aiModel: 'claude-haiku-4-5-20251001', ttsProvider: 'openai', ttsModel: 'tts-1-hd', sttProvider: 'openai', sttModel: 'whisper-1' }, dailyGenerationLimit: 3, dailyGenerationLimitPro: 5, dailyVideoLimit: 1, dailyVideoLimitPro: 2, dailyAvatarLimit: 1, dailyAvatarLimitPro: 1, ttsAllocations: [], aiAllocations: [] });
+const mockCheckGenerationGate = vi
+  .fn()
+  .mockResolvedValue({ allowed: true, reason: 'ok', isByokUser: true });
+const mockGetAutoModelConfig = vi.fn().mockResolvedValue({
+  free: {
+    aiProvider: 'anthropic',
+    aiModel: 'claude-haiku-4-5-20251001',
+    ttsProvider: 'openai',
+    ttsModel: 'tts-1-hd',
+    sttProvider: 'openai',
+    sttModel: 'whisper-1',
+  },
+  dailyGenerationLimit: 3,
+  dailyGenerationLimitPro: 5,
+  dailyVideoLimit: 1,
+  dailyVideoLimitPro: 2,
+  dailyAvatarLimit: 1,
+  dailyAvatarLimitPro: 1,
+  ttsAllocations: [],
+  aiAllocations: [],
+});
 
 vi.mock('@/lib/generation-gate', () => ({
   checkGenerationGate: (...args: unknown[]) => mockCheckGenerationGate(...args),
@@ -99,19 +118,15 @@ vi.mock('@/lib/generation-gate', () => ({
 
 vi.mock('@/lib/auto-model-config', () => ({
   getAutoModelConfig: (...args: unknown[]) => mockGetAutoModelConfig(...args),
-  resolveAutoModel: vi.fn().mockResolvedValue({
-    aiProvider: 'anthropic',
-    aiModel: 'claude-haiku-4-5-20251001',
-    ttsProvider: 'openai',
-    ttsModel: 'tts-1-hd',
-    sttProvider: 'openai',
-    sttModel: 'whisper-1',
-  }),
 }));
 
 const mockSelectFreeTierProviders = vi.fn().mockResolvedValue({
-  aiProvider: 'anthropic', aiModel: 'claude-haiku-4-5-20251001', aiQuota: 10,
-  ttsProvider: 'elevenlabs', ttsModel: 'eleven_multilingual_v2', ttsQuota: 10,
+  aiProvider: 'anthropic',
+  aiModel: 'claude-haiku-4-5-20251001',
+  aiQuota: 10,
+  ttsProvider: 'elevenlabs',
+  ttsModel: 'eleven_multilingual_v2',
+  ttsQuota: 10,
 });
 
 vi.mock('@/lib/free-tier-provider-selector', () => ({
@@ -162,7 +177,10 @@ import { POST } from '@/app/api/podcasts/[podcastId]/generate/route';
 
 // ---- Helpers ----
 
-function createMockRequest(searchParams?: Record<string, string>, body?: Record<string, unknown>): NextRequest {
+function createMockRequest(
+  searchParams?: Record<string, string>,
+  body?: Record<string, unknown>
+): NextRequest {
   const url = new URL('http://localhost/api/podcasts/p/generate');
   if (searchParams) {
     for (const [k, v] of Object.entries(searchParams)) {
@@ -194,6 +212,10 @@ describe('POST /api/podcasts/[podcastId]/generate', () => {
     mockPrismaPodcastUpdate.mockResolvedValue({});
     mockPrismaPodcastUpdateMany.mockResolvedValue({ count: 1 });
     mockAddJob.mockResolvedValue({ id: 'job-1' });
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it('returns 401 for unauthenticated request', async () => {
@@ -261,7 +283,11 @@ describe('POST /api/podcasts/[podcastId]/generate', () => {
 
   it('returns 403 when TTS provider not configured', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-001' });
-    mockCheckGenerationGate.mockResolvedValue({ allowed: false, reason: 'no_provider', isByokUser: false });
+    mockCheckGenerationGate.mockResolvedValue({
+      allowed: false,
+      reason: 'no_provider',
+      isByokUser: false,
+    });
 
     const request = createMockRequest();
     const params = await createMockParams('podcast-noai');
@@ -274,7 +300,11 @@ describe('POST /api/podcasts/[podcastId]/generate', () => {
 
   it('returns 429 when rate limited', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-001' });
-    mockCheckRateLimit.mockResolvedValue({ allowed: false, remaining: 0, resetAt: Date.now() + 3600000 });
+    mockCheckRateLimit.mockResolvedValue({
+      allowed: false,
+      remaining: 0,
+      resetAt: Date.now() + 3600000,
+    });
 
     const request = createMockRequest();
     const params = await createMockParams('podcast-rl');
@@ -306,6 +336,68 @@ describe('POST /api/podcasts/[podcastId]/generate', () => {
 
     expect(response.status).toBe(200);
     expect(data).toEqual({ success: true, message: 'Generation started' });
+  });
+
+  describe('import retry STT routing', () => {
+    it('rejects import restart when no STT provider is persisted', async () => {
+      mockAuthenticateRequest.mockResolvedValue({ userId: 'user-001' });
+      mockPrismaPodcastFindUnique.mockResolvedValue({
+        id: 'podcast-import',
+        userId: 'user-001',
+        status: 'PENDING',
+        source: 'IMPORT',
+        importedAudioKey: 'imports/podcast-import/original.mp3',
+        sttProvider: null,
+        sttModel: null,
+        isHumanContent: false,
+        title: 'Imported podcast',
+        discovery: null,
+      });
+
+      const request = createMockRequest();
+      const params = await createMockParams('podcast-import');
+      const response = await POST(request, params);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data).toMatchObject({ code: 'stt_provider_required' });
+      expect(mockAddJob).not.toHaveBeenCalled();
+    });
+
+    it('queues import restart with the stored STT provider and model', async () => {
+      vi.stubEnv('OPENAI_API_KEY', 'sk-platform');
+      mockAuthenticateRequest.mockResolvedValue({ userId: 'user-001' });
+      mockPrismaPodcastFindUnique.mockResolvedValue({
+        id: 'podcast-import',
+        userId: 'user-001',
+        status: 'PENDING',
+        source: 'IMPORT',
+        importedAudioKey: 'imports/podcast-import/original.mp3',
+        sttProvider: 'openai',
+        sttModel: 'whisper-1',
+        isHumanContent: false,
+        title: 'Imported podcast',
+        discovery: null,
+      });
+
+      const request = createMockRequest();
+      const params = await createMockParams('podcast-import');
+      const response = await POST(request, params);
+
+      expect(response.status).toBe(200);
+      expect(mockAddJob).toHaveBeenCalledWith(
+        { name: 'audio-import' },
+        'import_audio',
+        expect.objectContaining({
+          podcastId: 'podcast-import',
+          userId: 'user-001',
+          sttProvider: 'openai',
+          sttModel: 'whisper-1',
+          sttApiKey: 'sk-platform',
+        }),
+        expect.objectContaining({ jobId: expect.stringMatching(/^import-podcast-import-\d+$/) })
+      );
+    });
   });
 
   it('returns 400 when duration exceeds limit', async () => {
@@ -566,7 +658,11 @@ describe('POST /api/podcasts/[podcastId]/generate', () => {
     it('admin skips rate limit', async () => {
       mockRequireAdmin.mockResolvedValue('admin-user-id');
       mockAuthenticateRequest.mockResolvedValue({ userId: 'admin-user-id' });
-      mockCheckRateLimit.mockResolvedValue({ allowed: false, remaining: 0, resetAt: Date.now() + 3600000 });
+      mockCheckRateLimit.mockResolvedValue({
+        allowed: false,
+        remaining: 0,
+        resetAt: Date.now() + 3600000,
+      });
       mockPrismaPodcastFindUnique.mockResolvedValue({
         id: 'podcast-rl-admin',
         userId: 'admin-user-id',
@@ -587,7 +683,11 @@ describe('POST /api/podcasts/[podcastId]/generate', () => {
     it('admin skips generation gate', async () => {
       mockRequireAdmin.mockResolvedValue('admin-user-id');
       mockAuthenticateRequest.mockResolvedValue({ userId: 'admin-user-id' });
-      mockCheckGenerationGate.mockResolvedValue({ allowed: false, reason: 'no_provider', isByokUser: false });
+      mockCheckGenerationGate.mockResolvedValue({
+        allowed: false,
+        reason: 'no_provider',
+        isByokUser: false,
+      });
       mockPrismaPodcastFindUnique.mockResolvedValue({
         id: 'podcast-gate-admin',
         userId: 'admin-user-id',

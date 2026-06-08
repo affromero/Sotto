@@ -40,7 +40,7 @@ export function DiscoveryParamsCard({ metadata, onUpdate }: DiscoveryParamsCardP
         <PillGroup
           options={DEPTH_OPTIONS}
           selected={metadata.depth ?? 'standard'}
-          onChange={(value) => onUpdate({ depth: value })}
+          onChange={(value) => onUpdate({ depth: value as DiscoveryMetadata['depth'] })}
           testIDPrefix="params-depth"
         />
       </View>
@@ -60,7 +60,9 @@ export function DiscoveryParamsCard({ metadata, onUpdate }: DiscoveryParamsCardP
         <PillGroup
           options={AUDIENCE_OPTIONS}
           selected={metadata.audienceLevel ?? 'intermediate'}
-          onChange={(value) => onUpdate({ audienceLevel: value })}
+          onChange={(value) =>
+            onUpdate({ audienceLevel: value as DiscoveryMetadata['audienceLevel'] })
+          }
           testIDPrefix="params-audience"
         />
       </View>

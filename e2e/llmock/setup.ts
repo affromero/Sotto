@@ -104,33 +104,6 @@ EXPERT: My pleasure. There's so much more to explore, and I'm excited to see whe
     }
   );
 
-  // Fork / remix — generates a remixed podcast script
-  mock.on(
-    {
-      predicate: (req) => {
-        const systemMsg = req.messages.find((m) => m.role === 'system');
-        const systemText = typeof systemMsg?.content === 'string' ? systemMsg.content : '';
-        return systemText.includes('fork') || systemText.includes('remix') || systemText.includes('Fork');
-      },
-    },
-    {
-      content: `HOST: Welcome to this remix where we take a fresh look at an existing conversation. [1]
-
-EXPERT: I love how we're building on what came before while adding a completely new perspective. [2]
-
-HOST: Let's dive into what makes this angle unique.
-
-EXPERT: The key difference here is that we're approaching it from a practical standpoint rather than theoretical.
-
-HOST: Fascinating. Thanks for this fresh take!
-
-[REFERENCES]
-[1] Original Podcast. (2025). "E2E Test Podcast." Sotto.
-[2] Remix Analysis. (2025). "Building on Ideas." Internal.
-[/REFERENCES]`,
-    }
-  );
-
   // Script editing / revision — returns a revised script
   mock.on(
     {

@@ -9,7 +9,6 @@ import { checkGenerationGate } from '@/lib/generation-gate';
 import { computeVoiceCharges } from '@/lib/voice-pricing';
 import { resolveTtsProvider } from '@/lib/providers';
 import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
-import { resolveAutoModel } from '@/lib/auto-model-config';
 import { checkRateLimit } from '@/lib/redis';
 import { checkSuspension } from '@/lib/auth-guards';
 import { getProviderMeta, type TtsProviderId } from '@/lib/providers/tts-registry';
@@ -25,16 +24,14 @@ type RouteParams = { params: Promise<{ podcastId: string }> };
  * Groups voices by provider+model pair.
  */
 function buildTrackName(
-  voices: Array<{ speaker: string; voiceId: string; providerId: TtsProviderId; ttsModel?: string }>,
+  voices: Array<{ speaker: string; voiceId: string; providerId: TtsProviderId; ttsModel?: string }>
 ): string {
   // Group by provider+model, preserving speaker order
   const byKey = new Map<string, string[]>();
   for (const v of voices) {
     const providerLabel = getProviderMeta(v.providerId).displayName;
     const key = v.ttsModel ? `${providerLabel} - ${formatModelName(v.ttsModel)}` : providerLabel;
-    const voiceName = v.voiceId
-      ? (findVoiceName(v.voiceId) ?? v.voiceId)
-      : 'Auto';
+    const voiceName = v.voiceId ? (findVoiceName(v.voiceId) ?? v.voiceId) : 'Auto';
     const existing = byKey.get(key) ?? [];
     existing.push(voiceName);
     byKey.set(key, existing);
@@ -50,7 +47,7 @@ function buildTrackName(
  * Sorted by speaker to be order-independent.
  */
 function buildVoiceFingerprint(
-  voices: Array<{ speaker: string; voiceId: string; providerId: string }>,
+  voices: Array<{ speaker: string; voiceId: string; providerId: string }>
 ): string {
   return voices
     .map((v) => `${v.speaker}:${v.providerId}:${v.voiceId || 'auto'}`)
@@ -76,7 +73,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     select: {
       userId: true,
       status: true,
-      segments: { orderBy: { order: 'asc' as const }, select: { id: true, speaker: true, text: true, order: true } },
+      segments: {
+        orderBy: { order: 'asc' as const },
+        select: { id: true, speaker: true, text: true, order: true },
+      },
     },
   });
 
@@ -95,10 +95,18 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     checkGenerationGate(userId),
     getPlanFeatureConfig(),
   ]);
-  const features = getTierFeatures(gate.isProUser ? 'PRO' : 'FREE', gate.isByokUser, session.user.role, voiceConfig);
+  const features = getTierFeatures(
+    gate.isProUser ? 'PRO' : 'FREE',
+    gate.isByokUser,
+    session.user.role,
+    voiceConfig
+  );
 
   if (!features.voiceTracksEnabled) {
-    return errorResponse('Voice tracks are not available on your plan. Upgrade to Pro or add your own API keys.', 403);
+    return errorResponse(
+      'Voice tracks are not available on your plan. Upgrade to Pro or add your own API keys.',
+      403
+    );
   }
 
   // Check track limit
@@ -120,9 +128,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   }
 
   if (!gate.allowed) {
-    const msg = gate.reason === 'generation_in_progress'
-      ? 'A podcast is already generating. Wait for it to finish before starting another.'
-      : 'No voice provider available. Add a TTS key in Settings for unlimited generation.';
+    const msg =
+      gate.reason === 'generation_in_progress'
+        ? 'A podcast is already generating. Wait for it to finish before starting another.'
+        : 'No voice provider available. Add a TTS key in Settings for unlimited generation.';
     return errorResponse(msg, 403, { code: gate.reason });
   }
 
@@ -136,7 +145,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   const { ttsProvider, ttsModel, voices, paymentIntentIds, skipPaidVoices } = parsed.data;
 
   // Check paid voices
-  const voicesWithIds = voices.filter(v => !!v.voiceId);
+  const voicesWithIds = voices.filter((v) => !!v.voiceId);
   if (!skipPaidVoices && !paymentIntentIds && voicesWithIds.length > 0) {
     const voiceCharges = await computeVoiceCharges(userId, voicesWithIds);
     if (voiceCharges.length > 0) {
@@ -144,9 +153,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
   }
 
-  const resolvedVoices = skipPaidVoices
-    ? voices.map(v => ({ ...v, voiceId: '' }))
-    : voices;
+  const resolvedVoices = skipPaidVoices ? voices.map((v) => ({ ...v, voiceId: '' })) : voices;
 
   // Verify payment intents
   if (paymentIntentIds) {
@@ -173,24 +180,31 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       }
     : undefined;
 
-  // Resolve TTS provider per speaker — same priority system as from-scratch generation.
-  // Use selectFreeTierProviders() for free users (allocation-based) or resolveAutoModel() for PRO
-  // to get the correct provider+model pair, avoiding default model fallbacks that BYOK keys may lack.
+  // Resolve TTS provider per speaker. Providerless voices require a request-level provider
+  // or a platform-selected provider; BYOK users must choose one explicitly.
   const plan = gate.isProUser ? 'PRO' : 'FREE';
-  const selected = gate.isByokUser
-    ? null
-    : await selectFreeTierProviders(userId);
-  const autoModel = selected
-    ? null
-    : await resolveAutoModel(plan);
-
-  const fallback = await resolveTtsProvider({
-    userId,
-    podcastId,
-    requestedProvider: (ttsProvider as TtsProviderId | null) ?? undefined,
-    requestedModel: ttsModel ?? selected?.ttsModel ?? autoModel?.ttsModel,
-    plan,
-  });
+  const selected = gate.isByokUser ? null : await selectFreeTierProviders(userId);
+  const selectedProviderId = selected?.ttsProvider as TtsProviderId | undefined;
+  const defaultProviderId = (ttsProvider as TtsProviderId | undefined) ?? selectedProviderId;
+  const defaultModel =
+    ttsModel ??
+    (selected && selectedProviderId === defaultProviderId ? selected.ttsModel : undefined);
+  const hasProviderlessVoice = resolvedVoices.some((v) => !v.provider);
+  let defaultResolved: Awaited<ReturnType<typeof resolveTtsProvider>> | null = null;
+  if (hasProviderlessVoice) {
+    if (!defaultProviderId) {
+      return errorResponse('Choose a TTS provider before creating a voice track.', 400, {
+        code: 'tts_provider_required',
+      });
+    }
+    defaultResolved = await resolveTtsProvider({
+      userId,
+      podcastId,
+      requestedProvider: defaultProviderId,
+      requestedModel: defaultModel,
+      plan,
+    });
+  }
 
   // Resolve per-voice provider: parse "elevenlabs:eleven_v3" → provider "elevenlabs", model "eleven_v3"
   // When no explicit model suffix, use the allocation/config model for that provider.
@@ -200,9 +214,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         const [providerKey, ...modelParts] = v.provider.split(':');
         const explicitModel = modelParts.join(':') || undefined;
         // Use explicit model, or the model from the same priority system as from-scratch
-        const modelForProvider = explicitModel
-          ?? (selected?.ttsProvider === providerKey ? selected.ttsModel : undefined)
-          ?? (autoModel?.ttsProvider === providerKey ? autoModel.ttsModel : undefined);
+        const modelForProvider =
+          explicitModel ??
+          (selected && selectedProviderId === providerKey ? selected.ttsModel : undefined) ??
+          (defaultProviderId === providerKey ? defaultModel : undefined);
         const resolved = await resolveTtsProvider({
           userId,
           podcastId,
@@ -210,12 +225,27 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           requestedModel: modelForProvider,
           plan,
         });
-        const voiceId = v.voiceId || resolved.provider.getVoiceId(v.speaker, podcastId, voiceMetadata);
-        return { speaker: v.speaker, voiceId, providerId: resolved.providerId, ttsModel: resolved.provider.getModelId() };
+        const voiceId =
+          v.voiceId || resolved.provider.getVoiceId(v.speaker, podcastId, voiceMetadata);
+        return {
+          speaker: v.speaker,
+          voiceId,
+          providerId: resolved.providerId,
+          ttsModel: resolved.provider.getModelId(),
+        };
       }
-      const voiceId = v.voiceId || fallback.provider.getVoiceId(v.speaker, podcastId, voiceMetadata);
-      return { speaker: v.speaker, voiceId, providerId: fallback.providerId, ttsModel: fallback.provider.getModelId() };
-    }),
+      if (!defaultResolved) {
+        throw new Error('Default TTS provider was not resolved for providerless voice');
+      }
+      const voiceId =
+        v.voiceId || defaultResolved.provider.getVoiceId(v.speaker, podcastId, voiceMetadata);
+      return {
+        speaker: v.speaker,
+        voiceId,
+        providerId: defaultResolved.providerId,
+        ttsModel: defaultResolved.provider.getModelId(),
+      };
+    })
   );
 
   // Dedup: check if a voice track with the exact same voice combination already exists
@@ -238,7 +268,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     if (existingFingerprint === fingerprint) {
       return NextResponse.json(
         { id: existing.id, status: existing.status, duplicate: true },
-        { status: 200 },
+        { status: 200 }
       );
     }
   }
@@ -247,15 +277,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   const name = buildTrackName(resolvedVoiceProviders);
 
   // Determine track-level provider for display — use first voice's provider or "mixed" if they differ
-  const uniqueProviders = [...new Set(resolvedVoiceProviders.map(v => v.providerId))];
+  const uniqueProviders = [...new Set(resolvedVoiceProviders.map((v) => v.providerId))];
   const trackProvider = uniqueProviders.length === 1 ? uniqueProviders[0] : 'mixed';
 
-  // Derive track-level model — match from-scratch pattern:
-  // BYOK users: null (worker resolves dynamically with BYOK→platform fallback)
-  // Free/Pro: use configured auto-model (same as selectFreeTierProviders)
-  const trackModel = gate.isByokUser
-    ? (ttsModel || null)
-    : (ttsModel || selected?.ttsModel || autoModel?.ttsModel || null);
+  const uniqueModels = [...new Set(resolvedVoiceProviders.map((v) => v.ttsModel).filter(Boolean))];
+  const trackModel = uniqueModels.length === 1 ? uniqueModels[0] : null;
 
   // Create voice track, voice assignments, and segments in a transaction
   const voiceTrack = await prisma.$transaction(async (tx) => {
@@ -271,7 +297,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     // Create voice assignments with per-speaker provider + model
     await tx.voiceTrackVoice.createMany({
-      data: resolvedVoiceProviders.map(v => ({
+      data: resolvedVoiceProviders.map((v) => ({
         voiceTrackId: track.id,
         speaker: v.speaker,
         voiceId: v.voiceId,
@@ -282,7 +308,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     // Create voice track segments for each podcast segment
     await tx.voiceTrackSegment.createMany({
-      data: podcast.segments.map(seg => ({
+      data: podcast.segments.map((seg) => ({
         voiceTrackId: track.id,
         segmentId: seg.id,
         order: seg.order,
@@ -312,16 +338,23 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     where: { podcastId },
     select: { turns: true },
   });
-  const scriptTurns = (script?.turns ?? []) as Array<{ speaker: string; text: string; direction?: string }>;
+  const scriptTurns = (script?.turns ?? []) as Array<{
+    speaker: string;
+    text: string;
+    direction?: string;
+  }>;
   const orderedSegments = podcast.segments;
 
   for (const vtSeg of vtSegments) {
-    const segIndex = orderedSegments.findIndex(s => s.id === vtSeg.segmentId);
+    const segIndex = orderedSegments.findIndex((s) => s.id === vtSeg.segmentId);
     if (segIndex === -1) continue;
     const podcastSeg = orderedSegments[segIndex];
 
     const previousText = segIndex > 0 ? orderedSegments[segIndex - 1].text.slice(-500) : undefined;
-    const nextText = segIndex < orderedSegments.length - 1 ? orderedSegments[segIndex + 1].text.slice(0, 500) : undefined;
+    const nextText =
+      segIndex < orderedSegments.length - 1
+        ? orderedSegments[segIndex + 1].text.slice(0, 500)
+        : undefined;
     const direction = scriptTurns[podcastSeg.order]?.direction;
 
     const payload: GenerateVoiceTrackAudioPayload = {
@@ -344,37 +377,29 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 export async function GET(_request: NextRequest, { params }: RouteParams) {
   const { podcastId } = await params;
 
-  // Auth is optional — public podcasts visible to all
   const session = await auth();
   const userId = session?.user?.id;
 
+  if (!userId) {
+    return errorResponse('Unauthorized', 401);
+  }
+
   const podcast = await prisma.podcast.findUnique({
     where: { id: podcastId },
-    select: { userId: true, visibility: true },
+    select: { userId: true },
   });
 
   if (!podcast) {
     return errorResponse('Podcast not found', 404);
   }
 
-  if (podcast.visibility === 'PRIVATE' && podcast.userId !== userId) {
+  if (podcast.userId !== userId) {
     return errorResponse('Forbidden', 403);
   }
-
-  const isOwner = podcast.userId === userId;
 
   const tracks = await prisma.voiceTrack.findMany({
     where: {
       podcastId,
-      ...(isOwner
-        ? {}
-        : {
-            status: 'READY',
-            OR: [
-              { proposalStatus: null },
-              { proposalStatus: 'ACCEPTED' },
-            ],
-          }),
     },
     orderBy: { createdAt: 'asc' },
     select: {
@@ -385,7 +410,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
       duration: true,
       ttsProvider: true,
       ttsModel: true,
-      failureReason: isOwner ? true : false,
+      failureReason: true,
       voices: { select: { speaker: true, voiceId: true, provider: true } },
       proposalStatus: true,
       proposalMessage: true,

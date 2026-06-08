@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ListMusic, Users } from 'lucide-react';
+import { ListMusic } from 'lucide-react';
 import styles from './CollectionCard.module.css';
 
 interface CollectionCardProps {
@@ -7,7 +7,6 @@ interface CollectionCardProps {
   name: string;
   description: string | null;
   podcastCount: number;
-  followerCount: number;
   user?: {
     id: string;
     name: string | null;
@@ -22,14 +21,7 @@ function formatCount(count: number): string {
   return count.toString();
 }
 
-export function CollectionCard({
-  id,
-  name,
-  description,
-  podcastCount,
-  followerCount,
-  user,
-}: CollectionCardProps) {
+export function CollectionCard({ id, name, description, podcastCount, user }: CollectionCardProps) {
   return (
     <Link href={`/collections/${id}`} className={styles.card}>
       <div className={styles.header}>
@@ -39,9 +31,7 @@ export function CollectionCard({
         <h3 className={styles.name}>{name}</h3>
       </div>
 
-      {description && (
-        <p className={styles.description}>{description}</p>
-      )}
+      {description && <p className={styles.description}>{description}</p>}
 
       <div className={styles.footer}>
         <div className={styles.stats}>
@@ -49,15 +39,9 @@ export function CollectionCard({
             <ListMusic size={14} aria-hidden="true" />
             {formatCount(podcastCount)} {podcastCount === 1 ? 'podcast' : 'podcasts'}
           </span>
-          <span className={styles.stat}>
-            <Users size={14} aria-hidden="true" />
-            {formatCount(followerCount)} {followerCount === 1 ? 'follower' : 'followers'}
-          </span>
         </div>
         {user && (
-          <span className={styles.creator}>
-            by {user.name || user.handle || 'Anonymous'}
-          </span>
+          <span className={styles.creator}>by {user.name || user.handle || 'Anonymous'}</span>
         )}
       </div>
     </Link>

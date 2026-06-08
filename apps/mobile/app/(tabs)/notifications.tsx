@@ -23,11 +23,7 @@ import { ErrorState } from '../../components/ErrorState';
 const NOTIFICATION_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
   PODCAST_READY: 'headset',
   PODCAST_FAILED: 'warning-outline',
-  NEW_FOLLOWER: 'person-add-outline',
-  NEW_LIKE: 'heart',
-  NEW_FORK: 'git-branch-outline',
   INTERACTION_ANSWERED: 'chatbubble-outline',
-  NEW_COMMENT: 'chatbubbles-outline',
   SYSTEM: 'information-circle-outline',
 };
 
@@ -53,22 +49,21 @@ function NotificationItem({
       testID={`notifications-item-${notification.id}`}
     >
       <View style={styles.iconContainer}>
-        <Ionicons name={getNotificationIcon(notification.type)} size={20} color={colors.textSecondary} />
+        <Ionicons
+          name={getNotificationIcon(notification.type)}
+          size={20}
+          color={colors.textSecondary}
+        />
       </View>
       <View style={styles.notificationContent}>
         <View style={styles.notificationHeader}>
           <Text
-            style={[
-              styles.notificationTitle,
-              !notification.read && styles.notificationTitleUnread,
-            ]}
+            style={[styles.notificationTitle, !notification.read && styles.notificationTitleUnread]}
             numberOfLines={1}
           >
             {notification.title}
           </Text>
-          <Text style={styles.notificationTime}>
-            {timeAgo(notification.createdAt)}
-          </Text>
+          <Text style={styles.notificationTime}>{timeAgo(notification.createdAt)}</Text>
         </View>
         <Text style={styles.notificationMessage} numberOfLines={2}>
           {notification.message}
@@ -110,11 +105,7 @@ export default function NotificationsScreen() {
   const markAllReadMutation = useMutation({
     mutationFn: async () => {
       const unread = notifications?.filter((n) => !n.read) ?? [];
-      await Promise.all(
-        unread.map((n) =>
-          api.patch(`/notifications/${n.id}`, { read: true }),
-        ),
-      );
+      await Promise.all(unread.map((n) => api.patch(`/notifications/${n.id}`, { read: true })));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
@@ -130,26 +121,19 @@ export default function NotificationsScreen() {
         router.push(`/podcast/${notification.data.podcastId}`);
       }
     },
-    [markReadMutation, router],
+    [markReadMutation, router]
   );
 
-  const hasUnread =
-    notifications?.some((n) => !n.read) ?? false;
+  const hasUnread = notifications?.some((n) => !n.read) ?? false;
 
   const renderItem = useCallback(
     ({ item }: { item: NotificationData }) => (
-      <NotificationItem
-        notification={item}
-        onPress={() => handleNotificationPress(item)}
-      />
+      <NotificationItem notification={item} onPress={() => handleNotificationPress(item)} />
     ),
-    [handleNotificationPress],
+    [handleNotificationPress]
   );
 
-  const keyExtractor = useCallback(
-    (item: NotificationData) => item.id,
-    [],
-  );
+  const keyExtractor = useCallback((item: NotificationData) => item.id, []);
 
   return (
     <View style={globalStyles.screenContainer}>
@@ -166,9 +150,7 @@ export default function NotificationsScreen() {
             testID="notifications-mark-all-read"
           >
             <Text style={styles.markAllButtonText}>
-              {markAllReadMutation.isPending
-                ? 'Marking...'
-                : 'Mark all as read'}
+              {markAllReadMutation.isPending ? 'Marking...' : 'Mark all as read'}
             </Text>
           </Pressable>
         </View>
@@ -199,18 +181,14 @@ export default function NotificationsScreen() {
             </View>
           ) : isError ? (
             <ErrorState
-              message={
-                error instanceof Error
-                  ? error.message
-                  : 'Failed to load notifications'
-              }
+              message={error instanceof Error ? error.message : 'Failed to load notifications'}
               onRetry={() => refetch()}
             />
           ) : (
             <EmptyState
               iconName="notifications-outline"
               title="No notifications yet"
-              subtitle="When someone likes your podcast, follows you, or your podcast finishes generating, you will see it here."
+              subtitle="When a podcast finishes generating or a question is answered, you will see it here."
             />
           )
         }

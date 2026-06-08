@@ -24,7 +24,6 @@ interface Collection {
   description: string | null;
   isPublic: boolean;
   podcastCount: number;
-  followerCount: number;
   createdAt: string;
 }
 
@@ -87,14 +86,10 @@ export default function CollectionsScreen() {
           <Text style={styles.cardMetaText}>
             {item.podcastCount} podcast{item.podcastCount !== 1 ? 's' : ''}
           </Text>
-          <Text style={styles.cardMetaDot}>&middot;</Text>
-          <Text style={styles.cardMetaText}>
-            {item.followerCount} follower{item.followerCount !== 1 ? 's' : ''}
-          </Text>
         </View>
       </Pressable>
     ),
-    [router],
+    [router]
   );
 
   const collections = data?.collections ?? [];
@@ -172,8 +167,7 @@ export default function CollectionsScreen() {
         <Pressable
           style={[
             styles.saveButton,
-            (!newName.trim() || createMutation.isPending) &&
-              styles.saveButtonDisabled,
+            (!newName.trim() || createMutation.isPending) && styles.saveButtonDisabled,
           ]}
           onPress={() => createMutation.mutate()}
           disabled={!newName.trim() || createMutation.isPending}
@@ -240,10 +234,6 @@ const styles = StyleSheet.create({
   },
   cardMetaText: {
     fontFamily: typography.fontBody,
-    fontSize: 13,
-    color: colors.textTertiary,
-  },
-  cardMetaDot: {
     fontSize: 13,
     color: colors.textTertiary,
   },

@@ -53,19 +53,26 @@ export async function processSegmentRegeneration(
     : undefined;
 
   // Resolve provider using multi-provider system (matches audio-generation worker)
+  if (!podcast.ttsProvider) {
+    throw new Error(
+      `Podcast ${podcastId} is missing a TTS provider. Select a provider before regenerating audio.`
+    );
+  }
+
   const { provider, source, providerId } = await resolveTtsProvider({
     userId: podcast.userId,
     podcastId,
-    requestedProvider: (podcast.ttsProvider as TtsProviderId | null) ?? undefined,
+    requestedProvider: podcast.ttsProvider as TtsProviderId,
     requestedModel: podcast.ttsModel,
     plan: podcast.user.plan as 'FREE' | 'PRO',
     language: podcast.language,
   });
 
-  const podcastVoice = podcast.voices.find(v => v.speaker === speaker);
-  const voiceId = (podcastVoice?.voiceId && podcastVoice.provider === providerId)
-    ? podcastVoice.voiceId
-    : provider.getVoiceId(speaker, podcastId, voiceMetadata, podcast.language ?? undefined);
+  const podcastVoice = podcast.voices.find((v) => v.speaker === speaker);
+  const voiceId =
+    podcastVoice?.voiceId && podcastVoice.provider === providerId
+      ? podcastVoice.voiceId
+      : provider.getVoiceId(speaker, podcastId, voiceMetadata, podcast.language ?? undefined);
 
   // Persist resolved voice for retry consistency and analytics
   if (!podcastVoice || podcastVoice.provider !== providerId || podcastVoice.voiceId !== voiceId) {
@@ -77,7 +84,9 @@ export async function processSegmentRegeneration(
       });
     } catch (err) {
       logger.warn('Failed to persist voice assignment', {
-        podcastId, speaker, error: err instanceof Error ? err.message : String(err),
+        podcastId,
+        speaker,
+        error: err instanceof Error ? err.message : String(err),
       });
     }
   }
@@ -91,7 +100,11 @@ export async function processSegmentRegeneration(
   });
 
   const ttsText = cleanTextForTts(newText);
-  const audioBuffer = await provider.generateSpeech({ text: ttsText, voiceId, language: podcast.language ?? undefined });
+  const audioBuffer = await provider.generateSpeech({
+    text: ttsText,
+    voiceId,
+    language: podcast.language ?? undefined,
+  });
 
   const charCount = ttsText.length;
   const ttsMeta = getProviderMeta(providerId);

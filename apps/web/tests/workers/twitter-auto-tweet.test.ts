@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Job } from 'bullmq';
 import type { AutoTweetPayload } from '@/lib/queue';
 
@@ -57,11 +57,16 @@ function createMockJob(data: AutoTweetPayload): Job<AutoTweetPayload> {
 describe('processAutoTweet', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://selfhost.example.com');
     mockGetTwitterConfig.mockResolvedValue({
       tweetTemplate: 'New on Sotto: {{title}}\n\n{{topic}}\n\nListen: {{url}}',
     });
     // Default: CAS claim succeeds
     mockPrismaTwitterAutoTweetUpdateMany.mockResolvedValue({ count: 1 });
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it('skips when no pending auto-tweet record exists', async () => {
@@ -92,11 +97,9 @@ describe('processAutoTweet', () => {
     const job = createMockJob({ podcastId: 'pod-1', trigger: 'threshold' });
     await processAutoTweet(job);
 
+    expect(mockPostTweet).toHaveBeenCalledWith(expect.stringContaining('AI Ethics Debate'));
     expect(mockPostTweet).toHaveBeenCalledWith(
-      expect.stringContaining('AI Ethics Debate')
-    );
-    expect(mockPostTweet).toHaveBeenCalledWith(
-      expect.stringContaining('/podcast/pod-1')
+      expect.stringContaining('https://selfhost.example.com/podcast/pod-1')
     );
     expect(mockPrismaTwitterAutoTweetUpdate).toHaveBeenCalledWith({
       where: { id: 'at-1' },

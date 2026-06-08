@@ -268,7 +268,7 @@ function renderActionParams(
           className={styles.paramInput}
           value={(action.name as string) ?? ''}
           onChange={(e) => onChange({ name: e.target.value })}
-          placeholder="Interceptor name (discovery, interact, fork, scriptApprove)"
+          placeholder="Interceptor name (discovery, interact, library, scriptApprove)"
         />
       );
     case 'clearIntercept':

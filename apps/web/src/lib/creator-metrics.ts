@@ -1,6 +1,6 @@
 /**
  * Creator-scoped podcast analytics queries.
- * Follows the engagement-metrics.ts pattern: exported async functions, Promise.all for parallel queries.
+ * Uses private activity signals instead of public social metrics.
  */
 
 import { prisma } from './prisma';
@@ -8,7 +8,7 @@ import type {
   CreatorOverview,
   CreatorTopPodcast,
   CreatorDailyPlays,
-  CreatorEngagement,
+  CreatorPrivateActivity,
   CreatorAudienceInsights,
 } from '@/types/analytics';
 
@@ -20,7 +20,13 @@ export async function getCreatorOverview(userId: string, since: Date): Promise<C
   const ids = podcastIds.map((p) => p.id);
 
   if (ids.length === 0) {
-    return { totalPlays: 0, uniqueListeners: 0, avgCompletion: 0, totalListenHours: 0, podcastCount: 0 };
+    return {
+      totalPlays: 0,
+      uniqueListeners: 0,
+      avgCompletion: 0,
+      totalListenHours: 0,
+      podcastCount: 0,
+    };
   }
 
   const [playCount, sessionAgg, uniqueListeners] = await Promise.all([
@@ -63,38 +69,47 @@ export async function getCreatorTopPodcasts(
       id: true,
       title: true,
       playCount: true,
-      likeCount: true,
-      forkCount: true,
+      saveCount: true,
     },
   });
 
   if (podcasts.length === 0) return [];
 
-  const completionData = await prisma.$queryRaw<
-    Array<{ podcastId: string; avgCompletion: number }>
-  >`
+  const ids = podcasts.map((p) => p.id);
+  const [completionData, questionData] = await Promise.all([
+    prisma.$queryRaw<Array<{ podcastId: string; avgCompletion: number }>>`
     SELECT
       "podcastId",
       AVG("completionPercent")::float AS "avgCompletion"
     FROM "PlaybackSession"
-    WHERE "podcastId" = ANY(${podcasts.map((p) => p.id)})
+    WHERE "podcastId" = ANY(${ids})
       AND "startedAt" >= ${since}
     GROUP BY "podcastId"
-  `;
+  `,
+    prisma.interaction.groupBy({
+      by: ['podcastId'],
+      where: { podcastId: { in: ids }, createdAt: { gte: since } },
+      _count: { id: true },
+    }),
+  ]);
 
   const completionMap = new Map(completionData.map((c) => [c.podcastId, c.avgCompletion]));
+  const questionMap = new Map(questionData.map((q) => [q.podcastId, q._count.id]));
 
   return podcasts.map((p) => ({
     id: p.id,
     title: p.title,
     plays: p.playCount,
     completionPercent: completionMap.get(p.id) ?? 0,
-    likes: p.likeCount,
-    forks: p.forkCount,
+    saves: p.saveCount,
+    questions: questionMap.get(p.id) ?? 0,
   }));
 }
 
-export async function getCreatorDailyPlays(userId: string, since: Date): Promise<CreatorDailyPlays[]> {
+export async function getCreatorDailyPlays(
+  userId: string,
+  since: Date
+): Promise<CreatorDailyPlays[]> {
   const podcastIds = await prisma.podcast.findMany({
     where: { userId, deletedAt: null },
     select: { id: true },
@@ -120,7 +135,10 @@ export async function getCreatorDailyPlays(userId: string, since: Date): Promise
   }));
 }
 
-export async function getCreatorEngagement(userId: string, since: Date): Promise<CreatorEngagement> {
+export async function getCreatorPrivateActivity(
+  userId: string,
+  since: Date
+): Promise<CreatorPrivateActivity> {
   const podcastIds = await prisma.podcast.findMany({
     where: { userId, deletedAt: null },
     select: { id: true },
@@ -128,21 +146,26 @@ export async function getCreatorEngagement(userId: string, since: Date): Promise
   const ids = podcastIds.map((p) => p.id);
 
   if (ids.length === 0) {
-    return { likes: 0, saves: 0, comments: 0, forks: 0, follows: 0, interactions: 0 };
+    return { saves: 0, questions: 0, answered: 0, incorporated: 0, ratings: 0 };
   }
 
-  const [likes, saves, comments, forks, follows, interactions] = await Promise.all([
-    prisma.like.count({ where: { podcastId: { in: ids }, createdAt: { gte: since } } }),
+  const [saves, questions, answered, incorporated, ratings] = await Promise.all([
     prisma.save.count({ where: { podcastId: { in: ids }, createdAt: { gte: since } } }),
-    prisma.comment.count({ where: { podcastId: { in: ids }, createdAt: { gte: since } } }),
-    prisma.podcast.count({
-      where: { forkedFromId: { in: ids }, deletedAt: null, createdAt: { gte: since } },
-    }),
-    prisma.follow.count({ where: { followingId: userId, createdAt: { gte: since } } }),
     prisma.interaction.count({ where: { podcastId: { in: ids }, createdAt: { gte: since } } }),
+    prisma.interaction.count({
+      where: {
+        podcastId: { in: ids },
+        createdAt: { gte: since },
+        status: { in: ['ANSWERED', 'INCORPORATED', 'RESOLVED'] },
+      },
+    }),
+    prisma.interaction.count({
+      where: { podcastId: { in: ids }, createdAt: { gte: since }, incorporated: true },
+    }),
+    prisma.podcastRating.count({ where: { podcastId: { in: ids }, createdAt: { gte: since } } }),
   ]);
 
-  return { likes, saves, comments, forks, follows, interactions };
+  return { saves, questions, answered, incorporated, ratings };
 }
 
 export async function getCreatorAudienceInsights(
@@ -175,7 +198,6 @@ export async function getCreatorAudienceInsights(
       SELECT
         CASE
           WHEN rl.id IS NOT NULL THEN 'recommendation'
-          WHEN be."referrer" LIKE '%/feed%' THEN 'feed'
           WHEN be."referrer" LIKE '%/search%' OR be."referrer" LIKE '%q=%' THEN 'search'
           ELSE 'direct'
         END AS source,

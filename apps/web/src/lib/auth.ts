@@ -8,13 +8,15 @@ import Resend from 'next-auth/providers/resend';
 import { prisma } from './prisma';
 import { generateUniqueHandle } from './handles';
 import { isAdminEmail } from './admin-emails';
-import { sendEmail } from './email';
+import { getOptionalEmailProviderConfig, sendEmail } from './email';
 import { buildMagicLinkEmail } from './email-templates';
 import { isOpenSignup } from './site-config';
 
+const emailProviderConfig = getOptionalEmailProviderConfig();
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
-  secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
+  secret: process.env.AUTH_SECRET,
   adapter: PrismaAdapter(prisma),
   providers: [
     ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
@@ -53,15 +55,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           }),
         ]
       : []),
-    ...(process.env.RESEND_API_KEY
+    ...(emailProviderConfig
       ? [
           Resend({
-            apiKey: process.env.RESEND_API_KEY,
-            from: process.env.EMAIL_FROM || 'Sotto <hello@sotto.fm>',
+            apiKey: emailProviderConfig.apiKey,
+            from: emailProviderConfig.from,
             async sendVerificationRequest({ identifier: to, url }) {
               const { subject, html } = buildMagicLinkEmail(url);
-              const sent = await sendEmail({ to, subject, html });
-              if (!sent) throw new Error('Failed to send magic link email');
+              await sendEmail({ to, subject, html });
             },
           }),
         ]

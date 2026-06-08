@@ -3,6 +3,7 @@ import { JSDOM } from 'jsdom';
 import * as cheerio from 'cheerio';
 import { logger } from '../logger';
 import { safeFetch } from '../url-validator';
+import { getAppBaseUrl } from '../urls';
 import type { ExtractedContent, ExtractedTable, ExtractedFigure } from './types';
 
 export const MAX_CONTENT_LENGTH = 50000;
@@ -90,11 +91,9 @@ export async function extractHtmlFromString(html: string, url: string): Promise<
     text: truncatedText,
     markdown: truncatedMarkdown,
     title: $('title').text().trim() || ogMeta.title,
-    description:
-      $('meta[name="description"]').attr('content')?.trim() || ogMeta.description,
+    description: $('meta[name="description"]').attr('content')?.trim() || ogMeta.description,
     siteName: ogMeta.siteName,
-    author:
-      $('meta[name="author"]').attr('content')?.trim() || ogMeta.author,
+    author: $('meta[name="author"]').attr('content')?.trim() || ogMeta.author,
     publishedDate: ogMeta.publishedDate,
     wordCount: countWords(truncatedText),
     sourceType: 'html',
@@ -112,8 +111,7 @@ async function fetchHtml(url: string): Promise<string> {
     const response = await safeFetch(url, {
       signal: controller.signal,
       headers: {
-        'User-Agent':
-          'Mozilla/5.0 (compatible; SottoBot/1.0; +https://sotto.fm)',
+        'User-Agent': `Mozilla/5.0 (compatible; SottoBot/1.0; +${getAppBaseUrl()})`,
         Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.5',
       },
@@ -270,9 +268,11 @@ function extractTables(html: string): ExtractedTable[] {
     $table.find(rowSelector).each((_, tr) => {
       if (rows.length >= MAX_ROWS_PER_TABLE) return false;
       const cells: string[] = [];
-      $(tr).find('td, th').each((__, cell) => {
-        cells.push($(cell).text().trim());
-      });
+      $(tr)
+        .find('td, th')
+        .each((__, cell) => {
+          cells.push($(cell).text().trim());
+        });
       if (cells.length > 0 && cells.some((c) => c.length > 0)) {
         rows.push(cells);
       }
@@ -303,7 +303,11 @@ function extractFigures(html: string, baseUrl: string): ExtractedFigure[] {
     // Filter out tiny images (icons, tracking pixels, avatars)
     const width = parseInt($img.attr('width') || '0', 10);
     const height = parseInt($img.attr('height') || '0', 10);
-    if ((width > 0 && width < MIN_FIGURE_DIMENSION) || (height > 0 && height < MIN_FIGURE_DIMENSION)) return;
+    if (
+      (width > 0 && width < MIN_FIGURE_DIMENSION) ||
+      (height > 0 && height < MIN_FIGURE_DIMENSION)
+    )
+      return;
 
     // Filter out common non-content images by URL pattern
     if (/\b(icon|logo|avatar|badge|sprite|tracking|pixel|ad[_-])\b/i.test(src)) return;
@@ -326,7 +330,14 @@ function extractFigures(html: string, baseUrl: string): ExtractedFigure[] {
     const altText = $img.attr('alt')?.trim() || null;
 
     const ext = absoluteUrl.split('?')[0].split('.').pop()?.toLowerCase() || '';
-    const mimeMap: Record<string, string> = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml' };
+    const mimeMap: Record<string, string> = {
+      jpg: 'image/jpeg',
+      jpeg: 'image/jpeg',
+      png: 'image/png',
+      gif: 'image/gif',
+      webp: 'image/webp',
+      svg: 'image/svg+xml',
+    };
     const mimeType = mimeMap[ext] || 'image/jpeg';
 
     figures.push({ url: absoluteUrl, caption, altText, sourceLabel: null, mimeType });

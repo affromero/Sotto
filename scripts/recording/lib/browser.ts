@@ -13,11 +13,11 @@ export async function createSessionToken(
   role: string,
   name: string
 ): Promise<string> {
-  const secret = process.env.NEXTAUTH_SECRET;
-  if (!secret) throw new Error('NEXTAUTH_SECRET not set');
+  const secret = process.env.AUTH_SECRET;
+  if (!secret) throw new Error('AUTH_SECRET not set');
 
   return encode({
-    token: { sub: userId, role, name, email: `${role.toLowerCase()}@sotto.fm` },
+    token: { sub: userId, role, name, email: `${role.toLowerCase()}@example.com` },
     secret,
     salt: APP_URL.startsWith('https')
       ? '__Secure-authjs.session-token'

@@ -7,11 +7,106 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$REPO_ROOT"
+
 SLOT_FILE="$HOME/.sotto-deploy-slot"
 COMPOSE_INFRA="docker-compose.infra.yml"
 COMPOSE_APP="docker-compose.app.yml"
 COMPOSE_WORKERS="docker-compose.workers.yml"
 HEALTH_TIMEOUT=120  # seconds to wait for new slot to become healthy
+ENV_FILE="${SOTTO_ENV_FILE:-$REPO_ROOT/.env.production}"
+COMPOSE_ENV_FILE="$REPO_ROOT/.env"
+CADDY_TEMPLATE="$REPO_ROOT/Caddyfile"
+
+require_env() {
+  local name="$1"
+  if [ -z "${!name:-}" ]; then
+    echo "ERROR: $name is required in $ENV_FILE"
+    exit 1
+  fi
+}
+
+app_host_from_url() {
+  local url="$1"
+  case "$url" in
+    https://*) ;;
+    *)
+      echo "ERROR: NEXT_PUBLIC_APP_URL must be an https:// URL for server deploy"
+      exit 1
+      ;;
+  esac
+
+  local host="${url#https://}"
+  host="${host%%/*}"
+
+  if [ -z "$host" ] || [ "$host" != "${host// /}" ]; then
+    echo "ERROR: NEXT_PUBLIC_APP_URL does not contain a valid host: $url"
+    exit 1
+  fi
+
+  printf '%s\n' "$host"
+}
+
+validate_caddy_host() {
+  local name="$1"
+  local host="$2"
+  if [ -z "$host" ]; then
+    return
+  fi
+
+  case "$host" in
+    http://*|https://*|*/*|*" "*)
+      echo "ERROR: $name must be a bare host, not a URL or path: $host"
+      exit 1
+      ;;
+  esac
+}
+
+remove_optional_block() {
+  local start="$1"
+  local end="$2"
+  awk -v start="$start" -v end="$end" '
+    $0 == start { skip = 1; next }
+    $0 == end { skip = 0; next }
+    skip != 1 { print }
+  '
+}
+
+remove_optional_markers() {
+  awk '
+    $0 == "# BEGIN_OPTIONAL_MAPS" { next }
+    $0 == "# END_OPTIONAL_MAPS" { next }
+    $0 == "# BEGIN_OPTIONAL_WWW" { next }
+    $0 == "# END_OPTIONAL_WWW" { next }
+    { print }
+  '
+}
+
+render_caddy_config() {
+  local app_host="$1"
+  local maps_host="$2"
+  local www_host="$3"
+
+  local rendered
+  rendered="$(<"$CADDY_TEMPLATE")"
+  rendered="${rendered//__SOTTO_APP_DOMAIN__/$app_host}"
+
+  if [ -n "$maps_host" ]; then
+    rendered="${rendered//__SOTTO_MAPS_DOMAIN__/$maps_host}"
+  else
+    rendered="$(printf '%s\n' "$rendered" | remove_optional_block "# BEGIN_OPTIONAL_MAPS" "# END_OPTIONAL_MAPS")"
+  fi
+
+  if [ -n "$www_host" ]; then
+    rendered="${rendered//__SOTTO_WWW_DOMAIN__/$www_host}"
+  else
+    rendered="$(printf '%s\n' "$rendered" | remove_optional_block "# BEGIN_OPTIONAL_WWW" "# END_OPTIONAL_WWW")"
+  fi
+
+  printf '%s\n' "$rendered" | remove_optional_markers
+}
 
 # --- Slot resolution ---
 
@@ -51,25 +146,53 @@ PREV_SHA=$(git rev-parse --short HEAD)
 git pull origin main
 git submodule update --init --recursive
 
-# --- Secrets ---
+# --- Environment ---
 
 echo ""
-echo "=== Downloading secrets from Doppler ==="
-doppler secrets download --no-file --format env > .env
-chmod 600 .env
-set -a
-source .env
-if [ -f .env.workers.local ]; then
-  echo "Loading worker overrides from .env.workers.local"
-  source .env.workers.local
+echo "=== Loading deployment environment ==="
+if [ ! -f "$ENV_FILE" ]; then
+  echo "ERROR: deployment env file not found: $ENV_FILE"
+  echo "Create it from .env.example, fill every required value, or set SOTTO_ENV_FILE=/path/to/env."
+  exit 1
 fi
+
+cp "$ENV_FILE" "$COMPOSE_ENV_FILE"
+chmod 600 "$COMPOSE_ENV_FILE"
+set -a
+source "$COMPOSE_ENV_FILE"
 set +a
+require_env NEXT_PUBLIC_APP_URL
+
+APP_DOMAIN="$(app_host_from_url "$NEXT_PUBLIC_APP_URL")"
+MAPS_DOMAIN="${SOTTO_MAPS_DOMAIN:-}"
+WWW_DOMAIN="${SOTTO_WWW_DOMAIN:-}"
+CADDY_SITE_PATH="${CADDY_SITE_PATH:-/etc/caddy/conf.d/sotto.conf}"
+
+validate_caddy_host SOTTO_MAPS_DOMAIN "$MAPS_DOMAIN"
+validate_caddy_host SOTTO_WWW_DOMAIN "$WWW_DOMAIN"
+
+echo "Loaded env file: $ENV_FILE"
+echo "App domain:      $APP_DOMAIN"
+if [ -n "$MAPS_DOMAIN" ]; then
+  echo "Maps domain:     $MAPS_DOMAIN"
+else
+  echo "Maps domain:     disabled"
+fi
+if [ -n "$WWW_DOMAIN" ]; then
+  echo "WWW domain:      $WWW_DOMAIN"
+else
+  echo "WWW domain:      disabled"
+fi
 
 # --- Caddy config ---
 
 echo ""
 echo "=== Syncing Caddy config ==="
-sudo cp ~/sotto/Caddyfile /etc/caddy/conf.d/sotto.fm
+TMP_CADDY="$(mktemp)"
+render_caddy_config "$APP_DOMAIN" "$MAPS_DOMAIN" "$WWW_DOMAIN" > "$TMP_CADDY"
+sudo install -m 0644 "$TMP_CADDY" "$CADDY_SITE_PATH"
+rm -f "$TMP_CADDY"
+sudo caddy validate --config /etc/caddy/Caddyfile
 sudo caddy reload --config /etc/caddy/Caddyfile --force
 
 # --- Infrastructure ---

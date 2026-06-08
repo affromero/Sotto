@@ -2,8 +2,8 @@
 ; Sotto Financial Ledger
 ; ============================================================
 ;
-; Where podcasts get social — AI podcast generation platform
-; https://sotto.fm
+; Private podcast briefing platform
+; https://your-domain.example
 ;
 ; Validate:  uv run bean-check ledger/main.beancount
 ; Web UI:    uv run fava ledger/main.beancount

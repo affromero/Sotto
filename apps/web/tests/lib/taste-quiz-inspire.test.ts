@@ -5,7 +5,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const mockTagFindMany = vi.fn();
 const mockUserInterestFindMany = vi.fn();
 const mockTasteQuizAnswerFindMany = vi.fn();
-const mockResolveAutoModel = vi.fn();
 const mockCreateAIProvider = vi.fn();
 const mockGetAiKey = vi.fn();
 
@@ -22,10 +21,6 @@ vi.mock('@/lib/prisma', () => {
   return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
 });
 
-vi.mock('@/lib/auto-model-config', () => ({
-  resolveAutoModel: (...args: unknown[]) => mockResolveAutoModel(...args),
-}));
-
 vi.mock('@/lib/providers/ai', () => ({
   createAIProvider: (...args: unknown[]) => mockCreateAIProvider(...args),
 }));
@@ -38,12 +33,17 @@ vi.mock('@/lib/providers/ai-registry', () => ({
   getProviderForModel: (id: string) => {
     if (id.startsWith('claude')) return 'anthropic';
     if (id.startsWith('gpt')) return 'openai';
+    if (id === 'sonnet' || id === 'opus') return 'claude-code';
     return null;
   },
   getAllAiProviderMeta: vi.fn(() => []),
-  getAiProviderMeta: vi.fn(() => ({ models: [] })),
+  getAiProviderMeta: vi.fn((id: string) => {
+    if (id === 'anthropic') return { defaultModel: 'claude-haiku-4-5-20251001', models: [] };
+    if (id === 'openai') return { defaultModel: 'gpt-5-mini', models: [] };
+    if (id === 'claude-code') return { defaultModel: 'opus', models: [] };
+    return { defaultModel: '', models: [] };
+  }),
   getAiProviderIdsWithPricing: vi.fn(() => []),
-  resolveAiModelAndProvider: vi.fn(async () => ({ model: 'claude-haiku-4-5-20251001', provider: 'anthropic' })),
 }));
 
 vi.mock('@/lib/logger', () => ({
@@ -88,18 +88,13 @@ const mockCategories = [
 function setupDefaultMocks() {
   mockTagFindMany.mockResolvedValue(mockCategories);
   mockTasteQuizAnswerFindMany.mockResolvedValue([]);
-  mockResolveAutoModel.mockResolvedValue({
-    aiProvider: 'anthropic',
-    aiModel: 'claude-haiku-4-5-20251001',
-    ttsProvider: 'openai',
-    ttsModel: 'tts-1-hd',
-    sttProvider: 'openai',
-    sttModel: 'whisper-1',
-  });
   mockUserInterestFindMany.mockResolvedValue([]);
   mockUserFindUnique.mockResolvedValue({ plan: 'FREE' });
-  // Default: no BYOK key, falls through to createAIProvider
-  mockGetAiKey.mockResolvedValue(null);
+  mockGetAiKey.mockImplementation(async (_userId: string, provider?: string) => {
+    if (provider === 'openai') return { provider: 'openai', apiKey: 'openai-key' };
+    if (provider === 'anthropic') return { provider: 'anthropic', apiKey: 'anthropic-key' };
+    return { provider: 'anthropic', apiKey: 'anthropic-key' };
+  });
   // Default: no newsletter articles, falls back to web search path
   mockFetchNewsletterArticles.mockResolvedValue([]);
   mockFormatArticlesForPrompt.mockReturnValue('');
@@ -139,7 +134,6 @@ describe('generateForYouQuestions', () => {
 
     expect(result).toHaveLength(1);
     expect(result[0].text).toContain('AI in cooking');
-    // Tries BYOK first (getAiKey), falls back to auto model config
     expect(mockGetAiKey).toHaveBeenCalledWith('user-1');
     expect(mockCreateAIProvider).toHaveBeenCalled();
   });
@@ -203,44 +197,21 @@ describe('generateForYouQuestions', () => {
     expect(prompt).toContain('politics');
   });
 
-  it('returns empty array when auto config has mismatched model/provider', async () => {
-    // Make resolveAiModelAndProvider fail so the fallback reaches autoModel
-    const { resolveAiModelAndProvider } = await import('@/lib/providers/ai-registry');
-    vi.mocked(resolveAiModelAndProvider).mockRejectedValueOnce(new Error('no key'));
-
-    // Simulate anthropic provider with an OpenAI model
-    mockResolveAutoModel.mockResolvedValue({
-      aiProvider: 'anthropic',
-      aiModel: 'gpt-5-mini',
-      ttsProvider: 'openai',
-      ttsModel: 'tts-1-hd',
-      sttProvider: 'openai',
-      sttModel: 'whisper-1',
+  it('returns empty array when an explicit hosted model has no matching key', async () => {
+    mockGetAiKey.mockImplementation(async (_userId: string, provider?: string) => {
+      if (provider === 'openai') return null;
+      return { provider: 'anthropic', apiKey: 'anthropic-key' };
     });
 
-    const result = await generateForYouQuestions('user-1', 1);
+    const result = await generateForYouQuestions('user-1', 1, undefined, undefined, 'gpt-5-mini');
 
-    // Should return empty (error caught internally) rather than silently substituting
     expect(result).toEqual([]);
+    expect(mockGetAiKey).toHaveBeenCalledWith('user-1', 'openai');
   });
 
-  it('returns empty array when auto config has unknown model', async () => {
-    // Make resolveAiModelAndProvider fail so the fallback reaches autoModel
-    const { resolveAiModelAndProvider } = await import('@/lib/providers/ai-registry');
-    vi.mocked(resolveAiModelAndProvider).mockRejectedValueOnce(new Error('no key'));
+  it('returns empty array when an explicit model is unknown', async () => {
+    const result = await generateForYouQuestions('user-1', 1, undefined, undefined, 'llama-3.1-8b-instant');
 
-    mockResolveAutoModel.mockResolvedValue({
-      aiProvider: 'anthropic',
-      aiModel: 'llama-3.1-8b-instant',
-      ttsProvider: 'openai',
-      ttsModel: 'tts-1-hd',
-      sttProvider: 'openai',
-      sttModel: 'whisper-1',
-    });
-
-    const result = await generateForYouQuestions('user-1', 1);
-
-    // Should return empty (error caught internally) rather than silently substituting
     expect(result).toEqual([]);
   });
 });
@@ -273,7 +244,7 @@ describe('generateNewsQuestions', () => {
       },
     }));
 
-    // Re-import to pick up new mock... but since we can't easily, test the fallback path
+    // Re-import to pick up new mock... but since we can't easily, test the provider path
     mockGetAiKey.mockResolvedValue({
       provider: 'openai',
       apiKey: 'sk-test',

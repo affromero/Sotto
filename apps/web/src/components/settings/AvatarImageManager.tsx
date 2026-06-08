@@ -69,46 +69,51 @@ export function AvatarImageManager() {
     fetchImages();
   }, [fetchImages]);
 
-  const handleUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleUpload = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
 
-    if (!ALLOWED_TYPES.includes(file.type)) {
-      setError('Invalid file type. Only JPEG, PNG, and WebP are allowed.');
-      return;
-    }
-    if (file.size > MAX_FILE_SIZE) {
-      setError('File too large. Maximum size is 5MB.');
-      return;
-    }
-
-    setUploading(true);
-    setError(null);
-
-    try {
-      const formData = new FormData();
-      formData.append('image', file);
-      formData.append('name', file.name.replace(/\.[^.]+$/, ''));
-      formData.append('consentAcknowledged', 'true');
-
-      const res = await fetch('/api/avatar-images', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(typeof data.error === 'string' ? data.error : `Upload failed (${res.status})`);
+      if (!ALLOWED_TYPES.includes(file.type)) {
+        setError('Invalid file type. Only JPEG, PNG, and WebP are allowed.');
+        return;
+      }
+      if (file.size > MAX_FILE_SIZE) {
+        setError('File too large. Maximum size is 5MB.');
+        return;
       }
 
-      await fetchImages();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Upload failed');
-    } finally {
-      setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
-  }, [fetchImages]);
+      setUploading(true);
+      setError(null);
+
+      try {
+        const formData = new FormData();
+        formData.append('image', file);
+        formData.append('name', file.name.replace(/\.[^.]+$/, ''));
+        formData.append('consentAcknowledged', 'true');
+
+        const res = await fetch('/api/avatar-images', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(
+            typeof data.error === 'string' ? data.error : `Upload failed (${res.status})`
+          );
+        }
+
+        await fetchImages();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Upload failed');
+      } finally {
+        setUploading(false);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+    },
+    [fetchImages]
+  );
 
   const handleDelete = useCallback(async (id: string) => {
     if (!confirm('Delete this avatar image?')) return;
@@ -120,7 +125,9 @@ export function AvatarImageManager() {
       const res = await fetch(`/api/avatar-images/${id}`, { method: 'DELETE' });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(typeof data.error === 'string' ? data.error : `Delete failed (${res.status})`);
+        throw new Error(
+          typeof data.error === 'string' ? data.error : `Delete failed (${res.status})`
+        );
       }
 
       setImages((prev) => prev.filter((img) => img.id !== id));
@@ -140,7 +147,7 @@ export function AvatarImageManager() {
         body: JSON.stringify({ shareable }),
       });
       if (!res.ok) throw new Error('Failed to update');
-      setImages((prev) => prev.map((img) => img.id === id ? { ...img, shareable } : img));
+      setImages((prev) => prev.map((img) => (img.id === id ? { ...img, shareable } : img)));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update shareable');
     }
@@ -150,7 +157,11 @@ export function AvatarImageManager() {
   const uploadDisabled = !consentChecked || !capabilities.canUpload || atLimit || uploading;
 
   if (loading) {
-    return <div className={styles.root}><p className={styles.status}>Loading images...</p></div>;
+    return (
+      <div className={styles.root}>
+        <p className={styles.status}>Loading images...</p>
+      </div>
+    );
   }
 
   return (
@@ -169,7 +180,8 @@ export function AvatarImageManager() {
       )}
       {capabilities.uploadsEnabled && !capabilities.isVerified && (
         <p className={styles.disabledNotice}>
-          You must be a verified user to upload avatar images. Complete the verification process to unlock uploads.
+          You must be a verified user to upload avatar images. Complete the verification process to
+          unlock uploads.
         </p>
       )}
 
@@ -186,7 +198,9 @@ export function AvatarImageManager() {
                 <div key={img.id} className={styles.card}>
                   <img src={img.imageUrl} alt={img.name} className={styles.cardImage} />
                   <span className={styles.cardName}>{img.name}</span>
-                  <span className={styles.cardSource}>{SOURCE_LABELS[img.sourceType] ?? img.sourceType}</span>
+                  <span className={styles.cardSource}>
+                    {SOURCE_LABELS[img.sourceType] ?? img.sourceType}
+                  </span>
                   <label className={styles.shareToggle}>
                     <input
                       type="checkbox"
@@ -216,7 +230,11 @@ export function AvatarImageManager() {
               <div className={styles.grid}>
                 {sharedImages.map((shared) => (
                   <div key={shared.shareId} className={`${styles.card} ${styles.cardShared}`}>
-                    <img src={shared.image.imageUrl} alt={shared.image.name} className={styles.cardImage} />
+                    <img
+                      src={shared.image.imageUrl}
+                      alt={shared.image.name}
+                      className={styles.cardImage}
+                    />
                     <span className={styles.cardName}>{shared.image.name}</span>
                     <span className={styles.ownerBadge}>
                       by {shared.owner.name ?? shared.owner.handle ?? 'Unknown'}
@@ -242,15 +260,17 @@ export function AvatarImageManager() {
                 aria-label="Consent acknowledgment for avatar upload"
               />
               <span className={styles.consentLabel}>
-                I confirm this is an image of myself. I have not uploaded someone
-                else&apos;s likeness without their written consent. I understand
-                generated avatars may appear on public podcasts.
+                I confirm this is an image of myself. I have not uploaded someone else&apos;s
+                likeness without their written consent. I understand generated avatars may appear in
+                podcasts I share or export.
               </span>
             </label>
           </div>
 
           <div className={styles.actions}>
-            <label className={`${styles.uploadLabel} ${uploadDisabled ? styles.uploadLabelDisabled : ''}`}>
+            <label
+              className={`${styles.uploadLabel} ${uploadDisabled ? styles.uploadLabelDisabled : ''}`}
+            >
               {uploading ? 'Uploading...' : 'Upload Image'}
               <input
                 ref={fileInputRef}

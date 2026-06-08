@@ -4,6 +4,7 @@ import { stripe } from '@/lib/stripe';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { errorResponse } from '@/lib/api-response';
+import { getAppBaseUrl } from '@/lib/urls';
 
 /**
  * Create a Stripe Customer Portal session.
@@ -37,7 +38,7 @@ export async function POST(request: NextRequest) {
     // allow empty body
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://sotto.fm';
+  const appUrl = getAppBaseUrl();
 
   function isSameOrigin(url: string): boolean {
     try {
@@ -47,9 +48,8 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const returnUrl = body.returnUrl && isSameOrigin(body.returnUrl)
-    ? body.returnUrl
-    : `${appUrl}/billing`;
+  const returnUrl =
+    body.returnUrl && isSameOrigin(body.returnUrl) ? body.returnUrl : `${appUrl}/billing`;
 
   try {
     const portalSession = await stripe.billingPortal.sessions.create({

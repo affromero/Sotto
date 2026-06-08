@@ -46,13 +46,13 @@ describe('Middleware Security Tests', () => {
   beforeEach(async () => {
     vi.resetModules();
     vi.clearAllMocks();
-    process.env.NEXTAUTH_SECRET = TEST_SECRET;
+    process.env.AUTH_SECRET = TEST_SECRET;
     mockGetToken.mockResolvedValue(null);
     middleware = await getMiddleware();
   });
 
   afterEach(() => {
-    delete process.env.NEXTAUTH_SECRET;
+    delete process.env.AUTH_SECRET;
   });
 
   // =====================================================================
@@ -213,8 +213,8 @@ describe('Middleware Security Tests', () => {
       expect(isPassThrough(res)).toBe(true);
     });
 
-    it('passes through non-protected routes like /feed', async () => {
-      const res = await middleware(createRequest('/feed'));
+    it('passes through public feedback route', async () => {
+      const res = await middleware(createRequest('/feedback'));
       expect(isPassThrough(res)).toBe(true);
     });
   });

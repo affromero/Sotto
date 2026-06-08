@@ -1,18 +1,11 @@
 import { useCallback } from 'react';
-import {
-  View,
-  Text,
-  Pressable,
-  Share,
-  Alert,
-  ScrollView,
-  StyleSheet,
-} from 'react-native';
+import { View, Text, Pressable, Share, Alert, ScrollView, StyleSheet } from 'react-native';
 import { Stack } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography, borderRadius } from '@sotto/shared';
 import { api } from '../../lib/api';
+import { appUrl } from '../../lib/config';
 import { shadowSm, shadowMd } from '../../lib/shadows';
 
 export default function ReferralScreen() {
@@ -28,17 +21,18 @@ export default function ReferralScreen() {
   });
 
   const handle = profile?.handle;
-  const referralLink = handle
-    ? `https://sotto.fm/ref/${handle}`
-    : null;
+  const referralLink = handle ? appUrl(`/ref/${handle}`) : null;
 
   const handleShare = useCallback(async () => {
     if (!referralLink) {
-      Alert.alert('Set Handle First', 'You need a handle to share your referral link. Set one in Edit Profile.');
+      Alert.alert(
+        'Set Handle First',
+        'You need a handle to share your referral link. Set one in Edit Profile.'
+      );
       return;
     }
     await Share.share({
-      message: `Join me on Sotto — the social podcast network!\n${referralLink}`,
+      message: `Join me on Sotto — private AI podcast briefings.\n${referralLink}`,
       url: referralLink,
     });
   }, [referralLink]);
@@ -60,8 +54,8 @@ export default function ReferralScreen() {
           <Ionicons name="gift-outline" size={48} color={colors.primary} />
           <Text style={styles.heroTitle}>Invite Friends to Sotto</Text>
           <Text style={styles.heroDescription}>
-            Share your referral link and grow the community. When friends sign
-            up using your link, they get attributed to you.
+            Share your referral link and grow the community. When friends sign up using your link,
+            they get attributed to you.
           </Text>
         </View>
 
@@ -72,11 +66,19 @@ export default function ReferralScreen() {
               {referralLink}
             </Text>
             <View style={styles.linkActions}>
-              <Pressable style={styles.copyButton} onPress={handleCopy} testID="referral-copy-button">
+              <Pressable
+                style={styles.copyButton}
+                onPress={handleCopy}
+                testID="referral-copy-button"
+              >
                 <Ionicons name="copy-outline" size={18} color={colors.primary} />
                 <Text style={styles.copyButtonText}>Copy</Text>
               </Pressable>
-              <Pressable style={styles.shareButton} onPress={handleShare} testID="referral-share-button">
+              <Pressable
+                style={styles.shareButton}
+                onPress={handleShare}
+                testID="referral-share-button"
+              >
                 <Ionicons name="share-outline" size={18} color={colors.textInverse} />
                 <Text style={styles.shareButtonText}>Share</Text>
               </Pressable>

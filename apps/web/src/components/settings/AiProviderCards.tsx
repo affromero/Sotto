@@ -16,9 +16,14 @@ interface ProviderStatus {
 interface AiProviderCardsProps {
   initialConfigured: Array<ProviderStatus>;
   providerMeta: AiProviderClientMeta[];
+  onReadyChange?: (ready: boolean) => void;
 }
 
-export function AiProviderCards({ initialConfigured, providerMeta }: AiProviderCardsProps) {
+export function AiProviderCards({
+  initialConfigured,
+  providerMeta,
+  onReadyChange,
+}: AiProviderCardsProps) {
   const [configured, setConfigured] = useState<Map<string, boolean>>(
     new Map(initialConfigured.map((p) => [p.provider, p.isValid]))
   );
@@ -50,7 +55,11 @@ export function AiProviderCards({ initialConfigured, providerMeta }: AiProviderC
         return;
       }
 
-      setConfigured((prev) => new Map(prev).set(providerId, true));
+      setConfigured((prev) => {
+        const next = new Map(prev).set(providerId, true);
+        onReadyChange?.(Array.from(next.values()).some(Boolean));
+        return next;
+      });
       setFieldValues((prev) => {
         const next = { ...prev };
         delete next[providerId];
@@ -78,6 +87,7 @@ export function AiProviderCards({ initialConfigured, providerMeta }: AiProviderC
       setConfigured((prev) => {
         const next = new Map(prev);
         next.delete(providerId);
+        onReadyChange?.(Array.from(next.values()).some(Boolean));
         return next;
       });
       setStatus((prev) => ({ ...prev, [providerId]: 'removed' }));

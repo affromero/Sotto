@@ -256,6 +256,18 @@ export async function PATCH(request: NextRequest) {
     return errorResponse('Forbidden', 403);
   }
 
+  const enablesMarketplaceListing =
+    (hasRequestable && requestable === true) ||
+    hasDescription ||
+    (hasPrice && priceInCents !== null && priceInCents > 0);
+
+  if (enablesMarketplaceListing) {
+    const voiceConfig = await getPlanFeatureConfig();
+    if (!voiceConfig.voiceMarketplaceEnabled) {
+      return errorResponse('Paid voice sharing is currently unavailable.', 503);
+    }
+  }
+
   // Setting a price requires Stripe onboarding
   if (hasPrice && priceInCents !== null && priceInCents > 0) {
     const user = await prisma.user.findUniqueOrThrow({

@@ -45,7 +45,7 @@ export default async function AdminStoragePage({ searchParams }: PageProps) {
           <p>
             To enable R2 usage monitoring, create a Cloudflare API token with
             <strong> Workers R2 Storage: Read</strong> and <strong>Account Analytics: Read</strong> permissions,
-            then add <code>CF_API_TOKEN</code> to Doppler (both dev and prd configs).
+            then add <code>CF_API_TOKEN</code> to your deployment environment.
           </p>
           <p>
             <code>R2_ACCOUNT_ID</code> must also be set (used for both storage and monitoring).

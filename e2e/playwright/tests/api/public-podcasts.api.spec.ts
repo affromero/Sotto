@@ -14,33 +14,10 @@ test.describe('Public podcast API routes', () => {
     expect(res.status()).toBe(404);
   });
 
-  test('lineage returns data', async ({ authedRequest, seedData }) => {
-    const res = await authedRequest.get(`/api/podcasts/${seedData.testPodcast.id}/lineage`);
-    expect(res.status()).toBe(200);
-    const body = await res.json();
-    expect(body).toHaveProperty('ancestors');
-    expect(body).toHaveProperty('forks');
-  });
-
   test('quality returns score', async ({ authedRequest, seedData }) => {
     const res = await authedRequest.get(`/api/podcasts/${seedData.testPodcast.id}/quality`);
     expect(res.status()).toBe(200);
     const body = await res.json();
     expect(body).toHaveProperty('qualityScore');
-  });
-
-  test('questions returns public Q&A', async ({ authedRequest, seedData }) => {
-    const res = await authedRequest.get(`/api/podcasts/${seedData.testPodcast.id}/questions`);
-    expect(res.status()).toBe(200);
-    const body = await res.json();
-    expect(body).toHaveProperty('items');
-  });
-
-  test('comments returns list', async ({ authedRequest, seedData }) => {
-    const res = await authedRequest.get(`/api/podcasts/${seedData.testPodcast.id}/comments`);
-    expect(res.status()).toBe(200);
-    const body = await res.json();
-    expect(body).toHaveProperty('items');
-    expect(body).toHaveProperty('total');
   });
 });

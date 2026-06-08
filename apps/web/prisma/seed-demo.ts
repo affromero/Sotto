@@ -8,7 +8,7 @@ async function main() {
 
   // ── 1. Demo user ───────────────────────────────────────────────
   const demoUser = await prisma.user.upsert({
-    where: { email: 'demo@sotto.fm' },
+    where: { email: 'demo@example.com' },
     update: {
       name: 'Nico Valerio',
       role: 'USER',
@@ -16,7 +16,7 @@ async function main() {
       image: 'https://ui-avatars.com/api/?name=K+B&background=D97706&color=fff&size=256&bold=true&format=png',
     },
     create: {
-      email: 'demo@sotto.fm',
+      email: 'demo@example.com',
       name: 'Nico Valerio',
       role: 'USER',
       bio: 'Curious mind, lifelong learner. I make podcasts about the things that keep me up at night — from quantum mechanics to ancient philosophy.',
@@ -27,10 +27,10 @@ async function main() {
 
   // ── 2. Admin user ───────────────────────────────────────────────
   const adminUser = await prisma.user.upsert({
-    where: { email: 'admin@sotto.fm' },
+    where: { email: 'admin@example.com' },
     update: { name: 'Sotto Admin', role: 'ADMIN' },
     create: {
-      email: 'admin@sotto.fm',
+      email: 'admin@example.com',
       name: 'Sotto Admin',
       role: 'ADMIN',
       image: 'https://api.dicebear.com/9.x/notionists/svg?seed=admin&backgroundColor=1E3A5F',
@@ -123,8 +123,6 @@ async function main() {
         'From ancient ciphers to modern encryption — how secret codes shaped wars, commerce, and the digital age.',
       visibility: 'PUBLIC' as const,
       playCount: 500,
-      likeCount: 42,
-      forkCount: 3,
       tags: ['history', 'technology'],
       userId: demoUser.id,
     },
@@ -134,8 +132,6 @@ async function main() {
         'Qubits, superposition, and entanglement explained for curious minds. What quantum computers can (and cannot) do today.',
       visibility: 'PUBLIC' as const,
       playCount: 320,
-      likeCount: 28,
-      forkCount: 1,
       tags: ['science', 'technology'],
       userId: demoUser.id,
     },
@@ -145,8 +141,6 @@ async function main() {
         'How distributed teams, async communication, and AI tools are reshaping the way we work — and what it means for cities, culture, and careers.',
       visibility: 'PUBLIC' as const,
       playCount: 210,
-      likeCount: 19,
-      forkCount: 0,
       tags: ['business', 'technology'],
       userId: demoUser.id,
     },
@@ -156,8 +150,6 @@ async function main() {
         'Bias in models, deepfakes, autonomous weapons, surveillance — the ethical dilemmas of artificial intelligence and who gets to decide.',
       visibility: 'PUBLIC' as const,
       playCount: 180,
-      likeCount: 15,
-      forkCount: 2,
       tags: ['ai-ml', 'philosophy'],
       userId: demoUser.id,
     },
@@ -167,8 +159,6 @@ async function main() {
         'Marcus Aurelius, Seneca, and Epictetus — how ancient Stoic philosophy offers practical wisdom for dealing with stress, uncertainty, and ambition today.',
       visibility: 'PUBLIC' as const,
       playCount: 150,
-      likeCount: 12,
-      forkCount: 1,
       tags: ['philosophy', 'health'],
       userId: demoUser.id,
     },
@@ -178,8 +168,6 @@ async function main() {
         'The science behind mRNA vaccine technology, from basic cell biology to the Pfizer and Moderna COVID-19 vaccines. How they were developed so quickly and what comes next.',
       visibility: 'PRIVATE' as const,
       playCount: 0,
-      likeCount: 0,
-      forkCount: 0,
       tags: ['science', 'health'],
       userId: demoUser.id,
     },
@@ -647,8 +635,6 @@ async function main() {
           status: 'READY',
           visibility: def.visibility,
           playCount: def.playCount,
-          likeCount: def.likeCount,
-          forkCount: def.forkCount,
           duration: segments.length * 25, // ~25 seconds per segment
         },
       });
@@ -661,8 +647,6 @@ async function main() {
           status: 'READY',
           visibility: def.visibility,
           playCount: def.playCount,
-          likeCount: def.likeCount,
-          forkCount: def.forkCount,
           duration: segments.length * 25,
         },
       });
@@ -734,53 +718,8 @@ async function main() {
     }
   }
 
-  // ── 8. Follows (make demo user popular) ─────────────────────────
-  const followPairs = [
-    ...createdUsers.slice(0, 7).map((u) => ({ followerId: u.id, followingId: demoUser.id })),
-    { followerId: demoUser.id, followingId: createdUsers[0].id },
-    { followerId: demoUser.id, followingId: createdUsers[1].id },
-    { followerId: createdUsers[2].id, followingId: createdUsers[0].id },
-    { followerId: createdUsers[3].id, followingId: createdUsers[1].id },
-  ];
-
-  for (const pair of followPairs) {
-    await prisma.follow.create({ data: pair }).catch(() => {}); // ignore if already exists
-  }
-  console.log(`  Created ${followPairs.length} follow relationships`);
-
-  // ── 9. Comments on Cryptography podcast ───────────────────────
+  // ── 8. Set audioUrl on Cryptography podcast ──────────────────
   const cryptoPodcast = podcasts[0];
-  if (cryptoPodcast) {
-    const commentAuthors = [
-      { user: createdUsers[0], content: 'The Enigma section was fascinating. I had no idea Turing\'s work saved that many lives.' },
-      { user: createdUsers[1], content: 'Would love a deep dive on post-quantum cryptography!' },
-      { user: createdUsers[2], content: 'Shared this with my CS class. Great explanation of RSA.' },
-    ];
-    for (const c of commentAuthors) {
-      await prisma.comment.create({
-        data: {
-          podcastId: cryptoPodcast.id,
-          userId: c.user.id,
-          content: c.content,
-        },
-      }).catch(() => {}); // ignore if already exists
-    }
-    console.log('  Created 3 comments on Cryptography podcast');
-  }
-
-  // ── 10. Likes on top 3 podcasts ──────────────────────────────
-  const likeUsers = createdUsers.slice(0, 5);
-  const likePodcasts = podcasts.slice(0, 3);
-  for (const podcast of likePodcasts) {
-    for (const user of likeUsers) {
-      await prisma.like.create({
-        data: { podcastId: podcast.id, userId: user.id },
-      }).catch(() => {}); // ignore @@unique constraint
-    }
-  }
-  console.log(`  Created likes from ${likeUsers.length} users on ${likePodcasts.length} podcasts`);
-
-  // ── 11. Set audioUrl on Cryptography podcast ──────────────────
   if (cryptoPodcast) {
     await prisma.podcast.update({
       where: { id: cryptoPodcast.id },
@@ -789,7 +728,7 @@ async function main() {
     console.log('  Set audioUrl on Cryptography podcast');
   }
 
-  // ── 12. SCRIPT_READY podcast — "The Psychology of Decision Making" ──
+  // ── 9. SCRIPT_READY podcast — "The Psychology of Decision Making" ──
   const scriptReadyTurns = [
     { speaker: 'HOST', text: 'Welcome to Sotto. Today we\'re exploring something that affects every single decision you make — the psychology behind why we choose what we choose.' },
     { speaker: 'EXPERT', text: 'And spoiler alert — most of those choices aren\'t nearly as rational as we think they are. Our brains use mental shortcuts called heuristics that often lead us astray.' },
@@ -829,8 +768,6 @@ async function main() {
         status: 'SCRIPT_READY',
         visibility: 'PUBLIC',
         playCount: 0,
-        likeCount: 0,
-        forkCount: 0,
         duration: 0,
       },
     });
@@ -860,42 +797,6 @@ async function main() {
   }
 
   console.log(`  Created SCRIPT_READY podcast: ${scriptReadyPodcast.id}`);
-
-  // ── 13. Activity entries ──────────────────────────────────────
-  const activityEntries = [
-    {
-      userId: demoUser.id,
-      type: 'PODCAST_CREATED',
-      targetId: cryptoPodcast?.id,
-      targetType: 'podcast',
-      metadata: { title: 'The Hidden History of Cryptography' },
-    },
-    {
-      userId: demoUser.id,
-      type: 'PODCAST_CREATED',
-      targetId: podcasts[1]?.id,
-      targetType: 'podcast',
-      metadata: { title: 'Understanding Quantum Computing' },
-    },
-    {
-      userId: createdUsers[0].id,
-      type: 'USER_FOLLOWED',
-      targetId: demoUser.id,
-      targetType: 'user',
-      metadata: { name: 'Nico Valerio' },
-    },
-    {
-      userId: demoUser.id,
-      type: 'PODCAST_CREATED',
-      targetId: scriptReadyPodcast.id,
-      targetType: 'podcast',
-      metadata: { title: 'The Psychology of Decision Making' },
-    },
-  ];
-  for (const entry of activityEntries) {
-    await prisma.activity.create({ data: entry }).catch(() => {});
-  }
-  console.log(`  Created ${activityEntries.length} activity entries`);
 
   console.log('\nDemo data seeded successfully!');
   console.log(`  Demo user:  ${demoUser.email} (${demoUser.id})`);

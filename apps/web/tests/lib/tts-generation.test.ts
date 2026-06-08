@@ -49,9 +49,11 @@ vi.mock('fs/promises', () => {
 });
 
 vi.mock('child_process', () => {
-  const execFile = vi.fn((_cmd: string, _args: string[], cb: (err: null, stdout: string, stderr: string) => void) => {
-    cb(null, '', '');
-  });
+  const execFile = vi.fn(
+    (_cmd: string, _args: string[], cb: (err: null, stdout: string, stderr: string) => void) => {
+      cb(null, '', '');
+    }
+  );
   return { default: { execFile }, execFile };
 });
 
@@ -78,15 +80,6 @@ vi.mock('@/lib/byok-errors', () => ({
   isModelAccessError: vi.fn((msg: string) => /\b404\b/.test(msg)),
 }));
 
-const mockGetWordTimingsViaStt = vi.fn().mockResolvedValue(null);
-vi.mock('@/lib/forced-alignment', () => ({
-  getWordTimingsViaStt: (...args: unknown[]) => mockGetWordTimingsViaStt(...args),
-}));
-
-vi.mock('@/lib/tts-expression-mapper', () => ({
-  convertInlineAudioTags: vi.fn((text: string) => text.replace(/\[([^\]]+)\]/g, '')),
-}));
-
 const mockResolveTtsProvider = vi.fn();
 vi.mock('@/lib/providers/tts', () => ({
   resolveTtsProvider: (...args: unknown[]) => mockResolveTtsProvider(...args),
@@ -97,10 +90,17 @@ vi.mock('@/lib/logger', () => ({
 }));
 
 // ---- Import under test ----
-import { generateTtsAudio, getPlatformTtsKey, type TtsGenerationParams } from '@/lib/tts-generation';
+import {
+  generateTtsAudio,
+  getPlatformTtsKey,
+  type TtsGenerationParams,
+} from '@/lib/tts-generation';
 import { splitTextForTts } from '@/lib/tts-text-cleaner';
 import { getElevenLabsConcurrencyLimit } from '@/lib/elevenlabs';
-import { getCartesiaConcurrencyLimit, updateCartesiaConcurrencyFromError } from '@/lib/providers/tts/cartesia.provider';
+import {
+  getCartesiaConcurrencyLimit,
+  updateCartesiaConcurrencyFromError,
+} from '@/lib/providers/tts/cartesia.provider';
 import { updateHumeConcurrencyFromError } from '@/lib/providers/tts/hume.provider';
 import type { TtsProviderId } from '@/lib/providers/tts-registry';
 
@@ -151,14 +151,16 @@ describe('generateTtsAudio', () => {
   });
 
   it('passes all speech params to provider.generateSpeech', async () => {
-    await generateTtsAudio(defaultParams({
-      text: 'Test segment',
-      voiceId: 'voice-42',
-      previousText: 'Previous text',
-      nextText: 'Next text',
-      direction: 'enthusiastic',
-      speaker: 'EXPERT',
-    }));
+    await generateTtsAudio(
+      defaultParams({
+        text: 'Test segment',
+        voiceId: 'voice-42',
+        previousText: 'Previous text',
+        nextText: 'Next text',
+        direction: 'enthusiastic',
+        speaker: 'EXPERT',
+      })
+    );
 
     expect(mockGenerateSpeech).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -246,10 +248,12 @@ describe('generateTtsAudio', () => {
   });
 
   it('logs usage with correct category and metadata', async () => {
-    await generateTtsAudio(defaultParams({
-      usageCategory: 'voice_track_audio',
-      extraMetadata: { voiceTrackId: 'vt-1' },
-    }));
+    await generateTtsAudio(
+      defaultParams({
+        usageCategory: 'voice_track_audio',
+        extraMetadata: { voiceTrackId: 'vt-1' },
+      })
+    );
 
     expect(mockLogUsage).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -266,9 +270,7 @@ describe('generateTtsAudio', () => {
       new Error('ElevenLabs API error (404): The model does not exist')
     );
 
-    await expect(
-      generateTtsAudio(defaultParams({ source: 'byok' }))
-    ).rejects.toThrow('(404)');
+    await expect(generateTtsAudio(defaultParams({ source: 'byok' }))).rejects.toThrow('(404)');
 
     expect(mockResolveTtsProvider).not.toHaveBeenCalled();
   });
@@ -276,20 +278,22 @@ describe('generateTtsAudio', () => {
   describe('429 error handling', () => {
     it('updates Cartesia concurrency on 429', async () => {
       process.env.CARTESIA_API_KEY = 'cartesia-key';
-      const cartesiaSpeech = vi.fn().mockRejectedValue(
-        new Error('Cartesia API error (429): Rate limited. Current limit: 3')
-      );
+      const cartesiaSpeech = vi
+        .fn()
+        .mockRejectedValue(new Error('Cartesia API error (429): Rate limited. Current limit: 3'));
 
       await expect(
-        generateTtsAudio(defaultParams({
-          providerId: 'cartesia',
-          provider: {
-            generateSpeech: (...args: unknown[]) => cartesiaSpeech(...args),
-            getVoiceId: vi.fn(),
-            getModelId: () => 'sonic-3',
-            providerId: 'cartesia' as TtsProviderId,
-          },
-        }))
+        generateTtsAudio(
+          defaultParams({
+            providerId: 'cartesia',
+            provider: {
+              generateSpeech: (...args: unknown[]) => cartesiaSpeech(...args),
+              getVoiceId: vi.fn(),
+              getModelId: () => 'sonic-3',
+              providerId: 'cartesia' as TtsProviderId,
+            },
+          })
+        )
       ).rejects.toThrow('(429)');
 
       expect(updateCartesiaConcurrencyFromError).toHaveBeenCalledWith(
@@ -303,20 +307,22 @@ describe('generateTtsAudio', () => {
 
     it('updates Hume concurrency on 429', async () => {
       process.env.HUME_API_KEY = 'hume-key';
-      const humeSpeech = vi.fn().mockRejectedValue(
-        new Error('Hume AI API error (429): concurrency limit exceeded')
-      );
+      const humeSpeech = vi
+        .fn()
+        .mockRejectedValue(new Error('Hume AI API error (429): concurrency limit exceeded'));
 
       await expect(
-        generateTtsAudio(defaultParams({
-          providerId: 'hume',
-          provider: {
-            generateSpeech: (...args: unknown[]) => humeSpeech(...args),
-            getVoiceId: vi.fn(),
-            getModelId: () => 'octave-v1',
-            providerId: 'hume' as TtsProviderId,
-          },
-        }))
+        generateTtsAudio(
+          defaultParams({
+            providerId: 'hume',
+            provider: {
+              generateSpeech: (...args: unknown[]) => humeSpeech(...args),
+              getVoiceId: vi.fn(),
+              getModelId: () => 'octave-v1',
+              providerId: 'hume' as TtsProviderId,
+            },
+          })
+        )
       ).rejects.toThrow('(429)');
 
       expect(updateHumeConcurrencyFromError).toHaveBeenCalledWith(
@@ -345,25 +351,11 @@ describe('generateTtsAudio', () => {
     });
   });
 
-  it('passes cleaned text (no brackets) to forced alignment, not raw script text', async () => {
-    const rawText = 'Hello [laughs] world [pause] end [1,2]';
-    // cleanTextForTts mock is a passthrough, but convertInlineAudioTags strips brackets
-    mockGetWordTimingsViaStt.mockResolvedValue([
-      { word: 'Hello', start: 0, end: 0.5 },
-      { word: 'world', start: 0.6, end: 1.0 },
-      { word: 'end', start: 1.1, end: 1.5 },
-    ]);
-
-    const result = await generateTtsAudio(defaultParams({ text: rawText }));
+  it('does not invoke STT alignment when the TTS provider returns no word timings', async () => {
+    const result = await generateTtsAudio(defaultParams({ text: 'Hello world' }));
 
     expect(result).not.toBeNull();
-    // The text passed to forced alignment should have brackets stripped
-    expect(mockGetWordTimingsViaStt).toHaveBeenCalledWith(
-      expect.any(Buffer),
-      expect.not.stringContaining('[laughs]'),
-      'user-1',
-    );
-    expect(result!.wordTimings).toHaveLength(3);
+    expect(result!.wordTimings).toBeNull();
   });
 
   describe('multi-chunk generation', () => {
@@ -383,36 +375,44 @@ describe('generateTtsAudio', () => {
         .mockResolvedValueOnce(Buffer.from('audio-chunk-1'))
         .mockResolvedValueOnce(Buffer.from('audio-chunk-2'));
 
-      const result = await generateTtsAudio(defaultParams({
-        text: `${chunk1} ${chunk2}`,
-        previousText: 'Before segment.',
-        nextText: 'After segment.',
-        provider: {
-          generateSpeech: (...args: unknown[]) => mockGenerateSpeech(...args),
-          getVoiceId: vi.fn().mockReturnValue('voice-1'),
-          getModelId: () => 'eleven_v3',
-          getLastContinuityId: mockGetLastContinuityId,
-          providerId: 'elevenlabs' as TtsProviderId,
-        },
-      }));
+      const result = await generateTtsAudio(
+        defaultParams({
+          text: `${chunk1} ${chunk2}`,
+          previousText: 'Before segment.',
+          nextText: 'After segment.',
+          provider: {
+            generateSpeech: (...args: unknown[]) => mockGenerateSpeech(...args),
+            getVoiceId: vi.fn().mockReturnValue('voice-1'),
+            getModelId: () => 'eleven_v3',
+            getLastContinuityId: mockGetLastContinuityId,
+            providerId: 'elevenlabs' as TtsProviderId,
+          },
+        })
+      );
 
       expect(result).not.toBeNull();
       expect(mockGenerateSpeech).toHaveBeenCalledTimes(2);
 
       // eleven_v3 is in modelsWithoutTextContext — text context should be undefined
-      expect(mockGenerateSpeech).toHaveBeenNthCalledWith(1, expect.objectContaining({
-        text: chunk1,
-        previousText: undefined,
-        nextText: undefined,
-      }));
+      expect(mockGenerateSpeech).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          text: chunk1,
+          previousText: undefined,
+          nextText: undefined,
+        })
+      );
 
       // Second chunk gets continuityIds from the first chunk
-      expect(mockGenerateSpeech).toHaveBeenNthCalledWith(2, expect.objectContaining({
-        text: chunk2,
-        previousText: undefined,
-        nextText: undefined,
-        continuityIds: ['req-1'],
-      }));
+      expect(mockGenerateSpeech).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          text: chunk2,
+          previousText: undefined,
+          nextText: undefined,
+          continuityIds: ['req-1'],
+        })
+      );
 
       expect(result!.audioBuffer).toEqual(Buffer.from('concatenated-audio'));
     });
@@ -426,33 +426,41 @@ describe('generateTtsAudio', () => {
         .mockResolvedValueOnce(Buffer.from('audio-chunk-1'))
         .mockResolvedValueOnce(Buffer.from('audio-chunk-2'));
 
-      const result = await generateTtsAudio(defaultParams({
-        text: `${chunk1} ${chunk2}`,
-        previousText: 'Before segment.',
-        nextText: 'After segment.',
-        provider: {
-          generateSpeech: (...args: unknown[]) => mockGenerateSpeech(...args),
-          getVoiceId: vi.fn().mockReturnValue('voice-1'),
-          getModelId: () => 'eleven_turbo_v2',
-          providerId: 'elevenlabs' as TtsProviderId,
-        },
-      }));
+      const result = await generateTtsAudio(
+        defaultParams({
+          text: `${chunk1} ${chunk2}`,
+          previousText: 'Before segment.',
+          nextText: 'After segment.',
+          provider: {
+            generateSpeech: (...args: unknown[]) => mockGenerateSpeech(...args),
+            getVoiceId: vi.fn().mockReturnValue('voice-1'),
+            getModelId: () => 'eleven_turbo_v2',
+            providerId: 'elevenlabs' as TtsProviderId,
+          },
+        })
+      );
 
       expect(result).not.toBeNull();
       expect(mockGenerateSpeech).toHaveBeenCalledTimes(2);
 
       // Non-v3 model keeps text context bridging
-      expect(mockGenerateSpeech).toHaveBeenNthCalledWith(1, expect.objectContaining({
-        text: chunk1,
-        previousText: 'Before segment.',
-        nextText: chunk2.slice(0, 500),
-      }));
+      expect(mockGenerateSpeech).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          text: chunk1,
+          previousText: 'Before segment.',
+          nextText: chunk2.slice(0, 500),
+        })
+      );
 
-      expect(mockGenerateSpeech).toHaveBeenNthCalledWith(2, expect.objectContaining({
-        text: chunk2,
-        previousText: chunk1.slice(-500),
-        nextText: 'After segment.',
-      }));
+      expect(mockGenerateSpeech).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          text: chunk2,
+          previousText: chunk1.slice(-500),
+          nextText: 'After segment.',
+        })
+      );
 
       expect(result!.audioBuffer).toEqual(Buffer.from('concatenated-audio'));
     });

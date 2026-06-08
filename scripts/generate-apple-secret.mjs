@@ -4,7 +4,7 @@
  * Usage: node scripts/generate-apple-secret.mjs /path/to/AuthKey.p8
  *
  * The JWT is valid for 180 days (Apple max is 6 months).
- * Rotate by re-running and updating Doppler.
+ * Rotate by re-running and updating the secret manager or env file used by the deployment.
  */
 
 import { readFileSync } from 'fs';
@@ -58,6 +58,6 @@ const jwt = `${signingInput}.${signature}`;
 
 console.log('\n--- Apple Client Secret (valid %d days, expires %s) ---\n', EXPIRY_DAYS, new Date(exp * 1000).toISOString().split('T')[0]);
 console.log(jwt);
-console.log('\nSet in Doppler:');
+console.log('\nSet in your deployment environment:');
 console.log('  APPLE_CLIENT_ID = fm.sotto.web');
 console.log('  APPLE_CLIENT_SECRET = <the JWT above>\n');

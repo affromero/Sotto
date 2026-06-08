@@ -14,8 +14,6 @@ interface Pick {
   duration: number | null;
   audioUrl: string | null;
   playCount: number;
-  likeCount: number;
-  forkCount: number;
   createdAt: string;
   user: { id: string; name: string | null; image: string | null; handle?: string | null };
   tags: Array<{ id: string; name: string; slug: string }>;
@@ -46,12 +44,9 @@ function pickToPodcastSummary(pick: Pick): PodcastSummary {
     audioUrl: pick.audioUrl,
     duration: pick.duration,
     playCount: pick.playCount,
-    likeCount: pick.likeCount,
-    forkCount: pick.forkCount,
     createdAt: pick.createdAt,
     source: 'WEB',
     isHumanContent: false,
-    forkedFromId: null,
     ownerIsPro: false,
     user: {
       ...pick.user,
@@ -133,7 +128,7 @@ export function DailyPicks({ initialPicks, initialCategories, initialMessage }: 
                   <PodcastCard
                     podcast={pickToPodcastSummary(pick)}
                     position={idx}
-                    feedSort="picks"
+                    surface="picks"
                   />
                   <p className={styles.explanation}>{pick.explanation}</p>
                 </div>

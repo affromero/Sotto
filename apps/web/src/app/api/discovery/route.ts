@@ -5,7 +5,7 @@ import { logUsage } from '@/lib/usage-logger';
 import { extractContent } from '@/lib/extractors';
 import { checkRateLimit } from '@/lib/redis';
 import { getAiKey } from '@/lib/byok';
-import { getAllAiProviderMeta, getModelRequiredPlan, isValidModelId } from '@/lib/providers/ai-registry';
+import { getAiProviderMeta, getAllAiProviderMeta, getCheapestModelForProvider, getModelRequiredPlan, isValidModelId } from '@/lib/providers/ai-registry';
 import type { AiProviderId } from '@/lib/providers/ai-registry';
 import { isModelAllowedForUser } from '@/lib/tier-features';
 import { prisma } from '@/lib/prisma';
@@ -103,14 +103,6 @@ export async function POST(request: NextRequest) {
   const body = await request.json();
   const { message, content, discoveryId, history, model, maxDuration } = body;
 
-  // Block non-admins from using claude-code models
-  if (typeof model === 'string' && model.startsWith('claude-code:')) {
-    const sess = await auth();
-    if (sess?.user?.role !== 'ADMIN') {
-      return errorResponse('Forbidden', 403);
-    }
-  }
-
   // Validate model ID against registry (claude-code:* models are exempt)
   if (typeof model === 'string' && !model.startsWith('claude-code:')) {
     if (!isValidModelId(model)) {
@@ -136,7 +128,9 @@ export async function POST(request: NextRequest) {
   // Resolve which provider owns the requested model so we use the right BYOK key.
   // e.g. 'gpt-5-mini' → 'openai', 'claude-sonnet-4-6' → 'anthropic'
   let modelProvider: AiProviderId | undefined;
-  if (typeof model === 'string' && !model.startsWith('claude-code:')) {
+  if (typeof model === 'string' && model.startsWith('claude-code:')) {
+    modelProvider = 'claude-code';
+  } else if (typeof model === 'string') {
     for (const p of getAllAiProviderMeta()) {
       if (p.models.some((m) => m.id === model)) {
         modelProvider = p.id as AiProviderId;
@@ -145,10 +139,13 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Fetch the BYOK key for the resolved provider (falls back to any valid key if no match)
-  const aiKey = modelProvider
-    ? (await getAiKey(authed.userId, modelProvider)) ?? (await getAiKey(authed.userId))
-    : await getAiKey(authed.userId);
+  // Fetch the BYOK key for the resolved provider only. Explicit model choices must not
+  // silently switch to a different provider key.
+  const aiKey = modelProvider && modelProvider !== 'claude-code'
+    ? await getAiKey(authed.userId, modelProvider)
+    : modelProvider === 'claude-code'
+      ? null
+      : await getAiKey(authed.userId);
 
   // Fetch user for plan gating and language detection
   const user = await prisma.user.findUnique({
@@ -168,6 +165,18 @@ export async function POST(request: NextRequest) {
         return errorResponse('This model requires a Pro subscription.', 403, { code: 'model_requires_pro' });
       }
     }
+  }
+
+  const effectiveProvider = modelProvider ?? (aiKey?.provider as AiProviderId | undefined);
+  const effectiveModel = typeof model === 'string' && model.length > 0
+    ? model
+    : aiKey
+      ? getAiProviderMeta(aiKey.provider as AiProviderId).defaultModel
+      : undefined;
+  if (!effectiveProvider || !effectiveModel) {
+    return errorResponse('AI model is required when no AI key is configured.', 400, {
+      code: 'ai_model_required',
+    });
   }
 
   // Inline URL extraction: detect URLs in the latest message and inject context
@@ -205,7 +214,17 @@ export async function POST(request: NextRequest) {
   if (isFirstMessage && !user?.preferredLanguage) {
     const rawMessage = message ?? content;
     if (typeof rawMessage === 'string') {
-      const lang = await detectLanguage(rawMessage);
+      const languageDetectionModel = getCheapestModelForProvider(effectiveProvider);
+      if (!languageDetectionModel) {
+        return errorResponse('Language detection model is not configured for the selected AI provider.', 400, {
+          code: 'ai_model_required',
+        });
+      }
+      const lang = await detectLanguage(rawMessage, {
+        providerType: effectiveProvider,
+        model: languageDetectionModel,
+        apiKeyOverride: aiKey?.apiKey,
+      });
       if (lang && lang !== 'en') {
         detectedLanguage = lang;
       }
@@ -233,8 +252,6 @@ export async function POST(request: NextRequest) {
 
   const messages = [...priorMessages, { role: 'user' as const, content: userMessage }];
 
-  const effectiveProvider = modelProvider ?? aiKey?.provider ?? 'anthropic';
-
   // For free-tier users (maxDuration <= 5), tell the AI not to ask about duration
   const systemSuffix = typeof maxDuration === 'number' && maxDuration <= 5
     ? 'IMPORTANT: This user is on the free tier with a fixed 5-minute podcast duration. Do NOT ask about duration preference — skip step 7 entirely. Always set "duration_target": 5 in the metadata.'
@@ -250,10 +267,10 @@ export async function POST(request: NextRequest) {
         for await (const chunk of streamDiscoveryResponse(
           messages,
           aiKey?.apiKey,
-          model || undefined,
+          effectiveModel,
           (usage) => {
             logUsage({
-              service: effectiveProvider as 'anthropic' | 'openai',
+              service: effectiveProvider,
               model: usage.model,
               category: 'discovery',
               inputTokens: usage.inputTokens,
@@ -317,10 +334,10 @@ export async function POST(request: NextRequest) {
             for await (const chunk of streamFallbackDiscoveryResponse(
               originalMessage,
               aiKey?.apiKey,
-              model || undefined,
+              effectiveModel,
               (usage) => {
                 logUsage({
-                  service: effectiveProvider as 'anthropic' | 'openai',
+                  service: effectiveProvider,
                   model: usage.model,
                   category: 'discovery',
                   inputTokens: usage.inputTokens,

@@ -1,6 +1,7 @@
 import { uploadFile } from './r2';
 import { logger } from './logger';
 import { createAIProvider } from './providers/ai';
+import { getProviderForModel } from './providers/ai-registry';
 import type { VideoSegment } from '@sotto/video';
 
 const REMOTION_URL = process.env.REMOTION_URL;
@@ -106,12 +107,23 @@ interface ExternalHints {
   mapDescription: string;
 }
 
-async function generateShowcaseMetadata(topic: string): Promise<{ segments: GeneratedSegment[]; hints: ExternalHints }> {
-  const ai = createAIProvider();
+interface ShowcaseGenerationOptions {
+  aiModel: string;
+  imageModel?: string;
+  topic: string;
+}
+
+async function generateShowcaseMetadata(topic: string, aiModel: string): Promise<{ segments: GeneratedSegment[]; hints: ExternalHints }> {
+  const aiProvider = getProviderForModel(aiModel);
+  if (!aiProvider) {
+    throw new Error(`Unknown showcase AI model: "${aiModel}"`);
+  }
+
+  const ai = createAIProvider(aiProvider);
   const result = await ai.generateResponse(
     SHOWCASE_PROMPT,
     [{ role: 'user', content: `Topic: ${topic}` }],
-    { maxTokens: 16384, skipModeration: true, useWebSearch: true },
+    { maxTokens: 16384, model: aiModel, skipModeration: true, useWebSearch: true },
   );
 
   let parsed: Record<string, unknown>;
@@ -230,16 +242,16 @@ async function renderClip(segment: VideoSegment, durationSeconds = SHOWCASE_CLIP
   return Buffer.from(await response.arrayBuffer());
 }
 
-export async function generateShowcaseClips(opts?: { imageModel?: string; topic?: string }): Promise<ShowcaseResult> {
+export async function generateShowcaseClips(opts: ShowcaseGenerationOptions): Promise<ShowcaseResult> {
   const items: ShowcaseItem[] = [];
   const failures: Array<{ visualType: string; error: string }> = [];
   const cacheBust = Date.now();
 
-  const topic = opts?.topic || 'Technology';
+  const topic = opts.topic;
 
   // Generate all metadata from the topic via LLM
   logger.info('Generating showcase metadata via LLM', { topic });
-  const { segments: generatedSegments, hints } = await generateShowcaseMetadata(topic);
+  const { segments: generatedSegments, hints } = await generateShowcaseMetadata(topic, opts.aiModel);
 
   // 1. Render programmatic types as animated clips via /clip
   for (const entry of generatedSegments) {
@@ -272,7 +284,7 @@ export async function generateShowcaseClips(opts?: { imageModel?: string; topic?
     const { FalImageProvider } = await import('./providers/image/fal.provider');
     const falKey = process.env.FAL_KEY;
     if (falKey) {
-      const selectedModel = opts?.imageModel;
+      const selectedModel = opts.imageModel;
       logger.info('Generating AI illustration', { model: selectedModel ?? 'default (fal-flux-1-schnell)' });
       const provider = new FalImageProvider(falKey, selectedModel);
       const imageBuffer = await provider.generateImage({
@@ -385,13 +397,13 @@ export async function generateShowcaseClips(opts?: { imageModel?: string; topic?
  */
 export async function regenerateShowcaseItem(
   visualType: string,
-  opts?: { imageModel?: string; topic?: string },
+  opts: ShowcaseGenerationOptions,
 ): Promise<ShowcaseItem> {
   const cacheBust = Date.now();
-  const topic = opts?.topic || 'Technology';
+  const topic = opts.topic;
 
   // Generate fresh metadata for this single type via LLM
-  const { segments: generatedSegments } = await generateShowcaseMetadata(topic);
+  const { segments: generatedSegments } = await generateShowcaseMetadata(topic, opts.aiModel);
   const entry = generatedSegments.find((s: GeneratedSegment) => s.visualType === visualType);
 
   if (entry) {
@@ -416,7 +428,7 @@ export async function regenerateShowcaseItem(
     const { FalImageProvider } = await import('./providers/image/fal.provider');
     const falKey = process.env.FAL_KEY;
     if (!falKey) throw new Error('FAL_KEY not configured');
-    const provider = new FalImageProvider(falKey, opts?.imageModel);
+    const provider = new FalImageProvider(falKey, opts.imageModel);
     const imageBuffer = await provider.generateImage({
       prompt: `Editorial illustration about ${topic}, warm amber and deep navy tones, clean lines, no text, no real people likenesses`,
       width: 1280, height: 720,

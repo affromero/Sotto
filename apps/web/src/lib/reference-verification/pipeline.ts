@@ -3,7 +3,7 @@ import {
   computeBayesianScore,
   type ContentDomain,
   type LayerResult,
-} from '@sottofm/verification-standard';
+} from '@sotto/verification-standard';
 import {
   verifyUrl,
   verifyDoi,

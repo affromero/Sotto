@@ -1,17 +1,8 @@
 /**
- * LLM-based multi-voice assignment for podcasts with 3+ speakers.
- *
- * Uses an LLM (via platform config) to intelligently match speakers to voices
- * from the provider's voice catalog. Falls back to deterministic hash-based
- * selection on failure.
+ * Deterministic multi-voice assignment for podcasts.
  */
 
 import { prisma } from './prisma';
-import { getVoiceCatalog, type CatalogVoice } from './voice-catalog';
-import { createAIProvider } from './providers/ai';
-import { loadAndRender } from './prompt-loader';
-import { logUsage } from './usage-logger';
-import { resolveAutoModel } from './auto-model-config';
 import {
   selectVoiceSet,
   resolveVoiceId,
@@ -37,14 +28,14 @@ interface SpeakerInput {
  * Assign distinct voices for each speaker in a podcast.
  *
  * For 2 or fewer speakers, or when all speakers already have PodcastVoice
- * entries, this is a no-op. For 3+ speakers, uses an LLM to cast voices
- * from the provider's catalog. Falls back to hash-based selection on failure.
+ * entries, this is a no-op. Remaining speakers are assigned using stable
+ * provider voice pools so self-hosted deployments do not need AI credentials
+ * for voice casting.
  */
 export async function assignVoicesForPodcast(
   podcastId: string,
   speakers: SpeakerInput[],
   providerId: TtsProviderId,
-  apiKey?: string,
   metadata?: VoiceMatchMetadata,
 ): Promise<void> {
   if (speakers.length <= 1) return;
@@ -59,170 +50,25 @@ export async function assignVoicesForPodcast(
   const unassigned = speakers.filter((s) => !assignedSpeakers.has(s.name));
   if (unassigned.length === 0) return;
 
-  // For 2 speakers, the existing pair selection is sufficient — skip LLM
-  if (speakers.length <= 2) {
-    await fallbackAssign(podcastId, unassigned, providerId, metadata);
-    return;
-  }
-
-  try {
-    const catalog = await getVoiceCatalog(providerId, apiKey);
-    if (catalog.length === 0) {
-      await fallbackAssign(podcastId, unassigned, providerId, metadata);
-      return;
-    }
-
-    const mapping = await llmAssignVoices(podcastId, unassigned, catalog);
-    if (!mapping) {
-      await fallbackAssign(podcastId, unassigned, providerId, metadata);
-      return;
-    }
-
-    // Validate all mapped voice IDs exist in catalog
-    const catalogIds = new Set(catalog.map((v) => v.id));
-    const validEntries: Array<{ speaker: string; voiceId: string }> = [];
-
-    for (const [speaker, voiceId] of Object.entries(mapping)) {
-      if (catalogIds.has(voiceId) && unassigned.some((s) => s.name === speaker)) {
-        validEntries.push({ speaker, voiceId });
-      }
-    }
-
-    // Ensure no duplicate voice IDs
-    const usedVoices = new Set<string>();
-    const deduped: Array<{ speaker: string; voiceId: string }> = [];
-    for (const entry of validEntries) {
-      if (!usedVoices.has(entry.voiceId)) {
-        deduped.push(entry);
-        usedVoices.add(entry.voiceId);
-      }
-    }
-
-    if (deduped.length === 0) {
-      await fallbackAssign(podcastId, unassigned, providerId, metadata);
-      return;
-    }
-
-    // Store in PodcastVoice
-    await prisma.podcastVoice.createMany({
-      data: deduped.map((e) => ({
-        podcastId,
-        speaker: e.speaker,
-        voiceId: e.voiceId,
-        provider: providerId,
-      })),
-      skipDuplicates: true,
-    });
-
-    // If some speakers weren't mapped by LLM, fall back for those
-    const mappedSpeakers = new Set(deduped.map((e) => e.speaker));
-    const stillUnassigned = unassigned.filter((s) => !mappedSpeakers.has(s.name));
-    if (stillUnassigned.length > 0) {
-      await fallbackAssign(podcastId, stillUnassigned, providerId, metadata);
-    }
-
-    logger.info('LLM voice assignment complete', {
-      podcastId,
-      provider: providerId,
-      assigned: String(deduped.length),
-      fallback: String(stillUnassigned.length),
-    });
-  } catch (err) {
-    logger.warn('LLM voice assignment failed, using fallback', {
-      podcastId,
-      error: err instanceof Error ? err.message : String(err),
-    });
-    await fallbackAssign(podcastId, unassigned, providerId, metadata);
-  }
+  await assignDeterministicVoices(podcastId, unassigned, providerId, metadata);
 }
 
 // ---------------------------------------------------------------------------
-// LLM casting
+// Deterministic assignment
 // ---------------------------------------------------------------------------
 
-async function llmAssignVoices(
-  podcastId: string,
-  speakers: SpeakerInput[],
-  catalog: CatalogVoice[],
-): Promise<Record<string, string> | null> {
-  const voiceCatalogText = catalog
-    .map((v) => {
-      const parts = [`- ID: ${v.id}, Name: ${v.name}`];
-      if (v.gender) parts.push(`Gender: ${v.gender}`);
-      if (v.age) parts.push(`Age: ${v.age}`);
-      if (v.accent) parts.push(`Accent: ${v.accent}`);
-      if (v.description) parts.push(`Style: ${v.description}`);
-      return parts.join(', ');
-    })
-    .join('\n');
-
-  const speakersText = speakers
-    .map((s) => {
-      if (s.description) return `- ${s.name}: ${s.description}`;
-      return `- ${s.name}`;
-    })
-    .join('\n');
-
-  const prompt = loadAndRender('audio/voice-assigner.md', {
-    VOICE_CATALOG: voiceCatalogText,
-    SPEAKER_COUNT: String(speakers.length),
-    SPEAKERS: speakersText,
-  });
-
-  const autoConfig = await resolveAutoModel('PLATFORM');
-
-  const response = await createAIProvider(autoConfig.aiProvider).generateResponse(
-    prompt,
-    [{ role: 'user', content: 'Assign voices now.' }],
-    {
-      maxTokens: 512,
-      model: autoConfig.aiModel,
-      skipModeration: true,
-    },
-  );
-
-  await logUsage({
-    service: autoConfig.aiProvider,
-    model: response.model,
-    category: 'voice_assignment',
-    inputTokens: response.inputTokens,
-    outputTokens: response.outputTokens,
-    podcastId,
-  });
-
-  // Parse JSON from response — strip markdown fences if present
-  let content = response.content.trim();
-  const fenceMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (fenceMatch) {
-    content = fenceMatch[1].trim();
-  }
-
-  try {
-    const parsed = JSON.parse(content);
-    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-      return null;
-    }
-    return parsed as Record<string, string>;
-  } catch {
-    logger.warn('Failed to parse LLM voice assignment response', {
-      podcastId,
-      content: content.substring(0, 200),
-    });
-    return null;
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Fallback — deterministic hash-based assignment
-// ---------------------------------------------------------------------------
-
-async function fallbackAssign(
+async function assignDeterministicVoices(
   podcastId: string,
   speakers: SpeakerInput[],
   providerId: TtsProviderId,
   metadata?: VoiceMatchMetadata,
 ): Promise<void> {
-  const voiceIds = getFallbackVoiceIds(podcastId, speakers.length, providerId, metadata);
+  const voiceIds = selectDeterministicVoiceIds(podcastId, speakers.length, providerId, metadata);
+  if (voiceIds.length < speakers.length) {
+    throw new Error(
+      `Unable to assign ${speakers.length} voices for provider "${providerId}"; only ${voiceIds.length} voices are available.`
+    );
+  }
 
   const entries: Array<{ podcastId: string; speaker: string; voiceId: string; provider: string }> = [];
   for (let i = 0; i < speakers.length && i < voiceIds.length; i++) {
@@ -241,14 +87,14 @@ async function fallbackAssign(
     });
   }
 
-  logger.info('Fallback voice assignment complete', {
+  logger.info('Deterministic voice assignment complete', {
     podcastId,
     provider: providerId,
     assigned: String(entries.length),
   });
 }
 
-function getFallbackVoiceIds(
+function selectDeterministicVoiceIds(
   podcastId: string,
   speakerCount: number,
   providerId: TtsProviderId,
@@ -291,9 +137,11 @@ function getFallbackVoiceIds(
       return voices.map((v) => v.id);
     }
 
-    default: {
-      const entries = selectVoiceSet(podcastId, speakerCount, metadata);
-      return entries.map((e) => resolveVoiceId(e, 'elevenlabs'));
-    }
+    default:
+      return unsupportedProvider(providerId);
   }
+}
+
+function unsupportedProvider(providerId: never): never {
+  throw new Error(`Unsupported TTS provider for voice assignment: ${String(providerId)}`);
 }

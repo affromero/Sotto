@@ -32,7 +32,7 @@ export const SottoWatermark: React.FC = () => {
           letterSpacing: 0.5,
         }}
       >
-        sotto.fm
+        Sotto
       </span>
     </div>
   );

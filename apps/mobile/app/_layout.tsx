@@ -7,14 +7,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useFonts } from 'expo-font';
-import {
-  DMSerifDisplay_400Regular,
-} from '@expo-google-fonts/dm-serif-display';
-import {
-  Inter_400Regular,
-  Inter_500Medium,
-  Inter_600SemiBold,
-} from '@expo-google-fonts/inter';
+import { DMSerifDisplay_400Regular } from '@expo-google-fonts/dm-serif-display';
+import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold } from '@expo-google-fonts/inter';
 import { isAuthenticated, onAuthSuccess } from '../lib/auth';
 import { useThemeColors, useThemeStore } from '../lib/useThemeColors';
 import { api, onAuthRevoked } from '../lib/api';
@@ -33,7 +27,9 @@ function useProtectedRoute() {
 
   // Track current path so we can restore it after re-auth
   const pathnameRef = useRef(pathname);
-  useEffect(() => { pathnameRef.current = pathname; }, [pathname]);
+  useEffect(() => {
+    pathnameRef.current = pathname;
+  }, [pathname]);
   const pendingPostAuthRoute = useRef<string | null>(null);
 
   // Instant navigation on login/logout events
@@ -55,7 +51,10 @@ function useProtectedRoute() {
       // Register push notification token after successful auth
       registerForPushNotifications().catch(() => {});
     });
-    return () => { unsubRevoke(); unsubSuccess(); };
+    return () => {
+      unsubRevoke();
+      unsubSuccess();
+    };
   }, [router]);
 
   // Startup auth check — runs once on mount.
@@ -107,7 +106,9 @@ function useProtectedRoute() {
     }
 
     checkAuth();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps — intentional: runs once on mount
 
   return { isChecking: !isReady };
@@ -116,7 +117,7 @@ function useProtectedRoute() {
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
     'DM Serif Display': DMSerifDisplay_400Regular,
-    'Inter': Inter_400Regular,
+    Inter: Inter_400Regular,
     'Inter-Medium': Inter_500Medium,
     'Inter-SemiBold': Inter_600SemiBold,
   });
@@ -127,7 +128,14 @@ export default function RootLayout() {
 
   if (!fontsLoaded || isChecking) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
+      <View
+        style={{
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          backgroundColor: colors.background,
+        }}
+      >
         <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
@@ -135,34 +143,32 @@ export default function RootLayout() {
 
   return (
     <AppErrorBoundary>
-    <SafeAreaProvider>
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <QueryClientProvider client={queryClient}>
-          <EventProvider>
-            <StatusBar style={isDark ? 'light' : 'dark'} />
-            <Stack
-              screenOptions={{
-                headerStyle: { backgroundColor: colors.background },
-                headerTintColor: colors.textPrimary,
-                contentStyle: { backgroundColor: colors.background },
-              }}
-            >
-              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-              <Stack.Screen name="auth/login" options={{ headerShown: false }} />
-              <Stack.Screen name="onboarding/index" options={{ headerShown: false }} />
-              <Stack.Screen name="podcast/[id]" options={{ headerShown: false }} />
-              <Stack.Screen name="podcast/[id]/edit" options={{ title: 'Edit Podcast' }} />
-              <Stack.Screen name="analytics" options={{ title: 'Analytics' }} />
-              <Stack.Screen name="voices" options={{ title: 'Voice Marketplace' }} />
-              <Stack.Screen name="collections/index" options={{ title: 'Collections' }} />
-              <Stack.Screen name="collections/[id]" options={{ title: '' }} />
-              <Stack.Screen name="user/[userId]" options={{ title: '' }} />
-            </Stack>
-            <MiniPlayer />
-          </EventProvider>
-        </QueryClientProvider>
-      </GestureHandlerRootView>
-    </SafeAreaProvider>
+      <SafeAreaProvider>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <QueryClientProvider client={queryClient}>
+            <EventProvider>
+              <StatusBar style={isDark ? 'light' : 'dark'} />
+              <Stack
+                screenOptions={{
+                  headerStyle: { backgroundColor: colors.background },
+                  headerTintColor: colors.textPrimary,
+                  contentStyle: { backgroundColor: colors.background },
+                }}
+              >
+                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                <Stack.Screen name="auth/login" options={{ headerShown: false }} />
+                <Stack.Screen name="onboarding/index" options={{ headerShown: false }} />
+                <Stack.Screen name="podcast/[id]" options={{ headerShown: false }} />
+                <Stack.Screen name="podcast/[id]/edit" options={{ title: 'Edit Podcast' }} />
+                <Stack.Screen name="analytics" options={{ title: 'Analytics' }} />
+                <Stack.Screen name="collections/index" options={{ title: 'Collections' }} />
+                <Stack.Screen name="collections/[id]" options={{ title: '' }} />
+              </Stack>
+              <MiniPlayer />
+            </EventProvider>
+          </QueryClientProvider>
+        </GestureHandlerRootView>
+      </SafeAreaProvider>
     </AppErrorBoundary>
   );
 }

@@ -128,22 +128,6 @@ export async function interceptInteract(
   });
 }
 
-// ── Fork (POST /api/podcasts/*/fork) ─────────────────────────────
-
-export async function interceptFork(
-  page: Page,
-  podcastId: string,
-  forkId: string
-): Promise<void> {
-  await page.route(`**/api/podcasts/${podcastId}/fork`, async (route: Route) => {
-    await route.fulfill({
-      status: 201,
-      contentType: 'application/json',
-      body: JSON.stringify({ id: forkId }),
-    });
-  });
-}
-
 // ── Script Approve (POST /api/podcasts/*/script/approve) ─────────
 
 export async function interceptScriptApprove(

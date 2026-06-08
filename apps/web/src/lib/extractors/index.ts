@@ -7,18 +7,21 @@ import { textToMarkdown } from './text-to-markdown';
 import { isYouTubeUrl, extractYouTubeContent } from './youtube';
 import { safeFetch } from '../url-validator';
 import { logger } from '../logger';
+import { getAppBaseUrl } from '../urls';
 import type { ExtractedContent } from './types';
 
-export type { ExtractedContent, ExtractedTable, ExtractedFigure, ExtractedStatistic } from './types';
+export type {
+  ExtractedContent,
+  ExtractedTable,
+  ExtractedFigure,
+  ExtractedStatistic,
+} from './types';
 
 const MIN_WORD_COUNT = 50;
 const FETCH_TIMEOUT_MS = 15000;
 
 /** MIME types that indicate HTML content */
-const HTML_MIME_TYPES = new Set([
-  'text/html',
-  'application/xhtml+xml',
-]);
+const HTML_MIME_TYPES = new Set(['text/html', 'application/xhtml+xml']);
 
 /** MIME types for document formats handled by Markit (Phase 2) */
 const DOCUMENT_MIME_TYPES = new Set([
@@ -63,7 +66,10 @@ function getUrlExtension(url: string): string | null {
  * Detect the content category from MIME type and URL extension.
  * Returns 'html' | 'pdf' | 'document' | null.
  */
-function detectContentType(mimeType: string | null, url: string): 'html' | 'pdf' | 'document' | null {
+function detectContentType(
+  mimeType: string | null,
+  url: string
+): 'html' | 'pdf' | 'document' | null {
   if (mimeType) {
     if (HTML_MIME_TYPES.has(mimeType)) return 'html';
     if (mimeType === 'application/pdf') return 'pdf';
@@ -106,8 +112,8 @@ export async function extractContent(url: string): Promise<ExtractedContent> {
     response = await safeFetch(url, {
       signal: controller.signal,
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; SottoBot/1.0; +https://sotto.fm)',
-        'Accept': '*/*',
+        'User-Agent': `Mozilla/5.0 (compatible; SottoBot/1.0; +${getAppBaseUrl()})`,
+        Accept: '*/*',
         'Accept-Language': 'en-US,en;q=0.5',
       },
     });
@@ -155,12 +161,18 @@ export async function extractContent(url: string): Promise<ExtractedContent> {
 
   // Pinchtab fallback for thin HTML content (JS-heavy SPAs)
   if (!isPinchtabAvailable()) {
-    logger.info('Thin extraction, Pinchtab not configured', { url, wordCount: htmlResult.wordCount });
+    logger.info('Thin extraction, Pinchtab not configured', {
+      url,
+      wordCount: htmlResult.wordCount,
+    });
     return htmlResult;
   }
 
   try {
-    logger.info('Thin extraction, trying Pinchtab fallback', { url, wordCount: htmlResult.wordCount });
+    logger.info('Thin extraction, trying Pinchtab fallback', {
+      url,
+      wordCount: htmlResult.wordCount,
+    });
     const pinchtabText = await extractViaPinchtab(url);
     const pinchtabWordCount = countWords(pinchtabText);
 

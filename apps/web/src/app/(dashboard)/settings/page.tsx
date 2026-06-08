@@ -6,6 +6,7 @@ import { getAllAiProviderClientMeta } from '@/lib/providers/ai-registry';
 import { getAllTtsProviderClientMeta } from '@/lib/providers/tts-registry';
 import { getMusicByokProviderMeta } from '@/lib/providers/music-registry';
 import { getReferralBonus, getActiveReferralCount } from '@/lib/referrals';
+import { getAppBaseUrl } from '@/lib/urls';
 import { SettingsForm } from './SettingsForm';
 import styles from './page.module.css';
 
@@ -20,7 +21,18 @@ export default async function SettingsPage() {
     return null;
   }
 
-  const [user, accounts, voiceClones, userInterests, categories, byokKeys, aiKeys, quizAnswerCount, referredUsers] = await Promise.all([
+  const [
+    user,
+    accounts,
+    voiceClones,
+    userInterests,
+    categories,
+    byokKeys,
+    aiKeys,
+    quizAnswerCount,
+    referredUsers,
+    privateFeedTokens,
+  ] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -120,6 +132,17 @@ export default async function SettingsPage() {
       orderBy: { createdAt: 'desc' },
       take: 10,
     }),
+    prisma.privateFeedToken.findMany({
+      where: { userId, revokedAt: null },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        name: true,
+        feedType: true,
+        createdAt: true,
+        lastUsedAt: true,
+      },
+    }),
   ]);
 
   if (!user) return null;
@@ -138,8 +161,12 @@ export default async function SettingsPage() {
   const ttsProviderMeta = getAllTtsProviderClientMeta();
   const musicProviderMeta = getMusicByokProviderMeta();
 
-  const configuredMusicProviders = configuredProviders.filter((p) => (p.provider as string) === 'suno');
-  const isTwitterProviderAvailable = !!process.env.TWITTER_CLIENT_ID && !!process.env.TWITTER_CLIENT_SECRET;
+  const configuredMusicProviders = configuredProviders.filter(
+    (p) => (p.provider as string) === 'suno'
+  );
+  const isTwitterProviderAvailable =
+    !!process.env.TWITTER_CLIENT_ID && !!process.env.TWITTER_CLIENT_SECRET;
+  const appBaseUrl = getAppBaseUrl();
 
   return (
     <main className={styles.main}>
@@ -181,16 +208,37 @@ export default async function SettingsPage() {
             nextRunAt: b.nextRunAt?.toISOString() ?? null,
             lastGeneratedAt: b.lastGeneratedAt?.toISOString() ?? null,
             createdAt: b.createdAt.toISOString(),
-            todayPodcast: todayLog && !podcastDeleted
-              ? { id: todayLog.podcastId, status: todayLog.podcast.status, title: todayLog.podcast.title }
-              : null,
+            todayPodcast:
+              todayLog && !podcastDeleted
+                ? {
+                    id: todayLog.podcastId,
+                    status: todayLog.podcast.status,
+                    title: todayLog.podcast.title,
+                  }
+                : null,
           };
         })}
-        hasByokKeys={configuredProviders.some((p) => p.isValid) || configuredAiProviders.some((p) => p.isValid)}
+        privateFeedTokens={privateFeedTokens.map((token) => ({
+          id: token.id,
+          name: token.name,
+          feedType: token.feedType,
+          createdAt: token.createdAt.toISOString(),
+          lastUsedAt: token.lastUsedAt?.toISOString() ?? null,
+        }))}
+        hasByokKeys={
+          configuredProviders.some((p) => p.isValid) || configuredAiProviders.some((p) => p.isValid)
+        }
         initialQuizEnabled={user.quizEnabled}
         quizAnswerCount={quizAnswerCount}
-        referredUsers={referredUsers.map((u) => ({ name: u.name, handle: u.handle, image: u.image, joinedAt: u.createdAt.toISOString(), verified: u.referralVerified }))}
+        referredUsers={referredUsers.map((u) => ({
+          name: u.name,
+          handle: u.handle,
+          image: u.image,
+          joinedAt: u.createdAt.toISOString(),
+          verified: u.referralVerified,
+        }))}
         referralBonus={getReferralBonus(activeReferralCount)}
+        appBaseUrl={appBaseUrl}
       />
     </main>
   );

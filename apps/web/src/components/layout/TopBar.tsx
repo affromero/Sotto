@@ -30,14 +30,15 @@ export function TopBar({ user }: TopBarProps) {
         Sotto
       </Link>
       <nav className={styles.nav}>
-        <Link href="/feed">Feed</Link>
         <Link href="/voices">Voices</Link>
         <Link href="/create">Create</Link>
       </nav>
       <div className={styles.actions}>
         <button
           className={styles.searchTrigger}
-          onClick={() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }))}
+          onClick={() =>
+            document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }))
+          }
           aria-label="Open search"
           type="button"
         >
@@ -45,11 +46,7 @@ export function TopBar({ user }: TopBarProps) {
         </button>
         <ThemeToggle />
         {user ? (
-          <Link
-            href="/dashboard"
-            className={styles.avatarLink}
-            aria-label="Go to dashboard"
-          >
+          <Link href="/dashboard" className={styles.avatarLink} aria-label="Go to dashboard">
             {user.image ? (
               <Image
                 src={user.image}

@@ -1,25 +1,89 @@
-const API_BASE = 'https://sotto.fm';
-
-function getApiKey() {
-  return chrome.storage.sync.get('apiKey').then((data) => data.apiKey || null);
+function trimTrailingSlashes(value) {
+  return value.replace(/\/+$/, '');
 }
 
-function setApiKey(key) {
-  return chrome.storage.sync.set({ apiKey: key });
+function isLocalHttpHost(hostname) {
+  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]';
 }
 
-function clearApiKey() {
+function normalizeAppBaseUrl(value) {
+  const trimmed = String(value || '').trim();
+  if (!trimmed) {
+    throw new Error('Sotto deployment URL is required');
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    throw new Error('Sotto deployment URL must be a valid absolute URL');
+  }
+
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+    throw new Error('Sotto deployment URL must use http or https');
+  }
+
+  if (parsed.protocol === 'http:' && !isLocalHttpHost(parsed.hostname)) {
+    throw new Error('Use HTTPS for non-local Sotto deployments');
+  }
+
+  parsed.hash = '';
+  parsed.search = '';
+  const pathname = trimTrailingSlashes(parsed.pathname);
+  parsed.pathname = pathname.endsWith('/api') ? pathname.slice(0, -4) || '/' : pathname || '/';
+
+  return trimTrailingSlashes(parsed.toString());
+}
+
+function apiUrl(appBaseUrl, path) {
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  return `${appBaseUrl}/api${normalizedPath}`;
+}
+
+async function getConfig() {
+  const data = await chrome.storage.sync.get(['apiKey', 'appBaseUrl']);
+  return {
+    apiKey: typeof data.apiKey === 'string' ? data.apiKey : '',
+    appBaseUrl: typeof data.appBaseUrl === 'string' ? data.appBaseUrl : '',
+  };
+}
+
+async function setConfig({ apiKey, appBaseUrl }) {
+  const normalizedAppBaseUrl = normalizeAppBaseUrl(appBaseUrl);
+  const normalizedApiKey = String(apiKey || '').trim();
+
+  if (!normalizedApiKey) {
+    throw new Error('API key is required');
+  }
+
+  await chrome.storage.sync.set({
+    apiKey: normalizedApiKey,
+    appBaseUrl: normalizedAppBaseUrl,
+  });
+}
+
+function clearAuth() {
   return chrome.storage.sync.remove('apiKey');
 }
 
 async function checkAuth() {
-  const apiKey = await getApiKey();
+  const { apiKey, appBaseUrl } = await getConfig();
+  if (!appBaseUrl) {
+    return { ok: false, error: 'No Sotto deployment URL configured' };
+  }
   if (!apiKey) {
     return { ok: false, error: 'No API key configured' };
   }
 
+  let normalizedAppBaseUrl;
   try {
-    const res = await fetch(`${API_BASE}/api/users/me`, {
+    normalizedAppBaseUrl = normalizeAppBaseUrl(appBaseUrl);
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+
+  try {
+    const res = await fetch(apiUrl(normalizedAppBaseUrl, '/users/me'), {
       headers: { Authorization: `Bearer ${apiKey}` },
     });
 
@@ -28,7 +92,7 @@ async function checkAuth() {
     }
 
     const user = await res.json();
-    return { ok: true, user };
+    return { ok: true, user, appBaseUrl: normalizedAppBaseUrl };
   } catch (err) {
     return { ok: false, error: `Connection failed: ${err.message}` };
   }
@@ -44,9 +108,19 @@ function base64ToArrayBuffer(base64) {
 }
 
 async function uploadAudio(base64Data, filename, notebookTitle) {
-  const apiKey = await getApiKey();
+  const { apiKey, appBaseUrl } = await getConfig();
+  if (!appBaseUrl) {
+    return { ok: false, error: 'No Sotto deployment URL configured' };
+  }
   if (!apiKey) {
     return { ok: false, error: 'No API key configured' };
+  }
+
+  let normalizedAppBaseUrl;
+  try {
+    normalizedAppBaseUrl = normalizeAppBaseUrl(appBaseUrl);
+  } catch (err) {
+    return { ok: false, error: err.message };
   }
 
   try {
@@ -73,7 +147,7 @@ async function uploadAudio(base64Data, filename, notebookTitle) {
       formData.append('title', notebookTitle);
     }
 
-    const res = await fetch(`${API_BASE}/api/podcasts/import`, {
+    const res = await fetch(apiUrl(normalizedAppBaseUrl, '/podcasts/import'), {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}` },
       body: formData,
@@ -100,21 +174,32 @@ async function uploadAudio(base64Data, filename, notebookTitle) {
 }
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message.type === 'GET_CONFIG') {
+    getConfig()
+      .then(({ appBaseUrl }) => {
+        sendResponse({
+          appBaseUrl: appBaseUrl ? normalizeAppBaseUrl(appBaseUrl) : '',
+        });
+      })
+      .catch((err) => sendResponse({ appBaseUrl: '', error: err.message }));
+    return true;
+  }
+
   if (message.type === 'CHECK_AUTH') {
     checkAuth().then(sendResponse);
     return true;
   }
 
-  if (message.type === 'SET_API_KEY') {
-    setApiKey(message.apiKey)
+  if (message.type === 'SET_CONFIG') {
+    setConfig({ apiKey: message.apiKey, appBaseUrl: message.appBaseUrl })
       .then(() => checkAuth())
-      .then(sendResponse);
+      .then(sendResponse)
+      .catch((err) => sendResponse({ ok: false, error: err.message }));
     return true;
   }
 
-  if (message.type === 'CLEAR_API_KEY') {
-    clearApiKey()
-      .then(() => sendResponse({ ok: true }));
+  if (message.type === 'CLEAR_AUTH') {
+    clearAuth().then(() => sendResponse({ ok: true }));
     return true;
   }
 

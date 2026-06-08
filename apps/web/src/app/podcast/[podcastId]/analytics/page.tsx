@@ -9,7 +9,7 @@ import {
   getPodcastOverview,
   getPodcastDailyPlays,
   getPodcastRetentionCurve,
-  getPodcastEngagement,
+  getPodcastPrivateActivity,
   getPodcastListenerBehavior,
   getPodcastTrafficSources,
 } from '@/lib/podcast-analytics';
@@ -70,12 +70,12 @@ export default async function PodcastAnalyticsPage({ params, searchParams }: Pag
   const days = [7, 30, 90].includes(Number(sp.range)) ? Number(sp.range) : 30;
   const since = subDays(startOfDay(new Date()), days);
 
-  const [overview, dailyPlays, retentionCurve, engagement, behavior, trafficSources] =
+  const [overview, dailyPlays, retentionCurve, privateActivity, behavior, trafficSources] =
     await Promise.all([
       getPodcastOverview(podcastId),
       getPodcastDailyPlays(podcastId, since),
       getPodcastRetentionCurve(podcastId),
-      getPodcastEngagement(podcastId),
+      getPodcastPrivateActivity(podcastId),
       getPodcastListenerBehavior(podcastId),
       getPodcastTrafficSources(podcastId),
     ]);
@@ -144,12 +144,12 @@ export default async function PodcastAnalyticsPage({ params, searchParams }: Pag
           <span className={styles.cardValue}>{formatHours(overview.listenHours)}</span>
         </div>
         <div className={styles.card}>
-          <span className={styles.cardLabel}>Likes</span>
-          <span className={styles.cardValue}>{overview.likes.toLocaleString()}</span>
+          <span className={styles.cardLabel}>Saves</span>
+          <span className={styles.cardValue}>{overview.saves.toLocaleString()}</span>
         </div>
         <div className={styles.card}>
-          <span className={styles.cardLabel}>Forks</span>
-          <span className={styles.cardValue}>{overview.forks.toLocaleString()}</span>
+          <span className={styles.cardLabel}>Questions</span>
+          <span className={styles.cardValue}>{overview.questions.toLocaleString()}</span>
         </div>
       </div>
 
@@ -183,7 +183,9 @@ export default async function PodcastAnalyticsPage({ params, searchParams }: Pag
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Retention Curve</h2>
         {!retentionCurve ? (
-          <p className={styles.empty}>Not enough data yet. Retention data appears after feature computation.</p>
+          <p className={styles.empty}>
+            Not enough data yet. Retention data appears after feature computation.
+          </p>
         ) : (
           <div className={styles.hBarContainer}>
             {retentionCurve.map((r) => (
@@ -202,21 +204,20 @@ export default async function PodcastAnalyticsPage({ params, searchParams }: Pag
         )}
       </section>
 
-      {/* Engagement stats */}
+      {/* Private activity stats */}
       <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Engagement</h2>
-        <div className={styles.engagementGrid}>
+        <h2 className={styles.sectionTitle}>Private Activity</h2>
+        <div className={styles.activityGrid}>
           {[
-            { label: 'Likes', value: engagement.likes },
-            { label: 'Saves', value: engagement.saves },
-            { label: 'Comments', value: engagement.comments },
-            { label: 'Forks', value: engagement.forks },
-            { label: 'Q&A', value: engagement.interactions },
-            { label: 'Upvotes', value: engagement.upvotes },
+            { label: 'Saves', value: privateActivity.saves },
+            { label: 'Questions', value: privateActivity.questions },
+            { label: 'Answered', value: privateActivity.answered },
+            { label: 'Incorporated', value: privateActivity.incorporated },
+            { label: 'Ratings', value: privateActivity.ratings },
           ].map((item) => (
-            <div key={item.label} className={styles.engagementItem}>
-              <span className={styles.engagementValue}>{item.value.toLocaleString()}</span>
-              <span className={styles.engagementLabel}>{item.label}</span>
+            <div key={item.label} className={styles.activityItem}>
+              <span className={styles.activityValue}>{item.value.toLocaleString()}</span>
+              <span className={styles.activityLabel}>{item.label}</span>
             </div>
           ))}
         </div>
@@ -274,10 +275,7 @@ export default async function PodcastAnalyticsPage({ params, searchParams }: Pag
               <div key={s.source} className={styles.hBarRow}>
                 <span className={styles.hBarLabel}>{s.source}</span>
                 <div className={styles.hBarTrack}>
-                  <div
-                    className={styles.hBarFillAccent}
-                    style={{ width: `${s.percentage}%` }}
-                  />
+                  <div className={styles.hBarFillAccent} style={{ width: `${s.percentage}%` }} />
                 </div>
                 <span className={styles.hBarValue}>{s.percentage.toFixed(0)}%</span>
               </div>

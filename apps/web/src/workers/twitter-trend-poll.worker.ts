@@ -8,6 +8,7 @@ import { selectVoicePair } from '@/lib/elevenlabs';
 import { engagementScore, filterQualityTweets } from '@/lib/twitter-utils';
 import { generatePodcastSlug } from '@/lib/slugify';
 import { logger } from '@/lib/logger';
+import { findSystemUser, getSystemUserLabel } from '@/lib/system-user';
 import type { PollTwitterTrendsPayload } from '@/lib/queue';
 import type { TwitterTweet } from '@/types/twitter';
 
@@ -105,28 +106,27 @@ export async function processTrendPoll(job: Job<PollTwitterTrendsPayload>): Prom
     selected.push(candidate);
   }
 
-  // Resolve @sotto system user
-  const sottoUser = await prisma.user.findUnique({
-    where: { handle: 'sotto' },
-    select: { id: true },
-  });
+  const systemUser = await findSystemUser(prisma);
 
-  if (!sottoUser) {
-    logger.error('Cannot create trend podcasts — @sotto system user not found');
+  if (!systemUser) {
+    logger.error(`Cannot create trend podcasts — configured system owner ${getSystemUserLabel()} not found`);
     return;
   }
 
   // Create podcasts for selected topics
   for (const { tweet } of selected) {
     try {
-      const parsed = await parseTweetIntent(tweet.text);
+      const parsed = await parseTweetIntent(tweet.text, undefined, {
+        userId: systemUser.id,
+        aiModel: config.defaultAiModel ?? undefined,
+      });
 
       const voicePair = selectVoicePair(tweet.id);
-      const slug = await generatePodcastSlug(parsed.title, sottoUser.id, prisma);
+      const slug = await generatePodcastSlug(parsed.title, systemUser.id, prisma);
 
       const podcast = await prisma.podcast.create({
         data: {
-          userId: sottoUser.id,
+          userId: systemUser.id,
           title: parsed.title,
           topic: parsed.topic,
           slug,
@@ -149,7 +149,7 @@ export async function processTrendPoll(job: Job<PollTwitterTrendsPayload>): Prom
           visibility: 'PUBLIC',
           discovery: {
             create: {
-              userId: sottoUser.id,
+              userId: systemUser.id,
               topic: parsed.topic,
               depth: parsed.depth,
               audienceLevel: parsed.audienceLevel,
@@ -175,7 +175,7 @@ export async function processTrendPoll(job: Job<PollTwitterTrendsPayload>): Prom
       // Kick off generation pipeline
       await addJob(contentExtractionQueue, JobType.EXTRACT_CONTENT, {
         podcastId: podcast.id,
-        userId: sottoUser.id,
+        userId: systemUser.id,
         sourceUrl: parsed.sourceUrl,
       });
 

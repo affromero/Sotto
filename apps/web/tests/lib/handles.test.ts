@@ -17,39 +17,6 @@ vi.mock('@/lib/prisma', () => {
   return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
 });
 
-const mockGenerateResponse = vi.fn();
-vi.mock('@/lib/llm', () => ({
-  generateResponse: (...args: unknown[]) => mockGenerateResponse(...args),
-}));
-
-const mockCacheGet = vi.fn();
-const mockCacheSet = vi.fn();
-vi.mock('@/lib/redis', () => ({
-  cache: {
-    get: (...args: unknown[]) => mockCacheGet(...args),
-    set: (...args: unknown[]) => mockCacheSet(...args),
-  },
-}));
-
-vi.mock('@/lib/logger', () => ({
-  logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn(), debug: vi.fn() },
-}));
-
-vi.mock('@/lib/auto-model-config', () => ({
-  resolveAutoModel: vi.fn().mockResolvedValue({
-    aiProvider: 'anthropic',
-    aiModel: 'claude-test-model',
-    ttsProvider: 'openai',
-    ttsModel: 'tts-1-hd',
-    sttProvider: 'openai',
-    sttModel: 'whisper-1',
-  }),
-}));
-
-vi.mock('@/lib/usage-logger', () => ({
-  logUsage: vi.fn().mockResolvedValue(undefined),
-}));
-
 // ---- Import under test ----
 
 import {
@@ -68,10 +35,6 @@ import {
 describe('handles', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Default: handle content check returns OK unless overridden
-    mockCacheGet.mockResolvedValue(null);
-    mockCacheSet.mockResolvedValue(undefined);
-    mockGenerateResponse.mockResolvedValue({ content: 'OK', inputTokens: 5, outputTokens: 1 });
   });
 
   describe('isValidHandleFormat', () => {
@@ -160,71 +123,40 @@ describe('handles', () => {
   });
 
   describe('checkHandleContent', () => {
-    it('returns NAME when LLM classifies as a common name', async () => {
-      mockGenerateResponse.mockResolvedValue({ content: 'NAME', inputTokens: 5, outputTokens: 1 });
-
-      const result = await checkHandleContent('alice');
+    it('returns NAME for locally reserved common first names', () => {
+      const result = checkHandleContent('alice');
 
       expect(result).toBe('NAME');
-      expect(mockCacheSet).toHaveBeenCalledWith('handle:check:alice', 'NAME', expect.any(Number));
     });
 
-    it('returns OFFENSIVE when LLM classifies as profane', async () => {
-      mockGenerateResponse.mockResolvedValue({
-        content: 'OFFENSIVE',
-        inputTokens: 5,
-        outputTokens: 1,
-      });
-
-      const result = await checkHandleContent('slurword');
+    it('returns OFFENSIVE for locally blocked content', () => {
+      const result = checkHandleContent('nazicast');
 
       expect(result).toBe('OFFENSIVE');
-      expect(mockCacheSet).toHaveBeenCalledWith(
-        'handle:check:slurword',
-        'OFFENSIVE',
-        expect.any(Number)
-      );
     });
 
-    it('returns OK when LLM says OK', async () => {
-      mockGenerateResponse.mockResolvedValue({ content: 'OK', inputTokens: 5, outputTokens: 1 });
-
-      const result = await checkHandleContent('zephyrbot');
+    it('returns OK for neutral handles', () => {
+      const result = checkHandleContent('zephyrbot');
 
       expect(result).toBe('OK');
-      expect(mockCacheSet).toHaveBeenCalledWith('handle:check:zephyrbot', 'OK', expect.any(Number));
     });
 
-    it('returns cached result without calling LLM', async () => {
-      mockCacheGet.mockResolvedValue('NAME');
-
-      const result = await checkHandleContent('maria');
-
-      expect(result).toBe('NAME');
-      expect(mockGenerateResponse).not.toHaveBeenCalled();
-    });
-
-    it('skips check for handles with underscores', async () => {
-      const result = await checkHandleContent('alice_smith');
+    it('does not reserve first-name handles with underscores', () => {
+      const result = checkHandleContent('alice_smith');
 
       expect(result).toBe('OK');
-      expect(mockGenerateResponse).not.toHaveBeenCalled();
-      expect(mockCacheGet).not.toHaveBeenCalled();
     });
 
-    it('skips check for handles with digits', async () => {
-      const result = await checkHandleContent('bob42');
+    it('does not reserve first-name handles with digits', () => {
+      const result = checkHandleContent('bob42');
 
       expect(result).toBe('OK');
-      expect(mockGenerateResponse).not.toHaveBeenCalled();
     });
 
-    it('fails open (returns OK) when LLM throws', async () => {
-      mockGenerateResponse.mockRejectedValue(new Error('API unavailable'));
+    it('still blocks offensive handles with separators', () => {
+      const result = checkHandleContent('nazi_user');
 
-      const result = await checkHandleContent('james');
-
-      expect(result).toBe('OK');
+      expect(result).toBe('OFFENSIVE');
     });
 
   });
@@ -328,8 +260,6 @@ describe('handles', () => {
     });
 
     it('returns "already taken" for premium name handles', async () => {
-      mockGenerateResponse.mockResolvedValue({ content: 'NAME', inputTokens: 5, outputTokens: 1 });
-
       const result = await isHandleAvailable('sophia');
 
       expect(result).toEqual({
@@ -341,13 +271,7 @@ describe('handles', () => {
     });
 
     it('returns "not allowed" for offensive handles', async () => {
-      mockGenerateResponse.mockResolvedValue({
-        content: 'OFFENSIVE',
-        inputTokens: 5,
-        outputTokens: 1,
-      });
-
-      const result = await isHandleAvailable('badword');
+      const result = await isHandleAvailable('nazicast');
 
       expect(result).toEqual({
         available: false,

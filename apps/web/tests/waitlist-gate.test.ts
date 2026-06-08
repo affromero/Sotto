@@ -93,8 +93,8 @@ describe('Waitlist Sign-Up Gate — signIn callback', () => {
     mockIsAdminEmail.mockReturnValue(true);
 
     const result = await signIn({
-      user: { email: 'admin@sotto.fm' },
-      profile: { email: 'admin@sotto.fm' },
+      user: { email: 'admin@example.com' },
+      profile: { email: 'admin@example.com' },
     });
 
     expect(result).toBe(true);

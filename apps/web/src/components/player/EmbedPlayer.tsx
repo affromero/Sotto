@@ -9,6 +9,7 @@ interface EmbedPlayerProps {
   creatorName: string;
   audioUrl: string;
   duration: number | null;
+  appBaseUrl: string;
 }
 
 function formatTime(seconds: number): string {
@@ -23,6 +24,7 @@ export function EmbedPlayer({
   creatorName,
   audioUrl,
   duration,
+  appBaseUrl,
 }: EmbedPlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
@@ -75,7 +77,6 @@ export function EmbedPlayer({
   );
 
   const progress = totalDuration > 0 ? (currentTime / totalDuration) * 100 : 0;
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://sotto.fm';
 
   return (
     <div className={styles.player}>
@@ -126,7 +127,7 @@ export function EmbedPlayer({
 
       <div className={styles.footer}>
         <a
-          href={`${appUrl}/podcast/${podcastId}?utm_source=embed&utm_medium=player&utm_campaign=listen`}
+          href={`${appBaseUrl}/podcast/${podcastId}?utm_source=embed&utm_medium=player&utm_campaign=listen`}
           target="_blank"
           rel="noopener noreferrer"
           className={styles.poweredBy}

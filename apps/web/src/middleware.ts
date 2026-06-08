@@ -63,7 +63,7 @@ export async function middleware(request: NextRequest) {
   // Fetch JWT token once — secureCookie ensures correct cookie name lookup
   const token = await getToken({
     req: request,
-    secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
+    secret: process.env.AUTH_SECRET,
     secureCookie,
   });
 

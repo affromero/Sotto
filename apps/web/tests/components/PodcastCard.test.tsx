@@ -2,10 +2,6 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
-}));
-
 vi.mock('@/components/providers/EventProvider', () => ({
   useTrack: () => vi.fn(),
 }));
@@ -14,7 +10,11 @@ vi.mock('@/lib/podcast-gradient', () => ({
   getPodcastGradient: () => ({ from: '#000', to: '#fff', angle: '135deg' }),
 }));
 
-const mockUseAuth = vi.fn(() => ({ user: { id: 'user-1' }, isAuthenticated: true, isLoading: false }));
+const mockUseAuth = vi.fn(() => ({
+  user: { id: 'user-1' },
+  isAuthenticated: true,
+  isLoading: false,
+}));
 vi.mock('@/lib/hooks/useAuth', () => ({
   useAuth: () => mockUseAuth(),
 }));
@@ -29,16 +29,11 @@ const mockPodcast: PodcastSummary = {
   duration: 600,
   audioUrl: 'https://example.com/audio.mp3',
   playCount: 1250,
-  likeCount: 89,
-  forkCount: 12,
   visibility: 'PUBLIC',
   status: 'READY',
   createdAt: '2026-02-08T10:00:00Z',
   source: 'WEB' as const,
   isHumanContent: false,
-  forkedFromId: null,
-  forkedFrom: null,
-  isVoiceOnlyFork: false,
   ownerIsPro: true,
   user: {
     id: 'user-1',
@@ -73,16 +68,6 @@ describe('PodcastCard', () => {
   it('displays play count for Pro owner', () => {
     render(<PodcastCard podcast={mockPodcast} />);
     expect(screen.getByLabelText('1250 plays')).toBeInTheDocument();
-  });
-
-  it('displays like count for Pro owner', () => {
-    render(<PodcastCard podcast={mockPodcast} />);
-    expect(screen.getByLabelText('89 likes')).toBeInTheDocument();
-  });
-
-  it('displays fork count for Pro owner', () => {
-    render(<PodcastCard podcast={mockPodcast} />);
-    expect(screen.getByLabelText('12 forks')).toBeInTheDocument();
   });
 
   it('formats large play counts with M suffix', () => {
@@ -159,42 +144,42 @@ describe('PodcastCard', () => {
   });
 
   it('hides stats for non-owners', () => {
-    mockUseAuth.mockReturnValueOnce({ user: { id: 'other-user' }, isAuthenticated: true, isLoading: false });
+    mockUseAuth.mockReturnValueOnce({
+      user: { id: 'other-user' },
+      isAuthenticated: true,
+      isLoading: false,
+    });
     render(<PodcastCard podcast={mockPodcast} />);
     expect(screen.queryByLabelText('1250 plays')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('89 likes')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('12 forks')).not.toBeInTheDocument();
   });
 
   it('hides stats for free owner viewing own podcast', () => {
     const freePodcast = { ...mockPodcast, ownerIsPro: false };
     render(<PodcastCard podcast={freePodcast} />);
     expect(screen.queryByLabelText('1250 plays')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('89 likes')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('12 forks')).not.toBeInTheDocument();
   });
 
-  it('shows stats for Pro owner viewing own podcast', () => {
+  it('shows private playback stats for Pro owner viewing own podcast', () => {
     render(<PodcastCard podcast={mockPodcast} />);
     expect(screen.getByLabelText('1250 plays')).toBeInTheDocument();
-    expect(screen.getByLabelText('89 likes')).toBeInTheDocument();
-    expect(screen.getByLabelText('12 forks')).toBeInTheDocument();
+    expect(screen.queryByLabelText(/likes/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/forks/i)).not.toBeInTheDocument();
   });
 
-  it('hides stats for Pro owner viewing someone else\'s podcast', () => {
-    mockUseAuth.mockReturnValueOnce({ user: { id: 'other-user' }, isAuthenticated: true, isLoading: false });
+  it("hides stats for Pro owner viewing someone else's podcast", () => {
+    mockUseAuth.mockReturnValueOnce({
+      user: { id: 'other-user' },
+      isAuthenticated: true,
+      isLoading: false,
+    });
     render(<PodcastCard podcast={mockPodcast} />);
     expect(screen.queryByLabelText('1250 plays')).not.toBeInTheDocument();
   });
 
-  it('renders remix subline when forkedFromId set', () => {
-    const remixPodcast = {
-      ...mockPodcast,
-      forkedFromId: 'original-1',
-      forkedFrom: { id: 'original-1', title: 'Original Podcast' },
-    };
-    render(<PodcastCard podcast={remixPodcast} />);
-    expect(screen.getByText(/Remix of/)).toBeInTheDocument();
-    expect(screen.getByText(/Original Podcast/)).toBeInTheDocument();
+  it('does not render social controls', () => {
+    render(<PodcastCard podcast={mockPodcast} />);
+    expect(screen.queryByRole('button', { name: /Like/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Follow/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Original Podcast/)).not.toBeInTheDocument();
   });
 });

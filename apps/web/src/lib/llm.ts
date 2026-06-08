@@ -72,13 +72,12 @@ export async function generateResponse(
     return { ...result, model: options.model };
   }
 
-  // Resolve the effective model: explicit → auto-config fallback
-  const { resolveAutoModel } = await import('./auto-model-config');
-  const autoConfig = await resolveAutoModel('PLATFORM');
-  const resolvedModel = options?.model || autoConfig.aiModel;
+  const resolvedModel = options?.model;
+  if (!resolvedModel) {
+    throw new Error('AI model is required for generateResponse.');
+  }
 
-  // Guardrail: auto-route non-Anthropic models to the correct provider.
-  // Applies to both explicitly-passed AND auto-resolved models.
+  // Guardrail: route explicitly selected non-Anthropic models to the correct provider.
   {
     const { getProviderForModel } = await import('./providers/ai-registry');
     const ownerProvider = getProviderForModel(resolvedModel);
@@ -194,13 +193,12 @@ export async function* streamResponse(
     return;
   }
 
-  // Resolve the effective model: explicit → auto-config fallback
-  const { resolveAutoModel } = await import('./auto-model-config');
-  const autoConfig = await resolveAutoModel('PLATFORM');
-  const streamModel = options?.model || autoConfig.aiModel;
+  const streamModel = options?.model;
+  if (!streamModel) {
+    throw new Error('AI model is required for streamResponse.');
+  }
 
-  // Guardrail: auto-route non-Anthropic models to the correct provider.
-  // Applies to both explicitly-passed AND auto-resolved models.
+  // Guardrail: route explicitly selected non-Anthropic models to the correct provider.
   {
     const { getProviderForModel } = await import('./providers/ai-registry');
     const ownerProvider = getProviderForModel(streamModel);
@@ -282,4 +280,3 @@ export async function* streamResponse(
     }
   }
 }
-

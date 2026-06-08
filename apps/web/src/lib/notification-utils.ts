@@ -38,16 +38,12 @@ export function isPipelineNotification(type: string): boolean {
  */
 export function getNotificationUrl(notification: NotificationData): string | null {
   const podcastId = notification.data?.podcastId;
-  const userId = notification.data?.userId;
-
   switch (notification.type) {
     // Podcast-centric
     case 'PODCAST_READY':
     case 'TWITTER_PODCAST_READY':
     case 'TELEGRAM_PODCAST_READY':
     case 'PODCAST_FAILED':
-    case 'PODCAST_LIKED':
-    case 'PODCAST_FORKED':
     case 'SCRIPT_READY':
     case 'VIDEO_READY':
     case 'VIDEO_FAILED':
@@ -56,29 +52,22 @@ export function getNotificationUrl(notification: NotificationData): string | nul
     case 'MUSIC_FAILED':
     case 'AVATAR_FAILED':
     case 'VOICE_TRACK_FAILED':
-    case 'COMMENT_ON_YOUR_PODCAST':
-    case 'COMMENT_REPLY':
     case 'QUESTION_ON_YOUR_PODCAST':
-    case 'QUESTION_UPVOTED':
     case 'CLAIM_REPORT_ON_YOUR_PODCAST':
     case 'RENDITION_PROPOSED':
     case 'RENDITION_ACCEPTED':
     case 'RENDITION_REJECTED':
       return podcastId ? `/podcast/${podcastId}` : null;
 
-    // User-centric
-    case 'NEW_FOLLOWER':
-      return userId ? `/profile/${userId}` : null;
-
     // Settings / BYOK
     case 'KEY_INVALID':
       return '/billing';
 
-    // Voice marketplace
+    // Voice access requests
     case 'VOICE_REQUEST_RECEIVED':
     case 'VOICE_REQUEST_APPROVED':
     case 'VOICE_REQUEST_DENIED':
-      return '/voices';
+      return '/settings/voices';
 
     // Account moderation
     case 'ACCOUNT_WARNING':

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from '@testing-library/react';
 import { PodcastJsonLd } from '@/components/player/PodcastJsonLd';
 
@@ -15,11 +15,19 @@ const BASE_PROPS = {
   topic: 'A topic about testing',
   createdAt: '2026-01-15T10:00:00.000Z',
   duration: 3661,
-  audioUrl: 'https://cdn.sotto.fm/audio/pod-123.mp3',
+  audioUrl: 'https://media.example.com/audio/pod-123.mp3',
   creator: { name: 'Jane Doe', handle: 'janedoe' },
 };
 
 describe('PodcastJsonLd', () => {
+  beforeEach(() => {
+    vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://selfhost.example.com');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it('renders correct schema type and context', () => {
     const data = renderAndParse(BASE_PROPS);
     expect(data['@context']).toBe('https://schema.org');
@@ -30,7 +38,7 @@ describe('PodcastJsonLd', () => {
     const data = renderAndParse(BASE_PROPS);
     expect(data.name).toBe('Test Podcast');
     expect(data.description).toBe('A topic about testing');
-    expect(data.url).toBe('https://sotto.fm/podcast/pod-123');
+    expect(data.url).toBe('https://selfhost.example.com/podcast/pod-123');
     expect(data.datePublished).toBe('2026-01-15T10:00:00.000Z');
   });
 
@@ -58,7 +66,7 @@ describe('PodcastJsonLd', () => {
     const data = renderAndParse(BASE_PROPS);
     expect(data.associatedMedia).toEqual({
       '@type': 'MediaObject',
-      contentUrl: 'https://cdn.sotto.fm/audio/pod-123.mp3',
+      contentUrl: 'https://media.example.com/audio/pod-123.mp3',
       encodingFormat: 'audio/mpeg',
     });
   });
@@ -73,7 +81,7 @@ describe('PodcastJsonLd', () => {
     expect(data.partOfSeries).toEqual({
       '@type': 'PodcastSeries',
       name: "Jane Doe's Sotto Podcasts",
-      url: 'https://sotto.fm/@janedoe',
+      url: 'https://selfhost.example.com/@janedoe',
     });
   });
 
@@ -90,7 +98,7 @@ describe('PodcastJsonLd', () => {
     expect(data.creator).toEqual({
       '@type': 'Person',
       name: 'Jane Doe',
-      url: 'https://sotto.fm/@janedoe',
+      url: 'https://selfhost.example.com/@janedoe',
     });
   });
 

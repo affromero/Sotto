@@ -28,7 +28,10 @@ const PLATFORM_TTS_ENV: Partial<Record<TtsProviderId, string>> = {
 
 /** Sort options: providers alphabetically by group, models alphabetically within each provider. */
 function sortOptions(options: TtsOption[]): TtsOption[] {
-  return [...options].sort((a, b) => (a.group ?? '').localeCompare(b.group ?? '') || a.displayName.localeCompare(b.displayName));
+  return [...options].sort(
+    (a, b) =>
+      (a.group ?? '').localeCompare(b.group ?? '') || a.displayName.localeCompare(b.displayName)
+  );
 }
 
 function hasPlatformKey(providerId: TtsProviderId): boolean {
@@ -69,7 +72,12 @@ export async function GET(request: NextRequest) {
       const options: TtsOption[] = [];
 
       if (!proView) {
-        options.push({ id: 'auto', displayName: 'Auto', badge: 'Best available', hint: 'Picks the best voice and provider based on your podcast\u2019s topic, tone, and speakers' });
+        options.push({
+          id: 'auto',
+          displayName: 'Auto',
+          badge: 'Best available',
+          hint: 'Picks the best voice and provider based on your podcast\u2019s topic, tone, and speakers',
+        });
       }
 
       if (proView) {
@@ -109,7 +117,10 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      return NextResponse.json({ readOnly: false, adminViewMode: autoConfig.adminViewMode, options: sortOptions(options) }, { headers: CACHE_HEADERS });
+      return NextResponse.json(
+        { readOnly: false, adminViewMode: autoConfig.adminViewMode, options: sortOptions(options) },
+        { headers: CACHE_HEADERS }
+      );
     }
 
     // Non-admins: show included TTS models with plan gating
@@ -140,7 +151,10 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ readOnly: false, userPlan, isByok: false, options: sortOptions(options) }, { headers: CACHE_HEADERS });
+    return NextResponse.json(
+      { readOnly: false, userPlan, isByok: false, options: sortOptions(options) },
+      { headers: CACHE_HEADERS }
+    );
   }
 
   // BYOK keys present — filter through AutoModelConfig (same as non-BYOK)
@@ -148,9 +162,7 @@ export async function GET(request: NextRequest) {
   const autoConfig = await getAutoModelConfig();
   const adminFreeView = isAdmin && autoConfig.adminViewMode !== 'PRO';
 
-  const options: TtsOption[] = [
-    { id: 'auto', displayName: 'Auto', badge: 'Best available', hint: 'Picks the best voice and provider based on your podcast\u2019s topic, tone, and speakers' },
-  ];
+  const options: TtsOption[] = [];
 
   if (adminFreeView) {
     // Admin free view: show all BYOK provider models unfiltered
@@ -193,5 +205,8 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  return NextResponse.json({ readOnly: false, isByok: true, options: sortOptions(options) }, { headers: CACHE_HEADERS });
+  return NextResponse.json(
+    { readOnly: false, isByok: true, options: sortOptions(options) },
+    { headers: CACHE_HEADERS }
+  );
 }

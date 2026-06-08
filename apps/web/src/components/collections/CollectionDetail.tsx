@@ -3,10 +3,9 @@
 import { useCallback, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ListMusic, Users, X } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
+import { ListMusic, X } from 'lucide-react';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { profileUrl, podcastUrl } from '@/lib/urls';
+import { podcastUrl } from '@/lib/urls';
 import type { PodcastSummary } from '@/types/podcast';
 import styles from './CollectionDetail.module.css';
 
@@ -26,15 +25,11 @@ interface CollectionDetailProps {
   id: string;
   name: string;
   description: string | null;
-  isPublic: boolean;
   podcastCount: number;
-  followerCount: number;
   createdAt: string;
   user: CollectionUser;
   items: CollectionItem[];
-  isFollowing: boolean;
   isOwner: boolean;
-  isAuthenticated: boolean;
 }
 
 function formatDate(dateString: string): string {
@@ -64,36 +59,15 @@ export function CollectionDetail({
   name,
   description,
   podcastCount: initialPodcastCount,
-  followerCount: initialFollowerCount,
   createdAt,
   user,
   items: initialItems,
-  isFollowing: initialIsFollowing,
   isOwner,
-  isAuthenticated,
 }: CollectionDetailProps) {
-  const [following, setFollowing] = useState(initialIsFollowing);
-  const [followerCount, setFollowerCount] = useState(initialFollowerCount);
   const [items, setItems] = useState(initialItems);
   const [podcastCount, setPodcastCount] = useState(initialPodcastCount);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const { user: currentUser } = useAuth();
-
-  const handleFollow = useCallback(async () => {
-    if (!isAuthenticated) return;
-    const newFollowing = !following;
-    setFollowing(newFollowing);
-    setFollowerCount((c) => c + (newFollowing ? 1 : -1));
-
-    try {
-      await fetch(`/api/collections/${id}/follow`, {
-        method: newFollowing ? 'POST' : 'DELETE',
-      });
-    } catch {
-      setFollowing(!newFollowing);
-      setFollowerCount((c) => c + (newFollowing ? -1 : 1));
-    }
-  }, [following, isAuthenticated, id]);
 
   const handleRemoveItem = useCallback(
     async (podcastId: string) => {
@@ -128,7 +102,7 @@ export function CollectionDetail({
           {description && <p className={styles.description}>{description}</p>}
 
           <div className={styles.meta}>
-            <Link href={profileUrl(user)} className={styles.creator}>
+            <span className={styles.creator}>
               <div className={styles.creatorAvatar}>
                 {user.image ? (
                   <Image
@@ -145,16 +119,11 @@ export function CollectionDetail({
                 )}
               </div>
               <span>{user.name || user.handle || 'Anonymous'}</span>
-            </Link>
+            </span>
             <span className={styles.metaDot} aria-hidden="true" />
             <span className={styles.stat}>
               <ListMusic size={14} aria-hidden="true" />
               {formatCount(podcastCount)} {podcastCount === 1 ? 'podcast' : 'podcasts'}
-            </span>
-            <span className={styles.metaDot} aria-hidden="true" />
-            <span className={styles.stat}>
-              <Users size={14} aria-hidden="true" />
-              {formatCount(followerCount)} {followerCount === 1 ? 'follower' : 'followers'}
             </span>
             <span className={styles.metaDot} aria-hidden="true" />
             <time className={styles.date} dateTime={createdAt}>
@@ -162,16 +131,6 @@ export function CollectionDetail({
             </time>
           </div>
         </div>
-
-        {!isOwner && isAuthenticated && (
-          <Button
-            variant={following ? 'secondary' : 'primary'}
-            size="small"
-            onClick={handleFollow}
-          >
-            {following ? 'Following' : 'Follow'}
-          </Button>
-        )}
       </header>
 
       {/* Podcast list */}
@@ -196,9 +155,7 @@ export function CollectionDetail({
                   <h3 className={styles.itemTitle}>{item.title}</h3>
                   <p className={styles.itemTopic}>{item.topic}</p>
                   <div className={styles.itemMeta}>
-                    <span className={styles.itemCreator}>
-                      {item.user.name || 'Anonymous'}
-                    </span>
+                    <span className={styles.itemCreator}>{item.user.name || 'Anonymous'}</span>
                     <span className={styles.itemSep} aria-hidden="true">
                       ·
                     </span>
