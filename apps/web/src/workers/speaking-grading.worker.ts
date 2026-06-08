@@ -30,26 +30,30 @@ export async function processSpeakingGrading(job: Job<SpeakingGradingPayload>): 
     throw new Error(`SpeakingRecording not found: ${recordingId}`);
   }
 
-  // Resolve targetLang via section -> class -> course
-  const section = await prisma.classSection.findUnique({
-    where: { id: recording.sectionId },
-    select: {
-      classId: true,
-      class: {
-        select: {
-          course: {
-            select: { targetLang: true },
-          },
-        },
-      },
-    },
-  });
-
-  if (!section) {
-    throw new Error(`ClassSection not found for sectionId: ${recording.sectionId}`);
+  // Resolve targetLang via the recording's parent: a class section
+  // (section -> class -> course) or a practice session (practiceSession -> course).
+  let targetLang: string;
+  if (recording.sectionId) {
+    const section = await prisma.classSection.findUnique({
+      where: { id: recording.sectionId },
+      select: { class: { select: { course: { select: { targetLang: true } } } } },
+    });
+    if (!section) {
+      throw new Error(`ClassSection not found for sectionId: ${recording.sectionId}`);
+    }
+    targetLang = section.class.course.targetLang;
+  } else if (recording.practiceSessionId) {
+    const ps = await prisma.practiceSession.findUnique({
+      where: { id: recording.practiceSessionId },
+      select: { course: { select: { targetLang: true } } },
+    });
+    if (!ps) {
+      throw new Error(`PracticeSession not found for practiceSessionId: ${recording.practiceSessionId}`);
+    }
+    targetLang = ps.course.targetLang;
+  } else {
+    throw new Error(`SpeakingRecording ${recordingId} has no parent section or practice session`);
   }
-
-  const targetLang = section.class.course.targetLang;
   const userId = recording.userId;
 
   // Mark as GRADING

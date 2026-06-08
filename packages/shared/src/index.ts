@@ -23,6 +23,8 @@ export type {
   SectionStatus,
   SpeakingGradeStatus,
   EdgeType,
+  PracticeKind,
+  PracticeStatus,
 } from './types/enums';
 
 // Types
