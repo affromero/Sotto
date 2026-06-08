@@ -11,7 +11,7 @@ function readSource(relativePath: string): string {
   return readFileSync(resolve(webRoot, relativePath), 'utf8');
 }
 
-describe('private-first OSS surfaces', () => {
+describe('open-source language-learning OSS surfaces', () => {
   const primarySurfaceFiles = [
     'src/components/layout/Sidebar.tsx',
     'src/components/layout/MobileNav.tsx',
@@ -40,7 +40,13 @@ describe('private-first OSS surfaces', () => {
     }
   });
 
-  it('does not describe the product as a social podcast network', () => {
+  it('ships with an AGPL-3.0 LICENSE file', () => {
+    const licenseSource = readFileSync(resolve(repoRoot, 'LICENSE'), 'utf8');
+    expect(existsSync(resolve(repoRoot, 'LICENSE'))).toBe(true);
+    expect(licenseSource).toContain('GNU AFFERO GENERAL PUBLIC LICENSE');
+  });
+
+  it('positions the product as open-source language-learning infrastructure, not a social podcast network', () => {
     const landingSource = [
       'src/components/landing/chapters/ConvertChapter.tsx',
       'src/components/landing/chapters/JourneyChapter.tsx',
@@ -56,6 +62,11 @@ describe('private-first OSS surfaces', () => {
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
 
+    // brand.ts must carry the new language-learning taglines
+    expect(sharedPositioningSource).toContain('Learn a language with a tutor you own.');
+    expect(sharedPositioningSource).toContain('Open-source language-learning infrastructure.');
+
+    // old social-podcast and podcast-network copy must be gone
     expect(landingSource).not.toContain('social podcast network');
     expect(landingSource).not.toContain('social feed');
     expect(landingSource).not.toContain('social features');
@@ -68,7 +79,7 @@ describe('private-first OSS surfaces', () => {
     expect(sharedPositioningSource).not.toContain('Every voice. Every topic. One feed.');
   });
 
-  it('keeps public product copy private-first', () => {
+  it('keeps public product copy free of social-network and old-brand positioning', () => {
     const webCopySources = [
       'src/app/about/page.tsx',
       'src/app/join/page.tsx',
@@ -90,7 +101,6 @@ describe('private-first OSS surfaces', () => {
       .join('\n');
     const copySources = [webCopySources, mobileCopySources].join('\n');
 
-    expect(copySources).toContain('private');
     expect(copySources).not.toContain('social podcast network');
     expect(copySources).not.toContain('social feed');
     expect(copySources).not.toContain('social features');
@@ -530,7 +540,6 @@ describe('private-first OSS surfaces', () => {
     expect(publicContactSources).toContain('support@example.com');
     expect(publicContactSources).toContain('https://your-domain.example');
     expect(publicContactSources).toContain('https://media.example.com/demos/');
-    expect(publicContactSources).toContain('Your voices. Your topics. Private by default.');
     expect(publicContactSources).not.toContain('sotto.fm');
     expect(publicContactSources).not.toContain('@sottofm');
     expect(publicContactSources).not.toContain('r2.sotto.fm');
@@ -947,7 +956,7 @@ describe('private-first OSS surfaces', () => {
     expect(ttsSources).not.toContain('ttsProvider      String? // null = auto');
   });
 
-  it('keeps release docs aligned with private-first OSS strategy', () => {
+  it('keeps release docs aligned with open-source language-learning strategy', () => {
     const removedPitchDocs = [
       'docs/02-ui-mockups.md',
       'docs/03-market-analysis.md',
@@ -1004,8 +1013,8 @@ describe('private-first OSS surfaces', () => {
     for (const claim of staleClaims) {
       expect(releaseDocsSource, claim).not.toContain(claim);
     }
-    expect(releaseDocsSource).toContain('Private audio briefings');
-    expect(releaseDocsSource).toContain('private RSS');
+    expect(releaseDocsSource).toContain('Learn a language with a tutor you own.');
+    expect(releaseDocsSource).toContain('language-learning infrastructure');
     expect(releaseDocsSource).toContain('implicit provider fallback');
     expect(releaseDocsSource).toContain('Managed hosting');
   });

@@ -7,7 +7,8 @@
     "packages/*",
     "services/*"
   ],
-  "description": "Private audio briefings from your agents, meetings, workflows, and trusted sources.",
+  "description": "Open-source, self-hostable language-learning infrastructure. Learn a language with a tutor you own.",
+  "license": "AGPL-3.0-only",
   "scripts": {
     "build": "npm run build --workspace=@sotto/web",
     "ci": "npm run ci --workspace=@sotto/web",

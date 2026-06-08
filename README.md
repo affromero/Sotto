@@ -1,81 +1,109 @@
 # Sotto
 
-Private audio briefings from your agents, meetings, workflows, and trusted sources.
+**Learn a language with a tutor you own.**
 
-Sotto is open source infrastructure for people who want private, self-owned audio feeds. The goal is simple: point your agents and sources at Sotto, generate audio briefings, and listen in any podcast app through private RSS.
+[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE) [![Self-hostable](https://img.shields.io/badge/self--hostable-yes-brightgreen)]() [![BYOK](https://img.shields.io/badge/BYOK-bring%20your%20own%20keys-orange)]()
 
-## What It Is
+---
 
-Sotto turns structured work into private audio:
+## What is Sotto
 
-- Agent outputs from Claude Code, Codex, OpenClaw, Hermes, or another local/hosted assistant.
-- Meeting recordings and transcripts that should feed a personal daily briefing.
-- News and source digests for a separate "what happened in the world" podcast.
-- Twitter, Telegram, or other bot-triggered workflows when self-hosted.
-- Manual topics and imported audio for people who still want direct podcast creation.
+Sotto is open-source, self-hostable language-learning infrastructure. Instead of locking you into a subscription app and its servers, Sotto runs on your own stack, uses your own AI agents, and keeps all data on infrastructure you control.
 
-The default is private. New podcasts are private unless a user explicitly changes visibility, and private/unlisted visibility is not a paid feature.
+The curriculum is organized around CEFR levels and covers four skills:
 
-## What It Is Not
+- **Grammar** — structured exercises with automated feedback from your connected LLM.
+- **Reading** — graded passages with comprehension checks, vocabulary extraction, and review.
+- **Listening** — an adaptive audio course generated and narrated by your own TTS provider.
+- **Speaking** — pronunciation feedback scored through your connected STT/pronunciation provider.
 
-Sotto should not be another NotebookLM wrapper.
+Progression is mastery-gated: you do not advance to the next unit until you demonstrate command of the current one. As you learn, a personal vocabulary memory graph tracks what you know and surfaces spaced-repetition reviews.
 
-NotebookLM-style generation starts from documents and produces a one-off synthetic conversation. Sotto's useful surface is the private delivery layer around recurring workflows: agents, meetings, news, bots, imported audio, verified references, scheduled briefings, and private RSS feeds owned by the user.
+You bring your own Claude Code, Codex, or any API-compatible agent. You bring your own keys for LLM, TTS, and STT. Nothing is billed through Sotto for the self-hosted build — you pay your providers directly.
 
-If hosted billing exists, it should charge for managed infrastructure and convenience: workers, storage, scheduled ingestion, TTS routing, bot hosting, monitoring, and updates. It should not pretend the core value is generic AI-generated podcast content.
+---
 
-## Status
+## Why Sotto
 
-This repository is mid-pivot.
+| Capability | Sotto | Duolingo | Speak | Praktika | TalkPal | Pimsleur |
+|---|---|---|---|---|---|---|
+| Open source | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| Self-hostable | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| BYOK / own API keys | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| Bring your own agent (Claude Code / Codex) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| Data stays private (your infra) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| 4-skill (grammar / reading / listening / speaking) | ✓ | ~ | ~ | ~ | ~ | ~ |
+| Mastery-gated progression | ✓ | ~ | ✗ | ✗ | ✗ | ~ |
+| Spaced-repetition memory graph | ✓ | ~ | ✗ | ✗ | ✗ | ~ |
+| Adaptive listening podcasts | ✓ | ✗ | ✗ | ✗ | ✗ | ~ |
+| Offline / PDF worksheets | ✓ | ✗ | ✗ | ✗ | ✗ | ~ |
+| Pronunciation scoring | ~ | ~ | ✓ | ✓ | ✓ | ✗ |
+| Price model | Free / self-host (pay providers directly) | Freemium + sub | Subscription | Subscription | Subscription | Subscription |
 
-- The private RSS token model and API exist.
-- New podcasts and imports default to private.
-- Local storage is the default storage provider.
-- The default `npm run dev` path no longer requires Doppler or a production database sync.
-- Public social routes, social schema tables, follow/like/comment/fork flows, social counters, and legacy demo harnesses have been removed from the active code path.
-- A public open source license still needs to be chosen before release.
+Values reflect the self-hosted open-source build; pronunciation-scoring quality depends on the speech provider you connect. Verified June 2026.
 
-## Quick Start
+Rows marked ✓ include capabilities currently under active development (see [Status](#status) below).
 
-Prerequisites:
+---
 
-- Node.js 18+
-- Docker
-- FFmpeg
+## Architecture
 
-Recommended setup:
+```
+apps/web          Next.js 14 App Router — web UI, API routes, Prisma schema, Vitest tests
+apps/mobile       Expo React Native — iPad-first UI with react-native-track-player
+packages/shared   Shared types, Zod schemas, brand copy
+packages/mcp      MCP server — exposes Sotto tools to Claude Code / Codex locally
+packages/maps     Language curriculum maps (private submodule)
+services/remotion Remotion render sidecar (video worksheets)
+```
+
+**Runtime stack:**
+
+- PostgreSQL 16 + Prisma ORM for user data, vocabulary graph, and progress records.
+- Redis 7 + BullMQ worker pool for all heavy async work (generation, scoring, audio stitching).
+- Provider-resolved AI, TTS, and STT: the resolvers (`resolveAutoModel`, `resolveTtsProvider`, `resolveSttProvider`) pick the configured provider — never by key availability.
+- Local Claude Code or Codex CLI routed through `AI_PROVIDER=claude-code`; no outbound API key required for that path.
+- MCP server (`packages/mcp`) lets your local agent call `ingest_agent_output` and other Sotto tools directly.
+
+---
+
+## Self-host quickstart
+
+Prerequisites: Node.js 18+, Docker, FFmpeg.
 
 ```bash
+# 1. Clone and set up
+git clone https://github.com/SottoFM/sotto.git
+cd sotto
 npm run setup
 ```
 
-`npm run setup` installs dependencies, starts PostgreSQL and Redis, creates `.env.local` with local defaults, pushes the Prisma schema, and generates the Prisma client.
-
-Then add provider credentials to `.env.local`. The smallest hosted-provider path is one OpenAI key:
+`npm run setup` installs all workspace dependencies, copies `.env.oss.example` to `.env.local`, generates `AUTH_SECRET` and `BYOK_ENCRYPTION_KEY`, starts PostgreSQL and Redis via Docker Compose, pushes the Prisma schema, and generates the Prisma client.
 
 ```bash
-OPENAI_API_KEY="sk-..."
-AI_PROVIDER="openai"
-TTS_PROVIDER="openai"
-STT_PROVIDER="openai"
-```
-
-For local-agent use, install and authenticate the agent CLI you want to use, then choose its model in the app when available. Claude Code models are exposed when the `claude` CLI is available locally.
-
-Start the app:
-
-```bash
+# 2. Start the app
 npm run dev
 ```
 
-Optional mobile app:
+That's the minimum path. Open `http://localhost:3000`.
 
-```bash
-npm run mobile:env
-npm run mobile:ios
+**To route generation through your local Claude CLI with no API key:**
+
+```dotenv
+# .env.local
+AI_PROVIDER=claude-code
 ```
 
-## Manual Setup
+**One-key hosted path** (OpenAI for everything):
+
+```dotenv
+OPENAI_API_KEY=sk-...
+AI_PROVIDER=openai
+TTS_PROVIDER=openai
+STT_PROVIDER=openai
+```
+
+**Manual setup** (if you prefer not to use `npm run setup`):
 
 ```bash
 npm install
@@ -86,95 +114,65 @@ npx prisma generate --schema=apps/web/prisma/schema.prisma
 npm run dev
 ```
 
-Use `.env.oss.example` as the local onboarding template. It defaults to:
+`.env.oss.example` defaults to local PostgreSQL, local Redis, local file storage under `.sotto/storage`, and payments disabled.
 
-- PostgreSQL on `localhost:5432`
-- Redis on `localhost:6379`
-- Local file storage under `.sotto/storage`
-- Payments disabled with `PAYMENT_PROVIDER=none`
-- Private podcast visibility
+---
 
-## Private RSS
+## Bring your own Claude / Codex and keys
 
-Authenticated users can create private RSS tokens:
+Sotto is designed around BYOK from the start. There are three places this surfaces:
 
-```http
-POST /api/rss/private
-```
+**1. Source connector readiness flag**
+`apps/web/src/lib/source-connectors.ts` exports a `CONNECTOR_READINESS` map. The `agent` connector is marked ready; set `AI_PROVIDER=claude-code` or `AI_PROVIDER=codex` to route all LLM calls through your local CLI.
 
-The response includes the raw token and feed URL once. Tokens are stored only as SHA-256 hashes.
+**2. MCP server**
+`packages/mcp` exposes an MCP-compatible server. Add it to your Claude Code or Codex config and call the `ingest_agent_output` tool to push content from any agent workflow directly into Sotto.
 
-Manage tokens:
+**3. BYOK in Settings**
+The Settings page lets you store encrypted API keys (LLM, TTS, STT) per-account. Keys are encrypted at rest with `BYOK_ENCRYPTION_KEY`. You pay your providers; Sotto is the infrastructure layer.
 
-```http
-GET /api/rss/private
-DELETE /api/rss/private/tokens/:tokenId
-```
+---
 
-Podcast apps consume:
+## Status
 
-```http
-GET /api/rss/private/:token
-```
+**Shipped in this branch (oss-private-briefings / language-pivot):**
 
-That feed includes the user's ready, non-deleted podcasts, including private and unlisted episodes.
+- Briefings, news, meetings, social, quiz, and bot-event pipelines removed from the active code path.
+- OSS packaging: `.env.oss.example`, `npm run setup`, local-storage default, payments disabled.
+- `AI_PROVIDER=claude-code` path functional end-to-end.
+- Private source connector readiness (`source-connectors.ts`).
+- MCP `ingest_agent_output` tool exposed.
+- Brand copy updated to language-learning positioning (`packages/shared/src/brand.ts`).
+- AGPL-3.0 license added.
 
-## Architecture
+**In progress / coming next:**
 
-The current monorepo contains:
+- CEFR curriculum structure and placement test.
+- Mastery-gated unit progression.
+- Grammar and reading skill classes.
+- Adaptive listening podcast generation pipeline.
+- Speaking turn + pronunciation scoring integration.
+- Vocabulary memory graph with spaced-repetition scheduler.
+- iPad UI in Expo app.
+- Managed-hosting trial path for non-technical users.
 
-- `apps/web` - Next.js app, API routes, workers, Prisma schema, Vitest tests.
-- `apps/mobile` - Expo React Native app.
-- `packages/shared` - shared validation and types.
-- `packages/mcp` - MCP integration surface.
-- `services/remotion` - video rendering service.
-- `docs` - architecture, deployment, and product planning documents.
+---
 
-Generation pipeline:
-
-```text
-topic, source, meeting, agent output, or bot event
-  -> content extraction
-  -> script generation
-  -> reference validation
-  -> TTS
-  -> audio stitching
-  -> private RSS
-```
-
-## Provider Strategy
-
-Sotto should support three onboarding paths:
-
-- Local agent path: use a local CLI or self-hosted agent for script generation, plus a TTS provider.
-- One-key path: use a single provider such as OpenAI for script generation, TTS, and transcription.
-- Managed path: Sotto-hosted infrastructure with a short trial, then paid hosting for non-technical users.
-
-Provider families already in the codebase include Anthropic, OpenAI, Google, Claude Code, ElevenLabs, Cartesia, Hume, Fal, Replicate, Mistral, S3, R2, and local storage.
-
-## Development Commands
+## Development commands
 
 ```bash
-npm run dev           # web + workers, local defaults
+npm run dev           # web + workers
 npm run dev:web       # web only
 npm run dev:workers   # workers only
 npm run build
 npm run lint
 npm run type-check
 npm run test
+npm run ci            # lint + type-check + test + build (run before every commit)
 ```
 
-Before merging larger changes, run:
+---
 
-```bash
-npm run ci
-```
+## License
 
-## Release Work Remaining
-
-- Choose and add an open source license.
-- Add a first-run onboarding screen for provider selection and private RSS setup.
-- Add meeting ingestion and agent webhook endpoints.
-- Add a scheduled news briefing source.
-- Add a managed-hosting trial path for users who do not want to run infra.
-- Finish replacing old pitch-era docs with private-first OSS release docs.
+[AGPL-3.0](LICENSE) — free to self-host, modify, and redistribute under the same terms. If you run a modified version as a network service, you must publish the source.
