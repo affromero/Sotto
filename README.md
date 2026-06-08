@@ -37,19 +37,19 @@ You bring your own Claude Code, Codex, or any API-compatible agent. You bring yo
 | Spaced-repetition memory graph | ✓ | ~ | ✗ | ✗ | ✗ | ~ |
 | Adaptive listening podcasts | ✓ | ✗ | ✗ | ✗ | ✗ | ~ |
 | Offline / PDF worksheets | ✓ | ✗ | ✗ | ✗ | ✗ | ~ |
-| Pronunciation scoring | ~ | ~ | ✓ | ✓ | ✓ | ✗ |
+| Pronunciation scoring | ✓ | ~ | ✓ | ✓ | ✓ | ✗ |
 | Price model | Free / self-host (pay providers directly) | Freemium + sub | Subscription | Subscription | Subscription | Subscription |
 
 Values reflect the self-hosted open-source build; pronunciation-scoring quality depends on the speech provider you connect. Verified June 2026.
 
-Rows marked ✓ include capabilities currently under active development (see [Status](#status) below).
+Every ✓ in the Sotto column ships in this repo today (see [Status](#status)).
 
 ---
 
 ## Architecture
 
 ```
-apps/web          Next.js 14 App Router — web UI, API routes, Prisma schema, Vitest tests
+apps/web          Next.js 16 App Router — web UI, API routes, Prisma schema, Vitest tests
 apps/mobile       Expo React Native — iPad-first UI with react-native-track-player
 packages/shared   Shared types, Zod schemas, brand copy
 packages/mcp      MCP server — exposes Sotto tools to Claude Code / Codex locally
@@ -78,7 +78,7 @@ cd sotto
 npm run setup
 ```
 
-`npm run setup` installs all workspace dependencies, copies `.env.oss.example` to `.env.local`, generates `AUTH_SECRET` and `BYOK_ENCRYPTION_KEY`, starts PostgreSQL and Redis via Docker Compose, pushes the Prisma schema, and generates the Prisma client.
+`npm run setup` installs all workspace dependencies, copies `.env.oss.example` to `.env.local`, generates `AUTH_SECRET` and `BYOK_ENCRYPTION_KEY`, starts PostgreSQL and Redis via Docker Compose, pushes the Prisma schema, generates the Prisma client, and seeds the CEFR language curriculum.
 
 ```bash
 # 2. Start the app
@@ -135,26 +135,20 @@ The Settings page lets you store encrypted API keys (LLM, TTS, STT) per-account.
 
 ## Status
 
-**Shipped in this branch (oss-private-briefings / language-pivot):**
+The full learning loop is shipped and self-hostable today:
 
-- Briefings, news, meetings, social, quiz, and bot-event pipelines removed from the active code path.
-- OSS packaging: `.env.oss.example`, `npm run setup`, local-storage default, payments disabled.
-- `AI_PROVIDER=claude-code` path functional end-to-end.
-- Private source connector readiness (`source-connectors.ts`).
-- MCP `ingest_agent_output` tool exposed.
-- Brand copy updated to language-learning positioning (`packages/shared/src/brand.ts`).
-- AGPL-3.0 license added.
+- **Clean OSS core** — briefings/news/meetings/social/quiz/bot pipelines removed; AGPL-3.0; `.env.oss.example`, `npm run setup`, local-storage default, payments disabled.
+- **BYOK / own agent** — `AI_PROVIDER=claude-code` (or `codex`) routes every LLM call through your local CLI; encrypted per-account keys; MCP `ingest_agent_output`; source-connector readiness.
+- **Placement → courses** — a CEFR/Goethe-aligned placement test assigns a level and creates a directed course (German-from-English, English-from-Spanish, Spanish-from-English).
+- **Mastery-gated classes** — each class is four skill sections; you cannot advance until you pass, and failed sections regenerate in a similar-but-not-identical form (retrieval practice / anti-copy).
+- **Four skills** — grammar and reading (multiple choice), adaptive listening (an AI podcast seeded by your due vocabulary, with comprehension questions), and speaking (record → STT → pronunciation scoring with a rubric).
+- **Vocabulary memory graph** — a per-course, Obsidian-style graph with SM-2 spaced repetition that drives review selection, seeds the listening podcast, and renders as an interactive Cytoscape visualization.
+- **Worksheets** — a print-optimized worksheet page plus a server-side PDF, with iPad PencilKit annotation (ink stored, never graded; needs a custom Expo dev build).
+- **Web + iPad** — the whole flow runs on the Next.js web app and the Expo iOS/iPad app against the same APIs.
 
-**In progress / coming next:**
+**Planned (optional managed offering):**
 
-- CEFR curriculum structure and placement test.
-- Mastery-gated unit progression.
-- Grammar and reading skill classes.
-- Adaptive listening podcast generation pipeline.
-- Speaking turn + pronunciation scoring integration.
-- Vocabulary memory graph with spaced-repetition scheduler.
-- iPad UI in Expo app.
-- Managed-hosting trial path for non-technical users.
+- Hosted infrastructure for non-technical learners — workers, storage, scheduled generation, and provider routing as a convenience layer. The learning stack itself stays open and self-hostable.
 
 ---
 
