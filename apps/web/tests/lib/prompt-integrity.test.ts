@@ -39,6 +39,7 @@ const EXPECTED_FILES = [
   'discovery/agent.md',
   'discovery/fallback.md',
   'topic-assessor.md',
+  'placement/placement-probe.md',
   'import/import-metadata.md',
   'import/transcript-diarization.md',
   'verification/reference-validator.md',
@@ -144,6 +145,9 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
   'research/source-discovery.md': [
     'DEPTH', 'DEPTH_DESCRIPTION', 'MIN_SERIOUS_COUNT',
     'SOURCE_CONTENT', 'SOURCE_COUNT', 'TOPIC',
+  ].sort(),
+  'placement/placement-probe.md': [
+    'COUNT', 'LEVELS', 'NATIVE', 'PER_BAND', 'SKILLS', 'TARGET',
   ].sort(),
 };
 

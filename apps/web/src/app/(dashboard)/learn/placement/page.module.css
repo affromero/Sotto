@@ -1,0 +1,37 @@
+/* Placement page */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xl);
+  max-width: 600px;
+  margin: 0 auto;
+  padding: var(--spacing-xl) var(--spacing-md);
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.title {
+  font: var(--text-h1);
+  color: var(--color-text-primary);
+}
+
+.subtitle {
+  font: var(--text-body);
+  color: var(--color-text-secondary);
+  max-width: 480px;
+}
+
+.content {
+  width: 100%;
+}
+
+@media (min-width: 768px) {
+  .root {
+    padding: var(--spacing-2xl) var(--spacing-lg);
+  }
+}
