@@ -207,6 +207,9 @@ model User {
   avatarSharesSent     AvatarImageShare[] @relation("AvatarShareRequester")
   avatarSharesReceived AvatarImageShare[] @relation("AvatarShareOwner")
 
+  // Language learning
+  courses Course[]
+
   @@index([role])
   @@index([handle])
   @@index([referredById])
@@ -2431,6 +2434,7 @@ model Curriculum {
   updatedAt  DateTime     @updatedAt
 
   lessons Lesson[]
+  courses Course[]
 }
 
 // A node in the fixed lesson tree. Ordering + competencies are fixed; class
@@ -2460,4 +2464,42 @@ model Lesson {
   @@unique([curriculumId, order])
   @@index([curriculumId, level, order])
   @@index([parentId])
+}
+
+// A learner's enrollment in one language pair. CEFR level lives here (a user
+// can hold several courses at several levels).
+model Course {
+  id            String       @id @default(cuid())
+  userId        String
+  pair          LanguagePair
+  nativeLang    String
+  targetLang    String
+  curriculumId  String
+  currentLevel  CefrLevel    @default(A1) // "you are here"; assigned by placement, advances with mastery
+  startLevel    CefrLevel    @default(A1) // immutable placement result
+  activeClassId String? // current in-flight class (gating convenience cache)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  curriculum Curriculum       @relation(fields: [curriculumId], references: [id])
+  placement  PlacementResult?
+
+  @@unique([userId, pair]) // one course per user per language pair
+  @@index([userId])
+  @@index([curriculumId])
+}
+
+// Snapshot of the adaptive placement test that assigned a course's start level.
+model PlacementResult {
+  id           String    @id @default(cuid())
+  courseId     String    @unique
+  level        CefrLevel
+  responses    Json // [{ questionId, skill, cefr, selectedIndex, correct }]
+  scoreBySkill Json // { grammar, vocab, listening } -> 0..1
+  model        String?
+  provider     String?
+  createdAt    DateTime  @default(now())
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
 }
