@@ -45,7 +45,9 @@ interface PromptState {
 }
 
 interface SpeakingExerciseProps {
-  classId: string;
+  /** Endpoint prefix for upload/poll, e.g. `/api/classes/{classId}/speaking`
+   *  or `/api/practice/{sessionId}/speaking`. Prompt id is appended. */
+  endpointBase: string;
   prompts: Prompt[];
 }
 
@@ -61,13 +63,13 @@ const RUBRIC_LABELS: Record<string, string> = {
 // ---- PromptCard sub-component ----
 
 interface PromptCardProps {
-  classId: string;
+  endpointBase: string;
   prompt: Prompt;
   index: number;
   total: number;
 }
 
-function PromptCard({ classId, prompt, index, total }: PromptCardProps) {
+function PromptCard({ endpointBase, prompt, index, total }: PromptCardProps) {
   const [state, setState] = useState<PromptState>({
     phase: 'idle',
     recordingId: null,
@@ -102,7 +104,7 @@ function PromptCard({ classId, prompt, index, total }: PromptCardProps) {
         form.append('audio', blob, 'recording.webm');
 
         const res = await fetch(
-          `/api/classes/${classId}/speaking/${prompt.id}`,
+          `${endpointBase}/${prompt.id}`,
           { method: 'POST', body: form }
         );
 
@@ -130,7 +132,7 @@ function PromptCard({ classId, prompt, index, total }: PromptCardProps) {
         }));
       }
     },
-    [classId, prompt.id]
+    [endpointBase, prompt.id]
   );
 
   // ---- Trigger upload when blob lands ----
@@ -147,7 +149,7 @@ function PromptCard({ classId, prompt, index, total }: PromptCardProps) {
     async (recordingId: string) => {
       try {
         const res = await fetch(
-          `/api/classes/${classId}/speaking/${prompt.id}?recordingId=${encodeURIComponent(recordingId)}`
+          `${endpointBase}/${prompt.id}?recordingId=${encodeURIComponent(recordingId)}`
         );
         if (!res.ok) return;
 
@@ -174,7 +176,7 @@ function PromptCard({ classId, prompt, index, total }: PromptCardProps) {
         }, POLL_INTERVAL_MS);
       }
     },
-    [classId, prompt.id]
+    [endpointBase, prompt.id]
   );
 
   useEffect(() => {
@@ -466,7 +468,7 @@ function PromptCard({ classId, prompt, index, total }: PromptCardProps) {
 
 // ---- Main export ----
 
-export function SpeakingExercise({ classId, prompts }: SpeakingExerciseProps) {
+export function SpeakingExercise({ endpointBase, prompts }: SpeakingExerciseProps) {
   if (!prompts.length) {
     return (
       <div className={styles.empty} role="status">
@@ -488,7 +490,7 @@ export function SpeakingExercise({ classId, prompts }: SpeakingExerciseProps) {
         {prompts.map((prompt, idx) => (
           <li key={prompt.id} className={styles.promptItem}>
             <PromptCard
-              classId={classId}
+              endpointBase={endpointBase}
               prompt={prompt}
               index={idx}
               total={prompts.length}

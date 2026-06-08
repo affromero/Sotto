@@ -1,0 +1,116 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+  padding: var(--spacing-lg);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.courseName {
+  font: var(--text-h3);
+  color: var(--color-text-primary);
+}
+
+.subtitle {
+  font: var(--text-caption);
+  color: var(--color-text-secondary);
+}
+
+.runHeader {
+  display: flex;
+}
+
+.backLink,
+.linkButton {
+  background: none;
+  border: none;
+  padding: 0;
+  font: var(--text-body);
+  color: var(--color-primary);
+  cursor: pointer;
+}
+
+.backLink {
+  min-height: 44px;
+}
+
+.kindList {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--spacing-sm);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+@media (min-width: 480px) {
+  .kindList {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.kindCard {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  min-height: 64px;
+  padding: var(--spacing-md);
+  text-align: left;
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.kindCard:hover:not(:disabled) {
+  border-color: var(--color-primary);
+}
+
+.kindCard:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.kindLabel {
+  font-weight: 600;
+  font-size: var(--font-size-base);
+  color: var(--color-text-primary);
+}
+
+.kindBlurb {
+  font: var(--text-caption);
+  color: var(--color-text-secondary);
+}
+
+.dueBadge {
+  position: absolute;
+  top: var(--spacing-sm);
+  right: var(--spacing-sm);
+  padding: 2px 8px;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text-inverse);
+  background: var(--color-primary);
+  border-radius: var(--radius-full);
+}
+
+.notice {
+  font: var(--text-body);
+  color: var(--color-text-secondary);
+}
+
+.error {
+  font: var(--text-caption);
+  color: var(--color-error);
+}

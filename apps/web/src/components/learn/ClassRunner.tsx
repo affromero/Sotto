@@ -331,7 +331,7 @@ export function ClassRunner({ classId }: ClassRunnerProps) {
 
               {/* SPEAKING: delegate entirely to SpeakingExercise */}
               {section.skill === 'SPEAKING' && (
-                <SpeakingExercise classId={classId} prompts={section.prompts} />
+                <SpeakingExercise endpointBase={`/api/classes/${classId}/speaking`} prompts={section.prompts} />
               )}
 
               {/* LISTENING: audio player above comprehension MC */}
