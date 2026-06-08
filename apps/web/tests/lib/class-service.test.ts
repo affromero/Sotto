@@ -60,6 +60,10 @@ vi.mock('@/lib/knowledge-graph', () => ({
   applyReviewOutcome: vi.fn(),
 }));
 
+vi.mock('@/lib/class-listening-generator', () => ({
+  generateClassListening: vi.fn().mockResolvedValue({ sectionId: 'section-listening', podcastId: 'podcast-listening' }),
+}));
+
 // ---- Import under test ----
 import {
   createNextClass,

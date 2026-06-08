@@ -28,7 +28,8 @@ export type PodcastSource =
   | 'API'
   | 'AGENT'
   | 'IMPORT'
-  | 'ADMIN';
+  | 'ADMIN'
+  | 'CLASS';
 
 export type Speaker = string;
 

@@ -87,8 +87,6 @@ export function ClassRunner({ classId }: ClassRunnerProps) {
   const optionButtonRefs = useRef<Map<string, HTMLButtonElement | null>>(new Map());
 
   const loadClass = useCallback(async () => {
-    setPhase('loading');
-    setErrorMessage('');
     try {
       const res = await fetch(`/api/classes/${classId}`);
       if (res.status === 404) {
@@ -130,7 +128,9 @@ export function ClassRunner({ classId }: ClassRunnerProps) {
   }, [classId]);
 
   useEffect(() => {
-    void loadClass();
+    void (async () => {
+      await loadClass();
+    })();
   }, [loadClass]);
 
   function selectAnswer(questionId: string, index: number) {
@@ -238,7 +238,15 @@ export function ClassRunner({ classId }: ClassRunnerProps) {
     return (
       <div className={styles.error} role="alert">
         <p>{errorMessage || 'An unexpected error occurred.'}</p>
-        <button type="button" className={styles.secondaryButton} onClick={() => void loadClass()}>
+        <button
+          type="button"
+          className={styles.secondaryButton}
+          onClick={() => {
+            setPhase('loading');
+            setErrorMessage('');
+            void loadClass();
+          }}
+        >
           Try again
         </button>
       </div>

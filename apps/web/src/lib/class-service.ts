@@ -4,6 +4,8 @@
 import { prisma } from './prisma';
 import { generateSectionQuestions } from './class-generation';
 import { seedLessonItems, getDueItems, applyReviewOutcome } from './knowledge-graph';
+import { generateClassListening } from './class-listening-generator';
+import { logger } from './logger';
 import type { SkillType, CefrLevel } from '@sotto/shared';
 
 const MC_SKILLS: SkillType[] = ['GRAMMAR', 'READING'];
@@ -110,6 +112,27 @@ export async function createNextClass(courseId: string, userId: string): Promise
   const { grammarPoints, targetVocab } = lessonInputs(lesson);
   await seedLessonItems(courseId, cls.id, lesson.level as CefrLevel, targetVocab, grammarPoints);
   const due = await getDueItems(courseId);
+
+  // Adaptive listening section — non-blocking: a TTS/AI hiccup must not
+  // prevent the learner from accessing their MC sections.
+  try {
+    await generateClassListening({
+      userId,
+      classId: cls.id,
+      courseId,
+      level: lesson.level,
+      nativeLang: course.nativeLang,
+      targetLang: course.targetLang,
+      objective: lesson.objective,
+      mustIncludeVocab: due.vocab.map((v) => ({ word: v.lemma, translation: v.translation })),
+    });
+  } catch (err) {
+    logger.warn('generateClassListening failed; continuing without listening section', {
+      classId: cls.id,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+
   await prisma.courseClass.update({
     where: { id: cls.id },
     data: {
