@@ -208,7 +208,8 @@ model User {
   avatarSharesReceived AvatarImageShare[] @relation("AvatarShareOwner")
 
   // Language learning
-  courses Course[]
+  courses          Course[]
+  classSubmissions ClassSubmission[]
 
   @@index([role])
   @@index([handle])
@@ -2458,7 +2459,8 @@ model Lesson {
 
   curriculum Curriculum @relation(fields: [curriculumId], references: [id], onDelete: Cascade)
   parent     Lesson?    @relation("LessonTree", fields: [parentId], references: [id], onDelete: SetNull)
-  children   Lesson[]   @relation("LessonTree")
+  children   Lesson[]      @relation("LessonTree")
+  classes    CourseClass[]
 
   @@unique([curriculumId, slug])
   @@unique([curriculumId, order])
@@ -2484,6 +2486,7 @@ model Course {
   user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   curriculum Curriculum       @relation(fields: [curriculumId], references: [id])
   placement  PlacementResult?
+  classes    CourseClass[]
 
   @@unique([userId, pair]) // one course per user per language pair
   @@index([userId])
@@ -2502,4 +2505,139 @@ model PlacementResult {
   createdAt    DateTime  @default(now())
 
   course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+}
+
+// ============ LANGUAGE LEARNING — CLASSES ============
+
+enum SkillType {
+  GRAMMAR
+  READING
+  LISTENING
+  SPEAKING
+}
+
+enum ClassStatus {
+  LOCKED
+  GENERATING
+  AVAILABLE
+  IN_PROGRESS
+  SUBMITTED
+  PASSED
+  FAILED
+}
+
+enum SectionStatus {
+  PENDING
+  GENERATING
+  READY
+  IN_PROGRESS
+  SUBMITTED
+  PASSED
+  FAILED
+}
+
+// A ~1h class instantiated from a Lesson for a specific course. Mastery-gated:
+// the next class only unlocks once this one is PASSED.
+model CourseClass {
+  id              String      @id @default(cuid())
+  courseId        String
+  lessonId        String
+  order           Int // mirrors Lesson.order; stable user-facing sequence
+  status          ClassStatus @default(LOCKED)
+  attempt         Int         @default(1) // whole-class retry counter
+  adaptiveSeed    Json? // { vocabIds, grammarKeys, dueCount } that seeded this class
+  passThreshold   Float       @default(0.7) // fraction of sections that must pass
+  worksheetPdfUrl String?
+  submittedAt     DateTime?
+  passedAt        DateTime?
+  failedAt        DateTime?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  course     Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lesson     Lesson           @relation(fields: [lessonId], references: [id])
+  sections   ClassSection[]
+  submission ClassSubmission?
+
+  @@index([courseId, order])
+  @@index([courseId, status])
+  @@index([lessonId])
+}
+
+// One skill section per (re)attempt. Failed-section regeneration = a new row
+// with attempt+1 and a new seed; the latest attempt per (class, skill) is active.
+model ClassSection {
+  id            String        @id @default(cuid())
+  classId       String
+  skill         SkillType
+  attempt       Int           @default(1)
+  status        SectionStatus @default(PENDING)
+  seed          String // variation token; changes on retry -> similar-but-not-identical
+  spec          Json // resolved generation spec (objective + adaptive items used)
+  score         Float?
+  passed        Boolean?
+  passThreshold Float         @default(0.7)
+  podcastId     String? // LISTENING section -> reuse Podcast (added later)
+  generatedAt   DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  class     CourseClass      @relation(fields: [classId], references: [id], onDelete: Cascade)
+  questions LessonQuestion[]
+
+  @@index([classId, skill, attempt])
+  @@index([podcastId])
+}
+
+// MC question for a GRAMMAR/READING/LISTENING section. Forked from the old
+// post-listen quiz question shape, but supports retries and has no podcast.
+model LessonQuestion {
+  id           String   @id @default(cuid())
+  sectionId    String
+  order        Int
+  skill        SkillType
+  question     String   @db.Text
+  options      Json // ["A","B","C","D"]
+  correctIndex Int
+  explanation  String   @db.Text
+  vocabIds     String[] @default([]) // memory-graph linkage (later phases)
+  grammarKeys  String[] @default([])
+  passageRef   String?  @db.Text // reading passage / listening turn anchor
+  createdAt    DateTime @default(now())
+
+  section ClassSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  @@unique([sectionId, order])
+  @@index([sectionId])
+}
+
+// One submission per class attempt; aggregates the graded MC answers.
+model ClassSubmission {
+  id           String   @id @default(cuid())
+  classId      String   @unique
+  userId       String
+  overallScore Float?
+  passed       Boolean?
+  submittedAt  DateTime @default(now())
+
+  class   CourseClass     @relation(fields: [classId], references: [id], onDelete: Cascade)
+  user    User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  answers SectionAnswer[]
+
+  @@index([userId])
+}
+
+model SectionAnswer {
+  id            String   @id @default(cuid())
+  submissionId  String
+  sectionId     String
+  questionId    String
+  selectedIndex Int
+  isCorrect     Boolean
+  answeredAt    DateTime @default(now())
+
+  submission ClassSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  @@unique([submissionId, questionId])
+  @@index([sectionId])
 }
