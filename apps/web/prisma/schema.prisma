@@ -208,8 +208,9 @@ model User {
   avatarSharesReceived AvatarImageShare[] @relation("AvatarShareOwner")
 
   // Language learning
-  courses          Course[]
-  classSubmissions ClassSubmission[]
+  courses            Course[]
+  classSubmissions   ClassSubmission[]
+  speakingRecordings SpeakingRecording[]
 
   @@index([role])
   @@index([handle])
@@ -2588,6 +2589,7 @@ model ClassSection {
 
   class     CourseClass      @relation(fields: [classId], references: [id], onDelete: Cascade)
   questions LessonQuestion[]
+  prompts   SpeakingPrompt[]
 
   @@index([classId, skill, attempt])
   @@index([podcastId])
@@ -2644,6 +2646,57 @@ model SectionAnswer {
 
   @@unique([submissionId, questionId])
   @@index([sectionId])
+}
+
+// ============ LANGUAGE LEARNING — SPEAKING ============
+
+enum SpeakingGradeStatus {
+  PENDING
+  GRADING
+  SCORED
+  FAILED
+}
+
+// One target phrase the learner must say aloud, hung off a SPEAKING ClassSection.
+model SpeakingPrompt {
+  id              String   @id @default(cuid())
+  sectionId       String
+  order           Int
+  targetPhrase    String   @db.Text
+  translation     String   @db.Text
+  ipa             String?  @db.Text
+  referenceTtsUrl String? // pre-rendered model pronunciation (resolveTtsProvider at class build)
+  createdAt       DateTime @default(now())
+
+  section    ClassSection        @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  recordings SpeakingRecording[]
+
+  @@unique([sectionId, order])
+  @@index([sectionId])
+}
+
+// A learner's recorded attempt at a SpeakingPrompt, graded asynchronously.
+model SpeakingRecording {
+  id            String              @id @default(cuid())
+  sectionId     String
+  promptId      String
+  userId        String
+  audioUrl      String
+  transcript    String?             @db.Text
+  overallScore  Float? // 0..1 combined pronunciation score
+  rubricScores  Json? // { accuracy, fluency, completeness } each 0..1
+  phonemeScores Json? // per-word alignment ops from align.ts
+  feedback      String?             @db.Text
+  status        SpeakingGradeStatus @default(PENDING)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  prompt SpeakingPrompt @relation(fields: [promptId], references: [id], onDelete: Cascade)
+  user   User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([sectionId])
+  @@index([promptId])
+  @@index([userId])
 }
 
 // ============ LANGUAGE LEARNING — MEMORY GRAPH (SRS) ============
