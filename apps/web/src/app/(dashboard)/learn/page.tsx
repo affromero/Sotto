@@ -89,6 +89,11 @@ export default async function LearnPage() {
       )}
 
       <div className={styles.newCourse}>
+        {courses.length > 0 && (
+          <Link href="/learn/practice" className={styles.newCourseLink}>
+            Practice a single skill →
+          </Link>
+        )}
         <Link href="/learn/placement" className={styles.newCourseLink}>
           + Start a new course
         </Link>
