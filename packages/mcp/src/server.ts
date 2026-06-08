@@ -7,7 +7,6 @@ import {
   formatProfile,
   formatCreated,
   formatAgentIngested,
-  formatMeetingIngested,
   formatDeleted,
 } from './format.js';
 
@@ -107,68 +106,6 @@ export function createServer(client: SottoClient): McpServer {
       try {
         const result = await client.ingestAgentOutput(params);
         return { content: [{ type: 'text', text: formatAgentIngested(result) }] };
-      } catch (err) {
-        return errorResult(err);
-      }
-    }
-  );
-
-  server.tool(
-    'ingest_meeting_transcript',
-    'Create a private Sotto recap podcast from a meeting transcript or recorder output.',
-    {
-      title: z.string().describe('Meeting title'),
-      transcript: z.string().describe('Meeting transcript, diarized notes, or recorder output'),
-      tts_provider: z
-        .enum(['elevenlabs', 'openai', 'cartesia', 'hume', 'fal', 'replicate', 'minimax', 'mistral'])
-        .describe('Explicit TTS provider configured in Sotto'),
-      topic: z
-        .string()
-        .optional()
-        .describe('Optional topic override; defaults to a meeting recap topic'),
-      idempotency_key: z
-        .string()
-        .optional()
-        .describe('Stable meeting key so retries do not create duplicate podcasts'),
-      meeting_url: z.string().optional().describe('Optional meeting recording or calendar URL'),
-      platform: z.string().optional().describe('Meeting platform, e.g. zoom, meet, teams, or custom'),
-      started_at: z.string().optional().describe('ISO-8601 meeting start time'),
-      ended_at: z.string().optional().describe('ISO-8601 meeting end time'),
-      participants: z
-        .array(
-          z.object({
-            name: z.string(),
-            email: z.string().optional(),
-            role: z.string().optional(),
-          })
-        )
-        .optional()
-        .describe('Meeting participants to include in the private source record'),
-      action_items: z
-        .array(z.string())
-        .optional()
-        .describe('Action items extracted by the recorder or local agent'),
-      duration_minutes: z.number().min(1).max(40).optional().describe('Target duration in minutes'),
-      depth: z
-        .enum(['eli5', 'quick_overview', 'standard', 'deep_dive'])
-        .optional()
-        .describe('Content depth level'),
-      audience_level: z
-        .enum(['beginner', 'intermediate', 'expert', 'general'])
-        .optional()
-        .describe('Target audience expertise'),
-      tone: z.string().optional().describe('Conversation tone'),
-      focus_areas: z
-        .string()
-        .optional()
-        .describe('Comma-separated focus areas, e.g. "decisions, blockers, action items"'),
-      ai_model: z.string().optional().describe('Optional Sotto AI model for script generation'),
-      tts_model: z.string().optional().describe('Optional provider-specific TTS model'),
-    },
-    async (params) => {
-      try {
-        const result = await client.ingestMeetingTranscript(params);
-        return { content: [{ type: 'text', text: formatMeetingIngested(result) }] };
       } catch (err) {
         return errorResult(err);
       }

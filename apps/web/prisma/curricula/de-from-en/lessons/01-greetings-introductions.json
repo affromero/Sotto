@@ -1,0 +1,23 @@
+{
+  "slug": "a1-greetings-introductions",
+  "level": "A1",
+  "order": 1,
+  "title": "Greetings and introductions",
+  "objective": "Greet people and introduce yourself by name in German. Understand and use basic courtesy phrases.",
+  "grammarPoints": ["verb-sein-present", "personal-pronouns-nominative", "verb-heissen-present"],
+  "vocabThemes": ["greetings", "courtesy", "introductions"],
+  "targetVocab": [
+    { "lemma": "Hallo", "gloss": "hello", "pos": "interjection" },
+    { "lemma": "Guten Morgen", "gloss": "good morning", "pos": "phrase" },
+    { "lemma": "Guten Tag", "gloss": "good day / hello (formal)", "pos": "phrase" },
+    { "lemma": "Guten Abend", "gloss": "good evening", "pos": "phrase" },
+    { "lemma": "Auf Wiedersehen", "gloss": "goodbye (formal)", "pos": "phrase" },
+    { "lemma": "Tschüss", "gloss": "bye (informal)", "pos": "interjection" },
+    { "lemma": "ich heiße", "gloss": "my name is", "pos": "phrase" },
+    { "lemma": "Wie heißen Sie?", "gloss": "What is your name? (formal)", "pos": "phrase" },
+    { "lemma": "Wie heißt du?", "gloss": "What is your name? (informal)", "pos": "phrase" },
+    { "lemma": "Bitte", "gloss": "please / you're welcome", "pos": "adverb" }
+  ],
+  "canDoSummary": "I can greet people and introduce myself by name in formal and informal contexts.",
+  "estMinutes": 60
+}

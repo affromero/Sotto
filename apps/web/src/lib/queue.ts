@@ -8,18 +8,15 @@ import { markTtsKeyInvalid, markAiKeyInvalid } from './byok';
 import type { AiProviderId } from './providers/ai-registry';
 import type { TtsProviderId } from './providers/tts-registry';
 import type { SttProviderId } from '@sotto/shared';
-import { sendMessage as sendTelegram, isTelegramBotConfigured } from './telegram';
 
 /** Cached admin user lookup — avoids hitting DB on every worker failure. */
-async function getCachedAdminUsers(): Promise<
-  Array<{ id: string; telegramChatId: string | null }>
-> {
+async function getCachedAdminUsers(): Promise<Array<{ id: string }>> {
   const cacheKey = 'admin_users';
-  const cached = await cache.get<Array<{ id: string; telegramChatId: string | null }>>(cacheKey);
+  const cached = await cache.get<Array<{ id: string }>>(cacheKey);
   if (cached) return cached;
   const admins = await prisma.user.findMany({
     where: { role: 'ADMIN' },
-    select: { id: true, telegramChatId: true },
+    select: { id: true },
   });
   await cache.set(cacheKey, admins, 3600);
   return admins;
@@ -43,21 +40,12 @@ export enum JobType {
   REGENERATE_SEGMENT = 'regenerate_segment',
   SEND_NOTIFICATION = 'send_notification',
   GENERATE_PDF = 'generate_pdf',
-  POLL_TWITTER_MENTIONS = 'poll_twitter_mentions',
-  REPLY_TWITTER = 'reply_twitter',
   IMPORT_AUDIO = 'import_audio',
   INGEST_EVENTS = 'ingest_events',
   COMPUTE_FEATURES = 'compute_features',
   EXPORT_DATA = 'export_data',
   VALIDATE_KEYS = 'validate_keys',
-  POLL_TELEGRAM_UPDATES = 'poll_telegram_updates',
-  REPLY_TELEGRAM = 'reply_telegram',
-  AUTO_TWEET = 'auto_tweet',
-  POLL_TWITTER_TRENDS = 'poll_twitter_trends',
-  ADMIN_THREAD_TO_PODCAST = 'admin_thread_to_podcast',
-  MODERATE_CONTENT = 'moderate_content',
-  SEND_EMAIL_DIGEST = 'send_email_digest',
-  SEND_ANNOUNCEMENT = 'send_announcement',
+MODERATE_CONTENT = 'moderate_content',
   VERIFY_VOICE = 'verify_voice',
   GENERATE_VOICE_TRACK_AUDIO = 'generate_voice_track_audio',
   STITCH_VOICE_TRACK = 'stitch_voice_track',
@@ -70,7 +58,6 @@ export enum JobType {
   COMPOSE_VIDEO = 'compose_video',
   GENERATE_AVATAR = 'generate_avatar',
   PLACE_ENRICHMENT = 'place_enrichment',
-  INGEST_NEWS = 'ingest_news',
   GENERATE_DEMO_SCRIPT = 'generate_demo_script',
   GENERATE_DEMO_RECORDING = 'generate_demo_recording',
   GENERATE_DEMO_VOICEOVER = 'generate_demo_voiceover',
@@ -81,11 +68,11 @@ export enum JobType {
   GENERATE_MUSIC = 'generate_music',
   LIP_SYNC_TEST = 'lip_sync_test',
   GENERATE_WAVEFORM = 'generate_waveform',
-  GENERATE_QUIZ = 'generate_quiz',
-  SCHEDULE_BRIEFINGS = 'schedule_briefings',
   CLASSIFY_PIPELINE = 'classify_pipeline',
   MONITOR_TTS_PROVIDERS = 'monitor_tts_providers',
   RENDER_SEGMENT_PREVIEW = 'render_segment_preview',
+  SPEAKING_GRADING = 'speaking_grading',
+  WORKSHEET_PDF = 'worksheet_pdf',
 }
 
 /**
@@ -218,16 +205,6 @@ export interface GeneratePdfPayload {
   userId: string;
 }
 
-export interface PollTwitterMentionsPayload {
-  // Empty — repeatable job, no per-invocation data
-}
-
-export interface ReplyTwitterPayload {
-  podcastId: string;
-  tweetMentionId: string;
-  originalTweetId: string;
-}
-
 export interface ImportAudioPayload {
   podcastId: string;
   userId: string;
@@ -276,23 +253,6 @@ export interface DataExportPayload {
 
 export interface ValidateKeysPayload {}
 
-export interface PollTelegramUpdatesPayload {}
-
-export interface ReplyTelegramPayload {
-  podcastId: string;
-  telegramMessageId?: string;
-  chatId: string;
-}
-
-export interface AutoTweetPayload {
-  podcastId: string;
-  trigger: 'threshold' | 'manual' | 'trend';
-}
-
-export interface PollTwitterTrendsPayload {}
-
-export interface NewsIngestPayload {}
-
 export interface GenerateDemoScriptPayload {
   projectId: string;
   durationTarget?: number;
@@ -327,23 +287,11 @@ export interface ComposeDemoScenePayload {
   sceneId: string;
 }
 
-export interface AdminThreadToPodcastPayload {
-  tweetUrl: string;
-  adminUserId: string;
-  message?: string;
-  podcastId?: string;
-}
-
 export interface ModerateContentPayload {
   targetType: 'podcast';
   targetId: string;
   content: string;
   userId?: string;
-}
-
-export interface AnnouncementPayload {
-  subject: string;
-  message: string;
 }
 
 export interface CollectR2UsagePayload {}
@@ -439,12 +387,6 @@ export interface GenerateWaveformPayload {
   userId: string;
 }
 
-export interface GenerateQuizPayload {
-  podcastId: string;
-}
-
-export interface ScheduleBriefingsPayload {}
-
 export interface ClassifyPipelinePayload {
   classificationId: string;
   podcastId: string;
@@ -488,21 +430,12 @@ const QUEUE_DEFINITIONS: Record<string, QueueDefinition> = {
   'segment-regeneration': { attempts: 2 },
   notifications: { attempts: 5, skipEvents: true },
   'pdf-generation': { attempts: 2, skipEvents: true },
-  'twitter-mentions': { attempts: 1, skipEvents: true },
-  'twitter-reply': { attempts: 3, skipEvents: true },
   'event-ingestion': { attempts: 2, removeOnComplete: { age: 3600, count: 500 }, skipEvents: true },
   'audio-import': { attempts: 2 },
   'feature-computation': { attempts: 2, skipEvents: true },
   'data-export': { attempts: 2, skipEvents: true },
   'key-validation': { attempts: 1, skipEvents: true },
-  'telegram-bot': { attempts: 1, skipEvents: true },
-  'telegram-reply': { attempts: 3, skipEvents: true },
-  'twitter-auto-tweet': { attempts: 3, skipEvents: true },
-  'twitter-trend-poll': { attempts: 1, skipEvents: true },
-  'admin-thread-to-podcast': { attempts: 2, skipEvents: true },
   'content-moderation': { attempts: 2, skipEvents: true },
-  'email-digest': { attempts: 2, skipEvents: true },
-  announcements: { attempts: 2, skipEvents: true },
   'voice-verification': { attempts: 2, skipEvents: true },
   'voice-track-audio': { attempts: 3 },
   'voice-track-stitching': { attempts: 2 },
@@ -515,7 +448,6 @@ const QUEUE_DEFINITIONS: Record<string, QueueDefinition> = {
   'video-composition': { attempts: 2 },
   'avatar-generation': { attempts: 2 },
   'place-enrichment': { attempts: 2 },
-  'news-ingest': { attempts: 2, skipEvents: true },
   'demo-script': { attempts: 2 },
   'demo-recording': { attempts: 2 },
   'demo-voiceover': { attempts: 2 },
@@ -526,10 +458,10 @@ const QUEUE_DEFINITIONS: Record<string, QueueDefinition> = {
   'music-generation': { attempts: 3 },
   'lip-sync-test': { attempts: 1 },
   'waveform-generation': { attempts: 2, skipEvents: true },
-  'quiz-generation': { attempts: 2, skipEvents: true },
-  'briefing-scheduler': { attempts: 1, skipEvents: true },
   'pipeline-classification': { attempts: 2, skipEvents: true },
   'tts-provider-monitor': { attempts: 2, skipEvents: true },
+  'speaking-grading': { attempts: 3 },
+  'worksheet-pdf': { attempts: 2, skipEvents: true },
 };
 
 const queueInstances = new Map<string, Queue>();
@@ -692,8 +624,7 @@ async function handleWorkerFailure(
         title: true,
         ttsProvider: true,
         source: true,
-        sourceTweetId: true,
-        user: { select: { name: true, email: true, telegramEnabled: true, telegramChatId: true } },
+        user: { select: { name: true, email: true } },
       },
     });
     if (!podcast) {
@@ -766,18 +697,6 @@ async function handleWorkerFailure(
               data: { podcastId },
             })
             .catch(() => {});
-        }
-        if (admin.telegramChatId && isTelegramBotConfigured()) {
-          const telegramText = [
-            `🎭 *Avatar Pipeline Failure*`,
-            `*Podcast:* ${podcastLabel}`,
-            `*Owner:* ${ownerLabel}`,
-            `*Error:* ${errorKind}`,
-            `\`${(failedReason || 'Unknown').substring(0, 500)}\``,
-          ].join('\n');
-          sendTelegram(admin.telegramChatId, telegramText, { parse_mode: 'Markdown' }).catch(
-            () => {}
-          );
         }
       }
       return;
@@ -946,10 +865,9 @@ async function handleWorkerFailure(
     }
 
     const podcastLabel = podcast.title || podcastId;
-    const techError = failedReason || 'Unknown error';
     const adminUsers = await prisma.user.findMany({
       where: { role: 'ADMIN', id: { not: podcast.userId } },
-      select: { id: true, telegramChatId: true },
+      select: { id: true },
     });
     const adminMessage = `[${queueName}] ${podcastLabel} (by ${ownerLabel}) — ${errorKind}`;
     for (const admin of adminUsers) {
@@ -968,73 +886,6 @@ async function handleWorkerFailure(
               error: err instanceof Error ? err.message : String(err),
             });
           });
-      }
-      if (admin.telegramChatId && isTelegramBotConfigured()) {
-        const telegramText = [
-          `🚨 *Pipeline Failure*`,
-          `*Queue:* ${queueName}`,
-          `*Podcast:* ${podcastLabel}`,
-          `*Owner:* ${ownerLabel}`,
-          `*Error:* ${errorKind}`,
-          `*Ref:* \`${errorId}\``,
-          `\`${techError.substring(0, 500)}\``,
-        ].join('\n');
-        sendTelegram(admin.telegramChatId, telegramText, { parse_mode: 'Markdown' }).catch(
-          (err: unknown) => {
-            logger.warn('Failed to send admin pipeline-failure Telegram', {
-              adminId: admin.id,
-              error: err instanceof Error ? err.message : String(err),
-            });
-          }
-        );
-      }
-    }
-
-    if (podcast.source === 'TWITTER' && podcast.sourceTweetId) {
-      const twitterReplyQ = createQueue('twitter-reply');
-      if (twitterReplyQ) {
-        const mention = await prisma.tweetMention
-          .findFirst({
-            where: { podcastId, status: { in: ['GENERATING', 'READY'] } },
-            select: { id: true, tweetId: true },
-          })
-          .catch(() => null);
-        if (mention) {
-          await twitterReplyQ
-            .add(
-              'reply_twitter',
-              {
-                podcastId,
-                tweetMentionId: mention.id,
-                originalTweetId: mention.tweetId,
-              },
-              { jobId: `twitter-fail-${podcastId}-${Date.now()}` }
-            )
-            .catch(() => {});
-        }
-      }
-    }
-
-    if (podcast.user?.telegramEnabled && podcast.user?.telegramChatId) {
-      const telegramReplyQ = createQueue('telegram-reply');
-      if (telegramReplyQ) {
-        const tgMsg = await prisma.telegramMessage
-          .findFirst({
-            where: { podcastId, status: { in: ['GENERATING', 'READY'] } },
-            select: { id: true, chatId: true },
-          })
-          .catch(() => null);
-        await telegramReplyQ
-          .add(
-            'reply_telegram',
-            {
-              podcastId,
-              telegramMessageId: tgMsg?.id,
-              chatId: tgMsg?.chatId ?? podcast.user.telegramChatId,
-            },
-            { jobId: `telegram-fail-${podcastId}-${Date.now()}` }
-          )
-          .catch(() => {});
       }
     }
 
@@ -1156,21 +1007,12 @@ export const notificationQueue = createQueueReference('notifications');
 export const referenceValidationQueue = createQueueReference('reference-validation');
 export const pdfGenerationQueue = createQueueReference('pdf-generation');
 export const scriptVerificationQueue = createQueueReference('script-verification');
-export const twitterMentionsQueue = createQueueReference('twitter-mentions');
-export const twitterReplyQueue = createQueueReference('twitter-reply');
 export const eventIngestionQueue = createQueueReference('event-ingestion');
 export const audioImportQueue = createQueueReference('audio-import');
 export const featureComputationQueue = createQueueReference('feature-computation');
 export const dataExportQueue = createQueueReference('data-export');
 export const keyValidationQueue = createQueueReference('key-validation');
-export const telegramBotQueue = createQueueReference('telegram-bot');
-export const telegramReplyQueue = createQueueReference('telegram-reply');
-export const twitterAutoTweetQueue = createQueueReference('twitter-auto-tweet');
-export const twitterTrendPollQueue = createQueueReference('twitter-trend-poll');
-export const adminThreadToPodcastQueue = createQueueReference('admin-thread-to-podcast');
 export const contentModerationQueue = createQueueReference('content-moderation');
-export const emailDigestQueue = createQueueReference('email-digest');
-export const announcementQueue = createQueueReference('announcements');
 export const voiceVerificationQueue = createQueueReference('voice-verification');
 export const voiceTrackAudioQueue = createQueueReference('voice-track-audio');
 export const voiceTrackStitchingQueue = createQueueReference('voice-track-stitching');
@@ -1188,9 +1030,17 @@ export interface LipSyncTestPayload {
   avatarImageUrl: string;
   avatarModelId: string;
 }
+
+export interface SpeakingGradingPayload {
+  recordingId: string;
+}
+
+export interface WorksheetPdfPayload {
+  classId: string;
+  appBaseUrl?: string;
+}
 export const lipSyncTestQueue = createQueueReference('lip-sync-test');
 export const placeEnrichmentQueue = createQueueReference('place-enrichment');
-export const newsIngestQueue = createQueueReference('news-ingest');
 export const demoScriptQueue = createQueueReference('demo-script');
 export const demoRecordingQueue = createQueueReference('demo-recording');
 export const demoVoiceoverQueue = createQueueReference('demo-voiceover');
@@ -1200,11 +1050,11 @@ export const demoCompositionQueue = createQueueReference('demo-composition');
 export const demoSceneCompositionQueue = createQueueReference('demo-scene-composition');
 export const musicGenerationQueue = createQueueReference('music-generation');
 export const waveformGenerationQueue = createQueueReference('waveform-generation');
-export const quizGenerationQueue = createQueueReference('quiz-generation');
-export const briefingSchedulerQueue = createQueueReference('briefing-scheduler');
 export const pipelineClassificationQueue = createQueueReference('pipeline-classification');
 export const ttsProviderMonitorQueue = createQueueReference('tts-provider-monitor');
 export const segmentPreviewQueue = createQueueReference('segment-preview');
+export const speakingGradingQueue = createQueueReference('speaking-grading');
+export const worksheetPdfQueue = createQueueReference('worksheet-pdf');
 
 /** All queue names — single source of truth for admin and health endpoints */
 export const ALL_QUEUE_NAMES = Object.freeze(Object.keys(QUEUE_DEFINITIONS));

@@ -1,0 +1,22 @@
+{
+  "slug": "a1-daily-routine-time",
+  "level": "A1",
+  "order": 7,
+  "title": "Daily routine and telling time",
+  "objective": "Describe a typical daily routine and tell the time using o'clock and half-past expressions.",
+  "grammarPoints": ["separable-verbs-basic", "time-expressions-uhr", "verb-present-regular-conjugation", "adverbs-of-time"],
+  "vocabThemes": ["daily-routine", "time", "activities"],
+  "targetVocab": [
+    { "lemma": "aufstehen", "gloss": "to get up", "pos": "verb" },
+    { "lemma": "frühstücken", "gloss": "to have breakfast", "pos": "verb" },
+    { "lemma": "arbeiten", "gloss": "to work", "pos": "verb" },
+    { "lemma": "schlafen", "gloss": "to sleep", "pos": "verb" },
+    { "lemma": "Wie spät ist es?", "gloss": "What time is it?", "pos": "phrase" },
+    { "lemma": "Es ist … Uhr.", "gloss": "It is … o'clock.", "pos": "phrase" },
+    { "lemma": "halb", "gloss": "half (as in half past)", "pos": "adverb" },
+    { "lemma": "morgens", "gloss": "in the morning", "pos": "adverb" },
+    { "lemma": "abends", "gloss": "in the evening", "pos": "adverb" }
+  ],
+  "canDoSummary": "I can describe my daily routine and say what time I do things.",
+  "estMinutes": 60
+}

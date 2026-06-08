@@ -1,0 +1,21 @@
+{
+  "slug": "a2-travel-transport",
+  "level": "A2",
+  "order": 14,
+  "title": "Travel and transport",
+  "objective": "The learner can handle common travel situations such as buying tickets, asking about schedules, and checking in at a hotel, using a range of A2-level language.",
+  "grammarPoints": ["modal-can-could-for-requests", "comparative-adjectives", "present-continuous-for-arrangements"],
+  "vocabThemes": ["transport", "travel", "accommodation"],
+  "targetVocab": [
+    { "lemma": "ticket", "gloss": "billete / tiquete / boleto", "pos": "noun" },
+    { "lemma": "platform", "gloss": "andén", "pos": "noun" },
+    { "lemma": "departure", "gloss": "salida", "pos": "noun" },
+    { "lemma": "arrival", "gloss": "llegada", "pos": "noun" },
+    { "lemma": "Could I have…?", "gloss": "¿Me podría dar…?", "pos": "phrase" },
+    { "lemma": "check in", "gloss": "registrarse / hacer el check-in", "pos": "phrase" },
+    { "lemma": "delayed", "gloss": "retrasado/a", "pos": "adjective" },
+    { "lemma": "I am travelling to", "gloss": "viajo a / voy a", "pos": "phrase" }
+  ],
+  "canDoSummary": "Can buy tickets, ask about timetables, and handle a hotel check-in in English.",
+  "estMinutes": 60
+}

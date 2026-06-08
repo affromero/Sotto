@@ -1,0 +1,21 @@
+{
+  "slug": "a1-food-drink",
+  "level": "A1",
+  "order": 6,
+  "title": "Food and drink",
+  "objective": "The learner can name common foods and drinks, express likes and dislikes, and order something simple in a café or restaurant.",
+  "grammarPoints": ["verb-like-dislike", "countable-uncountable-nouns", "some-any"],
+  "vocabThemes": ["food", "drinks", "restaurant"],
+  "targetVocab": [
+    { "lemma": "bread", "gloss": "pan", "pos": "noun" },
+    { "lemma": "water", "gloss": "agua", "pos": "noun" },
+    { "lemma": "coffee", "gloss": "café", "pos": "noun" },
+    { "lemma": "chicken", "gloss": "pollo", "pos": "noun" },
+    { "lemma": "I would like", "gloss": "quisiera / me gustaría", "pos": "phrase" },
+    { "lemma": "I like", "gloss": "me gusta", "pos": "phrase" },
+    { "lemma": "I don't like", "gloss": "no me gusta", "pos": "phrase" },
+    { "lemma": "the menu", "gloss": "el menú / la carta", "pos": "noun" }
+  ],
+  "canDoSummary": "Can order food and drink in English and express basic preferences about what they like or dislike.",
+  "estMinutes": 60
+}

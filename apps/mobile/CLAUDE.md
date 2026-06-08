@@ -54,7 +54,12 @@ app/
 ├── ideas.tsx              # Saved ideas — swipe to dismiss, tap to generate
 ├── settings.tsx           # Settings hub — BYOK keys, logout
 ├── settings/api-keys.tsx  # BYOK key management
-└── podcast/[id].tsx       # Full-screen player
+├── podcast/[id].tsx       # Full-screen player
+└── learn/
+    ├── placement.tsx      # Placement test (PlacementQuiz component)
+    ├── memory.tsx         # Memory graph (MemoryGraphWebView)
+    ├── [classId].tsx      # Class runner — all 4 skill sections
+    └── class/[classId].tsx # Alias route / deep-link target for a specific class
 ```
 
 ## Lib Files
@@ -69,6 +74,7 @@ app/
 | `notifications.ts` | Push notification handler + token registration |
 | `event-buffer.ts` | Event batching: 5s flush, AppState-aware, silent failure |
 | `usePlaybackTelemetry.ts` | Observes RNTP state, fires playback events |
+| `learn-api.ts` | Learn flow API calls: placement, courses, classes, submit, speaking upload, memory graph |
 
 ## Components
 
@@ -87,6 +93,12 @@ app/
 | `GenerationProgress.tsx` | 8-step pipeline progress indicator |
 | `ScriptPreview.tsx` | Read-only script preview with approve/regenerate |
 | `EventProvider.tsx` | React context providing `track()` + userId sync |
+| `learn/PlacementQuiz.tsx` | Multi-step placement test UI — fetches questions, submits answers |
+| `learn/MCSection.tsx` | Multiple-choice section renderer for grammar/reading/listening |
+| `learn/ListeningSection.tsx` | Listening section: embedded audio player + MC questions |
+| `learn/SpeakingExercise.tsx` | Microphone capture for a SpeakingPrompt, polls for SCORED status |
+| `learn/MemoryGraphWebView.tsx` | WebView wrapping the web memory graph at `/memory?courseId=…` |
+| `learn/ClassWorksheet.tsx` | Displays the printable worksheet PDF + PencilKit ink overlay (requires custom dev build) |
 
 ## Creation Flow
 
@@ -139,6 +151,10 @@ npm run mobile:android:build:production  # Play Store AAB (EAS)
 - Use inline styles
 - Define local format functions — use `lib/formatters.ts`
 - Duplicate type definitions — use `@sotto/shared`
+
+## Native Modules
+
+- **`modules/sotto-pencilkit/`** — optional native iOS PencilKit module for ink-layer capture on class worksheets. Feature-detected at runtime (`modules/sotto-pencilkit/index.ts`). Requires a custom dev build (`npm run mobile:ios:build`); the standard Expo Go client does not include it. Android gracefully degrades (no ink layer).
 
 ## Platform Notes
 

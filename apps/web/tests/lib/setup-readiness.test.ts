@@ -21,7 +21,7 @@ describe('buildSetupReadiness', () => {
     expect(readiness.nextAction).toBeNull();
   });
 
-  it('marks agent and transcript ingestion ready without requiring STT', () => {
+  it('marks agent ingestion ready without requiring STT', () => {
     const readiness = buildSetupReadiness({
       hasDatabase: true,
       hasQueue: true,
@@ -42,11 +42,6 @@ describe('buildSetupReadiness', () => {
         expect.objectContaining({
           id: 'agent-ingestion',
           status: 'ready',
-        }),
-        expect.objectContaining({
-          id: 'meeting-transcripts',
-          status: 'ready',
-          detail: 'Transcript ingestion ready; STT is optional for raw audio.',
         }),
         expect.objectContaining({
           id: 'stt',

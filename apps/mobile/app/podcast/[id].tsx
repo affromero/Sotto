@@ -28,7 +28,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography, borderRadius, getContentBadgeLabel } from '@sotto/shared';
 import { getPodcastGradient } from '../../lib/gradients';
 import type { PodcastDetail, SegmentData } from '@sotto/shared';
-import { PostListenQuiz } from '../../components/PostListenQuiz';
 import { PostListenRating } from '../../components/PostListenRating';
 import { api } from '../../lib/api';
 import { setupPlayer, loadTrack } from '../../lib/audio-player';
@@ -73,7 +72,6 @@ export default function PodcastScreen() {
   const [collectionSheetVisible, setCollectionSheetVisible] = useState(false);
   const [activeVoiceTrackId, setActiveVoiceTrackId] = useState<string | null>(null);
   const [showRating, setShowRating] = useState(false);
-  const [showQuiz, setShowQuiz] = useState(false);
   const playbackEndedRef = useRef(false);
   const setCurrentPodcast = usePlayerStore((s) => s.setCurrentPodcast);
   const lastSeekFromRef = useRef<number | undefined>(undefined);
@@ -87,7 +85,7 @@ export default function PodcastScreen() {
   const playbackState = usePlaybackState();
   const isPlaying = playerReady && playbackState.state === State.Playing;
 
-  // Detect playback completion → show rating first, then quiz
+  // Detect playback completion → show post-listen rating
   useEffect(() => {
     if (
       !playbackEndedRef.current &&
@@ -820,37 +818,19 @@ export default function PodcastScreen() {
         podcastId={podcast.id}
       />
 
-      {/* Post-listen rating → then quiz */}
+      {/* Post-listen rating */}
       <Modal
         visible={showRating}
         animationType="slide"
         transparent={false}
-        onRequestClose={() => {
-          setShowRating(false);
-          setShowQuiz(true);
-        }}
+        onRequestClose={() => setShowRating(false)}
       >
         <View style={styles.quizModal}>
           <PostListenRating
             podcastId={podcast.id}
             completionPercent={trackDuration > 0 ? (position / trackDuration) * 100 : undefined}
-            onDismiss={() => {
-              setShowRating(false);
-              setShowQuiz(true);
-            }}
+            onDismiss={() => setShowRating(false)}
           />
-        </View>
-      </Modal>
-
-      {/* Post-listen quiz */}
-      <Modal
-        visible={showQuiz}
-        animationType="slide"
-        transparent={false}
-        onRequestClose={() => setShowQuiz(false)}
-      >
-        <View style={styles.quizModal}>
-          <PostListenQuiz podcastId={podcast.id} onDismiss={() => setShowQuiz(false)} />
         </View>
       </Modal>
     </View>

@@ -1,0 +1,21 @@
+{
+  "slug": "a1-places-directions",
+  "level": "A1",
+  "order": 7,
+  "title": "Places and directions",
+  "objective": "The learner can ask for and give simple directions, name common places in a town, and use basic prepositions of place.",
+  "grammarPoints": ["prepositions-of-place", "imperative-for-directions", "there-is-there-are"],
+  "vocabThemes": ["places-in-town", "directions"],
+  "targetVocab": [
+    { "lemma": "the bank", "gloss": "el banco", "pos": "noun" },
+    { "lemma": "the hospital", "gloss": "el hospital", "pos": "noun" },
+    { "lemma": "the supermarket", "gloss": "el supermercado", "pos": "noun" },
+    { "lemma": "turn left", "gloss": "gira a la izquierda", "pos": "phrase" },
+    { "lemma": "turn right", "gloss": "gira a la derecha", "pos": "phrase" },
+    { "lemma": "go straight ahead", "gloss": "sigue recto / todo recto", "pos": "phrase" },
+    { "lemma": "near", "gloss": "cerca (de)", "pos": "preposition" },
+    { "lemma": "far from", "gloss": "lejos de", "pos": "preposition" }
+  ],
+  "canDoSummary": "Can ask where a place is and understand simple directions such as turn left or go straight ahead in English.",
+  "estMinutes": 60
+}

@@ -1,0 +1,561 @@
+/* SpeakingExercise — speaking + pronunciation scoring UI */
+
+/* ---- Section shell ---- */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xl);
+  padding: var(--spacing-lg) 0;
+}
+
+.exerciseHeader {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.exerciseTitle {
+  font: var(--text-h3);
+  color: var(--color-text-primary);
+}
+
+.exerciseSubtitle {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+}
+
+/* ---- Prompt list ---- */
+
+.promptList {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.promptItem {
+  /* list-item reset */
+}
+
+/* ---- Card ---- */
+
+.card {
+  background: var(--color-surface);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: var(--spacing-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  transition: border-color var(--transition-base), box-shadow var(--transition-base);
+}
+
+.cardRecording {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.12);
+}
+
+.cardScored {
+  border-color: var(--color-success);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ---- Phrase header ---- */
+
+.phraseHeader {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-md);
+}
+
+.phraseIndex {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-full);
+  background: var(--color-primary-subtle);
+  color: var(--color-primary);
+  font: var(--text-caption);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 2px;
+}
+
+.phraseContent {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xxs);
+}
+
+.targetPhrase {
+  font: var(--text-h4);
+  color: var(--color-text-primary);
+  word-break: break-word;
+}
+
+.translation {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+}
+
+.ipa {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  color: var(--color-accent);
+  letter-spacing: 0.02em;
+  margin-top: var(--spacing-xxs);
+}
+
+/* ---- Reference play button ---- */
+
+.playRefButton {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-full);
+  border: 1.5px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
+}
+
+.playRefButton:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  background: var(--color-accent-lighter);
+}
+
+.playRefButton:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.playRefButtonActive {
+  border-color: var(--color-accent);
+  background: var(--color-accent-lighter);
+  color: var(--color-accent);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .playRefButton:active {
+    transform: scale(0.92);
+  }
+}
+
+/* ---- Recorder row ---- */
+
+.recorderRow {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+  min-height: 44px;
+}
+
+/* ---- Record button ---- */
+
+.recordButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  height: 44px;
+  padding: 0 var(--spacing-lg);
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  border: none;
+  border-radius: var(--radius-full);
+  font: var(--text-label);
+  cursor: pointer;
+  transition: background var(--transition-fast), transform var(--transition-fast);
+}
+
+.recordButton:hover {
+  background: var(--color-primary-hover);
+}
+
+.recordButton:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .recordButton:active {
+    transform: scale(0.96);
+  }
+}
+
+.recordDot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--color-text-inverse);
+  flex-shrink: 0;
+}
+
+/* ---- Recording in-progress indicator ---- */
+
+.recordingIndicator {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  color: var(--color-error);
+}
+
+.recordingPulse {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-full);
+  background: var(--color-error);
+  flex-shrink: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .recordingPulse {
+    animation: pulse 1.2s ease-in-out infinite;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.5; transform: scale(0.85); }
+}
+
+.recordingLabel {
+  font: var(--text-label);
+  color: var(--color-error);
+}
+
+.recordingTime {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Stop button ---- */
+
+.stopButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  height: 44px;
+  padding: 0 var(--spacing-lg);
+  background: var(--color-error-light);
+  color: var(--color-error);
+  border: 1.5px solid var(--color-error);
+  border-radius: var(--radius-full);
+  font: var(--text-label);
+  cursor: pointer;
+  transition: background var(--transition-fast), transform var(--transition-fast);
+}
+
+.stopButton:hover {
+  background: var(--color-error);
+  color: var(--color-text-inverse);
+}
+
+.stopButton:focus-visible {
+  outline: 2px solid var(--color-error);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .stopButton:active {
+    transform: scale(0.96);
+  }
+}
+
+/* ---- Busy state (uploading / grading) ---- */
+
+.busyRow {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  color: var(--color-text-secondary);
+}
+
+.spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-primary);
+  border-radius: var(--radius-full);
+  flex-shrink: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .spinner {
+    animation: spin 0.7s linear infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    border-color: var(--color-primary);
+    opacity: 0.6;
+  }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.busyLabel {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+}
+
+/* ---- Failed state ---- */
+
+.failedRow {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+}
+
+.failedText {
+  font: var(--text-body-sm);
+  color: var(--color-error);
+}
+
+.retryButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 44px;
+  padding: 0 var(--spacing-lg);
+  background: transparent;
+  color: var(--color-primary);
+  border: 1.5px solid var(--color-primary);
+  border-radius: var(--radius-full);
+  font: var(--text-label);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.retryButton:hover {
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+}
+
+.retryButton:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+}
+
+/* ---- Mic permission error ---- */
+
+.micError {
+  font: var(--text-body-sm);
+  color: var(--color-error);
+  width: 100%;
+}
+
+/* ---- Results panel ---- */
+
+.results {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  padding-top: var(--spacing-xs);
+  border-top: 1px solid var(--color-border);
+}
+
+/* ---- Overall score dial ---- */
+
+.scoreRow {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.scoreDial {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  min-width: 64px;
+  height: 64px;
+  border-radius: var(--radius-full);
+  background: var(--color-success-lighter);
+  border: 2px solid var(--color-success-light);
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.scoreNumber {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--color-success);
+  font-variant-numeric: tabular-nums;
+}
+
+.scoreSuffix {
+  font: var(--text-caption);
+  color: var(--color-success);
+  font-weight: 600;
+}
+
+.scoreLabel {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+}
+
+/* ---- Transcript ---- */
+
+.transcriptBlock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.transcriptHeading {
+  font: var(--text-overline);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-tertiary);
+}
+
+.transcript {
+  font: var(--text-body-sm);
+  color: var(--color-text-primary);
+  font-style: italic;
+}
+
+/* ---- Rubric bars ---- */
+
+.rubricList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.rubricItem {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xxs);
+}
+
+.rubricMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.rubricLabel {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+}
+
+.rubricValue {
+  font: var(--text-caption);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.rubricTrack {
+  height: 6px;
+  background: var(--color-surface-sunken);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.rubricFill {
+  height: 100%;
+  width: var(--score-pct, 0%);
+  background: var(--color-accent);
+  border-radius: var(--radius-full);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .rubricFill {
+    transition: width 600ms var(--ease-out-expo);
+  }
+}
+
+/* ---- Feedback ---- */
+
+.feedback {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  background: var(--color-surface-nested);
+  border-left: 3px solid var(--color-primary);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  line-height: 1.6;
+}
+
+/* ---- Try again button ---- */
+
+.tryAgainButton {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 44px;
+  padding: 0 var(--spacing-lg);
+  background: transparent;
+  color: var(--color-text-secondary);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-full);
+  font: var(--text-label);
+  cursor: pointer;
+  transition: border-color var(--transition-fast), color var(--transition-fast), background var(--transition-fast);
+}
+
+.tryAgainButton:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: var(--color-primary-subtle);
+}
+
+.tryAgainButton:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+}
+
+/* ---- Empty state ---- */
+
+.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-3xl) var(--spacing-lg);
+  text-align: center;
+}
+
+.emptyText {
+  font: var(--text-body-sm);
+  color: var(--color-text-tertiary);
+}
+
+/* ---- Responsive ---- */
+
+@media (min-width: 768px) {
+  .card {
+    padding: var(--spacing-xl);
+  }
+
+  .phraseHeader {
+    align-items: center;
+  }
+
+  .phraseIndex {
+    width: 32px;
+    height: 32px;
+    font-size: var(--font-size-sm);
+  }
+
+  .targetPhrase {
+    font-size: var(--font-size-lg);
+  }
+}

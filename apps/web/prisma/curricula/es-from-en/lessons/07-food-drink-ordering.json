@@ -1,0 +1,21 @@
+{
+  "slug": "a1-food-drink-ordering",
+  "level": "A1",
+  "order": 7,
+  "title": "Food, drink, and ordering in a café",
+  "objective": "Name common foods and drinks, read a simple menu, and order politely in a café or restaurant.",
+  "grammarPoints": ["querer-present-tense-irregular", "indefinite-articles-un-una", "gustar-construction"],
+  "vocabThemes": ["food", "drinks", "restaurant"],
+  "targetVocab": [
+    { "lemma": "el desayuno", "gloss": "breakfast", "pos": "noun" },
+    { "lemma": "el almuerzo", "gloss": "lunch", "pos": "noun" },
+    { "lemma": "la cena", "gloss": "dinner", "pos": "noun" },
+    { "lemma": "quiero un café", "gloss": "I want a coffee", "pos": "phrase" },
+    { "lemma": "me gustaría", "gloss": "I would like", "pos": "phrase" },
+    { "lemma": "la carta / el menú", "gloss": "the menu", "pos": "noun" },
+    { "lemma": "la cuenta, por favor", "gloss": "the bill, please", "pos": "phrase" },
+    { "lemma": "el agua", "gloss": "water", "pos": "noun" }
+  ],
+  "canDoSummary": "Can order food and drinks in a café or restaurant using polite request forms.",
+  "estMinutes": 60
+}

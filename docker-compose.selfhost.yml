@@ -1,0 +1,87 @@
+# Self-host Sotto from pre-built public images (no source, no build).
+# The curl|bash installer (scripts/install.sh) writes .env and runs this.
+#
+#   docker compose -f docker-compose.selfhost.yml up -d
+#
+# Images are published by .github/workflows/oss-image.yml. Postgres, Redis, and
+# the Remotion sidecar are pulled from public registries.
+name: sotto
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_USER: sotto
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sotto}
+      POSTGRES_DB: sotto
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U sotto -d sotto']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks: [sotto-network]
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks: [sotto-network]
+    restart: unless-stopped
+
+  web:
+    image: ghcr.io/affromero/sotto-web:${SOTTO_IMAGE_TAG:-latest}
+    env_file: [.env]
+    environment:
+      NODE_ENV: production
+      HOSTNAME: '0.0.0.0'
+    ports:
+      - '${WEB_PORT:-3000}:3000'
+    volumes:
+      - storage:/app/apps/web/.sotto/storage
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    healthcheck:
+      test:
+        ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://127.0.0.1:3000/api/health']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    networks: [sotto-network]
+    restart: unless-stopped
+
+  workers:
+    image: ghcr.io/affromero/sotto-workers:${SOTTO_IMAGE_TAG:-latest}
+    env_file: [.env]
+    environment:
+      NODE_ENV: production
+    volumes:
+      - storage:/app/apps/web/.sotto/storage
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    networks: [sotto-network]
+    restart: unless-stopped
+
+  remotion:
+    image: ghcr.io/affromero/sotto-remotion:latest
+    networks: [sotto-network]
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  redisdata:
+  storage:
+
+networks:
+  sotto-network:

@@ -1,0 +1,21 @@
+{
+  "slug": "a1-numbers-alphabet",
+  "level": "A1",
+  "order": 2,
+  "title": "Numbers and the alphabet",
+  "objective": "Count from 0 to 100, spell out words using the Spanish alphabet, and give or understand a phone number or age.",
+  "grammarPoints": ["cardinal-numbers", "tener-present-tense-age"],
+  "vocabThemes": ["numbers", "alphabet"],
+  "targetVocab": [
+    { "lemma": "cero", "gloss": "zero", "pos": "noun" },
+    { "lemma": "uno", "gloss": "one", "pos": "noun" },
+    { "lemma": "diez", "gloss": "ten", "pos": "noun" },
+    { "lemma": "veinte", "gloss": "twenty", "pos": "noun" },
+    { "lemma": "cien", "gloss": "one hundred", "pos": "noun" },
+    { "lemma": "¿cuántos años tienes?", "gloss": "how old are you?", "pos": "phrase" },
+    { "lemma": "tengo … años", "gloss": "I am … years old", "pos": "phrase" },
+    { "lemma": "el número de teléfono", "gloss": "phone number", "pos": "noun phrase" }
+  ],
+  "canDoSummary": "Can give and understand numbers, ages, and telephone numbers in straightforward exchanges.",
+  "estMinutes": 60
+}

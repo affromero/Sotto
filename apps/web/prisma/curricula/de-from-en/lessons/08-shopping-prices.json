@@ -1,0 +1,23 @@
+{
+  "slug": "a1-shopping-prices",
+  "level": "A1",
+  "order": 8,
+  "title": "Shopping and prices",
+  "objective": "Buy items in a shop, ask the price, and understand basic monetary amounts in euros.",
+  "grammarPoints": ["accusative-case-basic", "question-words-wie-viel", "modal-verb-moechten", "negation-nicht"],
+  "vocabThemes": ["shopping", "money", "clothing", "colours"],
+  "targetVocab": [
+    { "lemma": "Was kostet das?", "gloss": "How much does that cost?", "pos": "phrase" },
+    { "lemma": "Wie viel kostet …?", "gloss": "How much does … cost?", "pos": "phrase" },
+    { "lemma": "der Euro", "gloss": "the euro", "pos": "noun" },
+    { "lemma": "teuer", "gloss": "expensive", "pos": "adjective" },
+    { "lemma": "billig", "gloss": "cheap", "pos": "adjective" },
+    { "lemma": "das Hemd", "gloss": "the shirt", "pos": "noun" },
+    { "lemma": "die Hose", "gloss": "the trousers", "pos": "noun" },
+    { "lemma": "kaufen", "gloss": "to buy", "pos": "verb" },
+    { "lemma": "Ich nehme das.", "gloss": "I'll take that.", "pos": "phrase" },
+    { "lemma": "Haben Sie … in Blau?", "gloss": "Do you have … in blue?", "pos": "phrase" }
+  ],
+  "canDoSummary": "I can buy things in a shop, ask the price, and understand simple price information.",
+  "estMinutes": 60
+}

@@ -1,0 +1,21 @@
+{
+  "slug": "a1-everyday-objects",
+  "level": "A1",
+  "order": 3,
+  "title": "Everyday objects",
+  "objective": "The learner can name common objects in a home or classroom and use the articles 'a', 'an', and 'the' correctly.",
+  "grammarPoints": ["definite-article-the", "indefinite-articles-a-an", "this-that-these-those"],
+  "vocabThemes": ["household-items", "classroom"],
+  "targetVocab": [
+    { "lemma": "a book", "gloss": "un libro", "pos": "noun" },
+    { "lemma": "a chair", "gloss": "una silla", "pos": "noun" },
+    { "lemma": "a table", "gloss": "una mesa", "pos": "noun" },
+    { "lemma": "a pen", "gloss": "un bolígrafo / una pluma", "pos": "noun" },
+    { "lemma": "a phone", "gloss": "un teléfono", "pos": "noun" },
+    { "lemma": "a bag", "gloss": "una bolsa / una mochila", "pos": "noun" },
+    { "lemma": "a window", "gloss": "una ventana", "pos": "noun" },
+    { "lemma": "a door", "gloss": "una puerta", "pos": "noun" }
+  ],
+  "canDoSummary": "Can identify and name common objects and use articles correctly when referring to them.",
+  "estMinutes": 60
+}

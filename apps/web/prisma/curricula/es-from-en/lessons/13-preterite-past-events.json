@@ -1,0 +1,21 @@
+{
+  "slug": "a2-preterite-past-events",
+  "level": "A2",
+  "order": 13,
+  "title": "Talking about the past: the preterite",
+  "objective": "Form and use the preterite (indefinido) tense for regular verbs to recount completed past events.",
+  "grammarPoints": ["preterite-regular-ar-verbs", "preterite-regular-er-ir-verbs", "past-time-expressions"],
+  "vocabThemes": ["past-events", "weekends", "time-expressions"],
+  "targetVocab": [
+    { "lemma": "ayer", "gloss": "yesterday", "pos": "adverb" },
+    { "lemma": "la semana pasada", "gloss": "last week", "pos": "noun phrase" },
+    { "lemma": "el año pasado", "gloss": "last year", "pos": "noun phrase" },
+    { "lemma": "fui", "gloss": "I went (preterite of ir)", "pos": "verb form" },
+    { "lemma": "comí", "gloss": "I ate (preterite of comer)", "pos": "verb form" },
+    { "lemma": "hablé", "gloss": "I spoke (preterite of hablar)", "pos": "verb form" },
+    { "lemma": "visité", "gloss": "I visited (preterite of visitar)", "pos": "verb form" },
+    { "lemma": "¿qué hiciste?", "gloss": "what did you do?", "pos": "phrase" }
+  ],
+  "canDoSummary": "Can describe past events and activities such as a recent trip or weekend using the preterite tense.",
+  "estMinutes": 60
+}

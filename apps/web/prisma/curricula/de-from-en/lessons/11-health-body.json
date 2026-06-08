@@ -1,0 +1,22 @@
+{
+  "slug": "a2-health-body",
+  "level": "A2",
+  "order": 11,
+  "title": "Health and the body",
+  "objective": "Name parts of the body and describe common ailments to a doctor or pharmacist.",
+  "grammarPoints": ["verb-haben-with-schmerzen", "modal-verb-muessen", "dative-with-body-parts", "adjective-predicative-basic"],
+  "vocabThemes": ["health", "body", "illness", "medical"],
+  "targetVocab": [
+    { "lemma": "der Kopf", "gloss": "the head", "pos": "noun" },
+    { "lemma": "der Bauch", "gloss": "the stomach / belly", "pos": "noun" },
+    { "lemma": "die Hand", "gloss": "the hand", "pos": "noun" },
+    { "lemma": "Ich habe Kopfschmerzen.", "gloss": "I have a headache.", "pos": "phrase" },
+    { "lemma": "Mir ist schlecht.", "gloss": "I feel sick.", "pos": "phrase" },
+    { "lemma": "der Arzt", "gloss": "the doctor (male)", "pos": "noun" },
+    { "lemma": "die Apotheke", "gloss": "the pharmacy", "pos": "noun" },
+    { "lemma": "das Medikament", "gloss": "the medicine", "pos": "noun" },
+    { "lemma": "krank", "gloss": "ill / sick", "pos": "adjective" }
+  ],
+  "canDoSummary": "I can describe simple health problems and understand basic advice from a doctor or pharmacist.",
+  "estMinutes": 60
+}

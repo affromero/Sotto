@@ -113,12 +113,6 @@ model User {
   apiKeys           ApiKey[]
   privateFeedTokens PrivateFeedToken[]
 
-  // Twitter mentions
-  tweetMentions TweetMention[]
-
-  // Telegram messages
-  telegramMessages TelegramMessage[]
-
   // BYOK TTS keys (multi-provider)
   userTtsKeys UserTtsKey[]
 
@@ -153,9 +147,6 @@ model User {
 
   // Private agent output ingestions
   agentIngestions AgentIngestion[]
-
-  // Private meeting transcript ingestions
-  meetingIngestions MeetingIngestion[]
 
   // Free tier
   dailyGenerationOverride Int? // null = use global, 0 = unlimited, N = custom daily limit
@@ -216,34 +207,10 @@ model User {
   avatarSharesSent     AvatarImageShare[] @relation("AvatarShareRequester")
   avatarSharesReceived AvatarImageShare[] @relation("AvatarShareOwner")
 
-  // Daily Briefings
-  briefingEnabled       Boolean           @default(false)
-  briefingTime          String? // "HH:mm" wall-clock
-  briefingTimezone      String? // IANA, e.g. "America/New_York"
-  briefingDays          Int               @default(127) // bitmask: Mon=1..Sun=64
-  briefingVisibility    PodcastVisibility @default(PRIVATE)
-  lastBriefingAt        DateTime?
-  briefingLogs          BriefingLog[]
-  // Briefing customization — null = use user's general pref → admin default → platform auto
-  briefingAiModel       String? // AI model override for briefings
-  briefingTtsProvider   String? // TTS provider override
-  briefingTtsModel      String? // TTS model override
-  briefingHostVoiceId   String? // Voice pool entry name (provider-agnostic)
-  briefingExpertVoiceId String? // Voice pool entry name (provider-agnostic)
-  briefingDepth         String? // eli5, quick_overview, standard, deep_dive
-  briefingTone          String? // casual, professional, socratic, comedic, satirical, storytelling
-  briefingAudienceLevel String? // beginner, intermediate, expert
-  briefingDuration      Int? // target minutes (1-40)
-  briefingFormat        Int               @default(2) // 1=Solo, 2=Dialogue, 3=Panel, 4=Roundtable
-  briefingPrompt        String?           @db.Text // custom instructions/topic focus
-  briefingUseByokKeys   Boolean           @default(false) // opt-in: when true + user has BYOK, use their keys
-
-  // Multi-briefing configs
-  userBriefings UserBriefing[]
-
-  // Quizzes
-  quizEnabled  Boolean       @default(true)
-  quizAttempts QuizAttempt[]
+  // Language learning
+  courses            Course[]
+  classSubmissions   ClassSubmission[]
+  speakingRecordings SpeakingRecording[]
 
   @@index([role])
   @@index([handle])
@@ -340,9 +307,8 @@ model Podcast {
   sttModel         String? // e.g. 'whisper-1', 'whisper-large-v3-turbo', 'scribe_v1'
   language         String? // ISO 639-1, e.g. 'en', 'es', 'ja'
 
-  // Source tracking (web, twitter, api)
+  // Source tracking
   source        PodcastSource @default(WEB)
-  sourceTweetId String?
 
   // Visibility
   visibility PodcastVisibility @default(PRIVATE)
@@ -398,8 +364,6 @@ model Podcast {
   pipelineEvents      PipelineEvent[]
   references          Reference[]
   versions            PodcastVersion[]
-  tweetMention        TweetMention?
-  telegramMessage     TelegramMessage?
   playbackSessions    PlaybackSession[]
   podcastFeature      PodcastFeature?
   listeningQueues     ListeningQueue[]
@@ -407,7 +371,6 @@ model Podcast {
   savedIdea           SavedIdea?
   voices              PodcastVoice[]
   voicePurchases      VoicePurchase[]
-  autoTweets          TwitterAutoTweet[]
   ratings             PodcastRating[]
   claimReports        ClaimReport[]
   voiceTracks         VoiceTrack[]
@@ -418,14 +381,12 @@ model Podcast {
   audioFingerprint    AudioFingerprint?
   duplicateSource     DuplicateMatch[]   @relation("DuplicateSource")
   duplicateMatches    DuplicateMatch[]   @relation("DuplicateMatch")
-  quiz                PodcastQuiz?
-  briefingLogs        BriefingLog[]
   agentIngestion      AgentIngestion?
-  meetingIngestion    MeetingIngestion?
   landingShowcase     LandingShowcase?
   researchDossier     ResearchDossier?
   creativeOutline     CreativeOutline?
   vocabularyEntries   VocabularyEntry[]
+  classSection        ClassSection?
 
   @@unique([userId, slug])
   @@index([userId])
@@ -509,14 +470,11 @@ enum PodcastVisibility {
 
 enum PodcastSource {
   WEB
-  TWITTER
-  TELEGRAM
   API
   AGENT
-  MEETING
   IMPORT
   ADMIN
-  BRIEFING
+  CLASS
 }
 
 // ============ DISCOVERY (Chat-Based) ============
@@ -574,28 +532,6 @@ model AgentIngestion {
   @@unique([userId, idempotencyKey])
   @@index([userId, createdAt])
   @@index([contentHash])
-}
-
-model MeetingIngestion {
-  id             String    @id @default(cuid())
-  userId         String
-  podcastId      String    @unique
-  idempotencyKey String?
-  platform       String?
-  meetingTitle   String
-  startedAt      DateTime?
-  endedAt        DateTime?
-  transcriptHash String
-  metadata       Json?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  podcast Podcast @relation(fields: [podcastId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, idempotencyKey])
-  @@index([userId, createdAt])
-  @@index([transcriptHash])
 }
 
 model DiscoveryMessage {
@@ -933,8 +869,6 @@ enum NotificationType {
   PODCAST_READY
   PODCAST_FAILED
   KEY_INVALID
-  TWITTER_PODCAST_READY
-  TELEGRAM_PODCAST_READY
   VOICE_REQUEST_RECEIVED
   VOICE_REQUEST_APPROVED
   VOICE_REQUEST_DENIED
@@ -962,7 +896,6 @@ enum NotificationType {
   RENDITION_PROPOSED
   RENDITION_ACCEPTED
   RENDITION_REJECTED
-  BRIEFING_READY
   AVATAR_IMAGE_REQUEST_RECEIVED
   AVATAR_IMAGE_REQUEST_APPROVED
   AVATAR_IMAGE_REQUEST_DENIED
@@ -1121,77 +1054,6 @@ enum FeedbackStatus {
   IN_PROGRESS
   RESOLVED
   ARCHIVED
-}
-
-// ============ TWITTER MENTIONS ============
-
-model TweetMention {
-  id            String             @id @default(cuid())
-  tweetId       String             @unique
-  authorId      String // Twitter numeric user ID
-  text          String             @db.Text
-  parsedTopic   String?            @db.Text
-  status        TweetMentionStatus @default(PENDING)
-  userId        String?
-  podcastId     String?            @unique
-  replyTweetId  String?
-  parentTweetId String?
-  errorMessage  String?            @db.Text
-  videoPrefs    Json? // { imageModel, videoModel, wantsVideo } from tweet parsing
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
-
-  user    User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
-  podcast Podcast? @relation(fields: [podcastId], references: [id], onDelete: SetNull)
-
-  @@index([authorId])
-  @@index([status])
-  @@index([createdAt])
-}
-
-enum TweetMentionStatus {
-  PENDING
-  PARSING
-  GENERATING
-  READY
-  REPLIED
-  FAILED
-  IGNORED
-}
-
-// ============ TELEGRAM MESSAGES ============
-
-model TelegramMessage {
-  id                String                @id @default(cuid())
-  telegramUserId    String
-  chatId            String
-  telegramMessageId String?
-  text              String?               @db.Text
-  parsedTopic       String?               @db.Text
-  status            TelegramMessageStatus @default(PENDING)
-  userId            String?
-  podcastId         String?               @unique
-  errorMessage      String?               @db.Text
-  createdAt         DateTime              @default(now())
-  updatedAt         DateTime              @updatedAt
-
-  user    User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
-  podcast Podcast? @relation(fields: [podcastId], references: [id], onDelete: SetNull)
-
-  @@index([telegramUserId])
-  @@index([chatId])
-  @@index([status])
-  @@index([createdAt])
-}
-
-enum TelegramMessageStatus {
-  PENDING
-  DISCOVERING
-  GENERATING
-  READY
-  REPLIED
-  FAILED
-  IGNORED
 }
 
 // ============ PODCAST IDEAS (Telegram Save-for-Later) ============
@@ -1923,42 +1785,6 @@ model VoicePurchase {
   @@index([stripePaymentIntent])
 }
 
-// ============ TWITTER CONFIG (Admin Dashboard) ============
-
-model TwitterConfig {
-  id                     String   @id @default("singleton")
-  autoTweetEnabled       Boolean  @default(false)
-  minPlays               Int      @default(50)
-  mentionPollIntervalMs  Int      @default(60000)
-  trendPollingEnabled    Boolean  @default(false)
-  trendPollIntervalMs    Int      @default(7200000)
-  maxTrendPodcastsPerDay Int      @default(3)
-  trendSearchQueries     String[] @default(["AI", "science", "technology"])
-  tweetTemplate          String   @default("New on Sotto: {{title}}\n\n{{topic}}\n\nListen: {{url}}")
-  defaultAiModel         String?
-  defaultTtsProvider     String?
-  defaultTtsModel        String?
-  updatedAt              DateTime @updatedAt
-  updatedBy              String?
-}
-
-model TwitterAutoTweet {
-  id           String   @id @default(cuid())
-  podcastId    String
-  tweetId      String?
-  tweetText    String?  @db.Text
-  trigger      String // 'threshold' | 'manual' | 'trend'
-  status       String   @default("pending") // 'pending' | 'posted' | 'failed'
-  errorMessage String?  @db.Text
-  createdAt    DateTime @default(now())
-
-  podcast Podcast @relation(fields: [podcastId], references: [id], onDelete: Cascade)
-
-  @@index([podcastId])
-  @@index([status])
-  @@index([createdAt])
-}
-
 // ============ LANDING SHOWCASE CONFIG (Admin Dashboard) ============
 
 model LandingShowcase {
@@ -2470,24 +2296,6 @@ model AvatarImageShare {
   @@index([status])
 }
 
-// ============ NEWS INGESTION ============
-
-model IngestedArticle {
-  id        String    @id @default(cuid())
-  title     String
-  url       String    @unique
-  summary   String?   @db.Text
-  source    String
-  sourceUrl String?
-  category  String?
-  pubDate   DateTime?
-  fetchedAt DateTime  @default(now())
-
-  @@index([pubDate])
-  @@index([category, pubDate])
-  @@index([fetchedAt])
-}
-
 // ============ DEMO VIDEO STUDIO ============
 
 enum DemoProjectStatus {
@@ -2592,163 +2400,6 @@ model DemoScene {
   @@unique([projectId, order])
 }
 
-// ============ DAILY BRIEFINGS ============
-
-model UserBriefing {
-  id        String   @id @default(cuid())
-  userId    String
-  name      String // "Morning Tech News", "Evening Finance"
-  enabled   Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Schedule
-  time      String // "HH:mm" (required)
-  timezone  String // IANA timezone (required)
-  days      Int       @default(127) // bitmask Mon=1..Sun=64
-  nextRunAt DateTime? // pre-computed next eligible run time
-
-  // Content
-  prompt         String? @db.Text
-  depth          String? // eli5, quick_overview, standard, deep_dive
-  tone           String? // casual, professional, socratic, etc.
-  audienceLevel  String? // beginner, intermediate, expert
-  duration       Int? // target minutes 1-40
-  format         Int     @default(2) // 1=Solo 2=Dialogue 3=Panel 4=Roundtable
-  targetLanguage String? // ISO 639-1 code (e.g. "de") — null = English
-  languageMode   String? // vocabulary_intro | conversational_mix | full_immersion
-
-  // Audio
-  aiModel       String?
-  ttsProvider   String?
-  ttsModel      String?
-  hostVoiceId   String?
-  expertVoiceId String?
-
-  // Continuous Learning
-  continuousLearning Boolean @default(false)
-  contextEpisodes    Int     @default(3) // 1-5: how many prior episodes to include as context
-
-  // Advanced
-  visibility    PodcastVisibility @default(PRIVATE)
-  useByokKeys   Boolean           @default(false)
-  zeroCostVideo Boolean           @default(false) // free visuals only, skip verification
-
-  // State
-  lastGeneratedAt DateTime?
-
-  // Relations
-  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  briefingLogs BriefingLog[]
-
-  @@index([userId])
-  @@index([enabled, nextRunAt])
-}
-
-model BriefingConfig {
-  id                     String   @id @default("singleton")
-  enabled                Boolean  @default(true)
-  defaultAiModel         String?
-  defaultTtsProvider     String?
-  defaultTtsModel        String?
-  maxArticlesPerBriefing Int      @default(5)
-  targetDurationMinutes  Int      @default(6)
-  maxBriefingsPerBatch   Int      @default(50)
-  pollIntervalMs         Int      @default(900000) // 15 min
-  updatedAt              DateTime @updatedAt
-  updatedBy              String?
-}
-
-model BriefingLog {
-  id             String   @id @default(cuid())
-  userId         String
-  podcastId      String
-  topicSlugs     String[]
-  articleUrls    String[]
-  generatedAt    DateTime @default(now())
-  userBriefingId String?
-  scheduledDate  String? // "YYYY-MM-DD" for idempotency
-
-  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  podcast      Podcast       @relation(fields: [podcastId], references: [id], onDelete: Cascade)
-  userBriefing UserBriefing? @relation(fields: [userBriefingId], references: [id], onDelete: SetNull)
-
-  @@unique([userBriefingId, scheduledDate])
-  @@index([userId, generatedAt])
-}
-
-// ============ POST-LISTEN QUIZZES ============
-
-enum QuizStatus {
-  GENERATING
-  READY
-  FAILED
-}
-
-model PodcastQuiz {
-  id           String     @id @default(cuid())
-  podcastId    String     @unique
-  status       QuizStatus @default(GENERATING)
-  model        String?
-  provider     String?
-  attemptCount Int        @default(0)
-  avgScore     Float      @default(0)
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
-
-  podcast   Podcast        @relation(fields: [podcastId], references: [id], onDelete: Cascade)
-  questions QuizQuestion[]
-  attempts  QuizAttempt[]
-}
-
-model QuizQuestion {
-  id           String @id @default(cuid())
-  quizId       String
-  order        Int
-  question     String @db.Text
-  options      Json // ["A","B","C","D"]
-  correctIndex Int // 0-3
-  explanation  String @db.Text
-  turnIndex    Int?
-  correctCount Int    @default(0)
-  attemptCount Int    @default(0)
-
-  quiz    PodcastQuiz  @relation(fields: [quizId], references: [id], onDelete: Cascade)
-  answers QuizAnswer[]
-
-  @@unique([quizId, order])
-}
-
-model QuizAttempt {
-  id          String    @id @default(cuid())
-  userId      String
-  quizId      String
-  score       Int
-  total       Int
-  startedAt   DateTime  @default(now())
-  completedAt DateTime?
-
-  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  quiz    PodcastQuiz  @relation(fields: [quizId], references: [id], onDelete: Cascade)
-  answers QuizAnswer[]
-
-  @@unique([userId, quizId])
-}
-
-model QuizAnswer {
-  id            String   @id @default(cuid())
-  attemptId     String
-  questionId    String
-  selectedIndex Int
-  isCorrect     Boolean
-  answeredAt    DateTime @default(now())
-
-  attempt  QuizAttempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
-  question QuizQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
-
-  @@unique([attemptId, questionId])
-}
-
 model ShowcaseSet {
   id        String   @id @default(cuid())
   name      String
@@ -2756,4 +2407,400 @@ model ShowcaseSet {
   active    Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// ============ LANGUAGE LEARNING — CURRICULUM ============
+
+enum CefrLevel {
+  A1
+  A2
+  B1
+  B2
+  C1
+  C2
+}
+
+enum LanguagePair {
+  DE_FROM_EN // German for English speakers
+  EN_FROM_ES // English for Spanish speakers
+  ES_FROM_EN // Spanish for English speakers
+}
+
+// Global, seeded curriculum: one per language pair (the fixed CEFR lesson tree).
+model Curriculum {
+  id         String       @id @default(cuid())
+  pair       LanguagePair @unique
+  nativeLang String // ISO 639-1, e.g. "en"
+  targetLang String // ISO 639-1, e.g. "de"
+  title      String
+  version    Int          @default(1)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  lessons Lesson[]
+  courses Course[]
+}
+
+// A node in the fixed lesson tree. Ordering + competencies are fixed; class
+// instances generated from a lesson adapt to the learner's weak items.
+model Lesson {
+  id            String    @id @default(cuid())
+  curriculumId  String
+  level         CefrLevel
+  order         Int // global gate ordering within the curriculum
+  parentId      String? // tree: unit -> lesson; null = top-level unit
+  slug          String // stable key, e.g. "a1-greetings"
+  title         String
+  objective     String    @db.Text
+  grammarPoints Json // string[] of grammar topic keys, e.g. ["present-tense-sein"]
+  vocabThemes   Json // string[] themes, e.g. ["greetings","numbers-1-20"]
+  targetVocab   Json // [{ lemma, gloss, pos? }]
+  canDoSummary  String?   @db.Text // CEFR can-do statement
+  estMinutes    Int       @default(60)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  curriculum Curriculum @relation(fields: [curriculumId], references: [id], onDelete: Cascade)
+  parent     Lesson?    @relation("LessonTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children   Lesson[]      @relation("LessonTree")
+  classes    CourseClass[]
+
+  @@unique([curriculumId, slug])
+  @@unique([curriculumId, order])
+  @@index([curriculumId, level, order])
+  @@index([parentId])
+}
+
+// A learner's enrollment in one language pair. CEFR level lives here (a user
+// can hold several courses at several levels).
+model Course {
+  id            String       @id @default(cuid())
+  userId        String
+  pair          LanguagePair
+  nativeLang    String
+  targetLang    String
+  curriculumId  String
+  currentLevel  CefrLevel    @default(A1) // "you are here"; assigned by placement, advances with mastery
+  startLevel    CefrLevel    @default(A1) // immutable placement result
+  activeClassId String? // current in-flight class (gating convenience cache)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  curriculum Curriculum       @relation(fields: [curriculumId], references: [id])
+  placement  PlacementResult?
+  classes    CourseClass[]
+  vocab      LearnerVocab[]
+  grammar    LearnerGrammar[]
+  vocabEdges VocabEdge[]
+
+  @@unique([userId, pair]) // one course per user per language pair
+  @@index([userId])
+  @@index([curriculumId])
+}
+
+// Snapshot of the adaptive placement test that assigned a course's start level.
+model PlacementResult {
+  id           String    @id @default(cuid())
+  courseId     String    @unique
+  level        CefrLevel
+  responses    Json // [{ questionId, skill, cefr, selectedIndex, correct }]
+  scoreBySkill Json // { grammar, vocab, listening } -> 0..1
+  model        String?
+  provider     String?
+  createdAt    DateTime  @default(now())
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+}
+
+// ============ LANGUAGE LEARNING — CLASSES ============
+
+enum SkillType {
+  GRAMMAR
+  READING
+  LISTENING
+  SPEAKING
+}
+
+enum ClassStatus {
+  LOCKED
+  GENERATING
+  AVAILABLE
+  IN_PROGRESS
+  SUBMITTED
+  PASSED
+  FAILED
+}
+
+enum SectionStatus {
+  PENDING
+  GENERATING
+  READY
+  IN_PROGRESS
+  SUBMITTED
+  PASSED
+  FAILED
+}
+
+// A ~1h class instantiated from a Lesson for a specific course. Mastery-gated:
+// the next class only unlocks once this one is PASSED.
+model CourseClass {
+  id              String      @id @default(cuid())
+  courseId        String
+  lessonId        String
+  order           Int // mirrors Lesson.order; stable user-facing sequence
+  status          ClassStatus @default(LOCKED)
+  attempt         Int         @default(1) // whole-class retry counter
+  adaptiveSeed    Json? // { vocabIds, grammarKeys, dueCount } that seeded this class
+  passThreshold   Float       @default(0.7) // fraction of sections that must pass
+  worksheetPdfUrl String?
+  submittedAt     DateTime?
+  passedAt        DateTime?
+  failedAt        DateTime?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  course     Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lesson     Lesson           @relation(fields: [lessonId], references: [id])
+  sections   ClassSection[]
+  submission ClassSubmission?
+  inkLayers  ClassInkLayer[]
+
+  @@index([courseId, order])
+  @@index([courseId, status])
+  @@index([lessonId])
+}
+
+// Learner's iPad PencilKit ink for one worksheet surface. Stored verbatim,
+// never graded, never sent to an LLM.
+model ClassInkLayer {
+  id        String   @id @default(cuid())
+  classId   String
+  surface   String // worksheet surface/page the strokes belong to
+  strokes   String   @db.Text // base64-encoded PKDrawing
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  class CourseClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  @@unique([classId, surface])
+  @@index([classId])
+}
+
+// One skill section per (re)attempt. Failed-section regeneration = a new row
+// with attempt+1 and a new seed; the latest attempt per (class, skill) is active.
+model ClassSection {
+  id            String        @id @default(cuid())
+  classId       String
+  skill         SkillType
+  attempt       Int           @default(1)
+  status        SectionStatus @default(PENDING)
+  seed          String // variation token; changes on retry -> similar-but-not-identical
+  spec          Json // resolved generation spec (objective + adaptive items used)
+  score         Float?
+  passed        Boolean?
+  passThreshold Float         @default(0.7)
+  podcastId     String?       @unique // LISTENING section -> reuse Podcast; @unique because one section per podcast
+  generatedAt   DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  class     CourseClass      @relation(fields: [classId], references: [id], onDelete: Cascade)
+  podcast   Podcast?         @relation(fields: [podcastId], references: [id], onDelete: SetNull)
+  questions LessonQuestion[]
+  prompts   SpeakingPrompt[]
+
+  @@index([classId, skill, attempt])
+}
+
+// MC question for a GRAMMAR/READING/LISTENING section. Forked from the old
+// post-listen quiz question shape, but supports retries and has no podcast.
+model LessonQuestion {
+  id           String   @id @default(cuid())
+  sectionId    String
+  order        Int
+  skill        SkillType
+  question     String   @db.Text
+  options      Json // ["A","B","C","D"]
+  correctIndex Int
+  explanation  String   @db.Text
+  vocabIds     String[] @default([]) // memory-graph linkage (later phases)
+  grammarKeys  String[] @default([])
+  passageRef   String?  @db.Text // reading passage / listening turn anchor
+  createdAt    DateTime @default(now())
+
+  section ClassSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  @@unique([sectionId, order])
+  @@index([sectionId])
+}
+
+// One submission per class attempt; aggregates the graded MC answers.
+model ClassSubmission {
+  id           String   @id @default(cuid())
+  classId      String   @unique
+  userId       String
+  overallScore Float?
+  passed       Boolean?
+  submittedAt  DateTime @default(now())
+
+  class   CourseClass     @relation(fields: [classId], references: [id], onDelete: Cascade)
+  user    User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  answers SectionAnswer[]
+
+  @@index([userId])
+}
+
+model SectionAnswer {
+  id            String   @id @default(cuid())
+  submissionId  String
+  sectionId     String
+  questionId    String
+  selectedIndex Int
+  isCorrect     Boolean
+  answeredAt    DateTime @default(now())
+
+  submission ClassSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  @@unique([submissionId, questionId])
+  @@index([sectionId])
+}
+
+// ============ LANGUAGE LEARNING — SPEAKING ============
+
+enum SpeakingGradeStatus {
+  PENDING
+  GRADING
+  SCORED
+  FAILED
+}
+
+// One target phrase the learner must say aloud, hung off a SPEAKING ClassSection.
+model SpeakingPrompt {
+  id              String   @id @default(cuid())
+  sectionId       String
+  order           Int
+  targetPhrase    String   @db.Text
+  translation     String   @db.Text
+  ipa             String?  @db.Text
+  referenceTtsUrl String? // pre-rendered model pronunciation (resolveTtsProvider at class build)
+  createdAt       DateTime @default(now())
+
+  section    ClassSection        @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  recordings SpeakingRecording[]
+
+  @@unique([sectionId, order])
+  @@index([sectionId])
+}
+
+// A learner's recorded attempt at a SpeakingPrompt, graded asynchronously.
+model SpeakingRecording {
+  id            String              @id @default(cuid())
+  sectionId     String
+  promptId      String
+  userId        String
+  audioUrl      String
+  transcript    String?             @db.Text
+  overallScore  Float? // 0..1 combined pronunciation score
+  rubricScores  Json? // { accuracy, fluency, completeness } each 0..1
+  phonemeScores Json? // per-word alignment ops from align.ts
+  feedback      String?             @db.Text
+  status        SpeakingGradeStatus @default(PENDING)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  prompt SpeakingPrompt @relation(fields: [promptId], references: [id], onDelete: Cascade)
+  user   User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([sectionId])
+  @@index([promptId])
+  @@index([userId])
+}
+
+// ============ LANGUAGE LEARNING — MEMORY GRAPH (SRS) ============
+
+enum EdgeType {
+  VOCAB_VOCAB // collocation / morphological relation
+  VOCAB_GRAMMAR // word exemplifies a grammar topic
+  VOCAB_CLASS // word introduced / practiced in a class
+  VOCAB_PODCAST // word appeared in a listening podcast
+  GRAMMAR_GRAMMAR // prerequisite chain
+}
+
+// Per-course vocabulary node with SM-2 spaced-repetition state.
+model LearnerVocab {
+  id            String  @id @default(cuid())
+  courseId      String
+  lemma         String // canonical target-language form
+  translation   String
+  partOfSpeech  String?
+  pronunciation String?
+  // SRS state (SM-2)
+  ease         Float     @default(2.5)
+  intervalDays Float     @default(0)
+  dueAt        DateTime  @default(now())
+  reps         Int       @default(0)
+  lapses       Int       @default(0)
+  mastery      Float     @default(0) // 0..1 rolled-up strength
+  lastReviewed DateTime?
+  // provenance
+  firstSeenClassId String?
+  cefrLevel        CefrLevel?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  course   Course      @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  edgesOut VocabEdge[] @relation("EdgeSource")
+  edgesIn  VocabEdge[] @relation("EdgeTarget")
+
+  @@unique([courseId, lemma])
+  @@index([courseId, dueAt])
+  @@index([courseId, mastery])
+}
+
+// Per-course grammar-topic node with SRS state.
+model LearnerGrammar {
+  id           String     @id @default(cuid())
+  courseId     String
+  topicKey     String // matches Lesson.grammarPoints keys
+  title        String
+  cefrLevel    CefrLevel?
+  ease         Float      @default(2.5)
+  intervalDays Float      @default(0)
+  dueAt        DateTime   @default(now())
+  reps         Int        @default(0)
+  lapses       Int        @default(0)
+  mastery      Float      @default(0)
+  lastReviewed DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, topicKey])
+  @@index([courseId, dueAt])
+  @@index([courseId, mastery])
+}
+
+// Polymorphic edge: exactly the endpoints relevant to `type` are non-null.
+model VocabEdge {
+  id            String   @id @default(cuid())
+  courseId      String
+  type          EdgeType
+  weight        Float    @default(1.0)
+  sourceVocabId String?
+  targetVocabId String?
+  grammarId     String?
+  classId       String?
+  podcastId     String?
+  createdAt     DateTime @default(now())
+
+  course      Course        @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  sourceVocab LearnerVocab? @relation("EdgeSource", fields: [sourceVocabId], references: [id], onDelete: Cascade)
+  targetVocab LearnerVocab? @relation("EdgeTarget", fields: [targetVocabId], references: [id], onDelete: Cascade)
+
+  @@index([courseId, type])
+  @@index([sourceVocabId])
+  @@index([targetVocabId])
+  @@index([grammarId])
 }

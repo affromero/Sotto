@@ -9,7 +9,7 @@ export default defineConfig({
     setupFiles: ['./tests/setup/index.ts'],
     globals: true,
     css: true,
-    pool: 'threads',
+    pool: (process.env.VITEST_POOL as 'threads' | 'forks' | undefined) || 'threads',
     maxWorkers: 4,
     testTimeout: 20_000,
     hookTimeout: 20_000,

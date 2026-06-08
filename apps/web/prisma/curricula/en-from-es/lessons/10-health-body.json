@@ -1,0 +1,21 @@
+{
+  "slug": "a2-health-body",
+  "level": "A2",
+  "order": 10,
+  "title": "Health and the body",
+  "objective": "The learner can name parts of the body, describe symptoms and ailments, and have a basic conversation with a doctor or pharmacist in English.",
+  "grammarPoints": ["verb-feel-hurt-ache", "modal-should-must", "simple-present-for-symptoms"],
+  "vocabThemes": ["body-parts", "health", "medical"],
+  "targetVocab": [
+    { "lemma": "head", "gloss": "cabeza", "pos": "noun" },
+    { "lemma": "stomach", "gloss": "estómago", "pos": "noun" },
+    { "lemma": "I have a headache", "gloss": "me duele la cabeza", "pos": "phrase" },
+    { "lemma": "I feel sick", "gloss": "me siento mal / tengo náuseas", "pos": "phrase" },
+    { "lemma": "fever", "gloss": "fiebre", "pos": "noun" },
+    { "lemma": "medicine", "gloss": "medicamento / medicina", "pos": "noun" },
+    { "lemma": "you should", "gloss": "deberías", "pos": "phrase" },
+    { "lemma": "appointment", "gloss": "cita (médica)", "pos": "noun" }
+  ],
+  "canDoSummary": "Can describe basic health problems and understand simple advice from a doctor or pharmacist in English.",
+  "estMinutes": 60
+}

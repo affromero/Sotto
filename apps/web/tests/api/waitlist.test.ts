@@ -8,7 +8,6 @@ const {
   mockAssertEmailDeliveryConfigured,
   mockSendEmail,
   mockBuildWaitlistWelcomeEmail,
-  mockIsTelegramBotConfigured,
 } = vi.hoisted(() => ({
   mockCheckRateLimit: vi.fn(),
   mockWaitlistFindUnique: vi.fn(),
@@ -16,7 +15,6 @@ const {
   mockAssertEmailDeliveryConfigured: vi.fn(),
   mockSendEmail: vi.fn(),
   mockBuildWaitlistWelcomeEmail: vi.fn(),
-  mockIsTelegramBotConfigured: vi.fn(),
 }));
 
 vi.mock('@/lib/redis', () => ({
@@ -38,10 +36,6 @@ vi.mock('@/lib/email', () => ({
 }));
 vi.mock('@/lib/email-templates', () => ({
   buildWaitlistWelcomeEmail: (...args: unknown[]) => mockBuildWaitlistWelcomeEmail(...args),
-}));
-vi.mock('@/lib/telegram', () => ({
-  isTelegramBotConfigured: () => mockIsTelegramBotConfigured(),
-  sendMessage: vi.fn(),
 }));
 vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
@@ -77,7 +71,6 @@ describe('POST /api/waitlist', () => {
       subject: 'Welcome to Sotto',
       html: '<p>welcome</p>',
     });
-    mockIsTelegramBotConfigured.mockReturnValue(false);
     mockWaitlistUpsert.mockResolvedValue({ id: 'wl-1', email: 'user@example.com' });
     handler = await getHandler();
   });

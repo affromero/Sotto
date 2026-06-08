@@ -1,0 +1,79 @@
+# Publishes the open-source Sotto images to GHCR.
+#
+# Unlike deploy.yml (which builds on the server with the private maps submodule),
+# this builds a PUBLIC image: it initializes only the public verification-standard
+# submodule and drops in the @sotto/maps no-op stub, so no private code ships in
+# the published image. The curl|bash installer pulls these images.
+name: Publish OSS image
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Extra image tag (in addition to latest + sha)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      # Public submodule only (no SSH key); the private maps package is replaced
+      # by a no-op stub so the build needs no private code.
+      - name: Init public submodule + stub maps
+        run: |
+          git submodule update --init packages/verification-standard
+          node scripts/oss-maps-stub.mjs
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Short SHA
+        id: sha
+        run: echo "short=${GITHUB_SHA::8}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push sotto-web
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          push: true
+          build-args: |
+            COMMIT_SHA=${{ steps.sha.outputs.short }}
+            NEXT_PUBLIC_APP_URL=http://localhost:3000
+          tags: |
+            ghcr.io/affromero/sotto-web:latest
+            ghcr.io/affromero/sotto-web:${{ steps.sha.outputs.short }}
+            ${{ github.ref_type == 'tag' && format('ghcr.io/affromero/sotto-web:{0}', github.ref_name) || '' }}
+          cache-from: type=gha,scope=sotto-web
+          cache-to: type=gha,mode=max,scope=sotto-web
+
+      - name: Build and push sotto-workers
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/web/Dockerfile.workers
+          push: true
+          tags: |
+            ghcr.io/affromero/sotto-workers:latest
+            ghcr.io/affromero/sotto-workers:${{ steps.sha.outputs.short }}
+            ${{ github.ref_type == 'tag' && format('ghcr.io/affromero/sotto-workers:{0}', github.ref_name) || '' }}
+          cache-from: type=gha,scope=sotto-workers
+          cache-to: type=gha,mode=max,scope=sotto-workers

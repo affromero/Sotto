@@ -10,7 +10,6 @@ export type {
   InteractionStatus,
   ReferenceType,
   VerificationStatus,
-  TweetMentionStatus,
   NotificationType,
   VoiceCloneSource,
   VoiceRequestStatus,
@@ -18,7 +17,13 @@ export type {
   ProposalStatus,
   FeedbackType,
   FeedbackStatus,
-  QuizStatus,
+  CefrLevel,
+  LanguagePair,
+  SkillType,
+  ClassStatus,
+  SectionStatus,
+  SpeakingGradeStatus,
+  EdgeType,
 } from './types/enums';
 
 // Types
@@ -41,12 +46,11 @@ export type {
 export type { ReferenceData, VerificationLayerResult } from './types/reference';
 
 export type {
-  TweetParseResult,
-  TwitterTweet,
-  TwitterMention,
-  TwitterSettingsData,
-  TweetMentionData,
-} from './types/twitter';
+  ClassDocument,
+  ClassDocumentSection,
+  ClassDocumentQuestion,
+  ClassDocumentPrompt,
+} from './types/class-document';
 
 export type {
   DiscoveryMessage,
@@ -55,13 +59,10 @@ export type {
   TasteQuestion,
   TasteAnswer,
   InspireSection,
-  NewsTimeRange,
 } from './types/discovery';
 
-export { INSPIRE_SECTION_LABELS, NEWS_TIME_RANGE_LABELS } from './types/discovery';
+export { INSPIRE_SECTION_LABELS } from './types/discovery';
 
-export type { NewsArticle, NewsMeta, NewsResponse, NewsCategory } from './types/news';
-export { NEWS_CATEGORIES, NEWS_CATEGORY_LABELS } from './types/news';
 
 export type { PlayerState, PlayerControls } from './types/player';
 

@@ -2,10 +2,9 @@
 
 import { useState, useEffect, useCallback, useRef, type MutableRefObject } from 'react';
 import { X, Sparkles, RefreshCw, Search } from 'lucide-react';
-import type { TasteQuestion, InspireSection, NewsTimeRange } from '@sotto/shared';
-import { INSPIRE_SECTION_LABELS, NEWS_TIME_RANGE_LABELS } from '@sotto/shared';
+import type { TasteQuestion, InspireSection } from '@sotto/shared';
+import { INSPIRE_SECTION_LABELS } from '@sotto/shared';
 import type { PodcastSummary } from '@/types/podcast';
-import { Spinner } from '@/components/ui/Spinner';
 import { InspireQuiz } from './InspireQuiz';
 import { InspireTrendingList } from './InspireTrendingList';
 import styles from './InspireMe.module.css';
@@ -41,23 +40,19 @@ export function InspireMe({ open, onClose, onSelectTopic, aiModel, prefetchRef }
   const [sectionsLoading, setSectionsLoading] = useState<Record<Section, boolean>>({
     forYou: false,
     trending: false,
-    news: false,
     curiosity: false,
   });
   const [forYouQuestions, setForYouQuestions] = useState<TasteQuestion[]>([]);
   const [trendingPodcasts, setTrendingPodcasts] = useState<PodcastSummary[]>([]);
-  const [newsQuestions, setNewsQuestions] = useState<TasteQuestion[]>([]);
   const [curiosityQuestions, setCuriosityQuestions] = useState<TasteQuestion[]>([]);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [newsTimeRange, setNewsTimeRange] = useState<NewsTimeRange>('1w');
-  const [isLoadingNews, setIsLoadingNews] = useState(false);
   const [fetchError, setFetchError] = useState(false);
   const [topicInput, setTopicInput] = useState('');
   const [activeTopic, setActiveTopic] = useState<string | undefined>();
   const topicInputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  const isAnyLoading = sectionsLoading.forYou || sectionsLoading.trending || sectionsLoading.news || sectionsLoading.curiosity;
+  const isAnyLoading = sectionsLoading.forYou || sectionsLoading.trending || sectionsLoading.curiosity;
 
   const fetchAll = useCallback((topic?: string) => {
     // Abort any in-flight request
@@ -65,7 +60,7 @@ export function InspireMe({ open, onClose, onSelectTopic, aiModel, prefetchRef }
     const controller = new AbortController();
     abortRef.current = controller;
 
-    setSectionsLoading({ forYou: true, trending: true, news: true, curiosity: true });
+    setSectionsLoading({ forYou: true, trending: true, curiosity: true });
     setFetchError(false);
 
     const url = buildUrl({ topic, model: aiModel });
@@ -87,9 +82,8 @@ export function InspireMe({ open, onClose, onSelectTopic, aiModel, prefetchRef }
           const data = await res.json();
           setForYouQuestions(data.forYou ?? []);
           setTrendingPodcasts(data.trending ?? []);
-          setNewsQuestions(data.news ?? []);
           setCuriosityQuestions(data.curiosity ?? []);
-          setSectionsLoading({ forYou: false, trending: false, news: false, curiosity: false });
+          setSectionsLoading({ forYou: false, trending: false, curiosity: false });
           return;
         }
 
@@ -118,7 +112,7 @@ export function InspireMe({ open, onClose, onSelectTopic, aiModel, prefetchRef }
               const event: SseEvent = JSON.parse(jsonStr);
 
               if (event.done) {
-                setSectionsLoading({ forYou: false, trending: false, news: false, curiosity: false });
+                setSectionsLoading({ forYou: false, trending: false, curiosity: false });
                 return;
               }
 
@@ -129,9 +123,6 @@ export function InspireMe({ open, onClose, onSelectTopic, aiModel, prefetchRef }
                     break;
                   case 'forYou':
                     setForYouQuestions(event.data as TasteQuestion[]);
-                    break;
-                  case 'news':
-                    setNewsQuestions(event.data as TasteQuestion[]);
                     break;
                   case 'curiosity':
                     setCuriosityQuestions(event.data as TasteQuestion[]);
@@ -146,12 +137,12 @@ export function InspireMe({ open, onClose, onSelectTopic, aiModel, prefetchRef }
         }
 
         // Stream ended without explicit done event
-        setSectionsLoading({ forYou: false, trending: false, news: false, curiosity: false });
+        setSectionsLoading({ forYou: false, trending: false, curiosity: false });
       })
       .catch((err) => {
         if ((err as Error).name === 'AbortError') return;
         setFetchError(true);
-        setSectionsLoading({ forYou: false, trending: false, news: false, curiosity: false });
+        setSectionsLoading({ forYou: false, trending: false, curiosity: false });
       });
 
     return () => controller.abort();
@@ -178,16 +169,14 @@ export function InspireMe({ open, onClose, onSelectTopic, aiModel, prefetchRef }
   );
 
   const handleLoadMore = useCallback(
-    async (section: 'forYou' | 'news' | 'curiosity', timeRange?: NewsTimeRange) => {
+    async (section: 'forYou' | 'curiosity') => {
       setIsLoadingMore(true);
       try {
-        const res = await fetch(buildUrl({ section, timeRange, topic: activeTopic, model: aiModel }));
+        const res = await fetch(buildUrl({ section, topic: activeTopic, model: aiModel }));
         if (!res.ok) return;
         const data = await res.json();
         if (section === 'forYou' && data.forYou) {
           setForYouQuestions(data.forYou);
-        } else if (section === 'news' && data.news) {
-          setNewsQuestions(data.news);
         } else if (section === 'curiosity' && data.curiosity) {
           setCuriosityQuestions(data.curiosity);
         }
@@ -196,25 +185,6 @@ export function InspireMe({ open, onClose, onSelectTopic, aiModel, prefetchRef }
       }
     },
     [activeTopic, aiModel]
-  );
-
-  const handleTimeRangeChange = useCallback(
-    async (range: NewsTimeRange) => {
-      if (range === newsTimeRange) return;
-      setNewsTimeRange(range);
-      setIsLoadingNews(true);
-      try {
-        const res = await fetch(buildUrl({ section: 'news', timeRange: range, topic: activeTopic, model: aiModel }));
-        if (!res.ok) return;
-        const data = await res.json();
-        if (data.news) {
-          setNewsQuestions(data.news);
-        }
-      } finally {
-        setIsLoadingNews(false);
-      }
-    },
-    [activeTopic, newsTimeRange, aiModel]
   );
 
   const handleTopicSubmit = useCallback(() => {
@@ -314,15 +284,13 @@ export function InspireMe({ open, onClose, onSelectTopic, aiModel, prefetchRef }
           ) : activeTabLoading ? (
             <div className={styles.skeletonGrid} aria-busy="true" aria-label="Loading suggestions">
               <p className={styles.skeletonHint}>
-                {activeSection === 'news'
-                  ? 'Searching for news...'
-                  : activeSection === 'trending'
-                    ? 'Loading trending podcasts...'
-                    : activeSection === 'curiosity'
-                      ? 'Discovering curiosities...'
-                      : activeTopic
-                        ? `Finding ideas about "${activeTopic}"...`
-                        : 'Finding ideas for you...'}
+                {activeSection === 'trending'
+                  ? 'Loading trending podcasts...'
+                  : activeSection === 'curiosity'
+                    ? 'Discovering curiosities...'
+                    : activeTopic
+                      ? `Finding ideas about "${activeTopic}"...`
+                      : 'Finding ideas for you...'}
               </p>
               {Array.from({ length: 4 }).map((_, i) => (
                 <div key={i} className={styles.skeletonCard}>
@@ -340,41 +308,6 @@ export function InspireMe({ open, onClose, onSelectTopic, aiModel, prefetchRef }
               podcasts={trendingPodcasts}
               onSelectTopic={handleSelectTopic}
             />
-          ) : activeSection === 'news' ? (
-            <>
-              <div className={styles.timeRangeBar}>
-                <label htmlFor="news-time-range" className={styles.timeRangeLabel}>
-                  Show news from:
-                </label>
-                <select
-                  id="news-time-range"
-                  className={styles.timeRangeSelect}
-                  value={newsTimeRange}
-                  onChange={(e) => handleTimeRangeChange(e.target.value as NewsTimeRange)}
-                  disabled={isLoadingNews}
-                >
-                  {(Object.keys(NEWS_TIME_RANGE_LABELS) as NewsTimeRange[]).map((range) => (
-                    <option key={range} value={range}>
-                      {NEWS_TIME_RANGE_LABELS[range]}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              {isLoadingNews ? (
-                <div className={styles.loadingState}>
-                  <Spinner size="large" />
-                  <p>Searching for news...</p>
-                </div>
-              ) : (
-                <InspireQuiz
-                  key={`news-${newsQuestions[0]?.id ?? 'empty'}`}
-                  questions={newsQuestions}
-                  onSelectTopic={handleSelectTopic}
-                  onLoadMore={() => handleLoadMore('news', newsTimeRange)}
-                  isLoadingMore={isLoadingMore}
-                />
-              )}
-            </>
           ) : activeSection === 'curiosity' ? (
             <InspireQuiz
               key={`curiosity-${curiosityQuestions[0]?.id ?? 'empty'}`}

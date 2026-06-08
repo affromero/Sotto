@@ -62,6 +62,11 @@ wait_for_service() {
 # Install only the dependencies needed for local OSS app development.
 bash "$SCRIPT_DIR/install-deps.sh" --node --docker --ffmpeg
 
+# The maps package is a private submodule (historical map visuals for the video
+# pipeline). Open-source clones won't have it, so drop in a no-op stub when it is
+# absent — the workspace then installs and builds without private code.
+node "$SCRIPT_DIR/oss-maps-stub.mjs"
+
 # Install Node.js dependencies
 echo "Installing Node.js dependencies..."
 npm install
@@ -97,6 +102,11 @@ npx prisma db push --schema=apps/web/prisma/schema.prisma
 
 # Generate Prisma client
 npx prisma generate --schema=apps/web/prisma/schema.prisma
+
+# Seed the fixed language curriculum (idempotent)
+echo "Seeding curriculum..."
+set -a; [ -f "$ENV_FILE" ] && . "$ENV_FILE"; set +a
+npx tsx apps/web/prisma/seed-curriculum.ts
 
 echo ""
 echo "Sotto is ready!"
