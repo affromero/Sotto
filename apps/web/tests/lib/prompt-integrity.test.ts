@@ -41,7 +41,6 @@ const EXPECTED_FILES = [
   'topic-assessor.md',
   'import/import-metadata.md',
   'import/transcript-diarization.md',
-  'social/telegram-parser.md',
   'verification/reference-validator.md',
   'verification/reference-verification-ai.md',
   'verification/reference-grounding.md',

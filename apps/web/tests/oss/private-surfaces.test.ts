@@ -250,8 +250,6 @@ describe('private-first OSS surfaces', () => {
   it('requires bot and shared URL helpers to use an explicit deployment URL', () => {
     const runtimeUrlSources = [
       'src/lib/urls.ts',
-      'src/lib/telegram-handler.ts',
-      'src/workers/telegram-reply.worker.ts',
     ]
       .map(readSource)
       .join('\n');
@@ -581,12 +579,10 @@ describe('private-first OSS surfaces', () => {
       'docs/07-ai-prompts.md',
       'docs/17-authentication-setup.md',
       'docs/25-twitter-integration.md',
-      'apps/web/prompts/social/telegram-parser.md',
       'apps/web/src/app/(admin)/admin/queues/queue-metadata.ts',
       'apps/web/src/app/(dashboard)/ideas/tabs/IdeasTab.tsx',
       'apps/web/src/app/(dashboard)/settings/SettingsForm.tsx',
       'apps/web/src/app/changelog/page.tsx',
-      'apps/web/src/app/connect/telegram/page.tsx',
       'apps/web/src/app/support/page.tsx',
       'apps/web/src/components/landing/JsonLd.tsx',
       'apps/web/src/components/landing/chapters/ConvertChapter.tsx',

@@ -3,7 +3,6 @@ import { prisma } from '@/lib/prisma';
 import { waitlistSchema } from '@/lib/validations';
 import { assertEmailDeliveryConfigured, sendEmail } from '@/lib/email';
 import { buildWaitlistWelcomeEmail } from '@/lib/email-templates';
-import { sendMessage, isTelegramBotConfigured } from '@/lib/telegram';
 import { logger } from '@/lib/logger';
 import { checkRateLimit } from '@/lib/redis';
 
@@ -57,7 +56,7 @@ export async function POST(request: NextRequest) {
     },
   });
 
-  // Send welcome email + admin Telegram notification for new signups
+  // Send welcome email for new signups
   if (welcomeEmail) {
     try {
       await sendEmail({ to: email, subject: welcomeEmail.subject, html: welcomeEmail.html });
@@ -68,46 +67,7 @@ export async function POST(request: NextRequest) {
       });
       return errorResponse('Waitlist welcome email failed', 502);
     }
-
-    if (isTelegramBotConfigured()) {
-      notifyAdminsViaTelegram({ email, twitterHandle, source, wishlist, referralCode }).catch(() => {});
-    }
   }
 
   return NextResponse.json({ message: "You're on the list!" }, { status: 201 });
-}
-
-async function notifyAdminsViaTelegram(signup: {
-  email: string;
-  twitterHandle?: string;
-  source?: string;
-  wishlist?: string;
-  referralCode?: string;
-}) {
-  const admins = await prisma.user.findMany({
-    where: { role: 'ADMIN', telegramEnabled: true, telegramChatId: { not: null } },
-    select: { telegramChatId: true },
-  });
-
-  if (admins.length === 0) return;
-
-  const totalCount = await prisma.waitlist.count();
-
-  const lines = [
-    `📋 *New waitlist signup* (#${totalCount})`,
-    '',
-    `*Email:* ${signup.email}`,
-  ];
-  if (signup.twitterHandle) lines.push(`*Twitter:* @${signup.twitterHandle}`);
-  if (signup.source) lines.push(`*Source:* ${signup.source}`);
-  if (signup.wishlist) lines.push(`*Wishlist:* ${signup.wishlist}`);
-  if (signup.referralCode) lines.push(`*Referral:* ${signup.referralCode}`);
-
-  const text = lines.join('\n');
-
-  await Promise.allSettled(
-    admins.map((admin) =>
-      sendMessage(admin.telegramChatId!, text, { parse_mode: 'Markdown' })
-    )
-  ).catch((err) => logger.error('Failed to send waitlist Telegram notification', { error: err }));
 }

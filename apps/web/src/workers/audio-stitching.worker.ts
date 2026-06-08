@@ -6,7 +6,6 @@ import {
   notificationQueue,
   pdfGenerationQueue,
   featureComputationQueue,
-  telegramReplyQueue,
   waveformGenerationQueue,
   quizGenerationQueue,
 } from '@/lib/queue';
@@ -189,8 +188,7 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
     // 3. Load podcast metadata
     const podcast = await prisma.podcast.findUniqueOrThrow({
       where: { id: podcastId },
-      select: { userId: true, title: true, source: true,
-                user: { select: { telegramEnabled: true, telegramChatId: true } } },
+      select: { userId: true, title: true, source: true },
     });
     const usePremiumSfx = LIMITS.hasPremiumSfx;
 
@@ -357,19 +355,6 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
         durationSeconds: String(Math.round(duration)),
         maxSeconds: String(Math.round(maxDurationSeconds)),
       });
-
-      // Queue Telegram failure reply for duration-exceeded
-      if (podcast.user.telegramEnabled && podcast.user.telegramChatId) {
-        const tgMsg = await prisma.telegramMessage.findFirst({
-          where: { podcastId, status: { in: ['GENERATING', 'READY'] } },
-          select: { id: true, chatId: true },
-        }).catch(() => null);
-        await addJob(telegramReplyQueue, JobType.REPLY_TELEGRAM, {
-          podcastId,
-          telegramMessageId: tgMsg?.id,
-          chatId: tgMsg?.chatId ?? podcast.user.telegramChatId,
-        }).catch(() => {});
-      }
 
       await job.updateProgress(100);
       return;
@@ -542,9 +527,7 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
     // 10. Send notification (source-specific type for display differentiation)
     const notificationType = podcast.source === 'BRIEFING'
       ? 'BRIEFING_READY'
-      : podcast.source === 'TELEGRAM'
-        ? 'TELEGRAM_PODCAST_READY'
-        : 'PODCAST_READY';
+      : 'PODCAST_READY';
     const isBriefing = podcast.source === 'BRIEFING';
 
     // Idempotency: skip if a notification for this podcast+type already exists (stalled job retry)
@@ -600,37 +583,6 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
 
     // 10c4. Generate post-listen quiz
     await addJob(quizGenerationQueue, JobType.GENERATE_QUIZ, { podcastId }).catch(() => {});
-
-    // 11. If user has Telegram enabled, send a notification
-    if (!skipSfx && podcast.user.telegramEnabled && podcast.user.telegramChatId) {
-      // Idempotency: skip if Telegram reply was already sent for this podcast (stalled job retry)
-      const existingTgReply = await prisma.telegramMessage.findFirst({
-        where: { podcastId, status: 'READY' },
-        select: { id: true },
-      });
-
-      if (!existingTgReply) {
-        const telegramMsg = podcast.source === 'TELEGRAM'
-          ? await prisma.telegramMessage.findFirst({
-              where: { podcastId, status: { in: ['GENERATING', 'FAILED'] } },
-              select: { id: true, chatId: true },
-            })
-          : null;
-        await addJob(telegramReplyQueue, JobType.REPLY_TELEGRAM, {
-          podcastId,
-          telegramMessageId: telegramMsg?.id,
-          chatId: telegramMsg?.chatId ?? podcast.user.telegramChatId,
-        });
-        if (telegramMsg) {
-          await prisma.telegramMessage.update({
-            where: { id: telegramMsg.id },
-            data: { status: 'READY' },
-          });
-        }
-      } else {
-        logger.info('Skipping duplicate Telegram reply (already sent)', { podcastId });
-      }
-    }
 
     await job.updateProgress(100);
     logger.info('Audio stitching complete', {

@@ -11,7 +11,6 @@ export type PipelineStage =
   | 'Content Pipeline'
   | 'Audio Pipeline'
   | 'Interactions'
-  | 'Social'
   | 'Analytics'
   | 'Platform Ops'
   | 'Voice Features'
@@ -27,7 +26,6 @@ export const PIPELINE_STAGE_ORDER: PipelineStage[] = [
   'Content Pipeline',
   'Audio Pipeline',
   'Interactions',
-  'Social',
   'Analytics',
   'Platform Ops',
   'Voice Features',
@@ -75,14 +73,6 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
   'pdf-generation': {
     description: 'Generates PDF transcripts with references',
     stage: 'Interactions',
-  },
-  'telegram-bot': {
-    description: 'Processes incoming Telegram bot messages',
-    stage: 'Social',
-  },
-  'telegram-reply': {
-    description: 'Sends Telegram bot replies and notifications',
-    stage: 'Social',
   },
   'event-ingestion': {
     description: 'Ingests behavioral analytics events in batches',
