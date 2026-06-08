@@ -43,7 +43,14 @@
       ],
       "expo-apple-authentication",
       "expo-web-browser",
-      "@react-native-google-signin/google-signin"
+      "@react-native-google-signin/google-signin",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Allow Sotto to access your microphone for speaking practice."
+        }
+      ],
+      "./modules/sotto-pencilkit/app.plugin.js"
     ],
     "extra": {
       "router": {},
