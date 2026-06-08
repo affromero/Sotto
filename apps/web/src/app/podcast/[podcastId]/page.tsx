@@ -104,7 +104,7 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
   ];
 
   // All secondary queries in parallel
-  const [interactions, quizData, clones, ownerData] = await Promise.all([
+  const [interactions, clones, ownerData] = await Promise.all([
     // Interactions (separate from cached query because it depends on userId)
     userId
       ? prisma.interaction.findMany({
@@ -121,12 +121,6 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
           },
         })
       : Promise.resolve([]),
-
-    // Quiz
-    prisma.podcastQuiz.findUnique({
-      where: { podcastId: podcast.id },
-      select: { status: true, attemptCount: true, avgScore: true },
-    }),
 
     // Voice clone names
     allVoiceIds.length > 0
@@ -150,12 +144,6 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
       : Promise.resolve(null),
   ]);
 
-  // Quiz
-  const hasQuiz = quizData?.status === 'READY';
-  const quizStats =
-    hasQuiz && quizData.attemptCount > 0
-      ? { attemptCount: quizData.attemptCount, avgScore: quizData.avgScore }
-      : undefined;
 
   // Owner data
   let videoStatus:
@@ -373,8 +361,6 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
           videoStatus={videoStatus}
           avatarStatus={avatarStatus}
           musicStatus={musicStatus}
-          hasQuiz={hasQuiz}
-          quizStats={quizStats}
         />
         {costBreakdown && costBreakdown.total > 0 && (
           <CostBreakdown breakdown={costBreakdown} isPro={ownerIsPro} isByok={ownerIsByok} />

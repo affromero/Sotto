@@ -47,19 +47,6 @@ export default function SettingsScreen() {
   const hasTtsKey = ttsKeys?.keys?.some((k) => k.isValid) ?? false;
   const allKeysConfigured = hasAiKey && hasTtsKey;
 
-  // Quiz toggle
-  const { data: userData } = useQuery<{ quizEnabled?: boolean }>({
-    queryKey: ['user', 'me', 'settings'],
-    queryFn: async () => {
-      const res = await api.get('/users/me');
-      return res.data;
-    },
-  });
-  const [quizEnabled, setQuizEnabled] = useState(true);
-  useEffect(() => {
-    if (userData?.quizEnabled !== undefined) setQuizEnabled(userData.quizEnabled);
-  }, [userData?.quizEnabled]);
-
   const handleDeleteAccount = useCallback(() => {
     Alert.alert(
       'Delete Account',
@@ -169,22 +156,6 @@ export default function SettingsScreen() {
               <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>Voice Clones</Text>
               <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
             </Pressable>
-            <View style={styles.rowSeparator} />
-            <View style={styles.row}>
-              <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
-                Post-Listen Quizzes
-              </Text>
-              <Switch
-                value={quizEnabled}
-                onValueChange={(val) => {
-                  setQuizEnabled(val);
-                  api.patch('/users/me', { quizEnabled: val });
-                }}
-                trackColor={{ false: colors.border, true: colors.primary }}
-                thumbColor={colors.surface}
-                testID="settings-quiz-toggle"
-              />
-            </View>
           </View>
         </View>
 

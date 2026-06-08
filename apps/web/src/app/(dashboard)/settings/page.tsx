@@ -29,7 +29,7 @@ export default async function SettingsPage() {
     categories,
     byokKeys,
     aiKeys,
-    quizAnswerCount,
+    tasteQuizAnswerCount,
     referredUsers,
     privateFeedTokens,
   ] = await Promise.all([
@@ -51,7 +51,6 @@ export default async function SettingsPage() {
         preferredTtsModel: true,
         emailNotifications: true,
         pushNotifications: true,
-        quizEnabled: true,
       },
     }),
     prisma.account.findMany({
@@ -167,8 +166,7 @@ export default async function SettingsPage() {
           createdAt: token.createdAt.toISOString(),
           lastUsedAt: token.lastUsedAt?.toISOString() ?? null,
         }))}
-        initialQuizEnabled={user.quizEnabled}
-        quizAnswerCount={quizAnswerCount}
+        quizAnswerCount={tasteQuizAnswerCount}
         referredUsers={referredUsers.map((u) => ({
           name: u.name,
           handle: u.handle,

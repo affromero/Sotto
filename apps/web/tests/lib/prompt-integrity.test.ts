@@ -67,7 +67,6 @@ const EXPECTED_FILES = [
   'audio/voice-assigner.md',
   'audio/tts-tag-converter.md',
   'demo/walkthrough.md',
-  'quiz/generate-quiz.md',
 ];
 
 // ── Variable contracts: template → expected placeholder names ──
@@ -145,9 +144,6 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
   'research/source-discovery.md': [
     'DEPTH', 'DEPTH_DESCRIPTION', 'MIN_SERIOUS_COUNT',
     'SOURCE_CONTENT', 'SOURCE_COUNT', 'TOPIC',
-  ].sort(),
-  'quiz/generate-quiz.md': [
-    'MEDIUM_COUNT', 'QUESTION_COUNT', 'SCRIPT_CONTEXT', 'SCRIPT_TURNS',
   ].sort(),
 };
 

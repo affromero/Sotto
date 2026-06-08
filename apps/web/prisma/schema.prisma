@@ -207,10 +207,6 @@ model User {
   avatarSharesSent     AvatarImageShare[] @relation("AvatarShareRequester")
   avatarSharesReceived AvatarImageShare[] @relation("AvatarShareOwner")
 
-  // Quizzes
-  quizEnabled  Boolean       @default(true)
-  quizAttempts QuizAttempt[]
-
   @@index([role])
   @@index([handle])
   @@index([referredById])
@@ -380,7 +376,6 @@ model Podcast {
   audioFingerprint    AudioFingerprint?
   duplicateSource     DuplicateMatch[]   @relation("DuplicateSource")
   duplicateMatches    DuplicateMatch[]   @relation("DuplicateMatch")
-  quiz                PodcastQuiz?
   agentIngestion      AgentIngestion?
   landingShowcase     LandingShowcase?
   researchDossier     ResearchDossier?
@@ -2396,78 +2391,6 @@ model DemoScene {
   updatedAt DateTime @updatedAt
 
   @@unique([projectId, order])
-}
-
-// ============ POST-LISTEN QUIZZES ============
-
-enum QuizStatus {
-  GENERATING
-  READY
-  FAILED
-}
-
-model PodcastQuiz {
-  id           String     @id @default(cuid())
-  podcastId    String     @unique
-  status       QuizStatus @default(GENERATING)
-  model        String?
-  provider     String?
-  attemptCount Int        @default(0)
-  avgScore     Float      @default(0)
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
-
-  podcast   Podcast        @relation(fields: [podcastId], references: [id], onDelete: Cascade)
-  questions QuizQuestion[]
-  attempts  QuizAttempt[]
-}
-
-model QuizQuestion {
-  id           String @id @default(cuid())
-  quizId       String
-  order        Int
-  question     String @db.Text
-  options      Json // ["A","B","C","D"]
-  correctIndex Int // 0-3
-  explanation  String @db.Text
-  turnIndex    Int?
-  correctCount Int    @default(0)
-  attemptCount Int    @default(0)
-
-  quiz    PodcastQuiz  @relation(fields: [quizId], references: [id], onDelete: Cascade)
-  answers QuizAnswer[]
-
-  @@unique([quizId, order])
-}
-
-model QuizAttempt {
-  id          String    @id @default(cuid())
-  userId      String
-  quizId      String
-  score       Int
-  total       Int
-  startedAt   DateTime  @default(now())
-  completedAt DateTime?
-
-  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  quiz    PodcastQuiz  @relation(fields: [quizId], references: [id], onDelete: Cascade)
-  answers QuizAnswer[]
-
-  @@unique([userId, quizId])
-}
-
-model QuizAnswer {
-  id            String   @id @default(cuid())
-  attemptId     String
-  questionId    String
-  selectedIndex Int
-  isCorrect     Boolean
-  answeredAt    DateTime @default(now())
-
-  attempt  QuizAttempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
-  question QuizQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
-
-  @@unique([attemptId, questionId])
 }
 
 model ShowcaseSet {

@@ -23,7 +23,7 @@ describe('getCostBucket', () => {
     const textCategories = [
       'topic_assessment', 'script_generation', 'script_verification',
       'reference_validation', 'voice_assignment', 'tts-tag-conversion',
-      'interaction', 'quiz-generation', 'discovery', 'language_detection',
+      'interaction', 'discovery', 'language_detection',
       'handle_screening', 'telegram_parse', 'inspire_foryou', 'inspire_news',
       'inspire_curiosity', 'name_moderation', 'credential_lookup', 'embedding',
       'diarization', 'import_metadata', 'moderation', 'tweet_parse',
@@ -58,7 +58,7 @@ describe('getCostBucket', () => {
   });
 
   it('CATEGORY_BUCKET_MAP has entries for all expected categories', () => {
-    expect(Object.keys(CATEGORY_BUCKET_MAP).length).toBe(31);
+    expect(Object.keys(CATEGORY_BUCKET_MAP).length).toBe(30);
   });
 });
 

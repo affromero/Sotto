@@ -36,7 +36,6 @@ BullMQ workers that process async jobs. Each worker runs in a separate thread wi
 | `demo-transition`         | `demo-transition`         | 2           | Adjacent scene recordings → FFmpeg xfade crossfade clip                                                                                                                                                                                                                                                                                                                                                        | Uploads transition to R2, sets DemoScene.transitionUrl + transitionStatus=READY                                                                               |
 | `demo-composition`        | `demo-composition`        | 1           | All scene assets ready → Remotion sidecar /render (compositionId=LaunchVideo) → poll status → download MP4                                                                                                                                                                                                                                                                                                     | Uploads final video to R2, sets DemoProject.videoUrl + status=READY                                                                                           |
 | `waveform-generation`     | `waveform-generation`     | 2           | Podcast audioUrl → FFmpeg astats (waveform peaks JSON) + showspectrumpic (spectrogram PNG) → R2 upload                                                                                                                                                                                                                                                                                                         | Sets Podcast.waveformUrl + spectrogramUrl                                                                                                                     |
-| `quiz-generation`         | `quiz-generation`         | 2           | Podcast script → LLM generates 3-5 MCQ → PodcastQuiz + QuizQuestion records                                                                                                                                                                                                                                                                                                                                    | Creates PodcastQuiz (status READY), fire-and-forget from audio-stitching + audio-import                                                                       |
 
 ## Pipeline Flow
 
@@ -46,8 +45,6 @@ content-extraction → script-generation → script-verification ──→ refer
                                               │  FAIL (≤3)                         WEB/IMPORT: pause      pdf-generation
                                               └───────┘                            for user review         (on-demand)
                                                                                    API/AGENT/MEETING: auto-approve
-
-quiz-generation (fire-and-forget, post-READY) → generates MCQ from script → creates PodcastQuiz
 
 Script review (at SCRIPT_READY):
   User edits script → PATCH /api/podcasts/[id]/script (save edits)

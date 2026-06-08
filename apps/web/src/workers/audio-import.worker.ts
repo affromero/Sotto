@@ -4,7 +4,6 @@ import {
   notificationQueue,
   featureComputationQueue,
   waveformGenerationQueue,
-  quizGenerationQueue,
   addJob,
   JobType,
 } from '@/lib/queue';
@@ -100,8 +99,6 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
         podcastId,
         userId,
       });
-
-      await addJob(quizGenerationQueue, JobType.GENERATE_QUIZ, { podcastId }).catch(() => {});
 
       await job.updateProgress(100);
       return;
@@ -576,9 +573,6 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
       podcastId,
       userId,
     });
-
-    // Generate post-listen quiz
-    await addJob(quizGenerationQueue, JobType.GENERATE_QUIZ, { podcastId }).catch(() => {});
 
     // Consume free-tier quota on successful import (not at creation time)
     const importUser = await prisma.user.findUniqueOrThrow({
