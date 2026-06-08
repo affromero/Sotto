@@ -19,6 +19,9 @@ export type {
   FeedbackStatus,
   CefrLevel,
   LanguagePair,
+  SkillType,
+  ClassStatus,
+  SectionStatus,
 } from './types/enums';
 
 // Types

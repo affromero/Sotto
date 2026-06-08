@@ -161,3 +161,23 @@ export type MusicStatus =
 export type CefrLevel = 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2';
 
 export type LanguagePair = 'DE_FROM_EN' | 'EN_FROM_ES' | 'ES_FROM_EN';
+
+export type SkillType = 'GRAMMAR' | 'READING' | 'LISTENING' | 'SPEAKING';
+
+export type ClassStatus =
+  | 'LOCKED'
+  | 'GENERATING'
+  | 'AVAILABLE'
+  | 'IN_PROGRESS'
+  | 'SUBMITTED'
+  | 'PASSED'
+  | 'FAILED';
+
+export type SectionStatus =
+  | 'PENDING'
+  | 'GENERATING'
+  | 'READY'
+  | 'IN_PROGRESS'
+  | 'SUBMITTED'
+  | 'PASSED'
+  | 'FAILED';
