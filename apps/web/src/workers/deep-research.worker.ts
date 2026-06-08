@@ -92,13 +92,8 @@ export async function processDeepResearch(job: Job<DeepResearchPayload>): Promis
 
   // Determine research mode
   const hasSourceContent = !!discovery.sourceContent;
-  const isBriefing = podcast.source === 'BRIEFING';
 
-  const mode: BuildDossierParams['mode'] = isBriefing
-    ? 'curated'
-    : hasSourceContent
-      ? 'source-bound'
-      : 'open-web';
+  const mode: BuildDossierParams['mode'] = hasSourceContent ? 'source-bound' : 'open-web';
 
   // Extract discovery summary from chat messages
   const discoverySummary = discovery.messages

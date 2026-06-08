@@ -42,7 +42,7 @@ export default function SupportPage() {
                 <p>
                   Join our{' '}
                   <a href="https://discord.gg/Dm4T42RXa" target="_blank" rel="noopener noreferrer">Discord server</a>{' '}
-                  to chat with other creators, share podcasts, and get help
+                  to chat with other learners, share feedback, and get help
                   from the community.
                 </p>
               </div>
@@ -81,8 +81,8 @@ export default function SupportPage() {
                 BYOK (Bring Your Own Key) removes daily generation limits and lets you
                 use your own AI and TTS providers. You provide API keys for providers like
                 Anthropic, OpenAI, or ElevenLabs — you pay them directly for what you use.
-                Pro features like private podcasts, analytics, and voice tracks require a
-                Pro subscription separately. Add your keys in Settings &gt; API Keys.
+                Pro features like advanced analytics and voice tracks require a Pro
+                subscription separately. Add your keys in Settings &gt; API Keys.
               </p>
             </div>
             <div className={styles.faqItem}>
@@ -121,10 +121,10 @@ export default function SupportPage() {
               </p>
             </div>
             <div className={styles.faqItem}>
-              <h3>Can I revise a podcast after it is generated?</h3>
+              <h3>Can I revise a lesson after it is generated?</h3>
               <p>
                 Yes. Ask follow-up questions during playback, save the useful answers,
-                and generate a new private briefing when you want a different focus,
+                and generate a new listening lesson when you want a different focus,
                 tone, or depth.
               </p>
             </div>

@@ -27,13 +27,13 @@ export function HeroChapter({ showcase }: HeroChapterProps) {
           </div>
 
           <h1 className={styles.title}>
-            Any topic.
+            Your agent knows you.
             <br />
-            <em>Studio-quality podcast.</em>
+            <em>Now it can teach you.</em>
           </h1>
 
           <p className={styles.subtitle}>
-            Describe what you want to hear. Sotto writes, voices, and films it.
+            Connect the agent that already knows your work and interests. Sotto builds a language course around the things you actually care about.
           </p>
 
           <AuthCTA source="hero" />

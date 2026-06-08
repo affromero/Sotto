@@ -1,0 +1,239 @@
+// Generates the LISTENING section of a class:
+// 1. Creates a CLASS podcast seeded with due vocabulary.
+// 2. Generates a short conversational script via generateScript().
+// 3. Persists Script + VocabularyEntry rows (mirrors script-generation worker).
+// 4. Queues audio generation via createSegmentsAndQueueAudio().
+// 5. Upserts each generated vocab word into the learner's knowledge graph.
+// 6. Generates comprehension MC questions over the transcript.
+// 7. Creates the ClassSection + LessonQuestion rows (status: READY).
+import { prisma } from './prisma';
+import { getAiKey } from './byok';
+import { getAiProviderMeta } from './providers/ai-registry';
+import { createAIProvider } from './providers/ai';
+import { loadAndRender } from './prompt-loader';
+import { generateScript } from './script-generator';
+import { createSegmentsAndQueueAudio } from './segment-creator';
+import { logUsage } from './usage-logger';
+import { logger } from './logger';
+
+const LISTENING_QUIZ_COUNT = 4;
+
+export interface ClassListeningParams {
+  userId: string;
+  classId: string;
+  courseId: string;
+  level: string;
+  nativeLang: string;
+  targetLang: string;
+  objective: string;
+  mustIncludeVocab: Array<{ word: string; translation: string }>;
+}
+
+export interface ClassListeningResult {
+  sectionId: string;
+  podcastId: string;
+}
+
+export async function generateClassListening(p: ClassListeningParams): Promise<ClassListeningResult> {
+  // Step 1: resolve AI key
+  const aiKey = await getAiKey(p.userId);
+  if (!aiKey) {
+    throw new Error('An AI provider key (or a configured local Claude/Codex) is required to generate the listening section.');
+  }
+  const model = getAiProviderMeta(aiKey.provider).defaultModel;
+  if (!model) {
+    throw new Error(`No default AI model configured for provider "${aiKey.provider}".`);
+  }
+
+  // Step 2: create a CLASS podcast
+  const podcast = await prisma.podcast.create({
+    data: {
+      userId: p.userId,
+      title: `Listening: ${p.objective}`,
+      topic: p.objective,
+      source: 'CLASS',
+      visibility: 'PRIVATE',
+      language: p.targetLang,
+      status: 'PENDING',
+    },
+  });
+  const podcastId = podcast.id;
+
+  try {
+    // Step 3: generate the script
+    const result = await generateScript({
+      topic: p.objective,
+      depth: 'standard',
+      audienceLevel: p.level,
+      focusAreas: [],
+      tone: 'casual',
+      durationTarget: 4,
+      provider: aiKey.provider,
+      model,
+      apiKeyOverride: aiKey.apiKey,
+      source: 'CLASS',
+      targetLanguage: p.targetLang,
+      languageMode: 'conversational_mix',
+      forLearning: true,
+      mustIncludeVocabulary: p.mustIncludeVocab,
+    });
+
+    // Step 4: persist Script + VocabularyEntry (mirrors script-generation worker)
+    await prisma.$transaction(async (tx) => {
+      await tx.script.create({
+        data: {
+          podcastId,
+          turns: result.turns,
+          soundCues: result.soundCues.length > 0 ? result.soundCues : undefined,
+          markdown: result.markdown,
+        },
+      });
+
+      if (result.vocabulary && result.vocabulary.length > 0) {
+        await tx.vocabularyEntry.createMany({
+          data: result.vocabulary.map((v) => ({
+            podcastId,
+            number: v.number,
+            word: v.word,
+            translation: v.translation,
+            partOfSpeech: v.partOfSpeech,
+            pronunciation: v.pronunciation,
+            exampleSentence: v.exampleSentence,
+            difficulty: v.difficulty,
+          })),
+        });
+      }
+    });
+
+    // Step 5: queue audio generation segments
+    await createSegmentsAndQueueAudio(podcastId, result.turns);
+
+    // Step 6: log usage
+    logUsage({
+      service: aiKey.provider,
+      model: result.model,
+      category: 'class-listening-script',
+      inputTokens: result.inputTokens,
+      outputTokens: result.outputTokens,
+      userId: p.userId,
+      podcastId,
+    });
+
+    // Step 7: upsert generated vocab into the learner's knowledge graph
+    for (const v of result.vocabulary ?? []) {
+      if (!v.word) continue;
+      await prisma.learnerVocab.upsert({
+        where: { courseId_lemma: { courseId: p.courseId, lemma: v.word } },
+        create: {
+          courseId: p.courseId,
+          lemma: v.word,
+          translation: v.translation,
+          partOfSpeech: v.partOfSpeech ?? null,
+          pronunciation: v.pronunciation ?? null,
+          firstSeenClassId: p.classId,
+        },
+        update: {},
+      });
+    }
+
+    // Step 8: build transcript for quiz generation
+    const transcript = result.turns.map((t) => `${t.speaker}: ${t.text}`).join('\n');
+
+    // Step 9: generate comprehension questions
+    const systemPrompt = loadAndRender('class/generate-listening-quiz.md', {
+      COUNT: String(LISTENING_QUIZ_COUNT),
+      LEVEL: p.level,
+      NATIVE: p.nativeLang,
+      TARGET: p.targetLang,
+      TRANSCRIPT: transcript,
+    });
+
+    const provider = createAIProvider(aiKey.provider);
+    const quizResponse = await provider.generateResponse(
+      systemPrompt,
+      [{ role: 'user', content: `Generate ${LISTENING_QUIZ_COUNT} listening comprehension questions.` }],
+      { model, apiKeyOverride: aiKey.apiKey, maxTokens: 4096, temperature: 0.7 },
+    );
+
+    logUsage({
+      service: aiKey.provider,
+      model: quizResponse.model,
+      category: 'class-listening-quiz',
+      inputTokens: quizResponse.inputTokens,
+      outputTokens: quizResponse.outputTokens,
+      userId: p.userId,
+      podcastId,
+    });
+
+    // Step 10: parse quiz JSON
+    const cleaned = quizResponse.content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    let rawQuestions: Array<{ question: string; options: unknown[]; correctIndex: unknown; explanation: string }>;
+    try {
+      rawQuestions = JSON.parse(cleaned);
+    } catch (err) {
+      logger.error('Failed to parse listening-quiz LLM response', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      throw new Error('Listening quiz generation returned malformed output.');
+    }
+
+    const questions = rawQuestions
+      .filter(
+        (q) =>
+          typeof q.question === 'string' &&
+          Array.isArray(q.options) &&
+          q.options.length === 4 &&
+          typeof q.correctIndex === 'number',
+      )
+      .slice(0, LISTENING_QUIZ_COUNT)
+      .map((q) => ({
+        question: q.question,
+        options: (q.options as string[]).slice(0, 4),
+        correctIndex: Math.max(0, Math.min(3, q.correctIndex as number)),
+        explanation: typeof q.explanation === 'string' ? q.explanation : '',
+      }));
+
+    if (questions.length === 0) {
+      throw new Error('Listening quiz generation produced no usable questions.');
+    }
+
+    // Step 11: create ClassSection + LessonQuestion rows
+    const section = await prisma.classSection.create({
+      data: {
+        classId: p.classId,
+        skill: 'LISTENING',
+        attempt: 1,
+        seed: `${p.classId}-LISTENING-1`,
+        spec: { objective: p.objective },
+        status: 'READY',
+        podcastId,
+        generatedAt: new Date(),
+      },
+    });
+
+    await prisma.lessonQuestion.createMany({
+      data: questions.map((q, i) => ({
+        sectionId: section.id,
+        order: i + 1,
+        skill: 'LISTENING' as const,
+        question: q.question,
+        options: q.options,
+        correctIndex: q.correctIndex,
+        explanation: q.explanation,
+      })),
+    });
+
+    logger.info('Listening section generated', {
+      classId: p.classId,
+      podcastId,
+      sectionId: section.id,
+      questionCount: String(questions.length),
+    });
+
+    return { sectionId: section.id, podcastId };
+  } catch (err) {
+    // Best-effort cleanup: mark the podcast failed so it doesn't linger as PENDING.
+    await prisma.podcast.update({ where: { id: podcastId }, data: { status: 'FAILED' } }).catch(() => {});
+    throw err;
+  }
+}

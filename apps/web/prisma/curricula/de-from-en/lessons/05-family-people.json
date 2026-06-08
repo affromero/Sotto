@@ -1,0 +1,22 @@
+{
+  "slug": "a1-family-people",
+  "level": "A1",
+  "order": 5,
+  "title": "Family and people",
+  "objective": "Name immediate family members in German and describe your family using basic possessive articles.",
+  "grammarPoints": ["possessive-articles-mein-dein", "verb-haben-present", "verb-sein-present", "adjective-predicative-basic"],
+  "vocabThemes": ["family", "relationships", "age"],
+  "targetVocab": [
+    { "lemma": "die Familie", "gloss": "the family", "pos": "noun" },
+    { "lemma": "die Mutter", "gloss": "the mother", "pos": "noun" },
+    { "lemma": "der Vater", "gloss": "the father", "pos": "noun" },
+    { "lemma": "die Schwester", "gloss": "the sister", "pos": "noun" },
+    { "lemma": "der Bruder", "gloss": "the brother", "pos": "noun" },
+    { "lemma": "mein", "gloss": "my (masculine/neuter)", "pos": "determiner" },
+    { "lemma": "meine", "gloss": "my (feminine/plural)", "pos": "determiner" },
+    { "lemma": "Wie alt bist du?", "gloss": "How old are you? (informal)", "pos": "phrase" },
+    { "lemma": "Ich bin … Jahre alt.", "gloss": "I am … years old.", "pos": "phrase" }
+  ],
+  "canDoSummary": "I can introduce my family members and say how old they are.",
+  "estMinutes": 60
+}

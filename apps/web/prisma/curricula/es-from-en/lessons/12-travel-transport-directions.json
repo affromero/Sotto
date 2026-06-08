@@ -1,0 +1,21 @@
+{
+  "slug": "a2-travel-transport-directions",
+  "level": "A2",
+  "order": 12,
+  "title": "Travel, transport, and asking for directions",
+  "objective": "Ask for and give simple directions, name modes of transport, and buy a ticket.",
+  "grammarPoints": ["ir-present-tense-irregular", "imperative-informal-directions", "prepositions-movement-a-en-hacia"],
+  "vocabThemes": ["transport", "directions", "travel"],
+  "targetVocab": [
+    { "lemma": "el autobús", "gloss": "bus", "pos": "noun" },
+    { "lemma": "el metro", "gloss": "underground / metro", "pos": "noun" },
+    { "lemma": "ir a pie", "gloss": "to go on foot / to walk", "pos": "phrase" },
+    { "lemma": "gira a la derecha", "gloss": "turn right", "pos": "phrase" },
+    { "lemma": "sigue recto", "gloss": "go straight ahead", "pos": "phrase" },
+    { "lemma": "¿dónde está …?", "gloss": "where is …?", "pos": "phrase" },
+    { "lemma": "un billete de ida y vuelta", "gloss": "a return ticket", "pos": "noun phrase" },
+    { "lemma": "la parada", "gloss": "stop (bus/metro)", "pos": "noun" }
+  ],
+  "canDoSummary": "Can ask for and follow simple directions and handle basic transactions at a transport ticket office.",
+  "estMinutes": 60
+}

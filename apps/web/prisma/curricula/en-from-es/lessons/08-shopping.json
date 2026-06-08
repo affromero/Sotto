@@ -1,0 +1,21 @@
+{
+  "slug": "a1-shopping",
+  "level": "A1",
+  "order": 8,
+  "title": "Shopping and prices",
+  "objective": "The learner can ask about prices, sizes, and colours, and handle a simple shop transaction in English.",
+  "grammarPoints": ["how-much-how-many", "demonstrative-pronouns", "adjective-colour-size"],
+  "vocabThemes": ["shopping", "clothes", "colours"],
+  "targetVocab": [
+    { "lemma": "how much is it?", "gloss": "¿cuánto cuesta?", "pos": "phrase" },
+    { "lemma": "it costs", "gloss": "cuesta", "pos": "phrase" },
+    { "lemma": "expensive", "gloss": "caro/a", "pos": "adjective" },
+    { "lemma": "cheap", "gloss": "barato/a", "pos": "adjective" },
+    { "lemma": "size", "gloss": "talla / tamaño", "pos": "noun" },
+    { "lemma": "colour", "gloss": "color", "pos": "noun" },
+    { "lemma": "I'll take it", "gloss": "me lo llevo", "pos": "phrase" },
+    { "lemma": "do you have", "gloss": "¿tiene/tienes…?", "pos": "phrase" }
+  ],
+  "canDoSummary": "Can buy an item in a shop, ask about prices and sizes, and complete a basic purchase in English.",
+  "estMinutes": 60
+}

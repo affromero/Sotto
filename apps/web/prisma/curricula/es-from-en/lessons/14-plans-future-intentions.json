@@ -1,0 +1,21 @@
+{
+  "slug": "a2-plans-future-intentions",
+  "level": "A2",
+  "order": 14,
+  "title": "Making plans and expressing future intentions",
+  "objective": "Talk about near-future plans using ir + a + infinitive and express intentions with querer and pensar.",
+  "grammarPoints": ["ir-a-infinitive-future", "querer-pensar-present-tense", "future-time-expressions"],
+  "vocabThemes": ["plans", "free-time", "future-expressions"],
+  "targetVocab": [
+    { "lemma": "voy a …", "gloss": "I am going to …", "pos": "phrase" },
+    { "lemma": "quiero …", "gloss": "I want to …", "pos": "phrase" },
+    { "lemma": "pienso …", "gloss": "I plan to / I think I will …", "pos": "phrase" },
+    { "lemma": "mañana", "gloss": "tomorrow", "pos": "adverb" },
+    { "lemma": "el próximo mes", "gloss": "next month", "pos": "noun phrase" },
+    { "lemma": "este verano", "gloss": "this summer", "pos": "noun phrase" },
+    { "lemma": "hacer un viaje", "gloss": "to go on a trip", "pos": "phrase" },
+    { "lemma": "aprender español", "gloss": "to learn Spanish", "pos": "phrase" }
+  ],
+  "canDoSummary": "Can express near-future plans and personal intentions using ir a + infinitive and modal verbs.",
+  "estMinutes": 60
+}

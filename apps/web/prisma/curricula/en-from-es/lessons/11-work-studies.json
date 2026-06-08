@@ -1,0 +1,21 @@
+{
+  "slug": "a2-work-studies",
+  "level": "A2",
+  "order": 11,
+  "title": "Work and studies",
+  "objective": "The learner can talk about their job or studies, describe workplace routines, and discuss basic work-related situations in English.",
+  "grammarPoints": ["simple-present-for-routines", "wh-questions", "prepositions-of-time-at-on-in"],
+  "vocabThemes": ["jobs", "workplace", "education"],
+  "targetVocab": [
+    { "lemma": "job", "gloss": "trabajo / empleo", "pos": "noun" },
+    { "lemma": "office", "gloss": "oficina", "pos": "noun" },
+    { "lemma": "meeting", "gloss": "reunión", "pos": "noun" },
+    { "lemma": "colleague", "gloss": "colega / compañero/a de trabajo", "pos": "noun" },
+    { "lemma": "I work as", "gloss": "trabajo como", "pos": "phrase" },
+    { "lemma": "I study", "gloss": "estudio", "pos": "phrase" },
+    { "lemma": "full-time", "gloss": "a tiempo completo", "pos": "phrase" },
+    { "lemma": "part-time", "gloss": "a tiempo parcial", "pos": "phrase" }
+  ],
+  "canDoSummary": "Can describe their job or course of study and talk about basic workplace situations in English.",
+  "estMinutes": 60
+}

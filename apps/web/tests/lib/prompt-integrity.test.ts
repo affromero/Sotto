@@ -39,13 +39,11 @@ const EXPECTED_FILES = [
   'discovery/agent.md',
   'discovery/fallback.md',
   'topic-assessor.md',
-  'credential-lookup.md',
+  'placement/placement-probe.md',
+  'class/generate-listening-quiz.md',
+  'class/generate-section-quiz.md',
   'import/import-metadata.md',
   'import/transcript-diarization.md',
-  'social/telegram-parser.md',
-  'social/tweet-parser.md',
-  'social/thread-analyzer.md',
-  'social/mention-filter.md',
   'verification/reference-validator.md',
   'verification/reference-verification-ai.md',
   'verification/reference-grounding.md',
@@ -69,13 +67,11 @@ const EXPECTED_FILES = [
   'feeds/taste-quiz.md',
   'feeds/for-you.md',
   'feeds/curiosity.md',
-  'feeds/news.md',
-  'feeds/news-from-newsletters.md',
   'audio/voice-assigner.md',
   'audio/tts-tag-converter.md',
   'demo/walkthrough.md',
-  'generation/briefing-script.md',
-  'quiz/generate-quiz.md',
+  'speaking/pronunciation-rubric.md',
+  'speaking/generate-speaking-prompts.md',
 ];
 
 // ── Variable contracts: template → expected placeholder names ──
@@ -123,16 +119,14 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
   'feeds/curiosity.md': [
     'INPUT_SANITIZATION', 'REQUEST_COUNT', 'TAXONOMY', 'TOPIC_CONTEXT',
   ].sort(),
-  'feeds/news.md': [
-    'DIVERSITY_NOTE', 'EXCLUDE_CONTEXT', 'INPUT_SANITIZATION',
-    'REQUEST_COUNT', 'TAXONOMY', 'TIME_LABEL', 'TOPIC_FOCUS',
-  ].sort(),
-  'feeds/news-from-newsletters.md': [
-    'DIVERSITY_NOTE', 'EXCLUDE_CONTEXT', 'INPUT_SANITIZATION',
-    'NEWSLETTER_ARTICLES', 'REQUEST_COUNT', 'TAXONOMY', 'TIME_LABEL', 'TOPIC_FOCUS',
-  ].sort(),
   'audio/voice-assigner.md': [
     'SPEAKERS', 'SPEAKER_COUNT', 'VOICE_CATALOG',
+  ].sort(),
+  'speaking/pronunciation-rubric.md': [
+    'ALIGNMENT_SUMMARY', 'TARGET', 'TARGET_PHRASE', 'TRANSCRIPT',
+  ].sort(),
+  'speaking/generate-speaking-prompts.md': [
+    'COUNT', 'LEVEL', 'NATIVE', 'OBJECTIVE', 'TARGET', 'VOCAB',
   ].sort(),
   'audio/tts-tag-converter.md': [
     'PROVIDER_DOCS', 'PROVIDER_NAME', 'TURNS_JSON',
@@ -162,14 +156,14 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
     'DEPTH', 'DEPTH_DESCRIPTION', 'MIN_SERIOUS_COUNT',
     'SOURCE_CONTENT', 'SOURCE_COUNT', 'TOPIC',
   ].sort(),
-  'generation/briefing-script.md': [
-    'CLOSING_LINE', 'CONTENT_SAFETY', 'DURATION_TARGET', 'EXPERT_SPEAKER', 'HOST_SPEAKER',
-    'LANGUAGE_INSTRUCTION', 'MIN_REFERENCE_COUNT', 'OPENING_LINE', 'PREVIOUS_EPISODES',
-    'SOURCE_ARTICLES', 'SPEAKER_SECTION', 'VOCABULARY_INSTRUCTION',
-    'VOICE_REALISM', 'WORD_COUNT_IDEAL', 'WORD_COUNT_MAX', 'WORD_COUNT_MIN',
+  'placement/placement-probe.md': [
+    'COUNT', 'LEVELS', 'NATIVE', 'PER_BAND', 'SKILLS', 'TARGET',
   ].sort(),
-  'quiz/generate-quiz.md': [
-    'MEDIUM_COUNT', 'QUESTION_COUNT', 'SCRIPT_CONTEXT', 'SCRIPT_TURNS',
+  'class/generate-listening-quiz.md': [
+    'COUNT', 'LEVEL', 'NATIVE', 'TARGET', 'TRANSCRIPT',
+  ].sort(),
+  'class/generate-section-quiz.md': [
+    'COUNT', 'GRAMMAR_POINTS', 'LEVEL', 'NATIVE', 'OBJECTIVE', 'SEED', 'SKILL', 'TARGET', 'VOCAB',
   ].sort(),
 };
 
@@ -179,7 +173,7 @@ const STATIC_TEMPLATES = EXPECTED_FILES.filter((f) => !VARIABLE_CONTRACTS[f]);
 // ── Tests ─────────────────────────────────────────────────────
 
 describe('prompt file existence', () => {
-  it(`prompts directory contains exactly ${EXPECTED_FILES.length} .md files`, () => {
+  it(`prompts directory contains exactly ${EXPECTED_FILES.length} .md files`, () => { // bumped +2 for speaking/pronunciation-rubric.md and speaking/generate-speaking-prompts.md
     const actual = glob.sync('**/*.md', { cwd: PROMPTS_DIR }).sort();
     expect(actual).toHaveLength(EXPECTED_FILES.length);
     expect(actual).toEqual(EXPECTED_FILES.sort());
@@ -306,17 +300,12 @@ describe('verification templates', () => {
 
 describe('feed templates', () => {
   it('all feed templates produce JSON array output', () => {
-    for (const file of ['feeds/taste-quiz.md', 'feeds/for-you.md', 'feeds/curiosity.md', 'feeds/news.md']) {
+    for (const file of ['feeds/taste-quiz.md', 'feeds/for-you.md', 'feeds/curiosity.md']) {
       const content = readFileSync(join(PROMPTS_DIR, file), 'utf-8');
       expect(content).toContain('JSON array');
       expect(content).toContain('"text"');
       expect(content).toContain('"tagSlugs"');
     }
-  });
-
-  it('news.md includes web search instruction', () => {
-    const content = readFileSync(join(PROMPTS_DIR, 'feeds/news.md'), 'utf-8');
-    expect(content.toLowerCase()).toContain('search the web');
   });
 
   it('curiosity.md explicitly avoids personalization', () => {

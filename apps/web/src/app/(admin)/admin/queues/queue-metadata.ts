@@ -11,7 +11,6 @@ export type PipelineStage =
   | 'Content Pipeline'
   | 'Audio Pipeline'
   | 'Interactions'
-  | 'Social'
   | 'Analytics'
   | 'Platform Ops'
   | 'Voice Features'
@@ -27,7 +26,6 @@ export const PIPELINE_STAGE_ORDER: PipelineStage[] = [
   'Content Pipeline',
   'Audio Pipeline',
   'Interactions',
-  'Social',
   'Analytics',
   'Platform Ops',
   'Voice Features',
@@ -60,6 +58,10 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
     description: 'Concatenates audio segments with crossfades and SFX',
     stage: 'Audio Pipeline',
   },
+  'speaking-grading': {
+    description: 'Transcribes learner speaking recordings and scores pronunciation',
+    stage: 'Audio Pipeline',
+  },
   'segment-regeneration': {
     description: 'Re-generates individual audio segments after edits',
     stage: 'Audio Pipeline',
@@ -75,34 +77,6 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
   'pdf-generation': {
     description: 'Generates PDF transcripts with references',
     stage: 'Interactions',
-  },
-  'twitter-mentions': {
-    description: 'Polls Twitter for configured bot mentions',
-    stage: 'Social',
-  },
-  'twitter-reply': {
-    description: 'Posts tweet replies with podcast links',
-    stage: 'Social',
-  },
-  'twitter-auto-tweet': {
-    description: 'Auto-tweets trending podcasts above threshold',
-    stage: 'Social',
-  },
-  'twitter-trend-poll': {
-    description: 'Polls Twitter trending topics for inspiration',
-    stage: 'Social',
-  },
-  'telegram-bot': {
-    description: 'Processes incoming Telegram bot messages',
-    stage: 'Social',
-  },
-  'telegram-reply': {
-    description: 'Sends Telegram bot replies and notifications',
-    stage: 'Social',
-  },
-  'admin-thread-to-podcast': {
-    description: 'Converts admin-selected Twitter threads to podcasts',
-    stage: 'Social',
   },
   'event-ingestion': {
     description: 'Ingests behavioral analytics events in batches',
@@ -126,14 +100,6 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
   },
   'content-moderation': {
     description: 'Moderates user-generated content via OpenAI',
-    stage: 'Platform Ops',
-  },
-  'email-digest': {
-    description: 'Sends weekly email digests to subscribers',
-    stage: 'Platform Ops',
-  },
-  'announcements': {
-    description: 'Delivers platform announcements to users',
     stage: 'Platform Ops',
   },
   'draft-cleanup': {
@@ -184,10 +150,6 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
     description: 'Resolves place names to coordinates via gazetteers for map visuals',
     stage: 'Video Pipeline',
   },
-  'news-ingest': {
-    description: 'Fetches RSS feeds and ingests articles into the database (every 30min)',
-    stage: 'Platform Ops',
-  },
   'demo-script': {
     description: 'Generates demo video scripts from project features',
     stage: 'Video Pipeline',
@@ -228,14 +190,6 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
     description: 'Generates waveform peaks JSON and spectrogram PNG from podcast audio',
     stage: 'Audio Pipeline',
   },
-  'quiz-generation': {
-    description: 'Generates post-listen quiz questions from podcast script',
-    stage: 'Content Pipeline',
-  },
-  'briefing-scheduler': {
-    description: 'Schedules and generates daily briefing podcasts for subscribers',
-    stage: 'Content Pipeline',
-  },
   'pipeline-classification': {
     description: 'Classifies segment visuals via LLM and builds pipeline JSON for the video editor',
     stage: 'Video Pipeline',
@@ -243,5 +197,9 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
   'tts-provider-monitor': {
     description: 'Daily monitor: fetches models/voices from TTS APIs, diffs against snapshot, creates GitHub issues for changes',
     stage: 'Platform Ops',
+  },
+  'worksheet-pdf': {
+    description: 'Renders class worksheet to a print-optimized PDF via Playwright and uploads to storage',
+    stage: 'Content Pipeline',
   },
 };

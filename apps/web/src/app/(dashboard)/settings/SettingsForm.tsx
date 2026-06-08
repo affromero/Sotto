@@ -19,8 +19,6 @@ import { TtsProviderCards } from '@/components/settings/TtsProviderCards';
 import { AiProviderCards } from '@/components/settings/AiProviderCards';
 import { MusicProviderCards } from '@/components/settings/MusicProviderCards';
 import { AvatarImageManager } from '@/components/settings/AvatarImageManager';
-import { BriefingSection } from '@/components/settings/BriefingSection';
-import type { BriefingData } from '@/components/settings/BriefingCard';
 import {
   PrivateRssFeedManager,
   type PrivateFeedTokenMetadata,
@@ -76,10 +74,7 @@ interface SettingsFormProps {
   isTwitterProviderAvailable: boolean;
   initialEmailNotifications: boolean;
   initialPushNotifications: boolean;
-  briefings: BriefingData[];
   privateFeedTokens: PrivateFeedTokenMetadata[];
-  hasByokKeys: boolean;
-  initialQuizEnabled: boolean;
   quizAnswerCount: number;
   referredUsers: Array<{
     name: string | null;
@@ -125,12 +120,9 @@ export function SettingsForm({
   initialPreferredTtsModel,
   initialEmailNotifications,
   initialPushNotifications,
-  briefings,
   privateFeedTokens,
-  hasByokKeys,
-  initialQuizEnabled,
-  isTwitterProviderAvailable,
   quizAnswerCount,
+  isTwitterProviderAvailable,
   referredUsers,
   referralBonus,
   appBaseUrl,
@@ -181,7 +173,6 @@ export function SettingsForm({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [emailNotifications, setEmailNotifications] = useState(initialEmailNotifications);
   const [pushNotifications, setPushNotifications] = useState(initialPushNotifications);
-  const [quizEnabled, setQuizEnabled] = useState(initialQuizEnabled);
   const {
     pushState,
     subscribe: pushSubscribe,
@@ -763,49 +754,9 @@ export function SettingsForm({
         </div>
       </section>
 
-      {/* Daily Briefings Section */}
-      <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Daily Briefings</h2>
-        <BriefingSection
-          initialBriefings={briefings}
-          hasByokKeys={hasByokKeys}
-          aiModelOptions={aiModelOptions}
-          ttsOptions={ttsOptions}
-        />
-      </section>
-
       {/* Private RSS Feed Section */}
       <section className={styles.section}>
         <PrivateRssFeedManager initialTokens={privateFeedTokens} />
-      </section>
-
-      {/* Quizzes Section */}
-      <section className={styles.section}>
-        <div className={styles.toggleList}>
-          <label className={styles.toggleRow}>
-            <div className={styles.toggleInfo}>
-              <span className={styles.toggleLabel}>Post-Listen Quizzes</span>
-              <span className={styles.toggleDescription}>
-                Show comprehension quizzes after finishing a podcast
-              </span>
-            </div>
-            <input
-              type="checkbox"
-              className={styles.toggle}
-              checked={quizEnabled}
-              onChange={async (e) => {
-                const checked = e.target.checked;
-                setQuizEnabled(checked);
-                await fetch('/api/users/me', {
-                  method: 'PATCH',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ quizEnabled: checked }),
-                });
-              }}
-              aria-label="Toggle post-listen quizzes"
-            />
-          </label>
-        </div>
       </section>
 
       {/* Connected Accounts Section */}

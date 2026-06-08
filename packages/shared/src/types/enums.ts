@@ -25,14 +25,11 @@ export type PodcastVisibility = 'PUBLIC' | 'UNLISTED' | 'PRIVATE';
 
 export type PodcastSource =
   | 'WEB'
-  | 'TWITTER'
-  | 'TELEGRAM'
   | 'API'
   | 'AGENT'
-  | 'MEETING'
   | 'IMPORT'
   | 'ADMIN'
-  | 'BRIEFING';
+  | 'CLASS';
 
 export type Speaker = string;
 
@@ -48,30 +45,10 @@ export type ReferenceType = 'WEB' | 'PAPER' | 'BOOK' | 'ARTICLE' | 'VIDEO' | 'RE
 
 export type VerificationStatus = 'PENDING' | 'VERIFIED' | 'FAILED' | 'REPLACED' | 'REMOVED';
 
-export type TweetMentionStatus =
-  | 'PENDING'
-  | 'PARSING'
-  | 'GENERATING'
-  | 'READY'
-  | 'REPLIED'
-  | 'FAILED'
-  | 'IGNORED';
-
-export type TelegramMessageStatus =
-  | 'PENDING'
-  | 'DISCOVERING'
-  | 'GENERATING'
-  | 'READY'
-  | 'REPLIED'
-  | 'FAILED'
-  | 'IGNORED';
-
 export type NotificationType =
   | 'PODCAST_READY'
   | 'PODCAST_FAILED'
   | 'KEY_INVALID'
-  | 'TWITTER_PODCAST_READY'
-  | 'TELEGRAM_PODCAST_READY'
   | 'VOICE_REQUEST_RECEIVED'
   | 'VOICE_REQUEST_APPROVED'
   | 'VOICE_REQUEST_DENIED'
@@ -94,7 +71,6 @@ export type NotificationType =
   | 'MUSIC_FAILED'
   | 'PIPELINE_FAILURE'
   | 'REFERRAL_SIGNUP'
-  | 'BRIEFING_READY'
   | 'AVATAR_IMAGE_REQUEST_RECEIVED'
   | 'AVATAR_IMAGE_REQUEST_APPROVED'
   | 'AVATAR_IMAGE_REQUEST_DENIED'
@@ -182,4 +158,36 @@ export type MusicStatus =
   | 'READY'
   | 'FAILED';
 
-export type QuizStatus = 'GENERATING' | 'READY' | 'FAILED';
+// Language learning
+export type CefrLevel = 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2';
+
+export type LanguagePair = 'DE_FROM_EN' | 'EN_FROM_ES' | 'ES_FROM_EN';
+
+export type SkillType = 'GRAMMAR' | 'READING' | 'LISTENING' | 'SPEAKING';
+
+export type ClassStatus =
+  | 'LOCKED'
+  | 'GENERATING'
+  | 'AVAILABLE'
+  | 'IN_PROGRESS'
+  | 'SUBMITTED'
+  | 'PASSED'
+  | 'FAILED';
+
+export type SectionStatus =
+  | 'PENDING'
+  | 'GENERATING'
+  | 'READY'
+  | 'IN_PROGRESS'
+  | 'SUBMITTED'
+  | 'PASSED'
+  | 'FAILED';
+
+export type SpeakingGradeStatus = 'PENDING' | 'GRADING' | 'SCORED' | 'FAILED';
+
+export type EdgeType =
+  | 'VOCAB_VOCAB'
+  | 'VOCAB_GRAMMAR'
+  | 'VOCAB_CLASS'
+  | 'VOCAB_PODCAST'
+  | 'GRAMMAR_GRAMMAR';

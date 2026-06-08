@@ -5,19 +5,17 @@ import { authenticateRequest } from '@/lib/api-keys';
 import { cache, checkRateLimit, counters, inspireFailures } from '@/lib/redis';
 import {
   generateForYouQuestions,
-  generateNewsQuestions,
   generateCuriosityQuestions,
   loadInspireContext,
 } from '@/lib/taste-quiz';
-import type { TasteQuestion, NewsTimeRange } from '@sotto/shared';
+import type { TasteQuestion } from '@sotto/shared';
 import { getTrending } from '@/lib/recommendation-engine';
 import type { PodcastSummary } from '@/types/podcast';
 import { errorResponse } from '@/lib/api-response';
 import { logger } from '@/lib/logger';
 
 const inspireAllSchema = z.object({
-  section: z.enum(['forYou', 'news', 'curiosity', 'trending']).optional(),
-  timeRange: z.enum(['1h', '12h', '24h', '1w', '1m']).optional(),
+  section: z.enum(['forYou', 'curiosity', 'trending']).optional(),
   topic: z.string().max(50).optional(),
   model: z.string().optional(),
 });
@@ -39,28 +37,25 @@ function sanitizeTopic(raw: string): string {
 // Cache TTLs in seconds
 // Hard TTL: how long data stays in Redis. Soft TTL: after this, serve stale + regen in background.
 // forYou/curiosity: interests don't change fast, stale content is fine.
-// news: needs freshness. trending: DB-backed, cheap to regen.
+// trending: DB-backed, cheap to regen.
 const CACHE_TTL = {
   forYou: 14400, // 4h
-  news: 5400, // 90 min
   trending: 1800, // 30 min (global, DB-backed)
   curiosity: 14400, // 4h
 } as const;
 
 const SOFT_TTL = {
   forYou: 3600, // 60 min
-  news: 900, // 15 min
   trending: 600, // 10 min
   curiosity: 3600, // 60 min
 } as const;
 
-type Section = 'forYou' | 'trending' | 'news' | 'curiosity';
+type Section = 'forYou' | 'trending' | 'curiosity';
 
-function cacheKey(section: Section, userId: string, topic?: string, timeRange?: string): string {
+function cacheKey(section: Section, userId: string, topic?: string): string {
   if (section === 'trending') return 'inspire:trending';
   const topicHash = topic ? createHash('md5').update(topic).digest('hex').slice(0, 8) : '_';
-  const suffix = section === 'news' && timeRange ? `:${timeRange}` : '';
-  return `inspire:${section}:${userId}:${topicHash}${suffix}`;
+  return `inspire:${section}:${userId}:${topicHash}`;
 }
 
 function cacheTtl(section: Section): number {
@@ -124,7 +119,7 @@ function mapTrendingToPodcastSummary(
  * Returns all three Inspire Me sections.
  *
  * Full fetch (no ?section=): returns SSE stream with progressive loading.
- * Single-section refresh (?section=forYou|news): returns JSON, bypasses cache read.
+ * Single-section refresh (?section=forYou|curiosity|trending): returns JSON, bypasses cache read.
  */
 export async function GET(request: NextRequest) {
   const authResult = await authenticateRequest(request);
@@ -138,8 +133,7 @@ export async function GET(request: NextRequest) {
     return errorResponse(validation.error.errors[0].message, 400);
   }
 
-  const { section, timeRange, topic, model } = validation.data;
-  const newsTimeRange: NewsTimeRange = timeRange ?? '1w';
+  const { section, topic, model } = validation.data;
   const topicHint = topic ? sanitizeTopic(topic) || undefined : undefined;
   const userId = authResult.userId;
 
@@ -155,15 +149,6 @@ export async function GET(request: NextRequest) {
       if (forYou.length === 0) trackEmptyResult('forYou');
       await cacheIfNonEmpty(cacheKey('forYou', userId, topicHint), forYou, CACHE_TTL.forYou);
       return new Response(JSON.stringify({ forYou }), {
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
-
-    if (section === 'news') {
-      const news = await generateNewsQuestions(userId, 6, [], newsTimeRange, topicHint, undefined, model);
-      if (news.length === 0) trackEmptyResult('news');
-      await cacheIfNonEmpty(cacheKey('news', userId, topicHint, newsTimeRange), news, CACHE_TTL.news);
-      return new Response(JSON.stringify({ news }), {
         headers: { 'Content-Type': 'application/json' },
       });
     }
@@ -191,26 +176,23 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // Full fetch — check cache for all 4 sections in parallel (with TTL for staleness detection)
+  // Full fetch — check cache for all 3 sections in parallel (with TTL for staleness detection)
   // nonEmpty() treats cached [] as a cache miss so stale empties trigger regeneration
-  const [forYouResult, trendingResult, newsResult, curiosityResult] = await Promise.all([
+  const [forYouResult, trendingResult, curiosityResult] = await Promise.all([
     cache.getWithTtl<TasteQuestion[]>(cacheKey('forYou', userId, topicHint)),
     cache.getWithTtl<PodcastSummary[]>(cacheKey('trending', userId)),
-    cache.getWithTtl<TasteQuestion[]>(cacheKey('news', userId, topicHint, newsTimeRange)),
     cache.getWithTtl<TasteQuestion[]>(cacheKey('curiosity', userId, topicHint)),
   ]);
 
   const cachedForYou = nonEmpty(forYouResult.value);
   const cachedTrending = nonEmpty(trendingResult.value);
-  const cachedNews = nonEmpty(newsResult.value);
   const cachedCuriosity = nonEmpty(curiosityResult.value);
 
-  const allCached = cachedForYou !== null && cachedTrending !== null && cachedNews !== null && cachedCuriosity !== null;
+  const allCached = cachedForYou !== null && cachedTrending !== null && cachedCuriosity !== null;
 
   // Track cache metrics per section
   trackCacheMetric('forYou', cachedForYou !== null);
   trackCacheMetric('trending', cachedTrending !== null);
-  trackCacheMetric('news', cachedNews !== null);
   trackCacheMetric('curiosity', cachedCuriosity !== null);
 
   // All cached — return immediately, skip rate limit
@@ -220,12 +202,11 @@ export async function GET(request: NextRequest) {
     const isStale = (ttl: number, section: Section) => ttl >= 0 && ttl < CACHE_TTL[section] - SOFT_TTL[section];
     if (isStale(forYouResult.ttl, 'forYou')) staleSections.push('forYou');
     if (isStale(trendingResult.ttl, 'trending')) staleSections.push('trending');
-    if (isStale(newsResult.ttl, 'news')) staleSections.push('news');
     if (isStale(curiosityResult.ttl, 'curiosity')) staleSections.push('curiosity');
 
     if (staleSections.length > 0) {
       logger.debug('Inspire: serving stale cache, regenerating in background', { staleSections });
-      regenInBackground(userId, staleSections, topicHint, newsTimeRange, model);
+      regenInBackground(userId, staleSections, topicHint, model);
     } else {
       logger.debug('Inspire: all sections fresh, returning immediately');
     }
@@ -233,7 +214,6 @@ export async function GET(request: NextRequest) {
     return new Response(JSON.stringify({
       forYou: cachedForYou,
       trending: cachedTrending,
-      news: cachedNews,
       curiosity: cachedCuriosity,
     }), {
       headers: { 'Content-Type': 'application/json' },
@@ -247,7 +227,6 @@ export async function GET(request: NextRequest) {
       JSON.stringify({
         forYou: cachedForYou ?? [],
         trending: cachedTrending ?? [],
-        news: cachedNews ?? [],
         curiosity: cachedCuriosity ?? [],
         error: 'Rate limit exceeded. Try again later.',
         resetAt: rateLimit.resetAt,
@@ -267,7 +246,7 @@ export async function GET(request: NextRequest) {
       // Load shared context once for generators
       const ctxPromise = loadInspireContext(userId, { model });
 
-      // Fire all 4 sections in parallel
+      // Fire all 3 sections in parallel
       const results = await Promise.allSettled([
         // Trending
         (async () => {
@@ -299,19 +278,6 @@ export async function GET(request: NextRequest) {
           send({ section: 'forYou', data: forYou });
         })(),
 
-        // News
-        (async () => {
-          if (cachedNews !== null) {
-            send({ section: 'news', data: cachedNews });
-            return;
-          }
-          const ctx = await ctxPromise;
-          const news = await generateNewsQuestions(userId, 6, [], newsTimeRange, topicHint, ctx, model);
-          if (news.length === 0) trackEmptyResult('news');
-          await cacheIfNonEmpty(cacheKey('news', userId, topicHint, newsTimeRange), news, CACHE_TTL.news);
-          send({ section: 'news', data: news });
-        })(),
-
         // Curiosity
         (async () => {
           if (cachedCuriosity !== null) {
@@ -327,7 +293,7 @@ export async function GET(request: NextRequest) {
       ]);
 
       // Log any failures and track error metrics
-      const sectionNames: Section[] = ['trending', 'forYou', 'news', 'curiosity'];
+      const sectionNames: Section[] = ['trending', 'forYou', 'curiosity'];
       for (let i = 0; i < results.length; i++) {
         const result = results[i];
         if (result.status === 'rejected') {
@@ -364,7 +330,6 @@ function regenInBackground(
   userId: string,
   sections: Section[],
   topicHint: string | undefined,
-  newsTimeRange: NewsTimeRange,
   model: string | undefined
 ): void {
   (async () => {
@@ -376,12 +341,6 @@ function regenInBackground(
             const data = await generateForYouQuestions(userId, 6, topicHint, ctx, model);
             if (data.length === 0) trackEmptyResult('forYou');
             await cacheIfNonEmpty(cacheKey('forYou', userId, topicHint), data, CACHE_TTL.forYou);
-            break;
-          }
-          case 'news': {
-            const data = await generateNewsQuestions(userId, 6, [], newsTimeRange, topicHint, ctx, model);
-            if (data.length === 0) trackEmptyResult('news');
-            await cacheIfNonEmpty(cacheKey('news', userId, topicHint, newsTimeRange), data, CACHE_TTL.news);
             break;
           }
           case 'curiosity': {

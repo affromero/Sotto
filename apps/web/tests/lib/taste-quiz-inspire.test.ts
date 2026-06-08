@@ -54,15 +54,7 @@ vi.mock('@/lib/redis', () => ({
   inspireFailures: { push: vi.fn().mockResolvedValue(undefined) },
 }));
 
-const mockFetchNewsletterArticles = vi.fn();
-const mockFormatArticlesForPrompt = vi.fn();
-
-vi.mock('@/lib/newsletter-fetcher', () => ({
-  fetchNewsletterArticles: (...args: unknown[]) => mockFetchNewsletterArticles(...args),
-  formatArticlesForPrompt: (...args: unknown[]) => mockFormatArticlesForPrompt(...args),
-}));
-
-import { generateForYouQuestions, generateNewsQuestions, generateCuriosityQuestions } from '@/lib/taste-quiz';
+import { generateForYouQuestions, generateCuriosityQuestions } from '@/lib/taste-quiz';
 
 // ---- Helpers ----
 
@@ -95,9 +87,6 @@ function setupDefaultMocks() {
     if (provider === 'anthropic') return { provider: 'anthropic', apiKey: 'anthropic-key' };
     return { provider: 'anthropic', apiKey: 'anthropic-key' };
   });
-  // Default: no newsletter articles, falls back to web search path
-  mockFetchNewsletterArticles.mockResolvedValue([]);
-  mockFormatArticlesForPrompt.mockReturnValue('');
 }
 
 function createMockAI(responseContent: string) {
@@ -213,146 +202,6 @@ describe('generateForYouQuestions', () => {
     const result = await generateForYouQuestions('user-1', 1, undefined, undefined, 'llama-3.1-8b-instant');
 
     expect(result).toEqual([]);
-  });
-});
-
-describe('generateNewsQuestions', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    setupDefaultMocks();
-  });
-
-  it('uses web search when provider is anthropic', async () => {
-    mockGetAiKey.mockResolvedValue({
-      provider: 'anthropic',
-      apiKey: 'test-key',
-    });
-
-    // Mock Anthropic SDK
-    const mockCreate = vi.fn().mockResolvedValue({
-      content: [
-        { type: 'text', text: JSON.stringify([
-          { text: 'Latest Mars discovery this week', tagSlugs: ['science'], category: 'science' },
-        ])},
-      ],
-      usage: { input_tokens: 100, output_tokens: 50 },
-    });
-
-    vi.doMock('@anthropic-ai/sdk', () => ({
-      default: class {
-        messages = { create: mockCreate };
-      },
-    }));
-
-    // Re-import to pick up new mock... but since we can't easily, test the provider path
-    mockGetAiKey.mockResolvedValue({
-      provider: 'openai',
-      apiKey: 'sk-test',
-    });
-
-    const questions = JSON.stringify([
-      { text: 'Breaking news about physics', tagSlugs: ['physics'], category: 'science' },
-    ]);
-    mockCreateAIProvider.mockReturnValue(createMockAI(questions));
-
-    const result = await generateNewsQuestions('user-1', 1);
-
-    expect(result).toHaveLength(1);
-    expect(mockGetAiKey).toHaveBeenCalledWith('user-1');
-  });
-
-  it('excludes provided topics in the prompt', async () => {
-    // Resolve with no apiKey so it falls through to createAIProvider path
-    mockGetAiKey.mockResolvedValue({
-      provider: 'openai',
-      apiKey: '',
-    });
-    delete process.env.ANTHROPIC_API_KEY;
-
-    const ai = createMockAI(JSON.stringify([
-      { text: 'News question', tagSlugs: ['science'], category: 'science' },
-    ]));
-    mockCreateAIProvider.mockReturnValue(ai);
-
-    await generateNewsQuestions('user-1', 1, ['AI in cooking', 'Psychology of music']);
-
-    // The system prompt should contain the exclude topics
-    const call = ai.generateResponse.mock.calls[0];
-    expect(call[0]).toContain('AI in cooking');
-    expect(call[0]).toContain('Psychology of music');
-  });
-
-  it('returns empty array on AI failure', async () => {
-    mockCreateAIProvider.mockReturnValue({
-      generateResponse: vi.fn().mockRejectedValue(new Error('API down')),
-    });
-
-    const result = await generateNewsQuestions('user-1', 3);
-    expect(result).toEqual([]);
-  });
-
-  it('uses newsletter-grounded path when 3+ articles available', async () => {
-    const mockArticles = [
-      { title: 'Article 1', url: 'https://a.com', summary: 'Summary 1', pubDate: '2026-02-27', source: 'Reuters' },
-      { title: 'Article 2', url: 'https://b.com', summary: 'Summary 2', pubDate: '2026-02-26', source: 'NPR' },
-      { title: 'Article 3', url: 'https://c.com', summary: 'Summary 3', pubDate: '2026-02-25', source: 'BBC' },
-    ];
-    mockFetchNewsletterArticles.mockResolvedValue(mockArticles);
-    mockFormatArticlesForPrompt.mockReturnValue('[1] Reuters — "Article 1"\n[2] NPR — "Article 2"\n[3] BBC — "Article 3"');
-
-    // Falls through to auto model config since getAiKey returns null by default
-    mockGetAiKey.mockResolvedValue({ provider: 'openai', apiKey: '' });
-    delete process.env.ANTHROPIC_API_KEY;
-
-    const ai = createMockAI(JSON.stringify([
-      { text: 'News from newsletters', tagSlugs: ['science'], category: 'science', sourceUrl: 'https://a.com', sourceName: 'Reuters' },
-    ]));
-    mockCreateAIProvider.mockReturnValue(ai);
-
-    const result = await generateNewsQuestions('user-1', 1);
-
-    expect(result).toHaveLength(1);
-    expect(result[0].sourceUrl).toBe('https://a.com');
-    expect(result[0].sourceName).toBe('Reuters');
-    expect(mockFetchNewsletterArticles).toHaveBeenCalledWith('1w');
-    expect(mockFormatArticlesForPrompt).toHaveBeenCalledWith(mockArticles);
-  });
-
-  it('falls back to web search when fewer than 3 articles', async () => {
-    mockFetchNewsletterArticles.mockResolvedValue([
-      { title: 'Only One', url: 'https://a.com', summary: 'Solo', pubDate: '2026-02-27', source: 'Reuters' },
-    ]);
-
-    mockGetAiKey.mockResolvedValue({ provider: 'openai', apiKey: '' });
-    delete process.env.ANTHROPIC_API_KEY;
-
-    const ai = createMockAI(JSON.stringify([
-      { text: 'Web search news', tagSlugs: ['science'], category: 'science' },
-    ]));
-    mockCreateAIProvider.mockReturnValue(ai);
-
-    const result = await generateNewsQuestions('user-1', 1);
-
-    expect(result).toHaveLength(1);
-    // formatArticlesForPrompt should NOT be called when < 3 articles
-    expect(mockFormatArticlesForPrompt).not.toHaveBeenCalled();
-  });
-
-  it('falls back to web search when fetchNewsletterArticles fails', async () => {
-    mockFetchNewsletterArticles.mockRejectedValue(new Error('Fetch failed'));
-
-    mockGetAiKey.mockResolvedValue({ provider: 'openai', apiKey: '' });
-    delete process.env.ANTHROPIC_API_KEY;
-
-    const ai = createMockAI(JSON.stringify([
-      { text: 'Fallback news', tagSlugs: ['technology'], category: 'technology' },
-    ]));
-    mockCreateAIProvider.mockReturnValue(ai);
-
-    const result = await generateNewsQuestions('user-1', 1);
-
-    expect(result).toHaveLength(1);
-    expect(mockFormatArticlesForPrompt).not.toHaveBeenCalled();
   });
 });
 

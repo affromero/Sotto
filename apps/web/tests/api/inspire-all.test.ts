@@ -130,12 +130,11 @@ describe('GET /api/inspire/all', () => {
 
   it('returns all cached sections as JSON when all hit', async () => {
     const cachedTrending = [{ id: 'pod-1', title: 'Top Pod' }];
-    // Return cached values for all 4 — TTLs above per-section stale thresholds (hard - soft)
-    // forYou: 14400-3600=10800, trending: 1800-600=1200, news: 5400-900=4500, curiosity: 14400-3600=10800
+    // Return cached values for all 3 — TTLs above per-section stale thresholds (hard - soft)
+    // forYou: 14400-3600=10800, trending: 1800-600=1200, curiosity: 14400-3600=10800
     mockCacheGetWithTtl
       .mockResolvedValueOnce({ value: mockForYou, ttl: 13000 }) // forYou (fresh)
       .mockResolvedValueOnce({ value: cachedTrending, ttl: 1500 }) // trending (fresh)
-      .mockResolvedValueOnce({ value: mockNews, ttl: 5000 }) // news (fresh)
       .mockResolvedValueOnce({ value: mockCuriosity, ttl: 13000 }); // curiosity (fresh)
 
     const res = await GET(createRequest());
@@ -145,11 +144,11 @@ describe('GET /api/inspire/all', () => {
     expect(res.headers.get('content-type')).toContain('application/json');
     expect(body.forYou).toEqual(mockForYou);
     expect(body.trending).toEqual(cachedTrending);
-    expect(body.news).toEqual(mockNews);
     expect(body.curiosity).toEqual(mockCuriosity);
+    expect(body.news).toBeUndefined();
   });
 
-  it('returns SSE stream with 4 sections on cache miss', async () => {
+  it('returns SSE stream with 3 sections on cache miss', async () => {
     const res = await GET(createRequest());
 
     expect(res.headers.get('content-type')).toBe('text/event-stream');
@@ -159,8 +158,8 @@ describe('GET /api/inspire/all', () => {
 
     expect(sectionNames).toContain('trending');
     expect(sectionNames).toContain('forYou');
-    expect(sectionNames).toContain('news');
     expect(sectionNames).toContain('curiosity');
+    expect(sectionNames).not.toContain('news');
     expect(events[events.length - 1]).toEqual({ done: true });
   });
 
@@ -177,15 +176,6 @@ describe('GET /api/inspire/all', () => {
     expect(body.forYou).toEqual(mockForYou);
     expect(body.trending).toBeUndefined();
     expect(body.news).toBeUndefined();
-  });
-
-  it('returns only news when section=news', async () => {
-    const res = await GET(createRequest({ section: 'news' }));
-    const body = await res.json();
-
-    expect(body.news).toEqual(mockNews);
-    expect(body.forYou).toBeUndefined();
-    expect(body.trending).toBeUndefined();
   });
 
   it('caches single-section refresh results', async () => {

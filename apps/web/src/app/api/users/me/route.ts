@@ -32,34 +32,6 @@ const updateUserSchema = z
     preferredAiModel: z.string().nullable().optional(),
     emailNotifications: z.boolean().optional(),
     pushNotifications: z.boolean().optional(),
-    briefingEnabled: z.boolean().optional(),
-    briefingTime: z
-      .string()
-      .regex(/^\d{2}:\d{2}$/)
-      .nullable()
-      .optional(),
-    briefingTimezone: z.string().max(50).nullable().optional(),
-    briefingDays: z.number().int().min(0).max(127).optional(),
-    briefingVisibility: z.enum(['PUBLIC', 'UNLISTED', 'PRIVATE']).optional(),
-    briefingAiModel: z.string().nullable().optional(),
-    briefingTtsProvider: z.string().nullable().optional(),
-    briefingTtsModel: z.string().nullable().optional(),
-    briefingHostVoiceId: z.string().nullable().optional(),
-    briefingExpertVoiceId: z.string().nullable().optional(),
-    briefingDepth: z
-      .enum(['eli5', 'quick_overview', 'standard', 'deep_dive'])
-      .nullable()
-      .optional(),
-    briefingTone: z
-      .enum(['casual', 'professional', 'socratic', 'comedic', 'satirical', 'storytelling'])
-      .nullable()
-      .optional(),
-    briefingAudienceLevel: z.enum(['beginner', 'intermediate', 'expert']).nullable().optional(),
-    briefingDuration: z.number().int().min(1).max(40).nullable().optional(),
-    briefingFormat: z.number().int().min(1).max(4).optional(),
-    briefingPrompt: z.string().max(2000).nullable().optional(),
-    briefingUseByokKeys: z.boolean().optional(),
-    quizEnabled: z.boolean().optional(),
     interests: z.array(z.string()).max(20).optional(),
     customTags: z.array(customTagSchema).max(10).optional(),
   })
@@ -101,23 +73,6 @@ export async function GET(request: NextRequest) {
       voicePreferences: user.voicePreferences,
       preferredLanguage: user.preferredLanguage,
       preferredAiModel: user.preferredAiModel,
-      briefingEnabled: user.briefingEnabled,
-      briefingTime: user.briefingTime,
-      briefingTimezone: user.briefingTimezone,
-      briefingDays: user.briefingDays,
-      briefingVisibility: user.briefingVisibility,
-      briefingAiModel: user.briefingAiModel,
-      briefingTtsProvider: user.briefingTtsProvider,
-      briefingTtsModel: user.briefingTtsModel,
-      briefingHostVoiceId: user.briefingHostVoiceId,
-      briefingExpertVoiceId: user.briefingExpertVoiceId,
-      briefingDepth: user.briefingDepth,
-      briefingTone: user.briefingTone,
-      briefingAudienceLevel: user.briefingAudienceLevel,
-      briefingDuration: user.briefingDuration,
-      briefingFormat: user.briefingFormat,
-      briefingPrompt: user.briefingPrompt,
-      briefingUseByokKeys: user.briefingUseByokKeys,
     });
   } catch (error: unknown) {
     logger.error('Failed to fetch user', {
@@ -147,7 +102,6 @@ export async function PATCH(request: NextRequest) {
       handle,
       voicePreferences,
       preferredAiModel,
-      briefingAiModel,
       ...data
     } = validation.data;
 
@@ -167,19 +121,6 @@ export async function PATCH(request: NextRequest) {
       (data as Record<string, unknown>).preferredAiProvider = preferredAiModel
         ? (getProviderForModel(preferredAiModel) ?? null)
         : null;
-    }
-
-    // Validate briefingAiModel against registry
-    if (briefingAiModel && !briefingAiModel.startsWith('claude-code:')) {
-      if (!isValidModelId(briefingAiModel)) {
-        return errorResponse(
-          `Unknown AI model: "${briefingAiModel}". Check /api/ai-models for available models.`,
-          400
-        );
-      }
-    }
-    if (briefingAiModel !== undefined) {
-      (data as Record<string, unknown>).briefingAiModel = briefingAiModel;
     }
 
     // Validate handle availability if changing it
@@ -308,23 +249,6 @@ export async function PATCH(request: NextRequest) {
       voicePreferences: updatedUser.voicePreferences,
       preferredLanguage: updatedUser.preferredLanguage,
       preferredAiModel: updatedUser.preferredAiModel,
-      briefingEnabled: updatedUser.briefingEnabled,
-      briefingTime: updatedUser.briefingTime,
-      briefingTimezone: updatedUser.briefingTimezone,
-      briefingDays: updatedUser.briefingDays,
-      briefingVisibility: updatedUser.briefingVisibility,
-      briefingAiModel: updatedUser.briefingAiModel,
-      briefingTtsProvider: updatedUser.briefingTtsProvider,
-      briefingTtsModel: updatedUser.briefingTtsModel,
-      briefingHostVoiceId: updatedUser.briefingHostVoiceId,
-      briefingExpertVoiceId: updatedUser.briefingExpertVoiceId,
-      briefingDepth: updatedUser.briefingDepth,
-      briefingTone: updatedUser.briefingTone,
-      briefingAudienceLevel: updatedUser.briefingAudienceLevel,
-      briefingDuration: updatedUser.briefingDuration,
-      briefingFormat: updatedUser.briefingFormat,
-      briefingPrompt: updatedUser.briefingPrompt,
-      briefingUseByokKeys: updatedUser.briefingUseByokKeys,
     });
   } catch (error: unknown) {
     logger.error('Failed to update user', {

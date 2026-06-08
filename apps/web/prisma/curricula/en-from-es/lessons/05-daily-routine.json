@@ -1,0 +1,21 @@
+{
+  "slug": "a1-daily-routine",
+  "level": "A1",
+  "order": 5,
+  "title": "Daily routine and time",
+  "objective": "The learner can describe their daily routine and say what time activities happen using the simple present tense.",
+  "grammarPoints": ["simple-present-tense", "adverbs-of-frequency", "telling-the-time"],
+  "vocabThemes": ["daily-routine", "time-expressions"],
+  "targetVocab": [
+    { "lemma": "wake up", "gloss": "despertarse", "pos": "verb" },
+    { "lemma": "have breakfast", "gloss": "desayunar / tomar el desayuno", "pos": "phrase" },
+    { "lemma": "go to work", "gloss": "ir al trabajo", "pos": "phrase" },
+    { "lemma": "in the morning", "gloss": "por la mañana", "pos": "phrase" },
+    { "lemma": "at night", "gloss": "por la noche", "pos": "phrase" },
+    { "lemma": "always", "gloss": "siempre", "pos": "adverb" },
+    { "lemma": "sometimes", "gloss": "a veces", "pos": "adverb" },
+    { "lemma": "never", "gloss": "nunca", "pos": "adverb" }
+  ],
+  "canDoSummary": "Can describe a typical day and say at what time things happen using simple present tense.",
+  "estMinutes": 60
+}

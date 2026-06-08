@@ -1,0 +1,21 @@
+{
+  "slug": "a1-nouns-articles-gender",
+  "level": "A1",
+  "order": 3,
+  "title": "Nouns, articles, and gender",
+  "objective": "Identify masculine and feminine nouns, use definite and indefinite articles correctly, and form simple noun phrases.",
+  "grammarPoints": ["grammatical-gender", "definite-articles-el-la", "indefinite-articles-un-una", "noun-plural-formation"],
+  "vocabThemes": ["everyday-objects", "places"],
+  "targetVocab": [
+    { "lemma": "el libro", "gloss": "the book", "pos": "noun" },
+    { "lemma": "la mesa", "gloss": "the table", "pos": "noun" },
+    { "lemma": "un bolígrafo", "gloss": "a pen", "pos": "noun" },
+    { "lemma": "una silla", "gloss": "a chair", "pos": "noun" },
+    { "lemma": "el café", "gloss": "the café / coffee", "pos": "noun" },
+    { "lemma": "la ciudad", "gloss": "the city", "pos": "noun" },
+    { "lemma": "los libros", "gloss": "the books", "pos": "noun" },
+    { "lemma": "las mesas", "gloss": "the tables", "pos": "noun" }
+  ],
+  "canDoSummary": "Can use basic nouns with correct articles and form simple noun phrases with proper gender agreement.",
+  "estMinutes": 60
+}

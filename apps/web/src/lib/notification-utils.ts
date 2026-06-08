@@ -2,11 +2,8 @@ import type { NotificationData } from '@/types/notification';
 
 const PIPELINE_SUCCESS_TYPES = new Set([
   'PODCAST_READY',
-  'TWITTER_PODCAST_READY',
-  'TELEGRAM_PODCAST_READY',
   'SCRIPT_READY',
   'VIDEO_READY',
-  'BRIEFING_READY',
   'MUSIC_READY',
 ]);
 
@@ -41,13 +38,10 @@ export function getNotificationUrl(notification: NotificationData): string | nul
   switch (notification.type) {
     // Podcast-centric
     case 'PODCAST_READY':
-    case 'TWITTER_PODCAST_READY':
-    case 'TELEGRAM_PODCAST_READY':
     case 'PODCAST_FAILED':
     case 'SCRIPT_READY':
     case 'VIDEO_READY':
     case 'VIDEO_FAILED':
-    case 'BRIEFING_READY':
     case 'MUSIC_READY':
     case 'MUSIC_FAILED':
     case 'AVATAR_FAILED':

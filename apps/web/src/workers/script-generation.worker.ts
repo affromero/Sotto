@@ -119,51 +119,6 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
     ? requestedSpeakers.slice(0, tierFeatures.maxSpeakers)
     : requestedSpeakers;
 
-  // Fetch previous episode context and language mode for continuous learning briefings
-  let previousEpisodesContext: string | undefined;
-  let briefingLanguageMode: string | null = null;
-  if (podcast.source === 'BRIEFING') {
-    const briefingLog = await prisma.briefingLog.findFirst({
-      where: { podcastId },
-      select: { userBriefingId: true },
-    });
-    if (briefingLog?.userBriefingId) {
-      const briefing = await prisma.userBriefing.findUnique({
-        where: { id: briefingLog.userBriefingId },
-        select: { continuousLearning: true, contextEpisodes: true, languageMode: true },
-      });
-      briefingLanguageMode = briefing?.languageMode ?? null;
-      if (briefing?.continuousLearning) {
-        const priorLogs = await prisma.briefingLog.findMany({
-          where: {
-            userBriefingId: briefingLog.userBriefingId,
-            podcastId: { not: podcastId },
-          },
-          orderBy: { generatedAt: 'desc' },
-          take: briefing.contextEpisodes,
-          select: {
-            scheduledDate: true,
-            podcast: {
-              select: {
-                script: { select: { markdown: true } },
-              },
-            },
-          },
-        });
-        const episodeSummaries = priorLogs
-          .filter((log) => log.podcast.script?.markdown)
-          .map((log) => `[Episode ${log.scheduledDate}]\n${log.podcast.script!.markdown}`);
-        if (episodeSummaries.length > 0) {
-          previousEpisodesContext = episodeSummaries.join('\n\n---\n\n');
-          logger.info('Continuous learning context loaded', {
-            podcastId,
-            priorEpisodes: String(episodeSummaries.length),
-          });
-        }
-      }
-    }
-  }
-
   const hasUserFeedback = job.data.userFeedback && job.data.previousTurns;
 
   const result = hasUserFeedback
@@ -203,9 +158,7 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
         webSearchEnabled: tierFeatures.webSearchEnabled,
         mode: podcast.verificationMode === 'showcase' ? 'demo' : 'standard',
         source: podcast.source,
-        previousEpisodesContext,
         targetLanguage: podcast.language,
-        languageMode: briefingLanguageMode,
       });
 
   await job.updateProgress(50);

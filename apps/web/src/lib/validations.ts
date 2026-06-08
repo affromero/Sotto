@@ -207,47 +207,6 @@ export const agentIngestionSchema = z
   })
   .strict();
 
-const meetingParticipantSchema = z
-  .object({
-    name: z.string().trim().min(1).max(120),
-    email: z.string().trim().email().optional(),
-    role: z.string().trim().min(1).max(80).optional(),
-  })
-  .strict();
-
-/**
- * Private meeting transcript ingestion. Recorders can send transcripts here
- * after STT/diarization without exposing meeting contents outside the owner.
- */
-export const meetingIngestionSchema = z
-  .object({
-    title: z.string().trim().min(1).max(200),
-    topic: z.string().trim().min(1).max(5000).optional(),
-    transcript: z.string().trim().min(1).max(160000),
-    idempotencyKey: z
-      .string()
-      .trim()
-      .min(1)
-      .max(200)
-      .regex(/^[A-Za-z0-9._:-]+$/)
-      .optional(),
-    meetingUrl: z.string().url().optional(),
-    platform: z.string().trim().min(1).max(80).optional(),
-    startedAt: z.string().datetime().optional(),
-    endedAt: z.string().datetime().optional(),
-    participants: z.array(meetingParticipantSchema).max(100).optional(),
-    actionItems: z.array(z.string().trim().min(1).max(500)).max(100).optional(),
-    durationTarget: z.number().int().min(1).max(40).optional(),
-    depth: z.enum(['eli5', 'quick_overview', 'standard', 'deep_dive']).optional(),
-    audienceLevel: z.enum(['beginner', 'intermediate', 'expert', 'general']).optional(),
-    tone: z.string().trim().min(1).max(80).optional(),
-    focusAreas: z.array(z.string().trim().min(1).max(80)).max(12).optional(),
-    aiModel: z.string().trim().min(1).max(160).optional(),
-    ttsProvider: explicitTtsProviderSchema,
-    ttsModel: z.string().trim().min(1).max(120).optional(),
-  })
-  .strict();
-
 /**
  * Script turn update validation
  */
@@ -394,25 +353,6 @@ export const adminWaitlistActionSchema = z.object({
 
 export const adminWaitlistDeleteSchema = z.object({
   id: z.string(),
-});
-
-/**
- * Twitter settings validation
- */
-export const twitterSettingsSchema = z.object({
-  twitterEnabled: z.boolean().optional(),
-  voicePreferences: z
-    .array(
-      z.object({
-        speaker: z.string().min(1).max(50),
-        voiceId: z.string().min(1),
-      })
-    )
-    .optional(),
-  preferredTtsProvider: z.string().nullable().optional(),
-  preferredTtsModel: z.string().nullable().optional(),
-  preferredAiProvider: z.string().nullable().optional(),
-  preferredAiModel: z.string().nullable().optional(),
 });
 
 /**
@@ -604,13 +544,6 @@ export const deleteAccountSchema = z.object({
 });
 
 /**
- * Telegram account linking validation
- */
-export const telegramConnectSchema = z.object({
-  code: z.string().min(1),
-});
-
-/**
  * User discovery search validation
  */
 export const userDiscoverySearchSchema = z.object({
@@ -727,30 +660,6 @@ export const moderateUserSchema = z.object({
 });
 
 /**
- * Twitter config update validation (admin)
- */
-export const twitterConfigUpdateSchema = z.object({
-  autoTweetEnabled: z.boolean().optional(),
-  minPlays: z.number().int().min(1).max(100000).optional(),
-  mentionPollIntervalMs: z.number().int().min(10000).max(600000).optional(),
-  trendPollingEnabled: z.boolean().optional(),
-  trendPollIntervalMs: z.number().int().min(300000).max(86400000).optional(),
-  maxTrendPodcastsPerDay: z.number().int().min(1).max(20).optional(),
-  trendSearchQueries: z.array(z.string().min(1).max(100)).min(1).max(20).optional(),
-  tweetTemplate: z.string().min(10).max(500).optional(),
-  defaultAiModel: z.string().max(100).nullable().optional(),
-  defaultTtsProvider: z.string().max(100).nullable().optional(),
-  defaultTtsModel: z.string().max(100).nullable().optional(),
-});
-
-/**
- * Manual tweet validation (admin)
- */
-export const manualTweetSchema = z.object({
-  podcastId: z.string().min(1),
-});
-
-/**
  * Landing showcase config update validation (admin)
  */
 export const landingShowcaseUpdateSchema = z
@@ -771,51 +680,10 @@ export const landingShowcaseUpdateSchema = z
   .strict();
 
 /**
- * Thread-to-podcast validation (admin)
- */
-export const threadToPodcastSchema = z.object({
-  tweetUrl: z
-    .string()
-    .url()
-    .regex(/(?:twitter\.com|x\.com)\/\w+\/status\/\d+/),
-  message: z.string().max(1000).optional(),
-});
-
-/**
  * Referral attribution validation
  */
 export const referralSchema = z.object({
   handle: z.string().min(3).max(30),
-});
-
-/**
- * Mentions list validation (admin GET)
- */
-export const mentionsQuerySchema = z.object({
-  status: z
-    .enum(['PENDING', 'PARSING', 'GENERATING', 'READY', 'REPLIED', 'FAILED', 'IGNORED'])
-    .optional(),
-  search: z.string().max(200).optional(),
-  page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(20),
-});
-
-/**
- * Trend filter validation (admin GET)
- */
-export const trendFilterSchema = z.object({
-  lang: z.string().min(2).max(5).optional(),
-  verified: z.coerce.boolean().optional(),
-  minEngagement: z.coerce.number().int().min(0).optional(),
-  maxPerQuery: z.coerce.number().int().min(10).max(100).optional(),
-});
-
-/**
- * Trend generate validation (admin POST)
- */
-export const trendGenerateSchema = z.object({
-  tweetText: z.string().min(1).max(5000),
-  tweetId: z.string().optional(),
 });
 
 /**

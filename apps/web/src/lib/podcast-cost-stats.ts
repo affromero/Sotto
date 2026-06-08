@@ -11,7 +11,6 @@ export const CATEGORY_BUCKET_MAP: Record<string, CostBucket> = {
   voice_assignment: 'text',
   'tts-tag-conversion': 'text',
   interaction: 'text',
-  'quiz-generation': 'text',
   discovery: 'text',
   language_detection: 'text',
   handle_screening: 'text',

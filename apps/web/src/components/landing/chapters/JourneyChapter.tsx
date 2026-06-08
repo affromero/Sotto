@@ -8,11 +8,12 @@ interface JourneyChapterProps {
 }
 
 const FEATURES = [
-  'Generate private RSS feeds for any podcast app',
-  'Import from Spotify, YouTube, Apple Podcasts, or audio files',
-  'Ask follow-up questions mid-playback',
-  'Daily briefings and comprehension quizzes',
-  'Generate video with AI illustrations, maps, avatars',
+  'Mastery-gated CEFR courses across grammar, reading, listening, and speaking',
+  'Adaptive listening lessons built around your topics and interests',
+  'Pronunciation feedback with speaking exercises',
+  'Personal vocabulary memory graph with spaced-repetition review',
+  'Connect Claude Code, Codex, or any local agent via MCP',
+  'Self-host on your own stack with your own keys and data',
 ];
 
 export function JourneyChapter({ showcase }: JourneyChapterProps) {
@@ -25,7 +26,7 @@ export function JourneyChapter({ showcase }: JourneyChapterProps) {
       <div className={styles.root}>
         <div className={styles.header} data-reveal>
           <span className={styles.overline}>How it works</span>
-          <h2 className={styles.heading}>Two steps. One incredible podcast.</h2>
+          <h2 className={styles.heading}>Your context. Your language course.</h2>
         </div>
 
         <div className={styles.stepsContainer}>
@@ -35,10 +36,10 @@ export function JourneyChapter({ showcase }: JourneyChapterProps) {
               <div className={styles.step}>
                 <div className={styles.stepNum}>1</div>
                 <div className={styles.stepBody}>
-                  <h3 className={styles.stepTitle}>Describe your topic</h3>
+                  <h3 className={styles.stepTitle}>Connect your agent</h3>
                   <p className={styles.stepDesc}>
-                    Chat with Sotto about what you want to learn. AI researches your topic, writes a
-                    script with citations, and verifies every claim.
+                    Plug in Claude Code, Codex, or another local agent via MCP. Sotto reads your
+                    work context and places you at the right CEFR level to start.
                   </p>
                 </div>
               </div>
@@ -127,10 +128,10 @@ export function JourneyChapter({ showcase }: JourneyChapterProps) {
               <div className={styles.step}>
                 <div className={styles.stepNum}>2</div>
                 <div className={styles.stepBody}>
-                  <h3 className={styles.stepTitle}>Review &amp; choose voices</h3>
+                  <h3 className={styles.stepTitle}>Learn in your context</h3>
                   <p className={styles.stepDesc}>
-                    Edit every line of the script. Pick from 7 TTS providers (ElevenLabs, Cartesia,
-                    Hume, OpenAI, and more) or use your cloned voice.
+                    Courses are built around the topics your agent already knows. Grammar, reading,
+                    adaptive listening, and speaking — all using vocabulary from your real work and interests.
                   </p>
                 </div>
               </div>

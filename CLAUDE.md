@@ -1,19 +1,20 @@
 # CLAUDE.md - Sotto
 
-> Private audio briefings from your agents, meetings, workflows, and trusted sources. Canonical brand copy lives in `packages/shared/src/brand.ts`.
+> Open-source, self-hostable language-learning infrastructure. Learn a language with the agent that already knows you. Canonical brand copy lives in `packages/shared/src/brand.ts`.
 
 ## What Is Sotto?
 
-Sotto is private-first open source audio infrastructure for people who want self-owned podcasts from their own tools and sources.
+Sotto is open-source, self-hostable language-learning infrastructure. Learners work through mastery-gated CEFR courses across four skills — grammar, reading, adaptive listening, and speaking — on a stack they fully control, connected to their own AI agent and API keys (BYOK).
 
-1. Users create briefings from topics, URLs, imported audio, transcripts, meeting recordings, agents, news, or bot events.
-2. Users can pause playback, ask contextual questions, and optionally update their private episode with the clarification.
-3. Ready episodes are delivered through private RSS tokens that the user controls.
-4. Self-hosters can connect local agents such as Claude Code, Codex, OpenClaw, or Hermes plus their preferred TTS provider.
-5. Non-technical users can use managed Sotto-hosted infrastructure when the product offers it.
-6. There is no social layer: no public feed, follows, likes, comments, forks, remix graph, or community ranking.
+1. Learners are placed at the right CEFR level and progress through grammar, reading, adaptive listening, and speaking modules gated by demonstrated mastery.
+2. The adaptive listening backbone delivers AI-generated audio lessons; learners can pause, ask contextual questions, and receive spoken clarifications.
+3. Speaking practice captures learner recordings and returns pronunciation feedback through the configured STT/TTS providers.
+4. A personal vocabulary memory graph tracks words and grammar points across all four skills, surfacing spaced-repetition review when needed.
+5. Self-hosters connect their own agents (Claude Code, Codex, OpenClaw, Hermes) and any supported TTS/STT/LLM provider through BYOK configuration.
+6. Non-technical learners can use managed Sotto-hosted infrastructure when the product offers it.
+7. There is no social layer: no public feed, follows, likes, comments, leaderboards, or community ranking.
 
-Hosted billing, if present, must charge for infrastructure and convenience: workers, storage, scheduled ingestion, bot hosting, provider routing, monitoring, and updates. Do not position generic AI-generated podcast content as the core value.
+Hosted billing, if present, must charge for infrastructure and convenience: workers, storage, scheduled lesson generation, agent hosting, provider routing, monitoring, and updates. Do not position generic AI-generated content as the core value — learner progress and ownership of the learning stack are the differentiators.
 
 ## Tech Stack
 
@@ -79,15 +80,17 @@ Fonts: DM Serif Display for headings, Inter for body text.
 
 ## Generation Pipeline
 
+The audio generation pipeline powers the adaptive listening skill and any spoken feedback in other skills.
+
 ```text
-topic, source, meeting, transcript, agent output, or bot event
-  -> content extraction
+lesson spec, vocabulary set, CEFR level, or exercise prompt
+  -> content extraction / curriculum resolution
   -> script generation
   -> script verification
   -> reference validation
   -> audio generation
   -> audio stitching
-  -> private library + private RSS
+  -> learner library (private per-user)
 ```
 
 Status flow:
@@ -125,7 +128,7 @@ PENDING -> DISCOVERING -> EXTRACTING -> SCRIPTING -> VERIFYING_SCRIPT -> VALIDAT
 - Do not use Tailwind, inline styles, or styled-components.
 - Do not hardcode model names or provider IDs.
 - Do not create fallback chains that pick providers by key availability. Use explicit provider selection through `resolveSttProvider()`, `resolveTtsProvider()`, `resolveAutoModel()`, or the closest existing resolver.
-- Do not reuse the same two voices for every generated episode unless the user explicitly selected them.
+- Do not reuse the same two voices for every generated lesson unless the learner explicitly selected them.
 - Do not create admin endpoints or scripts that bulk-delete R2 files. Segment audio and podcast audio are protected in `deleteFile()`; never bypass that guard.
 - Do not require Doppler for local OSS workflows.
 

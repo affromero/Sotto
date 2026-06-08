@@ -11,7 +11,6 @@ import {
   BarChart2,
   Shield,
   AtSign,
-  MessageSquareShare,
   Star,
   Sparkles,
   DollarSign,
@@ -21,7 +20,6 @@ import {
   TrendingUp,
   Brain,
   Target,
-  Megaphone,
   FlaskConical,
   Gauge,
   HardDrive,
@@ -103,8 +101,7 @@ const navGroups: NavGroup[] = [
       { href: '/admin/waitlist', label: 'Waitlist', icon: Mail },
       { href: '/admin/handles', label: 'Handles', icon: AtSign },
       { href: '/admin/auto-models', label: 'Auto Models', icon: Wand2 },
-      { href: '/admin/announcements', label: 'Announcements', icon: Megaphone },
-      { href: '/admin/models', label: 'Model Tester', icon: FlaskConical },
+{ href: '/admin/models', label: 'Model Tester', icon: FlaskConical },
       { href: '/admin/health', label: 'System Health', icon: HeartPulse },
       { href: '/admin/queues', label: 'Queues', icon: ListTodo },
       { href: '/admin/site-config', label: 'Site Config', icon: ToggleRight },
@@ -112,12 +109,6 @@ const navGroups: NavGroup[] = [
       { href: '/admin/landing', label: 'Landing', icon: Globe },
       { href: '/admin/showcase', label: 'Showcase', icon: Film },
       { href: '/admin/video-tests', label: 'Video Tests', icon: Clapperboard },
-    ],
-  },
-  {
-    label: 'Integrations',
-    items: [
-      { href: '/admin/twitter', label: 'Twitter', icon: MessageSquareShare },
     ],
   },
   {
