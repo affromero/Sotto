@@ -21,19 +21,19 @@ export const MARKETING_TEMPLATES: MarketingTemplate[] = [
     description: '2 min overview of all platform features',
     metadata: {
       topic:
-        'Sotto: open-source private podcast infrastructure for AI-generated briefings, BYOK keys, private RSS, Q&A interrupts, and podcast importing',
+        'Sotto: open-source, self-hostable language learning — context-aware CEFR courses taught through the AI agent that already knows your work and interests, with BYOK keys and full data ownership',
       depth: 'quick_overview',
-      audience: 'Potential users discovering Sotto for the first time',
+      audience: 'Potential learners discovering Sotto for the first time',
       audienceLevel: 'beginner',
       tone: 'casual',
       focusAreas: [
-        'AI podcast generation from any topic or URL',
-        'Voice selection and multi-provider TTS',
-        'Private RSS feeds for personal podcast apps',
-        'Interrupt mid-playback to ask questions',
+        'Context-aware language courses built around your own projects and interests',
+        'Mastery-gated CEFR grammar, reading, listening, and speaking modules',
+        'Connect Claude Code, Codex, or another local agent via MCP',
+        'Adaptive listening lessons generated from your topics',
+        'Pronunciation feedback with speaking exercises',
+        'Personal vocabulary memory graph with spaced-repetition review',
         'Bring your own keys (BYOK) for self-hosted usage',
-        'Hosted infrastructure for users who do not want to operate AI services',
-        'Import existing podcasts',
       ],
       durationTarget: 2,
       speakers: [
@@ -51,7 +51,7 @@ export const MARKETING_TEMPLATES: MarketingTemplate[] = [
     description: '1 min update on recent changes',
     metadata: {
       topic:
-        "What's New on Sotto — latest private podcast, briefing, BYOK, and self-hosting improvements",
+        "What's New on Sotto — latest language-learning features, BYOK, and self-hosting improvements",
       depth: 'quick_overview',
       audience: 'Existing Sotto users who want to stay up-to-date',
       audienceLevel: 'intermediate',
@@ -59,7 +59,7 @@ export const MARKETING_TEMPLATES: MarketingTemplate[] = [
       focusAreas: [
         'Recent feature releases',
         'Platform improvements',
-        'Private briefing workflow improvements',
+        'Language-learning and course workflow improvements',
       ],
       durationTarget: 1,
       speakers: [
@@ -74,9 +74,9 @@ export const MARKETING_TEMPLATES: MarketingTemplate[] = [
     description: '3 min explainer of the generation pipeline',
     metadata: {
       topic:
-        'How Sotto Creates Podcasts — from topic discovery through AI scripting, reference verification, multi-voice audio generation, and final stitching',
+        'How Sotto Builds Language Courses — from agent context and CEFR placement through AI scripting, reference verification, multi-voice audio generation, and spaced-repetition review',
       depth: 'standard',
-      audience: 'Tech-curious users and developers interested in the generation pipeline',
+      audience: 'Tech-curious learners and developers interested in the course generation pipeline',
       audienceLevel: 'intermediate',
       tone: 'professional',
       focusAreas: [

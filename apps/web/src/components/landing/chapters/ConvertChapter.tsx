@@ -12,10 +12,10 @@ const FAQ_ITEMS = [
     question: 'What exactly is Sotto?',
     answer: (
       <>
-        Sotto is a private audio briefing workspace. You describe what you want to learn, connect
-        your own agents or hosted AI providers, and generate a fact-checked podcast with real
-        text-to-speech voices. Finished episodes can stay private and ship through your own RSS
-        feed.
+        Sotto is open-source, self-hostable language-learning infrastructure. Connect the AI agent
+        that already knows your work and interests — Claude Code, Codex, or another local agent —
+        and it builds a CEFR course around the things you actually care about. You own the stack,
+        the data, and the agent.
       </>
     ),
   },
@@ -40,23 +40,23 @@ const FAQ_ITEMS = [
     ),
   },
   {
-    question: 'How do you protect creators and public figures?',
+    question: 'How does the agent context work?',
     answer: (
       <>
-        Voice cloning requires identity verification and explicit consent. You can only clone your
-        own voice. Avatar images go through the same consent gate. All AI-generated content is
-        clearly labeled. We have active content moderation and a zero-tolerance policy for
-        impersonation or deepfakes.
+        Sotto reads context from your connected agent via MCP. Your projects, interests, and domain
+        vocabulary inform the course content — so lessons use real examples from your work, not
+        generic textbook scenarios. Voice cloning and AI-generated audio are clearly labeled.
       </>
     ),
   },
   {
-    question: 'Can I import my own podcast?',
+    question: 'What does a course actually include?',
     answer: (
       <>
-        From anywhere. Spotify, Apple Podcasts, YouTube, NotebookLM, or just drag in an audio file.
-        Sotto adds transcripts, private RSS delivery, and interactive Q&amp;A on top. Human-created
-        content is always labeled as human.
+        Mastery-gated classes across four skills: grammar, reading, adaptive listening (an
+        AI-generated audio lesson about your topics), and speaking with pronunciation feedback. A
+        personal vocabulary memory graph tracks what you know and surfaces spaced-repetition review
+        when items are due.
       </>
     ),
   },
@@ -105,10 +105,10 @@ export function ConvertChapter() {
                 early access.
               </h2>
               <p className={styles.descLight}>
-                During early access, everything works with platform AI. No card, no limits. Bring
-                your own API keys for unlimited generations at your provider&apos;s rates. Just one
-                Fal key covers the entire pipeline: AI, voices, images, video, and avatars.
-                We&apos;ll introduce plans down the road. Early members get grandfathered in.
+                During early access, the full course system is free to use with platform AI. No
+                card, no limits. Bring your own API keys for unlimited lessons at your
+                provider&apos;s rates. We&apos;ll introduce plans down the road. Early members get
+                grandfathered in.
               </p>
             </div>
             <div className={styles.stats} data-reveal>
@@ -131,20 +131,20 @@ export function ConvertChapter() {
         <div className={styles.cta}>
           <div className={styles.ctaContent} data-reveal>
             <h2 className={styles.ctaTitle}>
-              Start creating <em>today.</em>
+              Start learning <em>today.</em>
             </h2>
             <p className={styles.ctaSub}>{BRAND.subline}</p>
             <AuthCTA source="cta" />
             <Link href="/create" className={styles.ctaCreate}>
-              or start creating now &rarr;
+              or start a lesson now &rarr;
             </Link>
           </div>
           <aside id="teams" className={styles.teams} data-reveal>
             <div className={styles.teamsDivider} aria-hidden="true" />
             <p className={styles.teamsText}>
               <strong>Exploring Sotto for your organization?</strong> We&apos;re working with early
-              partners on internal audio briefings, video explainers, and avatar-hosted
-              presentations from company docs and updates.
+              partners on team language programs built around internal docs, projects, and agent
+              workflows. Your stack, your data, your keys.
             </p>
             <a href="mailto:teams@example.com" className={styles.teamsLink}>
               Let&apos;s talk &rarr;

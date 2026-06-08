@@ -12,13 +12,13 @@ const FEATURE_CATALOG: Record<string, string> = {
     'Create private RSS feed URLs for podcast apps without exposing podcasts to public listings.',
   byok: 'Bring Your Own Keys — use your own API keys for LLM and TTS providers. All features become unlimited and free. No subscription required.',
   'voice-cloning':
-    'Clone voices for private podcasts, keep usage under your control, and grant access only to specific users when needed.',
+    'Clone voices for private listening lessons, keep usage under your control, and grant access only to specific users when needed.',
   'script-review':
     'Review AI-generated scripts before audio generation. Edit turns, approve, or regenerate with feedback. Full control over content.',
   'video-generation':
     'Turn any podcast into a video with AI-generated visuals, transitions, and avatars. Each segment gets matched with relevant imagery.',
   collections:
-    'Curate private podcast playlists and keep related research, meetings, and news briefings organized.',
+    'Curate private lesson playlists and keep related research, meetings, and course content organized.',
   'multi-speaker':
     'Up to 4 speakers per podcast. Custom speaker names and descriptions — not just Host and Expert.',
 };
@@ -35,14 +35,14 @@ export function getDemoProductContext(): string {
     `URL: ${BRAND.url}`,
     '',
     'Core capabilities:',
-    '- AI podcast generation from natural language chat',
-    '- 8+ TTS voice providers with side-by-side comparison',
+    '- Mastery-gated CEFR courses across grammar, reading, listening, and speaking',
+    '- Adaptive listening lessons generated from your topics and agent context',
+    '- Pronunciation feedback with speaking exercises',
+    '- Personal vocabulary memory graph with spaced-repetition review',
+    '- Connect Claude Code, Codex, or another local agent via MCP',
+    '- 8+ TTS voice providers for audio lessons',
     '- Interrupt mid-playback to ask questions',
-    '- Import human-made podcasts into a private workspace',
-    '- Private RSS feeds for podcast apps',
     '- Bring Your Own Keys (BYOK) for unlimited free usage',
-    '- Private voice cloning and allowlisted access',
-    '- Video generation with AI visuals',
   ].join('\n');
 }
 
