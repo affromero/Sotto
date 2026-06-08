@@ -1,0 +1,165 @@
+/* Memory graph page */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xl);
+  max-width: 900px;
+  margin: 0 auto;
+  padding: var(--spacing-xl) var(--spacing-md);
+  /* Keep content clear of the MiniPlayer at the bottom */
+  padding-bottom: calc(var(--mini-player-height) + var(--spacing-xl));
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.title {
+  font: var(--text-h1);
+  color: var(--color-text-primary);
+}
+
+.subtitle {
+  font: var(--text-body);
+  color: var(--color-text-secondary);
+}
+
+/* Inline status row (loading / error) */
+
+.statusRow {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+}
+
+.spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-primary);
+  border-radius: var(--radius-full);
+  animation: spin 700ms linear infinite;
+  flex-shrink: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+    border-top-color: var(--color-border);
+  }
+}
+
+.errorBox {
+  padding: var(--spacing-md) var(--spacing-lg);
+  background: var(--color-error-lighter);
+  border: 1px solid var(--color-error-light);
+  border-radius: var(--radius-xl);
+  font: var(--text-body-sm);
+  color: var(--color-error);
+}
+
+/* Empty state */
+
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-3xl) var(--spacing-lg);
+  background: var(--color-surface);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-xl);
+}
+
+.emptyHeading {
+  font: var(--text-h4);
+  color: var(--color-text-primary);
+}
+
+.emptyBody {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  max-width: 360px;
+}
+
+/* Main body: selector + graph */
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+/* Course selector */
+
+.selectorRow {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.selectorLabel {
+  font: var(--text-label);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.selector {
+  height: 44px;
+  padding: 0 var(--spacing-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  font: var(--text-body-sm);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  transition: border-color var(--transition-fast);
+  /* Prevent iOS auto-zoom */
+  font-size: max(16px, var(--font-size-sm));
+}
+
+.selector:hover {
+  border-color: var(--color-border-hover);
+}
+
+.selector:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* Graph wrapper — position:relative so MemoryNodeDetail can anchor absolutely */
+
+.graphWrapper {
+  position: relative;
+  min-height: 240px;
+  display: flex;
+  flex-direction: column;
+}
+
+.graphOverlay {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  justify-content: center;
+  min-height: 240px;
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+}
+
+@media (min-width: 768px) {
+  .root {
+    padding: var(--spacing-2xl) var(--spacing-lg);
+    padding-bottom: calc(var(--mini-player-height) + var(--spacing-2xl));
+  }
+}
