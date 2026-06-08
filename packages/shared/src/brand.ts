@@ -9,19 +9,19 @@ export const BRAND = {
   twitter: null,
 
   // Consumer-facing
-  tagline: 'Learn a language with a tutor you own.',
-  subline: 'Open-source, self-hostable courses powered by your own agents and your own keys.',
+  tagline: 'Learn a language with the agent that already knows you.',
+  subline: 'Open-source, self-hostable courses taught in the context of your work and interests — through the agent and keys you already own.',
   cta: 'Place. Practice. Progress.',
 
   // Investor-facing
-  pitchTagline: 'Open-source language-learning infrastructure.',
+  pitchTagline: 'Context-aware, self-hostable language learning.',
 
   // Pre-composed
-  title: 'Sotto — Learn a language with a tutor you own.',
+  title: 'Sotto — Learn a language with the agent that already knows you.',
   description:
-    'Open-source, self-hostable language learning. Mastery-gated CEFR courses across grammar, reading, listening, and speaking, built on your own AI agents, your keys, and your data.',
+    'Open-source, self-hostable language learning, taught in your own context. Connect the AI agent that already knows your work and interests, then take mastery-gated CEFR courses across grammar, reading, listening, and speaking — with your keys, your data, and the whole stack.',
   elevatorPitch:
-    'Open-source language-learning infrastructure. Take mastery-gated CEFR courses with grammar, reading, an adaptive listening podcast, and speaking with pronunciation feedback. Self-host it on your own stack, connect your own Claude or Codex with your own keys, and grow a personal vocabulary memory graph as you learn.',
+    'Sotto is open-source language-learning infrastructure that teaches in your context. Connect your own Claude or Codex — the agent that already knows your work and interests — and it builds a language course around the things you actually care about: mastery-gated CEFR grammar, reading, an adaptive listening podcast, and speaking with pronunciation feedback, plus a personal vocabulary memory graph you own. Self-host it on your stack, with your keys and your data.',
 } as const;
 
 export type Brand = typeof BRAND;

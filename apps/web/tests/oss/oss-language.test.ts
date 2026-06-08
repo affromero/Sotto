@@ -63,8 +63,8 @@ describe('open-source language-learning OSS surfaces', () => {
       .join('\n');
 
     // brand.ts must carry the new language-learning taglines
-    expect(sharedPositioningSource).toContain('Learn a language with a tutor you own.');
-    expect(sharedPositioningSource).toContain('Open-source language-learning infrastructure.');
+    expect(sharedPositioningSource).toContain('Learn a language with the agent that already knows you.');
+    expect(sharedPositioningSource).toContain('Context-aware, self-hostable language learning.');
 
     // old social-podcast and podcast-network copy must be gone
     expect(landingSource).not.toContain('social podcast network');
@@ -1013,7 +1013,7 @@ describe('open-source language-learning OSS surfaces', () => {
     for (const claim of staleClaims) {
       expect(releaseDocsSource, claim).not.toContain(claim);
     }
-    expect(releaseDocsSource).toContain('Learn a language with a tutor you own.');
+    expect(releaseDocsSource).toContain('Learn a language with the agent that already knows you.');
     expect(releaseDocsSource).toContain('language-learning infrastructure');
     expect(releaseDocsSource).toContain('implicit provider fallback');
     expect(releaseDocsSource).toContain('Managed hosting');

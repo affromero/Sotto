@@ -1,7 +1,7 @@
 {
-  "name": "Sotto - Private audio briefings",
+  "name": "Sotto — Learn a language in your context",
   "short_name": "Sotto",
-  "description": "Private audio briefings from your agents, meetings, workflows, and trusted sources.",
+  "description": "Open-source, self-hostable language learning, taught in your own context through the AI agent you already own.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#FEFCF8",
