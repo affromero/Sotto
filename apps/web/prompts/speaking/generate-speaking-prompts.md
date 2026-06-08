@@ -4,7 +4,7 @@ The lesson objective is: {{OBJECTIVE}}
 
 The lesson vocabulary the learner has been studying:
 {{VOCAB}}
-
+{{NOTES}}
 Generate exactly {{COUNT}} short target phrases the learner should say aloud. Each phrase must:
 
 - Be written entirely in {{TARGET}}

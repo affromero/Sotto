@@ -7,6 +7,7 @@
 // Returns { sectionId }.
 import { prisma } from './prisma';
 import { resolveLearningAi } from './learning-ai';
+import { formatNotesForPrompt } from './course-notes';
 import { createAIProvider } from './providers/ai';
 import { loadAndRender } from './prompt-loader';
 import { canResolveTts, resolveTtsProvider } from './providers/tts';
@@ -25,6 +26,7 @@ export interface ClassSpeakingParams {
   targetLang: string;
   objective: string;
   targetVocab: Array<{ lemma: string; gloss: string }>;
+  note?: string;
 }
 
 export interface ClassSpeakingResult {
@@ -41,6 +43,7 @@ export interface SpeakingPromptsParams {
   objective: string;
   targetVocab: Array<{ lemma: string; gloss: string }>;
   refId: string;
+  note?: string;
 }
 
 export interface ComposedSpeakingPrompt {
@@ -78,6 +81,7 @@ export async function composeSpeakingPrompts(
     TARGET: p.targetLang,
     OBJECTIVE: p.objective,
     VOCAB: vocabList,
+    NOTES: formatNotesForPrompt(p.note ?? ''),
   });
 
   const client = createAIProvider(ai.provider);
@@ -183,6 +187,7 @@ export async function generateClassSpeaking(
     objective: p.objective,
     targetVocab: p.targetVocab,
     refId: p.classId,
+    note: p.note,
   });
 
   const section = await prisma.classSection.create({

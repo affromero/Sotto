@@ -5,6 +5,7 @@
 import { resolveLearningAi } from './learning-ai';
 import { createAIProvider } from './providers/ai';
 import { loadAndRender } from './prompt-loader';
+import { formatNotesForPrompt } from './course-notes';
 import { logUsage } from './usage-logger';
 import { logger } from './logger';
 import type { CefrLevel } from '@sotto/shared';
@@ -37,6 +38,7 @@ export async function generatePlacement(
   userId: string,
   nativeLang: string,
   targetLang: string,
+  note = '',
 ): Promise<{ questions: PlacementQuestion[]; provider: string; model: string }> {
   const ai = await resolveLearningAi(userId);
   const count = PLACEMENT_LEVELS.length * PER_BAND;
@@ -48,6 +50,7 @@ export async function generatePlacement(
     SKILLS: PLACEMENT_SKILLS.join(', '),
     PER_BAND: String(PER_BAND),
     COUNT: String(count),
+    NOTES: formatNotesForPrompt(note),
   });
 
   const provider = createAIProvider(ai.provider);
