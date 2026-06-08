@@ -108,8 +108,8 @@ vi.mock('@/lib/logger', () => ({
 
 // ---- Import under test (must come AFTER vi.mock calls) ----
 
-import { generateClassListening } from '@/lib/class-listening-generator';
-import type { ClassListeningParams } from '@/lib/class-listening-generator';
+import { generateClassListening, composeListeningContent } from '@/lib/class-listening-generator';
+import type { ClassListeningParams, ListeningContentParams } from '@/lib/class-listening-generator';
 
 // ---- Fixtures ----
 
@@ -474,5 +474,50 @@ describe('generateClassListening', () => {
         }),
       );
     });
+  });
+});
+
+describe('composeListeningContent', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const CONTENT_PARAMS: ListeningContentParams = {
+    userId: 'u1',
+    courseId: 'course-1',
+    level: 'A1',
+    nativeLang: 'en',
+    targetLang: 'es',
+    objective: 'Learn greetings',
+    mustIncludeVocab: [{ word: 'hola', translation: 'hello' }],
+  };
+
+  it('returns the podcast id + comprehension questions without persisting a class section', async () => {
+    setupHappyPath();
+
+    const content = await composeListeningContent(CONTENT_PARAMS);
+
+    expect(content.podcastId).toBe('podcast-1');
+    expect(content.comprehensionQuestions.length).toBeGreaterThan(0);
+    expect(content.comprehensionQuestions[0]).toMatchObject({
+      question: expect.any(String),
+      options: expect.any(Array),
+      correctIndex: expect.any(Number),
+    });
+    // The content core must NOT create class rows — that is the caller's job.
+    expect(mockClassSectionCreate).not.toHaveBeenCalled();
+    expect(mockLessonQuestionCreateMany).not.toHaveBeenCalled();
+  });
+
+  it('upserts generated vocab with a null firstSeenClassId (practice provenance)', async () => {
+    setupHappyPath();
+
+    await composeListeningContent(CONTENT_PARAMS);
+
+    expect(mockLearnerVocabUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({ firstSeenClassId: null }),
+      }),
+    );
   });
 });
