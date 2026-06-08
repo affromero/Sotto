@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { scorePlacement, pairToLangs, type PlacementQuestion } from '@/lib/placement-test';
+import { scorePlacement, type PlacementQuestion } from '@/lib/placement-test';
 
 function q(id: string, cefr: string, skill: string): PlacementQuestion {
   return {
@@ -26,13 +26,6 @@ const questions: PlacementQuestion[] = [
 ];
 const allCorrect = questions.map((x) => ({ id: x.id, selectedIndex: 0 }));
 
-describe('pairToLangs', () => {
-  it('maps the three v1 language pairs', () => {
-    expect(pairToLangs('DE_FROM_EN')).toEqual({ native: 'en', target: 'de' });
-    expect(pairToLangs('EN_FROM_ES')).toEqual({ native: 'es', target: 'en' });
-    expect(pairToLangs('ES_FROM_EN')).toEqual({ native: 'en', target: 'es' });
-  });
-});
 
 describe('scorePlacement staircase', () => {
   it('assigns the highest fully-passed band', () => {

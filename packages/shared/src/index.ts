@@ -18,7 +18,6 @@ export type {
   FeedbackType,
   FeedbackStatus,
   CefrLevel,
-  LanguagePair,
   SkillType,
   ClassStatus,
   SectionStatus,

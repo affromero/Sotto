@@ -72,6 +72,7 @@ const EXPECTED_FILES = [
   'demo/walkthrough.md',
   'speaking/pronunciation-rubric.md',
   'speaking/generate-speaking-prompts.md',
+  'curriculum/generate-curriculum.md',
 ];
 
 // ── Variable contracts: template → expected placeholder names ──
@@ -165,6 +166,7 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
   'class/generate-section-quiz.md': [
     'COUNT', 'GRAMMAR_POINTS', 'LEVEL', 'NATIVE', 'OBJECTIVE', 'SEED', 'SKILL', 'TARGET', 'VOCAB',
   ].sort(),
+  'curriculum/generate-curriculum.md': ['NATIVE', 'TARGET'].sort(),
 };
 
 // Templates that are static (no placeholders)
@@ -173,7 +175,7 @@ const STATIC_TEMPLATES = EXPECTED_FILES.filter((f) => !VARIABLE_CONTRACTS[f]);
 // ── Tests ─────────────────────────────────────────────────────
 
 describe('prompt file existence', () => {
-  it(`prompts directory contains exactly ${EXPECTED_FILES.length} .md files`, () => { // bumped +2 for speaking/pronunciation-rubric.md and speaking/generate-speaking-prompts.md
+  it(`prompts directory contains exactly ${EXPECTED_FILES.length} .md files`, () => { // bumped +1 for curriculum/generate-curriculum.md
     const actual = glob.sync('**/*.md', { cwd: PROMPTS_DIR }).sort();
     expect(actual).toHaveLength(EXPECTED_FILES.length);
     expect(actual).toEqual(EXPECTED_FILES.sort());

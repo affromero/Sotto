@@ -8,7 +8,7 @@ import { createAIProvider } from './providers/ai';
 import { loadAndRender } from './prompt-loader';
 import { logUsage } from './usage-logger';
 import { logger } from './logger';
-import type { CefrLevel, LanguagePair } from '@sotto/shared';
+import type { CefrLevel } from '@sotto/shared';
 
 export const PLACEMENT_LEVELS: CefrLevel[] = ['A1', 'A2', 'B1', 'B2'];
 export const PLACEMENT_SKILLS = ['grammar', 'vocab', 'reading'] as const;
@@ -31,16 +31,6 @@ export type PlacementQuestionPublic = Pick<PlacementQuestion, 'id' | 'cefr' | 's
 
 export function toPublic(q: PlacementQuestion): PlacementQuestionPublic {
   return { id: q.id, cefr: q.cefr, skill: q.skill, prompt: q.prompt, options: q.options };
-}
-
-const PAIR_LANGS: Record<LanguagePair, { native: string; target: string }> = {
-  DE_FROM_EN: { native: 'en', target: 'de' },
-  EN_FROM_ES: { native: 'es', target: 'en' },
-  ES_FROM_EN: { native: 'en', target: 'es' },
-};
-
-export function pairToLangs(pair: LanguagePair): { native: string; target: string } {
-  return PAIR_LANGS[pair];
 }
 
 interface ResolvedAi {
