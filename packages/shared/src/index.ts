@@ -22,6 +22,7 @@ export type {
   SkillType,
   ClassStatus,
   SectionStatus,
+  SpeakingGradeStatus,
   EdgeType,
 } from './types/enums';
 

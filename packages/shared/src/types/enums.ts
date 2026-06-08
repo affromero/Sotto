@@ -183,6 +183,8 @@ export type SectionStatus =
   | 'PASSED'
   | 'FAILED';
 
+export type SpeakingGradeStatus = 'PENDING' | 'GRADING' | 'SCORED' | 'FAILED';
+
 export type EdgeType =
   | 'VOCAB_VOCAB'
   | 'VOCAB_GRAMMAR'
