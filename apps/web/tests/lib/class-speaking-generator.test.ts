@@ -84,7 +84,7 @@ vi.mock('@/lib/logger', () => ({
 
 // ---- Import under test (must come AFTER vi.mock calls) ----
 
-import { generateClassSpeaking } from '@/lib/class-speaking-generator';
+import { generateClassSpeaking, composeSpeakingPrompts } from '@/lib/class-speaking-generator';
 import type { ClassSpeakingParams } from '@/lib/class-speaking-generator';
 
 // ---- Fixtures ----
@@ -366,5 +366,54 @@ describe('generateClassSpeaking', () => {
         }),
       );
     });
+  });
+});
+
+describe('composeSpeakingPrompts', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns composed prompts (with reference TTS) without persisting a class section', async () => {
+    setupHappyPath();
+
+    const prompts = await composeSpeakingPrompts({
+      userId: 'u1',
+      level: 'A1',
+      nativeLang: 'en',
+      targetLang: 'es',
+      objective: 'Practice everyday greetings',
+      targetVocab: [{ lemma: 'hola', gloss: 'hello' }],
+      refId: 'practice-1',
+    });
+
+    expect(prompts.length).toBeGreaterThan(0);
+    expect(prompts[0]).toMatchObject({
+      targetPhrase: expect.any(String),
+      translation: expect.any(String),
+    });
+    // The content core must NOT create class rows — that is the caller's job.
+    expect(mockClassSectionCreate).not.toHaveBeenCalled();
+    expect(mockSpeakingPromptCreateMany).not.toHaveBeenCalled();
+  });
+
+  it('namespaces reference TTS audio by refId', async () => {
+    setupHappyPath();
+
+    await composeSpeakingPrompts({
+      userId: 'u1',
+      level: 'A1',
+      nativeLang: 'en',
+      targetLang: 'es',
+      objective: 'Practice everyday greetings',
+      targetVocab: [{ lemma: 'hola', gloss: 'hello' }],
+      refId: 'practice-1',
+    });
+
+    expect(mockUploadFile).toHaveBeenCalledWith(
+      expect.stringContaining('speaking-ref/practice-1/'),
+      expect.anything(),
+      'audio/mpeg',
+    );
   });
 });

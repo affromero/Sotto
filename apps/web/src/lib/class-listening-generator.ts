@@ -33,7 +33,35 @@ export interface ClassListeningResult {
   podcastId: string;
 }
 
-export async function generateClassListening(p: ClassListeningParams): Promise<ClassListeningResult> {
+export interface ListeningComprehensionQuestion {
+  question: string;
+  options: string[];
+  correctIndex: number;
+  explanation: string;
+}
+
+// Content-only listening generation: builds the CLASS podcast (script → audio)
+// and the comprehension questions, feeds generated vocab into the memory graph,
+// and returns both. The caller decides where to persist the questions (a class
+// section, or a practice session). No ClassSection/LessonQuestion rows here.
+export interface ListeningContentParams {
+  userId: string;
+  courseId: string;
+  level: string;
+  nativeLang: string;
+  targetLang: string;
+  objective: string;
+  mustIncludeVocab: Array<{ word: string; translation: string }>;
+  /** Provenance for graph vocab (a class id). Undefined for practice sessions. */
+  firstSeenClassId?: string;
+}
+
+export interface ListeningContent {
+  podcastId: string;
+  comprehensionQuestions: ListeningComprehensionQuestion[];
+}
+
+export async function composeListeningContent(p: ListeningContentParams): Promise<ListeningContent> {
   // Step 1: resolve the learning AI provider (BYOK or local agent)
   const ai = await resolveLearningAi(p.userId);
 
@@ -122,7 +150,7 @@ export async function generateClassListening(p: ClassListeningParams): Promise<C
           translation: v.translation,
           partOfSpeech: v.partOfSpeech ?? null,
           pronunciation: v.pronunciation ?? null,
-          firstSeenClassId: p.classId,
+          firstSeenClassId: p.firstSeenClassId ?? null,
         },
         update: {},
       });
@@ -189,7 +217,29 @@ export async function generateClassListening(p: ClassListeningParams): Promise<C
       throw new Error('Listening quiz generation produced no usable questions.');
     }
 
-    // Step 11: create ClassSection + LessonQuestion rows
+    return { podcastId, comprehensionQuestions: questions };
+  } catch (err) {
+    // Best-effort cleanup: mark the podcast failed so it doesn't linger as PENDING.
+    await prisma.podcast.update({ where: { id: podcastId }, data: { status: 'FAILED' } }).catch(() => {});
+    throw err;
+  }
+}
+
+// Generate the LISTENING section of a class: compose the content, then persist
+// the gated ClassSection + LessonQuestion rows.
+export async function generateClassListening(p: ClassListeningParams): Promise<ClassListeningResult> {
+  const { podcastId, comprehensionQuestions } = await composeListeningContent({
+    userId: p.userId,
+    courseId: p.courseId,
+    level: p.level,
+    nativeLang: p.nativeLang,
+    targetLang: p.targetLang,
+    objective: p.objective,
+    mustIncludeVocab: p.mustIncludeVocab,
+    firstSeenClassId: p.classId,
+  });
+
+  try {
     const section = await prisma.classSection.create({
       data: {
         classId: p.classId,
@@ -204,7 +254,7 @@ export async function generateClassListening(p: ClassListeningParams): Promise<C
     });
 
     await prisma.lessonQuestion.createMany({
-      data: questions.map((q, i) => ({
+      data: comprehensionQuestions.map((q, i) => ({
         sectionId: section.id,
         order: i + 1,
         skill: 'LISTENING' as const,
@@ -219,7 +269,7 @@ export async function generateClassListening(p: ClassListeningParams): Promise<C
       classId: p.classId,
       podcastId,
       sectionId: section.id,
-      questionCount: String(questions.length),
+      questionCount: String(comprehensionQuestions.length),
     });
 
     return { sectionId: section.id, podcastId };
