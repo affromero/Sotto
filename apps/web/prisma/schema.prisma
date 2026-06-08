@@ -386,6 +386,7 @@ model Podcast {
   researchDossier     ResearchDossier?
   creativeOutline     CreativeOutline?
   vocabularyEntries   VocabularyEntry[]
+  classSection        ClassSection?
 
   @@unique([userId, slug])
   @@index([userId])
@@ -2599,17 +2600,17 @@ model ClassSection {
   score         Float?
   passed        Boolean?
   passThreshold Float         @default(0.7)
-  podcastId     String? // LISTENING section -> reuse Podcast (added later)
+  podcastId     String?       @unique // LISTENING section -> reuse Podcast; @unique because one section per podcast
   generatedAt   DateTime?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
   class     CourseClass      @relation(fields: [classId], references: [id], onDelete: Cascade)
+  podcast   Podcast?         @relation(fields: [podcastId], references: [id], onDelete: SetNull)
   questions LessonQuestion[]
   prompts   SpeakingPrompt[]
 
   @@index([classId, skill, attempt])
-  @@index([podcastId])
 }
 
 // MC question for a GRAMMAR/READING/LISTENING section. Forked from the old

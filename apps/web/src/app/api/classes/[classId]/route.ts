@@ -24,6 +24,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       attempt: s.attempt,
       score: s.score,
       passed: s.passed,
+      podcast: s.podcast
+        ? { id: s.podcast.id, audioUrl: s.podcast.audioUrl, title: s.podcast.title }
+        : null,
       questions: s.questions.map((q) => ({
         id: q.id,
         order: q.order,
