@@ -97,6 +97,26 @@ const SAMPLE_CLASS_SPEAKING = {
   ],
 };
 
+// A class whose LISTENING section reuses a podcast (audio + comprehension MC).
+const SAMPLE_CLASS_LISTENING = {
+  ...SAMPLE_CLASS_UNSUBMITTED,
+  sections: [
+    {
+      id: 'sec-listening',
+      skill: 'LISTENING',
+      status: 'READY',
+      attempt: 1,
+      score: null,
+      passed: null,
+      podcast: { id: 'pod-1', audioUrl: 'https://r2/listen.mp3', title: 'Listening' },
+      questions: [
+        { id: 'l1', order: 1, question: 'What did they discuss?', options: ['a', 'b', 'c', 'd'], passageRef: null, correctIndex: 0, explanation: 'E' },
+      ],
+      prompts: [],
+    },
+  ],
+};
+
 // Same class after submission — submission is non-null.
 const SAMPLE_CLASS_SUBMITTED = {
   ...SAMPLE_CLASS_UNSUBMITTED,
@@ -174,6 +194,23 @@ describe('GET /api/classes/[classId]', () => {
       targetPhrase: 'Hola',
       translation: 'Hello',
       referenceTtsUrl: 'https://r2/ref.mp3',
+    });
+  });
+
+  it('returns the LISTENING podcast (audio url + title) for the player', async () => {
+    mockGetClassForUser.mockResolvedValue(SAMPLE_CLASS_LISTENING);
+
+    const res = await GET(
+      makeRequest('http://localhost/api/classes/class-1', 'GET'),
+      classParams('class-1'),
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.sections[0].podcast).toMatchObject({
+      id: 'pod-1',
+      audioUrl: 'https://r2/listen.mp3',
+      title: 'Listening',
     });
   });
 

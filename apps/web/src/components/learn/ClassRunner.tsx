@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { SpeakingExercise } from '@/components/class/SpeakingExercise';
 import styles from './ClassRunner.module.css';
 
 // ---- Types (mirrors API contract) ----
@@ -16,6 +17,21 @@ interface Question {
   explanation?: string | null;
 }
 
+interface SpeakingPrompt {
+  id: string;
+  order: number;
+  targetPhrase: string;
+  translation: string;
+  ipa?: string | null;
+  referenceTtsUrl?: string | null;
+}
+
+interface SectionPodcast {
+  id: string;
+  audioUrl: string | null;
+  title: string;
+}
+
 interface Section {
   id: string;
   skill: string;
@@ -23,7 +39,9 @@ interface Section {
   attempt: number;
   score: number | null;
   passed: boolean | null;
+  podcast: SectionPodcast | null;
   questions: Question[];
+  prompts: SpeakingPrompt[];
 }
 
 interface ClassData {
@@ -156,9 +174,12 @@ export function ClassRunner({ classId }: ClassRunnerProps) {
     }
   }
 
+  // SPEAKING has no MC questions — exclude it from the "all answered" check.
   const allAnswered =
     cls !== null &&
-    cls.sections.every((s) => s.questions.every((q) => answers[q.id] !== undefined));
+    cls.sections
+      .filter((s) => s.skill !== 'SPEAKING')
+      .every((s) => s.questions.every((q) => answers[q.id] !== undefined));
 
   async function handleSubmit() {
     if (!cls || !allAnswered) return;
@@ -274,6 +295,15 @@ export function ClassRunner({ classId }: ClassRunnerProps) {
         </div>
         <h1 className={styles.classTitle}>{cls.lesson.title}</h1>
         <p className={styles.classObjective}>{cls.lesson.objective}</p>
+        <a
+          href={`/classes/${classId}/worksheet`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={styles.worksheetLink}
+          aria-label="Print worksheet for this class (opens in new tab)"
+        >
+          Print worksheet
+        </a>
       </header>
 
       {/* Sections */}
@@ -299,83 +329,110 @@ export function ClassRunner({ classId }: ClassRunnerProps) {
                 )}
               </div>
 
-              <ol className={styles.questionList}>
-                {section.questions.map((q) => {
-                  const selected = answers[q.id];
-                  const isSubmitted = submitted;
-                  const options = Array.isArray(q.options) ? (q.options as string[]) : [];
+              {/* SPEAKING: delegate entirely to SpeakingExercise */}
+              {section.skill === 'SPEAKING' && (
+                <SpeakingExercise classId={classId} prompts={section.prompts} />
+              )}
 
-                  return (
-                    <li key={q.id} className={styles.question}>
-                      {/* Passage (READING) */}
-                      {q.passageRef && (
-                        <blockquote className={styles.passage}>{q.passageRef}</blockquote>
-                      )}
+              {/* LISTENING: audio player above comprehension MC */}
+              {section.skill === 'LISTENING' && (
+                <div className={styles.listeningAudio}>
+                  {section.podcast?.audioUrl ? (
+                    <audio
+                      className={styles.audioPlayer}
+                      controls
+                      preload="metadata"
+                      src={section.podcast.audioUrl}
+                      aria-label="Lesson audio"
+                    />
+                  ) : (
+                    <p className={styles.audioGenerating} role="status">
+                      Audio is still generating — your comprehension questions are ready below.
+                    </p>
+                  )}
+                </div>
+              )}
 
-                      <p className={styles.questionText}>{q.question}</p>
+              {/* MC questions: GRAMMAR, READING, and LISTENING comprehension */}
+              {section.skill !== 'SPEAKING' && (
+                <ol className={styles.questionList}>
+                  {section.questions.map((q) => {
+                    const selected = answers[q.id];
+                    const isSubmitted = submitted;
+                    const options = Array.isArray(q.options) ? (q.options as string[]) : [];
 
-                      <div
-                        className={styles.options}
-                        role="group"
-                        aria-label={`Options for: ${q.question}`}
-                      >
-                        {options.map((opt, idx) => {
-                          const isSelected = selected === idx;
-                          const isCorrect = isSubmitted && q.correctIndex === idx;
-                          const isWrong = isSubmitted && isSelected && q.correctIndex !== idx;
+                    return (
+                      <li key={q.id} className={styles.question}>
+                        {/* Passage (READING) */}
+                        {q.passageRef && (
+                          <blockquote className={styles.passage}>{q.passageRef}</blockquote>
+                        )}
 
-                          let optClass = styles.option;
-                          if (isSelected && !isSubmitted) optClass += ` ${styles.optionSelected}`;
-                          if (isCorrect) optClass += ` ${styles.optionCorrect}`;
-                          if (isWrong) optClass += ` ${styles.optionWrong}`;
+                        <p className={styles.questionText}>{q.question}</p>
 
-                          const refKey = `${q.id}-${idx}`;
+                        <div
+                          className={styles.options}
+                          role="group"
+                          aria-label={`Options for: ${q.question}`}
+                        >
+                          {options.map((opt, idx) => {
+                            const isSelected = selected === idx;
+                            const isCorrect = isSubmitted && q.correctIndex === idx;
+                            const isWrong = isSubmitted && isSelected && q.correctIndex !== idx;
 
-                          return (
-                            <button
-                              key={idx}
-                              ref={(el) => {
-                                optionButtonRefs.current.set(refKey, el);
-                              }}
-                              type="button"
-                              className={optClass}
-                              onClick={() => {
-                                if (!isSubmitted) selectAnswer(q.id, idx);
-                              }}
-                              onKeyDown={(e) => handleKeyDown(e, q.id, idx, options.length)}
-                              disabled={isSubmitted}
-                              aria-pressed={isSelected}
-                              aria-label={`Option ${idx + 1}: ${opt}${isCorrect ? ' — correct answer' : ''}${isWrong ? ' — wrong answer' : ''}`}
-                            >
-                              <span className={styles.optionLetter} aria-hidden="true">
-                                {String.fromCharCode(65 + idx)}
-                              </span>
-                              <span className={styles.optionText}>{opt}</span>
-                              {isCorrect && (
-                                <span className={styles.optionIcon} aria-hidden="true">
-                                  ✓
+                            let optClass = styles.option;
+                            if (isSelected && !isSubmitted) optClass += ` ${styles.optionSelected}`;
+                            if (isCorrect) optClass += ` ${styles.optionCorrect}`;
+                            if (isWrong) optClass += ` ${styles.optionWrong}`;
+
+                            const refKey = `${q.id}-${idx}`;
+
+                            return (
+                              <button
+                                key={idx}
+                                ref={(el) => {
+                                  optionButtonRefs.current.set(refKey, el);
+                                }}
+                                type="button"
+                                className={optClass}
+                                onClick={() => {
+                                  if (!isSubmitted) selectAnswer(q.id, idx);
+                                }}
+                                onKeyDown={(e) => handleKeyDown(e, q.id, idx, options.length)}
+                                disabled={isSubmitted}
+                                aria-pressed={isSelected}
+                                aria-label={`Option ${idx + 1}: ${opt}${isCorrect ? ' — correct answer' : ''}${isWrong ? ' — wrong answer' : ''}`}
+                              >
+                                <span className={styles.optionLetter} aria-hidden="true">
+                                  {String.fromCharCode(65 + idx)}
                                 </span>
-                              )}
-                              {isWrong && (
-                                <span className={styles.optionIcon} aria-hidden="true">
-                                  ✗
-                                </span>
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
+                                <span className={styles.optionText}>{opt}</span>
+                                {isCorrect && (
+                                  <span className={styles.optionIcon} aria-hidden="true">
+                                    ✓
+                                  </span>
+                                )}
+                                {isWrong && (
+                                  <span className={styles.optionIcon} aria-hidden="true">
+                                    ✗
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
 
-                      {/* Explanation after submit */}
-                      {isSubmitted && q.explanation && (
-                        <p className={styles.explanation}>
-                          <strong>Explanation:</strong> {q.explanation}
-                        </p>
-                      )}
-                    </li>
-                  );
-                })}
-              </ol>
+                        {/* Explanation after submit */}
+                        {isSubmitted && q.explanation && (
+                          <p className={styles.explanation}>
+                            <strong>Explanation:</strong> {q.explanation}
+                          </p>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ol>
+              )}
             </section>
           );
         })}
@@ -393,7 +450,10 @@ export function ClassRunner({ classId }: ClassRunnerProps) {
         <div className={styles.actions}>
           <p className={styles.progressHint} aria-live="polite">
             {Object.keys(answers).length} of{' '}
-            {cls.sections.reduce((sum, s) => sum + s.questions.length, 0)} questions answered
+            {cls.sections
+              .filter((s) => s.skill !== 'SPEAKING')
+              .reduce((sum, s) => sum + s.questions.length, 0)}{' '}
+            questions answered
           </p>
           <button
             type="button"

@@ -176,6 +176,7 @@ export async function getClassForUser(classId: string, userId: string) {
         include: {
           questions: { orderBy: { order: 'asc' } },
           prompts: { orderBy: { order: 'asc' } },
+          podcast: { select: { id: true, audioUrl: true, title: true } },
         },
       },
       lesson: { select: { title: true, level: true, objective: true } },
