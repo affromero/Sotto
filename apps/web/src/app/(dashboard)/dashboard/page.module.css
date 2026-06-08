@@ -49,7 +49,9 @@
   font-size: var(--font-size-base);
   text-decoration: none;
   height: 48px;
-  transition: background var(--transition-fast), box-shadow var(--transition-fast);
+  transition:
+    background var(--transition-fast),
+    box-shadow var(--transition-fast);
   align-self: flex-start;
   box-shadow: 0 2px 12px rgba(217, 119, 6, 0.3);
 }
@@ -77,7 +79,8 @@
   display: flex;
   flex-direction: column;
   gap: var(--spacing-xs);
-  transition: background 350ms var(--ease-out-expo),
+  transition:
+    background 350ms var(--ease-out-expo),
     box-shadow 350ms var(--ease-out-expo),
     transform 350ms var(--ease-out-expo),
     border-color 350ms var(--ease-out-expo);
@@ -104,30 +107,6 @@
 
 .statListens:hover {
   box-shadow: 0 8px 24px rgba(16, 185, 129, 0.12);
-}
-
-.statFollowers {
-  border-left-color: var(--color-accent);
-}
-
-.statFollowers:hover {
-  box-shadow: 0 8px 24px rgba(30, 58, 95, 0.12);
-}
-
-.statForks {
-  border-left-color: var(--color-rose);
-}
-
-.statForks:hover {
-  box-shadow: 0 8px 24px rgba(244, 63, 94, 0.12);
-}
-
-.statLikes {
-  border-left-color: var(--color-pink);
-}
-
-.statLikes:hover {
-  box-shadow: 0 8px 24px rgba(236, 72, 153, 0.12);
 }
 
 .statLabel {
@@ -162,35 +141,6 @@
 
 .outOfCreditsLink:hover {
   text-decoration: underline;
-}
-
-/* Creator Stats */
-
-.creatorStats {
-  background: rgba(30, 58, 95, 0.04);
-  border: 1px solid rgba(30, 58, 95, 0.1);
-  border-radius: var(--radius-xl);
-  padding: var(--spacing-lg);
-}
-
-.creatorStatsTitle {
-  font: var(--text-h3);
-  color: var(--color-accent);
-  margin-bottom: var(--spacing-md);
-}
-
-.creatorStatsGrid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: var(--spacing-md);
-}
-
-.creatorStatCard {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xs);
-  padding-left: var(--spacing-md);
-  border-left: 3px solid var(--color-border);
 }
 
 /* Podcasts Section */
@@ -261,7 +211,9 @@
   font-size: var(--font-size-base);
   text-decoration: none;
   height: 44px;
-  transition: background var(--transition-fast), box-shadow var(--transition-fast);
+  transition:
+    background var(--transition-fast),
+    box-shadow var(--transition-fast);
 }
 
 .emptyCta:hover {
@@ -292,7 +244,9 @@
   box-shadow: var(--shadow-sm);
   text-decoration: none;
   color: inherit;
-  transition: box-shadow var(--transition-base), transform var(--transition-base);
+  transition:
+    box-shadow var(--transition-base),
+    transform var(--transition-base);
 }
 
 .miniGradientCard:hover {
@@ -319,7 +273,12 @@
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0.1) 60%, transparent 100%);
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.55) 0%,
+    rgba(0, 0, 0, 0.1) 60%,
+    transparent 100%
+  );
   pointer-events: none;
 }
 
@@ -417,65 +376,11 @@
   text-decoration: underline;
 }
 
-/* Trending to Fork — horizontal scroll */
-
-.trendingSection {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-md);
-  background: var(--color-primary-subtle);
-  border: 1px solid rgba(217, 119, 6, 0.1);
-  border-radius: var(--radius-2xl);
-  padding: var(--spacing-ml);
-}
-
-.trendingSectionHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.trendingScroll {
-  display: flex;
-  gap: var(--spacing-md);
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  -webkit-overflow-scrolling: touch;
-  padding-bottom: var(--spacing-sm);
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-.trendingScroll::-webkit-scrollbar {
-  display: none;
-}
-
-.trendingCardWrapper {
-  flex: 0 0 auto;
-  width: 200px;
-  scroll-snap-align: start;
-}
-
-.seeAllLink {
-  font: var(--text-body-sm);
-  font-weight: 500;
-  color: var(--color-primary);
-  text-decoration: none;
-}
-
-.seeAllLink:hover {
-  text-decoration: underline;
-}
-
 /* Responsive */
 
 @media (min-width: 600px) {
   .stats {
-    grid-template-columns: repeat(3, 1fr);
-  }
-
-  .creatorStatsGrid {
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(2, 1fr);
   }
 
   .header {
@@ -487,16 +392,6 @@
 
   .podcastGrid {
     grid-template-columns: repeat(2, 1fr);
-  }
-
-  .trendingCardWrapper {
-    width: 240px;
-  }
-}
-
-@media (min-width: 1024px) {
-  .trendingCardWrapper {
-    width: 260px;
   }
 }
 

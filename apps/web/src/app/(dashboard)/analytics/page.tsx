@@ -38,10 +38,14 @@ export default async function AnalyticsPage() {
         <div className={styles.upgradeCard}>
           <h1 className={styles.upgradeTitle}>Analytics</h1>
           <p className={styles.upgradeText}>
-            Analytics is a Pro feature. Upgrade to Pro to unlock performance analytics,
-            audience insights, and engagement data.
+            Analytics is a Pro feature. Upgrade to Pro to unlock performance analytics, audience
+            insights, and private activity.
           </p>
-          <ProWaitlistButton email={session.user.email!} source="pro-analytics" className={styles.upgradeLink} />
+          <ProWaitlistButton
+            email={session.user.email!}
+            source="pro-analytics"
+            className={styles.upgradeLink}
+          />
         </div>
       </main>
     );

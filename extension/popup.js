@@ -1,7 +1,9 @@
 const setupView = document.getElementById('setup-view');
 const connectedView = document.getElementById('connected-view');
 const loadingView = document.getElementById('loading-view');
+const appUrlInput = document.getElementById('app-url-input');
 const apiKeyInput = document.getElementById('api-key-input');
+const apiKeyLink = document.getElementById('api-key-link');
 const connectBtn = document.getElementById('connect-btn');
 const setupError = document.getElementById('setup-error');
 const userName = document.getElementById('user-name');
@@ -27,6 +29,25 @@ function hideError() {
   setupError.hidden = true;
 }
 
+function normalizeAppBaseUrl(value) {
+  const url = new URL(value.trim());
+  url.hash = '';
+  url.search = '';
+  const pathname = url.pathname.replace(/\/+$/, '');
+  url.pathname = pathname.endsWith('/api') ? pathname.slice(0, -4) || '/' : pathname || '/';
+  return url.toString().replace(/\/+$/, '');
+}
+
+function updateApiKeyLink() {
+  try {
+    const appBaseUrl = normalizeAppBaseUrl(appUrlInput.value);
+    apiKeyLink.href = `${appBaseUrl}/settings/api`;
+    apiKeyLink.hidden = false;
+  } catch {
+    apiKeyLink.hidden = true;
+  }
+}
+
 function formatTimeAgo(timestamp) {
   const seconds = Math.floor((Date.now() - timestamp) / 1000);
   if (seconds < 60) return 'just now';
@@ -39,11 +60,14 @@ function formatTimeAgo(timestamp) {
 }
 
 async function loadLastImport() {
-  const lastImport = await chrome.runtime.sendMessage({ type: 'GET_LAST_IMPORT' });
+  const [lastImport, config] = await Promise.all([
+    chrome.runtime.sendMessage({ type: 'GET_LAST_IMPORT' }),
+    chrome.runtime.sendMessage({ type: 'GET_CONFIG' }),
+  ]);
   if (lastImport) {
     lastImportTitle.textContent = lastImport.title;
     lastImportTime.textContent = formatTimeAgo(lastImport.timestamp);
-    lastImportLink.href = `https://sotto.fm/podcast/${lastImport.podcastId}`;
+    lastImportLink.href = `${config.appBaseUrl}/podcast/${lastImport.podcastId}`;
     lastImportEl.hidden = false;
   } else {
     lastImportEl.hidden = true;
@@ -52,6 +76,12 @@ async function loadLastImport() {
 
 async function init() {
   showView(loadingView);
+
+  const config = await chrome.runtime.sendMessage({ type: 'GET_CONFIG' });
+  if (config.appBaseUrl) {
+    appUrlInput.value = config.appBaseUrl;
+    updateApiKeyLink();
+  }
 
   const result = await chrome.runtime.sendMessage({ type: 'CHECK_AUTH' });
 
@@ -66,7 +96,20 @@ async function init() {
 
 connectBtn.addEventListener('click', async () => {
   hideError();
+  const appBaseUrl = appUrlInput.value.trim();
   const key = apiKeyInput.value.trim();
+
+  if (!appBaseUrl) {
+    showError('Please enter your Sotto deployment URL');
+    return;
+  }
+
+  try {
+    normalizeAppBaseUrl(appBaseUrl);
+  } catch {
+    showError('Sotto URL must be a valid absolute URL');
+    return;
+  }
 
   if (!key) {
     showError('Please enter your API key');
@@ -81,7 +124,11 @@ connectBtn.addEventListener('click', async () => {
   connectBtn.disabled = true;
   connectBtn.textContent = 'Connecting...';
 
-  const result = await chrome.runtime.sendMessage({ type: 'SET_API_KEY', apiKey: key });
+  const result = await chrome.runtime.sendMessage({
+    type: 'SET_CONFIG',
+    appBaseUrl,
+    apiKey: key,
+  });
 
   if (result.ok) {
     userName.textContent = result.user.name || result.user.email || 'Connected';
@@ -101,9 +148,17 @@ apiKeyInput.addEventListener('keydown', (e) => {
   }
 });
 
+appUrlInput.addEventListener('input', updateApiKeyLink);
+appUrlInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    connectBtn.click();
+  }
+});
+
 disconnectBtn.addEventListener('click', async () => {
-  await chrome.runtime.sendMessage({ type: 'CLEAR_API_KEY' });
+  await chrome.runtime.sendMessage({ type: 'CLEAR_AUTH' });
   apiKeyInput.value = '';
+  updateApiKeyLink();
   showView(setupView);
 });
 

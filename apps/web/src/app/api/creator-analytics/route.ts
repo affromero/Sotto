@@ -8,7 +8,7 @@ import {
   getCreatorOverview,
   getCreatorTopPodcasts,
   getCreatorDailyPlays,
-  getCreatorEngagement,
+  getCreatorPrivateActivity,
   getCreatorAudienceInsights,
 } from '@/lib/creator-metrics';
 
@@ -53,11 +53,11 @@ export async function GET(request: NextRequest) {
 
   const since = periodToDate(parsed.data.period);
 
-  const [overview, topPodcasts, dailyPlays, engagement, audienceInsights] = await Promise.all([
+  const [overview, topPodcasts, dailyPlays, privateActivity, audienceInsights] = await Promise.all([
     getCreatorOverview(userId, since),
     getCreatorTopPodcasts(userId, since),
     getCreatorDailyPlays(userId, since),
-    getCreatorEngagement(userId, since),
+    getCreatorPrivateActivity(userId, since),
     getCreatorAudienceInsights(userId, since),
   ]);
 
@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
     overview,
     topPodcasts,
     dailyPlays,
-    engagement,
+    privateActivity,
     audienceInsights,
     period: parsed.data.period,
   });

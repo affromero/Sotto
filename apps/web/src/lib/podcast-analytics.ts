@@ -10,18 +10,15 @@ export interface PodcastOverviewData {
   uniqueListeners: number;
   avgCompletion: number;
   listenHours: number;
-  likes: number;
   saves: number;
-  forks: number;
-  comments: number;
-  interactions: number;
+  questions: number;
 }
 
 export async function getPodcastOverview(podcastId: string): Promise<PodcastOverviewData> {
-  const [podcast, sessionAgg, uniqueListeners, interactions] = await Promise.all([
+  const [podcast, sessionAgg, uniqueListeners, questions] = await Promise.all([
     prisma.podcast.findUnique({
       where: { id: podcastId },
-      select: { playCount: true, likeCount: true, forkCount: true, saveCount: true, commentCount: true },
+      select: { playCount: true, saveCount: true },
     }),
     prisma.playbackSession.aggregate({
       where: { podcastId },
@@ -42,11 +39,8 @@ export async function getPodcastOverview(podcastId: string): Promise<PodcastOver
     uniqueListeners: Number(uniqueListeners[0]?.count ?? 0),
     avgCompletion: sessionAgg._avg.completionPercent ?? 0,
     listenHours: (sessionAgg._sum.totalListenSeconds ?? 0) / 3600,
-    likes: podcast?.likeCount ?? 0,
     saves: podcast?.saveCount ?? 0,
-    forks: podcast?.forkCount ?? 0,
-    comments: podcast?.commentCount ?? 0,
-    interactions,
+    questions,
   };
 }
 
@@ -81,7 +75,9 @@ export interface RetentionBucket {
   abandonRate: number;
 }
 
-export async function getPodcastRetentionCurve(podcastId: string): Promise<RetentionBucket[] | null> {
+export async function getPodcastRetentionCurve(
+  podcastId: string
+): Promise<RetentionBucket[] | null> {
   const feature = await prisma.podcastFeature.findUnique({
     where: { podcastId },
     select: { abandonmentCurve: true },
@@ -92,35 +88,41 @@ export async function getPodcastRetentionCurve(podcastId: string): Promise<Reten
   return feature.abandonmentCurve as unknown as RetentionBucket[];
 }
 
-export interface PodcastEngagementData {
-  likes: number;
+export interface PodcastPrivateActivityData {
   saves: number;
-  forks: number;
-  comments: number;
-  interactions: number;
-  upvotes: number;
+  questions: number;
+  answered: number;
+  incorporated: number;
+  ratings: number;
 }
 
-export async function getPodcastEngagement(podcastId: string): Promise<PodcastEngagementData> {
-  const [podcast, interactions, upvotes] = await Promise.all([
+export async function getPodcastPrivateActivity(
+  podcastId: string
+): Promise<PodcastPrivateActivityData> {
+  const [podcast, questions, answered, incorporated, ratings] = await Promise.all([
     prisma.podcast.findUnique({
       where: { id: podcastId },
-      select: { likeCount: true, saveCount: true, forkCount: true, commentCount: true },
+      select: { saveCount: true },
     }),
     prisma.interaction.count({ where: { podcastId } }),
-    prisma.interaction.aggregate({
-      where: { podcastId },
-      _sum: { upvoteCount: true },
+    prisma.interaction.count({
+      where: {
+        podcastId,
+        status: { in: ['ANSWERED', 'INCORPORATED', 'RESOLVED'] },
+      },
     }),
+    prisma.interaction.count({
+      where: { podcastId, incorporated: true },
+    }),
+    prisma.podcastRating.count({ where: { podcastId } }),
   ]);
 
   return {
-    likes: podcast?.likeCount ?? 0,
     saves: podcast?.saveCount ?? 0,
-    forks: podcast?.forkCount ?? 0,
-    comments: podcast?.commentCount ?? 0,
-    interactions,
-    upvotes: upvotes._sum.upvoteCount ?? 0,
+    questions,
+    answered,
+    incorporated,
+    ratings,
   };
 }
 
@@ -165,7 +167,10 @@ export async function getPodcastListenerBehavior(podcastId: string): Promise<Lis
 
   return {
     speedDistribution: speedDist.map((s) => ({ speed: s.speed, count: Number(s.count) })),
-    completionDistribution: completionDist.map((c) => ({ bucket: c.bucket, count: Number(c.count) })),
+    completionDistribution: completionDist.map((c) => ({
+      bucket: c.bucket,
+      count: Number(c.count),
+    })),
   };
 }
 
@@ -174,7 +179,9 @@ export interface TrafficSourceData {
   percentage: number;
 }
 
-export async function getPodcastTrafficSources(podcastId: string): Promise<TrafficSourceData[] | null> {
+export async function getPodcastTrafficSources(
+  podcastId: string
+): Promise<TrafficSourceData[] | null> {
   const feature = await prisma.podcastFeature.findUnique({
     where: { podcastId },
     select: { completionBySource: true },

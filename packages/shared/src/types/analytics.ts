@@ -45,8 +45,8 @@ export interface CreatorTopPodcast {
   title: string | null;
   plays: number;
   completionPercent: number;
-  likes: number;
-  forks: number;
+  saves: number;
+  questions: number;
 }
 
 export interface CreatorDailyPlays {
@@ -54,13 +54,12 @@ export interface CreatorDailyPlays {
   plays: number;
 }
 
-export interface CreatorEngagement {
-  likes: number;
+export interface CreatorPrivateActivity {
   saves: number;
-  comments: number;
-  forks: number;
-  follows: number;
-  interactions: number;
+  questions: number;
+  answered: number;
+  incorporated: number;
+  ratings: number;
 }
 
 export interface CreatorAudienceInsights {
@@ -72,7 +71,7 @@ export interface CreatorAnalyticsResponse {
   overview: CreatorOverview;
   topPodcasts: CreatorTopPodcast[];
   dailyPlays: CreatorDailyPlays[];
-  engagement: CreatorEngagement;
+  privateActivity: CreatorPrivateActivity;
   audienceInsights: CreatorAudienceInsights;
   period: string;
 }

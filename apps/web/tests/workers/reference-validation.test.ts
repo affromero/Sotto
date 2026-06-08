@@ -18,6 +18,7 @@ const mockPrismaPodcastFindUnique = vi.fn().mockResolvedValue({
 });
 const mockPrismaPodcastFindUniqueOrThrow = vi.fn().mockResolvedValue({
   source: 'TWITTER',
+  ttsProvider: 'elevenlabs',
 });
 const mockPrismaPodcastUpdate = vi.fn().mockResolvedValue({});
 const mockPrismaSegmentCreate = vi.fn().mockResolvedValue({ id: 'segment-001' });
@@ -138,10 +139,16 @@ vi.mock('@/lib/segment-creator', () => ({
   createSegmentsAndQueueAudio: (...args: unknown[]) => mockCreateSegmentsAndQueueAudio(...args),
 }));
 
+const { mockGetAiKey, mockHasByokKey, mockGetByokKey } = vi.hoisted(() => ({
+  mockGetAiKey: vi.fn().mockResolvedValue({ apiKey: 'anthropic-key', provider: 'anthropic' }),
+  mockHasByokKey: vi.fn().mockResolvedValue(false),
+  mockGetByokKey: vi.fn().mockResolvedValue(null),
+}));
+
 vi.mock('@/lib/byok', () => ({
-  getAiKey: vi.fn().mockResolvedValue(null),
-  hasByokKey: vi.fn().mockResolvedValue(false),
-  getByokKey: vi.fn().mockResolvedValue(null),
+  getAiKey: mockGetAiKey,
+  hasByokKey: mockHasByokKey,
+  getByokKey: mockGetByokKey,
 }));
 
 vi.mock('@/lib/tier-features', () => ({
@@ -161,8 +168,12 @@ vi.mock('@/lib/tier-features', () => ({
   getJobPriority: vi.fn().mockReturnValue(1),
 }));
 
+const { mockResolveAiModelAndProvider } = vi.hoisted(() => ({
+  mockResolveAiModelAndProvider: vi.fn().mockResolvedValue({ model: 'claude-haiku-4-5-20251001', provider: 'anthropic' }),
+}));
+
 vi.mock('@/lib/providers/ai-registry', () => ({
-  resolveAiModelAndProvider: vi.fn().mockResolvedValue({ model: 'claude-haiku-4-5-20251001', provider: 'anthropic' }),
+  resolveAiModelAndProvider: mockResolveAiModelAndProvider,
   getCheapestModelForProvider: vi.fn().mockReturnValue('claude-haiku-4-5-20251001'),
   getAllAiProviderMeta: vi.fn().mockReturnValue([]),
   getAiProviderMeta: vi.fn().mockReturnValue({ id: 'anthropic', models: [] }),
@@ -224,9 +235,13 @@ vi.mock('@/lib/script-verifier', () => ({
   },
 }));
 
+const { mockGenerateScriptWithFeedback } = vi.hoisted(() => ({
+  mockGenerateScriptWithFeedback: vi.fn().mockResolvedValue({ turns: [], references: [], markdown: '' }),
+}));
+
 vi.mock('@/lib/script-generator', () => ({
   generateScript: vi.fn().mockResolvedValue({ turns: [], references: [], markdown: '' }),
-  generateScriptWithFeedback: vi.fn().mockResolvedValue({ turns: [], references: [], markdown: '' }),
+  generateScriptWithFeedback: mockGenerateScriptWithFeedback,
   generateScriptWithUserFeedback: vi.fn().mockResolvedValue({ turns: [], references: [], markdown: '' }),
 }));
 
@@ -240,10 +255,6 @@ vi.mock('@/lib/auto-model-config', () => ({
     platformAiModel: 'claude-haiku-4-5-20251001',
     dailyFreeLimit: 3,
     dailyProLimit: 50,
-  }),
-  resolveAutoModel: vi.fn().mockResolvedValue({
-    aiProvider: 'anthropic',
-    aiModel: 'claude-haiku-4-5-20251001',
   }),
 }));
 
@@ -312,8 +323,15 @@ describe('processReferenceValidation', () => {
     mockPrismaPodcastFindUnique.mockResolvedValue({
       topic: 'Quantum Computing Basics',
       source: 'TWITTER',
+      aiModel: null,
       verificationMode: 'standard',
     });
+
+    mockGetAiKey.mockResolvedValue({ apiKey: 'anthropic-key', provider: 'anthropic' });
+    mockHasByokKey.mockResolvedValue(false);
+    mockGetByokKey.mockResolvedValue(null);
+    mockResolveAiModelAndProvider.mockResolvedValue({ model: 'claude-haiku-4-5-20251001', provider: 'anthropic' });
+    mockGenerateScriptWithFeedback.mockResolvedValue({ turns: [], references: [], markdown: '' });
 
     mockRunReferenceVerification.mockResolvedValue({
       results: new Map(
@@ -346,6 +364,217 @@ describe('processReferenceValidation', () => {
 
       await expect(processReferenceValidation(job)).rejects.toThrow(
         'Script not found for podcast podcast-001'
+      );
+    });
+  });
+
+  describe('AI routing', () => {
+    it('uses the configured BYOK provider when the podcast has no model', async () => {
+      const aiKey = { apiKey: 'anthropic-key', provider: 'anthropic' };
+      mockGetAiKey.mockResolvedValue(aiKey);
+
+      const job = createMockJob(defaultPayload);
+      await processReferenceValidation(job);
+
+      expect(mockGetAiKey).toHaveBeenCalledTimes(1);
+      expect(mockGetAiKey).toHaveBeenCalledWith('user-001');
+      expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
+        podcastAiModel: null,
+        aiKey,
+        plan: 'PRO',
+      });
+      expect(mockRunReferenceVerification).toHaveBeenCalledWith(
+        expect.any(Array),
+        expect.any(Array),
+        'Quantum Computing Basics',
+        'anthropic-key',
+        'claude-haiku-4-5-20251001',
+        'anthropic',
+        expect.any(Number)
+      );
+    });
+
+    it('uses the explicit podcast model owner and matching provider key', async () => {
+      mockPrismaPodcastFindUnique.mockResolvedValue({
+        topic: 'Quantum Computing Basics',
+        source: 'TWITTER',
+        aiModel: 'gpt-5-mini',
+        verificationMode: 'standard',
+      });
+      mockResolveAiModelAndProvider.mockResolvedValue({
+        model: 'gpt-5-mini',
+        provider: 'openai',
+      });
+      mockGetAiKey.mockResolvedValue({ apiKey: 'openai-key', provider: 'openai' });
+
+      const job = createMockJob(defaultPayload);
+      await processReferenceValidation(job);
+
+      expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
+        podcastAiModel: 'gpt-5-mini',
+        aiKey: null,
+        plan: 'PRO',
+      });
+      expect(mockGetAiKey).toHaveBeenCalledTimes(1);
+      expect(mockGetAiKey).toHaveBeenCalledWith('user-001', 'openai');
+      expect(mockRunReferenceVerification).toHaveBeenCalledWith(
+        expect.any(Array),
+        expect.any(Array),
+        'Quantum Computing Basics',
+        'openai-key',
+        'gpt-5-mini',
+        'openai',
+        expect.any(Number)
+      );
+    });
+
+    it('rejects explicit non-local models without a matching provider key', async () => {
+      mockPrismaPodcastFindUnique.mockResolvedValue({
+        topic: 'Quantum Computing Basics',
+        source: 'TWITTER',
+        aiModel: 'gpt-5-mini',
+        verificationMode: 'standard',
+      });
+      mockResolveAiModelAndProvider.mockResolvedValue({
+        model: 'gpt-5-mini',
+        provider: 'openai',
+      });
+      mockGetAiKey.mockResolvedValue(null);
+
+      const job = createMockJob(defaultPayload);
+      await expect(processReferenceValidation(job)).rejects.toThrow(
+        'AI key for provider "openai" is required for reference validation.'
+      );
+      expect(mockRunReferenceVerification).not.toHaveBeenCalled();
+    });
+
+    it('rejects missing model and missing BYOK key before verification', async () => {
+      mockGetAiKey.mockResolvedValue(null);
+
+      const job = createMockJob(defaultPayload);
+      await expect(processReferenceValidation(job)).rejects.toThrow(
+        'AI model is required for reference validation when no AI key is configured.'
+      );
+      expect(mockResolveAiModelAndProvider).not.toHaveBeenCalled();
+      expect(mockRunReferenceVerification).not.toHaveBeenCalled();
+    });
+
+    it('uses platform credentials only for explicit admin-credit routes', async () => {
+      mockPrismaPodcastFindUnique.mockResolvedValue({
+        topic: 'Quantum Computing Basics',
+        source: 'TWITTER',
+        aiModel: 'gpt-5-mini',
+        verificationMode: 'standard',
+      });
+      mockResolveAiModelAndProvider.mockResolvedValue({
+        model: 'gpt-5-mini',
+        provider: 'openai',
+      });
+
+      const job = createMockJob({ ...defaultPayload, useAdminCredits: true });
+      await processReferenceValidation(job);
+
+      expect(mockGetAiKey).not.toHaveBeenCalled();
+      expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
+        podcastAiModel: 'gpt-5-mini',
+        aiKey: null,
+        plan: 'PRO',
+      });
+      expect(mockRunReferenceVerification).toHaveBeenCalledWith(
+        expect.any(Array),
+        expect.any(Array),
+        'Quantum Computing Basics',
+        undefined,
+        'gpt-5-mini',
+        'openai',
+        expect.any(Number)
+      );
+    });
+
+    it('rejects admin-credit routes without an explicit model when references need AI', async () => {
+      const job = createMockJob({ ...defaultPayload, useAdminCredits: true });
+
+      await expect(processReferenceValidation(job)).rejects.toThrow(
+        'AI model is required for reference validation when no AI key is configured.'
+      );
+      expect(mockGetAiKey).not.toHaveBeenCalled();
+      expect(mockResolveAiModelAndProvider).not.toHaveBeenCalled();
+      expect(mockRunReferenceVerification).not.toHaveBeenCalled();
+    });
+
+    it('allows local claude-code models without provider keys', async () => {
+      mockPrismaPodcastFindUnique.mockResolvedValue({
+        topic: 'Quantum Computing Basics',
+        source: 'TWITTER',
+        aiModel: 'claude-code:sonnet',
+        verificationMode: 'standard',
+      });
+      mockResolveAiModelAndProvider.mockResolvedValue({
+        model: 'claude-code:sonnet',
+        provider: 'claude-code',
+      });
+      mockGetAiKey.mockResolvedValue(null);
+
+      const job = createMockJob(defaultPayload);
+      await processReferenceValidation(job);
+
+      expect(mockGetAiKey).not.toHaveBeenCalled();
+      expect(mockRunReferenceVerification).toHaveBeenCalledWith(
+        expect.any(Array),
+        expect.any(Array),
+        'Quantum Computing Basics',
+        undefined,
+        'claude-code:sonnet',
+        'claude-code',
+        expect.any(Number)
+      );
+    });
+
+    it('skips AI routing when no references require verification', async () => {
+      mockPrismaReferenceFindMany.mockResolvedValue([]);
+      mockPrismaPodcastFindUnique.mockResolvedValue({
+        topic: 'Quantum Computing Basics',
+        source: 'TWITTER',
+        aiModel: null,
+        verificationMode: 'showcase',
+      });
+      mockGetAiKey.mockResolvedValue(null);
+
+      const job = createMockJob(defaultPayload);
+      await processReferenceValidation(job);
+
+      expect(mockGetAiKey).not.toHaveBeenCalled();
+      expect(mockResolveAiModelAndProvider).not.toHaveBeenCalled();
+      expect(mockRunReferenceVerification).not.toHaveBeenCalled();
+      expect(mockCreateSegmentsAndQueueAudio).toHaveBeenCalled();
+    });
+
+    it('uses the routed provider key for retry script regeneration', async () => {
+      mockRunReferenceVerification.mockResolvedValue({
+        results: new Map(
+          Array.from({ length: 5 }, (_, i) => [
+            `ref-00${i + 1}`,
+            {
+              domain: 'GENERAL',
+              verdict: { status: i === 0 ? 'VERIFIED' : 'REMOVED', confidence: 0.8 },
+              score: 0.8,
+              checks: [],
+              logOddsContributions: {},
+            },
+          ])
+        ),
+        rejectedRefIds: new Set<string>(),
+      });
+
+      const job = createMockJob(defaultPayload);
+      await processReferenceValidation(job);
+
+      expect(mockGenerateScriptWithFeedback).toHaveBeenCalledWith(
+        expect.objectContaining({
+          apiKeyOverride: 'anthropic-key',
+          model: 'claude-haiku-4-5-20251001',
+          provider: 'anthropic',
+        })
       );
     });
   });
@@ -390,7 +619,7 @@ describe('processReferenceValidation', () => {
           expect.objectContaining({ speaker: 'HOST' }),
         ]),
         'Quantum Computing Basics',
-        undefined,
+        'anthropic-key',
         expect.any(String),
         'anthropic',
         expect.any(Number)
@@ -940,7 +1169,10 @@ describe('processReferenceValidation', () => {
         source: 'TWITTER',
         verificationMode: 'showcase',
       });
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({ source: 'TWITTER' });
+      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+        source: 'TWITTER',
+        ttsProvider: 'elevenlabs',
+      });
     });
 
     it('calls selectFreeTierProviders for free-tier user (no-refs path)', async () => {
@@ -961,7 +1193,7 @@ describe('processReferenceValidation', () => {
       );
     });
 
-    it('skips selectFreeTierProviders for BYOK user (no-refs path)', async () => {
+    it('uses persisted ttsProvider for BYOK user (no-refs path)', async () => {
       const { hasByokKey } = await import('@/lib/byok');
       (hasByokKey as ReturnType<typeof vi.fn>).mockResolvedValue(true);
 
@@ -971,6 +1203,33 @@ describe('processReferenceValidation', () => {
       await processReferenceValidation(job);
 
       expect(selectFreeTierProviders).not.toHaveBeenCalled();
+      expect(mockCreateSegmentsAndQueueAudio).toHaveBeenCalled();
+    });
+
+    it('pauses BYOK no-refs auto-approval when no ttsProvider is persisted', async () => {
+      const { hasByokKey } = await import('@/lib/byok');
+      (hasByokKey as ReturnType<typeof vi.fn>).mockResolvedValue(true);
+      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValueOnce({ ttsProvider: null });
+
+      const job = createMockJob(defaultPayload);
+      await processReferenceValidation(job);
+
+      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'podcast-001' },
+          data: expect.objectContaining({ status: 'SCRIPT_READY' }),
+        })
+      );
+      expect(mockAddJob).toHaveBeenCalledWith(
+        expect.anything(),
+        'send_notification',
+        expect.objectContaining({
+          userId: 'user-001',
+          type: 'SCRIPT_READY',
+          data: expect.objectContaining({ podcastId: 'podcast-001', missingTtsProvider: true }),
+        })
+      );
+      expect(mockCreateSegmentsAndQueueAudio).not.toHaveBeenCalled();
     });
 
     it('calls selectFreeTierProviders for free-tier at full-validation auto-approve', async () => {
@@ -986,7 +1245,10 @@ describe('processReferenceValidation', () => {
       });
       mockPrismaPodcastFindUnique.mockResolvedValue({ topic: 'Test', source: 'TWITTER', verificationMode: 'standard' });
       // TWITTER auto-approves + non-BYOK
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({ source: 'TWITTER' });
+      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+        source: 'TWITTER',
+        ttsProvider: 'elevenlabs',
+      });
       const { hasByokKey } = await import('@/lib/byok');
       (hasByokKey as ReturnType<typeof vi.fn>).mockResolvedValue(false);
 
@@ -1003,7 +1265,7 @@ describe('processReferenceValidation', () => {
       );
     });
 
-    it('skips selectFreeTierProviders for BYOK at full-validation auto-approve', async () => {
+    it('uses persisted ttsProvider for BYOK at full-validation auto-approve', async () => {
       mockPrismaReferenceFindMany.mockResolvedValue(
         Array.from({ length: 5 }, (_, i) => ({ id: `ref-00${i + 1}`, number: i + 1, title: 'Paper', authors: [], year: 2023, url: 'https://example.com', doi: null, type: 'article' }))
       );
@@ -1014,7 +1276,10 @@ describe('processReferenceValidation', () => {
         rejectedRefIds: new Set<string>(),
       });
       mockPrismaPodcastFindUnique.mockResolvedValue({ topic: 'Test', source: 'TWITTER', verificationMode: 'standard' });
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({ source: 'TWITTER' });
+      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+        source: 'TWITTER',
+        ttsProvider: 'elevenlabs',
+      });
       const { hasByokKey } = await import('@/lib/byok');
       (hasByokKey as ReturnType<typeof vi.fn>).mockResolvedValue(true);
 
@@ -1024,6 +1289,43 @@ describe('processReferenceValidation', () => {
       await processReferenceValidation(job);
 
       expect(selectFreeTierProviders).not.toHaveBeenCalled();
+      expect(mockCreateSegmentsAndQueueAudio).toHaveBeenCalled();
+    });
+
+    it('pauses BYOK full-validation auto-approval when no ttsProvider is persisted', async () => {
+      mockPrismaReferenceFindMany.mockResolvedValue(
+        Array.from({ length: 5 }, (_, i) => ({ id: `ref-00${i + 1}`, number: i + 1, title: 'Paper', authors: [], year: 2023, url: 'https://example.com', doi: null, type: 'article' }))
+      );
+      mockRunReferenceVerification.mockResolvedValue({
+        results: new Map(
+          Array.from({ length: 5 }, (_, i) => [`ref-00${i + 1}`, { domain: 'GENERAL', verdict: { status: 'VERIFIED' as const, confidence: 0.8 }, score: 0.8, checks: [], logOddsContributions: {} }])
+        ),
+        rejectedRefIds: new Set<string>(),
+      });
+      mockPrismaPodcastFindUnique.mockResolvedValue({ topic: 'Test', source: 'TWITTER', verificationMode: 'standard' });
+      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValueOnce({ ttsProvider: null });
+      const { hasByokKey } = await import('@/lib/byok');
+      (hasByokKey as ReturnType<typeof vi.fn>).mockResolvedValue(true);
+
+      const job = createMockJob(defaultPayload);
+      await processReferenceValidation(job);
+
+      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'podcast-001' },
+          data: expect.objectContaining({ status: 'SCRIPT_READY' }),
+        })
+      );
+      expect(mockAddJob).toHaveBeenCalledWith(
+        expect.anything(),
+        'send_notification',
+        expect.objectContaining({
+          userId: 'user-001',
+          type: 'SCRIPT_READY',
+          data: expect.objectContaining({ podcastId: 'podcast-001', missingTtsProvider: true }),
+        })
+      );
+      expect(mockCreateSegmentsAndQueueAudio).not.toHaveBeenCalled();
     });
   });
 

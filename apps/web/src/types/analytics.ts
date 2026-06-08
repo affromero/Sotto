@@ -7,7 +7,7 @@ export type {
   CreatorOverview,
   CreatorTopPodcast,
   CreatorDailyPlays,
-  CreatorEngagement,
+  CreatorPrivateActivity,
   CreatorAudienceInsights,
   CreatorAnalyticsResponse,
 } from '@sotto/shared';

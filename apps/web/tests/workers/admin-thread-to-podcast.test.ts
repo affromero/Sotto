@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Job } from 'bullmq';
 import type { AdminThreadToPodcastPayload } from '@/lib/queue';
 
@@ -73,6 +73,26 @@ vi.mock('@/lib/twitter-config', () => ({
   }),
 }));
 
+const mockGetAiKey = vi.fn().mockResolvedValue({
+  apiKey: 'anthropic-key',
+  provider: 'anthropic',
+});
+
+vi.mock('@/lib/byok', () => ({
+  getAiKey: (...args: unknown[]) => mockGetAiKey(...args),
+}));
+
+vi.mock('@/lib/providers/ai-registry', () => ({
+  getProviderForModel: vi.fn((model: string) => {
+    if (model.startsWith('gpt-')) return 'openai';
+    if (model.startsWith('claude-')) return 'anthropic';
+    return null;
+  }),
+  getAiProviderMeta: vi.fn((provider: string) => ({
+    defaultModel: provider === 'openai' ? 'gpt-5-nano' : 'claude-haiku-4-5-20251001',
+  })),
+}));
+
 vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
@@ -112,7 +132,8 @@ const DEFAULT_PARSED = {
 describe('processAdminThreadToPodcast', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockPrismaUserFindUnique.mockResolvedValue({ id: 'sotto-user-id' });
+    vi.stubEnv('SYSTEM_USER_HANDLE', 'system');
+    mockPrismaUserFindUnique.mockResolvedValue({ id: 'system-owner-id' });
     mockSelectVoicePair.mockReturnValue({
       host: { id: 'host-v1' },
       expert: { id: 'expert-v1' },
@@ -122,7 +143,12 @@ describe('processAdminThreadToPodcast', () => {
     mockPrismaPodcastCreate.mockResolvedValue({ id: 'podcast-001' });
     mockGetVerifiedParticipants.mockReturnValue([]);
     mockLookupParticipantCredentials.mockResolvedValue([]);
+    mockGetAiKey.mockResolvedValue({ apiKey: 'anthropic-key', provider: 'anthropic' });
     mockFormatThreadAsSourceText.mockReturnValue('## Thread source text');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   describe('URL parsing', () => {
@@ -188,11 +214,14 @@ describe('processAdminThreadToPodcast', () => {
       });
       await processAdminThreadToPodcast(job);
 
-      expect(mockParseTweetIntent).toHaveBeenCalledWith('Single tweet about AI');
+      expect(mockParseTweetIntent).toHaveBeenCalledWith('Single tweet about AI', undefined, {
+        userId: 'system-owner-id',
+        aiModel: undefined,
+      });
       expect(mockParseThreadIntent).not.toHaveBeenCalled();
       expect(mockPrismaPodcastCreate).toHaveBeenCalledWith({
         data: expect.objectContaining({
-          userId: 'sotto-user-id',
+          userId: 'system-owner-id',
           source: 'TWITTER',
           sourceTweetId: '111',
           status: 'EXTRACTING',
@@ -263,6 +292,39 @@ describe('processAdminThreadToPodcast', () => {
         }),
       });
     });
+
+    it('passes explicit AI runtime to participant credential lookup', async () => {
+      const verifiedParticipants = [
+        { authorUsername: 'alice', authorName: 'Alice', authorBio: 'Researcher' },
+      ];
+      mockGetTweet.mockResolvedValue({ tweet: {
+        id: '555',
+        text: 'Thread starter',
+        author_id: 'author-1',
+        conversation_id: '555',
+        created_at: '2025-01-01T00:00:00Z',
+      }, mediaByKey: new Map() });
+      mockGetThread.mockResolvedValue({
+        rootTweet: { text: 'Thread starter', authorUsername: 'user1' },
+        replies: [
+          { text: 'Reply 1', authorUsername: 'user2' },
+          { text: 'Reply 2', authorUsername: 'user3' },
+        ],
+        isSelfAuthored: false,
+      });
+      mockGetVerifiedParticipants.mockReturnValue(verifiedParticipants);
+
+      await processAdminThreadToPodcast(createMockJob({
+        tweetUrl: 'https://x.com/user/status/555',
+        adminUserId: 'admin-1',
+      }));
+
+      expect(mockLookupParticipantCredentials).toHaveBeenCalledWith(verifiedParticipants, {
+        providerType: 'anthropic',
+        model: 'claude-haiku-4-5-20251001',
+        apiKeyOverride: 'anthropic-key',
+      });
+    });
   });
 
   describe('error handling', () => {
@@ -277,7 +339,7 @@ describe('processAdminThreadToPodcast', () => {
       await expect(processAdminThreadToPodcast(job)).rejects.toThrow('Tweet not found');
     });
 
-    it('throws when @sotto user is missing', async () => {
+    it('throws when configured system owner user is missing', async () => {
       mockGetTweet.mockResolvedValue({ tweet: {
         id: '444',
         text: 'Test',
@@ -292,7 +354,9 @@ describe('processAdminThreadToPodcast', () => {
         adminUserId: 'admin-1',
       });
 
-      await expect(processAdminThreadToPodcast(job)).rejects.toThrow('@sotto system account not found');
+      await expect(processAdminThreadToPodcast(job)).rejects.toThrow(
+        'Configured system owner @system was not found',
+      );
     });
   });
 
@@ -391,7 +455,10 @@ describe('processAdminThreadToPodcast', () => {
       // parseThreadIntent should be called for content (thread qualifies)
       expect(mockParseThreadIntent).toHaveBeenCalled();
       // parseTweetIntent called for admin overrides
-      expect(mockParseTweetIntent).toHaveBeenCalledWith('eli5 for beginners');
+      expect(mockParseTweetIntent).toHaveBeenCalledWith('eli5 for beginners', undefined, {
+        userId: 'system-owner-id',
+        aiModel: undefined,
+      });
 
       expect(mockPrismaPodcastCreate).toHaveBeenCalledWith({
         data: expect.objectContaining({
@@ -430,7 +497,7 @@ describe('processAdminThreadToPodcast', () => {
         'EXTRACT_CONTENT',
         expect.objectContaining({
           podcastId: 'podcast-001',
-          userId: 'sotto-user-id',
+          userId: 'system-owner-id',
         })
       );
     });

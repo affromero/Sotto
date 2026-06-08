@@ -1,11 +1,11 @@
-# sotto.fm — Caddy site fragment
-# Deployed to: /etc/caddy/conf.d/sotto.fm
-# Imported by the shared /etc/caddy/Caddyfile on sotto-prod
+# Sotto Caddy site fragment template.
+# Rendered by scripts/deploy.sh to /etc/caddy/conf.d/sotto.conf by default.
+# The shared /etc/caddy/Caddyfile must import /etc/caddy/conf.d/*.
 #
 # Blue-green deploy: both slots listed, Caddy auto-routes to whichever is healthy.
 # During normal operation only one slot is up. During transitions both are briefly up.
 
-sotto.fm {
+__SOTTO_APP_DOMAIN__ {
 	reverse_proxy localhost:3000 localhost:3010 {
 		lb_policy first
 		health_uri /api/health
@@ -35,7 +35,8 @@ sotto.fm {
 	}
 }
 
-maps.sotto.fm {
+# BEGIN_OPTIONAL_MAPS
+__SOTTO_MAPS_DOMAIN__ {
 	reverse_proxy localhost:3002 localhost:3012 {
 		lb_policy first
 		health_uri /api/health
@@ -61,9 +62,11 @@ maps.sotto.fm {
 		}
 	}
 }
+# END_OPTIONAL_MAPS
 
-www.sotto.fm {
-	# Telegram webhook — proxy directly (Telegram can't resolve apex .fm domains)
+# BEGIN_OPTIONAL_WWW
+__SOTTO_WWW_DOMAIN__ {
+	# Telegram webhook — proxy directly when a deployment registers webhooks on the www host.
 	handle /api/telegram/webhook {
 		reverse_proxy localhost:3000 localhost:3010 {
 			lb_policy first
@@ -76,6 +79,7 @@ www.sotto.fm {
 
 	# Everything else redirects to apex
 	handle {
-		redir https://sotto.fm{uri} permanent
+		redir https://__SOTTO_APP_DOMAIN__{uri} permanent
 	}
 }
+# END_OPTIONAL_WWW

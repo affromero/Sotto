@@ -23,7 +23,16 @@ export type PodcastStatus =
 
 export type PodcastVisibility = 'PUBLIC' | 'UNLISTED' | 'PRIVATE';
 
-export type PodcastSource = 'WEB' | 'TWITTER' | 'TELEGRAM' | 'API' | 'IMPORT' | 'ADMIN' | 'BRIEFING';
+export type PodcastSource =
+  | 'WEB'
+  | 'TWITTER'
+  | 'TELEGRAM'
+  | 'API'
+  | 'AGENT'
+  | 'MEETING'
+  | 'IMPORT'
+  | 'ADMIN'
+  | 'BRIEFING';
 
 export type Speaker = string;
 
@@ -61,19 +70,12 @@ export type NotificationType =
   | 'PODCAST_READY'
   | 'PODCAST_FAILED'
   | 'KEY_INVALID'
-  | 'PODCAST_LIKED'
-  | 'PODCAST_FORKED'
-  | 'NEW_FOLLOWER'
-  | 'SIMILAR_PODCAST_CREATED'
   | 'TWITTER_PODCAST_READY'
   | 'TELEGRAM_PODCAST_READY'
   | 'VOICE_REQUEST_RECEIVED'
   | 'VOICE_REQUEST_APPROVED'
   | 'VOICE_REQUEST_DENIED'
   | 'QUESTION_ON_YOUR_PODCAST'
-  | 'QUESTION_UPVOTED'
-  | 'COMMENT_ON_YOUR_PODCAST'
-  | 'COMMENT_REPLY'
   | 'SCRIPT_READY'
   | 'ACCOUNT_WARNING'
   | 'ACCOUNT_SUSPENDED'

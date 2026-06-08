@@ -1108,7 +1108,7 @@ function LipSyncSection({
       const res = await fetch('/api/voices/preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ voiceId: DEFAULT_VOICE_ID, text: textPrompt }),
+        body: JSON.stringify({ voiceId: DEFAULT_VOICE_ID, text: textPrompt, provider: 'elevenlabs' }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));

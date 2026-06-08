@@ -1,160 +1,145 @@
-# 17 — Roles, Dashboards & Admin
+# Roles, Dashboards, and Admin
 
-## Role System Overview
+> **Date**: 2026-05-15
+>
+> **Summary**: Sotto roles control workspace and admin access. They do not create a creator network or public ranking layer. Dashboards focus on private library health, provider readiness, source status, worker operations, and managed hosting administration.
 
-Sotto uses a four-role system stored on the `User` model. All features are available to all users — users bring their own API keys (BYOK) for AI and TTS providers. There are no subscription tiers or credit limits.
+---
 
-| Role        | How Assigned                                           | Access                                                        |
-| ----------- | ------------------------------------------------------ | ------------------------------------------------------------- |
-| **USER**    | Default on signup                                      | `/dashboard` — all features with BYOK keys                   |
-| **CREATOR** | Manually granted by admin via `/admin/users`           | `/dashboard` + creator stats, analytics, voices, team         |
-| **ADMIN**   | Auto-assigned on sign-in if email is in `ADMIN_EMAILS` | `/dashboard` + `/admin` — full platform access                |
-| **SYSTEM**  | Used for system-generated content/actions              | Not a login role — used internally for automated operations   |
+## 1. Role System
 
-### Key Design Decisions
+| Role | Assignment | Access |
+|---|---|---|
+| `USER` | default on signup | private dashboard, library, settings, provider keys, private RSS |
+| `CREATOR` | manually granted by admin when needed | user access plus expanded analytics and voice/source management |
+| `ADMIN` | email allowlist or manual admin assignment | admin dashboards and operational controls |
+| `SYSTEM` | internal automation only | owns system operations; never assigned to a real login |
 
-- **No subscription tiers.** All users get the same features. Revenue comes from the voice marketplace (Stripe Connect), not subscriptions.
-- **BYOK model.** Users bring their own API keys for AI providers (Anthropic/OpenAI) and TTS providers (ElevenLabs, OpenAI, Cartesia, Hume). Keys are encrypted with AES-256-GCM.
-- **ADMIN bypasses BYOK requirements.** Admin users can use platform-level API keys when configured.
-- **Roles never auto-downgrade.** Once granted, a role persists unless manually changed by an admin.
-- **SYSTEM role** is for automated actions (e.g., system-generated podcasts, internal operations). It is never assigned to real users.
+Roles are not subscription tiers. Privacy, private RSS, and local operation are available without a paid plan.
 
-## BYOK (Bring Your Own Key) Model
+---
 
-Instead of subscription tiers with credit limits, all users access all features by providing their own API keys:
+## 2. User Dashboard
 
-| Requirement | Details |
-|-------------|---------|
-| **AI key**  | Anthropic or OpenAI — required for discovery chat, script generation, Q&A |
-| **TTS key** | ElevenLabs, OpenAI, Cartesia, or Hume — required for audio generation |
-| **Features** | Unlimited — voice clones, downloads, private podcasts, collections, analytics, PDF export, everything |
+The signed-in dashboard should show:
 
-**Rate limits** (abuse prevention only): 20 generations/hour, 100/day per user. 60 interactions/hour.
+- private podcast library
+- generation status
+- private RSS token status
+- provider readiness
+- local-agent readiness when configured
+- source status for meetings, agents, news, Twitter, Telegram, and webhooks
+- recent private activity such as listens, saves, and completed jobs
 
-**Dev mode**: When `AI_PROVIDER=claude-code`, the Claude CLI is used instead of an API key. Platform-level TTS keys also satisfy the TTS requirement. Developers can run the full pipeline locally without any BYOK keys.
+The dashboard should not show public follower counts, public likes, public comments, public fork counts, or community rank.
 
-Users manage their keys at `/settings` → BYOK section. Key status (valid/invalid/missing) is shown in the dashboard.
+---
 
-## Voice Marketplace
+## 3. Creator Role
 
-Voice owners connect Stripe and set a per-podcast price (or keep voices free). Buyers pay once per podcast. Payment flow:
+The `CREATOR` role is for users who need expanded operational controls, not public creator distribution.
 
-1. **Authorize** — Payment held when buyer starts generating with a paid voice
-2. **Capture** — Funds transferred on READY (minus 10% platform fee via `application_fee_amount`)
-3. **Cancel** — Hold released on FAILED
+Possible controls:
 
-**Free access paths**: voice owner, allowlisted user, approved VoiceRequest, or existing VoicePurchase.
+- voice management
+- source management
+- advanced analytics
+- team/workspace controls
+- managed hosting settings
 
-Dashboard shows voice marketplace earnings for sellers and purchase history for buyers.
+Analytics should stay private and operational:
 
-## How to Access Each Dashboard
+- listen count
+- completion rate
+- save-to-listen ratio
+- source run success
+- provider cost estimates
+- job failure reasons
 
-### User Dashboard (`/dashboard`)
+---
 
-Available to all signed-in users. Shows:
+## 4. Admin Dashboard
 
-- Podcast library with status badges
-- BYOK key status (AI + TTS provider connection status)
-- Quick-create CTA
+| Page | Path | Purpose |
+|---|---|---|
+| Overview | `/admin` | users, podcasts, jobs, health, managed hosting status |
+| Users | `/admin/users` | search users, update role, inspect setup readiness |
+| Podcasts | `/admin/podcasts` | inspect podcast status and ownership |
+| Waitlist | `/admin/waitlist` | export and manage early access |
+| Analytics | `/admin/analytics` | site and product usage metrics |
+| Moderation | `/admin/moderation` | reports and failed content review |
+| Config | `/admin/config` | provider defaults and operational limits |
+| Handles | `/admin/handles` | reserved handle management where still needed |
+| Inspire | `/admin/inspire` | private inspiration/source management |
+| Ratings | `/admin/ratings` | quality/rating oversight |
+| Twitter | `/admin/twitter` | owner-scoped Twitter source health |
+| Revenue | `/admin/revenue` | managed hosting and optional paid voice-sharing revenue |
+| Costs | `/admin/costs` | provider and infrastructure cost tracking |
+| Pipeline | `/admin/pipeline` | queue status, failures, retries |
+| Engagement | `/admin/engagement` | private activity metrics |
+| Playback | `/admin/playback` | playback analytics |
+| Retention | `/admin/retention` | retention cohorts |
 
-### Creator Dashboard (same `/dashboard`, enhanced)
+Admin pages must not bypass ownership checks for user-facing private resources. Admin inspection should be explicit and auditable.
 
-For CREATOR and ADMIN roles, the dashboard shows additional **Creator Stats**:
+---
 
-- Total Listens (sum of all podcast play counts)
-- Followers
-- Total Forks
+## 5. Admin Assignment
 
-Plus access to:
+Admin access is email-based unless a future admin UI changes it:
 
-- `/analytics` — usage analytics
-- `/settings/voices` — voice clone management + marketplace earnings
-- `/team` — team management
+1. Add the email to `ADMIN_EMAILS`.
+2. The user signs in again.
+3. The auth callback syncs the database role to `ADMIN`.
+4. The session includes the role for admin navigation and server checks.
 
-### Admin Dashboard (`/admin`)
+Manual role changes happen in `/admin/users`.
 
-ADMIN-only. Protected by both middleware (JWT role check) and server-side layout auth.
+---
 
-| Page        | Path                  | Description                                                                          |
-| ----------- | --------------------- | ------------------------------------------------------------------------------------ |
-| Overview    | `/admin`              | Total users, podcasts, waitlist, signups (today/week/month), monetization snapshot   |
-| Users       | `/admin/users`        | User table with search, pagination, role dropdown (USER/CREATOR/ADMIN)               |
-| Podcasts    | `/admin/podcasts`     | Podcast table with search, status filter, pagination                                 |
-| Waitlist    | `/admin/waitlist`     | Waitlist entries with CSV export                                                     |
-| Analytics   | `/admin/analytics`    | Site analytics: page views, visitors, referrers, devices, time-series chart          |
-| Moderation  | `/admin/moderation`   | Failed podcasts, recent feedback                                                     |
-| Config      | `/admin/config`       | Free tier configuration (default AI/TTS providers, generation limits)                |
-| Handles     | `/admin/handles`      | Reserved handle management                                                           |
-| Inspire     | `/admin/inspire`      | Inspiration/featured podcast management                                              |
-| Ratings     | `/admin/ratings`      | Podcast rating oversight                                                             |
-| Twitter     | `/admin/twitter`      | @sottofm Twitter integration status, mention tracking                                |
-| Revenue     | `/admin/revenue`      | Voice marketplace revenue, connected sellers, platform fees                          |
-| Costs       | `/admin/costs`        | API cost tracking (Claude, ElevenLabs, FFmpeg)                                       |
-| Pipeline    | `/admin/pipeline`     | Worker job queue status, failed jobs, retry management                               |
-| Engagement  | `/admin/engagement`   | User engagement metrics, interaction rates                                           |
-| Playback    | `/admin/playback`     | Playback analytics, listen durations                                                 |
-| Retention   | `/admin/retention`    | User retention cohort analysis                                                       |
+## 6. Provider And Hosting Readiness
 
-## How Admin Works
+Dashboards should report setup as capabilities:
 
-Admin access is **email-based**:
+| Capability | Example status |
+|---|---|
+| database | connected |
+| Redis | connected |
+| storage | local or hosted provider selected |
+| LLM/local agent | selected and validated |
+| TTS | selected and validated |
+| STT | selected when meeting transcription is enabled |
+| private RSS | token created or skipped |
+| source | enabled, last run, last error |
+| managed hosting | trial, active, overdue, canceled |
 
-1. A comma-separated list of admin emails is stored in the `ADMIN_EMAILS` environment variable
-2. On every sign-in, the NextAuth `jwt` callback checks if the user's email matches
-3. If it matches, the user's `role` is set to `ADMIN` in the database
-4. The ADMIN role is stored in the JWT token and propagated to the session
+The UI should not silently treat another provider as ready just because another key exists.
 
-### How to Add New Admins
+---
 
-1. Add the email to `ADMIN_EMAILS` in your environment (comma-separated):
-   ```
-   ADMIN_EMAILS=andres2912@gmail.com,newadmin@example.com
-   ```
-2. The user gets ADMIN role on their **next sign-in**
+## 7. Avatar And Profile Data
 
-### How to Grant Creator Role
+Users can manage account display data in settings. Profile-style fields may still exist for account identity, but there is no public profile hub. Avoid building UI that implies public discovery or creator following.
 
-Admin visits `/admin/users`, finds the user, and changes their role to CREATOR via the dropdown.
+---
 
-## Avatar Management
+## 8. Site Analytics
 
-Users can upload custom avatars in Settings (`/settings`):
+The `PageViewTracker` component records route-level analytics through the existing event pipeline:
 
-- Click "Change Avatar" button next to the current avatar
-- Supported formats: JPEG, PNG, WebP, GIF
-- Max file size: 2MB
-- Uploaded to Cloudflare R2 at `avatars/{userId}/{timestamp}.{ext}`
-- Immediately updates in the UI (optimistic)
-- Falls back to OAuth avatar or initials if no custom avatar
+```text
+EventBuffer -> /api/events -> BullMQ -> BehavioralEvent
+```
 
-## Badges
+Admin analytics may show:
 
-Role badges appear next to user names on profiles and feed cards:
+- page views
+- unique visitors
+- referrers
+- devices
+- conversion through onboarding
+- provider setup completion
+- private RSS setup completion
+- source activation
 
-| Role    | Badge Text | Colors                                                                 |
-| ------- | ---------- | ---------------------------------------------------------------------- |
-| CREATOR | "Creator"  | Navy background (rgba(30,58,95,0.1)), navy text (`--color-accent`)     |
-| ADMIN   | "Admin"    | Amber background (rgba(217,119,6,0.1)), amber text (`--color-primary`) |
-| USER    | (none)     | No badge                                                               |
-
-Badges are shown in:
-
-- Profile header (next to the user's name)
-- Podcast cards in the feed (next to the creator name)
-
-## Site Analytics (Page View Tracking)
-
-The `PageViewTracker` component fires `page.view` events on every route change:
-
-- Mounted once in the root layout inside `EventProvider`
-- Uses `usePathname()` to detect navigation
-- Events flow through the existing pipeline: EventBuffer → `/api/events` → BullMQ → `BehavioralEvent` table
-
-The admin analytics page (`/admin/analytics`) visualizes this data with:
-
-- Page views, unique visitors, avg pages/session stat cards
-- Daily visitor time-series bar chart (CSS-only, no chart library)
-- Top pages table
-- Referrer sources table
-- Device type breakdown with percentage bars
-- Selectable time range: 7d / 30d / 90d
+Do not add public popularity metrics as admin success criteria.

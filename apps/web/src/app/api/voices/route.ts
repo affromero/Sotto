@@ -3,6 +3,7 @@ import { authenticateRequest } from '@/lib/api-keys';
 import { prisma } from '@/lib/prisma';
 import { getVoiceCatalog } from '@/lib/voice-catalog';
 import { isValidProviderId, type TtsProviderId } from '@/lib/providers/tts-registry';
+import { getPlanFeatureConfig } from '@/lib/plan-feature-config';
 import { LIMITS } from '@/lib/stripe';
 
 import { errorResponse } from '@/lib/api-response';
@@ -13,8 +14,15 @@ export async function GET(request: NextRequest) {
   }
 
   const providerParam = request.nextUrl.searchParams.get('provider');
-  const provider: TtsProviderId = (providerParam && isValidProviderId(providerParam)) ? providerParam : 'elevenlabs';
+  let provider: TtsProviderId = 'elevenlabs';
+  if (providerParam) {
+    if (!isValidProviderId(providerParam)) {
+      return errorResponse('Invalid provider', 400);
+    }
+    provider = providerParam;
+  }
 
+  const voiceConfigPromise = getPlanFeatureConfig();
   const [user, catalogVoices, userClones, approvedRequests, allowlistEntries] = await Promise.all([
     prisma.user.findUniqueOrThrow({
       where: { id: authResult.userId },
@@ -85,6 +93,7 @@ export async function GET(request: NextRequest) {
       },
     }),
   ]);
+  const voiceConfig = await voiceConfigPromise;
 
   // Enrich user clones with earnings
   const enrichedClones = userClones.map((clone) => {
@@ -162,6 +171,7 @@ export async function GET(request: NextRequest) {
     userClones: enrichedClones,
     sharedVoices,
     maxVoiceClones: LIMITS.maxVoiceClones,
+    voiceMarketplaceEnabled: voiceConfig.voiceMarketplaceEnabled,
     stripeOnboarded: user.stripeOnboarded,
     stripeAccountId: user.stripeAccountId,
   });

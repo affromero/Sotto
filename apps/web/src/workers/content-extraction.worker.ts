@@ -8,7 +8,7 @@ import { markPodcastFailed } from '@/lib/pipeline-resume';
 import { invalidatePodcastCache, publishPodcastStatus } from '@/lib/redis';
 import { logUsage } from '@/lib/usage-logger';
 import { getAiKey } from '@/lib/byok';
-import { resolveAiModelAndProvider } from '@/lib/providers/ai-registry';
+import { resolveAiModelAndProvider, type AiProviderId } from '@/lib/providers/ai-registry';
 import { logger } from '@/lib/logger';
 import { logPipelineStageComplete } from '@/lib/pipeline-events';
 import { analyzeBias } from '@/lib/media-bias';
@@ -112,21 +112,41 @@ export async function processContentExtraction(job: Job<ExtractContentPayload>):
   // Twitter/Telegram/API sources have pre-validated topics and no interactive retry.
   const podcast = await prisma.podcast.findUniqueOrThrow({
     where: { id: podcastId },
-    select: { source: true },
+    select: {
+      source: true,
+      aiModel: true,
+      user: { select: { plan: true } },
+    },
   });
 
   if (podcast.source === 'WEB') {
     if (discoveryMeta?.topic) {
       logger.info('Running topic feasibility check', { podcastId });
 
-      const aiKey = useAdminCredits ? null : await getAiKey(userId);
-      const { model, provider } = await resolveAiModelAndProvider({ aiKey, plan: 'FREE' });
+      const initialAiKey = useAdminCredits || podcast.aiModel ? null : await getAiKey(userId);
+      if (!podcast.aiModel && !initialAiKey) {
+        throw new Error('AI model is required for topic feasibility assessment when no AI key is configured.');
+      }
+
+      const { model, provider } = await resolveAiModelAndProvider({
+        podcastAiModel: podcast.aiModel,
+        aiKey: initialAiKey,
+        plan: podcast.user.plan as 'FREE' | 'PRO',
+      });
+
+      const providerAiKey =
+        podcast.aiModel && provider !== 'claude-code' && !useAdminCredits
+          ? await getAiKey(userId, provider as AiProviderId)
+          : initialAiKey;
+      if (podcast.aiModel && provider !== 'claude-code' && !useAdminCredits && !providerAiKey) {
+        throw new Error(`AI key for provider "${provider}" is required for topic feasibility assessment.`);
+      }
 
       const assessment = await assessTopicFeasibility({
         topic: discoveryMeta.topic,
         sourceContent: content || undefined,
         depth: discoveryMeta.depth || undefined,
-        apiKeyOverride: aiKey?.apiKey,
+        apiKeyOverride: providerAiKey?.apiKey,
         model,
         provider,
       });

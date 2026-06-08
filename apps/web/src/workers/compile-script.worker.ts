@@ -6,7 +6,7 @@ import { compileScript } from '@/lib/script-compiler';
 import { createSegmentsAndQueueAudio } from '@/lib/segment-creator';
 import type { SourceRecord, EvidenceCard } from '@/lib/research-agent';
 import { invalidatePodcastCache, publishPodcastStatus } from '@/lib/redis';
-import { hasByokKey, getByokKey } from '@/lib/byok';
+import { hasByokKey } from '@/lib/byok';
 import { getTierFeatures } from '@/lib/tier-features';
 import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
 import { assignVoicesForPodcast } from '@/lib/voice-assigner';
@@ -149,8 +149,7 @@ export async function processCompileScript(job: Job<CompileScriptPayload>): Prom
     });
     const lateProvider = (latePodcast.ttsProvider ?? 'elevenlabs') as TtsProviderId;
     const lateSpeakers = [...new Set(result.turns.map(t => t.speaker))].map(name => ({ name }));
-    const lateTtsKey = isByok ? ((await getByokKey(userId, lateProvider)) ?? undefined) : undefined;
-    await assignVoicesForPodcast(podcastId, lateSpeakers, lateProvider, lateTtsKey ?? undefined);
+    await assignVoicesForPodcast(podcastId, lateSpeakers, lateProvider);
 
     // Set GENERATING_AUDIO before creating segments — audio worker expects this status
     await prisma.podcast.update({

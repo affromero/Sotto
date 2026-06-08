@@ -118,11 +118,11 @@ Safe-for-launch core flow:
 6. audio generation (parallel per segment) and stitching run
 7. notifications run
 
-Note: `PENDING`/`DISCOVERING` statuses are only used by BYOK resume, fork, and admin paths — standard web creation starts directly at `EXTRACTING`.
+Note: `PENDING`/`DISCOVERING` statuses are used by BYOK resume, agent/manual setup, and admin paths. Standard web creation starts directly at `EXTRACTING`.
 
 Everything outside that path should be considered optional for day one.
 
-`deploy.sh` supports `.env.workers.local` for per-server preset overrides without touching Doppler — useful for launch-day flexibility (e.g., temporarily enabling a single non-core queue on one server).
+`deploy.sh` reads the env file selected by `SOTTO_ENV_FILE`, so launch-day queue and worker preset changes can be made without changing repository files.
 
 ## Required Next Steps Before Launch
 

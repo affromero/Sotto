@@ -20,6 +20,8 @@ jobs:
   ci:
     name: Lint, Type Check, Test & Build
     runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_APP_URL: https://selfhost.example.com
 
     steps:
       - name: Checkout code

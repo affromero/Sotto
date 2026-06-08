@@ -15,8 +15,8 @@ export default function BannedPage() {
         </p>
         <p className={styles.detail}>
           If you believe this was a mistake, please contact us at{' '}
-          <a href="mailto:support@sotto.fm" className={styles.link}>
-            support@sotto.fm
+          <a href="mailto:support@example.com" className={styles.link}>
+            support@example.com
           </a>{' '}
           with your account email and we will review your case.
         </p>

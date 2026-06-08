@@ -154,9 +154,7 @@ export interface TweetMentionData {
 
 export interface TwitterConfigData {
   autoTweetEnabled: boolean;
-  minLikes: number;
   minPlays: number;
-  minForks: number;
   mentionPollIntervalMs: number;
   trendPollingEnabled: boolean;
   trendPollIntervalMs: number;

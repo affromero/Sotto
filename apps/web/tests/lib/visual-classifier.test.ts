@@ -19,6 +19,8 @@ const SEGMENTS: SegmentInput[] = [
   { segmentId: 'seg-3', order: 2, speaker: 'Host', text: 'As Einstein once said, imagination is more important than knowledge.', duration: 6 },
 ];
 
+const AI_RUNTIME = { provider: 'anthropic', model: 'claude-haiku-4-5-20251001' };
+
 beforeEach(() => {
   vi.clearAllMocks();
 });
@@ -38,7 +40,7 @@ describe('classifySegmentVisuals', () => {
       model: 'claude-haiku-4-5-20251001',
     });
 
-    const result = await classifySegmentVisuals(SEGMENTS, 'AI Revolution', 'How AI is changing the world');
+    const result = await classifySegmentVisuals(SEGMENTS, 'AI Revolution', 'How AI is changing the world', AI_RUNTIME);
 
     expect(result.classifications).toHaveLength(3);
     expect(result.classifications[0].subVisuals).toHaveLength(1);
@@ -71,7 +73,7 @@ describe('classifySegmentVisuals', () => {
       model: 'claude-haiku-4-5-20251001',
     });
 
-    const result = await classifySegmentVisuals(SEGMENTS, 'AI Revolution', 'AI topic');
+    const result = await classifySegmentVisuals(SEGMENTS, 'AI Revolution', 'AI topic', AI_RUNTIME);
 
     expect(result.classifications[0].subVisuals).toHaveLength(2);
     expect(result.classifications[0].subVisuals[0].visualType).toBe('TEXT_CARD');
@@ -95,7 +97,7 @@ describe('classifySegmentVisuals', () => {
       model: 'claude-haiku-4-5-20251001',
     });
 
-    const result = await classifySegmentVisuals(SEGMENTS, 'AI Podcast', 'AI topic');
+    const result = await classifySegmentVisuals(SEGMENTS, 'AI Podcast', 'AI topic', AI_RUNTIME);
 
     expect(result.classifications).toHaveLength(3);
     // Each legacy item should be wrapped as a single sub-visual
@@ -123,7 +125,7 @@ describe('classifySegmentVisuals', () => {
       model: 'claude-haiku-4-5-20251001',
     });
 
-    const result = await classifySegmentVisuals(SEGMENTS, 'AI Stats', 'AI adoption data');
+    const result = await classifySegmentVisuals(SEGMENTS, 'AI Stats', 'AI adoption data', AI_RUNTIME);
 
     expect(result.classifications).toHaveLength(3);
     expect(result.classifications[0].subVisuals[0].visualType).toBe('DATA_TABLE');
@@ -146,7 +148,7 @@ describe('classifySegmentVisuals', () => {
       model: 'claude-haiku-4-5-20251001',
     });
 
-    const result = await classifySegmentVisuals(SEGMENTS, 'AI Podcast', 'AI topic');
+    const result = await classifySegmentVisuals(SEGMENTS, 'AI Podcast', 'AI topic', AI_RUNTIME);
 
     expect(result.classifications).toHaveLength(3);
     expect(result.classifications[1].subVisuals[0].visualType).toBe('TEXT_CARD');
@@ -162,7 +164,7 @@ describe('classifySegmentVisuals', () => {
       model: 'claude-haiku-4-5-20251001',
     });
 
-    const result = await classifySegmentVisuals(SEGMENTS, 'AI Podcast', 'AI topic');
+    const result = await classifySegmentVisuals(SEGMENTS, 'AI Podcast', 'AI topic', AI_RUNTIME);
 
     expect(result.classifications).toHaveLength(3);
     expect(result.classifications.every((c) => c.subVisuals[0].visualType === 'TEXT_CARD')).toBe(true);
@@ -190,7 +192,7 @@ describe('classifySegmentVisuals', () => {
       model: 'claude-haiku-4-5-20251001',
     });
 
-    const result = await classifySegmentVisuals(SEGMENTS, 'Test', 'Test');
+    const result = await classifySegmentVisuals(SEGMENTS, 'Test', 'Test', AI_RUNTIME);
 
     // Fractions should be normalized to sum to 1.0
     const subVisuals = result.classifications[0].subVisuals;
@@ -208,7 +210,7 @@ describe('classifySegmentVisuals', () => {
       model: 'claude-haiku-4-5-20251001',
     });
 
-    await classifySegmentVisuals(SEGMENTS, 'Test', 'Test');
+    await classifySegmentVisuals(SEGMENTS, 'Test', 'Test', AI_RUNTIME);
 
     expect(mockGenerateResponse).toHaveBeenCalledWith(
       expect.any(String),
@@ -234,7 +236,7 @@ describe('classifySegmentVisuals', () => {
       model: 'claude-haiku-4-5-20251001',
     });
 
-    const result = await classifySegmentVisuals(SEGMENTS, 'Test', 'Test');
+    const result = await classifySegmentVisuals(SEGMENTS, 'Test', 'Test', AI_RUNTIME);
 
     expect(result.classifications[0].order).toBe(0);
     expect(result.classifications[1].order).toBe(1);

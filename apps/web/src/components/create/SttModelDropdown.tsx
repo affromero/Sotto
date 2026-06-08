@@ -36,10 +36,15 @@ export function SttModelDropdown({ value, onChange }: SttModelDropdownProps) {
         }));
         setOptions(mapped);
 
-        // Restore from localStorage if valid and available
+        // Restore from localStorage if valid and available, otherwise select the first configured provider.
         const stored = localStorage.getItem(STORAGE_KEY);
         if (stored && mapped.some((o) => o.id === stored && !o.unavailable)) {
-          onChange(stored === 'openai' ? undefined : stored);
+          onChange(stored);
+        } else if (!value) {
+          const firstAvailable = mapped.find((o) => !o.unavailable);
+          if (firstAvailable) {
+            onChange(firstAvailable.id);
+          }
         }
       })
       .catch(() => {})

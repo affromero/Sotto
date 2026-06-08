@@ -49,7 +49,7 @@ export async function processDemoRecording(job: Job<GenerateDemoRecordingPayload
     const appUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
     const isSecure = appUrl.startsWith('https://');
     const cookieName = isSecure ? '__Secure-authjs.session-token' : 'authjs.session-token';
-    const secret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
+    const secret = process.env.AUTH_SECRET;
     if (!secret) throw new Error('AUTH_SECRET is not set');
 
     const maxAge = 30 * 60; // 30 minutes

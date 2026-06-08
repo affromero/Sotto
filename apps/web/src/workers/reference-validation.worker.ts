@@ -20,11 +20,11 @@ import {
 import { createSegmentsAndQueueAudio } from '@/lib/segment-creator';
 import { convertTurnsForProvider } from '@/lib/tts-tag-converter';
 import { getMinReferenceCount } from '@/lib/script-verifier';
-import { getAiKey, getByokKey, hasByokKey } from '@/lib/byok';
+import { getAiKey, hasByokKey } from '@/lib/byok';
 import { getTierFeatures } from '@/lib/tier-features';
 import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
 import { assignVoicesForPodcast } from '@/lib/voice-assigner';
-import { resolveAiModelAndProvider } from '@/lib/providers/ai-registry';
+import { resolveAiModelAndProvider, type AiProviderId } from '@/lib/providers/ai-registry';
 import type { TtsProviderId } from '@/lib/providers/tts-registry';
 import { logger } from '@/lib/logger';
 import { logPipelineStageComplete } from '@/lib/pipeline-events';
@@ -37,6 +37,25 @@ const MAX_REF_RETRY_ATTEMPTS: Record<string, number> = {
   eli5: 1,
 };
 
+async function pauseForTtsProviderSelection(podcastId: string, userId: string): Promise<void> {
+  await prisma.podcast.update({
+    where: { id: podcastId },
+    data: { status: 'SCRIPT_READY', verificationProgress: Prisma.DbNull },
+  });
+  await invalidatePodcastCache(podcastId);
+  await publishPodcastStatus(podcastId, { status: 'SCRIPT_READY' });
+
+  await addJob(notificationQueue, JobType.SEND_NOTIFICATION, {
+    userId,
+    type: 'SCRIPT_READY',
+    title: 'Choose a voice provider',
+    message: 'Your script is ready. Choose a TTS provider to start audio generation.',
+    data: { podcastId, missingTtsProvider: true },
+  });
+
+  logger.warn('Reference validation paused before audio: missing TTS provider', { podcastId, userId });
+}
+
 export async function processReferenceValidation(
   job: Job<ValidateReferencesPayload>
 ): Promise<void> {
@@ -45,8 +64,6 @@ export async function processReferenceValidation(
 
   logger.info('Starting reference validation', { podcastId, attempt: String(attempt) });
   await job.updateProgress(5);
-
-  const aiKey = useAdminCredits ? null : await getAiKey(userId);
 
   // Load references and script
   const [references, script, podcast, userPlanRecord, discovery] = await Promise.all([
@@ -78,14 +95,6 @@ export async function processReferenceValidation(
       },
     }),
   ]);
-
-  // Model + provider resolved together — prevents sending e.g. gpt-5-mini to Anthropic
-  const { model, provider } = await resolveAiModelAndProvider({
-    podcastAiModel: podcast?.aiModel,
-    aiKey,
-    plan: userPlanRecord.plan as 'FREE' | 'PRO',
-  });
-  const verificationModel = model;
 
   if (!script) {
     throw new Error(`Script not found for podcast ${podcastId}`);
@@ -140,18 +149,42 @@ export async function processReferenceValidation(
       where: { id: podcastId },
       select: { ttsProvider: true },
     });
-    const earlyProvider = (earlyPodcast.ttsProvider ?? 'elevenlabs') as TtsProviderId;
+    if (!earlyPodcast.ttsProvider) {
+      await pauseForTtsProviderSelection(podcastId, userId);
+      await job.updateProgress(100);
+      return;
+    }
+
+    const earlyProvider = earlyPodcast.ttsProvider as TtsProviderId;
     const earlySpeakers = [...new Set(earlyTurns.map((t) => t.speaker))].map((name) => ({ name }));
-    const earlyTtsKey = isByokEarly ? ((await getByokKey(userId, earlyProvider)) ?? undefined) : undefined;
-    await assignVoicesForPodcast(podcastId, earlySpeakers, earlyProvider, earlyTtsKey);
+    await assignVoicesForPodcast(podcastId, earlySpeakers, earlyProvider);
 
     // Convert TTS tags before creating segments
-    const convertedEarlyTurns = earlyPodcast.ttsProvider
-      ? await convertTurnsForProvider(earlyTurns, earlyProvider, podcastId)
-      : earlyTurns;
+    const convertedEarlyTurns = await convertTurnsForProvider(earlyTurns, earlyProvider, { mode: 'disabled' });
     await createSegmentsAndQueueAudio(podcastId, convertedEarlyTurns);
     await job.updateProgress(100);
     return;
+  }
+
+  const aiKey = useAdminCredits || podcast?.aiModel ? null : await getAiKey(userId);
+  if (!podcast?.aiModel && !aiKey) {
+    throw new Error('AI model is required for reference validation when no AI key is configured.');
+  }
+
+  // Model + provider resolved together — prevents sending e.g. gpt-5-mini to Anthropic
+  const { model, provider } = await resolveAiModelAndProvider({
+    podcastAiModel: podcast?.aiModel,
+    aiKey,
+    plan: userPlanRecord.plan as 'FREE' | 'PRO',
+  });
+  const verificationModel = model;
+
+  const providerAiKey =
+    podcast?.aiModel && provider !== 'claude-code' && !useAdminCredits
+      ? await getAiKey(userId, provider as AiProviderId)
+      : aiKey;
+  if (podcast?.aiModel && provider !== 'claude-code' && !useAdminCredits && !providerAiKey) {
+    throw new Error(`AI key for provider "${provider}" is required for reference validation.`);
   }
 
   const refInputs: ReferenceInput[] = references.map((r) => ({
@@ -205,7 +238,7 @@ export async function processReferenceValidation(
     refsToVerify,
     scriptTurns,
     podcast?.topic || '',
-    aiKey?.apiKey,
+    providerAiKey?.apiKey,
     verificationModel,
     provider,
     requiredRefCount
@@ -446,7 +479,7 @@ export async function processReferenceValidation(
             doi: r.doi,
           })),
           verificationFeedback: feedback,
-          apiKeyOverride: aiKey?.apiKey,
+          apiKeyOverride: providerAiKey?.apiKey,
           model: verificationModel,
           provider,
           webSearchEnabled: true,
@@ -670,22 +703,24 @@ export async function processReferenceValidation(
         data: { ttsProvider: selected.ttsProvider, ttsModel: selected.ttsModel },
       });
     }
-    // BYOK: leave null — worker's resolveTtsProvider() picks best available
+    // BYOK keeps the provider chosen at creation or script approval. Missing provider pauses below.
 
     // Assign voices for multi-speaker podcasts
     const latePodcast = await prisma.podcast.findUniqueOrThrow({
       where: { id: podcastId },
       select: { ttsProvider: true },
     });
-    const lateProvider = (latePodcast.ttsProvider ?? 'elevenlabs') as TtsProviderId;
+    if (!latePodcast.ttsProvider) {
+      await pauseForTtsProviderSelection(podcastId, userId);
+      return;
+    }
+
+    const lateProvider = latePodcast.ttsProvider as TtsProviderId;
     const lateSpeakers = [...new Set(turns.map((t) => t.speaker))].map((name) => ({ name }));
-    const lateTtsKey = isByok ? ((await getByokKey(userId, lateProvider)) ?? undefined) : undefined;
-    await assignVoicesForPodcast(podcastId, lateSpeakers, lateProvider, lateTtsKey);
+    await assignVoicesForPodcast(podcastId, lateSpeakers, lateProvider);
 
     // Convert TTS tags before creating segments
-    const convertedTurns = latePodcast.ttsProvider
-      ? await convertTurnsForProvider(turns, lateProvider, podcastId)
-      : turns;
+    const convertedTurns = await convertTurnsForProvider(turns, lateProvider, { mode: 'disabled' });
     await createSegmentsAndQueueAudio(podcastId, convertedTurns);
 
     await prisma.podcast.update({

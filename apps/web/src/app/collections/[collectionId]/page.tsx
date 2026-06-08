@@ -3,6 +3,8 @@ import type { Metadata } from 'next';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { CollectionDetail } from '@/components/collections/CollectionDetail';
+import { getAppBaseUrl } from '@/lib/urls';
+import { getTwitterBotHandle } from '@/lib/bot-identity';
 import styles from './page.module.css';
 
 interface CollectionPageProps {
@@ -18,10 +20,13 @@ export async function generateMetadata({ params }: CollectionPageProps): Promise
 
   if (!collection) return { title: 'Collection Not Found' };
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://sotto.fm';
+  const appUrl = getAppBaseUrl();
   const title = `${collection.name} — Sotto Collection`;
-  const description = collection.description || `A curated podcast collection by ${collection.user.name || 'Anonymous'}`;
+  const description =
+    collection.description ||
+    `A curated podcast collection by ${collection.user.name || 'Anonymous'}`;
   const canonicalUrl = `${appUrl}/collections/${collectionId}`;
+  const twitterSite = getTwitterBotHandle();
 
   return {
     title,
@@ -37,7 +42,7 @@ export async function generateMetadata({ params }: CollectionPageProps): Promise
       card: 'summary_large_image',
       title,
       description,
-      site: '@SottoFM',
+      ...(twitterSite ? { site: twitterSite } : {}),
     },
     alternates: {
       canonical: canonicalUrl,
@@ -70,12 +75,9 @@ export default async function CollectionPage({ params }: CollectionPageProps) {
               audioUrl: true,
               duration: true,
               playCount: true,
-              likeCount: true,
-              forkCount: true,
               createdAt: true,
               source: true,
               isHumanContent: true,
-              forkedFromId: true,
               user: {
                 select: { id: true, name: true, handle: true, image: true },
               },
@@ -100,17 +102,6 @@ export default async function CollectionPage({ params }: CollectionPageProps) {
     notFound();
   }
 
-  // Check if the current user follows this collection
-  let isFollowing = false;
-  if (userId) {
-    const follow = await prisma.collectionFollow.findUnique({
-      where: {
-        userId_collectionId: { userId, collectionId: collection.id },
-      },
-    });
-    isFollowing = !!follow;
-  }
-
   const isOwner = userId === collection.userId;
 
   // Filter non-ready/private podcasts for non-owners
@@ -132,7 +123,7 @@ export default async function CollectionPage({ params }: CollectionPageProps) {
     <main className={styles.main}>
       <div className={styles.container}>
         <nav className={styles.breadcrumb}>
-          <a href="/feed" className={styles.backLink}>
+          <a href="/dashboard" className={styles.backLink}>
             <svg
               width="16"
               height="16"
@@ -147,7 +138,7 @@ export default async function CollectionPage({ params }: CollectionPageProps) {
               <line x1="19" y1="12" x2="5" y2="12" />
               <polyline points="12 19 5 12 12 5" />
             </svg>
-            Feed
+            Dashboard
           </a>
         </nav>
 
@@ -155,15 +146,11 @@ export default async function CollectionPage({ params }: CollectionPageProps) {
           id={collection.id}
           name={collection.name}
           description={collection.description}
-          isPublic={collection.isPublic}
           podcastCount={collection.podcastCount}
-          followerCount={collection.followerCount}
           createdAt={collection.createdAt.toISOString()}
           user={collection.user}
           items={items}
-          isFollowing={isFollowing}
           isOwner={isOwner}
-          isAuthenticated={!!userId}
         />
       </div>
     </main>

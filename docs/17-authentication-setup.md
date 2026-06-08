@@ -26,9 +26,8 @@ All auth-related environment variables required for the system to function:
 
 | Variable               | Required         | Description                                       | Example                             |
 | ---------------------- | ---------------- | ------------------------------------------------- | ----------------------------------- |
-| `AUTH_SECRET`          | Yes              | Primary encryption key (fallback: `NEXTAUTH_SECRET`) | `openssl rand -base64 32` output |
-| `NEXTAUTH_SECRET`      | Fallback         | Legacy name — `AUTH_SECRET` takes precedence      | `openssl rand -base64 32` output    |
-| `NEXTAUTH_URL`         | Yes (production) | Canonical URL of the app                          | `https://sotto.fm`                  |
+| `AUTH_SECRET`          | Yes              | Encryption key for Auth.js sessions and signed app tokens | `openssl rand -base64 32` output |
+| `NEXTAUTH_URL`         | Yes (production) | Canonical URL of the app                          | `https://your-domain.example`                  |
 | `GOOGLE_CLIENT_ID`     | No               | Google OAuth client ID                            | `123456.apps.googleusercontent.com` |
 | `GOOGLE_CLIENT_SECRET` | No               | Google OAuth client secret                        | `GOCSPX-xxxxxxxxxxxx`               |
 | `GOOGLE_IOS_CLIENT_ID` | No               | Google OAuth client ID for iOS app                | `123456.apps.googleusercontent.com` |
@@ -41,7 +40,7 @@ All auth-related environment variables required for the system to function:
 
 OAuth providers are conditionally loaded. If the environment variables for a provider are not set, that provider is simply not available. The app will still start and function with no OAuth providers configured (useful for local development where you only need to test other features).
 
-### Generating NEXTAUTH_SECRET
+### Generating AUTH_SECRET
 
 ```bash
 openssl rand -base64 32
@@ -66,7 +65,7 @@ import { prisma } from './prisma';
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
-  secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
+  secret: process.env.AUTH_SECRET,
   adapter: PrismaAdapter(prisma),
   providers: [
     ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
@@ -143,7 +142,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 - Session data is available in middleware without a database call
 - The `Session` model in Prisma exists for NextAuth adapter compatibility but is not actively used for session storage
 
-**Secret fallback:** `AUTH_SECRET` is the primary secret. `NEXTAUTH_SECRET` is supported as a fallback for backward compatibility. The `trustHost: true` flag is required for Hetzner VPS deployment (non-Vercel).
+**Single auth secret:** `AUTH_SECRET` is the only supported session/signature secret. The `trustHost: true` flag is required for Hetzner VPS deployment (non-Vercel).
 
 **Conditional providers:** Providers are wrapped in conditional spread operators so the app starts even when OAuth credentials are missing. This is critical for local development where you might not have all OAuth apps configured.
 
@@ -151,7 +150,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
 **User ID + role in session:** The `jwt` callback copies the database user ID, role, ban state, and suspension state into the JWT token. The `session` callback propagates these to `session.user`. This ensures every API route and server component can access the authenticated user's role and moderation status.
 
-**Twitter handle sync:** The `events.linkAccount` hook automatically syncs the user's Twitter handle when they link their Twitter account, enabling the @sottofm bot integration.
+**Twitter handle sync:** The `events.linkAccount` hook automatically syncs the user's Twitter handle when they link their Twitter account, enabling the configured bot integration.
 
 ---
 
@@ -242,17 +241,17 @@ The `Account` model stores OAuth provider tokens. A user can have multiple accou
 5. Configure the OAuth consent screen:
    - App name: `Sotto`
    - User support email: your email
-   - Authorized domains: `sotto.fm` (production) or `localhost` (development)
+   - Authorized domains: `your-domain.example` (production) or `localhost` (development)
    - Scopes: `email`, `profile`, `openid`
 6. Create the OAuth client:
    - Application type: **Web application**
    - Name: `Sotto Web`
    - Authorized JavaScript origins:
      - `http://localhost:3000` (development)
-     - `https://sotto.fm` (production)
+     - `https://your-domain.example` (production)
    - Authorized redirect URIs:
      - `http://localhost:3000/api/auth/callback/google` (development)
-     - `https://sotto.fm/api/auth/callback/google` (production)
+     - `https://your-domain.example/api/auth/callback/google` (production)
 7. Copy the **Client ID** and **Client Secret** into your `.env` file:
 
 ```bash
@@ -273,8 +272,8 @@ GOOGLE_CLIENT_SECRET=GOCSPX-xxxxxxxxxxxxxxxx
 2. Click **New OAuth App**
 3. Fill in the application details:
    - Application name: `Sotto`
-   - Homepage URL: `http://localhost:3000` (development) or `https://sotto.fm` (production)
-   - Authorization callback URL: `http://localhost:3000/api/auth/callback/github` (development) or `https://sotto.fm/api/auth/callback/github` (production)
+   - Homepage URL: `http://localhost:3000` (development) or `https://your-domain.example` (production)
+   - Authorization callback URL: `http://localhost:3000/api/auth/callback/github` (development) or `https://your-domain.example/api/auth/callback/github` (production)
 4. Click **Register application**
 5. On the app page, copy the **Client ID**
 6. Click **Generate a new client secret** and copy it immediately (shown only once)
@@ -298,8 +297,8 @@ GITHUB_CLIENT_SECRET=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 3. Navigate to **User authentication settings** → **Set up**
 4. Configure OAuth 2.0:
    - Type of app: **Web App**
-   - Callback URI: `http://localhost:3000/api/auth/callback/twitter` (development) or `https://sotto.fm/api/auth/callback/twitter` (production)
-   - Website URL: `https://sotto.fm`
+   - Callback URI: `http://localhost:3000/api/auth/callback/twitter` (development) or `https://your-domain.example/api/auth/callback/twitter` (production)
+   - Website URL: `https://your-domain.example`
 5. Copy the **Client ID** and **Client Secret**
 6. Add to `.env`:
 
@@ -311,7 +310,7 @@ TWITTER_CLIENT_SECRET=xxxxxxxxxxxxxxxxxxxx
 **Important notes:**
 
 - Twitter uses OAuth 2.0 with PKCE for NextAuth v5 (not OAuth 1.0a)
-- The `events.linkAccount` hook automatically syncs the user's Twitter handle to enable @sottofm bot features
+- The `events.linkAccount` hook automatically syncs the user's Twitter handle to enable configured bot features
 - Users who sign in with Twitter get `twitterEnabled: true` set on their User record
 
 ### Apple Sign In
@@ -337,8 +336,8 @@ Apple Sign In is more involved than Google or GitHub. It requires an Apple Devel
    - Enable **Sign In with Apple**
    - Click **Configure** next to Sign In with Apple:
      - Primary App ID: select `com.sotto.app`
-     - Domains: `sotto.fm` (production), `localhost` (development)
-     - Return URLs: `https://sotto.fm/api/auth/callback/apple`
+     - Domains: `your-domain.example` (production), `localhost` (development)
+     - Return URLs: `https://your-domain.example/api/auth/callback/apple`
    - Click **Save**, then **Continue**, then **Save**
 
 4. **Create a Key for Sign In with Apple:**
@@ -489,9 +488,7 @@ export const config = {
 | `/billing`      | Yes                        | Redirect to `/auth/login?callbackUrl=/billing`                      |
 | `/auth/login`   | No (redirect if logged in) | Redirect to `/dashboard` if already authenticated                   |
 | `/auth/signup`  | No (redirect if logged in) | Redirect to `/dashboard` if already authenticated                   |
-| `/feed`         | No                         | Public access                                                       |
 | `/podcast/[id]` | Depends on visibility      | Public podcasts: no auth. Private/unlisted: checked in the page/API |
-| `/profile/[id]` | No                         | Public access                                                       |
 | `/pricing`      | No                         | Public access                                                       |
 | `/api/*`        | Varies                     | Auth checked per-route in the API handler                           |
 
@@ -513,7 +510,7 @@ export async function GET() {
 }
 ```
 
-This pattern allows fine-grained control: some API routes (like `/api/feed`) are public, while others (like `/api/podcasts` POST) require authentication.
+This pattern allows fine-grained control: public informational routes can stay unauthenticated, while private workspace routes such as `/api/podcasts` POST require authentication.
 
 ### Callback URL Preservation
 
@@ -594,7 +591,7 @@ For local development where you do not have Google or GitHub OAuth apps configur
 
 1. The app starts without errors (providers are conditionally loaded)
 2. The login page renders but shows no OAuth buttons
-3. You can test non-auth features (feed, public podcasts, pricing page)
+3. You can test non-auth features such as public informational pages and pricing
 4. To test authenticated features, set up at least one OAuth provider
 
 ### With Google OAuth (Recommended for Local Dev)
@@ -608,7 +605,7 @@ For local development where you do not have Google or GitHub OAuth apps configur
 ```bash
 GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=GOCSPX-your-secret
-NEXTAUTH_SECRET=any-random-string-for-local-dev
+AUTH_SECRET=any-random-string-for-local-dev
 NEXTAUTH_URL=http://localhost:3000
 ```
 
@@ -665,7 +662,7 @@ export async function GET(request: NextRequest) {
 
 | Issue                           | Cause                                            | Solution                                                                                |
 | ------------------------------- | ------------------------------------------------ | --------------------------------------------------------------------------------------- |
-| "CSRF token mismatch"           | Missing or wrong `NEXTAUTH_SECRET`               | Ensure `NEXTAUTH_SECRET` is set and consistent                                          |
+| "CSRF token mismatch"           | Missing or wrong `AUTH_SECRET`                   | Ensure `AUTH_SECRET` is set and consistent                                              |
 | "OAuth redirect_uri mismatch"   | Callback URL in provider settings does not match | Verify the redirect URI is exactly `http://localhost:3000/api/auth/callback/{provider}` |
 | "Access denied" on Google       | Account not added as test user                   | Add your Google account in OAuth consent screen > Test users                            |
 | Session is `null` in API routes | Using wrong import                               | Use `import { auth } from '@/lib/auth'`, not from `next-auth` directly                  |
@@ -680,10 +677,10 @@ Sotto is deployed on a Hetzner VPS with Docker Compose + Caddy reverse proxy:
 
 1. Set all environment variables in the production `.env` file on the VPS:
    - `AUTH_SECRET` (generate a strong random string — primary secret)
-   - `NEXTAUTH_URL` = `https://sotto.fm`
+   - `NEXTAUTH_URL` = `https://your-domain.example`
    - All OAuth provider credentials with production redirect URIs
 2. The `trustHost: true` flag in the NextAuth config is required for non-Vercel deployments (Caddy proxies HTTPS)
-3. Update all OAuth provider callback URIs to use `https://sotto.fm/api/auth/callback/{provider}`
+3. Update all OAuth provider callback URIs to use `https://your-domain.example/api/auth/callback/{provider}`
 4. For Google: submit the app for verification to remove the "unverified app" warning
 5. For Apple: ensure the Services ID is configured with the production domain
 

@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { Check, AlertCircle, Pause, ShieldCheck } from 'lucide-react';
 import { useRotatingMessage } from '@/lib/hooks/useRotatingMessage';
 import { SottoSpinner } from '@/components/ui/SottoSpinner';
+import { getVerificationStandardUrl } from '@/lib/public-links';
 import type { VerificationProgressSnapshot } from '@/types/podcast';
 import styles from './GenerationProgress.module.css';
 
@@ -45,6 +46,7 @@ function getVerificationMessage(vp: VerificationProgressSnapshot): string | null
 }
 
 export function GenerationProgress({ status, progress, error, topic, verificationProgress }: GenerationProgressProps) {
+  const verificationStandardUrl = getVerificationStandardUrl();
   const currentIndex = useMemo(
     () => PIPELINE_STEPS.findIndex((step) => step.key === status),
     [status]
@@ -160,9 +162,9 @@ export function GenerationProgress({ status, progress, error, topic, verificatio
             </span>
           )}
 
-          {isActive && COMPILE_STAGES.has(status) && (
+          {isActive && COMPILE_STAGES.has(status) && verificationStandardUrl && (
             <a
-              href="https://github.com/SottoFM/reference-verification-standard"
+              href={verificationStandardUrl}
               target="_blank"
               rel="noopener noreferrer"
               className={styles.verifyBadge}

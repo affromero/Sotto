@@ -1,15 +1,27 @@
 import { MetadataRoute } from 'next';
 import { prisma } from '@/lib/prisma';
+import { getAppBaseUrl } from '@/lib/urls';
 
 export const revalidate = 3600;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = 'https://sotto.fm';
+  const baseUrl = getAppBaseUrl();
 
   const staticPages = [
-    '', '/feed', '/voices', '/about', '/join', '/terms',
-    '/privacy', '/changelog', '/developers', '/support', '/pricing', '/feedback',
-    '/languages', '/briefings', '/quizzes',
+    '',
+    '/voices',
+    '/about',
+    '/join',
+    '/terms',
+    '/privacy',
+    '/changelog',
+    '/developers',
+    '/support',
+    '/pricing',
+    '/feedback',
+    '/languages',
+    '/briefings',
+    '/quizzes',
   ].map((path) => ({
     url: `${baseUrl}${path}`,
     lastModified: new Date(),
@@ -26,33 +38,20 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     });
 
     const podcastPages = podcasts.map((p) => ({
-      url: p.slug && p.user.handle
-        ? `${baseUrl}/@${p.user.handle}/${p.slug}`
-        : `${baseUrl}/podcast/${p.id}`,
+      url:
+        p.slug && p.user.handle
+          ? `${baseUrl}/@${p.user.handle}/${p.slug}`
+          : `${baseUrl}/podcast/${p.id}`,
       lastModified: p.updatedAt,
       changeFrequency: 'monthly' as const,
       priority: 0.6,
     }));
 
-    const [users, collections] = await Promise.all([
-      prisma.user.findMany({
-        where: { handle: { not: null } },
-        select: { handle: true, updatedAt: true },
-        take: 5000,
-      }),
-      prisma.collection.findMany({
-        where: { isPublic: true },
-        select: { id: true, updatedAt: true },
-        take: 5000,
-      }),
-    ]);
-
-    const profilePages = users.map((u) => ({
-      url: `${baseUrl}/@${u.handle}`,
-      lastModified: u.updatedAt,
-      changeFrequency: 'weekly' as const,
-      priority: 0.5,
-    }));
+    const collections = await prisma.collection.findMany({
+      where: { isPublic: true },
+      select: { id: true, updatedAt: true },
+      take: 5000,
+    });
 
     const collectionPages = collections.map((c) => ({
       url: `${baseUrl}/collections/${c.id}`,
@@ -61,7 +60,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.5,
     }));
 
-    return [...staticPages, ...podcastPages, ...profilePages, ...collectionPages];
+    return [...staticPages, ...podcastPages, ...collectionPages];
   } catch (error) {
     console.error('[sitemap] DB query failed, returning static pages only:', error);
     return staticPages;

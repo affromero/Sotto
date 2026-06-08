@@ -6,12 +6,57 @@ import { getTwitterConfig } from '@/lib/twitter-config';
 import { addJob, JobType, contentExtractionQueue } from '@/lib/queue';
 import { selectVoicePair } from '@/lib/elevenlabs';
 import { lookupParticipantCredentials } from '@/lib/credential-lookup';
+import { getAiKey } from '@/lib/byok';
+import { getAiProviderMeta, getProviderForModel, type AiProviderId } from '@/lib/providers/ai-registry';
 import { formatThreadAsSourceText, getVerifiedParticipants } from '@/lib/twitter-utils';
 import { generatePodcastSlug } from '@/lib/slugify';
 import { logger } from '@/lib/logger';
+import { requireSystemUser } from '@/lib/system-user';
 import type { AdminThreadToPodcastPayload } from '@/lib/queue';
+import type { CredentialLookupAiOptions } from '@/lib/credential-lookup';
 
 const TWEET_URL_REGEX = /(?:twitter\.com|x\.com)\/\w+\/status\/(\d+)/;
+const LOCAL_AI_PROVIDER: AiProviderId = 'claude-code';
+const LOCAL_MODEL_PREFIX = 'claude-code:';
+
+function providerForAdminCredentialModel(model: string): AiProviderId | null {
+  if (model.startsWith(LOCAL_MODEL_PREFIX) && model.length > LOCAL_MODEL_PREFIX.length) {
+    return LOCAL_AI_PROVIDER;
+  }
+  return getProviderForModel(model);
+}
+
+async function resolveAdminCredentialLookupAi(
+  userId: string,
+  model: string | null,
+): Promise<CredentialLookupAiOptions> {
+  if (model) {
+    const provider = providerForAdminCredentialModel(model);
+    if (!provider) {
+      throw new Error(`Unknown AI model for participant credential lookup: ${model}`);
+    }
+    if (provider === LOCAL_AI_PROVIDER) {
+      return { providerType: provider, model };
+    }
+
+    const providerKey = await getAiKey(userId, provider);
+    if (!providerKey) {
+      throw new Error(`AI key for provider "${provider}" is required for participant credential lookup.`);
+    }
+    return { providerType: provider, model, apiKeyOverride: providerKey.apiKey };
+  }
+
+  const userKey = await getAiKey(userId);
+  if (!userKey) {
+    throw new Error('AI key or explicit local AI model is required for participant credential lookup.');
+  }
+  const provider = userKey.provider;
+  const defaultModel = getAiProviderMeta(provider).defaultModel;
+  if (!defaultModel) {
+    throw new Error(`No default AI model configured for provider "${provider}".`);
+  }
+  return { providerType: provider, model: defaultModel, apiKeyOverride: userKey.apiKey };
+}
 
 export async function processAdminThreadToPodcast(
   job: Job<AdminThreadToPodcastPayload>
@@ -48,7 +93,16 @@ export async function processAdminThreadToPodcast(
     (!threadData.isSelfAuthored && threadData.replies.length >= 2)
   );
 
-  // 5. Always parse thread/tweet for content first, then merge admin overrides
+  // 5. Resolve configured system owner and admin-configured model defaults for parsing
+  const systemUser = await requireSystemUser(prisma);
+
+  const twitterConfig = await getTwitterConfig();
+  const parseOptions = {
+    userId: systemUser.id,
+    aiModel: twitterConfig.defaultAiModel ?? undefined,
+  };
+
+  // 6. Always parse thread/tweet for content first, then merge admin overrides
   let parsed;
   const mentionAsThreadTweet = {
     id: tweet.id,
@@ -61,11 +115,11 @@ export async function processAdminThreadToPodcast(
   };
 
   const contentParsed = isThreadPodcast && threadData
-    ? await parseThreadIntent(mentionAsThreadTweet, threadData)
-    : await parseTweetIntent(tweet.text);
+    ? await parseThreadIntent(mentionAsThreadTweet, threadData, parseOptions)
+    : await parseTweetIntent(tweet.text, undefined, parseOptions);
 
   if (message) {
-    const overrides = await parseTweetIntent(message);
+    const overrides = await parseTweetIntent(message, undefined, parseOptions);
     parsed = {
       ...contentParsed,
       depth: overrides.depth,
@@ -85,26 +139,16 @@ export async function processAdminThreadToPodcast(
   if (isThreadPodcast && threadData) {
     const verifiedParticipants = getVerifiedParticipants(threadData);
     if (verifiedParticipants.length > 0) {
-      participantCredentials = await lookupParticipantCredentials(verifiedParticipants);
+      participantCredentials = await lookupParticipantCredentials(
+        verifiedParticipants,
+        await resolveAdminCredentialLookupAi(systemUser.id, twitterConfig.defaultAiModel)
+      );
     }
   }
 
   await job.updateProgress(60);
 
-  // 6. Resolve @sotto system user
-  const sottoUser = await prisma.user.findUnique({
-    where: { handle: 'sotto' },
-    select: { id: true },
-  });
-
-  if (!sottoUser) {
-    throw new Error('@sotto system account not found. Run prisma db seed.');
-  }
-
-  // 7. Read admin-configured model defaults
-  const twitterConfig = await getTwitterConfig();
-
-  // 8. Create podcast as @sotto
+  // 8. Create podcast owned by the configured system owner
   const voicePair = selectVoicePair(tweetId);
 
   const tone = parsed.isDebate ? 'socratic' : parsed.tone;
@@ -115,10 +159,10 @@ export async function processAdminThreadToPodcast(
     ? formatThreadAsSourceText(threadData, parsed, participantCredentials)
     : undefined;
 
-  const slug = await generatePodcastSlug(parsed.title, sottoUser.id, prisma);
+  const slug = await generatePodcastSlug(parsed.title, systemUser.id, prisma);
   const podcast = await prisma.podcast.create({
     data: {
-      userId: sottoUser.id,
+      userId: systemUser.id,
       title: parsed.title,
       topic: parsed.topic,
       slug,
@@ -141,7 +185,7 @@ export async function processAdminThreadToPodcast(
       visibility: 'PUBLIC',
       discovery: {
         create: {
-          userId: sottoUser.id,
+          userId: systemUser.id,
           topic: parsed.topic,
           depth: parsed.depth,
           audienceLevel: parsed.audienceLevel,
@@ -161,7 +205,7 @@ export async function processAdminThreadToPodcast(
   // 8. Kick off generation pipeline
   await addJob(contentExtractionQueue, JobType.EXTRACT_CONTENT, {
     podcastId: podcast.id,
-    userId: sottoUser.id,
+    userId: systemUser.id,
     sourceUrl: parsed.sourceUrl,
     sourceText,
   });

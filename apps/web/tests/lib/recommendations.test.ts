@@ -32,14 +32,13 @@ describe('findSimilarPodcasts', () => {
     vi.clearAllMocks();
   });
 
-  it('returns podcasts ranked by playCount and likeCount', async () => {
+  it('returns podcasts ranked by plays and private save signal', async () => {
     const mockPodcasts = [
       {
         id: 'p1',
         title: 'Quantum Computing 101',
         topic: 'quantum physics',
         playCount: 150,
-        likeCount: 30,
         duration: 600,
         user: { id: 'u1', name: 'Alice', image: null },
       },
@@ -48,16 +47,28 @@ describe('findSimilarPodcasts', () => {
         title: 'Introduction to Quantum',
         topic: 'quantum computing',
         playCount: 120,
-        likeCount: 25,
         duration: 450,
         user: { id: 'u2', name: 'Bob', image: 'avatar.jpg' },
       },
     ];
 
-    vi.mocked(prisma.podcast.findMany).mockResolvedValue(mockPodcasts as any);
+    vi.mocked(prisma.podcast.findMany).mockResolvedValue(mockPodcasts as never);
 
-    const result = await findSimilarPodcasts({ topic: 'quantum' });
+    const result = await findSimilarPodcasts({ topic: 'quantum', userId: 'user-1' });
 
+    expect(prisma.podcast.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          userId: 'user-1',
+          status: 'READY',
+          deletedAt: null,
+        }),
+        orderBy: [{ playCount: 'desc' }, { saveCount: 'desc' }, { createdAt: 'desc' }],
+      })
+    );
+    expect(JSON.stringify(vi.mocked(prisma.podcast.findMany).mock.calls[0][0])).not.toContain(
+      'visibility'
+    );
     expect(result).toEqual(mockPodcasts);
   });
 
@@ -68,7 +79,6 @@ describe('findSimilarPodcasts', () => {
         title: 'Quantum 101',
         topic: 'quantum',
         playCount: 50,
-        likeCount: 10,
         duration: 300,
         user: { id: 'u1', name: 'Alice', image: null },
       },
@@ -77,15 +87,14 @@ describe('findSimilarPodcasts', () => {
         title: 'Quantum 102',
         topic: 'quantum',
         playCount: 40,
-        likeCount: 8,
         duration: 350,
         user: { id: 'u1', name: 'Alice', image: null },
       },
     ];
 
-    vi.mocked(prisma.podcast.findMany).mockResolvedValue(mockPodcasts as any);
+    vi.mocked(prisma.podcast.findMany).mockResolvedValue(mockPodcasts as never);
 
-    const result = await findSimilarPodcasts({ topic: 'quantum' });
+    const result = await findSimilarPodcasts({ topic: 'quantum', userId: 'user-1' });
 
     expect(result.length).toBe(2);
     const ids = result.map((p) => p.id);
@@ -95,7 +104,7 @@ describe('findSimilarPodcasts', () => {
   it('returns empty array for empty topic', async () => {
     vi.mocked(prisma.podcast.findMany).mockResolvedValue([]);
 
-    const result = await findSimilarPodcasts({ topic: '' });
+    const result = await findSimilarPodcasts({ topic: '', userId: 'user-1' });
 
     // Text search with empty string still runs but returns empty from DB
     expect(result).toEqual([]);
@@ -104,7 +113,7 @@ describe('findSimilarPodcasts', () => {
   it('handles short search terms', async () => {
     vi.mocked(prisma.podcast.findMany).mockResolvedValue([]);
 
-    const result = await findSimilarPodcasts({ topic: 'a b c' });
+    const result = await findSimilarPodcasts({ topic: 'a b c', userId: 'user-1' });
 
     // Text search with short terms still runs via OR contains
     expect(result).toEqual([]);
@@ -113,7 +122,10 @@ describe('findSimilarPodcasts', () => {
   it('handles special characters in search query', async () => {
     vi.mocked(prisma.podcast.findMany).mockResolvedValue([]);
 
-    const result = await findSimilarPodcasts({ topic: 'C++ & JavaScript (ES6+)' });
+    const result = await findSimilarPodcasts({
+      topic: 'C++ & JavaScript (ES6+)',
+      userId: 'user-1',
+    });
 
     expect(result).toEqual([]);
   });
@@ -125,15 +137,14 @@ describe('findSimilarPodcasts', () => {
         title: 'Test Podcast',
         topic: 'testing',
         playCount: 50,
-        likeCount: 5,
         duration: 300,
         user: { id: 'u1', name: 'Test User', image: 'avatar.jpg' },
       },
     ];
 
-    vi.mocked(prisma.podcast.findMany).mockResolvedValue(mockPodcasts as any);
+    vi.mocked(prisma.podcast.findMany).mockResolvedValue(mockPodcasts as never);
 
-    const result = await findSimilarPodcasts({ topic: 'testing' });
+    const result = await findSimilarPodcasts({ topic: 'testing', userId: 'user-1' });
 
     expect(result[0].user).toEqual({
       id: 'u1',

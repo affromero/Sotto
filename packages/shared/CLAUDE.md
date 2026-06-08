@@ -13,7 +13,6 @@ src/
 │   ├── twitter.ts        # TweetParseResult, TwitterTweet, TweetMentionData
 │   ├── discovery.ts      # DiscoveryMessage, DiscoveryMetadata, DiscoveryState, InspireSection, NewsTimeRange, INSPIRE_SECTION_LABELS, NEWS_TIME_RANGE_LABELS
 │   ├── news.ts           # NEWS_CATEGORIES, NEWS_CATEGORY_LABELS, NewsCategory, NewsArticle, NewsMeta, NewsResponse
-│   ├── feed.ts           # FeedResponse, FeedSort, FeedFilters
 │   ├── player.ts         # PlayerState, PlayerControls
 │   ├── interaction.ts    # InteractionRequest, InteractionResponse
 │   ├── notification.ts   # NotificationData, PushSubscriptionData
@@ -21,7 +20,7 @@ src/
 │   ├── analytics.ts      # AnalyticsResponse, AnalyticsSummary
 │   ├── api-key.ts        # ApiKeyData, ApiKeyCreated
 │   ├── import.ts         # ImportPodcastRequest, ImportProgress
-│   ├── events.ts         # EventPayload (23 event types), EventContext
+│   ├── events.ts         # EventPayload (17 private workspace event types), EventContext
 │   └── pitch.ts          # PitchDocument, PitchVersion, PitchManifest
 ├── brand.ts              # BRAND constant — single source of truth for product tagline, descriptions, and pitch copy
 ├── content-badge.ts      # getContentBadgeLabel(), getPodcastBadges() — content/AI/TTS/language badge logic
@@ -42,6 +41,7 @@ src/
 ## How web app consumes this
 
 Type files in `apps/web/src/types/` are thin re-exports:
+
 ```typescript
 // apps/web/src/types/discovery.ts
 export type { DiscoveryMessage, DiscoveryMetadata, DiscoveryState } from '@sotto/shared';

@@ -11,8 +11,6 @@ export interface PodcastSummary {
   audioUrl: string | null;
   duration: number | null;
   playCount: number;
-  likeCount: number;
-  forkCount: number;
   createdAt: string;
   source: PodcastSource;
   isHumanContent: boolean;
@@ -25,9 +23,6 @@ export interface PodcastSummary {
   language?: string | null;
   aiAutoResolved?: boolean | null;
   ttsAutoResolved?: boolean | null;
-  forkedFromId: string | null;
-  forkedFrom?: { id: string; title: string } | null;
-  isVoiceOnlyFork: boolean;
   ownerIsPro?: boolean;
   user: {
     id: string;
@@ -39,44 +34,14 @@ export interface PodcastSummary {
   tags: Array<{ id: string; name: string; slug: string }>;
 }
 
-export interface ForkedFromInfo {
-  id: string;
-  title: string;
-  user: {
-    id: string;
-    name: string | null;
-    handle: string | null;
-    image: string | null;
-  };
-}
-
-export interface ForkSummary {
-  id: string;
-  title: string;
-  remixNote: string | null;
-  isVoiceOnlyFork: boolean;
-  createdAt: string;
-  user: {
-    id: string;
-    name: string | null;
-    handle: string | null;
-    image: string | null;
-  };
-}
-
 export interface PodcastDetail extends PodcastSummary {
   saveCount: number;
-  commentCount: number;
-  remixNote: string | null;
-  forkedFrom: ForkedFromInfo | null;
-  forks: ForkSummary[];
   currentVersion: number;
   versions: PodcastVersionSummary[];
   segments: SegmentData[];
   interactions: InteractionSummary[];
   references: ReferenceData[];
   pdfUrl: string | null;
-  isLiked: boolean;
   isSaved: boolean;
   /** Owner-only: reason the generation pipeline failed (null for non-owners or non-failed podcasts) */
   failureReason?: string | null;

@@ -118,9 +118,12 @@ vi.mock('@/lib/queue', () => ({
   audioGenerationQueue: { name: 'audio-generation' },
 }));
 
+const mockGetAiKey = vi.fn().mockResolvedValue({ apiKey: 'provider-key', provider: 'anthropic' });
+const mockHasByokKey = vi.fn().mockResolvedValue(false);
+
 vi.mock('@/lib/byok', () => ({
-  getAiKey: vi.fn().mockResolvedValue(null),
-  hasByokKey: vi.fn().mockResolvedValue(false),
+  getAiKey: (...args: unknown[]) => mockGetAiKey(...args),
+  hasByokKey: (...args: unknown[]) => mockHasByokKey(...args),
 }));
 
 vi.mock('@/lib/tier-features', () => ({
@@ -143,9 +146,15 @@ const mockResolveAiModelAndProvider = vi.fn().mockResolvedValue({
   model: 'claude-haiku-4-5-20251001',
   provider: 'anthropic',
 });
+const mockGetCheapestModelForProvider = vi.fn((provider: string) => {
+  if (provider === 'openai') return 'gpt-5-nano';
+  if (provider === 'claude-code') return 'haiku';
+  return 'claude-haiku-4-5-20251001';
+});
 
 vi.mock('@/lib/providers/ai-registry', () => ({
   resolveAiModelAndProvider: (...args: unknown[]) => mockResolveAiModelAndProvider(...args),
+  getCheapestModelForProvider: (provider: string) => mockGetCheapestModelForProvider(provider),
 }));
 
 vi.mock('@/lib/pipeline-events', () => ({
@@ -161,8 +170,10 @@ vi.mock('@/lib/logger', () => ({
   },
 }));
 
+const mockDetectLanguage = vi.fn().mockResolvedValue(null);
+
 vi.mock('@/lib/language-detect', () => ({
-  detectLanguage: vi.fn().mockResolvedValue(null),
+  detectLanguage: (...args: unknown[]) => mockDetectLanguage(...args),
 }));
 
 // ---- Import under test ----
@@ -234,6 +245,8 @@ describe('processScriptGeneration', () => {
       ...args.data,
     }));
     mockAddJob.mockResolvedValue({ id: 'job-1' });
+    mockGetAiKey.mockResolvedValue({ apiKey: 'anthropic-key', provider: 'anthropic' });
+    mockHasByokKey.mockResolvedValue(false);
 
     // Reset model resolution mock
     mockResolveAiModelAndProvider.mockResolvedValue({
@@ -283,6 +296,128 @@ describe('processScriptGeneration', () => {
       const job = createMockJob(defaultPayload);
 
       await expect(processScriptGeneration(job)).rejects.toThrow('Discovery not found');
+    });
+  });
+
+  describe('AI routing', () => {
+    it('uses the configured BYOK provider when the podcast has no model', async () => {
+      const aiKey = { apiKey: 'anthropic-key', provider: 'anthropic' };
+      mockGetAiKey.mockResolvedValue(aiKey);
+
+      await processScriptGeneration(createMockJob(defaultPayload));
+
+      expect(mockGetAiKey).toHaveBeenCalledTimes(1);
+      expect(mockGetAiKey).toHaveBeenCalledWith('user-001');
+      expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
+        podcastAiModel: null,
+        aiKey,
+        plan: 'FREE',
+      });
+      expect(mockGenerateScript).toHaveBeenCalledWith(
+        expect.objectContaining({
+          apiKeyOverride: 'anthropic-key',
+          model: 'claude-haiku-4-5-20251001',
+          provider: 'anthropic',
+        }),
+      );
+      expect(mockDetectLanguage).toHaveBeenCalledWith(
+        expect.stringContaining('Welcome to the show!'),
+        {
+          providerType: 'anthropic',
+          model: 'claude-haiku-4-5-20251001',
+          apiKeyOverride: 'anthropic-key',
+        },
+      );
+    });
+
+    it('uses the explicit podcast model owner and matching provider key', async () => {
+      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+        aiModel: 'gpt-5-mini',
+        verificationMode: 'standard',
+        source: 'WEB',
+        language: null,
+      });
+      mockGetAiKey.mockResolvedValue({ apiKey: 'openai-key', provider: 'openai' });
+      mockResolveAiModelAndProvider.mockResolvedValue({
+        model: 'gpt-5-mini',
+        provider: 'openai',
+      });
+
+      await processScriptGeneration(createMockJob(defaultPayload));
+
+      expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
+        podcastAiModel: 'gpt-5-mini',
+        aiKey: null,
+        plan: 'FREE',
+      });
+      expect(mockGetAiKey).toHaveBeenCalledTimes(1);
+      expect(mockGetAiKey).toHaveBeenCalledWith('user-001', 'openai');
+      expect(mockGenerateScript).toHaveBeenCalledWith(
+        expect.objectContaining({
+          apiKeyOverride: 'openai-key',
+          model: 'gpt-5-mini',
+          provider: 'openai',
+        }),
+      );
+      expect(mockDetectLanguage).toHaveBeenCalledWith(
+        expect.stringContaining('Welcome to the show!'),
+        {
+          providerType: 'openai',
+          model: 'gpt-5-nano',
+          apiKeyOverride: 'openai-key',
+        },
+      );
+    });
+
+    it('rejects explicit non-local models without a matching provider key', async () => {
+      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+        aiModel: 'gpt-5-mini',
+        verificationMode: 'standard',
+        source: 'WEB',
+        language: null,
+      });
+      mockGetAiKey.mockResolvedValue(null);
+      mockResolveAiModelAndProvider.mockResolvedValue({
+        model: 'gpt-5-mini',
+        provider: 'openai',
+      });
+
+      await expect(processScriptGeneration(createMockJob(defaultPayload))).rejects.toThrow(
+        'AI key for provider "openai" is required for script generation.',
+      );
+      expect(mockGenerateScript).not.toHaveBeenCalled();
+    });
+
+    it('uses platform credentials only for explicit admin-credit routes', async () => {
+      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+        aiModel: 'gpt-5-mini',
+        verificationMode: 'standard',
+        source: 'WEB',
+        language: null,
+      });
+      mockResolveAiModelAndProvider.mockResolvedValue({
+        model: 'gpt-5-mini',
+        provider: 'openai',
+      });
+
+      await processScriptGeneration(createMockJob({
+        ...defaultPayload,
+        useAdminCredits: true,
+      }));
+
+      expect(mockGetAiKey).not.toHaveBeenCalled();
+      expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
+        podcastAiModel: 'gpt-5-mini',
+        aiKey: null,
+        plan: 'FREE',
+      });
+      expect(mockGenerateScript).toHaveBeenCalledWith(
+        expect.objectContaining({
+          apiKeyOverride: undefined,
+          model: 'gpt-5-mini',
+          provider: 'openai',
+        }),
+      );
     });
   });
 

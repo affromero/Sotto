@@ -17,9 +17,9 @@ export default function AboutPage() {
           <header className={styles.hero}>
             <h1 className={styles.heroTitle}>{BRAND.tagline}</h1>
             <p className={styles.heroSubtitle}>
-              Sotto turns any topic into a conversational podcast you
-              can interrupt, remix, and share. Built for curious minds who learn
-              by listening.
+              Sotto turns topics, sources, and meetings into private conversational
+              podcasts you can interrupt and revisit. Built for curious minds who
+              learn by listening.
             </p>
           </header>
 
@@ -50,11 +50,11 @@ export default function AboutPage() {
                   <path d="M12 12v3" />
                 </svg>
               </div>
-              <h2 className={styles.featureTitle}>Fork</h2>
+              <h2 className={styles.featureTitle}>Extend</h2>
               <p className={styles.featureDescription}>
-                Found a podcast you love? Fork it and add your own angle.
-                Every remix links back to the original, building a living
-                knowledge tree.
+                Save a briefing, ask follow-up questions, and generate a new angle
+                from your own context. Your workspace stays private unless you
+                choose otherwise.
               </p>
             </div>
 
@@ -66,11 +66,11 @@ export default function AboutPage() {
                   <line x1="12" x2="12" y1="2" y2="15" />
                 </svg>
               </div>
-              <h2 className={styles.featureTitle}>Share</h2>
+              <h2 className={styles.featureTitle}>Control</h2>
               <p className={styles.featureDescription}>
-                Publish to the social feed, follow creators, build collections,
-                and discover podcasts on every topic imaginable. Knowledge
-                is better when it&apos;s shared.
+                Keep podcasts private by default, organize collections, and decide
+                when a link should be shared. Knowledge work is more useful when
+                you control access.
               </p>
             </div>
           </section>
@@ -79,10 +79,9 @@ export default function AboutPage() {
             <h2 className={styles.sectionTitle}>Accessible by Design</h2>
             <p className={styles.sectionText}>
               Sotto gives you one podcast every day for free — no credit card, no API keys.
-              Platform AI and voices are included. Upgrade to Pro (coming soon)
-              for private podcasts, analytics, voice tracks, voice cloning, and unlimited Q&amp;A.
-              Or bring your own API keys (BYOK) for unlimited generation, duration, and model
-              choice at cost price — connect Anthropic, OpenAI, or any of seven TTS providers.
+              Platform AI and voices are included. Bring your own API keys (BYOK)
+              for unlimited generation, duration, and model choice at cost price —
+              connect Anthropic, OpenAI, or any of seven TTS providers.
             </p>
             <p className={styles.sectionText}>
               Your keys are encrypted with AES-256-GCM and never leave our servers unencrypted.
@@ -104,7 +103,7 @@ export default function AboutPage() {
             <h2 className={styles.sectionTitle}>Get in Touch</h2>
             <p className={styles.sectionText}>
               Questions, feedback, or just want to say hello? Reach out at{' '}
-              <a href="mailto:support@sotto.fm">support@sotto.fm</a>.
+              <a href="mailto:support@example.com">support@example.com</a>.
             </p>
           </section>
         </div>

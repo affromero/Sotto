@@ -416,9 +416,8 @@ export function isValidModelId(modelId: string): boolean {
  * Resolve the AI model and its owning provider, keeping them in sync.
  *
  * Priority:
- * 1. podcast.aiModel (user's explicit choice) → look up provider from registry
+ * 1. podcast.aiModel (user's explicit choice) → look up provider from registry. Throws if unknown.
  * 2. BYOK key → provider default model
- * 3. Free tier admin config → aiAllocations[0] or aiModel
  *
  * Returns both `model` and `provider` so callers never mismatch them.
  */
@@ -427,17 +426,19 @@ export async function resolveAiModelAndProvider(opts: {
   aiKey?: { provider: string; apiKey: string } | null;
   plan?: 'FREE' | 'PRO';
 }): Promise<{ model: string; provider: string }> {
-  const { resolveAutoModel } = await import('../auto-model-config');
-
   // 1. Podcast-level model override — only use if the model is in the registry
   if (opts.podcastAiModel) {
+    if (opts.podcastAiModel.startsWith('claude-code:')) {
+      return { model: opts.podcastAiModel, provider: 'claude-code' };
+    }
+
     const owner = getProviderForModel(opts.podcastAiModel);
     if (owner) {
       return { model: opts.podcastAiModel, provider: owner };
     }
-    logger.warn('resolveAiModelAndProvider: unknown model, falling through', {
-      model: opts.podcastAiModel,
-    });
+    throw new Error(
+      `Unknown AI model "${opts.podcastAiModel}". Choose a registered model before generation.`
+    );
   }
 
   // 2. BYOK key → provider's default model
@@ -451,12 +452,7 @@ export async function resolveAiModelAndProvider(opts: {
     }
   }
 
-  // 3. Auto model config (plan-aware)
-  const autoConfig = await resolveAutoModel(opts.plan ?? 'FREE');
-  return {
-    model: autoConfig.aiModel,
-    provider: autoConfig.aiProvider,
-  };
+  throw new Error('AI model is required when no AI key is configured.');
 }
 
 /**

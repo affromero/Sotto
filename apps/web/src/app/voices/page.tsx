@@ -1,5 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/lib/auth';
+import { getPlanFeatureConfig } from '@/lib/plan-feature-config';
+import { redirect } from 'next/navigation';
 import type { Metadata } from 'next';
 import { TopBar } from '@/components/layout/TopBar';
 import { VoicesClient } from './VoicesClient';
@@ -8,13 +10,17 @@ import styles from './page.module.css';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'Voice Marketplace — Sotto',
-  description: 'Browse and request access to community voice clones on Sotto.',
+  title: 'Shared Voices — Sotto',
+  description: 'Optional shared voice access for private Sotto workspaces.',
 };
 
 export default async function VoicesPage() {
-  const session = await auth();
+  const [session, voiceConfig] = await Promise.all([auth(), getPlanFeatureConfig()]);
   const currentUserId = session?.user?.id ?? null;
+
+  if (!voiceConfig.voiceMarketplaceEnabled) {
+    redirect(currentUserId ? '/settings/voices' : '/');
+  }
 
   const [voices, total] = await Promise.all([
     prisma.voiceClone.findMany({
@@ -29,6 +35,7 @@ export default async function VoicesPage() {
         priceInCents: true,
         createdAt: true,
         externalVoiceId: true,
+        provider: true,
         user: {
           select: {
             id: true,
@@ -71,9 +78,7 @@ export default async function VoicesPage() {
         select: { voiceCloneId: true },
       }),
     ]);
-    requestStatusMap = Object.fromEntries(
-      userRequests.map((r) => [r.voiceCloneId, r.status])
-    );
+    requestStatusMap = Object.fromEntries(userRequests.map((r) => [r.voiceCloneId, r.status]));
     accessSet = new Set([
       ...userPurchases.map((p) => p.voiceCloneId),
       ...userAllowlist.map((a) => a.voiceCloneId),
@@ -82,10 +87,7 @@ export default async function VoicesPage() {
 
   const serializedVoices = voices.map((v) => {
     const isOwner = currentUserId === v.user.id;
-    const hasAccess =
-      isOwner ||
-      requestStatusMap[v.id] === 'APPROVED' ||
-      accessSet.has(v.id);
+    const hasAccess = isOwner || requestStatusMap[v.id] === 'APPROVED' || accessSet.has(v.id);
 
     return {
       id: v.id,
@@ -95,6 +97,7 @@ export default async function VoicesPage() {
       priceInCents: v.priceInCents,
       createdAt: v.createdAt.toISOString(),
       externalVoiceId: v.externalVoiceId,
+      provider: v.provider,
       owner: {
         id: v.user.id,
         name: v.user.name,
@@ -109,7 +112,12 @@ export default async function VoicesPage() {
   });
 
   const topBarUser = session?.user
-    ? { name: session.user.name, email: session.user.email, image: session.user.image, id: session.user.id }
+    ? {
+        name: session.user.name,
+        email: session.user.email,
+        image: session.user.image,
+        id: session.user.id,
+      }
     : null;
 
   return (

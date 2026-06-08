@@ -219,7 +219,7 @@ async function handleVerifyChallenge(voiceCloneId: string, userId: string, chall
       userId,
       type: 'VOICE_VERIFICATION_PASSED',
       title: 'Voice Verified',
-      message: 'Your voice clone has been verified and is now live on the marketplace.',
+      message: 'Your voice clone has been verified and is ready to use.',
     });
 
     logger.info('Voice verified', { voiceCloneId, similarity });

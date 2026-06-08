@@ -24,7 +24,7 @@ export async function DELETE(
   try {
     const podcast = await prismaUnfiltered.podcast.findUnique({
       where: { id: podcastId },
-      select: { forkedFromId: true, deletedAt: true },
+      select: { deletedAt: true },
     });
 
     if (!podcast) {
@@ -35,29 +35,9 @@ export async function DELETE(
       return errorResponse('Podcast already deleted', 409);
     }
 
-    await prismaUnfiltered.$transaction(async (tx) => {
-      await tx.podcast.updateMany({
-        where: { forkedFromId: podcastId },
-        data: { forkedFromId: null },
-      });
-
-      if (podcast.forkedFromId) {
-        const parent = await tx.podcast.findUnique({
-          where: { id: podcast.forkedFromId },
-          select: { id: true },
-        });
-        if (parent) {
-          await tx.podcast.update({
-            where: { id: podcast.forkedFromId },
-            data: { forkCount: { decrement: 1 } },
-          });
-        }
-      }
-
-      await tx.podcast.update({
-        where: { id: podcastId },
-        data: { deletedAt: new Date() },
-      });
+    await prismaUnfiltered.podcast.update({
+      where: { id: podcastId },
+      data: { deletedAt: new Date() },
     });
 
     return NextResponse.json({ success: true });

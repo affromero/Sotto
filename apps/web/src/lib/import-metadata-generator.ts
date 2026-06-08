@@ -35,6 +35,10 @@ export async function generateImportMetadata(
   model?: string,
   provider?: string
 ): Promise<{ title: string; topic: string }> {
+  if (!provider || !model) {
+    throw new Error('AI provider and model are required for import metadata generation.');
+  }
+
   const truncated = transcriptText.slice(0, MAX_TRANSCRIPT_LENGTH);
 
   const ai = createAIProvider(provider);
@@ -45,7 +49,7 @@ export async function generateImportMetadata(
   );
 
   logUsage({
-    service: provider ?? 'anthropic',
+    service: provider,
     model: response.model,
     category: 'import_metadata',
     inputTokens: response.inputTokens,

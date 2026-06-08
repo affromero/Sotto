@@ -44,7 +44,7 @@ describe('push-notifications', () => {
       ...originalEnv,
       NEXT_PUBLIC_VAPID_PUBLIC_KEY: 'test-public-key',
       VAPID_PRIVATE_KEY: 'test-private-key',
-      VAPID_SUBJECT: 'mailto:test@sotto.fm',
+      VAPID_SUBJECT: 'mailto:test@example.com',
     };
   });
 
@@ -264,7 +264,7 @@ describe('push-notifications', () => {
     });
 
     expect(logger.warn).toHaveBeenCalledWith(
-      'VAPID keys not configured — push notifications disabled'
+      'VAPID keys and subject not configured — push notifications disabled'
     );
   });
 
@@ -272,7 +272,7 @@ describe('push-notifications', () => {
     vi.resetModules();
     process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY = 'test-public-key';
     process.env.VAPID_PRIVATE_KEY = 'test-private-key';
-    process.env.VAPID_SUBJECT = 'mailto:test@sotto.fm';
+    process.env.VAPID_SUBJECT = 'mailto:test@example.com';
 
     const { sendPushNotification } = await import('@/lib/push-notifications');
 
@@ -291,7 +291,7 @@ describe('push-notifications', () => {
     vi.resetModules();
     process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY = 'test-public-key';
     process.env.VAPID_PRIVATE_KEY = 'test-private-key';
-    process.env.VAPID_SUBJECT = 'mailto:test@sotto.fm';
+    process.env.VAPID_SUBJECT = 'mailto:test@example.com';
 
     const { sendPushNotification } = await import('@/lib/push-notifications');
 
@@ -341,7 +341,7 @@ describe('push-notifications', () => {
     });
   });
 
-  it('uses default VAPID subject when not configured', async () => {
+  it('does not send when VAPID subject is not configured', async () => {
     vi.resetModules();
     delete process.env.VAPID_SUBJECT;
     process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY = 'test-public-key';
@@ -369,10 +369,10 @@ describe('push-notifications', () => {
       body: 'Test',
     });
 
-    expect(mockSetVapidDetails).toHaveBeenCalledWith(
-      'mailto:hello@sotto.fm',
-      expect.any(String),
-      expect.any(String)
+    expect(logger.warn).toHaveBeenCalledWith(
+      'VAPID keys and subject not configured — push notifications disabled'
     );
+    expect(mockSetVapidDetails).not.toHaveBeenCalled();
+    expect(mockSendNotification).not.toHaveBeenCalled();
   });
 });

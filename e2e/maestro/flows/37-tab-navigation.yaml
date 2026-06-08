@@ -7,67 +7,67 @@ tags:
 
 - runFlow: ../helpers/login.yaml
 
-# Feed tab (already here after login)
+# Library tab (already here after login)
 - extendedWaitUntil:
     visible:
-      id: "feed-podcast-list"
+      id: 'library-podcast-list'
     timeout: 5000
 
 # Search tab
 - tapOn:
-    text: "Search"
+    text: 'Search'
 - extendedWaitUntil:
     visible:
-      id: "search-input"
+      id: 'search-input'
     timeout: 3000
 - assertVisible:
-    id: "search-input"
+    id: 'search-input'
 
 # Create tab
 - tapOn:
-    text: "Create"
+    text: 'Create'
 - extendedWaitUntil:
     visible:
-      id: "create-chat-input"
+      id: 'create-chat-input'
     timeout: 5000
 - assertVisible:
-    id: "create-chat-input"
+    id: 'create-chat-input'
 
 # Notifications tab
 - tapOn:
-    text: "Notifications"
+    text: 'Notifications'
 - extendedWaitUntil:
     visible:
-      id: "notifications-list"
+      id: 'notifications-list'
     timeout: 5000
 - assertVisible:
-    id: "notifications-list"
+    id: 'notifications-list'
 
 # Profile tab
 - tapOn:
-    text: "Profile"
+    text: 'Profile'
 - extendedWaitUntil:
     visible:
-      id: "profile-podcast-list"
+      id: 'profile-podcast-list'
     timeout: 5000
 - assertVisible:
-    id: "profile-podcast-list"
+    id: 'profile-podcast-list'
 
 # Rapid cycle back through all tabs
 - tapOn:
-    text: "Notifications"
+    text: 'Notifications'
 - wait: 500
 - tapOn:
-    text: "Create"
+    text: 'Create'
 - wait: 500
 - tapOn:
-    text: "Search"
+    text: 'Search'
 - wait: 500
 - tapOn:
-    text: "Feed"
+    text: 'Library'
 - extendedWaitUntil:
     visible:
-      id: "feed-podcast-list"
+      id: 'library-podcast-list'
     timeout: 3000
 
 - takeScreenshot: tab-navigation-complete

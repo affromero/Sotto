@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { getRedisClient } from '@/lib/redis';
+import { getTelegramBotLabel } from '@/lib/bot-identity';
 import { ConnectForm } from './ConnectForm';
 import styles from './page.module.css';
 
@@ -15,6 +16,7 @@ interface Props {
 
 export default async function ConnectTelegramPage({ searchParams }: Props) {
   const { code } = await searchParams;
+  const telegramBotLabel = getTelegramBotLabel();
 
   if (!code) {
     return (
@@ -22,7 +24,7 @@ export default async function ConnectTelegramPage({ searchParams }: Props) {
         <div className={styles.container}>
           <h1 className={styles.title}>Invalid Link</h1>
           <p className={styles.subtitle}>
-            This link is missing a connection code. Please use the link sent by @SottoFMBot in Telegram.
+            This link is missing a connection code. Please use the link sent by {telegramBotLabel} in Telegram.
           </p>
         </div>
       </main>
@@ -43,7 +45,7 @@ export default async function ConnectTelegramPage({ searchParams }: Props) {
         <div className={styles.container}>
           <h1 className={styles.title}>Link Expired</h1>
           <p className={styles.subtitle}>
-            This connection link has expired. Please send /start to @SottoFMBot again to get a new link.
+            This connection link has expired. Please send /start to {telegramBotLabel} again to get a new link.
           </p>
         </div>
       </main>
@@ -57,7 +59,7 @@ export default async function ConnectTelegramPage({ searchParams }: Props) {
       <div className={styles.container}>
         <h1 className={styles.title}>Connect Telegram</h1>
         <p className={styles.subtitle}>
-          Link your Telegram account to generate podcasts via @SottoFMBot.
+          Link your Telegram account to generate podcasts via {telegramBotLabel}.
         </p>
         <div className={styles.card}>
           <div className={styles.telegramInfo}>

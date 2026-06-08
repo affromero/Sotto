@@ -47,13 +47,13 @@ export default function PodcastEditScreen() {
 
   const [title, setTitle] = useState('');
   const [topic, setTopic] = useState('');
-  const [visibility, setVisibility] = useState<Visibility>('PUBLIC');
+  const [visibility, setVisibility] = useState<Visibility>('PRIVATE');
   const [initialized, setInitialized] = useState(false);
 
   if (podcast && !initialized) {
     setTitle(podcast.title ?? '');
     setTopic(podcast.topic ?? '');
-    setVisibility(podcast.visibility ?? 'PUBLIC');
+    setVisibility(podcast.visibility ?? 'PRIVATE');
     setInitialized(true);
   }
 

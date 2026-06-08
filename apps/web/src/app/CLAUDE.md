@@ -2,149 +2,131 @@
 
 ## Page Index
 
-| Path | File | Auth | Description |
-|------|------|------|-------------|
-| `/` | `page.tsx` | No | Landing page |
-| `/@handle` | Rewrite → `profile/handle/[handle]` | No | Vanity profile URL |
-| `/auth/login` | `auth/login/page.tsx` | No | OAuth sign in |
-| `/auth/signup` | `auth/signup/page.tsx` | No | Create account (invite-only notice) |
-| `/auth/waitlisted` | `auth/waitlisted/page.tsx` | No | Waitlisted user landing (reason-based messages) |
-| `/dashboard` | `(dashboard)/dashboard/page.tsx` | Yes | My podcasts, usage |
-| `/settings` | `(dashboard)/settings/page.tsx` | Yes | Profile & preferences |
-| `/billing` | `(dashboard)/billing/page.tsx` | Yes | Keys & usage |
-| `/analytics` | `(dashboard)/analytics/page.tsx` | Yes | Usage analytics |
-| `/settings/api` | `(dashboard)/settings/api/page.tsx` | Yes | API key management |
-| `/settings/voices` | `(dashboard)/settings/voices/page.tsx` | Yes | Voice clone management |
-| `/ideas` | `(dashboard)/ideas/page.tsx` | Yes | Saved podcast ideas |
-| `/onboarding` | `onboarding/page.tsx` | Yes | Post-signup interest + BYOK setup |
-| `/create` | `create/page.tsx` | Yes | Chat-based creation + Import |
-| `/podcast/[podcastId]` | `podcast/[podcastId]/page.tsx` | Mixed | Podcast player |
-| `/podcast/[podcastId]/edit` | `podcast/[podcastId]/edit/page.tsx` | Yes | Edit metadata (owner) |
-| `/podcast/[podcastId]/embed` | `podcast/[podcastId]/embed/page.tsx` | No | Embeddable player |
-| `/feed` | `feed/page.tsx` | No | Public podcast feed |
-| `/profile/[userId]` | `profile/[userId]/page.tsx` | No | User profile |
-| `/collections/[id]` | `collections/[collectionId]/page.tsx` | No | Collection detail |
-| `/voices` | `voices/page.tsx` | No | Voice marketplace |
-| `/invite/[code]` | `invite/[code]/page.tsx` | No | Invitation redemption (server validates, client form redeems) |
-| `/connect/telegram` | `connect/telegram/page.tsx` | Yes | Link Telegram account |
-| `/pitch` | `pitch/page.tsx` | Password | Investor pitch deck |
-| Static pages | `about`, `pricing`, `support`, `join`, `changelog`, `developers`, `privacy`, `terms`, `feedback`, `banned`, `briefings`, `quizzes`, `languages` | No | Public info pages |
-| `/admin/*` | `(admin)/admin/*.tsx` | ADMIN | 21 admin pages (overview, users, podcasts, revenue, costs, pricing, storage, engagement, playback, pipeline, retention, waitlist, analytics, moderation, handles, twitter, landing, inspire, ratings, quality, announcements, auto-models, models, video-tests) |
-| `/admin/video-tests` | `(admin)/admin/video-tests/page.tsx` | ADMIN | Video pipeline test bench: classify visuals, resolve places, generate map images, AI illustrations, stock footage search |
-| `/admin/storage/[podcastId]` | `(admin)/admin/storage/[podcastId]/page.tsx` | ADMIN | Per-podcast data inspector: 19 sections (provider info, R2 files, script, references, segments, Q&A, discovery, tags, engagement, ratings, API costs, pipeline, ML features, voice assignments, voice tracks, segment voice map, TTS providers, completeness) |
-| `not-found` / `error` | `not-found.tsx` / `error.tsx` | No | 404 + error boundary |
-| `sitemap.xml` | `sitemap.ts` | No | Dynamic sitemap |
+| Path                         | File                                                                                                                                            | Auth     | Description                                                                                                                                                                                                                                                     |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/`                          | `page.tsx`                                                                                                                                      | No       | Landing page                                                                                                                                                                                                                                                    |
+| `/auth/login`                | `auth/login/page.tsx`                                                                                                                           | No       | OAuth sign in                                                                                                                                                                                                                                                   |
+| `/auth/signup`               | `auth/signup/page.tsx`                                                                                                                          | No       | Create account (invite-only notice)                                                                                                                                                                                                                             |
+| `/auth/waitlisted`           | `auth/waitlisted/page.tsx`                                                                                                                      | No       | Waitlisted user landing (reason-based messages)                                                                                                                                                                                                                 |
+| `/dashboard`                 | `(dashboard)/dashboard/page.tsx`                                                                                                                | Yes      | My podcasts, usage                                                                                                                                                                                                                                              |
+| `/settings`                  | `(dashboard)/settings/page.tsx`                                                                                                                 | Yes      | Profile & preferences                                                                                                                                                                                                                                           |
+| `/profile`                   | `profile/page.tsx`                                                                                                                              | Yes      | Redirects to settings                                                                                                                                                                                                                                           |
+| `/billing`                   | `(dashboard)/billing/page.tsx`                                                                                                                  | Yes      | Keys & usage                                                                                                                                                                                                                                                    |
+| `/analytics`                 | `(dashboard)/analytics/page.tsx`                                                                                                                | Yes      | Usage analytics                                                                                                                                                                                                                                                 |
+| `/settings/api`              | `(dashboard)/settings/api/page.tsx`                                                                                                             | Yes      | API key management                                                                                                                                                                                                                                              |
+| `/settings/voices`           | `(dashboard)/settings/voices/page.tsx`                                                                                                          | Yes      | Voice clone management                                                                                                                                                                                                                                          |
+| `/ideas`                     | `(dashboard)/ideas/page.tsx`                                                                                                                    | Yes      | Saved podcast ideas                                                                                                                                                                                                                                             |
+| `/onboarding`                | `onboarding/page.tsx`                                                                                                                           | Yes      | Post-signup interest + BYOK setup                                                                                                                                                                                                                               |
+| `/create`                    | `create/page.tsx`                                                                                                                               | Yes      | Chat-based creation + Import                                                                                                                                                                                                                                    |
+| `/podcast/[podcastId]`       | `podcast/[podcastId]/page.tsx`                                                                                                                  | Mixed    | Podcast player                                                                                                                                                                                                                                                  |
+| `/podcast/[podcastId]/edit`  | `podcast/[podcastId]/edit/page.tsx`                                                                                                             | Yes      | Edit metadata (owner)                                                                                                                                                                                                                                           |
+| `/podcast/[podcastId]/embed` | `podcast/[podcastId]/embed/page.tsx`                                                                                                            | No       | Embeddable player                                                                                                                                                                                                                                               |
+| `/collections/[id]`          | `collections/[collectionId]/page.tsx`                                                                                                           | No       | Collection detail                                                                                                                                                                                                                                               |
+| `/voices`                    | `voices/page.tsx`                                                                                                                               | Gated    | Optional shared voice directory; disabled by default for private-first installs                                                                                                                                                                                 |
+| `/invite/[code]`             | `invite/[code]/page.tsx`                                                                                                                        | No       | Invitation redemption (server validates, client form redeems)                                                                                                                                                                                                   |
+| `/connect/telegram`          | `connect/telegram/page.tsx`                                                                                                                     | Yes      | Link Telegram account                                                                                                                                                                                                                                           |
+| `/pitch`                     | `pitch/page.tsx`                                                                                                                                | Password | Investor pitch deck                                                                                                                                                                                                                                             |
+| Static pages                 | `about`, `pricing`, `support`, `join`, `changelog`, `developers`, `privacy`, `terms`, `feedback`, `banned`, `briefings`, `quizzes`, `languages` | No       | Public info pages                                                                                                                                                                                                                                               |
+| `/admin/*`                   | `(admin)/admin/*.tsx`                                                                                                                           | ADMIN    | 21 admin pages (overview, users, podcasts, revenue, costs, pricing, storage, engagement, playback, pipeline, retention, waitlist, analytics, moderation, handles, twitter, landing, inspire, ratings, quality, announcements, auto-models, models, video-tests) |
+| `/admin/video-tests`         | `(admin)/admin/video-tests/page.tsx`                                                                                                            | ADMIN    | Video pipeline test bench: classify visuals, resolve places, generate map images, AI illustrations, stock footage search                                                                                                                                        |
+| `/admin/storage/[podcastId]` | `(admin)/admin/storage/[podcastId]/page.tsx`                                                                                                    | ADMIN    | Per-podcast data inspector: 19 sections (provider info, R2 files, script, references, segments, Q&A, discovery, tags, engagement, ratings, API costs, pipeline, ML features, voice assignments, voice tracks, segment voice map, TTS providers, completeness)   |
+| `not-found` / `error`        | `not-found.tsx` / `error.tsx`                                                                                                                   | No       | 404 + error boundary                                                                                                                                                                                                                                            |
+| `sitemap.xml`                | `sitemap.ts`                                                                                                                                    | No       | Dynamic sitemap                                                                                                                                                                                                                                                 |
 
 ## API Route Index
 
-| Endpoint | Method | Auth | Description |
-|----------|--------|------|-------------|
-| `/api/auth/[...nextauth]` | GET/POST | — | NextAuth handlers |
-| `/api/auth/mobile` | POST | No | Mobile OAuth → API key token |
-| `/api/discovery` | POST | Yes | Streaming discovery chat |
-| `/api/discovery/client-error` | POST | Yes | Log client-side stream fallback errors for admin panel |
-| `/api/podcasts` | GET/POST | Yes | List/create podcasts |
-| `/api/podcasts/import` | POST | Yes | Import audio (multipart) |
-| `/api/podcasts/[id]` | GET/PATCH/DELETE | Yes | Podcast CRUD |
-| `/api/podcasts/[id]/generate` | POST | Yes | Trigger generation (BYOK) |
-| `/api/podcasts/[id]/interact` | POST | Yes | Submit Q&A interaction |
-| `/api/podcasts/[id]/interact/[iid]` | GET | Yes | Poll interaction status |
-| `/api/podcasts/[id]/interact/[iid]/resolve` | PATCH | Yes | Resolve with feedback |
-| `/api/podcasts/[id]/interact/[iid]/incorporate` | POST | Yes | Incorporate Q&A into podcast |
-| `/api/podcasts/[id]/interact/[iid]/vote` | POST | Yes | Upvote Q&A |
-| `/api/podcasts/[id]/knowledge-gaps` | GET | Yes | Knowledge gap aggregation |
-| `/api/podcasts/[id]/questions` | GET | No | Public Q&A questions |
-| `/api/podcasts/[id]/script` | GET/PATCH | Yes | Fetch/edit script turns |
-| `/api/podcasts/[id]/script/approve` | POST | Yes | Approve → queue audio |
-| `/api/podcasts/[id]/script/regenerate` | POST | Yes | Re-queue script generation |
-| `/api/podcasts/[id]/fork` | POST | Yes | Fork podcast |
-| `/api/podcasts/[id]/download` | GET | No | Download audio |
-| `/api/podcasts/[id]/versions` | GET | Yes | Version history |
-| `/api/podcasts/[id]/lineage` | GET | No | Fork tree |
-| `/api/podcasts/[id]/like` | POST/DELETE | Yes | Like/unlike |
-| `/api/podcasts/[id]/save` | POST/DELETE | Yes | Save/unsave |
-| `/api/podcasts/[id]/comments` | GET/POST | Mixed | Threaded comments |
-| `/api/podcasts/[id]/comments/[cid]` | DELETE | Yes | Delete comment |
-| `/api/podcasts/[id]/comments/[cid]/replies` | GET | No | Comment replies |
-| `/api/podcasts/[id]/rating` | GET/POST | Yes | Podcast rating (creator + listener) |
-| `/api/podcasts/[id]/claims` | POST/GET | Yes | Flag/list inaccurate claims |
-| `/api/podcasts/[id]/video` | POST/GET/DELETE | Yes | Video generation: trigger (accepts optional pipeline JSON), poll status, delete |
-| `/api/podcasts/[id]/quiz` | GET | Mixed | Podcast quiz (strips answers pre-submit) |
-| `/api/podcasts/[id]/quiz/submit` | POST | Yes | Submit quiz answers, compute score, update aggregates |
-| `/api/podcasts/[id]/video/pipeline` | POST/PATCH | Yes | Pipeline editor API: POST classifies segments + returns pipeline JSON; PATCH validates + recalculates costs |
-| `/api/fal-models` | GET | Yes | Available Fal image/video models with live pricetoken pricing |
-| `/api/avatar-images` | GET/POST | Yes | List own + shared avatar images with capabilities; upload with consent + verification gate |
-| `/api/avatar-images/[id]` | PATCH/DELETE | Yes | Toggle shareable flag; delete image |
-| `/api/avatar-images/generate` | POST | ADMIN | AI-generate avatar image (feature flag gated) |
-| `/api/avatar-images/share` | GET/POST | Yes | List sent/received share requests; request access to shareable image |
-| `/api/avatar-images/share/[id]` | PATCH | Yes | Approve/deny/revoke share request (image owner only) |
-| `/api/podcasts/[id]/export` | POST/GET | Yes | PDF export |
-| `/api/feed` | GET | No | Public feed (search/filter/sort) |
-| `/api/activity` | GET | Yes | Followed users activity |
-| `/api/recommendations` | GET | Yes | Similar podcasts |
-| `/api/tags` | GET | No | Tag taxonomy |
-| `/api/users/[id]` | GET | No | User profile |
-| `/api/users/[id]/rss` | GET | No | Creator RSS feed |
-| `/api/users/[id]/follow` | POST/DELETE | Yes | Follow/unfollow |
-| `/api/users/[id]/followers` | GET | No | Follower list |
-| `/api/users/[id]/following` | GET | No | Following list |
-| `/api/users/[id]/liked` | GET | No | Liked podcasts |
-| `/api/users/[id]/collections` | GET | No | User collections |
-| `/api/users/[id]/activity` | GET | No | User activity |
-| `/api/users/handle/[handle]/rss` | GET | No | RSS by handle |
-| `/api/users/me` | GET/PATCH | Yes | Current user (includes briefing + quiz fields) |
-| `/api/users/me/quiz-stats` | GET | Yes | Learning stats: total quizzes, avg score, recent attempts |
-| `/api/users/me/avatar` | POST | Yes | Upload avatar |
-| `/api/users/me/twitter` | GET/PATCH/DELETE | Yes | Twitter settings |
-| `/api/users/discover` | GET | Opt | Search users |
-| `/api/users/suggested` | GET | Yes | Suggested follows |
-| `/api/oembed` | GET | No | oEmbed for embeds |
-| `/api/notifications` | GET/PATCH | Yes | List/mark read |
-| `/api/notifications/mark-all-read` | POST | Yes | Mark all read |
-| `/api/billing/subscription` | GET | Yes | BYOK status |
-| `/api/billing/usage` | GET | Yes | Generation count |
-| `/api/collections` | GET/POST | Yes | Collection CRUD |
-| `/api/collections/[id]` | GET/PATCH/DELETE | Yes | Single collection |
-| `/api/collections/[id]/items` | GET/POST/DELETE | Yes | Collection items |
-| `/api/collections/[id]/follow` | POST/DELETE | Yes | Follow collection |
-| `/api/keys` | GET/POST/DELETE | Yes | API key management |
-| `/api/teams/[id]` | GET/PATCH/DELETE | Yes | Team CRUD |
-| `/api/stripe/connect` | GET/POST | Yes | Stripe Connect |
-| `/api/stripe/webhooks` | POST | No | Stripe webhooks |
-| `/api/stripe/payment-intent` | POST | Yes | Voice charges |
-| `/api/voices/clone` | POST | Yes | Create voice clone |
-| `/api/voices/preview` | POST | Yes | Preview voice |
-| `/api/voices/allowlist` | GET/POST/DELETE | Yes | Voice allowlist |
-| `/api/voices/browse` | GET | Opt | Browse voices |
-| `/api/voices/hume` | GET | Yes | Browse Hume AI voice library (BYOK or platform key) |
-| `/api/voices/request` | GET/POST/PATCH | Yes | Voice requests |
-| `/api/tts-providers` | GET | Yes | TTS providers + BYOK |
-| `/api/tts-options` | GET | Yes | TTS provider:model list |
-| `/api/ai-models` | GET | Yes | AI model list |
-| `/api/tts-models` | GET | Yes | TTS models by provider |
-| `/api/stt-providers` | GET | Yes | STT providers |
-| `/api/settings/ai-keys` | GET/POST/DELETE | Yes | AI BYOK keys |
-| `/api/settings/byok` | GET/POST/DELETE | Yes | TTS BYOK keys |
-| `/api/onboarding/interests` | POST | Yes | Save interests |
-| `/api/inspire/all` | GET | Yes | Inspire Me sections |
-| `/api/handles/check` | GET | No | Handle availability |
-| `/api/connect/telegram` | GET/POST | Yes | Telegram linking |
-| `/api/telegram/webhook` | POST | No | Telegram webhook |
-| `/api/events` | POST | Opt | Behavioral events |
-| `/api/ideas` | GET/POST/DELETE | Yes | Podcast ideas |
-| `/api/picks` | GET/POST | Yes | Daily picks |
-| `/api/queue` | GET/POST/DELETE/PATCH | Yes | Listening queue |
-| `/api/reports` | POST | Yes | Content reports |
-| `/api/taste-quiz` | GET/POST/DELETE | Yes | Taste quiz |
-| `/api/waitlist` | POST | No | Waitlist signup |
-| `/api/health` | GET | No | Health check |
-| `/api/feedback` | POST/GET | No | Feedback |
-| `/api/invite/redeem` | POST | No | Redeem invitation code (upserts waitlist as APPROVED) |
-| `/api/admin/waitlist` | PATCH | ADMIN | Approve/reject waitlist entries |
-| `/api/admin/invitations` | GET/POST/PATCH | ADMIN | Generate, list, toggle invitation links |
-| `/api/admin/test-video-pipeline` | POST | ADMIN | Video pipeline test bench: classify visuals, resolve places, generate map images, AI illustrations, stock footage search |
-| `/api/admin/briefing-config` | GET/PATCH | ADMIN | Briefing scheduler config (singleton) |
-| `/api/admin/*` | Various | ADMIN | Admin endpoints (users, podcasts, auto-models, costs, model-pricing, ratings, handles, announcements, twitter, moderation, reports, claims, test-model, test-video-pipeline, traffic-report) |
+| Endpoint                                        | Method                | Auth  | Description                                                                                                                                                                                  |
+| ----------------------------------------------- | --------------------- | ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/api/auth/[...nextauth]`                       | GET/POST              | —     | NextAuth handlers                                                                                                                                                                            |
+| `/api/auth/mobile`                              | POST                  | No    | Mobile OAuth → API key token                                                                                                                                                                 |
+| `/api/discovery`                                | POST                  | Yes   | Streaming discovery chat                                                                                                                                                                     |
+| `/api/discovery/client-error`                   | POST                  | Yes   | Log client-side stream fallback errors for admin panel                                                                                                                                       |
+| `/api/ingest/agent`                             | POST                  | Yes   | Private agent-output ingestion for local Claude Code, Codex, OpenClaw, Hermes, or custom agent runs                                                                                          |
+| `/api/ingest/meeting`                           | POST                  | Yes   | Private meeting transcript ingestion for user-owned recorders, invited agents, and hosted meeting bots                                                                                       |
+| `/api/podcasts`                                 | GET/POST              | Yes   | List/create podcasts                                                                                                                                                                         |
+| `/api/podcasts/import`                          | POST                  | Yes   | Import audio (multipart)                                                                                                                                                                     |
+| `/api/podcasts/[id]`                            | GET/PATCH/DELETE      | Yes   | Podcast CRUD                                                                                                                                                                                 |
+| `/api/podcasts/[id]/generate`                   | POST                  | Yes   | Trigger generation (BYOK)                                                                                                                                                                    |
+| `/api/podcasts/[id]/interact`                   | POST                  | Yes   | Submit Q&A interaction                                                                                                                                                                       |
+| `/api/podcasts/[id]/interact/[iid]`             | GET                   | Yes   | Poll interaction status                                                                                                                                                                      |
+| `/api/podcasts/[id]/interact/[iid]/resolve`     | PATCH                 | Yes   | Resolve with feedback                                                                                                                                                                        |
+| `/api/podcasts/[id]/interact/[iid]/incorporate` | POST                  | Yes   | Incorporate Q&A into podcast                                                                                                                                                                 |
+| `/api/podcasts/[id]/knowledge-gaps`             | GET                   | Yes   | Knowledge gap aggregation                                                                                                                                                                    |
+| `/api/podcasts/[id]/script`                     | GET/PATCH             | Yes   | Fetch/edit script turns                                                                                                                                                                      |
+| `/api/podcasts/[id]/script/approve`             | POST                  | Yes   | Approve → queue audio                                                                                                                                                                        |
+| `/api/podcasts/[id]/script/regenerate`          | POST                  | Yes   | Re-queue script generation                                                                                                                                                                   |
+| `/api/podcasts/[id]/download`                   | GET                   | No    | Download audio                                                                                                                                                                               |
+| `/api/podcasts/[id]/versions`                   | GET                   | Yes   | Version history                                                                                                                                                                              |
+| `/api/podcasts/[id]/save`                       | POST/DELETE           | Yes   | Save/unsave                                                                                                                                                                                  |
+| `/api/podcasts/[id]/rating`                     | GET/POST              | Yes   | Podcast rating (creator + listener)                                                                                                                                                          |
+| `/api/podcasts/[id]/claims`                     | POST/GET              | Yes   | Flag/list inaccurate claims                                                                                                                                                                  |
+| `/api/podcasts/[id]/video`                      | POST/GET/DELETE       | Yes   | Video generation: trigger (accepts optional pipeline JSON), poll status, delete                                                                                                              |
+| `/api/podcasts/[id]/quiz`                       | GET                   | Mixed | Podcast quiz (strips answers pre-submit)                                                                                                                                                     |
+| `/api/podcasts/[id]/quiz/submit`                | POST                  | Yes   | Submit quiz answers, compute score, update aggregates                                                                                                                                        |
+| `/api/podcasts/[id]/video/pipeline`             | POST/PATCH            | Yes   | Pipeline editor API: POST classifies segments + returns pipeline JSON; PATCH validates + recalculates costs                                                                                  |
+| `/api/fal-models`                               | GET                   | Yes   | Available Fal image/video models with live pricetoken pricing                                                                                                                                |
+| `/api/avatar-images`                            | GET/POST              | Yes   | List own + shared avatar images with capabilities; upload with consent + verification gate                                                                                                   |
+| `/api/avatar-images/[id]`                       | PATCH/DELETE          | Yes   | Toggle shareable flag; delete image                                                                                                                                                          |
+| `/api/avatar-images/generate`                   | POST                  | ADMIN | AI-generate avatar image (feature flag gated)                                                                                                                                                |
+| `/api/avatar-images/share`                      | GET/POST              | Yes   | List sent/received share requests; request access to shareable image                                                                                                                         |
+| `/api/avatar-images/share/[id]`                 | PATCH                 | Yes   | Approve/deny/revoke share request (image owner only)                                                                                                                                         |
+| `/api/podcasts/[id]/export`                     | POST/GET              | Yes   | PDF export                                                                                                                                                                                   |
+| `/api/rss/private`                              | GET/POST              | Yes   | List/create private RSS feed tokens                                                                                                                                                          |
+| `/api/rss/private/[token]`                      | GET                   | No    | Token-scoped private RSS feed                                                                                                                                                                |
+| `/api/rss/private/tokens/[tokenId]`             | DELETE                | Yes   | Revoke private RSS feed token                                                                                                                                                                |
+| `/api/recommendations`                          | GET                   | Yes   | Similar podcasts                                                                                                                                                                             |
+| `/api/tags`                                     | GET                   | No    | Tag taxonomy                                                                                                                                                                                 |
+| `/api/users/me`                                 | GET/PATCH             | Yes   | Current user (includes briefing + quiz fields)                                                                                                                                               |
+| `/api/users/me/quiz-stats`                      | GET                   | Yes   | Learning stats: total quizzes, avg score, recent attempts                                                                                                                                    |
+| `/api/users/me/avatar`                          | POST                  | Yes   | Upload avatar                                                                                                                                                                                |
+| `/api/users/me/twitter`                         | GET/PATCH/DELETE      | Yes   | Twitter settings                                                                                                                                                                             |
+| `/api/oembed`                                   | GET                   | No    | oEmbed for embeds                                                                                                                                                                            |
+| `/api/notifications`                            | GET/PATCH             | Yes   | List/mark read                                                                                                                                                                               |
+| `/api/notifications/mark-all-read`              | POST                  | Yes   | Mark all read                                                                                                                                                                                |
+| `/api/billing/subscription`                     | GET                   | Yes   | BYOK status                                                                                                                                                                                  |
+| `/api/billing/usage`                            | GET                   | Yes   | Generation count                                                                                                                                                                             |
+| `/api/collections`                              | GET/POST              | Yes   | Collection CRUD                                                                                                                                                                              |
+| `/api/collections/[id]`                         | GET/PATCH/DELETE      | Yes   | Single collection                                                                                                                                                                            |
+| `/api/collections/[id]/items`                   | GET/POST/DELETE       | Yes   | Collection items                                                                                                                                                                             |
+| `/api/keys`                                     | GET/POST/DELETE       | Yes   | API key management                                                                                                                                                                           |
+| `/api/teams/[id]`                               | GET/PATCH/DELETE      | Yes   | Team CRUD                                                                                                                                                                                    |
+| `/api/stripe/connect`                           | GET/POST              | Yes   | Stripe Connect                                                                                                                                                                               |
+| `/api/stripe/webhooks`                          | POST                  | No    | Stripe webhooks                                                                                                                                                                              |
+| `/api/stripe/payment-intent`                    | POST                  | Yes   | Voice charges                                                                                                                                                                                |
+| `/api/voices/clone`                             | POST                  | Yes   | Create voice clone                                                                                                                                                                           |
+| `/api/voices/preview`                           | POST                  | Yes   | Preview voice                                                                                                                                                                                |
+| `/api/voices/allowlist`                         | GET/POST/DELETE       | Yes   | Voice allowlist                                                                                                                                                                              |
+| `/api/voices/browse`                            | GET                   | Gated | Optional shared voice browse; disabled by default                                                                                                                                            |
+| `/api/voices/hume`                              | GET                   | Yes   | Browse Hume AI voice library (BYOK or platform key)                                                                                                                                          |
+| `/api/voices/request`                           | GET/POST/PATCH        | Yes   | Voice requests                                                                                                                                                                               |
+| `/api/tts-providers`                            | GET                   | Yes   | TTS providers + BYOK                                                                                                                                                                         |
+| `/api/tts-options`                              | GET                   | Yes   | TTS provider:model list                                                                                                                                                                      |
+| `/api/ai-models`                                | GET                   | Yes   | AI model list                                                                                                                                                                                |
+| `/api/tts-models`                               | GET                   | Yes   | TTS models by provider                                                                                                                                                                       |
+| `/api/stt-providers`                            | GET                   | Yes   | STT providers                                                                                                                                                                                |
+| `/api/settings/ai-keys`                         | GET/POST/DELETE       | Yes   | AI BYOK keys                                                                                                                                                                                 |
+| `/api/settings/byok`                            | GET/POST/DELETE       | Yes   | TTS BYOK keys                                                                                                                                                                                |
+| `/api/onboarding/interests`                     | POST                  | Yes   | Save interests                                                                                                                                                                               |
+| `/api/source-connectors/readiness`              | GET                   | Yes   | Private source connector readiness for Slack, Gmail via Google Workspace CLI, Claude Code, and Codex                                                                                         |
+| `/api/inspire/all`                              | GET                   | Yes   | Inspire Me sections                                                                                                                                                                          |
+| `/api/handles/check`                            | GET                   | No    | Handle availability                                                                                                                                                                          |
+| `/api/connect/telegram`                         | GET/POST              | Yes   | Telegram linking                                                                                                                                                                             |
+| `/api/telegram/webhook`                         | POST                  | No    | Telegram webhook                                                                                                                                                                             |
+| `/api/events`                                   | POST                  | Opt   | Behavioral events                                                                                                                                                                            |
+| `/api/ideas`                                    | GET/POST/DELETE       | Yes   | Podcast ideas                                                                                                                                                                                |
+| `/api/picks`                                    | GET/POST              | Yes   | Daily picks                                                                                                                                                                                  |
+| `/api/queue`                                    | GET/POST/DELETE/PATCH | Yes   | Listening queue                                                                                                                                                                              |
+| `/api/reports`                                  | POST                  | Yes   | Content reports                                                                                                                                                                              |
+| `/api/taste-quiz`                               | GET/POST/DELETE       | Yes   | Taste quiz                                                                                                                                                                                   |
+| `/api/waitlist`                                 | POST                  | No    | Waitlist signup                                                                                                                                                                              |
+| `/api/health`                                   | GET                   | No    | Health check                                                                                                                                                                                 |
+| `/api/feedback`                                 | POST/GET              | No    | Feedback                                                                                                                                                                                     |
+| `/api/invite/redeem`                            | POST                  | No    | Redeem invitation code (upserts waitlist as APPROVED)                                                                                                                                        |
+| `/api/admin/waitlist`                           | PATCH                 | ADMIN | Approve/reject waitlist entries                                                                                                                                                              |
+| `/api/admin/invitations`                        | GET/POST/PATCH        | ADMIN | Generate, list, toggle invitation links                                                                                                                                                      |
+| `/api/admin/test-video-pipeline`                | POST                  | ADMIN | Video pipeline test bench: classify visuals, resolve places, generate map images, AI illustrations, stock footage search                                                                     |
+| `/api/admin/briefing-config`                    | GET/PATCH             | ADMIN | Briefing scheduler config (singleton)                                                                                                                                                        |
+| `/api/admin/*`                                  | Various               | ADMIN | Admin endpoints (users, podcasts, auto-models, costs, model-pricing, ratings, handles, announcements, twitter, moderation, reports, claims, test-model, test-video-pipeline, traffic-report) |
 
 ## Route Groups
 

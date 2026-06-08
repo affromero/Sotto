@@ -16,8 +16,8 @@ const classifySchema = z.object({
   title: z.string().min(1),
   topic: z.string().min(1),
   segments: z.array(z.string().min(1)).min(1),
-  provider: z.string().optional(),
-  model: z.string().optional(),
+  provider: z.string().min(1),
+  model: z.string().min(1),
 });
 
 const resolvePlaceSchema = z.object({

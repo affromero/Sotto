@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockAuth = vi.fn();
 const mockUserFindUniqueOrThrow = vi.fn();
@@ -45,6 +45,11 @@ import { GET, POST } from '@/app/api/stripe/connect/route';
 describe('POST /api/stripe/connect', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://selfhost.example.com');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it('returns 401 when user is not authenticated', async () => {
@@ -73,6 +78,12 @@ describe('POST /api/stripe/connect', () => {
 
     expect(response.status).toBe(200);
     expect(body).toEqual({ url: 'https://connect.stripe.com/onboarding' });
+    expect(mockAccountLinksCreate).toHaveBeenCalledWith({
+      account: 'acct_123',
+      refresh_url: 'https://selfhost.example.com/settings/voices?stripe=refresh',
+      return_url: 'https://selfhost.example.com/api/stripe/connect/callback?account_id=acct_123',
+      type: 'account_onboarding',
+    });
   });
 
   it('reuses existing Stripe account when already created', async () => {
@@ -95,6 +106,11 @@ describe('POST /api/stripe/connect', () => {
 describe('GET /api/stripe/connect', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://selfhost.example.com');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it('returns 401 when user is not authenticated', async () => {

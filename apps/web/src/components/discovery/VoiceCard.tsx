@@ -10,7 +10,7 @@ interface VoiceCardProps {
   isSelected: boolean;
   disabled?: boolean;
   onSelect: () => void;
-  provider?: string;
+  provider: string;
 }
 
 export function VoiceCard({
@@ -45,7 +45,7 @@ export function VoiceCard({
         body: JSON.stringify({
           voiceId,
           text: 'Welcome to Sotto. Let me tell you something fascinating today.',
-          ...(provider ? { provider } : {}),
+          provider,
         }),
       });
 

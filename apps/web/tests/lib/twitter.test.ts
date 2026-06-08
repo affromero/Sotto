@@ -46,7 +46,7 @@ describe('twitter', () => {
     process.env.TWITTER_API_SECRET = 'mock_api_secret';
     process.env.TWITTER_ACCESS_TOKEN = 'mock_access_token';
     process.env.TWITTER_ACCESS_SECRET = 'mock_access_secret';
-    process.env.TWITTER_SOTTO_USER_ID = '123456789';
+    process.env.TWITTER_BOT_USER_ID = '123456789';
   });
 
   describe('getMentions', () => {
@@ -54,13 +54,13 @@ describe('twitter', () => {
       const mockTweets: TwitterTweet[] = [
         {
           id: 'tweet-1',
-          text: '@sottofm explain quantum computing',
+          text: '@podbot explain quantum computing',
           author_id: 'user-1',
           created_at: '2026-02-09T10:00:00Z',
         },
         {
           id: 'tweet-2',
-          text: '@sottofm tell me about AI',
+          text: '@podbot tell me about AI',
           author_id: 'user-2',
           created_at: '2026-02-09T11:00:00Z',
         },

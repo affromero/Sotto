@@ -1,36 +1,14 @@
 import { spawn } from 'child_process';
 import { mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
+import { isCommandAvailable } from './local-command';
 import { logger } from './logger';
 import { getAiProviderMeta } from './providers/ai-registry';
 
 const CLAUDE_CODE_DEFAULT_MODEL = getAiProviderMeta('claude-code').defaultModel;
 
-/**
- * Check whether the `claude` CLI is installed and reachable.
- * Result is cached after the first call — the binary doesn't appear/disappear at runtime.
- */
-let _claudeAvailable: boolean | null = null;
 export function isClaudeAvailable(): Promise<boolean> {
-  if (_claudeAvailable !== null) return Promise.resolve(_claudeAvailable);
-  return new Promise((resolve) => {
-    const child = spawn('claude', ['--version'], { stdio: 'ignore' });
-    const timer = setTimeout(() => {
-      child.kill('SIGTERM');
-      _claudeAvailable = false;
-      resolve(false);
-    }, 3000);
-    child.on('close', (code) => {
-      clearTimeout(timer);
-      _claudeAvailable = code === 0;
-      resolve(_claudeAvailable!);
-    });
-    child.on('error', () => {
-      clearTimeout(timer);
-      _claudeAvailable = false;
-      resolve(false);
-    });
-  });
+  return isCommandAvailable('claude');
 }
 
 /**
@@ -59,7 +37,9 @@ function ensureClaudeHome(): string | undefined {
       mkdirSync(claudeDir, { recursive: true });
       writeFileSync(join(claudeDir, '.credentials.json'), credsJson, { mode: 0o600 });
       _claudeHome = runtimeDir;
-      logger.info('claude-code: initialized writable home from CLAUDE_CODE_CREDENTIALS_JSON', { dir: runtimeDir });
+      logger.info('claude-code: initialized writable home from CLAUDE_CODE_CREDENTIALS_JSON', {
+        dir: runtimeDir,
+      });
       return runtimeDir;
     } catch (err) {
       logger.warn('claude-code: failed to write credentials to /tmp', {
@@ -126,7 +106,11 @@ export async function executeClaudeCode(
 
   const args = buildArgs(model, systemPrompt, opts);
 
-  logger.info('claude-code: executing', { model, promptLength: String(prompt.length), webSearch: String(!!opts?.useWebSearch) });
+  logger.info('claude-code: executing', {
+    model,
+    promptLength: String(prompt.length),
+    webSearch: String(!!opts?.useWebSearch),
+  });
 
   // Strip CLAUDECODE to prevent "cannot launch inside another session".
   // Set HOME to the writable claude runtime dir (created from CLAUDE_CODE_CREDENTIALS_JSON
@@ -169,7 +153,9 @@ export async function executeClaudeCode(
       const content = stdout.trim();
       if (!content) {
         const detail = stderr.trim().slice(0, 300) || '(empty)';
-        logger.error('claude-code: exited cleanly but produced no output', { bufferRemainder: detail });
+        logger.error('claude-code: exited cleanly but produced no output', {
+          bufferRemainder: detail,
+        });
         reject(new Error(`claude-code: no output produced (empty response). Buffer: ${detail}`));
         return;
       }
@@ -179,7 +165,9 @@ export async function executeClaudeCode(
 
     child.on('error', (err) => {
       clearTimeout(timer);
-      reject(new Error(`claude-code: failed to spawn — ${err.message}. Is the 'claude' CLI installed?`));
+      reject(
+        new Error(`claude-code: failed to spawn — ${err.message}. Is the 'claude' CLI installed?`)
+      );
     });
 
     child.stdin.write(prompt);
@@ -203,7 +191,11 @@ export async function* streamClaudeCode(
   if (systemPrompt) args.push('--system-prompt', systemPrompt);
   if (opts?.useWebSearch) args.push('--allowedTools', 'WebSearch,WebFetch');
 
-  logger.info('claude-code: streaming', { model, promptLength: String(prompt.length), webSearch: String(!!opts?.useWebSearch) });
+  logger.info('claude-code: streaming', {
+    model,
+    promptLength: String(prompt.length),
+    webSearch: String(!!opts?.useWebSearch),
+  });
 
   // Strip CLAUDECODE to prevent "cannot launch inside another session".
   // Set HOME to the writable claude runtime dir so the CLI can read credentials
@@ -328,7 +320,10 @@ export async function* streamClaudeCode(
     if (!hasDeltas) {
       if (exitCode !== null && exitCode !== 0) {
         const errorMsg = stderr.trim() || `claude-code exited with code ${exitCode}`;
-        logger.error('claude-code: stream failed', { exitCode: String(exitCode), stderr: stderr.slice(0, 500) });
+        logger.error('claude-code: stream failed', {
+          exitCode: String(exitCode),
+          stderr: stderr.slice(0, 500),
+        });
         throw new Error(errorMsg);
       } else if (stderr.trim()) {
         logger.error('claude-code: stream produced no output', { stderr: stderr.slice(0, 500) });
@@ -336,7 +331,9 @@ export async function* streamClaudeCode(
       } else {
         // Exit 0, no stderr, no output — this is the empty-response failure mode
         const detail = buffer.trim().slice(0, 300) || '(empty)';
-        logger.error('claude-code: exited cleanly but produced no output', { bufferRemainder: detail });
+        logger.error('claude-code: exited cleanly but produced no output', {
+          bufferRemainder: detail,
+        });
         throw new Error(`claude-code: no output produced (empty response). Buffer: ${detail}`);
       }
     }

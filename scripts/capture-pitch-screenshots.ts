@@ -9,7 +9,7 @@
  *   - App running at APP_URL (default http://localhost:3000)
  *   - Demo data seeded (prisma/seed-demo.ts)
  *   - R2 env vars set
- *   - NEXTAUTH_SECRET set
+ *   - AUTH_SECRET set
  *   - Playwright browsers installed: npx playwright install chromium
  *
  * Usage:
@@ -62,11 +62,11 @@ async function uploadToR2(client: S3Client, key: string, body: Buffer): Promise<
 // ── Session Token ─────────────────────────────────────────────────
 
 async function createSessionToken(userId: string, role: string, name: string): Promise<string> {
-  const secret = process.env.NEXTAUTH_SECRET;
-  if (!secret) throw new Error('NEXTAUTH_SECRET not set');
+  const secret = process.env.AUTH_SECRET;
+  if (!secret) throw new Error('AUTH_SECRET not set');
 
   const token = await encode({
-    token: { sub: userId, role, name, email: `${role.toLowerCase()}@sotto.fm` },
+    token: { sub: userId, role, name, email: `${role.toLowerCase()}@example.com` },
     secret,
     salt: APP_URL.startsWith('https') ? '__Secure-authjs.session-token' : 'authjs.session-token',
   });
@@ -89,7 +89,7 @@ interface ScreenshotDef {
   waitFor?: string;
 }
 
-function getScreenshotDefs(demoPodcastId: string, demoUserId: string): ScreenshotDef[] {
+function getScreenshotDefs(demoPodcastId: string): ScreenshotDef[] {
   return [
     // Desktop captures
     {
@@ -129,14 +129,6 @@ function getScreenshotDefs(demoPodcastId: string, demoUserId: string): Screensho
       fullPage: false,
     },
     {
-      name: 'feed',
-      path: '/feed',
-      viewport: { width: 1440, height: 900 },
-      auth: 'none',
-      fullPage: false,
-      waitFor: '[class*="card"], [class*="podcast"], [class*="grid"]',
-    },
-    {
       name: 'pricing',
       path: '/pricing',
       viewport: { width: 1440, height: 900 },
@@ -148,13 +140,6 @@ function getScreenshotDefs(demoPodcastId: string, demoUserId: string): Screensho
       path: '/billing',
       viewport: { width: 1440, height: 900 },
       auth: 'demo',
-      fullPage: false,
-    },
-    {
-      name: 'profile',
-      path: `/profile/${demoUserId}`,
-      viewport: { width: 1440, height: 900 },
-      auth: 'none',
       fullPage: false,
     },
     {
@@ -197,13 +182,6 @@ function getScreenshotDefs(demoPodcastId: string, demoUserId: string): Screensho
     {
       name: 'mobile-player',
       path: `/podcast/${demoPodcastId}`,
-      viewport: { width: 390, height: 844 },
-      auth: 'none',
-      fullPage: false,
-    },
-    {
-      name: 'mobile-feed',
-      path: '/feed',
       viewport: { width: 390, height: 844 },
       auth: 'none',
       fullPage: false,
@@ -287,16 +265,16 @@ async function main() {
   // Look up demo data from database
   const prisma = new PrismaClient();
   try {
-    const demoUser = await prisma.user.findUnique({ where: { email: 'demo@sotto.fm' } });
-    const adminUser = await prisma.user.findUnique({ where: { email: 'admin@sotto.fm' } });
+    const demoUser = await prisma.user.findUnique({ where: { email: 'demo@example.com' } });
+    const adminUser = await prisma.user.findUnique({ where: { email: 'admin@example.com' } });
 
     if (!demoUser) throw new Error('Demo user not found — run `npx tsx prisma/seed-demo.ts` first');
     if (!adminUser)
       throw new Error('Admin user not found — run `npx tsx prisma/seed-demo.ts` first');
 
-    // Find a READY public podcast for player screenshots
+    // Find a READY demo podcast for player screenshots
     const demoPodcast = await prisma.podcast.findFirst({
-      where: { userId: demoUser.id, status: 'READY', visibility: 'PUBLIC' },
+      where: { userId: demoUser.id, status: 'READY' },
       orderBy: { playCount: 'desc' },
     });
 
@@ -321,7 +299,7 @@ async function main() {
     console.log('Browser launched\n');
 
     // Capture all screenshots
-    const defs = getScreenshotDefs(demoPodcast.id, demoUser.id);
+    const defs = getScreenshotDefs(demoPodcast.id);
     const captured: Record<string, string> = {};
 
     for (const def of defs) {

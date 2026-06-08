@@ -11,11 +11,10 @@ import {
   computeWeightedScore,
   getArchetypeWeights,
   explain,
-} from '@sottofm/feed';
-import type { RecommendationSignals } from '@sottofm/feed';
+} from '@/lib/private-recommendations';
+import type { RecommendationSignals } from '@/lib/private-recommendations';
 
-// Re-export for downstream compatibility
-export type { RecommendationSignals } from '@sottofm/feed';
+export type { RecommendationSignals } from '@/lib/private-recommendations';
 
 export interface ScoredPodcast {
   podcastId: string;
@@ -39,7 +38,7 @@ export interface MLProvider {
 /**
  * Sotto ML Provider implementation.
  * Uses pgvector for vector ops, Prisma for feature lookups.
- * Delegates signal computation to @sottofm/feed.
+ * Delegates signal computation to private recommendation utilities.
  */
 export class SottoMLProvider implements MLProvider {
   async embed(text: string): Promise<number[]> {
@@ -126,10 +125,7 @@ export class SottoMLProvider implements MLProvider {
     // Fetch tag parent map for sibling matching
     let tagParentMap = new Map<string, string | null>();
     if (userInterests.length > 0 && podcastTags.length > 0) {
-      const allTagIds = [
-        ...userInterests.map((i) => i.tagId),
-        ...podcastTags.map((t) => t.tagId),
-      ];
+      const allTagIds = [...userInterests.map((i) => i.tagId), ...podcastTags.map((t) => t.tagId)];
       const tagParents = await prisma.tag.findMany({
         where: { id: { in: allTagIds } },
         select: { id: true, parentId: true },
@@ -154,7 +150,7 @@ export class SottoMLProvider implements MLProvider {
       // No collaborative data
     }
 
-    // Compute signals via @sottofm/feed
+    // Compute signals from private recommendation features.
     const relevance = computeRelevance({
       embeddingSimilarity,
       interestMatches: userInterests.map((i) => ({ tagId: i.tagId, weight: i.weight })),
@@ -167,7 +163,7 @@ export class SottoMLProvider implements MLProvider {
     const quality = podcastFeature
       ? computeQuality({
           avgCompletionRate: podcastFeature.avgCompletionRate,
-          likeToListenRatio: podcastFeature.likeToListenRatio,
+          saveToListenRatio: podcastFeature.saveToListenRatio,
           verifiedReferenceRate: podcastFeature.verifiedReferenceRate,
           interactionRate: podcastFeature.interactionRate,
         })

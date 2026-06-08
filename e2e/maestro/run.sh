@@ -102,18 +102,19 @@ if [[ "$SKIP_BACKEND" == "false" ]]; then
 
   # Start Next.js backend with AI base URLs pointing to LLMock
   echo "Starting Next.js backend..."
-  SKIP_DB_SYNC=1 \
-  ANTHROPIC_BASE_URL=http://localhost:4100 \
-  OPENAI_BASE_URL=http://localhost:4100 \
-  GOOGLE_AI_BASE_URL=http://localhost:4100 \
-  doppler run -- npm run dev:web &
+  "$ROOT_DIR/scripts/run-with-env.sh" env \
+    SKIP_DB_SYNC=1 \
+    ANTHROPIC_BASE_URL=http://localhost:4100 \
+    OPENAI_BASE_URL=http://localhost:4100 \
+    GOOGLE_AI_BASE_URL=http://localhost:4100 \
+    npm run dev:web &
   PIDS_TO_KILL+=($!)
   wait_for_port 3000 "Next.js" 120
 
   # Seed the database
   echo "Seeding test data..."
   cd "$ROOT_DIR"
-  doppler run -- npx tsx e2e/playwright/helpers/seed.ts
+  "$ROOT_DIR/scripts/run-with-env.sh" npx tsx e2e/playwright/helpers/seed.ts
 fi
 
 # Build Maestro command

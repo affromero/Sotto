@@ -6,6 +6,10 @@ const mockRequireAdmin = vi.fn();
 const mockCheckVideoGenerationGate = vi.fn();
 const mockAddJob = vi.fn().mockResolvedValue({});
 const mockCacheGet = vi.fn();
+const { mockGetAiKey, mockResolveAiModelAndProvider } = vi.hoisted(() => ({
+  mockGetAiKey: vi.fn(),
+  mockResolveAiModelAndProvider: vi.fn(),
+}));
 
 const mockPodcast = {
   id: 'pod-1',
@@ -39,7 +43,7 @@ vi.mock('@/lib/prisma', () => ({
 }));
 
 vi.mock('@/lib/byok', () => ({
-  getAiKey: vi.fn().mockResolvedValue(null),
+  getAiKey: (...args: unknown[]) => mockGetAiKey(...args),
 }));
 
 vi.mock('@/lib/auto-model-config', () => ({
@@ -49,31 +53,40 @@ vi.mock('@/lib/auto-model-config', () => ({
   }),
 }));
 
-const VALID_PROVIDERS = new Set(['anthropic', 'openai', 'google']);
-const VALID_MODELS = new Set(['claude-haiku-4-5-20251001', 'gpt-5-nano', 'gemini-3.1-flash-lite-preview']);
+const VALID_PROVIDERS = new Set(['anthropic', 'openai', 'google', 'claude-code']);
+const VALID_MODELS = new Set([
+  'claude-haiku-4-5-20251001',
+  'gpt-5-nano',
+  'gemini-3.1-flash-lite-preview',
+  'sonnet',
+]);
 
 const MODEL_TO_PROVIDER: Record<string, string> = {
   'claude-haiku-4-5-20251001': 'anthropic',
   'gpt-5-nano': 'openai',
   'gemini-3.1-flash-lite-preview': 'google',
+  sonnet: 'claude-code',
 };
 const PROVIDER_CHEAPEST: Record<string, string> = {
   anthropic: 'claude-haiku-4-5-20251001',
   openai: 'gpt-5-nano',
   google: 'gemini-3.1-flash-lite-preview',
+  'claude-code': 'sonnet',
 };
 
 vi.mock('@/lib/providers/ai-registry', () => ({
-  resolveAiModelAndProvider: vi.fn().mockResolvedValue({
-    model: 'claude-haiku-4-5-20251001',
-    provider: 'anthropic',
-  }),
+  resolveAiModelAndProvider: (...args: unknown[]) => mockResolveAiModelAndProvider(...args),
   isValidAiProviderId: (id: string) => VALID_PROVIDERS.has(id),
   isValidModelId: (id: string) => VALID_MODELS.has(id),
   getProviderForModel: (id: string) => MODEL_TO_PROVIDER[id] ?? null,
   getCheapestModelForProvider: (id: string) => PROVIDER_CHEAPEST[id] ?? null,
   getAiProviderMeta: (id: string) => {
-    const names: Record<string, string> = { anthropic: 'Anthropic (Claude)', openai: 'OpenAI', google: 'Google (Gemini)' };
+    const names: Record<string, string> = {
+      anthropic: 'Anthropic (Claude)',
+      openai: 'OpenAI',
+      google: 'Google (Gemini)',
+      'claude-code': 'Claude Code (CLI)',
+    };
     if (!names[id]) throw new Error(`Unknown AI provider: ${id}`);
     return { displayName: names[id] };
   },
@@ -174,6 +187,31 @@ describe('POST /api/podcasts/[id]/video/pipeline', () => {
     mockFindUnique.mockResolvedValue(mockPodcast);
     mockUserFindUniqueOrThrow.mockResolvedValue({ plan: 'FREE', preferredAiModel: null });
     mockUserAiKeyFindMany.mockResolvedValue([]);
+    mockGetAiKey.mockImplementation(async (_userId: string, provider?: string) => {
+      if (provider === 'openai') return { apiKey: 'openai-key', provider: 'openai' };
+      if (provider === 'google') return { apiKey: 'google-key', provider: 'google' };
+      return { apiKey: 'anthropic-key', provider: 'anthropic' };
+    });
+    mockResolveAiModelAndProvider.mockImplementation(
+      async (opts: { podcastAiModel?: string | null; aiKey?: { provider: string } | null }) => {
+        if (opts.podcastAiModel) {
+          const provider = opts.podcastAiModel.startsWith('claude-code:')
+            ? 'claude-code'
+            : MODEL_TO_PROVIDER[opts.podcastAiModel];
+          if (!provider) throw new Error(`Unknown AI model "${opts.podcastAiModel}".`);
+          return { model: opts.podcastAiModel, provider };
+        }
+
+        if (opts.aiKey) {
+          return {
+            model: PROVIDER_CHEAPEST[opts.aiKey.provider],
+            provider: opts.aiKey.provider,
+          };
+        }
+
+        return { model: 'claude-haiku-4-5-20251001', provider: 'anthropic' };
+      },
+    );
   });
 
   it('queues classification job and returns classificationId', async () => {
@@ -192,9 +230,26 @@ describe('POST /api/podcasts/[id]/video/pipeline', () => {
         userId: 'user-1',
         aiProvider: 'anthropic',
         aiModel: 'claude-haiku-4-5-20251001',
+        apiKeyOverride: 'anthropic-key',
         tier: 'FREE',
       }),
     );
+    expect(mockGetAiKey).toHaveBeenCalledWith('user-1');
+    expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
+      podcastAiModel: null,
+      aiKey: { apiKey: 'anthropic-key', provider: 'anthropic' },
+      plan: 'FREE',
+    });
+  });
+
+  it('requires an AI key when no explicit model is configured', async () => {
+    mockGetAiKey.mockResolvedValue(null);
+    const res = await POST(createRequest('POST'), routeParams);
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.code).toBe('ai_key_required');
+    expect(body.error).toBe('AI model is required for video pipeline classification when no AI key is configured.');
+    expect(mockAddJob).not.toHaveBeenCalled();
   });
 
   it('requires auth', async () => {
@@ -236,8 +291,10 @@ describe('POST /api/podcasts/[id]/video/pipeline', () => {
       expect.objectContaining({
         aiProvider: 'google',
         aiModel: 'gemini-3.1-flash-lite-preview',
+        apiKeyOverride: 'google-key',
       }),
     );
+    expect(mockGetAiKey).toHaveBeenCalledWith('user-1', 'google');
   });
 
   it('resolves provider from model when only aiModel is provided', async () => {
@@ -252,8 +309,85 @@ describe('POST /api/podcasts/[id]/video/pipeline', () => {
       expect.objectContaining({
         aiProvider: 'openai',
         aiModel: 'gpt-5-nano',
+        apiKeyOverride: 'openai-key',
       }),
     );
+    expect(mockGetAiKey).toHaveBeenCalledWith('user-1', 'openai');
+  });
+
+  it('uses the selected user model and requires the matching provider key', async () => {
+    mockUserFindUniqueOrThrow.mockResolvedValue({ plan: 'FREE', preferredAiModel: 'gpt-5-nano' });
+    const res = await POST(createRequest('POST'), routeParams);
+    expect(res.status).toBe(200);
+    expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
+      podcastAiModel: 'gpt-5-nano',
+      aiKey: null,
+      plan: 'FREE',
+    });
+    expect(mockGetAiKey).toHaveBeenCalledWith('user-1', 'openai');
+    expect(mockAddJob).toHaveBeenCalledWith(
+      expect.anything(),
+      'classify_pipeline',
+      expect.objectContaining({
+        aiProvider: 'openai',
+        aiModel: 'gpt-5-nano',
+        apiKeyOverride: 'openai-key',
+      }),
+    );
+  });
+
+  it('rejects explicit hosted models without a matching provider key', async () => {
+    mockGetAiKey.mockResolvedValue(null);
+    const res = await POST(
+      createRequest('POST', { aiModel: 'gpt-5-nano' }),
+      routeParams,
+    );
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.code).toBe('ai_key_required');
+    expect(body.provider).toBe('openai');
+    expect(mockAddJob).not.toHaveBeenCalled();
+  });
+
+  it('allows local Claude Code models without an AI key', async () => {
+    mockGetAiKey.mockResolvedValue(null);
+    const res = await POST(
+      createRequest('POST', { aiModel: 'claude-code:sonnet' }),
+      routeParams,
+    );
+    expect(res.status).toBe(200);
+    expect(mockGetAiKey).not.toHaveBeenCalled();
+    expect(mockAddJob).toHaveBeenCalledWith(
+      expect.anything(),
+      'classify_pipeline',
+      expect.objectContaining({
+        aiProvider: 'claude-code',
+        aiModel: 'claude-code:sonnet',
+        apiKeyOverride: undefined,
+      }),
+    );
+  });
+
+  it('rejects an empty local Claude Code model suffix', async () => {
+    const res = await POST(
+      createRequest('POST', { aiModel: 'claude-code:' }),
+      routeParams,
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe('Unknown AI model: claude-code:');
+    expect(mockAddJob).not.toHaveBeenCalled();
+  });
+
+  it('rejects provider and model mismatches', async () => {
+    const res = await POST(
+      createRequest('POST', { aiProvider: 'anthropic', aiModel: 'gpt-5-nano' }),
+      routeParams,
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe('AI model "gpt-5-nano" does not belong to provider "anthropic".');
+    expect(mockAddJob).not.toHaveBeenCalled();
   });
 
   it('rejects invalid aiProvider in POST body', async () => {

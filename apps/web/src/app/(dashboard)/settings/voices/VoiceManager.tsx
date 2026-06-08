@@ -8,6 +8,7 @@ import { useAudioRecorder } from '@/lib/hooks/useAudioRecorder';
 interface VoiceClone {
   id: string;
   name: string;
+  provider: string;
   description: string | null;
   externalVoiceId: string;
   sourceType: 'UPLOAD' | 'RECORD' | 'IMPORT';
@@ -38,8 +39,6 @@ interface AllowlistEntry {
 interface UserSearchResult {
   id: string;
   handle: string | null;
-  name: string | null;
-  image: string | null;
 }
 
 export function VoiceManager() {
@@ -69,6 +68,7 @@ export function VoiceManager() {
   const [descriptionDraft, setDescriptionDraft] = useState('');
   const [savingDescription, setSavingDescription] = useState(false);
   const [stripeOnboarded, setStripeOnboarded] = useState(false);
+  const [voiceMarketplaceEnabled, setVoiceMarketplaceEnabled] = useState(false);
   const [connectingStripe, setConnectingStripe] = useState(false);
   const [editingPrice, setEditingPrice] = useState<string | null>(null);
   const [priceDraft, setPriceDraft] = useState('');
@@ -105,6 +105,7 @@ export function VoiceManager() {
       const voiceData = await response.json();
       setUserClones(voiceData.userClones ?? []);
       setStripeOnboarded(voiceData.stripeOnboarded ?? false);
+      setVoiceMarketplaceEnabled(voiceData.voiceMarketplaceEnabled ?? false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load voices');
     } finally {
@@ -139,7 +140,7 @@ export function VoiceManager() {
   async function handleSearchUsers(query: string) {
     setSearchQuery(query);
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
-    if (query.length < 2) {
+    if (query.replace(/^@/, '').length < 3) {
       setSearchResults([]);
       return;
     }
@@ -416,7 +417,7 @@ export function VoiceManager() {
     }
   }
 
-  async function handlePreviewById(voiceId: string) {
+  async function handlePreviewById(voiceId: string, provider: string) {
     const trimmedId = voiceId.trim();
     const trimmedText = previewText.trim();
     if (!trimmedId || !trimmedText) return;
@@ -430,7 +431,7 @@ export function VoiceManager() {
       const res = await fetch('/api/voices/preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ voiceId: trimmedId, text: trimmedText }),
+        body: JSON.stringify({ voiceId: trimmedId, text: trimmedText, provider }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -473,7 +474,7 @@ export function VoiceManager() {
     }
   }
 
-  async function handlePlayPreview(externalVoiceId: string) {
+  async function handlePlayPreview(externalVoiceId: string, provider: string) {
     try {
       if (audioRef.current) {
         audioRef.current.pause();
@@ -489,6 +490,7 @@ export function VoiceManager() {
         body: JSON.stringify({
           voiceId: externalVoiceId,
           text: 'Hello, this is a preview of my cloned voice on Sotto.',
+          provider,
         }),
       });
 
@@ -543,32 +545,34 @@ export function VoiceManager() {
         </div>
       )}
 
-      <section className={styles.section}>
-        <h3 className={styles.sectionTitle}>Stripe Payouts</h3>
-        {stripeOnboarded ? (
-          <div className={styles.stripeConnected}>
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-              <polyline points="3 8 7 12 13 4" />
-            </svg>
-            <span>Stripe Connected</span>
-            <a href="/api/stripe/connect" className={styles.stripeDashboardLink}>Dashboard</a>
-          </div>
-        ) : (
-          <div className={styles.stripePrompt}>
-            <p className={styles.stripePromptText}>
-              Connect your Stripe account to set prices on your voices and receive payouts (90% of each sale).
-            </p>
-            <button
-              type="button"
-              className={styles.cloneButton}
-              onClick={handleConnectStripe}
-              disabled={connectingStripe}
-            >
-              {connectingStripe ? 'Connecting...' : 'Connect Stripe'}
-            </button>
-          </div>
-        )}
-      </section>
+      {voiceMarketplaceEnabled && (
+        <section className={styles.section}>
+          <h3 className={styles.sectionTitle}>Stripe Payouts</h3>
+          {stripeOnboarded ? (
+            <div className={styles.stripeConnected}>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                <polyline points="3 8 7 12 13 4" />
+              </svg>
+              <span>Stripe Connected</span>
+              <a href="/api/stripe/connect" className={styles.stripeDashboardLink}>Dashboard</a>
+            </div>
+          ) : (
+            <div className={styles.stripePrompt}>
+              <p className={styles.stripePromptText}>
+                Connect your Stripe account to set prices on your voices and receive payouts (90% of each sale).
+              </p>
+              <button
+                type="button"
+                className={styles.cloneButton}
+                onClick={handleConnectStripe}
+                disabled={connectingStripe}
+              >
+                {connectingStripe ? 'Connecting...' : 'Connect Stripe'}
+              </button>
+            </div>
+          )}
+        </section>
+      )}
 
       <section className={styles.section}>
         <h3 className={styles.sectionTitle}>Cloned Voices</h3>
@@ -630,7 +634,7 @@ export function VoiceManager() {
                         </span>
                       )}
                     </div>
-                    {voice.requestable && (
+                    {voiceMarketplaceEnabled && voice.requestable && (
                       editingDescription === voice.id ? (
                         <div className={styles.descriptionEdit}>
                           <textarea
@@ -647,7 +651,7 @@ export function VoiceManager() {
                                 setEditingDescription(null);
                               }
                             }}
-                            placeholder="Add a description for the marketplace..."
+                            placeholder="Add a description for shared voice access..."
                             maxLength={200}
                             rows={2}
                             autoFocus
@@ -663,56 +667,58 @@ export function VoiceManager() {
                           className={styles.descriptionBtn}
                           onClick={() => handleStartEditDescription(voice)}
                         >
-                          {voice.description || 'Add a description for the marketplace...'}
+                          {voice.description || 'Add a description for shared voice access...'}
                         </button>
                       )
                     )}
-                    <div className={styles.priceRow}>
-                      {editingPrice === voice.id ? (
-                        <div className={styles.priceEdit}>
-                          <span className={styles.priceCurrency}>$</span>
-                          <input
-                            type="number"
-                            className={styles.priceInput}
-                            value={priceDraft}
-                            onChange={(e) => setPriceDraft(e.target.value)}
-                            onBlur={() => handleSavePrice(voice.id)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault();
-                                handleSavePrice(voice.id);
-                              }
-                              if (e.key === 'Escape') setEditingPrice(null);
-                            }}
-                            placeholder="0.00"
-                            min="0"
-                            max="100"
-                            step="0.01"
-                            autoFocus
-                            disabled={savingPrice}
-                          />
-                          <span className={styles.priceUnit}>/ podcast</span>
-                          <span className={styles.priceFee}>10% platform fee</span>
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          className={styles.priceBtn}
-                          onClick={() => handleStartEditPrice(voice)}
-                          disabled={!stripeOnboarded && !voice.priceInCents}
-                          title={stripeOnboarded ? 'Set price' : 'Connect Stripe to set prices'}
-                        >
-                          {voice.priceInCents && voice.priceInCents > 0
-                            ? `$${(voice.priceInCents / 100).toFixed(2)} / podcast`
-                            : 'Free — set a price'}
-                        </button>
-                      )}
-                      {voice.salesCount > 0 && (
-                        <span className={styles.earnings}>
-                          {voice.salesCount} {voice.salesCount === 1 ? 'sale' : 'sales'} — ${(voice.totalEarningsCents / 100).toFixed(2)} earned
-                        </span>
-                      )}
-                    </div>
+                    {voiceMarketplaceEnabled && (
+                      <div className={styles.priceRow}>
+                        {editingPrice === voice.id ? (
+                          <div className={styles.priceEdit}>
+                            <span className={styles.priceCurrency}>$</span>
+                            <input
+                              type="number"
+                              className={styles.priceInput}
+                              value={priceDraft}
+                              onChange={(e) => setPriceDraft(e.target.value)}
+                              onBlur={() => handleSavePrice(voice.id)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  handleSavePrice(voice.id);
+                                }
+                                if (e.key === 'Escape') setEditingPrice(null);
+                              }}
+                              placeholder="0.00"
+                              min="0"
+                              max="100"
+                              step="0.01"
+                              autoFocus
+                              disabled={savingPrice}
+                            />
+                            <span className={styles.priceUnit}>/ podcast</span>
+                            <span className={styles.priceFee}>10% platform fee</span>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            className={styles.priceBtn}
+                            onClick={() => handleStartEditPrice(voice)}
+                            disabled={!stripeOnboarded && !voice.priceInCents}
+                            title={stripeOnboarded ? 'Set price' : 'Connect Stripe to set prices'}
+                          >
+                            {voice.priceInCents && voice.priceInCents > 0
+                              ? `$${(voice.priceInCents / 100).toFixed(2)} / podcast`
+                              : 'Free — set a price'}
+                          </button>
+                        )}
+                        {voice.salesCount > 0 && (
+                          <span className={styles.earnings}>
+                            {voice.salesCount} {voice.salesCount === 1 ? 'sale' : 'sales'} — ${(voice.totalEarningsCents / 100).toFixed(2)} earned
+                          </span>
+                        )}
+                      </div>
+                    )}
                     <div className={styles.voiceMeta}>
                       <span
                         className={`${styles.voiceBadge} ${voice.sourceType === 'RECORD' ? styles.badgeRecord : styles.badgeUpload}`}
@@ -723,24 +729,24 @@ export function VoiceManager() {
                     </div>
                   </div>
                   <div className={styles.voiceActions}>
-                    {isVoiceVerified && (
-                    <label
-                      className={styles.requestableToggle}
-                      title={
-                        voice.requestable ? 'Shared: others can request' : 'Private: not shared'
-                      }
-                    >
-                      <input
-                        type="checkbox"
-                        checked={voice.requestable}
-                        onChange={() => handleToggleRequestable(voice.id, voice.requestable)}
-                        disabled={togglingRequestable === voice.id}
-                        aria-label={`Toggle sharing for ${voice.name}`}
-                      />
-                      <span className={styles.requestableLabel}>
-                        {voice.requestable ? 'Shared' : 'Private'}
-                      </span>
-                    </label>
+                    {voiceMarketplaceEnabled && isVoiceVerified && (
+                      <label
+                        className={styles.requestableToggle}
+                        title={
+                          voice.requestable ? 'Shared: others can request' : 'Private: not shared'
+                        }
+                      >
+                        <input
+                          type="checkbox"
+                          checked={voice.requestable}
+                          onChange={() => handleToggleRequestable(voice.id, voice.requestable)}
+                          disabled={togglingRequestable === voice.id}
+                          aria-label={`Toggle sharing for ${voice.name}`}
+                        />
+                        <span className={styles.requestableLabel}>
+                          {voice.requestable ? 'Shared' : 'Private'}
+                        </span>
+                      </label>
                     )}
                     <button
                       type="button"
@@ -766,7 +772,7 @@ export function VoiceManager() {
                     <button
                       type="button"
                       className={styles.playButton}
-                      onClick={() => handlePlayPreview(voice.externalVoiceId)}
+                      onClick={() => handlePlayPreview(voice.externalVoiceId, voice.provider)}
                       disabled={playing === voice.externalVoiceId}
                       aria-label={`Preview ${voice.name}`}
                     >
@@ -821,7 +827,7 @@ export function VoiceManager() {
                         className={styles.nameInput}
                         value={searchQuery}
                         onChange={(e) => handleSearchUsers(e.target.value)}
-                        placeholder="Search by @handle..."
+                        placeholder="Enter exact handle..."
                         disabled={addingToAllowlist}
                       />
                       {searching && <span className={styles.spinnerSmall} />}
@@ -839,7 +845,6 @@ export function VoiceManager() {
                             disabled={addingToAllowlist || !user.handle}
                           >
                             <span className={styles.searchHandle}>@{user.handle}</span>
-                            {user.name && <span className={styles.searchName}>{user.name}</span>}
                           </button>
                         ))}
                       </div>
@@ -1154,7 +1159,7 @@ export function VoiceManager() {
                   <button
                     type="button"
                     className={styles.previewButton}
-                    onClick={() => handlePreviewById(elImportVoiceId)}
+                    onClick={() => handlePreviewById(elImportVoiceId, 'elevenlabs')}
                     disabled={previewing || !elImportVoiceId.trim() || !previewText.trim()}
                     aria-label="Preview voice"
                   >

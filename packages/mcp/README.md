@@ -1,12 +1,12 @@
 # @sotto/mcp
 
-MCP server for [Sotto](https://sotto.fm) — every voice, every topic, one feed. Create, manage, and discover AI podcasts from any MCP-compatible client (Claude Desktop, Claude Code, Cursor).
+MCP server for Sotto. Create and manage private AI podcasts from any MCP-compatible client (Claude Desktop, Claude Code, Cursor).
 
 ## Setup
 
 ### 1. Get an API key
 
-Go to [sotto.fm/settings/api](https://sotto.fm/settings/api) and create a new API key. Keys start with `sk_sotto_`.
+Create an API key from your Sotto deployment at `/settings/api`. Keys start with `sk_sotto_`.
 
 ### 2. Configure your client
 
@@ -21,7 +21,8 @@ Add to `claude_desktop_config.json`:
       "command": "npx",
       "args": ["-y", "@sotto/mcp"],
       "env": {
-        "SOTTO_API_KEY": "sk_sotto_your_key_here"
+        "SOTTO_API_KEY": "sk_sotto_your_key_here",
+        "SOTTO_API_URL": "https://your-sotto.example.com"
       }
     }
   }
@@ -39,11 +40,23 @@ Add to `.mcp.json` in your project root:
       "command": "npx",
       "args": ["-y", "@sotto/mcp"],
       "env": {
-        "SOTTO_API_KEY": "sk_sotto_your_key_here"
+        "SOTTO_API_KEY": "sk_sotto_your_key_here",
+        "SOTTO_API_URL": "https://your-sotto.example.com"
       }
     }
   }
 }
+```
+
+#### Codex CLI
+
+Register the Sotto MCP server with Codex:
+
+```bash
+codex mcp add sotto \
+  --env SOTTO_API_KEY=sk_sotto_your_key_here \
+  --env SOTTO_API_URL=https://your-sotto.example.com \
+  -- npx -y @sotto/mcp
 ```
 
 #### Local development
@@ -67,30 +80,71 @@ Point at your local dev server:
 
 ## Environment Variables
 
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `SOTTO_API_KEY` | Yes | — | Your `sk_sotto_...` API key |
-| `SOTTO_API_URL` | No | `https://sotto.fm` | API base URL (for local dev) |
+| Variable        | Required | Default | Description                      |
+| --------------- | -------- | ------- | -------------------------------- |
+| `SOTTO_API_KEY` | Yes      | —       | Your `sk_sotto_...` API key      |
+| `SOTTO_API_URL` | Yes      | —       | API base URL for your deployment |
 
 ## Tools
 
-| Tool | Description |
-|------|-------------|
-| `create_podcast` | Create an AI podcast from a topic |
-| `get_podcast` | Get podcast details + generation status |
-| `list_podcasts` | List your podcasts |
-| `browse_feed` | Search/filter the public podcast feed |
-| `fork_podcast` | Remix a public podcast with your angle |
-| `update_podcast` | Update title, topic, or visibility |
-| `delete_podcast` | Delete a podcast |
-| `get_me` | Get your Sotto profile |
+| Tool                        | Description                                             |
+| --------------------------- | ------------------------------------------------------- |
+| `create_podcast`            | Create an AI podcast from a topic                       |
+| `ingest_agent_output`       | Create a private podcast from local agent output        |
+| `ingest_meeting_transcript` | Create a private meeting recap from transcript material |
+| `get_podcast`               | Get podcast details + generation status                 |
+| `list_podcasts`             | List your podcasts                                      |
+| `update_podcast`            | Update title, topic, or visibility                      |
+| `delete_podcast`            | Delete a podcast                                        |
+| `get_me`                    | Get your Sotto profile                                  |
+
+### Local Agent Ingestion
+
+Use `ingest_agent_output` when Claude Code, Codex, OpenClaw, Hermes, or another local agent has produced a report you want in your private podcast feed. The tool requires an explicit `tts_provider` and never publishes the result publicly.
+
+Minimal fields:
+
+```json
+{
+  "title": "Daily engineering notes",
+  "content": "Paste or pass the local agent output here.",
+  "tts_provider": "openai",
+  "agent_provider": "claude-code",
+  "agent_name": "Claude Code",
+  "idempotency_key": "claude-code:2026-05-18:daily-notes"
+}
+```
+
+Optional fields include `topic`, `duration_minutes`, `focus_areas`, `source_url`, `agent_model`, `agent_run_id`, `ai_model`, and `tts_model`.
+
+### Workspace Source Connectors
+
+The web app exposes `/api/source-connectors/readiness` so self-hosted installs can verify private source setup before wiring workers. Slack is modeled as a user-owned Slack app with `SLACK_BOT_TOKEN` and `SLACK_SIGNING_SECRET`. Gmail is modeled through Google Workspace CLI (`gws`) so local and hosted installs can use the same owner-controlled command surface.
+
+### Meeting Transcript Ingestion
+
+Use `ingest_meeting_transcript` when a recorder, calendar bot, or invited local agent has produced transcript material for a private meeting recap. The tool requires an explicit `tts_provider`, accepts optional participants and action items, and never exposes the meeting in a public feed.
+
+Minimal fields:
+
+```json
+{
+  "title": "Product planning review",
+  "transcript": "Alex: We will ship private RSS first.\nSam: I will document the setup path.",
+  "tts_provider": "openai",
+  "platform": "zoom",
+  "idempotency_key": "zoom:2026-05-18:planning"
+}
+```
+
+Optional fields include `topic`, `meeting_url`, `started_at`, `ended_at`, `participants`, `action_items`, `duration_minutes`, `focus_areas`, `ai_model`, and `tts_model`.
 
 ## Resources
 
-| Resource | URI | Description |
-|----------|-----|-------------|
-| Podcast | `sotto://podcasts/{id}` | Podcast detail (with list for discovery) |
-| Profile | `sotto://me` | Your profile |
+| Resource | URI                     | Description                              |
+| -------- | ----------------------- | ---------------------------------------- |
+| Podcast  | `sotto://podcasts/{id}` | Podcast detail (with list for discovery) |
+| Profile  | `sotto://me`            | Your profile                             |
 
 ## Development
 
@@ -102,7 +156,7 @@ npm run build --workspace=@sotto/mcp
 npx tsc --noEmit --project packages/mcp/tsconfig.json
 
 # Test startup
-SOTTO_API_KEY=test node packages/mcp/dist/index.js
+SOTTO_API_KEY=test SOTTO_API_URL=http://localhost:3000 node packages/mcp/dist/index.js
 
 # Inspect with MCP Inspector
 npx @modelcontextprotocol/inspector node packages/mcp/dist/index.js

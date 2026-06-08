@@ -12,7 +12,6 @@ interface CollectionSummary {
   description: string | null;
   isPublic: boolean;
   podcastCount: number;
-  followerCount: number;
   createdAt: string;
 }
 
@@ -37,7 +36,11 @@ export function CollectionsTab({ collections: initialCollections }: CollectionsT
       const res = await fetch('/api/collections', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), description: description.trim() || null, isPublic }),
+        body: JSON.stringify({
+          name: name.trim(),
+          description: description.trim() || null,
+          isPublic,
+        }),
       });
       if (res.ok) {
         const created = await res.json();
@@ -57,9 +60,7 @@ export function CollectionsTab({ collections: initialCollections }: CollectionsT
       <div className={styles.emptyState}>
         <FolderOpen size={48} className={styles.emptyIcon} aria-hidden="true" />
         <h3 className={styles.emptyTitle}>No collections yet</h3>
-        <p className={styles.emptyText}>
-          Create a collection to organize your favorite podcasts.
-        </p>
+        <p className={styles.emptyText}>Create a collection to organize your favorite podcasts.</p>
         <button type="button" className={styles.emptyLink} onClick={() => setShowForm(true)}>
           Create a collection
         </button>
@@ -110,11 +111,7 @@ export function CollectionsTab({ collections: initialCollections }: CollectionsT
             <Button size="small" type="submit" disabled={creating || !name.trim()}>
               {creating ? 'Creating...' : 'Create'}
             </Button>
-            <button
-              type="button"
-              className={styles.cancelBtn}
-              onClick={() => setShowForm(false)}
-            >
+            <button type="button" className={styles.cancelBtn} onClick={() => setShowForm(false)}>
               Cancel
             </button>
           </div>
@@ -128,7 +125,6 @@ export function CollectionsTab({ collections: initialCollections }: CollectionsT
           name={c.name}
           description={c.description}
           podcastCount={c.podcastCount}
-          followerCount={c.followerCount}
         />
       ))}
     </div>

@@ -10,6 +10,7 @@ const mockPrismaScriptFindUnique = vi.fn().mockResolvedValue({
 });
 const mockPrismaPodcastFindUnique = vi.fn().mockResolvedValue({ language: null });
 const mockPrismaUserFindUnique = vi.fn().mockResolvedValue({ preferredLanguage: null });
+const mockPrismaUserFindUniqueOrThrow = vi.fn().mockResolvedValue({ plan: 'FREE', role: 'USER' });
 const mockPrismaSegmentFindMany = vi.fn().mockResolvedValue([]);
 const mockPrismaInteractionUpdate = vi.fn().mockResolvedValue({});
 const mockPrismaApiUsageLogCreate = vi.fn().mockResolvedValue({});
@@ -24,7 +25,7 @@ vi.mock('@/lib/prisma', () => {
     },
     user: {
       findUnique: (...args: unknown[]) => mockPrismaUserFindUnique(...args),
-      findUniqueOrThrow: vi.fn().mockResolvedValue({ plan: 'FREE' }),
+      findUniqueOrThrow: (...args: unknown[]) => mockPrismaUserFindUniqueOrThrow(...args),
     },
     segment: {
       findMany: (...args: unknown[]) => mockPrismaSegmentFindMany(...args),
@@ -39,16 +40,36 @@ vi.mock('@/lib/prisma', () => {
   return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
 });
 
-const mockGenerateResponse = vi.fn().mockResolvedValue({
-  content: 'Here is the answer to your question.',
-  inputTokens: 150,
-  outputTokens: 50,
+const {
+  mockCreateAIProvider,
+  mockGenerateResponse,
+  mockGetAiKey,
+  mockHasByokKey,
+  mockResolveAiModelAndProvider,
+} = vi.hoisted(() => {
+  const generateResponse = vi.fn().mockResolvedValue({
+    content: 'Here is the answer to your question.',
+    inputTokens: 150,
+    outputTokens: 50,
+    model: 'claude-haiku-4-5-20251001',
+  });
+
+  return {
+    mockCreateAIProvider: vi.fn((_provider: string) => ({ generateResponse })),
+    mockGenerateResponse: generateResponse,
+    mockGetAiKey: vi.fn().mockResolvedValue({ apiKey: 'anthropic-key', provider: 'anthropic' }),
+    mockHasByokKey: vi.fn().mockResolvedValue(false),
+    mockResolveAiModelAndProvider: vi.fn().mockResolvedValue({
+      model: 'claude-haiku-4-5-20251001',
+      provider: 'anthropic',
+    }),
+  };
 });
 
 const mockLogUsage = vi.fn();
 
-vi.mock('@/lib/llm', () => ({
-  generateResponse: (...args: unknown[]) => mockGenerateResponse(...args),
+vi.mock('@/lib/providers/ai', () => ({
+  createAIProvider: (provider: string) => mockCreateAIProvider(provider),
 }));
 
 vi.mock('@/lib/usage-logger', () => ({
@@ -56,8 +77,8 @@ vi.mock('@/lib/usage-logger', () => ({
 }));
 
 vi.mock('@/lib/byok', () => ({
-  getAiKey: vi.fn().mockResolvedValue(null),
-  hasByokKey: vi.fn().mockResolvedValue(false),
+  getAiKey: (...args: unknown[]) => mockGetAiKey(...args),
+  hasByokKey: (...args: unknown[]) => mockHasByokKey(...args),
 }));
 
 vi.mock('@/lib/tier-features', () => ({
@@ -77,7 +98,7 @@ vi.mock('@/lib/tier-features', () => ({
 }));
 
 vi.mock('@/lib/providers/ai-registry', () => ({
-  resolveAiModelAndProvider: vi.fn().mockResolvedValue({ model: 'claude-haiku-4-5-20251001', provider: 'anthropic' }),
+  resolveAiModelAndProvider: (...args: unknown[]) => mockResolveAiModelAndProvider(...args),
 }));
 
 vi.mock('@/lib/logger', () => ({
@@ -116,8 +137,9 @@ const defaultPayload: ProcessInteractionPayload = {
 describe('processInteraction', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockPrismaPodcastFindUnique.mockResolvedValue({ language: null });
+    mockPrismaPodcastFindUnique.mockResolvedValue({ language: null, aiModel: null });
     mockPrismaUserFindUnique.mockResolvedValue({ preferredLanguage: null });
+    mockPrismaUserFindUniqueOrThrow.mockResolvedValue({ plan: 'FREE', role: 'USER' });
     mockPrismaScriptFindUnique.mockResolvedValue({
       turns: [
         { speaker: 'HOST', text: 'Welcome to the show!' },
@@ -144,9 +166,113 @@ describe('processInteraction', () => {
       content: 'Here is the answer to your question.',
       inputTokens: 150,
       outputTokens: 50,
+      model: 'claude-haiku-4-5-20251001',
     });
     mockPrismaInteractionUpdate.mockResolvedValue({});
     mockLogUsage.mockReset();
+    mockGetAiKey.mockResolvedValue({ apiKey: 'anthropic-key', provider: 'anthropic' });
+    mockHasByokKey.mockResolvedValue(false);
+    mockResolveAiModelAndProvider.mockResolvedValue({
+      model: 'claude-haiku-4-5-20251001',
+      provider: 'anthropic',
+    });
+    mockCreateAIProvider.mockReturnValue({ generateResponse: mockGenerateResponse });
+  });
+
+  describe('AI routing', () => {
+    it('uses the configured BYOK provider when the podcast has no model', async () => {
+      const aiKey = { apiKey: 'anthropic-key', provider: 'anthropic' };
+      mockGetAiKey.mockResolvedValue(aiKey);
+
+      await processInteraction(createMockJob(defaultPayload));
+
+      expect(mockGetAiKey).toHaveBeenCalledTimes(1);
+      expect(mockGetAiKey).toHaveBeenCalledWith('user-001');
+      expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
+        podcastAiModel: null,
+        aiKey,
+        plan: 'FREE',
+      });
+      expect(mockCreateAIProvider).toHaveBeenCalledWith('anthropic');
+      expect(mockGenerateResponse).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(Array),
+        expect.objectContaining({
+          apiKeyOverride: 'anthropic-key',
+          model: 'claude-haiku-4-5-20251001',
+        }),
+      );
+    });
+
+    it('uses the explicit podcast model owner and matching provider key', async () => {
+      mockPrismaPodcastFindUnique.mockResolvedValue({ language: null, aiModel: 'gpt-5-mini' });
+      mockResolveAiModelAndProvider.mockResolvedValue({ model: 'gpt-5-mini', provider: 'openai' });
+      mockGetAiKey.mockResolvedValue({ apiKey: 'openai-key', provider: 'openai' });
+
+      await processInteraction(createMockJob(defaultPayload));
+
+      expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
+        podcastAiModel: 'gpt-5-mini',
+        aiKey: null,
+        plan: 'FREE',
+      });
+      expect(mockGetAiKey).toHaveBeenCalledTimes(1);
+      expect(mockGetAiKey).toHaveBeenCalledWith('user-001', 'openai');
+      expect(mockCreateAIProvider).toHaveBeenCalledWith('openai');
+      expect(mockGenerateResponse).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(Array),
+        expect.objectContaining({
+          apiKeyOverride: 'openai-key',
+          model: 'gpt-5-mini',
+        }),
+      );
+    });
+
+    it('rejects explicit non-local models without a matching provider key', async () => {
+      mockPrismaPodcastFindUnique.mockResolvedValue({ language: null, aiModel: 'gpt-5-mini' });
+      mockResolveAiModelAndProvider.mockResolvedValue({ model: 'gpt-5-mini', provider: 'openai' });
+      mockGetAiKey.mockResolvedValue(null);
+
+      await expect(processInteraction(createMockJob(defaultPayload))).rejects.toThrow(
+        'AI key for provider "openai" is required for interactions.',
+      );
+      expect(mockCreateAIProvider).not.toHaveBeenCalled();
+      expect(mockGenerateResponse).not.toHaveBeenCalled();
+    });
+
+    it('rejects missing model and missing BYOK key before answering', async () => {
+      mockGetAiKey.mockResolvedValue(null);
+
+      await expect(processInteraction(createMockJob(defaultPayload))).rejects.toThrow(
+        'AI model is required for interactions when no AI key is configured.',
+      );
+      expect(mockResolveAiModelAndProvider).not.toHaveBeenCalled();
+      expect(mockCreateAIProvider).not.toHaveBeenCalled();
+      expect(mockGenerateResponse).not.toHaveBeenCalled();
+    });
+
+    it('allows local claude-code models without provider keys', async () => {
+      mockPrismaPodcastFindUnique.mockResolvedValue({ language: null, aiModel: 'claude-code:sonnet' });
+      mockResolveAiModelAndProvider.mockResolvedValue({
+        model: 'claude-code:sonnet',
+        provider: 'claude-code',
+      });
+      mockGetAiKey.mockResolvedValue(null);
+
+      await processInteraction(createMockJob(defaultPayload));
+
+      expect(mockGetAiKey).not.toHaveBeenCalled();
+      expect(mockCreateAIProvider).toHaveBeenCalledWith('claude-code');
+      expect(mockGenerateResponse).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(Array),
+        expect.objectContaining({
+          apiKeyOverride: undefined,
+          model: 'claude-code:sonnet',
+        }),
+      );
+    });
   });
 
   describe('script context lookup', () => {
@@ -342,6 +468,7 @@ describe('processInteraction', () => {
         content: 'Quantum entanglement is a phenomenon where particles become correlated.',
         inputTokens: 200,
         outputTokens: 75,
+        model: 'claude-haiku-4-5-20251001',
       });
       const job = createMockJob(defaultPayload);
       await processInteraction(job);
@@ -361,6 +488,7 @@ describe('processInteraction', () => {
         content: 'First paragraph.\n\nSecond paragraph with more detail.',
         inputTokens: 180,
         outputTokens: 60,
+        model: 'claude-haiku-4-5-20251001',
       });
       const job = createMockJob(defaultPayload);
       await processInteraction(job);
@@ -383,6 +511,7 @@ describe('processInteraction', () => {
         content: 'Answer here.',
         inputTokens: 225,
         outputTokens: 90,
+        model: 'claude-haiku-4-5-20251001',
       });
       const job = createMockJob(defaultPayload);
       await processInteraction(job);
@@ -433,7 +562,7 @@ describe('processInteraction', () => {
       const job = createMockJob(defaultPayload);
       await processInteraction(job);
 
-      const calls = (job.updateProgress as ReturnType<typeof vi.fn>).mock.calls.map((c: any[]) => c[0]);
+      const calls = (job.updateProgress as ReturnType<typeof vi.fn>).mock.calls.map(([progress]) => progress as number);
       for (let i = 1; i < calls.length; i++) {
         expect(calls[i]).toBeGreaterThanOrEqual(calls[i - 1]);
       }
@@ -506,6 +635,7 @@ describe('processInteraction', () => {
         content: '',
         inputTokens: 100,
         outputTokens: 0,
+        model: 'claude-haiku-4-5-20251001',
       });
       const job = createMockJob(defaultPayload);
       await processInteraction(job);
@@ -547,6 +677,7 @@ describe('processInteraction', () => {
         content: 'AI stands for Artificial Intelligence, which refers to...',
         inputTokens: 180,
         outputTokens: 65,
+        model: 'claude-haiku-4-5-20251001',
       });
 
       const job = createMockJob({

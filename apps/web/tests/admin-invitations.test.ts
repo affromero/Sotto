@@ -3,7 +3,7 @@
  *
  * Tests POST (generate), GET (list), PATCH (toggle enabled).
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
 // Mock auth-guards
@@ -50,7 +50,12 @@ describe('Admin Invitations API', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://selfhost.example.com');
     handlers = await getHandlers();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   describe('POST — generate invitation', () => {
@@ -63,18 +68,20 @@ describe('Admin Invitations API', () => {
     it('creates an invitation with a 12-char code and 24h expiry', async () => {
       mockRequireAdmin.mockResolvedValue('admin-1');
       const now = Date.now();
-      mockInvitationLink.create.mockImplementation(({ data }: { data: Record<string, unknown> }) => ({
-        id: 'inv-1',
-        ...data,
-        createdAt: new Date(),
-      }));
+      mockInvitationLink.create.mockImplementation(
+        ({ data }: { data: Record<string, unknown> }) => ({
+          id: 'inv-1',
+          ...data,
+          createdAt: new Date(),
+        })
+      );
 
       const res = await handlers.POST();
       expect(res.status).toBe(201);
 
       const body = await res.json();
       expect(body.invitation.code).toBeDefined();
-      expect(body.url).toContain('/invite/');
+      expect(body.url).toBe(`https://selfhost.example.com/invite/${body.invitation.code}`);
 
       // Verify expiry is ~24h from now
       const createCall = mockInvitationLink.create.mock.calls[0][0].data;
@@ -98,23 +105,39 @@ describe('Admin Invitations API', () => {
       const now = new Date();
       mockInvitationLink.findMany.mockResolvedValue([
         {
-          id: 'inv-1', code: 'abc123', enabled: true, usedAt: null,
-          expiresAt: new Date(now.getTime() + 60000), createdAt: now,
+          id: 'inv-1',
+          code: 'abc123',
+          enabled: true,
+          usedAt: null,
+          expiresAt: new Date(now.getTime() + 60000),
+          createdAt: now,
           creator: { name: 'Admin', email: 'admin@test.com' },
         },
         {
-          id: 'inv-2', code: 'def456', enabled: true, usedAt: new Date(),
-          expiresAt: new Date(now.getTime() + 60000), createdAt: now,
+          id: 'inv-2',
+          code: 'def456',
+          enabled: true,
+          usedAt: new Date(),
+          expiresAt: new Date(now.getTime() + 60000),
+          createdAt: now,
           creator: { name: 'Admin', email: 'admin@test.com' },
         },
         {
-          id: 'inv-3', code: 'ghi789', enabled: true, usedAt: null,
-          expiresAt: new Date(now.getTime() - 60000), createdAt: now,
+          id: 'inv-3',
+          code: 'ghi789',
+          enabled: true,
+          usedAt: null,
+          expiresAt: new Date(now.getTime() - 60000),
+          createdAt: now,
           creator: { name: 'Admin', email: 'admin@test.com' },
         },
         {
-          id: 'inv-4', code: 'jkl012', enabled: false, usedAt: null,
-          expiresAt: new Date(now.getTime() + 60000), createdAt: now,
+          id: 'inv-4',
+          code: 'jkl012',
+          enabled: false,
+          usedAt: null,
+          expiresAt: new Date(now.getTime() + 60000),
+          createdAt: now,
           creator: { name: 'Admin', email: 'admin@test.com' },
         },
       ]);
@@ -152,8 +175,12 @@ describe('Admin Invitations API', () => {
     it('toggles enabled state', async () => {
       mockRequireAdmin.mockResolvedValue('admin-1');
       const invitation = {
-        id: 'inv-1', code: 'abc123', enabled: false, usedAt: null,
-        expiresAt: new Date(Date.now() + 60000), createdAt: new Date(),
+        id: 'inv-1',
+        code: 'abc123',
+        enabled: false,
+        usedAt: null,
+        expiresAt: new Date(Date.now() + 60000),
+        createdAt: new Date(),
       };
       mockInvitationLink.findUnique.mockResolvedValue({ ...invitation, enabled: true });
       mockInvitationLink.update.mockResolvedValue(invitation);

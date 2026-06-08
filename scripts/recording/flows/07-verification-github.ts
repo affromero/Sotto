@@ -3,8 +3,12 @@ import { smoothScroll, injectCursor } from '../lib/actions';
 import type { FlowScenario, FlowContext } from '../lib/types';
 
 async function run(page: Page, _ctx: FlowContext): Promise<void> {
-  // Navigate to the open-source verification standard repo
-  await page.goto('https://github.com/SottoFM/reference-verification-standard', {
+  const verificationStandardUrl = process.env.NEXT_PUBLIC_VERIFICATION_STANDARD_URL?.trim();
+  if (!verificationStandardUrl) {
+    throw new Error('NEXT_PUBLIC_VERIFICATION_STANDARD_URL is required for this recording flow');
+  }
+
+  await page.goto(verificationStandardUrl, {
     waitUntil: 'domcontentloaded',
     timeout: 30000,
   });

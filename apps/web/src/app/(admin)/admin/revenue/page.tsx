@@ -49,7 +49,7 @@ export default async function AdminRevenuePage({ searchParams }: PageProps) {
       <div className={styles.headerRow}>
         <div className={styles.header}>
           <h1 className={styles.title}>Revenue Dashboard</h1>
-          <p className={styles.subtitle}>Voice marketplace revenue, purchases, and seller metrics</p>
+          <p className={styles.subtitle}>Paid voice-sharing revenue, purchases, and seller metrics</p>
         </div>
         <nav className={styles.rangeNav} aria-label="Time range">
           {[
@@ -183,9 +183,9 @@ export default async function AdminRevenuePage({ searchParams }: PageProps) {
         )}
       </section>
 
-      {/* Marketplace health */}
+      {/* Paid voice-sharing health */}
       <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Marketplace Health</h2>
+        <h2 className={styles.sectionTitle}>Paid Voice Sharing Health</h2>
         <div className={styles.statsGrid}>
           <div className={styles.statCard}>
             <span className={styles.statLabel}>Stripe-Connected Sellers</span>

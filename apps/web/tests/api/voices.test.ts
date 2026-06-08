@@ -9,6 +9,7 @@ const mockVoiceCloneCount = vi.fn();
 const mockVoiceCloneFindUnique = vi.fn();
 const mockVoiceCloneCreate = vi.fn();
 const mockVoiceCloneDelete = vi.fn();
+const mockVoiceCloneUpdate = vi.fn();
 const mockVoiceAllowlistFindMany = vi.fn();
 const mockVoiceRequestFindMany = vi.fn();
 const mockVoiceRequestDeleteMany = vi.fn();
@@ -18,6 +19,9 @@ const mockGenerateSpeech = vi.fn();
 const mockGetVoiceById = vi.fn();
 const mockCheckRateLimit = vi.fn();
 const mockGetVoiceCatalog = vi.fn();
+const mockGetByokKey = vi.fn();
+const mockCreateTtsProviderAsync = vi.fn();
+const mockGetPlanFeatureConfig = vi.fn();
 
 vi.mock('@/lib/auth', () => ({
   auth: (...args: unknown[]) => mockAuth(...args),
@@ -38,6 +42,7 @@ vi.mock('@/lib/prisma', () => {
       findUnique: (...args: unknown[]) => mockVoiceCloneFindUnique(...args),
       create: (...args: unknown[]) => mockVoiceCloneCreate(...args),
       delete: (...args: unknown[]) => mockVoiceCloneDelete(...args),
+      update: (...args: unknown[]) => mockVoiceCloneUpdate(...args),
     },
     voiceAllowlist: {
       findMany: (...args: unknown[]) => mockVoiceAllowlistFindMany(...args),
@@ -92,7 +97,11 @@ vi.mock('@/lib/queue', () => ({
 
 vi.mock('@/lib/byok', () => ({
   hasByokKey: vi.fn().mockResolvedValue(false),
-  getByokKey: vi.fn().mockResolvedValue(null),
+  getByokKey: (...args: unknown[]) => mockGetByokKey(...args),
+}));
+
+vi.mock('@/lib/providers/tts', () => ({
+  createTtsProviderAsync: (...args: unknown[]) => mockCreateTtsProviderAsync(...args),
 }));
 
 vi.mock('@/lib/tier-features', () => ({
@@ -112,15 +121,7 @@ vi.mock('@/lib/tier-features', () => ({
 }));
 
 vi.mock('@/lib/plan-feature-config', () => ({
-  getPlanFeatureConfig: vi.fn().mockResolvedValue({
-    freeVoiceCloningEnabled: false,
-    proVoiceCloningEnabled: true,
-    freeVoiceTracksEnabled: false,
-    proVoiceTracksEnabled: true,
-    freeMaxVoiceTracks: 0,
-    proMaxVoiceTracks: 3,
-    voiceMarketplaceEnabled: true,
-  }),
+  getPlanFeatureConfig: (...args: unknown[]) => mockGetPlanFeatureConfig(...args),
 }));
 
 vi.mock('@/lib/fal-voice-clone', () => ({
@@ -140,7 +141,11 @@ vi.mock('@/lib/logger', () => ({
 }));
 
 import { GET } from '@/app/api/voices/route';
-import { POST as POST_CLONE, DELETE as DELETE_CLONE } from '@/app/api/voices/clone/route';
+import {
+  POST as POST_CLONE,
+  PATCH as PATCH_CLONE,
+  DELETE as DELETE_CLONE,
+} from '@/app/api/voices/clone/route';
 import { POST as POST_PREVIEW } from '@/app/api/voices/preview/route';
 
 function createRequest(
@@ -158,6 +163,20 @@ const mockSession = {
   },
   expires: '2025-12-31',
 };
+
+const defaultPlanFeatureConfig = {
+  freeVoiceCloningEnabled: false,
+  proVoiceCloningEnabled: true,
+  freeVoiceTracksEnabled: false,
+  proVoiceTracksEnabled: true,
+  freeMaxVoiceTracks: 0,
+  proMaxVoiceTracks: 3,
+  voiceMarketplaceEnabled: true,
+};
+
+beforeEach(() => {
+  mockGetPlanFeatureConfig.mockResolvedValue(defaultPlanFeatureConfig);
+});
 
 const mockVoiceClone = {
   id: 'clone-1',
@@ -189,8 +208,22 @@ describe('GET /api/voices', () => {
     mockVoiceAllowlistFindMany.mockResolvedValue([]);
     mockVoiceRequestFindMany.mockResolvedValue([]);
     mockGetVoiceCatalog.mockResolvedValue([
-      { id: 'voice-1', name: 'Adam', gender: 'male', accent: 'american', age: 'middle', description: 'warm narrator' },
-      { id: 'voice-2', name: 'Bella', gender: 'female', accent: 'american', age: 'young', description: 'engaging storyteller' },
+      {
+        id: 'voice-1',
+        name: 'Adam',
+        gender: 'male',
+        accent: 'american',
+        age: 'middle',
+        description: 'warm narrator',
+      },
+      {
+        id: 'voice-2',
+        name: 'Bella',
+        gender: 'female',
+        accent: 'american',
+        age: 'young',
+        description: 'engaging storyteller',
+      },
     ]);
   });
 
@@ -208,7 +241,14 @@ describe('GET /api/voices', () => {
   it('returns voice pool, user clones, and maxVoiceClones for authenticated user', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockVoiceCloneFindMany.mockResolvedValue([
-      { ...mockVoiceClone, provider: 'elevenlabs', description: null, requestable: false, priceInCents: null, voicePurchases: [] },
+      {
+        ...mockVoiceClone,
+        provider: 'elevenlabs',
+        description: null,
+        requestable: false,
+        priceInCents: null,
+        voicePurchases: [],
+      },
     ]);
 
     const request = createRequest();
@@ -220,6 +260,7 @@ describe('GET /api/voices', () => {
     expect(body).toHaveProperty('userClones');
     expect(body).toHaveProperty('maxVoiceClones');
     expect(body.maxVoiceClones).toBe(10);
+    expect(body.voiceMarketplaceEnabled).toBe(true);
     expect(Array.isArray(body.poolVoices)).toBe(true);
     expect(body.poolVoices).toHaveLength(2);
   });
@@ -299,7 +340,14 @@ describe('GET /api/voices', () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockVoiceCloneFindMany.mockResolvedValue([]);
     mockGetVoiceCatalog.mockResolvedValue([
-      { id: 'cartesia-1', name: 'Cartesia Voice', gender: 'female', accent: 'british', age: 'young', description: 'clear speaker' },
+      {
+        id: 'cartesia-1',
+        name: 'Cartesia Voice',
+        gender: 'female',
+        accent: 'british',
+        age: 'young',
+        description: 'clear speaker',
+      },
     ]);
 
     const request = createRequest('http://localhost:3000/api/voices?provider=cartesia');
@@ -327,14 +375,17 @@ describe('GET /api/voices', () => {
     expect(mockGetVoiceCatalog).toHaveBeenCalledWith('elevenlabs');
   });
 
-  it('falls back to elevenlabs for invalid provider param', async () => {
+  it('rejects invalid provider param', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockVoiceCloneFindMany.mockResolvedValue([]);
 
     const request = createRequest('http://localhost:3000/api/voices?provider=invalid');
-    await GET(request);
+    const response = await GET(request);
+    const body = await response.json();
 
-    expect(mockGetVoiceCatalog).toHaveBeenCalledWith('elevenlabs');
+    expect(response.status).toBe(400);
+    expect(body).toMatchObject({ error: 'Invalid provider' });
+    expect(mockGetVoiceCatalog).not.toHaveBeenCalled();
   });
 });
 
@@ -581,6 +632,75 @@ describe('POST /api/voices/clone', () => {
   });
 });
 
+describe('PATCH /api/voices/clone', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetPlanFeatureConfig.mockResolvedValue(defaultPlanFeatureConfig);
+  });
+
+  it('returns 503 when enabling paid voice sharing while sharing is disabled', async () => {
+    mockAuth.mockResolvedValue(mockSession);
+    mockGetPlanFeatureConfig.mockResolvedValue({
+      ...defaultPlanFeatureConfig,
+      voiceMarketplaceEnabled: false,
+    });
+    mockVoiceCloneFindUnique.mockResolvedValue({
+      ...mockVoiceClone,
+      userId: 'user-1',
+      verificationStatus: 'VERIFIED',
+    });
+
+    const request = createRequest('http://localhost:3000/api/voices/clone', {
+      method: 'PATCH',
+      body: JSON.stringify({ voiceCloneId: 'clone-1', requestable: true }),
+    });
+    const response = await PATCH_CLONE(request);
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body).toMatchObject({ error: 'Paid voice sharing is currently unavailable.' });
+    expect(mockVoiceCloneUpdate).not.toHaveBeenCalled();
+  });
+
+  it('allows privacy-preserving cleanup while marketplace is disabled', async () => {
+    mockAuth.mockResolvedValue(mockSession);
+    mockGetPlanFeatureConfig.mockResolvedValue({
+      ...defaultPlanFeatureConfig,
+      voiceMarketplaceEnabled: false,
+    });
+    mockVoiceCloneFindUnique.mockResolvedValue({
+      ...mockVoiceClone,
+      userId: 'user-1',
+      requestable: true,
+      priceInCents: 500,
+    });
+    mockVoiceCloneUpdate.mockResolvedValue({
+      ...mockVoiceClone,
+      requestable: false,
+      priceInCents: null,
+    });
+
+    const request = createRequest('http://localhost:3000/api/voices/clone', {
+      method: 'PATCH',
+      body: JSON.stringify({
+        voiceCloneId: 'clone-1',
+        requestable: false,
+        priceInCents: null,
+      }),
+    });
+    const response = await PATCH_CLONE(request);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.requestable).toBe(false);
+    expect(body.priceInCents).toBeNull();
+    expect(mockVoiceCloneUpdate).toHaveBeenCalledWith({
+      where: { id: 'clone-1' },
+      data: { requestable: false, priceInCents: null },
+    });
+  });
+});
+
 describe('DELETE /api/voices/clone', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -695,6 +815,17 @@ describe('DELETE /api/voices/clone', () => {
 describe('POST /api/voices/preview', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetByokKey.mockResolvedValue('user-elevenlabs-key');
+    mockCreateTtsProviderAsync.mockResolvedValue({
+      generateSpeech: vi.fn().mockResolvedValue(Buffer.from('fake-audio-data')),
+    });
+    delete process.env.ELEVENLABS_API_KEY;
+    delete process.env.OPENAI_API_KEY;
+    delete process.env.CARTESIA_API_KEY;
+    delete process.env.HUME_API_KEY;
+    delete process.env.FAL_KEY;
+    delete process.env.REPLICATE_API_TOKEN;
+    delete process.env.MISTRAL_API_KEY;
   });
 
   it('returns 401 when user is not authenticated', async () => {
@@ -765,23 +896,61 @@ describe('POST /api/voices/preview', () => {
     expect(response.status).toBe(400);
   });
 
+  it('returns 400 when provider is missing', async () => {
+    mockAuth.mockResolvedValue(mockSession);
+    mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 9 });
+
+    const request = createRequest('http://localhost:3000/api/voices/preview', {
+      method: 'POST',
+      body: JSON.stringify({ voiceId: 'voice-1', text: 'Hello world' }),
+    });
+    const response = await POST_PREVIEW(request);
+
+    expect(response.status).toBe(400);
+  });
+
+  it('returns 400 when no provider key is available', async () => {
+    mockAuth.mockResolvedValue(mockSession);
+    mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 9 });
+    mockGetByokKey.mockResolvedValue(null);
+
+    const request = createRequest('http://localhost:3000/api/voices/preview', {
+      method: 'POST',
+      body: JSON.stringify({ voiceId: 'voice-1', text: 'Hello world', provider: 'elevenlabs' }),
+    });
+    const response = await POST_PREVIEW(request);
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error).toBe('No elevenlabs API key available');
+  });
+
   it('successfully generates voice preview audio', async () => {
     mockAuth.mockResolvedValue(mockSession);
     mockUserFindUniqueOrThrow.mockResolvedValue({ role: 'ADMIN' });
     mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 9 });
     mockUserFindUniqueOrThrow.mockResolvedValue({ role: 'ADMIN' });
     const mockAudioBuffer = Buffer.from('fake-audio-data');
-    mockGenerateSpeech.mockResolvedValue({ audio: mockAudioBuffer, requestId: 'req-1' });
+    const generateSpeech = vi.fn().mockResolvedValue(mockAudioBuffer);
+    mockCreateTtsProviderAsync.mockResolvedValue({ generateSpeech });
 
     const request = createRequest('http://localhost:3000/api/voices/preview', {
       method: 'POST',
-      body: JSON.stringify({ voiceId: 'voice-1', text: 'Hello world, this is a preview.' }),
+      body: JSON.stringify({
+        voiceId: 'voice-1',
+        text: 'Hello world, this is a preview.',
+        provider: 'elevenlabs',
+      }),
     });
     const response = await POST_PREVIEW(request);
 
     expect(response.status).toBe(200);
     expect(response.headers.get('Content-Type')).toBe('audio/mpeg');
     expect(response.headers.get('Content-Length')).toBe(mockAudioBuffer.length.toString());
+    expect(mockCreateTtsProviderAsync).toHaveBeenCalledWith('elevenlabs', 'user-elevenlabs-key');
+    expect(generateSpeech).toHaveBeenCalledWith({
+      text: 'Hello world, this is a preview.',
+      voiceId: 'voice-1',
+    });
   });
-
 });

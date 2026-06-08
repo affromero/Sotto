@@ -49,9 +49,7 @@ export function AutoTweetSection() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           autoTweetEnabled: config.autoTweetEnabled,
-          minLikes: config.minLikes,
           minPlays: config.minPlays,
-          minForks: config.minForks,
           tweetTemplate: config.tweetTemplate,
         }),
       });
@@ -108,24 +106,11 @@ export function AutoTweetSection() {
             Enable Auto-Tweet
           </label>
           <span className={styles.hint}>
-            Automatically tweet when podcasts reach engagement thresholds
+            Automatically tweet when podcasts reach the private play threshold
           </span>
         </div>
 
         <div className={styles.thresholds}>
-          <div className={styles.field}>
-            <label className={styles.label} htmlFor="minLikes">
-              Min Likes
-            </label>
-            <input
-              id="minLikes"
-              type="number"
-              className={styles.input}
-              value={config.minLikes}
-              onChange={(e) => setConfig({ ...config, minLikes: parseInt(e.target.value, 10) || 1 })}
-              min={1}
-            />
-          </div>
           <div className={styles.field}>
             <label className={styles.label} htmlFor="minPlays">
               Min Plays
@@ -135,20 +120,9 @@ export function AutoTweetSection() {
               type="number"
               className={styles.input}
               value={config.minPlays}
-              onChange={(e) => setConfig({ ...config, minPlays: parseInt(e.target.value, 10) || 1 })}
-              min={1}
-            />
-          </div>
-          <div className={styles.field}>
-            <label className={styles.label} htmlFor="minForks">
-              Min Forks
-            </label>
-            <input
-              id="minForks"
-              type="number"
-              className={styles.input}
-              value={config.minForks}
-              onChange={(e) => setConfig({ ...config, minForks: parseInt(e.target.value, 10) || 1 })}
+              onChange={(e) =>
+                setConfig({ ...config, minPlays: parseInt(e.target.value, 10) || 1 })
+              }
               min={1}
             />
           </div>
@@ -176,12 +150,7 @@ export function AutoTweetSection() {
           </div>
         )}
 
-        <button
-          type="button"
-          className={styles.saveButton}
-          onClick={handleSave}
-          disabled={saving}
-        >
+        <button type="button" className={styles.saveButton} onClick={handleSave} disabled={saving}>
           {saving ? 'Saving...' : saved ? 'Saved' : 'Save Changes'}
         </button>
       </div>

@@ -2,7 +2,7 @@
   "version": 1,
   "project": {
     "title": "Sotto Product Launch",
-    "description": "Cinematic product launch video for Sotto — the social podcast network"
+    "description": "Cinematic product launch video for Sotto private podcast infrastructure"
   },
   "defaults": {
     "ttsProvider": "elevenlabs",
@@ -21,7 +21,7 @@
       "title": "Landing Page — Brand Introduction",
       "narration": "What if creating a podcast was as simple as having a conversation? Sotto turns any topic into a studio-quality, two-voice podcast — in minutes. No mic. No editing. Just your curiosity.",
       "actions": [
-        { "type": "navigate", "url": "https://sotto.fm" },
+        { "type": "navigate", "url": "https://your-domain.example" },
         { "type": "wait", "ms": 1500 },
         { "type": "scroll", "distance": 300, "duration": 2000 },
         { "type": "wait", "ms": 2000 },
@@ -35,7 +35,7 @@
       },
       "overlays": [
         {
-          "text": "Every voice. Every topic. One feed.",
+          "text": "Your voices. Your topics. Private by default.",
           "position": "center",
           "showAtSeconds": 0.5,
           "hideAtSeconds": 3.5,
@@ -194,7 +194,7 @@
       "title": "Podcast Playback — ElevenLabs Voice",
       "narration": "Listen to the result. Two distinct voices, natural pacing, emotional range — all generated from text in under a minute.",
       "actions": [
-        { "type": "navigate", "url": "https://sotto.fm/podcast/PODCAST_ID_PLACEHOLDER" },
+        { "type": "navigate", "url": "https://your-domain.example/podcast/PODCAST_ID_PLACEHOLDER" },
         { "type": "waitForSelector", "selector": "[class*='player']", "timeout": 5000 },
         { "type": "wait", "ms": 1000 },
         { "type": "click", "selector": "[class*='playButton']" },
@@ -397,9 +397,9 @@
     },
     {
       "title": "Dashboard Tour",
-      "narration": "Your dashboard is your studio. Every podcast you've created, every fork, every collaboration — all in one place. Track listens, manage voice tracks, and see your content grow.",
+      "narration": "Your dashboard is your studio. Every podcast you've created, every private briefing, every voice track — all in one place. Track listens, manage voices, and keep your content under your control.",
       "actions": [
-        { "type": "navigate", "url": "https://sotto.fm/dashboard" },
+        { "type": "navigate", "url": "https://your-domain.example/dashboard" },
         { "type": "waitForSelector", "selector": "[class*='greeting'], [class*='header']", "timeout": 5000 },
         { "type": "wait", "ms": 1500 },
         { "type": "scroll", "distance": 300, "duration": 1500 },
@@ -418,9 +418,9 @@
     },
     {
       "title": "Closing — Back to Landing",
-      "narration": "Sotto. Every voice. Every topic. One feed. Start creating — it only takes a conversation.",
+      "narration": "Sotto. Your voices. Your topics. Private by default. Start creating — it only takes a conversation.",
       "actions": [
-        { "type": "navigate", "url": "https://sotto.fm" },
+        { "type": "navigate", "url": "https://your-domain.example" },
         { "type": "waitForSelector", "selector": "[class*='hero']", "timeout": 5000 },
         { "type": "wait", "ms": 4000 }
       ],
@@ -430,7 +430,7 @@
       },
       "overlays": [
         {
-          "text": "sotto.fm",
+          "text": "your-domain.example",
           "position": "center",
           "showAtSeconds": 2,
           "hideAtSeconds": 6,

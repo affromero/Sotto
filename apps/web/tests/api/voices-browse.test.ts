@@ -7,21 +7,14 @@ const mockVoiceCloneCount = vi.fn();
 const mockVoiceRequestFindMany = vi.fn();
 const mockVoicePurchaseFindMany = vi.fn();
 const mockVoiceAllowlistFindMany = vi.fn();
+const mockGetPlanFeatureConfig = vi.fn();
 
 vi.mock('@/lib/auth', () => ({
   auth: (...args: unknown[]) => mockAuth(...args),
 }));
 
 vi.mock('@/lib/plan-feature-config', () => ({
-  getPlanFeatureConfig: vi.fn().mockResolvedValue({
-    freeVoiceCloningEnabled: false,
-    proVoiceCloningEnabled: true,
-    freeVoiceTracksEnabled: false,
-    proVoiceTracksEnabled: true,
-    freeMaxVoiceTracks: 0,
-    proMaxVoiceTracks: 3,
-    voiceMarketplaceEnabled: true,
-  }),
+  getPlanFeatureConfig: (...args: unknown[]) => mockGetPlanFeatureConfig(...args),
 }));
 
 vi.mock('@/lib/prisma', () => {
@@ -101,6 +94,34 @@ describe('GET /api/voices/browse', () => {
     mockVoiceCloneCount.mockResolvedValue(0);
     mockVoicePurchaseFindMany.mockResolvedValue([]);
     mockVoiceAllowlistFindMany.mockResolvedValue([]);
+    mockGetPlanFeatureConfig.mockResolvedValue({
+      freeVoiceCloningEnabled: false,
+      proVoiceCloningEnabled: true,
+      freeVoiceTracksEnabled: false,
+      proVoiceTracksEnabled: true,
+      freeMaxVoiceTracks: 0,
+      proMaxVoiceTracks: 3,
+      voiceMarketplaceEnabled: true,
+    });
+  });
+
+  it('returns 503 when optional paid voice sharing is disabled', async () => {
+    mockGetPlanFeatureConfig.mockResolvedValue({
+      freeVoiceCloningEnabled: false,
+      proVoiceCloningEnabled: true,
+      freeVoiceTracksEnabled: false,
+      proVoiceTracksEnabled: true,
+      freeMaxVoiceTracks: 0,
+      proMaxVoiceTracks: 3,
+      voiceMarketplaceEnabled: false,
+    });
+
+    const response = await GET(createRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body).toMatchObject({ error: 'Paid voice sharing is currently unavailable.' });
+    expect(mockVoiceCloneFindMany).not.toHaveBeenCalled();
   });
 
   it('returns empty results when no requestable voices exist', async () => {
@@ -169,9 +190,7 @@ describe('GET /api/voices/browse', () => {
     });
     mockVoiceCloneFindMany.mockResolvedValue([mockVoice, mockVoice2]);
     mockVoiceCloneCount.mockResolvedValue(2);
-    mockVoiceRequestFindMany.mockResolvedValue([
-      { voiceCloneId: 'clone-1', status: 'PENDING' },
-    ]);
+    mockVoiceRequestFindMany.mockResolvedValue([{ voiceCloneId: 'clone-1', status: 'PENDING' }]);
 
     const response = await GET(createRequest());
     const body = await response.json();

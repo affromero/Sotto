@@ -1,11 +1,7 @@
-import { createAIProvider, type AIProvider } from './ai';
-import { createTtsProvider, type TtsProvider } from './tts';
 import { createStorageProvider, type StorageProvider } from './storage';
 import { createMLProvider, type MLProvider } from './ml';
 
 export interface Providers {
-  ai: AIProvider;
-  tts: TtsProvider;
   storage: StorageProvider;
   ml: MLProvider;
 }
@@ -13,15 +9,12 @@ export interface Providers {
 let _providers: Providers | null = null;
 
 /**
- * Get the singleton provider instances, selected by environment variables:
- * - TTS_PROVIDER: elevenlabs (default) | openai
- * - STORAGE_PROVIDER: r2 (default) | s3 | local
+ * Get singleton provider instances that are safe to construct without user runtime choices:
+ * - STORAGE_PROVIDER: local (default) | r2 | s3
  */
 export function getProviders(): Providers {
   if (!_providers) {
     _providers = {
-      ai: createAIProvider(),
-      tts: createTtsProvider(),
       storage: createStorageProvider(),
       ml: createMLProvider(),
     };

@@ -18,7 +18,7 @@
 - showcase-generator type errors: AIResponse.content, destructured segments, CURATED_SEGMENTS reference
 - Voice track loading state persistence across tab switches
 - Architecture detection at build time for correct native bindings
-- Dockerfile packages/feed import path for @sottofm/feed
+- Dockerfile feed workspace import path
 
 ### Changed
 - ShowcaseChapter now dark full-bleed, returns null when no showcase data (no fallback mock)
@@ -32,7 +32,7 @@
 - Persistent showcase sets with names, active toggle, and random rotation on landing page
 - Per-item regeneration: re-render individual visual types without regenerating the entire set
 - Hybrid carousel on landing page: featured video + thumbnail rail with auto-advance
-- `@sottofm/feed` package: core ranking signals, scoring, diversity, and social proof
+- Standalone feed package: core ranking signals, scoring, diversity, and social proof
 - Design system tokens: surface-nested, surface-sunken, state layers, consolidated spacing
 - Public `GET /api/showcase` endpoint for landing page consumption
 

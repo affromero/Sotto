@@ -47,9 +47,7 @@ import { checkAutoTweetThreshold, manualTweet } from '@/lib/twitter-auto-tweet';
 
 const DEFAULT_CONFIG = {
   autoTweetEnabled: true,
-  minLikes: 10,
   minPlays: 50,
-  minForks: 3,
   trendPollingEnabled: false,
   trendPollIntervalMs: 7200000,
   maxTrendPodcastsPerDay: 3,
@@ -86,8 +84,6 @@ describe('checkAutoTweetThreshold', () => {
     mockPrismaPodcastFindUnique.mockResolvedValue({
       visibility: 'PRIVATE',
       playCount: 999,
-      likeCount: 999,
-      forkCount: 999,
     });
 
     await checkAutoTweetThreshold('pod-private');
@@ -99,8 +95,6 @@ describe('checkAutoTweetThreshold', () => {
     mockPrismaPodcastFindUnique.mockResolvedValue({
       visibility: 'PUBLIC',
       playCount: 100,
-      likeCount: 20,
-      forkCount: 5,
     });
     mockPrismaTwitterAutoTweetFindFirst.mockResolvedValue({ id: 'existing-tweet' });
 
@@ -113,8 +107,6 @@ describe('checkAutoTweetThreshold', () => {
     mockPrismaPodcastFindUnique.mockResolvedValue({
       visibility: 'PUBLIC',
       playCount: 5,
-      likeCount: 2,
-      forkCount: 0,
     });
 
     await checkAutoTweetThreshold('pod-low');
@@ -122,33 +114,28 @@ describe('checkAutoTweetThreshold', () => {
     expect(mockPrismaTwitterAutoTweetCreate).not.toHaveBeenCalled();
   });
 
-  it('creates auto-tweet record and enqueues job when likes threshold met', async () => {
-    mockPrismaPodcastFindUnique.mockResolvedValue({
-      visibility: 'PUBLIC',
-      playCount: 5,
-      likeCount: 10,
-      forkCount: 0,
-    });
-    mockPrismaTwitterAutoTweetCreate.mockResolvedValue({ id: 'new-tweet' });
-
-    await checkAutoTweetThreshold('pod-liked');
-
-    expect(mockPrismaTwitterAutoTweetCreate).toHaveBeenCalledWith({
-      data: { podcastId: 'pod-liked', trigger: 'threshold', status: 'pending' },
-    });
-    expect(mockAddJob).toHaveBeenCalledWith(
-      'twitter-auto-tweet-queue',
-      'AUTO_TWEET',
-      { podcastId: 'pod-liked', trigger: 'threshold' }
-    );
-  });
-
-  it('triggers on plays threshold alone (OR logic)', async () => {
+  it('creates auto-tweet record and enqueues job when play threshold is met', async () => {
     mockPrismaPodcastFindUnique.mockResolvedValue({
       visibility: 'PUBLIC',
       playCount: 50,
-      likeCount: 0,
-      forkCount: 0,
+    });
+    mockPrismaTwitterAutoTweetCreate.mockResolvedValue({ id: 'new-tweet' });
+
+    await checkAutoTweetThreshold('pod-played');
+
+    expect(mockPrismaTwitterAutoTweetCreate).toHaveBeenCalledWith({
+      data: { podcastId: 'pod-played', trigger: 'threshold', status: 'pending' },
+    });
+    expect(mockAddJob).toHaveBeenCalledWith('twitter-auto-tweet-queue', 'AUTO_TWEET', {
+      podcastId: 'pod-played',
+      trigger: 'threshold',
+    });
+  });
+
+  it('triggers only on the play threshold', async () => {
+    mockPrismaPodcastFindUnique.mockResolvedValue({
+      visibility: 'PUBLIC',
+      playCount: 50,
     });
     mockPrismaTwitterAutoTweetCreate.mockResolvedValue({ id: 'at-1' });
 
@@ -156,20 +143,6 @@ describe('checkAutoTweetThreshold', () => {
 
     expect(mockPrismaTwitterAutoTweetCreate).toHaveBeenCalled();
     expect(mockAddJob).toHaveBeenCalled();
-  });
-
-  it('triggers on forks threshold alone (OR logic)', async () => {
-    mockPrismaPodcastFindUnique.mockResolvedValue({
-      visibility: 'PUBLIC',
-      playCount: 0,
-      likeCount: 0,
-      forkCount: 3,
-    });
-    mockPrismaTwitterAutoTweetCreate.mockResolvedValue({ id: 'at-2' });
-
-    await checkAutoTweetThreshold('pod-forks');
-
-    expect(mockPrismaTwitterAutoTweetCreate).toHaveBeenCalled();
   });
 });
 
@@ -194,10 +167,9 @@ describe('manualTweet', () => {
 
     await manualTweet('pod-xyz');
 
-    expect(mockAddJob).toHaveBeenCalledWith(
-      'twitter-auto-tweet-queue',
-      'AUTO_TWEET',
-      { podcastId: 'pod-xyz', trigger: 'manual' }
-    );
+    expect(mockAddJob).toHaveBeenCalledWith('twitter-auto-tweet-queue', 'AUTO_TWEET', {
+      podcastId: 'pod-xyz',
+      trigger: 'manual',
+    });
   });
 });

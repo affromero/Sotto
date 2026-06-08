@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import { generateSpeech } from '@/lib/elevenlabs';
 import { voicePreviewSchema } from '@/lib/validations';
 import { checkRateLimit } from '@/lib/redis';
 import { getProviderMeta, type TtsProviderId } from '@/lib/providers/tts-registry';
@@ -8,6 +7,20 @@ import { logUsage } from '@/lib/usage-logger';
 import { getByokKey } from '@/lib/byok';
 import { createTtsProviderAsync } from '@/lib/providers/tts';
 import { errorResponse } from '@/lib/api-response';
+
+function getPlatformPreviewKey(provider: TtsProviderId): string | undefined {
+  switch (provider) {
+    case 'elevenlabs': return process.env.ELEVENLABS_API_KEY;
+    case 'openai': return process.env.OPENAI_API_KEY;
+    case 'cartesia': return process.env.CARTESIA_API_KEY;
+    case 'hume': return process.env.HUME_API_KEY;
+    case 'fal': return process.env.FAL_KEY;
+    case 'replicate': return process.env.REPLICATE_API_TOKEN;
+    case 'minimax': return process.env.FAL_KEY;
+    case 'mistral': return process.env.MISTRAL_API_KEY;
+  }
+}
+
 export async function POST(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
@@ -29,30 +42,18 @@ export async function POST(request: NextRequest) {
   const { voiceId, text, provider } = parsed.data;
 
   let audioBuffer: Buffer;
-  const providerName: TtsProviderId = (provider || 'elevenlabs') as TtsProviderId;
+  const providerName: TtsProviderId = provider;
 
   try {
-    if (provider && provider !== 'elevenlabs') {
-      // Multi-provider preview: use BYOK key or platform key
-      const ttsProviderId = provider as TtsProviderId;
-      const byokKey = await getByokKey(session.user.id, ttsProviderId);
-      const platformKey = provider === 'hume' ? process.env.HUME_API_KEY
-        : provider === 'cartesia' ? process.env.CARTESIA_API_KEY
-        : undefined;
-      const apiKey = byokKey || platformKey;
+    const byokKey = await getByokKey(session.user.id, providerName);
+    const apiKey = byokKey || getPlatformPreviewKey(providerName);
 
-      if (!apiKey) {
-        return errorResponse(`No ${provider} API key available`, 400);
-      }
-
-      const ttsProvider = await createTtsProviderAsync(ttsProviderId, apiKey);
-      audioBuffer = await ttsProvider.generateSpeech({ text, voiceId });
-    } else {
-      // Default: ElevenLabs — use BYOK when available, otherwise fall back to platform preview.
-      const elByokKey = await getByokKey(session.user.id, 'elevenlabs');
-      const result = await generateSpeech({ text, voiceId, apiKeyOverride: elByokKey ?? undefined });
-      audioBuffer = result.audio;
+    if (!apiKey) {
+      return errorResponse(`No ${providerName} API key available`, 400);
     }
+
+    const ttsProvider = await createTtsProviderAsync(providerName, apiKey);
+    audioBuffer = await ttsProvider.generateSpeech({ text, voiceId });
   } catch (err) {
     const msg = err instanceof Error ? err.message : '';
     const isInvalidId = msg.includes('422') || msg.toLowerCase().includes('pattern') || msg.toLowerCase().includes('invalid_uid');

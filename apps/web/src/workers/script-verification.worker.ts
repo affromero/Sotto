@@ -21,8 +21,8 @@ import {
 import { createSegmentsAndQueueAudio } from '@/lib/segment-creator';
 import { convertTurnsForProvider } from '@/lib/tts-tag-converter';
 import { logUsage } from '@/lib/usage-logger';
-import { getAiKey, getByokKey, hasByokKey } from '@/lib/byok';
-import { resolveAiModelAndProvider } from '@/lib/providers/ai-registry';
+import { getAiKey, hasByokKey } from '@/lib/byok';
+import { resolveAiModelAndProvider, type AiProviderId } from '@/lib/providers/ai-registry';
 import { assignVoicesForPodcast } from '@/lib/voice-assigner';
 import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
 import type { TtsProviderId } from '@/lib/providers/tts-registry';
@@ -48,8 +48,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
   logger.info('Starting script verification', { podcastId });
   await job.updateProgress(5);
 
-  const [aiKey, hasTts, userPlan] = await Promise.all([
-    useAdminCredits ? Promise.resolve(null) : getAiKey(userId),
+  const [hasTts, userPlan] = await Promise.all([
     useAdminCredits ? Promise.resolve(true) : hasByokKey(userId),
     prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { plan: true, role: true } }),
   ]);
@@ -75,6 +74,21 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
 
   const verificationMode = podcastRecord.verificationMode;
 
+  let turns = script.turns as ScriptTurn[];
+
+  // Zero-cost mode: skip verification entirely — treat script as passed
+  if (podcastRecord.zeroCostVideo) {
+    logger.info('Zero-cost mode: skipping script verification', { podcastId });
+    await prisma.script.update({
+      where: { podcastId },
+      data: { verificationFeedback: 'Skipped (zero-cost mode)' },
+    });
+    // Route to audio — same as auto-approve path
+    await createSegmentsAndQueueAudio(podcastId, turns);
+    await job.updateProgress(100);
+    return;
+  }
+
   // Look up languageMode from the briefing if this is a BRIEFING podcast
   let briefingLanguageMode: string | null = null;
   if (podcastRecord.source === 'BRIEFING') {
@@ -91,6 +105,11 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
     }
   }
 
+  const aiKey = useAdminCredits || podcastRecord.aiModel ? null : await getAiKey(userId);
+  if (!podcastRecord.aiModel && !aiKey) {
+    throw new Error('AI model is required for script verification when no AI key is configured.');
+  }
+
   // Model + provider resolved together — prevents sending e.g. gpt-5-mini to Anthropic
   const { model, provider } = await resolveAiModelAndProvider({
     podcastAiModel: podcastRecord.aiModel,
@@ -100,12 +119,19 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
 
   const verificationModel = model;
 
+  const providerAiKey =
+    podcastRecord.aiModel && provider !== 'claude-code' && !useAdminCredits
+      ? await getAiKey(userId, provider as AiProviderId)
+      : aiKey;
+  if (podcastRecord.aiModel && provider !== 'claude-code' && !useAdminCredits && !providerAiKey) {
+    throw new Error(`AI key for provider "${provider}" is required for script verification.`);
+  }
+
   const requestedDuration = discovery.durationTarget || 10;
   const maxDurationMinutes = isFinite(tierFeatures.maxDurationMinutes)
     ? Math.min(requestedDuration, tierFeatures.maxDurationMinutes)
     : requestedDuration;
 
-  let turns = script.turns as ScriptTurn[];
   const generatedRefs: GeneratedReference[] = references.map((r) => ({
     number: r.number,
     title: r.title,
@@ -122,20 +148,6 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
 
   await job.updateProgress(15);
 
-  // Zero-cost mode: skip verification entirely — treat script as passed
-  if (podcastRecord.zeroCostVideo) {
-    logger.info('Zero-cost mode: skipping script verification', { podcastId });
-    await prisma.script.update({
-      where: { podcastId },
-      data: { verificationFeedback: 'Skipped (zero-cost mode)' },
-    });
-    // Route to audio — same as auto-approve path
-    const { createSegmentsAndQueueAudio } = await import('@/lib/segment-creator');
-    await createSegmentsAndQueueAudio(podcastId, turns);
-    await job.updateProgress(100);
-    return;
-  }
-
   const verdict = await verifyScript({
     topic: discovery.topic || '',
     turns,
@@ -147,8 +159,9 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
     tone: discovery.tone || 'casual',
     durationTarget: discovery.durationTarget || 10,
     previousFeedback: script.verificationFeedback || undefined,
-    apiKeyOverride: aiKey?.apiKey,
+    apiKeyOverride: providerAiKey?.apiKey,
     model: verificationModel,
+    provider,
     previousClaims: previousClaims.length > 0 ? previousClaims : undefined,
     verificationMode,
   });
@@ -234,7 +247,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
         previousScript: turns,
         previousReferences: generatedRefs,
         verificationFeedback: `DURATION: ${verdict.durationFeedback}`,
-        apiKeyOverride: aiKey?.apiKey,
+        apiKeyOverride: providerAiKey?.apiKey,
         model,
         provider,
         webSearchEnabled: false,
@@ -369,13 +382,12 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
         const speakerList = svSpeakers && svSpeakers.length > 0
           ? svSpeakers
           : [...new Set(turns.map((t) => t.speaker))].map((name) => ({ name }));
-        const svTtsKey = hasTts ? ((await getByokKey(userId, svProvider)) ?? undefined) : undefined;
-        await assignVoicesForPodcast(podcastId, speakerList, svProvider, svTtsKey);
+        await assignVoicesForPodcast(podcastId, speakerList, svProvider);
 
         // Convert TTS tags before creating segments
         const scriptTurns = turns as Array<{ speaker: string; text: string; direction?: string }>;
         const convertedScriptTurns = svPodcast.ttsProvider
-          ? await convertTurnsForProvider(scriptTurns, svProvider, podcastId)
+          ? await convertTurnsForProvider(scriptTurns, svProvider, { mode: 'disabled' })
           : scriptTurns;
         await createSegmentsAndQueueAudio(podcastId, convertedScriptTurns);
 
@@ -516,7 +528,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
     verificationFeedback: verdict.feedback,
     repairMode,
     bannedRefNumbers: [...bannedRefNumbers],
-    apiKeyOverride: aiKey?.apiKey,
+    apiKeyOverride: providerAiKey?.apiKey,
     model,
     provider,
     webSearchEnabled: useWebSearchForRevision,

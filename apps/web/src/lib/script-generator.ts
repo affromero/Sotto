@@ -497,7 +497,7 @@ export async function generateScript(params: {
   speakers?: Array<{ name: string; description: string }>;
   apiKeyOverride?: string;
   model?: string;
-  provider?: string;
+  provider: string;
   webSearchEnabled?: boolean;
   mode?: 'standard' | 'demo';
   source?: string;
@@ -695,7 +695,7 @@ export async function generateScriptWithFeedback(params: {
   bannedRefNumbers?: number[];
   apiKeyOverride?: string;
   model?: string;
-  provider?: string;
+  provider: string;
   webSearchEnabled?: boolean;
   targetLanguage?: string | null;
   languageMode?: string | null;
@@ -861,7 +861,7 @@ export async function generateScriptWithUserFeedback(params: {
   userFeedback: string;
   apiKeyOverride?: string;
   model?: string;
-  provider?: string;
+  provider: string;
   webSearchEnabled?: boolean;
 }): Promise<{
   turns: ScriptTurn[];

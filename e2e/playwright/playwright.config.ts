@@ -37,7 +37,7 @@ export default defineConfig({
     },
     {
       command:
-        'SKIP_DB_SYNC=1 ANTHROPIC_BASE_URL=http://localhost:4100 OPENAI_BASE_URL=http://localhost:4100 GOOGLE_AI_BASE_URL=http://localhost:4100 doppler run -- npm run dev:web',
+        'scripts/run-with-env.sh env SKIP_DB_SYNC=1 ANTHROPIC_BASE_URL=http://localhost:4100 OPENAI_BASE_URL=http://localhost:4100 GOOGLE_AI_BASE_URL=http://localhost:4100 npm run dev:web',
       url: 'http://localhost:3000',
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,

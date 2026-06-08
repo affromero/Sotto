@@ -75,12 +75,35 @@ vi.mock('@/lib/providers/tts/openai.provider', () => ({
   OpenAITtsProvider: MockOpenAITtsProvider,
 }));
 
+const mockLlmGenerateResponse = vi.fn(
+  async (_system: unknown, _messages: unknown, _options?: unknown) => ({
+    content: 'test',
+    inputTokens: 10,
+    outputTokens: 20,
+  }),
+);
+const mockLlmStreamResponse = vi.fn((_system: unknown, _messages: unknown, _options?: unknown) => (async function* () {
+  yield 'chunk';
+})());
+
 // Mock the underlying service modules to prevent initialization errors
 vi.mock('@/lib/llm', () => ({
-  generateResponse: vi
-    .fn()
-    .mockResolvedValue({ content: 'test', inputTokens: 10, outputTokens: 20 }),
-  streamResponse: vi.fn(),
+  generateResponse: mockLlmGenerateResponse,
+  streamResponse: mockLlmStreamResponse,
+}));
+
+const mockExecuteClaudeCode = vi.fn(
+  async (_system: unknown, _prompt: unknown, _options?: unknown) => ({
+    content: 'claude-code',
+    inputTokens: 3,
+    outputTokens: 4,
+  }),
+);
+
+vi.mock('@/lib/claude-code-client', () => ({
+  executeClaudeCode: mockExecuteClaudeCode,
+  streamClaudeCode: vi.fn(),
+  serializeMessages: vi.fn((messages: unknown) => JSON.stringify(messages)),
 }));
 
 vi.mock('@/lib/elevenlabs', () => ({
@@ -120,11 +143,15 @@ vi.mock('@/lib/logger', () => ({
 }));
 
 import { createAIProvider } from '@/lib/providers/ai';
-import { createTtsProvider } from '@/lib/providers/tts';
+import { createTtsProvider, resolveTtsProvider } from '@/lib/providers/tts';
 import { createStorageProvider } from '@/lib/providers/storage';
 
 describe('Provider Factories', () => {
   describe('createAIProvider', () => {
+    it('rejects missing provider instead of defaulting to hosted AI', () => {
+      expect(() => createAIProvider(undefined as unknown as string)).toThrow('AI provider type is required');
+    });
+
     it('anthropic provider delegates to claude.ts', async () => {
       const provider = createAIProvider('anthropic');
       const result = await provider.generateResponse('system', [
@@ -132,9 +159,51 @@ describe('Provider Factories', () => {
       ]);
       expect(result).toEqual({ content: 'test', inputTokens: 10, outputTokens: 20 });
     });
+
+    it('anthropic stream provider forwards BYOK API key overrides', async () => {
+      const provider = createAIProvider('anthropic');
+      const chunks: string[] = [];
+      for await (const chunk of provider.streamResponse('system', [
+        { role: 'user', content: 'hello' },
+      ], { model: 'claude-haiku-4-5-20251001', apiKeyOverride: 'user-key' })) {
+        chunks.push(chunk);
+      }
+
+      expect(chunks).toEqual(['chunk']);
+      expect(mockLlmStreamResponse).toHaveBeenCalledWith(
+        'system',
+        [{ role: 'user', content: 'hello' }],
+        expect.objectContaining({
+          model: 'claude-haiku-4-5-20251001',
+          apiKeyOverride: 'user-key',
+        }),
+      );
+    });
+
+    it('claude-code provider delegates to the Claude Code client', async () => {
+      const provider = createAIProvider('claude-code');
+      const result = await provider.generateResponse('system', [
+        { role: 'user', content: 'hello' },
+      ], { model: 'claude-code:opus' });
+      expect(mockExecuteClaudeCode).toHaveBeenCalledWith(
+        'system',
+        JSON.stringify([{ role: 'user', content: 'hello' }]),
+        { model: 'opus', useWebSearch: undefined },
+      );
+      expect(result).toEqual({
+        content: 'claude-code',
+        inputTokens: 3,
+        outputTokens: 4,
+        model: 'claude-code:opus',
+      });
+    });
   });
 
   describe('createTtsProvider', () => {
+    it('rejects missing provider instead of defaulting to hosted TTS', () => {
+      expect(() => createTtsProvider(undefined as unknown as string)).toThrow('TTS provider type is required');
+    });
+
     it('elevenlabs provider delegates to elevenlabs.ts', async () => {
       const provider = createTtsProvider('elevenlabs');
       const result = await provider.generateSpeech({ text: 'hello', voiceId: 'test' });
@@ -152,11 +221,33 @@ describe('Provider Factories', () => {
 
   });
 
+  describe('resolveTtsProvider', () => {
+    it('rejects missing provider instead of auto-selecting one', async () => {
+      await expect(
+        resolveTtsProvider({ userId: 'user-1', podcastId: 'podcast-1' })
+      ).rejects.toThrow('TTS provider is required');
+    });
+
+    it('rejects auto provider instead of choosing from configured keys', async () => {
+      await expect(
+        resolveTtsProvider({
+          userId: 'user-1',
+          podcastId: 'podcast-1',
+          requestedProvider: 'auto',
+        })
+      ).rejects.toThrow('TTS provider is required');
+    });
+  });
+
   describe('createStorageProvider', () => {
     it('r2 provider delegates to r2.ts', async () => {
       const provider = createStorageProvider('r2');
       const url = await provider.uploadFile('key', Buffer.from('data'), 'text/plain');
       expect(url).toBe('https://r2.example.com/file');
+    });
+
+    it('rejects unknown storage providers instead of switching to local storage', () => {
+      expect(() => createStorageProvider('unknown')).toThrow('Unknown storage provider "unknown"');
     });
   });
 

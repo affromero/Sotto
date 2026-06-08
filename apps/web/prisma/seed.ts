@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { getSystemUserConfig } from '../src/lib/system-user';
 
 const prisma = new PrismaClient();
 
@@ -270,7 +271,6 @@ async function main() {
         { name: 'Human-Created', slug: 'prod-human-created' },
         { name: 'AI-Assisted', slug: 'prod-ai-assisted' },
         { name: 'Imported', slug: 'prod-imported' },
-        { name: 'Remix', slug: 'prod-remix' },
       ],
     },
   ];
@@ -295,31 +295,33 @@ async function main() {
 
   console.warn(`✅ Created ${taxonomyCategories.length} taxonomy categories with ${taxonomyTagCount} tags`);
 
-  // Upsert @sotto system account
+  const systemUserConfig = getSystemUserConfig();
+
+  // Upsert configured system owner account
   await prisma.user.upsert({
-    where: { email: 'system@sotto.fm' },
+    where: { email: systemUserConfig.email },
     update: {
-      handle: 'sotto',
+      handle: systemUserConfig.handle,
       role: 'SYSTEM',
-      name: 'Sotto',
-      bio: 'The official Sotto account. Curated podcasts and platform highlights.',
-      image: '/brand/profile?v=amber',
+      name: systemUserConfig.name,
+      bio: systemUserConfig.bio,
+      image: systemUserConfig.image,
     },
     create: {
-      email: 'system@sotto.fm',
-      handle: 'sotto',
+      email: systemUserConfig.email,
+      handle: systemUserConfig.handle,
       role: 'SYSTEM',
-      name: 'Sotto',
-      bio: 'The official Sotto account. Curated podcasts and platform highlights.',
-      image: '/brand/profile?v=amber',
+      name: systemUserConfig.name,
+      bio: systemUserConfig.bio,
+      image: systemUserConfig.image,
     },
   });
 
-  console.warn('✅ Created @sotto system account');
+  console.warn(`✅ Created @${systemUserConfig.handle} system owner account`);
 
   // Seed reserved handles
   const reservedHandles = [
-    'sotto',
+    systemUserConfig.handle,
     'admin',
     'support',
     'help',

@@ -6,7 +6,7 @@ import { buildResearchDossier, type BuildDossierParams } from '@/lib/research-ag
 import { invalidatePodcastCache, publishPodcastStatus } from '@/lib/redis';
 import { logUsage } from '@/lib/usage-logger';
 import { getAiKey } from '@/lib/byok';
-import { resolveAiModelAndProvider } from '@/lib/providers/ai-registry';
+import { resolveAiModelAndProvider, type AiProviderId } from '@/lib/providers/ai-registry';
 import { logger } from '@/lib/logger';
 import { logPipelineStageComplete } from '@/lib/pipeline-events';
 
@@ -45,7 +45,7 @@ export async function processDeepResearch(job: Job<DeepResearchPayload>): Promis
   }
 
   // Load discovery + podcast metadata
-  const [discovery, podcast, aiKey] = await Promise.all([
+  const [discovery, podcast, user] = await Promise.all([
     prisma.discovery.findUniqueOrThrow({
       where: { id: discoveryId },
       select: {
@@ -65,16 +65,30 @@ export async function processDeepResearch(job: Job<DeepResearchPayload>): Promis
       where: { id: podcastId },
       select: { source: true, aiProvider: true, aiModel: true },
     }),
-    getAiKey(userId),
+    prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { plan: true } }),
   ]);
 
   await job.updateProgress(10);
+
+  const aiKey = useAdminCredits || podcast.aiModel ? null : await getAiKey(userId);
+  if (!podcast.aiModel && !aiKey) {
+    throw new Error('AI model is required for deep research when no AI key is configured.');
+  }
 
   // Resolve AI model
   const { model, provider } = await resolveAiModelAndProvider({
     podcastAiModel: podcast.aiModel,
     aiKey,
+    plan: user.plan as 'FREE' | 'PRO',
   });
+
+  const providerAiKey =
+    podcast.aiModel && provider !== 'claude-code' && !useAdminCredits
+      ? await getAiKey(userId, provider as AiProviderId)
+      : aiKey;
+  if (podcast.aiModel && provider !== 'claude-code' && !useAdminCredits && !providerAiKey) {
+    throw new Error(`AI key for provider "${provider}" is required for deep research.`);
+  }
 
   // Determine research mode
   const hasSourceContent = !!discovery.sourceContent;
@@ -107,7 +121,7 @@ export async function processDeepResearch(job: Job<DeepResearchPayload>): Promis
     focusAreas: discovery.focusAreas || [],
     suppliedSourceUrls: discovery.sourceUrl ? [discovery.sourceUrl] : [],
     discoverySummary,
-    apiKeyOverride: aiKey?.apiKey,
+    apiKeyOverride: providerAiKey?.apiKey,
     model,
     provider,
   });

@@ -2,8 +2,7 @@
 
 import { useRef, useCallback, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { Play, Heart, GitFork } from 'lucide-react';
+import { Play } from 'lucide-react';
 import { OwnerOnlyBadge } from '@/components/ui/OwnerOnlyBadge';
 import { getContentBadgeLabel } from '@sotto/shared';
 import { useTrack } from '@/components/providers/EventProvider';
@@ -18,13 +17,13 @@ interface PodcastCardProps {
   variant?: 'default' | 'compact';
   onPlay?: (id: string) => void;
   position?: number;
-  feedSort?: string;
+  surface?: string;
   searchQuery?: string;
   observeRef?: (
     el: HTMLElement | null,
     podcastId: string,
     position: number,
-    feedSort?: string,
+    surface?: string,
     searchQuery?: string
   ) => void;
 }
@@ -59,17 +58,15 @@ function formatDate(dateString: string): string {
   return `${Math.floor(diffDays / 365)}y ago`;
 }
 
-
 export function PodcastCard({
   podcast,
   variant = 'default',
   onPlay,
   position = 0,
-  feedSort,
+  surface,
   searchQuery,
   observeRef,
 }: PodcastCardProps) {
-  const router = useRouter();
   const track = useTrack();
   const { user } = useAuth();
   const isOwner = user?.id === podcast.user.id;
@@ -85,22 +82,22 @@ export function PodcastCard({
   const cardRef = useCallback(
     (el: HTMLElement | null) => {
       if (observeRef && el) {
-        observeRef(el, podcast.id, position, feedSort, searchQuery);
+        observeRef(el, podcast.id, position, surface, searchQuery);
       }
     },
-    [observeRef, podcast.id, position, feedSort, searchQuery]
+    [observeRef, podcast.id, position, surface, searchQuery]
   );
 
   const handleClick = useCallback(() => {
     track({
-      eventType: 'feed.click',
+      eventType: 'library.click',
       podcastId: podcast.id,
       position,
-      feedSort,
+      surface,
       searchQuery,
       dwellTimeMs: Date.now() - mountTimeRef.current,
     });
-  }, [track, podcast.id, position, feedSort, searchQuery]);
+  }, [track, podcast.id, position, surface, searchQuery]);
 
   const variantClass = variant !== 'default' ? styles[variant] : '';
   const cardClassName = `${styles.card} ${variantClass}`.trim();
@@ -121,11 +118,6 @@ export function PodcastCard({
       >
         <div className={styles.cover}>
           <div className={styles.coverContent}>
-            {podcast.forkedFromId && (
-              <p className={styles.remixSubline}>
-                Remix of {podcast.forkedFrom?.title || 'another podcast'}
-              </p>
-            )}
             <h3 className={styles.title}>{podcast.title}</h3>
             <p className={styles.topic}>{podcast.topic}</p>
           </div>
@@ -142,14 +134,20 @@ export function PodcastCard({
 
           <div className={styles.coverMeta}>
             <div className={styles.coverMetaLeft}>
-              <time className={styles.coverDate} dateTime={podcast.createdAt} suppressHydrationWarning>
+              <time
+                className={styles.coverDate}
+                dateTime={podcast.createdAt}
+                suppressHydrationWarning
+              >
                 {formatDate(podcast.createdAt)}
               </time>
-              <span className={styles.contentBadge}>
-                {getContentBadgeLabel(podcast)}
-              </span>
+              <span className={styles.contentBadge}>{getContentBadgeLabel(podcast)}</span>
               {podcast.lowReferences && (
-                <span className={styles.limitedSourcesBadge} aria-label="Limited Sources" title="This podcast has fewer verified references than recommended. Some claims may not be backed by cited sources.">
+                <span
+                  className={styles.limitedSourcesBadge}
+                  aria-label="Limited Sources"
+                  title="This podcast has fewer verified references than recommended. Some claims may not be backed by cited sources."
+                >
                   Limited Sources
                 </span>
               )}
@@ -160,14 +158,6 @@ export function PodcastCard({
                 <span className={styles.coverStat} aria-label={`${podcast.playCount} plays`}>
                   <Play size={10} aria-hidden="true" />
                   {formatCount(podcast.playCount)}
-                </span>
-                <span className={styles.coverStat} aria-label={`${podcast.likeCount} likes`}>
-                  <Heart size={10} aria-hidden="true" />
-                  {formatCount(podcast.likeCount)}
-                </span>
-                <span className={styles.coverStat} aria-label={`${podcast.forkCount} forks`}>
-                  <GitFork size={10} aria-hidden="true" />
-                  {formatCount(podcast.forkCount)}
                 </span>
                 <OwnerOnlyBadge className={styles.coverStatBadge} />
               </div>
@@ -190,20 +180,6 @@ export function PodcastCard({
           <Play size={18} aria-hidden="true" />
         </button>
       )}
-
-      <button
-        className={styles.forkButton}
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          router.push(`${podcastUrl(podcast, podcast.user.handle)}?fork=1`);
-        }}
-        aria-label={`Fork ${podcast.title}`}
-        type="button"
-      >
-        <GitFork size={14} strokeWidth={2.5} aria-hidden="true" />
-        <span>Fork</span>
-      </button>
     </article>
   );
 }

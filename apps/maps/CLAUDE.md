@@ -1,4 +1,4 @@
-# @sotto/maps-app — maps.sotto.fm
+# @sotto/maps-app — maps playground
 
 Playground site for the `@sotto/maps` package. Explore historical places with rich map visuals.
 
@@ -32,4 +32,4 @@ npm run build   # Production build
 
 ## Env vars
 
-- `NEXT_PUBLIC_MAPBOX_TOKEN` — client-side Mapbox (Doppler)
+- `NEXT_PUBLIC_MAPBOX_TOKEN` — client-side Mapbox

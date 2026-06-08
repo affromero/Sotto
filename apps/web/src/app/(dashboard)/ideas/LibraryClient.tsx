@@ -16,7 +16,6 @@ interface CollectionSummary {
   description: string | null;
   isPublic: boolean;
   podcastCount: number;
-  followerCount: number;
   createdAt: string;
 }
 

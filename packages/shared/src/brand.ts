@@ -5,23 +5,22 @@
 export const BRAND = {
   name: 'Sotto',
   origin: 'From Italian "sotto voce" — speaking in a soft, intimate voice',
-  url: 'https://sotto.fm',
-  twitter: '@SottoFM',
+  url: '/',
+  twitter: null,
 
   // Consumer-facing
-  tagline: 'Every voice. Every topic. One feed.',
-  subline: 'Create AI podcasts, compare voices side-by-side, remix anything.',
-  cta: 'Create. Fork. Remix. Share.',
+  tagline: 'Private audio briefings from your own stack.',
+  subline: 'Create podcasts with your agents, your keys, and your private RSS feed.',
+  cta: 'Create. Listen. Keep private.',
 
   // Investor-facing
-  pitchTagline: 'GitHub for podcasts.',
+  pitchTagline: 'Open-source private podcast infrastructure.',
 
   // Pre-composed
-  title: 'Sotto — Every voice. Every topic. One feed.',
-  description:
-    'Every voice. Every topic. One feed. Create AI podcasts, compare voices side-by-side, remix anything.',
+  title: 'Sotto — Private audio briefings from your own stack.',
+  description: 'Create private podcasts with your agents, your keys, and your private RSS feed.',
   elevatorPitch:
-    'The social podcast network. Create AI podcasts or import human ones, compare 8+ voice providers side-by-side, fork and remix anything. Bring your own API keys — unlimited and free.',
+    'Open-source private podcast infrastructure. Connect your AI tools and TTS provider, generate audio briefings, and keep distribution private through self-hosted or managed infrastructure.',
 } as const;
 
 export type Brand = typeof BRAND;

@@ -10,7 +10,14 @@ const nextConfig = {
     proxyClientMaxBodySize: '150mb',
     viewTransition: true,
   },
-  transpilePackages: ['next-auth', '@auth/prisma-adapter', '@auth/core', '@sotto/shared', '@sottofm/verification-standard', '@sotto/maps'],
+  transpilePackages: [
+    'next-auth',
+    '@auth/prisma-adapter',
+    '@auth/core',
+    '@sotto/shared',
+    '@sotto/verification-standard',
+    '@sotto/maps',
+  ],
   turbopack: {
     root: path.resolve(__dirname, '../..'),
   },
@@ -48,9 +55,7 @@ const nextConfig = {
     ],
   },
   async redirects() {
-    return [
-      { source: '/profile/handle/:handle', destination: '/@:handle', permanent: true },
-    ];
+    return [];
   },
   async rewrites() {
     return [
@@ -61,10 +66,6 @@ const nextConfig = {
       {
         source: '/@:handle/:slug',
         destination: '/podcast/by-slug/:handle/:slug',
-      },
-      {
-        source: '/@:handle',
-        destination: '/profile/handle/:handle',
       },
     ];
   },
@@ -118,9 +119,7 @@ const nextConfig = {
     return [
       {
         source: '/api/:path*',
-        headers: [
-          { key: 'X-Robots-Tag', value: 'noindex, nofollow, nosnippet' },
-        ],
+        headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow, nosnippet' }],
       },
       {
         source: '/:path*',

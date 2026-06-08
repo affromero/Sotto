@@ -1,5 +1,4 @@
 import type { Readable } from 'stream';
-import { logger } from '../logger';
 
 export interface StorageProvider {
   uploadFile(key: string, data: Buffer, contentType: string): Promise<string>;
@@ -76,7 +75,6 @@ class S3Provider implements StorageProvider {
     const { client } = await this.getS3Client();
     const { Upload } = await import('@aws-sdk/lib-storage');
     const upload = new Upload({
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       client: client as any,
       params: { Bucket: this.bucket, Key: key, Body: body, ContentType: contentType },
       queueSize: 4,
@@ -147,8 +145,18 @@ class LocalProvider implements StorageProvider {
   }
 }
 
+export type StorageProviderId = 'local' | 'r2' | 's3';
+
+function resolveStorageProviderType(type?: string): StorageProviderId {
+  const providerType = type || process.env.STORAGE_PROVIDER || 'local';
+  if (providerType !== 'local' && providerType !== 'r2' && providerType !== 's3') {
+    throw new Error(`Unknown storage provider "${providerType}". Expected one of: local, r2, s3.`);
+  }
+  return providerType;
+}
+
 export function createStorageProvider(type?: string): StorageProvider {
-  const providerType = type || process.env.STORAGE_PROVIDER || 'r2';
+  const providerType = resolveStorageProviderType(type);
   switch (providerType) {
     case 'r2':
       return new R2Provider();
@@ -156,8 +164,5 @@ export function createStorageProvider(type?: string): StorageProvider {
       return new S3Provider();
     case 'local':
       return new LocalProvider();
-    default:
-      logger.warn(`Unknown STORAGE_PROVIDER "${providerType}", falling back to r2`);
-      return new R2Provider();
   }
 }

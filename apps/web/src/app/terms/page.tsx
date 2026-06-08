@@ -30,9 +30,9 @@ export default function TermsPage() {
 
           <h2>2. Description of Service</h2>
           <p>
-            Sotto is an open podcast network that enables users to generate AI-powered
-            conversational podcasts, interact with content during playback, fork and
-            remix existing podcasts, and share knowledge publicly.
+            Sotto is private AI podcast infrastructure that enables users to generate
+            conversational podcasts, interact with content during playback, organize a
+            private library, and share access when they choose.
           </p>
 
           <h2>3. BYOK Model and API Keys</h2>
@@ -68,10 +68,10 @@ export default function TermsPage() {
 
           <h2>5. User Content and Ownership</h2>
           <p>
-            You retain ownership of podcasts you create or import. By making content
-            public, you grant other users the right to listen, fork, and remix your
-            podcasts (with attribution). You may set podcasts to private or unlisted
-            at any time.
+            You retain ownership of podcasts you create or import. You control
+            whether podcasts are private, unlisted, or shared by link. Sharing a
+            podcast does not transfer ownership or grant other users rights beyond
+            the access you explicitly provide.
           </p>
 
           <h2>6. Acceptable Use</h2>
@@ -85,12 +85,12 @@ export default function TermsPage() {
             <li>Engage in harassment, hate speech, or discrimination</li>
           </ul>
 
-          <h2>7. Forking and Remixing</h2>
+          <h2>7. Private Library and Sharing</h2>
           <p>
-            Sotto allows users to fork public podcasts. Forks are attributed to the
-            original creator. Forking does not transfer ownership of the original
-            content. The original creator may make their podcast private at any time,
-            but existing forks remain accessible.
+            Sotto is designed for private libraries. You are responsible for sharing
+            podcasts only with people who are allowed to access the underlying
+            content. You may revoke access by changing visibility settings or
+            deleting the podcast.
           </p>
 
           <h2>8. Account Termination</h2>
@@ -135,7 +135,7 @@ export default function TermsPage() {
           <h3>Designated Agent</h3>
           <p>
             Send DMCA notices to:{' '}
-            <a href="mailto:dmca@sotto.fm">dmca@sotto.fm</a>
+            <a href="mailto:dmca@example.com">dmca@example.com</a>
           </p>
 
           <h3>Counter-Notice</h3>
@@ -153,13 +153,14 @@ export default function TermsPage() {
             infringers.
           </p>
 
-          <h2>12. Voice Marketplace and Payments</h2>
+          <h2>12. Optional Paid Voice Sharing and Payments</h2>
           <p>
-            Sotto operates a voice marketplace where voice owners can set
-            per-podcast pricing for their voice clones.
+            Private-first installs keep paid voice sharing disabled by default.
+            If an operator enables it, voice owners may set per-podcast pricing
+            for access to their voice clones.
           </p>
 
-          <h3>Purchases</h3>
+          <h3>Paid Access</h3>
           <ul>
             <li>Payments are processed securely via Stripe</li>
             <li>Voice access is granted per podcast &mdash; one purchase covers one podcast generation</li>
@@ -169,8 +170,9 @@ export default function TermsPage() {
 
           <h3>Platform Fee</h3>
           <p>
-            Sotto charges a 10% platform fee on voice marketplace transactions.
-            The remaining 90% is transferred to the voice owner via Stripe Connect.
+            Sotto charges a 10% platform fee on paid voice-sharing transactions
+            when this optional feature is enabled. The remaining 90% is
+            transferred to the voice owner via Stripe Connect.
           </p>
 
           <h3>Refunds</h3>
@@ -178,12 +180,12 @@ export default function TermsPage() {
             Since payment is only captured on successful podcast generation, refunds
             are generally not applicable. If you experience issues with a completed
             purchase, contact{' '}
-            <a href="mailto:support@sotto.fm">support@sotto.fm</a>.
+            <a href="mailto:support@example.com">support@example.com</a>.
           </p>
 
           <h3>Voice Owner Responsibilities</h3>
           <p>
-            Voice owners who sell access to their voices must comply with
+            Voice owners who enable paid access to their voices must comply with
             Stripe&apos;s terms of service and are responsible for any applicable
             taxes on their earnings.
           </p>
@@ -197,7 +199,7 @@ export default function TermsPage() {
           <h2>14. Contact</h2>
           <p>
             Questions about these terms? Email us at{' '}
-            <a href="mailto:support@sotto.fm">support@sotto.fm</a>.
+            <a href="mailto:support@example.com">support@example.com</a>.
           </p>
         </div>
       </div>

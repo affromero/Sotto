@@ -7,12 +7,10 @@ const protectedRoutes: { method: 'get' | 'post' | 'patch' | 'delete'; path: stri
   { method: 'get', path: '/api/ideas' },
   { method: 'get', path: '/api/keys' },
   { method: 'get', path: '/api/saved' },
-  { method: 'get', path: '/api/activity' },
   { method: 'get', path: '/api/picks' },
   { method: 'patch', path: '/api/users/me' },
   { method: 'post', path: '/api/collections' },
   { method: 'post', path: '/api/drafts' },
-  { method: 'post', path: '/api/podcasts/e2e-podcast/like' },
   { method: 'post', path: '/api/podcasts/e2e-podcast/interact' },
 ];
 

@@ -1,5 +1,6 @@
 import { ImageResponse } from 'next/og';
 import { BRAND } from '@sotto/shared';
+import { getAppBaseUrl } from '@/lib/urls';
 
 export const runtime = 'nodejs';
 export const alt = BRAND.title;
@@ -7,6 +8,7 @@ export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
 export default function OgImage() {
+  const appHost = new URL(getAppBaseUrl()).host;
   const bars = Array.from({ length: 48 }, (_, i) => {
     const center = 24;
     const dist = Math.abs(i - center) / center;
@@ -149,9 +151,9 @@ export default function OgImage() {
         ))}
       </div>
 
-      {/* sotto.fm URL */}
+      {/* Deployment host */}
       <div style={{ display: 'flex', alignItems: 'center' }}>
-        <span style={{ fontSize: 20, color: '#D1D5DB' }}>sotto.fm</span>
+        <span style={{ fontSize: 20, color: '#D1D5DB' }}>{appHost}</span>
       </div>
     </div>,
     { ...size }

@@ -70,39 +70,6 @@ export const getPodcastForDetailPage = cache(async (podcastId: string) => {
           difficulty: true,
         },
       },
-      forkedFrom: {
-        select: {
-          id: true,
-          title: true,
-          user: {
-            select: {
-              id: true,
-              name: true,
-              handle: true,
-              image: true,
-            },
-          },
-        },
-      },
-      forks: {
-        take: 10,
-        orderBy: { forkCount: 'desc' },
-        select: {
-          id: true,
-          title: true,
-          remixNote: true,
-          createdAt: true,
-          isVoiceOnlyFork: true,
-          user: {
-            select: {
-              id: true,
-              name: true,
-              handle: true,
-              image: true,
-            },
-          },
-        },
-      },
       versions: {
         orderBy: { version: 'desc' },
         select: {

@@ -144,7 +144,6 @@ export function BriefingForm({
   const [time, setTime] = useState(initial?.time ?? '08:00');
   const [timezone] = useState(initial?.timezone ?? defaultTz);
   const [days, setDays] = useState(initial?.days ?? 127);
-  const [visibility, setVisibility] = useState(initial?.visibility ?? 'PRIVATE');
   const [aiModel, setAiModel] = useState(initial?.aiModel ?? '');
   const [ttsOption, setTtsOption] = useState(
     initial?.ttsProvider && initial?.ttsModel
@@ -245,7 +244,7 @@ export function BriefingForm({
       expertVoiceId: expertVoice || null,
       continuousLearning,
       contextEpisodes,
-      visibility,
+      visibility: 'PRIVATE',
       useByokKeys,
       zeroCostVideo,
       targetLanguage: targetLanguage || null,
@@ -664,23 +663,6 @@ export function BriefingForm({
       {/* Advanced */}
       <div className={styles.group} role="group" aria-labelledby="briefing-advanced">
         <h3 className={styles.groupTitle} id="briefing-advanced">Advanced</h3>
-        <div className={styles.field}>
-          <label className={styles.label}>Visibility</label>
-          <select
-            className={styles.select}
-            value={visibility}
-            onChange={(e) => {
-              const val = e.target.value;
-              setVisibility(val);
-              autoSave({ visibility: val });
-            }}
-            aria-label="Briefing visibility"
-          >
-            <option value="PRIVATE">Private</option>
-            <option value="UNLISTED">Unlisted</option>
-            <option value="PUBLIC">Public</option>
-          </select>
-        </div>
         {hasByokKeys && (
           <label className={styles.checkboxRow}>
             <input

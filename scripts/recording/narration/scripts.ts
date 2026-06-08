@@ -35,10 +35,10 @@ const landingPage: FlowNarration = {
   sourceFlowName: '06-landing-page',
   videoDuration: 12.56,
   segments: [
-    { startAt: 0.0, text: 'Sotto. Where podcasts get social.' },
+    { startAt: 0.0, text: 'Sotto. Private podcasts with AI.' },
     { startAt: 2.5, text: 'Create from any topic.' },
     { startAt: 5.0, text: 'Interrupt to ask questions.' },
-    { startAt: 7.5, text: 'Fork and remix.' },
+    { startAt: 7.5, text: 'Keep it private.' },
     { startAt: 10.0, text: 'Bring your own keys.' },
   ],
 };
@@ -55,21 +55,6 @@ const verificationGithub: FlowNarration = {
     { startAt: 3.0, text: 'Every claim gets a trust score.' },
     { startAt: 5.5, text: 'Bayesian scoring. Fully auditable.' },
     { startAt: 8.5, text: 'Trust, built in the open.' },
-  ],
-};
-
-// ── 03: Feed Browsing (8.28s) ────────────────────────────────────
-// Windows: 0→2.3 (2.3s), 2.3→5.0 (2.7s), 5.0→6.8 (1.8s), 6.8→8.28 (1.5s)
-
-const feedBrowsing: FlowNarration = {
-  flowName: '03-feed-browsing',
-  sourceFlowName: '01-feed-browsing',
-  videoDuration: 8.28,
-  segments: [
-    { startAt: 0.0, text: 'The Sotto feed.' },
-    { startAt: 2.3, text: 'Filter by topic.' },
-    { startAt: 5.0, text: 'Sort by popular.' },
-    { startAt: 6.8, text: 'Every card, at a glance.' },
   ],
 };
 
@@ -105,20 +90,6 @@ const playerInterrupt: FlowNarration = {
   ],
 };
 
-// ── 06: Fork Flow (10.28s) ───────────────────────────────────────
-// Windows: 0.3→3.5 (3.2s), 3.5→6.5 (3.0s), 6.5→10.28 (3.78s)
-
-const forkFlow: FlowNarration = {
-  flowName: '06-fork-flow',
-  sourceFlowName: '04-fork-flow',
-  videoDuration: 10.28,
-  segments: [
-    { startAt: 0.3, text: 'Fork any podcast.' },
-    { startAt: 3.5, text: 'Add your own angle.' },
-    { startAt: 6.5, text: 'A new podcast, from the original.' },
-  ],
-};
-
 // ── 07: Script Review (10.36s) ───────────────────────────────────
 // Windows: 0.3→3.5 (3.2s), 3.5→6.5 (3.0s), 6.5→10.36 (3.86s)
 
@@ -138,9 +109,7 @@ const scriptReview: FlowNarration = {
 export const ALL_NARRATIONS: FlowNarration[] = [
   landingPage,
   verificationGithub,
-  feedBrowsing,
   chatCreation,
   playerInterrupt,
-  forkFlow,
   scriptReview,
 ];

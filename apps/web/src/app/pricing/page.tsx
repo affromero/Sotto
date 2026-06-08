@@ -31,7 +31,7 @@ export default function PricingPage() {
                 <p className={styles.planPrice}>$0 / month</p>
               </div>
               <p className={styles.planDescription}>
-                Everything you need to create, listen, and share AI podcasts.
+                Everything you need to create and listen to private AI podcasts.
               </p>
               <ul className={styles.planFeatures}>
                 <li>3 podcasts per day</li>
@@ -39,9 +39,9 @@ export default function PricingPage() {
                 <li>Platform AI + voices included</li>
                 <li>Web search for current information</li>
                 <li>Q&amp;A interactions while listening</li>
-                <li>Fork and remix any podcast</li>
-                <li>Browse, listen, and share</li>
-                <li>Collections and social features</li>
+                <li>Private and unlisted podcasts</li>
+                <li>Listen across web and mobile</li>
+                <li>Collections and saved library tools</li>
               </ul>
               <Link href="/auth/signup" className={styles.planButton}>
                 Sign up free

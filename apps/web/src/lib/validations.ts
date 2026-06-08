@@ -8,7 +8,10 @@ export const createDemoSchema = z.object({
   title: z.string().max(200).optional(),
   featureFocus: z.array(z.string()).max(10).optional(),
   durationTarget: z.number().min(1).max(3).default(2),
-  speakers: z.array(z.object({ name: z.string(), description: z.string() })).max(4).optional(),
+  speakers: z
+    .array(z.object({ name: z.string(), description: z.string() }))
+    .max(4)
+    .optional(),
   aiModel: z.string().optional(),
 });
 
@@ -44,13 +47,27 @@ export const updateDemoProjectSchema = z.object({
 export const demoActionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('navigate'), url: z.string() }),
   z.object({ type: z.literal('click'), selector: z.string() }),
-  z.object({ type: z.literal('type'), selector: z.string(), text: z.string(), speed: z.object({ min: z.number(), max: z.number() }).optional() }),
+  z.object({
+    type: z.literal('type'),
+    selector: z.string(),
+    text: z.string(),
+    speed: z.object({ min: z.number(), max: z.number() }).optional(),
+  }),
   z.object({ type: z.literal('wait'), ms: z.number() }),
   z.object({ type: z.literal('scroll'), distance: z.number(), duration: z.number().optional() }),
-  z.object({ type: z.literal('zoom'), selector: z.string(), scale: z.number().optional(), duration: z.number().optional() }),
+  z.object({
+    type: z.literal('zoom'),
+    selector: z.string(),
+    scale: z.number().optional(),
+    duration: z.number().optional(),
+  }),
   z.object({ type: z.literal('zoomReset'), duration: z.number().optional() }),
   z.object({ type: z.literal('hover'), selector: z.string() }),
-  z.object({ type: z.literal('waitForSelector'), selector: z.string(), timeout: z.number().optional() }),
+  z.object({
+    type: z.literal('waitForSelector'),
+    selector: z.string(),
+    timeout: z.number().optional(),
+  }),
   z.object({ type: z.literal('intercept'), name: z.string(), options: z.record(z.unknown()) }),
   z.object({ type: z.literal('clearIntercept'), name: z.string() }),
   z.object({ type: z.literal('keypress'), key: z.string() }),
@@ -60,11 +77,13 @@ export const demoActionSchema = z.discriminatedUnion('type', [
 /**
  * Timing segment — speed zone within a recording
  */
-export const timingSegmentSchema = z.object({
-  start: z.number().min(0),
-  end: z.number().min(0),
-  speed: z.number().min(0).max(16), // 0 = skip, max 16x
-}).refine((s) => s.end > s.start, { message: 'end must be greater than start' });
+export const timingSegmentSchema = z
+  .object({
+    start: z.number().min(0),
+    end: z.number().min(0),
+    speed: z.number().min(0).max(16), // 0 = skip, max 16x
+  })
+  .refine((s) => s.end > s.start, { message: 'end must be greater than start' });
 
 const timingSegmentsArraySchema = z.array(timingSegmentSchema).refine(
   (segs) => {
@@ -73,7 +92,7 @@ const timingSegmentsArraySchema = z.array(timingSegmentSchema).refine(
     }
     return true;
   },
-  { message: 'Timing segments must be contiguous (no gaps or overlaps)' },
+  { message: 'Timing segments must be contiguous (no gaps or overlaps)' }
 );
 
 /**
@@ -104,11 +123,15 @@ export const updateDemoSceneSchema = z.object({
 export const createVoiceTrackSchema = z.object({
   ttsProvider: z.string().optional(),
   ttsModel: z.string().optional(),
-  voices: z.array(z.object({
-    speaker: z.string(),
-    voiceId: z.string(),
-    provider: z.string().optional(),
-  })).min(1),
+  voices: z
+    .array(
+      z.object({
+        speaker: z.string(),
+        voiceId: z.string(),
+        provider: z.string().optional(),
+      })
+    )
+    .min(1),
   paymentIntentIds: z.array(z.string()).optional(),
   skipPaidVoices: z.boolean().optional(),
 });
@@ -119,19 +142,6 @@ export const updateVoiceTrackSchema = z.object({
 
 export const setDefaultTrackSchema = z.object({
   voiceTrackId: z.string().nullable(),
-});
-
-export const voiceForkBodySchema = z.object({
-  name: z.string().min(1).max(100),
-  ttsProvider: z.string().optional(),
-  ttsModel: z.string().optional(),
-  voices: z.array(z.object({
-    speaker: z.string(),
-    voiceId: z.string(),
-    provider: z.string().optional(),
-  })).min(1),
-  paymentIntentIds: z.array(z.string()).optional(),
-  skipPaidVoices: z.boolean().optional(),
 });
 
 /**
@@ -147,15 +157,110 @@ export const discoveryMessageSchema = z.object({
  */
 export { createPodcastSchema } from '@sotto/shared';
 
+const explicitTtsProviderSchema = z.enum([
+  'elevenlabs',
+  'openai',
+  'cartesia',
+  'hume',
+  'fal',
+  'replicate',
+  'minimax',
+  'mistral',
+]);
+
+const agentProviderSchema = z.enum(['claude-code', 'codex', 'openclaw', 'hermes', 'custom']);
+
+/**
+ * Private agent-output ingestion. This is intentionally separate from generic
+ * podcast creation so local agents can post source material without exposing a
+ * social or public sharing surface.
+ */
+export const agentIngestionSchema = z
+  .object({
+    title: z.string().trim().min(1).max(200),
+    topic: z.string().trim().min(1).max(5000).optional(),
+    content: z.string().trim().min(1).max(120000),
+    idempotencyKey: z
+      .string()
+      .trim()
+      .min(1)
+      .max(200)
+      .regex(/^[A-Za-z0-9._:-]+$/)
+      .optional(),
+    sourceUrl: z.string().url().optional(),
+    durationTarget: z.number().int().min(1).max(40).optional(),
+    depth: z.enum(['eli5', 'quick_overview', 'standard', 'deep_dive']).optional(),
+    audienceLevel: z.enum(['beginner', 'intermediate', 'expert', 'general']).optional(),
+    tone: z.string().trim().min(1).max(80).optional(),
+    focusAreas: z.array(z.string().trim().min(1).max(80)).max(12).optional(),
+    agent: z
+      .object({
+        provider: agentProviderSchema,
+        name: z.string().trim().min(1).max(80),
+        model: z.string().trim().min(1).max(120).optional(),
+        runId: z.string().trim().min(1).max(200).optional(),
+      })
+      .strict(),
+    aiModel: z.string().trim().min(1).max(160).optional(),
+    ttsProvider: explicitTtsProviderSchema,
+    ttsModel: z.string().trim().min(1).max(120).optional(),
+  })
+  .strict();
+
+const meetingParticipantSchema = z
+  .object({
+    name: z.string().trim().min(1).max(120),
+    email: z.string().trim().email().optional(),
+    role: z.string().trim().min(1).max(80).optional(),
+  })
+  .strict();
+
+/**
+ * Private meeting transcript ingestion. Recorders can send transcripts here
+ * after STT/diarization without exposing meeting contents outside the owner.
+ */
+export const meetingIngestionSchema = z
+  .object({
+    title: z.string().trim().min(1).max(200),
+    topic: z.string().trim().min(1).max(5000).optional(),
+    transcript: z.string().trim().min(1).max(160000),
+    idempotencyKey: z
+      .string()
+      .trim()
+      .min(1)
+      .max(200)
+      .regex(/^[A-Za-z0-9._:-]+$/)
+      .optional(),
+    meetingUrl: z.string().url().optional(),
+    platform: z.string().trim().min(1).max(80).optional(),
+    startedAt: z.string().datetime().optional(),
+    endedAt: z.string().datetime().optional(),
+    participants: z.array(meetingParticipantSchema).max(100).optional(),
+    actionItems: z.array(z.string().trim().min(1).max(500)).max(100).optional(),
+    durationTarget: z.number().int().min(1).max(40).optional(),
+    depth: z.enum(['eli5', 'quick_overview', 'standard', 'deep_dive']).optional(),
+    audienceLevel: z.enum(['beginner', 'intermediate', 'expert', 'general']).optional(),
+    tone: z.string().trim().min(1).max(80).optional(),
+    focusAreas: z.array(z.string().trim().min(1).max(80)).max(12).optional(),
+    aiModel: z.string().trim().min(1).max(160).optional(),
+    ttsProvider: explicitTtsProviderSchema,
+    ttsModel: z.string().trim().min(1).max(120).optional(),
+  })
+  .strict();
+
 /**
  * Script turn update validation
  */
 export const updateScriptSchema = z.object({
-  turns: z.array(z.object({
-    speaker: z.string().min(1).max(50),
-    text: z.string().min(1).max(10000),
-    direction: z.string().optional(),
-  })).min(1),
+  turns: z
+    .array(
+      z.object({
+        speaker: z.string().min(1).max(50),
+        text: z.string().min(1).max(10000),
+        direction: z.string().optional(),
+      })
+    )
+    .min(1),
 });
 
 /**
@@ -169,12 +274,14 @@ export const interactionSchema = z.object({
 /**
  * Podcast update validation
  */
-export const updatePodcastSchema = z.object({
-  title: z.string().min(1).max(200).optional(),
-  topic: z.string().min(1).max(5000).optional(),
-  visibility: z.enum(['PUBLIC', 'UNLISTED', 'PRIVATE']).optional(),
-  dismissSuggestion: z.boolean().optional(),
-});
+export const updatePodcastSchema = z
+  .object({
+    title: z.string().min(1).max(200).optional(),
+    topic: z.string().min(1).max(5000).optional(),
+    visibility: z.enum(['PUBLIC', 'UNLISTED', 'PRIVATE']).optional(),
+    dismissSuggestion: z.boolean().optional(),
+  })
+  .strict();
 
 /**
  * User profile update validation
@@ -185,33 +292,12 @@ export const updateProfileSchema = z.object({
 });
 
 /**
- * Feed query validation
- */
-export const feedQuerySchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(50).default(20),
-  search: z.string().max(200).optional(),
-  tag: z.string().optional(),
-  language: z.string().max(5).optional(),
-  sort: z.enum(['recent', 'popular', 'trending', 'most_forked']).default('recent'),
-  tags: z.string().optional(), // comma-separated tag slugs
-  depth: z.enum(['eli5', 'quick_overview', 'standard', 'deep_dive']).optional(),
-  audience: z.enum(['beginner', 'intermediate', 'expert']).optional(),
-  tone: z.enum(['casual', 'professional', 'socratic', 'comedic', 'satirical', 'storytelling']).optional(),
-  durationMin: z.coerce.number().int().min(0).optional(),
-  durationMax: z.coerce.number().int().min(0).optional(),
-  dateFrom: z.string().optional(),
-  dateTo: z.string().optional(),
-});
-
-/**
  * Pagination query validation
  */
 export const paginationSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(50).default(20),
 });
-
 
 /**
  * Analytics query validation
@@ -274,7 +360,9 @@ export const voiceVerifyChallengeSchema = z.object({
 export const voicePreviewSchema = z.object({
   voiceId: z.string().min(1),
   text: z.string().min(1).max(500),
-  provider: z.enum(['elevenlabs', 'hume', 'cartesia', 'openai', 'fal', 'replicate', 'minimax', 'mistral']).optional(),
+  provider: z
+    .enum(['elevenlabs', 'hume', 'cartesia', 'openai', 'fal', 'replicate', 'minimax', 'mistral'])
+    .refine((value) => value.length > 0),
 });
 
 /**
@@ -282,12 +370,18 @@ export const voicePreviewSchema = z.object({
  */
 export const waitlistSchema = z.object({
   email: z.string().email().max(200),
-  twitterHandle: z.string().max(50).optional()
-    .transform(val => val ? val.replace(/^@/, '').trim() : undefined),
+  twitterHandle: z
+    .string()
+    .max(50)
+    .optional()
+    .transform((val) => (val ? val.replace(/^@/, '').trim() : undefined)),
   source: z.string().max(50).optional(),
   wishlist: z.string().max(500).optional(),
-  referralCode: z.string().max(50).optional()
-    .transform(val => val ? val.replace(/^@/, '').trim().toLowerCase() : undefined),
+  referralCode: z
+    .string()
+    .max(50)
+    .optional()
+    .transform((val) => (val ? val.replace(/^@/, '').trim().toLowerCase() : undefined)),
 });
 
 /**
@@ -307,27 +401,18 @@ export const adminWaitlistDeleteSchema = z.object({
  */
 export const twitterSettingsSchema = z.object({
   twitterEnabled: z.boolean().optional(),
-  voicePreferences: z.array(z.object({
-    speaker: z.string().min(1).max(50),
-    voiceId: z.string().min(1),
-  })).optional(),
+  voicePreferences: z
+    .array(
+      z.object({
+        speaker: z.string().min(1).max(50),
+        voiceId: z.string().min(1),
+      })
+    )
+    .optional(),
   preferredTtsProvider: z.string().nullable().optional(),
   preferredTtsModel: z.string().nullable().optional(),
   preferredAiProvider: z.string().nullable().optional(),
   preferredAiModel: z.string().nullable().optional(),
-});
-
-/**
- * Listening queue validation
- */
-export const addToQueueSchema = z.object({
-  podcastId: z.string(),
-  source: z.enum(['picks', 'explore', 'following', 'search']).default('explore'),
-});
-
-export const reorderQueueSchema = z.object({
-  podcastId: z.string(),
-  newPosition: z.number().int().min(0),
 });
 
 /**
@@ -392,23 +477,35 @@ export const updateVoiceRequestSchema = z.object({
  */
 export const addToAllowlistSchema = z.object({
   voiceCloneId: z.string().min(1),
-  handle: z.string().min(3).max(30),
+  handle: handleSchema,
 });
 
 /**
- * User search validation
+ * Explicit user handle lookup validation
  */
 export const userSearchSchema = z.object({
-  handle: z.string().min(2).max(30),
+  handle: handleSchema,
 });
 
 /**
  * BYOK API key validation (multi-provider)
  */
 export const byokSchema = z.object({
-  provider: z.enum(['elevenlabs', 'openai', 'cartesia', 'hume', 'fal', 'replicate', 'minimax', 'mistral', 'suno']),
+  provider: z.enum([
+    'elevenlabs',
+    'openai',
+    'cartesia',
+    'hume',
+    'fal',
+    'replicate',
+    'minimax',
+    'mistral',
+    'suno',
+  ]),
   apiKey: z.string().min(10).max(500),
 });
+
+export const byokProviderSchema = byokSchema.pick({ provider: true });
 
 /**
  * Draft creation validation
@@ -434,13 +531,15 @@ export const createDraftSchema = z.object({
   tabMode: z.enum(['create', 'import']),
   messages: z.array(draftMessageSchema).optional(),
   metadata: draftMetadataSchema.optional(),
-  importData: z.object({
-    title: z.string().max(200).optional(),
-    topic: z.string().max(5000).optional(),
-    sourcePlatform: z.string().max(50).optional(),
-    isHumanContent: z.boolean().optional(),
-    sttProvider: z.string().optional(),
-  }).optional(),
+  importData: z
+    .object({
+      title: z.string().max(200).optional(),
+      topic: z.string().max(5000).optional(),
+      sourcePlatform: z.string().max(50).optional(),
+      isHumanContent: z.boolean().optional(),
+      sttProvider: z.string().optional(),
+    })
+    .optional(),
 });
 
 export const updateDraftSchema = z.object({
@@ -466,30 +565,10 @@ export const importPodcastSchema = z.object({
 });
 
 /**
- * Fork body validation (optional remix parameters)
- */
-export const forkBodySchema = z.object({
-  topic: z.string().min(1).max(5000).optional(),
-  remixNote: z.string().max(2000).optional(),
-  focusAreas: z.array(z.string()).max(10).optional(),
-  depth: z.enum(['eli5', 'quick_overview', 'standard', 'deep_dive']).optional(),
-  tone: z.enum(['casual', 'professional', 'socratic', 'comedic', 'satirical', 'storytelling']).optional(),
-});
-
-/**
  * Resolve interaction validation (helpful feedback)
  */
 export const resolveInteractionSchema = z.object({
   helpful: z.boolean(),
-});
-
-/**
- * Comment creation validation
- */
-export const createCommentSchema = z.object({
-  content: z.string().min(1).max(2000),
-  parentId: z.string().optional(),
-  timestamp: z.number().min(0).optional(),
 });
 
 /**
@@ -561,12 +640,17 @@ export const tasteQuizQuerySchema = z.object({
  * Taste quiz answer submission validation
  */
 export const tasteQuizAnswerSchema = z.object({
-  answers: z.array(z.object({
-    questionId: z.string().min(1).max(20),
-    question: z.string().min(1).max(500),
-    tagSlugs: z.array(z.string().min(1).max(100)).min(1).max(3),
-    response: z.enum(['yes', 'no', 'skip']),
-  })).min(1).max(20),
+  answers: z
+    .array(
+      z.object({
+        questionId: z.string().min(1).max(20),
+        question: z.string().min(1).max(500),
+        tagSlugs: z.array(z.string().min(1).max(100)).min(1).max(3),
+        response: z.enum(['yes', 'no', 'skip']),
+      })
+    )
+    .min(1)
+    .max(20),
 });
 
 /**
@@ -585,7 +669,7 @@ export const podcastRatingSchema = z.object({
  * Report creation validation
  */
 export const createReportSchema = z.object({
-  targetType: z.enum(['podcast', 'comment', 'user']),
+  targetType: z.enum(['podcast', 'user']),
   targetId: z.string().min(1),
   reason: z.enum([
     'HARASSMENT',
@@ -647,9 +731,7 @@ export const moderateUserSchema = z.object({
  */
 export const twitterConfigUpdateSchema = z.object({
   autoTweetEnabled: z.boolean().optional(),
-  minLikes: z.number().int().min(1).max(10000).optional(),
   minPlays: z.number().int().min(1).max(100000).optional(),
-  minForks: z.number().int().min(1).max(1000).optional(),
   mentionPollIntervalMs: z.number().int().min(10000).max(600000).optional(),
   trendPollingEnabled: z.boolean().optional(),
   trendPollIntervalMs: z.number().int().min(300000).max(86400000).optional(),
@@ -671,26 +753,31 @@ export const manualTweetSchema = z.object({
 /**
  * Landing showcase config update validation (admin)
  */
-export const landingShowcaseUpdateSchema = z.object({
-  podcastId: z.string().min(1),
-  scriptTurnStart: z.number().int().min(0).optional(),
-  scriptTurnCount: z.number().int().min(1).max(10).optional(),
-  audioClipStart: z.number().min(0).optional(),
-  audioClipEnd: z.number().min(0).nullable().optional(),
-  videoSegmentStart: z.number().int().min(0).optional(),
-  videoSegmentCount: z.number().int().min(1).max(50).optional(),
-  showAvatar: z.boolean().optional(),
-  showVideo: z.boolean().optional(),
-  twitterHandle: z.string().min(1).max(50).optional(),
-  twitterName: z.string().min(1).max(100).optional(),
-  telegramTopic: z.string().max(200).nullable().optional(),
-}).strict();
+export const landingShowcaseUpdateSchema = z
+  .object({
+    podcastId: z.string().min(1),
+    scriptTurnStart: z.number().int().min(0).optional(),
+    scriptTurnCount: z.number().int().min(1).max(10).optional(),
+    audioClipStart: z.number().min(0).optional(),
+    audioClipEnd: z.number().min(0).nullable().optional(),
+    videoSegmentStart: z.number().int().min(0).optional(),
+    videoSegmentCount: z.number().int().min(1).max(50).optional(),
+    showAvatar: z.boolean().optional(),
+    showVideo: z.boolean().optional(),
+    twitterHandle: z.string().min(1).max(50).optional(),
+    twitterName: z.string().min(1).max(100).optional(),
+    telegramTopic: z.string().max(200).nullable().optional(),
+  })
+  .strict();
 
 /**
  * Thread-to-podcast validation (admin)
  */
 export const threadToPodcastSchema = z.object({
-  tweetUrl: z.string().url().regex(/(?:twitter\.com|x\.com)\/\w+\/status\/\d+/),
+  tweetUrl: z
+    .string()
+    .url()
+    .regex(/(?:twitter\.com|x\.com)\/\w+\/status\/\d+/),
   message: z.string().max(1000).optional(),
 });
 
@@ -705,7 +792,9 @@ export const referralSchema = z.object({
  * Mentions list validation (admin GET)
  */
 export const mentionsQuerySchema = z.object({
-  status: z.enum(['PENDING', 'PARSING', 'GENERATING', 'READY', 'REPLIED', 'FAILED', 'IGNORED']).optional(),
+  status: z
+    .enum(['PENDING', 'PARSING', 'GENERATING', 'READY', 'REPLIED', 'FAILED', 'IGNORED'])
+    .optional(),
   search: z.string().max(200).optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
@@ -749,16 +838,23 @@ export const resolveClaimReportSchema = z.object({
 /**
  * Script regeneration with optional user feedback
  */
-export const regenerateWithFeedbackSchema = z.object({
-  feedback: z.string().max(5000).optional(),
-  turnComments: z.record(z.coerce.number(), z.string().max(2000)).optional(),
-  highlights: z.array(z.object({
-    turnIndex: z.number().int().min(0),
-    text: z.string().max(500),
-    note: z.string().max(2000),
-  })).max(50).optional(),
-  sourceUrls: z.array(z.string().url()).max(5).optional(),
-}).optional();
+export const regenerateWithFeedbackSchema = z
+  .object({
+    feedback: z.string().max(5000).optional(),
+    turnComments: z.record(z.coerce.number(), z.string().max(2000)).optional(),
+    highlights: z
+      .array(
+        z.object({
+          turnIndex: z.number().int().min(0),
+          text: z.string().max(500),
+          note: z.string().max(2000),
+        })
+      )
+      .max(50)
+      .optional(),
+    sourceUrls: z.array(z.string().url()).max(5).optional(),
+  })
+  .optional();
 
 /**
  * Video generation request validation
@@ -808,7 +904,7 @@ export const generateVideoSchema = z
             metadata: z.record(z.unknown()).nullable(),
             endStatePrompt: z.string().nullable().optional(),
             subVisuals: z.array(pipelineSubVisualSchema).optional(),
-          }),
+          })
         ),
         transitions: z.array(pipelineTransitionSchema).optional(),
         defaultTransitionModel: z.string().optional(),
@@ -821,37 +917,57 @@ export const generateVideoSchema = z
  * Video segment update validation — selective regeneration via PATCH
  */
 export const updateVideoSegmentsSchema = z.object({
-  segments: z.array(
-    z.object({
-      segmentVisualId: z.string(),
-      visualType: z.string().optional(),
-      visualMode: z.enum(['image', 'video', 'programmatic']).optional(),
-      model: z.string().nullable().optional(),
-      prompt: z.string().nullable().optional(),
-      metadata: z.record(z.unknown()).nullable().optional(),
-      endStatePrompt: z.string().nullable().optional(),
-      feedback: z.string().optional(),
-    }),
-  ).min(1),
+  segments: z
+    .array(
+      z.object({
+        segmentVisualId: z.string(),
+        visualType: z.string().optional(),
+        visualMode: z.enum(['image', 'video', 'programmatic']).optional(),
+        model: z.string().nullable().optional(),
+        prompt: z.string().nullable().optional(),
+        metadata: z.record(z.unknown()).nullable().optional(),
+        endStatePrompt: z.string().nullable().optional(),
+        feedback: z.string().optional(),
+      })
+    )
+    .min(1),
 });
 
 /**
  * AI-generated script validation — applied after JSON parse in script-generator
  */
 export const generatedScriptSchema = z.object({
-  turns: z.array(z.object({
-    speaker: z.string().min(1).max(50),
-    text: z.string().min(1),
-    direction: z.string().optional(),
-  })).min(1),
-  soundCues: z.array(z.object({
-    type: z.enum(['intro', 'transition', 'outro', 'ambient', 'laugh_track', 'music_sting', 'applause', 'comedic_hit', 'rim_shot']),
-    prompt: z.string().min(1),
-    durationSeconds: z.number().positive(),
-    insertAfterTurn: z.number().int(),
-    volume: z.number().min(0).max(1).optional(),
-    fadeOutMs: z.number().int().min(0).max(10000).optional(),
-  })).catch([]),
+  turns: z
+    .array(
+      z.object({
+        speaker: z.string().min(1).max(50),
+        text: z.string().min(1),
+        direction: z.string().optional(),
+      })
+    )
+    .min(1),
+  soundCues: z
+    .array(
+      z.object({
+        type: z.enum([
+          'intro',
+          'transition',
+          'outro',
+          'ambient',
+          'laugh_track',
+          'music_sting',
+          'applause',
+          'comedic_hit',
+          'rim_shot',
+        ]),
+        prompt: z.string().min(1),
+        durationSeconds: z.number().positive(),
+        insertAfterTurn: z.number().int(),
+        volume: z.number().min(0).max(1).optional(),
+        fadeOutMs: z.number().int().min(0).max(10000).optional(),
+      })
+    )
+    .catch([]),
   references: z.preprocess(
     (val) => {
       if (!Array.isArray(val)) return [];
@@ -868,33 +984,43 @@ export const generatedScriptSchema = z.object({
       // Filter invalid items individually instead of dropping the entire array
       return val.filter((item) => itemSchema.safeParse(item).success);
     },
-    z.array(z.object({
-      number: z.number().int().positive(),
-      title: z.string().min(1),
-      authors: z.union([z.array(z.string()), z.string()]),
-      year: z.number().nullish(),
-      url: z.string().nullish(),
-      type: z.enum(['WEB', 'PAPER', 'BOOK', 'ARTICLE', 'VIDEO', 'REPORT']),
-      publisher: z.string().nullish(),
-      doi: z.string().nullish(),
-    })),
+    z.array(
+      z.object({
+        number: z.number().int().positive(),
+        title: z.string().min(1),
+        authors: z.union([z.array(z.string()), z.string()]),
+        year: z.number().nullish(),
+        url: z.string().nullish(),
+        type: z.enum(['WEB', 'PAPER', 'BOOK', 'ARTICLE', 'VIDEO', 'REPORT']),
+        publisher: z.string().nullish(),
+        doi: z.string().nullish(),
+      })
+    )
   ),
-  places: z.array(z.object({
-    name: z.string().min(1),
-    modernName: z.string().nullish(),
-    coordinates: z.tuple([z.number(), z.number()]).nullish(),
-    yearHint: z.number().int().nullish(),
-    significance: z.string().nullish(),
-  })).catch([]),
-  vocabulary: z.array(z.object({
-    number: z.number().int().positive(),
-    word: z.string().min(1),
-    translation: z.string().min(1),
-    partOfSpeech: z.string().nullish(),
-    pronunciation: z.string().nullish(),
-    exampleSentence: z.string().nullish(),
-    difficulty: z.string().nullish(),
-  })).catch([]),
+  places: z
+    .array(
+      z.object({
+        name: z.string().min(1),
+        modernName: z.string().nullish(),
+        coordinates: z.tuple([z.number(), z.number()]).nullish(),
+        yearHint: z.number().int().nullish(),
+        significance: z.string().nullish(),
+      })
+    )
+    .catch([]),
+  vocabulary: z
+    .array(
+      z.object({
+        number: z.number().int().positive(),
+        word: z.string().min(1),
+        translation: z.string().min(1),
+        partOfSpeech: z.string().nullish(),
+        pronunciation: z.string().nullish(),
+        exampleSentence: z.string().nullish(),
+        difficulty: z.string().nullish(),
+      })
+    )
+    .catch([]),
 });
 
 /**
@@ -915,28 +1041,37 @@ export const redeemInvitationSchema = z.object({
 
 export const configureAvatarsSchema = z.object({
   voiceTrackId: z.string().optional(),
-  avatars: z.array(z.object({
-    speaker: z.string().min(1).max(50),
-    avatarId: z.string().min(1).optional(),
-    avatarProvider: z.enum(['heygen', 'runway', 'fal']).optional(),
-    avatarImageUrl: z.string().url().optional(),
-    avatarModelId: z.string().optional(),
-    isPreset: z.boolean().optional(),
-    enabledSegmentIds: z.array(z.string()).optional(),
-    voiceTrackId: z.string().optional(),
-  })).min(1).max(4),
+  avatars: z
+    .array(
+      z.object({
+        speaker: z.string().min(1).max(50),
+        avatarId: z.string().min(1).optional(),
+        avatarProvider: z.enum(['heygen', 'runway', 'fal']).optional(),
+        avatarImageUrl: z.string().url().optional(),
+        avatarModelId: z.string().optional(),
+        isPreset: z.boolean().optional(),
+        enabledSegmentIds: z.array(z.string()).optional(),
+        voiceTrackId: z.string().optional(),
+      })
+    )
+    .min(1)
+    .max(4),
 });
 
 export const updateAvatarPositionsSchema = z.object({
   voiceTrackId: z.string().optional(),
-  positions: z.array(z.object({
-    speaker: z.string().min(1),
-    posX: z.number().min(0).max(1).optional(),
-    posY: z.number().min(0).max(1).optional(),
-    width: z.number().min(0.05).max(0.8).optional(),
-    height: z.number().min(0.05).max(0.8).optional(),
-    maskShape: z.enum(['none', 'rounded', 'circle', 'hexagon', 'diamond', 'blob', 'squircle']).optional(),
-  })),
+  positions: z.array(
+    z.object({
+      speaker: z.string().min(1),
+      posX: z.number().min(0).max(1).optional(),
+      posY: z.number().min(0).max(1).optional(),
+      width: z.number().min(0.05).max(0.8).optional(),
+      height: z.number().min(0.05).max(0.8).optional(),
+      maskShape: z
+        .enum(['none', 'rounded', 'circle', 'hexagon', 'diamond', 'blob', 'squircle'])
+        .optional(),
+    })
+  ),
 });
 
 /**

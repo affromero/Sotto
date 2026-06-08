@@ -3,16 +3,10 @@
 import { useRouter } from 'next/navigation';
 import {
   Headphones,
-  Heart,
-  GitFork,
-  UserPlus,
   Bell,
   AlertTriangle,
   AlertOctagon,
-  MessageCircle,
-  Reply,
   HelpCircle,
-  ThumbsUp,
   FileText,
   ShieldCheck,
   ShieldAlert,
@@ -57,14 +51,7 @@ const typeIcons: Record<string, typeof Bell> = {
   KEY_INVALID: AlertTriangle,
   PIPELINE_FAILURE: AlertTriangle,
 
-  // Social
-  PODCAST_LIKED: Heart,
-  PODCAST_FORKED: GitFork,
-  NEW_FOLLOWER: UserPlus,
-  COMMENT_ON_YOUR_PODCAST: MessageCircle,
-  COMMENT_REPLY: Reply,
   QUESTION_ON_YOUR_PODCAST: HelpCircle,
-  QUESTION_UPVOTED: ThumbsUp,
   REFERRAL_SIGNUP: Gift,
 
   // Voice verification
@@ -74,7 +61,7 @@ const typeIcons: Record<string, typeof Bell> = {
   VOICE_BLOCKED_DUPLICATE: ShieldAlert,
   VOICE_OWNERSHIP_ALERT: ShieldAlert,
 
-  // Voice marketplace
+  // Voice access requests
   VOICE_REQUEST_RECEIVED: Mic,
   VOICE_REQUEST_APPROVED: Mic,
   VOICE_REQUEST_DENIED: Mic,

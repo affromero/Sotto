@@ -203,7 +203,7 @@ export async function classifySegmentVisuals(
   segments: SegmentInput[],
   podcastTitle: string,
   podcastTopic: string,
-  opts?: { provider?: string; model?: string; apiKeyOverride?: string; structuredData?: StructuredSourceData; zeroCostVideo?: boolean },
+  opts: { provider: string; model: string; apiKeyOverride?: string; structuredData?: StructuredSourceData; zeroCostVideo?: boolean },
 ): Promise<{ classifications: ClassifiedSegment[]; transitionRecommendations: TransitionRecommendation[]; inputTokens: number; outputTokens: number; model: string }> {
   const segmentList = segments
     .map((s) => `[${s.order}] ${s.speaker}: ${s.text} (${s.duration.toFixed(1)}s)`)
@@ -211,7 +211,7 @@ export async function classifySegmentVisuals(
 
   const structuredSections: string[] = [];
 
-  if (opts?.structuredData?.tables && opts.structuredData.tables.length > 0) {
+  if (opts.structuredData?.tables && opts.structuredData.tables.length > 0) {
     const tableBlocks = opts.structuredData.tables.map((t, i) => {
       const label = t.caption || `Table ${i + 1}`;
       const header = t.headers.join(' | ');
@@ -221,7 +221,7 @@ export async function classifySegmentVisuals(
     structuredSections.push(`\nAvailable Source Tables (use exact values for DATA_TABLE/DATA_CHART):\n${tableBlocks.join('\n\n')}`);
   }
 
-  if (opts?.structuredData?.figures && opts.structuredData.figures.length > 0) {
+  if (opts.structuredData?.figures && opts.structuredData.figures.length > 0) {
     // Exclude data URIs from the prompt — they'd explode token count
     const httpFigures = opts.structuredData.figures.filter((f) => !f.url.startsWith('data:'));
     if (httpFigures.length > 0) {
@@ -243,18 +243,18 @@ ${segmentList}
 ${structuredBlock}
 Classify each segment with sub-visuals. Return JSON only.`;
 
-  const systemPrompt = opts?.zeroCostVideo
+  const systemPrompt = opts.zeroCostVideo
     ? SYSTEM_PROMPT.replace(/- AI_ILLUSTRATION:.*?\n/, '').replace(/10\. Use AI_ILLUSTRATION.*?\n/, '10. Use TEXT_CARD for vivid narrative moments, abstract concepts, and scene-setting.\n') + ZERO_COST_CONSTRAINT
     : SYSTEM_PROMPT;
 
-  const ai = createAIProvider(opts?.provider);
+  const ai = createAIProvider(opts.provider);
   const result = await ai.generateResponse(
     systemPrompt,
     [{ role: 'user', content: userMessage }],
     {
       maxTokens: 8192,
-      model: opts?.model,
-      apiKeyOverride: opts?.apiKeyOverride,
+      model: opts.model,
+      apiKeyOverride: opts.apiKeyOverride,
       skipModeration: true,
       jsonSchema: {
         name: 'visual_classification',

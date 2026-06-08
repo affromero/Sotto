@@ -29,7 +29,7 @@ const updateBriefingSchema = z.object({
   expertVoiceId: z.string().max(200).nullable().optional(),
   continuousLearning: z.boolean().optional(),
   contextEpisodes: z.number().int().min(1).max(5).optional(),
-  visibility: z.enum(['PUBLIC', 'UNLISTED', 'PRIVATE']).optional(),
+  visibility: z.literal('PRIVATE').optional(),
   useByokKeys: z.boolean().optional(),
   zeroCostVideo: z.boolean().optional(),
 });

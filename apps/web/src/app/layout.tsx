@@ -12,6 +12,8 @@ import { NotificationProvider } from '@/components/providers/NotificationProvide
 import { CommandPaletteLoader } from '@/components/ui/CommandPaletteLoader';
 import { ImpersonationBanner } from '@/components/layout/ImpersonationBanner';
 import { THEME_INIT_SCRIPT } from '@/lib/theme-script';
+import { getAppBaseUrl } from '@/lib/urls';
+import { getTwitterBotHandle } from '@/lib/bot-identity';
 import '@/styles/globals.css';
 
 const dmSerifDisplay = DM_Serif_Display({
@@ -27,14 +29,17 @@ const inter = Inter({
   display: 'swap',
 });
 
+const appBaseUrl = getAppBaseUrl();
+const twitterSite = getTwitterBotHandle();
+
 export const metadata: Metadata = {
-  metadataBase: new URL(BRAND.url),
+  metadataBase: new URL(appBaseUrl),
   title: {
     default: `${BRAND.name} — ${BRAND.cta}`,
     template: `%s | ${BRAND.name}`,
   },
   description: BRAND.description,
-  keywords: ['podcast', 'AI', 'social', 'remix', 'fork', 'import', 'interactive', 'learning'],
+  keywords: ['podcast', 'AI', 'private', 'briefing', 'BYOK', 'import', 'interactive', 'learning'],
   alternates: {
     canonical: '/',
   },
@@ -44,11 +49,11 @@ export const metadata: Metadata = {
     type: 'website',
     locale: 'en_US',
     siteName: BRAND.name,
-    url: BRAND.url,
+    url: appBaseUrl,
   },
   twitter: {
     card: 'summary_large_image',
-    site: BRAND.twitter,
+    ...(twitterSite ? { site: twitterSite } : {}),
     title: BRAND.title,
     description: BRAND.description,
   },
@@ -64,7 +69,11 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${dmSerifDisplay.variable} ${inter.variable}`} suppressHydrationWarning>
+    <html
+      lang="en"
+      className={`${dmSerifDisplay.variable} ${inter.variable}`}
+      suppressHydrationWarning
+    >
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
@@ -75,14 +84,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <ThemeProvider>
             <ToastProvider>
               <NotificationProvider>
-              <EventProvider>
-                <AudioPlayerProvider>
-                  <PageViewTracker />
-                  {children}
-                  <GlobalMiniPlayer />
-                  <CommandPaletteLoader />
-                </AudioPlayerProvider>
-              </EventProvider>
+                <EventProvider>
+                  <AudioPlayerProvider>
+                    <PageViewTracker />
+                    {children}
+                    <GlobalMiniPlayer />
+                    <CommandPaletteLoader />
+                  </AudioPlayerProvider>
+                </EventProvider>
               </NotificationProvider>
             </ToastProvider>
           </ThemeProvider>

@@ -9,6 +9,12 @@ import { selectVoicePair } from '@/lib/elevenlabs';
 import { getTwitterConfig } from '@/lib/twitter-config';
 import { trendGenerateSchema, trendFilterSchema } from '@/lib/validations';
 import { generatePodcastSlug } from '@/lib/slugify';
+import {
+  getSystemUserErrorMessage,
+  getSystemUserErrorStatus,
+  requireSystemUser,
+} from '@/lib/system-user';
+import type { SystemUserRecord } from '@/lib/system-user';
 import type { TwitterTweet, TrendTopic, EnrichedTrendTweet, TweetAuthor } from '@/types/twitter';
 
 import { errorResponse } from '@/lib/api-response';
@@ -104,22 +110,24 @@ export async function POST(request: NextRequest) {
     return errorResponse(parsed.error.flatten(), 400);
   }
 
-  const sottoUser = await prisma.user.findUnique({
-    where: { handle: 'sotto' },
-    select: { id: true },
-  });
-
-  if (!sottoUser) {
-    return errorResponse('@sotto system account not found', 404);
+  let systemUser: SystemUserRecord;
+  try {
+    systemUser = await requireSystemUser(prisma);
+  } catch (error) {
+    return errorResponse(getSystemUserErrorMessage(error), getSystemUserErrorStatus(error));
   }
 
-  const intent = await parseTweetIntent(parsed.data.tweetText);
+  const config = await getTwitterConfig();
+  const intent = await parseTweetIntent(parsed.data.tweetText, undefined, {
+    userId: systemUser.id,
+    aiModel: config.defaultAiModel ?? undefined,
+  });
   const voicePair = selectVoicePair(parsed.data.tweetId || intent.title);
-  const slug = await generatePodcastSlug(intent.title, sottoUser.id, prisma);
+  const slug = await generatePodcastSlug(intent.title, systemUser.id, prisma);
 
   const podcast = await prisma.podcast.create({
     data: {
-      userId: sottoUser.id,
+      userId: systemUser.id,
       title: intent.title,
       topic: intent.topic,
       slug,
@@ -137,7 +145,7 @@ export async function POST(request: NextRequest) {
       },
       discovery: {
         create: {
-          userId: sottoUser.id,
+          userId: systemUser.id,
           topic: intent.topic,
           depth: intent.depth,
           audienceLevel: intent.audienceLevel,
@@ -156,7 +164,7 @@ export async function POST(request: NextRequest) {
 
   await addJob(contentExtractionQueue, JobType.EXTRACT_CONTENT, {
     podcastId: podcast.id,
-    userId: sottoUser.id,
+    userId: systemUser.id,
     sourceUrl: intent.sourceUrl,
   });
 

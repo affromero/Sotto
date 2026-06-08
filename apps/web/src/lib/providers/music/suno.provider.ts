@@ -2,6 +2,7 @@
  * Suno music provider via sunoapi.org — async generation with polling.
  */
 import { logger } from '../../logger';
+import { getPublicAppBaseUrl } from '../../urls';
 import type { MusicProvider } from '../music';
 
 const BASE_URL = 'https://api.sunoapi.org';
@@ -96,7 +97,7 @@ export class SunoMusicProvider implements MusicProvider {
         model: apiModel,
         style: params.style || 'ambient',
         title: params.title || 'Background Music',
-        callBackUrl: 'https://sotto.fm/api/webhooks/noop',
+        callBackUrl: `${getPublicAppBaseUrl()}/api/webhooks/noop`,
       }),
     });
 
@@ -136,7 +137,7 @@ export class SunoMusicProvider implements MusicProvider {
 
       const statusRes = await fetch(
         `${BASE_URL}/api/v1/generate/record-info?taskId=${encodeURIComponent(taskId)}`,
-        { headers: { Authorization: `Bearer ${this.apiKey}` } },
+        { headers: { Authorization: `Bearer ${this.apiKey}` } }
       );
 
       if (!statusRes.ok) {

@@ -53,7 +53,7 @@ vi.mock('@/lib/logger', () => ({
 
 // ---- Import under test ----
 
-import { getAutoModelConfig, setAutoModelConfig, resolveAutoModel, resolveIncludedModels, resolveTtsIncludedModels, resolveSttIncludedModels, resolveIncludedImageModels, resolveIncludedVideoModels } from '@/lib/auto-model-config';
+import { getAutoModelConfig, setAutoModelConfig, resolveIncludedModels, resolveTtsIncludedModels, resolveSttIncludedModels, resolveIncludedImageModels, resolveIncludedVideoModels } from '@/lib/auto-model-config';
 
 // ---- Default row ----
 
@@ -814,51 +814,5 @@ describe('resolveIncludedVideoModels', () => {
     const result = resolveIncludedVideoModels({ ...baseConfig, freeIncludedVideoModels: ['shared-vid'], proIncludedVideoModels: ['shared-vid', 'pro-vid'] });
     const count = result.proVideoModels.filter((m) => m === 'shared-vid').length;
     expect(count).toBe(1);
-  });
-});
-
-describe('resolveAutoModel', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockAutoModelConfigFindUnique.mockResolvedValue(defaultRow);
-  });
-
-  it('returns free config for FREE plan', async () => {
-    const result = await resolveAutoModel('FREE');
-
-    expect(result).toEqual({
-      aiProvider: 'anthropic',
-      aiModel: 'claude-haiku-4-5-20251001',
-      ttsProvider: 'openai',
-      ttsModel: 'tts-1-hd',
-      sttProvider: 'openai',
-      sttModel: 'whisper-1',
-    });
-  });
-
-  it('returns pro config for PRO plan', async () => {
-    const result = await resolveAutoModel('PRO');
-
-    expect(result).toEqual({
-      aiProvider: 'anthropic',
-      aiModel: 'claude-haiku-4-5-20251001',
-      ttsProvider: 'elevenlabs',
-      ttsModel: 'eleven_v3',
-      sttProvider: 'openai',
-      sttModel: 'whisper-1',
-    });
-  });
-
-  it('returns platform AI config with free TTS/STT for PLATFORM plan', async () => {
-    const result = await resolveAutoModel('PLATFORM');
-
-    expect(result).toEqual({
-      aiProvider: 'anthropic',
-      aiModel: 'claude-haiku-4-5-20251001',
-      ttsProvider: 'openai',
-      ttsModel: 'tts-1-hd',
-      sttProvider: 'openai',
-      sttModel: 'whisper-1',
-    });
   });
 });

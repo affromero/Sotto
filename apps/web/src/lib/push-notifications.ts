@@ -3,7 +3,7 @@ import { prisma } from './prisma';
 
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
-const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:hello@sotto.fm';
+const VAPID_SUBJECT = process.env.VAPID_SUBJECT;
 
 /**
  * Send a push notification to all of a user's registered devices
@@ -15,8 +15,8 @@ export async function sendPushNotification(params: {
   url?: string;
   data?: Record<string, string>;
 }): Promise<void> {
-  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
-    logger.warn('VAPID keys not configured — push notifications disabled');
+  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY || !VAPID_SUBJECT) {
+    logger.warn('VAPID keys and subject not configured — push notifications disabled');
     return;
   }
 

@@ -1,7 +1,7 @@
 import React from 'react';
 import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
-import { CreateAsSottoButton } from './CreateAsSottoButton';
+import { CreateAsSystemOwnerButton } from './CreateAsSystemOwnerButton';
 import { CopyButton } from '@/components/admin/CopyButton';
 import { CreateGitHubIssueButton } from './CreateGitHubIssueButton';
 import { RetryButton } from './RetryButton';
@@ -79,7 +79,7 @@ export default async function AdminPodcastsPage({ searchParams }: PageProps) {
           <h1 className={styles.title}>Podcasts</h1>
           <p className={styles.subtitle}>{total.toLocaleString()} total podcasts</p>
         </div>
-        <CreateAsSottoButton />
+        <CreateAsSystemOwnerButton />
       </div>
 
       <form className={styles.filters} action="/admin/podcasts" method="get">

@@ -11,7 +11,7 @@ const mockPrismaPodcastFindUniqueOrThrow = vi.fn().mockResolvedValue({
   userId: 'user-1',
   language: null,
   voices: [],
-  ttsProvider: null,
+  ttsProvider: 'elevenlabs',
   ttsModel: null,
   user: { plan: 'FREE' },
 });
@@ -188,9 +188,9 @@ describe('processSegmentRegeneration', () => {
     // Default: no custom voice IDs
     mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
       userId: 'user-1',
-        language: null,
+      language: null,
       voices: [],
-      ttsProvider: null,
+      ttsProvider: 'elevenlabs',
       ttsModel: null,
       user: { plan: 'FREE' },
     });
@@ -213,30 +213,37 @@ describe('processSegmentRegeneration', () => {
     setupPremiumProvider();
   });
 
-
   describe('premium voice selection', () => {
     it('calls provider getVoiceId with speaker and podcastId for voice diversity', async () => {
       const job = createMockJob(defaultPayload);
       await processSegmentRegeneration(job);
 
-      expect(mockProviderGetVoiceId).toHaveBeenCalledWith('EXPERT', 'podcast-001', undefined, undefined);
+      expect(mockProviderGetVoiceId).toHaveBeenCalledWith(
+        'EXPERT',
+        'podcast-001',
+        undefined,
+        undefined
+      );
     });
 
     it('passes HOST speaker to getVoiceId when speaker is HOST', async () => {
       const job = createMockJob({ ...defaultPayload, speaker: 'HOST' });
       await processSegmentRegeneration(job);
 
-      expect(mockProviderGetVoiceId).toHaveBeenCalledWith('HOST', 'podcast-001', undefined, undefined);
+      expect(mockProviderGetVoiceId).toHaveBeenCalledWith(
+        'HOST',
+        'podcast-001',
+        undefined,
+        undefined
+      );
     });
 
     it('uses custom hostVoiceId when set and provider matches', async () => {
       mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
         userId: 'user-1',
         language: null,
-        voices: [
-          { speaker: 'HOST', voiceId: 'custom-host-voice', provider: 'elevenlabs' },
-        ],
-        ttsProvider: null,
+        voices: [{ speaker: 'HOST', voiceId: 'custom-host-voice', provider: 'elevenlabs' }],
+        ttsProvider: 'elevenlabs',
         ttsModel: null,
         user: { plan: 'FREE' },
       });
@@ -252,10 +259,8 @@ describe('processSegmentRegeneration', () => {
       mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
         userId: 'user-1',
         language: null,
-        voices: [
-          { speaker: 'EXPERT', voiceId: 'custom-expert-voice', provider: 'elevenlabs' },
-        ],
-        ttsProvider: null,
+        voices: [{ speaker: 'EXPERT', voiceId: 'custom-expert-voice', provider: 'elevenlabs' }],
+        ttsProvider: 'elevenlabs',
         ttsModel: null,
         user: { plan: 'FREE' },
       });
@@ -271,10 +276,8 @@ describe('processSegmentRegeneration', () => {
       mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
         userId: 'user-1',
         language: null,
-        voices: [
-          { speaker: 'EXPERT', voiceId: 'elevenlabs-voice-id', provider: 'elevenlabs' },
-        ],
-        ttsProvider: null,
+        voices: [{ speaker: 'EXPERT', voiceId: 'elevenlabs-voice-id', provider: 'elevenlabs' }],
+        ttsProvider: 'openai',
         ttsModel: null,
         user: { plan: 'FREE' },
       });
@@ -288,14 +291,12 @@ describe('processSegmentRegeneration', () => {
       );
     });
 
-    it('falls back to pool when stored voice has null provider (legacy)', async () => {
+    it('uses the provider voice pool when stored voice has no provider', async () => {
       mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
         userId: 'user-1',
         language: null,
-        voices: [
-          { speaker: 'EXPERT', voiceId: 'old-voice-id', provider: null },
-        ],
-        ttsProvider: null,
+        voices: [{ speaker: 'EXPERT', voiceId: 'old-voice-id', provider: null }],
+        ttsProvider: 'elevenlabs',
         ttsModel: null,
         user: { plan: 'FREE' },
       });
@@ -316,7 +317,12 @@ describe('processSegmentRegeneration', () => {
       expect(mockPrismaPodcastVoiceUpsert).toHaveBeenCalledWith({
         where: { podcastId_speaker: { podcastId: 'podcast-001', speaker: 'EXPERT' } },
         update: { voiceId: 'pool-voice-xyz', provider: 'elevenlabs' },
-        create: { podcastId: 'podcast-001', speaker: 'EXPERT', voiceId: 'pool-voice-xyz', provider: 'elevenlabs' },
+        create: {
+          podcastId: 'podcast-001',
+          speaker: 'EXPERT',
+          voiceId: 'pool-voice-xyz',
+          provider: 'elevenlabs',
+        },
       });
     });
   });
@@ -354,7 +360,7 @@ describe('processSegmentRegeneration', () => {
         userId: 'user-1',
         language: null,
         voices: [],
-        ttsProvider: null,
+        ttsProvider: 'openai',
         ttsModel: null,
         user: { plan: 'FREE' },
       });
@@ -374,7 +380,12 @@ describe('processSegmentRegeneration', () => {
       const job = createMockJob(defaultPayload);
       await processSegmentRegeneration(job);
 
-      expect(mockStandardGetVoiceId).toHaveBeenCalledWith('EXPERT', 'podcast-001', undefined, undefined);
+      expect(mockStandardGetVoiceId).toHaveBeenCalledWith(
+        'EXPERT',
+        'podcast-001',
+        undefined,
+        undefined
+      );
       expect(mockStandardGenerateSpeech).toHaveBeenCalledWith(
         expect.objectContaining({ voiceId: 'openai-voice-xyz' })
       );
@@ -421,7 +432,6 @@ describe('processSegmentRegeneration', () => {
         }),
       });
     });
-
   });
 
   describe('transaction segment reordering', () => {
@@ -577,7 +587,9 @@ describe('processSegmentRegeneration', () => {
       const job = createMockJob(defaultPayload);
       await processSegmentRegeneration(job);
 
-      const calls = (job.updateProgress as ReturnType<typeof vi.fn>).mock.calls.map((c: any[]) => c[0]);
+      const calls = (job.updateProgress as ReturnType<typeof vi.fn>).mock.calls.map(
+        (c: any[]) => c[0]
+      );
       for (let i = 1; i < calls.length; i++) {
         expect(calls[i]).toBeGreaterThanOrEqual(calls[i - 1]);
       }
@@ -615,7 +627,12 @@ describe('processSegmentRegeneration', () => {
       expect(mockPrismaPodcastFindUniqueOrThrow).toHaveBeenCalled();
 
       // Voice selected via provider
-      expect(mockProviderGetVoiceId).toHaveBeenCalledWith('HOST', 'podcast-001', undefined, undefined);
+      expect(mockProviderGetVoiceId).toHaveBeenCalledWith(
+        'HOST',
+        'podcast-001',
+        undefined,
+        undefined
+      );
 
       // Audio generated via premium provider
       expect(mockPremiumGenerateSpeech).toHaveBeenCalledWith({
@@ -670,7 +687,7 @@ describe('processSegmentRegeneration', () => {
         userId: 'user-1',
         language: null,
         voices: [],
-        ttsProvider: null,
+        ttsProvider: 'openai',
         ttsModel: null,
         user: { plan: 'FREE' },
       });
@@ -700,7 +717,12 @@ describe('processSegmentRegeneration', () => {
       await processSegmentRegeneration(job);
 
       // Voice selected for EXPERT via standard provider
-      expect(mockStandardGetVoiceId).toHaveBeenCalledWith('EXPERT', 'podcast-002', undefined, undefined);
+      expect(mockStandardGetVoiceId).toHaveBeenCalledWith(
+        'EXPERT',
+        'podcast-002',
+        undefined,
+        undefined
+      );
 
       // Audio generated via standard provider
       expect(mockStandardGenerateSpeech).toHaveBeenCalledWith({
@@ -744,6 +766,24 @@ describe('processSegmentRegeneration', () => {
       await expect(processSegmentRegeneration(job)).rejects.toThrow('Podcast not found');
     });
 
+    it('rejects segment regeneration when no TTS provider is persisted', async () => {
+      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+        userId: 'user-1',
+        language: null,
+        voices: [],
+        ttsProvider: null,
+        ttsModel: null,
+        user: { plan: 'FREE' },
+      });
+      const job = createMockJob(defaultPayload);
+
+      await expect(processSegmentRegeneration(job)).rejects.toThrow(
+        'Podcast podcast-001 is missing a TTS provider'
+      );
+      expect(mockResolveTtsProvider).not.toHaveBeenCalled();
+      expect(mockPremiumGenerateSpeech).not.toHaveBeenCalled();
+    });
+
     it('propagates errors from premium generateSpeech', async () => {
       mockPremiumGenerateSpeech.mockRejectedValue(
         new Error('ElevenLabs API error (429): rate limited')
@@ -760,7 +800,7 @@ describe('processSegmentRegeneration', () => {
         userId: 'user-1',
         language: null,
         voices: [],
-        ttsProvider: null,
+        ttsProvider: 'openai',
         ttsModel: null,
         user: { plan: 'FREE' },
       });

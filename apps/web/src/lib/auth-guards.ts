@@ -16,7 +16,7 @@ export async function requireAdmin(): Promise<string | null> {
 
 /**
  * Returns a 403 response if the user is currently suspended.
- * Call this in write-path API routes (create, comment, interact, fork).
+ * Call this in write-path API routes (create, interact, rate, import).
  * Returns null if the user is not suspended.
  */
 export function checkSuspension(session: Session): NextResponse | null {

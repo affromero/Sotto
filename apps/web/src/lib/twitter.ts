@@ -119,16 +119,16 @@ async function generateOAuthHeader(
 }
 
 /**
- * Fetch recent mentions of the @sottofm bot account.
+ * Fetch recent mentions of the configured Twitter bot account.
  * Uses Twitter API v2 GET /2/users/:id/mentions
  */
 export async function getMentions(sinceId?: string): Promise<TwitterMentionsResult> {
   const bearerToken = getEnv('TWITTER_BEARER_TOKEN');
-  const userId = getEnv('TWITTER_SOTTO_USER_ID');
+  const userId = getEnv('TWITTER_BOT_USER_ID');
 
   if (!bearerToken || !userId) {
     throw new Error(
-      'Twitter credentials not configured — set TWITTER_BEARER_TOKEN and TWITTER_SOTTO_USER_ID'
+      'Twitter credentials not configured — set TWITTER_BEARER_TOKEN and TWITTER_BOT_USER_ID'
     );
   }
 
@@ -433,7 +433,7 @@ export async function getThread(conversationId: string): Promise<ThreadData | nu
 }
 
 /**
- * Reply to a tweet using the @sottofm bot account.
+ * Reply to a tweet using the configured Twitter bot account.
  * Uses OAuth 1.0a for user-context write operations.
  */
 export async function replyToTweet(tweetId: string, text: string): Promise<string> {
@@ -466,7 +466,7 @@ export async function replyToTweet(tweetId: string, text: string): Promise<strin
 }
 
 /**
- * Post a new tweet from the @sottofm bot account.
+ * Post a new tweet from the configured Twitter bot account.
  * Uses OAuth 1.0a for user-context write operations.
  */
 export async function postTweet(text: string): Promise<string> {
@@ -618,7 +618,7 @@ export async function searchPopularTweets(
 }
 
 export function isTwitterConfigured(): boolean {
-  return !!(getEnv('TWITTER_BEARER_TOKEN') && getEnv('TWITTER_SOTTO_USER_ID'));
+  return !!(getEnv('TWITTER_BEARER_TOKEN') && getEnv('TWITTER_BOT_USER_ID'));
 }
 
 /** @internal Reset rate limit state — for testing only */

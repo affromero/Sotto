@@ -25,8 +25,6 @@ export type {
 export type {
   PodcastSummary,
   PodcastDetail,
-  ForkedFromInfo,
-  ForkSummary,
   SegmentData,
   WordTiming,
   InteractionSummary,
@@ -60,10 +58,7 @@ export type {
   NewsTimeRange,
 } from './types/discovery';
 
-export {
-  INSPIRE_SECTION_LABELS,
-  NEWS_TIME_RANGE_LABELS,
-} from './types/discovery';
+export { INSPIRE_SECTION_LABELS, NEWS_TIME_RANGE_LABELS } from './types/discovery';
 
 export type { NewsArticle, NewsMeta, NewsResponse, NewsCategory } from './types/news';
 export { NEWS_CATEGORIES, NEWS_CATEGORY_LABELS } from './types/news';
@@ -76,14 +71,9 @@ export type {
   ResolutionChoice,
 } from './types/interaction';
 
-export type { FeedResponse, FeedSort, FeedFilters } from './types/feed';
-
 export type { NotificationData, PushSubscriptionData } from './types/notification';
 
-export type {
-  PodcastVersionSummary,
-  PodcastVersionDetail,
-} from './types/version';
+export type { PodcastVersionSummary, PodcastVersionDetail } from './types/version';
 
 export type {
   ServiceBreakdown,
@@ -94,7 +84,7 @@ export type {
   CreatorOverview,
   CreatorTopPodcast,
   CreatorDailyPlays,
-  CreatorEngagement,
+  CreatorPrivateActivity,
   CreatorAudienceInsights,
   CreatorAnalyticsResponse,
 } from './types/analytics';
@@ -157,7 +147,6 @@ export {
   createPodcastSchema,
   interactionSchema,
   updateProfileSchema,
-  feedQuerySchema,
   paginationSchema,
   handleSchema,
   discoveryMessageSchema,

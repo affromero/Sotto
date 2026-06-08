@@ -14,12 +14,6 @@ vi.mock('@/lib/byok', () => ({
   getByokKey: (...args: unknown[]) => mockGetByokKey(...args),
 }));
 
-const mockResolveAutoModel = vi.fn();
-
-vi.mock('@/lib/auto-model-config', () => ({
-  resolveAutoModel: (...args: unknown[]) => mockResolveAutoModel(...args),
-}));
-
 vi.mock('@/lib/prisma', () => ({
   prisma: {},
 }));
@@ -102,9 +96,7 @@ describe('createSttProvider', () => {
     const provider = createSttProvider('together', 'tog-test');
 
     // First call (verbose_json) throws
-    mockTranscriptionsCreate.mockRejectedValueOnce(
-      new Error('verbose_json is not supported')
-    );
+    mockTranscriptionsCreate.mockRejectedValueOnce(new Error('verbose_json is not supported'));
     // Second call (text fallback) returns an object instead of a string
     mockTranscriptionsCreate.mockResolvedValueOnce({ text: 'transcribed content' });
 
@@ -146,9 +138,7 @@ describe('createSttProvider', () => {
 
   it('deepgram provider throws without API key', () => {
     vi.stubEnv('DEEPGRAM_API_KEY', '');
-    expect(() => createSttProvider('deepgram')).toThrow(
-      'No Deepgram API key provided'
-    );
+    expect(() => createSttProvider('deepgram')).toThrow('No Deepgram API key provided');
   });
 
   it('returns an assemblyai provider for "assemblyai"', () => {
@@ -159,9 +149,7 @@ describe('createSttProvider', () => {
 
   it('assemblyai provider throws without API key', () => {
     vi.stubEnv('ASSEMBLYAI_API_KEY', '');
-    expect(() => createSttProvider('assemblyai')).toThrow(
-      'No AssemblyAI API key provided'
-    );
+    expect(() => createSttProvider('assemblyai')).toThrow('No AssemblyAI API key provided');
   });
 });
 
@@ -210,9 +198,9 @@ describe('AI Registry — new STT-only providers', () => {
 
   it('together validation calls correct endpoint', async () => {
     const meta = getAiProviderMeta('together');
-    const mockFetch = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-      new Response(null, { status: 200 })
-    );
+    const mockFetch = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(null, { status: 200 }));
 
     const result = await meta.auth.validate({ apiKey: 'tog-test' });
     expect(result).toBe(true);
@@ -228,9 +216,9 @@ describe('AI Registry — new STT-only providers', () => {
 
   it('deepgram validation uses Token auth', async () => {
     const meta = getAiProviderMeta('deepgram');
-    const mockFetch = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-      new Response(null, { status: 200 })
-    );
+    const mockFetch = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(null, { status: 200 }));
 
     const result = await meta.auth.validate({ apiKey: 'dg-test' });
     expect(result).toBe(true);
@@ -246,9 +234,9 @@ describe('AI Registry — new STT-only providers', () => {
 
   it('assemblyai validation uses authorization header', async () => {
     const meta = getAiProviderMeta('assemblyai');
-    const mockFetch = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-      new Response(null, { status: 200 })
-    );
+    const mockFetch = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(null, { status: 200 }));
 
     const result = await meta.auth.validate({ apiKey: 'aai-test' });
     expect(result).toBe(true);
@@ -368,7 +356,6 @@ describe('resolveSttProvider', () => {
     vi.unstubAllEnvs();
     mockGetAiKey.mockReset();
     mockGetByokKey.mockReset();
-    mockResolveAutoModel.mockReset();
   });
 
   afterEach(() => {
@@ -424,28 +411,11 @@ describe('resolveSttProvider', () => {
     expect(result.model).toBe('gpt-4o-transcribe');
   });
 
-  it('auto-resolves from DB config when no requestedProvider', async () => {
-    mockResolveAutoModel.mockResolvedValue({
-      sttProvider: 'openai',
-      sttModel: 'whisper-1',
-      aiProvider: 'anthropic',
-      aiModel: 'claude-sonnet-4-20250514',
-      ttsProvider: 'elevenlabs',
-      ttsModel: 'eleven_v3',
-    });
-    vi.stubEnv('OPENAI_API_KEY', 'sk-platform');
-    mockGetAiKey.mockResolvedValue(null);
-
-    const result = await resolveSttProvider({
-      userId: 'user-1',
-      plan: 'FREE',
-    });
-
-    expect(result.providerId).toBe('openai');
-    expect(result.apiKey).toBe('sk-platform');
-    expect(result.model).toBe('whisper-1');
-    expect(result.source).toBe('auto');
-    expect(mockResolveAutoModel).toHaveBeenCalledWith('FREE');
+  it('rejects missing provider instead of resolving from DB config', async () => {
+    await expect(resolveSttProvider({ userId: 'user-1', plan: 'FREE' })).rejects.toThrow(
+      'STT provider is required'
+    );
+    expect(mockGetAiKey).not.toHaveBeenCalled();
   });
 
   it('resolves elevenlabs via getByokKey', async () => {
@@ -460,22 +430,5 @@ describe('resolveSttProvider', () => {
     expect(result.apiKey).toBe('el-byok-key');
     expect(result.source).toBe('byok');
     expect(mockGetByokKey).toHaveBeenCalledWith('user-1', 'elevenlabs');
-  });
-
-  it('throws when auto-resolved provider has no key', async () => {
-    mockResolveAutoModel.mockResolvedValue({
-      sttProvider: 'deepgram',
-      sttModel: 'nova-3',
-      aiProvider: 'anthropic',
-      aiModel: 'claude-sonnet-4-20250514',
-      ttsProvider: 'elevenlabs',
-      ttsModel: 'eleven_v3',
-    });
-    mockGetAiKey.mockResolvedValue(null);
-    vi.stubEnv('DEEPGRAM_API_KEY', '');
-
-    await expect(
-      resolveSttProvider({ userId: 'user-1', plan: 'PRO' })
-    ).rejects.toThrow('No API key available for auto-configured STT provider "deepgram"');
   });
 });

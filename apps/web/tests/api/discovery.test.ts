@@ -147,7 +147,7 @@ async function readSSEStream(response: Response): Promise<string[]> {
 describe('POST /api/discovery', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGetAiKey.mockResolvedValue({ apiKey: 'test-ai-key' });
+    mockGetAiKey.mockResolvedValue({ apiKey: 'test-ai-key', provider: 'anthropic' });
     mockUserFindUnique.mockResolvedValue({ plan: 'FREE', preferredLanguage: null });
     mockDetectLanguage.mockResolvedValue(null);
   });
@@ -522,7 +522,7 @@ describe('POST /api/discovery', () => {
       expect(mockStreamDiscoveryResponse).toHaveBeenCalledWith(
         [{ role: 'user', content: 'Hello' }],
         'test-ai-key',
-        undefined,
+        'claude-haiku-4-5-20251001',
         expect.any(Function),
         'anthropic',
         undefined,
@@ -698,7 +698,7 @@ describe('POST /api/discovery', () => {
   describe('BYOK key passthrough', () => {
     it('passes user AI key to streamDiscoveryResponse', async () => {
       mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-      mockGetAiKey.mockResolvedValue({ apiKey: 'user-anthropic-key-123' });
+      mockGetAiKey.mockResolvedValue({ apiKey: 'user-anthropic-key-123', provider: 'anthropic' });
       mockStreamDiscoveryResponse.mockReturnValue(mockStreamGenerator(['Response']));
       mockParseChips.mockReturnValue({ text: 'Response', chips: [] });
       mockParseMetadata.mockReturnValue(null);
@@ -709,17 +709,99 @@ describe('POST /api/discovery', () => {
       expect(response.status).toBe(200);
     });
 
-    it('passes undefined when user has no AI key', async () => {
+    it('uses provider default for streaming and cheapest provider model for language detection', async () => {
+      mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+      mockGetAiKey.mockResolvedValue({ apiKey: 'user-openai-key-123', provider: 'openai' });
+      mockDetectLanguage.mockResolvedValue('es');
+      mockStreamDiscoveryResponse.mockReturnValue(mockStreamGenerator(['Response']));
+      mockParseChips.mockReturnValue({ text: 'Response', chips: [] });
+      mockParseMetadata.mockReturnValue(null);
+
+      const message = 'Quiero aprender sobre historia mediterranea y cultura espanola';
+      const request = createPostRequest({ message });
+      const response = await POST(request);
+      await readSSEStream(response);
+
+      expect(response.status).toBe(200);
+      expect(mockDetectLanguage).toHaveBeenCalledWith(message, {
+        providerType: 'openai',
+        model: 'gpt-5-nano',
+        apiKeyOverride: 'user-openai-key-123',
+      });
+      expect(mockStreamDiscoveryResponse).toHaveBeenCalledWith(
+        [{ role: 'user', content: message }],
+        'user-openai-key-123',
+        'gpt-5.4',
+        expect.any(Function),
+        'openai',
+        undefined,
+      );
+    });
+
+    it('does not substitute another BYOK provider for an explicit model provider', async () => {
+      mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+      mockGetAiKey.mockImplementation(async (_userId: string, provider?: string) =>
+        provider === 'openai'
+          ? null
+          : { apiKey: 'user-anthropic-key-123', provider: 'anthropic' }
+      );
+      mockStreamDiscoveryResponse.mockReturnValue(mockStreamGenerator(['Response']));
+      mockParseChips.mockReturnValue({ text: 'Response', chips: [] });
+      mockParseMetadata.mockReturnValue(null);
+
+      const request = createPostRequest({ message: 'Test', model: 'gpt-5-mini' });
+      const response = await POST(request);
+      await readSSEStream(response);
+
+      expect(response.status).toBe(200);
+      expect(mockGetAiKey).toHaveBeenCalledTimes(1);
+      expect(mockGetAiKey).toHaveBeenCalledWith('user-1', 'openai');
+      expect(mockStreamDiscoveryResponse).toHaveBeenCalledWith(
+        [{ role: 'user', content: 'Test' }],
+        undefined,
+        'gpt-5-mini',
+        expect.any(Function),
+        'openai',
+        undefined,
+      );
+    });
+
+    it('uses explicit model routing when user has no AI key', async () => {
       mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
       mockGetAiKey.mockResolvedValue(null);
       mockStreamDiscoveryResponse.mockReturnValue(mockStreamGenerator(['Response']));
       mockParseChips.mockReturnValue({ text: 'Response', chips: [] });
       mockParseMetadata.mockReturnValue(null);
 
-      const request = createPostRequest({ message: 'Test' });
+      const request = createPostRequest({ message: 'Test', model: 'gpt-5-mini' });
       const response = await POST(request);
+      await readSSEStream(response);
 
       expect(response.status).toBe(200);
+      expect(mockStreamDiscoveryResponse).toHaveBeenCalledWith(
+        [{ role: 'user', content: 'Test' }],
+        undefined,
+        'gpt-5-mini',
+        expect.any(Function),
+        'openai',
+        undefined,
+      );
+    });
+
+    it('requires an explicit model when user has no AI key', async () => {
+      mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+      mockGetAiKey.mockResolvedValue(null);
+
+      const request = createPostRequest({ message: 'Test' });
+      const response = await POST(request);
+      const body = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(body).toMatchObject({
+        error: 'AI model is required when no AI key is configured.',
+        code: 'ai_model_required',
+      });
+      expect(mockStreamDiscoveryResponse).not.toHaveBeenCalled();
     });
   });
 

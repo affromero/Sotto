@@ -2,47 +2,40 @@ appId: fm.sotto.app
 tags:
   - collections
 ---
-# Collection Detail — Browse existing collection, verify items, follow/unfollow
+# Collection Detail — Browse existing collection and verify items
 
 - runFlow: ../helpers/login.yaml
 
 # Navigate to collections from profile
 - tapOn:
-    text: "Profile"
+    text: 'Profile'
 - extendedWaitUntil:
     visible:
-      id: "profile-collections-link"
+      id: 'profile-collections-link'
     timeout: 5000
 - tapOn:
-    id: "profile-collections-link"
+    id: 'profile-collections-link'
 - extendedWaitUntil:
     visible:
-      id: "collections-list"
+      id: 'collections-list'
     timeout: 5000
 
 # Tap the seeded collection
 - tapOn:
-    text: "E2E Test Collection"
+    text: 'E2E Test Collection'
 - extendedWaitUntil:
     visible:
-      id: "collection-detail-name"
+      id: 'collection-detail-name'
     timeout: 5000
 - assertVisible:
-    id: "collection-detail-name"
+    id: 'collection-detail-name'
 
 # Verify collection has items
 - assertVisible:
-    id: "collection-detail-list"
-
-# Follow / unfollow toggle
-- tapOn:
-    id: "collection-detail-follow-button"
-- wait: 1000
-- tapOn:
-    id: "collection-detail-follow-button"
+    id: 'collection-detail-list'
 
 # Verify still on collection detail
 - assertVisible:
-    id: "collection-detail-name"
+    id: 'collection-detail-name'
 
 - takeScreenshot: collection-detail

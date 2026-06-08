@@ -26,7 +26,10 @@ interface TtsModelDropdownProps {
   detectedLanguage?: string | null;
 }
 
-function parseValue(combined: string | undefined): { provider: string | undefined; model: string | undefined } {
+function parseValue(combined: string | undefined): {
+  provider: string | undefined;
+  model: string | undefined;
+} {
   if (!combined || combined === 'auto') return { provider: undefined, model: undefined };
   const [provider, ...rest] = combined.split(':');
   return { provider, model: rest.join(':') || undefined };
@@ -37,7 +40,12 @@ function toValue(provider: string | undefined, model: string | undefined): strin
   return `${provider}:${model}`;
 }
 
-export function TtsModelDropdown({ ttsProvider, ttsModel, onChange, detectedLanguage }: TtsModelDropdownProps) {
+export function TtsModelDropdown({
+  ttsProvider,
+  ttsModel,
+  onChange,
+  detectedLanguage,
+}: TtsModelDropdownProps) {
   const [options, setOptions] = useState<ModelOption[]>([]);
   const [rawOptions, setRawOptions] = useState<TtsOptionsResponse['options']>([]);
   const [readOnly, setReadOnly] = useState(false);
@@ -61,10 +69,13 @@ export function TtsModelDropdown({ ttsProvider, ttsModel, onChange, detectedLang
         setOptions(mapped);
         setReadOnly(data.readOnly ?? false);
 
-        // Restore from localStorage if valid
+        // Restore from localStorage if valid, otherwise select the first concrete provider.
         const stored = localStorage.getItem(STORAGE_KEY);
         if (stored && mapped.some((o) => o.id === stored)) {
           const { provider, model } = parseValue(stored);
+          onChange(provider, model);
+        } else if (!currentValue && mapped[0] && mapped[0].id !== 'auto') {
+          const { provider, model } = parseValue(mapped[0].id);
           onChange(provider, model);
         }
       })
@@ -79,7 +90,7 @@ export function TtsModelDropdown({ ttsProvider, ttsModel, onChange, detectedLang
   }, [currentValue]);
 
   const handleChange = (value: string | undefined) => {
-    // value is undefined when "Auto" (first option) is selected
+    // value is undefined only when the explicit Auto option is selected.
     const combined = value ?? 'auto';
     const { provider, model } = parseValue(combined);
     onChange(provider, model);
@@ -104,11 +115,9 @@ export function TtsModelDropdown({ ttsProvider, ttsModel, onChange, detectedLang
         loading={loading}
       />
       {languageUnsupported && detectedLanguage && (
-        <p
-          role="alert"
-          className={styles.languageWarning}
-        >
-          This model may not support {detectedLanguage.toUpperCase()} audio. Consider switching to a multilingual model.
+        <p role="alert" className={styles.languageWarning}>
+          This model may not support {detectedLanguage.toUpperCase()} audio. Consider switching to a
+          multilingual model.
         </p>
       )}
     </div>

@@ -25,10 +25,10 @@ export function SearchBar({
   const handleChange = useCallback(
     (newValue: string) => {
       onChange(newValue);
-      // Emit search event when results are available (caller passes resultCount)
+      // Emit private library search when results are available.
       if (newValue.length > 0 && resultCount !== undefined) {
         track({
-          eventType: 'feed.search',
+          eventType: 'library.search',
           query: newValue,
           resultCount,
           filters: activeFilters,

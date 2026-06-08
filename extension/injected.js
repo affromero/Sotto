@@ -72,7 +72,7 @@
       }
     }
 
-    throw new Error('No audio found on this page. Make sure an Audio Overview has been generated.');
+    throw new Error('No audio found on this page. Make sure a source audio file is available.');
   }
 
   async function fetchAudioUrl(url) {
@@ -91,16 +91,22 @@
       const { buffer, filename } = await captureAudio();
       const base64Data = arrayBufferToBase64(buffer);
 
-      window.postMessage({
-        type: 'SOTTO_AUDIO_READY',
-        base64Data,
-        filename,
-      }, '*');
+      window.postMessage(
+        {
+          type: 'SOTTO_AUDIO_READY',
+          base64Data,
+          filename,
+        },
+        '*'
+      );
     } catch (err) {
-      window.postMessage({
-        type: 'SOTTO_CAPTURE_ERROR',
-        error: err.message,
-      }, '*');
+      window.postMessage(
+        {
+          type: 'SOTTO_CAPTURE_ERROR',
+          error: err.message,
+        },
+        '*'
+      );
     }
   });
 })();

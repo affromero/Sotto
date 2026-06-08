@@ -1,13 +1,13 @@
 import { getRedisClient } from './redis';
 import { loadPrompt } from './prompt-loader';
-import { resolveAutoModel } from './auto-model-config';
 import { createAIProvider } from './providers/ai';
+import type { AiProviderId } from './providers/ai-registry';
 import { logUsage } from './usage-logger';
 import { logger } from './logger';
 import { isRetweet } from './twitter-utils';
+import { stripTwitterBotMentions } from './bot-identity';
 import type { TwitterTweet, TwitterAuthorData } from '@/types/twitter';
 
-const SOTTO_HANDLE_RE = /@sottofm/gi;
 const REDIS_RATE_PREFIX = 'twitter:mention_rate:';
 const RATE_LIMIT_MAX = 5;
 const RATE_LIMIT_WINDOW_S = 3600; // 1 hour
@@ -19,12 +19,22 @@ export interface MentionFilterResult {
   reason: string;
 }
 
+export interface MentionFilterAiOptions {
+  providerType: AiProviderId;
+  model: string;
+  apiKeyOverride?: string;
+}
+
+export interface MentionFilterOptions {
+  ai: MentionFilterAiOptions | null;
+}
+
 /**
  * Three-layer spam gate for Twitter mentions.
  *
  * Layer 1 — Structural (free, no API calls):
  *   - Skip retweets
- *   - Skip empty mentions (just "@sottofm" with no content, no parent tweet, no images)
+ *   - Skip empty mentions with no content, no parent tweet, and no images
  *
  * Layer 2 — Rate limit (Redis):
  *   - Max 5 mentions per author per hour (prevents bot floods)
@@ -32,22 +42,23 @@ export interface MentionFilterResult {
  * Layer 3 — Account quality (Twitter API data):
  *   - Flag brand-new accounts (<7 days) with no followers and no tweets
  *
- * Layer 4 — LLM intent classification (platform model):
+ * Layer 4 — LLM intent classification (explicit AI runtime only):
  *   - Quick classify: genuine / spam / garbage / abuse
- *   - Only runs if layers 1-3 pass
+ *   - Only runs when layers 1-3 pass and an AI runtime is provided
  */
 export async function filterMention(
   tweet: TwitterTweet,
   author: TwitterAuthorData | undefined,
   hasParentTweet: boolean,
   hasImages: boolean,
+  options: MentionFilterOptions,
 ): Promise<MentionFilterResult> {
   // Layer 1: Structural filters
   if (isRetweet(tweet)) {
     return { verdict: 'skip_retweet', reason: 'Retweet — not a direct mention' };
   }
 
-  const stripped = tweet.text.replace(SOTTO_HANDLE_RE, '').trim();
+  const stripped = stripTwitterBotMentions(tweet.text);
   if (stripped.length === 0 && !hasParentTweet && !hasImages) {
     return { verdict: 'skip_empty', reason: 'Empty mention — no topic, no parent tweet, no images' };
   }
@@ -66,10 +77,14 @@ export async function filterMention(
     }
   }
 
-  // Layer 4: LLM intent classification
-  const llmResult = await classifyMentionIntent(tweet, hasParentTweet);
-  if (llmResult.verdict !== 'pass') {
-    return llmResult;
+  // Layer 4: LLM intent classification. OSS/self-hosted paths may run without
+  // this optional classifier; structural/rate/account gates still apply.
+  const ai = options.ai;
+  if (ai) {
+    const llmResult = await classifyMentionIntent(tweet, hasParentTweet, ai);
+    if (llmResult.verdict !== 'pass') {
+      return llmResult;
+    }
   }
 
   // Passed all layers — increment rate counter
@@ -129,10 +144,13 @@ const FILTER_SYSTEM_PROMPT = loadPrompt('social/mention-filter.md');
 async function classifyMentionIntent(
   tweet: TwitterTweet,
   hasParentTweet: boolean,
+  ai: MentionFilterAiOptions,
 ): Promise<MentionFilterResult> {
   try {
-    const { aiProvider, aiModel } = await resolveAutoModel('PLATFORM');
-    const provider = createAIProvider(aiProvider);
+    if (!ai.providerType || !ai.model) {
+      throw new Error('AI provider and model are required for mention filtering.');
+    }
+    const provider = createAIProvider(ai.providerType);
 
     let userMessage = `Tweet: "${tweet.text}"`;
     if (hasParentTweet) {
@@ -142,11 +160,11 @@ async function classifyMentionIntent(
     const response = await provider.generateResponse(
       FILTER_SYSTEM_PROMPT,
       [{ role: 'user', content: userMessage }],
-      { maxTokens: 128, model: aiModel }
+      { maxTokens: 128, model: ai.model, apiKeyOverride: ai.apiKeyOverride }
     );
 
     logUsage({
-      service: aiProvider,
+      service: ai.providerType,
       model: response.model,
       category: 'mention_filter',
       inputTokens: response.inputTokens,

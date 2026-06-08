@@ -6,6 +6,7 @@ import { errorResponse } from '@/lib/api-response';
 import { createDemoProjectSchema } from '@/lib/validations';
 import { launchVideoScriptSchema } from '@/types/launch-video';
 import { addJob, JobType, demoScriptQueue } from '@/lib/queue';
+import { getProviderForModel } from '@/lib/providers/ai-registry';
 
 /** GET /api/admin/demo — List all DemoProjects */
 export async function GET() {
@@ -79,7 +80,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ id: project.id, status: project.status }, { status: 201 });
   }
 
-  // Legacy flow: AI-generated script
+  if (!aiModel) {
+    return errorResponse('aiModel is required when scriptJson is not provided', 400);
+  }
+  if (!getProviderForModel(aiModel)) {
+    return errorResponse(`Unknown AI model: "${aiModel}"`, 400);
+  }
+
+  // AI-generated script flow
   const project = await prisma.demoProject.create({
     data: {
       userId: adminId,

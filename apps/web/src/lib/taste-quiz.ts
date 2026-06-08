@@ -1,9 +1,8 @@
 import { createHash } from 'crypto';
 import type { TasteQuestion, NewsTimeRange } from '@sotto/shared';
 import { prisma } from './prisma';
-import { resolveAutoModel, type PlanModelConfig } from './auto-model-config';
 import { createAIProvider } from './providers/ai';
-import { getProviderForModel, resolveAiModelAndProvider } from './providers/ai-registry';
+import { getAiProviderMeta, getProviderForModel, type AiProviderId } from './providers/ai-registry';
 import { getAiKey } from './byok';
 import { INPUT_SANITIZATION_INSTRUCTIONS } from './safety-prompts';
 import { loadAndRender } from './prompt-loader';
@@ -12,12 +11,74 @@ import { logger } from './logger';
 import { inspireFailures } from './redis';
 import { fetchNewsletterArticles, formatArticlesForPrompt } from './newsletter-fetcher';
 
+const LOCAL_AI_PROVIDER: AiProviderId = 'claude-code';
+const LOCAL_MODEL_PREFIX = 'claude-code:';
+
+interface ResolvedTasteAiProvider {
+  provider: AiProviderId;
+  source: 'byok' | 'local';
+  apiKey?: string;
+  model: string;
+}
+
 function hashQuestion(text: string): string {
   return createHash('sha256').update(text.toLowerCase().trim()).digest('hex').slice(0, 12);
 }
 
+function providerForTasteModel(model: string): AiProviderId | null {
+  if (model.startsWith(LOCAL_MODEL_PREFIX) && model.length > LOCAL_MODEL_PREFIX.length) {
+    return LOCAL_AI_PROVIDER;
+  }
+  return getProviderForModel(model);
+}
+
+async function resolveTasteAiProvider(
+  userId: string,
+  explicitModel?: string,
+): Promise<ResolvedTasteAiProvider> {
+  if (explicitModel) {
+    const provider = providerForTasteModel(explicitModel);
+    if (!provider) {
+      throw new Error(`Unknown AI model: ${explicitModel}`);
+    }
+
+    if (provider === LOCAL_AI_PROVIDER) {
+      return { provider, source: 'local', model: explicitModel };
+    }
+
+    const providerKey = await getAiKey(userId, provider);
+    if (!providerKey) {
+      throw new Error(`AI key for provider "${provider}" is required for taste quiz generation.`);
+    }
+
+    return {
+      provider,
+      source: 'byok',
+      apiKey: providerKey.apiKey,
+      model: explicitModel,
+    };
+  }
+
+  const aiKey = await getAiKey(userId);
+  if (!aiKey) {
+    throw new Error('AI key or explicit local AI model is required for taste quiz generation.');
+  }
+
+  const model = getAiProviderMeta(aiKey.provider).defaultModel;
+  if (!model) {
+    throw new Error(`No default AI model configured for provider "${aiKey.provider}".`);
+  }
+
+  return {
+    provider: aiKey.provider,
+    source: 'byok',
+    apiKey: aiKey.apiKey,
+    model,
+  };
+}
+
 /**
- * Generate fresh taste quiz questions for a user using the platform's default LLM.
+ * Generate fresh taste quiz questions for a user using their configured AI key.
  * Questions are unique per user — previously answered questions are filtered out.
  */
 export async function generateQuestions(
@@ -25,7 +86,7 @@ export async function generateQuestions(
   count: number
 ): Promise<TasteQuestion[]> {
   // Fetch taxonomy, user context, and prior answers in parallel
-  const [categories, existingInterests, priorAnswers, autoFree] = await Promise.all([
+  const [categories, existingInterests, priorAnswers, aiConfig] = await Promise.all([
     prisma.tag.findMany({
       where: { parentId: null },
       select: {
@@ -47,7 +108,7 @@ export async function generateQuestions(
       orderBy: { createdAt: 'desc' },
       take: 200,
     }),
-    resolveAutoModel('FREE'),
+    resolveTasteAiProvider(userId),
   ]);
 
   const priorQuestionIds = new Set(priorAnswers.map((a) => a.questionId));
@@ -86,15 +147,15 @@ export async function generateQuestions(
     RECENT_QUESTIONS: recentQuestions ? `Previously asked questions (DO NOT repeat these):\n${recentQuestions}` : '',
   });
 
-  const ai = createAIProvider(autoFree.aiProvider);
+  const ai = createAIProvider(aiConfig.provider);
   const response = await ai.generateResponse(
     systemPrompt,
     [{ role: 'user', content: `Generate ${requestCount} taste quiz questions.` }],
-    { model: autoFree.aiModel, maxTokens: 4096, temperature: 1.0 }
+    { model: aiConfig.model, apiKeyOverride: aiConfig.apiKey, maxTokens: 4096, temperature: 1.0 }
   );
 
   logUsage({
-    service: autoFree.aiProvider,
+    service: aiConfig.provider,
     model: response.model,
     category: 'taste_quiz',
     inputTokens: response.inputTokens,
@@ -161,13 +222,12 @@ export interface InspireContext {
   taxonomyLines: string[];
   validSlugs: Set<string>;
   priorQuestionIds: Set<string>;
-  autoModel: PlanModelConfig;
   /** Pre-resolved provider info — avoids 3× redundant DB lookups across generators. */
-  resolvedProvider: { provider: string; source: string; apiKey?: string; model?: string } | null;
+  resolvedProvider: ResolvedTasteAiProvider | null;
 }
 
 export async function loadInspireContext(userId: string, opts?: { model?: string; plan?: 'FREE' | 'PRO' }): Promise<InspireContext> {
-  const [categories, priorAnswers, autoFreeConfig, userRecord, aiKeyResult] = await Promise.all([
+  const [categories, priorAnswers, resolvedProvider] = await Promise.all([
     prisma.tag.findMany({
       where: { parentId: null },
       select: {
@@ -185,9 +245,7 @@ export async function loadInspireContext(userId: string, opts?: { model?: string
       orderBy: { createdAt: 'desc' },
       take: 200,
     }),
-    resolveAutoModel(opts?.plan ?? 'FREE'),
-    prisma.user.findUnique({ where: { id: userId }, select: { plan: true } }),
-    getAiKey(userId).catch(() => null),
+    resolveTasteAiProvider(userId, opts?.model).catch(() => null),
   ]);
 
   const validSlugs = new Set<string>();
@@ -203,27 +261,10 @@ export async function loadInspireContext(userId: string, opts?: { model?: string
     return `${cat.slug}: [${children}]`;
   });
 
-  // If caller passed an explicit model, override the auto-resolved config
-  const resolvedAutoModel = opts?.model
-    ? { ...autoFreeConfig, aiModel: opts.model }
-    : autoFreeConfig;
-
-  // Resolve AI provider once for all sections
-  const plan = userRecord?.plan as 'FREE' | 'PRO' | undefined;
-  const resolvedProvider = await resolveAiModelAndProvider({ aiKey: aiKeyResult, plan }).then(
-    ({ model: m, provider }) => ({
-      provider,
-      source: aiKeyResult ? 'byok' as const : 'platform' as const,
-      apiKey: aiKeyResult?.apiKey,
-      model: m,
-    })
-  ).catch(() => null);
-
   return {
     taxonomyLines,
     validSlugs,
     priorQuestionIds: new Set(priorAnswers.map((a) => a.questionId)),
-    autoModel: resolvedAutoModel,
     resolvedProvider,
   };
 }
@@ -234,28 +275,29 @@ export async function loadInspireContext(userId: string, opts?: { model?: string
  * cross-provider 404s (e.g. sending 'gpt-5-mini' to Anthropic).
  */
 function resolveInspireProvider(
-  resolved: { provider: string; source: string; apiKey?: string; model?: string } | null,
-  autoModel: PlanModelConfig,
+  resolved: ResolvedTasteAiProvider | null,
   explicitModel?: string
 ): { providerType: string; apiKey: string | undefined; model: string } {
-  const providerType = resolved?.provider ?? autoModel.aiProvider;
-  const apiKey = resolved?.source === 'byok' ? resolved.apiKey : undefined;
+  if (!resolved) {
+    throw new Error('AI key or explicit local AI model is required for Inspire question generation.');
+  }
 
-  // Prefer: explicit model → BYOK key model → auto config model
-  const candidateModel = explicitModel ?? resolved?.model ?? autoModel.aiModel;
+  const providerType = resolved.provider;
+  const apiKey = resolved.source === 'byok' ? resolved.apiKey : undefined;
+  const candidateModel = explicitModel ?? resolved.model;
 
   // Validate model belongs to target provider — never silently substitute
-  const modelOwner = getProviderForModel(candidateModel);
+  const modelOwner = providerForTasteModel(candidateModel);
   if (!modelOwner) {
     throw new Error(
       `AI model "${candidateModel}" is not registered with any provider. ` +
-      `Update the model in Admin → Auto Models. Provider: ${providerType}`
+      `Choose a registered model before generating Inspire questions. Provider: ${providerType}`
     );
   }
   if (modelOwner !== providerType) {
     throw new Error(
       `AI model "${candidateModel}" belongs to "${modelOwner}", not "${providerType}". ` +
-      `Update the model/provider pair in Admin → Auto Models.`
+      `Choose a model/key pair from the same provider.`
     );
   }
 
@@ -375,7 +417,7 @@ export async function generateForYouQuestions(
 ): Promise<TasteQuestion[]> {
 
   const [ctx, existingInterests] = await Promise.all([
-    preloadedCtx ?? loadInspireContext(userId),
+    preloadedCtx ?? loadInspireContext(userId, { model }),
     prisma.userInterest.findMany({
       where: { userId },
       select: { tag: { select: { name: true, slug: true } }, weight: true },
@@ -414,8 +456,8 @@ Also explore topics ADJACENT to their interests — things they haven't explicit
   });
 
   try {
-    const { providerType, apiKey, model: resolvedModel } = resolveInspireProvider(ctx.resolvedProvider, ctx.autoModel, model);
-    logger.info('Inspire forYou provider resolved', { provider: providerType, model: resolvedModel, source: ctx.resolvedProvider?.source ?? 'auto' });
+    const { providerType, apiKey, model: resolvedModel } = resolveInspireProvider(ctx.resolvedProvider, model);
+    logger.info('Inspire forYou provider resolved', { provider: providerType, model: resolvedModel, source: ctx.resolvedProvider?.source ?? 'none' });
     const llmStart = Date.now();
 
     const ai = createAIProvider(providerType);
@@ -468,7 +510,7 @@ export async function generateCuriosityQuestions(
   model?: string
 ): Promise<TasteQuestion[]> {
 
-  const ctx = preloadedCtx ?? await loadInspireContext(userId);
+  const ctx = preloadedCtx ?? await loadInspireContext(userId, { model });
 
   const safeTopic = topic?.replace(/["\n\r]/g, ' ').trim();
 
@@ -486,8 +528,8 @@ export async function generateCuriosityQuestions(
   });
 
   try {
-    const { providerType, apiKey, model: resolvedModel } = resolveInspireProvider(ctx.resolvedProvider, ctx.autoModel, model);
-    logger.info('Inspire curiosity provider resolved', { provider: providerType, model: resolvedModel, source: ctx.resolvedProvider?.source ?? 'auto' });
+    const { providerType, apiKey, model: resolvedModel } = resolveInspireProvider(ctx.resolvedProvider, model);
+    logger.info('Inspire curiosity provider resolved', { provider: providerType, model: resolvedModel, source: ctx.resolvedProvider?.source ?? 'none' });
     const llmStart = Date.now();
 
     const ai = createAIProvider(providerType);
@@ -554,7 +596,7 @@ export async function generateNewsQuestions(
   model?: string
 ): Promise<TasteQuestion[]> {
 
-  const ctx = preloadedCtx ?? await loadInspireContext(userId);
+  const ctx = preloadedCtx ?? await loadInspireContext(userId, { model });
 
   const timeLabel = NEWS_TIME_LABELS[timeRange];
 
@@ -601,8 +643,8 @@ export async function generateNewsQuestions(
       });
 
   try {
-    const { providerType, apiKey, model: resolvedModel } = resolveInspireProvider(ctx.resolvedProvider, ctx.autoModel, model);
-    logger.info('Inspire news provider resolved', { provider: providerType, model: resolvedModel, source: ctx.resolvedProvider?.source ?? 'auto' });
+    const { providerType, apiKey, model: resolvedModel } = resolveInspireProvider(ctx.resolvedProvider, model);
+    logger.info('Inspire news provider resolved', { provider: providerType, model: resolvedModel, source: ctx.resolvedProvider?.source ?? 'none' });
     const llmStart = Date.now();
 
     const ai = createAIProvider(providerType);

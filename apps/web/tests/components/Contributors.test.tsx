@@ -1,22 +1,21 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 
-vi.mock('next/link', () => ({
-  default: ({ children, href, ...props }: { children: React.ReactNode; href: string; className?: string }) => (
-    <a href={href} {...props}>{children}</a>
-  ),
-}));
-
 vi.mock('next/image', () => ({
-  default: ({ src, alt, ...props }: { src: string; alt: string; width: number; height: number; className?: string }) => (
+  default: ({
+    src,
+    alt,
+    ...props
+  }: {
+    src: string;
+    alt: string;
+    width: number;
+    height: number;
+    className?: string;
+  }) => (
     // eslint-disable-next-line @next/next/no-img-element
     <img src={src} alt={alt} {...props} />
   ),
-}));
-
-vi.mock('@/lib/urls', () => ({
-  profileUrl: (user: { id: string; handle?: string | null }) =>
-    user.handle ? `/@${user.handle}` : `/profile/${user.id}`,
 }));
 
 import { Contributors } from '@/components/player/Contributors';
@@ -30,7 +29,12 @@ describe('Contributors', () => {
   it('renders heading and contributor chips with avatars', () => {
     const contributors = [
       {
-        contributor: { id: 'u-1', name: 'Alice', handle: 'alice', image: 'https://example.com/alice.jpg' },
+        contributor: {
+          id: 'u-1',
+          name: 'Alice',
+          handle: 'alice',
+          image: 'https://example.com/alice.jpg',
+        },
         count: 1,
       },
     ];
@@ -80,7 +84,7 @@ describe('Contributors', () => {
     expect(badges[0].textContent).toBe('3');
   });
 
-  it('links to contributor profile', () => {
+  it('does not link contributors to public profiles', () => {
     const contributors = [
       {
         contributor: { id: 'u-1', name: 'Alice', handle: 'alice', image: null },
@@ -90,21 +94,6 @@ describe('Contributors', () => {
 
     render(<Contributors contributors={contributors} />);
 
-    const link = screen.getByRole('link');
-    expect(link).toHaveAttribute('href', '/@alice');
-  });
-
-  it('links to profile by id when handle is missing', () => {
-    const contributors = [
-      {
-        contributor: { id: 'u-3', name: 'Carol', handle: null, image: null },
-        count: 1,
-      },
-    ];
-
-    render(<Contributors contributors={contributors} />);
-
-    const link = screen.getByRole('link');
-    expect(link).toHaveAttribute('href', '/profile/u-3');
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
   });
 });
