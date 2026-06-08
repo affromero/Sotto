@@ -1,0 +1,21 @@
+{
+  "slug": "a1-ser-estar",
+  "level": "A1",
+  "order": 4,
+  "title": "To be: ser and estar",
+  "objective": "Distinguish and use ser for permanent characteristics and estar for states and locations in the present tense.",
+  "grammarPoints": ["ser-present-tense", "estar-present-tense", "ser-vs-estar-distinction"],
+  "vocabThemes": ["descriptions", "locations", "emotions"],
+  "targetVocab": [
+    { "lemma": "ser", "gloss": "to be (permanent)", "pos": "verb" },
+    { "lemma": "estar", "gloss": "to be (state/location)", "pos": "verb" },
+    { "lemma": "estoy bien", "gloss": "I am well", "pos": "phrase" },
+    { "lemma": "soy estudiante", "gloss": "I am a student", "pos": "phrase" },
+    { "lemma": "está aquí", "gloss": "it is here", "pos": "phrase" },
+    { "lemma": "cansado / cansada", "gloss": "tired", "pos": "adjective" },
+    { "lemma": "contento / contenta", "gloss": "happy / pleased", "pos": "adjective" },
+    { "lemma": "ocupado / ocupada", "gloss": "busy", "pos": "adjective" }
+  ],
+  "canDoSummary": "Can describe people and objects using ser and express locations and temporary states using estar.",
+  "estMinutes": 60
+}

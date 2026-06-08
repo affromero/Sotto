@@ -1,0 +1,21 @@
+{
+  "slug": "a1-greetings-introductions",
+  "level": "A1",
+  "order": 1,
+  "title": "Greetings and introductions",
+  "objective": "Greet people at different times of day and introduce yourself with your name and where you are from.",
+  "grammarPoints": ["ser-present-tense", "subject-pronouns", "question-words-cómo-de-dónde"],
+  "vocabThemes": ["greetings", "introductions"],
+  "targetVocab": [
+    { "lemma": "hola", "gloss": "hello", "pos": "interjection" },
+    { "lemma": "buenos días", "gloss": "good morning", "pos": "phrase" },
+    { "lemma": "buenas tardes", "gloss": "good afternoon", "pos": "phrase" },
+    { "lemma": "buenas noches", "gloss": "good evening / good night", "pos": "phrase" },
+    { "lemma": "me llamo", "gloss": "my name is", "pos": "phrase" },
+    { "lemma": "soy de", "gloss": "I am from", "pos": "phrase" },
+    { "lemma": "mucho gusto", "gloss": "nice to meet you", "pos": "phrase" },
+    { "lemma": "adiós", "gloss": "goodbye", "pos": "interjection" }
+  ],
+  "canDoSummary": "Can greet someone, state their name, and say where they are from in simple spoken or written exchanges.",
+  "estMinutes": 60
+}

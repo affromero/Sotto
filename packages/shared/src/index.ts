@@ -17,6 +17,8 @@ export type {
   ProposalStatus,
   FeedbackType,
   FeedbackStatus,
+  CefrLevel,
+  LanguagePair,
 } from './types/enums';
 
 // Types

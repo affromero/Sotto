@@ -1,0 +1,22 @@
+{
+  "slug": "a1-family-descriptions",
+  "level": "A1",
+  "order": 4,
+  "title": "Family and descriptions",
+  "objective": "The learner can name family members and describe people using adjectives for age, appearance, and personality.",
+  "grammarPoints": ["possessive-adjectives", "adjective-position", "verb-to-have-present"],
+  "vocabThemes": ["family", "physical-description"],
+  "targetVocab": [
+    { "lemma": "mother", "gloss": "madre", "pos": "noun" },
+    { "lemma": "father", "gloss": "padre", "pos": "noun" },
+    { "lemma": "brother", "gloss": "hermano", "pos": "noun" },
+    { "lemma": "sister", "gloss": "hermana", "pos": "noun" },
+    { "lemma": "tall", "gloss": "alto/a", "pos": "adjective" },
+    { "lemma": "short", "gloss": "bajo/a", "pos": "adjective" },
+    { "lemma": "young", "gloss": "joven", "pos": "adjective" },
+    { "lemma": "old", "gloss": "viejo/a / mayor", "pos": "adjective" },
+    { "lemma": "my", "gloss": "mi / mis", "pos": "adjective" }
+  ],
+  "canDoSummary": "Can describe family members using basic adjectives and possessive forms in English.",
+  "estMinutes": 60
+}

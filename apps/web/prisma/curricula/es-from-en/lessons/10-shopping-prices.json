@@ -1,0 +1,21 @@
+{
+  "slug": "a2-shopping-prices",
+  "level": "A2",
+  "order": 10,
+  "title": "Shopping and prices",
+  "objective": "Ask for items in a shop, understand prices, and handle a simple buying transaction.",
+  "grammarPoints": ["direct-object-pronouns-lo-la", "querer-poder-present-tense", "agreement-with-prices"],
+  "vocabThemes": ["shopping", "clothing", "prices"],
+  "targetVocab": [
+    { "lemma": "¿cuánto cuesta?", "gloss": "how much does it cost?", "pos": "phrase" },
+    { "lemma": "cuesta … euros", "gloss": "it costs … euros", "pos": "phrase" },
+    { "lemma": "la talla", "gloss": "the size (clothing)", "pos": "noun" },
+    { "lemma": "el color", "gloss": "colour", "pos": "noun" },
+    { "lemma": "me lo llevo", "gloss": "I'll take it", "pos": "phrase" },
+    { "lemma": "la tienda", "gloss": "shop / store", "pos": "noun" },
+    { "lemma": "barato / barata", "gloss": "cheap / inexpensive", "pos": "adjective" },
+    { "lemma": "caro / cara", "gloss": "expensive", "pos": "adjective" }
+  ],
+  "canDoSummary": "Can ask the price of items, understand basic price responses, and complete a simple shopping transaction.",
+  "estMinutes": 60
+}

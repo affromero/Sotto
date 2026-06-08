@@ -1,0 +1,21 @@
+{
+  "slug": "a2-future-plans",
+  "level": "A2",
+  "order": 12,
+  "title": "Future plans and intentions",
+  "objective": "The learner can talk about future plans, intentions, and predictions using 'going to' and 'will' in English.",
+  "grammarPoints": ["going-to-future", "will-for-predictions", "future-time-expressions"],
+  "vocabThemes": ["plans", "travel", "ambitions"],
+  "targetVocab": [
+    { "lemma": "I am going to", "gloss": "voy a", "pos": "phrase" },
+    { "lemma": "I will", "gloss": "voy a / lo haré", "pos": "phrase" },
+    { "lemma": "next year", "gloss": "el año que viene", "pos": "phrase" },
+    { "lemma": "soon", "gloss": "pronto", "pos": "adverb" },
+    { "lemma": "I hope to", "gloss": "espero (poder)", "pos": "phrase" },
+    { "lemma": "trip", "gloss": "viaje", "pos": "noun" },
+    { "lemma": "maybe", "gloss": "quizás / tal vez", "pos": "adverb" },
+    { "lemma": "I would like to", "gloss": "me gustaría", "pos": "phrase" }
+  ],
+  "canDoSummary": "Can express future plans and intentions using 'going to' and 'will' in English.",
+  "estMinutes": 60
+}

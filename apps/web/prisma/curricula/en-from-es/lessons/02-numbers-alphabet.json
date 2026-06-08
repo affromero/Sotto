@@ -1,0 +1,20 @@
+{
+  "slug": "a1-numbers-alphabet",
+  "level": "A1",
+  "order": 2,
+  "title": "Numbers and the alphabet",
+  "objective": "The learner can say and understand numbers 0–100, spell words aloud, and ask for clarification when someone speaks too fast.",
+  "grammarPoints": ["cardinal-numbers", "spelling-conventions", "how-do-you-spell"],
+  "vocabThemes": ["numbers", "alphabet"],
+  "targetVocab": [
+    { "lemma": "one", "gloss": "uno", "pos": "numeral" },
+    { "lemma": "ten", "gloss": "diez", "pos": "numeral" },
+    { "lemma": "twenty", "gloss": "veinte", "pos": "numeral" },
+    { "lemma": "hundred", "gloss": "cien / ciento", "pos": "numeral" },
+    { "lemma": "how do you spell that?", "gloss": "¿cómo se escribe eso?", "pos": "phrase" },
+    { "lemma": "could you repeat that?", "gloss": "¿puedes repetir eso?", "pos": "phrase" },
+    { "lemma": "slowly", "gloss": "despacio", "pos": "adverb" }
+  ],
+  "canDoSummary": "Can count to 100, spell a name, and ask someone to repeat or spell something in English.",
+  "estMinutes": 60
+}

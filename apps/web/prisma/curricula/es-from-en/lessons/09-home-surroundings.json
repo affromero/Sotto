@@ -1,0 +1,21 @@
+{
+  "slug": "a2-home-surroundings",
+  "level": "A2",
+  "order": 9,
+  "title": "Home and surroundings",
+  "objective": "Describe your home and neighbourhood, name rooms and furniture, and express existence using hay.",
+  "grammarPoints": ["hay-existence", "prepositions-place", "demonstrative-adjectives-este-ese-aquel"],
+  "vocabThemes": ["home", "furniture", "neighbourhood"],
+  "targetVocab": [
+    { "lemma": "la cocina", "gloss": "kitchen", "pos": "noun" },
+    { "lemma": "el dormitorio", "gloss": "bedroom", "pos": "noun" },
+    { "lemma": "el salón", "gloss": "living room", "pos": "noun" },
+    { "lemma": "hay", "gloss": "there is / there are", "pos": "verb" },
+    { "lemma": "cerca de", "gloss": "near / close to", "pos": "preposition phrase" },
+    { "lemma": "este / esta", "gloss": "this", "pos": "adjective" },
+    { "lemma": "el barrio", "gloss": "neighbourhood", "pos": "noun" },
+    { "lemma": "enfrente de", "gloss": "opposite / in front of", "pos": "preposition phrase" }
+  ],
+  "canDoSummary": "Can describe a home or neighbourhood and locate objects and places using spatial prepositions.",
+  "estMinutes": 60
+}

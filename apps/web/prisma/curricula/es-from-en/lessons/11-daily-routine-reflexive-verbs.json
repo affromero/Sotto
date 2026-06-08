@@ -1,0 +1,21 @@
+{
+  "slug": "a2-daily-routine-reflexive-verbs",
+  "level": "A2",
+  "order": 11,
+  "title": "Daily routine and reflexive verbs",
+  "objective": "Describe a daily routine from morning to night using reflexive verbs and time expressions.",
+  "grammarPoints": ["reflexive-verbs-present-tense", "reflexive-pronouns", "time-sequencing-adverbs"],
+  "vocabThemes": ["daily-routine", "hygiene", "time-expressions"],
+  "targetVocab": [
+    { "lemma": "despertarse", "gloss": "to wake up", "pos": "verb" },
+    { "lemma": "levantarse", "gloss": "to get up", "pos": "verb" },
+    { "lemma": "ducharse", "gloss": "to shower", "pos": "verb" },
+    { "lemma": "vestirse", "gloss": "to get dressed", "pos": "verb" },
+    { "lemma": "acostarse", "gloss": "to go to bed", "pos": "verb" },
+    { "lemma": "primero", "gloss": "first", "pos": "adverb" },
+    { "lemma": "luego", "gloss": "then / next", "pos": "adverb" },
+    { "lemma": "por fin", "gloss": "finally", "pos": "adverb phrase" }
+  ],
+  "canDoSummary": "Can describe their typical daily routine using reflexive verbs and ordering adverbs.",
+  "estMinutes": 60
+}
