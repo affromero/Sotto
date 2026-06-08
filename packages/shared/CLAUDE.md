@@ -7,12 +7,11 @@ Prisma-free package consumed by both `apps/web/` and `apps/mobile/`.
 ```
 src/
 ├── types/
-│   ├── enums.ts          # String union equivalents of Prisma enums
+│   ├── enums.ts          # String union equivalents of Prisma enums — includes language-learning enums: CefrLevel, LanguagePair, SkillType, ClassStatus, SectionStatus, SpeakingGradeStatus, EdgeType
 │   ├── podcast.ts        # PodcastSummary, PodcastDetail, SegmentData, CreatePodcastRequest, AiModelOption, TtsOption, ScriptTurn, VoiceProfile
 │   ├── reference.ts      # ReferenceData (includes contentDomain: string | null), VerificationLayerResult
-│   ├── twitter.ts        # TweetParseResult, TwitterTweet, TweetMentionData
+│   ├── class-document.ts # ClassDocument, ClassDocumentSection, ClassDocumentQuestion, ClassDocumentPrompt — render contract for web worksheet page and mobile PencilKit ClassWorksheet
 │   ├── discovery.ts      # DiscoveryMessage, DiscoveryMetadata, DiscoveryState, InspireSection, NewsTimeRange, INSPIRE_SECTION_LABELS, NEWS_TIME_RANGE_LABELS
-│   ├── news.ts           # NEWS_CATEGORIES, NEWS_CATEGORY_LABELS, NewsCategory, NewsArticle, NewsMeta, NewsResponse
 │   ├── player.ts         # PlayerState, PlayerControls
 │   ├── interaction.ts    # InteractionRequest, InteractionResponse
 │   ├── notification.ts   # NotificationData, PushSubscriptionData
@@ -48,4 +47,4 @@ export type { DiscoveryMessage, DiscoveryMetadata, DiscoveryState } from '@sotto
 ```
 
 This means `@/types/*` imports throughout the web app don't change.
-Prisma-dependent types (podcast.ts, reference.ts, twitter.ts) still import from `@prisma/client` directly.
+Prisma-dependent types (podcast.ts, reference.ts) still import from `@prisma/client` directly.
