@@ -25,20 +25,20 @@ You bring your own Claude Code, Codex, or any API-compatible agent. You bring yo
 
 ## Why Sotto
 
-| Capability | Sotto | Duolingo | Speak | Praktika | TalkPal | Pimsleur |
-|---|---|---|---|---|---|---|
-| Open source | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
-| Self-hostable | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
-| BYOK / own API keys | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
-| Bring your own agent (Claude Code / Codex) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
-| Data stays private (your infra) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
-| 4-skill (grammar / reading / listening / speaking) | ✓ | ~ | ~ | ~ | ~ | ~ |
-| Mastery-gated progression | ✓ | ~ | ✗ | ✗ | ✗ | ~ |
-| Spaced-repetition memory graph | ✓ | ~ | ✗ | ✗ | ✗ | ~ |
-| Adaptive listening podcasts | ✓ | ✗ | ✗ | ✗ | ✗ | ~ |
-| Offline / PDF worksheets | ✓ | ✗ | ✗ | ✗ | ✗ | ~ |
-| Pronunciation scoring | ✓ | ~ | ✓ | ✓ | ✓ | ✗ |
-| Price model | Free / self-host (pay providers directly) | Freemium + sub | Subscription | Subscription | Subscription | Subscription |
+| Capability                                         | Sotto                                     | Duolingo       | Speak        | Praktika     | TalkPal      | Pimsleur     |
+| -------------------------------------------------- | ----------------------------------------- | -------------- | ------------ | ------------ | ------------ | ------------ |
+| Open source                                        | ✓                                         | ✗              | ✗            | ✗            | ✗            | ✗            |
+| Self-hostable                                      | ✓                                         | ✗              | ✗            | ✗            | ✗            | ✗            |
+| BYOK / own API keys                                | ✓                                         | ✗              | ✗            | ✗            | ✗            | ✗            |
+| Bring your own agent (Claude Code / Codex)         | ✓                                         | ✗              | ✗            | ✗            | ✗            | ✗            |
+| Data stays private (your infra)                    | ✓                                         | ✗              | ✗            | ✗            | ✗            | ✗            |
+| 4-skill (grammar / reading / listening / speaking) | ✓                                         | ~              | ~            | ~            | ~            | ~            |
+| Mastery-gated progression                          | ✓                                         | ~              | ✗            | ✗            | ✗            | ~            |
+| Spaced-repetition memory graph                     | ✓                                         | ~              | ✗            | ✗            | ✗            | ~            |
+| Adaptive listening podcasts                        | ✓                                         | ✗              | ✗            | ✗            | ✗            | ~            |
+| Offline / PDF worksheets                           | ✓                                         | ✗              | ✗            | ✗            | ✗            | ~            |
+| Pronunciation scoring                              | ✓                                         | ~              | ✓            | ✓            | ✓            | ✗            |
+| Price model                                        | Free / self-host (pay providers directly) | Freemium + sub | Subscription | Subscription | Subscription | Subscription |
 
 Values reflect the self-hosted open-source build; pronunciation-scoring quality depends on the speech provider you connect. Verified June 2026.
 
@@ -69,49 +69,51 @@ services/remotion Remotion render sidecar (video worksheets)
 
 ## Self-host quickstart
 
+### One command (recommended)
+
+Just Docker — no clone, no build:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/SottoFM/sotto/main/scripts/install.sh | bash
+```
+
+It pulls the pre-built images, asks how to connect your AI agent, writes config to `~/.sotto`, and starts everything. Then open `http://localhost:3000`.
+
+During install you choose how Sotto reaches your AI:
+
+- **An API key** (OpenAI or Anthropic) — simplest.
+- **Your local Claude Code / Codex CLI** — bring your own agent; it passes your credentials into the container, no API key.
+- **Your agent on a VPS, over SSH** — Sotto runs `ssh you@vps claude ...` for every LLM call (`CLAUDE_CODE_SSH_HOST`), so your data can stay on your machine. If you run Sotto on the VPS too, the installer prints how to tunnel the UI back (Tailscale / cloudflared / `ssh -L`).
+
+Manage it from `~/.sotto`: `docker compose logs -f`, `docker compose down`.
+
+### From source (contributors)
+
 Prerequisites: Node.js 18+, Docker, FFmpeg.
 
 ```bash
-# 1. Clone and set up
 git clone https://github.com/SottoFM/sotto.git
 cd sotto
 npm run setup
-```
-
-`npm run setup` installs all workspace dependencies, copies `.env.oss.example` to `.env.local`, generates `AUTH_SECRET` and `BYOK_ENCRYPTION_KEY`, starts PostgreSQL and Redis via Docker Compose, pushes the Prisma schema, generates the Prisma client, and seeds the CEFR language curriculum.
-
-```bash
-# 2. Start the app
 npm run dev
 ```
 
-That's the minimum path. Open `http://localhost:3000`.
+`npm run setup` installs dependencies, writes `.env.local` (with generated `AUTH_SECRET` + `BYOK_ENCRYPTION_KEY`), starts PostgreSQL and Redis, pushes the Prisma schema, generates the client, and seeds the CEFR curriculum. The private `maps` submodule is optional — a no-op stub is dropped in when it's absent. Open `http://localhost:3000`.
 
-**To route generation through your local Claude CLI with no API key:**
+**Bring your own agent / keys** in `.env.local`:
 
 ```dotenv
-# .env.local
-AI_PROVIDER=claude-code
+AI_PROVIDER=claude-code            # route LLM calls through your local Claude CLI, no key
+# CLAUDE_CODE_SSH_HOST=you@vps     # ...or your agent on a VPS, over SSH
 ```
 
-**One-key hosted path** (OpenAI for everything):
+Or one OpenAI key for everything:
 
 ```dotenv
-OPENAI_API_KEY=sk-...
 AI_PROVIDER=openai
 TTS_PROVIDER=openai
 STT_PROVIDER=openai
-```
-
-**Manual setup** (if you prefer not to use `npm run setup`):
-
-```bash
-npm install
-cp .env.oss.example .env.local
-docker compose up -d postgres redis
-npx prisma db push --schema=apps/web/prisma/schema.prisma
-npx prisma generate --schema=apps/web/prisma/schema.prisma
-npm run dev
+OPENAI_API_KEY=sk-...
 ```
 
 `.env.oss.example` defaults to local PostgreSQL, local Redis, local file storage under `.sotto/storage`, and payments disabled.
