@@ -46,6 +46,13 @@ export type {
 export type { ReferenceData, VerificationLayerResult } from './types/reference';
 
 export type {
+  ClassDocument,
+  ClassDocumentSection,
+  ClassDocumentQuestion,
+  ClassDocumentPrompt,
+} from './types/class-document';
+
+export type {
   DiscoveryMessage,
   DiscoveryMetadata,
   DiscoveryState,
