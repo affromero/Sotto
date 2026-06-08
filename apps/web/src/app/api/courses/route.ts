@@ -4,9 +4,10 @@ import { authenticateRequest } from '@/lib/api-keys';
 import { prisma } from '@/lib/prisma';
 import { errorResponse } from '@/lib/api-response';
 import { logger } from '@/lib/logger';
-import { pairToLangs } from '@/lib/placement-test';
+import { getOrCreateCurriculum } from '@/lib/curriculum-generator';
 
-const createSchema = z.object({ pair: z.enum(['DE_FROM_EN', 'EN_FROM_ES', 'ES_FROM_EN']) });
+const langCode = z.string().trim().toLowerCase().length(2);
+const createSchema = z.object({ native: langCode, target: langCode });
 
 /** GET /api/courses — list the signed-in learner's courses. */
 export async function GET(request: NextRequest) {
@@ -18,7 +19,6 @@ export async function GET(request: NextRequest) {
       where: { userId: authed.userId },
       select: {
         id: true,
-        pair: true,
         nativeLang: true,
         targetLang: true,
         currentLevel: true,
@@ -37,7 +37,8 @@ export async function GET(request: NextRequest) {
   }
 }
 
-/** POST /api/courses { pair } — start a course at A1 (skip placement). */
+/** POST /api/courses { native, target } — start a course at A1 (skip placement).
+ *  Composes the curriculum on demand for any pair we haven't hand-authored. */
 export async function POST(request: NextRequest) {
   try {
     const authed = await authenticateRequest(request);
@@ -46,15 +47,14 @@ export async function POST(request: NextRequest) {
 
     const parsed = createSchema.safeParse(await request.json());
     if (!parsed.success) return errorResponse(parsed.error.errors[0].message, 400);
-    const { pair } = parsed.data;
+    const { native, target } = parsed.data;
+    if (native === target) return errorResponse('Native and target languages must differ.', 400);
 
-    const curriculum = await prisma.curriculum.findUnique({ where: { pair } });
-    if (!curriculum) return errorResponse('No curriculum available for this language pair.', 400);
+    const curriculum = await getOrCreateCurriculum(userId, native, target);
 
-    const { native, target } = pairToLangs(pair);
     const course = await prisma.course.upsert({
-      where: { userId_pair: { userId, pair } },
-      create: { userId, pair, nativeLang: native, targetLang: target, curriculumId: curriculum.id },
+      where: { userId_nativeLang_targetLang: { userId, nativeLang: native, targetLang: target } },
+      create: { userId, nativeLang: native, targetLang: target, curriculumId: curriculum.id },
       update: {},
     });
 

@@ -36,10 +36,11 @@ const LEVEL_DESCRIPTIONS: Record<string, string> = {
 };
 
 interface PlacementTestProps {
-  pair: string;
+  native: string;
+  target: string;
 }
 
-export function PlacementTest({ pair }: PlacementTestProps) {
+export function PlacementTest({ native, target }: PlacementTestProps) {
   const [phase, setPhase] = useState<Phase>('loading');
   const [questions, setQuestions] = useState<PlacementQuestion[]>([]);
   const [answers, setAnswers] = useState<Record<string, number>>({});
@@ -50,7 +51,9 @@ export function PlacementTest({ pair }: PlacementTestProps) {
 
   const loadQuestions = useCallback(async () => {
     try {
-      const res = await fetch(`/api/placement?pair=${encodeURIComponent(pair)}`);
+      const res = await fetch(
+        `/api/placement?native=${encodeURIComponent(native)}&target=${encodeURIComponent(target)}`,
+      );
       if (res.status === 401) {
         setErrorMessage('You must be signed in to take the placement test.');
         setPhase('error');
@@ -81,7 +84,7 @@ export function PlacementTest({ pair }: PlacementTestProps) {
       setErrorMessage('A network error occurred. Please check your connection and try again.');
       setPhase('error');
     }
-  }, [pair]);
+  }, [native, target]);
 
   useEffect(() => {
     void (async () => {
@@ -117,7 +120,8 @@ export function PlacementTest({ pair }: PlacementTestProps) {
   async function submit() {
     setPhase('submitting');
     const payload = {
-      pair,
+      native,
+      target,
       answers: Object.entries(answers).map(([id, selectedIndex]) => ({ id, selectedIndex })),
     };
     try {
