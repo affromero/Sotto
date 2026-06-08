@@ -45,6 +45,7 @@ export const PIPELINE_WORKERS = new Set([
   'voice-track-stitching',
   'pipeline-classification',
   'speaking-grading',
+  'worksheet-pdf',
 ]);
 
 /**
