@@ -207,47 +207,6 @@ export const agentIngestionSchema = z
   })
   .strict();
 
-const meetingParticipantSchema = z
-  .object({
-    name: z.string().trim().min(1).max(120),
-    email: z.string().trim().email().optional(),
-    role: z.string().trim().min(1).max(80).optional(),
-  })
-  .strict();
-
-/**
- * Private meeting transcript ingestion. Recorders can send transcripts here
- * after STT/diarization without exposing meeting contents outside the owner.
- */
-export const meetingIngestionSchema = z
-  .object({
-    title: z.string().trim().min(1).max(200),
-    topic: z.string().trim().min(1).max(5000).optional(),
-    transcript: z.string().trim().min(1).max(160000),
-    idempotencyKey: z
-      .string()
-      .trim()
-      .min(1)
-      .max(200)
-      .regex(/^[A-Za-z0-9._:-]+$/)
-      .optional(),
-    meetingUrl: z.string().url().optional(),
-    platform: z.string().trim().min(1).max(80).optional(),
-    startedAt: z.string().datetime().optional(),
-    endedAt: z.string().datetime().optional(),
-    participants: z.array(meetingParticipantSchema).max(100).optional(),
-    actionItems: z.array(z.string().trim().min(1).max(500)).max(100).optional(),
-    durationTarget: z.number().int().min(1).max(40).optional(),
-    depth: z.enum(['eli5', 'quick_overview', 'standard', 'deep_dive']).optional(),
-    audienceLevel: z.enum(['beginner', 'intermediate', 'expert', 'general']).optional(),
-    tone: z.string().trim().min(1).max(80).optional(),
-    focusAreas: z.array(z.string().trim().min(1).max(80)).max(12).optional(),
-    aiModel: z.string().trim().min(1).max(160).optional(),
-    ttsProvider: explicitTtsProviderSchema,
-    ttsModel: z.string().trim().min(1).max(120).optional(),
-  })
-  .strict();
-
 /**
  * Script turn update validation
  */

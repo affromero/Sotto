@@ -148,9 +148,6 @@ model User {
   // Private agent output ingestions
   agentIngestions AgentIngestion[]
 
-  // Private meeting transcript ingestions
-  meetingIngestions MeetingIngestion[]
-
   // Free tier
   dailyGenerationOverride Int? // null = use global, 0 = unlimited, N = custom daily limit
 
@@ -385,7 +382,6 @@ model Podcast {
   duplicateMatches    DuplicateMatch[]   @relation("DuplicateMatch")
   quiz                PodcastQuiz?
   agentIngestion      AgentIngestion?
-  meetingIngestion    MeetingIngestion?
   landingShowcase     LandingShowcase?
   researchDossier     ResearchDossier?
   creativeOutline     CreativeOutline?
@@ -475,7 +471,6 @@ enum PodcastSource {
   WEB
   API
   AGENT
-  MEETING
   IMPORT
   ADMIN
 }
@@ -535,28 +530,6 @@ model AgentIngestion {
   @@unique([userId, idempotencyKey])
   @@index([userId, createdAt])
   @@index([contentHash])
-}
-
-model MeetingIngestion {
-  id             String    @id @default(cuid())
-  userId         String
-  podcastId      String    @unique
-  idempotencyKey String?
-  platform       String?
-  meetingTitle   String
-  startedAt      DateTime?
-  endedAt        DateTime?
-  transcriptHash String
-  metadata       Json?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  podcast Podcast @relation(fields: [podcastId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, idempotencyKey])
-  @@index([userId, createdAt])
-  @@index([transcriptHash])
 }
 
 model DiscoveryMessage {
