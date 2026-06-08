@@ -73,6 +73,26 @@ const SAMPLE_CLASS_UNSUBMITTED = {
         { id: 'q1', order: 1, question: 'Q1?', options: ['a', 'b', 'c', 'd'], passageRef: null, correctIndex: 0, explanation: 'Exp1' },
         { id: 'q2', order: 2, question: 'Q2?', options: ['a', 'b', 'c', 'd'], passageRef: null, correctIndex: 1, explanation: 'Exp2' },
       ],
+      prompts: [],
+    },
+  ],
+};
+
+// A class whose SPEAKING section carries prompts (no MC questions).
+const SAMPLE_CLASS_SPEAKING = {
+  ...SAMPLE_CLASS_UNSUBMITTED,
+  sections: [
+    {
+      id: 'sec-speaking',
+      skill: 'SPEAKING',
+      status: 'READY',
+      attempt: 1,
+      score: null,
+      passed: null,
+      questions: [],
+      prompts: [
+        { id: 'p1', order: 1, targetPhrase: 'Hola', translation: 'Hello', ipa: 'ˈola', referenceTtsUrl: 'https://r2/ref.mp3' },
+      ],
     },
   ],
 };
@@ -135,6 +155,26 @@ describe('GET /api/classes/[classId]', () => {
     expect(questions[0]).toHaveProperty('id');
     expect(questions[0]).toHaveProperty('question');
     expect(questions[0]).toHaveProperty('options');
+  });
+
+  it('returns SPEAKING section prompts (phrase + translation + reference audio)', async () => {
+    mockGetClassForUser.mockResolvedValue(SAMPLE_CLASS_SPEAKING);
+
+    const res = await GET(
+      makeRequest('http://localhost/api/classes/class-1', 'GET'),
+      classParams('class-1'),
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    const prompts = body.sections[0].prompts;
+    expect(prompts).toHaveLength(1);
+    expect(prompts[0]).toMatchObject({
+      id: 'p1',
+      targetPhrase: 'Hola',
+      translation: 'Hello',
+      referenceTtsUrl: 'https://r2/ref.mp3',
+    });
   });
 
   it('includes correctIndex and explanation after submission', async () => {
