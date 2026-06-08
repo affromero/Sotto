@@ -409,8 +409,12 @@ function renderBiasGuidance(sourceMetadata?: SourceMetadata): string {
   });
 }
 
-function buildLanguageInstruction(lang: string | null | undefined, mode: string | null | undefined): { languageInstruction: string; vocabularyInstruction: string; openingLine: string; closingLine: string } {
-  if (!lang || lang === 'en') {
+function buildLanguageInstruction(
+  lang: string | null | undefined,
+  mode: string | null | undefined,
+  opts?: { mustIncludeVocabulary?: Array<{ word: string; translation: string }>; forLearning?: boolean },
+): { languageInstruction: string; vocabularyInstruction: string; openingLine: string; closingLine: string } {
+  if (!lang || (lang === 'en' && !opts?.forLearning)) {
     return {
       languageInstruction: '',
       vocabularyInstruction: '',
@@ -476,9 +480,15 @@ Rules:
 - "exampleSentence" shows the word used in a natural sentence with translation in parentheses
 - "difficulty" is beginner/intermediate/advanced`;
 
+  const requiredItems = opts?.mustIncludeVocabulary?.length
+    ? `\n\n## REQUIRED review items (from the learner's spaced-repetition queue)
+You MUST naturally incorporate AND wrap each of these with [V{N}:word], and include each in the vocabulary[] output. Prioritize them as anticipation/recall targets:
+${opts.mustIncludeVocabulary.map((v) => `- ${v.word} — ${v.translation}`).join('\n')}`
+    : '';
+
   return {
     languageInstruction: instruction,
-    vocabularyInstruction,
+    vocabularyInstruction: vocabularyInstruction + requiredItems,
     openingLine: `A culturally appropriate greeting in ${langName} (with English translation if in vocabulary_intro mode)`,
     closingLine: `A culturally appropriate farewell in ${langName} (with English translation if in vocabulary_intro mode)`,
   };
@@ -504,6 +514,8 @@ export async function generateScript(params: {
   previousEpisodesContext?: string;
   targetLanguage?: string | null;
   languageMode?: string | null;
+  mustIncludeVocabulary?: Array<{ word: string; translation: string }>;
+  forLearning?: boolean;
 }): Promise<{
   turns: ScriptTurn[];
   soundCues: SoundCue[];
@@ -536,7 +548,10 @@ export async function generateScript(params: {
     // Briefings should cite most of their input articles
     Math.ceil((params.sourceContent?.match(/^\[\d+\]/gm)?.length ?? 5) * 0.6),
   );
-  const langInstr = buildLanguageInstruction(params.targetLanguage, params.languageMode);
+  const langInstr = buildLanguageInstruction(params.targetLanguage, params.languageMode, {
+    mustIncludeVocabulary: params.mustIncludeVocabulary,
+    forLearning: params.forLearning,
+  });
   const systemPrompt = params.source === 'BRIEFING'
     ? loadAndRender('generation/briefing-script.md', {
         VOICE_REALISM: VOICE_REALISM_INSTRUCTIONS,

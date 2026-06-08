@@ -472,6 +472,7 @@ enum PodcastSource {
   AGENT
   IMPORT
   ADMIN
+  CLASS
 }
 
 // ============ DISCOVERY (Chat-Based) ============

@@ -49,8 +49,6 @@ export function PlacementTest({ pair }: PlacementTestProps) {
   const optionRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   const loadQuestions = useCallback(async () => {
-    setPhase('loading');
-    setErrorMessage('');
     try {
       const res = await fetch(`/api/placement?pair=${encodeURIComponent(pair)}`);
       if (res.status === 401) {
@@ -86,7 +84,9 @@ export function PlacementTest({ pair }: PlacementTestProps) {
   }, [pair]);
 
   useEffect(() => {
-    void loadQuestions();
+    void (async () => {
+      await loadQuestions();
+    })();
   }, [loadQuestions]);
 
   // Keyboard shortcut: 1-4 selects option, Enter advances
@@ -171,7 +171,14 @@ export function PlacementTest({ pair }: PlacementTestProps) {
           </svg>
         </div>
         <p className={styles.errorMessage}>{errorMessage}</p>
-        <button className={styles.retryButton} onClick={() => void loadQuestions()}>
+        <button
+          className={styles.retryButton}
+          onClick={() => {
+            setPhase('loading');
+            setErrorMessage('');
+            void loadQuestions();
+          }}
+        >
           Try again
         </button>
       </div>
