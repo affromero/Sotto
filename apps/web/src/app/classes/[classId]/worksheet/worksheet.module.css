@@ -1,0 +1,609 @@
+/* ============================================================ */
+/* Worksheet — print-first layout, A4-width on screen           */
+/* ============================================================ */
+
+/* ---- Screen shell ---- */
+
+.root {
+  min-width: 375px;
+  background: var(--color-background);
+  min-height: 100vh;
+}
+
+/* ---- Toolbar (screen-only, hidden on print) ---- */
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+}
+
+@media (min-width: 768px) {
+  .toolbar {
+    padding: var(--spacing-sm) var(--spacing-xl);
+  }
+}
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  min-width: 0;
+  overflow: hidden;
+}
+
+.breadcrumbLink {
+  color: var(--color-primary);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color var(--transition-fast);
+}
+
+.breadcrumbLink:hover {
+  color: var(--color-primary-hover);
+}
+
+.breadcrumbSep {
+  color: var(--color-text-tertiary);
+  flex-shrink: 0;
+}
+
+.breadcrumbCurrent {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--color-text-primary);
+  font-weight: 500;
+}
+
+.printButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: 0 var(--spacing-md);
+  height: 44px;
+  min-width: 44px;
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  border: none;
+  border-radius: var(--radius-lg);
+  font: var(--text-body-sm);
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.printButton:hover {
+  background: var(--color-primary-hover);
+  box-shadow: var(--shadow-primary-glow);
+}
+
+.printButton:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .printButton {
+    transition: none;
+  }
+}
+
+/* ---- Worksheet body ---- */
+
+.worksheet {
+  width: 100%;
+  max-width: 794px; /* A4 at 96 dpi */
+  margin: var(--spacing-xl) auto;
+  padding: var(--spacing-xl) var(--spacing-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-lg);
+  border-radius: var(--radius-xl);
+}
+
+@media (min-width: 600px) {
+  .worksheet {
+    padding: 48px 56px;
+  }
+}
+
+/* ---- Worksheet header ---- */
+
+.worksheetHeader {
+  border-bottom: 2px solid var(--color-text-primary);
+  padding-bottom: var(--spacing-lg);
+  margin-bottom: var(--spacing-xl);
+}
+
+.worksheetBrand {
+  margin-bottom: var(--spacing-md);
+}
+
+.brandLogo {
+  display: block;
+  height: 20px;
+  width: auto;
+  opacity: 0.7;
+}
+
+.worksheetMeta {
+  margin-bottom: var(--spacing-lg);
+}
+
+.worksheetTitle {
+  font: var(--text-h1);
+  color: var(--color-text-primary);
+  margin-bottom: var(--spacing-xs);
+  text-wrap: balance;
+}
+
+.worksheetDetails {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--spacing-sm);
+}
+
+.worksheetLevel {
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.worksheetDot {
+  color: var(--color-text-tertiary);
+}
+
+.worksheetLang {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  letter-spacing: 0.04em;
+}
+
+.worksheetObjective {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  font-style: italic;
+  max-width: 60ch;
+}
+
+/* Name / date fill-in line */
+
+.worksheetNameLine {
+  display: flex;
+  align-items: baseline;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+  margin-top: var(--spacing-md);
+}
+
+.worksheetNameLabel {
+  font: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: var(--font-size-xs);
+}
+
+.worksheetNameUnderline {
+  flex: 2;
+  min-width: 120px;
+  border-bottom: 1px solid var(--color-text-primary);
+  height: 1.4em;
+  display: block;
+}
+
+.worksheetDateUnderline {
+  flex: 1;
+  min-width: 80px;
+  border-bottom: 1px solid var(--color-text-primary);
+  height: 1.4em;
+  display: block;
+}
+
+/* ---- Sections grid ---- */
+
+.sectionsGrid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2xl);
+}
+
+/* ---- Section block ---- */
+
+.sectionBlock {
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-md);
+  padding-bottom: var(--spacing-sm);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.sectionMeta {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.sectionTitle {
+  font: var(--text-h3);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+/* ---- Skill badge ---- */
+
+.skillBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--spacing-sm);
+  border-radius: var(--radius-full);
+  font: var(--text-caption);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.skill_grammar {
+  background: var(--color-primary-light);
+  color: var(--color-primary-active);
+}
+
+.skill_reading {
+  background: var(--color-accent-light);
+  color: var(--color-accent);
+}
+
+.skill_listening {
+  background: var(--color-success-light);
+  color: var(--color-success);
+}
+
+.skill_speaking {
+  background: var(--color-info-light);
+  color: var(--color-info);
+}
+
+/* ---- QR code ---- */
+
+.qrWrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.qrImage {
+  display: block;
+  width: 80px;
+  height: 80px;
+  image-rendering: pixelated;
+}
+
+.qrCaption {
+  font: var(--text-caption);
+  color: var(--color-text-tertiary);
+  text-align: center;
+}
+
+/* ---- Section instructions ---- */
+
+.instructions {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  font-style: italic;
+  margin-bottom: var(--spacing-md);
+}
+
+/* ---- Questions ---- */
+
+.questionList {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+  padding: 0;
+  margin: 0;
+}
+
+.questionItem {
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+
+.passageRef {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  border-left: 3px solid var(--color-border);
+  padding-left: var(--spacing-sm);
+  margin: 0 0 var(--spacing-sm) 0;
+  font-style: italic;
+}
+
+.questionText {
+  font: var(--text-body);
+  color: var(--color-text-primary);
+  margin-bottom: var(--spacing-sm);
+  display: flex;
+  gap: var(--spacing-xs);
+}
+
+.questionNumber {
+  font-weight: 600;
+  color: var(--color-primary);
+  flex-shrink: 0;
+  min-width: 1.5em;
+}
+
+/* ---- MC options ---- */
+
+.optionList {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  padding: 0;
+  margin: 0 0 0 var(--spacing-lg);
+}
+
+.optionItem {
+  display: flex;
+}
+
+.optionLabel {
+  display: flex;
+  align-items: baseline;
+  gap: var(--spacing-xs);
+  cursor: default;
+  min-height: 44px;
+  align-items: center;
+}
+
+/* Handwriting checkbox — a square outline for learners to fill in */
+.optionCheckbox {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--color-text-primary);
+  border-radius: var(--radius-xs);
+  flex-shrink: 0;
+  margin-right: 2px;
+}
+
+.optionLetter {
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  min-width: 1.5em;
+  flex-shrink: 0;
+}
+
+.optionText {
+  font: var(--text-body-sm);
+  color: var(--color-text-primary);
+}
+
+/* ---- Speaking prompts ---- */
+
+.promptList {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  padding: 0;
+  margin: 0;
+}
+
+.promptItem {
+  display: flex;
+  gap: var(--spacing-md);
+  align-items: flex-start;
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--color-surface-nested);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+
+.promptNumber {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: var(--text-caption);
+  font-weight: 700;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.promptContent {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.targetPhrase {
+  font: var(--text-body);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.ipa {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  margin: 0;
+  letter-spacing: 0.02em;
+}
+
+.translation {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  margin: 0;
+  font-style: italic;
+}
+
+/* ---- Footer ---- */
+
+.worksheetFooter {
+  margin-top: var(--spacing-2xl);
+  padding-top: var(--spacing-md);
+  border-top: 1px solid var(--color-border);
+  text-align: center;
+}
+
+.footerText {
+  font: var(--text-caption);
+  color: var(--color-text-tertiary);
+}
+
+/* ============================================================ */
+/* PRINT STYLES — A4, black-on-white, no chrome                  */
+/* ============================================================ */
+
+@media print {
+  /* Hide everything that isn't the worksheet */
+  .toolbar {
+    display: none !important;
+  }
+
+  /* Reset page chrome */
+  .root {
+    background: #fff;
+    min-height: unset;
+  }
+
+  .worksheet {
+    max-width: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 16mm 20mm;
+    box-shadow: none;
+    border-radius: 0;
+    background: #fff;
+  }
+
+  /* Force black-on-white for all text */
+  .worksheetTitle,
+  .sectionTitle,
+  .questionText,
+  .targetPhrase,
+  .instructions,
+  .passageRef,
+  .translation,
+  .optionText,
+  .footerText {
+    color: #000 !important;
+  }
+
+  .worksheetLevel,
+  .questionNumber,
+  .promptNumber {
+    color: #000 !important;
+    background: none !important;
+  }
+
+  .worksheetObjective,
+  .worksheetDetails,
+  .optionLetter,
+  .ipa,
+  .qrCaption {
+    color: #555 !important;
+  }
+
+  /* Skill badge — print without color fill */
+  .skillBadge {
+    background: none !important;
+    color: #000 !important;
+    border: 1px solid #000;
+  }
+
+  /* Prompt item — no background on print */
+  .promptItem {
+    background: none !important;
+    border-color: #ccc;
+  }
+
+  /* Prevent sections / questions breaking across pages */
+  .sectionBlock {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .questionItem,
+  .promptItem {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* Allow new sections to start on a new page when needed */
+  .sectionBlock + .sectionBlock {
+    page-break-before: auto;
+    break-before: auto;
+  }
+
+  /* QR image must be crisp */
+  .qrImage {
+    image-rendering: pixelated;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Brand logo on print */
+  .brandLogo {
+    opacity: 1;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Checkbox border in print */
+  .optionCheckbox {
+    border-color: #000;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Prompt circle number */
+  .promptNumber {
+    background: #000 !important;
+    color: #fff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Page setup */
+  @page {
+    size: A4;
+    margin: 15mm 18mm;
+  }
+}

@@ -198,4 +198,8 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
     description: 'Daily monitor: fetches models/voices from TTS APIs, diffs against snapshot, creates GitHub issues for changes',
     stage: 'Platform Ops',
   },
+  'worksheet-pdf': {
+    description: 'Renders class worksheet to a print-optimized PDF via Playwright and uploads to storage',
+    stage: 'Content Pipeline',
+  },
 };
