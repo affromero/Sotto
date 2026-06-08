@@ -23,6 +23,7 @@
     "lint": "npm run lint --workspace=@sotto/web",
     "lint:fix": "npm run lint:fix --workspace=@sotto/web",
     "setup": "chmod +x ./scripts/setup.sh && ./scripts/setup.sh",
+    "oss:maps-stub": "node scripts/oss-maps-stub.mjs",
     "start": "npm run start --workspace=@sotto/web",
     "start:workers": "npm run start:workers --workspace=@sotto/web",
     "test": "npm run test --workspace=@sotto/web",
