@@ -82,13 +82,11 @@ vi.mock('@/lib/queue', () => ({
     GENERATE_PDF: 'generate_pdf',
     COMPUTE_FEATURES: 'compute_features',
     GENERATE_WAVEFORM: 'generate_waveform',
-    GENERATE_QUIZ: 'generate_quiz',
   },
   notificationQueue: { name: 'notifications' },
   pdfGenerationQueue: { name: 'pdf-generation' },
   featureComputationQueue: { name: 'feature-computation' },
   waveformGenerationQueue: { name: 'waveform-generation' },
-  quizGenerationQueue: { name: 'quiz-generation' },
 }));
 
 const mockGenerateSoundEffect = vi.fn().mockResolvedValue(Buffer.from('sfx-audio'));

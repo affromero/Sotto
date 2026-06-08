@@ -75,7 +75,6 @@ interface SettingsFormProps {
   initialEmailNotifications: boolean;
   initialPushNotifications: boolean;
   privateFeedTokens: PrivateFeedTokenMetadata[];
-  initialQuizEnabled: boolean;
   quizAnswerCount: number;
   referredUsers: Array<{
     name: string | null;
@@ -122,9 +121,8 @@ export function SettingsForm({
   initialEmailNotifications,
   initialPushNotifications,
   privateFeedTokens,
-  initialQuizEnabled,
-  isTwitterProviderAvailable,
   quizAnswerCount,
+  isTwitterProviderAvailable,
   referredUsers,
   referralBonus,
   appBaseUrl,
@@ -175,7 +173,6 @@ export function SettingsForm({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [emailNotifications, setEmailNotifications] = useState(initialEmailNotifications);
   const [pushNotifications, setPushNotifications] = useState(initialPushNotifications);
-  const [quizEnabled, setQuizEnabled] = useState(initialQuizEnabled);
   const {
     pushState,
     subscribe: pushSubscribe,
@@ -760,35 +757,6 @@ export function SettingsForm({
       {/* Private RSS Feed Section */}
       <section className={styles.section}>
         <PrivateRssFeedManager initialTokens={privateFeedTokens} />
-      </section>
-
-      {/* Quizzes Section */}
-      <section className={styles.section}>
-        <div className={styles.toggleList}>
-          <label className={styles.toggleRow}>
-            <div className={styles.toggleInfo}>
-              <span className={styles.toggleLabel}>Post-Listen Quizzes</span>
-              <span className={styles.toggleDescription}>
-                Show comprehension quizzes after finishing a podcast
-              </span>
-            </div>
-            <input
-              type="checkbox"
-              className={styles.toggle}
-              checked={quizEnabled}
-              onChange={async (e) => {
-                const checked = e.target.checked;
-                setQuizEnabled(checked);
-                await fetch('/api/users/me', {
-                  method: 'PATCH',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ quizEnabled: checked }),
-                });
-              }}
-              aria-label="Toggle post-listen quizzes"
-            />
-          </label>
-        </div>
       </section>
 
       {/* Connected Accounts Section */}

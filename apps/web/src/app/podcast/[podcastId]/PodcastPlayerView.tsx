@@ -39,7 +39,6 @@ import { VisibilityToggle } from '@/components/ui/VisibilityToggle';
 import { VoiceTrackSelector } from '@/components/player/VoiceTrackSelector';
 import { VersionHistory } from '@/components/player/VersionHistory';
 import { PostListenRating } from '@/components/player/PostListenRating';
-import { PostListenQuiz } from '@/components/player/PostListenQuiz';
 import { Badge } from '@/components/ui/Badge';
 import { SottoBadge } from '@/components/ui/SottoBadge';
 import { MetadataBadges } from '@/components/ui/MetadataBadges';
@@ -81,8 +80,6 @@ interface PodcastPlayerViewProps {
   videoStatus?: VideoGenerationStatus;
   avatarStatus?: VideoGenerationStatus;
   musicStatus?: VideoGenerationStatus;
-  hasQuiz?: boolean;
-  quizStats?: { attemptCount: number; avgScore: number };
 }
 
 type ViewMode = 'transcript' | 'teleprompter' | 'video';
@@ -162,8 +159,6 @@ export function PodcastPlayerView({
   videoStatus,
   avatarStatus,
   musicStatus,
-  hasQuiz,
-  quizStats,
 }: PodcastPlayerViewProps) {
   const router = useRouter();
   const player = usePlayer();
@@ -195,8 +190,6 @@ export function PodcastPlayerView({
   const playerSectionRef = useRef<HTMLElement>(null);
   const [showRatingPrompt, setShowRatingPrompt] = useState(false);
   const [hasRated, setHasRated] = useState(false);
-  const [showQuizPrompt, setShowQuizPrompt] = useState(false);
-  const [quizCompleted, setQuizCompleted] = useState(false);
   const completionPercentRef = useRef(0);
   const [questionCounts, setQuestionCounts] = useState<Map<number, number>>(new Map());
   const [videoState, setVideoState] = useState<'idle' | 'generating' | 'ready' | 'failed'>(
@@ -1306,32 +1299,8 @@ export function PodcastPlayerView({
             onDismiss={() => {
               setShowRatingPrompt(false);
               setHasRated(true);
-              if (hasQuiz && !quizCompleted) {
-                setShowQuizPrompt(true);
-              }
             }}
           />
-        )}
-
-        {/* Post-Listen Quiz */}
-        {showQuizPrompt && !quizCompleted && (
-          <PostListenQuiz
-            podcastId={podcast.id}
-            onDismiss={() => {
-              setShowQuizPrompt(false);
-              setQuizCompleted(true);
-            }}
-          />
-        )}
-
-        {/* Quiz Stats Badge */}
-        {quizStats && quizStats.attemptCount > 0 && (
-          <div className={styles.badgeSection}>
-            <span className={styles.verificationBadge}>
-              {Math.round(quizStats.avgScore)}% avg quiz score ({quizStats.attemptCount}{' '}
-              {quizStats.attemptCount === 1 ? 'attempt' : 'attempts'})
-            </span>
-          </div>
         )}
 
         {/* Stats & Actions */}

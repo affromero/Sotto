@@ -156,5 +156,3 @@ export type MusicStatus =
   | 'GENERATING'
   | 'READY'
   | 'FAILED';
-
-export type QuizStatus = 'GENERATING' | 'READY' | 'FAILED';

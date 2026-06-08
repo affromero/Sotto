@@ -7,7 +7,6 @@ import {
   pdfGenerationQueue,
   featureComputationQueue,
   waveformGenerationQueue,
-  quizGenerationQueue,
 } from '@/lib/queue';
 import { invalidatePodcastCache, publishPodcastStatus } from '@/lib/redis';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
@@ -575,9 +574,6 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
       podcastId,
       userId: podcast.userId,
     });
-
-    // 10c4. Generate post-listen quiz
-    await addJob(quizGenerationQueue, JobType.GENERATE_QUIZ, { podcastId }).catch(() => {});
 
     await job.updateProgress(100);
     logger.info('Audio stitching complete', {

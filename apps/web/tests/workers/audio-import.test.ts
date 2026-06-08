@@ -210,12 +210,10 @@ vi.mock('@/lib/queue', () => ({
     SEND_NOTIFICATION: 'send_notification',
     COMPUTE_FEATURES: 'compute_features',
     GENERATE_WAVEFORM: 'generate_waveform',
-    GENERATE_QUIZ: 'generate_quiz',
   },
   notificationQueue: { name: 'notifications' },
   featureComputationQueue: { name: 'feature-computation' },
   waveformGenerationQueue: { name: 'waveform-generation' },
-  quizGenerationQueue: { name: 'quiz-generation' },
 }));
 
 vi.mock('@/lib/logger', () => ({
