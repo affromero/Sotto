@@ -1,7 +1,7 @@
 .runner {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-lg);
+  gap: 22px;
 }
 
 .audioBlock {
@@ -14,15 +14,16 @@
 }
 
 .audioGenerating {
-  font: var(--text-caption);
-  color: var(--color-text-secondary);
-  padding: var(--spacing-sm) 0;
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--ink-soft);
+  padding: 8px 0;
 }
 
 .questionList {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-lg);
+  gap: 24px;
   list-style: none;
   margin: 0;
   padding: 0;
@@ -31,43 +32,46 @@
 .question {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-sm);
+  gap: 12px;
 }
 
 .questionText {
-  font-size: var(--font-size-base);
-  font-weight: 600;
-  color: var(--color-text-primary);
+  font-family: var(--serif);
+  font-size: 21px;
+  font-weight: 500;
+  line-height: 1.3;
+  color: var(--ink);
 }
 
 .options {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-xs);
+  gap: 10px;
 }
 
 .option {
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
+  gap: 12px;
   width: 100%;
   min-height: 48px;
-  padding: var(--spacing-sm) var(--spacing-md);
+  padding: 12px 16px;
   text-align: left;
-  background: var(--color-surface-sunken);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
+  background: var(--well);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition: border-color 0.18s var(--ease), background 0.18s var(--ease), transform 0.18s var(--ease);
 }
 
 .option:hover {
-  border-color: var(--color-primary);
+  border-color: var(--ink-soft);
+  transform: translateY(-1px);
 }
 
 .optionSelected {
-  border-color: var(--color-primary);
-  background: var(--color-primary-subtle);
+  border-color: var(--accent);
+  background: var(--accent-soft);
 }
 
 .optionLetter {
@@ -77,29 +81,33 @@
   flex-shrink: 0;
   width: 24px;
   height: 24px;
-  font-size: var(--font-size-sm);
-  font-weight: 700;
-  color: var(--color-text-secondary);
-  background: var(--color-surface);
-  border-radius: var(--radius-full);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-soft);
+  background: var(--paper-2);
+  border-radius: var(--r);
 }
 
 .optionText {
-  font-size: var(--font-size-base);
-  color: var(--color-text-primary);
+  font-family: var(--serif);
+  font-size: 19px;
+  color: var(--ink);
 }
 
 .actions {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--spacing-md);
+  gap: 16px;
   flex-wrap: wrap;
 }
 
 .progressHint {
-  font: var(--text-caption);
-  color: var(--color-text-secondary);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  color: var(--ink-mute);
 }
 
 .primaryButton {
@@ -107,24 +115,27 @@
   align-items: center;
   justify-content: center;
   min-height: 48px;
-  padding: 0 var(--spacing-xl);
-  background: var(--color-primary);
-  color: var(--color-text-inverse);
+  padding: 0 26px;
+  background: var(--accent);
+  color: var(--accent-fg);
   border: none;
-  border-radius: var(--radius-lg);
+  border-radius: var(--r);
+  font-family: var(--sans);
   font-weight: 600;
-  font-size: var(--font-size-base);
+  font-size: 14.5px;
   cursor: pointer;
+  transition: opacity 0.18s var(--ease);
 }
 
 .primaryButton:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: default;
 }
 
 .errorBanner {
-  font: var(--text-caption);
-  color: var(--color-error);
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--bad);
 }
 
 .resultPanel {
@@ -132,33 +143,36 @@
   flex-direction: column;
   align-items: center;
   text-align: center;
-  gap: var(--spacing-md);
-  padding: var(--spacing-xl) var(--spacing-lg);
-  background: var(--color-surface-sunken);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-xl);
+  gap: 16px;
+  padding: 32px 24px;
+  background: var(--well);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
 }
 
 .scoreDial {
   display: inline-flex;
   align-items: baseline;
   gap: 2px;
-  color: var(--color-primary);
+  color: var(--accent);
 }
 
 .scoreNumber {
-  font-size: 2.5rem;
-  font-weight: 700;
+  font-family: var(--serif);
+  font-size: 2.6rem;
+  font-weight: 500;
   line-height: 1;
 }
 
 .scoreSuffix {
-  font-size: var(--font-size-lg);
-  font-weight: 600;
+  font-family: var(--serif);
+  font-size: 1.2rem;
+  font-weight: 500;
 }
 
 .resultLine {
-  font: var(--text-body);
-  color: var(--color-text-secondary);
-  max-width: 40ch;
+  font-family: var(--sans);
+  font-size: 14.5px;
+  color: var(--ink-soft);
+  max-width: 42ch;
 }
