@@ -7,7 +7,7 @@
     "packages/*",
     "services/*"
   ],
-  "description": "Open-source, self-hostable language-learning infrastructure. Learn a language with a tutor you own.",
+  "description": "Open-source, self-hostable language learning, taught in your own context through the AI agent you already own.",
   "license": "AGPL-3.0-only",
   "scripts": {
     "build": "npm run build --workspace=@sotto/web",

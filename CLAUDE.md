@@ -1,6 +1,6 @@
 # CLAUDE.md - Sotto
 
-> Open-source, self-hostable language-learning infrastructure. Learn a language with a tutor you own. Canonical brand copy lives in `packages/shared/src/brand.ts`.
+> Open-source, self-hostable language-learning infrastructure. Learn a language with the agent that already knows you. Canonical brand copy lives in `packages/shared/src/brand.ts`.
 
 ## What Is Sotto?
 

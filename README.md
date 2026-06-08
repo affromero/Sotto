@@ -1,6 +1,6 @@
 # Sotto
 
-**Learn a language with a tutor you own.**
+**Learn a language with the agent that already knows you.**
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE) [![Self-hostable](https://img.shields.io/badge/self--hostable-yes-brightgreen)]() [![BYOK](https://img.shields.io/badge/BYOK-bring%20your%20own%20keys-orange)]()
 
