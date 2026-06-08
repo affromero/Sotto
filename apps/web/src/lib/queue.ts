@@ -46,8 +46,6 @@ export enum JobType {
   EXPORT_DATA = 'export_data',
   VALIDATE_KEYS = 'validate_keys',
 MODERATE_CONTENT = 'moderate_content',
-  SEND_EMAIL_DIGEST = 'send_email_digest',
-  SEND_ANNOUNCEMENT = 'send_announcement',
   VERIFY_VOICE = 'verify_voice',
   GENERATE_VOICE_TRACK_AUDIO = 'generate_voice_track_audio',
   STITCH_VOICE_TRACK = 'stitch_voice_track',
@@ -60,7 +58,6 @@ MODERATE_CONTENT = 'moderate_content',
   COMPOSE_VIDEO = 'compose_video',
   GENERATE_AVATAR = 'generate_avatar',
   PLACE_ENRICHMENT = 'place_enrichment',
-  INGEST_NEWS = 'ingest_news',
   GENERATE_DEMO_SCRIPT = 'generate_demo_script',
   GENERATE_DEMO_RECORDING = 'generate_demo_recording',
   GENERATE_DEMO_VOICEOVER = 'generate_demo_voiceover',
@@ -72,7 +69,6 @@ MODERATE_CONTENT = 'moderate_content',
   LIP_SYNC_TEST = 'lip_sync_test',
   GENERATE_WAVEFORM = 'generate_waveform',
   GENERATE_QUIZ = 'generate_quiz',
-  SCHEDULE_BRIEFINGS = 'schedule_briefings',
   CLASSIFY_PIPELINE = 'classify_pipeline',
   MONITOR_TTS_PROVIDERS = 'monitor_tts_providers',
   RENDER_SEGMENT_PREVIEW = 'render_segment_preview',
@@ -256,8 +252,6 @@ export interface DataExportPayload {
 
 export interface ValidateKeysPayload {}
 
-export interface NewsIngestPayload {}
-
 export interface GenerateDemoScriptPayload {
   projectId: string;
   durationTarget?: number;
@@ -297,11 +291,6 @@ export interface ModerateContentPayload {
   targetId: string;
   content: string;
   userId?: string;
-}
-
-export interface AnnouncementPayload {
-  subject: string;
-  message: string;
 }
 
 export interface CollectR2UsagePayload {}
@@ -401,8 +390,6 @@ export interface GenerateQuizPayload {
   podcastId: string;
 }
 
-export interface ScheduleBriefingsPayload {}
-
 export interface ClassifyPipelinePayload {
   classificationId: string;
   podcastId: string;
@@ -452,8 +439,6 @@ const QUEUE_DEFINITIONS: Record<string, QueueDefinition> = {
   'data-export': { attempts: 2, skipEvents: true },
   'key-validation': { attempts: 1, skipEvents: true },
   'content-moderation': { attempts: 2, skipEvents: true },
-  'email-digest': { attempts: 2, skipEvents: true },
-  announcements: { attempts: 2, skipEvents: true },
   'voice-verification': { attempts: 2, skipEvents: true },
   'voice-track-audio': { attempts: 3 },
   'voice-track-stitching': { attempts: 2 },
@@ -466,7 +451,6 @@ const QUEUE_DEFINITIONS: Record<string, QueueDefinition> = {
   'video-composition': { attempts: 2 },
   'avatar-generation': { attempts: 2 },
   'place-enrichment': { attempts: 2 },
-  'news-ingest': { attempts: 2, skipEvents: true },
   'demo-script': { attempts: 2 },
   'demo-recording': { attempts: 2 },
   'demo-voiceover': { attempts: 2 },
@@ -478,7 +462,6 @@ const QUEUE_DEFINITIONS: Record<string, QueueDefinition> = {
   'lip-sync-test': { attempts: 1 },
   'waveform-generation': { attempts: 2, skipEvents: true },
   'quiz-generation': { attempts: 2, skipEvents: true },
-  'briefing-scheduler': { attempts: 1, skipEvents: true },
   'pipeline-classification': { attempts: 2, skipEvents: true },
   'tts-provider-monitor': { attempts: 2, skipEvents: true },
 };
@@ -1032,8 +1015,6 @@ export const featureComputationQueue = createQueueReference('feature-computation
 export const dataExportQueue = createQueueReference('data-export');
 export const keyValidationQueue = createQueueReference('key-validation');
 export const contentModerationQueue = createQueueReference('content-moderation');
-export const emailDigestQueue = createQueueReference('email-digest');
-export const announcementQueue = createQueueReference('announcements');
 export const voiceVerificationQueue = createQueueReference('voice-verification');
 export const voiceTrackAudioQueue = createQueueReference('voice-track-audio');
 export const voiceTrackStitchingQueue = createQueueReference('voice-track-stitching');
@@ -1053,7 +1034,6 @@ export interface LipSyncTestPayload {
 }
 export const lipSyncTestQueue = createQueueReference('lip-sync-test');
 export const placeEnrichmentQueue = createQueueReference('place-enrichment');
-export const newsIngestQueue = createQueueReference('news-ingest');
 export const demoScriptQueue = createQueueReference('demo-script');
 export const demoRecordingQueue = createQueueReference('demo-recording');
 export const demoVoiceoverQueue = createQueueReference('demo-voiceover');
@@ -1064,7 +1044,6 @@ export const demoSceneCompositionQueue = createQueueReference('demo-scene-compos
 export const musicGenerationQueue = createQueueReference('music-generation');
 export const waveformGenerationQueue = createQueueReference('waveform-generation');
 export const quizGenerationQueue = createQueueReference('quiz-generation');
-export const briefingSchedulerQueue = createQueueReference('briefing-scheduler');
 export const pipelineClassificationQueue = createQueueReference('pipeline-classification');
 export const ttsProviderMonitorQueue = createQueueReference('tts-provider-monitor');
 export const segmentPreviewQueue = createQueueReference('segment-preview');

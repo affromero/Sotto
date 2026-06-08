@@ -149,26 +149,6 @@ describe('private-first OSS surfaces', () => {
     expect(creatorMetricsSource).not.toContain("THEN 'feed'");
   });
 
-  it('keeps news briefing links authenticated and owner-scoped', () => {
-    const newsRouteSource = readSource('src/app/api/news/route.ts');
-    const newsCardSource = readSource('src/components/feed/NewsCard.tsx');
-    const newsTypesSource = readFileSync(
-      resolve(repoRoot, 'packages/shared/src/types/news.ts'),
-      'utf8'
-    );
-    const newsSources = [newsRouteSource, newsCardSource, newsTypesSource].join('\n');
-
-    expect(newsRouteSource).toContain('authenticateRequest(request)');
-    expect(newsRouteSource).toContain("errorResponse('Unauthorized', 401)");
-    expect(newsRouteSource).toContain('userId: authResult.userId');
-    expect(newsRouteSource).toContain('podcastId: true');
-    expect(newsRouteSource).toContain('checkRateLimit(`news:${authResult.userId}`');
-    expect(newsRouteSource).not.toContain('Public browsable news feed');
-    expect(newsRouteSource).not.toContain('user: { select: { handle: true } }');
-    expect(newsSources).not.toContain('relatedUserHandle');
-    expect(newsSources).not.toContain('relatedPodcastSlug');
-  });
-
   it('does not keep public feed contracts in mobile, shared, or MCP packages', () => {
     const mobileSources = ['apps/mobile/app/(tabs)/index.tsx', 'apps/mobile/app/(tabs)/search.tsx']
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
@@ -615,7 +595,6 @@ describe('private-first OSS surfaces', () => {
       '.env.oss.example',
       'apps/web/prisma/seed.ts',
       'apps/web/src/lib/system-user.ts',
-      'apps/web/src/lib/briefing-generator.ts',
       'apps/web/src/workers/CLAUDE.md',
       'apps/web/src/app/api/admin/podcasts/create-as-system-owner/route.ts',
       'apps/web/src/app/api/admin/landing-showcase/bootstrap/route.ts',
@@ -955,23 +934,6 @@ describe('private-first OSS surfaces', () => {
     expect(setupSources).toContain('required for imported audio without transcript');
     expect(setupSources).not.toContain("stored === 'openai' ? undefined");
     expect(setupSources).not.toContain('sttProvider      String? // null = auto');
-  });
-
-  it('keeps scheduled news briefings private-only', () => {
-    const briefingSources = [
-      'src/app/api/briefings/route.ts',
-      'src/app/api/briefings/[id]/route.ts',
-      'src/lib/briefing-generator.ts',
-      'src/components/settings/BriefingForm.tsx',
-    ]
-      .map(readSource)
-      .join('\n');
-
-    expect(briefingSources).toContain("visibility: z.literal('PRIVATE')");
-    expect(briefingSources).toContain("visibility: 'PRIVATE'");
-    expect(briefingSources).not.toContain("z.enum(['PUBLIC', 'UNLISTED', 'PRIVATE'])");
-    expect(briefingSources).not.toContain('<option value="PUBLIC">Public</option>');
-    expect(briefingSources).not.toContain('<option value="UNLISTED">Unlisted</option>');
   });
 
   it('keeps BYOK voice generation explicit instead of submitting Auto', () => {

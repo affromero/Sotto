@@ -1,8 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  buildAnnouncementEmail,
   buildWaitlistWelcomeEmail,
-  buildWeeklyDigestEmail,
   generateUserUnsubscribeUrl,
 } from '@/lib/email-templates';
 
@@ -22,36 +20,11 @@ describe('email templates', () => {
     );
   });
 
-  it('uses the configured deployment URL in waitlist and announcement emails', () => {
+  it('uses the configured deployment URL in waitlist emails', () => {
     const waitlist = buildWaitlistWelcomeEmail('alice@example.com');
-    const announcement = buildAnnouncementEmail(
-      'Product update',
-      'New private briefing tools',
-      'https://selfhost.example.com/unsubscribe'
-    );
 
     expect(waitlist.html).toContain('https://selfhost.example.com/create');
     expect(waitlist.html).toContain('>selfhost.example.com</a>');
-    expect(announcement.html).toContain('https://selfhost.example.com');
-    expect(`${waitlist.html}${announcement.html}`).not.toContain('https://sotto.fm');
-  });
-
-  it('uses the configured deployment URL for digest podcast and dashboard links', () => {
-    const digest = buildWeeklyDigestEmail('alice@example.com', [
-      {
-        id: 'pod-1',
-        title: 'Daily Brief',
-        topic: 'Private news',
-        slug: 'daily-brief',
-        creatorHandle: 'alice',
-        creatorName: 'Alice',
-      },
-    ]);
-
-    expect(digest.html).toContain(
-      'https://selfhost.example.com/@alice/daily-brief?utm_source=digest'
-    );
-    expect(digest.html).toContain('https://selfhost.example.com/dashboard?utm_source=digest');
-    expect(digest.html).not.toContain('https://sotto.fm');
+    expect(waitlist.html).not.toContain('https://sotto.fm');
   });
 });

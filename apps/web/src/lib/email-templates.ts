@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import { BRAND } from '@sotto/shared';
-import { getAppBaseUrl, podcastUrl } from './urls';
+import { getAppBaseUrl } from './urls';
 import { getTwitterBotHandle, getTwitterProfileUrl } from './bot-identity';
 
 function appLinkLabel(appUrl: string): string {
@@ -19,36 +19,6 @@ export function generateUserUnsubscribeUrl(userId: string, appUrl = getAppBaseUr
   const secret = requireAuthSecret();
   const signature = crypto.createHmac('sha256', secret).update(userId).digest('hex');
   return `${appUrl}/api/users/unsubscribe?userId=${encodeURIComponent(userId)}&sig=${signature}`;
-}
-
-export function buildAnnouncementEmail(
-  subject: string,
-  body: string,
-  unsubscribeUrl: string
-): { subject: string; html: string } {
-  const appUrl = getAppBaseUrl();
-  const announcementFooter = `
-      <div style="padding:24px 32px; border-top:1px solid #f3f4f6; text-align:center;">
-        <p style="font-size:12px; color:#9ca3af; margin:0;">
-          <a href="${unsubscribeUrl}" style="color:#9ca3af; text-decoration:underline;">Unsubscribe from announcements</a>
-          &nbsp;·&nbsp;
-          <a href="${appUrl}" style="color:#9ca3af; text-decoration:underline;">${appLinkLabel(appUrl)}</a>
-        </p>
-      </div>
-    </div>
-  </div>
-  `;
-
-  return {
-    subject,
-    html: `${HEADER}
-      <div style="padding:16px 32px 32px;">
-        <p style="font-size:15px; line-height:1.7; color:#1A1A1A; margin:0;">
-          ${body.replace(/\n/g, '<br />')}
-        </p>
-      </div>
-    ${announcementFooter}`,
-  };
 }
 
 function generateUnsubscribeUrl(email: string, appUrl = getAppBaseUrl()): string {
@@ -212,57 +182,3 @@ export function buildWelcomeEmail(name: string): { subject: string; html: string
   };
 }
 
-interface DigestPodcast {
-  id: string;
-  title: string;
-  topic: string | null;
-  slug?: string | null;
-  creatorHandle?: string | null;
-  creatorName: string | null;
-}
-
-export function buildWeeklyDigestEmail(
-  email: string,
-  podcasts: DigestPodcast[]
-): { subject: string; html: string } {
-  const appUrl = getAppBaseUrl();
-  const podcastRows = podcasts
-    .map(
-      (p) => `
-      <tr>
-        <td style="padding:12px 0; border-bottom:1px solid #f3f4f6;">
-          <a href="${appUrl}${podcastUrl({ id: p.id, slug: p.slug }, p.creatorHandle)}?utm_source=digest&utm_medium=email&utm_campaign=weekly" style="font-size:14px; font-weight:600; color:#1A1A1A; text-decoration:none;">
-            ${p.title}
-          </a>
-          <p style="font-size:12px; color:#6B7280; margin:4px 0 0;">
-            by ${p.creatorName || 'Anonymous'}${p.topic ? ` · ${p.topic.substring(0, 80)}${p.topic.length > 80 ? '...' : ''}` : ''}
-          </p>
-        </td>
-      </tr>`
-    )
-    .join('');
-
-  return {
-    subject: 'This week on Sotto — top podcasts',
-    html: `${HEADER}
-      <div style="padding:16px 32px 32px;">
-        <h2 style="font-family:'DM Serif Display',Georgia,serif; font-size:20px; color:#1A1A1A; margin:0 0 12px;">
-          This week on Sotto
-        </h2>
-        <p style="font-size:14px; line-height:1.7; color:#6B7280; margin:0 0 16px;">
-          Here are the most popular podcasts from the last 7 days.
-        </p>
-        <table style="width:100%; border-collapse:collapse;">
-          <tbody>
-            ${podcastRows}
-          </tbody>
-        </table>
-        <div style="margin-top:24px;">
-          <a href="${appUrl}/dashboard?utm_source=digest&utm_medium=email&utm_campaign=weekly" style="display:inline-block; background:#D97706; color:#fff; font-size:14px; font-weight:600; padding:10px 24px; border-radius:8px; text-decoration:none;">
-            Open Dashboard
-          </a>
-        </div>
-      </div>
-    ${footer(email)}`,
-  };
-}

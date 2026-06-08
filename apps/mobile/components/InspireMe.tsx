@@ -16,9 +16,8 @@ import {
   typography,
   borderRadius,
   INSPIRE_SECTION_LABELS,
-  NEWS_TIME_RANGE_LABELS,
 } from '@sotto/shared';
-import type { TasteQuestion, PodcastSummary, InspireSection, NewsTimeRange } from '@sotto/shared';
+import type { TasteQuestion, PodcastSummary, InspireSection } from '@sotto/shared';
 import { api } from '../lib/api';
 import { PillGroup } from './PillGroup';
 import { InspireSwipeQuiz } from './InspireSwipeQuiz';
@@ -35,16 +34,11 @@ const SECTION_OPTIONS = (Object.keys(INSPIRE_SECTION_LABELS) as InspireSection[]
   label: INSPIRE_SECTION_LABELS[key],
 }));
 
-const TIME_RANGE_OPTIONS = (Object.keys(NEWS_TIME_RANGE_LABELS) as NewsTimeRange[]).map((key) => ({
-  value: key,
-  label: NEWS_TIME_RANGE_LABELS[key],
-}));
 
 export function InspireMe({ visible, onClose, onSelectTopic }: InspireMeProps) {
   const [activeSection, setActiveSection] = useState<InspireSection>('forYou');
   const [topicInput, setTopicInput] = useState('');
   const [activeTopic, setActiveTopic] = useState<string | undefined>();
-  const [newsTimeRange, setNewsTimeRange] = useState<NewsTimeRange>('1w');
   const queryClient = useQueryClient();
   const topicInputRef = useRef<TextInput>(null);
 
@@ -68,18 +62,6 @@ export function InspireMe({ visible, onClose, onSelectTopic }: InspireMeProps) {
     },
     staleTime: 2 * 60 * 1000,
     enabled: visible && activeSection === 'trending',
-  });
-
-  const newsQuery = useQuery<TasteQuestion[]>({
-    queryKey: ['inspire', 'news', activeTopic, newsTimeRange],
-    queryFn: async () => {
-      const params: Record<string, string> = { section: 'news', timeRange: newsTimeRange };
-      if (activeTopic) params.topic = activeTopic;
-      const res = await api.get('/inspire/all', { params });
-      return res.data.news ?? [];
-    },
-    staleTime: 5 * 60 * 1000,
-    enabled: visible && activeSection === 'news',
   });
 
   const curiosityQuery = useQuery<TasteQuestion[]>({
@@ -176,17 +158,6 @@ export function InspireMe({ visible, onClose, onSelectTopic }: InspireMeProps) {
             ) : null}
           </View>
 
-          {/* News time range */}
-          {activeSection === 'news' ? (
-            <View style={styles.timeRangeRow}>
-              <PillGroup
-                options={TIME_RANGE_OPTIONS}
-                selected={newsTimeRange}
-                onChange={(val) => setNewsTimeRange(val as NewsTimeRange)}
-              />
-            </View>
-          ) : null}
-
           {/* Content */}
           <View style={styles.content}>
             {activeSection === 'forYou' ? (
@@ -201,13 +172,6 @@ export function InspireMe({ visible, onClose, onSelectTopic }: InspireMeProps) {
                 podcasts={trendingQuery.data ?? []}
                 isLoading={trendingQuery.isLoading}
                 onSelectTopic={handleSelectTopic}
-              />
-            ) : activeSection === 'news' ? (
-              <InspireSwipeQuiz
-                questions={newsQuery.data ?? []}
-                isLoading={newsQuery.isLoading}
-                onSelectTopic={handleSelectTopic}
-                onLoadMore={() => handleLoadMore('news')}
               />
             ) : (
               <InspireSwipeQuiz
@@ -309,10 +273,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: colors.primary,
     fontWeight: '700',
-  },
-  timeRangeRow: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.xs,
   },
   content: {
     flex: 1,

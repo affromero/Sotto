@@ -64,12 +64,9 @@ const EXPECTED_FILES = [
   'feeds/taste-quiz.md',
   'feeds/for-you.md',
   'feeds/curiosity.md',
-  'feeds/news.md',
-  'feeds/news-from-newsletters.md',
   'audio/voice-assigner.md',
   'audio/tts-tag-converter.md',
   'demo/walkthrough.md',
-  'generation/briefing-script.md',
   'quiz/generate-quiz.md',
 ];
 
@@ -118,14 +115,6 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
   'feeds/curiosity.md': [
     'INPUT_SANITIZATION', 'REQUEST_COUNT', 'TAXONOMY', 'TOPIC_CONTEXT',
   ].sort(),
-  'feeds/news.md': [
-    'DIVERSITY_NOTE', 'EXCLUDE_CONTEXT', 'INPUT_SANITIZATION',
-    'REQUEST_COUNT', 'TAXONOMY', 'TIME_LABEL', 'TOPIC_FOCUS',
-  ].sort(),
-  'feeds/news-from-newsletters.md': [
-    'DIVERSITY_NOTE', 'EXCLUDE_CONTEXT', 'INPUT_SANITIZATION',
-    'NEWSLETTER_ARTICLES', 'REQUEST_COUNT', 'TAXONOMY', 'TIME_LABEL', 'TOPIC_FOCUS',
-  ].sort(),
   'audio/voice-assigner.md': [
     'SPEAKERS', 'SPEAKER_COUNT', 'VOICE_CATALOG',
   ].sort(),
@@ -156,12 +145,6 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
   'research/source-discovery.md': [
     'DEPTH', 'DEPTH_DESCRIPTION', 'MIN_SERIOUS_COUNT',
     'SOURCE_CONTENT', 'SOURCE_COUNT', 'TOPIC',
-  ].sort(),
-  'generation/briefing-script.md': [
-    'CLOSING_LINE', 'CONTENT_SAFETY', 'DURATION_TARGET', 'EXPERT_SPEAKER', 'HOST_SPEAKER',
-    'LANGUAGE_INSTRUCTION', 'MIN_REFERENCE_COUNT', 'OPENING_LINE', 'PREVIOUS_EPISODES',
-    'SOURCE_ARTICLES', 'SPEAKER_SECTION', 'VOCABULARY_INSTRUCTION',
-    'VOICE_REALISM', 'WORD_COUNT_IDEAL', 'WORD_COUNT_MAX', 'WORD_COUNT_MIN',
   ].sort(),
   'quiz/generate-quiz.md': [
     'MEDIUM_COUNT', 'QUESTION_COUNT', 'SCRIPT_CONTEXT', 'SCRIPT_TURNS',
@@ -301,17 +284,12 @@ describe('verification templates', () => {
 
 describe('feed templates', () => {
   it('all feed templates produce JSON array output', () => {
-    for (const file of ['feeds/taste-quiz.md', 'feeds/for-you.md', 'feeds/curiosity.md', 'feeds/news.md']) {
+    for (const file of ['feeds/taste-quiz.md', 'feeds/for-you.md', 'feeds/curiosity.md']) {
       const content = readFileSync(join(PROMPTS_DIR, file), 'utf-8');
       expect(content).toContain('JSON array');
       expect(content).toContain('"text"');
       expect(content).toContain('"tagSlugs"');
     }
-  });
-
-  it('news.md includes web search instruction', () => {
-    const content = readFileSync(join(PROMPTS_DIR, 'feeds/news.md'), 'utf-8');
-    expect(content.toLowerCase()).toContain('search the web');
   });
 
   it('curiosity.md explicitly avoids personalization', () => {

@@ -1,5 +1,5 @@
 import { createHash } from 'crypto';
-import type { TasteQuestion, NewsTimeRange } from '@sotto/shared';
+import type { TasteQuestion } from '@sotto/shared';
 import { prisma } from './prisma';
 import { createAIProvider } from './providers/ai';
 import { getAiProviderMeta, getProviderForModel, type AiProviderId } from './providers/ai-registry';
@@ -9,7 +9,6 @@ import { loadAndRender } from './prompt-loader';
 import { logUsage } from './usage-logger';
 import { logger } from './logger';
 import { inspireFailures } from './redis';
-import { fetchNewsletterArticles, formatArticlesForPrompt } from './newsletter-fetcher';
 
 const LOCAL_AI_PROVIDER: AiProviderId = 'claude-code';
 const LOCAL_MODEL_PREFIX = 'claude-code:';
@@ -570,117 +569,3 @@ export async function generateCuriosityQuestions(
   }
 }
 
-// Re-export for consumers that import from this file
-export type { NewsTimeRange } from '@sotto/shared';
-
-const NEWS_TIME_LABELS: Record<NewsTimeRange, string> = {
-  '1h': 'the past hour',
-  '12h': 'the past 12 hours',
-  '24h': 'the past 24 hours',
-  '1w': 'the past week',
-  '1m': 'the past month',
-};
-
-/**
- * Generate current-events "In the News" questions using web search.
- * Must reference specific real events/people/dates from the given time range.
- * Accepts excludeTopics to avoid overlap with ForYou questions.
- */
-export async function generateNewsQuestions(
-  userId: string,
-  count: number,
-  excludeTopics: string[] = [],
-  timeRange: NewsTimeRange = '1w',
-  topic?: string,
-  preloadedCtx?: InspireContext,
-  model?: string
-): Promise<TasteQuestion[]> {
-
-  const ctx = preloadedCtx ?? await loadInspireContext(userId, { model });
-
-  const timeLabel = NEWS_TIME_LABELS[timeRange];
-
-  const excludeContext = excludeTopics.length > 0
-    ? `\n\nIMPORTANT: The following topics are already shown in a different tab. Do NOT generate questions about similar subjects:\n${excludeTopics.map((t) => `- ${t}`).join('\n')}`
-    : '';
-
-  // Strip quotes and newlines from user-supplied topic
-  const safeNewsTopic = topic?.replace(/["\n\r]/g, ' ').trim();
-
-  const topicFocus = safeNewsTopic
-    ? `\n\nThe user wants news about "${safeNewsTopic}". Prioritize questions related to this area. If there are no recent news stories specifically about "${safeNewsTopic}", broaden to closely related fields, recent developments in the broader domain, or historically significant events in "${safeNewsTopic}" that remain relevant.`
-    : '';
-
-  const requestCount = count + 5;
-
-  const diversityNote = safeNewsTopic
-    ? `Focus questions on "${safeNewsTopic}" and closely related areas`
-    : 'Cover diverse topics: science, politics, tech, business, culture, sports';
-
-  // Try newsletter-grounded path first (avoids web search, saves tokens + latency)
-  const articles = await fetchNewsletterArticles(timeRange).catch(() => []);
-  const useNewsletterPath = articles.length >= 3;
-
-  const systemPrompt = useNewsletterPath
-    ? loadAndRender('feeds/news-from-newsletters.md', {
-        TIME_LABEL: timeLabel,
-        REQUEST_COUNT: String(requestCount),
-        NEWSLETTER_ARTICLES: formatArticlesForPrompt(articles),
-        DIVERSITY_NOTE: diversityNote,
-        EXCLUDE_CONTEXT: excludeContext,
-        TOPIC_FOCUS: topicFocus,
-        TAXONOMY: ctx.taxonomyLines.join('\n'),
-        INPUT_SANITIZATION: INPUT_SANITIZATION_INSTRUCTIONS,
-      })
-    : loadAndRender('feeds/news.md', {
-        TIME_LABEL: timeLabel,
-        REQUEST_COUNT: String(requestCount),
-        DIVERSITY_NOTE: diversityNote,
-        EXCLUDE_CONTEXT: excludeContext,
-        TOPIC_FOCUS: topicFocus,
-        TAXONOMY: ctx.taxonomyLines.join('\n'),
-        INPUT_SANITIZATION: INPUT_SANITIZATION_INSTRUCTIONS,
-      });
-
-  try {
-    const { providerType, apiKey, model: resolvedModel } = resolveInspireProvider(ctx.resolvedProvider, model);
-    logger.info('Inspire news provider resolved', { provider: providerType, model: resolvedModel, source: ctx.resolvedProvider?.source ?? 'none' });
-    const llmStart = Date.now();
-
-    const ai = createAIProvider(providerType);
-    const result = await ai.generateResponse(
-      systemPrompt,
-      [{ role: 'user', content: `Generate ${requestCount} current-events questions.` }],
-      { model: resolvedModel, apiKeyOverride: apiKey, maxTokens: 16384, temperature: 1.0, useWebSearch: !useNewsletterPath }
-    );
-
-    const durationMs = Date.now() - llmStart;
-
-    const { questions, emptyReason } = parseAndFilterQuestions(
-      result.content, count, ctx.validSlugs, ctx.priorQuestionIds,
-      { lenient: true }
-    );
-
-    logUsage({
-      service: providerType,
-      model: result.model,
-      category: 'inspire_news',
-      inputTokens: result.inputTokens,
-      outputTokens: result.outputTokens,
-      durationMs,
-      userId,
-      metadata: { questionCount: questions.length, topic: topic ?? null, timeRange, useNewsletterPath },
-    });
-
-    if (emptyReason) {
-      inspireFailures.push({ section: 'news', reason: emptyReason, userId, timestamp: new Date().toISOString() }).catch(() => {});
-    }
-
-    return questions;
-  } catch (err) {
-    const reason = `LLM error: ${(err as Error).message}`;
-    logger.warn('Failed to generate News questions', { error: (err as Error).message });
-    inspireFailures.push({ section: 'news', reason, userId, timestamp: new Date().toISOString() }).catch(() => {});
-    return [];
-  }
-}

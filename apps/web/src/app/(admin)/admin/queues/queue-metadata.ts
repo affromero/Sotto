@@ -98,14 +98,6 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
     description: 'Moderates user-generated content via OpenAI',
     stage: 'Platform Ops',
   },
-  'email-digest': {
-    description: 'Sends weekly email digests to subscribers',
-    stage: 'Platform Ops',
-  },
-  'announcements': {
-    description: 'Delivers platform announcements to users',
-    stage: 'Platform Ops',
-  },
   'draft-cleanup': {
     description: 'Cleans up stale draft podcasts',
     stage: 'Platform Ops',
@@ -154,10 +146,6 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
     description: 'Resolves place names to coordinates via gazetteers for map visuals',
     stage: 'Video Pipeline',
   },
-  'news-ingest': {
-    description: 'Fetches RSS feeds and ingests articles into the database (every 30min)',
-    stage: 'Platform Ops',
-  },
   'demo-script': {
     description: 'Generates demo video scripts from project features',
     stage: 'Video Pipeline',
@@ -200,10 +188,6 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
   },
   'quiz-generation': {
     description: 'Generates post-listen quiz questions from podcast script',
-    stage: 'Content Pipeline',
-  },
-  'briefing-scheduler': {
-    description: 'Schedules and generates daily briefing podcasts for subscribers',
     stage: 'Content Pipeline',
   },
   'pipeline-classification': {

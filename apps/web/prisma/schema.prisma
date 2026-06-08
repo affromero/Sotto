@@ -210,31 +210,6 @@ model User {
   avatarSharesSent     AvatarImageShare[] @relation("AvatarShareRequester")
   avatarSharesReceived AvatarImageShare[] @relation("AvatarShareOwner")
 
-  // Daily Briefings
-  briefingEnabled       Boolean           @default(false)
-  briefingTime          String? // "HH:mm" wall-clock
-  briefingTimezone      String? // IANA, e.g. "America/New_York"
-  briefingDays          Int               @default(127) // bitmask: Mon=1..Sun=64
-  briefingVisibility    PodcastVisibility @default(PRIVATE)
-  lastBriefingAt        DateTime?
-  briefingLogs          BriefingLog[]
-  // Briefing customization — null = use user's general pref → admin default → platform auto
-  briefingAiModel       String? // AI model override for briefings
-  briefingTtsProvider   String? // TTS provider override
-  briefingTtsModel      String? // TTS model override
-  briefingHostVoiceId   String? // Voice pool entry name (provider-agnostic)
-  briefingExpertVoiceId String? // Voice pool entry name (provider-agnostic)
-  briefingDepth         String? // eli5, quick_overview, standard, deep_dive
-  briefingTone          String? // casual, professional, socratic, comedic, satirical, storytelling
-  briefingAudienceLevel String? // beginner, intermediate, expert
-  briefingDuration      Int? // target minutes (1-40)
-  briefingFormat        Int               @default(2) // 1=Solo, 2=Dialogue, 3=Panel, 4=Roundtable
-  briefingPrompt        String?           @db.Text // custom instructions/topic focus
-  briefingUseByokKeys   Boolean           @default(false) // opt-in: when true + user has BYOK, use their keys
-
-  // Multi-briefing configs
-  userBriefings UserBriefing[]
-
   // Quizzes
   quizEnabled  Boolean       @default(true)
   quizAttempts QuizAttempt[]
@@ -409,7 +384,6 @@ model Podcast {
   duplicateSource     DuplicateMatch[]   @relation("DuplicateSource")
   duplicateMatches    DuplicateMatch[]   @relation("DuplicateMatch")
   quiz                PodcastQuiz?
-  briefingLogs        BriefingLog[]
   agentIngestion      AgentIngestion?
   meetingIngestion    MeetingIngestion?
   landingShowcase     LandingShowcase?
@@ -504,7 +478,6 @@ enum PodcastSource {
   MEETING
   IMPORT
   ADMIN
-  BRIEFING
 }
 
 // ============ DISCOVERY (Chat-Based) ============
@@ -948,7 +921,6 @@ enum NotificationType {
   RENDITION_PROPOSED
   RENDITION_ACCEPTED
   RENDITION_REJECTED
-  BRIEFING_READY
   AVATAR_IMAGE_REQUEST_RECEIVED
   AVATAR_IMAGE_REQUEST_APPROVED
   AVATAR_IMAGE_REQUEST_DENIED
@@ -2349,24 +2321,6 @@ model AvatarImageShare {
   @@index([status])
 }
 
-// ============ NEWS INGESTION ============
-
-model IngestedArticle {
-  id        String    @id @default(cuid())
-  title     String
-  url       String    @unique
-  summary   String?   @db.Text
-  source    String
-  sourceUrl String?
-  category  String?
-  pubDate   DateTime?
-  fetchedAt DateTime  @default(now())
-
-  @@index([pubDate])
-  @@index([category, pubDate])
-  @@index([fetchedAt])
-}
-
 // ============ DEMO VIDEO STUDIO ============
 
 enum DemoProjectStatus {
@@ -2469,91 +2423,6 @@ model DemoScene {
   updatedAt DateTime @updatedAt
 
   @@unique([projectId, order])
-}
-
-// ============ DAILY BRIEFINGS ============
-
-model UserBriefing {
-  id        String   @id @default(cuid())
-  userId    String
-  name      String // "Morning Tech News", "Evening Finance"
-  enabled   Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Schedule
-  time      String // "HH:mm" (required)
-  timezone  String // IANA timezone (required)
-  days      Int       @default(127) // bitmask Mon=1..Sun=64
-  nextRunAt DateTime? // pre-computed next eligible run time
-
-  // Content
-  prompt         String? @db.Text
-  depth          String? // eli5, quick_overview, standard, deep_dive
-  tone           String? // casual, professional, socratic, etc.
-  audienceLevel  String? // beginner, intermediate, expert
-  duration       Int? // target minutes 1-40
-  format         Int     @default(2) // 1=Solo 2=Dialogue 3=Panel 4=Roundtable
-  targetLanguage String? // ISO 639-1 code (e.g. "de") — null = English
-  languageMode   String? // vocabulary_intro | conversational_mix | full_immersion
-
-  // Audio
-  aiModel       String?
-  ttsProvider   String?
-  ttsModel      String?
-  hostVoiceId   String?
-  expertVoiceId String?
-
-  // Continuous Learning
-  continuousLearning Boolean @default(false)
-  contextEpisodes    Int     @default(3) // 1-5: how many prior episodes to include as context
-
-  // Advanced
-  visibility    PodcastVisibility @default(PRIVATE)
-  useByokKeys   Boolean           @default(false)
-  zeroCostVideo Boolean           @default(false) // free visuals only, skip verification
-
-  // State
-  lastGeneratedAt DateTime?
-
-  // Relations
-  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  briefingLogs BriefingLog[]
-
-  @@index([userId])
-  @@index([enabled, nextRunAt])
-}
-
-model BriefingConfig {
-  id                     String   @id @default("singleton")
-  enabled                Boolean  @default(true)
-  defaultAiModel         String?
-  defaultTtsProvider     String?
-  defaultTtsModel        String?
-  maxArticlesPerBriefing Int      @default(5)
-  targetDurationMinutes  Int      @default(6)
-  maxBriefingsPerBatch   Int      @default(50)
-  pollIntervalMs         Int      @default(900000) // 15 min
-  updatedAt              DateTime @updatedAt
-  updatedBy              String?
-}
-
-model BriefingLog {
-  id             String   @id @default(cuid())
-  userId         String
-  podcastId      String
-  topicSlugs     String[]
-  articleUrls    String[]
-  generatedAt    DateTime @default(now())
-  userBriefingId String?
-  scheduledDate  String? // "YYYY-MM-DD" for idempotency
-
-  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  podcast      Podcast       @relation(fields: [podcastId], references: [id], onDelete: Cascade)
-  userBriefing UserBriefing? @relation(fields: [userBriefingId], references: [id], onDelete: SetNull)
-
-  @@unique([userBriefingId, scheduledDate])
-  @@index([userId, generatedAt])
 }
 
 // ============ POST-LISTEN QUIZZES ============

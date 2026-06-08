@@ -50,20 +50,10 @@ export interface TasteAnswer {
   response: 'yes' | 'no' | 'skip';
 }
 
-export type InspireSection = 'forYou' | 'trending' | 'news' | 'curiosity';
-export type NewsTimeRange = '1h' | '12h' | '24h' | '1w' | '1m';
+export type InspireSection = 'forYou' | 'trending' | 'curiosity';
 
 export const INSPIRE_SECTION_LABELS: Record<InspireSection, string> = {
   forYou: 'For You',
   trending: 'Trending',
-  news: 'In the News',
   curiosity: 'Curiosity',
-};
-
-export const NEWS_TIME_RANGE_LABELS: Record<NewsTimeRange, string> = {
-  '1h': 'Past hour',
-  '12h': 'Past 12 hours',
-  '24h': 'Past 24 hours',
-  '1w': 'Past week',
-  '1m': 'Past month',
 };
