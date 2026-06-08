@@ -9,7 +9,6 @@ const mockPrismaPodcastFindUniqueOrThrow = vi.fn().mockResolvedValue({
   userId: 'user-1',
   title: 'Test Podcast',
   source: 'WEB',
-  sourceTweetId: null,
   currentVersion: 0,
   audioUrl: null,
   user: { telegramEnabled: false, telegramChatId: null },
@@ -17,11 +16,8 @@ const mockPrismaPodcastFindUniqueOrThrow = vi.fn().mockResolvedValue({
 const mockPrismaPodcastFindUnique = vi.fn().mockResolvedValue(null);
 const mockPrismaPodcastUpdate = vi.fn().mockResolvedValue({});
 const mockPrismaPodcastVersionCreate = vi.fn().mockResolvedValue({});
-const mockPrismaTweetMentionFindFirst = vi.fn().mockResolvedValue(null);
-const mockPrismaTweetMentionUpdate = vi.fn().mockResolvedValue({});
 const mockPrismaTelegramMessageFindFirst = vi.fn().mockResolvedValue(null);
 const mockPrismaTelegramMessageUpdate = vi.fn().mockResolvedValue({});
-const mockPrismaTwitterAutoTweetFindFirst = vi.fn().mockResolvedValue(null);
 const mockPrismaDiscoveryFindUnique = vi.fn().mockResolvedValue({ durationTarget: 5 });
 const mockPrismaPipelineEventCreate = vi.fn().mockResolvedValue({});
 const mockPrismaUserFindUniqueOrThrow = vi.fn().mockResolvedValue({ role: 'USER', plan: 'FREE' });
@@ -50,16 +46,9 @@ vi.mock('@/lib/prisma', () => {
     user: {
       findUniqueOrThrow: (...args: unknown[]) => mockPrismaUserFindUniqueOrThrow(...args),
     },
-    tweetMention: {
-      findFirst: (...args: unknown[]) => mockPrismaTweetMentionFindFirst(...args),
-      update: (...args: unknown[]) => mockPrismaTweetMentionUpdate(...args),
-    },
     telegramMessage: {
       findFirst: (...args: unknown[]) => mockPrismaTelegramMessageFindFirst(...args),
       update: (...args: unknown[]) => mockPrismaTelegramMessageUpdate(...args),
-    },
-    twitterAutoTweet: {
-      findFirst: (...args: unknown[]) => mockPrismaTwitterAutoTweetFindFirst(...args),
     },
     pipelineEvent: {
       create: (...args: unknown[]) => mockPrismaPipelineEventCreate(...args),
@@ -99,18 +88,14 @@ vi.mock('@/lib/queue', () => ({
     SEND_NOTIFICATION: 'send_notification',
     GENERATE_PDF: 'generate_pdf',
     COMPUTE_FEATURES: 'compute_features',
-    REPLY_TWITTER: 'reply_twitter',
     REPLY_TELEGRAM: 'reply_telegram',
-    AUTO_TWEET: 'AUTO_TWEET',
     GENERATE_WAVEFORM: 'generate_waveform',
     GENERATE_QUIZ: 'generate_quiz',
   },
   notificationQueue: { name: 'notifications' },
   pdfGenerationQueue: { name: 'pdf-generation' },
   featureComputationQueue: { name: 'feature-computation' },
-  twitterReplyQueue: { name: 'twitter-reply' },
   telegramReplyQueue: { name: 'telegram-reply' },
-  twitterAutoTweetQueue: { name: 'twitter-auto-tweet' },
   waveformGenerationQueue: { name: 'waveform-generation' },
   quizGenerationQueue: { name: 'quiz-generation' },
 }));
@@ -236,7 +221,6 @@ describe('processAudioStitching', () => {
       userId: 'user-1',
       title: 'Test Podcast',
       source: 'WEB',
-      sourceTweetId: null,
       currentVersion: 0,
       audioUrl: null,
       user: { telegramEnabled: false, telegramChatId: null },
@@ -625,7 +609,6 @@ describe('processAudioStitching', () => {
         userId: 'user-2',
         title: 'Quantum Computing Explained',
         source: 'WEB',
-        sourceTweetId: null,
         currentVersion: 0,
         audioUrl: null,
         user: { telegramEnabled: false, telegramChatId: null },
@@ -675,72 +658,6 @@ describe('processAudioStitching', () => {
         (call) => call[1] === 'compute_features'
       );
       expect(featureCall).toBeUndefined();
-    });
-  });
-
-  describe('Twitter reply (source=TWITTER)', () => {
-    beforeEach(() => {
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
-        userId: 'user-1',
-        title: 'Test Podcast',
-        source: 'TWITTER',
-        sourceTweetId: 'tweet-123',
-        currentVersion: 0,
-        audioUrl: null,
-        user: { telegramEnabled: false, telegramChatId: null },
-      });
-      mockPrismaTweetMentionFindFirst.mockResolvedValue({
-        id: 'mention-1',
-        tweetId: 'tweet-123',
-        status: 'GENERATING',
-      });
-    });
-
-    it('queues Twitter reply when source is TWITTER', async () => {
-      const job = createMockJob(defaultPayload);
-      await processAudioStitching(job);
-
-      expect(mockAddJob).toHaveBeenCalledWith({ name: 'twitter-reply' }, 'reply_twitter', {
-        podcastId: 'podcast-001',
-        tweetMentionId: 'mention-1',
-        originalTweetId: 'tweet-123',
-      });
-    });
-
-    it('updates mention status to READY after queueing reply', async () => {
-      const job = createMockJob(defaultPayload);
-      await processAudioStitching(job);
-
-      expect(mockPrismaTweetMentionUpdate).toHaveBeenCalledWith({
-        where: { id: 'mention-1' },
-        data: { status: 'READY' },
-      });
-    });
-
-    it('does not queue Twitter reply when source is WEB', async () => {
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
-        userId: 'user-1',
-        title: 'Test Podcast',
-        source: 'WEB',
-        sourceTweetId: null,
-        currentVersion: 0,
-        audioUrl: null,
-        user: { telegramEnabled: false, telegramChatId: null },
-      });
-      const job = createMockJob(defaultPayload);
-      await processAudioStitching(job);
-
-      expect(mockPrismaTweetMentionFindFirst).not.toHaveBeenCalled();
-      expect(mockAddJob).toHaveBeenCalledTimes(5); // notification + transcript + feature computation + waveform + quiz
-    });
-
-    it('does not queue Twitter reply when mention is not found', async () => {
-      mockPrismaTweetMentionFindFirst.mockResolvedValue(null);
-      const job = createMockJob(defaultPayload);
-      await processAudioStitching(job);
-
-      const replyJobCall = mockAddJob.mock.calls.find((call) => call[1] === 'reply_twitter');
-      expect(replyJobCall).toBeUndefined();
     });
   });
 
@@ -833,93 +750,6 @@ describe('processAudioStitching', () => {
       await expect(processAudioStitching(job)).rejects.toThrow('R2 upload failed');
     });
 
-    it('does not queue Twitter failure reply in catch block (centralized handler does that)', async () => {
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
-        userId: 'user-1',
-        title: 'Test Podcast',
-        source: 'TWITTER',
-        sourceTweetId: 'tweet-123',
-        currentVersion: 0,
-        audioUrl: null,
-        user: { telegramEnabled: false, telegramChatId: null },
-      });
-      mockStitchWithEffectsAndMusic.mockRejectedValue(new Error('FFmpeg error'));
-      mockPrismaSegmentFindMany.mockReset().mockResolvedValueOnce([
-        { id: 'seg-1', audioUrl: 'https://r2.example.com/seg-1.mp3', order: 0, duration: 100 },
-      ]);
-      const job = createMockJob(defaultPayload);
-
-      await expect(processAudioStitching(job)).rejects.toThrow('FFmpeg error');
-
-      // No twitter-reply job queued from catch block
-      const replyJobCall = mockAddJob.mock.calls.find((call) => call[1] === 'reply_twitter');
-      expect(replyJobCall).toBeUndefined();
-    });
-  });
-
-  describe('retry-after-failure success path', () => {
-    it('finds TweetMention in FAILED status on successful retry', async () => {
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
-        userId: 'user-1',
-        title: 'Retried Podcast',
-        source: 'TWITTER',
-        sourceTweetId: 'tweet-retry',
-        currentVersion: 0,
-        audioUrl: null,
-        user: { telegramEnabled: false, telegramChatId: null },
-      });
-      mockPrismaTweetMentionFindFirst.mockResolvedValue({
-        id: 'mention-failed',
-        tweetId: 'tweet-retry',
-        status: 'FAILED',
-      });
-
-      const job = createMockJob(defaultPayload);
-      await processAudioStitching(job);
-
-      expect(mockAddJob).toHaveBeenCalledWith({ name: 'twitter-reply' }, 'reply_twitter', {
-        podcastId: 'podcast-001',
-        tweetMentionId: 'mention-failed',
-        originalTweetId: 'tweet-retry',
-      });
-    });
-  });
-
-  describe('duration-exceeded failure replies', () => {
-    it('queues Twitter failure reply on duration-exceeded for Twitter-sourced podcast', async () => {
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
-        userId: 'user-1',
-        title: 'Long Podcast',
-        source: 'TWITTER',
-        sourceTweetId: 'tweet-long',
-        currentVersion: 0,
-        audioUrl: null,
-        user: { telegramEnabled: false, telegramChatId: null },
-      });
-      mockPrismaTweetMentionFindFirst.mockResolvedValue({
-        id: 'mention-long',
-        tweetId: 'tweet-long',
-        status: 'GENERATING',
-      });
-      // LIMITS.maxDurationMinutes is 30, so max with 10% grace = 1980s
-      mockStitchWithEffectsAndMusic.mockResolvedValue({ duration: 2100 });
-
-      const job = createMockJob(defaultPayload);
-      await processAudioStitching(job);
-
-      expect(mockMarkPodcastFailed).toHaveBeenCalledWith('podcast-001', expect.objectContaining({
-        technicalError: expect.stringContaining('exceeded max'),
-      }));
-      expect(mockAddJob).toHaveBeenCalledWith(
-        { name: 'twitter-reply' },
-        'reply_twitter',
-        expect.objectContaining({
-          podcastId: 'podcast-001',
-          tweetMentionId: 'mention-long',
-          originalTweetId: 'tweet-long',
-        })
-      );
-    });
   });
 
   describe('end-to-end flow', () => {
@@ -1025,50 +855,5 @@ describe('processAudioStitching', () => {
       });
     });
 
-    it('executes full pipeline for Twitter-sourced podcast', async () => {
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
-        userId: 'user-1',
-        title: 'Twitter Podcast',
-        source: 'TWITTER',
-        sourceTweetId: 'tweet-789',
-        currentVersion: 0,
-        audioUrl: null,
-        user: { telegramEnabled: false, telegramChatId: null },
-      });
-      mockPrismaTweetMentionFindFirst.mockResolvedValue({
-        id: 'mention-2',
-        tweetId: 'tweet-789',
-        status: 'GENERATING',
-      });
-
-      const job = createMockJob(defaultPayload);
-      await processAudioStitching(job);
-
-      // Notification queued
-      expect(mockAddJob).toHaveBeenCalledWith(
-        expect.anything(),
-        'send_notification',
-        expect.anything()
-      );
-
-      // Twitter reply queued
-      expect(mockAddJob).toHaveBeenCalledWith({ name: 'twitter-reply' }, 'reply_twitter', {
-        podcastId: 'podcast-001',
-        tweetMentionId: 'mention-2',
-        originalTweetId: 'tweet-789',
-      });
-
-      // Mention status updated
-      expect(mockPrismaTweetMentionUpdate).toHaveBeenCalledWith({
-        where: { id: 'mention-2' },
-        data: { status: 'READY' },
-      });
-
-      // Podcast completed
-      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
-        where: { id: 'podcast-001' },
-        data: expect.objectContaining({ status: 'READY' }),
-      });
-    });
   });
 });

@@ -25,7 +25,6 @@ export type PodcastVisibility = 'PUBLIC' | 'UNLISTED' | 'PRIVATE';
 
 export type PodcastSource =
   | 'WEB'
-  | 'TWITTER'
   | 'TELEGRAM'
   | 'API'
   | 'AGENT'
@@ -48,15 +47,6 @@ export type ReferenceType = 'WEB' | 'PAPER' | 'BOOK' | 'ARTICLE' | 'VIDEO' | 'RE
 
 export type VerificationStatus = 'PENDING' | 'VERIFIED' | 'FAILED' | 'REPLACED' | 'REMOVED';
 
-export type TweetMentionStatus =
-  | 'PENDING'
-  | 'PARSING'
-  | 'GENERATING'
-  | 'READY'
-  | 'REPLIED'
-  | 'FAILED'
-  | 'IGNORED';
-
 export type TelegramMessageStatus =
   | 'PENDING'
   | 'DISCOVERING'
@@ -70,7 +60,6 @@ export type NotificationType =
   | 'PODCAST_READY'
   | 'PODCAST_FAILED'
   | 'KEY_INVALID'
-  | 'TWITTER_PODCAST_READY'
   | 'TELEGRAM_PODCAST_READY'
   | 'VOICE_REQUEST_RECEIVED'
   | 'VOICE_REQUEST_APPROVED'

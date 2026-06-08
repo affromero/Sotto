@@ -43,8 +43,6 @@ export enum JobType {
   REGENERATE_SEGMENT = 'regenerate_segment',
   SEND_NOTIFICATION = 'send_notification',
   GENERATE_PDF = 'generate_pdf',
-  POLL_TWITTER_MENTIONS = 'poll_twitter_mentions',
-  REPLY_TWITTER = 'reply_twitter',
   IMPORT_AUDIO = 'import_audio',
   INGEST_EVENTS = 'ingest_events',
   COMPUTE_FEATURES = 'compute_features',
@@ -52,9 +50,6 @@ export enum JobType {
   VALIDATE_KEYS = 'validate_keys',
   POLL_TELEGRAM_UPDATES = 'poll_telegram_updates',
   REPLY_TELEGRAM = 'reply_telegram',
-  AUTO_TWEET = 'auto_tweet',
-  POLL_TWITTER_TRENDS = 'poll_twitter_trends',
-  ADMIN_THREAD_TO_PODCAST = 'admin_thread_to_podcast',
   MODERATE_CONTENT = 'moderate_content',
   SEND_EMAIL_DIGEST = 'send_email_digest',
   SEND_ANNOUNCEMENT = 'send_announcement',
@@ -218,16 +213,6 @@ export interface GeneratePdfPayload {
   userId: string;
 }
 
-export interface PollTwitterMentionsPayload {
-  // Empty — repeatable job, no per-invocation data
-}
-
-export interface ReplyTwitterPayload {
-  podcastId: string;
-  tweetMentionId: string;
-  originalTweetId: string;
-}
-
 export interface ImportAudioPayload {
   podcastId: string;
   userId: string;
@@ -284,13 +269,6 @@ export interface ReplyTelegramPayload {
   chatId: string;
 }
 
-export interface AutoTweetPayload {
-  podcastId: string;
-  trigger: 'threshold' | 'manual' | 'trend';
-}
-
-export interface PollTwitterTrendsPayload {}
-
 export interface NewsIngestPayload {}
 
 export interface GenerateDemoScriptPayload {
@@ -325,13 +303,6 @@ export interface ComposeDemoPayload {
 export interface ComposeDemoScenePayload {
   projectId: string;
   sceneId: string;
-}
-
-export interface AdminThreadToPodcastPayload {
-  tweetUrl: string;
-  adminUserId: string;
-  message?: string;
-  podcastId?: string;
 }
 
 export interface ModerateContentPayload {
@@ -488,8 +459,6 @@ const QUEUE_DEFINITIONS: Record<string, QueueDefinition> = {
   'segment-regeneration': { attempts: 2 },
   notifications: { attempts: 5, skipEvents: true },
   'pdf-generation': { attempts: 2, skipEvents: true },
-  'twitter-mentions': { attempts: 1, skipEvents: true },
-  'twitter-reply': { attempts: 3, skipEvents: true },
   'event-ingestion': { attempts: 2, removeOnComplete: { age: 3600, count: 500 }, skipEvents: true },
   'audio-import': { attempts: 2 },
   'feature-computation': { attempts: 2, skipEvents: true },
@@ -497,9 +466,6 @@ const QUEUE_DEFINITIONS: Record<string, QueueDefinition> = {
   'key-validation': { attempts: 1, skipEvents: true },
   'telegram-bot': { attempts: 1, skipEvents: true },
   'telegram-reply': { attempts: 3, skipEvents: true },
-  'twitter-auto-tweet': { attempts: 3, skipEvents: true },
-  'twitter-trend-poll': { attempts: 1, skipEvents: true },
-  'admin-thread-to-podcast': { attempts: 2, skipEvents: true },
   'content-moderation': { attempts: 2, skipEvents: true },
   'email-digest': { attempts: 2, skipEvents: true },
   announcements: { attempts: 2, skipEvents: true },
@@ -692,7 +658,6 @@ async function handleWorkerFailure(
         title: true,
         ttsProvider: true,
         source: true,
-        sourceTweetId: true,
         user: { select: { name: true, email: true, telegramEnabled: true, telegramChatId: true } },
       },
     });
@@ -990,31 +955,6 @@ async function handleWorkerFailure(
       }
     }
 
-    if (podcast.source === 'TWITTER' && podcast.sourceTweetId) {
-      const twitterReplyQ = createQueue('twitter-reply');
-      if (twitterReplyQ) {
-        const mention = await prisma.tweetMention
-          .findFirst({
-            where: { podcastId, status: { in: ['GENERATING', 'READY'] } },
-            select: { id: true, tweetId: true },
-          })
-          .catch(() => null);
-        if (mention) {
-          await twitterReplyQ
-            .add(
-              'reply_twitter',
-              {
-                podcastId,
-                tweetMentionId: mention.id,
-                originalTweetId: mention.tweetId,
-              },
-              { jobId: `twitter-fail-${podcastId}-${Date.now()}` }
-            )
-            .catch(() => {});
-        }
-      }
-    }
-
     if (podcast.user?.telegramEnabled && podcast.user?.telegramChatId) {
       const telegramReplyQ = createQueue('telegram-reply');
       if (telegramReplyQ) {
@@ -1156,8 +1096,6 @@ export const notificationQueue = createQueueReference('notifications');
 export const referenceValidationQueue = createQueueReference('reference-validation');
 export const pdfGenerationQueue = createQueueReference('pdf-generation');
 export const scriptVerificationQueue = createQueueReference('script-verification');
-export const twitterMentionsQueue = createQueueReference('twitter-mentions');
-export const twitterReplyQueue = createQueueReference('twitter-reply');
 export const eventIngestionQueue = createQueueReference('event-ingestion');
 export const audioImportQueue = createQueueReference('audio-import');
 export const featureComputationQueue = createQueueReference('feature-computation');
@@ -1165,9 +1103,6 @@ export const dataExportQueue = createQueueReference('data-export');
 export const keyValidationQueue = createQueueReference('key-validation');
 export const telegramBotQueue = createQueueReference('telegram-bot');
 export const telegramReplyQueue = createQueueReference('telegram-reply');
-export const twitterAutoTweetQueue = createQueueReference('twitter-auto-tweet');
-export const twitterTrendPollQueue = createQueueReference('twitter-trend-poll');
-export const adminThreadToPodcastQueue = createQueueReference('admin-thread-to-podcast');
 export const contentModerationQueue = createQueueReference('content-moderation');
 export const emailDigestQueue = createQueueReference('email-digest');
 export const announcementQueue = createQueueReference('announcements');

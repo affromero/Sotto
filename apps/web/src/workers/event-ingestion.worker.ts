@@ -2,7 +2,7 @@ import { Job } from 'bullmq';
 import { createHash } from 'crypto';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
-import { checkAutoTweetThreshold } from '@/lib/twitter-auto-tweet';
+
 import { addJob, featureComputationQueue, JobType } from '@/lib/queue';
 import type { IngestEventsPayload } from '@/lib/queue';
 
@@ -157,11 +157,6 @@ export async function processEventIngestion(
             data: { playCount: { increment: 1 } },
           });
           return session;
-        });
-
-        // Fire-and-forget auto-tweet threshold check (after transaction committed)
-        checkAutoTweetThreshold(podcastId).catch((err) => {
-          logger.warn('checkAutoTweetThreshold failed', { podcastId, error: err instanceof Error ? err.message : String(err) });
         });
       }
 

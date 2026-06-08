@@ -35,7 +35,6 @@ interface NotificationListProps {
 const typeIcons: Record<string, typeof Bell> = {
   // Pipeline — success
   PODCAST_READY: Headphones,
-  TWITTER_PODCAST_READY: Headphones,
   TELEGRAM_PODCAST_READY: Headphones,
   SCRIPT_READY: FileText,
   VIDEO_READY: Video,

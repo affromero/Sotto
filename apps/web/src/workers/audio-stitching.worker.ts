@@ -6,10 +6,7 @@ import {
   notificationQueue,
   pdfGenerationQueue,
   featureComputationQueue,
-  twitterReplyQueue,
   telegramReplyQueue,
-  twitterAutoTweetQueue,
-  visualClassificationQueue,
   waveformGenerationQueue,
   quizGenerationQueue,
 } from '@/lib/queue';
@@ -192,7 +189,7 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
     // 3. Load podcast metadata
     const podcast = await prisma.podcast.findUniqueOrThrow({
       where: { id: podcastId },
-      select: { userId: true, title: true, source: true, sourceTweetId: true,
+      select: { userId: true, title: true, source: true,
                 user: { select: { telegramEnabled: true, telegramChatId: true } } },
     });
     const usePremiumSfx = LIMITS.hasPremiumSfx;
@@ -360,19 +357,6 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
         durationSeconds: String(Math.round(duration)),
         maxSeconds: String(Math.round(maxDurationSeconds)),
       });
-
-      // Queue Twitter failure reply for duration-exceeded
-      if (podcast.source === 'TWITTER' && podcast.sourceTweetId) {
-        const mention = await prisma.tweetMention.findFirst({
-          where: { podcastId, status: { in: ['GENERATING', 'READY'] } },
-          select: { id: true, tweetId: true },
-        }).catch(() => null);
-        if (mention) {
-          await addJob(twitterReplyQueue, JobType.REPLY_TWITTER, {
-            podcastId, tweetMentionId: mention.id, originalTweetId: mention.tweetId,
-          }).catch(() => {});
-        }
-      }
 
       // Queue Telegram failure reply for duration-exceeded
       if (podcast.user.telegramEnabled && podcast.user.telegramChatId) {
@@ -558,11 +542,9 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
     // 10. Send notification (source-specific type for display differentiation)
     const notificationType = podcast.source === 'BRIEFING'
       ? 'BRIEFING_READY'
-      : podcast.source === 'TWITTER'
-        ? 'TWITTER_PODCAST_READY'
-        : podcast.source === 'TELEGRAM'
-          ? 'TELEGRAM_PODCAST_READY'
-          : 'PODCAST_READY';
+      : podcast.source === 'TELEGRAM'
+        ? 'TELEGRAM_PODCAST_READY'
+        : 'PODCAST_READY';
     const isBriefing = podcast.source === 'BRIEFING';
 
     // Idempotency: skip if a notification for this podcast+type already exists (stalled job retry)
@@ -619,115 +601,7 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
     // 10c4. Generate post-listen quiz
     await addJob(quizGenerationQueue, JobType.GENERATE_QUIZ, { podcastId }).catch(() => {});
 
-    // 10d. If this podcast has a pending trend auto-tweet, queue it
-    const pendingAutoTweet = await prisma.twitterAutoTweet.findFirst({
-      where: { podcastId, trigger: 'trend', status: 'pending' },
-    });
-    if (pendingAutoTweet) {
-      await addJob(twitterAutoTweetQueue, JobType.AUTO_TWEET, {
-        podcastId,
-        trigger: 'trend' as const,
-      });
-    }
-
-    // 11. If generated from Twitter, queue a reply to the original tweet
-    if (podcast.source === 'TWITTER' && podcast.sourceTweetId) {
-      const mention = await prisma.tweetMention.findFirst({
-        where: { podcastId, status: { in: ['GENERATING', 'FAILED'] } },
-        select: { id: true, tweetId: true },
-      });
-      if (mention) {
-        await addJob(twitterReplyQueue, JobType.REPLY_TWITTER, {
-          podcastId,
-          tweetMentionId: mention.id,
-          originalTweetId: mention.tweetId,
-        });
-        await prisma.tweetMention.update({
-          where: { id: mention.id },
-          data: { status: 'READY' },
-        });
-      }
-    }
-
-    // 11b. Auto-trigger video generation if tweet requested it
-    if (!skipSfx && podcast.source === 'TWITTER') {
-      const mentionWithVideoPrefs = await prisma.tweetMention.findFirst({
-        where: { podcastId },
-        select: { videoPrefs: true },
-      });
-      const videoPrefs = mentionWithVideoPrefs?.videoPrefs as { imageModel?: string; videoModel?: string; avatarModel?: string; wantsVideo?: boolean; wantsAvatar?: boolean } | null;
-      if (videoPrefs?.wantsVideo) {
-        const { checkVideoGenerationGate, tryIncrementVideoGeneration } = await import('@/lib/video-gate');
-        const gate = await checkVideoGenerationGate(podcast.userId);
-        if (gate.allowed) {
-          // Increment daily counter for non-BYOK users; skip video if limit reached
-          let videoLimitOk = true;
-          if (!gate.isByokUser) {
-            videoLimitOk = await tryIncrementVideoGeneration(podcast.userId, gate.dailyLimit);
-            if (!videoLimitOk) {
-              logger.info('Skipped auto video generation: daily limit reached', { podcastId });
-            }
-          }
-          const existing = await prisma.videoGeneration.findFirst({ where: { podcastId, voiceTrackId: null } });
-          if (videoLimitOk && !existing) {
-            const videoGen = await prisma.videoGeneration.create({
-              data: {
-                podcastId,
-                status: 'PENDING',
-                imageModel: videoPrefs.imageModel ?? null,
-                videoModel: videoPrefs.videoModel ?? null,
-              },
-            });
-            // Auto-create avatar overlays if requested
-            if (videoPrefs.wantsAvatar) {
-              try {
-                const avatarId = await pickDefaultAvatarId(podcastId);
-                const speakers = ['HOST', 'EXPERT'];
-                for (const speaker of speakers) {
-                  await prisma.avatarOverlay.create({
-                    data: {
-                      videoGenerationId: videoGen.id,
-                      speaker,
-                      avatarId,
-                      status: 'pending',
-                    },
-                  });
-                }
-                logger.info('Auto-created avatar overlays from tweet', {
-                  podcastId,
-                  avatarId,
-                  avatarModel: videoPrefs.avatarModel ?? 'default',
-                });
-              } catch (avatarErr) {
-                logger.warn('Failed to auto-create avatar overlays', {
-                  podcastId,
-                  error: avatarErr instanceof Error ? avatarErr.message : String(avatarErr),
-                });
-              }
-            }
-
-            await addJob(visualClassificationQueue, JobType.CLASSIFY_VISUALS, {
-              podcastId,
-              videoGenerationId: videoGen.id,
-              userId: podcast.userId,
-            });
-            logger.info('Auto-triggered video generation from tweet', {
-              podcastId,
-              imageModel: videoPrefs.imageModel ?? 'default',
-              videoModel: videoPrefs.videoModel ?? 'default',
-              wantsAvatar: String(!!videoPrefs.wantsAvatar),
-            });
-          }
-        } else {
-          logger.info('Skipping video auto-trigger — user not gated for video', {
-            podcastId,
-            reason: gate.reason,
-          });
-        }
-      }
-    }
-
-    // 12. If user has Telegram enabled, send a notification
+    // 11. If user has Telegram enabled, send a notification
     if (!skipSfx && podcast.user.telegramEnabled && podcast.user.telegramChatId) {
       // Idempotency: skip if Telegram reply was already sent for this podcast (stalled job retry)
       const existingTgReply = await prisma.telegramMessage.findFirst({
@@ -772,37 +646,4 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
     // 11. Clean up temp directory
     await rm(tmpDir, { recursive: true, force: true }).catch(() => {});
   }
-}
-
-/**
- * Pick a default HeyGen stock avatar ID for auto-triggered avatar generation.
- * Uses Redis-cached avatar list (same cache as GET /api/podcasts/[id]/video/avatars),
- * then deterministically selects one by hashing the podcastId.
- */
-async function pickDefaultAvatarId(podcastId: string): Promise<string> {
-  const { createHash } = await import('crypto');
-  const { listAvatars } = await import('@/lib/heygen');
-  const { getRedisClient } = await import('@/lib/redis');
-
-  const apiKey = process.env.HEYGEN_API_KEY;
-  if (!apiKey) throw new Error('HEYGEN_API_KEY is not configured');
-
-  const redis = getRedisClient();
-  const cacheKey = 'heygen:avatars:stock';
-  let avatars: Array<{ avatar_id: string; premium: boolean }>;
-
-  const cached = await redis.get(cacheKey);
-  if (cached) {
-    avatars = JSON.parse(cached);
-  } else {
-    const all = await listAvatars(apiKey);
-    avatars = all.filter((a) => !a.premium);
-    await redis.set(cacheKey, JSON.stringify(avatars), 'EX', 3600).catch(() => {});
-  }
-
-  if (avatars.length === 0) throw new Error('No stock avatars available');
-
-  const hash = createHash('sha256').update(podcastId).digest();
-  const index = hash.readUInt32BE(0) % avatars.length;
-  return avatars[index].avatar_id;
 }

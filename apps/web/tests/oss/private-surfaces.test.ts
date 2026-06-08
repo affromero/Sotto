@@ -251,10 +251,7 @@ describe('private-first OSS surfaces', () => {
     const runtimeUrlSources = [
       'src/lib/urls.ts',
       'src/lib/telegram-handler.ts',
-      'src/workers/twitter-reply.worker.ts',
       'src/workers/telegram-reply.worker.ts',
-      'src/workers/twitter-auto-tweet.worker.ts',
-      'src/workers/twitter-mentions.worker.ts',
     ]
       .map(readSource)
       .join('\n');
@@ -584,12 +581,8 @@ describe('private-first OSS surfaces', () => {
       'docs/07-ai-prompts.md',
       'docs/17-authentication-setup.md',
       'docs/25-twitter-integration.md',
-      'apps/web/prompts/social/mention-filter.md',
       'apps/web/prompts/social/telegram-parser.md',
-      'apps/web/prompts/social/thread-analyzer.md',
-      'apps/web/prompts/social/tweet-parser.md',
       'apps/web/src/app/(admin)/admin/queues/queue-metadata.ts',
-      'apps/web/src/app/(admin)/admin/twitter/page.tsx',
       'apps/web/src/app/(dashboard)/ideas/tabs/IdeasTab.tsx',
       'apps/web/src/app/(dashboard)/settings/SettingsForm.tsx',
       'apps/web/src/app/changelog/page.tsx',
@@ -600,9 +593,6 @@ describe('private-first OSS surfaces', () => {
       'apps/web/src/components/layout/Footer.tsx',
       'apps/web/src/lib/bot-identity.ts',
       'apps/web/src/lib/email-templates.ts',
-      'apps/web/src/lib/mention-filter.ts',
-      'apps/web/src/lib/twitter.ts',
-      'apps/web/src/lib/tweet-parser.ts',
       'apps/web/src/workers/CLAUDE.md',
       'packages/shared/src/brand.ts',
     ]
@@ -630,18 +620,13 @@ describe('private-first OSS surfaces', () => {
       'apps/web/prisma/seed.ts',
       'apps/web/src/lib/system-user.ts',
       'apps/web/src/lib/briefing-generator.ts',
-      'apps/web/src/workers/twitter-trend-poll.worker.ts',
-      'apps/web/src/workers/admin-thread-to-podcast.worker.ts',
       'apps/web/src/workers/CLAUDE.md',
       'apps/web/src/app/api/admin/podcasts/create-as-system-owner/route.ts',
       'apps/web/src/app/api/admin/landing-showcase/bootstrap/route.ts',
-      'apps/web/src/app/api/admin/twitter/trends/route.ts',
-      'apps/web/src/app/api/admin/twitter/analytics/route.ts',
       'apps/web/src/app/api/admin/impersonate/targets/route.ts',
       'apps/web/src/app/(admin)/admin/podcasts/CreateAsSystemOwnerButton.tsx',
       'apps/web/src/app/(admin)/admin/podcasts/page.tsx',
       'apps/web/src/app/(admin)/admin/podcasts/page.module.css',
-      'apps/web/src/app/(admin)/admin/twitter/ThreadSection.tsx',
       'apps/web/src/app/create/CreatePageClient.tsx',
       'apps/web/src/components/layout/AccountSwitcher.tsx',
     ]
@@ -1071,27 +1056,6 @@ describe('private-first OSS surfaces', () => {
     expect(releaseDocsSource).toContain('private RSS');
     expect(releaseDocsSource).toContain('implicit provider fallback');
     expect(releaseDocsSource).toContain('Managed hosting');
-  });
-
-  it('keeps Twitter auto-tweet thresholds scoped to private playback', () => {
-    const twitterThresholdSources = [
-      'src/lib/twitter-auto-tweet.ts',
-      'src/lib/twitter-config.ts',
-      'src/types/twitter.ts',
-      'src/lib/validations.ts',
-      'src/app/(admin)/admin/twitter/AutoTweetSection.tsx',
-    ]
-      .map(readSource)
-      .concat(readFileSync(resolve(repoRoot, 'apps/web/prisma/schema.prisma'), 'utf8'))
-      .join('\n');
-
-    expect(twitterThresholdSources).toContain('minPlays');
-    expect(twitterThresholdSources).not.toContain('minLikes');
-    expect(twitterThresholdSources).not.toContain('minForks');
-    expect(twitterThresholdSources).not.toContain('likeCount >=');
-    expect(twitterThresholdSources).not.toContain('forkCount >=');
-    expect(twitterThresholdSources).not.toContain('Min Likes');
-    expect(twitterThresholdSources).not.toContain('Min Forks');
   });
 
   it('keeps admin activity metrics private instead of social', () => {

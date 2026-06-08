@@ -15,7 +15,6 @@ Shared types used across the application. These mirror Prisma models but are sha
 | `analytics.ts`    | UsageStats, AnalyticsData, CostBreakdown                                                                                                                          |
 | `api-key.ts`      | ApiKeyData, CreateKeyRequest, KeyListResponse                                                                                                                     |
 | `team.ts`         | TeamData, TeamInviteData, TeamMember                                                                                                                              |
-| `twitter.ts`      | TweetParseResult, TwitterTweet, TwitterMention, TwitterSettingsData, TweetMentionData                                                                             |
 | `events.ts`       | EventPayload (discriminated union of 17 private workspace event types), EventContext, BehavioralEventInput                                                        |
 | `version.ts`      | PodcastVersionData, PodcastVersionSegmentData                                                                                                                     |
 | `import.ts`       | ImportPodcastRequest, ImportProgress, ImportStatus                                                                                                                |
@@ -38,7 +37,6 @@ This means `@/types/*` imports throughout the web app don't change.
 
 - `podcast.ts` — uses `PodcastStatus`, `PodcastVisibility`, `PodcastSource`, `Speaker`
 - `reference.ts` — uses `ReferenceType`, `VerificationStatus`
-- `twitter.ts` — uses `TweetMentionStatus`
 - `telegram.ts` — uses `TelegramMessageStatus`
 - `next-auth.d.ts` — uses `UserRole` (NextAuth module augmentation)
 
