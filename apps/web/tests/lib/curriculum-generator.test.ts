@@ -8,7 +8,7 @@
  *  - On a P2002 unique race, re-fetches and returns the winning curriculum
  *  - Throws when no AI key is configured
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // ── Mock declarations (must be hoisted) ──────────────────────────────────────
 
@@ -118,6 +118,10 @@ describe('getOrCreateCurriculum', () => {
       outputTokens: 500,
       model: 'claude-haiku-4-5-20251001',
     });
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   // ── Happy-path: curriculum already exists ──────────────────────────────────
@@ -283,15 +287,33 @@ describe('getOrCreateCurriculum', () => {
     expect(mockCurriculumFindUnique).toHaveBeenCalledTimes(2);
   });
 
-  // ── Missing AI key ─────────────────────────────────────────────────────────
+  // ── No AI provider available ─────────────────────────────────────────────────
 
-  it('throws when no AI key is configured for the user', async () => {
+  it('throws when there is no BYOK key and no local agent configured', async () => {
     mockCurriculumFindUnique.mockResolvedValue(null);
     mockGetAiKey.mockResolvedValue(null);
+    vi.stubEnv('AI_PROVIDER', '');
 
     await expect(getOrCreateCurriculum('user-no-key', 'en', 'de')).rejects.toThrow(
       /AI provider/i,
     );
     expect(mockGenerateResponse).not.toHaveBeenCalled();
+  });
+
+  // ── Keyless local-agent path ─────────────────────────────────────────────────
+
+  it('generates via the keyless local agent when no BYOK key but AI_PROVIDER=claude-code', async () => {
+    mockCurriculumFindUnique.mockResolvedValue(null);
+    mockGetAiKey.mockResolvedValue(null);
+    vi.stubEnv('AI_PROVIDER', 'claude-code');
+    mockGetAiProviderMeta.mockReturnValue({ defaultModel: 'claude-sonnet-4-6' });
+    setupSuccessfulTransaction('agent-built');
+
+    const result = await getOrCreateCurriculum('user-agent', 'en', 'de');
+
+    expect(result).toEqual({ id: 'agent-built' });
+    expect(mockGenerateResponse).toHaveBeenCalled();
+    // Keyless path: no apiKey override is forwarded to the provider.
+    expect(mockGenerateResponse.mock.calls[0][2]).toMatchObject({ apiKeyOverride: undefined });
   });
 });

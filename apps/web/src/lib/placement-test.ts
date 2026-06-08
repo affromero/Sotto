@@ -2,8 +2,7 @@
 // user's AI provider (BYOK or local Claude/Codex), render a prompt, call the
 // model, parse JSON. A single batch of questions spans A1..B2; the learner's
 // level is the highest band they clear on a staircase.
-import { getAiKey } from './byok';
-import { getAiProviderMeta, type AiProviderId } from './providers/ai-registry';
+import { resolveLearningAi } from './learning-ai';
 import { createAIProvider } from './providers/ai';
 import { loadAndRender } from './prompt-loader';
 import { logUsage } from './usage-logger';
@@ -33,30 +32,13 @@ export function toPublic(q: PlacementQuestion): PlacementQuestionPublic {
   return { id: q.id, cefr: q.cefr, skill: q.skill, prompt: q.prompt, options: q.options };
 }
 
-interface ResolvedAi {
-  provider: AiProviderId;
-  model: string;
-  apiKey?: string;
-}
-
-async function resolvePlacementAi(userId: string): Promise<ResolvedAi> {
-  const aiKey = await getAiKey(userId);
-  if (!aiKey) {
-    throw new Error('An AI provider key (or a configured local Claude/Codex) is required to run the placement test.');
-  }
-  const model = getAiProviderMeta(aiKey.provider).defaultModel;
-  if (!model) {
-    throw new Error(`No default AI model configured for provider "${aiKey.provider}".`);
-  }
-  return { provider: aiKey.provider, model, apiKey: aiKey.apiKey };
-}
 
 export async function generatePlacement(
   userId: string,
   nativeLang: string,
   targetLang: string,
 ): Promise<{ questions: PlacementQuestion[]; provider: string; model: string }> {
-  const ai = await resolvePlacementAi(userId);
+  const ai = await resolveLearningAi(userId);
   const count = PLACEMENT_LEVELS.length * PER_BAND;
 
   const systemPrompt = loadAndRender('placement/placement-probe.md', {

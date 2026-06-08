@@ -2,8 +2,7 @@ import { Job } from 'bullmq';
 import { Prisma } from '@prisma/client';
 import { SpeakingGradingPayload } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
-import { getAiKey } from '@/lib/byok';
-import { getAiProviderMeta } from '@/lib/providers/ai-registry';
+import { resolveLearningAi } from '@/lib/learning-ai';
 import { resolveSttProvider, createSttProvider } from '@/lib/providers/stt';
 import { resolvePronunciationScorer } from '@/lib/pronunciation/scorer';
 import { logger } from '@/lib/logger';
@@ -101,13 +100,8 @@ export async function processSpeakingGrading(job: Job<SpeakingGradingPayload>): 
   }
 
   try {
-    // Resolve AI key for scorer
-    const aiKey = await getAiKey(userId);
-    if (!aiKey) {
-      throw new Error(`No AI key available for user ${userId}. Configure an AI key to enable pronunciation scoring.`);
-    }
-
-    const aiModel = getAiProviderMeta(aiKey.provider).defaultModel;
+    // Resolve the learning AI provider (BYOK or local agent) for the scorer
+    const ai = await resolveLearningAi(userId);
 
     const scorer = resolvePronunciationScorer({});
     const score = await scorer.score({
@@ -115,9 +109,9 @@ export async function processSpeakingGrading(job: Job<SpeakingGradingPayload>): 
       transcript,
       wordTimings,
       targetLang,
-      aiProvider: aiKey.provider,
-      aiModel,
-      aiApiKey: aiKey.apiKey,
+      aiProvider: ai.provider,
+      aiModel: ai.model,
+      aiApiKey: ai.apiKey,
       userId,
     });
 

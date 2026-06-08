@@ -7,8 +7,7 @@
 // 6. Generates comprehension MC questions over the transcript.
 // 7. Creates the ClassSection + LessonQuestion rows (status: READY).
 import { prisma } from './prisma';
-import { getAiKey } from './byok';
-import { getAiProviderMeta } from './providers/ai-registry';
+import { resolveLearningAi } from './learning-ai';
 import { createAIProvider } from './providers/ai';
 import { loadAndRender } from './prompt-loader';
 import { generateScript } from './script-generator';
@@ -35,15 +34,8 @@ export interface ClassListeningResult {
 }
 
 export async function generateClassListening(p: ClassListeningParams): Promise<ClassListeningResult> {
-  // Step 1: resolve AI key
-  const aiKey = await getAiKey(p.userId);
-  if (!aiKey) {
-    throw new Error('An AI provider key (or a configured local Claude/Codex) is required to generate the listening section.');
-  }
-  const model = getAiProviderMeta(aiKey.provider).defaultModel;
-  if (!model) {
-    throw new Error(`No default AI model configured for provider "${aiKey.provider}".`);
-  }
+  // Step 1: resolve the learning AI provider (BYOK or local agent)
+  const ai = await resolveLearningAi(p.userId);
 
   // Step 2: create a CLASS podcast
   const podcast = await prisma.podcast.create({
@@ -68,9 +60,9 @@ export async function generateClassListening(p: ClassListeningParams): Promise<C
       focusAreas: [],
       tone: 'casual',
       durationTarget: 4,
-      provider: aiKey.provider,
-      model,
-      apiKeyOverride: aiKey.apiKey,
+      provider: ai.provider,
+      model: ai.model,
+      apiKeyOverride: ai.apiKey,
       source: 'CLASS',
       targetLanguage: p.targetLang,
       languageMode: 'conversational_mix',
@@ -110,7 +102,7 @@ export async function generateClassListening(p: ClassListeningParams): Promise<C
 
     // Step 6: log usage
     logUsage({
-      service: aiKey.provider,
+      service: ai.provider,
       model: result.model,
       category: 'class-listening-script',
       inputTokens: result.inputTokens,
@@ -148,15 +140,15 @@ export async function generateClassListening(p: ClassListeningParams): Promise<C
       TRANSCRIPT: transcript,
     });
 
-    const provider = createAIProvider(aiKey.provider);
+    const provider = createAIProvider(ai.provider);
     const quizResponse = await provider.generateResponse(
       systemPrompt,
       [{ role: 'user', content: `Generate ${LISTENING_QUIZ_COUNT} listening comprehension questions.` }],
-      { model, apiKeyOverride: aiKey.apiKey, maxTokens: 4096, temperature: 0.7 },
+      { model: ai.model, apiKeyOverride: ai.apiKey, maxTokens: 4096, temperature: 0.7 },
     );
 
     logUsage({
-      service: aiKey.provider,
+      service: ai.provider,
       model: quizResponse.model,
       category: 'class-listening-quiz',
       inputTokens: quizResponse.inputTokens,
