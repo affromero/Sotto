@@ -1,0 +1,21 @@
+{
+  "slug": "a1-nouns-articles-gender",
+  "level": "A1",
+  "order": 3,
+  "title": "Nouns, articles, and grammatical gender",
+  "objective": "Identify the three grammatical genders in German and use the correct definite and indefinite articles with common nouns.",
+  "grammarPoints": ["definite-articles-der-die-das", "indefinite-articles-ein", "noun-gender", "noun-plurals-basic"],
+  "vocabThemes": ["everyday-objects", "classroom", "basic-nouns"],
+  "targetVocab": [
+    { "lemma": "der Mann", "gloss": "the man", "pos": "noun" },
+    { "lemma": "die Frau", "gloss": "the woman", "pos": "noun" },
+    { "lemma": "das Kind", "gloss": "the child", "pos": "noun" },
+    { "lemma": "ein Buch", "gloss": "a book", "pos": "noun" },
+    { "lemma": "eine Tasche", "gloss": "a bag", "pos": "noun" },
+    { "lemma": "der Tisch", "gloss": "the table", "pos": "noun" },
+    { "lemma": "das Fenster", "gloss": "the window", "pos": "noun" },
+    { "lemma": "die Tür", "gloss": "the door", "pos": "noun" }
+  ],
+  "canDoSummary": "I can use der, die, das and ein, eine correctly with common everyday nouns.",
+  "estMinutes": 60
+}

@@ -2401,3 +2401,63 @@ model ShowcaseSet {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+// ============ LANGUAGE LEARNING — CURRICULUM ============
+
+enum CefrLevel {
+  A1
+  A2
+  B1
+  B2
+  C1
+  C2
+}
+
+enum LanguagePair {
+  DE_FROM_EN // German for English speakers
+  EN_FROM_ES // English for Spanish speakers
+  ES_FROM_EN // Spanish for English speakers
+}
+
+// Global, seeded curriculum: one per language pair (the fixed CEFR lesson tree).
+model Curriculum {
+  id         String       @id @default(cuid())
+  pair       LanguagePair @unique
+  nativeLang String // ISO 639-1, e.g. "en"
+  targetLang String // ISO 639-1, e.g. "de"
+  title      String
+  version    Int          @default(1)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  lessons Lesson[]
+}
+
+// A node in the fixed lesson tree. Ordering + competencies are fixed; class
+// instances generated from a lesson adapt to the learner's weak items.
+model Lesson {
+  id            String    @id @default(cuid())
+  curriculumId  String
+  level         CefrLevel
+  order         Int // global gate ordering within the curriculum
+  parentId      String? // tree: unit -> lesson; null = top-level unit
+  slug          String // stable key, e.g. "a1-greetings"
+  title         String
+  objective     String    @db.Text
+  grammarPoints Json // string[] of grammar topic keys, e.g. ["present-tense-sein"]
+  vocabThemes   Json // string[] themes, e.g. ["greetings","numbers-1-20"]
+  targetVocab   Json // [{ lemma, gloss, pos? }]
+  canDoSummary  String?   @db.Text // CEFR can-do statement
+  estMinutes    Int       @default(60)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  curriculum Curriculum @relation(fields: [curriculumId], references: [id], onDelete: Cascade)
+  parent     Lesson?    @relation("LessonTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children   Lesson[]   @relation("LessonTree")
+
+  @@unique([curriculumId, slug])
+  @@unique([curriculumId, order])
+  @@index([curriculumId, level, order])
+  @@index([parentId])
+}

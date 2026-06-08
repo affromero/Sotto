@@ -1,0 +1,22 @@
+{
+  "slug": "a2-work-occupations",
+  "level": "A2",
+  "order": 12,
+  "title": "Work and occupations",
+  "objective": "Say what job you do and ask others about their profession using occupational nouns with and without articles.",
+  "grammarPoints": ["occupation-nouns-no-article", "verb-arbeiten-als", "modal-verb-wollen", "wh-questions-review"],
+  "vocabThemes": ["jobs", "workplace", "professions", "working-life"],
+  "targetVocab": [
+    { "lemma": "Was sind Sie von Beruf?", "gloss": "What do you do for a living? (formal)", "pos": "phrase" },
+    { "lemma": "Ich bin Lehrerin.", "gloss": "I am a teacher (female).", "pos": "phrase" },
+    { "lemma": "der Arzt / die Ärztin", "gloss": "the doctor (male / female)", "pos": "noun" },
+    { "lemma": "der Ingenieur", "gloss": "the engineer (male)", "pos": "noun" },
+    { "lemma": "das Büro", "gloss": "the office", "pos": "noun" },
+    { "lemma": "die Arbeit", "gloss": "the work / the job", "pos": "noun" },
+    { "lemma": "arbeiten", "gloss": "to work", "pos": "verb" },
+    { "lemma": "Vollzeit", "gloss": "full-time", "pos": "adverb" },
+    { "lemma": "Teilzeit", "gloss": "part-time", "pos": "adverb" }
+  ],
+  "canDoSummary": "I can say what job I do and discuss basic aspects of work and working hours.",
+  "estMinutes": 60
+}

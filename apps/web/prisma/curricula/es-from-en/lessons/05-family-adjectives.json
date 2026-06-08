@@ -1,0 +1,21 @@
+{
+  "slug": "a1-family-adjectives",
+  "level": "A1",
+  "order": 5,
+  "title": "Family and descriptive adjectives",
+  "objective": "Name family members and describe people's physical appearance and personality using adjective agreement.",
+  "grammarPoints": ["adjective-gender-agreement", "possessive-adjectives-mi-tu-su", "tener-present-tense"],
+  "vocabThemes": ["family", "physical-descriptions", "personality"],
+  "targetVocab": [
+    { "lemma": "la madre", "gloss": "mother", "pos": "noun" },
+    { "lemma": "el padre", "gloss": "father", "pos": "noun" },
+    { "lemma": "el hermano / la hermana", "gloss": "brother / sister", "pos": "noun" },
+    { "lemma": "los abuelos", "gloss": "grandparents", "pos": "noun" },
+    { "lemma": "alto / alta", "gloss": "tall", "pos": "adjective" },
+    { "lemma": "joven", "gloss": "young", "pos": "adjective" },
+    { "lemma": "simpático / simpática", "gloss": "nice / friendly", "pos": "adjective" },
+    { "lemma": "mi familia", "gloss": "my family", "pos": "noun phrase" }
+  ],
+  "canDoSummary": "Can describe their family and give basic physical or personality descriptions using correct adjective agreement.",
+  "estMinutes": 60
+}

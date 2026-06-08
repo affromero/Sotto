@@ -1,0 +1,21 @@
+{
+  "slug": "a2-past-experiences",
+  "level": "A2",
+  "order": 9,
+  "title": "Talking about past experiences",
+  "objective": "The learner can describe completed past events and personal experiences using the simple past tense with regular and common irregular verbs.",
+  "grammarPoints": ["simple-past-tense", "irregular-past-forms", "past-time-expressions"],
+  "vocabThemes": ["past-activities", "travel", "time-expressions"],
+  "targetVocab": [
+    { "lemma": "yesterday", "gloss": "ayer", "pos": "adverb" },
+    { "lemma": "last week", "gloss": "la semana pasada", "pos": "phrase" },
+    { "lemma": "I went", "gloss": "fui / fui a", "pos": "phrase" },
+    { "lemma": "I saw", "gloss": "vi", "pos": "verb" },
+    { "lemma": "I ate", "gloss": "comí", "pos": "verb" },
+    { "lemma": "I had", "gloss": "tuve", "pos": "verb" },
+    { "lemma": "ago", "gloss": "hace (tiempo)", "pos": "adverb" },
+    { "lemma": "it was", "gloss": "fue / era", "pos": "phrase" }
+  ],
+  "canDoSummary": "Can write or speak about past events using simple past forms, including common irregular verbs.",
+  "estMinutes": 60
+}

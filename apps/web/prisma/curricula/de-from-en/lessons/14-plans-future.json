@@ -1,0 +1,22 @@
+{
+  "slug": "a2-plans-future",
+  "level": "A2",
+  "order": 14,
+  "title": "Making plans and talking about the future",
+  "objective": "Express future intentions and make simple plans using the present tense with future time expressions and the construction werden + infinitive.",
+  "grammarPoints": ["werden-future", "modal-verb-wollen", "time-expressions-future", "conjunction-wenn"],
+  "vocabThemes": ["future-plans", "leisure", "holidays", "intentions"],
+  "targetVocab": [
+    { "lemma": "werden", "gloss": "will (future auxiliary)", "pos": "verb" },
+    { "lemma": "Ich werde … besuchen.", "gloss": "I will visit …", "pos": "phrase" },
+    { "lemma": "morgen", "gloss": "tomorrow", "pos": "adverb" },
+    { "lemma": "nächste Woche", "gloss": "next week", "pos": "phrase" },
+    { "lemma": "der Urlaub", "gloss": "the holiday / vacation", "pos": "noun" },
+    { "lemma": "planen", "gloss": "to plan", "pos": "verb" },
+    { "lemma": "vorhaben", "gloss": "to intend / to plan (separable)", "pos": "verb" },
+    { "lemma": "Hast du Lust …?", "gloss": "Do you feel like …? (informal)", "pos": "phrase" },
+    { "lemma": "wenn", "gloss": "when / if (subordinating conjunction)", "pos": "conjunction" }
+  ],
+  "canDoSummary": "I can talk about future plans and intentions and respond to invitations.",
+  "estMinutes": 60
+}

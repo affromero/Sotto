@@ -1,0 +1,23 @@
+{
+  "slug": "a1-numbers-dates",
+  "level": "A1",
+  "order": 2,
+  "title": "Numbers and dates",
+  "objective": "Count to 100 in German and state the day of the week and today's date.",
+  "grammarPoints": ["cardinal-numbers", "ordinal-numbers-basic", "days-of-week"],
+  "vocabThemes": ["numbers", "calendar", "time-expressions"],
+  "targetVocab": [
+    { "lemma": "eins", "gloss": "one", "pos": "numeral" },
+    { "lemma": "zwei", "gloss": "two", "pos": "numeral" },
+    { "lemma": "zehn", "gloss": "ten", "pos": "numeral" },
+    { "lemma": "zwanzig", "gloss": "twenty", "pos": "numeral" },
+    { "lemma": "hundert", "gloss": "hundred", "pos": "numeral" },
+    { "lemma": "Montag", "gloss": "Monday", "pos": "noun" },
+    { "lemma": "Freitag", "gloss": "Friday", "pos": "noun" },
+    { "lemma": "heute", "gloss": "today", "pos": "adverb" },
+    { "lemma": "der erste", "gloss": "the first (ordinal)", "pos": "adjective" },
+    { "lemma": "Welches Datum haben wir heute?", "gloss": "What is today's date?", "pos": "phrase" }
+  ],
+  "canDoSummary": "I can say numbers up to 100 and tell someone today's date and day of the week.",
+  "estMinutes": 60
+}

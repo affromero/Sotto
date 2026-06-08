@@ -1,0 +1,21 @@
+{
+  "slug": "a1-present-tense-regular-verbs",
+  "level": "A1",
+  "order": 6,
+  "title": "Present tense: regular -ar, -er, -ir verbs",
+  "objective": "Conjugate regular -ar, -er, and -ir verbs in the present tense and use them in affirmative, negative, and question sentences.",
+  "grammarPoints": ["present-indicative-ar-verbs", "present-indicative-er-verbs", "present-indicative-ir-verbs", "negation-no"],
+  "vocabThemes": ["daily-actions", "hobbies"],
+  "targetVocab": [
+    { "lemma": "hablar", "gloss": "to speak / to talk", "pos": "verb" },
+    { "lemma": "comer", "gloss": "to eat", "pos": "verb" },
+    { "lemma": "vivir", "gloss": "to live", "pos": "verb" },
+    { "lemma": "trabajar", "gloss": "to work", "pos": "verb" },
+    { "lemma": "escribir", "gloss": "to write", "pos": "verb" },
+    { "lemma": "beber", "gloss": "to drink", "pos": "verb" },
+    { "lemma": "no hablo inglés", "gloss": "I don't speak English", "pos": "phrase" },
+    { "lemma": "¿hablas español?", "gloss": "do you speak Spanish?", "pos": "phrase" }
+  ],
+  "canDoSummary": "Can talk about everyday activities and habits using regular present-tense verbs in positive and negative sentences.",
+  "estMinutes": 60
+}

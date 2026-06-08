@@ -1,0 +1,21 @@
+{
+  "slug": "a2-hobbies-interests",
+  "level": "A2",
+  "order": 13,
+  "title": "Hobbies and interests",
+  "objective": "The learner can talk about hobbies, free-time activities, and interests, express opinions, and make and respond to invitations in English.",
+  "grammarPoints": ["verb-enjoy-love-hate-gerund", "modal-would-for-invitations", "expressing-opinions"],
+  "vocabThemes": ["hobbies", "sports", "leisure"],
+  "targetVocab": [
+    { "lemma": "I enjoy", "gloss": "disfruto de / me gusta", "pos": "phrase" },
+    { "lemma": "reading", "gloss": "leer / la lectura", "pos": "noun" },
+    { "lemma": "playing sport", "gloss": "hacer deporte", "pos": "phrase" },
+    { "lemma": "Would you like to…?", "gloss": "¿Te gustaría…?", "pos": "phrase" },
+    { "lemma": "I think", "gloss": "creo que / pienso que", "pos": "phrase" },
+    { "lemma": "in my free time", "gloss": "en mi tiempo libre", "pos": "phrase" },
+    { "lemma": "favourite", "gloss": "favorito/a", "pos": "adjective" },
+    { "lemma": "boring", "gloss": "aburrido/a", "pos": "adjective" }
+  ],
+  "canDoSummary": "Can describe hobbies and interests and make or accept a simple invitation in English.",
+  "estMinutes": 60
+}

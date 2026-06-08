@@ -1,0 +1,23 @@
+{
+  "slug": "a1-food-drink",
+  "level": "A1",
+  "order": 6,
+  "title": "Food and drink",
+  "objective": "Order food and drink in a café or restaurant and express likes and preferences for common foods.",
+  "grammarPoints": ["verb-moegen-present", "verb-essen-trinken-present", "accusative-case-basic", "negation-kein"],
+  "vocabThemes": ["food", "drinks", "café", "meals"],
+  "targetVocab": [
+    { "lemma": "das Brot", "gloss": "the bread", "pos": "noun" },
+    { "lemma": "der Kaffee", "gloss": "the coffee", "pos": "noun" },
+    { "lemma": "das Wasser", "gloss": "the water", "pos": "noun" },
+    { "lemma": "das Bier", "gloss": "the beer", "pos": "noun" },
+    { "lemma": "ich möchte", "gloss": "I would like", "pos": "phrase" },
+    { "lemma": "ich esse", "gloss": "I eat", "pos": "phrase" },
+    { "lemma": "ich trinke", "gloss": "I drink", "pos": "phrase" },
+    { "lemma": "kein / keine", "gloss": "no / not a (negation)", "pos": "determiner" },
+    { "lemma": "die Speisekarte", "gloss": "the menu", "pos": "noun" },
+    { "lemma": "die Rechnung", "gloss": "the bill", "pos": "noun" }
+  ],
+  "canDoSummary": "I can order food and drinks in a café or simple restaurant and say what I like or dislike.",
+  "estMinutes": 60
+}

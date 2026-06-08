@@ -1,0 +1,23 @@
+{
+  "slug": "a2-home-living",
+  "level": "A2",
+  "order": 9,
+  "title": "Home and living",
+  "objective": "Describe your home, the rooms it contains, and basic furniture using locative prepositions.",
+  "grammarPoints": ["two-way-prepositions-dative", "dative-case-location", "definite-articles-dative", "there-is-es-gibt"],
+  "vocabThemes": ["home", "rooms", "furniture", "location"],
+  "targetVocab": [
+    { "lemma": "das Zimmer", "gloss": "the room", "pos": "noun" },
+    { "lemma": "die Küche", "gloss": "the kitchen", "pos": "noun" },
+    { "lemma": "das Schlafzimmer", "gloss": "the bedroom", "pos": "noun" },
+    { "lemma": "das Wohnzimmer", "gloss": "the living room", "pos": "noun" },
+    { "lemma": "der Stuhl", "gloss": "the chair", "pos": "noun" },
+    { "lemma": "das Sofa", "gloss": "the sofa", "pos": "noun" },
+    { "lemma": "in", "gloss": "in / inside", "pos": "preposition" },
+    { "lemma": "auf", "gloss": "on / on top of", "pos": "preposition" },
+    { "lemma": "neben", "gloss": "next to", "pos": "preposition" },
+    { "lemma": "Es gibt …", "gloss": "There is / there are …", "pos": "phrase" }
+  ],
+  "canDoSummary": "I can describe where I live and what rooms and furniture my home has.",
+  "estMinutes": 60
+}

@@ -1,0 +1,21 @@
+{
+  "slug": "a1-days-time-schedule",
+  "level": "A1",
+  "order": 8,
+  "title": "Days, months, and telling the time",
+  "objective": "Name the days of the week and months of the year, tell the time, and describe a simple weekly schedule.",
+  "grammarPoints": ["ser-present-tense-time", "prepositions-a-en-de-time", "frequency-adverbs"],
+  "vocabThemes": ["days-of-week", "months", "time"],
+  "targetVocab": [
+    { "lemma": "el lunes", "gloss": "Monday", "pos": "noun" },
+    { "lemma": "el fin de semana", "gloss": "the weekend", "pos": "noun phrase" },
+    { "lemma": "enero", "gloss": "January", "pos": "noun" },
+    { "lemma": "¿qué hora es?", "gloss": "what time is it?", "pos": "phrase" },
+    { "lemma": "son las tres", "gloss": "it is three o'clock", "pos": "phrase" },
+    { "lemma": "por la mañana", "gloss": "in the morning", "pos": "phrase" },
+    { "lemma": "por la tarde", "gloss": "in the afternoon / evening", "pos": "phrase" },
+    { "lemma": "siempre", "gloss": "always", "pos": "adverb" }
+  ],
+  "canDoSummary": "Can state the time, date, and day of the week and describe a simple personal schedule.",
+  "estMinutes": 60
+}

@@ -1,0 +1,22 @@
+{
+  "slug": "a1-origin-nationality",
+  "level": "A1",
+  "order": 4,
+  "title": "Origin and nationality",
+  "objective": "Say where you come from and ask others about their origin and nationality using the verb kommen and country names.",
+  "grammarPoints": ["verb-kommen-present", "verb-wohnen-present", "preposition-aus", "preposition-in"],
+  "vocabThemes": ["countries", "nationalities", "cities", "origin"],
+  "targetVocab": [
+    { "lemma": "Woher kommen Sie?", "gloss": "Where do you come from? (formal)", "pos": "phrase" },
+    { "lemma": "Ich komme aus", "gloss": "I come from", "pos": "phrase" },
+    { "lemma": "Deutschland", "gloss": "Germany", "pos": "noun" },
+    { "lemma": "England", "gloss": "England", "pos": "noun" },
+    { "lemma": "Amerika", "gloss": "America", "pos": "noun" },
+    { "lemma": "Wo wohnen Sie?", "gloss": "Where do you live? (formal)", "pos": "phrase" },
+    { "lemma": "Ich wohne in", "gloss": "I live in", "pos": "phrase" },
+    { "lemma": "die Stadt", "gloss": "the city", "pos": "noun" },
+    { "lemma": "deutsch", "gloss": "German (adjective)", "pos": "adjective" }
+  ],
+  "canDoSummary": "I can say which country and city I am from and ask others the same question.",
+  "estMinutes": 60
+}

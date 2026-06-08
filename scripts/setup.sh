@@ -98,6 +98,11 @@ npx prisma db push --schema=apps/web/prisma/schema.prisma
 # Generate Prisma client
 npx prisma generate --schema=apps/web/prisma/schema.prisma
 
+# Seed the fixed language curriculum (idempotent)
+echo "Seeding curriculum..."
+set -a; [ -f "$ENV_FILE" ] && . "$ENV_FILE"; set +a
+npx tsx apps/web/prisma/seed-curriculum.ts
+
 echo ""
 echo "Sotto is ready!"
 echo ""

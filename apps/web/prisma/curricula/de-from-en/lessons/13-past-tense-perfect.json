@@ -1,0 +1,22 @@
+{
+  "slug": "a2-past-tense-perfect",
+  "level": "A2",
+  "order": 13,
+  "title": "Talking about the past: Perfekt",
+  "objective": "Form and use the Perfekt tense to describe completed past events with haben and sein auxiliary verbs.",
+  "grammarPoints": ["perfekt-with-haben", "perfekt-with-sein", "past-participle-regular", "past-participle-irregular-common"],
+  "vocabThemes": ["past-events", "weekend-activities", "travel"],
+  "targetVocab": [
+    { "lemma": "haben … gemacht", "gloss": "have done (Perfekt auxiliary)", "pos": "phrase" },
+    { "lemma": "sein … gegangen", "gloss": "have gone (Perfekt auxiliary)", "pos": "phrase" },
+    { "lemma": "gestern", "gloss": "yesterday", "pos": "adverb" },
+    { "lemma": "letzte Woche", "gloss": "last week", "pos": "phrase" },
+    { "lemma": "gegessen", "gloss": "eaten (past participle of essen)", "pos": "verb" },
+    { "lemma": "gekauft", "gloss": "bought (past participle of kaufen)", "pos": "verb" },
+    { "lemma": "gefahren", "gloss": "driven / travelled (past participle of fahren)", "pos": "verb" },
+    { "lemma": "besucht", "gloss": "visited (past participle of besuchen)", "pos": "verb" },
+    { "lemma": "Was hast du gemacht?", "gloss": "What did you do? (informal)", "pos": "phrase" }
+  ],
+  "canDoSummary": "I can talk about things I have done in the past using the Perfekt tense.",
+  "estMinutes": 60
+}

@@ -1,0 +1,21 @@
+{
+  "slug": "a1-greetings-introductions",
+  "level": "A1",
+  "order": 1,
+  "title": "Greetings and introductions",
+  "objective": "The learner can greet people, introduce themselves, and exchange basic personal information such as name and nationality.",
+  "grammarPoints": ["subject-pronouns", "verb-to-be-present", "yes-no-questions"],
+  "vocabThemes": ["greetings", "introductions"],
+  "targetVocab": [
+    { "lemma": "hello", "gloss": "hola", "pos": "interjection" },
+    { "lemma": "goodbye", "gloss": "adiós", "pos": "interjection" },
+    { "lemma": "my name is", "gloss": "me llamo / mi nombre es", "pos": "phrase" },
+    { "lemma": "nice to meet you", "gloss": "mucho gusto / encantado/a", "pos": "phrase" },
+    { "lemma": "how are you?", "gloss": "¿cómo estás?", "pos": "phrase" },
+    { "lemma": "I am", "gloss": "yo soy / yo estoy", "pos": "phrase" },
+    { "lemma": "please", "gloss": "por favor", "pos": "adverb" },
+    { "lemma": "thank you", "gloss": "gracias", "pos": "interjection" }
+  ],
+  "canDoSummary": "Can greet someone, say their name, and respond to basic greetings in English.",
+  "estMinutes": 60
+}

@@ -1,0 +1,22 @@
+{
+  "slug": "a2-transport-directions",
+  "level": "A2",
+  "order": 10,
+  "title": "Transport and asking for directions",
+  "objective": "Ask for and understand directions in a city and describe how to get somewhere by different means of transport.",
+  "grammarPoints": ["imperative-formal", "modal-verb-koennen", "accusative-direction-prepositions", "two-way-prepositions-accusative"],
+  "vocabThemes": ["transport", "directions", "city", "navigation"],
+  "targetVocab": [
+    { "lemma": "Wie komme ich zum …?", "gloss": "How do I get to the …?", "pos": "phrase" },
+    { "lemma": "links", "gloss": "left", "pos": "adverb" },
+    { "lemma": "rechts", "gloss": "right", "pos": "adverb" },
+    { "lemma": "geradeaus", "gloss": "straight ahead", "pos": "adverb" },
+    { "lemma": "die Haltestelle", "gloss": "the stop (bus/tram)", "pos": "noun" },
+    { "lemma": "der Bus", "gloss": "the bus", "pos": "noun" },
+    { "lemma": "die U-Bahn", "gloss": "the underground / subway", "pos": "noun" },
+    { "lemma": "zu Fuß", "gloss": "on foot", "pos": "phrase" },
+    { "lemma": "Entschuldigung", "gloss": "excuse me", "pos": "interjection" }
+  ],
+  "canDoSummary": "I can ask for and understand simple directions and talk about how to travel around a city.",
+  "estMinutes": 60
+}
