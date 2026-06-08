@@ -7,10 +7,8 @@ Sentry.init({
 
 import {
   createWorker,
-  twitterMentionsQueue,
   telegramBotQueue,
   keyValidationQueue,
-  twitterTrendPollQueue,
   emailDigestQueue,
   draftCleanupQueue,
   r2UsageQueue,
@@ -22,8 +20,6 @@ import {
   JobType,
 } from '@/lib/queue';
 import { processAnnouncement } from './announcement.worker';
-import { isTwitterConfigured } from '@/lib/twitter';
-import { getTwitterConfig } from '@/lib/twitter-config';
 import { isTelegramBotConfigured, setWebhook, deleteWebhook } from '@/lib/telegram';
 import { logger } from '@/lib/logger';
 import { closeRedis } from '@/lib/redis';
@@ -39,8 +35,6 @@ import { processInteraction } from './interaction.worker';
 import { processSegmentRegeneration } from './segment-regeneration.worker';
 import { processNotification } from './notification.worker';
 import { processPdfGeneration } from './pdf-generation.worker';
-import { processTwitterMentions } from './twitter-mentions.worker';
-import { processTwitterReply } from './twitter-reply.worker';
 import { processEventIngestion } from './event-ingestion.worker';
 import { processFeatureComputation } from './feature-computation.worker';
 import { processDataExport } from './data-export.worker';
@@ -48,9 +42,7 @@ import { processAudioImport } from './audio-import.worker';
 import { processKeyValidation } from './key-validation.worker';
 import { processTelegramUpdates } from './telegram-bot.worker';
 import { processTelegramReply } from './telegram-reply.worker';
-import { processAutoTweet } from './twitter-auto-tweet.worker';
-import { processTrendPoll } from './twitter-trend-poll.worker';
-import { processAdminThreadToPodcast } from './admin-thread-to-podcast.worker';
+
 import { processContentModeration } from './content-moderation.worker';
 import { processEmailDigest } from './email-digest.worker';
 import { processVoiceVerification } from './voice-verification.worker';
@@ -142,8 +134,6 @@ const workers = [
   shouldRun('segment-regeneration') && createWorker('segment-regeneration', processSegmentRegeneration, { concurrency: 2 }),
   shouldRun('notifications') && createWorker('notifications', processNotification, { concurrency: 5 }),
   shouldRun('pdf-generation') && createWorker('pdf-generation', processPdfGeneration, { concurrency: 2 }),
-  shouldRun('twitter-mentions') && createWorker('twitter-mentions', processTwitterMentions, { concurrency: 1 }),
-  shouldRun('twitter-reply') && createWorker('twitter-reply', processTwitterReply, { concurrency: 2 }),
   shouldRun('event-ingestion') && createWorker('event-ingestion', processEventIngestion, { concurrency: 5 }),
   shouldRun('feature-computation') && createWorker('feature-computation', processFeatureComputation, { concurrency: 2 }),
   shouldRun('data-export') && createWorker('data-export', processDataExport, { concurrency: 1 }),
@@ -151,9 +141,6 @@ const workers = [
   shouldRun('key-validation') && createWorker('key-validation', processKeyValidation, { concurrency: 1 }),
   shouldRun('telegram-bot') && createWorker('telegram-bot', processTelegramUpdates, { concurrency: 1, lockDuration: 10000 }),
   shouldRun('telegram-reply') && createWorker('telegram-reply', processTelegramReply, { concurrency: 2 }),
-  shouldRun('twitter-auto-tweet') && createWorker('twitter-auto-tweet', processAutoTweet, { concurrency: 1 }),
-  shouldRun('twitter-trend-poll') && createWorker('twitter-trend-poll', processTrendPoll, { concurrency: 1 }),
-  shouldRun('admin-thread-to-podcast') && createWorker('admin-thread-to-podcast', processAdminThreadToPodcast, { concurrency: 1 }),
   shouldRun('content-moderation') && createWorker('content-moderation', processContentModeration, { concurrency: 3 }),
   shouldRun('email-digest') && createWorker('email-digest', processEmailDigest, { concurrency: 1 }),
   shouldRun('announcements') && createWorker('announcements', processAnnouncement, { concurrency: 1 }),
@@ -189,27 +176,6 @@ const workers = [
 
 // Cron jobs and webhooks run only on light (or all) profile to prevent duplicate repeat registrations
 if (WORKER_PROFILE === 'all' || WORKER_PROFILE === 'light') {
-// Set up Twitter mentions polling if credentials are configured
-if (shouldRun('twitter-mentions') && isTwitterConfigured()) {
-  getTwitterConfig()
-    .catch((err) => {
-      logger.warn('Failed to read Twitter config at startup, using env/defaults', { error: err.message });
-      return null;
-    })
-    .then((config) => {
-      const pollInterval = config?.mentionPollIntervalMs
-        || parseInt(process.env.TWITTER_POLL_INTERVAL_MS || '60000', 10);
-      return twitterMentionsQueue
-        .add(JobType.POLL_TWITTER_MENTIONS, {}, { repeat: { every: pollInterval } })
-        .then(() =>
-          logger.info('Twitter mentions polling scheduled', { intervalMs: String(pollInterval) })
-        );
-    })
-    .catch((err) => logger.error('Failed to schedule Twitter polling', { error: err.message }));
-} else if (shouldRun('twitter-mentions')) {
-  logger.info('Twitter integration not configured — polling disabled');
-}
-
 // Set up Telegram bot: webhook (production) or polling (dev)
 if (shouldRun('telegram-bot') && isTelegramBotConfigured()) {
   const webhookUrl = process.env.TELEGRAM_WEBHOOK_URL;
@@ -235,19 +201,6 @@ if (shouldRun('telegram-bot') && isTelegramBotConfigured()) {
   }
 } else if (shouldRun('telegram-bot')) {
   logger.info('Telegram bot not configured — disabled');
-}
-
-// Set up Twitter trend polling if credentials are configured
-if (shouldRun('twitter-trend-poll') && isTwitterConfigured()) {
-  const trendInterval = parseInt(process.env.TWITTER_TREND_POLL_INTERVAL_MS || '7200000', 10);
-  twitterTrendPollQueue
-    .add(JobType.POLL_TWITTER_TRENDS, {}, { repeat: { every: trendInterval } })
-    .then(() =>
-      logger.info('Twitter trend polling scheduled', { intervalMs: String(trendInterval) })
-    )
-    .catch((err) => logger.error('Failed to schedule trend polling', { error: err.message }));
-} else if (shouldRun('twitter-trend-poll')) {
-  logger.info('Twitter integration not configured — trend polling disabled');
 }
 
 // Schedule weekly email digest (Sunday 10:00 UTC)

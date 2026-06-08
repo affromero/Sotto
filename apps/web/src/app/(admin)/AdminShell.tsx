@@ -11,7 +11,6 @@ import {
   BarChart2,
   Shield,
   AtSign,
-  MessageSquareShare,
   Star,
   Sparkles,
   DollarSign,
@@ -112,12 +111,6 @@ const navGroups: NavGroup[] = [
       { href: '/admin/landing', label: 'Landing', icon: Globe },
       { href: '/admin/showcase', label: 'Showcase', icon: Film },
       { href: '/admin/video-tests', label: 'Video Tests', icon: Clapperboard },
-    ],
-  },
-  {
-    label: 'Integrations',
-    items: [
-      { href: '/admin/twitter', label: 'Twitter', icon: MessageSquareShare },
     ],
   },
   {

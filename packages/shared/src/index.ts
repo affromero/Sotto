@@ -10,7 +10,6 @@ export type {
   InteractionStatus,
   ReferenceType,
   VerificationStatus,
-  TweetMentionStatus,
   NotificationType,
   VoiceCloneSource,
   VoiceRequestStatus,
@@ -39,14 +38,6 @@ export type {
 } from './types/podcast';
 
 export type { ReferenceData, VerificationLayerResult } from './types/reference';
-
-export type {
-  TweetParseResult,
-  TwitterTweet,
-  TwitterMention,
-  TwitterSettingsData,
-  TweetMentionData,
-} from './types/twitter';
 
 export type {
   DiscoveryMessage,

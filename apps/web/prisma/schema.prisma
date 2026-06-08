@@ -113,9 +113,6 @@ model User {
   apiKeys           ApiKey[]
   privateFeedTokens PrivateFeedToken[]
 
-  // Twitter mentions
-  tweetMentions TweetMention[]
-
   // Telegram messages
   telegramMessages TelegramMessage[]
 
@@ -340,9 +337,8 @@ model Podcast {
   sttModel         String? // e.g. 'whisper-1', 'whisper-large-v3-turbo', 'scribe_v1'
   language         String? // ISO 639-1, e.g. 'en', 'es', 'ja'
 
-  // Source tracking (web, twitter, api)
+  // Source tracking
   source        PodcastSource @default(WEB)
-  sourceTweetId String?
 
   // Visibility
   visibility PodcastVisibility @default(PRIVATE)
@@ -398,7 +394,6 @@ model Podcast {
   pipelineEvents      PipelineEvent[]
   references          Reference[]
   versions            PodcastVersion[]
-  tweetMention        TweetMention?
   telegramMessage     TelegramMessage?
   playbackSessions    PlaybackSession[]
   podcastFeature      PodcastFeature?
@@ -407,7 +402,6 @@ model Podcast {
   savedIdea           SavedIdea?
   voices              PodcastVoice[]
   voicePurchases      VoicePurchase[]
-  autoTweets          TwitterAutoTweet[]
   ratings             PodcastRating[]
   claimReports        ClaimReport[]
   voiceTracks         VoiceTrack[]
@@ -509,7 +503,6 @@ enum PodcastVisibility {
 
 enum PodcastSource {
   WEB
-  TWITTER
   TELEGRAM
   API
   AGENT
@@ -933,7 +926,6 @@ enum NotificationType {
   PODCAST_READY
   PODCAST_FAILED
   KEY_INVALID
-  TWITTER_PODCAST_READY
   TELEGRAM_PODCAST_READY
   VOICE_REQUEST_RECEIVED
   VOICE_REQUEST_APPROVED
@@ -1121,42 +1113,6 @@ enum FeedbackStatus {
   IN_PROGRESS
   RESOLVED
   ARCHIVED
-}
-
-// ============ TWITTER MENTIONS ============
-
-model TweetMention {
-  id            String             @id @default(cuid())
-  tweetId       String             @unique
-  authorId      String // Twitter numeric user ID
-  text          String             @db.Text
-  parsedTopic   String?            @db.Text
-  status        TweetMentionStatus @default(PENDING)
-  userId        String?
-  podcastId     String?            @unique
-  replyTweetId  String?
-  parentTweetId String?
-  errorMessage  String?            @db.Text
-  videoPrefs    Json? // { imageModel, videoModel, wantsVideo } from tweet parsing
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
-
-  user    User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
-  podcast Podcast? @relation(fields: [podcastId], references: [id], onDelete: SetNull)
-
-  @@index([authorId])
-  @@index([status])
-  @@index([createdAt])
-}
-
-enum TweetMentionStatus {
-  PENDING
-  PARSING
-  GENERATING
-  READY
-  REPLIED
-  FAILED
-  IGNORED
 }
 
 // ============ TELEGRAM MESSAGES ============
@@ -1921,42 +1877,6 @@ model VoicePurchase {
   @@index([voiceCloneId])
   @@index([podcastId])
   @@index([stripePaymentIntent])
-}
-
-// ============ TWITTER CONFIG (Admin Dashboard) ============
-
-model TwitterConfig {
-  id                     String   @id @default("singleton")
-  autoTweetEnabled       Boolean  @default(false)
-  minPlays               Int      @default(50)
-  mentionPollIntervalMs  Int      @default(60000)
-  trendPollingEnabled    Boolean  @default(false)
-  trendPollIntervalMs    Int      @default(7200000)
-  maxTrendPodcastsPerDay Int      @default(3)
-  trendSearchQueries     String[] @default(["AI", "science", "technology"])
-  tweetTemplate          String   @default("New on Sotto: {{title}}\n\n{{topic}}\n\nListen: {{url}}")
-  defaultAiModel         String?
-  defaultTtsProvider     String?
-  defaultTtsModel        String?
-  updatedAt              DateTime @updatedAt
-  updatedBy              String?
-}
-
-model TwitterAutoTweet {
-  id           String   @id @default(cuid())
-  podcastId    String
-  tweetId      String?
-  tweetText    String?  @db.Text
-  trigger      String // 'threshold' | 'manual' | 'trend'
-  status       String   @default("pending") // 'pending' | 'posted' | 'failed'
-  errorMessage String?  @db.Text
-  createdAt    DateTime @default(now())
-
-  podcast Podcast @relation(fields: [podcastId], references: [id], onDelete: Cascade)
-
-  @@index([podcastId])
-  @@index([status])
-  @@index([createdAt])
 }
 
 // ============ LANDING SHOWCASE CONFIG (Admin Dashboard) ============

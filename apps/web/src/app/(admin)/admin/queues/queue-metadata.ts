@@ -76,32 +76,12 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
     description: 'Generates PDF transcripts with references',
     stage: 'Interactions',
   },
-  'twitter-mentions': {
-    description: 'Polls Twitter for configured bot mentions',
-    stage: 'Social',
-  },
-  'twitter-reply': {
-    description: 'Posts tweet replies with podcast links',
-    stage: 'Social',
-  },
-  'twitter-auto-tweet': {
-    description: 'Auto-tweets trending podcasts above threshold',
-    stage: 'Social',
-  },
-  'twitter-trend-poll': {
-    description: 'Polls Twitter trending topics for inspiration',
-    stage: 'Social',
-  },
   'telegram-bot': {
     description: 'Processes incoming Telegram bot messages',
     stage: 'Social',
   },
   'telegram-reply': {
     description: 'Sends Telegram bot replies and notifications',
-    stage: 'Social',
-  },
-  'admin-thread-to-podcast': {
-    description: 'Converts admin-selected Twitter threads to podcasts',
     stage: 'Social',
   },
   'event-ingestion': {
