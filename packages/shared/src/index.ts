@@ -22,6 +22,7 @@ export type {
   SkillType,
   ClassStatus,
   SectionStatus,
+  EdgeType,
 } from './types/enums';
 
 // Types

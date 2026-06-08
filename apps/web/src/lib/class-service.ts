@@ -3,7 +3,8 @@
 // in a different form (retrieval practice / anti-copy).
 import { prisma } from './prisma';
 import { generateSectionQuestions } from './class-generation';
-import type { SkillType } from '@sotto/shared';
+import { seedLessonItems, getDueItems, applyReviewOutcome } from './knowledge-graph';
+import type { SkillType, CefrLevel } from '@sotto/shared';
 
 const MC_SKILLS: SkillType[] = ['GRAMMAR', 'READING'];
 
@@ -106,7 +107,20 @@ export async function createNextClass(courseId: string, userId: string): Promise
     throw err;
   }
 
-  await prisma.courseClass.update({ where: { id: cls.id }, data: { status: 'AVAILABLE' } });
+  const { grammarPoints, targetVocab } = lessonInputs(lesson);
+  await seedLessonItems(courseId, cls.id, lesson.level as CefrLevel, targetVocab, grammarPoints);
+  const due = await getDueItems(courseId);
+  await prisma.courseClass.update({
+    where: { id: cls.id },
+    data: {
+      status: 'AVAILABLE',
+      adaptiveSeed: {
+        vocabIds: due.vocab.map((v) => v.id),
+        grammarKeys: due.grammar.map((g) => g.topicKey),
+        dueCount: due.vocab.length + due.grammar.length,
+      },
+    },
+  });
   await prisma.course.update({ where: { id: courseId }, data: { activeClassId: cls.id } });
   return { kind: 'created', classId: cls.id };
 }
@@ -137,7 +151,7 @@ export async function submitClass(
 ): Promise<SubmitResult | null> {
   const cls = await prisma.courseClass.findFirst({
     where: { id: classId, course: { userId } },
-    include: { sections: { include: { questions: true } } },
+    include: { sections: { include: { questions: true } }, lesson: true },
   });
   if (!cls) return null;
 
@@ -202,6 +216,19 @@ export async function submitClass(
   if (classPassed) {
     await prisma.course.update({ where: { id: cls.courseId }, data: { activeClassId: null } });
   }
+
+  // Closed loop: update the learner's SRS for this lesson's items.
+  const grammarScore = sectionResults.find((r) => r.skill === 'GRAMMAR')?.score ?? 0;
+  const readingScore = sectionResults.find((r) => r.skill === 'READING')?.score ?? 0;
+  const { grammarPoints, targetVocab } = lessonInputs(cls.lesson);
+  await applyReviewOutcome(
+    cls.courseId,
+    targetVocab.map((v) => v.lemma),
+    grammarPoints,
+    readingScore,
+    grammarScore,
+    now,
+  );
 
   return { passed: classPassed, overallScore, passedSections, totalSections, sections: sectionResults };
 }

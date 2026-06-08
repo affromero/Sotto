@@ -2487,6 +2487,9 @@ model Course {
   curriculum Curriculum       @relation(fields: [curriculumId], references: [id])
   placement  PlacementResult?
   classes    CourseClass[]
+  vocab      LearnerVocab[]
+  grammar    LearnerGrammar[]
+  vocabEdges VocabEdge[]
 
   @@unique([userId, pair]) // one course per user per language pair
   @@index([userId])
@@ -2640,4 +2643,92 @@ model SectionAnswer {
 
   @@unique([submissionId, questionId])
   @@index([sectionId])
+}
+
+// ============ LANGUAGE LEARNING — MEMORY GRAPH (SRS) ============
+
+enum EdgeType {
+  VOCAB_VOCAB // collocation / morphological relation
+  VOCAB_GRAMMAR // word exemplifies a grammar topic
+  VOCAB_CLASS // word introduced / practiced in a class
+  VOCAB_PODCAST // word appeared in a listening podcast
+  GRAMMAR_GRAMMAR // prerequisite chain
+}
+
+// Per-course vocabulary node with SM-2 spaced-repetition state.
+model LearnerVocab {
+  id            String  @id @default(cuid())
+  courseId      String
+  lemma         String // canonical target-language form
+  translation   String
+  partOfSpeech  String?
+  pronunciation String?
+  // SRS state (SM-2)
+  ease         Float     @default(2.5)
+  intervalDays Float     @default(0)
+  dueAt        DateTime  @default(now())
+  reps         Int       @default(0)
+  lapses       Int       @default(0)
+  mastery      Float     @default(0) // 0..1 rolled-up strength
+  lastReviewed DateTime?
+  // provenance
+  firstSeenClassId String?
+  cefrLevel        CefrLevel?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  course   Course      @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  edgesOut VocabEdge[] @relation("EdgeSource")
+  edgesIn  VocabEdge[] @relation("EdgeTarget")
+
+  @@unique([courseId, lemma])
+  @@index([courseId, dueAt])
+  @@index([courseId, mastery])
+}
+
+// Per-course grammar-topic node with SRS state.
+model LearnerGrammar {
+  id           String     @id @default(cuid())
+  courseId     String
+  topicKey     String // matches Lesson.grammarPoints keys
+  title        String
+  cefrLevel    CefrLevel?
+  ease         Float      @default(2.5)
+  intervalDays Float      @default(0)
+  dueAt        DateTime   @default(now())
+  reps         Int        @default(0)
+  lapses       Int        @default(0)
+  mastery      Float      @default(0)
+  lastReviewed DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, topicKey])
+  @@index([courseId, dueAt])
+  @@index([courseId, mastery])
+}
+
+// Polymorphic edge: exactly the endpoints relevant to `type` are non-null.
+model VocabEdge {
+  id            String   @id @default(cuid())
+  courseId      String
+  type          EdgeType
+  weight        Float    @default(1.0)
+  sourceVocabId String?
+  targetVocabId String?
+  grammarId     String?
+  classId       String?
+  podcastId     String?
+  createdAt     DateTime @default(now())
+
+  course      Course        @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  sourceVocab LearnerVocab? @relation("EdgeSource", fields: [sourceVocabId], references: [id], onDelete: Cascade)
+  targetVocab LearnerVocab? @relation("EdgeTarget", fields: [targetVocabId], references: [id], onDelete: Cascade)
+
+  @@index([courseId, type])
+  @@index([sourceVocabId])
+  @@index([targetVocabId])
+  @@index([grammarId])
 }
