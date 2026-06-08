@@ -1,6 +1,8 @@
 {
   "name": "@sotto/web",
   "version": "0.1.0",
+  "description": "Open-source, self-hostable language-learning platform. CEFR-gated courses, adaptive listening, speaking practice, and a personal vocabulary memory graph — running on your own stack with your own API keys.",
+  "license": "AGPL-3.0-only",
   "private": true,
   "scripts": {
     "build": "next build",

@@ -9,18 +9,19 @@ export const BRAND = {
   twitter: null,
 
   // Consumer-facing
-  tagline: 'Private audio briefings from your own stack.',
-  subline: 'Create podcasts with your agents, your keys, and your private RSS feed.',
-  cta: 'Create. Listen. Keep private.',
+  tagline: 'Learn a language with a tutor you own.',
+  subline: 'Open-source, self-hostable courses powered by your own agents and your own keys.',
+  cta: 'Place. Practice. Progress.',
 
   // Investor-facing
-  pitchTagline: 'Open-source private podcast infrastructure.',
+  pitchTagline: 'Open-source language-learning infrastructure.',
 
   // Pre-composed
-  title: 'Sotto — Private audio briefings from your own stack.',
-  description: 'Create private podcasts with your agents, your keys, and your private RSS feed.',
+  title: 'Sotto — Learn a language with a tutor you own.',
+  description:
+    'Open-source, self-hostable language learning. Mastery-gated CEFR courses across grammar, reading, listening, and speaking, built on your own AI agents, your keys, and your data.',
   elevatorPitch:
-    'Open-source private podcast infrastructure. Connect your AI tools and TTS provider, generate audio briefings, and keep distribution private through self-hosted or managed infrastructure.',
+    'Open-source language-learning infrastructure. Take mastery-gated CEFR courses with grammar, reading, an adaptive listening podcast, and speaking with pronunciation feedback. Self-host it on your own stack, connect your own Claude or Codex with your own keys, and grow a personal vocabulary memory graph as you learn.',
 } as const;
 
 export type Brand = typeof BRAND;
