@@ -32,7 +32,7 @@ interface Section {
 const sections: Section[] = [
   {
     title: 'Private RSS',
-    description: 'Create and manage private podcast feeds for any podcast app.',
+    description: 'Create and manage private RSS feeds for any podcast app.',
     endpoints: [
       {
         method: 'POST',
