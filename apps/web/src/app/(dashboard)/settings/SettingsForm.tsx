@@ -19,8 +19,6 @@ import { TtsProviderCards } from '@/components/settings/TtsProviderCards';
 import { AiProviderCards } from '@/components/settings/AiProviderCards';
 import { MusicProviderCards } from '@/components/settings/MusicProviderCards';
 import { AvatarImageManager } from '@/components/settings/AvatarImageManager';
-import { BriefingSection } from '@/components/settings/BriefingSection';
-import type { BriefingData } from '@/components/settings/BriefingCard';
 import {
   PrivateRssFeedManager,
   type PrivateFeedTokenMetadata,
@@ -76,9 +74,7 @@ interface SettingsFormProps {
   isTwitterProviderAvailable: boolean;
   initialEmailNotifications: boolean;
   initialPushNotifications: boolean;
-  briefings: BriefingData[];
   privateFeedTokens: PrivateFeedTokenMetadata[];
-  hasByokKeys: boolean;
   initialQuizEnabled: boolean;
   quizAnswerCount: number;
   referredUsers: Array<{
@@ -125,9 +121,7 @@ export function SettingsForm({
   initialPreferredTtsModel,
   initialEmailNotifications,
   initialPushNotifications,
-  briefings,
   privateFeedTokens,
-  hasByokKeys,
   initialQuizEnabled,
   isTwitterProviderAvailable,
   quizAnswerCount,
@@ -761,17 +755,6 @@ export function SettingsForm({
             />
           </label>
         </div>
-      </section>
-
-      {/* Daily Briefings Section */}
-      <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Daily Briefings</h2>
-        <BriefingSection
-          initialBriefings={briefings}
-          hasByokKeys={hasByokKeys}
-          aiModelOptions={aiModelOptions}
-          ttsOptions={ttsOptions}
-        />
       </section>
 
       {/* Private RSS Feed Section */}

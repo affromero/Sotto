@@ -524,11 +524,8 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
 
     await job.updateProgress(95);
 
-    // 10. Send notification (source-specific type for display differentiation)
-    const notificationType = podcast.source === 'BRIEFING'
-      ? 'BRIEFING_READY'
-      : 'PODCAST_READY';
-    const isBriefing = podcast.source === 'BRIEFING';
+    // 10. Send notification
+    const notificationType = 'PODCAST_READY';
 
     // Idempotency: skip if a notification for this podcast+type already exists (stalled job retry)
     const existingNotif = await prisma.notification.findFirst({
@@ -544,10 +541,8 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
       await addJob(notificationQueue, JobType.SEND_NOTIFICATION, {
         userId: podcast.userId,
         type: notificationType,
-        title: isBriefing ? 'Your daily briefing is ready' : 'Your podcast is ready!',
-        message: isBriefing
-          ? `Your morning briefing "${podcast.title}" is ready to play.`
-          : `"${podcast.title}" is ready to play.`,
+        title: 'Your podcast is ready!',
+        message: `"${podcast.title}" is ready to play.`,
         data: { podcastId },
       });
     } else {

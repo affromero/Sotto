@@ -89,22 +89,6 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
     return;
   }
 
-  // Look up languageMode from the briefing if this is a BRIEFING podcast
-  let briefingLanguageMode: string | null = null;
-  if (podcastRecord.source === 'BRIEFING') {
-    const briefingLog = await prisma.briefingLog.findFirst({
-      where: { podcastId },
-      select: { userBriefingId: true },
-    });
-    if (briefingLog?.userBriefingId) {
-      const briefing = await prisma.userBriefing.findUnique({
-        where: { id: briefingLog.userBriefingId },
-        select: { languageMode: true },
-      });
-      briefingLanguageMode = briefing?.languageMode ?? null;
-    }
-  }
-
   const aiKey = useAdminCredits || podcastRecord.aiModel ? null : await getAiKey(userId);
   if (!podcastRecord.aiModel && !aiKey) {
     throw new Error('AI model is required for script verification when no AI key is configured.');
@@ -252,7 +236,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
         provider,
         webSearchEnabled: false,
         targetLanguage: podcastRecord.language,
-        languageMode: briefingLanguageMode,
+        languageMode: null,
       });
 
       await logUsage({
@@ -533,7 +517,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
     provider,
     webSearchEnabled: useWebSearchForRevision,
     targetLanguage: podcastRecord.language,
-    languageMode: briefingLanguageMode,
+    languageMode: null,
   });
 
   await job.updateProgress(80);

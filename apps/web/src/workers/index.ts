@@ -8,17 +8,13 @@ Sentry.init({
 import {
   createWorker,
   keyValidationQueue,
-  emailDigestQueue,
   draftCleanupQueue,
   r2UsageQueue,
   pricingFetchQueue,
   ttsProviderMonitorQueue,
   featureComputationQueue,
-  newsIngestQueue,
-  briefingSchedulerQueue,
   JobType,
 } from '@/lib/queue';
-import { processAnnouncement } from './announcement.worker';
 import { logger } from '@/lib/logger';
 import { closeRedis } from '@/lib/redis';
 import { processContentExtraction } from './content-extraction.worker';
@@ -39,7 +35,6 @@ import { processDataExport } from './data-export.worker';
 import { processAudioImport } from './audio-import.worker';
 import { processKeyValidation } from './key-validation.worker';
 import { processContentModeration } from './content-moderation.worker';
-import { processEmailDigest } from './email-digest.worker';
 import { processVoiceVerification } from './voice-verification.worker';
 import { processVoiceTrackAudio } from './voice-track-audio.worker';
 import { processVoiceTrackStitching } from './voice-track-stitching.worker';
@@ -54,7 +49,6 @@ import { processAvatarGeneration } from './avatar-generation.worker';
 import { processPlaceEnrichment } from './place-enrichment.worker';
 import { processTransitionGeneration } from './transition-generation.worker';
 import { processSegmentPreview } from './segment-preview.worker';
-import { processNewsIngest } from './news-ingest.worker';
 import { processDemoScriptGeneration } from './demo-script-generation.worker';
 import { processDemoRecording } from './demo-recording.worker';
 import { processDemoVoiceover } from './demo-voiceover.worker';
@@ -66,7 +60,6 @@ import { processMusicGeneration } from './music-generation.worker';
 import { processLipSyncTest } from './lip-sync-test.worker';
 import { processWaveformGeneration } from './waveform-generation.worker';
 import { processQuizGeneration } from './quiz-generation.worker';
-import { processBriefingScheduler } from './briefing-scheduler.worker';
 import { processPipelineClassification } from './pipeline-classification.worker';
 import { isR2MonitoringConfigured } from '@/lib/cloudflare-r2-usage';
 import { startPricingRefreshInterval } from '@/lib/pricing';
@@ -135,8 +128,6 @@ const workers = [
   shouldRun('audio-import') && createWorker('audio-import', processAudioImport, { concurrency: 2 }),
   shouldRun('key-validation') && createWorker('key-validation', processKeyValidation, { concurrency: 1 }),
   shouldRun('content-moderation') && createWorker('content-moderation', processContentModeration, { concurrency: 3 }),
-  shouldRun('email-digest') && createWorker('email-digest', processEmailDigest, { concurrency: 1 }),
-  shouldRun('announcements') && createWorker('announcements', processAnnouncement, { concurrency: 1 }),
   shouldRun('voice-verification') && createWorker('voice-verification', processVoiceVerification, { concurrency: 2 }),
   shouldRun('voice-track-audio') && createWorker('voice-track-audio', processVoiceTrackAudio, { concurrency: 10 }),
   shouldRun('voice-track-stitching') && createWorker('voice-track-stitching', processVoiceTrackStitching, { concurrency: 1 }),
@@ -151,7 +142,6 @@ const workers = [
   shouldRun('place-enrichment') && createWorker('place-enrichment', processPlaceEnrichment, { concurrency: 3 }),
   shouldRun('transition-generation') && createWorker('transition-generation', processTransitionGeneration, { concurrency: 3, lockDuration: 600000 }),
   shouldRun('segment-preview') && createWorker('segment-preview', processSegmentPreview, { concurrency: 3, lockDuration: 300000 }),
-  shouldRun('news-ingest') && createWorker('news-ingest', processNewsIngest, { concurrency: 1 }),
   shouldRun('demo-script') && createWorker('demo-script', processDemoScriptGeneration, { concurrency: 2 }),
   shouldRun('demo-recording') && createWorker('demo-recording', processDemoRecording, { concurrency: 1, lockDuration: 600000 }),
   shouldRun('demo-voiceover') && createWorker('demo-voiceover', processDemoVoiceover, { concurrency: 5 }),
@@ -163,20 +153,11 @@ const workers = [
   shouldRun('lip-sync-test') && createWorker('lip-sync-test', processLipSyncTest, { concurrency: 2, lockDuration: 300000 }),
   shouldRun('waveform-generation') && createWorker('waveform-generation', processWaveformGeneration, { concurrency: 2 }),
   shouldRun('quiz-generation') && createWorker('quiz-generation', processQuizGeneration, { concurrency: 2 }),
-  shouldRun('briefing-scheduler') && createWorker('briefing-scheduler', processBriefingScheduler, { concurrency: 1 }),
   shouldRun('pipeline-classification') && createWorker('pipeline-classification', processPipelineClassification, { concurrency: 2, lockDuration: 300000 }),
 ].filter(Boolean) as ReturnType<typeof createWorker>[];
 
 // Cron jobs and webhooks run only on light (or all) profile to prevent duplicate repeat registrations
 if (WORKER_PROFILE === 'all' || WORKER_PROFILE === 'light') {
-// Schedule weekly email digest (Sunday 10:00 UTC)
-if (shouldRun('email-digest')) {
-  emailDigestQueue
-    .add(JobType.SEND_EMAIL_DIGEST, {}, { repeat: { pattern: '0 10 * * 0' } })
-    .then(() => logger.info('Weekly email digest scheduled', { schedule: 'Sunday 10:00 UTC' }))
-    .catch((err) => logger.error('Failed to schedule email digest', { error: err.message }));
-}
-
 // Schedule cleanup every 2 hours (stale drafts + stuck video generations)
 if (shouldRun('draft-cleanup')) {
   draftCleanupQueue
@@ -225,20 +206,6 @@ if (shouldRun('feature-computation')) {
     .add(JobType.COMPUTE_FEATURES, { scope: 'all' }, { repeat: { every: 86400000 } })
     .then(() => logger.info('Feature computation catch-up scheduled', { intervalMs: '86400000' }))
     .catch((err) => logger.error('Failed to schedule feature computation', { error: err.message }));
-}
-
-// Schedule news ingestion every 4 hours
-if (shouldRun('news-ingest')) {
-  newsIngestQueue
-    .add(JobType.INGEST_NEWS, {}, { repeat: { every: 4 * 60 * 60 * 1000 } })
-    .then(() => logger.info('News ingestion scheduled', { intervalMs: '14400000' }))
-    .catch((err) => logger.error('Failed to schedule news ingestion', { error: err.message }));
-
-  // Briefing scheduler (every 1 hour)
-  briefingSchedulerQueue
-    .add(JobType.SCHEDULE_BRIEFINGS, {}, { repeat: { every: 60 * 60 * 1000 } })
-    .then(() => logger.info('Briefing scheduler started', { intervalMs: '3600000' }))
-    .catch((err) => logger.error('Failed to schedule briefings', { error: err.message }));
 }
 
 // Start in-memory pricing refresh interval (picks up DB changes every 5 min)

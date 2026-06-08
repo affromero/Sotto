@@ -52,45 +52,6 @@ export default async function SettingsPage() {
         emailNotifications: true,
         pushNotifications: true,
         quizEnabled: true,
-        userBriefings: {
-          orderBy: { createdAt: 'asc' as const },
-          select: {
-            id: true,
-            name: true,
-            enabled: true,
-            time: true,
-            timezone: true,
-            days: true,
-            nextRunAt: true,
-            prompt: true,
-            depth: true,
-            tone: true,
-            audienceLevel: true,
-            duration: true,
-            format: true,
-            aiModel: true,
-            ttsProvider: true,
-            ttsModel: true,
-            hostVoiceId: true,
-            expertVoiceId: true,
-            continuousLearning: true,
-            contextEpisodes: true,
-            visibility: true,
-            useByokKeys: true,
-            targetLanguage: true,
-            languageMode: true,
-            lastGeneratedAt: true,
-            createdAt: true,
-            briefingLogs: {
-              where: { scheduledDate: new Date().toISOString().slice(0, 10) },
-              take: 1,
-              select: {
-                podcastId: true,
-                podcast: { select: { status: true, title: true, deletedAt: true } },
-              },
-            },
-          },
-        },
       },
     }),
     prisma.account.findMany({
@@ -199,25 +160,6 @@ export default async function SettingsPage() {
         isTwitterProviderAvailable={isTwitterProviderAvailable}
         initialEmailNotifications={user.emailNotifications}
         initialPushNotifications={user.pushNotifications}
-        briefings={user.userBriefings.map((b) => {
-          const todayLog = b.briefingLogs[0] ?? null;
-          const podcastDeleted = todayLog?.podcast.deletedAt != null;
-          return {
-            ...b,
-            briefingLogs: undefined,
-            nextRunAt: b.nextRunAt?.toISOString() ?? null,
-            lastGeneratedAt: b.lastGeneratedAt?.toISOString() ?? null,
-            createdAt: b.createdAt.toISOString(),
-            todayPodcast:
-              todayLog && !podcastDeleted
-                ? {
-                    id: todayLog.podcastId,
-                    status: todayLog.podcast.status,
-                    title: todayLog.podcast.title,
-                  }
-                : null,
-          };
-        })}
         privateFeedTokens={privateFeedTokens.map((token) => ({
           id: token.id,
           name: token.name,
@@ -225,9 +167,6 @@ export default async function SettingsPage() {
           createdAt: token.createdAt.toISOString(),
           lastUsedAt: token.lastUsedAt?.toISOString() ?? null,
         }))}
-        hasByokKeys={
-          configuredProviders.some((p) => p.isValid) || configuredAiProviders.some((p) => p.isValid)
-        }
         initialQuizEnabled={user.quizEnabled}
         quizAnswerCount={quizAnswerCount}
         referredUsers={referredUsers.map((u) => ({

@@ -15,7 +15,6 @@ import {
   ImagePlus,
   Video,
   Music,
-  Newspaper,
   MicVocal,
   Megaphone,
   Flag,
@@ -37,7 +36,6 @@ const typeIcons: Record<string, typeof Bell> = {
   PODCAST_READY: Headphones,
   SCRIPT_READY: FileText,
   VIDEO_READY: Video,
-  BRIEFING_READY: Newspaper,
   MUSIC_READY: Music,
 
   // Pipeline — failure

@@ -29,8 +29,7 @@ export type PodcastSource =
   | 'AGENT'
   | 'MEETING'
   | 'IMPORT'
-  | 'ADMIN'
-  | 'BRIEFING';
+  | 'ADMIN';
 
 export type Speaker = string;
 
@@ -72,7 +71,6 @@ export type NotificationType =
   | 'MUSIC_FAILED'
   | 'PIPELINE_FAILURE'
   | 'REFERRAL_SIGNUP'
-  | 'BRIEFING_READY'
   | 'AVATAR_IMAGE_REQUEST_RECEIVED'
   | 'AVATAR_IMAGE_REQUEST_APPROVED'
   | 'AVATAR_IMAGE_REQUEST_DENIED'

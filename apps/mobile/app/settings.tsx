@@ -170,15 +170,6 @@ export default function SettingsScreen() {
               <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
             </Pressable>
             <View style={styles.rowSeparator} />
-            <Pressable
-              style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-              onPress={() => router.push('/settings/briefings')}
-              testID="settings-briefings"
-            >
-              <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>Daily Briefings</Text>
-              <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
-            </Pressable>
-            <View style={styles.rowSeparator} />
             <View style={styles.row}>
               <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
                 Post-Listen Quizzes

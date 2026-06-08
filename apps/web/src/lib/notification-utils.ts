@@ -4,7 +4,6 @@ const PIPELINE_SUCCESS_TYPES = new Set([
   'PODCAST_READY',
   'SCRIPT_READY',
   'VIDEO_READY',
-  'BRIEFING_READY',
   'MUSIC_READY',
 ]);
 
@@ -43,7 +42,6 @@ export function getNotificationUrl(notification: NotificationData): string | nul
     case 'SCRIPT_READY':
     case 'VIDEO_READY':
     case 'VIDEO_FAILED':
-    case 'BRIEFING_READY':
     case 'MUSIC_READY':
     case 'MUSIC_FAILED':
     case 'AVATAR_FAILED':

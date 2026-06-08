@@ -42,9 +42,6 @@ const mockAllResponse = {
       tags: [{ id: 'tag-1', name: 'Tech', slug: 'tech' }],
     },
   ],
-  news: [
-    { id: 'n1', text: 'Breaking: Mars Rover Discovery', topic: 'Mars Rover Discovery', tagSlugs: ['science'], category: 'Science' },
-  ],
 };
 
 /**
@@ -71,7 +68,6 @@ function createSseResponse(data: Record<string, unknown>) {
   let sseBody = '';
   if (data.trending !== undefined) sseBody += `data: ${JSON.stringify({ section: 'trending', data: data.trending })}\n\n`;
   if (data.forYou !== undefined) sseBody += `data: ${JSON.stringify({ section: 'forYou', data: data.forYou })}\n\n`;
-  if (data.news !== undefined) sseBody += `data: ${JSON.stringify({ section: 'news', data: data.news })}\n\n`;
   sseBody += `data: ${JSON.stringify({ done: true })}\n\n`;
 
   const encoder = new TextEncoder();
@@ -129,7 +125,7 @@ describe('InspireMe', () => {
 
     expect(screen.getByRole('tab', { name: 'For You' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Trending' })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'In the News' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Curiosity' })).toBeInTheDocument();
   });
 
   it('fetches all tabs with a single API call on open', async () => {
@@ -304,7 +300,7 @@ describe('InspireMe', () => {
 
   it('shows generate button when no ForYou questions returned', async () => {
     (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
-      createJsonResponse({ forYou: [], trending: [], news: [] })
+      createJsonResponse({ forYou: [], trending: [], curiosity: [] })
     );
 
     render(<InspireMe open={true} onClose={vi.fn()} onSelectTopic={vi.fn()} />);
