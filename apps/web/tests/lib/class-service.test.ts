@@ -54,6 +54,12 @@ vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
+vi.mock('@/lib/knowledge-graph', () => ({
+  seedLessonItems: vi.fn(),
+  getDueItems: vi.fn().mockResolvedValue({ vocab: [], grammar: [] }),
+  applyReviewOutcome: vi.fn(),
+}));
+
 // ---- Import under test ----
 import {
   createNextClass,
@@ -198,6 +204,7 @@ describe('submitClass', () => {
       id: 'class-1',
       courseId: 'course-1',
       passThreshold,
+      lesson: SAMPLE_LESSON,
       sections: [
         makeSection(SECTION_ID_GRAMMAR, 'GRAMMAR', 'q'),
         makeSection(SECTION_ID_READING, 'READING', 'r'),

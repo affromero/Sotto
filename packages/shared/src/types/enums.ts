@@ -181,3 +181,10 @@ export type SectionStatus =
   | 'SUBMITTED'
   | 'PASSED'
   | 'FAILED';
+
+export type EdgeType =
+  | 'VOCAB_VOCAB'
+  | 'VOCAB_GRAMMAR'
+  | 'VOCAB_CLASS'
+  | 'VOCAB_PODCAST'
+  | 'GRAMMAR_GRAMMAR';
