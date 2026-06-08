@@ -47,6 +47,7 @@ export function WelcomeFlow() {
     keys: {},
   });
   const [sources, setSources] = useState<Set<string>>(new Set());
+  const [note, setNote] = useState('');
   const [understood, setUnderstood] = useState<Set<CefrLevel>>(new Set());
 
   const level = useMemo<CefrLevel | null>(() => {
@@ -128,6 +129,8 @@ export function WelcomeFlow() {
         <StepContext
           sources={sources}
           toggle={toggleSource}
+          note={note}
+          setNote={setNote}
           onNext={() => go(4)}
           onBack={() => go(2)}
         />
@@ -160,6 +163,7 @@ export function WelcomeFlow() {
           sources={sources}
           agent={agent}
           voice={voice}
+          note={note}
           onRestart={reset}
         />
       );

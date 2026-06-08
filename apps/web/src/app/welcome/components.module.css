@@ -1173,3 +1173,49 @@
   animation: spin 0.7s linear infinite;
   flex: none;
 }
+
+/* Learner note (StepContext "Tell it about you") */
+.noteBlock {
+  display: flex;
+  flex-direction: column;
+  margin-top: 18px;
+}
+
+.noteLabel {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  margin-bottom: 6px;
+}
+
+.noteOptional {
+  text-transform: none;
+  letter-spacing: 0;
+  opacity: 0.7;
+}
+
+.noteField {
+  width: 100%;
+  resize: vertical;
+  min-height: 88px;
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r);
+  padding: 12px 14px;
+}
+
+.noteField::placeholder {
+  color: var(--ink-mute);
+}
+
+.noteField:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
