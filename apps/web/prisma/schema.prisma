@@ -2563,10 +2563,27 @@ model CourseClass {
   lesson     Lesson           @relation(fields: [lessonId], references: [id])
   sections   ClassSection[]
   submission ClassSubmission?
+  inkLayers  ClassInkLayer[]
 
   @@index([courseId, order])
   @@index([courseId, status])
   @@index([lessonId])
+}
+
+// Learner's iPad PencilKit ink for one worksheet surface. Stored verbatim,
+// never graded, never sent to an LLM.
+model ClassInkLayer {
+  id        String   @id @default(cuid())
+  classId   String
+  surface   String // worksheet surface/page the strokes belong to
+  strokes   String   @db.Text // base64-encoded PKDrawing
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  class CourseClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  @@unique([classId, surface])
+  @@index([classId])
 }
 
 // One skill section per (re)attempt. Failed-section regeneration = a new row
