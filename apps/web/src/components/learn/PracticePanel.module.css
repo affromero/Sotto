@@ -1,27 +1,32 @@
 .root {
+  composes: surface from './sottoLearn.module.css';
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-lg);
-  padding: var(--spacing-lg);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-xl);
+  gap: 22px;
+  padding: 26px;
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
 }
 
 .header {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
 }
 
 .courseName {
-  font: var(--text-h3);
-  color: var(--color-text-primary);
+  font-family: var(--serif);
+  font-size: 24px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--ink);
 }
 
 .subtitle {
-  font: var(--text-caption);
-  color: var(--color-text-secondary);
+  font-family: var(--sans);
+  font-size: 13.5px;
+  color: var(--ink-soft);
 }
 
 .runHeader {
@@ -33,8 +38,10 @@
   background: none;
   border: none;
   padding: 0;
-  font: var(--text-body);
-  color: var(--color-primary);
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--accent);
   cursor: pointer;
 }
 
@@ -45,7 +52,7 @@
 .kindList {
   display: grid;
   grid-template-columns: 1fr;
-  gap: var(--spacing-sm);
+  gap: 12px;
   list-style: none;
   margin: 0;
   padding: 0;
@@ -61,56 +68,62 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
   width: 100%;
-  min-height: 64px;
-  padding: var(--spacing-md);
+  min-height: 72px;
+  padding: 16px 18px;
   text-align: left;
-  background: var(--color-surface-sunken);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
+  background: var(--well);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
   cursor: pointer;
-  transition: border-color 0.15s ease, transform 0.15s ease;
+  transition: border-color 0.18s var(--ease), transform 0.18s var(--ease);
 }
 
 .kindCard:hover:not(:disabled) {
-  border-color: var(--color-primary);
+  border-color: var(--accent);
+  transform: translateY(-1px);
 }
 
 .kindCard:disabled {
-  opacity: 0.6;
+  opacity: 0.55;
   cursor: default;
 }
 
 .kindLabel {
-  font-weight: 600;
-  font-size: var(--font-size-base);
-  color: var(--color-text-primary);
+  font-family: var(--serif);
+  font-size: 20px;
+  font-weight: 500;
+  color: var(--ink);
 }
 
 .kindBlurb {
-  font: var(--text-caption);
-  color: var(--color-text-secondary);
+  font-family: var(--sans);
+  font-size: 12.5px;
+  color: var(--ink-mute);
 }
 
 .dueBadge {
   position: absolute;
-  top: var(--spacing-sm);
-  right: var(--spacing-sm);
-  padding: 2px 8px;
-  font-size: var(--font-size-sm);
-  font-weight: 600;
-  color: var(--color-text-inverse);
-  background: var(--color-primary);
-  border-radius: var(--radius-full);
+  top: 14px;
+  right: 14px;
+  padding: 3px 9px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  color: var(--accent-fg);
+  background: var(--accent);
+  border-radius: var(--r);
 }
 
 .notice {
-  font: var(--text-body);
-  color: var(--color-text-secondary);
+  font-family: var(--sans);
+  font-size: 14px;
+  color: var(--ink-soft);
 }
 
 .error {
-  font: var(--text-caption);
-  color: var(--color-error);
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--bad);
 }
