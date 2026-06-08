@@ -25,7 +25,6 @@ export type PodcastVisibility = 'PUBLIC' | 'UNLISTED' | 'PRIVATE';
 
 export type PodcastSource =
   | 'WEB'
-  | 'TELEGRAM'
   | 'API'
   | 'AGENT'
   | 'MEETING'
@@ -47,20 +46,10 @@ export type ReferenceType = 'WEB' | 'PAPER' | 'BOOK' | 'ARTICLE' | 'VIDEO' | 'RE
 
 export type VerificationStatus = 'PENDING' | 'VERIFIED' | 'FAILED' | 'REPLACED' | 'REMOVED';
 
-export type TelegramMessageStatus =
-  | 'PENDING'
-  | 'DISCOVERING'
-  | 'GENERATING'
-  | 'READY'
-  | 'REPLIED'
-  | 'FAILED'
-  | 'IGNORED';
-
 export type NotificationType =
   | 'PODCAST_READY'
   | 'PODCAST_FAILED'
   | 'KEY_INVALID'
-  | 'TELEGRAM_PODCAST_READY'
   | 'VOICE_REQUEST_RECEIVED'
   | 'VOICE_REQUEST_APPROVED'
   | 'VOICE_REQUEST_DENIED'

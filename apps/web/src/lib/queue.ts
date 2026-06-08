@@ -8,18 +8,15 @@ import { markTtsKeyInvalid, markAiKeyInvalid } from './byok';
 import type { AiProviderId } from './providers/ai-registry';
 import type { TtsProviderId } from './providers/tts-registry';
 import type { SttProviderId } from '@sotto/shared';
-import { sendMessage as sendTelegram, isTelegramBotConfigured } from './telegram';
 
 /** Cached admin user lookup — avoids hitting DB on every worker failure. */
-async function getCachedAdminUsers(): Promise<
-  Array<{ id: string; telegramChatId: string | null }>
-> {
+async function getCachedAdminUsers(): Promise<Array<{ id: string }>> {
   const cacheKey = 'admin_users';
-  const cached = await cache.get<Array<{ id: string; telegramChatId: string | null }>>(cacheKey);
+  const cached = await cache.get<Array<{ id: string }>>(cacheKey);
   if (cached) return cached;
   const admins = await prisma.user.findMany({
     where: { role: 'ADMIN' },
-    select: { id: true, telegramChatId: true },
+    select: { id: true },
   });
   await cache.set(cacheKey, admins, 3600);
   return admins;
@@ -48,9 +45,7 @@ export enum JobType {
   COMPUTE_FEATURES = 'compute_features',
   EXPORT_DATA = 'export_data',
   VALIDATE_KEYS = 'validate_keys',
-  POLL_TELEGRAM_UPDATES = 'poll_telegram_updates',
-  REPLY_TELEGRAM = 'reply_telegram',
-  MODERATE_CONTENT = 'moderate_content',
+MODERATE_CONTENT = 'moderate_content',
   SEND_EMAIL_DIGEST = 'send_email_digest',
   SEND_ANNOUNCEMENT = 'send_announcement',
   VERIFY_VOICE = 'verify_voice',
@@ -261,14 +256,6 @@ export interface DataExportPayload {
 
 export interface ValidateKeysPayload {}
 
-export interface PollTelegramUpdatesPayload {}
-
-export interface ReplyTelegramPayload {
-  podcastId: string;
-  telegramMessageId?: string;
-  chatId: string;
-}
-
 export interface NewsIngestPayload {}
 
 export interface GenerateDemoScriptPayload {
@@ -464,8 +451,6 @@ const QUEUE_DEFINITIONS: Record<string, QueueDefinition> = {
   'feature-computation': { attempts: 2, skipEvents: true },
   'data-export': { attempts: 2, skipEvents: true },
   'key-validation': { attempts: 1, skipEvents: true },
-  'telegram-bot': { attempts: 1, skipEvents: true },
-  'telegram-reply': { attempts: 3, skipEvents: true },
   'content-moderation': { attempts: 2, skipEvents: true },
   'email-digest': { attempts: 2, skipEvents: true },
   announcements: { attempts: 2, skipEvents: true },
@@ -658,7 +643,7 @@ async function handleWorkerFailure(
         title: true,
         ttsProvider: true,
         source: true,
-        user: { select: { name: true, email: true, telegramEnabled: true, telegramChatId: true } },
+        user: { select: { name: true, email: true } },
       },
     });
     if (!podcast) {
@@ -731,18 +716,6 @@ async function handleWorkerFailure(
               data: { podcastId },
             })
             .catch(() => {});
-        }
-        if (admin.telegramChatId && isTelegramBotConfigured()) {
-          const telegramText = [
-            `🎭 *Avatar Pipeline Failure*`,
-            `*Podcast:* ${podcastLabel}`,
-            `*Owner:* ${ownerLabel}`,
-            `*Error:* ${errorKind}`,
-            `\`${(failedReason || 'Unknown').substring(0, 500)}\``,
-          ].join('\n');
-          sendTelegram(admin.telegramChatId, telegramText, { parse_mode: 'Markdown' }).catch(
-            () => {}
-          );
         }
       }
       return;
@@ -911,10 +884,9 @@ async function handleWorkerFailure(
     }
 
     const podcastLabel = podcast.title || podcastId;
-    const techError = failedReason || 'Unknown error';
     const adminUsers = await prisma.user.findMany({
       where: { role: 'ADMIN', id: { not: podcast.userId } },
-      select: { id: true, telegramChatId: true },
+      select: { id: true },
     });
     const adminMessage = `[${queueName}] ${podcastLabel} (by ${ownerLabel}) — ${errorKind}`;
     for (const admin of adminUsers) {
@@ -933,48 +905,6 @@ async function handleWorkerFailure(
               error: err instanceof Error ? err.message : String(err),
             });
           });
-      }
-      if (admin.telegramChatId && isTelegramBotConfigured()) {
-        const telegramText = [
-          `🚨 *Pipeline Failure*`,
-          `*Queue:* ${queueName}`,
-          `*Podcast:* ${podcastLabel}`,
-          `*Owner:* ${ownerLabel}`,
-          `*Error:* ${errorKind}`,
-          `*Ref:* \`${errorId}\``,
-          `\`${techError.substring(0, 500)}\``,
-        ].join('\n');
-        sendTelegram(admin.telegramChatId, telegramText, { parse_mode: 'Markdown' }).catch(
-          (err: unknown) => {
-            logger.warn('Failed to send admin pipeline-failure Telegram', {
-              adminId: admin.id,
-              error: err instanceof Error ? err.message : String(err),
-            });
-          }
-        );
-      }
-    }
-
-    if (podcast.user?.telegramEnabled && podcast.user?.telegramChatId) {
-      const telegramReplyQ = createQueue('telegram-reply');
-      if (telegramReplyQ) {
-        const tgMsg = await prisma.telegramMessage
-          .findFirst({
-            where: { podcastId, status: { in: ['GENERATING', 'READY'] } },
-            select: { id: true, chatId: true },
-          })
-          .catch(() => null);
-        await telegramReplyQ
-          .add(
-            'reply_telegram',
-            {
-              podcastId,
-              telegramMessageId: tgMsg?.id,
-              chatId: tgMsg?.chatId ?? podcast.user.telegramChatId,
-            },
-            { jobId: `telegram-fail-${podcastId}-${Date.now()}` }
-          )
-          .catch(() => {});
       }
     }
 
@@ -1101,8 +1031,6 @@ export const audioImportQueue = createQueueReference('audio-import');
 export const featureComputationQueue = createQueueReference('feature-computation');
 export const dataExportQueue = createQueueReference('data-export');
 export const keyValidationQueue = createQueueReference('key-validation');
-export const telegramBotQueue = createQueueReference('telegram-bot');
-export const telegramReplyQueue = createQueueReference('telegram-reply');
 export const contentModerationQueue = createQueueReference('content-moderation');
 export const emailDigestQueue = createQueueReference('email-digest');
 export const announcementQueue = createQueueReference('announcements');

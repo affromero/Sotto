@@ -11,13 +11,10 @@ const mockPrismaPodcastFindUniqueOrThrow = vi.fn().mockResolvedValue({
   source: 'WEB',
   currentVersion: 0,
   audioUrl: null,
-  user: { telegramEnabled: false, telegramChatId: null },
 });
 const mockPrismaPodcastFindUnique = vi.fn().mockResolvedValue(null);
 const mockPrismaPodcastUpdate = vi.fn().mockResolvedValue({});
 const mockPrismaPodcastVersionCreate = vi.fn().mockResolvedValue({});
-const mockPrismaTelegramMessageFindFirst = vi.fn().mockResolvedValue(null);
-const mockPrismaTelegramMessageUpdate = vi.fn().mockResolvedValue({});
 const mockPrismaDiscoveryFindUnique = vi.fn().mockResolvedValue({ durationTarget: 5 });
 const mockPrismaPipelineEventCreate = vi.fn().mockResolvedValue({});
 const mockPrismaUserFindUniqueOrThrow = vi.fn().mockResolvedValue({ role: 'USER', plan: 'FREE' });
@@ -45,10 +42,6 @@ vi.mock('@/lib/prisma', () => {
     },
     user: {
       findUniqueOrThrow: (...args: unknown[]) => mockPrismaUserFindUniqueOrThrow(...args),
-    },
-    telegramMessage: {
-      findFirst: (...args: unknown[]) => mockPrismaTelegramMessageFindFirst(...args),
-      update: (...args: unknown[]) => mockPrismaTelegramMessageUpdate(...args),
     },
     pipelineEvent: {
       create: (...args: unknown[]) => mockPrismaPipelineEventCreate(...args),
@@ -88,14 +81,12 @@ vi.mock('@/lib/queue', () => ({
     SEND_NOTIFICATION: 'send_notification',
     GENERATE_PDF: 'generate_pdf',
     COMPUTE_FEATURES: 'compute_features',
-    REPLY_TELEGRAM: 'reply_telegram',
     GENERATE_WAVEFORM: 'generate_waveform',
     GENERATE_QUIZ: 'generate_quiz',
   },
   notificationQueue: { name: 'notifications' },
   pdfGenerationQueue: { name: 'pdf-generation' },
   featureComputationQueue: { name: 'feature-computation' },
-  telegramReplyQueue: { name: 'telegram-reply' },
   waveformGenerationQueue: { name: 'waveform-generation' },
   quizGenerationQueue: { name: 'quiz-generation' },
 }));
@@ -223,7 +214,6 @@ describe('processAudioStitching', () => {
       source: 'WEB',
       currentVersion: 0,
       audioUrl: null,
-      user: { telegramEnabled: false, telegramChatId: null },
     });
 
     // Default script data (no sound cues)
@@ -611,7 +601,6 @@ describe('processAudioStitching', () => {
         source: 'WEB',
         currentVersion: 0,
         audioUrl: null,
-        user: { telegramEnabled: false, telegramChatId: null },
       });
       const job = createMockJob(defaultPayload);
       await processAudioStitching(job);

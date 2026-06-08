@@ -113,9 +113,6 @@ model User {
   apiKeys           ApiKey[]
   privateFeedTokens PrivateFeedToken[]
 
-  // Telegram messages
-  telegramMessages TelegramMessage[]
-
   // BYOK TTS keys (multi-provider)
   userTtsKeys UserTtsKey[]
 
@@ -394,7 +391,6 @@ model Podcast {
   pipelineEvents      PipelineEvent[]
   references          Reference[]
   versions            PodcastVersion[]
-  telegramMessage     TelegramMessage?
   playbackSessions    PlaybackSession[]
   podcastFeature      PodcastFeature?
   listeningQueues     ListeningQueue[]
@@ -503,7 +499,6 @@ enum PodcastVisibility {
 
 enum PodcastSource {
   WEB
-  TELEGRAM
   API
   AGENT
   MEETING
@@ -926,7 +921,6 @@ enum NotificationType {
   PODCAST_READY
   PODCAST_FAILED
   KEY_INVALID
-  TELEGRAM_PODCAST_READY
   VOICE_REQUEST_RECEIVED
   VOICE_REQUEST_APPROVED
   VOICE_REQUEST_DENIED
@@ -1113,41 +1107,6 @@ enum FeedbackStatus {
   IN_PROGRESS
   RESOLVED
   ARCHIVED
-}
-
-// ============ TELEGRAM MESSAGES ============
-
-model TelegramMessage {
-  id                String                @id @default(cuid())
-  telegramUserId    String
-  chatId            String
-  telegramMessageId String?
-  text              String?               @db.Text
-  parsedTopic       String?               @db.Text
-  status            TelegramMessageStatus @default(PENDING)
-  userId            String?
-  podcastId         String?               @unique
-  errorMessage      String?               @db.Text
-  createdAt         DateTime              @default(now())
-  updatedAt         DateTime              @updatedAt
-
-  user    User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
-  podcast Podcast? @relation(fields: [podcastId], references: [id], onDelete: SetNull)
-
-  @@index([telegramUserId])
-  @@index([chatId])
-  @@index([status])
-  @@index([createdAt])
-}
-
-enum TelegramMessageStatus {
-  PENDING
-  DISCOVERING
-  GENERATING
-  READY
-  REPLIED
-  FAILED
-  IGNORED
 }
 
 // ============ PODCAST IDEAS (Telegram Save-for-Later) ============

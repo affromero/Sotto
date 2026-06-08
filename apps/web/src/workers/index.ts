@@ -7,7 +7,6 @@ Sentry.init({
 
 import {
   createWorker,
-  telegramBotQueue,
   keyValidationQueue,
   emailDigestQueue,
   draftCleanupQueue,
@@ -20,7 +19,6 @@ import {
   JobType,
 } from '@/lib/queue';
 import { processAnnouncement } from './announcement.worker';
-import { isTelegramBotConfigured, setWebhook, deleteWebhook } from '@/lib/telegram';
 import { logger } from '@/lib/logger';
 import { closeRedis } from '@/lib/redis';
 import { processContentExtraction } from './content-extraction.worker';
@@ -40,9 +38,6 @@ import { processFeatureComputation } from './feature-computation.worker';
 import { processDataExport } from './data-export.worker';
 import { processAudioImport } from './audio-import.worker';
 import { processKeyValidation } from './key-validation.worker';
-import { processTelegramUpdates } from './telegram-bot.worker';
-import { processTelegramReply } from './telegram-reply.worker';
-
 import { processContentModeration } from './content-moderation.worker';
 import { processEmailDigest } from './email-digest.worker';
 import { processVoiceVerification } from './voice-verification.worker';
@@ -139,8 +134,6 @@ const workers = [
   shouldRun('data-export') && createWorker('data-export', processDataExport, { concurrency: 1 }),
   shouldRun('audio-import') && createWorker('audio-import', processAudioImport, { concurrency: 2 }),
   shouldRun('key-validation') && createWorker('key-validation', processKeyValidation, { concurrency: 1 }),
-  shouldRun('telegram-bot') && createWorker('telegram-bot', processTelegramUpdates, { concurrency: 1, lockDuration: 10000 }),
-  shouldRun('telegram-reply') && createWorker('telegram-reply', processTelegramReply, { concurrency: 2 }),
   shouldRun('content-moderation') && createWorker('content-moderation', processContentModeration, { concurrency: 3 }),
   shouldRun('email-digest') && createWorker('email-digest', processEmailDigest, { concurrency: 1 }),
   shouldRun('announcements') && createWorker('announcements', processAnnouncement, { concurrency: 1 }),
@@ -176,33 +169,6 @@ const workers = [
 
 // Cron jobs and webhooks run only on light (or all) profile to prevent duplicate repeat registrations
 if (WORKER_PROFILE === 'all' || WORKER_PROFILE === 'light') {
-// Set up Telegram bot: webhook (production) or polling (dev)
-if (shouldRun('telegram-bot') && isTelegramBotConfigured()) {
-  const webhookUrl = process.env.TELEGRAM_WEBHOOK_URL;
-  const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
-
-  if (webhookUrl && webhookSecret) {
-    // Webhook mode: clear any stale polling jobs first, then register the webhook
-    telegramBotQueue
-      .obliterate({ force: true })
-      .then(() => setWebhook(webhookUrl, webhookSecret))
-      .then(() => logger.info('Telegram webhook registered', { url: webhookUrl }))
-      .catch((err) => logger.error('Failed to register Telegram webhook', { error: err.message }));
-  } else {
-    // Dev: clear any stale webhook, then start fast polling
-    deleteWebhook()
-      .then(() => telegramBotQueue.obliterate({ force: true }))
-      .then(() => {
-        const pollInterval = parseInt(process.env.TELEGRAM_POLL_INTERVAL_MS || '5000', 10);
-        return telegramBotQueue.add(JobType.POLL_TELEGRAM_UPDATES, {}, { repeat: { every: pollInterval } });
-      })
-      .then(() => logger.info('Telegram bot polling scheduled (dev mode)'))
-      .catch((err) => logger.error('Failed to set up Telegram polling', { error: err.message }));
-  }
-} else if (shouldRun('telegram-bot')) {
-  logger.info('Telegram bot not configured — disabled');
-}
-
 // Schedule weekly email digest (Sunday 10:00 UTC)
 if (shouldRun('email-digest')) {
   emailDigestQueue

@@ -585,13 +585,6 @@ export const deleteAccountSchema = z.object({
 });
 
 /**
- * Telegram account linking validation
- */
-export const telegramConnectSchema = z.object({
-  code: z.string().min(1),
-});
-
-/**
  * User discovery search validation
  */
 export const userDiscoverySearchSchema = z.object({
