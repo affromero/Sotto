@@ -8,11 +8,13 @@ import c from '../components.module.css';
 interface Props {
   sources: Set<string>;
   toggle: (id: string) => void;
+  note: string;
+  setNote: (v: string) => void;
   onNext: () => void;
   onBack: () => void;
 }
 
-export function StepContext({ sources, toggle, onNext, onBack }: Props) {
+export function StepContext({ sources, toggle, note, setNote, onNext, onBack }: Props) {
   const n = sources.size;
 
   return (
@@ -68,6 +70,22 @@ export function StepContext({ sources, toggle, onNext, onBack }: Props) {
             .
           </>
         )}
+      </div>
+
+      <div className={c.noteBlock}>
+        <label className={c.noteLabel} htmlFor="welcome-note">
+          Tell it about you <span className={c.noteOptional}>(optional)</span>
+        </label>
+        <textarea
+          id="welcome-note"
+          className={c.noteField}
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          rows={3}
+          maxLength={4000}
+          placeholder="Goals, interests, why you're learning — e.g. “I'm a nurse moving to Madrid; I want medical and everyday Spanish.” It shapes your placement, classes, and practice."
+          aria-label="Tell Sotto about your goals and background"
+        />
       </div>
 
       <div className={t.actions}>

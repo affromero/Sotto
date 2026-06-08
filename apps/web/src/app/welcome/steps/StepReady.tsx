@@ -25,6 +25,7 @@ interface Props {
   sources: Set<string>;
   agent: AgentState;
   voice: VoiceState;
+  note: string;
   onRestart: () => void;
 }
 
@@ -35,6 +36,7 @@ export function StepReady({
   sources,
   agent,
   voice,
+  note,
   onRestart,
 }: Props) {
   const router = useRouter();
@@ -53,16 +55,35 @@ export function StepReady({
 
   async function finishOnboarding() {
     setLoading(true);
+    let courseId: string | null = null;
     try {
       // 1. Create course
-      await fetch('/api/courses', {
+      const res = await fetch('/api/courses', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ native: baseLang, target: language }),
       });
+      if (res.ok) {
+        const data = (await res.json()) as { course?: { id?: string } };
+        courseId = data.course?.id ?? null;
+      }
     } catch {
       // Non-fatal — proceed regardless
+    }
+
+    // 1b. Best-effort persist the learner's context note for this course
+    if (courseId && note.trim()) {
+      try {
+        await fetch(`/api/courses/${courseId}/notes`, {
+          method: 'PUT',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ body: note }),
+        });
+      } catch {
+        // Swallow — editable later
+      }
     }
 
     // 2. Best-effort persist AI key
