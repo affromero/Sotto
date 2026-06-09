@@ -314,13 +314,20 @@ describe('open-source language-learning OSS surfaces', () => {
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
 
-    expect(mobileRuntimeSources).toContain('is required. Set it to your Sotto deployment API URL');
+    // The client must point at an explicit deployment — paired at runtime
+    // ("scan to connect") or baked in via EXPO_PUBLIC_API_URL — and never
+    // silently default to a hosted sotto.fm. getApiBaseUrl throws when no server
+    // is configured at all.
+    expect(mobileRuntimeSources).toContain('No Sotto server is configured');
     expect(mobileRuntimeSources).toContain('getApiBaseUrl');
     expect(mobileRuntimeSources).not.toContain('https://sotto.fm');
     expect(mobileRuntimeSources).not.toContain("?? 'https://sotto.fm/api'");
     expect(mobileRuntimeSources).not.toContain("|| 'https://sotto.fm/api'");
 
-    expect(mobileBuildConfigSources).toContain('EXPO_PUBLIC_API_URL is required for mobile builds');
+    // The build is driven by the explicit EXPO_PUBLIC_API_URL knob and also
+    // supports a runtime-config build (no baked-in server) — never a hardcoded host.
+    expect(mobileBuildConfigSources).toContain('EXPO_PUBLIC_API_URL');
+    expect(mobileBuildConfigSources).toContain('runtime-config');
     expect(mobileBuildConfigSources).not.toContain('applinks:sotto.fm');
     expect(mobileBuildConfigSources).not.toContain('"host": "sotto.fm"');
     expect(mobileBuildConfigSources).not.toContain('https://sotto.fm/api');

@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100" role="img" aria-label="Sotto mark">
+  <defs>
+    <linearGradient id="m-main" x1="0.16" y1="0.04" x2="0.84" y2="0.96">
+      <stop offset="0" stop-color="#6AA0FF"></stop>
+      <stop offset="1" stop-color="#FF8FB1"></stop>
+    </linearGradient>
+    <radialGradient id="m-blue" cx="0.28" cy="0.72" r="0.6">
+      <stop offset="0" stop-color="#5B8DEF"></stop>
+      <stop offset="1" stop-color="#5B8DEF" stop-opacity="0"></stop>
+    </radialGradient>
+    <radialGradient id="m-pink" cx="0.72" cy="0.76" r="0.55">
+      <stop offset="0" stop-color="#FF8FB1"></stop>
+      <stop offset="1" stop-color="#FF8FB1" stop-opacity="0"></stop>
+    </radialGradient>
+    <radialGradient id="m-shade" cx="0.5" cy="1" r="0.65">
+      <stop offset="0" stop-color="#23244E" stop-opacity="0.55"></stop>
+      <stop offset="1" stop-color="#23244E" stop-opacity="0"></stop>
+    </radialGradient>
+    <radialGradient id="m-hi" cx="0.34" cy="0.26" r="0.42">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.95"></stop>
+      <stop offset="0.5" stop-color="#FFFFFF" stop-opacity="0.22"></stop>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"></stop>
+    </radialGradient>
+    <radialGradient id="m-spec" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.95"></stop>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"></stop>
+    </radialGradient>
+    <clipPath id="m-clip"><circle cx="50" cy="50" r="48"></circle></clipPath>
+  </defs>
+  <g clip-path="url(#m-clip)">
+    <circle cx="50" cy="50" r="48" fill="url(#m-main)"></circle>
+    <rect width="100" height="100" fill="url(#m-blue)"></rect>
+    <rect width="100" height="100" fill="url(#m-pink)"></rect>
+    <rect width="100" height="100" fill="url(#m-shade)"></rect>
+    <rect width="100" height="100" fill="url(#m-hi)"></rect>
+    <ellipse cx="34" cy="24" rx="13" ry="8" fill="url(#m-spec)"></ellipse>
+  </g>
+  <circle cx="50" cy="50" r="47.5" fill="none" stroke="#FFFFFF" stroke-opacity="0.25" stroke-width="1"></circle>
+</svg>

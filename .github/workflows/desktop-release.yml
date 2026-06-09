@@ -1,0 +1,67 @@
+name: Desktop launcher release
+
+# Builds Sotto Host (apps/desktop) for macOS, Windows, and Linux and publishes the
+# installers to R2 — the bucket sotto.fm serves at /download/{mac,windows,linux}.
+# Trigger by pushing a tag like `desktop-v0.1.0`, or run manually.
+on:
+  push:
+    tags: ['desktop-v*']
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            slug: mac
+          - os: windows-latest
+            slug: windows
+          - os: ubuntu-latest
+            slug: linux
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Linux build deps
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install + generate icons
+        working-directory: apps/desktop
+        run: |
+          npm install
+          npm run icon
+
+      # Builds the installer for the current OS. Add signing secrets here to
+      # produce a signed/notarized build (see apps/desktop/README.md).
+      - uses: tauri-apps/tauri-action@v0
+        with:
+          projectPath: apps/desktop
+
+      # Publish the produced bundles to R2 so sotto.fm/download serves them.
+      - name: Upload installers to R2
+        if: ${{ env.R2_ACCESS_KEY_ID != '' }}
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+        shell: bash
+        run: |
+          BUNDLE_DIR="apps/desktop/src-tauri/target/release/bundle"
+          aws s3 cp "$BUNDLE_DIR" "s3://$R2_BUCKET/download/${{ matrix.slug }}/" \
+            --recursive --endpoint-url "$R2_ENDPOINT" \
+            --exclude "*" --include "*.dmg" --include "*.msi" --include "*.exe" \
+            --include "*.AppImage" --include "*.deb"
