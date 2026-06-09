@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useState, useMemo } from 'react';
 import { STEPS, WHISPERS, LEVELS } from './data';
 import type { CefrLevel } from './data';
@@ -178,7 +179,7 @@ export function WelcomeFlow() {
       <aside className={t.voice}>
         <div className={t.brand}>
           <div className={t.wordmark}>
-            <span className={t.wordmarkDot} />
+            <Image src="/brand/sotto-mark.svg" alt="" width={30} height={30} className={t.wordmarkMark} priority unoptimized />
             sotto
           </div>
           <div className={t.wordmarkSub}>v0 · self-hosted</div>

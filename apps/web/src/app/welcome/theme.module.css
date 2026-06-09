@@ -127,12 +127,11 @@
   gap: 11px;
 }
 
-.wordmarkDot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--accent);
+.wordmarkMark {
+  width: 30px;
+  height: 30px;
   flex: none;
+  border-radius: 50%;
 }
 
 .wordmarkSub {
