@@ -1747,8 +1747,24 @@ model AutoModelConfig {
 model SiteConfig {
   id         String   @id @default("singleton")
   openSignup Boolean  @default(false)
-  updatedAt  DateTime @updatedAt
-  updatedBy  String?
+
+  // Owner-set server infrastructure (non-secret selection only; null = fall back to env).
+  // Secrets (provider keys, R2/S3 credentials) never live here — they stay in env or the
+  // encrypted BYOK store. Set by the owner through the onboarding wizard.
+  aiProvider      String?
+  aiModel         String?
+  aiBaseUrl       String?
+  sttProvider     String?
+  sttBaseUrl      String?
+  sttModel        String?
+  ttsProvider     String?
+  ttsBaseUrl      String?
+  storageProvider String?
+  s3Bucket        String?
+  s3Region        String?
+
+  updatedAt DateTime @updatedAt
+  updatedBy String?
 }
 
 // ============ PLAN FEATURE CONFIG ============

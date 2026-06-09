@@ -21,6 +21,7 @@ import type { TtsProvider, SpeechParams } from '../tts';
 import type { TtsProviderId } from '../tts-registry';
 import { KOKORO_VOICE_POOL, selectVoicePairFromPool } from '../tts-voices';
 import type { VoiceMatchMetadata } from '../../voice-pool';
+import { infra } from '../../server-config';
 
 // HOST/GUEST → host voice slot; EXPERT/SKEPTIC → expert slot.
 const SPEAKER_VOICE_HOST_SET = new Set(['HOST', 'GUEST']);
@@ -32,7 +33,7 @@ export class KokoroProvider implements TtsProvider {
   private model: string;
 
   constructor(_apiKey?: string, model?: string) {
-    const baseURL = process.env.TTS_BASE_URL?.trim();
+    const baseURL = infra('ttsBaseUrl', 'TTS_BASE_URL');
     if (!baseURL) {
       throw new Error(
         'TTS_BASE_URL is required for TTS_PROVIDER=kokoro. Point it at your local ' +

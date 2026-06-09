@@ -3,6 +3,7 @@ import { isReasoningModel } from './ai-registry';
 import type { AiProviderId } from './ai-registry';
 import { logger } from '../logger';
 import { withRetry } from '../retry';
+import { getServerInfra, infra } from '../server-config';
 
 /**
  * Minimum max_completion_tokens for reasoning models.
@@ -405,19 +406,22 @@ class GoogleProvider implements AIProvider {
  */
 class LocalProvider implements AIProvider {
   private async getClient() {
-    const baseURL = process.env.AI_BASE_URL?.trim();
+    // Read-through the owner's DB infra config (warms the sync snapshot) then env.
+    await getServerInfra();
+    const baseURL = infra('aiBaseUrl', 'AI_BASE_URL');
     if (!baseURL) {
       throw new Error(
         'AI_BASE_URL is not set. Point it at your local OpenAI-compatible server (e.g. http://localhost:11434/v1 for Ollama).',
       );
     }
     const { default: OpenAI } = await import('openai');
+    // AI_API_KEY is a secret — never sourced from DB config; env-only (or 'local').
     // Disable SDK built-in retries — we handle retries via withRetry() to avoid stacking
     return new OpenAI({ apiKey: process.env.AI_API_KEY?.trim() || 'local', maxRetries: 0, baseURL });
   }
 
   private resolveModel(optsModel?: string): string {
-    const raw = (optsModel || process.env.AI_MODEL || '').trim();
+    const raw = (optsModel || infra('aiModel', 'AI_MODEL') || '').trim();
     const model = raw.startsWith('local:') ? raw.slice('local:'.length) : raw;
     if (!model) {
       throw new Error(
