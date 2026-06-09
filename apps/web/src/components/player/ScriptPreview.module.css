@@ -1,7 +1,7 @@
 /* Script Preview — same visual language as Teleprompter, but scrollable with all turns visible */
 
 .root {
-  background: #1A1A1A;
+  background: var(--color-text-primary);
   border-radius: var(--radius-2xl);
   max-height: 60vh;
   overflow-y: auto;
@@ -45,11 +45,11 @@
 /* Speaker-indexed badge colors */
 .speaker[data-speaker-index="0"] {
   color: var(--color-speaker-0);
-  background: rgba(217, 119, 6, 0.2);
+  background: rgba(63, 79, 176, 0.2);
 }
 .speaker[data-speaker-index="1"] {
   color: #93C5FD;
-  background: rgba(30, 58, 95, 0.4);
+  background: rgba(42, 53, 80, 0.4);
 }
 .speaker[data-speaker-index="2"] {
   color: #6EE7B7;

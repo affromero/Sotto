@@ -16,7 +16,7 @@
   color: var(--color-text-inverse);
   cursor: pointer;
   transition: all var(--transition-fast);
-  box-shadow: 0 2px 12px rgba(217, 119, 6, 0.25);
+  box-shadow: 0 2px 12px rgba(63, 79, 176, 0.25);
 }
 
 .playButton:hover {

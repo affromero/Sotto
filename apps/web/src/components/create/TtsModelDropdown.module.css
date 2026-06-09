@@ -1,5 +1,5 @@
 .languageWarning {
-  color: var(--color-warning, #b45309);
+  color: var(--color-warning);
   font-size: 0.8125rem;
   margin-top: 0.25rem;
 }

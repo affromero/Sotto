@@ -26,7 +26,7 @@
 .primary {
   background: var(--color-primary);
   color: var(--color-text-inverse);
-  box-shadow: 0 2px 8px rgba(217, 119, 6, 0.25);
+  box-shadow: 0 2px 8px rgba(63, 79, 176, 0.25);
 }
 .primary:hover:not(:disabled) {
   background: var(--color-primary-hover);
@@ -35,7 +35,7 @@
 }
 .primary:active:not(:disabled) {
   transform: translateY(0) scale(0.98);
-  box-shadow: 0 1px 4px rgba(217, 119, 6, 0.2);
+  box-shadow: 0 1px 4px rgba(63, 79, 176, 0.2);
 }
 
 .secondary {
@@ -46,7 +46,7 @@
 .secondary:hover:not(:disabled) {
   background: var(--color-primary-subtle);
   transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(217, 119, 6, 0.15);
+  box-shadow: 0 2px 8px rgba(63, 79, 176, 0.15);
 }
 .secondary:active:not(:disabled) {
   transform: translateY(0) scale(0.98);

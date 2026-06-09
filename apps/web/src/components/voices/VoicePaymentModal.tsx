@@ -138,8 +138,8 @@ function PaymentForm({
               style: {
                 base: {
                   fontSize: '16px',
-                  fontFamily: 'Inter, sans-serif',
-                  color: '#1A1A1A',
+                  fontFamily: 'IBM Plex Sans, sans-serif',
+                  color: '#1E2128',
                   '::placeholder': { color: '#9CA3AF' },
                 },
               },

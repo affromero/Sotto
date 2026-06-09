@@ -4,14 +4,14 @@
  */
 
 const BRAND = {
-  primary: '#D97706', // Golden Amber
-  accent: '#1E3A5F',  // Deep Navy
-  bg: '#FEFCF8',      // Soft Cream
-  headingFont: 'DM Serif Display',
-  bodyFont: 'Inter',
+  primary: '#3F4FB0', // Aula Indigo
+  accent: '#2A3550',  // Aula Slate
+  bg: '#F5F4F0',      // Soft Paper
+  headingFont: 'Newsreader',
+  bodyFont: 'IBM Plex Sans',
 };
 
-const BRAND_STYLE = `Color palette: ${BRAND.primary} (golden amber primary), ${BRAND.accent} (deep navy accent), ${BRAND.bg} (soft cream background). Typography: ${BRAND.headingFont} for headings, ${BRAND.bodyFont} for body text. Style: warm, professional, editorial.`;
+const BRAND_STYLE = `Color palette: ${BRAND.primary} (indigo primary), ${BRAND.accent} (slate accent), ${BRAND.bg} (soft paper background). Typography: ${BRAND.headingFont} for headings, ${BRAND.bodyFont} for body text. Style: clean, scholarly, editorial.`;
 
 function truncate(text: string, maxLen: number): string {
   if (text.length <= maxLen) return text;

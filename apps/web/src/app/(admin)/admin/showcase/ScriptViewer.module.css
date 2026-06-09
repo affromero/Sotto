@@ -30,7 +30,7 @@
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: var(--color-primary, #D97706);
+  background: var(--color-primary);
   color: #fff;
   font-size: 0.8rem;
   font-weight: 700;
@@ -49,7 +49,7 @@
 
 .narration {
   font-size: 0.9rem;
-  color: var(--color-text-primary, #1A1A1A);
+  color: var(--color-text-primary);
   line-height: 1.5;
   margin: 0;
 }
@@ -65,7 +65,7 @@
   font-size: 0.7rem;
   padding: 2px 8px;
   border-radius: var(--radius-xl);
-  background: var(--color-primary, #D97706);
+  background: var(--color-primary);
   color: #fff;
   font-weight: 500;
 }

@@ -138,7 +138,7 @@ export default async function AdminIntelligencePage({ searchParams }: PageProps)
                         key={`${dow}-${h}`}
                         className={styles.heatmapCell}
                         style={{
-                          backgroundColor: `rgba(217, 119, 6, ${Math.max(intensity, 0.05)})`,
+                          backgroundColor: `rgba(63, 79, 176, ${Math.max(intensity, 0.05)})`,
                         }}
                         title={`${day} ${h}:00 — ${val.toFixed(1)} min`}
                       />

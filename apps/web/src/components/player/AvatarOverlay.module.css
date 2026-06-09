@@ -26,12 +26,12 @@
 }
 
 .editable:hover {
-  border-color: rgba(217, 119, 6, 0.6);
+  border-color: rgba(63, 79, 176, 0.6);
 }
 
 .dragging {
   cursor: grabbing;
-  border-color: #d97706;
+  border-color: var(--color-primary);
 }
 
 .video {
@@ -63,7 +63,7 @@
   width: 16px;
   height: 16px;
   cursor: nwse-resize;
-  background: linear-gradient(135deg, transparent 50%, rgba(217, 119, 6, 0.8) 50%);
+  background: linear-gradient(135deg, transparent 50%, rgba(63, 79, 176, 0.8) 50%);
   border-radius: 0 0 6px 0;
   opacity: 0;
   transition: opacity 0.15s;

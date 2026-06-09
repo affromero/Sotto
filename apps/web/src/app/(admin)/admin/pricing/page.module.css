@@ -48,8 +48,8 @@
 }
 
 .sourceAdmin {
-  background: #fef3c7;
-  color: #92400e;
+  background: var(--color-primary-light);
+  color: var(--color-primary-active);
 }
 
 /* Provider group header row */

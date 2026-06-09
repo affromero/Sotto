@@ -23,14 +23,14 @@ export default function OgImage() {
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
-        backgroundColor: '#FEFCF8',
+        backgroundColor: '#F5F4F0',
         fontFamily: 'sans-serif',
         padding: 60,
         position: 'relative',
         overflow: 'hidden',
       }}
     >
-      {/* Amber accent bar at top */}
+      {/* Accent bar at top */}
       <div
         style={{
           position: 'absolute',
@@ -38,7 +38,7 @@ export default function OgImage() {
           left: 0,
           right: 0,
           height: 8,
-          backgroundColor: '#D97706',
+          backgroundColor: '#3F4FB0',
         }}
       />
 
@@ -51,7 +51,7 @@ export default function OgImage() {
           width: 500,
           height: 500,
           borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(217,119,6,0.08) 0%, transparent 70%)',
+          background: 'radial-gradient(circle, rgba(63,79,176,0.08) 0%, transparent 70%)',
         }}
       />
 
@@ -61,7 +61,7 @@ export default function OgImage() {
           style={{
             fontSize: 36,
             fontWeight: 700,
-            color: '#D97706',
+            color: '#3F4FB0',
             letterSpacing: '-0.02em',
           }}
         >
@@ -83,7 +83,7 @@ export default function OgImage() {
             width: 8,
             height: 8,
             borderRadius: '50%',
-            backgroundColor: '#D97706',
+            backgroundColor: '#3F4FB0',
           }}
         />
         <span style={{ fontSize: 20, color: '#6B7280', letterSpacing: '0.05em' }}>
@@ -104,14 +104,14 @@ export default function OgImage() {
           style={{
             fontSize: 72,
             fontWeight: 700,
-            color: '#1A1A1A',
+            color: '#1E2128',
             lineHeight: 1.1,
             margin: 0,
             marginBottom: 24,
           }}
         >
-          Create. Fork.{' '}
-          <span style={{ color: '#D97706', fontStyle: 'italic' }}>Remix. Share.</span>
+          Place. Practice.{' '}
+          <span style={{ color: '#3F4FB0', fontStyle: 'italic' }}>Progress.</span>
         </h1>
         <p
           style={{
@@ -145,7 +145,7 @@ export default function OgImage() {
               width: 4,
               height: h,
               borderRadius: 2,
-              backgroundColor: i % 2 === 0 ? '#D97706' : '#1E3A5F',
+              backgroundColor: i % 2 === 0 ? '#3F4FB0' : '#2A3550',
             }}
           />
         ))}

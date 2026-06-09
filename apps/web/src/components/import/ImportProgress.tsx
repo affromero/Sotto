@@ -234,7 +234,7 @@ export function ImportProgress({ podcastId, isAdmin }: ImportProgressProps) {
 
         {isUnderReview && (
           <div className={styles.failedSection}>
-            <Clock size={32} className={styles.loadingSpinner} style={{ animation: 'none', color: '#D97706' }} />
+            <Clock size={32} className={styles.loadingSpinner} style={{ animation: 'none', color: 'var(--color-primary)' }} />
             <p className={styles.failedMessage}>
               Your imported podcast matched existing content on Sotto and has been flagged for admin review.
               You will be notified once the review is complete.

@@ -76,7 +76,7 @@
   padding: 1px 5px;
   font-size: 9px;
   font-weight: 700;
-  background: rgba(30, 58, 95, 0.1);
+  background: rgba(42, 53, 80, 0.1);
   color: var(--color-accent);
   border-radius: var(--radius-sm);
 }
@@ -106,7 +106,7 @@
 }
 
 .statusProtected {
-  background: rgba(30, 58, 95, 0.1);
+  background: rgba(42, 53, 80, 0.1);
   color: var(--color-accent);
 }
 
@@ -116,7 +116,7 @@
 }
 
 .statusPending {
-  background: rgba(217, 119, 6, 0.1);
+  background: rgba(63, 79, 176, 0.1);
   color: var(--color-primary);
 }
 
@@ -202,15 +202,15 @@
 }
 
 .actionProtect {
-  background: rgba(30, 58, 95, 0.1);
+  background: rgba(42, 53, 80, 0.1);
   color: var(--color-accent);
-  border-color: rgba(30, 58, 95, 0.2);
+  border-color: rgba(42, 53, 80, 0.2);
 }
 
 .actionUnblock {
-  background: rgba(217, 119, 6, 0.1);
+  background: rgba(63, 79, 176, 0.1);
   color: var(--color-primary);
-  border-color: rgba(217, 119, 6, 0.2);
+  border-color: rgba(63, 79, 176, 0.2);
 }
 
 .actionVerify:disabled,

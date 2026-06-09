@@ -61,7 +61,7 @@ function formatDate(dateString: string): string {
 
 function getSimilarityColor(similarity: number): string {
   if (similarity >= 0.95) return 'var(--color-error)';
-  if (similarity >= 0.90) return '#D97706';
+  if (similarity >= 0.90) return 'var(--color-primary)';
   return 'var(--color-warning)';
 }
 

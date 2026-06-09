@@ -14,7 +14,7 @@
   width: 1rem;
   height: 1rem;
   border: 2px solid var(--color-border, #e5e7eb);
-  border-top-color: var(--color-primary, #d97706);
+  border-top-color: var(--color-primary);
   border-radius: 50%;
   animation: spin 0.6s linear infinite;
   flex-shrink: 0;
@@ -45,7 +45,7 @@
 }
 
 .title {
-  color: var(--color-text-primary, #1a1a1a);
+  color: var(--color-text-primary);
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;

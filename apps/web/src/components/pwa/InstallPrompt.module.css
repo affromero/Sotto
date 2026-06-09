@@ -59,7 +59,7 @@
 }
 
 .install {
-  background: var(--color-primary, #d97706);
+  background: var(--color-primary);
   border: none;
   color: #ffffff;
 }

@@ -42,11 +42,11 @@
   align-items: center;
   gap: var(--spacing-md);
   padding: var(--spacing-md) var(--spacing-lg);
-  background: #fef3c7;
+  background: var(--color-primary-light);
   border: 1px solid #f59e0b;
   border-radius: var(--radius-lg);
   font: var(--text-body);
-  color: #92400e;
+  color: var(--color-primary-active);
 }
 
 .noWarnings {

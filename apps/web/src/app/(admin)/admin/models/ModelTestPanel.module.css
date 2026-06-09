@@ -192,8 +192,8 @@
 
 .tier_balanced,
 .tier_premium {
-  background: #fef3c7;
-  color: #92400e;
+  background: var(--color-primary-light);
+  color: var(--color-primary-active);
 }
 
 .tier_best,
@@ -292,8 +292,8 @@
   border-radius: var(--radius-full);
   font: var(--text-caption);
   font-weight: 600;
-  background: #fef3c7;
-  color: #d97706;
+  background: var(--color-primary-light);
+  color: var(--color-primary);
 }
 
 .badgeByok {
@@ -302,8 +302,8 @@
   border-radius: var(--radius-full);
   font: var(--text-caption);
   font-weight: 600;
-  background: #dbeafe;
-  color: #1e3a5f;
+  background: var(--color-accent-light);
+  color: var(--color-accent);
 }
 
 /* ── Test button ── */

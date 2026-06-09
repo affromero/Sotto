@@ -29,7 +29,7 @@
 .filterSelect:focus {
   outline: none;
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 2px rgba(217, 119, 6, 0.15);
+  box-shadow: 0 0 0 2px rgba(63, 79, 176, 0.15);
 }
 
 /* Stats Bar */

@@ -132,12 +132,12 @@
 }
 
 .badgeUpload {
-  background: rgba(217, 119, 6, 0.1);
+  background: rgba(63, 79, 176, 0.1);
   color: var(--color-primary);
 }
 
 .badgeRecord {
-  background: rgba(30, 58, 95, 0.1);
+  background: rgba(42, 53, 80, 0.1);
   color: var(--color-accent);
 }
 
@@ -148,7 +148,7 @@
   font-size: 11px;
   font-weight: 600;
   border-radius: var(--radius-sm);
-  background: rgba(217, 119, 6, 0.12);
+  background: rgba(63, 79, 176, 0.12);
   color: var(--color-primary);
 }
 
@@ -170,7 +170,7 @@
   font-size: 11px;
   font-weight: 600;
   border-radius: var(--radius-sm);
-  background: rgba(30, 58, 95, 0.1);
+  background: rgba(42, 53, 80, 0.1);
   color: var(--color-accent);
 }
 
@@ -308,7 +308,7 @@
 .requestTextarea:focus {
   outline: none;
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.1);
+  box-shadow: 0 0 0 3px rgba(63, 79, 176, 0.1);
 }
 
 .requestActions {

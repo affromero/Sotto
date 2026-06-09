@@ -603,7 +603,7 @@ export function VoiceManager() {
                       {voice.verificationStatus === 'PROTECTED' && (
                         <span className={styles.protectedBadge} title="Protected">
                           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-                            <path d="M7 1L2 3.5v4C2 10.5 4 12.5 7 13c3-.5 5-2.5 5-5.5v-4L7 1z" fill="#1E3A5F" />
+                            <path d="M7 1L2 3.5v4C2 10.5 4 12.5 7 13c3-.5 5-2.5 5-5.5v-4L7 1z" fill="var(--color-accent)" />
                             <path d="M5 7l1.5 1.5L9.5 5" stroke="white" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
                           </svg>
                           Protected

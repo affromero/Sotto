@@ -236,7 +236,7 @@
 
 .startButton:hover {
   background: var(--color-primary-hover);
-  box-shadow: 0 6px 24px rgba(217, 119, 6, 0.35);
+  box-shadow: 0 6px 24px rgba(63, 79, 176, 0.35);
   transform: translateY(-1px);
   color: var(--color-text-inverse);
 }
@@ -495,7 +495,7 @@
   background: var(--color-primary);
   color: var(--color-text-inverse);
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(217, 119, 6, 0.25);
+  box-shadow: 0 2px 8px rgba(63, 79, 176, 0.25);
 }
 
 .submitReady:hover {

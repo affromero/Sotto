@@ -17,7 +17,7 @@
 
 .cardSelected {
   border-color: var(--color-primary);
-  background: rgba(217, 119, 6, 0.04);
+  background: rgba(63, 79, 176, 0.04);
 }
 
 .cardDisabled {
