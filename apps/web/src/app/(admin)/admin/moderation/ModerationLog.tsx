@@ -58,7 +58,7 @@ export function ModerationLog() {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- async data fetch, setState only after await
+     
   }, [page]);
 
   if (loading) {

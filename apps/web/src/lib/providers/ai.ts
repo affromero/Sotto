@@ -29,7 +29,7 @@ function textOf(content: string | ContentPart[]): string {
 }
 
 /** Convert ChatMessage[] to OpenAI Chat Completions format (images → image_url). */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 function toOpenAiMessages(system: string, messages: ChatMessage[]): any[] {
   return [
     { role: 'system', content: system },
@@ -37,7 +37,7 @@ function toOpenAiMessages(system: string, messages: ChatMessage[]): any[] {
       if (typeof m.content === 'string') return { role: m.role, content: m.content };
       return {
         role: m.role,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         content: m.content.map((p): any =>
           p.type === 'text'
             ? { type: 'text', text: p.text }
@@ -49,13 +49,13 @@ function toOpenAiMessages(system: string, messages: ChatMessage[]): any[] {
 }
 
 /** Convert ChatMessage[] to OpenAI Responses API format (input_text / input_image). */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 function toResponsesInput(messages: ChatMessage[]): any[] {
   return messages.map((m) => {
     if (typeof m.content === 'string') return { role: m.role, content: m.content };
     return {
       role: m.role,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       content: m.content.map((p): any =>
         p.type === 'text'
           ? { type: 'input_text', text: p.text }
@@ -162,7 +162,7 @@ class OpenAIProvider implements AIProvider {
     if (opts?.useWebSearch) {
       return withRetry('[OpenAI:Responses]', async () => {
         // OpenAI SDK v6 exposes client.responses but types may lag — cast to access it
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         const response = await (client as any).responses.create({
           model,
           instructions: system,
@@ -204,9 +204,9 @@ class OpenAIProvider implements AIProvider {
 
       const choice = response.choices[0];
       const content = choice?.message?.content || '';
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       if (!content && (choice as any)?.finish_reason === 'length') {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         const details = (response.usage as any)?.completion_tokens_details;
         logger.warn('[OpenAI] Empty content with finish_reason=length — reasoning model exhausted token budget', {
           model,
@@ -244,7 +244,7 @@ class OpenAIProvider implements AIProvider {
 
     // web_search_preview requires the Responses API (not Chat Completions)
     if (opts?.useWebSearch) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       const stream: any = await withRetry('[OpenAI:Responses:stream]', () => (client as any).responses.create({
         model,
         instructions: system,
@@ -255,9 +255,9 @@ class OpenAIProvider implements AIProvider {
         stream: true,
       }));
       for await (const event of stream) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         if ((event as any).type === 'response.output_text.delta') {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+           
           yield (event as any).delta;
         }
       }
@@ -281,7 +281,7 @@ class OpenAIProvider implements AIProvider {
     let lastFinishReason: string | null = null;
     for await (const chunk of stream) {
       const choice = chunk.choices[0];
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       const finishReason = (choice as any)?.finish_reason as string | null;
       if (finishReason) lastFinishReason = finishReason;
       const delta = choice?.delta?.content;

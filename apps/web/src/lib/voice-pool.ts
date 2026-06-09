@@ -381,7 +381,7 @@ export function findVoiceName(voiceId: string): string | undefined {
   if (main) return main.name;
 
   // Lazy import to avoid circular deps — these pools are static arrays
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
+   
   const { CARTESIA_VOICE_POOL, HUME_VOICE_POOL, FAL_VOICE_POOL, INWORLD_VOICE_POOL, MINIMAX_VOICE_POOL, MISTRAL_VOICE_POOL, KOKORO_VOICE_POOL } = require('./providers/tts-voices') as typeof import('./providers/tts-voices');
   const providerPools = [CARTESIA_VOICE_POOL, HUME_VOICE_POOL, FAL_VOICE_POOL, INWORLD_VOICE_POOL, MINIMAX_VOICE_POOL, MISTRAL_VOICE_POOL, KOKORO_VOICE_POOL];
   for (const pool of providerPools) {

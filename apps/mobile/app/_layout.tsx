@@ -121,7 +121,7 @@ function useProtectedRoute() {
     return () => {
       cancelled = true;
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps — intentional: runs once on mount
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- intentional: runs once on mount
 
   return { isChecking: !isReady };
 }

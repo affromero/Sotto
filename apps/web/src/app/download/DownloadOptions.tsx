@@ -35,6 +35,9 @@ export function DownloadOptions() {
   const [platform, setPlatform] = useState<Platform>('unknown');
 
   useEffect(() => {
+    // Client-only OS detection after mount — starting from 'unknown' keeps the
+    // server and first client render identical (no hydration mismatch).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPlatform(detectPlatform());
   }, []);
 
