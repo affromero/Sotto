@@ -23,6 +23,7 @@ const KINDS: Array<{ kind: string; label: string; blurb: string }> = [
   { kind: 'READING', label: 'Reading', blurb: 'Short passages + comprehension' },
   { kind: 'LISTENING', label: 'Listening', blurb: 'A short adaptive audio clip' },
   { kind: 'SPEAKING', label: 'Speaking', blurb: 'Say phrases, get feedback' },
+  { kind: 'WRITING', label: 'Writing', blurb: 'Write a reply, get inline corrections' },
 ];
 
 const UNAVAILABLE_COPY: Record<string, string> = {

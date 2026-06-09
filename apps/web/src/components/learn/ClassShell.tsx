@@ -6,10 +6,11 @@
  * bundle (`class-app.jsx`). Owns the class fetch, the cross-section answer map,
  * the gated advance flow, the final `/submit`, and failed-section regeneration.
  *
- * Skill mapping: our four skills (GRAMMAR, READING, LISTENING, SPEAKING) map
- * onto the design's module styles — grammar + reading render as the drill MC
- * card (reading shows its passage), listening is the waveform player + MCQ
- * wired to the real audio, speaking is record + rubric bars.
+ * Skill mapping: our skills (GRAMMAR, READING, LISTENING, SPEAKING, WRITING)
+ * map onto the design's module styles — grammar + reading render as the drill
+ * MC card (reading shows its passage), listening is the waveform player + MCQ
+ * wired to the real audio, speaking is record + rubric bars, writing is the
+ * task card + textarea + inline corrections.
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -19,6 +20,7 @@ import { ClassSummary } from './ClassSummary';
 import { GrammarSection } from './GrammarSection';
 import { ListeningSection } from './ListeningSection';
 import { SpeakingSection } from './SpeakingSection';
+import { WritingSection } from './WritingSection';
 import {
   SKILL_GLYPH,
   skillLabel,
@@ -34,12 +36,13 @@ interface ClassShellProps {
   classId: string;
 }
 
-/** Order the sections so the hour always runs grammar → reading → listening → speaking. */
+/** Order the sections so the hour runs grammar → reading → listening → speaking → writing. */
 const SKILL_ORDER: Record<string, number> = {
   GRAMMAR: 0,
   READING: 1,
   LISTENING: 2,
   SPEAKING: 3,
+  WRITING: 4,
 };
 
 function orderSections(sections: ClassSection[]): ClassSection[] {
@@ -300,6 +303,18 @@ export function ClassShell({ classId }: ClassShellProps) {
             key={seg.id}
             endpointBase={`/api/classes/${classId}/speaking`}
             prompts={seg.prompts}
+            gate={gate}
+            nextName={nextName}
+            onScore={setCurScore}
+            onContinue={advanceHour}
+          />
+        );
+      } else if (seg.skill === 'WRITING') {
+        stage = (
+          <WritingSection
+            key={seg.id}
+            endpointBase={`/api/classes/${classId}/writing`}
+            prompts={seg.writingPrompts}
             gate={gate}
             nextName={nextName}
             onScore={setCurScore}
