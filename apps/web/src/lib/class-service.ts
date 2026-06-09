@@ -5,6 +5,7 @@ import { prisma } from './prisma';
 import { generateSectionQuestions } from './class-generation';
 import { seedLessonItems, getDueItems, applyReviewOutcome } from './knowledge-graph';
 import { generateClassListening } from './class-listening-generator';
+import { prepareClassSource, type PreparedClassSource } from './class-source';
 import { generateClassSpeaking } from './class-speaking-generator';
 import { generateClassWriting } from './class-writing-generator';
 import { getCourseNote } from './course-notes';
@@ -32,6 +33,14 @@ function lessonInputs(lesson: LessonLike) {
   };
 }
 
+/** Optional overrides for a sourced class: level/objective adapt to the learner +
+ *  source, and the READING section is built from the leveled passage. */
+interface SectionOverride {
+  level?: string;
+  objective?: string;
+  sourceContent?: string;
+}
+
 async function buildSection(
   classId: string,
   userId: string,
@@ -40,6 +49,7 @@ async function buildSection(
   nativeLang: string,
   targetLang: string,
   note: string,
+  over?: SectionOverride,
 ): Promise<void> {
   const { grammarPoints, targetVocab } = lessonInputs(lesson);
   const section = await prisma.classSection.create({
@@ -48,14 +58,15 @@ async function buildSection(
   const questions = await generateSectionQuestions({
     userId,
     skill,
-    level: lesson.level,
+    level: over?.level ?? lesson.level,
     nativeLang,
     targetLang,
-    objective: lesson.objective,
+    objective: over?.objective ?? lesson.objective,
     grammarPoints,
     targetVocab,
     seed: section.seed,
     note,
+    sourceContent: over?.sourceContent,
   });
   await prisma.$transaction([
     ...questions.map((q, i) =>
@@ -69,6 +80,7 @@ async function buildSection(
           correctIndex: q.correctIndex,
           explanation: q.explanation,
           passageRef: q.passageRef ?? null,
+          passageText: q.passageText ?? null,
         },
       }),
     ),
@@ -81,7 +93,19 @@ export type NextClassResult =
   | { kind: 'done' }
   | { kind: 'created'; classId: string };
 
-export async function createNextClass(courseId: string, userId: string): Promise<NextClassResult> {
+/** Sourced class: build the next class around a real link/paper or an interest topic. */
+export interface SourcedClassOpts {
+  /** A link / news / paper / YouTube URL to extract, CEFR-level, and build the class from. */
+  sourceUrl?: string;
+  /** A topic (e.g. from the learner's interests) — web-search-seeded when no URL. */
+  topic?: string;
+}
+
+export async function createNextClass(
+  courseId: string,
+  userId: string,
+  opts?: SourcedClassOpts,
+): Promise<NextClassResult> {
   const course = await prisma.course.findFirst({
     where: { id: courseId, userId },
     include: { curriculum: { include: { lessons: { orderBy: { order: 'asc' } } } } },
@@ -100,15 +124,44 @@ export async function createNextClass(courseId: string, userId: string): Promise
   const lesson = course.curriculum.lessons.find((l) => !passedSet.has(l.id));
   if (!lesson) return { kind: 'done' };
 
+  // Sourced mode: prepare the source BEFORE creating the class so a failed
+  // extraction never leaves a half-built class. Authentic content levels to the
+  // learner's current CEFR, not the lesson's fixed level. A ClassSourceError here
+  // propagates (the route surfaces it); curriculum classes skip this entirely.
+  let prepared: PreparedClassSource | null = null;
+  let sourceTitle: string | null = null;
+  let sourceUrl: string | null = null;
+  let override: SectionOverride | undefined;
+  let listeningSource: { sourceContent?: string; sourceMetadata?: PreparedClassSource['sourceMetadata']; sourceUrl?: string } = {};
+
+  if (opts?.sourceUrl) {
+    prepared = await prepareClassSource({
+      url: opts.sourceUrl,
+      level: course.currentLevel,
+      targetLang: course.targetLang,
+      nativeLang: course.nativeLang,
+      userId,
+    });
+    sourceTitle = prepared.title;
+    sourceUrl = prepared.sourceUrl;
+    override = { level: course.currentLevel, objective: prepared.title ?? lesson.objective, sourceContent: prepared.leveledContent };
+    listeningSource = { sourceContent: prepared.leveledContent, sourceMetadata: prepared.sourceMetadata, sourceUrl: prepared.sourceUrl };
+  } else if (opts?.topic) {
+    // Topic mode: no extracted text; the listening script web-searches the topic
+    // for citations, and sections are built about the topic at the learner's level.
+    sourceTitle = opts.topic;
+    override = { level: course.currentLevel, objective: opts.topic };
+  }
+
   const cls = await prisma.courseClass.create({
-    data: { courseId, lessonId: lesson.id, order: lesson.order, status: 'GENERATING' },
+    data: { courseId, lessonId: lesson.id, order: lesson.order, status: 'GENERATING', sourceUrl, sourceTitle },
   });
 
   const note = await getCourseNote(courseId);
 
   try {
     for (const skill of MC_SKILLS) {
-      await buildSection(cls.id, userId, skill, lesson, course.nativeLang, course.targetLang, note);
+      await buildSection(cls.id, userId, skill, lesson, course.nativeLang, course.targetLang, note, override);
     }
   } catch (err) {
     // Roll back the half-built class so the learner can retry cleanly.
@@ -127,12 +180,15 @@ export async function createNextClass(courseId: string, userId: string): Promise
       userId,
       classId: cls.id,
       courseId,
-      level: lesson.level,
+      level: override?.level ?? lesson.level,
       nativeLang: course.nativeLang,
       targetLang: course.targetLang,
-      objective: lesson.objective,
+      objective: override?.objective ?? lesson.objective,
       mustIncludeVocab: due.vocab.map((v) => ({ word: v.lemma, translation: v.translation })),
       note,
+      sourceContent: listeningSource.sourceContent,
+      sourceMetadata: listeningSource.sourceMetadata,
+      sourceUrl: listeningSource.sourceUrl,
     });
   } catch (err) {
     logger.warn('generateClassListening failed; continuing without listening section', {
@@ -207,7 +263,27 @@ export async function getClassForUser(classId: string, userId: string) {
             orderBy: { order: 'asc' },
             include: { responses: { where: { userId }, orderBy: { createdAt: 'desc' }, take: 1 } },
           },
-          podcast: { select: { id: true, audioUrl: true, title: true } },
+          podcast: {
+            select: {
+              id: true,
+              audioUrl: true,
+              title: true,
+              // Sourced-class sources: render via ReferenceList with verification badges.
+              references: {
+                orderBy: { number: 'asc' },
+                select: {
+                  number: true,
+                  title: true,
+                  authors: true,
+                  year: true,
+                  url: true,
+                  type: true,
+                  verificationStatus: true,
+                  contentDomain: true,
+                },
+              },
+            },
+          },
         },
       },
       lesson: { select: { title: true, level: true, objective: true } },
@@ -395,6 +471,7 @@ export async function regenerateFailedSections(classId: string, userId: string):
             correctIndex: q.correctIndex,
             explanation: q.explanation,
             passageRef: q.passageRef ?? null,
+            passageText: q.passageText ?? null,
           },
         }),
       ),

@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { StartNextClass } from '@/components/learn/StartNextClass';
+import { SourcedClassEntry } from '@/components/learn/SourcedClassEntry';
 import styles from './page.module.css';
 
 export const dynamic = 'force-dynamic';
@@ -153,6 +154,12 @@ export default async function LearnPage() {
                     Practice
                   </Link>
                   <StartNextClass courseId={course.id} activeClassId={course.activeClassId ?? null} />
+                </div>
+                <div className={styles.sourcedRow}>
+                  <SourcedClassEntry
+                    courseId={course.id}
+                    activeClassId={course.activeClassId ?? null}
+                  />
                 </div>
               </li>
             );

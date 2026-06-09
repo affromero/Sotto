@@ -212,6 +212,13 @@
   flex-shrink: 0;
 }
 
+/* Full-width row under the card's main line — wraps onto its own line so the
+   expanded sourced-class panel has room to breathe. */
+.sourcedRow {
+  flex: 1 1 100%;
+  width: 100%;
+}
+
 .practiceLink {
   font-family: var(--mono);
   font-size: 12px;

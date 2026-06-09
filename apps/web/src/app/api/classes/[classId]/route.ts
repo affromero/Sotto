@@ -25,7 +25,13 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       score: s.score,
       passed: s.passed,
       podcast: s.podcast
-        ? { id: s.podcast.id, audioUrl: s.podcast.audioUrl, title: s.podcast.title }
+        ? {
+            id: s.podcast.id,
+            audioUrl: s.podcast.audioUrl,
+            title: s.podcast.title,
+            // Sourced-class sources: surfaced for the Sources panel + citation tooltips.
+            references: s.podcast.references,
+          }
         : null,
       questions: s.questions.map((q) => ({
         id: q.id,
@@ -33,6 +39,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         question: q.question,
         options: q.options,
         passageRef: q.passageRef,
+        // Sourced-class READING passage (may carry `[N]` citation markers).
+        passageText: q.passageText,
         ...(submitted ? { correctIndex: q.correctIndex, explanation: q.explanation } : {}),
       })),
       prompts: s.prompts.map((p) => ({
@@ -62,6 +70,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       status: cls.status,
       order: cls.order,
       passThreshold: cls.passThreshold,
+      // Sourced-class attribution (null for curriculum classes).
+      sourceUrl: cls.sourceUrl,
+      sourceTitle: cls.sourceTitle,
       lesson: cls.lesson,
       submission: cls.submission,
       submitted,

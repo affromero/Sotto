@@ -1,0 +1,219 @@
+/* ClassSources — verified-sources panel, aula design system. */
+
+.root {
+  composes: surface from './sottoLearn.module.css';
+  margin-top: 28px;
+  background: var(--well);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 24px 22px;
+  animation: srcIn 0.45s var(--ease) both;
+}
+
+@keyframes srcIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .root {
+    animation: none;
+  }
+}
+
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.title {
+  font-family: var(--serif);
+  font-weight: 420;
+  font-size: 22px;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  margin: 0;
+  color: var(--ink);
+}
+
+.builtFrom {
+  margin: 14px 0 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+
+.builtLink {
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-color: var(--accent-line);
+  text-underline-offset: 2px;
+  word-break: break-word;
+}
+
+.builtLink:hover {
+  text-decoration-color: var(--accent);
+}
+
+/* ---- reference list ---- */
+.list {
+  list-style: none;
+  margin: 18px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.item {
+  display: flex;
+  gap: 12px;
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+}
+
+.item:first-child {
+  border-top: none;
+}
+
+.num {
+  flex-shrink: 0;
+  padding-top: 3px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--accent);
+  min-width: 28px;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.titleRow {
+  display: flex;
+}
+
+.refTitle {
+  font-family: var(--serif);
+  font-size: 16.5px;
+  line-height: 1.4;
+  color: var(--ink);
+  text-wrap: pretty;
+}
+
+a.refTitle {
+  text-decoration: none;
+}
+
+a.refTitle:hover {
+  text-decoration: underline;
+  text-decoration-color: var(--accent-line);
+  text-underline-offset: 2px;
+}
+
+.metaRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--ink-mute);
+}
+
+.authors {
+  color: var(--ink-soft);
+}
+
+.year::before {
+  content: '·';
+  margin-right: 8px;
+  color: var(--ink-mute);
+}
+
+.domain {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 3px 7px;
+}
+
+/* ---- verification badges ---- */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-radius: var(--r);
+  padding: 3px 8px;
+  border: 1px solid transparent;
+}
+
+.badgeVerified {
+  color: var(--good);
+  background: var(--good-soft);
+  border-color: color-mix(in oklab, var(--good) 32%, transparent);
+}
+
+.badgeChecking {
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+}
+
+.badgeUnverified {
+  color: var(--ink-mute);
+  background: var(--paper);
+  border-color: var(--line-strong);
+}
+
+.checkingDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .checkingDot {
+    animation: none;
+    opacity: 0.8;
+  }
+}
