@@ -5,6 +5,7 @@ import { JsonLd } from '@/components/landing/JsonLd';
 import { LandingHeader } from '@/components/landing/LandingHeader';
 import { LandingCTA } from '@/components/landing/LandingCTA';
 import { GlassBead } from '@/components/landing/GlassBead';
+import { ProductFrame } from '@/components/landing/ProductFrame';
 import { Glyph } from '@/app/welcome/Glyph';
 import type { GlyphName } from '@/app/welcome/data';
 import { getPublicGithubUrl } from '@/lib/public-links';
@@ -140,6 +141,235 @@ const TENETS: Tenet[] = [
   },
 ];
 
+interface RunChip {
+  label: string;
+  title: string;
+  body: string;
+  icon: GlyphName;
+}
+
+const RUN_CHIPS: RunChip[] = [
+  {
+    label: 'Desktop launcher',
+    title: 'Sotto Host',
+    body: 'One app for macOS, Windows, and Linux. It starts the database, workers, and your AI, then hands you the app.',
+    icon: 'spark',
+  },
+  {
+    label: 'Docker',
+    title: 'One command',
+    body: 'On your own box, one command pulls the prebuilt images and starts everything. No clone, no build.',
+    icon: 'repo',
+  },
+  {
+    label: 'Bring your keys',
+    title: 'BYOK',
+    body: 'Connect your own agent and provider keys. Your courses, audio, and data stay where you put them.',
+    icon: 'key',
+  },
+];
+
+interface WalkProvider {
+  name: string;
+  meta: string;
+  selected?: boolean;
+}
+
+interface WalkSource {
+  label: string;
+  meta: string;
+  on: boolean;
+}
+
+interface WalkSkill {
+  label: string;
+  state: 'open' | 'locked';
+}
+
+interface WalkStep {
+  num: string;
+  label: string;
+  title: string;
+  titleAccent: string;
+  body: string;
+  caption: string;
+  frame: 'agent' | 'context' | 'placement' | 'skills';
+}
+
+const WALK_STEPS: WalkStep[] = [
+  {
+    num: '01',
+    label: 'Connect',
+    title: 'Connect your',
+    titleAccent: 'agent',
+    body: 'Pick the Claude, Codex, or local model you already run. Sotto reuses your installed CLI, so there is nothing new to paste and nothing to proxy through us.',
+    caption: 'Agent, reuse the CLI you already run',
+    frame: 'agent',
+  },
+  {
+    num: '02',
+    label: 'Grant context',
+    title: 'Grant the',
+    titleAccent: 'context',
+    body: 'Choose what it may read, source by source. Your repositories, reading list, notes, calendar. Every lesson is drawn from the world you share, and nothing leaves your machine.',
+    caption: 'Context, you decide the scope',
+    frame: 'context',
+  },
+  {
+    num: '03',
+    label: 'Get placed',
+    title: 'Get placed at',
+    titleAccent: 'your level',
+    body: 'Answer a few questions in the target language. Sotto reads your range and sets a starting CEFR level, so the course begins exactly where you are, not at lesson one.',
+    caption: 'Placement, your level in minutes',
+    frame: 'placement',
+  },
+  {
+    num: '04',
+    label: 'Learn',
+    title: 'Learn across',
+    titleAccent: 'five skills',
+    body: 'Grammar, reading, listening, speaking, and writing, each gated by mastery. Every word you meet joins a vocabulary memory graph that is entirely yours.',
+    caption: 'Class hub, five skills and one memory',
+    frame: 'skills',
+  },
+];
+
+const WALK_PROVIDERS: WalkProvider[] = [
+  { name: 'Claude', meta: 'Anthropic · CLI', selected: true },
+  { name: 'Codex', meta: 'OpenAI · CLI' },
+  { name: 'Local', meta: 'Ollama · llama.cpp' },
+  { name: 'Custom', meta: 'OpenAI-compatible' },
+];
+
+const WALK_SOURCES: WalkSource[] = [
+  { label: 'Code and repos', meta: 'what you build', on: true },
+  { label: 'Reading list', meta: 'what you follow', on: true },
+  { label: 'Notes', meta: 'what you think about', on: true },
+  { label: 'Calendar', meta: 'your week', on: false },
+];
+
+const WALK_SKILLS: WalkSkill[] = [
+  { label: 'Grammar', state: 'open' },
+  { label: 'Reading', state: 'open' },
+  { label: 'Listening', state: 'open' },
+  { label: 'Speaking', state: 'locked' },
+  { label: 'Writing', state: 'locked' },
+];
+
+/* ---- walkthrough frame mockups (static, CSS-built aula UI) ---- */
+
+function AgentMock() {
+  return (
+    <div className={styles.mock}>
+      <div className={styles.mockProviders}>
+        {WALK_PROVIDERS.map((p) => (
+          <div
+            key={p.name}
+            className={`${styles.mockProvider} ${p.selected ? styles.mockProviderSel : ''}`}
+          >
+            <span className={styles.mockProviderIco} aria-hidden="true">
+              <Glyph name="plug" size={16} />
+            </span>
+            <span className={styles.mockProviderName}>{p.name}</span>
+            <span className={styles.mockProviderMeta}>{p.meta}</span>
+          </div>
+        ))}
+      </div>
+      <div className={styles.mockTag}>
+        <Glyph name="check" size={13} />
+        Installed CLI, no key
+      </div>
+    </div>
+  );
+}
+
+function ContextMock() {
+  return (
+    <div className={styles.mock}>
+      <ul className={styles.mockSources}>
+        {WALK_SOURCES.map((s) => (
+          <li
+            key={s.label}
+            className={`${styles.mockSource} ${s.on ? styles.mockSourceOn : ''}`}
+          >
+            <span className={styles.mockSourceText}>
+              <span className={styles.mockSourceLabel}>{s.label}</span>
+              <span className={styles.mockSourceMeta}>{s.meta}</span>
+            </span>
+            <span
+              className={`${styles.mockSwitch} ${s.on ? styles.mockSwitchOn : ''}`}
+              aria-hidden="true"
+            />
+          </li>
+        ))}
+      </ul>
+      <div className={styles.mockLock}>
+        <Glyph name="lock" size={14} />
+        Nothing leaves your machine
+      </div>
+    </div>
+  );
+}
+
+function PlacementMock() {
+  return (
+    <div className={styles.mock}>
+      <p className={styles.mockQ}>Question 4 of 6</p>
+      <p className={styles.mockSentence}>Se avessi tempo, leggerei di più.</p>
+      <p className={styles.mockGloss}>If I had time, I would read more.</p>
+      <div className={styles.mockLevel}>
+        <span className={styles.mockLevelFrom}>A2</span>
+        <span className={styles.mockLevelArrow} aria-hidden="true">
+          <Glyph name="arrow" size={15} />
+        </span>
+        <span className={styles.mockLevelTo}>B1</span>
+      </div>
+    </div>
+  );
+}
+
+function SkillsMock() {
+  return (
+    <div className={styles.mock}>
+      <ul className={styles.mockSkills}>
+        {WALK_SKILLS.map((s) => (
+          <li
+            key={s.label}
+            className={`${styles.mockSkillRow} ${s.state === 'locked' ? styles.mockSkillLocked : ''}`}
+          >
+            <span className={styles.mockSkillLabel}>{s.label}</span>
+            <span className={styles.mockSkillState} aria-hidden="true">
+              <Glyph name={s.state === 'locked' ? 'gate' : 'check'} size={14} />
+            </span>
+          </li>
+        ))}
+      </ul>
+      <div className={styles.mockGraph} aria-hidden="true">
+        <span className={styles.mockGraphLine} />
+        <span className={`${styles.mockNode} ${styles.mockNodeA}`} />
+        <span className={`${styles.mockNode} ${styles.mockNodeB}`} />
+        <span className={`${styles.mockNode} ${styles.mockNodeC}`} />
+        <span className={`${styles.mockNode} ${styles.mockNodeD}`} />
+      </div>
+      <p className={styles.mockGraphNote}>Vocabulary memory graph</p>
+    </div>
+  );
+}
+
+function WalkFrameMock({ frame }: { frame: WalkStep['frame'] }) {
+  switch (frame) {
+    case 'agent':
+      return <AgentMock />;
+    case 'context':
+      return <ContextMock />;
+    case 'placement':
+      return <PlacementMock />;
+    case 'skills':
+      return <SkillsMock />;
+  }
+}
+
 export default function LandingPage() {
   return (
     <div
@@ -225,6 +455,52 @@ export default function LandingPage() {
             </ul>
           </section>
 
+          {/* ---- walkthrough ---- */}
+          <section className={styles.section} aria-labelledby="walk-title">
+            <header className={styles.sectionHead}>
+              <p className={styles.sectionLabel}>Step by step</p>
+              <h2 id="walk-title" className={styles.sectionTitle}>
+                From your agent to your first <em>class</em>.
+              </h2>
+              <p className={styles.sectionLede}>
+                Four steps, start to finish. Each one is the real screen you will
+                see, drawn in the same calm interface you learn in.
+              </p>
+            </header>
+
+            <ol className={styles.walk}>
+              {WALK_STEPS.map((step) => (
+                <li key={step.num} className={styles.walkStep}>
+                  <div className={styles.walkText}>
+                    <p className={styles.walkMeta}>
+                      <span className={styles.walkNum}>{step.num}</span>
+                      {step.label}
+                    </p>
+                    <h3 className={styles.walkTitle}>
+                      {step.title} <em>{step.titleAccent}</em>.
+                    </h3>
+                    <p className={styles.walkBody}>{step.body}</p>
+                  </div>
+                  <div className={styles.walkFrame}>
+                    <ProductFrame
+                      title={
+                        step.frame === 'placement'
+                          ? 'sotto.local / placement'
+                          : step.frame === 'skills'
+                            ? 'Sotto · Today'
+                            : 'sotto.local / welcome'
+                      }
+                      caption={step.caption}
+                      chrome={step.frame === 'skills' ? 'app' : 'browser'}
+                    >
+                      <WalkFrameMock frame={step.frame} />
+                    </ProductFrame>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </section>
+
           {/* ---- ownership ---- */}
           <section className={styles.section} aria-labelledby="own-title">
             <header className={styles.sectionHead}>
@@ -250,6 +526,54 @@ export default function LandingPage() {
                 </article>
               ))}
             </div>
+          </section>
+
+          {/* ---- download ---- */}
+          <section className={styles.section} aria-labelledby="download-title">
+            <header className={styles.sectionHead}>
+              <p className={styles.eyebrow}>
+                <span className={styles.eyebrowDash} aria-hidden="true" />
+                Run it yourself
+              </p>
+              <h2 id="download-title" className={styles.sectionTitle}>
+                Get Sotto on <em>your own stack</em>.
+              </h2>
+              <p className={styles.sectionLede}>
+                Run the whole thing on your computer in one click, or host it on a
+                server for the household. Your courses, audio, and data stay where
+                you put them.
+              </p>
+            </header>
+
+            <div className={styles.downloadActions}>
+              <Link href="/download" className={styles.downloadPrimary}>
+                Download Sotto
+                <span className={styles.downloadArrow} aria-hidden="true">
+                  <Glyph name="arrow" size={17} />
+                </span>
+              </Link>
+              <a
+                href={GITHUB_URL}
+                className={styles.downloadGhost}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Host on a server
+              </a>
+            </div>
+
+            <ul className={styles.runChips}>
+              {RUN_CHIPS.map((chip) => (
+                <li key={chip.label} className={styles.runChip}>
+                  <div className={styles.runChipIcon} aria-hidden="true">
+                    <Glyph name={chip.icon} size={18} />
+                  </div>
+                  <p className={styles.runChipLabel}>{chip.label}</p>
+                  <h3 className={styles.runChipTitle}>{chip.title}</h3>
+                  <p className={styles.runChipText}>{chip.body}</p>
+                </li>
+              ))}
+            </ul>
           </section>
 
           {/* ---- footer CTA ---- */}
