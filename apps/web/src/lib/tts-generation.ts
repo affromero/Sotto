@@ -54,6 +54,12 @@ export function getPlatformTtsKey(pid: TtsProviderId): string | undefined {
       return process.env.REPLICATE_API_TOKEN;
     case 'mistral':
       return process.env.MISTRAL_API_KEY;
+    case 'kokoro':
+      // Keyless local sidecar — the Kokoro server ignores auth, but callers that
+      // gate on "has a platform key" need a non-empty value. Return a placeholder
+      // so kokoro is never rejected for a missing key (mirrors getSttPlatformKey('local')).
+      // TTS_API_KEY overrides it only when the sidecar sits behind auth.
+      return process.env.TTS_API_KEY?.trim() || 'kokoro';
     default:
       return undefined;
   }
