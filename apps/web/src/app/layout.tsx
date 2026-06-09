@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { DM_Serif_Display, Inter } from 'next/font/google';
+import { Newsreader, IBM_Plex_Sans, IBM_Plex_Mono } from 'next/font/google';
 import { BRAND } from '@sotto/shared';
 import { SessionProvider } from '@/components/providers/SessionProvider';
 import { ThemeProvider } from '@/components/providers/ThemeProvider';
@@ -16,16 +16,25 @@ import { getAppBaseUrl } from '@/lib/urls';
 import { getTwitterBotHandle } from '@/lib/bot-identity';
 import '@/styles/globals.css';
 
-const dmSerifDisplay = DM_Serif_Display({
+const newsreader = Newsreader({
   subsets: ['latin'],
-  weight: '400',
+  style: ['normal', 'italic'],
+  weight: ['400', '500'],
   variable: '--font-heading',
   display: 'swap',
 });
 
-const inter = Inter({
+const ibmPlexSans = IBM_Plex_Sans({
   subsets: ['latin'],
+  weight: ['400', '500', '600'],
   variable: '--font-body',
+  display: 'swap',
+});
+
+const ibmPlexMono = IBM_Plex_Mono({
+  subsets: ['latin'],
+  weight: ['400', '500'],
+  variable: '--font-mono',
   display: 'swap',
 });
 
@@ -35,11 +44,11 @@ const twitterSite = getTwitterBotHandle();
 export const metadata: Metadata = {
   metadataBase: new URL(appBaseUrl),
   title: {
-    default: `${BRAND.name} — ${BRAND.cta}`,
+    default: `${BRAND.name}: ${BRAND.cta}`,
     template: `%s | ${BRAND.name}`,
   },
   description: BRAND.description,
-  keywords: ['podcast', 'AI', 'private', 'briefing', 'BYOK', 'import', 'interactive', 'learning'],
+  keywords: ['language learning', 'CEFR', 'self-hosted', 'open-source', 'BYOK', 'grammar', 'speaking', 'pronunciation', 'private'],
   alternates: {
     canonical: '/',
   },
@@ -66,7 +75,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: '#D97706',
+  themeColor: '#3F4FB0',
   viewportFit: 'cover',
   maximumScale: 1,
   interactiveWidget: 'resizes-content',
@@ -76,7 +85,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html
       lang="en"
-      className={`${dmSerifDisplay.variable} ${inter.variable}`}
+      className={`${newsreader.variable} ${ibmPlexSans.variable} ${ibmPlexMono.variable}`}
       suppressHydrationWarning
     >
       <head>

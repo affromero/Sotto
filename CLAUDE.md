@@ -74,9 +74,9 @@ npm run ci                     # lint + type-check + test + build
 
 ## Design System
 
-Primary: `#D97706` (Golden Amber). Accent: `#1E3A5F` (Deep Navy). Background: `#FEFCF8` (Soft Cream). Surface: `#FFFFFF`. Text: `#1A1A1A` / `#6B7280`.
+SottoDesign "aula": Primary `#3F4FB0` (aula blue). Accent `#2A3550` (ink slate). Background `#F5F4F0` (paper). Surface `#FFFFFF`. Text `#1E2128` (ink) / `#565B68`. Dark mode uses the "terminal" palette (`#121310` paper, `#E9E3D3` ink, `#6A9BFF` primary). The wordmark name carries a blue to pink gradient (`#6AA0FF` to `#FF8FB1`), and the glass-bead mark uses the same.
 
-Fonts: DM Serif Display for headings, Inter for body text.
+Fonts: Newsreader (serif) for headings and voice, IBM Plex Sans for body and UI, IBM Plex Mono for labels. Tokens live in `apps/web/src/styles/globals.css` and mirror to `packages/shared/src/theme.ts`.
 
 ## Generation Pipeline
 

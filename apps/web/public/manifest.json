@@ -10,8 +10,8 @@
   "lang": "en",
   "dir": "ltr",
   "categories": ["education", "productivity"],
-  "background_color": "#FEFCF8",
-  "theme_color": "#D97706",
+  "background_color": "#F5F4F0",
+  "theme_color": "#3F4FB0",
   "icons": [
     { "src": "/brand/sotto-mark.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
     { "src": "/favicon.ico", "sizes": "48x48", "type": "image/x-icon" },
