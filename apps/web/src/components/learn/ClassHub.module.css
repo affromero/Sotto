@@ -1,0 +1,343 @@
+/* ClassHub — "Today" entry view. */
+
+.root {
+  composes: surface from './sottoLearn.module.css';
+}
+
+.segEnter {
+  animation: segIn 0.5s var(--ease) both;
+}
+
+@keyframes segIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .segEnter {
+    animation: none;
+  }
+}
+
+/* ---- stage typography ---- */
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.eyebrowIdx {
+  color: var(--ink-mute);
+}
+
+.title {
+  font-family: var(--serif);
+  font-weight: 420;
+  font-size: clamp(30px, 4vw, 44px);
+  line-height: 1.14;
+  letter-spacing: -0.015em;
+  margin: 18px 0 0;
+  color: var(--ink);
+  text-wrap: balance;
+}
+
+.title em {
+  font-style: italic;
+  color: var(--accent);
+}
+
+.modLede {
+  font-size: 15.5px;
+  line-height: 1.6;
+  color: var(--ink-soft);
+  margin: 18px 0 0;
+  max-width: 56ch;
+  text-wrap: pretty;
+}
+
+.drawn {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 16px;
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 14px;
+  color: var(--ink-soft);
+}
+
+.drawn svg {
+  color: var(--accent);
+  flex: none;
+}
+
+/* ---- hour card ---- */
+.hourCard {
+  margin-top: 26px;
+  background: var(--well);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  overflow: hidden;
+}
+
+.hourCardTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--accent-soft), transparent);
+}
+
+.hourLabel {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
+
+.hourDur {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink);
+}
+
+.hourDur svg {
+  color: var(--accent);
+}
+
+.segSeq {
+  display: flex;
+  align-items: stretch;
+  padding: 20px 22px;
+  gap: 0;
+}
+
+.segChip {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 9px;
+  text-align: center;
+  position: relative;
+  padding: 0 6px;
+}
+
+.segChipIco {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line-strong);
+  color: var(--ink-soft);
+  background: var(--paper);
+}
+
+.segChipDone .segChipIco {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: var(--accent);
+}
+
+.segChipName {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.segConn {
+  position: absolute;
+  top: 21px;
+  left: calc(50% + 30px);
+  width: calc(100% - 60px);
+  height: 1px;
+  background: var(--line-strong);
+}
+
+.segChip:last-child .segConn {
+  display: none;
+}
+
+.hourFoot {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 22px 22px;
+  flex-wrap: wrap;
+}
+
+.hourProg {
+  flex: 1;
+  min-width: 160px;
+}
+
+.hpTop {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--ink-mute);
+}
+
+.hpBar {
+  height: 5px;
+  border-radius: 5px;
+  background: var(--line-strong);
+  margin-top: 7px;
+  overflow: hidden;
+}
+
+.hpBar i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .hpBar i {
+    transition: width 0.5s var(--ease);
+  }
+}
+
+/* ---- skill roster ---- */
+.practiceHead {
+  margin-top: 38px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.phTitle {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
+
+.phSub {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 14px;
+  color: var(--ink-soft);
+}
+
+.practiceGrid {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+@media (max-width: 560px) {
+  .practiceGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.practiceTile {
+  display: grid;
+  grid-template-columns: 40px 1fr auto;
+  align-items: center;
+  gap: 14px;
+  background: var(--well);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 16px 18px;
+  text-align: left;
+}
+
+.ptIco {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line-strong);
+  color: var(--ink-soft);
+}
+
+.ptName {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.ptSub {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink-mute);
+  margin-top: 3px;
+  letter-spacing: 0.02em;
+}
+
+.ptScore {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-mute);
+}
+
+.ptScoreHas {
+  color: var(--good);
+}
+
+/* ---- begin button ---- */
+.btn {
+  font-family: var(--sans);
+  font-size: 14.5px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  border-radius: var(--r);
+  padding: 13px 22px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  transition:
+    transform 0.15s var(--ease),
+    filter 0.2s;
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btnPrimary {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+.btnPrimary:hover {
+  filter: brightness(1.06);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn {
+    transition: filter 0.2s;
+  }
+  .btn:active {
+    transform: none;
+  }
+}
