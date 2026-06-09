@@ -1,0 +1,183 @@
+.runner {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.audioBlock {
+  display: flex;
+  flex-direction: column;
+}
+
+.audioPlayer {
+  width: 100%;
+}
+
+.audioGenerating {
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--ink-soft);
+  padding: 8px 0;
+}
+
+.questionList {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.question {
+  display: flex;
+  flex-direction: column;
+}
+
+/* drill card — matches the class GrammarSection/ListeningSection card */
+.drillCard {
+  background: var(--well);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 24px 22px;
+}
+
+.drillMeta {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--ink-mute);
+  display: flex;
+  gap: 12px;
+}
+
+.drillIdx {
+  color: var(--accent);
+}
+
+.questionText {
+  font-family: var(--serif);
+  font-size: 22px;
+  font-weight: 500;
+  line-height: 1.35;
+  color: var(--ink);
+  margin: 12px 0 0;
+  text-wrap: pretty;
+}
+
+.options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 48px;
+  padding: 12px 16px;
+  text-align: left;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  cursor: pointer;
+  transition: border-color 0.18s var(--ease), background 0.18s var(--ease), transform 0.18s var(--ease);
+}
+
+.option:hover {
+  border-color: var(--line-strong);
+  transform: translateY(-1px);
+}
+
+.optionSelected {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.optionLetter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-soft);
+  background: var(--paper-2);
+  border-radius: var(--r);
+}
+
+.optionText {
+  font-family: var(--serif);
+  font-size: 19px;
+  color: var(--ink);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.progressHint {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  color: var(--ink-mute);
+}
+
+.primaryButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0 26px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  border: none;
+  border-radius: var(--r);
+  font-family: var(--sans);
+  font-weight: 600;
+  font-size: 14.5px;
+  cursor: pointer;
+  transition: opacity 0.18s var(--ease);
+}
+
+.primaryButton:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.errorBanner {
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--bad);
+}
+
+.resultPanel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 18px;
+  padding: 36px 24px;
+  background: var(--well);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+
+.resultLine {
+  font-family: var(--serif);
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+  max-width: 42ch;
+  text-wrap: pretty;
+}

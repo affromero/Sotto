@@ -2,13 +2,13 @@
 // user's AI provider (BYOK or local Claude/Codex), render a prompt, call the
 // model, parse JSON. A single batch of questions spans A1..B2; the learner's
 // level is the highest band they clear on a staircase.
-import { getAiKey } from './byok';
-import { getAiProviderMeta, type AiProviderId } from './providers/ai-registry';
+import { resolveLearningAi } from './learning-ai';
 import { createAIProvider } from './providers/ai';
 import { loadAndRender } from './prompt-loader';
+import { formatNotesForPrompt } from './course-notes';
 import { logUsage } from './usage-logger';
 import { logger } from './logger';
-import type { CefrLevel, LanguagePair } from '@sotto/shared';
+import type { CefrLevel } from '@sotto/shared';
 
 export const PLACEMENT_LEVELS: CefrLevel[] = ['A1', 'A2', 'B1', 'B2'];
 export const PLACEMENT_SKILLS = ['grammar', 'vocab', 'reading'] as const;
@@ -33,40 +33,14 @@ export function toPublic(q: PlacementQuestion): PlacementQuestionPublic {
   return { id: q.id, cefr: q.cefr, skill: q.skill, prompt: q.prompt, options: q.options };
 }
 
-const PAIR_LANGS: Record<LanguagePair, { native: string; target: string }> = {
-  DE_FROM_EN: { native: 'en', target: 'de' },
-  EN_FROM_ES: { native: 'es', target: 'en' },
-  ES_FROM_EN: { native: 'en', target: 'es' },
-};
-
-export function pairToLangs(pair: LanguagePair): { native: string; target: string } {
-  return PAIR_LANGS[pair];
-}
-
-interface ResolvedAi {
-  provider: AiProviderId;
-  model: string;
-  apiKey?: string;
-}
-
-async function resolvePlacementAi(userId: string): Promise<ResolvedAi> {
-  const aiKey = await getAiKey(userId);
-  if (!aiKey) {
-    throw new Error('An AI provider key (or a configured local Claude/Codex) is required to run the placement test.');
-  }
-  const model = getAiProviderMeta(aiKey.provider).defaultModel;
-  if (!model) {
-    throw new Error(`No default AI model configured for provider "${aiKey.provider}".`);
-  }
-  return { provider: aiKey.provider, model, apiKey: aiKey.apiKey };
-}
 
 export async function generatePlacement(
   userId: string,
   nativeLang: string,
   targetLang: string,
+  note = '',
 ): Promise<{ questions: PlacementQuestion[]; provider: string; model: string }> {
-  const ai = await resolvePlacementAi(userId);
+  const ai = await resolveLearningAi(userId);
   const count = PLACEMENT_LEVELS.length * PER_BAND;
 
   const systemPrompt = loadAndRender('placement/placement-probe.md', {
@@ -76,6 +50,7 @@ export async function generatePlacement(
     SKILLS: PLACEMENT_SKILLS.join(', '),
     PER_BAND: String(PER_BAND),
     COUNT: String(count),
+    NOTES: formatNotesForPrompt(note),
   });
 
   const provider = createAIProvider(ai.provider);

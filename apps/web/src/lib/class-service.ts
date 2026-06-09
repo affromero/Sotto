@@ -6,6 +6,8 @@ import { generateSectionQuestions } from './class-generation';
 import { seedLessonItems, getDueItems, applyReviewOutcome } from './knowledge-graph';
 import { generateClassListening } from './class-listening-generator';
 import { generateClassSpeaking } from './class-speaking-generator';
+import { generateClassWriting } from './class-writing-generator';
+import { getCourseNote } from './course-notes';
 import { logger } from './logger';
 import type { SkillType, CefrLevel } from '@sotto/shared';
 
@@ -37,6 +39,7 @@ async function buildSection(
   lesson: LessonLike,
   nativeLang: string,
   targetLang: string,
+  note: string,
 ): Promise<void> {
   const { grammarPoints, targetVocab } = lessonInputs(lesson);
   const section = await prisma.classSection.create({
@@ -52,6 +55,7 @@ async function buildSection(
     grammarPoints,
     targetVocab,
     seed: section.seed,
+    note,
   });
   await prisma.$transaction([
     ...questions.map((q, i) =>
@@ -100,9 +104,11 @@ export async function createNextClass(courseId: string, userId: string): Promise
     data: { courseId, lessonId: lesson.id, order: lesson.order, status: 'GENERATING' },
   });
 
+  const note = await getCourseNote(courseId);
+
   try {
     for (const skill of MC_SKILLS) {
-      await buildSection(cls.id, userId, skill, lesson, course.nativeLang, course.targetLang);
+      await buildSection(cls.id, userId, skill, lesson, course.nativeLang, course.targetLang, note);
     }
   } catch (err) {
     // Roll back the half-built class so the learner can retry cleanly.
@@ -126,6 +132,7 @@ export async function createNextClass(courseId: string, userId: string): Promise
       targetLang: course.targetLang,
       objective: lesson.objective,
       mustIncludeVocab: due.vocab.map((v) => ({ word: v.lemma, translation: v.translation })),
+      note,
     });
   } catch (err) {
     logger.warn('generateClassListening failed; continuing without listening section', {
@@ -144,9 +151,29 @@ export async function createNextClass(courseId: string, userId: string): Promise
       targetLang: course.targetLang,
       objective: lesson.objective,
       targetVocab,
+      note,
     });
   } catch (err) {
     logger.warn('generateClassSpeaking failed; continuing without speaking section', {
+      classId: cls.id,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+
+  // Writing section — non-blocking, same rationale as listening/speaking.
+  try {
+    await generateClassWriting({
+      userId,
+      classId: cls.id,
+      level: lesson.level,
+      nativeLang: course.nativeLang,
+      targetLang: course.targetLang,
+      objective: lesson.objective,
+      targetVocab,
+      note,
+    });
+  } catch (err) {
+    logger.warn('generateClassWriting failed; continuing without writing section', {
       classId: cls.id,
       error: err instanceof Error ? err.message : String(err),
     });
@@ -176,6 +203,10 @@ export async function getClassForUser(classId: string, userId: string) {
         include: {
           questions: { orderBy: { order: 'asc' } },
           prompts: { orderBy: { order: 'asc' } },
+          writingPrompts: {
+            orderBy: { order: 'asc' },
+            include: { responses: { where: { userId }, orderBy: { createdAt: 'desc' }, take: 1 } },
+          },
           podcast: { select: { id: true, audioUrl: true, title: true } },
         },
       },
@@ -205,6 +236,7 @@ export async function submitClass(
         include: {
           questions: true,
           prompts: { include: { recordings: { orderBy: { createdAt: 'desc' } } } },
+          writingPrompts: { include: { responses: { orderBy: { createdAt: 'desc' } } } },
         },
       },
       lesson: true,
@@ -225,6 +257,10 @@ export async function submitClass(
         const scored = p.recordings.find((r) => r.status === 'SCORED' && r.overallScore != null);
         return scored?.overallScore ?? 0;
       });
+      score = promptScores.length > 0 ? promptScores.reduce((a, b) => a + b, 0) / promptScores.length : 0;
+    } else if (s.skill === 'WRITING') {
+      // Average the latest response score per writing prompt; ungraded prompts count as 0.
+      const promptScores = s.writingPrompts.map((p) => p.responses[0]?.overallScore ?? 0);
       score = promptScores.length > 0 ? promptScores.reduce((a, b) => a + b, 0) / promptScores.length : 0;
     } else {
       let correct = 0;

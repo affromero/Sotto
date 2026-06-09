@@ -1,9 +1,9 @@
 // Generates multiple-choice questions for a class's MC sections (GRAMMAR /
 // READING) via the user's AI provider. Mirrors the canonical worker LLM flow.
-import { getAiKey } from './byok';
-import { getAiProviderMeta } from './providers/ai-registry';
+import { resolveLearningAi } from './learning-ai';
 import { createAIProvider } from './providers/ai';
 import { loadAndRender } from './prompt-loader';
+import { formatNotesForPrompt } from './course-notes';
 import { logUsage } from './usage-logger';
 import { logger } from './logger';
 import type { SkillType } from '@sotto/shared';
@@ -28,17 +28,11 @@ export interface SectionGenParams {
   grammarPoints: string[];
   targetVocab: Array<{ lemma: string; gloss: string }>;
   seed: string;
+  note?: string;
 }
 
 export async function generateSectionQuestions(p: SectionGenParams): Promise<GeneratedQuestion[]> {
-  const aiKey = await getAiKey(p.userId);
-  if (!aiKey) {
-    throw new Error('An AI provider key (or a configured local Claude/Codex) is required to generate a class.');
-  }
-  const model = getAiProviderMeta(aiKey.provider).defaultModel;
-  if (!model) {
-    throw new Error(`No default AI model configured for provider "${aiKey.provider}".`);
-  }
+  const ai = await resolveLearningAi(p.userId);
 
   const systemPrompt = loadAndRender('class/generate-section-quiz.md', {
     COUNT: String(QUESTIONS_PER_SECTION),
@@ -50,17 +44,18 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
     GRAMMAR_POINTS: p.grammarPoints.join(', '),
     VOCAB: p.targetVocab.map((v) => `${v.lemma} (${v.gloss})`).join('; '),
     SEED: p.seed,
+    NOTES: formatNotesForPrompt(p.note ?? ''),
   });
 
-  const provider = createAIProvider(aiKey.provider);
+  const provider = createAIProvider(ai.provider);
   const response = await provider.generateResponse(
     systemPrompt,
     [{ role: 'user', content: `Generate ${QUESTIONS_PER_SECTION} ${p.skill.toLowerCase()} questions.` }],
-    { model, apiKeyOverride: aiKey.apiKey, maxTokens: 4096, temperature: 0.8 },
+    { model: ai.model, apiKeyOverride: ai.apiKey, maxTokens: 4096, temperature: 0.8 },
   );
 
   logUsage({
-    service: aiKey.provider,
+    service: ai.provider,
     model: response.model,
     category: 'class-section',
     inputTokens: response.inputTokens,

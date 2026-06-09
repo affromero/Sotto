@@ -6,7 +6,6 @@ import { readFileSync, readdirSync, existsSync } from 'fs';
 import { join } from 'path';
 
 export const CEFR_LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'] as const;
-export const LANGUAGE_PAIRS = ['DE_FROM_EN', 'EN_FROM_ES', 'ES_FROM_EN'] as const;
 
 export const targetVocabSchema = z.object({
   lemma: z.string().min(1),
@@ -31,7 +30,6 @@ export const lessonSchema = z
 
 export const courseManifestSchema = z
   .object({
-    pair: z.enum(LANGUAGE_PAIRS),
     nativeLang: z.string().length(2),
     targetLang: z.string().length(2),
     title: z.string().min(1),

@@ -5,7 +5,7 @@ Below is the full transcript of the episode:
 {{TRANSCRIPT}}
 
 Generate {{COUNT}} multiple-choice comprehension questions based solely on the content of the transcript above. Each question must be answerable from the transcript — do not introduce outside knowledge.
-
+{{NOTES}}
 ## Requirements
 
 - Write each question stem in the target language ({{TARGET}}); brief native-language ({{NATIVE}}) hints are allowed at A1/A2 level.
