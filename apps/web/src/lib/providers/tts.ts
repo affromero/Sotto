@@ -13,6 +13,7 @@ import { getByokKey, getByokExtraData, hasByokKey } from '../byok';
 import { getAutoModelConfig } from '../auto-model-config';
 import { supportsLanguage, getDefaultModelForLanguage } from '../tts-language-support';
 import { logger } from '../logger';
+import { infra } from '../server-config';
 
 export interface SpeechParams {
   text: string;
@@ -337,7 +338,7 @@ export async function resolveTtsProvider(context: {
  * explicit choice for learning audio, mirroring getConfiguredSttProviderId().
  */
 export function getConfiguredTtsProviderId(): TtsProviderId | null {
-  const raw = (process.env.TTS_PROVIDER ?? '').trim();
+  const raw = (infra('ttsProvider', 'TTS_PROVIDER') ?? '').trim();
   return isValidProviderId(raw) ? raw : null;
 }
 
@@ -348,7 +349,7 @@ export async function canResolveTts(userId: string): Promise<boolean> {
   if (await hasByokKey(userId)) return true;
   // Keyless local TTS (kokoro) counts only when explicitly configured AND given a
   // reachable endpoint — never auto-selected by mere availability.
-  if (getConfiguredTtsProviderId() === 'kokoro' && process.env.TTS_BASE_URL?.trim()) return true;
+  if (getConfiguredTtsProviderId() === 'kokoro' && infra('ttsBaseUrl', 'TTS_BASE_URL')) return true;
   if (process.env.ELEVENLABS_API_KEY) return true;
   if (process.env.OPENAI_API_KEY) return true;
   if (process.env.CARTESIA_API_KEY) return true;

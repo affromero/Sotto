@@ -1,6 +1,7 @@
 import { logger } from '../logger';
 import { getSttProviderMeta, isValidSttProviderId } from './stt-registry';
 import { getAiKey, getByokKey } from '../byok';
+import { infra } from '../server-config';
 
 /**
  * Speech-to-text transcription result
@@ -579,7 +580,7 @@ export function createSttProvider(
       return new OpenAIWhisperProvider(apiKey, config);
     }
     case 'local': {
-      const baseURL = process.env.STT_BASE_URL?.trim();
+      const baseURL = infra('sttBaseUrl', 'STT_BASE_URL');
       if (!baseURL) {
         throw new Error(
           'STT_BASE_URL is required for STT_PROVIDER=local. Point it at your local OpenAI-compatible Whisper server (e.g. http://localhost:8000/v1 for faster-whisper-server / Speaches).',
@@ -587,7 +588,7 @@ export function createSttProvider(
       }
       const config: WhisperProviderConfig = {
         baseURL,
-        model: process.env.STT_MODEL?.trim() || model || getSttProviderMeta('local').defaultModel,
+        model: infra('sttModel', 'STT_MODEL') || model || getSttProviderMeta('local').defaultModel,
         envVar: 'STT_API_KEY',
         name: 'Local Whisper',
       };
@@ -630,7 +631,7 @@ export function getSttPlatformKey(provider: SttProviderId): string | undefined {
  * routes transcription to a local Whisper server.
  */
 export function getConfiguredSttProviderId(): SttProviderId {
-  const raw = (process.env.STT_PROVIDER ?? '').trim();
+  const raw = (infra('sttProvider', 'STT_PROVIDER') ?? '').trim();
   return isValidSttProviderId(raw) ? raw : 'openai';
 }
 

@@ -1,4 +1,5 @@
 import type { Readable } from 'stream';
+import { infra } from '../server-config';
 
 export interface StorageProvider {
   uploadFile(key: string, data: Buffer, contentType: string): Promise<string>;
@@ -44,19 +45,31 @@ class S3Provider implements StorageProvider {
     const { S3Client: S3, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } = await import('@aws-sdk/client-s3');
     const { getSignedUrl } = await import('@aws-sdk/s3-request-presigner');
 
+    // Credentials are secrets — env-only, never sourced from DB config. When s3 is
+    // the explicit choice but creds are missing, fail loudly rather than building a
+    // broken client (no availability-based soft fallback).
+    const accessKeyId = process.env.AWS_ACCESS_KEY_ID?.trim();
+    const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY?.trim();
+    if (!accessKeyId || !secretAccessKey) {
+      throw new Error(
+        'STORAGE_PROVIDER=s3 requires AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY. Set them in your environment.',
+      );
+    }
+
     const client = new S3({
-      region: process.env.AWS_S3_REGION || 'us-east-1',
-      credentials: {
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
-      },
+      region: this.region,
+      credentials: { accessKeyId, secretAccessKey },
     });
 
     return { client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, getSignedUrl };
   }
 
   private get bucket() {
-    return process.env.AWS_S3_BUCKET || 'sotto-storage';
+    return infra('s3Bucket', 'AWS_S3_BUCKET') || 'sotto-storage';
+  }
+
+  private get region() {
+    return infra('s3Region', 'AWS_S3_REGION') || 'us-east-1';
   }
 
   async uploadFile(key: string, data: Buffer, contentType: string): Promise<string> {
@@ -67,8 +80,7 @@ class S3Provider implements StorageProvider {
       Body: data,
       ContentType: contentType,
     }));
-    const region = process.env.AWS_S3_REGION || 'us-east-1';
-    return `https://${this.bucket}.s3.${region}.amazonaws.com/${key}`;
+    return `https://${this.bucket}.s3.${this.region}.amazonaws.com/${key}`;
   }
 
   async uploadStream(key: string, body: Readable, contentType: string): Promise<string> {
@@ -81,8 +93,7 @@ class S3Provider implements StorageProvider {
       partSize: 5 * 1024 * 1024,
     });
     await upload.done();
-    const region = process.env.AWS_S3_REGION || 'us-east-1';
-    return `https://${this.bucket}.s3.${region}.amazonaws.com/${key}`;
+    return `https://${this.bucket}.s3.${this.region}.amazonaws.com/${key}`;
   }
 
   async getPresignedUrl(key: string, expiresIn = 3600): Promise<string> {
@@ -148,7 +159,7 @@ class LocalProvider implements StorageProvider {
 export type StorageProviderId = 'local' | 'r2' | 's3';
 
 function resolveStorageProviderType(type?: string): StorageProviderId {
-  const providerType = type || process.env.STORAGE_PROVIDER || 'local';
+  const providerType = type || infra('storageProvider', 'STORAGE_PROVIDER') || 'local';
   if (providerType !== 'local' && providerType !== 'r2' && providerType !== 's3') {
     throw new Error(`Unknown storage provider "${providerType}". Expected one of: local, r2, s3.`);
   }

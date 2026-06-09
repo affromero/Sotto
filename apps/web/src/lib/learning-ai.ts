@@ -6,6 +6,7 @@
 // path and return no apiKey (the CLI / local server authenticates itself).
 import { getAiKey } from './byok';
 import { getAiProviderMeta } from './providers/ai-registry';
+import { getServerInfra, infra } from './server-config';
 
 export interface ResolvedLearningAi {
   provider: string;
@@ -22,8 +23,11 @@ export async function resolveLearningAi(userId: string): Promise<ResolvedLearnin
     return { provider: aiKey.provider, model, apiKey: aiKey.apiKey };
   }
 
-  // No BYOK key — fall back to a server-configured keyless backend.
-  const envProvider = (process.env.AI_PROVIDER ?? '').trim();
+  // No BYOK key — fall back to a server-configured keyless backend. The owner's
+  // DB infra config wins over env (read-through warms the sync snapshot first);
+  // both are explicit selections, never an availability-based fallback.
+  await getServerInfra();
+  const envProvider = (infra('aiProvider', 'AI_PROVIDER') ?? '').trim();
   if (envProvider === 'claude-code') {
     const model = getAiProviderMeta('claude-code').defaultModel;
     if (!model) throw new Error('No default model configured for claude-code.');
@@ -34,13 +38,13 @@ export async function resolveLearningAi(userId: string): Promise<ResolvedLearnin
   // The model is host-defined (AI_MODEL) and routed by the "local:" prefix so the
   // llm.ts guardrail does not require it to be a registered model id.
   if (envProvider === 'local') {
-    const model = (process.env.AI_MODEL ?? '').trim();
+    const model = (infra('aiModel', 'AI_MODEL') ?? '').trim();
     if (!model) {
       throw new Error(
         'AI_PROVIDER=local requires AI_MODEL (the model your local server serves, e.g. "qwen3", "gemma3", "llama3.3").',
       );
     }
-    if (!(process.env.AI_BASE_URL ?? '').trim()) {
+    if (!(infra('aiBaseUrl', 'AI_BASE_URL') ?? '').trim()) {
       throw new Error(
         'AI_PROVIDER=local requires AI_BASE_URL (e.g. http://localhost:11434/v1 for Ollama, http://localhost:8000/v1 for vLLM).',
       );

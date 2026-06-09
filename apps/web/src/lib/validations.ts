@@ -995,3 +995,26 @@ export const pairDeviceSchema = z.object({
 export const redeemPairingSchema = z.object({
   token: z.string().min(10).max(256),
 });
+
+// Owner-set server infrastructure (non-secret selection). Each field accepts a
+// trimmed string to set, or null to clear (fall back to env). No secrets here.
+// Empty strings are normalized to null in setSiteConfig.
+const infraField = z.string().trim().max(512).nullable().optional();
+
+export const serverInfraSchema = z.object({
+  aiProvider: infraField,
+  aiModel: infraField,
+  aiBaseUrl: infraField,
+  sttProvider: infraField,
+  sttBaseUrl: infraField,
+  sttModel: infraField,
+  ttsProvider: infraField,
+  ttsBaseUrl: infraField,
+  storageProvider: infraField,
+  s3Bucket: infraField,
+  s3Region: infraField,
+});
+
+export const siteConfigUpdateSchema = serverInfraSchema.extend({
+  openSignup: z.boolean().optional(),
+});
