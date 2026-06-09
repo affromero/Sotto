@@ -76,6 +76,12 @@ vi.mock('@/lib/course-notes', () => ({
   getCourseNote: vi.fn().mockResolvedValue(''),
 }));
 
+const mockPrepareClassSource = vi.fn();
+vi.mock('@/lib/class-source', () => ({
+  prepareClassSource: (...a: unknown[]) => mockPrepareClassSource(...a),
+  ClassSourceError: class ClassSourceError extends Error {},
+}));
+
 // ---- Import under test ----
 import {
   createNextClass,
@@ -190,6 +196,67 @@ describe('createNextClass', () => {
     expect(mockCourseClassDelete).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: 'class-new' } }),
     );
+  });
+
+  describe('sourced mode', () => {
+    const SOURCED_COURSE = { ...SAMPLE_COURSE, currentLevel: 'B1' };
+
+    beforeEach(() => {
+      mockCourseFindFirst.mockResolvedValue(SOURCED_COURSE);
+      mockCourseClassFindFirst.mockResolvedValue(null);
+      mockCourseClassFindMany.mockResolvedValue([]);
+    });
+
+    it('builds a sourced class from a URL: leveled to currentLevel, stores sourceUrl, threads sourceContent', async () => {
+      mockPrepareClassSource.mockResolvedValue({
+        leveledContent: 'Ein angepasster Artikeltext.',
+        sourceMetadata: { title: 'Real Article', siteName: 'Example' },
+        title: 'Real Article',
+        sourceUrl: 'https://example.com/a',
+      });
+
+      const result = await createNextClass('course-1', 'u1', { sourceUrl: 'https://example.com/a' });
+
+      expect(result.kind).toBe('created');
+      // Source prepared at the LEARNER's current level, not the lesson level.
+      expect(mockPrepareClassSource).toHaveBeenCalledWith(
+        expect.objectContaining({ url: 'https://example.com/a', level: 'B1', targetLang: 'es' }),
+      );
+      // The class records what it was built from.
+      expect(mockCourseClassCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ sourceUrl: 'https://example.com/a', sourceTitle: 'Real Article' }),
+        }),
+      );
+      // The leveled passage is threaded into section generation.
+      expect(mockGenerateSectionQuestions).toHaveBeenCalledWith(
+        expect.objectContaining({ sourceContent: 'Ein angepasster Artikeltext.', level: 'B1' }),
+      );
+    });
+
+    it('topic mode builds about the topic at currentLevel without extracting a URL', async () => {
+      const result = await createNextClass('course-1', 'u1', { topic: 'Mars rovers' });
+
+      expect(result.kind).toBe('created');
+      expect(mockPrepareClassSource).not.toHaveBeenCalled();
+      expect(mockCourseClassCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ sourceTitle: 'Mars rovers', sourceUrl: null }) }),
+      );
+      expect(mockGenerateSectionQuestions).toHaveBeenCalledWith(
+        expect.objectContaining({ objective: 'Mars rovers', level: 'B1', sourceContent: undefined }),
+      );
+    });
+
+    it('fails closed when the source cannot be read — no class is created', async () => {
+      const { ClassSourceError } = await import('@/lib/class-source');
+      mockPrepareClassSource.mockRejectedValue(new ClassSourceError('Could not read that link.'));
+
+      await expect(
+        createNextClass('course-1', 'u1', { sourceUrl: 'https://paywalled.com/x' }),
+      ).rejects.toBeInstanceOf(ClassSourceError);
+      // Source prep happens BEFORE class creation, so nothing was persisted.
+      expect(mockCourseClassCreate).not.toHaveBeenCalled();
+    });
   });
 });
 

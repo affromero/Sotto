@@ -99,6 +99,7 @@ The newest wave is LLM-native, and the closest peer is genuinely good: [**OpenLi
 | [Spaced repetition](https://en.wikipedia.org/wiki/Spaced_repetition) (SM-2) | ✅ | ✅ | 〰️ | ❌ | ❌ | ❌ | 〰️ |
 | Interactive memory graph | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | Adaptive listening seeded by due vocab | ✅ | 〰️ | ❌ | ❌ | ❌ | ❌ | 〰️ |
+| Classes from your own sources, with verified `[N]` citations | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | Rubric pronunciation scoring | ✅ | 〰️ | 〰️ | ✅ | ✅ | ✅ | ❌ |
 | No social layer / dark patterns | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ |
 | Price | Self-host (pay providers directly) | Free (MIT) | Freemium + sub | Sub | Sub | Sub | Sub |
@@ -251,6 +252,7 @@ The full learning loop is shipped and self-hostable today:
 - ✅ **Runs 100% offline:** keyless local LLM, STT, and TTS (Ollama / faster-whisper / Kokoro) via `docker compose --profile local`.
 - ✅ **Households:** first account becomes owner; invite your family, invite-only/open toggle, fully isolated per-learner accounts.
 - ✅ **Your devices:** desktop launcher (Sotto Host), scan-to-connect pairing, installable PWA, and a one-command secure tunnel.
+- ✅ **Sourced classes:** build a class from a real article, paper, or YouTube link (or a topic from your interests). Sotto extracts it, levels it to your CEFR, and teaches from it with verified `[N]` citations and a sources panel.
 
 **Planned (optional managed offering):** hosted infrastructure for non-technical learners — workers, storage, scheduled generation, and provider routing as a convenience layer. The learning stack itself stays open and self-hostable.
 

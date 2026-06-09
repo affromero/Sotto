@@ -210,6 +210,34 @@ export default function ClassScreen() {
           </SectionWrapper>
         ))}
 
+        {/* Sources (sourced classes) */}
+        {(() => {
+          const refs =
+            classData.sections.find((s) => s.podcast?.references?.length)?.podcast?.references ?? [];
+          if (refs.length === 0 && !classData.sourceUrl) return null;
+          return (
+            <View style={styles.sourcesBlock}>
+              <Text style={styles.sourcesTitle}>Sources</Text>
+              {classData.sourceTitle ? (
+                <Text style={styles.sourcesBuiltFrom}>Built from {classData.sourceTitle}</Text>
+              ) : null}
+              {refs.map((r) => {
+                const verified =
+                  r.verificationStatus === 'VERIFIED' || r.verificationStatus === 'REPLACED';
+                return (
+                  <View key={r.number} style={styles.sourceRow}>
+                    <Text style={styles.sourceNum}>[{r.number}]</Text>
+                    <Text style={styles.sourceText}>
+                      {r.title}
+                      {verified ? '  ✓' : r.verificationStatus === 'PENDING' ? '  …' : ''}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+          );
+        })()}
+
         {/* Submit button */}
         {!submitted && totalMcQuestions > 0 && (
           <Pressable
@@ -380,5 +408,40 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: colors.textInverse,
+  },
+  sourcesBlock: {
+    padding: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: spacing.xs,
+  },
+  sourcesTitle: {
+    fontFamily: typography.fontHeading,
+    fontSize: 16,
+    color: colors.textPrimary,
+  },
+  sourcesBuiltFrom: {
+    fontFamily: typography.fontBody,
+    fontSize: 13,
+    color: colors.textSecondary,
+    marginBottom: spacing.xs,
+  },
+  sourceRow: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+  },
+  sourceNum: {
+    fontFamily: typography.fontBody,
+    fontSize: 13,
+    color: colors.textSecondary,
+    minWidth: 28,
+  },
+  sourceText: {
+    flex: 1,
+    fontFamily: typography.fontBody,
+    fontSize: 13,
+    color: colors.textPrimary,
   },
 });

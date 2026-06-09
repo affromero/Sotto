@@ -62,6 +62,7 @@ import { processWaveformGeneration } from './waveform-generation.worker';
 import { processPipelineClassification } from './pipeline-classification.worker';
 import { processSpeakingGrading } from './speaking-grading.worker';
 import { processWorksheetPdf } from './worksheet-pdf.worker';
+import { processVerifyClassReferences } from './verify-class-references.worker';
 import { isR2MonitoringConfigured } from '@/lib/cloudflare-r2-usage';
 import { startPricingRefreshInterval } from '@/lib/pricing';
 
@@ -156,6 +157,7 @@ const workers = [
   shouldRun('pipeline-classification') && createWorker('pipeline-classification', processPipelineClassification, { concurrency: 2, lockDuration: 300000 }),
   shouldRun('speaking-grading') && createWorker('speaking-grading', processSpeakingGrading, { concurrency: 5 }),
   shouldRun('worksheet-pdf') && createWorker('worksheet-pdf', processWorksheetPdf, { concurrency: 2 }),
+  shouldRun('verify-class-references') && createWorker('verify-class-references', processVerifyClassReferences, { concurrency: 2 }),
 ].filter(Boolean) as ReturnType<typeof createWorker>[];
 
 // Cron jobs and webhooks run only on light (or all) profile to prevent duplicate repeat registrations
