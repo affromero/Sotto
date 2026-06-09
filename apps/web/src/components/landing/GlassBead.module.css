@@ -1,0 +1,85 @@
+/*
+ * GlassBead.module.css — animated liquid-glass logo mark.
+ * Ported faithfully from SottoDesign/theme.css `.glass-bead`. Scales with the
+ * surrounding font-size (0.44em). Cool blue → warm pink, the way reading runs.
+ */
+
+.bead {
+  position: relative;
+  flex: none;
+  display: inline-block;
+  width: 0.44em;
+  height: 0.44em;
+  border-radius: 50%;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 32% 26%, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.25) 18%, transparent 42%),
+    radial-gradient(circle at 72% 76%, rgba(255, 143, 177, 0.95), transparent 58%),
+    radial-gradient(circle at 28% 72%, rgba(91, 141, 239, 1), transparent 62%),
+    linear-gradient(140deg, #6aa0ff, #ff8fb1);
+  box-shadow:
+    inset 0 1px 1.5px rgba(255, 255, 255, 0.9),
+    inset 0 -3px 5px rgba(40, 40, 96, 0.5),
+    0 0 0 0.5px rgba(255, 255, 255, 0.22),
+    0 0 9px rgba(120, 120, 230, 0.5);
+}
+
+.spec {
+  position: absolute;
+  left: 22%;
+  top: 14%;
+  width: 30%;
+  height: 22%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 50%, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0) 70%);
+  animation: beadSpec 7s cubic-bezier(0.22, 0.61, 0.36, 1) infinite;
+}
+
+.glare {
+  position: absolute;
+  top: -30%;
+  left: -60%;
+  width: 55%;
+  height: 160%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.6), transparent);
+  transform: rotate(18deg);
+  opacity: 0;
+  animation: beadGlare 6.5s cubic-bezier(0.22, 0.61, 0.36, 1) infinite;
+}
+
+@keyframes beadSpec {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.95;
+  }
+  50% {
+    transform: translate(8%, 7%) scale(1.1);
+    opacity: 1;
+  }
+}
+
+@keyframes beadGlare {
+  0% {
+    left: -60%;
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.6;
+  }
+  34% {
+    left: 120%;
+    opacity: 0;
+  }
+  100% {
+    left: 120%;
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spec,
+  .glare {
+    animation: none;
+  }
+}
