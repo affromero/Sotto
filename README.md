@@ -92,6 +92,7 @@ The newest wave is LLM-native, and the closest peer is genuinely good: [**OpenLi
 | BYOK / own API keys | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | Bring your own agent ([Claude Code](https://docs.anthropic.com/en/docs/claude-code) / [Codex](https://github.com/openai/codex), no key) | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | Runs 100% offline ([local LLM](#run-it-100-offline) + STT + TTS, no cloud key) | ✅ | 〰️ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Multi-user households on your server ([invite your family](#your-devices-and-household)) | ✅ | 〰️ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | Data stays private (your infra) | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | 5 *graded* skills (grammar / reading / listening / speaking / writing) | ✅ | 〰️ | 〰️ | 〰️ | 〰️ | 〰️ | 〰️ |
 | Mastery-gated progression | ✅ | ❌ | 〰️ | ❌ | ❌ | ❌ | 〰️ |
@@ -217,6 +218,17 @@ OPENAI_API_KEY=sk-...
 
 </details>
 
+## Your devices and household
+
+The product is self-hosted: you run it, then reach it from anywhere. Apps are distributed from **[sotto.fm/download](https://sotto.fm/download)**.
+
+- **Desktop.** *Sotto Host* (a tiny [Tauri](https://tauri.app) launcher in `apps/desktop/`) runs the whole stack on your computer with no terminal. Open it, click **Start**, and it brings up the containers and opens the app.
+- **Mobile and iPad.** The [Expo](https://expo.dev) app connects to *your* server. The smooth path is **scan to connect**: on the server open **Settings → Devices**, scan the QR, and the device is paired (a one-time token mints a session, no password). iPad with Apple Pencil is first-class (PencilKit ink on worksheets).
+- **Web and PWA.** Installable from any browser. Add to home screen for full-screen, offline-capable access.
+- **Reach it from anywhere.** The installer can open a secure public URL with one command (`cloudflared` quick tunnel, no account), or point a domain at the server and let Caddy handle TLS.
+
+**Households (invite your family).** The first account on a fresh self-host becomes the **owner** (admin). From **Settings → Household** the owner generates invite links and QRs, sees the roster, and toggles **invite-only vs open** sign-up. Every learner is a fully isolated account with their own courses, progress, vocabulary graph, and keys, and there is no social layer.
+
 ## Bring your own Claude / Codex
 
 Sotto is built around BYOK from the start, surfaced three ways:
@@ -236,6 +248,9 @@ The full learning loop is shipped and self-hostable today:
 - ✅ **Ungated practice + learner notes** — per-skill spaced-repetition practice; notes personalize placement, classes, and practice.
 - ✅ **Vocabulary memory graph** — per-course SM-2 graph, Cytoscape visualization, drives review + adaptive listening.
 - ✅ **Worksheets + web/iPad** — print/PDF worksheets with PencilKit ink; the whole flow runs on web and iPad.
+- ✅ **Runs 100% offline:** keyless local LLM, STT, and TTS (Ollama / faster-whisper / Kokoro) via `docker compose --profile local`.
+- ✅ **Households:** first account becomes owner; invite your family, invite-only/open toggle, fully isolated per-learner accounts.
+- ✅ **Your devices:** desktop launcher (Sotto Host), scan-to-connect pairing, installable PWA, and a one-command secure tunnel.
 
 **Planned (optional managed offering):** hosted infrastructure for non-technical learners — workers, storage, scheduled generation, and provider routing as a convenience layer. The learning stack itself stays open and self-hostable.
 
