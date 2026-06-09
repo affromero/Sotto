@@ -70,13 +70,19 @@ const nextConfig = {
     ];
   },
   async headers() {
+    // React/Next dev mode requires eval() (source maps, fast refresh, error
+    // overlays). Allow 'unsafe-eval' in development ONLY — production stays strict.
+    const isDev = process.env.NODE_ENV !== 'production';
+    const scriptSrc = `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''} https://js.stripe.com`;
+    const connectSrc = `connect-src 'self' https:${isDev ? ' ws: wss:' : ''}`;
+
     const defaultCsp = [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' https://js.stripe.com",
+      scriptSrc,
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: https: blob:",
       "font-src 'self' data: https://fonts.gstatic.com",
-      "connect-src 'self' https:",
+      connectSrc,
       "media-src 'self' data: https: blob:",
       "frame-src 'self' https://js.stripe.com",
       "frame-ancestors 'self'",
@@ -86,11 +92,11 @@ const nextConfig = {
 
     const embedCsp = [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' https://js.stripe.com",
+      scriptSrc,
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: https: blob:",
       "font-src 'self' data: https://fonts.gstatic.com",
-      "connect-src 'self' https:",
+      connectSrc,
       "media-src 'self' data: https: blob:",
       "frame-src 'self' https://js.stripe.com",
       'frame-ancestors *',
