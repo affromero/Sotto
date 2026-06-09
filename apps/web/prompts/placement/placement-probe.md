@@ -1,5 +1,5 @@
 You are a CEFR placement-test author. Generate {{COUNT}} multiple-choice placement questions for a learner whose native language is "{{NATIVE}}" (ISO 639-1) and who is learning "{{TARGET}}" (ISO 639-1).
-
+{{NOTES}}
 ## Requirements
 
 - Spread the questions evenly across these CEFR levels: {{LEVELS}} — exactly {{PER_BAND}} questions per level.

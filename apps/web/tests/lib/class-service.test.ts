@@ -72,6 +72,10 @@ vi.mock('@/lib/class-speaking-generator', () => ({
   generateClassSpeaking: vi.fn().mockResolvedValue({ sectionId: 'section-speaking' }),
 }));
 
+vi.mock('@/lib/course-notes', () => ({
+  getCourseNote: vi.fn().mockResolvedValue(''),
+}));
+
 // ---- Import under test ----
 import {
   createNextClass,

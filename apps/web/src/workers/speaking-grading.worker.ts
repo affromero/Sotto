@@ -2,8 +2,7 @@ import { Job } from 'bullmq';
 import { Prisma } from '@prisma/client';
 import { SpeakingGradingPayload } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
-import { getAiKey } from '@/lib/byok';
-import { getAiProviderMeta } from '@/lib/providers/ai-registry';
+import { resolveLearningAi } from '@/lib/learning-ai';
 import { resolveSttProvider, createSttProvider } from '@/lib/providers/stt';
 import { resolvePronunciationScorer } from '@/lib/pronunciation/scorer';
 import { logger } from '@/lib/logger';
@@ -31,26 +30,30 @@ export async function processSpeakingGrading(job: Job<SpeakingGradingPayload>): 
     throw new Error(`SpeakingRecording not found: ${recordingId}`);
   }
 
-  // Resolve targetLang via section -> class -> course
-  const section = await prisma.classSection.findUnique({
-    where: { id: recording.sectionId },
-    select: {
-      classId: true,
-      class: {
-        select: {
-          course: {
-            select: { targetLang: true },
-          },
-        },
-      },
-    },
-  });
-
-  if (!section) {
-    throw new Error(`ClassSection not found for sectionId: ${recording.sectionId}`);
+  // Resolve targetLang via the recording's parent: a class section
+  // (section -> class -> course) or a practice session (practiceSession -> course).
+  let targetLang: string;
+  if (recording.sectionId) {
+    const section = await prisma.classSection.findUnique({
+      where: { id: recording.sectionId },
+      select: { class: { select: { course: { select: { targetLang: true } } } } },
+    });
+    if (!section) {
+      throw new Error(`ClassSection not found for sectionId: ${recording.sectionId}`);
+    }
+    targetLang = section.class.course.targetLang;
+  } else if (recording.practiceSessionId) {
+    const ps = await prisma.practiceSession.findUnique({
+      where: { id: recording.practiceSessionId },
+      select: { course: { select: { targetLang: true } } },
+    });
+    if (!ps) {
+      throw new Error(`PracticeSession not found for practiceSessionId: ${recording.practiceSessionId}`);
+    }
+    targetLang = ps.course.targetLang;
+  } else {
+    throw new Error(`SpeakingRecording ${recordingId} has no parent section or practice session`);
   }
-
-  const targetLang = section.class.course.targetLang;
   const userId = recording.userId;
 
   // Mark as GRADING
@@ -101,13 +104,8 @@ export async function processSpeakingGrading(job: Job<SpeakingGradingPayload>): 
   }
 
   try {
-    // Resolve AI key for scorer
-    const aiKey = await getAiKey(userId);
-    if (!aiKey) {
-      throw new Error(`No AI key available for user ${userId}. Configure an AI key to enable pronunciation scoring.`);
-    }
-
-    const aiModel = getAiProviderMeta(aiKey.provider).defaultModel;
+    // Resolve the learning AI provider (BYOK or local agent) for the scorer
+    const ai = await resolveLearningAi(userId);
 
     const scorer = resolvePronunciationScorer({});
     const score = await scorer.score({
@@ -115,9 +113,9 @@ export async function processSpeakingGrading(job: Job<SpeakingGradingPayload>): 
       transcript,
       wordTimings,
       targetLang,
-      aiProvider: aiKey.provider,
-      aiModel,
-      aiApiKey: aiKey.apiKey,
+      aiProvider: ai.provider,
+      aiModel: ai.model,
+      aiApiKey: ai.apiKey,
       userId,
     });
 

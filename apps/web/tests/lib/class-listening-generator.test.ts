@@ -108,8 +108,8 @@ vi.mock('@/lib/logger', () => ({
 
 // ---- Import under test (must come AFTER vi.mock calls) ----
 
-import { generateClassListening } from '@/lib/class-listening-generator';
-import type { ClassListeningParams } from '@/lib/class-listening-generator';
+import { generateClassListening, composeListeningContent } from '@/lib/class-listening-generator';
+import type { ClassListeningParams, ListeningContentParams } from '@/lib/class-listening-generator';
 
 // ---- Fixtures ----
 
@@ -381,10 +381,15 @@ describe('generateClassListening', () => {
   });
 
   describe('error paths', () => {
-    it('throws when getAiKey returns null', async () => {
+    it('throws when there is no BYOK key and no local agent configured', async () => {
       mockGetAiKey.mockResolvedValue(null);
-
-      await expect(generateClassListening(PARAMS)).rejects.toThrow(/AI provider key/);
+      const prev = process.env.AI_PROVIDER;
+      process.env.AI_PROVIDER = '';
+      try {
+        await expect(generateClassListening(PARAMS)).rejects.toThrow(/AI provider/i);
+      } finally {
+        process.env.AI_PROVIDER = prev;
+      }
     });
 
     it('throws when the provider has no default model', async () => {
@@ -469,5 +474,50 @@ describe('generateClassListening', () => {
         }),
       );
     });
+  });
+});
+
+describe('composeListeningContent', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const CONTENT_PARAMS: ListeningContentParams = {
+    userId: 'u1',
+    courseId: 'course-1',
+    level: 'A1',
+    nativeLang: 'en',
+    targetLang: 'es',
+    objective: 'Learn greetings',
+    mustIncludeVocab: [{ word: 'hola', translation: 'hello' }],
+  };
+
+  it('returns the podcast id + comprehension questions without persisting a class section', async () => {
+    setupHappyPath();
+
+    const content = await composeListeningContent(CONTENT_PARAMS);
+
+    expect(content.podcastId).toBe('podcast-1');
+    expect(content.comprehensionQuestions.length).toBeGreaterThan(0);
+    expect(content.comprehensionQuestions[0]).toMatchObject({
+      question: expect.any(String),
+      options: expect.any(Array),
+      correctIndex: expect.any(Number),
+    });
+    // The content core must NOT create class rows — that is the caller's job.
+    expect(mockClassSectionCreate).not.toHaveBeenCalled();
+    expect(mockLessonQuestionCreateMany).not.toHaveBeenCalled();
+  });
+
+  it('upserts generated vocab with a null firstSeenClassId (practice provenance)', async () => {
+    setupHappyPath();
+
+    await composeListeningContent(CONTENT_PARAMS);
+
+    expect(mockLearnerVocabUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({ firstSeenClassId: null }),
+      }),
+    );
   });
 });

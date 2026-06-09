@@ -7,10 +7,10 @@
 // 6. Generates comprehension MC questions over the transcript.
 // 7. Creates the ClassSection + LessonQuestion rows (status: READY).
 import { prisma } from './prisma';
-import { getAiKey } from './byok';
-import { getAiProviderMeta } from './providers/ai-registry';
+import { resolveLearningAi } from './learning-ai';
 import { createAIProvider } from './providers/ai';
 import { loadAndRender } from './prompt-loader';
+import { formatNotesForPrompt } from './course-notes';
 import { generateScript } from './script-generator';
 import { createSegmentsAndQueueAudio } from './segment-creator';
 import { logUsage } from './usage-logger';
@@ -27,6 +27,7 @@ export interface ClassListeningParams {
   targetLang: string;
   objective: string;
   mustIncludeVocab: Array<{ word: string; translation: string }>;
+  note?: string;
 }
 
 export interface ClassListeningResult {
@@ -34,16 +35,38 @@ export interface ClassListeningResult {
   podcastId: string;
 }
 
-export async function generateClassListening(p: ClassListeningParams): Promise<ClassListeningResult> {
-  // Step 1: resolve AI key
-  const aiKey = await getAiKey(p.userId);
-  if (!aiKey) {
-    throw new Error('An AI provider key (or a configured local Claude/Codex) is required to generate the listening section.');
-  }
-  const model = getAiProviderMeta(aiKey.provider).defaultModel;
-  if (!model) {
-    throw new Error(`No default AI model configured for provider "${aiKey.provider}".`);
-  }
+export interface ListeningComprehensionQuestion {
+  question: string;
+  options: string[];
+  correctIndex: number;
+  explanation: string;
+}
+
+// Content-only listening generation: builds the CLASS podcast (script → audio)
+// and the comprehension questions, feeds generated vocab into the memory graph,
+// and returns both. The caller decides where to persist the questions (a class
+// section, or a practice session). No ClassSection/LessonQuestion rows here.
+export interface ListeningContentParams {
+  userId: string;
+  courseId: string;
+  level: string;
+  nativeLang: string;
+  targetLang: string;
+  objective: string;
+  mustIncludeVocab: Array<{ word: string; translation: string }>;
+  /** Provenance for graph vocab (a class id). Undefined for practice sessions. */
+  firstSeenClassId?: string;
+  note?: string;
+}
+
+export interface ListeningContent {
+  podcastId: string;
+  comprehensionQuestions: ListeningComprehensionQuestion[];
+}
+
+export async function composeListeningContent(p: ListeningContentParams): Promise<ListeningContent> {
+  // Step 1: resolve the learning AI provider (BYOK or local agent)
+  const ai = await resolveLearningAi(p.userId);
 
   // Step 2: create a CLASS podcast
   const podcast = await prisma.podcast.create({
@@ -68,9 +91,9 @@ export async function generateClassListening(p: ClassListeningParams): Promise<C
       focusAreas: [],
       tone: 'casual',
       durationTarget: 4,
-      provider: aiKey.provider,
-      model,
-      apiKeyOverride: aiKey.apiKey,
+      provider: ai.provider,
+      model: ai.model,
+      apiKeyOverride: ai.apiKey,
       source: 'CLASS',
       targetLanguage: p.targetLang,
       languageMode: 'conversational_mix',
@@ -110,7 +133,7 @@ export async function generateClassListening(p: ClassListeningParams): Promise<C
 
     // Step 6: log usage
     logUsage({
-      service: aiKey.provider,
+      service: ai.provider,
       model: result.model,
       category: 'class-listening-script',
       inputTokens: result.inputTokens,
@@ -130,7 +153,7 @@ export async function generateClassListening(p: ClassListeningParams): Promise<C
           translation: v.translation,
           partOfSpeech: v.partOfSpeech ?? null,
           pronunciation: v.pronunciation ?? null,
-          firstSeenClassId: p.classId,
+          firstSeenClassId: p.firstSeenClassId ?? null,
         },
         update: {},
       });
@@ -146,17 +169,18 @@ export async function generateClassListening(p: ClassListeningParams): Promise<C
       NATIVE: p.nativeLang,
       TARGET: p.targetLang,
       TRANSCRIPT: transcript,
+      NOTES: formatNotesForPrompt(p.note ?? ''),
     });
 
-    const provider = createAIProvider(aiKey.provider);
+    const provider = createAIProvider(ai.provider);
     const quizResponse = await provider.generateResponse(
       systemPrompt,
       [{ role: 'user', content: `Generate ${LISTENING_QUIZ_COUNT} listening comprehension questions.` }],
-      { model, apiKeyOverride: aiKey.apiKey, maxTokens: 4096, temperature: 0.7 },
+      { model: ai.model, apiKeyOverride: ai.apiKey, maxTokens: 4096, temperature: 0.7 },
     );
 
     logUsage({
-      service: aiKey.provider,
+      service: ai.provider,
       model: quizResponse.model,
       category: 'class-listening-quiz',
       inputTokens: quizResponse.inputTokens,
@@ -197,7 +221,30 @@ export async function generateClassListening(p: ClassListeningParams): Promise<C
       throw new Error('Listening quiz generation produced no usable questions.');
     }
 
-    // Step 11: create ClassSection + LessonQuestion rows
+    return { podcastId, comprehensionQuestions: questions };
+  } catch (err) {
+    // Best-effort cleanup: mark the podcast failed so it doesn't linger as PENDING.
+    await prisma.podcast.update({ where: { id: podcastId }, data: { status: 'FAILED' } }).catch(() => {});
+    throw err;
+  }
+}
+
+// Generate the LISTENING section of a class: compose the content, then persist
+// the gated ClassSection + LessonQuestion rows.
+export async function generateClassListening(p: ClassListeningParams): Promise<ClassListeningResult> {
+  const { podcastId, comprehensionQuestions } = await composeListeningContent({
+    userId: p.userId,
+    courseId: p.courseId,
+    level: p.level,
+    nativeLang: p.nativeLang,
+    targetLang: p.targetLang,
+    objective: p.objective,
+    mustIncludeVocab: p.mustIncludeVocab,
+    firstSeenClassId: p.classId,
+    note: p.note,
+  });
+
+  try {
     const section = await prisma.classSection.create({
       data: {
         classId: p.classId,
@@ -212,7 +259,7 @@ export async function generateClassListening(p: ClassListeningParams): Promise<C
     });
 
     await prisma.lessonQuestion.createMany({
-      data: questions.map((q, i) => ({
+      data: comprehensionQuestions.map((q, i) => ({
         sectionId: section.id,
         order: i + 1,
         skill: 'LISTENING' as const,
@@ -227,7 +274,7 @@ export async function generateClassListening(p: ClassListeningParams): Promise<C
       classId: p.classId,
       podcastId,
       sectionId: section.id,
-      questionCount: String(questions.length),
+      questionCount: String(comprehensionQuestions.length),
     });
 
     return { sectionId: section.id, podcastId };

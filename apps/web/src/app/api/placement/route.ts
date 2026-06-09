@@ -8,43 +8,58 @@ import { logger } from '@/lib/logger';
 import {
   generatePlacement,
   scorePlacement,
-  pairToLangs,
   toPublic,
   type PlacementQuestion,
 } from '@/lib/placement-test';
+import { getOrCreateCurriculum } from '@/lib/curriculum-generator';
+import { getCourseNote } from '@/lib/course-notes';
 
-const pairSchema = z.enum(['DE_FROM_EN', 'EN_FROM_ES', 'ES_FROM_EN']);
+const langCode = z.string().trim().toLowerCase().length(2);
 const submitSchema = z.object({
-  pair: pairSchema,
+  native: langCode,
+  target: langCode,
   answers: z
     .array(z.object({ id: z.string(), selectedIndex: z.number().int().min(0).max(3) }))
     .min(1),
 });
 
-const cacheKey = (userId: string, pair: string) => `placement:${userId}:${pair}`;
+const cacheKey = (userId: string, native: string, target: string) =>
+  `placement:${userId}:${native}_${target}`;
 
-/** GET /api/placement?pair=DE_FROM_EN — generate an adaptive placement batch. */
+/** GET /api/placement?native=en&target=de — generate an adaptive placement batch. */
 export async function GET(request: NextRequest) {
   try {
     const authed = await authenticateRequest(request);
     if (!authed) return errorResponse('Unauthorized', 401);
     const userId = authed.userId;
 
-    const pairParse = pairSchema.safeParse(request.nextUrl.searchParams.get('pair'));
-    if (!pairParse.success) return errorResponse('Invalid or missing "pair"', 400);
-    const pair = pairParse.data;
+    const nativeParse = langCode.safeParse(request.nextUrl.searchParams.get('native'));
+    const targetParse = langCode.safeParse(request.nextUrl.searchParams.get('target'));
+    if (!nativeParse.success || !targetParse.success) {
+      return errorResponse('Invalid or missing "native"/"target"', 400);
+    }
+    const native = nativeParse.data;
+    const target = targetParse.data;
 
     const rate = await checkRateLimit(`placement:${userId}`, 10, 3600);
     if (!rate.allowed) {
       return errorResponse('Rate limit exceeded. Try again later.', 429, { resetAt: rate.resetAt });
     }
 
-    const { native, target } = pairToLangs(pair);
-    const { questions } = await generatePlacement(userId, native, target);
+    // Best-effort: if the learner already has a course + note for this pair,
+    // let it inform the placement emphasis. Placement often precedes the course,
+    // in which case there is simply no note yet.
+    const existingCourse = await prisma.course.findUnique({
+      where: { userId_nativeLang_targetLang: { userId, nativeLang: native, targetLang: target } },
+      select: { id: true },
+    });
+    const note = existingCourse ? await getCourseNote(existingCourse.id) : '';
+
+    const { questions } = await generatePlacement(userId, native, target, note);
 
     // Cache the full questions (with answers) for grading; return public versions.
-    await cache.set(cacheKey(userId, pair), questions, 3600);
-    return NextResponse.json({ pair, questions: questions.map(toPublic) });
+    await cache.set(cacheKey(userId, native, target), questions, 3600);
+    return NextResponse.json({ native, target, questions: questions.map(toPublic) });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Placement generation failed';
     logger.error('Placement generation failed', { error: message });
@@ -61,22 +76,18 @@ export async function POST(request: NextRequest) {
 
     const parsed = submitSchema.safeParse(await request.json());
     if (!parsed.success) return errorResponse(parsed.error.errors[0].message, 400);
-    const { pair, answers } = parsed.data;
+    const { native, target, answers } = parsed.data;
 
-    const questions = await cache.get<PlacementQuestion[]>(cacheKey(userId, pair));
+    const questions = await cache.get<PlacementQuestion[]>(cacheKey(userId, native, target));
     if (!questions) return errorResponse('Placement session expired. Start the test again.', 409);
 
-    const curriculum = await prisma.curriculum.findUnique({ where: { pair } });
-    if (!curriculum) return errorResponse('No curriculum available for this language pair.', 400);
-
+    const curriculum = await getOrCreateCurriculum(userId, native, target);
     const outcome = scorePlacement(questions, answers);
-    const { native, target } = pairToLangs(pair);
 
     const course = await prisma.course.upsert({
-      where: { userId_pair: { userId, pair } },
+      where: { userId_nativeLang_targetLang: { userId, nativeLang: native, targetLang: target } },
       create: {
         userId,
-        pair,
         nativeLang: native,
         targetLang: target,
         curriculumId: curriculum.id,
@@ -97,7 +108,7 @@ export async function POST(request: NextRequest) {
       update: { level: outcome.level, responses: outcome.responses, scoreBySkill: outcome.scoreBySkill },
     });
 
-    await cache.delete(cacheKey(userId, pair)).catch(() => {});
+    await cache.delete(cacheKey(userId, native, target)).catch(() => {});
 
     return NextResponse.json({ courseId: course.id, level: outcome.level, scoreBySkill: outcome.scoreBySkill });
   } catch (error: unknown) {

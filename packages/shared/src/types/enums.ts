@@ -161,9 +161,7 @@ export type MusicStatus =
 // Language learning
 export type CefrLevel = 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2';
 
-export type LanguagePair = 'DE_FROM_EN' | 'EN_FROM_ES' | 'ES_FROM_EN';
-
-export type SkillType = 'GRAMMAR' | 'READING' | 'LISTENING' | 'SPEAKING';
+export type SkillType = 'GRAMMAR' | 'READING' | 'LISTENING' | 'SPEAKING' | 'WRITING';
 
 export type ClassStatus =
   | 'LOCKED'
@@ -191,3 +189,9 @@ export type EdgeType =
   | 'VOCAB_CLASS'
   | 'VOCAB_PODCAST'
   | 'GRAMMAR_GRAMMAR';
+
+// Ungated single-skill practice. VOCAB is first-class (spaced-repetition recall)
+// and is intentionally NOT part of SkillType (which gates the four class sections).
+export type PracticeKind = 'GRAMMAR' | 'READING' | 'LISTENING' | 'SPEAKING' | 'WRITING' | 'VOCAB';
+
+export type PracticeStatus = 'ACTIVE' | 'COMPLETED';

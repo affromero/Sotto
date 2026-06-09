@@ -15,19 +15,18 @@ async function main(): Promise<void> {
 
   for (const { manifest, lessons } of curricula) {
     const curriculum = await prisma.curriculum.upsert({
-      where: { pair: manifest.pair },
+      where: { nativeLang_targetLang: { nativeLang: manifest.nativeLang, targetLang: manifest.targetLang } },
       create: {
-        pair: manifest.pair,
         nativeLang: manifest.nativeLang,
         targetLang: manifest.targetLang,
         title: manifest.title,
         version: manifest.version,
+        source: 'seeded',
       },
       update: {
-        nativeLang: manifest.nativeLang,
-        targetLang: manifest.targetLang,
         title: manifest.title,
         version: manifest.version,
+        source: 'seeded',
       },
     });
 
@@ -50,7 +49,7 @@ async function main(): Promise<void> {
       });
     }
 
-    console.log(`Seeded ${manifest.pair}: ${lessons.length} lessons`);
+    console.log(`Seeded ${manifest.nativeLang}->${manifest.targetLang}: ${lessons.length} lessons`);
   }
 }
 

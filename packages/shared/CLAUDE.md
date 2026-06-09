@@ -7,7 +7,7 @@ Prisma-free package consumed by both `apps/web/` and `apps/mobile/`.
 ```
 src/
 ├── types/
-│   ├── enums.ts          # String union equivalents of Prisma enums — includes language-learning enums: CefrLevel, LanguagePair, SkillType, ClassStatus, SectionStatus, SpeakingGradeStatus, EdgeType
+│   ├── enums.ts          # String union equivalents of Prisma enums — includes language-learning enums: CefrLevel, SkillType, ClassStatus, SectionStatus, SpeakingGradeStatus, EdgeType, PracticeKind, PracticeStatus (language pairs are flexible native→target ISO codes, no enum)
 │   ├── podcast.ts        # PodcastSummary, PodcastDetail, SegmentData, CreatePodcastRequest, AiModelOption, TtsOption, ScriptTurn, VoiceProfile
 │   ├── reference.ts      # ReferenceData (includes contentDomain: string | null), VerificationLayerResult
 │   ├── class-document.ts # ClassDocument, ClassDocumentSection, ClassDocumentQuestion, ClassDocumentPrompt — render contract for web worksheet page and mobile PencilKit ClassWorksheet

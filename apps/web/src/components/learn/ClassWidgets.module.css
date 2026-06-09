@@ -1,0 +1,245 @@
+/*
+ * ClassWidgets — shared mastery/score widgets for the class flow.
+ * Tokens come from the `.surface` layer; each widget root composes it so the
+ * widget can be used standalone in tests and stories.
+ */
+
+/* ---- mastery meter ---- */
+.meterWrap {
+  composes: surface from './sottoLearn.module.css';
+  margin-top: 22px;
+}
+
+.meterTop {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--ink-mute);
+}
+
+.meterTop b {
+  font-family: var(--sans);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: 0;
+}
+
+.metPass {
+  color: var(--good);
+}
+
+.meter {
+  position: relative;
+  height: 8px;
+  border-radius: 8px;
+  background: var(--line-strong);
+  margin-top: 9px;
+  overflow: visible;
+}
+
+.meterFill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: 8px;
+  background: linear-gradient(
+    90deg,
+    var(--accent),
+    color-mix(in oklab, var(--accent) 60%, var(--good))
+  );
+}
+
+.meterFillPass {
+  background: linear-gradient(
+    90deg,
+    var(--good),
+    color-mix(in oklab, var(--good) 70%, var(--accent))
+  );
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .meterFill {
+    transition: width 0.5s var(--ease);
+  }
+}
+
+.meterGate {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  background: var(--ink);
+  opacity: 0.5;
+}
+
+.meterGate::after {
+  content: 'gate';
+  position: absolute;
+  top: -16px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--mono);
+  font-size: 8.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
+
+/* ---- score dial ---- */
+.dial {
+  composes: surface from './sottoLearn.module.css';
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dialRing {
+  transition: stroke-dashoffset 0.7s var(--ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dialRing {
+    transition: none;
+  }
+}
+
+.dialNum {
+  position: absolute;
+  font-family: var(--sans);
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.dialNum small {
+  font-weight: 500;
+  color: var(--ink-mute);
+}
+
+/* ---- dot rail ---- */
+.drillRail {
+  composes: surface from './sottoLearn.module.css';
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 26px;
+}
+
+.drillDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--line-strong);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .drillDot {
+    transition: all 0.3s var(--ease);
+  }
+}
+
+.drillDotDone {
+  background: var(--good);
+}
+
+.drillDotMiss {
+  background: var(--bad);
+}
+
+.drillDotNow {
+  background: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-soft);
+}
+
+.drillCount {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-mute);
+  margin-left: 8px;
+}
+
+/* ---- continue bar / actions ---- */
+.cactions {
+  composes: surface from './sottoLearn.module.css';
+  margin-top: 34px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.grow {
+  flex: 1;
+}
+
+.lockedNote {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-mute);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lockedNote svg {
+  color: var(--ink-mute);
+}
+
+.passNote,
+.passNote svg {
+  color: var(--good);
+}
+
+/* ---- buttons (class flow) ---- */
+.btn {
+  font-family: var(--sans);
+  font-size: 14.5px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  border-radius: var(--r);
+  padding: 13px 22px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  transition:
+    transform 0.15s var(--ease),
+    background 0.2s,
+    border-color 0.2s,
+    opacity 0.2s,
+    filter 0.2s;
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btnPrimary {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+.btnPrimary:not(:disabled):hover {
+  filter: brightness(1.06);
+}
+
+.btnPrimary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  filter: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn {
+    transition: background 0.2s, border-color 0.2s, opacity 0.2s, filter 0.2s;
+  }
+  .btn:active {
+    transform: none;
+  }
+}

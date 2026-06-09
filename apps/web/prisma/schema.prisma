@@ -211,6 +211,7 @@ model User {
   courses            Course[]
   classSubmissions   ClassSubmission[]
   speakingRecordings SpeakingRecording[]
+  writingResponses   WritingResponse[]
 
   @@index([role])
   @@index([handle])
@@ -387,6 +388,7 @@ model Podcast {
   creativeOutline     CreativeOutline?
   vocabularyEntries   VocabularyEntry[]
   classSection        ClassSection?
+  practiceSession     PracticeSession?
 
   @@unique([userId, slug])
   @@index([userId])
@@ -2420,25 +2422,22 @@ enum CefrLevel {
   C2
 }
 
-enum LanguagePair {
-  DE_FROM_EN // German for English speakers
-  EN_FROM_ES // English for Spanish speakers
-  ES_FROM_EN // Spanish for English speakers
-}
-
-// Global, seeded curriculum: one per language pair (the fixed CEFR lesson tree).
+// Global curriculum: one per native→target language pair.
+// source: 'seeded' = hand-authored JSON; 'generated' = agent-composed on demand.
 model Curriculum {
-  id         String       @id @default(cuid())
-  pair       LanguagePair @unique
+  id         String   @id @default(cuid())
   nativeLang String // ISO 639-1, e.g. "en"
   targetLang String // ISO 639-1, e.g. "de"
   title      String
-  version    Int          @default(1)
-  createdAt  DateTime     @default(now())
-  updatedAt  DateTime     @updatedAt
+  version    Int      @default(1)
+  source     String   @default("seeded") // "seeded" | "generated"
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   lessons Lesson[]
   courses Course[]
+
+  @@unique([nativeLang, targetLang])
 }
 
 // A node in the fixed lesson tree. Ordering + competencies are fixed; class
@@ -2474,27 +2473,28 @@ model Lesson {
 // A learner's enrollment in one language pair. CEFR level lives here (a user
 // can hold several courses at several levels).
 model Course {
-  id            String       @id @default(cuid())
+  id            String    @id @default(cuid())
   userId        String
-  pair          LanguagePair
   nativeLang    String
   targetLang    String
   curriculumId  String
-  currentLevel  CefrLevel    @default(A1) // "you are here"; assigned by placement, advances with mastery
-  startLevel    CefrLevel    @default(A1) // immutable placement result
+  currentLevel  CefrLevel @default(A1) // "you are here"; assigned by placement, advances with mastery
+  startLevel    CefrLevel @default(A1) // immutable placement result
   activeClassId String? // current in-flight class (gating convenience cache)
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  curriculum Curriculum       @relation(fields: [curriculumId], references: [id])
-  placement  PlacementResult?
-  classes    CourseClass[]
-  vocab      LearnerVocab[]
-  grammar    LearnerGrammar[]
-  vocabEdges VocabEdge[]
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  curriculum       Curriculum        @relation(fields: [curriculumId], references: [id])
+  placement        PlacementResult?
+  classes          CourseClass[]
+  vocab            LearnerVocab[]
+  grammar          LearnerGrammar[]
+  vocabEdges       VocabEdge[]
+  practiceSessions PracticeSession[]
+  note             CourseNote?
 
-  @@unique([userId, pair]) // one course per user per language pair
+  @@unique([userId, nativeLang, targetLang]) // one course per user per language pair
   @@index([userId])
   @@index([curriculumId])
 }
@@ -2520,6 +2520,7 @@ enum SkillType {
   READING
   LISTENING
   SPEAKING
+  WRITING
 }
 
 enum ClassStatus {
@@ -2540,6 +2541,22 @@ enum SectionStatus {
   SUBMITTED
   PASSED
   FAILED
+}
+
+// Single-skill practice. VOCAB is first-class here (spaced-repetition recall)
+// and is deliberately NOT in SkillType, which gates the four class sections.
+enum PracticeKind {
+  GRAMMAR
+  READING
+  LISTENING
+  SPEAKING
+  WRITING
+  VOCAB
+}
+
+enum PracticeStatus {
+  ACTIVE
+  COMPLETED
 }
 
 // A ~1h class instantiated from a Lesson for a specific course. Mastery-gated:
@@ -2605,10 +2622,11 @@ model ClassSection {
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
-  class     CourseClass      @relation(fields: [classId], references: [id], onDelete: Cascade)
-  podcast   Podcast?         @relation(fields: [podcastId], references: [id], onDelete: SetNull)
-  questions LessonQuestion[]
-  prompts   SpeakingPrompt[]
+  class         CourseClass      @relation(fields: [classId], references: [id], onDelete: Cascade)
+  podcast       Podcast?         @relation(fields: [podcastId], references: [id], onDelete: SetNull)
+  questions     LessonQuestion[]
+  prompts       SpeakingPrompt[]
+  writingPrompts WritingPrompt[]
 
   @@index([classId, skill, attempt])
 }
@@ -2676,43 +2694,98 @@ enum SpeakingGradeStatus {
 }
 
 // One target phrase the learner must say aloud, hung off a SPEAKING ClassSection.
+// A speaking prompt hangs off EXACTLY ONE parent: a class section (gated class)
+// or a practice session (ungated). The XOR is enforced in app code.
 model SpeakingPrompt {
-  id              String   @id @default(cuid())
-  sectionId       String
-  order           Int
-  targetPhrase    String   @db.Text
-  translation     String   @db.Text
-  ipa             String?  @db.Text
-  referenceTtsUrl String? // pre-rendered model pronunciation (resolveTtsProvider at class build)
-  createdAt       DateTime @default(now())
+  id                String   @id @default(cuid())
+  sectionId         String?
+  practiceSessionId String?
+  order             Int
+  targetPhrase      String   @db.Text
+  translation       String   @db.Text
+  ipa               String?  @db.Text
+  referenceTtsUrl   String? // pre-rendered model pronunciation (resolveTtsProvider at build)
+  createdAt         DateTime @default(now())
 
-  section    ClassSection        @relation(fields: [sectionId], references: [id], onDelete: Cascade)
-  recordings SpeakingRecording[]
+  section         ClassSection?    @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  practiceSession PracticeSession? @relation(fields: [practiceSessionId], references: [id], onDelete: Cascade)
+  recordings      SpeakingRecording[]
 
   @@unique([sectionId, order])
+  @@unique([practiceSessionId, order])
   @@index([sectionId])
+  @@index([practiceSessionId])
 }
 
 // A learner's recorded attempt at a SpeakingPrompt, graded asynchronously.
 model SpeakingRecording {
-  id            String              @id @default(cuid())
-  sectionId     String
-  promptId      String
-  userId        String
-  audioUrl      String
-  transcript    String?             @db.Text
-  overallScore  Float? // 0..1 combined pronunciation score
-  rubricScores  Json? // { accuracy, fluency, completeness } each 0..1
-  phonemeScores Json? // per-word alignment ops from align.ts
-  feedback      String?             @db.Text
-  status        SpeakingGradeStatus @default(PENDING)
-  createdAt     DateTime            @default(now())
-  updatedAt     DateTime            @updatedAt
+  id                String              @id @default(cuid())
+  sectionId         String?
+  practiceSessionId String?
+  promptId          String
+  userId            String
+  audioUrl          String
+  transcript        String?             @db.Text
+  overallScore      Float? // 0..1 combined pronunciation score
+  rubricScores      Json? // { accuracy, fluency, completeness } each 0..1
+  phonemeScores     Json? // per-word alignment ops from align.ts
+  feedback          String?             @db.Text
+  status            SpeakingGradeStatus @default(PENDING)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
 
-  prompt SpeakingPrompt @relation(fields: [promptId], references: [id], onDelete: Cascade)
-  user   User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  prompt          SpeakingPrompt   @relation(fields: [promptId], references: [id], onDelete: Cascade)
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  practiceSession PracticeSession? @relation(fields: [practiceSessionId], references: [id], onDelete: Cascade)
 
   @@index([sectionId])
+  @@index([practiceSessionId])
+  @@index([promptId])
+  @@index([userId])
+}
+
+// A writing task. Hangs off EXACTLY ONE parent (a class section or a practice
+// session), like SpeakingPrompt; XOR enforced in app code.
+model WritingPrompt {
+  id                String   @id @default(cuid())
+  sectionId         String?
+  practiceSessionId String?
+  order             Int
+  task              String   @db.Text // the writing task the learner responds to
+  guidance          String?  @db.Text // optional hints / what to include
+  createdAt         DateTime @default(now())
+
+  section         ClassSection?     @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  practiceSession PracticeSession?  @relation(fields: [practiceSessionId], references: [id], onDelete: Cascade)
+  responses       WritingResponse[]
+
+  @@unique([sectionId, order])
+  @@unique([practiceSessionId, order])
+  @@index([sectionId])
+  @@index([practiceSessionId])
+}
+
+// A learner's writing response, graded synchronously by the LLM (corrections +
+// score), unlike speaking which is graded async by a worker.
+model WritingResponse {
+  id                String   @id @default(cuid())
+  sectionId         String?
+  practiceSessionId String?
+  promptId          String
+  userId            String
+  text              String   @db.Text
+  overallScore      Float? // 0..1
+  corrections       Json? // [{ old, new, why }]
+  feedback          String?  @db.Text
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  prompt          WritingPrompt    @relation(fields: [promptId], references: [id], onDelete: Cascade)
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  practiceSession PracticeSession? @relation(fields: [practiceSessionId], references: [id], onDelete: Cascade)
+
+  @@index([sectionId])
+  @@index([practiceSessionId])
   @@index([promptId])
   @@index([userId])
 }
@@ -2803,4 +2876,43 @@ model VocabEdge {
   @@index([sourceVocabId])
   @@index([targetVocabId])
   @@index([grammarId])
+}
+
+// Ungated single-skill practice within a course. Distinct from the gated
+// CourseClass: short, repeatable, and only consolidates the memory graph (SRS).
+model PracticeSession {
+  id           String         @id @default(cuid())
+  courseId     String
+  kind         PracticeKind
+  status       PracticeStatus @default(ACTIVE)
+  items        Json // generated practice items (recall cards / questions / prompt refs)
+  seed         String
+  score        Float? // 0..1, set on submit
+  vocabLemmas  String[]       @default([]) // lemmas this session reviews (SRS targets)
+  grammarKeys  String[]       @default([]) // grammar topicKeys this session reviews
+  podcastId    String?        @unique // LISTENING practice audio (one podcast per session)
+  startedAt    DateTime       @default(now())
+  completedAt  DateTime?
+
+  course           Course              @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  podcast          Podcast?            @relation(fields: [podcastId], references: [id], onDelete: SetNull)
+  prompts          SpeakingPrompt[]
+  recordings       SpeakingRecording[]
+  writingPrompts   WritingPrompt[]
+  writingResponses WritingResponse[]
+
+  @@index([courseId, kind])
+  @@index([courseId, status])
+}
+
+// One editable free-text context doc per course: goals, background, interests.
+// Feeds placement + per-learner class/practice generation; never the shared curriculum.
+model CourseNote {
+  id        String   @id @default(cuid())
+  courseId  String   @unique
+  body      String   @db.Text
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
 }

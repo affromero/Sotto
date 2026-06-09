@@ -8,10 +8,10 @@ const mockCacheSet = vi.fn();
 const mockCacheDelete = vi.fn();
 const mockGeneratePlacement = vi.fn();
 const mockScorePlacement = vi.fn();
-const mockPairToLangs = vi.fn();
+const mockGetOrCreateCurriculum = vi.fn();
 const mockToPublic = vi.fn();
-const mockCurriculumFindUnique = vi.fn();
 const mockCourseUpsert = vi.fn();
+const mockCourseFindUnique = vi.fn();
 const mockPlacementResultUpsert = vi.fn();
 
 vi.mock('@/lib/api-keys', () => ({
@@ -30,17 +30,18 @@ vi.mock('@/lib/redis', () => ({
 vi.mock('@/lib/placement-test', () => ({
   generatePlacement: (...args: unknown[]) => mockGeneratePlacement(...args),
   scorePlacement: (...args: unknown[]) => mockScorePlacement(...args),
-  pairToLangs: (...args: unknown[]) => mockPairToLangs(...args),
   toPublic: (...args: unknown[]) => mockToPublic(...args),
+}));
+
+vi.mock('@/lib/curriculum-generator', () => ({
+  getOrCreateCurriculum: (...args: unknown[]) => mockGetOrCreateCurriculum(...args),
 }));
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
-    curriculum: {
-      findUnique: (...args: unknown[]) => mockCurriculumFindUnique(...args),
-    },
     course: {
       upsert: (...args: unknown[]) => mockCourseUpsert(...args),
+      findUnique: (...args: unknown[]) => mockCourseFindUnique(...args),
     },
     placementResult: {
       upsert: (...args: unknown[]) => mockPlacementResultUpsert(...args),
@@ -75,11 +76,11 @@ const SAMPLE_QUESTIONS = [
   },
 ];
 
-function makeGetRequest(pair?: string): NextRequest {
-  const url = pair
-    ? `http://localhost:3000/api/placement?pair=${pair}`
-    : 'http://localhost:3000/api/placement';
-  return new NextRequest(url, { method: 'GET' });
+function makeGetRequest(params?: { native?: string; target?: string }): NextRequest {
+  const url = new URL('http://localhost:3000/api/placement');
+  if (params?.native) url.searchParams.set('native', params.native);
+  if (params?.target) url.searchParams.set('target', params.target);
+  return new NextRequest(url.toString(), { method: 'GET' });
 }
 
 function makePostRequest(body: unknown): NextRequest {
@@ -95,7 +96,6 @@ describe('GET /api/placement', () => {
     vi.clearAllMocks();
     mockAuthenticateRequest.mockResolvedValue({ userId: 'u1' });
     mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 9, resetAt: Date.now() + 3600000 });
-    mockPairToLangs.mockReturnValue({ native: 'en', target: 'de' });
     mockGeneratePlacement.mockResolvedValue({ questions: SAMPLE_QUESTIONS, provider: 'anthropic', model: 'claude-3-haiku' });
     mockToPublic.mockImplementation((q: (typeof SAMPLE_QUESTIONS)[0]) => ({
       id: q.id, cefr: q.cefr, skill: q.skill, prompt: q.prompt, options: q.options,
@@ -106,7 +106,7 @@ describe('GET /api/placement', () => {
   it('returns 401 when unauthenticated', async () => {
     mockAuthenticateRequest.mockResolvedValue(null);
 
-    const response = await GET(makeGetRequest('DE_FROM_EN'));
+    const response = await GET(makeGetRequest({ native: 'en', target: 'de' }));
     const body = await response.json();
 
     expect(response.status).toBe(401);
@@ -114,16 +114,30 @@ describe('GET /api/placement', () => {
     expect(mockGeneratePlacement).not.toHaveBeenCalled();
   });
 
-  it('returns 400 for an invalid pair parameter', async () => {
-    const response = await GET(makeGetRequest('INVALID_PAIR'));
+  it('returns 400 for an invalid native parameter (too long)', async () => {
+    const response = await GET(makeGetRequest({ native: 'invalid', target: 'de' }));
     const body = await response.json();
 
     expect(response.status).toBe(400);
-    expect(body.error).toMatch(/pair/i);
+    expect(body.error).toMatch(/native|target/i);
     expect(mockGeneratePlacement).not.toHaveBeenCalled();
   });
 
-  it('returns 400 when pair is missing', async () => {
+  it('returns 400 when native is missing', async () => {
+    const response = await GET(makeGetRequest({ target: 'de' }));
+
+    expect(response.status).toBe(400);
+    expect(mockGeneratePlacement).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when target is missing', async () => {
+    const response = await GET(makeGetRequest({ native: 'en' }));
+
+    expect(response.status).toBe(400);
+    expect(mockGeneratePlacement).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when both params are missing', async () => {
     const response = await GET(makeGetRequest());
 
     expect(response.status).toBe(400);
@@ -133,18 +147,19 @@ describe('GET /api/placement', () => {
   it('returns 429 when rate limit is exceeded', async () => {
     mockCheckRateLimit.mockResolvedValue({ allowed: false, remaining: 0, resetAt: Date.now() + 3600000 });
 
-    const response = await GET(makeGetRequest('DE_FROM_EN'));
+    const response = await GET(makeGetRequest({ native: 'en', target: 'de' }));
 
     expect(response.status).toBe(429);
     expect(mockGeneratePlacement).not.toHaveBeenCalled();
   });
 
   it('returns public questions without correctIndex and caches the full questions', async () => {
-    const response = await GET(makeGetRequest('DE_FROM_EN'));
+    const response = await GET(makeGetRequest({ native: 'en', target: 'de' }));
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(body.pair).toBe('DE_FROM_EN');
+    expect(body.native).toBe('en');
+    expect(body.target).toBe('de');
     expect(body.questions).toHaveLength(2);
 
     // Public view must not expose correctIndex
@@ -157,25 +172,24 @@ describe('GET /api/placement', () => {
 
     // Full questions (with correctIndex) should be cached for grading
     expect(mockCacheSet).toHaveBeenCalledWith(
-      'placement:u1:DE_FROM_EN',
+      'placement:u1:en_de',
       SAMPLE_QUESTIONS,
       3600,
     );
   });
 
-  it('accepts all valid pair values', async () => {
-    for (const pair of ['DE_FROM_EN', 'EN_FROM_ES', 'ES_FROM_EN']) {
+  it('accepts valid two-letter ISO code pairs', async () => {
+    for (const [native, target] of [['en', 'de'], ['en', 'es'], ['es', 'en']]) {
       vi.clearAllMocks();
       mockAuthenticateRequest.mockResolvedValue({ userId: 'u1' });
       mockCheckRateLimit.mockResolvedValue({ allowed: true });
-      mockPairToLangs.mockReturnValue({ native: 'en', target: 'de' });
       mockGeneratePlacement.mockResolvedValue({ questions: SAMPLE_QUESTIONS, provider: 'anthropic', model: 'claude-3-haiku' });
       mockToPublic.mockImplementation((q: (typeof SAMPLE_QUESTIONS)[0]) => ({
         id: q.id, cefr: q.cefr, skill: q.skill, prompt: q.prompt, options: q.options,
       }));
       mockCacheSet.mockResolvedValue(undefined);
 
-      const response = await GET(makeGetRequest(pair));
+      const response = await GET(makeGetRequest({ native, target }));
       expect(response.status).toBe(200);
     }
   });
@@ -201,10 +215,9 @@ describe('POST /api/placement', () => {
     vi.clearAllMocks();
     mockAuthenticateRequest.mockResolvedValue({ userId: 'u1' });
     mockCacheGet.mockResolvedValue(SAMPLE_QUESTIONS);
-    mockCurriculumFindUnique.mockResolvedValue({ id: 'c1', title: 'German from English' });
+    mockGetOrCreateCurriculum.mockResolvedValue({ id: 'c1' });
     mockScorePlacement.mockReturnValue(scoreOutcome);
-    mockPairToLangs.mockReturnValue({ native: 'en', target: 'de' });
-    mockCourseUpsert.mockResolvedValue({ id: 'course-1', pair: 'DE_FROM_EN', currentLevel: 'B1' });
+    mockCourseUpsert.mockResolvedValue({ id: 'course-1', nativeLang: 'en', targetLang: 'de', currentLevel: 'B1' });
     mockPlacementResultUpsert.mockResolvedValue({ courseId: 'course-1', level: 'B1' });
     mockCacheDelete.mockResolvedValue(undefined);
   });
@@ -212,7 +225,7 @@ describe('POST /api/placement', () => {
   it('returns 401 when unauthenticated', async () => {
     mockAuthenticateRequest.mockResolvedValue(null);
 
-    const response = await POST(makePostRequest({ pair: 'DE_FROM_EN', answers }));
+    const response = await POST(makePostRequest({ native: 'en', target: 'de', answers }));
     const body = await response.json();
 
     expect(response.status).toBe(401);
@@ -220,15 +233,22 @@ describe('POST /api/placement', () => {
     expect(mockCourseUpsert).not.toHaveBeenCalled();
   });
 
-  it('returns 400 for invalid body (bad pair)', async () => {
-    const response = await POST(makePostRequest({ pair: 'INVALID', answers }));
+  it('returns 400 for invalid body (bad native code)', async () => {
+    const response = await POST(makePostRequest({ native: 'invalid', target: 'de', answers }));
 
     expect(response.status).toBe(400);
     expect(mockCourseUpsert).not.toHaveBeenCalled();
   });
 
   it('returns 400 when answers array is empty', async () => {
-    const response = await POST(makePostRequest({ pair: 'DE_FROM_EN', answers: [] }));
+    const response = await POST(makePostRequest({ native: 'en', target: 'de', answers: [] }));
+
+    expect(response.status).toBe(400);
+    expect(mockCourseUpsert).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when native is missing', async () => {
+    const response = await POST(makePostRequest({ target: 'de', answers }));
 
     expect(response.status).toBe(400);
     expect(mockCourseUpsert).not.toHaveBeenCalled();
@@ -237,7 +257,7 @@ describe('POST /api/placement', () => {
   it('returns 409 when placement session (cache) has expired', async () => {
     mockCacheGet.mockResolvedValue(null);
 
-    const response = await POST(makePostRequest({ pair: 'DE_FROM_EN', answers }));
+    const response = await POST(makePostRequest({ native: 'en', target: 'de', answers }));
     const body = await response.json();
 
     expect(response.status).toBe(409);
@@ -245,19 +265,14 @@ describe('POST /api/placement', () => {
     expect(mockCourseUpsert).not.toHaveBeenCalled();
   });
 
-  it('returns 400 when no curriculum exists for the pair', async () => {
-    mockCurriculumFindUnique.mockResolvedValue(null);
+  it('calls getOrCreateCurriculum to resolve the curriculum', async () => {
+    await POST(makePostRequest({ native: 'en', target: 'de', answers }));
 
-    const response = await POST(makePostRequest({ pair: 'DE_FROM_EN', answers }));
-    const body = await response.json();
-
-    expect(response.status).toBe(400);
-    expect(body.error).toMatch(/curriculum/i);
-    expect(mockCourseUpsert).not.toHaveBeenCalled();
+    expect(mockGetOrCreateCurriculum).toHaveBeenCalledWith('u1', 'en', 'de');
   });
 
   it('grades answers, upserts course with assigned level, and returns result', async () => {
-    const response = await POST(makePostRequest({ pair: 'DE_FROM_EN', answers }));
+    const response = await POST(makePostRequest({ native: 'en', target: 'de', answers }));
     const body = await response.json();
 
     expect(response.status).toBe(200);
@@ -268,14 +283,15 @@ describe('POST /api/placement', () => {
     expect(mockScorePlacement).toHaveBeenCalledWith(SAMPLE_QUESTIONS, answers);
   });
 
-  it('upserts course with the scored CEFR level', async () => {
-    await POST(makePostRequest({ pair: 'DE_FROM_EN', answers }));
+  it('upserts course with the scored CEFR level using userId_nativeLang_targetLang', async () => {
+    await POST(makePostRequest({ native: 'en', target: 'de', answers }));
 
     expect(mockCourseUpsert).toHaveBeenCalledWith({
-      where: { userId_pair: { userId: 'u1', pair: 'DE_FROM_EN' } },
+      where: { userId_nativeLang_targetLang: { userId: 'u1', nativeLang: 'en', targetLang: 'de' } },
       create: expect.objectContaining({
         userId: 'u1',
-        pair: 'DE_FROM_EN',
+        nativeLang: 'en',
+        targetLang: 'de',
         curriculumId: 'c1',
         currentLevel: 'B1',
         startLevel: 'B1',
@@ -288,7 +304,7 @@ describe('POST /api/placement', () => {
   });
 
   it('upserts placement result for the course', async () => {
-    await POST(makePostRequest({ pair: 'DE_FROM_EN', answers }));
+    await POST(makePostRequest({ native: 'en', target: 'de', answers }));
 
     expect(mockPlacementResultUpsert).toHaveBeenCalledWith({
       where: { courseId: 'course-1' },
@@ -305,9 +321,9 @@ describe('POST /api/placement', () => {
   });
 
   it('deletes the cached session after successful grading', async () => {
-    await POST(makePostRequest({ pair: 'DE_FROM_EN', answers }));
+    await POST(makePostRequest({ native: 'en', target: 'de', answers }));
 
-    expect(mockCacheDelete).toHaveBeenCalledWith('placement:u1:DE_FROM_EN');
+    expect(mockCacheDelete).toHaveBeenCalledWith('placement:u1:en_de');
   });
 
   it('accepts A1 level outcomes (lowest possible result)', async () => {
@@ -317,9 +333,9 @@ describe('POST /api/placement', () => {
       scoreByBand: { A1: 0.0 },
       scoreBySkill: { grammar: 0.0 },
     });
-    mockCourseUpsert.mockResolvedValue({ id: 'course-1', pair: 'DE_FROM_EN', currentLevel: 'A1' });
+    mockCourseUpsert.mockResolvedValue({ id: 'course-1', nativeLang: 'en', targetLang: 'de', currentLevel: 'A1' });
 
-    const response = await POST(makePostRequest({ pair: 'DE_FROM_EN', answers }));
+    const response = await POST(makePostRequest({ native: 'en', target: 'de', answers }));
     const body = await response.json();
 
     expect(response.status).toBe(200);

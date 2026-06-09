@@ -18,12 +18,13 @@ export type {
   FeedbackType,
   FeedbackStatus,
   CefrLevel,
-  LanguagePair,
   SkillType,
   ClassStatus,
   SectionStatus,
   SpeakingGradeStatus,
   EdgeType,
+  PracticeKind,
+  PracticeStatus,
 } from './types/enums';
 
 // Types

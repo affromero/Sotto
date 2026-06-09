@@ -72,6 +72,9 @@ const EXPECTED_FILES = [
   'demo/walkthrough.md',
   'speaking/pronunciation-rubric.md',
   'speaking/generate-speaking-prompts.md',
+  'writing/generate-writing-prompts.md',
+  'writing/grade-writing.md',
+  'curriculum/generate-curriculum.md',
 ];
 
 // ── Variable contracts: template → expected placeholder names ──
@@ -126,7 +129,7 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
     'ALIGNMENT_SUMMARY', 'TARGET', 'TARGET_PHRASE', 'TRANSCRIPT',
   ].sort(),
   'speaking/generate-speaking-prompts.md': [
-    'COUNT', 'LEVEL', 'NATIVE', 'OBJECTIVE', 'TARGET', 'VOCAB',
+    'COUNT', 'LEVEL', 'NATIVE', 'NOTES', 'OBJECTIVE', 'TARGET', 'VOCAB',
   ].sort(),
   'audio/tts-tag-converter.md': [
     'PROVIDER_DOCS', 'PROVIDER_NAME', 'TURNS_JSON',
@@ -157,14 +160,21 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
     'SOURCE_CONTENT', 'SOURCE_COUNT', 'TOPIC',
   ].sort(),
   'placement/placement-probe.md': [
-    'COUNT', 'LEVELS', 'NATIVE', 'PER_BAND', 'SKILLS', 'TARGET',
+    'COUNT', 'LEVELS', 'NATIVE', 'NOTES', 'PER_BAND', 'SKILLS', 'TARGET',
   ].sort(),
   'class/generate-listening-quiz.md': [
-    'COUNT', 'LEVEL', 'NATIVE', 'TARGET', 'TRANSCRIPT',
+    'COUNT', 'LEVEL', 'NATIVE', 'NOTES', 'TARGET', 'TRANSCRIPT',
   ].sort(),
   'class/generate-section-quiz.md': [
-    'COUNT', 'GRAMMAR_POINTS', 'LEVEL', 'NATIVE', 'OBJECTIVE', 'SEED', 'SKILL', 'TARGET', 'VOCAB',
+    'COUNT', 'GRAMMAR_POINTS', 'LEVEL', 'NATIVE', 'NOTES', 'OBJECTIVE', 'SEED', 'SKILL', 'TARGET', 'VOCAB',
   ].sort(),
+  'writing/generate-writing-prompts.md': [
+    'COUNT', 'LEVEL', 'NATIVE', 'NOTES', 'OBJECTIVE', 'TARGET', 'VOCAB',
+  ].sort(),
+  'writing/grade-writing.md': [
+    'LEVEL', 'NATIVE', 'RESPONSE', 'TARGET', 'TASK',
+  ].sort(),
+  'curriculum/generate-curriculum.md': ['NATIVE', 'TARGET'].sort(),
 };
 
 // Templates that are static (no placeholders)
@@ -173,7 +183,7 @@ const STATIC_TEMPLATES = EXPECTED_FILES.filter((f) => !VARIABLE_CONTRACTS[f]);
 // ── Tests ─────────────────────────────────────────────────────
 
 describe('prompt file existence', () => {
-  it(`prompts directory contains exactly ${EXPECTED_FILES.length} .md files`, () => { // bumped +2 for speaking/pronunciation-rubric.md and speaking/generate-speaking-prompts.md
+  it(`prompts directory contains exactly ${EXPECTED_FILES.length} .md files`, () => { // bumped +1 for curriculum/generate-curriculum.md
     const actual = glob.sync('**/*.md', { cwd: PROMPTS_DIR }).sort();
     expect(actual).toHaveLength(EXPECTED_FILES.length);
     expect(actual).toEqual(EXPECTED_FILES.sort());
