@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { SpeakingGradingPayload } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { resolveLearningAi } from '@/lib/learning-ai';
-import { resolveSttProvider, createSttProvider } from '@/lib/providers/stt';
+import { resolveSttProvider, createSttProvider, getConfiguredSttProviderId } from '@/lib/providers/stt';
 import { resolvePronunciationScorer } from '@/lib/pronunciation/scorer';
 import { logger } from '@/lib/logger';
 
@@ -78,10 +78,12 @@ export async function processSpeakingGrading(job: Job<SpeakingGradingPayload>): 
 
     await job.updateProgress(35);
 
-    // Resolve STT provider via BYOK or platform key
+    // Resolve STT provider via BYOK or platform key. Honor the instance's
+    // configured provider (STT_PROVIDER) so a self-hoster running STT_PROVIDER=local
+    // grades pronunciation on a local Whisper server with no cloud key.
     const resolvedStt = await resolveSttProvider({
       userId,
-      requestedProvider: 'openai',
+      requestedProvider: getConfiguredSttProviderId(),
     });
 
     const sttProvider = createSttProvider(resolvedStt.providerId, resolvedStt.apiKey, resolvedStt.model);

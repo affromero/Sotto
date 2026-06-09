@@ -29,7 +29,7 @@ vi.mock('openai', () => ({
   },
 }));
 
-import { createSttProvider, resolveSttProvider, getSttPlatformKey } from '@/lib/providers/stt';
+import { createSttProvider, resolveSttProvider, getSttPlatformKey, getConfiguredSttProviderId } from '@/lib/providers/stt';
 import {
   isValidAiProviderId,
   getAiProviderMeta,
@@ -150,6 +150,29 @@ describe('createSttProvider', () => {
   it('assemblyai provider throws without API key', () => {
     vi.stubEnv('ASSEMBLYAI_API_KEY', '');
     expect(() => createSttProvider('assemblyai')).toThrow('No AssemblyAI API key provided');
+  });
+
+  it('local provider throws without STT_BASE_URL', () => {
+    vi.stubEnv('STT_BASE_URL', '');
+    expect(() => createSttProvider('local', 'local')).toThrow('STT_BASE_URL is required');
+  });
+
+  it('local provider points the OpenAI SDK at STT_BASE_URL and uses STT_MODEL', async () => {
+    await import('openai');
+    vi.stubEnv('STT_BASE_URL', 'http://localhost:8000/v1');
+    vi.stubEnv('STT_MODEL', 'whisper-large-v3-turbo');
+    const provider = createSttProvider('local', 'local');
+
+    mockTranscriptionsCreate.mockResolvedValueOnce({
+      text: 'hola',
+      language: 'es',
+      segments: [{ start: 0, end: 1, text: 'hola' }],
+    });
+
+    await provider.transcribe(Buffer.from('audio'));
+    expect(mockTranscriptionsCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ model: 'whisper-large-v3-turbo' })
+    );
   });
 });
 
@@ -349,6 +372,36 @@ describe('getSttPlatformKey', () => {
     vi.stubEnv('OPENAI_API_KEY', '');
     expect(getSttPlatformKey('openai')).toBe('');
   });
+
+  it('returns a "local" placeholder for the keyless local provider', () => {
+    vi.stubEnv('STT_API_KEY', '');
+    expect(getSttPlatformKey('local')).toBe('local');
+  });
+
+  it('returns STT_API_KEY for local when the local server is behind auth', () => {
+    vi.stubEnv('STT_API_KEY', 'secret-token');
+    expect(getSttPlatformKey('local')).toBe('secret-token');
+  });
+});
+
+describe('getConfiguredSttProviderId', () => {
+  beforeEach(() => vi.unstubAllEnvs());
+  afterEach(() => vi.unstubAllEnvs());
+
+  it('defaults to openai when STT_PROVIDER is unset', () => {
+    vi.stubEnv('STT_PROVIDER', '');
+    expect(getConfiguredSttProviderId()).toBe('openai');
+  });
+
+  it('returns local when STT_PROVIDER=local', () => {
+    vi.stubEnv('STT_PROVIDER', 'local');
+    expect(getConfiguredSttProviderId()).toBe('local');
+  });
+
+  it('falls back to openai for an unknown STT_PROVIDER value', () => {
+    vi.stubEnv('STT_PROVIDER', 'bogus');
+    expect(getConfiguredSttProviderId()).toBe('openai');
+  });
 });
 
 describe('resolveSttProvider', () => {
@@ -430,5 +483,20 @@ describe('resolveSttProvider', () => {
     expect(result.apiKey).toBe('el-byok-key');
     expect(result.source).toBe('byok');
     expect(mockGetByokKey).toHaveBeenCalledWith('user-1', 'elevenlabs');
+  });
+
+  it('resolves the keyless local provider with a placeholder key (no cloud key needed)', async () => {
+    mockGetAiKey.mockResolvedValue(null);
+    vi.stubEnv('STT_API_KEY', '');
+
+    const result = await resolveSttProvider({
+      userId: 'user-1',
+      requestedProvider: 'local',
+    });
+
+    expect(result.providerId).toBe('local');
+    expect(result.apiKey).toBe('local');
+    expect(result.source).toBe('platform');
+    expect(result.model).toBe('whisper-1');
   });
 });
