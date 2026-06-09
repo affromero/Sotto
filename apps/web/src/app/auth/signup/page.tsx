@@ -17,7 +17,7 @@ export default async function SignupPage() {
           <>
             <h1 className={styles.title}>Create your account</h1>
             <p className={styles.subtitle}>
-              Start creating podcasts in seconds.
+              Sign in to this instance and start learning a language in your own context.
             </p>
             <AuthButtons />
           </>

@@ -3,10 +3,12 @@ import { PublicNav } from '@/components/layout/PublicNav';
 import { Footer } from '@/components/layout/Footer';
 import styles from './page.module.css';
 
+const GITHUB_URL = 'https://github.com/affromero/Sotto';
+
 export const metadata = {
-  title: 'Pricing — Sotto',
+  title: 'Free and Self-Hosted. Sotto',
   description:
-    'Sotto is free to start. Create up to 3 AI podcasts per day, up to 10 minutes each. No credit card required.',
+    'Sotto is free and open-source. Run it yourself with your own agent and your own provider keys. No subscription, no waitlist.',
 };
 
 export default function PricingPage() {
@@ -16,10 +18,11 @@ export default function PricingPage() {
       <main className={styles.main}>
         <div className={styles.container}>
           <header className={styles.hero}>
-            <h1 className={styles.heroTitle}>Free to start.</h1>
+            <h1 className={styles.heroTitle}>Free and self-hosted.</h1>
             <p className={styles.heroSubtitle}>
-              Sign up and start creating podcasts in seconds. No credit card, no
-              approval process. Upgrade when you need more.
+              Sotto has no price tag. It is open-source language-learning
+              infrastructure that you run yourself, with your own agent and your
+              own keys. There is no subscription and no waitlist.
             </p>
           </header>
 
@@ -27,36 +30,51 @@ export default function PricingPage() {
             <div className={`${styles.plan} ${styles.planFeatured}`}>
               <div className={styles.planBadge}>Free</div>
               <div className={styles.planHeader}>
-                <h2 className={styles.planName}>Starter</h2>
-                <p className={styles.planPrice}>$0 / month</p>
+                <h2 className={styles.planName}>Self-Hosted</h2>
+                <p className={styles.planPrice}>$0</p>
               </div>
               <p className={styles.planDescription}>
-                Everything you need to create and listen to private AI podcasts.
+                The whole stack, on your own machine. You pay your AI and audio
+                providers directly for what you use. Nothing else.
               </p>
               <ul className={styles.planFeatures}>
-                <li>3 podcasts per day</li>
-                <li>Up to 10 minutes each</li>
-                <li>Platform AI + voices included</li>
-                <li>Web search for current information</li>
-                <li>Q&amp;A interactions while listening</li>
-                <li>Private and unlisted podcasts</li>
-                <li>Listen across web and mobile</li>
-                <li>Collections and saved library tools</li>
+                <li>Mastery-gated CEFR courses</li>
+                <li>Five skills: grammar, reading, listening, speaking, writing</li>
+                <li>A personal vocabulary memory graph you own</li>
+                <li>Bring your own agent: Claude Code or Codex</li>
+                <li>Bring your own keys (BYOK), billed by your providers</li>
+                <li>Keys encrypted with AES-256-GCM on your instance</li>
+                <li>Your data and progress stay on your stack</li>
+                <li>No social layer, no public timeline</li>
               </ul>
-              <Link href="/auth/signup" className={styles.planButton}>
-                Sign up free
-              </Link>
+              <a
+                href={GITHUB_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={styles.planButton}
+              >
+                Get it on GitHub
+              </a>
             </div>
           </section>
 
           <section className={styles.cta}>
-            <h2 className={styles.ctaTitle}>Ready to start?</h2>
+            <h2 className={styles.ctaTitle}>Ready to run your own?</h2>
             <p className={styles.ctaText}>
-              Create your first podcast in under a minute.
+              Clone the repository, point it at your keys, and start learning.
+              Setup notes and help live with the project.
             </p>
             <div className={styles.ctaButtons}>
-              <Link href="/auth/signup" className={styles.ctaButtonPrimary}>
-                Sign up free
+              <a
+                href={GITHUB_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={styles.ctaButtonPrimary}
+              >
+                Read the self-host guide
+              </a>
+              <Link href="/support" className={styles.ctaButtonPrimary}>
+                Get setup help
               </Link>
             </div>
           </section>

@@ -25,8 +25,8 @@ export default async function LoginPage({ searchParams }: PageProps) {
   return (
     <main className={styles.main}>
       <div className={styles.container}>
-        <h1 className={styles.title}>Welcome Back to Sotto</h1>
-        <p className={styles.subtitle}>Sign in to continue creating and listening</p>
+        <h1 className={styles.title}>Welcome back to Sotto</h1>
+        <p className={styles.subtitle}>Sign in to continue your courses</p>
         <AuthButtons />
         <p className={styles.footer}>
           Don&apos;t have an account? <a href="/auth/signup">Sign up</a>

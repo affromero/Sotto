@@ -3,8 +3,9 @@ import { Footer } from '@/components/layout/Footer';
 import styles from './page.module.css';
 
 export const metadata = {
-  title: 'Developers — Sotto API',
-  description: 'Sotto public API documentation — endpoints, authentication, and usage examples.',
+  title: 'Developers. Sotto API',
+  description:
+    'Sotto API documentation for self-hosted deployments. Connect your own agent and keys, then drive courses and classes over HTTP.',
 };
 
 interface Param {
@@ -31,142 +32,143 @@ interface Section {
 
 const sections: Section[] = [
   {
-    title: 'Private RSS',
-    description: 'Create and manage private RSS feeds for any podcast app.',
-    endpoints: [
-      {
-        method: 'POST',
-        path: '/api/rss/private',
-        description: 'Create a new private feed token. The raw feed URL is returned once.',
-        auth: true,
-        params: [
-          { name: 'name', type: 'string', required: false, description: 'Feed display name' },
-        ],
-        response: '{ id: string, token: string, feedUrl: string }',
-      },
-      {
-        method: 'GET',
-        path: '/api/rss/private',
-        description: 'List active private feed token metadata. Token hashes are never returned.',
-        auth: true,
-        response: '{ id, name, feedType, createdAt, lastUsedAt }[]',
-      },
-      {
-        method: 'GET',
-        path: '/api/rss/private/:token',
-        description:
-          'RSS 2.0 feed for the token owner, including private and unlisted ready episodes.',
-        auth: false,
-        response: 'application/rss+xml',
-      },
-      {
-        method: 'DELETE',
-        path: '/api/rss/private/tokens/:id',
-        description: 'Revoke an active private feed token.',
-        auth: true,
-      },
-    ],
-  },
-  {
-    title: 'Podcasts',
-    description: 'Read podcast details and manage your own podcasts.',
+    title: 'Courses',
+    description: 'Enroll in a language pair and drive a learner through mastery-gated courses.',
     endpoints: [
       {
         method: 'GET',
-        path: '/api/podcasts/:id',
-        description: 'Get podcast details including segments, references, and metadata.',
-        auth: false,
-        response: '{ id, title, topic, status, audioUrl, duration, segments, references, ... }',
+        path: '/api/courses',
+        description: 'List the courses the signed-in learner is enrolled in.',
+        auth: true,
+        response: '{ courses: [{ id, nativeLang, targetLang, level }] }',
       },
       {
         method: 'POST',
-        path: '/api/podcasts',
-        description: 'Create a new podcast. Triggers the generation pipeline.',
+        path: '/api/courses',
+        description: 'Create a course enrollment for a native to target language pair.',
         auth: true,
         params: [
-          { name: 'title', type: 'string', required: true, description: 'Podcast title' },
-          {
-            name: 'topic',
-            type: 'string',
-            required: true,
-            description: 'Topic description (up to 5000 chars)',
-          },
-          {
-            name: 'metadata',
-            type: 'object',
-            required: false,
-            description: 'Discovery metadata: depth, audience, tone, focusAreas, durationTarget',
-          },
+          { name: 'nativeLang', type: 'string', required: true, description: 'Native language ISO code' },
+          { name: 'targetLang', type: 'string', required: true, description: 'Target language ISO code' },
         ],
-        response: '{ id: string, status: "PENDING" }',
+        response: '{ id: string, level: string }',
       },
       {
-        method: 'DELETE',
-        path: '/api/podcasts/:id',
-        description: 'Delete a podcast you own.',
-        auth: true,
-      },
-    ],
-  },
-  {
-    title: 'Users',
-    description: 'Private account and library data.',
-    endpoints: [
-      {
-        method: 'GET',
-        path: '/api/users/:id',
-        description: 'Get account metadata.',
-        auth: false,
-        response: '{ id, name, handle, image, bio, podcastCount }',
-      },
-      {
-        method: 'GET',
-        path: '/api/users/me/podcasts',
-        description: 'List podcasts in the signed-in account library.',
-        auth: true,
-        params: [
-          {
-            name: 'page',
-            type: 'number',
-            required: false,
-            description: 'Page number (default: 1)',
-          },
-          {
-            name: 'limit',
-            type: 'number',
-            required: false,
-            description: 'Results per page (default: 20)',
-          },
-        ],
-      },
-    ],
-  },
-  {
-    title: 'Embed & oEmbed',
-    description: 'Embed Sotto players on external sites.',
-    endpoints: [
-      {
-        method: 'GET',
-        path: '/podcast/:id/embed',
-        description: 'Embeddable player iframe. Use directly in an iframe or via oEmbed.',
-        auth: false,
-      },
-      {
-        method: 'GET',
-        path: '/api/oembed',
+        method: 'POST',
+        path: '/api/courses/:courseId/next-class',
         description:
-          'oEmbed endpoint for rich previews. Paste a podcast URL into Notion, Slack, or Discord for automatic embeds.',
-        auth: false,
+          'Generate the next gated class for a course. Optionally sourced from a real link or an interest topic.',
+        auth: true,
         params: [
-          {
-            name: 'url',
-            type: 'string',
-            required: true,
-            description: 'Podcast URL (e.g., https://your-sotto.example/podcast/abc123)',
-          },
+          { name: 'sourceUrl', type: 'string', required: false, description: 'A readable link or paper to build the class from' },
+          { name: 'topic', type: 'string', required: false, description: 'An interest topic to build the class from' },
         ],
-        response:
-          '{ version, type, provider_name, title, author_name, html, width, height, thumbnail_url }',
+        response: '{ classId: string }',
+      },
+      {
+        method: 'GET',
+        path: '/api/courses/:courseId/graph',
+        description:
+          'Read the learner-owned vocabulary memory graph for a course: nodes and connections with spaced-repetition due markers.',
+        auth: true,
+        response: '{ nodes, edges }',
+      },
+    ],
+  },
+  {
+    title: 'Placement',
+    description: 'Place a learner at the right CEFR level before the first course.',
+    endpoints: [
+      {
+        method: 'GET',
+        path: '/api/placement',
+        description: 'Generate adaptive placement questions for a language pair.',
+        auth: true,
+        response: '{ questions: [{ id, prompt, choices }] }',
+      },
+      {
+        method: 'POST',
+        path: '/api/placement',
+        description: 'Submit placement answers. Creates a course and sets the starting CEFR level.',
+        auth: true,
+        params: [
+          { name: 'answers', type: 'array', required: true, description: 'Answers to the placement questions' },
+        ],
+        response: '{ courseId: string, level: string }',
+      },
+    ],
+  },
+  {
+    title: 'Classes',
+    description: 'Read a generated class and submit a completed one across the five skills.',
+    endpoints: [
+      {
+        method: 'GET',
+        path: '/api/classes/:classId',
+        description:
+          'Fetch a class with its sections, questions, and prompts for grammar, reading, listening, speaking, and writing.',
+        auth: true,
+        response: '{ id, status, sections, references }',
+      },
+      {
+        method: 'POST',
+        path: '/api/classes/:classId/submit',
+        description:
+          'Submit a completed class. Scores the answers and advances the course level on a pass.',
+        auth: true,
+        params: [
+          { name: 'answers', type: 'array', required: true, description: 'Section answers for the class' },
+        ],
+        response: '{ overallScore: number, passed: boolean }',
+      },
+    ],
+  },
+  {
+    title: 'Agent Ingestion',
+    description:
+      'Send your own agent output into a private course. Nothing ingested is ever made public.',
+    endpoints: [
+      {
+        method: 'POST',
+        path: '/api/ingest/agent',
+        description:
+          'Ingest output from a local agent run, such as Claude Code or Codex. The result stays private to your account.',
+        auth: true,
+        params: [
+          { name: 'content', type: 'string', required: true, description: 'The agent output to ingest' },
+          { name: 'idempotency_key', type: 'string', required: false, description: 'Deduplicate repeated submissions' },
+        ],
+        response: '{ id: string, visibility: "PRIVATE" }',
+      },
+    ],
+  },
+  {
+    title: 'Keys and Health',
+    description: 'Manage the API keys your clients use, and check that the instance is live.',
+    endpoints: [
+      {
+        method: 'GET',
+        path: '/api/keys',
+        description: 'List the API keys on the signed-in account. Key hashes are never returned.',
+        auth: true,
+        response: '{ keys: [{ id, name, createdAt, lastUsedAt }] }',
+      },
+      {
+        method: 'POST',
+        path: '/api/keys',
+        description: 'Create a new API key. The raw key is returned once.',
+        auth: true,
+        params: [
+          { name: 'name', type: 'string', required: false, description: 'Key display name' },
+        ],
+        response: '{ id: string, key: string }',
+      },
+      {
+        method: 'GET',
+        path: '/api/health',
+        description: 'Liveness check for your deployment. No authentication required.',
+        auth: false,
+        response: '{ status: "ok" }',
       },
     ],
   },
@@ -181,8 +183,9 @@ export default function DevelopersPage() {
           <header className={styles.header}>
             <h1 className={styles.title}>API Documentation</h1>
             <p className={styles.subtitle}>
-              Build on Sotto. All public endpoints are available without authentication unless noted
-              otherwise.
+              Build on your own Sotto deployment. Connect your agent and keys, then
+              drive placement, courses, and classes over HTTP. Endpoints require
+              authentication unless noted otherwise.
             </p>
           </header>
 
@@ -276,9 +279,10 @@ export default function DevelopersPage() {
           <section className={styles.section}>
             <h2 className={styles.sectionTitle}>Rate Limits</h2>
             <p className={styles.sectionDescription}>
-              Unauthenticated requests: <strong>60 requests/minute</strong>. Authenticated requests:{' '}
-              <strong>200 requests/minute</strong>. Podcast generation: <strong>20/hour</strong>,{' '}
-              <strong>100/day</strong> per user.
+              Because you host the instance, rate limits are yours to set. The
+              defaults guard authentication and generation endpoints, and you can
+              tune them in your deployment configuration. Generation throughput is
+              ultimately bounded by your own provider quotas.
             </p>
           </section>
         </div>

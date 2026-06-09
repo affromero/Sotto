@@ -15,12 +15,12 @@ export function Footer() {
         <div className={styles.links}>
           <div>
             <h4>Product</h4>
-            <a href="/create">Create</a>
-            <a href="/briefings">Daily Briefings</a>
-            <a href="/quizzes">Quizzes</a>
             <a href="/languages">Languages</a>
-            <a href="/changelog">Changelog</a>
             <a href="/developers">Developers</a>
+            <a href="/changelog">Changelog</a>
+            <a href="https://github.com/affromero/Sotto" target="_blank" rel="noopener noreferrer">
+              GitHub
+            </a>
           </div>
           <div>
             <h4>Community</h4>
@@ -35,12 +35,12 @@ export function Footer() {
             <a href="/feedback">Feedback</a>
           </div>
           <div>
-            <h4>Company</h4>
+            <h4>Project</h4>
             <a href="/support">Support</a>
             <a href="/privacy">Privacy</a>
             <a href="/terms">Terms</a>
             <a href="/about">About</a>
-            <a href="/join">Join Us</a>
+            <a href="/join">Contribute</a>
           </div>
         </div>
       </div>
