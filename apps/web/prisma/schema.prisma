@@ -2592,6 +2592,8 @@ model CourseClass {
   adaptiveSeed    Json? // { vocabIds, grammarKeys, dueCount } that seeded this class
   passThreshold   Float       @default(0.7) // fraction of sections that must pass
   worksheetPdfUrl String?
+  sourceUrl       String? // sourced class: the real article/paper/link it was built from (null = curriculum class)
+  sourceTitle     String? // human-readable source title for display
   submittedAt     DateTime?
   passedAt        DateTime?
   failedAt        DateTime?
@@ -2665,7 +2667,8 @@ model LessonQuestion {
   explanation  String   @db.Text
   vocabIds     String[] @default([]) // memory-graph linkage (later phases)
   grammarKeys  String[] @default([])
-  passageRef   String?  @db.Text // reading passage / listening turn anchor
+  passageRef   String?  @db.Text // short label/anchor for the passage or listening turn
+  passageText  String?  @db.Text // the actual reading passage (sourced classes: a CEFR-leveled excerpt with [N] citations)
   createdAt    DateTime @default(now())
 
   section ClassSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
