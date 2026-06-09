@@ -44,7 +44,8 @@ Token lifecycle: SecureStore → Axios interceptor attaches Bearer → backend v
 
 ```
 app/
-├── _layout.tsx            # Root (fonts, providers, QueryClient, auth gate)
+├── _layout.tsx            # Root (fonts, providers, QueryClient, connect gate → auth gate)
+├── connect.tsx            # First-run "connect to your server" (enter URL) — routed to when no server is configured
 ├── (tabs)/
 │   ├── index.tsx          # Private library
 │   ├── create.tsx         # 5-step: discovery → voice → scripting → preview → generating
@@ -66,8 +67,10 @@ app/
 
 | File | Purpose |
 |------|---------|
-| `api.ts` | Axios client, Bearer token, `onAuthRevoked()` on 401 |
+| `api.ts` | Axios client, Bearer token, `onAuthRevoked()` on 401. `baseURL` resolved per-request (not frozen at import) so a runtime-paired server takes effect without restart |
 | `auth.ts` | SecureStore token management |
+| `server-url.ts` | Runtime server URL (SecureStore + sync cache): `loadStoredServerUrl()`, `getStoredServerUrl()`, `setStoredServerUrl()`, `hasServerConfigured()`. Lets one build connect to any self-hosted server |
+| `connect.ts` | `connectToServer(url)` (store a server) + `pairWithToken(url, token)` (redeem a "scan to connect" pairing token → session) + `normalizeServerUrl()` |
 | `theme.ts` | @sotto/shared tokens → RN StyleSheet helpers |
 | `formatters.ts` | `formatDuration`, `formatCount`, `timeAgo`, etc. |
 | `audio-player.ts` | react-native-track-player setup + track loading |
