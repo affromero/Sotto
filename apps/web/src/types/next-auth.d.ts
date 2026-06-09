@@ -28,6 +28,9 @@ declare module 'next-auth/jwt' {
     role?: UserRole;
     bannedAt?: string | null;
     suspendedUntil?: string | null;
+    /** Local (Credentials) session, subject to tokenVersion invalidation. */
+    local?: boolean;
+    tokenVersion?: number;
     impersonateUserId?: string;
     impersonateName?: string | null;
     impersonateEmail?: string | null;

@@ -1017,6 +1017,14 @@ export const serverInfraSchema = z.object({
 
 export const siteConfigUpdateSchema = serverInfraSchema.extend({
   openSignup: z.boolean().optional(),
+  localAuth: z.boolean().nullable().optional(),
+});
+
+// Local profile sign-in (the Netflix-style picker). The Credentials authorize
+// input: a user id from the picker and the password.
+export const credentialsAuthSchema = z.object({
+  userId: z.string().trim().min(1).max(64),
+  password: z.string().min(1).max(200),
 });
 
 // Unified onboarding-wizard save. Per-user fields persist on every self-hosted
