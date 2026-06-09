@@ -1,0 +1,277 @@
+/* GrammarSection — drill card (also used for READING). */
+
+.root {
+  composes: surface from './sottoLearn.module.css';
+}
+
+.segEnter {
+  animation: segIn 0.5s var(--ease) both;
+}
+
+@keyframes segIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .segEnter {
+    animation: none;
+  }
+}
+
+/* ---- stage typography ---- */
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.eyebrowIdx {
+  color: var(--ink-mute);
+}
+
+.title {
+  font-family: var(--serif);
+  font-weight: 420;
+  font-size: clamp(28px, 4vw, 44px);
+  line-height: 1.14;
+  letter-spacing: -0.015em;
+  margin: 16px 0 0;
+  color: var(--ink);
+  text-wrap: balance;
+}
+
+.title em {
+  font-style: italic;
+  color: var(--accent);
+}
+
+.modLede {
+  font-size: 15.5px;
+  line-height: 1.6;
+  color: var(--ink-soft);
+  margin: 18px 0 0;
+  max-width: 56ch;
+  text-wrap: pretty;
+}
+
+/* ---- drill card ---- */
+.drillCard {
+  margin-top: 16px;
+  background: var(--well);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 28px 26px;
+}
+
+.passage {
+  margin: 0 0 18px;
+  padding: 16px 18px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--r);
+  font-family: var(--serif);
+  font-size: 17px;
+  line-height: 1.6;
+  color: var(--ink);
+  text-wrap: pretty;
+}
+
+.drillMeta {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--ink-mute);
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.verb {
+  color: var(--accent);
+}
+
+.drillPrompt {
+  font-family: var(--serif);
+  font-size: 25px;
+  line-height: 1.4;
+  color: var(--ink);
+  margin: 14px 0 4px;
+  text-wrap: pretty;
+}
+
+.emGood {
+  font-style: italic;
+  color: var(--good);
+}
+
+.emBad {
+  font-style: italic;
+  color: var(--bad);
+}
+
+.drillEn {
+  font-size: 13.5px;
+  color: var(--ink-mute);
+}
+
+/* ---- options ---- */
+.optRow {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 22px;
+}
+
+.opt {
+  flex: 1;
+  min-width: 140px;
+  min-height: 44px;
+  font-family: var(--serif);
+  font-size: 18px;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r);
+  padding: 15px 18px;
+  cursor: pointer;
+  text-align: center;
+  transition:
+    border-color 0.18s,
+    background 0.18s,
+    transform 0.12s var(--ease),
+    color 0.18s;
+}
+
+.opt:hover:not(:disabled) {
+  border-color: var(--ink-soft);
+  transform: translateY(-1px);
+}
+
+.opt:disabled {
+  cursor: default;
+}
+
+.optCorrect {
+  border-color: var(--good);
+  background: var(--good-soft);
+  color: var(--good);
+}
+
+.optWrong {
+  border-color: var(--bad);
+  background: var(--bad-soft);
+  color: var(--bad);
+}
+
+.optDim {
+  opacity: 0.45;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .opt:hover:not(:disabled) {
+    transform: none;
+  }
+}
+
+/* ---- explanation ---- */
+.drillWhy {
+  margin-top: 18px;
+  border-left: 2px solid var(--accent);
+  padding: 4px 0 4px 16px;
+  animation: segIn 0.35s var(--ease) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drillWhy {
+    animation: none;
+  }
+}
+
+.whyHead {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.drillWhyOk .whyHead {
+  color: var(--good);
+}
+
+.drillWhyNo .whyHead {
+  color: var(--bad);
+}
+
+.drillWhy p {
+  margin: 8px 0 0;
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: var(--ink);
+}
+
+/* ---- inline actions (Next / See result) ---- */
+.cactions {
+  margin-top: 22px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.grow {
+  flex: 1;
+}
+
+.btn {
+  font-family: var(--sans);
+  font-size: 14.5px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  border-radius: var(--r);
+  padding: 13px 22px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  transition:
+    transform 0.15s var(--ease),
+    filter 0.2s;
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btnPrimary {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+.btnPrimary:hover {
+  filter: brightness(1.06);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn {
+    transition: filter 0.2s;
+  }
+  .btn:active {
+    transform: none;
+  }
+}

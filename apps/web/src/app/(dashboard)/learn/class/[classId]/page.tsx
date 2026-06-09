@@ -1,6 +1,5 @@
 import { auth } from '@/lib/auth';
-import { ClassRunner } from '@/components/learn/ClassRunner';
-import styles from './page.module.css';
+import { ClassShell } from '@/components/learn/ClassShell';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,9 +18,5 @@ export default async function ClassPage({ params }: ClassPageProps) {
 
   const { classId } = await params;
 
-  return (
-    <main className={styles.root}>
-      <ClassRunner classId={classId} />
-    </main>
-  );
+  return <ClassShell classId={classId} />;
 }
