@@ -393,6 +393,105 @@ class GoogleProvider implements AIProvider {
   }
 }
 
+/**
+ * Local provider — talks to any OpenAI-compatible local inference server
+ * (Ollama, vLLM, LM Studio, llama.cpp server) via the OpenAI SDK with a
+ * configurable baseURL. Keyless by design: local servers usually ignore the
+ * API key, but the SDK requires a non-empty string, so we send 'local' unless
+ * AI_API_KEY is set (for remote OpenAI-compatible servers behind auth).
+ *
+ * The model is host-defined (AI_MODEL) and may arrive prefixed as "local:<model>"
+ * from the llm.ts router or resolveAiModelAndProvider — strip it before sending.
+ */
+class LocalProvider implements AIProvider {
+  private async getClient() {
+    const baseURL = process.env.AI_BASE_URL?.trim();
+    if (!baseURL) {
+      throw new Error(
+        'AI_BASE_URL is not set. Point it at your local OpenAI-compatible server (e.g. http://localhost:11434/v1 for Ollama).',
+      );
+    }
+    const { default: OpenAI } = await import('openai');
+    // Disable SDK built-in retries — we handle retries via withRetry() to avoid stacking
+    return new OpenAI({ apiKey: process.env.AI_API_KEY?.trim() || 'local', maxRetries: 0, baseURL });
+  }
+
+  private resolveModel(optsModel?: string): string {
+    const raw = (optsModel || process.env.AI_MODEL || '').trim();
+    const model = raw.startsWith('local:') ? raw.slice('local:'.length) : raw;
+    if (!model) {
+      throw new Error(
+        'No local model configured. Set AI_MODEL to the model your local server serves (e.g. "qwen3", "gemma3", "llama3.3").',
+      );
+    }
+    return model;
+  }
+
+  async generateResponse(
+    system: string,
+    messages: ChatMessage[],
+    opts?: AIOptions
+  ): Promise<AIResponse> {
+    if (!opts?.skipModeration) {
+      const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
+      if (lastUserMsg) await moderateOrThrow(textOf(lastUserMsg.content));
+    }
+
+    const client = await this.getClient();
+    const model = this.resolveModel(opts?.model);
+
+    return withRetry('[Local:ChatCompletions]', async () => {
+      const response = await client.chat.completions.create({
+        model,
+        max_completion_tokens: opts?.maxTokens || 4096,
+        temperature: opts?.temperature,
+        messages: toOpenAiMessages(system, messages),
+        ...(opts?.jsonSchema ? {
+          response_format: {
+            type: 'json_schema' as const,
+            json_schema: { name: opts.jsonSchema.name, schema: opts.jsonSchema.schema, strict: true },
+          },
+        } : {}),
+      });
+
+      const content = response.choices[0]?.message?.content || '';
+      return {
+        content,
+        inputTokens: response.usage?.prompt_tokens || 0,
+        outputTokens: response.usage?.completion_tokens || 0,
+        model,
+      };
+    });
+  }
+
+  async *streamResponse(
+    system: string,
+    messages: ChatMessage[],
+    opts?: AIOptions
+  ): AsyncGenerator<string> {
+    if (!opts?.skipModeration) {
+      const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
+      if (lastUserMsg) await moderateOrThrow(textOf(lastUserMsg.content));
+    }
+
+    const client = await this.getClient();
+    const model = this.resolveModel(opts?.model);
+
+    const stream = await withRetry('[Local:ChatCompletions:stream]', () => client.chat.completions.create({
+      model,
+      max_completion_tokens: opts?.maxTokens || 4096,
+      temperature: opts?.temperature,
+      messages: toOpenAiMessages(system, messages),
+      stream: true,
+    }));
+
+    for await (const chunk of stream) {
+      const delta = chunk.choices[0]?.delta?.content;
+      if (delta) yield delta;
+    }
+  }
+}
+
 class ClaudeCodeLazyProvider implements AIProvider {
   private async createProvider(): Promise<AIProvider> {
     const { ClaudeCodeProvider } = await import('./claude-code');
@@ -432,8 +531,10 @@ export function createAIProvider(type: string): AIProvider {
       return new GoogleProvider();
     case 'claude-code':
       return new ClaudeCodeLazyProvider();
+    case 'local':
+      return new LocalProvider();
     default:
-      throw new Error(`Unknown AI provider type: "${type}". Registered providers: anthropic, openai, google, claude-code`);
+      throw new Error(`Unknown AI provider type: "${type}". Registered providers: anthropic, openai, google, claude-code, local`);
   }
 }
 
