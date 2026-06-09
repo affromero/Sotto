@@ -21,10 +21,13 @@ import { GrammarSection } from './GrammarSection';
 import { ListeningSection } from './ListeningSection';
 import { SpeakingSection } from './SpeakingSection';
 import { WritingSection } from './WritingSection';
+import { ClassSources } from './ClassSources';
 import {
   SKILL_GLYPH,
   skillLabel,
+  classRefToReferenceData,
   type ClassData,
+  type ClassReference,
   type ClassSection,
   type ClassSubmitResult,
 } from './classTypes';
@@ -69,6 +72,18 @@ export function ClassShell({ classId }: ClassShellProps) {
 
   const sections = useMemo(() => (cls ? orderSections(cls.sections) : []), [cls]);
   const gate = cls ? Math.round(cls.passThreshold * 100) : 70;
+
+  // The class's verified sources live on the LISTENING podcast (sourced classes).
+  // Collected once for the Sources panel + READING citation resolution.
+  const classReferences = useMemo<ClassReference[]>(() => {
+    const podcast = sections.find((s) => (s.podcast?.references?.length ?? 0) > 0)?.podcast;
+    return podcast?.references ?? [];
+  }, [sections]);
+
+  const passageReferences = useMemo(
+    () => classReferences.map(classRefToReferenceData),
+    [classReferences],
+  );
 
   const loadClass = useCallback(async () => {
     try {
@@ -240,26 +255,41 @@ export function ClassShell({ classId }: ClassShellProps) {
   const nextName =
     segIdx < sections.length - 1 ? skillLabel(sections[segIdx + 1].skill) : null;
 
+  const sourcesPanel =
+    classReferences.length > 0 || cls.sourceUrl ? (
+      <ClassSources
+        references={classReferences}
+        sourceUrl={cls.sourceUrl}
+        sourceTitle={cls.sourceTitle}
+      />
+    ) : null;
+
   if (view === 'hub') {
     stage = (
-      <ClassHub
-        lesson={cls.lesson}
-        order={cls.order}
-        sections={sections}
-        scores={scores}
-        started={startedHour}
-        onBegin={beginHour}
-      />
+      <>
+        <ClassHub
+          lesson={cls.lesson}
+          order={cls.order}
+          sections={sections}
+          scores={scores}
+          started={startedHour}
+          onBegin={beginHour}
+        />
+        {sourcesPanel}
+      </>
     );
   } else if (view === 'summary' && result) {
     stage = (
-      <ClassSummary
-        lesson={cls.lesson}
-        order={cls.order}
-        result={result}
-        regenerating={regenerating}
-        onRetryFailed={() => void handleRegenerate()}
-      />
+      <>
+        <ClassSummary
+          lesson={cls.lesson}
+          order={cls.order}
+          result={result}
+          regenerating={regenerating}
+          onRetryFailed={() => void handleRegenerate()}
+        />
+        {sourcesPanel}
+      </>
     );
   } else if (view === 'submitting') {
     stage = (
@@ -279,6 +309,7 @@ export function ClassShell({ classId }: ClassShellProps) {
             questions={seg.questions}
             gate={gate}
             nextName={nextName}
+            references={passageReferences}
             onAnswer={recordAnswer}
             onScore={setCurScore}
             onContinue={advanceHour}

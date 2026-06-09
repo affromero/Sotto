@@ -1,0 +1,269 @@
+/* SourcedClassEntry — start a class from a link or a topic (aula tokens). */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  padding: 16px;
+  background: var(--well, #efeeea);
+  border: 1px solid var(--line, rgba(30, 33, 40, 0.12));
+  border-radius: var(--r, 4px);
+  animation: entryIn 0.35s var(--ease, ease) both;
+}
+
+@keyframes entryIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .root {
+    animation: none;
+  }
+}
+
+/* ---- collapsed opener ---- */
+.opener {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-height: 44px;
+  padding: 8px 14px;
+  background: transparent;
+  border: 1px dashed var(--line-strong, rgba(30, 33, 40, 0.24));
+  border-radius: var(--r, 4px);
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color 0.18s,
+    background 0.18s;
+}
+
+.opener:hover {
+  border-color: var(--accent, #3f4fb0);
+  background: var(--accent-soft, rgba(63, 79, 176, 0.1));
+}
+
+.openerLede {
+  font-family: var(--serif, Georgia, serif);
+  font-size: 16px;
+  color: var(--ink, #1e2128);
+}
+
+.openerHint {
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  color: var(--ink-mute, #8a8f9c);
+}
+
+/* ---- expanded head ---- */
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.eyebrow {
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--accent, #3f4fb0);
+}
+
+.close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  font-size: 13px;
+  color: var(--ink-mute, #8a8f9c);
+  background: transparent;
+  border: none;
+  border-radius: var(--r, 4px);
+  cursor: pointer;
+  transition:
+    color 0.15s,
+    background 0.15s;
+}
+
+.close:hover:not(:disabled) {
+  color: var(--ink, #1e2128);
+  background: var(--paper, #f5f4f0);
+}
+
+.close:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ---- link field ---- */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fieldLabel {
+  font-size: 12.5px;
+  color: var(--ink-soft, #565b68);
+}
+
+.fieldRow {
+  display: flex;
+  gap: 8px;
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 14px;
+  font-family: var(--sans, system-ui, sans-serif);
+  font-size: 14.5px;
+  color: var(--ink, #1e2128);
+  background: var(--paper, #f5f4f0);
+  border: 1px solid var(--line-strong, rgba(30, 33, 40, 0.24));
+  border-radius: var(--r, 4px);
+  transition: border-color 0.18s;
+}
+
+.input::placeholder {
+  color: var(--ink-mute, #8a8f9c);
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--accent, #3f4fb0);
+}
+
+.go {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  color: var(--accent-fg, #f0f2ff);
+  background: var(--accent, #3f4fb0);
+  border: 1px solid transparent;
+  border-radius: var(--r, 4px);
+  cursor: pointer;
+  transition:
+    filter 0.18s,
+    opacity 0.18s;
+}
+
+.go:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+.go:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ---- topic chips ---- */
+.topics {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.topicsLabel {
+  font-size: 12.5px;
+  color: var(--ink-soft, #565b68);
+}
+
+.chipRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  min-height: 36px;
+  padding: 7px 13px;
+  font-family: var(--sans, system-ui, sans-serif);
+  font-size: 13px;
+  color: var(--ink, #1e2128);
+  background: var(--paper, #f5f4f0);
+  border: 1px solid var(--line-strong, rgba(30, 33, 40, 0.24));
+  border-radius: 999px;
+  cursor: pointer;
+  transition:
+    border-color 0.16s,
+    background 0.16s,
+    color 0.16s,
+    transform 0.12s var(--ease, ease);
+}
+
+.chip:hover {
+  border-color: var(--accent, #3f4fb0);
+  color: var(--accent, #3f4fb0);
+  background: var(--accent-soft, rgba(63, 79, 176, 0.1));
+  transform: translateY(-1px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chip:hover {
+    transform: none;
+  }
+}
+
+/* ---- loading ---- */
+.loading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+}
+
+.loadingText {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--ink-soft, #565b68);
+}
+
+.spinner {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  border: 2px solid var(--line-strong, rgba(30, 33, 40, 0.24));
+  border-top-color: var(--accent, #3f4fb0);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+    border-top-color: var(--line-strong, rgba(30, 33, 40, 0.24));
+  }
+}
+
+/* ---- error ---- */
+.error {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--bad, #be4a2c);
+}
