@@ -1,10 +1,10 @@
-/* StartNextClass */
+/* StartNextClass — Sotto learning design tokens (aula, blue accent). */
 
 .root {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: var(--spacing-xs);
+  gap: 6px;
   flex-shrink: 0;
 }
 
@@ -12,28 +12,27 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: var(--spacing-sm);
-  height: 44px;
-  padding: 0 var(--spacing-lg);
-  background: var(--color-primary);
-  color: var(--color-text-inverse);
-  border: none;
-  border-radius: var(--radius-lg);
+  gap: 9px;
+  min-height: 44px;
+  padding: 0 22px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  border: 1px solid transparent;
+  border-radius: var(--r);
+  font-family: var(--sans);
   font-weight: 600;
-  font-size: var(--font-size-base);
+  font-size: 14.5px;
   cursor: pointer;
-  transition:
-    background var(--transition-fast),
-    opacity var(--transition-fast);
   white-space: nowrap;
+  transition: filter 0.18s var(--ease), opacity 0.18s var(--ease);
 }
 
 .button:hover:not(:disabled) {
-  background: var(--color-primary-hover);
+  filter: brightness(1.06);
 }
 
 .button:disabled {
-  opacity: 0.7;
+  opacity: 0.55;
   cursor: not-allowed;
 }
 
@@ -41,11 +40,11 @@
   display: inline-block;
   width: 16px;
   height: 16px;
-  border: 2px solid rgba(255, 255, 255, 0.4);
-  border-top-color: #fff;
+  border: 2px solid color-mix(in oklab, var(--accent-fg) 40%, transparent);
+  border-top-color: var(--accent-fg);
   border-radius: 50%;
-  animation: spin 0.7s linear infinite;
   flex-shrink: 0;
+  animation: spin 0.7s linear infinite;
 }
 
 @keyframes spin {
@@ -57,19 +56,22 @@
 @media (prefers-reduced-motion: reduce) {
   .spinner {
     animation: none;
-    border-top-color: rgba(255, 255, 255, 0.4);
+    border-top-color: color-mix(in oklab, var(--accent-fg) 40%, transparent);
   }
 }
 
 .done {
-  font: var(--text-body-sm);
-  font-weight: 600;
-  color: var(--color-success);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  font-weight: 500;
+  color: var(--good);
 }
 
 .error {
-  font: var(--text-caption);
-  color: var(--color-error);
+  font-family: var(--sans);
+  font-size: 12px;
+  color: var(--bad);
   text-align: right;
   max-width: 200px;
 }

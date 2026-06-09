@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { SpeakingExercise } from '@/components/class/SpeakingExercise';
+import { ScoreDial } from './ClassWidgets';
 import { WritingSection } from './WritingSection';
 import type { WritingPromptData } from './classTypes';
 import styles from './PracticeRunner.module.css';
@@ -43,9 +44,6 @@ interface PracticeRunnerProps {
   onDone: () => void;
 }
 
-function pct(score: number): string {
-  return `${Math.round(score * 100)}%`;
-}
 
 // ---- Listening audio: poll the podcast until its audio is ready ----
 
@@ -127,10 +125,7 @@ function McRunner({ start, onDone }: { start: Extract<PracticeStart, { status: '
   if (phase === 'result' && result) {
     return (
       <div className={styles.resultPanel} role="region" aria-label="Practice result">
-        <div className={styles.scoreDial} aria-label={`Score ${pct(result.score)}`}>
-          <span className={styles.scoreNumber}>{Math.round(result.score * 100)}</span>
-          <span className={styles.scoreSuffix}>%</span>
-        </div>
+        <ScoreDial value={Math.round(result.score * 100)} size={92} stroke={7} />
         <p className={styles.resultLine}>
           {result.correct} of {result.total} correct — reviewed and scheduled for spaced repetition.
         </p>
@@ -150,30 +145,37 @@ function McRunner({ start, onDone }: { start: Extract<PracticeStart, { status: '
       )}
 
       <ol className={styles.questionList}>
-        {start.items.map((it) => {
+        {start.items.map((it, qi) => {
           const selected = answers[it.id];
           return (
             <li key={it.id} className={styles.question}>
-              <p className={styles.questionText}>{it.prompt}</p>
-              <div className={styles.options} role="group" aria-label={`Options for: ${it.prompt}`}>
-                {it.options.map((opt, idx) => {
-                  const isSelected = selected === idx;
-                  return (
-                    <button
-                      key={idx}
-                      type="button"
-                      className={`${styles.option} ${isSelected ? styles.optionSelected : ''}`}
-                      onClick={() => setAnswers((prev) => ({ ...prev, [it.id]: idx }))}
-                      aria-pressed={isSelected}
-                      aria-label={`Option ${idx + 1}: ${opt}`}
-                    >
-                      <span className={styles.optionLetter} aria-hidden="true">
-                        {String.fromCharCode(65 + idx)}
-                      </span>
-                      <span className={styles.optionText}>{opt}</span>
-                    </button>
-                  );
-                })}
+              <div className={styles.drillCard}>
+                <div className={styles.drillMeta}>
+                  <span className={styles.drillIdx}>
+                    {qi + 1} of {start.items.length}
+                  </span>
+                </div>
+                <p className={styles.questionText}>{it.prompt}</p>
+                <div className={styles.options} role="group" aria-label={`Options for: ${it.prompt}`}>
+                  {it.options.map((opt, idx) => {
+                    const isSelected = selected === idx;
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        className={`${styles.option} ${isSelected ? styles.optionSelected : ''}`}
+                        onClick={() => setAnswers((prev) => ({ ...prev, [it.id]: idx }))}
+                        aria-pressed={isSelected}
+                        aria-label={`Option ${idx + 1}: ${opt}`}
+                      >
+                        <span className={styles.optionLetter} aria-hidden="true">
+                          {String.fromCharCode(65 + idx)}
+                        </span>
+                        <span className={styles.optionText}>{opt}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </li>
           );
