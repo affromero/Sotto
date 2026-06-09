@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { STEPS, WHISPERS, LEVELS } from './data';
 import type { CefrLevel } from './data';
 import { Glyph } from './Glyph';
@@ -18,6 +18,8 @@ export interface AgentState {
   provider: string;
   method: 'cli' | 'key' | 'url' | null;
   value: string;
+  /** The model a local/custom OpenAI-compatible server serves (AI_MODEL). */
+  model: string;
   status: 'idle' | 'verifying' | 'connected';
 }
 
@@ -25,11 +27,19 @@ export interface VoiceState {
   tts: string;
   stt: string;
   keys: Record<string, string>;
+  /** Optional base URLs for keyless local providers (kokoro TTS, whisper STT). */
+  baseUrls: Record<string, string>;
 }
 
 export interface FlowState {
   baseLang: string;
   language: string;
+}
+
+/** How the wizard should behave, from /api/onboarding/config. */
+export interface OnboardingConfig {
+  selfHosted: boolean;
+  isOwner: boolean;
 }
 
 export function WelcomeFlow() {
@@ -40,16 +50,35 @@ export function WelcomeFlow() {
     provider: '',
     method: null,
     value: '',
+    model: '',
     status: 'idle',
   });
   const [voice, setVoice] = useState<VoiceState>({
     tts: 'elevenlabs',
     stt: 'whisper',
     keys: {},
+    baseUrls: {},
   });
   const [sources, setSources] = useState<Set<string>>(new Set());
   const [note, setNote] = useState('');
   const [understood, setUnderstood] = useState<Set<CefrLevel>>(new Set());
+  // Demo until proven self-hosted, so a misconfigured fetch never writes real data.
+  const [config, setConfig] = useState<OnboardingConfig>({ selfHosted: false, isOwner: false });
+
+  useEffect(() => {
+    let active = true;
+    fetch('/api/onboarding/config', { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: OnboardingConfig | null) => {
+        if (active && data) setConfig({ selfHosted: !!data.selfHosted, isOwner: !!data.isOwner });
+      })
+      .catch(() => {
+        // Leave the safe default (demo) if config can't be read.
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const level = useMemo<CefrLevel | null>(() => {
     let best: CefrLevel | null = null;
@@ -67,8 +96,8 @@ export function WelcomeFlow() {
     setStep(0);
     setLanguage('');
     setBaseLang('en');
-    setAgent({ provider: '', method: null, value: '', status: 'idle' });
-    setVoice({ tts: 'elevenlabs', stt: 'whisper', keys: {} });
+    setAgent({ provider: '', method: null, value: '', model: '', status: 'idle' });
+    setVoice({ tts: 'elevenlabs', stt: 'whisper', keys: {}, baseUrls: {} });
     setSources(new Set());
     setUnderstood(new Set());
   }
@@ -165,6 +194,7 @@ export function WelcomeFlow() {
           agent={agent}
           voice={voice}
           note={note}
+          config={config}
           onRestart={reset}
         />
       );
