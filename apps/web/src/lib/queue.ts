@@ -212,7 +212,7 @@ export interface ImportAudioPayload {
   transcriptText?: string;
   isHumanContent: boolean;
   generateMetadata?: boolean;
-  sttProvider?: 'openai' | 'elevenlabs' | 'together' | 'deepgram' | 'assemblyai';
+  sttProvider?: SttProviderId;
   sttModel?: string;
   sttApiKey?: string;
 }

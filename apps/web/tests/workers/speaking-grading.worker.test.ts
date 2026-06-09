@@ -58,6 +58,7 @@ const mockCreateSttProvider = vi.fn().mockReturnValue({
 vi.mock('@/lib/providers/stt', () => ({
   resolveSttProvider: (...args: unknown[]) => mockResolveSttProvider(...args),
   createSttProvider: (...args: unknown[]) => mockCreateSttProvider(...args),
+  getConfiguredSttProviderId: () => 'openai',
 }));
 
 // ---- Scorer mock ----

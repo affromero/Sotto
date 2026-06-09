@@ -5,9 +5,12 @@ import { getAllTtsProviderClientMeta } from '@/lib/providers/tts-registry';
 describe('AI Provider Client DTO', () => {
   const meta = getAllAiProviderClientMeta();
 
-  it('returns 6 providers and excludes claude-code', () => {
+  it('returns 6 providers and excludes the keyless server-configured providers', () => {
     expect(meta).toHaveLength(6);
+    // claude-code and local are keyless, server-configured backends — never
+    // surfaced in the BYOK client metadata (they have no API-key fields).
     expect(meta.map((m) => m.id)).not.toContain('claude-code');
+    expect(meta.map((m) => m.id)).not.toContain('local');
   });
 
   it('all providers have non-empty authFields and getApiKeyUrl', () => {

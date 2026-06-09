@@ -7,6 +7,7 @@ import {
   type VoiceMatchMetadata,
 } from '../voice-pool';
 import type { TtsProviderId } from './tts-registry';
+import { isValidProviderId } from './tts-registry';
 import type { WordTiming } from '@sotto/shared';
 import { getByokKey, getByokExtraData, hasByokKey } from '../byok';
 import { getAutoModelConfig } from '../auto-model-config';
@@ -95,6 +96,11 @@ async function importMistral() {
   return MistralProvider;
 }
 
+async function importKokoro() {
+  const { KokoroProvider } = await import('./tts/kokoro.provider');
+  return KokoroProvider;
+}
+
 // ---------------------------------------------------------------------------
 // Factory functions
 // ---------------------------------------------------------------------------
@@ -171,6 +177,12 @@ export async function createTtsProviderAsync(
     case 'mistral': {
       if (!apiKey) throw new Error('Mistral requires an API key');
       const Cls = await importMistral();
+      return new Cls(apiKey, model);
+    }
+    case 'kokoro': {
+      // Keyless — the Kokoro sidecar needs no API key. It validates TTS_BASE_URL
+      // and reachability internally and throws a clear error if unset.
+      const Cls = await importKokoro();
       return new Cls(apiKey, model);
     }
     default:
@@ -304,6 +316,15 @@ export async function resolveTtsProvider(context: {
     const provider = await createTtsProviderAsync('mistral', process.env.MISTRAL_API_KEY, undefined, resolvedModel);
     return { provider, source: 'platform', providerId: 'mistral' };
   }
+  // Kokoro is keyless and local — it is gated by TTS_BASE_URL, not an API key.
+  // It is only ever resolved when explicitly requested (TTS_PROVIDER=kokoro);
+  // it never auto-selects by availability. The provider constructor throws a
+  // clear error if TTS_BASE_URL is unset, so we surface that path here rather
+  // than the generic "missing key" message below.
+  if (requestedProvider === 'kokoro') {
+    const provider = await createTtsProviderAsync('kokoro', undefined, undefined, resolvedModel);
+    return { provider, source: 'platform', providerId: 'kokoro' };
+  }
 
   throw new Error(
     `No API key available for ${requestedProvider}. Please add a BYOK key in Settings.`
@@ -311,10 +332,23 @@ export async function resolveTtsProvider(context: {
 }
 
 /**
+ * The server-configured TTS provider from TTS_PROVIDER (validated), or null when
+ * unset/invalid. Lets a self-hoster pin a keyless local provider (kokoro) as the
+ * explicit choice for learning audio, mirroring getConfiguredSttProviderId().
+ */
+export function getConfiguredTtsProviderId(): TtsProviderId | null {
+  const raw = (process.env.TTS_PROVIDER ?? '').trim();
+  return isValidProviderId(raw) ? raw : null;
+}
+
+/**
  * Check if TTS can be resolved for a user without throwing.
  */
 export async function canResolveTts(userId: string): Promise<boolean> {
   if (await hasByokKey(userId)) return true;
+  // Keyless local TTS (kokoro) counts only when explicitly configured AND given a
+  // reachable endpoint — never auto-selected by mere availability.
+  if (getConfiguredTtsProviderId() === 'kokoro' && process.env.TTS_BASE_URL?.trim()) return true;
   if (process.env.ELEVENLABS_API_KEY) return true;
   if (process.env.OPENAI_API_KEY) return true;
   if (process.env.CARTESIA_API_KEY) return true;

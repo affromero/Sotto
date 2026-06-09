@@ -43,7 +43,7 @@ export function getPricetokenModelInfo(modelId: string): {
   };
 }
 
-export type AiProviderId = 'anthropic' | 'openai' | 'google' | 'claude-code' | 'together' | 'deepgram' | 'assemblyai';
+export type AiProviderId = 'anthropic' | 'openai' | 'google' | 'claude-code' | 'local' | 'together' | 'deepgram' | 'assemblyai';
 
 export interface AiProviderAuthField {
   key: string;
@@ -171,6 +171,24 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
       { id: 'sonnet', displayName: 'Sonnet', shortDisplayName: 'Sonnet 4.6', tier: 'balanced', requiredPlan: 'PRO', contextWindow: 200_000, maxOutputTokens: 64_000 },
       { id: 'opus', displayName: 'Opus', shortDisplayName: 'Opus 4.6', tier: 'best', requiredPlan: 'PRO', contextWindow: 200_000, maxOutputTokens: 128_000 },
     ],
+    auth: {
+      fields: [],
+      validate: async () => true,
+    },
+  },
+
+  // Local OpenAI-compatible inference (Ollama / vLLM / LM Studio). Keyless and
+  // server-configured: the model is whatever the local server serves, supplied
+  // via AI_MODEL and routed by the "local:" model prefix (see resolveLearningAi +
+  // the llm.ts guardrail). Like claude-code, it carries no API-key fields and is
+  // excluded from the BYOK client metadata.
+  local: {
+    id: 'local',
+    displayName: 'Local model (Ollama / vLLM / LM Studio)',
+    shortLabel: 'Local',
+    defaultModel: '',
+    getApiKeyUrl: '',
+    models: [],
     auth: {
       fields: [],
       validate: async () => true,
@@ -341,7 +359,7 @@ export function getAiModelDisplayName(modelId: string): string {
 // ---------------------------------------------------------------------------
 
 export interface AiProviderClientMeta {
-  id: Exclude<AiProviderId, 'claude-code'>;
+  id: Exclude<AiProviderId, 'claude-code' | 'local'>;
   displayName: string;
   getApiKeyUrl: string;
   models: AiModelOption[];
@@ -350,7 +368,7 @@ export interface AiProviderClientMeta {
   badge: 'optional' | 'free' | null;
 }
 
-const AI_CLIENT_DESCRIPTIONS: Record<Exclude<AiProviderId, 'claude-code'>, { description: string; badge: 'optional' | 'free' | null }> = {
+const AI_CLIENT_DESCRIPTIONS: Record<Exclude<AiProviderId, 'claude-code' | 'local'>, { description: string; badge: 'optional' | 'free' | null }> = {
   anthropic: { description: 'Better script generation and creative writing', badge: 'optional' },
   openai: { description: 'Covers both LLM and TTS with one key', badge: 'optional' },
   google: { description: 'Gemini models with 1M context window', badge: 'optional' },
@@ -366,7 +384,7 @@ const AI_CLIENT_DESCRIPTIONS: Record<Exclude<AiProviderId, 'claude-code'>, { des
  */
 export function getAllAiProviderClientMeta(): AiProviderClientMeta[] {
   return Object.values(AI_PROVIDERS)
-    .filter((p): p is AiProviderMeta & { id: Exclude<AiProviderId, 'claude-code'> } => p.id !== 'claude-code')
+    .filter((p): p is AiProviderMeta & { id: Exclude<AiProviderId, 'claude-code' | 'local'> } => p.id !== 'claude-code' && p.id !== 'local')
     .map((p) => ({
       id: p.id,
       displayName: p.displayName,
@@ -430,6 +448,12 @@ export async function resolveAiModelAndProvider(opts: {
   if (opts.podcastAiModel) {
     if (opts.podcastAiModel.startsWith('claude-code:')) {
       return { model: opts.podcastAiModel, provider: 'claude-code' };
+    }
+
+    // Local OpenAI-compatible model (e.g. "local:qwen3") — routed by prefix, not
+    // the registry, since the served model name is host-defined.
+    if (opts.podcastAiModel.startsWith('local:')) {
+      return { model: opts.podcastAiModel, provider: 'local' };
     }
 
     const owner = getProviderForModel(opts.podcastAiModel);

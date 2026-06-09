@@ -64,6 +64,7 @@ vi.mock('@/lib/prompt-loader', () => ({
 vi.mock('@/lib/providers/tts', () => ({
   canResolveTts: (...args: unknown[]) => mockCanResolveTts(...args),
   resolveTtsProvider: (...args: unknown[]) => mockResolveTtsProvider(...args),
+  getConfiguredTtsProviderId: () => null,
 }));
 
 vi.mock('@/lib/auto-model-config', () => ({

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 
 // Create mock TTS provider classes that will be injected via module.require
 class MockElevenLabsProvider {
@@ -44,6 +44,8 @@ vi.mock('@/lib/voice-pool', () => ({
 vi.mock('@/lib/providers/tts-registry', () => ({
   getProviderMeta: vi.fn().mockReturnValue({ defaultModel: 'test-model' }),
   compareQuality: vi.fn(),
+  isValidProviderId: (id: string) =>
+    ['elevenlabs', 'openai', 'cartesia', 'hume', 'fal', 'replicate', 'minimax', 'mistral', 'kokoro'].includes(id),
 }));
 
 vi.mock('@/lib/byok', () => ({
@@ -143,7 +145,7 @@ vi.mock('@/lib/logger', () => ({
 }));
 
 import { createAIProvider } from '@/lib/providers/ai';
-import { createTtsProvider, resolveTtsProvider } from '@/lib/providers/tts';
+import { createTtsProvider, resolveTtsProvider, getConfiguredTtsProviderId } from '@/lib/providers/tts';
 import { createStorageProvider } from '@/lib/providers/storage';
 
 describe('Provider Factories', () => {
@@ -236,6 +238,25 @@ describe('Provider Factories', () => {
           requestedProvider: 'auto',
         })
       ).rejects.toThrow('TTS provider is required');
+    });
+  });
+
+  describe('getConfiguredTtsProviderId', () => {
+    afterEach(() => vi.unstubAllEnvs());
+
+    it('returns null when TTS_PROVIDER is unset', () => {
+      vi.stubEnv('TTS_PROVIDER', '');
+      expect(getConfiguredTtsProviderId()).toBeNull();
+    });
+
+    it('returns the keyless local provider when TTS_PROVIDER=kokoro', () => {
+      vi.stubEnv('TTS_PROVIDER', 'kokoro');
+      expect(getConfiguredTtsProviderId()).toBe('kokoro');
+    });
+
+    it('returns null for an unknown TTS_PROVIDER value', () => {
+      vi.stubEnv('TTS_PROVIDER', 'bogus');
+      expect(getConfiguredTtsProviderId()).toBeNull();
     });
   });
 

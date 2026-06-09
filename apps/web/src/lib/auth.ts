@@ -8,6 +8,7 @@ import Resend from 'next-auth/providers/resend';
 import { prisma } from './prisma';
 import { generateUniqueHandle } from './handles';
 import { isAdminEmail } from './admin-emails';
+import { bootstrapFirstUserAsOwner } from './owner-bootstrap';
 import { getOptionalEmailProviderConfig, sendEmail } from './email';
 import { buildMagicLinkEmail } from './email-templates';
 import { isOpenSignup } from './site-config';
@@ -77,6 +78,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
   events: {
     async createUser({ user }) {
+      // First-user-becomes-owner: a fresh self-host's first account is promoted
+      // to household owner (ADMIN). No-op on hosted installs (ADMIN_EMAILS set)
+      // and once an owner already exists.
+      if (user.id) {
+        await bootstrapFirstUserAsOwner(user.id);
+      }
+
       if (user.email) {
         const entry = await prisma.waitlist.findUnique({
           where: { email: user.email },

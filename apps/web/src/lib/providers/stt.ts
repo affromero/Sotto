@@ -1,5 +1,5 @@
 import { logger } from '../logger';
-import { getSttProviderMeta } from './stt-registry';
+import { getSttProviderMeta, isValidSttProviderId } from './stt-registry';
 import { getAiKey, getByokKey } from '../byok';
 
 /**
@@ -578,6 +578,22 @@ export function createSttProvider(
       const config = model ? { ...OPENAI_WHISPER_CONFIG, model } : OPENAI_WHISPER_CONFIG;
       return new OpenAIWhisperProvider(apiKey, config);
     }
+    case 'local': {
+      const baseURL = process.env.STT_BASE_URL?.trim();
+      if (!baseURL) {
+        throw new Error(
+          'STT_BASE_URL is required for STT_PROVIDER=local. Point it at your local OpenAI-compatible Whisper server (e.g. http://localhost:8000/v1 for faster-whisper-server / Speaches).',
+        );
+      }
+      const config: WhisperProviderConfig = {
+        baseURL,
+        model: process.env.STT_MODEL?.trim() || model || getSttProviderMeta('local').defaultModel,
+        envVar: 'STT_API_KEY',
+        name: 'Local Whisper',
+      };
+      // Keyless: local servers ignore the key but the SDK needs a non-empty string.
+      return new OpenAIWhisperProvider(apiKey || 'local', config);
+    }
     default:
       throw new Error(`Unknown STT provider: "${target}"`);
   }
@@ -593,13 +609,29 @@ const STT_PLATFORM_ENV: Record<SttProviderId, string> = {
   deepgram: 'DEEPGRAM_API_KEY',
   assemblyai: 'ASSEMBLYAI_API_KEY',
   elevenlabs: 'ELEVENLABS_API_KEY',
+  local: 'STT_API_KEY',
 };
 
 /**
  * Get the platform API key for a given STT provider.
+ * The local provider is keyless — it returns a placeholder so the resolver does
+ * not reject it (the local server ignores the key; STT_API_KEY overrides it only
+ * when a local server sits behind auth).
  */
 export function getSttPlatformKey(provider: SttProviderId): string | undefined {
+  if (provider === 'local') return process.env.STT_API_KEY?.trim() || 'local';
   return process.env[STT_PLATFORM_ENV[provider]];
+}
+
+/**
+ * Resolve the server-configured STT provider from STT_PROVIDER (validated),
+ * defaulting to 'openai'. Used by workers that transcribe with the instance's
+ * configured provider rather than a per-request choice — so STT_PROVIDER=local
+ * routes transcription to a local Whisper server.
+ */
+export function getConfiguredSttProviderId(): SttProviderId {
+  const raw = (process.env.STT_PROVIDER ?? '').trim();
+  return isValidSttProviderId(raw) ? raw : 'openai';
 }
 
 // ---------------------------------------------------------------------------
