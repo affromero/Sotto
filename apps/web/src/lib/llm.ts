@@ -72,6 +72,22 @@ export async function generateResponse(
     return { ...result, model: options.model };
   }
 
+  // Per-request local routing (OpenAI-compatible local server, e.g. "local:qwen3").
+  // Routed by prefix here so the registry guardrail below never sees the
+  // host-defined model name.
+  if (options?.model?.startsWith('local:')) {
+    const { createAIProvider } = await import('./providers/ai');
+    const ai = createAIProvider('local');
+    const localModel = options.model.slice('local:'.length) || process.env.AI_MODEL || '';
+    const result = await ai.generateResponse(systemPrompt, messages, {
+      maxTokens: options?.maxTokens,
+      model: localModel,
+      skipModeration: options?.skipModeration,
+      ...(options?.jsonSchema ? { jsonSchema: options.jsonSchema } : {}),
+    });
+    return { ...result, model: options.model };
+  }
+
   const resolvedModel = options?.model;
   if (!resolvedModel) {
     throw new Error('AI model is required for generateResponse.');
@@ -188,6 +204,20 @@ export async function* streamResponse(
     yield* streamClaudeCode(systemPrompt, serializeMessages(textMessages), {
       model: ccModel,
       useWebSearch: hasWebSearch,
+    });
+    options?.onComplete?.({ inputTokens: 0, outputTokens: 0, model: options.model });
+    return;
+  }
+
+  // Per-request local routing (OpenAI-compatible local server, e.g. "local:qwen3").
+  if (options?.model?.startsWith('local:')) {
+    const { createAIProvider } = await import('./providers/ai');
+    const ai = createAIProvider('local');
+    const localModel = options.model.slice('local:'.length) || process.env.AI_MODEL || '';
+    yield* ai.streamResponse(systemPrompt, messages, {
+      maxTokens: options?.maxTokens,
+      model: localModel,
+      skipModeration: options?.skipModeration,
     });
     options?.onComplete?.({ inputTokens: 0, outputTokens: 0, model: options.model });
     return;

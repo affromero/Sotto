@@ -75,6 +75,20 @@ const STT_PROVIDERS: Record<SttProviderId, SttProviderMeta> = {
     ],
     platformCostPerMinute: 0.0025,
   },
+
+  // Local OpenAI-compatible Whisper server (faster-whisper-server / Speaches /
+  // whisper.cpp server). Keyless and free; the served model is host-defined via
+  // STT_MODEL (default whisper-1; recommend Whisper large-v3-turbo for broad
+  // multilingual coverage). Endpoint via STT_BASE_URL.
+  local: {
+    id: 'local',
+    displayName: 'Local Whisper',
+    defaultModel: 'whisper-1',
+    models: [
+      { id: 'whisper-1', displayName: 'Local Whisper (OpenAI-compatible)', tier: 'balanced' },
+    ],
+    platformCostPerMinute: 0,
+  },
 };
 
 export function getAllSttProviderMeta(): SttProviderMeta[] {

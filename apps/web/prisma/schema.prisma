@@ -112,6 +112,7 @@ model User {
   // API Keys
   apiKeys           ApiKey[]
   privateFeedTokens PrivateFeedToken[]
+  pairingTokens     PairingToken[]
 
   // BYOK TTS keys (multi-provider)
   userTtsKeys UserTtsKey[]
@@ -1342,6 +1343,26 @@ model ApiKey {
 
   @@index([userId])
   @@index([keyHash])
+}
+
+// ============ DEVICE PAIRING ============
+
+// Short-lived, single-use "scan to connect" token. The QR a learner shows on the
+// server renders {serverUrl, token}; a phone/tablet redeems it for a long-lived
+// ApiKey. Only the hash is stored — the raw token lives in the QR for a few minutes.
+model PairingToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  name      String    @default("Paired device")
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
 }
 
 // ============ PRIVATE RSS FEEDS ============

@@ -320,7 +320,7 @@ export const voicePreviewSchema = z.object({
   voiceId: z.string().min(1),
   text: z.string().min(1).max(500),
   provider: z
-    .enum(['elevenlabs', 'hume', 'cartesia', 'openai', 'fal', 'replicate', 'minimax', 'mistral'])
+    .enum(['elevenlabs', 'hume', 'cartesia', 'openai', 'fal', 'replicate', 'minimax', 'mistral', 'kokoro'])
     .refine((value) => value.length > 0),
 });
 
@@ -440,6 +440,7 @@ export const byokSchema = z.object({
     'replicate',
     'minimax',
     'mistral',
+    'kokoro',
     'suno',
   ]),
   apiKey: z.string().min(10).max(500),
@@ -978,4 +979,13 @@ export const updateMusicVolumeSchema = z.object({
 
 export const selectMusicGenerationSchema = z.object({
   generationId: z.string().min(1).max(100),
+});
+
+// Device pairing ("scan to connect")
+export const pairDeviceSchema = z.object({
+  name: z.string().trim().min(1).max(60).optional(),
+});
+
+export const redeemPairingSchema = z.object({
+  token: z.string().min(10).max(256),
 });

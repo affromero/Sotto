@@ -125,4 +125,16 @@ describe('TTS Providers', () => {
       expect(valid).toBe(true);
     });
   });
+
+  describe('Kokoro (local sidecar)', () => {
+    // Keyless — there are no credentials to validate, so the smoke test checks
+    // the local sidecar's /health endpoint when TTS_BASE_URL is configured.
+    it.skipIf(!process.env.TTS_BASE_URL)('reaches the sidecar health endpoint', async () => {
+      const baseURL = process.env.TTS_BASE_URL!.replace(/\/+$/, '');
+      const res = await fetch(`${baseURL}/health`);
+      expect(res.ok).toBe(true);
+      const body = (await res.json()) as { status?: string };
+      expect(body.status).toBe('ok');
+    });
+  });
 });

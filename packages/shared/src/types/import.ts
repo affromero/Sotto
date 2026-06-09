@@ -1,4 +1,4 @@
-export type SttProviderId = 'openai' | 'elevenlabs' | 'together' | 'deepgram' | 'assemblyai';
+export type SttProviderId = 'openai' | 'elevenlabs' | 'together' | 'deepgram' | 'assemblyai' | 'local';
 
 export interface ImportPodcastRequest {
   title?: string;

@@ -48,6 +48,7 @@ vi.mock('@/lib/providers/tts-voices', () => ({
   FAL_VOICE_POOL: [{ id: 'Vivian', name: 'Vivian', gender: 'female', character: 'warm' }],
   MINIMAX_VOICE_POOL: [{ id: 'Deep_Voice_Man', name: 'Deep Voice Man', gender: 'male', character: 'authoritative expert' }],
   MISTRAL_VOICE_POOL: [{ id: 'casual_male', name: 'Casual Male', gender: 'male', character: 'friendly conversationalist' }],
+  KOKORO_VOICE_POOL: [{ id: 'af_heart', name: 'Heart', gender: 'female', character: 'warm narrator' }],
   getTestVoiceId: vi.fn((provider: string) => {
     const map: Record<string, string> = {
       elevenlabs: '21m00Tcm4TlvDq8ikWAM',
@@ -58,6 +59,7 @@ vi.mock('@/lib/providers/tts-voices', () => ({
       replicate: 'Vivian',
       minimax: 'Deep_Voice_Man',
       mistral: 'casual_male',
+      kokoro: 'af_heart',
     };
     return map[provider] ?? 'alloy';
   }),
@@ -67,7 +69,7 @@ vi.mock('@/lib/providers/tts-voices', () => ({
 // Tests control keys via vi.stubEnv() in beforeEach.
 
 vi.mock('@/lib/providers/tts-registry', () => ({
-  getProviderIds: vi.fn(() => ['elevenlabs', 'openai', 'cartesia', 'hume', 'fal', 'replicate', 'minimax', 'mistral']),
+  getProviderIds: vi.fn(() => ['elevenlabs', 'openai', 'cartesia', 'hume', 'fal', 'replicate', 'minimax', 'mistral', 'kokoro']),
   getProviderMeta: vi.fn(() => ({ defaultModel: 'test-model' })),
 }));
 

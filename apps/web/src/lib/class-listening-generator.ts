@@ -13,6 +13,7 @@ import { loadAndRender } from './prompt-loader';
 import { formatNotesForPrompt } from './course-notes';
 import { generateScript } from './script-generator';
 import { createSegmentsAndQueueAudio } from './segment-creator';
+import { getConfiguredTtsProviderId } from './providers/tts';
 import { logUsage } from './usage-logger';
 import { logger } from './logger';
 
@@ -68,7 +69,9 @@ export async function composeListeningContent(p: ListeningContentParams): Promis
   // Step 1: resolve the learning AI provider (BYOK or local agent)
   const ai = await resolveLearningAi(p.userId);
 
-  // Step 2: create a CLASS podcast
+  // Step 2: create a CLASS podcast. When the instance pins an explicit TTS
+  // provider (TTS_PROVIDER, e.g. the keyless local kokoro sidecar), seed it on
+  // the podcast so the audio-generation worker renders listening audio with it.
   const podcast = await prisma.podcast.create({
     data: {
       userId: p.userId,
@@ -78,6 +81,7 @@ export async function composeListeningContent(p: ListeningContentParams): Promis
       visibility: 'PRIVATE',
       language: p.targetLang,
       status: 'PENDING',
+      ttsProvider: getConfiguredTtsProviderId() ?? undefined,
     },
   });
   const podcastId = podcast.id;

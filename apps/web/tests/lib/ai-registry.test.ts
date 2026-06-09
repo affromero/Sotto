@@ -26,6 +26,7 @@ describe('getCheapestModelForProvider', () => {
     expect(getCheapestModelForProvider('deepgram')).toBeNull();
     expect(getCheapestModelForProvider('assemblyai')).toBeNull();
     expect(getCheapestModelForProvider('together')).toBeNull();
+    expect(getCheapestModelForProvider('local')).toBeNull();
   });
 
   it('returns null for unknown provider', () => {
@@ -147,6 +148,15 @@ describe('resolveAiModelAndProvider — explicit model routing', () => {
 
     expect(result.provider).toBe('claude-code');
     expect(result.model).toBe('claude-code:sonnet');
+  });
+
+  it('keeps local: prefixed models routed to the local provider without registry lookup', async () => {
+    const result = await resolveAiModelAndProvider({
+      podcastAiModel: 'local:qwen3',
+    });
+
+    expect(result.provider).toBe('local');
+    expect(result.model).toBe('local:qwen3');
   });
 
   it('uses a BYOK provider default model when no explicit model is set', async () => {

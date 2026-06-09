@@ -94,6 +94,11 @@ vi.mock('@/lib/providers/ai', () => ({
   createAIProvider: (...args: unknown[]) => mockCreateAIProvider(...args),
 }));
 
+const mockGetConfiguredTtsProviderId = vi.fn(() => null as string | null);
+vi.mock('@/lib/providers/tts', () => ({
+  getConfiguredTtsProviderId: () => mockGetConfiguredTtsProviderId(),
+}));
+
 vi.mock('@/lib/prompt-loader', () => ({
   loadAndRender: (...args: unknown[]) => mockLoadAndRender(...args),
 }));
@@ -253,6 +258,19 @@ describe('generateClassListening', () => {
             language: 'es',
             status: 'PENDING',
           }),
+        }),
+      );
+    });
+
+    it('seeds the CLASS podcast with the configured local TTS provider (TTS_PROVIDER=kokoro)', async () => {
+      setupHappyPath();
+      mockGetConfiguredTtsProviderId.mockReturnValue('kokoro');
+
+      await generateClassListening(PARAMS);
+
+      expect(mockPodcastCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ ttsProvider: 'kokoro' }),
         }),
       );
     });

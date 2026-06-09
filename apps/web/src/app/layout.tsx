@@ -58,6 +58,11 @@ export const metadata: Metadata = {
     description: BRAND.description,
   },
   manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    title: 'Sotto',
+    statusBarStyle: 'default',
+  },
 };
 
 export const viewport: Viewport = {

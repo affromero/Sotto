@@ -9,6 +9,7 @@ import { addJob, audioImportQueue, JobType } from '@/lib/queue';
 import { importPodcastSchema } from '@/lib/validations';
 import { checkGenerationGate } from '@/lib/generation-gate';
 import { resolveSttProvider } from '@/lib/providers/stt';
+import type { SttProviderId } from '@sotto/shared';
 
 import { checkRateLimit } from '@/lib/redis';
 import { generatePodcastSlug } from '@/lib/slugify';
@@ -185,7 +186,7 @@ export async function POST(request: NextRequest) {
     const validatedTopic = validation.data.topic || '';
     const generateMetadata = !validation.data.title;
     let sttApiKey: string | undefined;
-    let effectiveSttProvider = validatedSttProvider;
+    let effectiveSttProvider: SttProviderId | undefined = validatedSttProvider;
     let effectiveSttModel = validatedSttModel;
 
     if (!transcriptFile) {

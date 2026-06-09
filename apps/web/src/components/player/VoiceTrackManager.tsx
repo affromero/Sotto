@@ -17,6 +17,7 @@ const PROVIDER_DISPLAY: Record<string, string> = {
   replicate: 'Replicate',
   minimax: 'MiniMax',
   mistral: 'Mistral',
+  kokoro: 'Kokoro',
 };
 
 function buildVoiceTooltip(voices: VoiceTrackSummary['voices']): string | undefined {

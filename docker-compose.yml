@@ -96,6 +96,72 @@ services:
     ports:
       - '3002:3002'
 
+  # ---------------------------------------------------------------------------
+  # Totally-local inference profile (opt-in):  docker compose --profile local up
+  # Runs the whole AI stack on your own hardware with zero cloud keys. Pair with:
+  #   AI_PROVIDER=local   AI_BASE_URL=http://ollama:11434/v1   AI_MODEL=qwen3
+  #   STT_PROVIDER=local  STT_BASE_URL=http://whisper:8000/v1
+  #   TTS_PROVIDER=kokoro TTS_BASE_URL=http://local-tts:8000
+  # (Inside Docker use the service names above; from the host use localhost +
+  # the mapped ports below. See .env.oss.example.)
+  # ---------------------------------------------------------------------------
+  ollama:
+    image: ollama/ollama:latest
+    container_name: sotto-ollama
+    profiles: ['local']
+    ports:
+      - '11434:11434'
+    volumes:
+      - sotto_ollama_data:/root/.ollama
+    # GPU (NVIDIA): uncomment to accelerate. Requires nvidia-container-toolkit.
+    # On Apple Silicon, Docker has no GPU passthrough — Ollama runs on CPU here;
+    # for Metal acceleration run Ollama natively on the host instead.
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+    healthcheck:
+      test: ['CMD-SHELL', 'ollama list || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  whisper:
+    # OpenAI-compatible local Whisper (faster-whisper-server). Serves
+    # /v1/audio/transcriptions. For NVIDIA GPUs use the :latest-cuda image.
+    image: fedirz/faster-whisper-server:latest-cpu
+    container_name: sotto-whisper
+    profiles: ['local']
+    ports:
+      - '8001:8000'
+    environment:
+      # large-v3-turbo: best broad multilingual coverage (99+ languages).
+      WHISPER__MODEL: deepdml/faster-whisper-large-v3-turbo-ct2
+    volumes:
+      - sotto_whisper_data:/root/.cache/huggingface
+
+  local-tts:
+    # Keyless Kokoro TTS sidecar (services/local-tts). Multilingual, CPU-friendly.
+    build:
+      context: .
+      dockerfile: services/local-tts/Dockerfile
+    container_name: sotto-local-tts
+    profiles: ['local']
+    ports:
+      - '8000:8000'
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -q --spider http://localhost:8000/health || exit 1']
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
 volumes:
   sotto_postgres_data:
   sotto_redis_data:
+  sotto_ollama_data:
+  sotto_whisper_data:

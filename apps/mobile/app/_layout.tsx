@@ -10,6 +10,7 @@ import { useFonts } from 'expo-font';
 import { DMSerifDisplay_400Regular } from '@expo-google-fonts/dm-serif-display';
 import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold } from '@expo-google-fonts/inter';
 import { isAuthenticated, onAuthSuccess } from '../lib/auth';
+import { loadStoredServerUrl, hasServerConfigured } from '../lib/server-url';
 import { useThemeColors, useThemeStore } from '../lib/useThemeColors';
 import { api, onAuthRevoked } from '../lib/api';
 import { registerForPushNotifications } from '../lib/notifications';
@@ -65,6 +66,17 @@ function useProtectedRoute() {
     let cancelled = false;
 
     async function checkAuth() {
+      // Connect gate: a runtime-config build must be paired to a server before
+      // anything else. Load the stored URL, then route to /connect if none.
+      await loadStoredServerUrl();
+      if (!hasServerConfigured()) {
+        if (!cancelled) {
+          setIsReady(true);
+          if (segments[0] !== 'connect') router.replace('/connect');
+        }
+        return;
+      }
+
       const hasToken = await isAuthenticated();
       if (!hasToken) {
         if (!cancelled) {

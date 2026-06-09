@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { signIn, signOut } from 'next-auth/react';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -390,6 +391,33 @@ export function SettingsForm({
         <h2 className={styles.sectionTitle}>Appearance</h2>
         <p className={styles.sectionDesc}>Choose your preferred theme</p>
         <ThemeSelector />
+      </section>
+
+      {/* Household Section — owner only */}
+      {role === 'ADMIN' && (
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Household</h2>
+          <p className={styles.sectionDesc}>
+            Invite your family to this instance. Each person learns on a private account of their
+            own.
+          </p>
+          <Link href="/settings/household" className={styles.householdLink}>
+            <span className={styles.householdLinkText}>Manage household</span>
+            <span aria-hidden="true">&rarr;</span>
+          </Link>
+        </section>
+      )}
+
+      {/* Connect a device — available to every learner */}
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>Devices</h2>
+        <p className={styles.sectionDesc}>
+          Link the app on your phone or tablet by scanning a one-time code — no password to type.
+        </p>
+        <Link href="/settings/devices" className={styles.householdLink}>
+          <span className={styles.householdLinkText}>Connect a device</span>
+          <span aria-hidden="true">&rarr;</span>
+        </Link>
       </section>
 
       {/* Profile Section */}

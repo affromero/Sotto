@@ -35,6 +35,8 @@ function sortOptions(options: TtsOption[]): TtsOption[] {
 }
 
 function hasPlatformKey(providerId: TtsProviderId): boolean {
+  // Kokoro is keyless and local — it is "available" when the sidecar URL is set.
+  if (providerId === 'kokoro') return !!process.env.TTS_BASE_URL?.trim();
   const envVar = PLATFORM_TTS_ENV[providerId];
   return envVar ? !!process.env[envVar] : false;
 }
