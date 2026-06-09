@@ -49,7 +49,7 @@ const DISALLOWED_PATHS = [
   '/settings',
   '/billing',
   '/analytics',
-  '/onboarding',
+  '/welcome',
   '/team',
   '/pitch',
   '/_next/',

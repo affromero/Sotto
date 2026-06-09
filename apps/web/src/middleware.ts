@@ -8,7 +8,7 @@ const PROTECTED_ROUTES = [
   '/billing',
   '/analytics',
   '/admin',
-  '/onboarding',
+  '/welcome',
 ];
 const AUTH_ROUTES = ['/auth/login', '/auth/signup', '/auth/waitlisted'];
 

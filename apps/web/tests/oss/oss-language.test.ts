@@ -907,7 +907,7 @@ describe('open-source language-learning OSS surfaces', () => {
       'scripts/recording/index.ts',
       'scripts/ml/prepare-quality-training.ts',
       'apps/web/src/app/changelog/page.tsx',
-      'apps/web/src/app/onboarding/KeySetupForm.tsx',
+      'apps/web/src/app/welcome/WelcomeFlow.tsx',
       'apps/web/src/lib/CLAUDE.md',
       'apps/web/src/lib/auth-guards.ts',
       'apps/web/src/lib/demo-context.ts',
@@ -926,7 +926,6 @@ describe('open-source language-learning OSS surfaces', () => {
   it('keeps onboarding setup explicit about transcription readiness', () => {
     const setupSources = [
       'apps/web/src/lib/setup-readiness.ts',
-      'apps/web/src/app/onboarding/page.tsx',
       'apps/web/src/app/api/onboarding/readiness/route.ts',
       'apps/web/src/components/create/SttModelDropdown.tsx',
       'apps/web/prisma/schema.prisma',
@@ -1159,8 +1158,7 @@ describe('open-source language-learning OSS surfaces', () => {
       'src/app/api/source-connectors/readiness/route.ts'
     );
     const onboardingSources = [
-      readSource('src/app/onboarding/page.tsx'),
-      readSource('src/app/onboarding/KeySetupForm.tsx'),
+      readSource('src/app/welcome/steps/StepContext.tsx'),
       sourceConnectorSource,
       sourceConnectorRouteSource,
       readFileSync(resolve(repoRoot, '.env.example'), 'utf8'),
@@ -1178,7 +1176,7 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(sourceConnectorSource).toContain("command: 'codex'");
     expect(sourceConnectorSource).toContain('SLACK_BOT_TOKEN');
     expect(sourceConnectorSource).toContain('GOOGLE_WORKSPACE_CLI_CREDENTIALS_FILE');
-    expect(onboardingSources).toContain('Private Sources');
+    expect(onboardingSources).toContain('Nothing leaves your machine');
     expect(onboardingSources).toContain('privateOnly: true');
     expect(onboardingSources).not.toContain("visibility: 'PUBLIC'");
     expect(onboardingSources).not.toContain('shared content feed');
