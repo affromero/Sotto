@@ -531,6 +531,41 @@
   margin-bottom: var(--spacing-md);
 }
 
+/* Household Section link */
+
+.householdLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  min-height: 44px;
+  padding: 0 var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-background);
+  color: var(--color-primary);
+  text-decoration: none;
+  transition: transform 0.15s ease;
+}
+
+.householdLink:hover {
+  transform: translateX(2px);
+}
+
+.householdLinkText {
+  font: var(--text-body-sm);
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .householdLink {
+    transition: none;
+  }
+
+  .householdLink:hover {
+    transform: none;
+  }
+}
+
 .byokInputRow {
   display: flex;
   gap: var(--spacing-sm);
