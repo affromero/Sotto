@@ -63,6 +63,44 @@ export function HouseholdManager() {
   const [copied, setCopied] = useState(false);
   const [revokingId, setRevokingId] = useState<string | null>(null);
 
+  const [openSignup, setOpenSignup] = useState<boolean | null>(null);
+  const [savingSignup, setSavingSignup] = useState(false);
+
+  const loadSiteConfig = useCallback(async () => {
+    try {
+      const response = await fetch('/api/admin/site-config');
+      if (!response.ok) return;
+      const data: { openSignup: boolean } = await response.json();
+      setOpenSignup(data.openSignup);
+    } catch {
+      // Non-fatal: the toggle simply stays hidden until it loads.
+    }
+  }, []);
+
+  const handleToggleSignup = useCallback(async () => {
+    if (openSignup === null) return;
+    setSavingSignup(true);
+    setError(null);
+    const next = !openSignup;
+    try {
+      const response = await fetch('/api/admin/site-config', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ openSignup: next }),
+      });
+      if (!response.ok) {
+        setError('Could not update who can join.');
+        return;
+      }
+      const data: { openSignup: boolean } = await response.json();
+      setOpenSignup(data.openSignup);
+    } catch {
+      setError('Could not update who can join.');
+    } finally {
+      setSavingSignup(false);
+    }
+  }, [openSignup]);
+
   const loadInvitations = useCallback(async () => {
     try {
       const response = await fetch('/api/admin/invitations');
@@ -98,7 +136,8 @@ export function HouseholdManager() {
   useEffect(() => {
     void loadInvitations();
     void loadMembers();
-  }, [loadInvitations, loadMembers]);
+    void loadSiteConfig();
+  }, [loadInvitations, loadMembers, loadSiteConfig]);
 
   const handleInvite = useCallback(async () => {
     setCreating(true);
@@ -151,6 +190,36 @@ export function HouseholdManager() {
 
   return (
     <>
+      {/* Who can join */}
+      {openSignup !== null && (
+        <section className={styles.inviteCard} aria-labelledby="signup-heading">
+          <div className={styles.inviteHead}>
+            <h2 id="signup-heading" className={styles.sectionTitle}>
+              Who can join
+            </h2>
+            <p className={styles.sectionHint}>
+              {openSignup
+                ? 'Open — anyone who can reach this instance can create an account.'
+                : 'Invite-only — only people you invite can create an account. Recommended for a private household.'}
+            </p>
+          </div>
+          <div className={styles.signupControl}>
+            <Badge variant={openSignup ? 'warning' : 'success'}>
+              {openSignup ? 'Open sign-up' : 'Invite-only'}
+            </Badge>
+            <Button
+              variant="secondary"
+              size="small"
+              onClick={handleToggleSignup}
+              loading={savingSignup}
+              disabled={savingSignup}
+            >
+              {openSignup ? 'Switch to invite-only' : 'Switch to open sign-up'}
+            </Button>
+          </div>
+        </section>
+      )}
+
       {/* Invite a family member */}
       <section className={styles.inviteCard} aria-labelledby="invite-heading">
         <div className={styles.inviteHead}>
