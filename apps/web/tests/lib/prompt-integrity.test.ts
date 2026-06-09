@@ -167,7 +167,7 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
     'COUNT', 'LEVEL', 'NATIVE', 'NOTES', 'TARGET', 'TRANSCRIPT',
   ].sort(),
   'class/generate-section-quiz.md': [
-    'COUNT', 'GRAMMAR_POINTS', 'LEVEL', 'NATIVE', 'NOTES', 'OBJECTIVE', 'SEED', 'SKILL', 'TARGET', 'VOCAB',
+    'COUNT', 'GRAMMAR_POINTS', 'LEVEL', 'NATIVE', 'NOTES', 'OBJECTIVE', 'SEED', 'SKILL', 'SOURCE', 'TARGET', 'VOCAB',
   ].sort(),
   'class/level-source.md': [
     'LEVEL', 'NATIVE', 'SOURCE', 'TARGET', 'TITLE',

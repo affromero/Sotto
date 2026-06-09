@@ -50,6 +50,10 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
     description: 'Validates source URLs and citation quality',
     stage: 'Content Pipeline',
   },
+  'verify-class-references': {
+    description: 'Verify-only reference check for sourced classes (writes verdicts, never creates segments)',
+    stage: 'Content Pipeline',
+  },
   'audio-generation': {
     description: 'Converts script segments to audio via TTS providers',
     stage: 'Audio Pipeline',

@@ -73,6 +73,7 @@ MODERATE_CONTENT = 'moderate_content',
   RENDER_SEGMENT_PREVIEW = 'render_segment_preview',
   SPEAKING_GRADING = 'speaking_grading',
   WORKSHEET_PDF = 'worksheet_pdf',
+  VERIFY_CLASS_REFERENCES = 'verify_class_references',
 }
 
 /**
@@ -462,6 +463,7 @@ const QUEUE_DEFINITIONS: Record<string, QueueDefinition> = {
   'tts-provider-monitor': { attempts: 2, skipEvents: true },
   'speaking-grading': { attempts: 3 },
   'worksheet-pdf': { attempts: 2, skipEvents: true },
+  'verify-class-references': { attempts: 2, skipEvents: true },
 };
 
 const queueInstances = new Map<string, Queue>();
@@ -1039,6 +1041,10 @@ export interface WorksheetPdfPayload {
   classId: string;
   appBaseUrl?: string;
 }
+
+export interface VerifyClassReferencesPayload {
+  podcastId: string;
+}
 export const lipSyncTestQueue = createQueueReference('lip-sync-test');
 export const placeEnrichmentQueue = createQueueReference('place-enrichment');
 export const demoScriptQueue = createQueueReference('demo-script');
@@ -1055,6 +1061,7 @@ export const ttsProviderMonitorQueue = createQueueReference('tts-provider-monito
 export const segmentPreviewQueue = createQueueReference('segment-preview');
 export const speakingGradingQueue = createQueueReference('speaking-grading');
 export const worksheetPdfQueue = createQueueReference('worksheet-pdf');
+export const verifyClassReferencesQueue = createQueueReference('verify-class-references');
 
 /** All queue names — single source of truth for admin and health endpoints */
 export const ALL_QUEUE_NAMES = Object.freeze(Object.keys(QUEUE_DEFINITIONS));
