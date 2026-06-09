@@ -23,10 +23,10 @@ const OUT = join(dirname(fileURLToPath(import.meta.url)), '..', 'apps', 'web', '
 mkdirSync(OUT, { recursive: true });
 
 const STYLE =
-  'Flat, minimal, modern editorial illustration. Centered friendly portrait, square composition. ' +
-  'Soft warm off-white paper background color #F5F4F0. Calm indigo-blue accent #3F4FB0 with subtle ' +
-  'teal and rose. Restrained, elegant palette, gentle grain. Suitable as a profile avatar. ' +
-  'No text, no words, no letters.';
+  'Artistic, expressive, painterly modern editorial illustration with rich texture and confident ' +
+  'brushwork. Centered portrait, square composition, gallery quality, a little dramatic. Warm ' +
+  'off-white paper background color #F5F4F0. Indigo-blue #3F4FB0 with subtle teal and rose accents. ' +
+  'Refined and elegant. Suitable as a profile avatar. No text, no words, no letters.';
 
 const ANIMALS = [
   ['capybara', 'capybara'],
@@ -41,7 +41,7 @@ const ANIMALS = [
 
 let ok = 0;
 for (const [slug, subject] of ANIMALS) {
-  const prompt = `A cute, friendly ${subject} from the Colombian tropics. ${STYLE}`;
+  const prompt = `An artistic portrait of a ${subject} from the Colombian tropics. ${STYLE}`;
   try {
     const res = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${KEY}`,
