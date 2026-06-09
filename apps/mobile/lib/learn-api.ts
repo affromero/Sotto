@@ -34,8 +34,22 @@ export interface ClassQuestion {
   question: string;
   options: string[];
   passageRef?: string | null;
+  /** Sourced classes: the real CEFR-leveled reading passage (may contain [N] markers). */
+  passageText?: string | null;
   correctIndex?: number;
   explanation?: string;
+}
+
+/** A verified source attached to a sourced class. */
+export interface ClassReference {
+  number: number;
+  title: string;
+  authors: string[];
+  year: number | null;
+  url: string | null;
+  type: string;
+  verificationStatus: 'PENDING' | 'VERIFIED' | 'FAILED' | 'REPLACED' | 'REMOVED';
+  contentDomain: string | null;
 }
 
 export interface ClassPrompt {
@@ -54,7 +68,7 @@ export interface ClassSectionData {
   attempt: number;
   score: number | null;
   passed: boolean | null;
-  podcast: { id: string; audioUrl: string | null; title: string } | null;
+  podcast: { id: string; audioUrl: string | null; title: string; references?: ClassReference[] } | null;
   questions: ClassQuestion[];
   prompts: ClassPrompt[];
 }
@@ -67,6 +81,9 @@ export interface ClassData {
   lesson: { title: string; level: string; objective: string };
   submitted: boolean;
   submission: { passed: boolean; overallScore: number } | null;
+  /** Sourced classes: the real link/title this class was built from. */
+  sourceUrl?: string | null;
+  sourceTitle?: string | null;
   sections: ClassSectionData[];
 }
 
