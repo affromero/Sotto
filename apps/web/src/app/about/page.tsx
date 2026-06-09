@@ -4,7 +4,7 @@ import { Footer } from '@/components/layout/Footer';
 import styles from './page.module.css';
 
 export const metadata = {
-  title: `About — ${BRAND.name}`,
+  title: `About ${BRAND.name}`,
   description: BRAND.description,
 };
 
@@ -17,9 +17,10 @@ export default function AboutPage() {
           <header className={styles.hero}>
             <h1 className={styles.heroTitle}>{BRAND.tagline}</h1>
             <p className={styles.heroSubtitle}>
-              Sotto turns topics, sources, and meetings into private conversational
-              podcasts you can interrupt and revisit. Built for curious minds who
-              learn by listening.
+              Sotto is open-source, self-hostable language-learning infrastructure.
+              You learn a language in the context of your own work and interests,
+              on a stack you run and control. The name is Italian. Sotto voce.
+              Spoken softly, kept private.
             </p>
           </header>
 
@@ -27,82 +28,83 @@ export default function AboutPage() {
             <div className={styles.feature}>
               <div className={styles.featureIcon} aria-hidden="true">
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-                  <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                  <line x1="12" x2="12" y1="19" y2="22" />
+                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z" />
                 </svg>
               </div>
-              <h2 className={styles.featureTitle}>Create</h2>
+              <h2 className={styles.featureTitle}>Learn</h2>
               <p className={styles.featureDescription}>
-                Describe what you want to hear. Our AI creates a rich,
-                multi-voice podcast with references and natural conversation
-                flow — no editing required.
+                Get placed at the right CEFR level, then work through mastery-gated
+                courses across five skills: grammar, reading, listening, speaking,
+                and writing. Each course is built from the context you choose to share.
               </p>
             </div>
 
             <div className={styles.feature}>
               <div className={styles.featureIcon} aria-hidden="true">
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="18" r="3" />
-                  <circle cx="6" cy="6" r="3" />
-                  <circle cx="18" cy="6" r="3" />
-                  <path d="M18 9v2c0 .6-.4 1-1 1H7c-.6 0-1-.4-1-1V9" />
-                  <path d="M12 12v3" />
+                  <circle cx="12" cy="12" r="3" />
+                  <circle cx="5" cy="6" r="2" />
+                  <circle cx="19" cy="6" r="2" />
+                  <circle cx="5" cy="18" r="2" />
+                  <circle cx="19" cy="18" r="2" />
+                  <path d="M7 7l3 3M17 7l-3 3M7 17l3-3M17 17l-3-3" />
                 </svg>
               </div>
-              <h2 className={styles.featureTitle}>Extend</h2>
+              <h2 className={styles.featureTitle}>Remember</h2>
               <p className={styles.featureDescription}>
-                Save a briefing, ask follow-up questions, and generate a new angle
-                from your own context. Your workspace stays private unless you
-                choose otherwise.
+                Every word and grammar point you meet enters a personal vocabulary
+                memory graph that you own. Spaced repetition brings the right review
+                back at the right moment, across all five skills.
               </p>
             </div>
 
             <div className={styles.feature}>
               <div className={styles.featureIcon} aria-hidden="true">
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
-                  <polyline points="16 6 12 2 8 6" />
-                  <line x1="12" x2="12" y1="2" y2="15" />
+                  <rect x="3" y="11" width="18" height="11" rx="2" />
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                 </svg>
               </div>
-              <h2 className={styles.featureTitle}>Control</h2>
+              <h2 className={styles.featureTitle}>Own</h2>
               <p className={styles.featureDescription}>
-                Keep podcasts private by default, organize collections, and decide
-                when a link should be shared. Knowledge work is more useful when
-                you control access.
+                Connect your own agent, Claude Code or Codex, and your own provider
+                keys. Run the whole stack yourself. Your keys, your data, your
+                progress. Nothing is shared unless you decide to share it.
               </p>
             </div>
           </section>
 
           <section className={styles.section}>
-            <h2 className={styles.sectionTitle}>Accessible by Design</h2>
+            <h2 className={styles.sectionTitle}>Free and Self-Hosted</h2>
             <p className={styles.sectionText}>
-              Sotto gives you one podcast every day for free — no credit card, no API keys.
-              Platform AI and voices are included. Bring your own API keys (BYOK)
-              for unlimited generation, duration, and model choice at cost price —
-              connect Anthropic, OpenAI, or any of seven TTS providers.
+              Sotto is free and open-source. There is no subscription, no waitlist,
+              and no managed account standing between you and your courses. You bring
+              your own keys for AI and audio, and you pay those providers directly
+              for what you use.
             </p>
             <p className={styles.sectionText}>
-              Your keys are encrypted with AES-256-GCM and never leave our servers unencrypted.
-              You stay in full control of your usage and costs with your own provider accounts.
+              Your keys are encrypted with AES-256-GCM on the instance you control.
+              Because you run the stack, your learning data stays with you. You decide
+              what your agent may read and what stays untouched.
             </p>
           </section>
 
           <section className={styles.section}>
-            <h2 className={styles.sectionTitle}>Interactive by Nature</h2>
+            <h2 className={styles.sectionTitle}>Built Around You</h2>
             <p className={styles.sectionText}>
-              Pause any podcast mid-playback and ask a question. The AI answers
-              in context — using what&apos;s been said so far — and you can bake
-              that explanation right back into the episode. Podcasts that learn
-              as you listen.
+              Most language tools teach the same lessons to everyone. Sotto teaches
+              the language through the things you already care about. A paper you are
+              reading, a project you are shipping, a topic you keep coming back to.
+              The course bends toward your context, not the other way around.
             </p>
           </section>
 
           <section className={styles.contact}>
             <h2 className={styles.sectionTitle}>Get in Touch</h2>
             <p className={styles.sectionText}>
-              Questions, feedback, or just want to say hello? Reach out at{' '}
+              Questions about running your own instance, or feedback on the courses?
+              Reach the maintainers of your deployment at{' '}
               <a href="mailto:support@example.com">support@example.com</a>.
             </p>
           </section>

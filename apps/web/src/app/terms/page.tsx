@@ -3,7 +3,7 @@ import { Footer } from '@/components/layout/Footer';
 import styles from './page.module.css';
 
 export const metadata = {
-  title: 'Terms of Service — Sotto',
+  title: 'Terms of Service. Sotto',
   description: 'Terms and conditions for using Sotto.',
 };
 
@@ -30,9 +30,10 @@ export default function TermsPage() {
 
           <h2>2. Description of Service</h2>
           <p>
-            Sotto is private AI podcast infrastructure that enables users to generate
-            conversational podcasts, interact with content during playback, organize a
-            private library, and share access when they choose.
+            Sotto is open-source, self-hostable language-learning infrastructure. It
+            lets you take mastery-gated CEFR courses across grammar, reading,
+            listening, speaking, and writing, keep a personal vocabulary memory graph,
+            and run the whole stack yourself with your own agent and provider keys.
           </p>
 
           <h2>3. BYOK Model and API Keys</h2>
@@ -53,13 +54,13 @@ export default function TermsPage() {
 
           <h2>4. AI-Generated Content</h2>
           <p>
-            Podcasts generated through Sotto are created using AI models. You
+            Lessons generated through Sotto are created using AI models. You
             acknowledge that:
           </p>
           <ul>
             <li>AI-generated content may contain inaccuracies or errors</li>
             <li>AI content is labeled as &quot;AI-Generated&quot; on the platform</li>
-            <li>You should not rely on AI-generated podcasts as authoritative sources</li>
+            <li>You should not rely on AI-generated lessons as authoritative sources</li>
             <li>
               Sotto includes a script verification step, but this does not guarantee
               factual accuracy
@@ -68,9 +69,9 @@ export default function TermsPage() {
 
           <h2>5. User Content and Ownership</h2>
           <p>
-            You retain ownership of podcasts you create or import. You control
-            whether podcasts are private, unlisted, or shared by link. Sharing a
-            podcast does not transfer ownership or grant other users rights beyond
+            You retain ownership of the lessons and learning data you create or import.
+            You control whether content is private, unlisted, or shared by link.
+            Sharing does not transfer ownership or grant other users rights beyond
             the access you explicitly provide.
           </p>
 
@@ -88,9 +89,9 @@ export default function TermsPage() {
           <h2>7. Private Library and Sharing</h2>
           <p>
             Sotto is designed for private libraries. You are responsible for sharing
-            podcasts only with people who are allowed to access the underlying
-            content. You may revoke access by changing visibility settings or
-            deleting the podcast.
+            content only with people who are allowed to access the underlying material.
+            You may revoke access by changing visibility settings or deleting the
+            content.
           </p>
 
           <h2>8. Account Termination</h2>
@@ -144,7 +145,7 @@ export default function TermsPage() {
             counter-notice with your contact information, identification of the
             removed material, a statement under penalty of perjury that removal was
             a mistake, and consent to jurisdiction. We will restore the content
-            within 10-14 business days unless the complainant files a court action.
+            within 10 to 14 business days unless the complainant files a court action.
           </p>
 
           <h3>Repeat Infringers</h3>
@@ -156,16 +157,16 @@ export default function TermsPage() {
           <h2>12. Optional Paid Voice Sharing and Payments</h2>
           <p>
             Private-first installs keep paid voice sharing disabled by default.
-            If an operator enables it, voice owners may set per-podcast pricing
+            If an operator enables it, voice owners may set per-lesson pricing
             for access to their voice clones.
           </p>
 
           <h3>Paid Access</h3>
           <ul>
             <li>Payments are processed securely via Stripe</li>
-            <li>Voice access is granted per podcast &mdash; one purchase covers one podcast generation</li>
-            <li>Payment is authorized upfront and captured only when the podcast reaches READY status</li>
-            <li>If podcast generation fails, the payment authorization is automatically cancelled</li>
+            <li>Voice access is granted per lesson. One purchase covers one lesson generation</li>
+            <li>Payment is authorized upfront and captured only when the lesson reaches READY status</li>
+            <li>If lesson generation fails, the payment authorization is automatically cancelled</li>
           </ul>
 
           <h3>Platform Fee</h3>
@@ -177,7 +178,7 @@ export default function TermsPage() {
 
           <h3>Refunds</h3>
           <p>
-            Since payment is only captured on successful podcast generation, refunds
+            Since payment is only captured on successful lesson generation, refunds
             are generally not applicable. If you experience issues with a completed
             purchase, contact{' '}
             <a href="mailto:support@example.com">support@example.com</a>.

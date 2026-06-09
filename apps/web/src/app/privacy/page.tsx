@@ -3,7 +3,7 @@ import { Footer } from '@/components/layout/Footer';
 import styles from './page.module.css';
 
 export const metadata = {
-  title: 'Privacy Policy — Sotto',
+  title: 'Privacy Policy. Sotto',
   description: 'How Sotto collects, uses, and protects your data.',
 };
 
@@ -33,9 +33,9 @@ export default function PrivacyPage() {
 
           <h3>Content You Create</h3>
           <p>
-            We store podcasts you generate, discovery chat conversations, scripts,
+            We store lessons you generate, discovery chat conversations, scripts,
             interactions (questions and answers), collections, voice clones,
-            and saved podcast ideas.
+            and saved lesson ideas.
           </p>
 
           <h3>BYOK Keys</h3>
@@ -46,7 +46,7 @@ export default function PrivacyPage() {
             and are never logged, shared, or used for any purpose other than processing
             your requests. API calls made with your keys are sent directly to the
             respective providers. Sotto does not store the content of those API calls
-            beyond what is necessary to deliver your podcast.
+            beyond what is necessary to deliver your lesson.
           </p>
 
           <h3>Usage and Behavioral Data</h3>
@@ -57,22 +57,22 @@ export default function PrivacyPage() {
           </p>
           <ul>
             <li>
-              <strong>Playback</strong> — play, pause, seek, speed change, complete,
+              <strong>Playback</strong>: play, pause, seek, speed change, complete,
               abandon, heartbeat (periodic position updates)
             </li>
             <li>
-              <strong>Library &amp; Discovery</strong> — library impression, library click,
+              <strong>Library &amp; Discovery</strong>: library impression, library click,
               search query, recommendation impression, recommendation click
             </li>
             <li>
-              <strong>Private Activity</strong> — save, unsave, rate, ask a question,
+              <strong>Private Activity</strong>: save, unsave, rate, ask a question,
               answer a question, incorporate an answer, share by link
             </li>
             <li>
-              <strong>Creation</strong> — generation start, generation complete
+              <strong>Creation</strong>: generation start, generation complete
             </li>
             <li>
-              <strong>Navigation</strong> — page view
+              <strong>Navigation</strong>: page view
             </li>
           </ul>
           <p>
@@ -103,7 +103,7 @@ export default function PrivacyPage() {
             <li>Listener archetype classification (e.g., deep diver, casual listener)</li>
             <li>Topic affinity scores derived from listening patterns</li>
             <li>Embedding vectors for content similarity matching</li>
-            <li>Peak listening hours and preferred podcast duration</li>
+            <li>Peak listening hours and preferred lesson duration</li>
             <li>Average completion rate, listen speed, and abandonment patterns</li>
           </ul>
           <p>
@@ -116,11 +116,11 @@ export default function PrivacyPage() {
           <h2>3. Legal Basis for Processing (GDPR)</h2>
           <ul>
             <li>
-              <strong>Contract performance</strong> — processing necessary to provide
-              your account, generate podcasts, and deliver the service you requested
+              <strong>Contract performance</strong>: processing necessary to provide
+              your account, generate lessons, and deliver the service you requested
             </li>
             <li>
-              <strong>Legitimate interest</strong> — personalized recommendations,
+              <strong>Legitimate interest</strong>: personalized recommendations,
               abuse prevention, rate limiting, and service improvement. We balance
               these interests against your privacy rights and provide opt-out
               mechanisms where feasible.
@@ -129,10 +129,10 @@ export default function PrivacyPage() {
 
           <h2>4. How We Use Your Information</h2>
           <ul>
-            <li>Generate and deliver podcasts you request</li>
+            <li>Generate and deliver lessons you request</li>
             <li>Provide private library, discovery, and recommendation features</li>
             <li>Build and update your behavioral profile for personalized recommendations</li>
-            <li>Send notifications about your podcasts and interactions</li>
+            <li>Send notifications about your lessons and interactions</li>
             <li>Process optional paid voice-sharing payments via Stripe Connect</li>
             <li>Moderate content for safety and policy compliance</li>
             <li>Improve service quality, fix bugs, and analyze usage patterns</li>
@@ -146,38 +146,38 @@ export default function PrivacyPage() {
           </p>
           <ul>
             <li>
-              <strong>AI Providers</strong> (Anthropic, OpenAI) — podcast script
+              <strong>AI Providers</strong> (Anthropic, OpenAI): lesson script
               generation, Q&amp;A, discovery chat, content moderation
             </li>
             <li>
-              <strong>Speech-to-Text</strong> (OpenAI Whisper) — audio
-              transcription for imported podcasts
+              <strong>Speech-to-Text</strong> (OpenAI Whisper): audio
+              transcription for imported audio
             </li>
             <li>
               <strong>TTS Providers</strong> (ElevenLabs, OpenAI, Cartesia,
-              Hume, Fal.ai, Replicate) — audio generation and voice cloning
+              Hume, Fal.ai, Replicate): audio generation and voice cloning
             </li>
             <li>
-              <strong>Content Moderation</strong> (OpenAI Moderation API) — automated
+              <strong>Content Moderation</strong> (OpenAI Moderation API): automated
               safety checks on user-generated content
             </li>
             <li>
-              <strong>Storage</strong> (Cloudflare R2) — audio files, transcripts,
+              <strong>Storage</strong> (Cloudflare R2): audio files, transcripts,
               and user avatars
             </li>
             <li>
-              <strong>Payments</strong> (Stripe) — optional paid voice-sharing
+              <strong>Payments</strong> (Stripe): optional paid voice-sharing
               transactions via Stripe Connect when enabled
             </li>
             <li>
-              <strong>Authentication</strong> (Google, GitHub, Apple) — OAuth sign-in
+              <strong>Authentication</strong> (Google, GitHub, Apple): OAuth sign-in
             </li>
             <li>
-              <strong>Account Linking</strong> (Twitter) — optional Twitter account
+              <strong>Account Linking</strong> (Twitter): optional Twitter account
               connection for bot integration
             </li>
             <li>
-              <strong>Bot Integrations</strong> (Telegram) — podcast creation via
+              <strong>Bot Integrations</strong> (Telegram): lesson creation via
               Telegram bot
             </li>
           </ul>
@@ -188,10 +188,10 @@ export default function PrivacyPage() {
 
           <h2>6. AI-Generated Content</h2>
           <p>
-            Sotto generates podcast content using AI. All AI-generated podcasts are
+            Sotto generates lesson content using AI. All AI-generated lessons are
             labeled as such. Imported human-created content is labeled accordingly.
-            Sotto does not claim ownership of AI-generated content — you retain rights
-            to podcasts you create.
+            Sotto does not claim ownership of AI-generated content. You retain rights
+            to the lessons you create.
           </p>
 
           <h2>7. Data Storage, Security, and Retention</h2>
@@ -205,18 +205,18 @@ export default function PrivacyPage() {
           <h3>Retention Periods</h3>
           <ul>
             <li>
-              <strong>Account data</strong> — retained until you delete your account
+              <strong>Account data</strong>: retained until you delete your account
             </li>
             <li>
-              <strong>Behavioral data</strong> — associated with your account while
+              <strong>Behavioral data</strong>: associated with your account while
               active; anonymized upon account deletion
             </li>
             <li>
-              <strong>API usage logs</strong> — user association removed (set to null)
+              <strong>API usage logs</strong>: user association removed (set to null)
               upon account deletion; aggregated logs retained for cost tracking
             </li>
             <li>
-              <strong>Audio files</strong> — deleted from storage upon account deletion
+              <strong>Audio files</strong>: deleted from storage upon account deletion
             </li>
           </ul>
 
@@ -227,26 +227,26 @@ export default function PrivacyPage() {
           </p>
           <ul>
             <li>
-              <strong>Access</strong> — request a copy of all personal data we hold
+              <strong>Access</strong>: request a copy of all personal data we hold
               about you
             </li>
             <li>
-              <strong>Rectification</strong> — correct inaccurate personal data via
+              <strong>Rectification</strong>: correct inaccurate personal data via
               your profile settings
             </li>
             <li>
-              <strong>Erasure</strong> — delete your account and all associated data
+              <strong>Erasure</strong>: delete your account and all associated data
             </li>
             <li>
-              <strong>Portability</strong> — export your data in a machine-readable
+              <strong>Portability</strong>: export your data in a machine-readable
               JSON format
             </li>
             <li>
-              <strong>Restriction</strong> — request that we limit processing of your
+              <strong>Restriction</strong>: request that we limit processing of your
               data
             </li>
             <li>
-              <strong>Objection</strong> — object to processing based on legitimate
+              <strong>Objection</strong>: object to processing based on legitimate
               interest
             </li>
           </ul>
@@ -254,7 +254,7 @@ export default function PrivacyPage() {
           <h3>Account Deletion</h3>
           <p>
             You can delete your account at any time from your profile settings. This
-            permanently removes your profile, podcasts, scripts, interactions,
+            permanently removes your profile, lessons, scripts, interactions,
             behavioral data, voice clones, and all associated content.
             Audio files are deleted from storage. Data in models without a direct
             foreign key (behavioral events, sessions, playback sessions, content
@@ -266,10 +266,10 @@ export default function PrivacyPage() {
           <p>
             You can export all your data at any time from your account settings or by
             calling <code>GET /api/users/me/export</code>. The export includes your
-            profile, podcasts, scripts, discovery conversations, interactions,
+            profile, lessons, scripts, discovery conversations, interactions,
             collections, saves, ratings, behavioral
             profile, recent behavioral events, playback sessions, voice clones,
-            feedback, taste quiz answers, and saved ideas — all in a single JSON file.
+            feedback, taste quiz answers, and saved ideas, all in a single JSON file.
           </p>
 
           <h3>BYOK Key Removal</h3>
