@@ -16,7 +16,7 @@
 }
 
 .root.enabled .line {
-  background: var(--color-primary, #d97706);
+  background: var(--color-primary);
 }
 
 .content {
@@ -54,7 +54,7 @@
 .checkbox {
   width: 14px;
   height: 14px;
-  accent-color: var(--color-primary, #d97706);
+  accent-color: var(--color-primary);
   cursor: pointer;
 }
 
@@ -69,8 +69,8 @@
   padding: 1px 5px;
   font-size: 10px;
   font-weight: 600;
-  color: var(--color-primary, #d97706);
-  background: rgba(217, 119, 6, 0.15);
+  color: var(--color-primary);
+  background: rgba(63, 79, 176, 0.15);
   border-radius: var(--radius-full, 9999px);
   cursor: help;
 }
@@ -96,7 +96,7 @@
 }
 
 .modelSelect:focus-visible {
-  outline: 2px solid var(--color-primary, #d97706);
+  outline: 2px solid var(--color-primary);
   outline-offset: 1px;
 }
 

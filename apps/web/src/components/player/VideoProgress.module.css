@@ -266,8 +266,8 @@
 }
 
 @keyframes thumbPulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.3); }
-  50% { box-shadow: 0 0 0 4px rgba(217, 119, 6, 0.15); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(63, 79, 176, 0.3); }
+  50% { box-shadow: 0 0 0 4px rgba(63, 79, 176, 0.15); }
 }
 
 .thumbReady {
@@ -286,7 +286,7 @@
 
   .thumbGenerating {
     animation: none;
-    box-shadow: 0 0 0 2px rgba(217, 119, 6, 0.3);
+    box-shadow: 0 0 0 2px rgba(63, 79, 176, 0.3);
   }
 }
 

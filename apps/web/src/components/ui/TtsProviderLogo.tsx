@@ -143,7 +143,7 @@ export function TtsProviderLogo({ provider, size = 24, className }: TtsProviderL
     case 'kokoro':
       return (
         <svg {...props}>
-          <rect width="24" height="24" rx="4" fill="#1E3A5F" />
+          <rect width="24" height="24" rx="4" fill="var(--color-accent)" />
           <text x="12" y="16" textAnchor="middle" fill="#fff" fontSize="9" fontWeight="700" fontFamily="sans-serif">K</text>
         </svg>
       );

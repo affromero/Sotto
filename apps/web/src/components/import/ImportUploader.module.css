@@ -171,7 +171,7 @@
   gap: var(--spacing-sm);
   padding: var(--spacing-sm) var(--spacing-md);
   background: var(--color-primary-lighter);
-  border: 1px solid rgba(217, 119, 6, 0.15);
+  border: 1px solid rgba(63, 79, 176, 0.15);
   border-radius: var(--radius-lg);
   color: var(--color-text-secondary);
   font: var(--text-body-sm);

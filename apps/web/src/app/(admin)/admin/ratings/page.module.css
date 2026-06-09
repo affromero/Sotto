@@ -154,8 +154,8 @@
 }
 
 .badgeListener {
-  background-color: color-mix(in srgb, var(--color-accent, #1E3A5F) 15%, transparent);
-  color: var(--color-accent, #1E3A5F);
+  background-color: color-mix(in srgb, var(--color-accent) 15%, transparent);
+  color: var(--color-accent);
 }
 
 /* Score color coding */

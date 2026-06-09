@@ -107,7 +107,7 @@
   margin-top: 12px;
   display: inline-block;
   padding: 4px 12px;
-  background: rgba(217, 119, 6, 0.1);
+  background: rgba(63, 79, 176, 0.1);
   color: var(--color-primary);
   border-radius: var(--radius-full);
   font: var(--text-body-sm);
@@ -226,7 +226,7 @@
 }
 
 .submitBtn:hover {
-  background: #b45309;
+  background: var(--color-primary-hover);
 }
 
 .expiredMsg {

@@ -64,7 +64,7 @@
   min-width: 0;
   padding: var(--spacing-xs) var(--spacing-sm);
   font-size: 0.8125rem;
-  font-family: var(--font-body, Inter, sans-serif);
+  font-family: var(--font-body, IBM Plex Sans, sans-serif);
   color: var(--color-text);
   background: var(--color-surface);
   border: 1px solid var(--color-border);

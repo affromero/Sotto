@@ -46,8 +46,8 @@
 }
 
 .actionSuspend {
-  background: #fef3c7;
-  color: #d97706;
+  background: var(--color-primary-light);
+  color: var(--color-primary);
 }
 
 .actionBan {

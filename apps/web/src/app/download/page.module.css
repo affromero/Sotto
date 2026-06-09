@@ -10,7 +10,7 @@
 }
 
 .title {
-  font-family: var(--font-heading, 'DM Serif Display', serif);
+  font-family: var(--font-heading, 'Newsreader', serif);
   font-size: clamp(2rem, 5vw, 3rem);
   color: var(--color-text-primary);
 }
@@ -24,7 +24,7 @@
 }
 
 .sectionTitle {
-  font-family: var(--font-heading, 'DM Serif Display', serif);
+  font-family: var(--font-heading, 'Newsreader', serif);
   font-size: 1.5rem;
   color: var(--color-text-primary);
   margin-bottom: var(--spacing-xs);
@@ -64,12 +64,12 @@
 
 .card:hover {
   transform: translateY(-2px);
-  border-color: var(--color-primary, #d97706);
+  border-color: var(--color-primary);
 }
 
 .cardRecommended {
-  border-color: var(--color-primary, #d97706);
-  box-shadow: 0 0 0 1px var(--color-primary, #d97706);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 1px var(--color-primary);
 }
 
 .badge {
@@ -78,7 +78,7 @@
   right: var(--spacing-sm);
   font: var(--text-caption);
   font-weight: 600;
-  color: var(--color-primary, #d97706);
+  color: var(--color-primary);
 }
 
 .cardLabel {
@@ -96,7 +96,7 @@
   margin-top: var(--spacing-sm);
   font: var(--text-body-sm);
   font-weight: 600;
-  color: var(--color-primary, #d97706);
+  color: var(--color-primary);
 }
 
 .mobile {
@@ -113,7 +113,7 @@
 }
 
 .inlineLink {
-  color: var(--color-primary, #d97706);
+  color: var(--color-primary);
   text-decoration: underline;
 }
 
@@ -127,8 +127,8 @@
 .command {
   margin: var(--spacing-md) 0;
   padding: var(--spacing-md);
-  background: var(--color-accent, #1e3a5f);
-  color: #fefcf8;
+  background: var(--color-accent);
+  color: var(--color-background);
   border-radius: var(--radius-md);
   overflow-x: auto;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;

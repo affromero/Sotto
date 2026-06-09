@@ -5,8 +5,8 @@
   align-items: center;
   gap: 3px;
   padding: 2px 8px;
-  background: rgba(217, 119, 6, 0.1);
-  border: 1px solid rgba(217, 119, 6, 0.2);
+  background: rgba(63, 79, 176, 0.1);
+  border: 1px solid rgba(63, 79, 176, 0.2);
   border-radius: var(--radius-full);
   font: var(--text-caption);
   font-weight: 500;

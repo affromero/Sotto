@@ -139,12 +139,12 @@
 }
 
 .navLinkActive {
-  background: rgba(217, 119, 6, 0.15);
+  background: rgba(63, 79, 176, 0.15);
   color: var(--color-primary);
 }
 
 .navLinkActive:hover {
-  background: rgba(217, 119, 6, 0.2);
+  background: rgba(63, 79, 176, 0.2);
   color: var(--color-primary);
 }
 

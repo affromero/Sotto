@@ -36,7 +36,7 @@
   aspect-ratio: 16 / 9;
   border-radius: var(--radius-md);
   overflow: hidden;
-  background: #1a1a1a;
+  background: var(--color-text-primary);
   flex-shrink: 0;
 }
 
@@ -110,12 +110,12 @@
   text-transform: uppercase;
   letter-spacing: 0.03em;
   white-space: nowrap;
-  background: rgba(217, 119, 6, 0.15);
-  color: var(--color-speaker-0, #d97706);
+  background: rgba(63, 79, 176, 0.15);
+  color: var(--color-speaker-0, var(--color-primary));
 }
 
 .speakerBadge[data-speaker-index='1'] {
-  background: rgba(30, 58, 95, 0.3);
+  background: rgba(42, 53, 80, 0.3);
   color: #93c5fd;
 }
 
@@ -248,12 +248,12 @@
 }
 
 .pillAmber {
-  background: rgba(217, 119, 6, 0.15);
+  background: rgba(63, 79, 176, 0.15);
   color: var(--color-primary);
 }
 
 .pillNavy {
-  background: rgba(30, 58, 95, 0.25);
+  background: rgba(42, 53, 80, 0.25);
   color: #93c5fd;
 }
 

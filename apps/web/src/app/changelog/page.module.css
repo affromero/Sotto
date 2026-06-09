@@ -94,13 +94,13 @@
 }
 
 .tag_feature {
-  background: #d9770615;
-  color: #d97706;
+  background: var(--color-primary)15;
+  color: var(--color-primary);
 }
 
 .tag_improvement {
-  background: #1e3a5f15;
-  color: #1e3a5f;
+  background: var(--color-accent)15;
+  color: var(--color-accent);
 }
 
 .tag_fix {

@@ -64,7 +64,7 @@
 }
 
 .item:hover {
-  border-color: var(--color-accent, #1E3A5F);
+  border-color: var(--color-accent);
 }
 
 .entryButton {
@@ -95,7 +95,7 @@
   font-family: var(--font-heading);
   font-size: var(--font-size-base);
   font-weight: 700;
-  color: var(--color-accent, #1E3A5F);
+  color: var(--color-accent);
 }
 
 .translation {
@@ -116,7 +116,7 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--color-text-inverse);
-  background: var(--color-accent, #1E3A5F);
+  background: var(--color-accent);
   padding: 1px 6px;
   border-radius: var(--radius-sm);
 }

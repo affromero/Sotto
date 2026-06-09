@@ -31,16 +31,16 @@ export async function GET(request: NextRequest) {
 
   return new NextResponse(
     `<html><head><meta charset="utf-8"><title>Unsubscribed — Sotto</title></head>
-    <body style="font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:#FEFCF8;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;">
+    <body style="font-family:'IBM Plex Sans',-apple-system,BlinkMacSystemFont,sans-serif;background:#F5F4F0;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;">
       <div style="max-width:480px;background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:48px 40px;text-align:center;">
-        <h1 style="font-family:'DM Serif Display',Georgia,serif;font-size:28px;color:#1A1A1A;margin:0 0 16px;">
-          <span style="color:#D97706;">Sotto</span>
+        <h1 style="font-family:'Newsreader',Georgia,serif;font-size:28px;color:#1E2128;margin:0 0 16px;">
+          <span style="color:#3F4FB0;">Sotto</span>
         </h1>
-        <h2 style="font-size:18px;color:#1A1A1A;margin:0 0 12px;">You&apos;ve been unsubscribed</h2>
+        <h2 style="font-size:18px;color:#1E2128;margin:0 0 12px;">You&apos;ve been unsubscribed</h2>
         <p style="font-size:14px;color:#6B7280;line-height:1.6;margin:0 0 24px;">
           You&apos;ve been unsubscribed from Sotto announcements. You&apos;ll no longer receive platform news by email.
         </p>
-        <a href="${appUrl}/settings" style="font-size:13px;color:#D97706;text-decoration:none;">
+        <a href="${appUrl}/settings" style="font-size:13px;color:#3F4FB0;text-decoration:none;">
           Manage notification preferences
         </a>
       </div>

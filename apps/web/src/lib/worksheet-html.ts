@@ -75,9 +75,9 @@ export function renderWorksheetHtml(doc: ClassDocument): string {
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html { font-size: 11pt; }
     body {
-      font-family: Inter, 'Helvetica Neue', Arial, sans-serif;
-      background: #FEFCF8;
-      color: #1A1A1A;
+      font-family: 'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif;
+      background: #F5F4F0;
+      color: #1E2128;
       padding: 0;
     }
 
@@ -95,7 +95,7 @@ export function renderWorksheetHtml(doc: ClassDocument): string {
 
     /* ---------- Header ---------- */
     .doc-header {
-      border-bottom: 3px solid #D97706;
+      border-bottom: 3px solid #3F4FB0;
       padding-bottom: 10pt;
       margin-bottom: 18pt;
     }
@@ -106,10 +106,10 @@ export function renderWorksheetHtml(doc: ClassDocument): string {
       gap: 12pt;
     }
     .doc-title {
-      font-family: 'DM Serif Display', 'Georgia', serif;
+      font-family: 'Newsreader', 'Georgia', serif;
       font-size: 22pt;
       font-weight: 700;
-      color: #1E3A5F;
+      color: #2A3550;
       line-height: 1.15;
     }
     .doc-meta {
@@ -123,7 +123,7 @@ export function renderWorksheetHtml(doc: ClassDocument): string {
     .doc-meta span { white-space: nowrap; }
     .doc-level {
       display: inline-block;
-      background: #D97706;
+      background: #3F4FB0;
       color: #fff;
       font-size: 8pt;
       font-weight: 700;
@@ -140,7 +140,7 @@ export function renderWorksheetHtml(doc: ClassDocument): string {
     }
     .answer-key-badge {
       display: inline-block;
-      background: #1E3A5F;
+      background: #2A3550;
       color: #fff;
       font-size: 8pt;
       font-weight: 700;
@@ -165,9 +165,9 @@ export function renderWorksheetHtml(doc: ClassDocument): string {
       margin-bottom: 6pt;
     }
     .section-title {
-      font-family: 'DM Serif Display', 'Georgia', serif;
+      font-family: 'Newsreader', 'Georgia', serif;
       font-size: 14pt;
-      color: #1E3A5F;
+      color: #2A3550;
       font-weight: 700;
     }
     .section-instructions {
@@ -184,7 +184,7 @@ export function renderWorksheetHtml(doc: ClassDocument): string {
 
     /* ---------- Questions ---------- */
     .question { margin-bottom: 12pt; break-inside: avoid; }
-    .question-number { font-weight: 700; color: #D97706; margin-right: 3pt; }
+    .question-number { font-weight: 700; color: #3F4FB0; margin-right: 3pt; }
     .question-text { font-size: 10.5pt; margin-bottom: 5pt; line-height: 1.45; }
     .passage-ref { font-size: 8.5pt; color: #6B7280; font-style: italic; }
     .options { list-style: none; padding-left: 12pt; }
@@ -192,13 +192,13 @@ export function renderWorksheetHtml(doc: ClassDocument): string {
     .checkbox { font-size: 11pt; line-height: 1; }
     .option-letter { font-weight: 600; min-width: 14pt; }
     .option-text { }
-    .correct-option .option-text { font-weight: 700; color: #1E3A5F; }
-    .correct-option .option-letter { color: #D97706; }
+    .correct-option .option-text { font-weight: 700; color: #2A3550; }
+    .correct-option .option-letter { color: #3F4FB0; }
     .explanation { margin-top: 5pt; font-size: 9pt; color: #374151; padding-left: 12pt; }
 
     /* ---------- Speaking Prompts ---------- */
-    .prompt { margin-bottom: 11pt; break-inside: avoid; padding: 7pt 10pt; border-left: 3pt solid #D97706; background: #FEFCF8; }
-    .target-phrase { font-size: 11.5pt; font-weight: 700; color: #1E3A5F; margin-bottom: 3pt; }
+    .prompt { margin-bottom: 11pt; break-inside: avoid; padding: 7pt 10pt; border-left: 3pt solid #3F4FB0; background: #F5F4F0; }
+    .target-phrase { font-size: 11.5pt; font-weight: 700; color: #2A3550; margin-bottom: 3pt; }
     .translation { font-size: 9.5pt; color: #6B7280; margin-bottom: 2pt; }
     .ipa { font-size: 9pt; color: #374151; font-style: italic; letter-spacing: 0.03em; }
 

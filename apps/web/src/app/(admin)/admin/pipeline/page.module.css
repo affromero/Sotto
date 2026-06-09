@@ -351,7 +351,7 @@
   font: var(--text-caption);
   font-weight: 600;
   text-transform: uppercase;
-  background: #eff6ff;
+  background: var(--color-accent-lighter);
   color: #2563eb;
 }
 

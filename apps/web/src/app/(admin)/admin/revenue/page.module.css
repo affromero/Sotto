@@ -45,7 +45,7 @@
 }
 
 .statusAuthorized {
-  background: #dbeafe;
+  background: var(--color-accent-light);
   color: #1e40af;
 }
 
@@ -55,8 +55,8 @@
 }
 
 .statusRefunded {
-  background: #fef3c7;
-  color: #92400e;
+  background: var(--color-primary-light);
+  color: var(--color-primary-active);
 }
 
 /* Page-specific: Marketplace stats */

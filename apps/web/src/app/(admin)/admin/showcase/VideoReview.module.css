@@ -25,7 +25,7 @@
 .placeholder {
   padding: 1.5rem;
   text-align: center;
-  background: var(--color-background, #FEFCF8);
+  background: var(--color-background);
   border-radius: var(--radius-lg);
   border: 1px dashed var(--color-border, #e5e7eb);
   color: var(--color-text-secondary, #6B7280);

@@ -86,8 +86,8 @@
 }
 
 .tabActive {
-  color: #D97706;
-  border-bottom-color: #D97706;
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
 }
 
 .tabBadge {
@@ -98,7 +98,7 @@
   height: 20px;
   padding: 0 6px;
   border-radius: var(--radius-full);
-  background: #D97706;
+  background: var(--color-primary);
   color: #fff;
   font-size: 11px;
   font-weight: 700;
@@ -323,7 +323,7 @@
 }
 
 .podcastTitle:hover {
-  color: #D97706;
+  color: var(--color-primary);
 }
 
 .podcastMeta {
@@ -364,7 +364,7 @@
   display: inline-block;
   padding: 1px var(--spacing-xs);
   border-radius: var(--radius-sm);
-  background: #1E3A5F;
+  background: var(--color-accent);
   color: #fff;
   font-size: 10px;
   font-weight: 600;
@@ -429,8 +429,8 @@
 
 .resolutionInput:focus {
   outline: none;
-  border-color: #D97706;
-  box-shadow: 0 0 0 2px rgba(217, 119, 6, 0.15);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(63, 79, 176, 0.15);
 }
 
 .actions {
@@ -512,7 +512,7 @@
   padding: var(--spacing-xs) var(--spacing-md);
   border: none;
   border-radius: var(--radius-md);
-  background: #D97706;
+  background: var(--color-primary);
   color: #fff;
   font: var(--text-body-sm);
   font-weight: 600;
@@ -522,7 +522,7 @@
 }
 
 .confirmYes:hover {
-  background: #b45309;
+  background: var(--color-primary-hover);
 }
 
 .confirmYes:disabled {

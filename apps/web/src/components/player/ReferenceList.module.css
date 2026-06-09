@@ -268,11 +268,11 @@
 }
 
 .domainAcademic {
-  background-color: #1E3A5F;
+  background-color: var(--color-accent);
 }
 
 .domainNews {
-  background-color: #D97706;
+  background-color: var(--color-primary);
 }
 
 .domainGovernment {

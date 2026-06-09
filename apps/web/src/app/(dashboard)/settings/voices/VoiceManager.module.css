@@ -120,7 +120,7 @@
   border: 1px solid var(--color-primary);
   border-radius: var(--radius-sm);
   resize: none;
-  box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.1);
+  box-shadow: 0 0 0 3px rgba(63, 79, 176, 0.1);
 }
 
 .descriptionTextarea:focus {
@@ -160,12 +160,12 @@
 }
 
 .badgeUpload {
-  background: rgba(217, 119, 6, 0.1);
+  background: rgba(63, 79, 176, 0.1);
   color: var(--color-primary);
 }
 
 .badgeRecord {
-  background: rgba(30, 58, 95, 0.1);
+  background: rgba(42, 53, 80, 0.1);
   color: var(--color-accent);
 }
 
@@ -189,7 +189,7 @@
   font-size: 11px;
   font-weight: 600;
   color: var(--color-accent);
-  background: rgba(30, 58, 95, 0.1);
+  background: rgba(42, 53, 80, 0.1);
   border-radius: var(--radius-full);
 }
 
@@ -232,7 +232,7 @@
 }
 
 .verifyBtn:hover {
-  background: #b45309;
+  background: var(--color-primary-hover);
 }
 
 .blockedBadge {
@@ -350,7 +350,7 @@
 
 .pill:hover:not(:disabled) {
   color: var(--color-text-primary);
-  background: rgba(217, 119, 6, 0.05);
+  background: rgba(63, 79, 176, 0.05);
 }
 
 .pill:disabled {
@@ -390,7 +390,7 @@
 
 .inputTab:hover:not(:disabled) {
   color: var(--color-text-primary);
-  background: rgba(217, 119, 6, 0.05);
+  background: rgba(63, 79, 176, 0.05);
 }
 
 .inputTab:disabled {
@@ -501,7 +501,7 @@
 .nameInput:focus {
   outline: none;
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.1);
+  box-shadow: 0 0 0 3px rgba(63, 79, 176, 0.1);
 }
 
 .nameInput:disabled {
@@ -609,8 +609,8 @@
   flex-direction: column;
   gap: var(--spacing-md);
   padding: var(--spacing-lg);
-  background: rgba(217, 119, 6, 0.05);
-  border: 1px solid rgba(217, 119, 6, 0.2);
+  background: rgba(63, 79, 176, 0.05);
+  border: 1px solid rgba(63, 79, 176, 0.2);
   border-radius: var(--radius-md);
 }
 
@@ -704,8 +704,8 @@
   gap: var(--spacing-sm);
   padding: var(--spacing-md);
   margin-top: var(--spacing-sm);
-  background: rgba(217, 119, 6, 0.03);
-  border: 1px solid rgba(217, 119, 6, 0.15);
+  background: rgba(63, 79, 176, 0.03);
+  border: 1px solid rgba(63, 79, 176, 0.15);
   border-radius: var(--radius-md);
 }
 
@@ -756,7 +756,7 @@
 }
 
 .searchResult:hover:not(:disabled) {
-  background: rgba(217, 119, 6, 0.05);
+  background: rgba(63, 79, 176, 0.05);
 }
 
 .searchResult:disabled {
@@ -910,7 +910,7 @@
   background: var(--color-surface);
   border: 1px solid var(--color-primary);
   border-radius: var(--radius-sm);
-  box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.1);
+  box-shadow: 0 0 0 3px rgba(63, 79, 176, 0.1);
 }
 
 .priceInput:focus {

@@ -80,7 +80,7 @@
   padding: 1rem;
   border: 2px solid var(--color-warning, #F59E0B);
   border-radius: 0.75rem;
-  background: var(--color-warning-lighter, #FFFBEB);
+  background: var(--color-warning-lighter);
 }
 
 .proposalInfo {

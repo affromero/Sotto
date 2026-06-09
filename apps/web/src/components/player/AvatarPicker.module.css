@@ -1,6 +1,6 @@
 .root {
   width: 100%;
-  background: #1a1a1a;
+  background: var(--color-text-primary);
   border-radius: var(--radius-xl);
   overflow: hidden;
   border: 1px solid #333;
@@ -31,7 +31,7 @@
   font-size: 18px;
   font-weight: 600;
   color: #f5f5f5;
-  font-family: var(--font-heading, 'DM Serif Display', serif);
+  font-family: var(--font-heading, 'Newsreader', serif);
 }
 
 .warning {
