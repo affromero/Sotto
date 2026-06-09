@@ -12,6 +12,7 @@ Open-source, self-hostable language-learning infrastructure — taught in the co
 [![Self-hostable](https://img.shields.io/badge/self--hostable-yes-1F8A5B)](#self-host)
 [![BYOK](https://img.shields.io/badge/BYOK-bring%20your%20own%20keys-D97706)](#bring-your-own-claude--codex)
 [![Bring your own agent](https://img.shields.io/badge/agent-Claude%20Code%20%2F%20Codex-3F4FB0)](#bring-your-own-claude--codex)
+[![Runs 100% offline](https://img.shields.io/badge/runs-100%25%20offline-1F8A5B)](#run-it-100-offline)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](https://nextjs.org)
 [![React](https://img.shields.io/badge/React-19-149ECA?logo=react&logoColor=white)](https://react.dev)
@@ -82,7 +83,7 @@ Plus the rest of the loop:
 
 ## How Sotto Compares
 
-The newest wave is LLM-native, and the closest peer is genuinely good: [**OpenLingo**](https://github.com/pretzelai/openlingo) is also open-source ([MIT](https://github.com/pretzelai/openlingo/blob/main/LICENSE)), self-hostable, and BYO-LLM, with [SM-2](https://super-memory.com/english/ol/sm2.htm) spaced repetition, [Whisper](https://openai.com/research/whisper) speaking feedback, and a nearly identical stack ([Next.js](https://nextjs.org/) 16 / [React](https://react.dev/) 19 / [PostgreSQL](https://www.postgresql.org/) 16). Credit where due. **Where Sotto goes further:** a structured, [mastery-gated](https://en.wikipedia.org/wiki/Mastery_learning) [CEFR](https://www.coe.int/en/web/common-european-framework-reference-languages/level-descriptions) course across five *graded* skills (including writing with inline corrections and rubric-based pronunciation scoring), a **[keyless local-agent](#bring-your-own-claude--codex) path** (run it through your own Claude Code / Codex with no API key), an interactive memory-graph, and adaptive listening seeded by your due vocabulary.
+The newest wave is LLM-native, and the closest peer is genuinely good: [**OpenLingo**](https://github.com/pretzelai/openlingo) is also open-source ([MIT](https://github.com/pretzelai/openlingo/blob/main/LICENSE)), self-hostable, and BYO-LLM, with [SM-2](https://super-memory.com/english/ol/sm2.htm) spaced repetition, [Whisper](https://openai.com/research/whisper) speaking feedback, and a nearly identical stack ([Next.js](https://nextjs.org/) 16 / [React](https://react.dev/) 19 / [PostgreSQL](https://www.postgresql.org/) 16). Credit where due. **Where Sotto goes further:** a structured, [mastery-gated](https://en.wikipedia.org/wiki/Mastery_learning) [CEFR](https://www.coe.int/en/web/common-european-framework-reference-languages/level-descriptions) course across five *graded* skills (including writing with inline corrections and rubric-based pronunciation scoring), a **[keyless local-agent](#bring-your-own-claude--codex) path** (run it through your own Claude Code / Codex with no API key), a **[100%-offline path](#run-it-100-offline)** (local LLM + STT + TTS via Ollama / Whisper / Kokoro — no cloud key for *any* layer), an interactive memory-graph, and adaptive listening seeded by your due vocabulary.
 
 | Capability | Sotto | [OpenLingo](https://github.com/pretzelai/openlingo) | [Duolingo](https://www.duolingo.com) | [Speak](https://www.speak.com) | [Praktika](https://praktika.ai) | [TalkPal](https://talkpal.ai) | [Pimsleur](https://www.pimsleur.com) |
 | --- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
@@ -90,6 +91,7 @@ The newest wave is LLM-native, and the closest peer is genuinely good: [**OpenLi
 | Self-hostable | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | BYOK / own API keys | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | Bring your own agent ([Claude Code](https://docs.anthropic.com/en/docs/claude-code) / [Codex](https://github.com/openai/codex), no key) | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Runs 100% offline ([local LLM](#run-it-100-offline) + STT + TTS, no cloud key) | ✅ | 〰️ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | Data stays private (your infra) | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | 5 *graded* skills (grammar / reading / listening / speaking / writing) | ✅ | 〰️ | 〰️ | 〰️ | 〰️ | 〰️ | 〰️ |
 | Mastery-gated progression | ✅ | ❌ | 〰️ | ❌ | ❌ | ❌ | 〰️ |
@@ -100,7 +102,7 @@ The newest wave is LLM-native, and the closest peer is genuinely good: [**OpenLi
 | No social layer / dark patterns | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ |
 | Price | Self-host (pay providers directly) | Free (MIT) | Freemium + sub | Sub | Sub | Sub | Sub |
 
-<sub>✅ yes · 〰️ partial · ❌ no. Values reflect each project's public repo/site (June 2026). OpenLingo: verified against [`pretzelai/openlingo`](https://github.com/pretzelai/openlingo) — it has STT speaking feedback (Whisper) and SM-2 SRS, but no rubric pronunciation score, mastery gates, or memory-graph. The closed apps (Duolingo/Speak/Praktika/TalkPal/Pimsleur) are hosted-only and subscription-funded. Sotto values reflect the self-hosted OSS build; corrections welcome via PR.</sub>
+<sub>✅ yes · 〰️ partial · ❌ no. Values reflect each project's public repo/site (June 2026). OpenLingo: verified against [`pretzelai/openlingo`](https://github.com/pretzelai/openlingo) — it has STT speaking feedback (Whisper) and SM-2 SRS, but no rubric pronunciation score, mastery gates, or memory-graph. *Offline:* OpenLingo's BYO-LLM can point at a local model, but its speaking feedback uses cloud Whisper — so it earns 〰️; Sotto runs LLM **and** STT **and** TTS locally for a true no-cloud-key stack. The closed apps (Duolingo/Speak/Praktika/TalkPal/Pimsleur) are hosted-only and subscription-funded. Sotto values reflect the self-hosted OSS build; corrections welcome via PR.</sub>
 
 ## The Learning Loop
 
@@ -170,6 +172,25 @@ npm run dev
 ```
 
 Then open [localhost:3000](http://localhost:3000). The private `maps` submodule is optional — a no-op stub is dropped in when it's absent.
+
+### Run it 100% offline
+
+No cloud key for *any* layer — the LLM, speech-to-text, and text-to-speech all run on your own hardware. One opt-in profile brings up [Ollama](https://ollama.com/) (LLM), [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (STT), and the bundled [Kokoro](https://github.com/hexgrad/kokoro) TTS sidecar:
+
+```bash
+docker compose --profile local up -d        # ollama + whisper + kokoro
+docker exec sotto-ollama ollama pull qwen3   # any multilingual model: qwen3 / gemma3 / llama3.3
+```
+
+Then point Sotto at them (in `.env.local`) — explicit selection, no cloud fallback:
+
+```dotenv
+AI_PROVIDER=local    AI_BASE_URL=http://localhost:11434/v1   AI_MODEL=qwen3
+STT_PROVIDER=local   STT_BASE_URL=http://localhost:8001/v1   STT_MODEL=deepdml/faster-whisper-large-v3-turbo-ct2
+TTS_PROVIDER=kokoro  TTS_BASE_URL=http://localhost:8000
+```
+
+Multilingual by design: **Qwen3 / Gemma 3** (100+ languages) for generation, **Whisper large-v3-turbo** (99+) for pronunciation, **Kokoro** (8 languages) for narration. A GPU helps the LLM but isn't required — Whisper and Kokoro are comfortable on CPU.
 
 <details>
 <summary>Bring your own agent / keys (.env.local)</summary>
