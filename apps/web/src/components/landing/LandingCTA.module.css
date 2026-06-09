@@ -1,0 +1,185 @@
+/*
+ * LandingCTA.module.css — auth-aware CTA + inline waitlist capture, aula theme.
+ * Consumes aula tokens from the page root. The email field visually fits the
+ * light paper surface (the shared WaitlistForm is dark-hero styled, so this CTA
+ * uses the same /api/waitlist endpoint via WaitlistProvider with its own skin).
+ */
+
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.btnPrimary {
+  font-family: var(--sans);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--accent-fg);
+  background: var(--accent);
+  border: 1px solid transparent;
+  border-radius: var(--r);
+  padding: 13px 22px;
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  text-decoration: none;
+  transition: filter 0.2s var(--ease), transform 0.15s var(--ease);
+}
+
+.btnPrimary:hover {
+  filter: brightness(1.06);
+}
+
+.btnPrimary:active {
+  transform: translateY(1px);
+}
+
+.btnGhost {
+  font-family: var(--sans);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r);
+  padding: 13px 22px;
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  transition: color 0.2s var(--ease), border-color 0.2s var(--ease);
+}
+
+.btnGhost:hover {
+  color: var(--ink);
+  border-color: var(--ink-soft);
+}
+
+.arrow {
+  transition: transform 0.2s var(--ease);
+}
+
+.btnPrimary:hover .arrow {
+  transform: translateX(3px);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 420px;
+}
+
+.formLabel {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
+
+.formRow {
+  display: flex;
+  gap: 8px;
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  height: 48px;
+  padding: 0 16px;
+  font-family: var(--sans);
+  font-size: 15px;
+  color: var(--ink);
+  background: var(--surface, #fff);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r);
+  outline: none;
+  transition: border-color 0.2s var(--ease);
+}
+
+.input::placeholder {
+  color: var(--ink-mute);
+}
+
+.input:focus {
+  border-color: var(--accent);
+}
+
+.submit {
+  height: 48px;
+  min-width: 88px;
+  padding: 0 22px;
+  font-family: var(--sans);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--accent-fg);
+  background: var(--accent);
+  border: none;
+  border-radius: var(--r);
+  cursor: pointer;
+  transition: filter 0.2s var(--ease), transform 0.15s var(--ease);
+}
+
+.submit:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+.submit:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.success {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 17px;
+  line-height: 1.5;
+  color: var(--ink);
+  margin: 0;
+  max-width: 40ch;
+}
+
+.error {
+  font-family: var(--sans);
+  font-size: 13px;
+  color: #b4332b;
+  margin: 0;
+}
+
+@media (max-width: 480px) {
+  .formRow {
+    flex-direction: column;
+  }
+
+  .submit {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btnPrimary,
+  .submit,
+  .arrow {
+    transition: none;
+  }
+
+  .btnPrimary:active,
+  .submit:active:not(:disabled),
+  .btnPrimary:hover .arrow {
+    transform: none;
+  }
+}
