@@ -63,7 +63,7 @@ describe('open-source language-learning OSS surfaces', () => {
       .join('\n');
 
     // brand.ts must carry the new language-learning taglines
-    expect(sharedPositioningSource).toContain('Learn a language with the agent that already knows you.');
+    expect(sharedPositioningSource).toContain('Learn a language, taught in your own context.');
     expect(sharedPositioningSource).toContain('Context-aware, self-hostable language learning.');
 
     // old social-podcast and podcast-network copy must be gone
@@ -786,7 +786,6 @@ describe('open-source language-learning OSS surfaces', () => {
       'apps/web/src/workers/feature-computation.worker.ts',
       'apps/web/src/lib/CLAUDE.md',
       'CHANGELOG.md',
-      'TODO.md',
     ]
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
@@ -1013,7 +1012,7 @@ describe('open-source language-learning OSS surfaces', () => {
     for (const claim of staleClaims) {
       expect(releaseDocsSource, claim).not.toContain(claim);
     }
-    expect(releaseDocsSource).toContain('Learn a language with the agent that already knows you.');
+    expect(releaseDocsSource).toContain('Learn a language, taught in your own context.');
     expect(releaseDocsSource).toContain('language-learning infrastructure');
     expect(releaseDocsSource).toContain('implicit provider fallback');
     expect(releaseDocsSource).toContain('Managed hosting');

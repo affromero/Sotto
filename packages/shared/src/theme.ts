@@ -1,4 +1,4 @@
-// Design system tokens — "Warm Intimacy"
+// Design system tokens — "Quiet Warmth"
 // Source of truth shared between web (CSS custom properties) and mobile (StyleSheet)
 
 export const colors = {

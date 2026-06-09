@@ -13,9 +13,9 @@ const FAQ_ITEMS = [
     answer: (
       <>
         Sotto is open-source, self-hostable language-learning infrastructure. Connect the AI agent
-        that already knows your work and interests — Claude Code, Codex, or another local agent —
-        and it builds a CEFR course around the things you actually care about. You own the stack,
-        the data, and the agent.
+        you already use — Claude Code, Codex, or another local agent — and the context you choose to
+        share, and it builds a CEFR course around the things you actually care about. You own the
+        stack, the data, and the agent.
       </>
     ),
   },

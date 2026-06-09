@@ -21,7 +21,7 @@ export const MARKETING_TEMPLATES: MarketingTemplate[] = [
     description: '2 min overview of all platform features',
     metadata: {
       topic:
-        'Sotto: open-source, self-hostable language learning — context-aware CEFR courses taught through the AI agent that already knows your work and interests, with BYOK keys and full data ownership',
+        'Sotto: open-source, self-hostable language learning — context-aware CEFR courses taught through the AI agent you already use, in the context of your work and interests, with BYOK keys and full data ownership',
       depth: 'quick_overview',
       audience: 'Potential learners discovering Sotto for the first time',
       audienceLevel: 'beginner',

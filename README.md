@@ -4,7 +4,7 @@
 
 # Sotto
 
-**Learn a language with the agent that already knows you.**
+**Learn a language, taught in your own context.**
 
 Open-source, self-hostable language-learning infrastructure — taught in the context of your work and interests, through the agent and keys you already own.
 
@@ -44,14 +44,14 @@ Manage it from `~/.sotto`: `docker compose logs -f`, `docker compose down`.
 
 ## Why Sotto?
 
-Every serious language app is closed, hosted, and subscription-funded. Your progress, your vocabulary, and the model that teaches you all live on someone else's servers. **Sotto inverts that.** You run the whole stack, you connect your own Claude or Codex — the agent that already knows your work and your interests — and it builds a course around the things you actually care about. Your data never leaves infrastructure you control.
+Every serious language app is closed, hosted, and subscription-funded. Your progress, your vocabulary, and the model that teaches you all live on someone else's servers. **Sotto inverts that.** You run the whole stack, you connect your own Claude or Codex and the context you choose to share, and it builds a course around your work and interests. Your data never leaves infrastructure you control.
 
 <details>
 <summary>The longer version</summary>
 
 <br>
 
-1. **The agent already knows you.** Connect your own Claude Code or Codex and grant the context you choose — your notes, goals, the things you're working on. Sotto draws lessons, readings, and listening from your real life instead of generic content.
+1. **Taught in your own context.** Connect your own Claude Code or Codex and grant the context you choose — your notes, goals, the things you're working on. Sotto draws lessons, readings, and listening from that, instead of generic content.
 2. **You own the learning stack.** Self-host it on your machine or a VPS, with your keys, your database, and your files. There's no Sotto account holding your progress hostage.
 3. **Pedagogy over gamification.** Mastery-gating is [retrieval practice](https://en.wikipedia.org/wiki/Testing_effect) (the testing effect). The adaptive listening podcast is [comprehensible input](https://en.wikipedia.org/wiki/Input_hypothesis) (Krashen's *i+1*). The memory graph is [spaced repetition](https://en.wikipedia.org/wiki/Spaced_repetition) on the [SM-2](https://super-memory.com/english/ol/sm2.htm) algorithm. No streaks-as-[dark-pattern](https://en.wikipedia.org/wiki/Dark_pattern), no leaderboards — **there is no social layer at all.**
 4. **Bring your own everything.** LLM, TTS, STT — explicit provider selection, BYOK, or a keyless local agent. You pay your providers directly; nothing is billed through the self-hosted build.
@@ -82,36 +82,39 @@ Plus the rest of the loop:
 
 ## How Sotto Compares
 
-The newest wave of apps connects an LLM to language learning. [OpenLingo](https://openlingo.dev) is the closest in spirit — "personalised units, read/listen to translated articles, practice with AI." But it's a hosted service. **Sotto is the version you own:** your agent, your keys, your data, and a full [mastery-gated](https://en.wikipedia.org/wiki/Mastery_learning) [CEFR](https://www.coe.int/en/web/common-european-framework-reference-languages/level-descriptions) course across five skills — not just generated units.
+The newest wave is LLM-native, and the closest peer is genuinely good: [**OpenLingo**](https://github.com/pretzelai/openlingo) is also open-source ([MIT](https://github.com/pretzelai/openlingo/blob/main/LICENSE)), self-hostable, and BYO-LLM, with [SM-2](https://super-memory.com/english/ol/sm2.htm) spaced repetition, [Whisper](https://openai.com/research/whisper) speaking feedback, and a nearly identical stack ([Next.js](https://nextjs.org/) 16 / [React](https://react.dev/) 19 / [PostgreSQL](https://www.postgresql.org/) 16). Credit where due. **Where Sotto goes further:** a structured, [mastery-gated](https://en.wikipedia.org/wiki/Mastery_learning) [CEFR](https://www.coe.int/en/web/common-european-framework-reference-languages/level-descriptions) course across five *graded* skills (including writing with inline corrections and rubric-based pronunciation scoring), a **[keyless local-agent](#bring-your-own-claude--codex) path** (run it through your own Claude Code / Codex with no API key), an interactive memory-graph, and adaptive listening seeded by your due vocabulary.
 
-| Capability | Sotto | [OpenLingo](https://openlingo.dev) | [Duolingo](https://www.duolingo.com) | [Speak](https://www.speak.com) | [Praktika](https://praktika.ai) | [TalkPal](https://talkpal.ai) | [Pimsleur](https://www.pimsleur.com) |
+| Capability | Sotto | [OpenLingo](https://github.com/pretzelai/openlingo) | [Duolingo](https://www.duolingo.com) | [Speak](https://www.speak.com) | [Praktika](https://praktika.ai) | [TalkPal](https://talkpal.ai) | [Pimsleur](https://www.pimsleur.com) |
 | --- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| Open source | ✅ | 〰️ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| Self-hostable | ✅ | ❓ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| BYOK / own API keys | ✅ | ❓ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| Bring your own agent ([Claude Code](https://docs.anthropic.com/en/docs/claude-code) / [Codex](https://github.com/openai/codex)) | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| Data stays private (your infra) | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| 5-skill (grammar / reading / listening / speaking / writing) | ✅ | 〰️ | 〰️ | 〰️ | 〰️ | 〰️ | 〰️ |
-| Mastery-gated progression | ✅ | ❓ | 〰️ | ❌ | ❌ | ❌ | 〰️ |
-| [Spaced-repetition](https://en.wikipedia.org/wiki/Spaced_repetition) memory graph | ✅ | ❌ | 〰️ | ❌ | ❌ | ❌ | 〰️ |
-| Adaptive listening podcasts | ✅ | 〰️ | ❌ | ❌ | ❌ | ❌ | 〰️ |
-| Pronunciation scoring | ✅ | ❓ | 〰️ | ✅ | ✅ | ✅ | ❌ |
+| Open source | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Self-hostable | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| BYOK / own API keys | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Bring your own agent ([Claude Code](https://docs.anthropic.com/en/docs/claude-code) / [Codex](https://github.com/openai/codex), no key) | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Data stays private (your infra) | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| 5 *graded* skills (grammar / reading / listening / speaking / writing) | ✅ | 〰️ | 〰️ | 〰️ | 〰️ | 〰️ | 〰️ |
+| Mastery-gated progression | ✅ | ❌ | 〰️ | ❌ | ❌ | ❌ | 〰️ |
+| [Spaced repetition](https://en.wikipedia.org/wiki/Spaced_repetition) (SM-2) | ✅ | ✅ | 〰️ | ❌ | ❌ | ❌ | 〰️ |
+| Interactive memory graph | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Adaptive listening seeded by due vocab | ✅ | 〰️ | ❌ | ❌ | ❌ | ❌ | 〰️ |
+| Rubric pronunciation scoring | ✅ | 〰️ | 〰️ | ✅ | ✅ | ✅ | ❌ |
 | No social layer / dark patterns | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ |
-| Price | Self-host (pay providers directly) | Free (beta) | Freemium + sub | Sub | Sub | Sub | Sub |
+| Price | Self-host (pay providers directly) | Free (MIT) | Freemium + sub | Sub | Sub | Sub | Sub |
 
-<sub>✅ yes · 〰️ partial · ❌ no · ❓ unspecified. Values reflect the self-hosted open-source build; pronunciation quality depends on the speech provider you connect. OpenLingo's row reflects its public landing page ([openlingo.dev](https://openlingo.dev), June 2026), where much is unspecified. Verified June 2026.</sub>
+<sub>✅ yes · 〰️ partial · ❌ no. Values reflect each project's public repo/site (June 2026). OpenLingo: verified against [`pretzelai/openlingo`](https://github.com/pretzelai/openlingo) — it has STT speaking feedback (Whisper) and SM-2 SRS, but no rubric pronunciation score, mastery gates, or memory-graph. The closed apps (Duolingo/Speak/Praktika/TalkPal/Pimsleur) are hosted-only and subscription-funded. Sotto values reflect the self-hosted OSS build; corrections welcome via PR.</sub>
 
 ## The Learning Loop
 
-```
-placement  →  mastery-gated class  →  pass to advance  →  next class adapts
-   │              (5 skills)            (or regenerate          ▲
-   │                  │                  a fresh form)          │
-   └──────────────────┴──────────────────────────────────────┐ │
-                      ▼                                        │ │
-              memory graph (SM-2)  ──── seeds due vocab ───────┘ │
-                      ▲                                          │
-                      └──────────── ungated practice ───────────┘
+```mermaid
+flowchart LR
+    P([Placement]) --> C
+    C["Mastery-gated class<br/><sub>grammar · reading · listening · speaking · writing</sub>"]
+    C -->|pass| N([Next class adapts])
+    C -->|fail| R[Regenerate a fresh form] --> C
+    N --> C
+    PR[Ungated practice] --> G
+    C --> G[("Memory graph<br/>SM-2 spaced repetition")]
+    G -. seeds due vocab .-> C
+    G -. due reviews .-> PR
 ```
 
 Everything a learner does — classes and practice alike — feeds one course-scoped memory graph. Due and weak items resurface in the next class's adaptive content and in practice.

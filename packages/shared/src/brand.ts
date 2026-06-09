@@ -9,19 +9,19 @@ export const BRAND = {
   twitter: null,
 
   // Consumer-facing
-  tagline: 'Learn a language with the agent that already knows you.',
-  subline: 'Open-source, self-hostable courses taught in the context of your work and interests — through the agent and keys you already own.',
+  tagline: 'Learn a language, taught in your own context.',
+  subline: 'Open-source, self-hostable courses built from the context of your work and interests — through the agent and keys you already own.',
   cta: 'Place. Practice. Progress.',
 
   // Investor-facing
   pitchTagline: 'Context-aware, self-hostable language learning.',
 
   // Pre-composed
-  title: 'Sotto — Learn a language with the agent that already knows you.',
+  title: 'Sotto — Learn a language, taught in your own context.',
   description:
-    'Open-source, self-hostable language learning, taught in your own context. Connect the AI agent that already knows your work and interests, then take mastery-gated CEFR courses across grammar, reading, listening, and speaking — with your keys, your data, and the whole stack.',
+    'Open-source, self-hostable language learning, taught in your own context. Connect your own Claude or Codex and choose what it may read, then take mastery-gated CEFR courses across grammar, reading, listening, speaking, and writing — with your keys, your data, and the whole stack.',
   elevatorPitch:
-    'Sotto is open-source language-learning infrastructure that teaches in your context. Connect your own Claude or Codex — the agent that already knows your work and interests — and it builds a language course around the things you actually care about: mastery-gated CEFR grammar, reading, an adaptive listening podcast, and speaking with pronunciation feedback, plus a personal vocabulary memory graph you own. Self-host it on your stack, with your keys and your data.',
+    'Sotto is open-source language-learning infrastructure that teaches in your context. Connect your own Claude or Codex and choose what it may read, and it builds a language course around your work and interests: mastery-gated CEFR grammar, reading, an adaptive listening podcast, speaking with pronunciation feedback, and writing with inline corrections, plus a personal vocabulary memory graph you own. Self-host it on your stack, with your keys and your data.',
 } as const;
 
 export type Brand = typeof BRAND;
