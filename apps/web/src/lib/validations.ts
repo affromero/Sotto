@@ -1018,3 +1018,28 @@ export const serverInfraSchema = z.object({
 export const siteConfigUpdateSchema = serverInfraSchema.extend({
   openSignup: z.boolean().optional(),
 });
+
+// Unified onboarding-wizard save. Per-user fields persist on every self-hosted
+// save; `infra` persists only when the caller is the owner (enforced server-side).
+// BYOK keys are NOT here — they flow through the validated /api/settings/* routes.
+const langCode2 = z.string().trim().toLowerCase().length(2);
+const cefrLevel = z.enum(['A1', 'A2', 'B1', 'B2', 'C1', 'C2']);
+
+export const onboardingSaveSchema = z.object({
+  course: z.object({
+    native: langCode2,
+    target: langCode2,
+    level: cefrLevel.optional(),
+  }),
+  note: z.string().trim().max(4000).optional(),
+  preferred: z
+    .object({
+      language: z.string().trim().max(40).optional(),
+      aiProvider: z.string().trim().max(64).optional(),
+      aiModel: z.string().trim().max(128).optional(),
+      ttsProvider: z.string().trim().max(64).optional(),
+      ttsModel: z.string().trim().max(128).optional(),
+    })
+    .optional(),
+  infra: serverInfraSchema.optional(),
+});
