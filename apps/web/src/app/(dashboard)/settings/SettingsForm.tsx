@@ -408,6 +408,18 @@ export function SettingsForm({
         </section>
       )}
 
+      {/* Connect a device — available to every learner */}
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>Devices</h2>
+        <p className={styles.sectionDesc}>
+          Link the app on your phone or tablet by scanning a one-time code — no password to type.
+        </p>
+        <Link href="/settings/devices" className={styles.householdLink}>
+          <span className={styles.householdLinkText}>Connect a device</span>
+          <span aria-hidden="true">&rarr;</span>
+        </Link>
+      </section>
+
       {/* Profile Section */}
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Profile</h2>
