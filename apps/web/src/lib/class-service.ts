@@ -263,7 +263,27 @@ export async function getClassForUser(classId: string, userId: string) {
             orderBy: { order: 'asc' },
             include: { responses: { where: { userId }, orderBy: { createdAt: 'desc' }, take: 1 } },
           },
-          podcast: { select: { id: true, audioUrl: true, title: true } },
+          podcast: {
+            select: {
+              id: true,
+              audioUrl: true,
+              title: true,
+              // Sourced-class sources: render via ReferenceList with verification badges.
+              references: {
+                orderBy: { number: 'asc' },
+                select: {
+                  number: true,
+                  title: true,
+                  authors: true,
+                  year: true,
+                  url: true,
+                  type: true,
+                  verificationStatus: true,
+                  contentDomain: true,
+                },
+              },
+            },
+          },
         },
       },
       lesson: { select: { title: true, level: true, objective: true } },
