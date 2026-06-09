@@ -4,7 +4,7 @@
  */
 import { logger } from '../logger';
 
-export type TtsProviderId = 'elevenlabs' | 'openai' | 'cartesia' | 'hume' | 'fal' | 'replicate' | 'minimax' | 'mistral';
+export type TtsProviderId = 'elevenlabs' | 'openai' | 'cartesia' | 'hume' | 'fal' | 'replicate' | 'minimax' | 'mistral' | 'kokoro';
 
 export interface TtsProviderAuthField {
   key: string;
@@ -76,6 +76,8 @@ const LANG_QWEN3: ReadonlySet<string> = new Set(['en','es','fr','de','ja','ko','
 const LANG_MISTRAL: ReadonlySet<string> = new Set(['en','es','fr','de','pt','it','ja','ko','zh']);
 /** Replicate Inworld TTS — 15 languages */
 const LANG_INWORLD: ReadonlySet<string> = new Set(['en','es','fr','de','pt','it','ja','ko','zh','ar','hi','ru','nl','sv','pl']);
+/** Kokoro-82M (local sidecar) — 8 languages */
+const LANG_KOKORO: ReadonlySet<string> = new Set(['en','es','fr','hi','it','pt','ja','zh']);
 
 const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
   elevenlabs: {
@@ -382,6 +384,40 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     },
   },
 
+  // Keyless, server-configured local provider — talks to the Kokoro FastAPI
+  // sidecar at TTS_BASE_URL (no cloud key). Selected explicitly via
+  // TTS_PROVIDER=kokoro; never auto-selected by key availability. Like the
+  // keyless local AI/STT backends, it carries no auth fields and is filtered out
+  // of the BYOK client DTO (see getAllTtsProviderClientMeta).
+  kokoro: {
+    id: 'kokoro',
+    displayName: 'Kokoro (Local)',
+    getApiKeyUrl: '',
+    supportsSfx: false,
+    supportsVoiceCloning: false,
+    supportsStreaming: false,
+    maxSegmentChars: 4096,
+    defaultModel: 'kokoro',
+    models: [
+      { id: 'kokoro', displayName: 'Kokoro 82M', tier: 'standard', supportedLanguages: LANG_KOKORO },
+    ],
+    supportsAudioTags: false,
+    docsUrl: null,
+    qualityTier: 'standard',
+    platformCostPerKChar: 0,
+    modelsWithoutTextContext: ['kokoro'],
+    languageDetection: 'optional_hint',
+    languageParam: 'language',
+    voicesAreCrossLingual: true,
+    auth: {
+      fields: [],
+      // Keyless — no credentials to validate. Reachability is checked at
+      // generation time by the provider (clear error if TTS_BASE_URL is unset
+      // or the sidecar is unreachable).
+      validate: async () => true,
+    },
+  },
+
 };
 
 export function getProviderMeta(id: TtsProviderId): TtsProviderMeta {
@@ -455,6 +491,10 @@ export interface TtsProviderClientMeta {
  */
 export function getAllTtsProviderClientMeta(): TtsProviderClientMeta[] {
   return Object.values(TTS_PROVIDERS)
+    // kokoro is a keyless, server-configured local backend (no API-key fields) —
+    // never surfaced in BYOK client metadata, mirroring how the AI registry
+    // excludes the keyless `local` and `claude-code` providers.
+    .filter((p) => p.id !== 'kokoro')
     .map((p) => ({
       id: p.id,
       displayName: p.displayName,
