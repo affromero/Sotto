@@ -1,0 +1,132 @@
+/*
+ * ProductFrame.module.css. Browser/app chrome wrapper for the landing
+ * walkthrough mockups. Inherits the aula tokens (--surface, --line, --ink,
+ * --mono, etc.) from the landing page .root, so it stays on-theme everywhere it
+ * is used. No motion here beyond a calm transform/opacity hover, gated by
+ * prefers-reduced-motion.
+ */
+
+.figure {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.frame {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  overflow: hidden;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.7) inset,
+    0 18px 44px -28px rgba(30, 33, 40, 0.4);
+  transition: transform 0.2s var(--ease), box-shadow 0.2s var(--ease);
+}
+
+.frame:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.7) inset,
+    0 26px 54px -28px rgba(30, 33, 40, 0.46);
+}
+
+/* ---- chrome bar ---- */
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 11px 14px;
+  background: var(--paper-2);
+  border-bottom: 1px solid var(--line);
+}
+
+.dots {
+  display: inline-flex;
+  gap: 6px;
+  flex: none;
+}
+
+.dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--line-strong);
+}
+
+.titlePill {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  color: var(--ink-mute);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 5px 12px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* app chrome: a flatter titlebar, left-aligned title, no pill border */
+.frameApp .bar {
+  background: var(--voice-bg);
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+.frameApp .dot {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.frameApp .titlePill {
+  flex: 1;
+  background: transparent;
+  border-color: transparent;
+  color: var(--voice-soft);
+  text-align: left;
+}
+
+/* ---- screen / content slot ---- */
+.screen {
+  padding: 20px;
+  background: var(--paper);
+}
+
+/* ---- caption ---- */
+.caption {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.caption::before {
+  content: '';
+  width: 14px;
+  height: 1px;
+  background: var(--accent-line);
+  flex: none;
+}
+
+@media (max-width: 520px) {
+  .screen {
+    padding: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .frame {
+    transition: none;
+  }
+
+  .frame:hover {
+    transform: none;
+  }
+}
