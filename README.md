@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="assets/sotto-mark.svg" alt="Sotto" width="96" height="96">
+
 # Sotto
 
 **Learn a language with the agent that already knows you.**

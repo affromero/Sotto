@@ -13,10 +13,18 @@
 }
 
 .logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   font-family: var(--font-heading);
   font-size: var(--font-size-xl);
   color: var(--color-primary);
   text-decoration: none;
+}
+
+.logoMark {
+  flex: none;
+  border-radius: 50%;
 }
 
 .logo:hover {

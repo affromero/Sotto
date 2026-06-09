@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 130" width="360" height="130" role="img" aria-label="sotto">
+  <defs>
+    <linearGradient id="w-grad" x1="0" y1="0" x2="1" y2="0.35">
+      <stop offset="0" stop-color="#CFE0FF"></stop>
+      <stop offset="0.44" stop-color="#FFFFFF"></stop>
+      <stop offset="0.72" stop-color="#FFD4E6"></stop>
+      <stop offset="1" stop-color="#FF9CBF"></stop>
+    </linearGradient>
+    
+  </defs>
+  <text class="wm" x="4" y="98" font-size="108" letter-spacing="-2" fill="url(#w-grad)">sotto</text>
+</svg>
