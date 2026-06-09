@@ -981,6 +981,12 @@ export const selectMusicGenerationSchema = z.object({
   generationId: z.string().min(1).max(100),
 });
 
+// Sourced classes: build the next class from a real link or an interest topic.
+export const sourcedClassSchema = z.object({
+  sourceUrl: z.string().url().max(2048).optional(),
+  topic: z.string().trim().min(1).max(200).optional(),
+});
+
 // Device pairing ("scan to connect")
 export const pairDeviceSchema = z.object({
   name: z.string().trim().min(1).max(60).optional(),
