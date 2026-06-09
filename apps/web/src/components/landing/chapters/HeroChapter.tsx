@@ -27,13 +27,13 @@ export function HeroChapter({ showcase }: HeroChapterProps) {
           </div>
 
           <h1 className={styles.title}>
-            Your agent knows you.
+            Your agent. Your context.
             <br />
             <em>Now it can teach you.</em>
           </h1>
 
           <p className={styles.subtitle}>
-            Connect the agent that already knows your work and interests. Sotto builds a language course around the things you actually care about.
+            Connect your own Claude or Codex and the context you choose to share. Sotto builds a language course around your work and interests.
           </p>
 
           <AuthCTA source="hero" />

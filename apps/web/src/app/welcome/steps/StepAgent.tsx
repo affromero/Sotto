@@ -47,11 +47,11 @@ export function StepAgent({ agent, setAgent, onNext, onBack }: Props) {
         <span className={t.eyebrowIdx}>01 ·</span> Bring your own agent
       </div>
       <h1 className={t.title}>
-        Connect the agent that <em>already knows you</em>.
+        Connect the agent you <em>already use</em>.
       </h1>
       <p className={t.lede}>
         Sotto is infrastructure, not a model. Hook the Claude Code or Codex you already run,
-        point it at a local endpoint, or paste a key — the same agent that knows your work becomes
+        point it at a local endpoint, or paste a key — the same agent you work with becomes
         your tutor.
       </p>
 

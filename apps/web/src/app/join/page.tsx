@@ -15,7 +15,7 @@ export default function JoinPage() {
       <main className={styles.main}>
         <div className={styles.container}>
           <header className={styles.hero}>
-            <h1 className={styles.heroTitle}>Build Language Learning That Knows You</h1>
+            <h1 className={styles.heroTitle}>Build Language Learning in Your Own Context</h1>
             <p className={styles.heroSubtitle}>
               We&apos;re a small team building the language-learning infrastructure
               we wish existed.
@@ -30,8 +30,8 @@ export default function JoinPage() {
               topics — none of it connected to the work and interests that make words stick.
             </p>
             <p className={styles.sectionText}>
-              Sotto changes this. Your AI agent already knows your projects, domain, and
-              interests. Sotto uses that context to build mastery-gated CEFR courses around
+              Sotto changes this. You already use an AI agent across your projects, domain, and
+              interests. Sotto uses the context you share to build mastery-gated CEFR courses around
               the things you actually care about. Open source works because people can
               inspect, adapt, and self-host the systems they depend on. We&apos;re bringing
               that ethos to language learning.
