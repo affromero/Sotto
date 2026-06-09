@@ -170,9 +170,29 @@ printf "\n"
 if [ "${READY:-}" = "1" ]; then ok "Sotto is running."; else warn "Sotto is starting; give it a moment."; fi
 printf "\n  ${BOLD}Open:${RESET}    http://localhost:%s\n" "$WEB_PORT"
 printf "  ${BOLD}Manage:${RESET}  cd %s  (then \`%s logs -f\`, \`%s down\`)\n" "$SOTTO_DIR" "$DC" "$DC"
-if [ "$AGENT_CHOICE" = "3" ]; then
-  printf "\n  ${DIM}Running Sotto on the same VPS as your agent? Reach the UI from your laptop with one of:${RESET}\n"
-  printf "    ssh -L %s:localhost:%s your-vps      ${DIM}# then open localhost:%s${RESET}\n" "$WEB_PORT" "$WEB_PORT" "$WEB_PORT"
-  printf "    tailscale / cloudflared tunnel\n"
-fi
+
+# ---------------------------------------------------------------------------
+# Reachability — open it on your phone / share with family (opt-in)
+# ---------------------------------------------------------------------------
+printf "\n  ${BOLD}Reach it from your phone or share with family?${RESET}\n"
+ask EXPOSE "  Open a secure public URL now with a Cloudflare quick tunnel (no account)? [y/N]: " "N"
+case "$EXPOSE" in
+  [yY]*)
+    if command -v cloudflared >/dev/null 2>&1; then
+      info "Starting a secure tunnel — copy the https://<name>.trycloudflare.com URL, Ctrl-C to stop."
+      cloudflared tunnel --url "http://localhost:$WEB_PORT" || warn "Tunnel exited."
+    else
+      warn "cloudflared isn't installed. Install it (macOS: \`brew install cloudflared\`), then run:"
+      printf "    cloudflared tunnel --url http://localhost:%s\n" "$WEB_PORT"
+    fi
+    ;;
+  *)
+    printf "\n  ${DIM}Later, to reach it from anywhere:${RESET}\n"
+    printf "    Quick public URL (no account):  cloudflared tunnel --url http://localhost:%s\n" "$WEB_PORT"
+    printf "    Stable URL (free account):      tailscale funnel %s\n" "$WEB_PORT"
+    printf "    Same VPS as your agent:         ssh -L %s:localhost:%s your-vps  ${DIM}# then localhost:%s${RESET}\n" "$WEB_PORT" "$WEB_PORT" "$WEB_PORT"
+    printf "    Own domain:                     point DNS at this server; Caddy handles TLS\n"
+    printf "\n  ${DIM}Then on a phone/tablet: open the URL, or Settings -> Devices for a scan-to-connect code.${RESET}\n"
+    ;;
+esac
 printf "\n"
