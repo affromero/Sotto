@@ -8,6 +8,7 @@ import { getDueItems, applyReviewOutcome } from './knowledge-graph';
 import { generateSectionQuestions } from './class-generation';
 import { composeListeningContent } from './class-listening-generator';
 import { composeSpeakingPrompts } from './class-speaking-generator';
+import { composeWritingPrompts } from './class-writing-generator';
 import { getCourseNote } from './course-notes';
 import { logger } from './logger';
 import type { CefrLevel, PracticeKind, SkillType } from '@sotto/shared';
@@ -43,10 +44,17 @@ export interface PracticeSpeakingItem {
   referenceTtsUrl: string | null;
 }
 
+export interface PracticeWritingItem {
+  id: string;
+  task: string;
+  guidance: string | null;
+}
+
 export type StartPracticeResult =
   | { status: 'unavailable'; reason: 'not_enough_vocab' | 'nothing_due' | 'no_content' }
   | { status: 'ready'; sessionId: string; kind: PracticeKind; items: PracticeMcItemPublic[]; podcastId?: string }
-  | { status: 'ready_speaking'; sessionId: string; prompts: PracticeSpeakingItem[] };
+  | { status: 'ready_speaking'; sessionId: string; prompts: PracticeSpeakingItem[] }
+  | { status: 'ready_writing'; sessionId: string; prompts: PracticeWritingItem[] };
 
 export interface PracticeAnswer {
   itemId: string;
@@ -146,7 +154,8 @@ export async function startPractice(
     return startMc(course, kind, seed, seedToken, note);
   }
   if (kind === 'LISTENING') return startListening(course, seed, seedToken, note);
-  return startSpeaking(course, seed, seedToken, note);
+  if (kind === 'SPEAKING') return startSpeaking(course, seed, seedToken, note);
+  return startWriting(course, seed, seedToken, note);
 }
 
 async function startVocab(course: CourseCtx, seedToken: string): Promise<StartPracticeResult> {
@@ -341,6 +350,53 @@ async function startSpeaking(
   return { status: 'ready_speaking', sessionId: session.id, prompts };
 }
 
+async function startWriting(
+  course: CourseCtx,
+  seed: PracticeSeed,
+  seedToken: string,
+  note: string,
+): Promise<StartPracticeResult> {
+  // Writing prompts hang off the session, so create it first.
+  const session = await prisma.practiceSession.create({
+    data: {
+      courseId: course.id,
+      kind: 'WRITING',
+      items: [] as unknown as Prisma.InputJsonValue,
+      seed: seedToken,
+      vocabLemmas: seed.targetVocab.map((v) => v.lemma),
+      grammarKeys: [],
+    },
+  });
+
+  const composed = await composeWritingPrompts({
+    userId: course.userId,
+    level: course.currentLevel,
+    nativeLang: course.nativeLang,
+    targetLang: course.targetLang,
+    objective: seed.objective,
+    targetVocab: seed.targetVocab,
+    note,
+  });
+
+  await prisma.writingPrompt.createMany({
+    data: composed.map((c, i) => ({
+      practiceSessionId: session.id,
+      order: i + 1,
+      task: c.task,
+      guidance: c.guidance,
+    })),
+  });
+
+  const prompts = await prisma.writingPrompt.findMany({
+    where: { practiceSessionId: session.id },
+    orderBy: { order: 'asc' },
+    select: { id: true, task: true, guidance: true },
+  });
+
+  logger.info('Writing practice generated', { sessionId: session.id, promptCount: String(prompts.length) });
+  return { status: 'ready_writing', sessionId: session.id, prompts };
+}
+
 export async function submitPractice(
   sessionId: string,
   userId: string,
@@ -354,6 +410,9 @@ export async function submitPractice(
   const now = new Date();
   if (session.kind === 'SPEAKING') {
     return submitSpeaking(session.id, session.courseId, session.vocabLemmas, now);
+  }
+  if (session.kind === 'WRITING') {
+    return submitWriting(session.id, session.courseId, session.vocabLemmas, now);
   }
 
   const items = (session.items as unknown as PracticeMcItem[]) ?? [];
@@ -405,5 +464,26 @@ async function submitSpeaking(
     data: { status: 'COMPLETED', score: avg, completedAt: now },
   });
   const total = await prisma.speakingPrompt.count({ where: { practiceSessionId: sessionId } });
+  return { score: avg, correct: graded, total };
+}
+
+async function submitWriting(
+  sessionId: string,
+  courseId: string,
+  vocabLemmas: string[],
+  now: Date,
+): Promise<SubmitPracticeResult> {
+  const responses = await prisma.writingResponse.findMany({
+    where: { practiceSessionId: sessionId, overallScore: { not: null } },
+    select: { overallScore: true },
+  });
+  const graded = responses.length;
+  const avg = graded > 0 ? responses.reduce((s, r) => s + (r.overallScore ?? 0), 0) / graded : 0;
+  if (vocabLemmas.length > 0) await applyReviewOutcome(courseId, vocabLemmas, [], avg, 0, now);
+  await prisma.practiceSession.update({
+    where: { id: sessionId },
+    data: { status: 'COMPLETED', score: avg, completedAt: now },
+  });
+  const total = await prisma.writingPrompt.count({ where: { practiceSessionId: sessionId } });
   return { score: avg, correct: graded, total };
 }

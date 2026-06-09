@@ -2550,6 +2550,7 @@ enum PracticeKind {
   READING
   LISTENING
   SPEAKING
+  WRITING
   VOCAB
 }
 

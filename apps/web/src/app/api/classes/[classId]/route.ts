@@ -43,6 +43,18 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         ipa: p.ipa,
         referenceTtsUrl: p.referenceTtsUrl,
       })),
+      writingPrompts: s.writingPrompts.map((p) => {
+        const r = p.responses[0];
+        return {
+          id: p.id,
+          order: p.order,
+          task: p.task,
+          guidance: p.guidance,
+          response: r
+            ? { text: r.text, overallScore: r.overallScore, corrections: r.corrections, feedback: r.feedback }
+            : null,
+        };
+      }),
     }));
 
     return NextResponse.json({

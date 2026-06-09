@@ -192,6 +192,6 @@ export type EdgeType =
 
 // Ungated single-skill practice. VOCAB is first-class (spaced-repetition recall)
 // and is intentionally NOT part of SkillType (which gates the four class sections).
-export type PracticeKind = 'GRAMMAR' | 'READING' | 'LISTENING' | 'SPEAKING' | 'VOCAB';
+export type PracticeKind = 'GRAMMAR' | 'READING' | 'LISTENING' | 'SPEAKING' | 'WRITING' | 'VOCAB';
 
 export type PracticeStatus = 'ACTIVE' | 'COMPLETED';

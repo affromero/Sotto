@@ -6,6 +6,7 @@ import { generateSectionQuestions } from './class-generation';
 import { seedLessonItems, getDueItems, applyReviewOutcome } from './knowledge-graph';
 import { generateClassListening } from './class-listening-generator';
 import { generateClassSpeaking } from './class-speaking-generator';
+import { generateClassWriting } from './class-writing-generator';
 import { getCourseNote } from './course-notes';
 import { logger } from './logger';
 import type { SkillType, CefrLevel } from '@sotto/shared';
@@ -159,6 +160,25 @@ export async function createNextClass(courseId: string, userId: string): Promise
     });
   }
 
+  // Writing section — non-blocking, same rationale as listening/speaking.
+  try {
+    await generateClassWriting({
+      userId,
+      classId: cls.id,
+      level: lesson.level,
+      nativeLang: course.nativeLang,
+      targetLang: course.targetLang,
+      objective: lesson.objective,
+      targetVocab,
+      note,
+    });
+  } catch (err) {
+    logger.warn('generateClassWriting failed; continuing without writing section', {
+      classId: cls.id,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+
   await prisma.courseClass.update({
     where: { id: cls.id },
     data: {
@@ -183,6 +203,10 @@ export async function getClassForUser(classId: string, userId: string) {
         include: {
           questions: { orderBy: { order: 'asc' } },
           prompts: { orderBy: { order: 'asc' } },
+          writingPrompts: {
+            orderBy: { order: 'asc' },
+            include: { responses: { where: { userId }, orderBy: { createdAt: 'desc' }, take: 1 } },
+          },
           podcast: { select: { id: true, audioUrl: true, title: true } },
         },
       },
@@ -212,6 +236,7 @@ export async function submitClass(
         include: {
           questions: true,
           prompts: { include: { recordings: { orderBy: { createdAt: 'desc' } } } },
+          writingPrompts: { include: { responses: { orderBy: { createdAt: 'desc' } } } },
         },
       },
       lesson: true,
@@ -232,6 +257,10 @@ export async function submitClass(
         const scored = p.recordings.find((r) => r.status === 'SCORED' && r.overallScore != null);
         return scored?.overallScore ?? 0;
       });
+      score = promptScores.length > 0 ? promptScores.reduce((a, b) => a + b, 0) / promptScores.length : 0;
+    } else if (s.skill === 'WRITING') {
+      // Average the latest response score per writing prompt; ungraded prompts count as 0.
+      const promptScores = s.writingPrompts.map((p) => p.responses[0]?.overallScore ?? 0);
       score = promptScores.length > 0 ? promptScores.reduce((a, b) => a + b, 0) / promptScores.length : 0;
     } else {
       let correct = 0;

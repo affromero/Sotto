@@ -15,6 +15,9 @@ const mockPracticeSessionCreate = vi.fn();
 const mockPracticeSessionFindFirst = vi.fn();
 const mockPracticeSessionUpdate = vi.fn();
 const mockSpeakingPromptCount = vi.fn();
+const mockWritingPromptCreateMany = vi.fn();
+const mockWritingPromptFindMany = vi.fn();
+const mockComposeWritingPrompts = vi.fn();
 const mockSpeakingRecordingFindMany = vi.fn();
 
 vi.mock('@/lib/prisma', () => ({
@@ -35,6 +38,10 @@ vi.mock('@/lib/prisma', () => ({
     },
     speakingPrompt: { count: (...a: unknown[]) => mockSpeakingPromptCount(...a) },
     speakingRecording: { findMany: (...a: unknown[]) => mockSpeakingRecordingFindMany(...a) },
+    writingPrompt: {
+      createMany: (...a: unknown[]) => mockWritingPromptCreateMany(...a),
+      findMany: (...a: unknown[]) => mockWritingPromptFindMany(...a),
+    },
   },
 }));
 
@@ -52,6 +59,7 @@ vi.mock('@/lib/class-generation', () => ({
 
 vi.mock('@/lib/class-listening-generator', () => ({ composeListeningContent: vi.fn() }));
 vi.mock('@/lib/class-speaking-generator', () => ({ composeSpeakingPrompts: vi.fn() }));
+vi.mock('@/lib/class-writing-generator', () => ({ composeWritingPrompts: (...a: unknown[]) => mockComposeWritingPrompts(...a) }));
 vi.mock('@/lib/course-notes', () => ({ getCourseNote: vi.fn().mockResolvedValue('') }));
 vi.mock('@/lib/logger', () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 
@@ -197,5 +205,29 @@ describe('submitPractice — SRS', () => {
 
     expect(r.score).toBe(1);
     expect(mockApplyReviewOutcome).toHaveBeenCalledWith('c1', ['hola'], ['ser-vs-estar'], 1, 1, expect.any(Date));
+  });
+});
+
+describe('startPractice — WRITING', () => {
+  it('creates a session + writing prompts and returns ready_writing', async () => {
+    mockGetDueItems.mockResolvedValue({
+      vocab: [{ id: 'lv1', lemma: 'hola', translation: 'hello', mastery: 0.4 }],
+      grammar: [],
+    });
+    mockPracticeSessionCreate.mockResolvedValue({ id: 'pw1' });
+    mockComposeWritingPrompts.mockResolvedValue([{ task: 'Write a greeting note.', guidance: null }]);
+    mockWritingPromptCreateMany.mockResolvedValue({ count: 1 });
+    mockWritingPromptFindMany.mockResolvedValue([{ id: 'wp1', task: 'Write a greeting note.', guidance: null }]);
+
+    const r = await startPractice('c1', 'u1', 'WRITING');
+    if (r.status !== 'ready_writing') throw new Error(`expected ready_writing, got ${r.status}`);
+
+    expect(r.sessionId).toBe('pw1');
+    expect(r.prompts).toEqual([{ id: 'wp1', task: 'Write a greeting note.', guidance: null }]);
+    expect(mockComposeWritingPrompts).toHaveBeenCalled();
+    expect(mockWritingPromptCreateMany).toHaveBeenCalled();
+    expect(mockPracticeSessionCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ kind: 'WRITING' }) }),
+    );
   });
 });
