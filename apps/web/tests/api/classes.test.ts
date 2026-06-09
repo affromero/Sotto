@@ -74,6 +74,7 @@ const SAMPLE_CLASS_UNSUBMITTED = {
         { id: 'q2', order: 2, question: 'Q2?', options: ['a', 'b', 'c', 'd'], passageRef: null, correctIndex: 1, explanation: 'Exp2' },
       ],
       prompts: [],
+      writingPrompts: [],
     },
   ],
 };
@@ -93,6 +94,7 @@ const SAMPLE_CLASS_SPEAKING = {
       prompts: [
         { id: 'p1', order: 1, targetPhrase: 'Hola', translation: 'Hello', ipa: 'ˈola', referenceTtsUrl: 'https://r2/ref.mp3' },
       ],
+      writingPrompts: [],
     },
   ],
 };
@@ -113,6 +115,7 @@ const SAMPLE_CLASS_LISTENING = {
         { id: 'l1', order: 1, question: 'What did they discuss?', options: ['a', 'b', 'c', 'd'], passageRef: null, correctIndex: 0, explanation: 'E' },
       ],
       prompts: [],
+      writingPrompts: [],
     },
   ],
 };
