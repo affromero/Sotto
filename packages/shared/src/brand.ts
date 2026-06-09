@@ -4,7 +4,7 @@
 
 export const BRAND = {
   name: 'Sotto',
-  origin: 'From Italian "sotto voce" — speaking in a soft, intimate voice',
+  origin: 'From Italian "sotto voce" — spoken softly, kept private',
   url: '/',
   twitter: null,
 

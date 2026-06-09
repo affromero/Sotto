@@ -20,7 +20,7 @@ Open-source, self-hostable language-learning infrastructure — taught in the co
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-1F8A5B.svg)](CONTRIBUTING.md)
 [![Ko-fi](https://img.shields.io/badge/Ko--fi-Support-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/afromero)
 
-<sub>From the Italian *sotto voce* — speaking in a soft, intimate voice.</sub>
+<sub>From the Italian *sotto voce* — spoken softly, kept private.</sub>
 
 </div>
 
