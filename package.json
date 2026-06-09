@@ -5,7 +5,8 @@
   "workspaces": [
     "apps/*",
     "packages/*",
-    "services/*"
+    "services/*",
+    "!apps/desktop"
   ],
   "description": "Open-source, self-hostable language learning, taught in your own context through the AI agent you already own.",
   "license": "AGPL-3.0-only",

@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sotto Host</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <header class="head">
+        <img src="sotto-mark.svg" alt="" class="mark" width="40" height="40" />
+        <h1>Sotto Host</h1>
+        <p class="tagline">Your self-hosted Sotto, in one click.</p>
+      </header>
+
+      <section class="status">
+        <span id="dot" class="dot dot-idle" aria-hidden="true"></span>
+        <span id="status-text">Checking…</span>
+      </section>
+
+      <div id="actions" class="actions" hidden>
+        <button id="start" class="btn btn-primary">Start Sotto</button>
+        <button id="stop" class="btn btn-ghost" hidden>Stop</button>
+        <button id="open" class="btn btn-secondary" hidden>Open Sotto</button>
+      </div>
+
+      <div id="needs-docker" class="notice" hidden>
+        Docker isn't running. Install Docker Desktop and start it, then reopen Sotto Host.
+      </div>
+
+      <div id="needs-install" class="notice" hidden>
+        No Sotto install found in <code>~/.sotto</code>. Run the one-command installer first:
+        <pre><code>curl -fsSL https://sotto.fm/install.sh | bash</code></pre>
+      </div>
+    </main>
+    <script src="main.js"></script>
+  </body>
+</html>
