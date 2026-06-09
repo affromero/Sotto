@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import {
   LayoutDashboard,
   PlusCircle,
@@ -76,6 +77,7 @@ export function Sidebar({
       <aside className={styles.sidebar} aria-label="Main navigation">
         <div className={styles.brand}>
           <Link href="/" className={styles.logo}>
+            <Image src="/brand/sotto-mark.svg" alt="" width={26} height={26} className={styles.logoMark} unoptimized />
             Sotto
           </Link>
         </div>

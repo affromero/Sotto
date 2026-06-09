@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import styles from './PublicNav.module.css';
 
 const NAV_LINKS = [
@@ -13,6 +14,7 @@ export function PublicNav() {
     <nav className={styles.nav} aria-label="Public navigation">
       <div className={styles.inner}>
         <Link href="/" className={styles.logo}>
+          <Image src="/brand/sotto-mark.svg" alt="" width={26} height={26} className={styles.logoMark} unoptimized />
           Sotto
         </Link>
         <ul className={styles.links} role="list">

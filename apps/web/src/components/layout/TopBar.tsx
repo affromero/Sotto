@@ -27,6 +27,7 @@ export function TopBar({ user }: TopBarProps) {
   return (
     <header className={styles.topBar}>
       <Link href="/" className={styles.logo}>
+        <Image src="/brand/sotto-mark.svg" alt="" width={24} height={24} className={styles.logoMark} unoptimized />
         Sotto
       </Link>
       <nav className={styles.nav}>
