@@ -42,6 +42,7 @@ const EXPECTED_FILES = [
   'placement/placement-probe.md',
   'class/generate-listening-quiz.md',
   'class/generate-section-quiz.md',
+  'class/level-source.md',
   'import/import-metadata.md',
   'import/transcript-diarization.md',
   'verification/reference-validator.md',
@@ -167,6 +168,9 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
   ].sort(),
   'class/generate-section-quiz.md': [
     'COUNT', 'GRAMMAR_POINTS', 'LEVEL', 'NATIVE', 'NOTES', 'OBJECTIVE', 'SEED', 'SKILL', 'TARGET', 'VOCAB',
+  ].sort(),
+  'class/level-source.md': [
+    'LEVEL', 'NATIVE', 'SOURCE', 'TARGET', 'TITLE',
   ].sort(),
   'writing/generate-writing-prompts.md': [
     'COUNT', 'LEVEL', 'NATIVE', 'NOTES', 'OBJECTIVE', 'TARGET', 'VOCAB',
