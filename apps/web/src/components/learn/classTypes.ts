@@ -4,7 +4,28 @@
  * place so ClassShell and every section module agree on shapes.
  */
 
-export type ClassSkill = 'GRAMMAR' | 'READING' | 'LISTENING' | 'SPEAKING';
+export type ClassSkill = 'GRAMMAR' | 'READING' | 'LISTENING' | 'SPEAKING' | 'WRITING';
+
+export interface WritingCorrection {
+  old: string;
+  new: string;
+  why: string;
+}
+
+export interface WritingResponse {
+  text: string;
+  overallScore: number;
+  corrections: WritingCorrection[];
+  feedback: string;
+}
+
+export interface WritingPromptData {
+  id: string;
+  order: number;
+  task: string;
+  guidance?: string | null;
+  response: WritingResponse | null;
+}
 
 export interface ClassQuestion {
   id: string;
@@ -41,6 +62,7 @@ export interface ClassSection {
   podcast: ClassSectionPodcast | null;
   questions: ClassQuestion[];
   prompts: ClassSpeakingPrompt[];
+  writingPrompts: WritingPromptData[];
 }
 
 export interface ClassData {
@@ -74,13 +96,15 @@ export const SKILL_LABELS: Record<string, string> = {
   READING: 'Reading',
   LISTENING: 'Listening',
   SPEAKING: 'Speaking',
+  WRITING: 'Writing',
 };
 
-export const SKILL_GLYPH: Record<string, 'gate' | 'book' | 'wave' | 'mic'> = {
+export const SKILL_GLYPH: Record<string, 'gate' | 'book' | 'wave' | 'mic' | 'pen'> = {
   GRAMMAR: 'gate',
   READING: 'book',
   LISTENING: 'wave',
   SPEAKING: 'mic',
+  WRITING: 'pen',
 };
 
 export function skillLabel(skill: string): string {

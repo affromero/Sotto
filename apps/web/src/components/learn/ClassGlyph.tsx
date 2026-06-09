@@ -13,6 +13,7 @@ export type ClassGlyphName =
   | 'gate'
   | 'wave'
   | 'mic'
+  | 'pen'
   | 'book'
   | 'graph'
   | 'spark'
@@ -90,6 +91,13 @@ export function ClassGlyph({ name, size = 20, stroke = 1.6 }: ClassGlyphProps) {
         <svg {...p}>
           <rect x="9" y="3" width="6" height="11" rx="3" />
           <path d="M5 11a7 7 0 0014 0M12 18v3" />
+        </svg>
+      );
+    case 'pen':
+      return (
+        <svg {...p}>
+          <path d="M4 20l4-1L20 7a2 2 0 00-3-3L5 16l-1 4z" />
+          <path d="M14 6l3 3" />
         </svg>
       );
     case 'book':

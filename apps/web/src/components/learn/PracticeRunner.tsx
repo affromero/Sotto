@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { SpeakingExercise } from '@/components/class/SpeakingExercise';
+import { WritingSection } from './WritingSection';
+import type { WritingPromptData } from './classTypes';
 import styles from './PracticeRunner.module.css';
 
 // ---- Types (mirror the practice API) ----
@@ -19,9 +21,16 @@ export interface PracticeSpeakingItem {
   referenceTtsUrl?: string | null;
 }
 
+export interface PracticeWritingItem {
+  id: string;
+  task: string;
+  guidance?: string | null;
+}
+
 export type PracticeStart =
   | { status: 'ready'; sessionId: string; kind: string; items: PracticeMcItem[]; podcastId?: string }
-  | { status: 'ready_speaking'; sessionId: string; prompts: PracticeSpeakingItem[] };
+  | { status: 'ready_speaking'; sessionId: string; prompts: PracticeSpeakingItem[] }
+  | { status: 'ready_writing'; sessionId: string; prompts: PracticeWritingItem[] };
 
 interface SubmitResult {
   score: number;
@@ -236,9 +245,60 @@ function SpeakingRunner({
   );
 }
 
+// ---- Writing runner ----
+
+function WritingRunner({
+  start,
+  onDone,
+}: {
+  start: Extract<PracticeStart, { status: 'ready_writing' }>;
+  onDone: () => void;
+}) {
+  const [finishing, setFinishing] = useState(false);
+
+  const prompts: WritingPromptData[] = start.prompts.map((p, idx) => ({
+    id: p.id,
+    order: idx,
+    task: p.task,
+    guidance: p.guidance ?? null,
+    response: null,
+  }));
+
+  async function finish() {
+    setFinishing(true);
+    // Apply SRS from whatever responses have been graded so far.
+    await fetch(`/api/practice/${start.sessionId}/submit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ answers: [] }),
+    }).catch(() => {});
+    onDone();
+  }
+
+  return (
+    <div className={styles.runner}>
+      <WritingSection endpointBase={`/api/practice/${start.sessionId}/writing`} prompts={prompts} />
+      <div className={styles.actions}>
+        <button
+          type="button"
+          className={styles.primaryButton}
+          onClick={() => void finish()}
+          disabled={finishing}
+          aria-busy={finishing}
+        >
+          {finishing ? 'Finishing…' : 'Finish practice'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function PracticeRunner({ start, onDone }: PracticeRunnerProps) {
   if (start.status === 'ready_speaking') {
     return <SpeakingRunner start={start} onDone={onDone} />;
+  }
+  if (start.status === 'ready_writing') {
+    return <WritingRunner start={start} onDone={onDone} />;
   }
   return <McRunner start={start} onDone={onDone} />;
 }

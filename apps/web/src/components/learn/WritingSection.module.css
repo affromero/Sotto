@@ -1,0 +1,413 @@
+/* WritingSection — task card, textarea, inline corrections + score. */
+
+.root {
+  composes: surface from './sottoLearn.module.css';
+  /* dark "voice" surface tokens (aula) for the correction tooltip */
+  --voice-bg: #1c1f27;
+  --voice-fg: #ecedf2;
+}
+
+/* ---- section header ---- */
+.header {
+  animation: segIn 0.5s var(--ease) both;
+  margin-bottom: 22px;
+}
+
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.eyebrowIdx {
+  color: var(--ink-mute);
+}
+
+.title {
+  font-family: var(--serif);
+  font-weight: 420;
+  font-size: clamp(28px, 4vw, 44px);
+  line-height: 1.14;
+  letter-spacing: -0.015em;
+  margin: 16px 0 0;
+  color: var(--ink);
+  text-wrap: balance;
+}
+
+.modLede {
+  font-size: 15.5px;
+  line-height: 1.6;
+  color: var(--ink-soft);
+  margin: 18px 0 0;
+  max-width: 56ch;
+  text-wrap: pretty;
+}
+
+.promptList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+
+.promptItem {
+  margin: 0;
+}
+
+.card {
+  animation: segIn 0.4s var(--ease) both;
+}
+
+@keyframes segIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .corrected,
+  .results {
+    animation: none;
+  }
+}
+
+/* ---- prompt card ---- */
+.writePrompt {
+  background: var(--well);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 18px 20px;
+}
+
+.writeFrom {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
+
+.writeBubble {
+  font-family: var(--serif);
+  font-size: 20px;
+  line-height: 1.4;
+  color: var(--ink);
+  margin-top: 8px;
+  text-wrap: pretty;
+}
+
+.writeTask {
+  font-size: 14px;
+  color: var(--ink-soft);
+  margin-top: 10px;
+  line-height: 1.5;
+}
+
+/* ---- editor ---- */
+.writer {
+  margin-top: 16px;
+  width: 100%;
+  min-height: 130px;
+  resize: vertical;
+  font-family: var(--serif);
+  font-size: 18px;
+  line-height: 1.6;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r);
+  padding: 16px 18px;
+}
+
+.writer:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.writer::placeholder {
+  color: var(--ink-mute);
+}
+
+.writer:disabled {
+  opacity: 0.6;
+}
+
+.writeCount {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-mute);
+  margin-top: 8px;
+  text-align: right;
+}
+
+/* ---- corrected text ---- */
+.results {
+  animation: segIn 0.4s var(--ease) both;
+}
+
+.corrected {
+  margin: 16px 0 0;
+  background: var(--paper);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r);
+  padding: 16px 18px;
+  font-family: var(--serif);
+  font-size: 18px;
+  line-height: 1.8;
+  color: var(--ink);
+  white-space: pre-wrap;
+}
+
+.corr {
+  position: relative;
+  cursor: help;
+  white-space: nowrap;
+  border-radius: 2px;
+}
+
+.corr:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.old {
+  color: var(--bad);
+  text-decoration: line-through;
+  text-decoration-color: var(--bad);
+  opacity: 0.7;
+}
+
+.new {
+  color: var(--good);
+  font-weight: 500;
+  margin-left: 6px;
+}
+
+.corrNote {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 260px;
+  z-index: 5;
+  background: var(--voice-bg);
+  color: var(--voice-fg);
+  border-radius: var(--r);
+  padding: 9px 12px;
+  font-family: var(--sans);
+  font-size: 12.5px;
+  line-height: 1.45;
+  white-space: normal;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+.ck {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+  display: block;
+  margin-bottom: 4px;
+}
+
+.corr:hover .corrNote,
+.corr:focus-visible .corrNote {
+  opacity: 1;
+}
+
+.corrNote::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: var(--voice-bg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .corrNote {
+    transition: none;
+  }
+}
+
+/* ---- corrections the learner already edited away ---- */
+.unmatchedList {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 12px 16px;
+  background: var(--well);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.unmatchedItem {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  font-family: var(--serif);
+  font-size: 15px;
+  color: var(--ink);
+}
+
+.unmatchedWhy {
+  flex-basis: 100%;
+  font-family: var(--sans);
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--ink-soft);
+}
+
+/* ---- feedback ---- */
+.writeFeedback {
+  margin-top: 18px;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.wfDial {
+  flex: none;
+}
+
+.writePraise {
+  margin: 0;
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+  text-wrap: pretty;
+}
+
+.tally {
+  font-style: normal;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--ink-mute);
+  display: block;
+  margin-top: 8px;
+}
+
+/* ---- actions ---- */
+.cactions {
+  margin-top: 22px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.grow {
+  flex: 1;
+}
+
+.btn {
+  font-family: var(--sans);
+  font-size: 14.5px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  border-radius: var(--r);
+  padding: 13px 22px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  transition:
+    transform 0.15s var(--ease),
+    filter 0.2s,
+    color 0.2s;
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btnPrimary {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+.btnPrimary:not(:disabled):hover {
+  filter: brightness(1.06);
+}
+
+.btnPrimary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  filter: none;
+}
+
+.btnBare {
+  background: transparent;
+  color: var(--ink-soft);
+  padding: 13px 6px;
+}
+
+.btnBare:hover {
+  color: var(--ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn {
+    transition: filter 0.2s, color 0.2s;
+  }
+  .btn:active {
+    transform: none;
+  }
+}
+
+/* ---- error / empty ---- */
+.errorBanner {
+  margin: 14px 0 0;
+  padding: 12px 16px;
+  border: 1px solid var(--bad);
+  background: var(--bad-soft);
+  border-radius: var(--r);
+  font-size: 13.5px;
+  color: var(--bad);
+}
+
+.empty {
+  margin: 0;
+  font-family: var(--sans);
+  font-size: 14px;
+  color: var(--ink-mute);
+}
+
+/* ---- a11y ---- */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
