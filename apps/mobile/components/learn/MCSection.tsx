@@ -58,9 +58,9 @@ export function MCSection({
 
         return (
           <View key={q.id} style={styles.questionBlock}>
-            {q.passageRef && (
-              <Text style={styles.passageRef}>{q.passageRef}</Text>
-            )}
+            {(q.passageText || q.passageRef) ? (
+              <Text style={styles.passageRef}>{q.passageText || q.passageRef}</Text>
+            ) : null}
             <Text style={styles.questionText}>{q.question}</Text>
 
             {q.options.map((opt, i) => {
