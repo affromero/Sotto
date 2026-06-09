@@ -13,6 +13,8 @@ import { loadAndRender } from './prompt-loader';
 import { formatNotesForPrompt } from './course-notes';
 import { generateScript } from './script-generator';
 import { createSegmentsAndQueueAudio } from './segment-creator';
+import { persistGeneratedReferences } from './references';
+import { addJob, verifyClassReferencesQueue, JobType } from './queue';
 import { getConfiguredTtsProviderId } from './providers/tts';
 import { logUsage } from './usage-logger';
 import { logger } from './logger';
@@ -29,6 +31,10 @@ export interface ClassListeningParams {
   objective: string;
   mustIncludeVocab: Array<{ word: string; translation: string }>;
   note?: string;
+  /** Optional sourced-class content + provenance (see ListeningContentParams). */
+  sourceContent?: string;
+  sourceMetadata?: { title?: string; author?: string; publishedDate?: string; siteName?: string };
+  sourceUrl?: string;
 }
 
 export interface ClassListeningResult {
@@ -58,6 +64,14 @@ export interface ListeningContentParams {
   /** Provenance for graph vocab (a class id). Undefined for practice sessions. */
   firstSeenClassId?: string;
   note?: string;
+  /**
+   * Optional sourced-class content: a CEFR-leveled passage in the target
+   * language (from `prepareClassSource`). When present, the listening episode
+   * derives from it with `[N]` citations and real, verified references.
+   */
+  sourceContent?: string;
+  sourceMetadata?: { title?: string; author?: string; publishedDate?: string; siteName?: string };
+  sourceUrl?: string;
 }
 
 export interface ListeningContent {
@@ -103,6 +117,11 @@ export async function composeListeningContent(p: ListeningContentParams): Promis
       languageMode: 'conversational_mix',
       forLearning: true,
       mustIncludeVocabulary: p.mustIncludeVocab,
+      sourceContent: p.sourceContent,
+      sourceMetadata: p.sourceMetadata,
+      // NOT key-availability fallback: web-search only enriches a topic that has
+      // no extracted text; provider selection stays explicit (resolveLearningAi).
+      webSearchEnabled: !p.sourceContent,
     });
 
     // Step 4: persist Script + VocabularyEntry (mirrors script-generation worker)
@@ -131,6 +150,15 @@ export async function composeListeningContent(p: ListeningContentParams): Promis
         });
       }
     });
+
+    // Step 4b: persist references, then enqueue the verify-ONLY worker. We do
+    // NOT enqueue the reference-validation worker: for non-WEB/IMPORT sources it
+    // re-runs createSegmentsAndQueueAudio (segment-creator is not idempotent),
+    // which would double-create segments + double-queue audio.
+    await persistGeneratedReferences(podcastId, result.references);
+    if (result.references.length > 0) {
+      await addJob(verifyClassReferencesQueue, JobType.VERIFY_CLASS_REFERENCES, { podcastId });
+    }
 
     // Step 5: queue audio generation segments
     await createSegmentsAndQueueAudio(podcastId, result.turns);
@@ -246,6 +274,9 @@ export async function generateClassListening(p: ClassListeningParams): Promise<C
     mustIncludeVocab: p.mustIncludeVocab,
     firstSeenClassId: p.classId,
     note: p.note,
+    sourceContent: p.sourceContent,
+    sourceMetadata: p.sourceMetadata,
+    sourceUrl: p.sourceUrl,
   });
 
   try {

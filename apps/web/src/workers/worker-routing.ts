@@ -46,6 +46,7 @@ export const PIPELINE_WORKERS = new Set([
   'pipeline-classification',
   'speaking-grading',
   'worksheet-pdf',
+  'verify-class-references',
 ]);
 
 /**
