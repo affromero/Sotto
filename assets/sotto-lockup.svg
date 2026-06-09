@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 470 130" width="470" height="130" role="img" aria-label="sotto">
+  <defs>
+    <linearGradient id="l-main" x1="0.16" y1="0.04" x2="0.84" y2="0.96">
+      <stop offset="0" stop-color="#6AA0FF"></stop>
+      <stop offset="1" stop-color="#FF8FB1"></stop>
+    </linearGradient>
+    <radialGradient id="l-blue" cx="0.28" cy="0.72" r="0.6">
+      <stop offset="0" stop-color="#5B8DEF"></stop>
+      <stop offset="1" stop-color="#5B8DEF" stop-opacity="0"></stop>
+    </radialGradient>
+    <radialGradient id="l-pink" cx="0.72" cy="0.76" r="0.55">
+      <stop offset="0" stop-color="#FF8FB1"></stop>
+      <stop offset="1" stop-color="#FF8FB1" stop-opacity="0"></stop>
+    </radialGradient>
+    <radialGradient id="l-shade" cx="0.5" cy="1" r="0.65">
+      <stop offset="0" stop-color="#23244E" stop-opacity="0.55"></stop>
+      <stop offset="1" stop-color="#23244E" stop-opacity="0"></stop>
+    </radialGradient>
+    <radialGradient id="l-hi" cx="0.34" cy="0.26" r="0.42">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.95"></stop>
+      <stop offset="0.5" stop-color="#FFFFFF" stop-opacity="0.22"></stop>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"></stop>
+    </radialGradient>
+    <radialGradient id="l-spec" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.95"></stop>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"></stop>
+    </radialGradient>
+    <linearGradient id="l-word" x1="0" y1="0" x2="1" y2="0.35">
+      <stop offset="0" stop-color="#CFE0FF"></stop>
+      <stop offset="0.44" stop-color="#FFFFFF"></stop>
+      <stop offset="0.72" stop-color="#FFD4E6"></stop>
+      <stop offset="1" stop-color="#FF9CBF"></stop>
+    </linearGradient>
+    <clipPath id="l-clip"><circle cx="50" cy="50" r="48"></circle></clipPath>
+    
+  </defs>
+
+  
+  <g transform="translate(8,17) scale(0.96)">
+    <g clip-path="url(#l-clip)">
+      <circle cx="50" cy="50" r="48" fill="url(#l-main)"></circle>
+      <rect width="100" height="100" fill="url(#l-blue)"></rect>
+      <rect width="100" height="100" fill="url(#l-pink)"></rect>
+      <rect width="100" height="100" fill="url(#l-shade)"></rect>
+      <rect width="100" height="100" fill="url(#l-hi)"></rect>
+      <ellipse cx="34" cy="24" rx="13" ry="8" fill="url(#l-spec)"></ellipse>
+    </g>
+    <circle cx="50" cy="50" r="47.5" fill="none" stroke="#FFFFFF" stroke-opacity="0.25" stroke-width="1"></circle>
+  </g>
+
+  
+  <text class="wm" x="120" y="92" font-size="100" letter-spacing="-2" fill="url(#l-word)">sotto</text>
+</svg>
