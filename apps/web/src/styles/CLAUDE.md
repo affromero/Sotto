@@ -1,28 +1,29 @@
 # src/styles/ — Global Styles & Design Tokens
 
-## Design System: "Warm Intimacy"
+## Design System: "SottoDesign aula"
 
 All design tokens are CSS custom properties defined in `globals.css`.
 JS equivalents for mobile consumption are in `@sotto/shared` (`packages/shared/src/theme.ts`).
+Dark mode uses the "terminal" palette via `[data-theme='dark']`. The wordmark name and glass bead carry a blue to pink gradient (`#6AA0FF` to `#FF8FB1`).
 
 ### Color Palette
 
 | Token | Value | Usage |
 |-------|-------|-------|
-| `--color-primary` | `#D97706` (Golden Amber) | CTAs, Host speaker, links |
-| `--color-accent` | `#1E3A5F` (Deep Navy) | Expert speaker, secondary |
-| `--color-background` | `#FEFCF8` (Soft Cream) | Page background |
+| `--color-primary` | `#3F4FB0` (aula blue) | CTAs, links, primary accent |
+| `--color-accent` | `#2A3550` (ink slate) | Secondary emphasis |
+| `--color-background` | `#F5F4F0` (paper) | Page background |
 | `--color-surface` | `#FFFFFF` | Cards, panels |
-| `--color-speaker-host` | `#D97706` | Host name/label in transcript |
-| `--color-speaker-expert` | `#1E3A5F` | Expert name/label in transcript |
+| `--color-text-primary` | `#1E2128` (ink) | Body text |
+| `--color-speaker-0..3` | blue, slate, teal, rose | Indexed voice palette (transcript, class) |
 
 ### Typography
 
 | Token | Font | Usage |
 |-------|------|-------|
-| `--font-heading` | DM Serif Display | h1, h2, h3 (editorial warmth) |
-| `--font-body` | Inter | Body text, UI elements |
-| `--font-mono` | JetBrains Mono | Code, technical content |
+| `--font-heading` | Newsreader | h1, h2, h3 and voice (editorial serif) |
+| `--font-body` | IBM Plex Sans | Body text, UI elements |
+| `--font-mono` | IBM Plex Mono | Labels, eyebrows, infra |
 
 ### Layout
 
