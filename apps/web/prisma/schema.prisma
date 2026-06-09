@@ -76,6 +76,14 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
+  // Local profile sign-in (self-hosted). passwordHash is scrypt (lib/password.ts);
+  // forcePasswordChange makes a member set a new password on first sign-in;
+  // tokenVersion is bumped to invalidate active JWT sessions (member removal,
+  // password reset). All null/zero for OAuth-only accounts.
+  passwordHash        String?
+  forcePasswordChange Boolean @default(false)
+  tokenVersion        Int     @default(0)
+
   // Twitter integration
   twitterHandle        String? @unique
   twitterEnabled       Boolean @default(false)
@@ -1747,6 +1755,11 @@ model AutoModelConfig {
 model SiteConfig {
   id         String   @id @default("singleton")
   openSignup Boolean  @default(false)
+
+  // Local profile sign-in (the Netflix-style picker). When true, the Credentials
+  // provider is active and the profile picker is the primary sign-in. Owner-set.
+  // null means "use the default": on for self-hosted instances with no ADMIN_EMAILS.
+  localAuth Boolean?
 
   // Owner-set server infrastructure (non-secret selection only; null = fall back to env).
   // Secrets (provider keys, R2/S3 credentials) never live here — they stay in env or the

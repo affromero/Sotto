@@ -5,6 +5,7 @@ import GitHub from 'next-auth/providers/github';
 import Twitter from 'next-auth/providers/twitter';
 import Apple from 'next-auth/providers/apple';
 import Resend from 'next-auth/providers/resend';
+import Credentials from 'next-auth/providers/credentials';
 import { prisma } from './prisma';
 import { generateUniqueHandle } from './handles';
 import { isAdminEmail } from './admin-emails';
@@ -12,6 +13,10 @@ import { bootstrapFirstUserAsOwner } from './owner-bootstrap';
 import { getOptionalEmailProviderConfig, sendEmail } from './email';
 import { buildMagicLinkEmail } from './email-templates';
 import { isOpenSignup } from './site-config';
+import { isLocalAuthEnabled } from './local-auth';
+import { verifyPassword } from './password';
+import { credentialsAuthSchema } from './validations';
+import { checkRateLimit } from './redis';
 
 const emailProviderConfig = getOptionalEmailProviderConfig();
 
@@ -68,6 +73,34 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           }),
         ]
       : []),
+    // Local profile sign-in (self-hosted). Always present, but authorize refuses
+    // unless localAuth is enabled, so it is inert on OAuth-only instances.
+    Credentials({
+      id: 'credentials',
+      name: 'Profile',
+      credentials: { userId: {}, password: {} },
+      async authorize(raw) {
+        const parsed = credentialsAuthSchema.safeParse(raw);
+        if (!parsed.success) return null;
+        if (!(await isLocalAuthEnabled())) return null;
+
+        const { userId, password } = parsed.data;
+
+        // Rate-limit by user id to slow password guessing.
+        const allowed = await checkRateLimit(`creds:${userId}`, 10, 300);
+        if (!allowed) return null;
+
+        const user = await prisma.user.findUnique({ where: { id: userId } });
+        if (!user || !user.passwordHash) return null;
+        if (user.bannedAt) return null;
+        if (user.suspendedUntil && user.suspendedUntil > new Date()) return null;
+
+        const valid = await verifyPassword(password, user.passwordHash);
+        if (!valid) return null;
+
+        return { id: user.id, name: user.name, email: user.email, image: user.image };
+      },
+    }),
   ],
   session: {
     strategy: 'jwt',
@@ -195,7 +228,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
       return session;
     },
-    async jwt({ token, user, trigger, session }) {
+    async jwt({ token, user, account, trigger, session }) {
       if (user) {
         token.sub = user.id;
       }
@@ -240,10 +273,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if ((user || trigger === 'update') && token.sub) {
         const dbUser = await prisma.user.findUnique({
           where: { id: token.sub },
-          select: { email: true, role: true, handle: true, name: true, bannedAt: true, suspendedUntil: true },
+          select: { email: true, role: true, handle: true, name: true, bannedAt: true, suspendedUntil: true, tokenVersion: true },
         });
 
         if (dbUser) {
+          // Mark local (Credentials) sessions and snapshot the token version so it
+          // can be invalidated when the member is removed or the password reset.
+          if (account?.provider === 'credentials') token.local = true;
+          token.tokenVersion = dbUser.tokenVersion;
+
           // Auto-assign ADMIN role if email is in admin list
           if (dbUser.email && isAdminEmail(dbUser.email) && dbUser.role !== 'ADMIN') {
             await prisma.user.update({
@@ -273,6 +311,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               // Non-fatal — handle will be generated on next sign-in
             }
           }
+        }
+      }
+
+      // On every request for a local (Credentials) session, verify the token
+      // version. A mismatch (member removed, password reset) clears the subject,
+      // so the session callback yields a logged-out session.
+      if (token.local && token.sub && !user) {
+        const current = await prisma.user.findUnique({
+          where: { id: token.sub },
+          select: { tokenVersion: true },
+        });
+        if (!current || current.tokenVersion !== token.tokenVersion) {
+          delete token.sub;
         }
       }
 

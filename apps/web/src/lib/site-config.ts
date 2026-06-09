@@ -23,6 +23,8 @@ export interface ServerInfraConfig {
 
 export interface SiteConfigData extends ServerInfraConfig {
   openSignup: boolean;
+  /** Local profile sign-in. null = default (on for self-hosted, no ADMIN_EMAILS). */
+  localAuth: boolean | null;
 }
 
 const EMPTY_INFRA: ServerInfraConfig = {
@@ -41,6 +43,7 @@ const EMPTY_INFRA: ServerInfraConfig = {
 
 const DEFAULTS: SiteConfigData = {
   openSignup: false,
+  localAuth: null,
   ...EMPTY_INFRA,
 };
 
@@ -66,6 +69,7 @@ export async function getSiteConfig(): Promise<SiteConfigData> {
     if (!row) return DEFAULTS;
     return {
       openSignup: row.openSignup,
+      localAuth: row.localAuth,
       aiProvider: row.aiProvider,
       aiModel: row.aiModel,
       aiBaseUrl: row.aiBaseUrl,
@@ -113,12 +117,14 @@ export async function setSiteConfig(
     where: { id: 'singleton' },
     update: {
       ...(data.openSignup !== undefined && { openSignup: data.openSignup }),
+      ...(data.localAuth !== undefined && { localAuth: data.localAuth }),
       ...infra,
       updatedBy: adminId,
     },
     create: {
       id: 'singleton',
       openSignup: data.openSignup ?? DEFAULTS.openSignup,
+      ...(data.localAuth !== undefined && { localAuth: data.localAuth }),
       ...infra,
       updatedBy: adminId,
     },
