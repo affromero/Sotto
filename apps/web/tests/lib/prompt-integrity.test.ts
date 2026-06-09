@@ -72,6 +72,8 @@ const EXPECTED_FILES = [
   'demo/walkthrough.md',
   'speaking/pronunciation-rubric.md',
   'speaking/generate-speaking-prompts.md',
+  'writing/generate-writing-prompts.md',
+  'writing/grade-writing.md',
   'curriculum/generate-curriculum.md',
 ];
 
@@ -165,6 +167,12 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
   ].sort(),
   'class/generate-section-quiz.md': [
     'COUNT', 'GRAMMAR_POINTS', 'LEVEL', 'NATIVE', 'NOTES', 'OBJECTIVE', 'SEED', 'SKILL', 'TARGET', 'VOCAB',
+  ].sort(),
+  'writing/generate-writing-prompts.md': [
+    'COUNT', 'LEVEL', 'NATIVE', 'NOTES', 'OBJECTIVE', 'TARGET', 'VOCAB',
+  ].sort(),
+  'writing/grade-writing.md': [
+    'LEVEL', 'NATIVE', 'RESPONSE', 'TARGET', 'TASK',
   ].sort(),
   'curriculum/generate-curriculum.md': ['NATIVE', 'TARGET'].sort(),
 };
