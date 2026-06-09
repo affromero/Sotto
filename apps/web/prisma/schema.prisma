@@ -211,6 +211,7 @@ model User {
   courses            Course[]
   classSubmissions   ClassSubmission[]
   speakingRecordings SpeakingRecording[]
+  writingResponses   WritingResponse[]
 
   @@index([role])
   @@index([handle])
@@ -2519,6 +2520,7 @@ enum SkillType {
   READING
   LISTENING
   SPEAKING
+  WRITING
 }
 
 enum ClassStatus {
@@ -2619,10 +2621,11 @@ model ClassSection {
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
-  class     CourseClass      @relation(fields: [classId], references: [id], onDelete: Cascade)
-  podcast   Podcast?         @relation(fields: [podcastId], references: [id], onDelete: SetNull)
-  questions LessonQuestion[]
-  prompts   SpeakingPrompt[]
+  class         CourseClass      @relation(fields: [classId], references: [id], onDelete: Cascade)
+  podcast       Podcast?         @relation(fields: [podcastId], references: [id], onDelete: SetNull)
+  questions     LessonQuestion[]
+  prompts       SpeakingPrompt[]
+  writingPrompts WritingPrompt[]
 
   @@index([classId, skill, attempt])
 }
@@ -2740,6 +2743,52 @@ model SpeakingRecording {
   @@index([userId])
 }
 
+// A writing task. Hangs off EXACTLY ONE parent (a class section or a practice
+// session), like SpeakingPrompt; XOR enforced in app code.
+model WritingPrompt {
+  id                String   @id @default(cuid())
+  sectionId         String?
+  practiceSessionId String?
+  order             Int
+  task              String   @db.Text // the writing task the learner responds to
+  guidance          String?  @db.Text // optional hints / what to include
+  createdAt         DateTime @default(now())
+
+  section         ClassSection?     @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  practiceSession PracticeSession?  @relation(fields: [practiceSessionId], references: [id], onDelete: Cascade)
+  responses       WritingResponse[]
+
+  @@unique([sectionId, order])
+  @@unique([practiceSessionId, order])
+  @@index([sectionId])
+  @@index([practiceSessionId])
+}
+
+// A learner's writing response, graded synchronously by the LLM (corrections +
+// score), unlike speaking which is graded async by a worker.
+model WritingResponse {
+  id                String   @id @default(cuid())
+  sectionId         String?
+  practiceSessionId String?
+  promptId          String
+  userId            String
+  text              String   @db.Text
+  overallScore      Float? // 0..1
+  corrections       Json? // [{ old, new, why }]
+  feedback          String?  @db.Text
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  prompt          WritingPrompt    @relation(fields: [promptId], references: [id], onDelete: Cascade)
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  practiceSession PracticeSession? @relation(fields: [practiceSessionId], references: [id], onDelete: Cascade)
+
+  @@index([sectionId])
+  @@index([practiceSessionId])
+  @@index([promptId])
+  @@index([userId])
+}
+
 // ============ LANGUAGE LEARNING — MEMORY GRAPH (SRS) ============
 
 enum EdgeType {
@@ -2844,10 +2893,12 @@ model PracticeSession {
   startedAt    DateTime       @default(now())
   completedAt  DateTime?
 
-  course     Course              @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  podcast    Podcast?            @relation(fields: [podcastId], references: [id], onDelete: SetNull)
-  prompts    SpeakingPrompt[]
-  recordings SpeakingRecording[]
+  course           Course              @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  podcast          Podcast?            @relation(fields: [podcastId], references: [id], onDelete: SetNull)
+  prompts          SpeakingPrompt[]
+  recordings       SpeakingRecording[]
+  writingPrompts   WritingPrompt[]
+  writingResponses WritingResponse[]
 
   @@index([courseId, kind])
   @@index([courseId, status])

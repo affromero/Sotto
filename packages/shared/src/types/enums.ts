@@ -161,7 +161,7 @@ export type MusicStatus =
 // Language learning
 export type CefrLevel = 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2';
 
-export type SkillType = 'GRAMMAR' | 'READING' | 'LISTENING' | 'SPEAKING';
+export type SkillType = 'GRAMMAR' | 'READING' | 'LISTENING' | 'SPEAKING' | 'WRITING';
 
 export type ClassStatus =
   | 'LOCKED'
