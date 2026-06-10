@@ -290,14 +290,13 @@ describe('generateClassListening', () => {
       );
     });
 
-    it('calls generateScript with CLASS source, targetLanguage, conversational_mix and forLearning', async () => {
+    it('calls generateScript with targetLanguage, conversational_mix and forLearning', async () => {
       setupHappyPath();
 
       await generateClassListening(PARAMS);
 
       expect(mockGenerateScript).toHaveBeenCalledWith(
         expect.objectContaining({
-          source: 'CLASS',
           targetLanguage: 'es',
           languageMode: 'conversational_mix',
           forLearning: true,

@@ -7,6 +7,8 @@ CRITICAL: Your text goes directly through text-to-speech. Write the way people S
 
 {{VOICE_DELIVERY_GUIDELINES}}
 
+{{LANGUAGE_INSTRUCTION}}
+
 ## Audio Expression Tags:
 For richer vocal expression, embed inline audio tags in the turn TEXT:
 - [laughs], [chuckles], [giggles] — amusement (light to full)
@@ -134,6 +136,8 @@ When the topic involves specific geographic locations, historical places, battle
 - Only include places that are specifically discussed — not passing mentions
 - Include yearHint when the place is discussed in a historical context
 - coordinates are optional — they will be resolved automatically if omitted
+
+{{VOCABULARY_INSTRUCTION}}
 
 ## Output Format:
 Return a JSON object with these fields:
