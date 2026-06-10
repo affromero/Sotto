@@ -68,7 +68,10 @@ export default async function AdminCostsPage({ searchParams }: PageProps) {
       <div className={styles.headerRow}>
         <div className={styles.header}>
           <h1 className={styles.title}>Cost Dashboard</h1>
-          <p className={styles.subtitle}>API costs by provider, daily trends, and threshold alerts</p>
+          <p className={styles.subtitle}>
+            Your provider spend (AI, TTS, STT) by provider and model, daily trends, and threshold
+            alerts. Visible to every admin on this server.
+          </p>
         </div>
         <nav className={styles.rangeNav} aria-label="Time range">
           {[
@@ -105,7 +108,7 @@ export default async function AdminCostsPage({ searchParams }: PageProps) {
           <span className={styles.cardValue}>${ttsCost.toFixed(2)}</span>
         </div>
         <div className={styles.card}>
-          <span className={styles.cardLabel}>Cost / Podcast</span>
+          <span className={styles.cardLabel}>Cost / generation</span>
           <span className={styles.cardValue}>${costPerPodcast.toFixed(2)}</span>
         </div>
       </div>
@@ -294,7 +297,7 @@ export default async function AdminCostsPage({ searchParams }: PageProps) {
                 <th>Plan</th>
                 <th className={styles.numCell}>Period Cost</th>
                 <th className={styles.numCell}>This Month</th>
-                <th className={styles.numCell}>Podcasts</th>
+                <th className={styles.numCell}>Generations</th>
               </tr>
             </thead>
             <tbody>
