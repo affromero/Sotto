@@ -1666,7 +1666,6 @@ describe('open-source language-learning OSS surfaces', () => {
         voiceSettingsRouteSource,
         voiceCloneRouteSource,
         voiceManagerSource,
-        readSource('src/app/api/voices/browse/route.ts'),
         readFileSync(resolve(repoRoot, 'apps/web/prisma/schema.prisma'), 'utf8')
       )
       .join('\n');
