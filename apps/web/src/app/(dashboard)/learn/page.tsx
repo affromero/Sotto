@@ -153,6 +153,13 @@ export default async function LearnPage() {
                   >
                     Practice
                   </Link>
+                  <Link
+                    href={`/learn/live?course=${course.id}`}
+                    className={styles.practiceLink}
+                    aria-label={`Live conversation for ${course.curriculum?.title ?? langLabel(course.targetLang)}`}
+                  >
+                    Live
+                  </Link>
                   <StartNextClass courseId={course.id} activeClassId={course.activeClassId ?? null} />
                 </div>
                 <div className={styles.sourcedRow}>
