@@ -148,7 +148,6 @@ Client-side React hooks (`'use client'`).
 | ---------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | `useAudioPlayer`       | HTML5 Audio playback: play/pause, seek, volume, playback rate, podcast loading                                              |
 | `useAuth`              | Session wrapper: `user`, `isAuthenticated`, `isLoading`, `signIn()`, `signOut()`                                            |
-| `useDiscovery`         | Discovery chat state: messages, metadata, streaming, URL detection + link previews                                          |
 | `useImpressionTracker` | IntersectionObserver-based private library impression tracking (50% visible for 1s, deduped)                                |
 | `useNotifications`     | Notification polling (30s interval): list, unread count, mark read, refresh                                                 |
 | `usePlaybackTelemetry` | Playback event tracking: heartbeats (30s), pause/seek/speed counts, abandon detection                                       |
