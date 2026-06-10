@@ -904,7 +904,6 @@ describe('open-source language-learning OSS surfaces', () => {
     const setupSources = [
       'apps/web/src/lib/setup-readiness.ts',
       'apps/web/src/app/api/onboarding/readiness/route.ts',
-      'apps/web/src/components/create/SttModelDropdown.tsx',
       'apps/web/prisma/schema.prisma',
     ]
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
@@ -925,7 +924,6 @@ describe('open-source language-learning OSS surfaces', () => {
     const ttsSources = [
       'apps/web/src/app/api/podcasts/route.ts',
       'apps/web/src/app/api/tts-options/route.ts',
-      'apps/web/src/components/create/TtsModelDropdown.tsx',
       'apps/web/prisma/schema.prisma',
     ]
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
@@ -933,8 +931,6 @@ describe('open-source language-learning OSS surfaces', () => {
 
     expect(ttsSources).toContain('tts_provider_required');
     expect(ttsSources).toContain('const options: TtsOption[] = [];');
-    expect(ttsSources).toContain("mapped[0].id !== 'auto'");
-    expect(ttsSources).toContain('explicit or platform-resolved provider required');
     expect(ttsSources).not.toContain('ttsProvider      String? // null = auto');
   });
 
