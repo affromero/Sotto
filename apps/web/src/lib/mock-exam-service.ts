@@ -4,7 +4,7 @@
 // generation is best-effort: a TTS/AI hiccup marks that section FAILED but never
 // sinks the whole exam. The exam is a self-assessment and NEVER touches level.
 import { prisma } from './prisma';
-import type { CefrLevel } from '@sotto/shared';
+import type { CefrLevel, PedagogyStyle } from '@sotto/shared';
 import {
   getBlueprint,
   resolveExamInstitution,
@@ -17,6 +17,7 @@ import { composeListeningContent } from './class-listening-generator';
 import { composeSpeakingPrompts } from './class-speaking-generator';
 import { composeWritingPrompts } from './class-writing-generator';
 import { getCourseNote } from './course-notes';
+import { buildLearnerContext } from './pedagogy';
 import { logger } from './logger';
 
 export class ExamCourseNotFoundError extends Error {}
@@ -28,6 +29,7 @@ interface ExamCourseCtx {
   targetLang: string;
   curriculumId: string;
   currentLevel: CefrLevel;
+  pedagogy: PedagogyStyle;
 }
 
 /**
@@ -48,6 +50,7 @@ export async function createMockExam(
       targetLang: true,
       curriculumId: true,
       currentLevel: true,
+      pedagogy: true,
     },
   });
   if (!course) throw new ExamCourseNotFoundError('Course not found');
@@ -60,7 +63,7 @@ export async function createMockExam(
     data: { userId, courseId, institution, level, status: 'GENERATING', blueprintId: blueprint.id },
   });
 
-  const note = await getCourseNote(courseId);
+  const note = buildLearnerContext(await getCourseNote(courseId), course.pedagogy);
   const spec = await resolveExamSpec(course.curriculumId, level);
 
   let anyReady = false;

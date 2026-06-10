@@ -27,6 +27,7 @@ export type {
   PracticeStatus,
   ExamInstitution,
   MockExamStatus,
+  PedagogyStyle,
 } from './types/enums';
 
 // Types

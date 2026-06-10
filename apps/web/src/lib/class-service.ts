@@ -9,6 +9,7 @@ import { prepareClassSource, type PreparedClassSource } from './class-source';
 import { generateClassSpeaking } from './class-speaking-generator';
 import { generateClassWriting } from './class-writing-generator';
 import { getCourseNote } from './course-notes';
+import { buildLearnerContext } from './pedagogy';
 import { logger } from './logger';
 import type { SkillType, CefrLevel } from '@sotto/shared';
 
@@ -157,7 +158,7 @@ export async function createNextClass(
     data: { courseId, lessonId: lesson.id, order: lesson.order, status: 'GENERATING', sourceUrl, sourceTitle },
   });
 
-  const note = await getCourseNote(courseId);
+  const note = buildLearnerContext(await getCourseNote(courseId), course.pedagogy);
 
   try {
     for (const skill of MC_SKILLS) {

@@ -207,3 +207,7 @@ export type MockExamStatus =
   | 'SUBMITTED'
   | 'SCORED'
   | 'FAILED';
+
+// The learner's chosen teaching approach, grounded in SLA research. Shapes how
+// content is generated so a learner can switch methods if one is not working.
+export type PedagogyStyle = 'BALANCED' | 'IMMERSION' | 'GRAMMAR' | 'COMMUNICATION' | 'INTENSIVE';
