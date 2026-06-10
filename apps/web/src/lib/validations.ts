@@ -284,13 +284,6 @@ export const voiceBrowseQuerySchema = z.object({
 });
 
 /**
- * Voice price update validation
- */
-export const voicePriceSchema = z.object({
-  priceInCents: z.number().int().min(0).max(10000).nullable(), // $0-$100, null = free
-});
-
-/**
  * Voice clone creation validation
  */
 export const cloneVoiceSchema = z.object({
@@ -410,14 +403,6 @@ export const createVoiceRequestSchema = z.object({
 
 export const updateVoiceRequestSchema = z.object({
   status: z.enum(['APPROVED', 'DENIED', 'REVOKED']),
-});
-
-/**
- * Voice allowlist validation
- */
-export const addToAllowlistSchema = z.object({
-  voiceCloneId: z.string().min(1),
-  handle: handleSchema,
 });
 
 /**

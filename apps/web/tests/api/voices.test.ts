@@ -609,66 +609,51 @@ describe('PATCH /api/voices/clone', () => {
     mockGetPlanFeatureConfig.mockResolvedValue(defaultPlanFeatureConfig);
   });
 
-  it('returns 503 when enabling paid voice sharing while sharing is disabled', async () => {
+  it('updates the voice clone description for its owner', async () => {
     mockAuth.mockResolvedValue(mockSession);
-    mockGetPlanFeatureConfig.mockResolvedValue({
-      ...defaultPlanFeatureConfig,
-      voiceMarketplaceEnabled: false,
-    });
-    mockVoiceCloneFindUnique.mockResolvedValue({
-      ...mockVoiceClone,
-      userId: 'user-1',
-      verificationStatus: 'VERIFIED',
-    });
+    mockVoiceCloneFindUnique.mockResolvedValue({ ...mockVoiceClone, userId: 'user-1' });
+    mockVoiceCloneUpdate.mockResolvedValue({ ...mockVoiceClone, description: 'A warm narrator' });
 
     const request = createRequest('http://localhost:3000/api/voices/clone', {
       method: 'PATCH',
-      body: JSON.stringify({ voiceCloneId: 'clone-1', requestable: true }),
-    });
-    const response = await PATCH_CLONE(request);
-    const body = await response.json();
-
-    expect(response.status).toBe(503);
-    expect(body).toMatchObject({ error: 'Paid voice sharing is currently unavailable.' });
-    expect(mockVoiceCloneUpdate).not.toHaveBeenCalled();
-  });
-
-  it('allows privacy-preserving cleanup while marketplace is disabled', async () => {
-    mockAuth.mockResolvedValue(mockSession);
-    mockGetPlanFeatureConfig.mockResolvedValue({
-      ...defaultPlanFeatureConfig,
-      voiceMarketplaceEnabled: false,
-    });
-    mockVoiceCloneFindUnique.mockResolvedValue({
-      ...mockVoiceClone,
-      userId: 'user-1',
-      requestable: true,
-      priceInCents: 500,
-    });
-    mockVoiceCloneUpdate.mockResolvedValue({
-      ...mockVoiceClone,
-      requestable: false,
-      priceInCents: null,
-    });
-
-    const request = createRequest('http://localhost:3000/api/voices/clone', {
-      method: 'PATCH',
-      body: JSON.stringify({
-        voiceCloneId: 'clone-1',
-        requestable: false,
-        priceInCents: null,
-      }),
+      body: JSON.stringify({ voiceCloneId: 'clone-1', description: 'A warm narrator' }),
     });
     const response = await PATCH_CLONE(request);
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(body.requestable).toBe(false);
-    expect(body.priceInCents).toBeNull();
+    expect(body.description).toBe('A warm narrator');
     expect(mockVoiceCloneUpdate).toHaveBeenCalledWith({
       where: { id: 'clone-1' },
-      data: { requestable: false, priceInCents: null },
+      data: { description: 'A warm narrator' },
     });
+  });
+
+  it('returns 400 when description is missing', async () => {
+    mockAuth.mockResolvedValue(mockSession);
+
+    const request = createRequest('http://localhost:3000/api/voices/clone', {
+      method: 'PATCH',
+      body: JSON.stringify({ voiceCloneId: 'clone-1' }),
+    });
+    const response = await PATCH_CLONE(request);
+
+    expect(response.status).toBe(400);
+    expect(mockVoiceCloneUpdate).not.toHaveBeenCalled();
+  });
+
+  it("returns 403 when editing another user's voice clone", async () => {
+    mockAuth.mockResolvedValue(mockSession);
+    mockVoiceCloneFindUnique.mockResolvedValue({ ...mockVoiceClone, userId: 'user-2' });
+
+    const request = createRequest('http://localhost:3000/api/voices/clone', {
+      method: 'PATCH',
+      body: JSON.stringify({ voiceCloneId: 'clone-1', description: 'hijack' }),
+    });
+    const response = await PATCH_CLONE(request);
+
+    expect(response.status).toBe(403);
+    expect(mockVoiceCloneUpdate).not.toHaveBeenCalled();
   });
 });
 

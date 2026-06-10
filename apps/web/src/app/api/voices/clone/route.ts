@@ -219,29 +219,18 @@ export async function PATCH(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { voiceCloneId, requestable, description, priceInCents } = body;
+  const { voiceCloneId, description } = body;
 
   if (!voiceCloneId || typeof voiceCloneId !== 'string') {
     return errorResponse('voiceCloneId is required', 400);
   }
 
-  const hasRequestable = typeof requestable === 'boolean';
-  const hasDescription = typeof description === 'string';
-  const hasPrice = priceInCents !== undefined;
-
-  if (!hasRequestable && !hasDescription && !hasPrice) {
-    return errorResponse('At least one of requestable, description, or priceInCents is required', 400);
+  if (typeof description !== 'string') {
+    return errorResponse('description is required', 400);
   }
 
-  if (hasDescription && description.length > 200) {
+  if (description.length > 200) {
     return errorResponse('Description must be 200 characters or less', 400);
-  }
-
-  // Validate priceInCents range
-  if (hasPrice && priceInCents !== null) {
-    if (typeof priceInCents !== 'number' || !Number.isInteger(priceInCents) || priceInCents < 0 || priceInCents > 10000) {
-      return errorResponse('Price must be an integer between 0 and 10000 cents ($0-$100)', 400);
-    }
   }
 
   const voiceClone = await prisma.voiceClone.findUnique({
@@ -256,37 +245,9 @@ export async function PATCH(request: NextRequest) {
     return errorResponse('Forbidden', 403);
   }
 
-  const enablesMarketplaceListing =
-    (hasRequestable && requestable === true) ||
-    hasDescription ||
-    (hasPrice && priceInCents !== null && priceInCents > 0);
-
-  if (enablesMarketplaceListing) {
-    const voiceConfig = await getPlanFeatureConfig();
-    if (!voiceConfig.voiceMarketplaceEnabled) {
-      return errorResponse('Paid voice sharing is currently unavailable.', 503);
-    }
-  }
-
-  // Setting a price requires Stripe onboarding
-  if (hasPrice && priceInCents !== null && priceInCents > 0) {
-    const user = await prisma.user.findUniqueOrThrow({
-      where: { id: session.user.id },
-      select: { stripeOnboarded: true },
-    });
-    if (!user.stripeOnboarded) {
-      return errorResponse('Connect your Stripe account before setting a price', 400);
-    }
-  }
-
-  const data: Record<string, boolean | string | number | null> = {};
-  if (hasRequestable) data.requestable = requestable;
-  if (hasDescription) data.description = description;
-  if (hasPrice) data.priceInCents = priceInCents;
-
   const updated = await prisma.voiceClone.update({
     where: { id: voiceCloneId },
-    data,
+    data: { description },
   });
 
   return NextResponse.json(updated);
