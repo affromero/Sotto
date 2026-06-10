@@ -217,31 +217,6 @@ export async function seedTestUser() {
     },
   });
 
-  // Collection owned by test user
-  const collection = await prisma.collection.upsert({
-    where: { id: 'e2e-collection' },
-    update: {},
-    create: {
-      id: 'e2e-collection',
-      name: 'E2E Test Collection',
-      description: 'Collection for E2E tests',
-      userId: user.id,
-      isPublic: true,
-      podcastCount: 1,
-    },
-  });
-
-  // Add podcast to collection
-  await prisma.collectionItem.upsert({
-    where: { collectionId_podcastId: { collectionId: collection.id, podcastId: testPodcast.id } },
-    update: {},
-    create: {
-      collectionId: collection.id,
-      podcastId: testPodcast.id,
-      order: 0,
-    },
-  });
-
   // Notifications (2 for test user)
   const notifications = await Promise.all([
     prisma.notification.upsert({
@@ -389,7 +364,6 @@ export async function seedTestUser() {
     comment,
     voiceTrack,
     subTag,
-    collection,
     ideas,
     notifications,
     failedPodcast,

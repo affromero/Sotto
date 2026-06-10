@@ -34,7 +34,7 @@ export default function PrivacyPage() {
           <h3>Content You Create</h3>
           <p>
             We store lessons you generate, discovery chat conversations, scripts,
-            interactions (questions and answers), collections, voice clones,
+            interactions (questions and answers), voice clones,
             and saved lesson ideas.
           </p>
 
@@ -267,7 +267,7 @@ export default function PrivacyPage() {
             You can export all your data at any time from your account settings or by
             calling <code>GET /api/users/me/export</code>. The export includes your
             profile, lessons, scripts, discovery conversations, interactions,
-            collections, saves, ratings, behavioral
+            saves, ratings, behavioral
             profile, recent behavioral events, playback sessions, voice clones,
             feedback, taste quiz answers, and saved ideas, all in a single JSON file.
           </p>
