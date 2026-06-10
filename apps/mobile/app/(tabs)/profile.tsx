@@ -199,20 +199,6 @@ export default function ProfileScreen() {
         </View>
       </View>
 
-      <Pressable
-        style={({ pressed }) => [styles.savedIdeasRow, pressed && styles.savedIdeasRowPressed]}
-        onPress={() => router.push('/ideas')}
-        testID="profile-saved-ideas-link"
-      >
-        <Ionicons
-          name="bookmark-outline"
-          size={20}
-          color={colors.primary}
-          style={styles.savedIdeasIcon}
-        />
-        <Text style={styles.savedIdeasLabel}>Saved Ideas</Text>
-        <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
-      </Pressable>
 
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Your Podcasts</Text>

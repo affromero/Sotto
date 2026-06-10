@@ -48,7 +48,6 @@ app/
 ├── connect.tsx            # First-run "connect to your server" (enter URL) — routed to when no server is configured
 ├── (tabs)/
 │   ├── index.tsx          # Private library
-│   ├── create.tsx         # 5-step: discovery → voice → scripting → preview → generating
 │   ├── notifications.tsx  # Notifications
 │   └── profile.tsx        # Current user profile
 ├── auth/login.tsx         # Login (dev: email, prod: OAuth)
@@ -86,15 +85,7 @@ app/
 | `Avatar.tsx` | Image with fallback initial circle |
 | `EmptyState.tsx` / `ErrorState.tsx` | Empty + error patterns |
 | `PodcastCard.tsx` | `variant="feed"` (full) / `variant="compact"` (row) |
-| `SwipeCard.tsx` / `SwipeQuiz.tsx` | Gesture-driven taste quiz |
-| `InspireMe.tsx` | Tabbed sections (forYou, trending, news, curiosity) |
-| `BottomSheet.tsx` / `OptionPicker.tsx` | Bottom sheet + selectable list |
-| `PillGroup.tsx` | Horizontal scrollable pill buttons |
-| `AiModelSelector.tsx` / `TtsModelSelector.tsx` | Model pickers (persist to SecureStore) |
-| `VoicePickerSheet.tsx` | Voice selection with auto-assign toggle |
-| `DurationPicker.tsx` / `VisibilityPicker.tsx` | Duration + visibility pickers |
-| `GenerationProgress.tsx` | 8-step pipeline progress indicator |
-| `ScriptPreview.tsx` | Read-only script preview with approve/regenerate |
+| `BottomSheet.tsx` | Bottom sheet container |
 | `EventProvider.tsx` | React context providing `track()` + userId sync |
 | `learn/PlacementQuiz.tsx` | Multi-step placement test UI — fetches questions, submits answers |
 | `learn/MCSection.tsx` | Multiple-choice section renderer for grammar/reading/listening |
@@ -102,18 +93,6 @@ app/
 | `learn/SpeakingExercise.tsx` | Microphone capture for a SpeakingPrompt, polls for SCORED status |
 | `learn/MemoryGraphWebView.tsx` | WebView wrapping the web memory graph at `/memory?courseId=…` |
 | `learn/ClassWorksheet.tsx` | Displays the printable worksheet PDF + PencilKit ink overlay (requires custom dev build) |
-
-## Creation Flow
-
-5-step state machine in `app/(tabs)/create.tsx`:
-
-1. **discovery** — Chat with AI model selector pill
-2. **voice** — VoicePickerSheet, TtsModelSelector, DurationPicker, VisibilityPicker
-3. **scripting** — GenerationProgress, 3s polling, auto-advances on SCRIPT_READY
-4. **script-preview** — Approve → generating, regenerate → scripting
-5. **generating** — GenerationProgress, 3s polling, navigates to podcast on READY
-
-Preferences persist via SecureStore: `sotto:aiModel`, `sotto:ttsOption`.
 
 ## Environment Variables
 

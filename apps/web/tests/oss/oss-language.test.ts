@@ -274,7 +274,6 @@ describe('open-source language-learning OSS surfaces', () => {
       'apps/mobile/lib/config.ts',
       'apps/mobile/lib/api.ts',
       'apps/mobile/lib/event-buffer.ts',
-      'apps/mobile/app/(tabs)/create.tsx',
       'apps/mobile/app/settings/billing.tsx',
       'apps/mobile/app/settings/referral.tsx',
       'apps/mobile/app/auth/login.tsx',
