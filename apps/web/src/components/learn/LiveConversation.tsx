@@ -154,7 +154,8 @@ export function LiveConversation({ courseId, nativeLabel, targetLabel, level }: 
           Speak and hear the <em>live translation</em>.
         </h1>
         <p className={styles.sub}>
-          {targetLabel} · {level}. Talk naturally; pause when you want to listen.
+          {targetLabel} · {level}. A translation practice aid: speak naturally and hear it back.
+          It will not chat or interrupt you, and new words you hit go into your review.
         </p>
       </header>
 

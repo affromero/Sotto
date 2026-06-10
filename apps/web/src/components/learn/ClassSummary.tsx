@@ -11,6 +11,7 @@
 
 import { useRouter } from 'next/navigation';
 import { ClassGlyph } from './ClassGlyph';
+import { CefrDisclaimer } from './CefrDisclaimer';
 import { ScoreDial } from './ClassWidgets';
 import { skillLabel, type ClassSubmitResult } from './classTypes';
 import styles from './ClassSummary.module.css';
@@ -81,11 +82,11 @@ export function ClassSummary({
             <div className={styles.wuText}>
               {passed ? (
                 <>
-                  Your <b>{lesson.level} gate</b> cleared — the next class is ready when you are.
+                  Your <b>{lesson.level} gate</b> cleared. The next class is ready when you are.
                 </>
               ) : (
                 <>
-                  {result.passedSections} of {result.totalSections} sections cleared — retry the
+                  {result.passedSections} of {result.totalSections} sections cleared. Retry the
                   missed ones to open the <b>{lesson.level} gate</b>.
                 </>
               )}
@@ -111,6 +112,8 @@ export function ClassSummary({
             </div>
           </div>
         </div>
+
+        <CefrDisclaimer variant="compact" />
 
         <div className={styles.cactions}>
           {passed ? (

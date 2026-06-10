@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { CefrDisclaimer } from '@/components/learn/CefrDisclaimer';
 import styles from './PlacementTest.module.css';
 
 // ---- Types (mirrors API contract) ----
@@ -216,6 +217,8 @@ export function PlacementTest({ native, target }: PlacementTestProps) {
         </div>
 
         <p className={styles.levelDescription}>{LEVEL_DESCRIPTIONS[result.level]}</p>
+
+        <CefrDisclaimer />
 
         <section className={styles.skills} aria-label="Score breakdown by skill">
           <h2 className={styles.skillsHeading}>Skill breakdown</h2>
