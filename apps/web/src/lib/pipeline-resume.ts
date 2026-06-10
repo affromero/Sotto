@@ -1,6 +1,5 @@
 import { prismaUnfiltered as prisma } from './prisma';
 import { logger } from './logger';
-import { cancelPodcastPayments } from './voice-pricing';
 import { invalidatePodcastCache, publishPodcastStatus } from './redis';
 
 /**
@@ -65,14 +64,6 @@ export async function markPodcastFailed(
 
   await invalidatePodcastCache(podcastId);
   await publishPodcastStatus(podcastId, { status: 'FAILED' });
-
-  // Cancel any authorized voice payments for this podcast
-  await cancelPodcastPayments(podcastId).catch((err) => {
-    logger.error('Failed to cancel voice payments on failure', {
-      podcastId,
-      error: err instanceof Error ? err.message : String(err),
-    });
-  });
 
   logger.info('Marked podcast as FAILED', {
     podcastId,

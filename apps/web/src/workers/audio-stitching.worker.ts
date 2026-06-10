@@ -17,7 +17,6 @@ import { generateSoundEffect } from '@/lib/elevenlabs';
 import { LIMITS } from '@/lib/stripe';
 import { type SoundCue } from '@/lib/script-generator';
 import { logger } from '@/lib/logger';
-import { capturePodcastPayments } from '@/lib/voice-pricing';
 import { generateFingerprint } from '@/lib/audio-fingerprint';
 import { verifyReferral } from '@/lib/referrals';
 import { consumeFreeGeneration } from '@/lib/generation-gate';
@@ -465,13 +464,6 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
       },
     });
 
-    // 9a. Capture voice payments on successful generation
-    await capturePodcastPayments(podcastId).catch((err) => {
-      logger.error('Failed to capture voice payments', {
-        podcastId,
-        error: err instanceof Error ? err.message : String(err),
-      });
-    });
 
     // 9. Update segment start times by detecting silence boundaries in the stitched audio
     // This gives exact positions regardless of crossfade/SFX/normalization

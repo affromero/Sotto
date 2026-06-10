@@ -53,8 +53,6 @@ async function getOverviewStats() {
     signupsThisWeek,
     signupsThisMonth,
     totalPlays,
-    // Monetization queries
-    revenueAgg,
     apiCostAgg,
     dauRow,
     pipelineAttempted,
@@ -77,11 +75,6 @@ async function getOverviewStats() {
     }),
     prisma.podcast.aggregate({
       _sum: { playCount: true },
-    }),
-    // Revenue (30d captured)
-    prisma.voicePurchase.aggregate({
-      where: { status: 'captured', createdAt: { gte: monthAgo } },
-      _sum: { amountCents: true, platformFeeCents: true },
     }),
     // API costs (30d)
     prisma.apiUsageLog.aggregate({
@@ -121,8 +114,6 @@ async function getOverviewStats() {
     signupsThisWeek,
     signupsThisMonth,
     totalPlays: totalPlays._sum.playCount ?? 0,
-    revenueCents: revenueAgg._sum.amountCents ?? 0,
-    platformFeesCents: revenueAgg._sum.platformFeeCents ?? 0,
     apiCosts: apiCostAgg._sum.totalCost ?? 0,
     dau: Number(dauRow[0]?.count ?? 0),
     pipelineSuccessRate:
@@ -209,16 +200,8 @@ export default async function AdminOverviewPage() {
       </div>
 
       <div className={styles.section}>
-        <h2 className={styles.sectionTitle}>Monetization (30d)</h2>
+        <h2 className={styles.sectionTitle}>Costs (30d)</h2>
         <div className={styles.statsGrid}>
-          <div className={styles.statCard}>
-            <span className={styles.statLabel}>Revenue</span>
-            <span className={styles.statValue}>${(stats.revenueCents / 100).toFixed(2)}</span>
-          </div>
-          <div className={styles.statCard}>
-            <span className={styles.statLabel}>Platform Fees</span>
-            <span className={styles.statValue}>${(stats.platformFeesCents / 100).toFixed(2)}</span>
-          </div>
           <div className={styles.statCard}>
             <span className={styles.statLabel}>API Costs</span>
             <span className={styles.statValue}>${stats.apiCosts.toFixed(2)}</span>

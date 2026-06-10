@@ -260,7 +260,6 @@ describe('GET /api/voices', () => {
     expect(body).toHaveProperty('userClones');
     expect(body).toHaveProperty('maxVoiceClones');
     expect(body.maxVoiceClones).toBe(10);
-    expect(body.voiceMarketplaceEnabled).toBe(true);
     expect(Array.isArray(body.poolVoices)).toBe(true);
     expect(body.poolVoices).toHaveLength(2);
   });
@@ -306,34 +305,6 @@ describe('GET /api/voices', () => {
       sourceType: 'UPLOAD',
       provider: 'elevenlabs',
     });
-  });
-
-  it('returns sharedVoices including allowlisted voices', async () => {
-    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
-    mockVoiceCloneFindMany.mockResolvedValue([]); // no user clones
-    mockVoiceRequestFindMany.mockResolvedValue([]); // no approved requests
-    mockVoiceAllowlistFindMany.mockResolvedValue([
-      {
-        voiceClone: {
-          id: 'clone-shared',
-          name: 'Shared Voice',
-          externalVoiceId: 'el-shared-1',
-          sourceType: 'UPLOAD',
-          provider: 'elevenlabs',
-          createdAt: new Date('2026-01-10T00:00:00Z'),
-          user: { id: 'user-other', name: 'Other User' },
-        },
-      },
-    ]);
-
-    const request = createRequest();
-    const response = await GET(request);
-    const body = await response.json();
-
-    expect(body.sharedVoices).toHaveLength(1);
-    expect(body.sharedVoices[0].name).toBe('Shared Voice');
-    expect(body.sharedVoices[0].provider).toBe('elevenlabs');
-    expect(body.sharedVoices[0].owner.id).toBe('user-other');
   });
 
   it('returns provider-specific pool voices when ?provider= is set', async () => {

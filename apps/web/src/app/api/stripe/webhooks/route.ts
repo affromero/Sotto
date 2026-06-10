@@ -7,8 +7,6 @@ import { errorResponse } from '@/lib/api-response';
 /**
  * Stripe webhook handler.
  * Handles:
- * - account.updated (Connect onboarding)
- * - payment_intent.payment_failed (voice purchases)
  * - customer.subscription.created / updated / deleted (Pro tier)
  */
 export async function POST(request: NextRequest) {
@@ -39,38 +37,6 @@ export async function POST(request: NextRequest) {
   }
 
   switch (event.type) {
-    case 'account.updated': {
-      const account = event.data.object;
-      const onboarded = account.charges_enabled && account.payouts_enabled;
-
-      await prisma.user.updateMany({
-        where: { stripeAccountId: account.id },
-        data: { stripeOnboarded: onboarded },
-      });
-
-      logger.info('Stripe account updated', {
-        accountId: account.id,
-        onboarded: String(onboarded),
-      });
-      break;
-    }
-
-    case 'payment_intent.payment_failed': {
-      const paymentIntent = event.data.object;
-      const purchase = await prisma.voicePurchase.findUnique({
-        where: { stripePaymentIntent: paymentIntent.id },
-      });
-
-      if (purchase && purchase.status === 'authorized') {
-        await prisma.voicePurchase.update({
-          where: { id: purchase.id },
-          data: { status: 'cancelled' },
-        });
-        logger.info('Voice payment failed', { paymentIntentId: paymentIntent.id });
-      }
-      break;
-    }
-
     case 'customer.subscription.created':
     case 'customer.subscription.updated': {
       const sub = event.data.object;

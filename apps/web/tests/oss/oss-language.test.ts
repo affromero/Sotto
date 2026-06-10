@@ -246,8 +246,6 @@ describe('open-source language-learning OSS surfaces', () => {
       'src/app/api/oembed/route.ts',
       'src/app/api/billing/checkout/route.ts',
       'src/app/api/billing/portal/route.ts',
-      'src/app/api/stripe/connect/route.ts',
-      'src/app/api/stripe/connect/callback/route.ts',
       'src/app/api/admin/invitations/route.ts',
       'src/app/api/users/unsubscribe/route.ts',
       'src/lib/rss.ts',
@@ -1570,102 +1568,45 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(userLookupSources).not.toContain('Search by @handle');
   });
 
-  it('keeps optional paid voice sharing disabled by default', () => {
-    const voiceSettingsRouteSource = readSource('src/app/api/voices/route.ts');
-    const voiceCloneRouteSource = readSource('src/app/api/voices/clone/route.ts');
-    const voiceManagerSource = readSource('src/app/(dashboard)/settings/voices/VoiceManager.tsx');
+  it('does not ship the voice marketplace (paid voice sharing removed)', () => {
+    const removedMarketplacePaths = [
+      'apps/web/src/lib/voice-pricing.ts',
+      'apps/web/src/lib/revenue-metrics.ts',
+      'apps/web/src/app/api/voices/request',
+      'apps/web/src/app/api/voices/allowlist',
+      'apps/web/src/app/api/stripe/connect',
+      'apps/web/src/app/api/stripe/payment-intent',
+      'apps/web/src/app/(admin)/admin/revenue',
+      'apps/mobile/app/voices.tsx',
+      'e2e/maestro/flows/21-voice-marketplace.yaml',
+    ];
+    for (const path of removedMarketplacePaths) {
+      expect(existsSync(resolve(repoRoot, path)), path).toBe(false);
+    }
+
+    const schemaSource = readFileSync(resolve(repoRoot, 'apps/web/prisma/schema.prisma'), 'utf8');
+    expect(schemaSource).not.toContain('model VoiceRequest');
+    expect(schemaSource).not.toContain('model VoicePurchase');
+    expect(schemaSource).not.toContain('model VoiceAllowlist');
+
+    // The shared voice directory still redirects to /learn; voice notifications route to settings.
+    expect(readSource('src/app/voices/page.tsx')).toContain("redirect('/learn')");
     const voiceNotificationSource = readSource('src/lib/notification-utils.ts');
-    const defaultVoiceSharingCopySources = [
-      'src/app/terms/page.tsx',
-      'src/app/privacy/page.tsx',
-      'src/app/changelog/page.tsx',
-      'src/lib/demo-context.ts',
-      'src/lib/notification-utils.ts',
-      'src/components/notifications/NotificationList.tsx',
-      'src/workers/voice-verification.worker.ts',
-    ]
-      .map(readSource)
-      .join('\n');
-    const internalVoiceSharingCopySources = [
-      'src/app/(admin)/admin/revenue/page.tsx',
-      'src/app/(admin)/admin/plan-features/PlanFeaturesForm.tsx',
-      'src/app/(admin)/admin/queues/queue-metadata.ts',
-      'src/lib/revenue-metrics.ts',
-      'src/lib/CLAUDE.md',
-      'src/components/CLAUDE.md',
-    ]
-      .map(readSource)
-      .concat(
-        readFileSync(resolve(repoRoot, 'docs/10-stripe-billing.md'), 'utf8'),
-        readFileSync(resolve(repoRoot, 'docs/20-roles-and-dashboards.md'), 'utf8')
-      )
-      .join('\n');
+    expect(voiceNotificationSource).toContain("return '/settings/voices'");
+    expect(voiceNotificationSource).not.toContain("return '/voices'");
+
+    // Mobile settings no longer exposes a voice marketplace or a /voices route.
     const mobileSettingsSource = readFileSync(
       resolve(repoRoot, 'apps/mobile/app/settings.tsx'),
       'utf8'
     );
+    expect(mobileSettingsSource).not.toContain('Voice Marketplace');
+    expect(mobileSettingsSource).not.toContain("router.push('/voices')");
     const mobileLayoutSource = readFileSync(
       resolve(repoRoot, 'apps/mobile/app/_layout.tsx'),
       'utf8'
     );
-    const voiceMarketplaceSources = [
-      'src/app/voices/page.tsx',
-      'src/app/api/voices/request/route.ts',
-      'src/app/CLAUDE.md',
-    ]
-      .map(readSource)
-      .concat(
-        voiceSettingsRouteSource,
-        voiceCloneRouteSource,
-        voiceManagerSource,
-        readFileSync(resolve(repoRoot, 'apps/web/prisma/schema.prisma'), 'utf8')
-      )
-      .join('\n');
-
-    expect(voiceMarketplaceSources).toContain('voiceMarketplaceEnabled Boolean  @default(false)');
-    expect(voiceMarketplaceSources).toContain('getPlanFeatureConfig');
-    // The shared voice marketplace page is retired in the language product: it now
-    // redirects to /learn instead of rendering, an even stronger off-by-default.
-    expect(readSource('src/app/voices/page.tsx')).toContain("redirect('/learn')");
-    expect(voiceSettingsRouteSource).toContain(
-      'voiceMarketplaceEnabled: voiceConfig.voiceMarketplaceEnabled'
-    );
-    expect(voiceManagerSource).toContain(
-      'setVoiceMarketplaceEnabled(voiceData.voiceMarketplaceEnabled ?? false)'
-    );
-    expect(voiceManagerSource.indexOf('{voiceMarketplaceEnabled && (')).toBeLessThan(
-      voiceManagerSource.indexOf('Stripe Payouts')
-    );
-    expect(voiceCloneRouteSource).toContain('const enablesMarketplaceListing');
-    expect(voiceCloneRouteSource).toContain('requestable === true');
-    expect(voiceMarketplaceSources).toContain('Paid voice sharing is currently unavailable.');
-    expect(voiceMarketplaceSources).toContain('disabled by default');
-    expect(existsSync(resolve(repoRoot, 'apps/mobile/app/voices.tsx'))).toBe(false);
-    expect(existsSync(resolve(repoRoot, 'e2e/maestro/flows/21-voice-marketplace.yaml'))).toBe(
-      false
-    );
-    expect(mobileSettingsSource).not.toContain('settings-voice-marketplace');
-    expect(mobileSettingsSource).not.toContain("router.push('/voices')");
-    expect(mobileSettingsSource).not.toContain('Voice Marketplace');
     expect(mobileLayoutSource).not.toContain('Stack.Screen name="voices"');
-    expect(defaultVoiceSharingCopySources).toContain('paid voice sharing disabled by default');
-    expect(voiceNotificationSource).toContain("return '/settings/voices'");
-    expect(voiceNotificationSource).not.toContain("return '/voices'");
-    expect(defaultVoiceSharingCopySources).not.toContain('Voice Marketplace');
-    expect(defaultVoiceSharingCopySources).not.toContain('voice marketplace');
-    expect(defaultVoiceSharingCopySources).not.toContain('marketplace transactions');
-    expect(defaultVoiceSharingCopySources).not.toContain('live on the marketplace');
-    expect(internalVoiceSharingCopySources).toContain('Paid Voice Sharing');
-    expect(internalVoiceSharingCopySources).toContain('optional paid voice sharing');
-    expect(internalVoiceSharingCopySources).not.toContain('Voice Marketplace');
-    expect(internalVoiceSharingCopySources).not.toContain('voice marketplace');
-    expect(internalVoiceSharingCopySources).not.toContain('community marketplace');
-    expect(internalVoiceSharingCopySources).not.toContain('marketplace revenue');
-    expect(internalVoiceSharingCopySources).not.toContain('voice marketplace tracks');
-    expect(voiceMarketplaceSources).not.toContain(
-      'voiceMarketplaceEnabled Boolean  @default(true)'
-    );
-    expect(voiceMarketplaceSources).not.toContain('Voice marketplace |');
   });
 
   it('does not ship public profile pages or creator RSS routes', () => {
