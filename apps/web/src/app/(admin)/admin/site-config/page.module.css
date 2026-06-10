@@ -29,6 +29,74 @@
   gap: var(--spacing-md);
 }
 
+.sectionTitle {
+  font: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: var(--spacing-lg) 0 var(--spacing-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: var(--spacing-sm);
+}
+
+.fieldLabel {
+  font: var(--text-body-xs);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+
+.input,
+.select {
+  width: 100%;
+  padding: 9px 12px;
+  font: var(--text-body-sm);
+  color: var(--color-text-primary);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.input:focus,
+.select:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-lg);
+}
+
+.saveBtn {
+  padding: 10px 20px;
+  font: var(--text-body-sm);
+  font-weight: 600;
+  color: white;
+  background: var(--color-primary);
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.saveBtn:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
 .rowLabel {
   flex: 1;
 }
