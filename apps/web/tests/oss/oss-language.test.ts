@@ -764,7 +764,6 @@ describe('open-source language-learning OSS surfaces', () => {
       'apps/web/next.config.js',
       'apps/web/Dockerfile',
       'apps/web/Dockerfile.workers',
-      'apps/web/src/lib/providers/ml.ts',
       'apps/web/src/workers/feature-computation.worker.ts',
       'apps/web/src/lib/CLAUDE.md',
       'CHANGELOG.md',
