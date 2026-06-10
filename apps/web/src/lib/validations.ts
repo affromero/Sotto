@@ -1104,3 +1104,8 @@ export const examSubmitSchema = z.object({
     .array(z.object({ questionId: z.string().min(1), selectedIndex: z.number().int().min(0) }))
     .max(200),
 });
+
+// PATCH /api/courses/[courseId]/pedagogy — switch the course's teaching approach.
+export const coursePedagogySchema = z.object({
+  pedagogy: z.enum(['BALANCED', 'IMMERSION', 'GRAMMAR', 'COMMUNICATION', 'INTENSIVE']),
+});

@@ -2474,6 +2474,17 @@ enum CefrLevel {
   C2
 }
 
+// The learner's chosen teaching approach, grounded in second-language-acquisition
+// research. Shapes how content is generated so a learner can switch methods if one
+// is not working for them. See lib/pedagogy.ts for the evidence behind each.
+enum PedagogyStyle {
+  BALANCED // mix of comprehensible input, form-focus, and retrieval practice
+  IMMERSION // comprehensible input (Krashen i+1), target-language-first
+  GRAMMAR // explicit, form-focused instruction
+  COMMUNICATION // communicative output (Swain), fluency-first
+  INTENSIVE // retrieval practice + spaced repetition (the testing effect)
+}
+
 // Global curriculum: one per native→target language pair.
 // source: 'seeded' = hand-authored JSON; 'generated' = agent-composed on demand.
 model Curriculum {
@@ -2532,6 +2543,7 @@ model Course {
   curriculumId  String
   currentLevel  CefrLevel @default(A1) // "you are here"; assigned by placement, advances with mastery
   startLevel    CefrLevel @default(A1) // immutable placement result
+  pedagogy      PedagogyStyle @default(BALANCED) // teaching approach; shapes generation
   activeClassId String? // current in-flight class (gating convenience cache)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt

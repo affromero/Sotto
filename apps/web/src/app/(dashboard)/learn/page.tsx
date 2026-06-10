@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { StartNextClass } from '@/components/learn/StartNextClass';
 import { SourcedClassEntry } from '@/components/learn/SourcedClassEntry';
 import { CefrDisclaimer } from '@/components/learn/CefrDisclaimer';
+import { PedagogySelector } from '@/components/learn/PedagogySelector';
 import styles from './page.module.css';
 
 export const dynamic = 'force-dynamic';
@@ -59,6 +60,7 @@ export default async function LearnPage() {
       targetLang: true,
       currentLevel: true,
       activeClassId: true,
+      pedagogy: true,
       curriculum: { select: { title: true } },
     },
     orderBy: { createdAt: 'desc' },
@@ -176,6 +178,9 @@ export default async function LearnPage() {
                     courseId={course.id}
                     activeClassId={course.activeClassId ?? null}
                   />
+                </div>
+                <div className={styles.sourcedRow}>
+                  <PedagogySelector courseId={course.id} current={course.pedagogy} />
                 </div>
               </li>
             );
