@@ -75,7 +75,7 @@ export async function middleware(request: NextRequest) {
   // Auth pages (login, signup, waitlisted): redirect to dashboard if already authenticated
   if (AUTH_ROUTES.some((route) => pathname.startsWith(route))) {
     if (token) {
-      return NextResponse.redirect(new URL('/dashboard', request.url));
+      return NextResponse.redirect(new URL('/learn', request.url));
     }
     return NextResponse.next();
   }
@@ -94,7 +94,7 @@ export async function middleware(request: NextRequest) {
 
   // Admin route protection: only ADMIN role can access /admin
   if (pathname.startsWith('/admin') && token?.role !== 'ADMIN') {
-    return NextResponse.redirect(new URL('/dashboard', request.url));
+    return NextResponse.redirect(new URL('/learn', request.url));
   }
 
   return NextResponse.next();
