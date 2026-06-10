@@ -116,14 +116,9 @@ vi.mock('@/lib/generation-gate', () => ({
   consumeFreeGeneration: (...args: unknown[]) => mockConsumeFreeGeneration(...args),
 }));
 
-vi.mock('@/lib/stripe', () => ({
-  LIMITS: {
-    maxDurationMinutes: 30,
-    maxVoiceClones: 10,
-    canMakePrivate: true,
-    canExportPdf: true,
-    hasPremiumSfx: true,
-  },
+vi.mock('@/lib/generation-limits', () => ({
+  MAX_LESSON_DURATION_MINUTES: 30,
+  MAX_VOICE_CLONES: 10,
 }));
 
 const mockMarkPodcastFailed = vi.fn().mockResolvedValue(undefined);

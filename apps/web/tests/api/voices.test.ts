@@ -55,15 +55,6 @@ vi.mock('@/lib/prisma', () => {
   return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
 });
 
-vi.mock('@/lib/stripe', () => ({
-  LIMITS: {
-    maxDurationMinutes: 30,
-    maxVoiceClones: 10,
-    canMakePrivate: true,
-    canExportPdf: true,
-    hasPremiumSfx: true,
-  },
-}));
 
 vi.mock('@/lib/elevenlabs', () => ({
   cloneVoice: (...args: unknown[]) => mockCloneVoice(...args),

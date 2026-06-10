@@ -14,7 +14,7 @@ import { markPodcastFailed } from '@/lib/pipeline-resume';
 import { downloadToFile, uploadPodcastAudio } from '@/lib/r2';
 import { stitchWithEffectsAndMusic, type SfxInsert } from '@/lib/audio-stitcher';
 import { generateSoundEffect } from '@/lib/elevenlabs';
-import { LIMITS } from '@/lib/stripe';
+import { MAX_LESSON_DURATION_MINUTES } from '@/lib/generation-limits';
 import { type SoundCue } from '@/lib/script-generator';
 import { logger } from '@/lib/logger';
 import { generateFingerprint } from '@/lib/audio-fingerprint';
@@ -188,7 +188,7 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
       where: { id: podcastId },
       select: { userId: true, title: true, source: true },
     });
-    const usePremiumSfx = LIMITS.hasPremiumSfx;
+    const usePremiumSfx = true;
 
     await job.updateProgress(10);
 
@@ -333,10 +333,10 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
     await job.updateProgress(80);
 
     // 7. Post-stitch duration hard check
-    const maxDurationSeconds = LIMITS.maxDurationMinutes * 60 * 1.1; // 10% grace
+    const maxDurationSeconds = MAX_LESSON_DURATION_MINUTES * 60 * 1.1; // 10% grace
     if (duration > maxDurationSeconds) {
       await markPodcastFailed(podcastId, {
-        failureReason: `"${podcast.title}" exceeded the ${LIMITS.maxDurationMinutes}-minute duration limit (${Math.round(duration / 60)} minutes). Please try with a shorter duration target.`,
+        failureReason: `"${podcast.title}" exceeded the ${MAX_LESSON_DURATION_MINUTES}-minute duration limit (${Math.round(duration / 60)} minutes). Please try with a shorter duration target.`,
         technicalError: `Duration ${Math.round(duration)}s exceeded max ${Math.round(maxDurationSeconds)}s`,
       });
 
@@ -344,7 +344,7 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
         userId: podcast.userId,
         type: 'PODCAST_FAILED',
         title: 'Podcast generation failed',
-        message: `"${podcast.title}" exceeded the ${LIMITS.maxDurationMinutes}-minute duration limit (${Math.round(duration / 60)} minutes). Please try with a shorter duration target.`,
+        message: `"${podcast.title}" exceeded the ${MAX_LESSON_DURATION_MINUTES}-minute duration limit (${Math.round(duration / 60)} minutes). Please try with a shorter duration target.`,
         data: { podcastId },
       });
 

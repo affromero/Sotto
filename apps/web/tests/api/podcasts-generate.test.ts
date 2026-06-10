@@ -139,10 +139,6 @@ vi.mock('@/lib/redis', () => ({
   checkRateLimit: (...args: unknown[]) => mockCheckRateLimit(...args),
 }));
 
-vi.mock('@/lib/stripe', () => ({
-  LIMITS: { maxDurationMinutes: 30 },
-}));
-
 vi.mock('@/lib/byok', () => ({
   getAiKey: vi.fn().mockResolvedValue(null),
   getByokKey: vi.fn().mockResolvedValue(null),

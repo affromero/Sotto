@@ -46,7 +46,7 @@ function getNavItems(role: string): NavItem[] {
     items.push({ href: '/analytics', label: 'Analytics', icon: BarChart2 });
   }
 
-  items.push({ href: '/billing', label: 'API Keys', icon: Key });
+  items.push({ href: '/settings/api', label: 'API Keys', icon: Key });
   items.push({ href: '/settings', label: 'Settings', icon: Settings });
 
   return items;

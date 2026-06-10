@@ -120,25 +120,6 @@ vi.mock('@/lib/r2', () => ({
   deleteFile: vi.fn(),
 }));
 
-vi.mock('@/lib/stripe', () => ({
-  LIMITS: {
-    maxDurationMinutes: 30,
-    maxVoiceClones: 10,
-    canMakePrivate: true,
-    canExportPdf: true,
-    hasPremiumSfx: true,
-  },
-  TIER_LIMITS: {
-    FREE: {
-      maxDurationMinutes: 30,
-      maxVoiceClones: 10,
-      canMakePrivate: true,
-      canExportPdf: true,
-      hasPremiumSfx: true,
-      premiumVoiceSurcharge: 0,
-    },
-  },
-}));
 
 vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },

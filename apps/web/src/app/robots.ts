@@ -47,7 +47,6 @@ const DISALLOWED_PATHS = [
   '/dashboard',
   '/create',
   '/settings',
-  '/billing',
   '/analytics',
   '/welcome',
   '/team',

@@ -53,7 +53,7 @@ describe('Sidebar', () => {
     render(<Sidebar currentPath="/learn" />);
     expect(screen.getByText('Learn').closest('a')).toHaveAttribute('href', '/learn');
     expect(screen.getByText('Memory').closest('a')).toHaveAttribute('href', '/memory');
-    expect(screen.getByText('API Keys').closest('a')).toHaveAttribute('href', '/billing');
+    expect(screen.getByText('API Keys').closest('a')).toHaveAttribute('href', '/settings/api');
     expect(screen.getByText('Settings').closest('a')).toHaveAttribute('href', '/settings');
   });
 
