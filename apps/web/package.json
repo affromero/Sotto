@@ -68,7 +68,6 @@
     "remotion": "^4.0.0",
     "resend": "^6.9.2",
     "sherpa-onnx": "^1.12.25",
-    "stripe": "^20.3.1",
     "styled-jsx": "^5.1.6",
     "typescript": "^5.9.3",
     "web-push": "^3.6.7",

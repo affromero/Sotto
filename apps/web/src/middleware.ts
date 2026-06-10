@@ -5,7 +5,6 @@ const PROTECTED_ROUTES = [
   '/dashboard',
   '/create',
   '/settings',
-  '/billing',
   '/analytics',
   '/admin',
   '/welcome',

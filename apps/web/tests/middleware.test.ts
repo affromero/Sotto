@@ -74,11 +74,6 @@ describe('Middleware Security Tests', () => {
       expect(getRedirectLocation(res)).toBe('/auth/login');
     });
 
-    it('redirects /billing/checkout to login', async () => {
-      const res = await middleware(createRequest('/billing/checkout'));
-      expect(getRedirectLocation(res)).toBe('/auth/login');
-    });
-
     it('redirects /welcome to login', async () => {
       const res = await middleware(createRequest('/welcome'));
       expect(getRedirectLocation(res)).toBe('/auth/login');

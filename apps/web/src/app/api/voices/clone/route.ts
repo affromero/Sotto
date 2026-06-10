@@ -6,7 +6,7 @@ import { cloneVoiceViaFal } from '@/lib/fal-voice-clone';
 import { cloneVoiceViaCartesia } from '@/lib/cartesia-voice-clone';
 import { getByokKey, hasByokKey } from '@/lib/byok';
 import { cloneVoiceSchema, importVoiceSchema, importElevenLabsVoiceSchema } from '@/lib/validations';
-import { LIMITS } from '@/lib/stripe';
+import { MAX_VOICE_CLONES } from '@/lib/generation-limits';
 import { getTierFeatures } from '@/lib/tier-features';
 import { getPlanFeatureConfig } from '@/lib/plan-feature-config';
 import { logUsage } from '@/lib/usage-logger';
@@ -42,8 +42,8 @@ export async function POST(request: NextRequest) {
     where: { userId: session.user.id },
   });
 
-  if (existingCount >= LIMITS.maxVoiceClones) {
-    return errorResponse(`Maximum of ${LIMITS.maxVoiceClones} voice clones allowed`, 403);
+  if (existingCount >= MAX_VOICE_CLONES) {
+    return errorResponse(`Maximum of ${MAX_VOICE_CLONES} voice clones allowed`, 403);
   }
 
   const formData = await request.formData();

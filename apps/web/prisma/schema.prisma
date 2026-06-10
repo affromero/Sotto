@@ -155,9 +155,8 @@ model User {
   budgetMonthCents  Int       @default(0) // 0 = no budget limit
   spentMonthResetAt DateTime?
 
-  // Subscription plan
-  plan         UserPlan      @default(FREE)
-  subscription Subscription?
+  // Plan (vestigial single tier; no payment path)
+  plan UserPlan @default(FREE)
 
   // Moderation
   bannedAt        DateTime?
@@ -209,23 +208,6 @@ model User {
   @@index([role])
   @@index([handle])
   @@index([referredById])
-}
-
-model Subscription {
-  id                   String   @id @default(cuid())
-  userId               String   @unique
-  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  stripeCustomerId     String   @unique
-  stripeSubscriptionId String   @unique
-  stripePriceId        String
-  status               String // active | canceled | past_due | trialing
-  currentPeriodEnd     DateTime
-  cancelAtPeriodEnd    Boolean  @default(false)
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
-
-  @@index([stripeCustomerId])
-  @@index([stripeSubscriptionId])
 }
 
 model Account {

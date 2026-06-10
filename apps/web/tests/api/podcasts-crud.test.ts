@@ -81,10 +81,6 @@ vi.mock('@/lib/auto-model-config', () => ({
   getAutoModelConfig: (...args: unknown[]) => mockGetAutoModelConfig(...args),
 }));
 
-vi.mock('@/lib/stripe', () => ({
-  LIMITS: { maxDurationMinutes: 60 },
-}));
-
 vi.mock('@/lib/voice-pricing', () => ({
   computeVoiceCharges: vi.fn().mockResolvedValue([]),
 }));

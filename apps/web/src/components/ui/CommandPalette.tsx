@@ -23,7 +23,7 @@ const NAV_ITEMS = [
   { href: '/create', label: 'Create Podcast', icon: PlusCircle },
   { href: '/analytics', label: 'Analytics', icon: BarChart2 },
   { href: '/ideas', label: 'Library', icon: Bookmark },
-  { href: '/billing', label: 'API Keys', icon: Key },
+  { href: '/settings/api', label: 'API Keys', icon: Key },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 

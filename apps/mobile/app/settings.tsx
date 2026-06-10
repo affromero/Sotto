@@ -174,15 +174,6 @@ export default function SettingsScreen() {
             <View style={styles.rowSeparator} />
             <Pressable
               style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-              onPress={() => router.push('/settings/billing')}
-              testID="settings-billing"
-            >
-              <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>Billing & Plan</Text>
-              <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
-            </Pressable>
-            <View style={styles.rowSeparator} />
-            <Pressable
-              style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
               onPress={() => router.push('/settings/referral')}
               testID="settings-referral"
             >

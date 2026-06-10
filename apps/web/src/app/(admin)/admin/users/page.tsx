@@ -15,7 +15,7 @@ interface PageProps {
 
 const USERS_PER_PAGE = 25;
 
-type TierFilter = 'ALL' | 'FREE' | 'PRO' | 'BYOK' | 'SUBSCRIBED';
+type TierFilter = 'ALL' | 'FREE' | 'PRO' | 'BYOK';
 
 function buildTierWhere(tier: TierFilter) {
   switch (tier) {
@@ -30,8 +30,6 @@ function buildTierWhere(tier: TierFilter) {
           { userTtsKeys: { some: { isValid: true } } },
         ],
       };
-    case 'SUBSCRIBED':
-      return { subscription: { status: 'active' } };
     default:
       return {};
   }
@@ -68,7 +66,6 @@ async function getUsers(search: string | undefined, page: number, tier: TierFilt
         plan: true,
         dailyGenerationOverride: true,
         spentMonthCents: true,
-        subscription: { select: { status: true, currentPeriodEnd: true } },
         _count: {
           select: {
             podcasts: true,
@@ -132,13 +129,13 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
         </form>
 
         <div className={styles.tierFilter}>
-          {(['ALL', 'FREE', 'PRO', 'BYOK', 'SUBSCRIBED'] as const).map((t) => (
+          {(['ALL', 'FREE', 'PRO', 'BYOK'] as const).map((t) => (
             <Link
               key={t}
               href={buildPaginationHref(1, search, t)}
               className={`${styles.filterChip} ${tier === t ? styles.filterChipActive : ''}`}
             >
-              {t === 'ALL' ? 'All' : t === 'SUBSCRIBED' ? 'Subscribed' : t}
+              {t === 'ALL' ? 'All' : t}
             </Link>
           ))}
         </div>
@@ -163,7 +160,6 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
               const displayName = user.name || user.email || 'Unknown';
               const initials = displayName.charAt(0).toUpperCase();
               const hasByok = user._count.userAiKeys > 0 || user._count.userTtsKeys > 0;
-              const subStatus = user.subscription?.status;
 
               return (
                 <tr key={user.id}>
@@ -203,15 +199,6 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
                       </span>
                       {hasByok && (
                         <span className={`${styles.badge} ${styles.badgeBYOK}`}>BYOK</span>
-                      )}
-                      {subStatus === 'active' && (
-                        <span className={styles.subDot} title="Active subscription" />
-                      )}
-                      {subStatus === 'canceled' && (
-                        <span className={`${styles.subDot} ${styles.subDotCanceled}`} title="Canceled subscription" />
-                      )}
-                      {subStatus === 'past_due' && (
-                        <span className={`${styles.subDot} ${styles.subDotPastDue}`} title="Past due subscription" />
                       )}
                     </div>
                   </td>
