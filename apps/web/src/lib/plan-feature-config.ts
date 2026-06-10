@@ -7,7 +7,6 @@ export interface PlanFeatureConfigData {
   proVoiceTracksEnabled: boolean;
   freeMaxVoiceTracks: number;
   proMaxVoiceTracks: number;
-  voiceMarketplaceEnabled: boolean;
   avatarUploadsEnabled: boolean;
   avatarGenerationEnabled: boolean;
 }
@@ -33,7 +32,6 @@ export async function getPlanFeatureConfig(): Promise<PlanFeatureConfigData> {
     proVoiceTracksEnabled: row.proVoiceTracksEnabled,
     freeMaxVoiceTracks: row.freeMaxVoiceTracks,
     proMaxVoiceTracks: row.proMaxVoiceTracks,
-    voiceMarketplaceEnabled: row.voiceMarketplaceEnabled,
     avatarUploadsEnabled: row.avatarUploadsEnabled,
     avatarGenerationEnabled: row.avatarGenerationEnabled,
   };
