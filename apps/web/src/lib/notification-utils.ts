@@ -57,12 +57,6 @@ export function getNotificationUrl(notification: NotificationData): string | nul
     case 'KEY_INVALID':
       return '/billing';
 
-    // Voice access requests
-    case 'VOICE_REQUEST_RECEIVED':
-    case 'VOICE_REQUEST_APPROVED':
-    case 'VOICE_REQUEST_DENIED':
-      return '/settings/voices';
-
     // Account moderation
     case 'ACCOUNT_WARNING':
     case 'ACCOUNT_SUSPENDED':

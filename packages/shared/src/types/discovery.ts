@@ -49,11 +49,3 @@ export interface TasteAnswer {
   tagSlugs: string[];
   response: 'yes' | 'no' | 'skip';
 }
-
-export type InspireSection = 'forYou' | 'trending' | 'curiosity';
-
-export const INSPIRE_SECTION_LABELS: Record<InspireSection, string> = {
-  forYou: 'For You',
-  trending: 'Trending',
-  curiosity: 'Curiosity',
-};
