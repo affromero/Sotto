@@ -42,13 +42,9 @@ export default async function LoginPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const session = await auth();
 
-  // Not signed in + signup closed + not a returning user → waitlist
-  if (!session && !params.returning && !await isOpenSignup()) {
-    redirect('/auth/waitlisted');
-  }
-
   // Self-hosted local sign-in: the Netflix-style profile picker, unless OAuth was
-  // explicitly requested via ?oauth=1. Fonts are wired here so the picker's aula
+  // explicitly requested via ?oauth=1. This bypasses the waitlist entirely, since a
+  // self-hosted instance has no waitlist. Fonts are wired here so the picker's aula
   // tokens (--font-newsreader / -ibm-plex-*) resolve, the same way welcome does.
   if (params.oauth !== '1' && (await isLocalAuthEnabled())) {
     return (
@@ -58,6 +54,11 @@ export default async function LoginPage({ searchParams }: PageProps) {
         <ProfilePicker />
       </div>
     );
+  }
+
+  // OAuth path: not signed in + signup closed + not a returning user → waitlist.
+  if (!session && !params.returning && !(await isOpenSignup())) {
+    redirect('/auth/waitlisted');
   }
 
   return (
