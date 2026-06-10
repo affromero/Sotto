@@ -766,7 +766,6 @@ describe('open-source language-learning OSS surfaces', () => {
       'apps/web/next.config.js',
       'apps/web/Dockerfile',
       'apps/web/Dockerfile.workers',
-      'apps/web/src/lib/recommendation-engine.ts',
       'apps/web/src/lib/providers/ml.ts',
       'apps/web/src/workers/feature-computation.worker.ts',
       'apps/web/src/lib/CLAUDE.md',
@@ -1061,21 +1060,23 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(creatorAnalyticsSources).not.toContain("label: 'Follows'");
   });
 
-  it('keeps similar-podcast recommendations free of social ranking payloads', () => {
-    const recommendationSources = [
-      'src/lib/recommendations.ts',
-      'src/app/api/recommendations/route.ts',
-    ]
-      .map(readSource)
-      .join('\n');
+  it('does not ship the podcast recommendation engine or feed', () => {
+    const removedRecommendationPaths = [
+      'apps/web/src/lib/recommendation-engine.ts',
+      'apps/web/src/lib/recommendations.ts',
+      'apps/web/src/lib/recommendation-metrics.ts',
+      'apps/web/src/app/api/recommendations',
+      'apps/web/src/app/api/picks',
+      'apps/web/src/app/api/users/me/recommendations',
+      'apps/web/src/app/api/inspire/all',
+      'apps/web/src/app/(admin)/admin/recommendations',
+    ];
+    for (const path of removedRecommendationPaths) {
+      expect(existsSync(resolve(repoRoot, path)), path).toBe(false);
+    }
 
-    expect(recommendationSources).toContain("saveCount: 'desc'");
-    expect(recommendationSources).toContain('userId: params.userId');
-    expect(recommendationSources).toContain("errorResponse('Unauthorized', 401)");
-    expect(recommendationSources).not.toContain('likeCount');
-    expect(recommendationSources).not.toContain('forkCount');
-    expect(recommendationSources).not.toContain("visibility: 'PUBLIC'");
-    expect(recommendationSources).not.toContain('excludeUserId');
+    const schemaSource = readFileSync(resolve(repoRoot, 'apps/web/prisma/schema.prisma'), 'utf8');
+    expect(schemaSource).not.toContain('model RecommendationLog');
   });
 
   it('keeps live podcast status and voice tracks owner-gated', () => {
@@ -1178,17 +1179,6 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(voiceProviderSources).not.toContain(
       'falls back to elevenlabs for invalid provider param'
     );
-  });
-
-  it('keeps daily picks and trending free of social ranking payloads', () => {
-    const recommendationEngineSource = readSource('src/lib/recommendation-engine.ts');
-
-    expect(recommendationEngineSource).toContain("saveCount: 'desc'");
-    expect(recommendationEngineSource).toContain('Listen velocity');
-    expect(recommendationEngineSource).not.toContain('likeCount');
-    expect(recommendationEngineSource).not.toContain('forkCount');
-    expect(recommendationEngineSource).not.toContain('forkedFromId');
-    expect(recommendationEngineSource).not.toContain("likeCount: 'desc'");
   });
 
   it('keeps recommendation training exports free of social labels', () => {
@@ -1347,7 +1337,6 @@ describe('open-source language-learning OSS surfaces', () => {
       'src/app/api/saved/route.ts',
       'src/app/api/queue/route.ts',
       'src/app/api/users/me/podcasts/route.ts',
-      'src/app/api/inspire/all/route.ts',
       'src/app/podcast/[podcastId]/page.tsx',
     ]
       .map(readSource)
