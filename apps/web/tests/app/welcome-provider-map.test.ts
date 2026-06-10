@@ -21,6 +21,12 @@ describe('resolveAi', () => {
     expect(r.preferredAiProvider).toBe('openai');
   });
 
+  it('maps google + key to a BYOK google key (unlocks live translation)', () => {
+    const r = resolveAi('google', 'key', 'AIza-xxx', '');
+    expect(r.keyPost).toEqual({ endpoint: 'ai-keys', provider: 'google', apiKey: 'AIza-xxx' });
+    expect(r.preferredAiProvider).toBe('google');
+  });
+
   it('maps the CLI method to the keyless claude-code backend (no key, infra set)', () => {
     const r = resolveAi('claude', 'cli', '', '');
     expect(r.keyPost).toBeNull();

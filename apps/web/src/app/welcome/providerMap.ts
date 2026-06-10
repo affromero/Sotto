@@ -47,7 +47,7 @@ function clean(v: string | undefined | null): string {
 
 /**
  * AI agent → backend.
- *   claude+key → BYOK anthropic;  codex+key → BYOK openai
+ *   claude+key → BYOK anthropic;  codex+key → BYOK openai;  google+key → BYOK google
  *   *+cli      → keyless infra aiProvider=claude-code (the local-agent generation backend)
  *   local/custom+url → infra aiProvider=local (+ base URL, + model)
  */
@@ -61,7 +61,8 @@ export function resolveAi(
   const m = clean(model);
 
   if (method === 'key' && v) {
-    const byokProvider = provider === 'claude' ? 'anthropic' : 'openai';
+    const byokProvider =
+      provider === 'claude' ? 'anthropic' : provider === 'google' ? 'google' : 'openai';
     return {
       keyPost: { endpoint: 'ai-keys', provider: byokProvider, apiKey: v },
       preferredAiProvider: byokProvider,
