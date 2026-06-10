@@ -75,6 +75,7 @@ Plus the rest of the loop:
 
 - **Mastery-gated classes** — you can't advance until you pass; failed sections regenerate in a *similar-but-not-identical* form (retrieval practice / anti-copy).
 - **Ungated practice** — drill any single skill on your own time, spaced-repetition-driven, separate from the graded classes.
+- **Live conversation** — speak and hear the real-time translation (either direction) through the [Gemini Live API](https://ai.google.dev/gemini-api/docs/live); new words you hit feed straight into your memory graph. Runs on your own Google key (added in Settings), and stays hidden until you add one.
 - **Personal memory graph** — a per-course, [Obsidian](https://obsidian.md/)-style vocabulary/grammar graph with [SM-2](https://super-memory.com/english/ol/sm2.htm) spaced repetition that drives review, seeds the listening podcast, and renders as an interactive [Cytoscape](https://js.cytoscape.org/) visualization.
 - **Notes that personalize everything** — tell Sotto your goals and background once; it threads through placement, classes, and practice.
 - **Any language pair** — German/English/Spanish ship as hand-authored reference curricula; any other native→target pair is composed by your connected agent on demand.
