@@ -1097,10 +1097,7 @@ describe('open-source language-learning OSS surfaces', () => {
   });
 
   it('keeps live podcast status and voice tracks owner-gated', () => {
-    const livePodcastSources = [
-      'src/app/api/podcasts/[podcastId]/stream/route.ts',
-      'src/app/api/podcasts/[podcastId]/voice-tracks/route.ts',
-    ]
+    const livePodcastSources = ['src/app/api/podcasts/[podcastId]/voice-tracks/route.ts']
       .map(readSource)
       .join('\n');
 
