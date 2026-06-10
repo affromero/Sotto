@@ -21,7 +21,7 @@ export function StepAgent({ agent, setAgent, onNext, onBack }: Props) {
     if (!p) return;
     setAgent(() => ({
       provider: id,
-      method: p.cli ? 'cli' : 'url',
+      method: p.cli ? 'cli' : p.kind === 'key' ? 'key' : 'url',
       value: '',
       model: '',
       status: 'idle',
