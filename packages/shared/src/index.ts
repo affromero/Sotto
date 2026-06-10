@@ -61,10 +61,7 @@ export type {
   DiscoveryState,
   TasteQuestion,
   TasteAnswer,
-  InspireSection,
 } from './types/discovery';
-
-export { INSPIRE_SECTION_LABELS } from './types/discovery';
 
 
 export type { PlayerState, PlayerControls } from './types/player';

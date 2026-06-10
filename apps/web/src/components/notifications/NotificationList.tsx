@@ -18,7 +18,6 @@ import {
   MicVocal,
   Megaphone,
   Flag,
-  Mic,
 } from 'lucide-react';
 import type { NotificationData } from '@/types/notification';
 import { getNotificationUrl } from '@/lib/notification-utils';
@@ -56,11 +55,6 @@ const typeIcons: Record<string, typeof Bell> = {
   VOICE_VERIFICATION_FAILED: ShieldCheck,
   VOICE_BLOCKED_DUPLICATE: ShieldAlert,
   VOICE_OWNERSHIP_ALERT: ShieldAlert,
-
-  // Voice access requests
-  VOICE_REQUEST_RECEIVED: Mic,
-  VOICE_REQUEST_APPROVED: Mic,
-  VOICE_REQUEST_DENIED: Mic,
 
   // Voice tracks (renditions)
   RENDITION_PROPOSED: MicVocal,

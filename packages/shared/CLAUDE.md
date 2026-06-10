@@ -11,7 +11,7 @@ src/
 │   ├── podcast.ts        # PodcastSummary, PodcastDetail, SegmentData, CreatePodcastRequest, AiModelOption, TtsOption, ScriptTurn, VoiceProfile
 │   ├── reference.ts      # ReferenceData (includes contentDomain: string | null), VerificationLayerResult
 │   ├── class-document.ts # ClassDocument, ClassDocumentSection, ClassDocumentQuestion, ClassDocumentPrompt — render contract for web worksheet page and mobile PencilKit ClassWorksheet
-│   ├── discovery.ts      # DiscoveryMessage, DiscoveryMetadata, DiscoveryState, InspireSection, NewsTimeRange, INSPIRE_SECTION_LABELS, NEWS_TIME_RANGE_LABELS
+│   ├── discovery.ts      # DiscoveryMessage, DiscoveryMetadata, DiscoveryState, VerificationMode, TasteQuestion, TasteAnswer
 │   ├── player.ts         # PlayerState, PlayerControls
 │   ├── interaction.ts    # InteractionRequest, InteractionResponse
 │   ├── notification.ts   # NotificationData, PushSubscriptionData
