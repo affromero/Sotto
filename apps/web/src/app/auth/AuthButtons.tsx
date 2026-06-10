@@ -61,7 +61,7 @@ const providerConfig: Record<ProviderId, { icon: React.FC; label: string }> = {
   apple: { icon: AppleIcon, label: 'Continue with Apple' },
 };
 
-export function AuthButtons({ callbackUrl = '/dashboard' }: AuthButtonsProps) {
+export function AuthButtons({ callbackUrl = '/learn' }: AuthButtonsProps) {
   const [availableProviders, setAvailableProviders] = useState<ProviderId[]>([]);
   const [hasResend, setHasResend] = useState(false);
   const [email, setEmail] = useState('');

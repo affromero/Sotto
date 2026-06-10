@@ -176,22 +176,22 @@ describe('Middleware Security Tests', () => {
       expect(fullLocation).toContain('callbackUrl=%2Fcreate');
     });
 
-    it('/auth/login redirects authenticated users to /dashboard', async () => {
+    it('/auth/login redirects authenticated users to /learn', async () => {
       mockGetToken.mockResolvedValue({ sub: 'user-1', role: 'USER' });
       const res = await middleware(createRequest('/auth/login'));
-      expect(getRedirectLocation(res)).toBe('/dashboard');
+      expect(getRedirectLocation(res)).toBe('/learn');
     });
 
-    it('/auth/signup redirects authenticated users to /dashboard', async () => {
+    it('/auth/signup redirects authenticated users to /learn', async () => {
       mockGetToken.mockResolvedValue({ sub: 'user-1', role: 'USER' });
       const res = await middleware(createRequest('/auth/signup'));
-      expect(getRedirectLocation(res)).toBe('/dashboard');
+      expect(getRedirectLocation(res)).toBe('/learn');
     });
 
-    it('/auth/waitlisted redirects authenticated users to /dashboard', async () => {
+    it('/auth/waitlisted redirects authenticated users to /learn', async () => {
       mockGetToken.mockResolvedValue({ sub: 'user-1', role: 'USER' });
       const res = await middleware(createRequest('/auth/waitlisted'));
-      expect(getRedirectLocation(res)).toBe('/dashboard');
+      expect(getRedirectLocation(res)).toBe('/learn');
     });
 
     it('allows authenticated user to access /dashboard', async () => {
@@ -226,19 +226,19 @@ describe('Middleware Security Tests', () => {
     it('blocks regular USER from /admin', async () => {
       mockGetToken.mockResolvedValue({ sub: 'user-1', role: 'USER' });
       const res = await middleware(createRequest('/admin'));
-      expect(getRedirectLocation(res)).toBe('/dashboard');
+      expect(getRedirectLocation(res)).toBe('/learn');
     });
 
     it('blocks user with no role from /admin', async () => {
       mockGetToken.mockResolvedValue({ sub: 'user-3' });
       const res = await middleware(createRequest('/admin'));
-      expect(getRedirectLocation(res)).toBe('/dashboard');
+      expect(getRedirectLocation(res)).toBe('/learn');
     });
 
     it('blocks user with fabricated role string from /admin', async () => {
       mockGetToken.mockResolvedValue({ sub: 'user-4', role: 'SUPERADMIN' });
       const res = await middleware(createRequest('/admin'));
-      expect(getRedirectLocation(res)).toBe('/dashboard');
+      expect(getRedirectLocation(res)).toBe('/learn');
     });
 
     it('allows ADMIN to access /admin', async () => {
@@ -256,7 +256,7 @@ describe('Middleware Security Tests', () => {
     it('blocks USER from /admin/users subpath', async () => {
       mockGetToken.mockResolvedValue({ sub: 'user-1', role: 'USER' });
       const res = await middleware(createRequest('/admin/users'));
-      expect(getRedirectLocation(res)).toBe('/dashboard');
+      expect(getRedirectLocation(res)).toBe('/learn');
     });
   });
 });
