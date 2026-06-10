@@ -11,9 +11,8 @@ interface ShowcaseTogglesState {
 
 const ShowcaseTogglesContext = createContext<ShowcaseTogglesState | null>(null);
 
-// Returns null when outside provider (e.g. admin dashboard) instead of throwing.
-// This differs from WaitlistProvider intentionally — AudioClipPlayer needs to work
-// both inside the provider (landing page) and without it (admin dashboard).
+// Returns null when outside provider (e.g. admin dashboard) instead of throwing,
+// so AudioClipPlayer works both inside the provider and without it (admin dashboard).
 export function useShowcaseToggles(): ShowcaseTogglesState | null {
   return useContext(ShowcaseTogglesContext);
 }

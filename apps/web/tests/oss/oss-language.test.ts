@@ -18,11 +18,10 @@ describe('open-source language-learning OSS surfaces', () => {
     'src/components/layout/TopBar.tsx',
     'src/components/layout/PublicNav.tsx',
     'src/components/layout/Footer.tsx',
-    'src/components/landing/LandingNav.tsx',
-    'src/components/landing/AuthCTA.tsx',
-    'src/components/landing/chapters/ConvertChapter.tsx',
-    'src/components/landing/chapters/JourneyChapter.tsx',
+    'src/components/landing/LandingHeader.tsx',
+    'src/components/landing/LandingCTA.tsx',
     'src/components/landing/JsonLd.tsx',
+    'src/app/page.tsx',
     'src/app/(dashboard)/dashboard/page.tsx',
     'src/app/podcast/[podcastId]/PodcastPlayerView.tsx',
   ];
@@ -46,8 +45,9 @@ describe('open-source language-learning OSS surfaces', () => {
 
   it('positions the product as open-source language-learning infrastructure, not a social podcast network', () => {
     const landingSource = [
-      'src/components/landing/chapters/ConvertChapter.tsx',
-      'src/components/landing/chapters/JourneyChapter.tsx',
+      'src/app/page.tsx',
+      'src/components/landing/LandingHeader.tsx',
+      'src/components/landing/LandingCTA.tsx',
     ]
       .map(readSource)
       .join('\n');
@@ -508,7 +508,6 @@ describe('open-source language-learning OSS surfaces', () => {
       'apps/web/src/app/api/auth/mobile/route.ts',
       'apps/web/src/app/opengraph-image.tsx',
       'apps/web/src/app/(admin)/admin/showcase/AvatarPrep.tsx',
-      'apps/web/src/components/landing/chapters/ConvertChapter.tsx',
       'apps/web/public/manifest.json',
       'apps/web/prisma/seed.ts',
       'apps/web/prisma/seed-demo.ts',
@@ -564,7 +563,6 @@ describe('open-source language-learning OSS surfaces', () => {
       'apps/web/src/app/changelog/page.tsx',
       'apps/web/src/app/support/page.tsx',
       'apps/web/src/components/landing/JsonLd.tsx',
-      'apps/web/src/components/landing/chapters/ConvertChapter.tsx',
       'apps/web/src/components/layout/Footer.tsx',
       'apps/web/src/lib/bot-identity.ts',
       'apps/web/src/lib/email-templates.ts',
@@ -631,8 +629,6 @@ describe('open-source language-learning OSS surfaces', () => {
       'apps/web/src/lib/public-links.ts',
       'apps/web/src/components/player/ReferenceList.tsx',
       'apps/web/src/components/create/GenerationProgress.tsx',
-      'apps/web/src/components/landing/chapters/TrustChapter.tsx',
-      'apps/web/src/components/landing/chapters/ConvertChapter.tsx',
       'scripts/recording/flows/07-verification-github.ts',
     ]
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
