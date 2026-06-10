@@ -51,8 +51,17 @@ export async function processSpeakingGrading(job: Job<SpeakingGradingPayload>): 
       throw new Error(`PracticeSession not found for practiceSessionId: ${recording.practiceSessionId}`);
     }
     targetLang = ps.course.targetLang;
+  } else if (recording.examSectionId) {
+    const es = await prisma.examSection.findUnique({
+      where: { id: recording.examSectionId },
+      select: { exam: { select: { course: { select: { targetLang: true } } } } },
+    });
+    if (!es) {
+      throw new Error(`ExamSection not found for examSectionId: ${recording.examSectionId}`);
+    }
+    targetLang = es.exam.course.targetLang;
   } else {
-    throw new Error(`SpeakingRecording ${recordingId} has no parent section or practice session`);
+    throw new Error(`SpeakingRecording ${recordingId} has no parent section, practice session, or exam section`);
   }
   const userId = recording.userId;
 
