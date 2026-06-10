@@ -179,10 +179,6 @@ model User {
   referralVerified   Boolean   @default(false)
   referralVerifiedAt DateTime?
 
-  // Stripe Connect (voice monetization)
-  stripeAccountId String?
-  stripeOnboarded Boolean @default(false)
-
   // Voice preferences (multi-speaker)
   voicePreferences UserVoicePreference[]
 
@@ -1369,8 +1365,6 @@ model VoiceClone {
   sourceType         VoiceCloneSource
   sampleUrl          String?
   description        String?                 @db.VarChar(200)
-  requestable        Boolean                 @default(false)
-  priceInCents       Int? // null = free, 0+ = paid per-podcast
   verificationStatus VoiceVerificationStatus @default(PENDING_VERIFICATION)
   createdAt          DateTime                @default(now())
 

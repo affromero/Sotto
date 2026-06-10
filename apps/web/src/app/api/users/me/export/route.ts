@@ -167,8 +167,6 @@ export async function GET() {
         provider: true,
         sourceType: true,
         description: true,
-        requestable: true,
-        priceInCents: true,
         createdAt: true,
       },
     }),
