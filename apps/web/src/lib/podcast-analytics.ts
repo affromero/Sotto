@@ -173,22 +173,3 @@ export async function getPodcastListenerBehavior(podcastId: string): Promise<Lis
     })),
   };
 }
-
-export interface TrafficSourceData {
-  source: string;
-  percentage: number;
-}
-
-export async function getPodcastTrafficSources(
-  podcastId: string
-): Promise<TrafficSourceData[] | null> {
-  const feature = await prisma.podcastFeature.findUnique({
-    where: { podcastId },
-    select: { completionBySource: true },
-  });
-
-  if (!feature?.completionBySource) return null;
-
-  const sources = feature.completionBySource as unknown as Record<string, number>;
-  return Object.entries(sources).map(([source, percentage]) => ({ source, percentage }));
-}

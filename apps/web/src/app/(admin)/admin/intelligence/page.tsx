@@ -2,7 +2,6 @@ import { subDays, subMonths, startOfDay } from 'date-fns';
 import {
   getPeakUsageHeatmap,
   getOptimalDurationByTopic,
-  getContentMarketFit,
   getGenerationToListenRatio,
   getSessionDepth,
   getAudienceArchetypes,
@@ -26,11 +25,10 @@ export default async function AdminIntelligencePage({ searchParams }: PageProps)
     return days === 90 ? subMonths(today, 3) : subDays(today, days);
   })();
 
-  const [heatmap, durationTopics, contentFit, genRatio, sessionDepth, archetypes] =
+  const [heatmap, durationTopics, genRatio, sessionDepth, archetypes] =
     await Promise.all([
       getPeakUsageHeatmap(since),
       getOptimalDurationByTopic(since),
-      getContentMarketFit(since),
       getGenerationToListenRatio(since),
       getSessionDepth(since),
       getAudienceArchetypes(since),
@@ -172,35 +170,6 @@ export default async function AdminIntelligencePage({ searchParams }: PageProps)
                     <td>{r.durationBucket}</td>
                     <td>{Math.round(r.avgCompletion)}%</td>
                     <td>{r.podcastCount}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
-
-      {/* Content-Market Fit */}
-      {contentFit.length > 0 && (
-        <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>Content-Market Fit</h2>
-          <div className={styles.tableWrapper}>
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th>Topic</th>
-                  <th>Demand (Impressions)</th>
-                  <th>Supply (Podcasts)</th>
-                  <th>Gap Ratio</th>
-                </tr>
-              </thead>
-              <tbody>
-                {contentFit.map((r) => (
-                  <tr key={r.topic}>
-                    <td>{r.topic}</td>
-                    <td>{r.demandScore.toLocaleString()}</td>
-                    <td>{r.supply.toLocaleString()}</td>
-                    <td>{r.gapRatio.toLocaleString()}</td>
                   </tr>
                 ))}
               </tbody>

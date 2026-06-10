@@ -1161,8 +1161,7 @@ model PodcastFeature {
   seekHotspots      Json? // [{position, seekCount}]
 
   // Re-engagement
-  relistenRate       Float @default(0)
-  completionBySource Json? // {feed: pct, recommendation: pct, search: pct, direct: pct}
+  relistenRate Float @default(0)
 
   // Content
   segmentCount              Int   @default(0)
