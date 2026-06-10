@@ -1097,3 +1097,10 @@ export const examStartSchema = z.object({
   courseId: z.string().min(1),
   level: z.enum(['A1', 'A2', 'B1', 'B2', 'C1', 'C2']).optional(),
 });
+
+// POST /api/exams/[examId]/submit — submit MC answers and score the exam.
+export const examSubmitSchema = z.object({
+  answers: z
+    .array(z.object({ questionId: z.string().min(1), selectedIndex: z.number().int().min(0) }))
+    .max(200),
+});
