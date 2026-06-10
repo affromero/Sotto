@@ -1091,3 +1091,9 @@ export const liveTranslateSessionSchema = z.object({
   courseId: z.string().min(1),
   transcript: z.string().max(20000),
 });
+
+// POST /api/exams — start a mock exam for a course (optional level override).
+export const examStartSchema = z.object({
+  courseId: z.string().min(1),
+  level: z.enum(['A1', 'A2', 'B1', 'B2', 'C1', 'C2']).optional(),
+});
