@@ -31,8 +31,8 @@ export function TopBar({ user }: TopBarProps) {
         Sotto
       </Link>
       <nav className={styles.nav}>
-        <Link href="/voices">Voices</Link>
-        <Link href="/create">Create</Link>
+        <Link href="/learn">Learn</Link>
+        <Link href="/memory">Memory</Link>
       </nav>
       <div className={styles.actions}>
         <button
@@ -47,7 +47,7 @@ export function TopBar({ user }: TopBarProps) {
         </button>
         <ThemeToggle />
         {user ? (
-          <Link href="/dashboard" className={styles.avatarLink} aria-label="Go to dashboard">
+          <Link href="/learn" className={styles.avatarLink} aria-label="Go to your courses">
             {user.image ? (
               <Image
                 src={user.image}

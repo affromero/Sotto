@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Bookmark, Home, PlusCircle, Settings } from 'lucide-react';
+import { GraduationCap, Network, Settings } from 'lucide-react';
 import styles from './MobileNav.module.css';
 
 interface MobileNavProps {
@@ -10,9 +10,8 @@ interface MobileNavProps {
 }
 
 const tabs = [
-  { href: '/dashboard', label: 'Home', icon: Home },
-  { href: '/create', label: 'Create', icon: PlusCircle },
-  { href: '/ideas', label: 'Library', icon: Bookmark },
+  { href: '/learn', label: 'Learn', icon: GraduationCap },
+  { href: '/memory', label: 'Memory', icon: Network },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
