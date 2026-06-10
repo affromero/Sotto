@@ -221,6 +221,7 @@ model User {
   classSubmissions   ClassSubmission[]
   speakingRecordings SpeakingRecording[]
   writingResponses   WritingResponse[]
+  mockExams          MockExam[]
 
   @@index([role])
   @@index([handle])
@@ -397,6 +398,7 @@ model Podcast {
   creativeOutline     CreativeOutline?
   vocabularyEntries   VocabularyEntry[]
   classSection        ClassSection?
+  examSection         ExamSection?
   practiceSession     PracticeSession?
 
   @@unique([userId, slug])
@@ -2543,6 +2545,7 @@ model Course {
   vocabEdges       VocabEdge[]
   practiceSessions PracticeSession[]
   note             CourseNote?
+  mockExams        MockExam[]
 
   @@unique([userId, nativeLang, targetLang]) // one course per user per language pair
   @@index([userId])
@@ -2753,6 +2756,7 @@ model SpeakingPrompt {
   id                String   @id @default(cuid())
   sectionId         String?
   practiceSessionId String?
+  examSectionId     String?
   order             Int
   targetPhrase      String   @db.Text
   translation       String   @db.Text
@@ -2762,12 +2766,15 @@ model SpeakingPrompt {
 
   section         ClassSection?    @relation(fields: [sectionId], references: [id], onDelete: Cascade)
   practiceSession PracticeSession? @relation(fields: [practiceSessionId], references: [id], onDelete: Cascade)
+  examSection     ExamSection?     @relation(fields: [examSectionId], references: [id], onDelete: Cascade)
   recordings      SpeakingRecording[]
 
   @@unique([sectionId, order])
   @@unique([practiceSessionId, order])
+  @@unique([examSectionId, order])
   @@index([sectionId])
   @@index([practiceSessionId])
+  @@index([examSectionId])
 }
 
 // A learner's recorded attempt at a SpeakingPrompt, graded asynchronously.
@@ -2775,6 +2782,7 @@ model SpeakingRecording {
   id                String              @id @default(cuid())
   sectionId         String?
   practiceSessionId String?
+  examSectionId     String?
   promptId          String
   userId            String
   audioUrl          String
@@ -2793,6 +2801,7 @@ model SpeakingRecording {
 
   @@index([sectionId])
   @@index([practiceSessionId])
+  @@index([examSectionId])
   @@index([promptId])
   @@index([userId])
 }
@@ -2803,6 +2812,7 @@ model WritingPrompt {
   id                String   @id @default(cuid())
   sectionId         String?
   practiceSessionId String?
+  examSectionId     String?
   order             Int
   task              String   @db.Text // the writing task the learner responds to
   guidance          String?  @db.Text // optional hints / what to include
@@ -2810,12 +2820,15 @@ model WritingPrompt {
 
   section         ClassSection?     @relation(fields: [sectionId], references: [id], onDelete: Cascade)
   practiceSession PracticeSession?  @relation(fields: [practiceSessionId], references: [id], onDelete: Cascade)
+  examSection     ExamSection?      @relation(fields: [examSectionId], references: [id], onDelete: Cascade)
   responses       WritingResponse[]
 
   @@unique([sectionId, order])
   @@unique([practiceSessionId, order])
+  @@unique([examSectionId, order])
   @@index([sectionId])
   @@index([practiceSessionId])
+  @@index([examSectionId])
 }
 
 // A learner's writing response, graded synchronously by the LLM (corrections +
@@ -2824,6 +2837,7 @@ model WritingResponse {
   id                String   @id @default(cuid())
   sectionId         String?
   practiceSessionId String?
+  examSectionId     String?
   promptId          String
   userId            String
   text              String   @db.Text
@@ -2839,8 +2853,124 @@ model WritingResponse {
 
   @@index([sectionId])
   @@index([practiceSessionId])
+  @@index([examSectionId])
   @@index([promptId])
   @@index([userId])
+}
+
+// ============ LANGUAGE LEARNING — MOCK EXAMS ============
+
+// Flagship CEFR exam whose FORMAT a mock exam is modeled on. Never affiliated
+// with the real institution; we replicate structure only, never exam content.
+enum ExamInstitution {
+  GOETHE // German (Goethe-Institut)
+  DELE // Spanish (Instituto Cervantes)
+  CAMBRIDGE // English (Cambridge English Qualifications)
+  CEFR_GENERIC // institution-agnostic CEFR mock
+}
+
+enum MockExamStatus {
+  GENERATING
+  READY
+  IN_PROGRESS
+  SUBMITTED
+  SCORED
+  FAILED
+}
+
+// An ungated, full-length practice exam modeled on a flagship CEFR exam format.
+// Self-assessment only: it NEVER advances Course.currentLevel.
+model MockExam {
+  id          String          @id @default(cuid())
+  userId      String
+  courseId    String
+  institution ExamInstitution
+  level       CefrLevel
+  status      MockExamStatus  @default(GENERATING)
+  blueprintId String // catalog id, e.g. "goethe/b1"
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course     Course          @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  sections   ExamSection[]
+  submission ExamSubmission?
+
+  @@index([userId])
+  @@index([courseId])
+}
+
+// One part of a mock exam (e.g. "Leseverstehen Teil 1"). LISTENING reuses Podcast;
+// speaking/writing reuse SpeakingPrompt/WritingPrompt via their examSectionId FK.
+model ExamSection {
+  id        String        @id @default(cuid())
+  examId    String
+  skill     SkillType
+  part      String // institution-flavored part name
+  order     Int
+  format    String // 'mc' | 'listening' | 'speaking' | 'writing'
+  weight    Float         @default(0) // share of the overall band; sums to ~1 per exam
+  status    SectionStatus @default(PENDING)
+  podcastId String?       @unique // LISTENING section -> reuse Podcast
+  score     Float?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  exam            MockExam         @relation(fields: [examId], references: [id], onDelete: Cascade)
+  podcast         Podcast?         @relation(fields: [podcastId], references: [id], onDelete: SetNull)
+  questions       ExamQuestion[]
+  speakingPrompts SpeakingPrompt[]
+  writingPrompts  WritingPrompt[]
+
+  @@index([examId, order])
+}
+
+// MC question for an exam section. Mirrors LessonQuestion; MC has no async grading
+// so a separate model keeps exams decoupled from ClassSection.
+model ExamQuestion {
+  id           String   @id @default(cuid())
+  sectionId    String
+  order        Int
+  skill        SkillType
+  question     String   @db.Text
+  options      Json // ["A","B","C","D"]
+  correctIndex Int
+  explanation  String   @db.Text
+  passageRef   String?  @db.Text
+  passageText  String?  @db.Text
+  createdAt    DateTime @default(now())
+
+  section ExamSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  @@unique([sectionId, order])
+  @@index([sectionId])
+}
+
+// One submission per exam: the mock band + overall feedback. Does not change level.
+model ExamSubmission {
+  id           String   @id @default(cuid())
+  examId       String   @unique
+  overallScore Float?
+  band         String? // e.g. "B2 (mock)"
+  feedback     String?  @db.Text
+  submittedAt  DateTime @default(now())
+
+  exam           MockExam            @relation(fields: [examId], references: [id], onDelete: Cascade)
+  sectionResults ExamSectionResult[]
+}
+
+model ExamSectionResult {
+  id           String  @id @default(cuid())
+  submissionId String
+  sectionId    String
+  skill        SkillType
+  score        Float // 0..1
+  feedback     String? @db.Text
+
+  submission ExamSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  @@unique([submissionId, sectionId])
+  @@index([sectionId])
 }
 
 // ============ LANGUAGE LEARNING — MEMORY GRAPH (SRS) ============
