@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { StartNextClass } from '@/components/learn/StartNextClass';
 import { SourcedClassEntry } from '@/components/learn/SourcedClassEntry';
+import { CefrDisclaimer } from '@/components/learn/CefrDisclaimer';
 import styles from './page.module.css';
 
 export const dynamic = 'force-dynamic';
@@ -74,6 +75,7 @@ export default async function LearnPage() {
           Each course moves through mastery-gated classes. Resume the next class, or sharpen a
           single skill in ungated practice.
         </p>
+        <CefrDisclaimer />
       </header>
 
       {courses.length === 0 ? (
