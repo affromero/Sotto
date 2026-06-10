@@ -85,15 +85,8 @@ export function getAppSelectorReference(): string {
     '## Navigation & Layout',
     '- `nav` — main navigation bar',
     '- `a[href="/"]` — home/logo link (landing page only)',
-    '- `a[href="/create"]` — create link (landing page nav + dashboard TopBar ONLY — NOT on /podcast/* pages)',
     '- `button[aria-label="User menu"]` — user avatar dropdown (dashboard TopBar only)',
     '- NOTE: /podcast/[id] pages have NO top nav — do not target nav selectors on those pages',
-    '',
-    '## Create / Discovery Chat',
-    '- `textarea[aria-label="Chat message input"]` — discovery chat input',
-    '- `button[aria-label="Send message"]` — send message button',
-    '- `[data-chip]` — suggestion chip buttons',
-    '- `button:has-text("Create Podcast")` — final create CTA',
     '',
     '## Player & Playback',
     '- `.playerControls` — mini player controls area',
@@ -156,11 +149,6 @@ export function getVoiceComparisonInstructions(providerNames: string[]): string 
  */
 export function getInterceptorCatalog(): string {
   return [
-    '## discovery',
-    'Mocks POST /api/discovery SSE stream.',
-    'Options: `{ textChunks: string[], chips: string[], metadata: { topic, depth, audienceLevel, audience, focusAreas, tone, durationTarget, speakers } }`',
-    'Use when: the demo shows the creation/chat flow. Set up before typing in the chat.',
-    '',
     '## interact',
     'Mocks POST /api/podcasts/{id}/interact + GET polling.',
     'Options: `{ podcastId: string, interactionId: string, answer: string, answerDelay?: number }`',
