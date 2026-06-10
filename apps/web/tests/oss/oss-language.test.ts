@@ -90,7 +90,6 @@ describe('open-source language-learning OSS surfaces', () => {
       'src/app/(admin)/admin/showcase/ActionEditor.tsx',
       'src/app/(dashboard)/settings/SettingsForm.tsx',
       'src/components/referral/JoinCTA.tsx',
-      'src/components/voices/VoicePaymentModal.tsx',
     ]
       .map(readSource)
       .join('\n');
@@ -1753,7 +1752,6 @@ describe('open-source language-learning OSS surfaces', () => {
       'src/app/api/oembed/route.ts',
       'src/app/sitemap.ts',
       'src/components/player/Contributors.tsx',
-      'src/components/voices/VoiceMarketplaceCard.tsx',
       'src/app/CLAUDE.md',
       'src/components/CLAUDE.md',
     ]
