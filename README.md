@@ -18,6 +18,8 @@ Open-source, self-hostable language-learning infrastructure — taught in the co
 [![React](https://img.shields.io/badge/React-19-149ECA?logo=react&logoColor=white)](https://react.dev)
 [![Prisma](https://img.shields.io/badge/Prisma-6-2D3748?logo=prisma&logoColor=white)](https://prisma.io)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](pyproject.toml)
+[![uv](https://img.shields.io/badge/uv-managed-DE5FE9?logo=astral&logoColor=white)](https://github.com/astral-sh/uv)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-1F8A5B.svg)](CONTRIBUTING.md)
 [![Ko-fi](https://img.shields.io/badge/Ko--fi-Support-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/afromero)
 
@@ -76,6 +78,7 @@ Plus the rest of the loop:
 - **Mastery-gated classes** — you can't advance until you pass; failed sections regenerate in a *similar-but-not-identical* form (retrieval practice / anti-copy).
 - **Ungated practice** — drill any single skill on your own time, spaced-repetition-driven, separate from the graded classes.
 - **Live conversation** — speak and hear the real-time translation (either direction) through the [Gemini Live API](https://ai.google.dev/gemini-api/docs/live); new words you hit feed straight into your memory graph. Runs on your own Google key (added in Settings), and stays hidden until you add one.
+- **Practice exams** — sit a full, multi-section mock exam modeled on the format of your target language's flagship ([Goethe-Zertifikat](https://www.goethe.de/en/spr/kup/prf.html) for German, [DELE](https://examenes.cervantes.es/) for Spanish, [Cambridge English](https://www.cambridgeenglish.org/) for English; a generic CEFR mock otherwise), at your level, with a mock band and section-by-section feedback. It is practice, never an official score, and never changes your level.
 - **Personal memory graph** — a per-course, [Obsidian](https://obsidian.md/)-style vocabulary/grammar graph with [SM-2](https://super-memory.com/english/ol/sm2.htm) spaced repetition that drives review, seeds the listening podcast, and renders as an interactive [Cytoscape](https://js.cytoscape.org/) visualization.
 - **Notes that personalize everything** — tell Sotto your goals and background once; it threads through placement, classes, and practice.
 - **Any language pair** — German/English/Spanish ship as hand-authored reference curricula; any other native→target pair is composed by your connected agent on demand.
@@ -101,6 +104,8 @@ The newest wave is LLM-native, and the closest peer is genuinely good: [**OpenLi
 | Interactive memory graph | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | Adaptive listening seeded by due vocab | ✅ | 〰️ | ❌ | ❌ | ❌ | ❌ | 〰️ |
 | Classes from your own sources, with verified `[N]` citations | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Institutional-style practice exams (Goethe / DELE / Cambridge format) | ✅ | ❌ | 〰️ | ❌ | ❌ | ❌ | ❌ |
+| Live spoken translation practice | ✅ | ❌ | ❌ | 〰️ | 〰️ | 〰️ | ❌ |
 | Rubric pronunciation scoring | ✅ | 〰️ | 〰️ | ✅ | ✅ | ✅ | ❌ |
 | No social layer / dark patterns | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ |
 | Price | Self-host (pay providers directly) | Free (MIT) | Freemium + sub | Sub | Sub | Sub | Sub |
@@ -254,6 +259,8 @@ The full learning loop is shipped and self-hostable today:
 - ✅ **Households:** first account becomes owner; invite your family, invite-only/open toggle, fully isolated per-learner accounts.
 - ✅ **Your devices:** desktop launcher (Sotto Host), scan-to-connect pairing, installable PWA, and a one-command secure tunnel.
 - ✅ **Sourced classes:** build a class from a real article, paper, or YouTube link (or a topic from your interests). Sotto extracts it, levels it to your CEFR, and teaches from it with verified `[N]` citations and a sources panel.
+- ✅ **Practice exams:** full multi-section mock exams modeled on each language's flagship (Goethe / DELE / Cambridge) at your level, with a mock band and per-section feedback. Clearly unaffiliated practice, never an official score.
+- ✅ **Live conversation:** real-time spoken translation (Gemini Live) on your own Google key; new vocabulary feeds the memory graph.
 
 **Planned (optional managed offering):** hosted infrastructure for non-technical learners — workers, storage, scheduled generation, and provider routing as a convenience layer. The learning stack itself stays open and self-hostable.
 
