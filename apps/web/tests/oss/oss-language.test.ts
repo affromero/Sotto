@@ -24,8 +24,6 @@ describe('open-source language-learning OSS surfaces', () => {
     'src/components/landing/chapters/JourneyChapter.tsx',
     'src/components/landing/JsonLd.tsx',
     'src/app/(dashboard)/dashboard/page.tsx',
-    'src/app/(dashboard)/dashboard/DashboardStats.tsx',
-    'src/app/(dashboard)/dashboard/MyPodcastsSection.tsx',
     'src/app/podcast/[podcastId]/PodcastPlayerView.tsx',
   ];
 
@@ -115,13 +113,9 @@ describe('open-source language-learning OSS surfaces', () => {
   });
 
   it('keeps dashboard data access scoped to private workspace metrics', () => {
-    const dashboardSource = [
-      'src/app/(dashboard)/dashboard/page.tsx',
-      'src/app/(dashboard)/dashboard/DashboardStats.tsx',
-      'src/app/(dashboard)/dashboard/MyPodcastsSection.tsx',
-    ]
-      .map(readSource)
-      .join('\n');
+    // The old podcast dashboard surfaces (DashboardStats, MyPodcastsSection) are
+    // retired; /dashboard is now a redirect to /learn. Guard what remains.
+    const dashboardSource = ['src/app/(dashboard)/dashboard/page.tsx'].map(readSource).join('\n');
 
     expect(dashboardSource).not.toContain('TrendingToForkSection');
     expect(dashboardSource).not.toContain('ReferralSharePrompt');
@@ -134,9 +128,6 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(readSource('src/components/ui/VisibilityToggle.tsx')).not.toContain('canMakePrivate');
     expect(readSource('src/app/podcast/[podcastId]/PodcastPlayerView.tsx')).not.toContain(
       'canMakePrivate'
-    );
-    expect(readSource('src/app/(dashboard)/dashboard/MyPodcastsSection.tsx')).not.toContain(
-      'getTierFeatures'
     );
   });
 
@@ -613,7 +604,6 @@ describe('open-source language-learning OSS surfaces', () => {
       'apps/web/src/app/(admin)/admin/podcasts/CreateAsSystemOwnerButton.tsx',
       'apps/web/src/app/(admin)/admin/podcasts/page.tsx',
       'apps/web/src/app/(admin)/admin/podcasts/page.module.css',
-      'apps/web/src/app/create/CreatePageClient.tsx',
       'apps/web/src/components/layout/AccountSwitcher.tsx',
     ]
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
@@ -1284,7 +1274,6 @@ describe('open-source language-learning OSS surfaces', () => {
 
   it('keeps traffic report and MCP contracts private-activity scoped', () => {
     const trafficReportSource = readSource('src/lib/traffic-report.ts');
-    const librarySource = readSource('src/app/(dashboard)/ideas/LibraryClient.tsx');
     const collectionE2ESource = readFileSync(
       resolve(repoRoot, 'e2e/playwright/tests/api/collections.api.spec.ts'),
       'utf8'
@@ -1292,12 +1281,7 @@ describe('open-source language-learning OSS surfaces', () => {
     const mcpSources = ['packages/mcp/src/types.ts', 'packages/mcp/src/format.ts']
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
-    const privateContractSources = [
-      trafficReportSource,
-      librarySource,
-      collectionE2ESource,
-      mcpSources,
-    ].join('\n');
+    const privateContractSources = [trafficReportSource, collectionE2ESource, mcpSources].join('\n');
 
     expect(trafficReportSource).toContain('PrivateActivitySection');
     expect(trafficReportSource).toContain('privateActivity');
@@ -1397,7 +1381,6 @@ describe('open-source language-learning OSS surfaces', () => {
       'src/app/api/inspire/all/route.ts',
       'src/components/feed/DailyPicks.tsx',
       'src/app/podcast/[podcastId]/page.tsx',
-      'src/app/(dashboard)/dashboard/MyPodcastsSection.tsx',
     ]
       .map(readSource)
       .concat(readFileSync(resolve(repoRoot, 'packages/shared/src/types/podcast.ts'), 'utf8'))
