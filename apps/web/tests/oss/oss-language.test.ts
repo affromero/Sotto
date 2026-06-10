@@ -255,10 +255,8 @@ describe('open-source language-learning OSS surfaces', () => {
       'src/lib/extractors/index.ts',
       'src/lib/extractors/html.ts',
       'src/lib/email-templates.ts',
-      'src/components/player/EmbedCodeModal.tsx',
       'src/components/player/EmbedPlayer.tsx',
       'src/app/(dashboard)/settings/SettingsForm.tsx',
-      'src/components/referral/ReferralSharePrompt.tsx',
     ]
       .map(readSource)
       .join('\n');
