@@ -6,7 +6,6 @@ import { voiceTrackAudioQueue, addJob, JobType } from '@/lib/queue';
 import { getTierFeatures } from '@/lib/tier-features';
 import { getPlanFeatureConfig } from '@/lib/plan-feature-config';
 import { checkGenerationGate } from '@/lib/generation-gate';
-import { computeVoiceCharges } from '@/lib/voice-pricing';
 import { resolveTtsProvider } from '@/lib/providers';
 import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
 import { checkRateLimit } from '@/lib/redis';
@@ -142,30 +141,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return errorResponse(parsed.error.flatten(), 400);
   }
 
-  const { ttsProvider, ttsModel, voices, paymentIntentIds, skipPaidVoices } = parsed.data;
+  const { ttsProvider, ttsModel, voices } = parsed.data;
 
-  // Check paid voices
-  const voicesWithIds = voices.filter((v) => !!v.voiceId);
-  if (!skipPaidVoices && !paymentIntentIds && voicesWithIds.length > 0) {
-    const voiceCharges = await computeVoiceCharges(userId, voicesWithIds);
-    if (voiceCharges.length > 0) {
-      return NextResponse.json({ requiresPayment: true, voiceCharges }, { status: 402 });
-    }
-  }
-
-  const resolvedVoices = skipPaidVoices ? voices.map((v) => ({ ...v, voiceId: '' })) : voices;
-
-  // Verify payment intents
-  if (paymentIntentIds) {
-    for (const piId of paymentIntentIds) {
-      const purchase = await prisma.voicePurchase.findUnique({
-        where: { stripePaymentIntent: piId },
-      });
-      if (!purchase || purchase.status !== 'authorized' || purchase.buyerId !== userId) {
-        return errorResponse('Invalid or unauthorized payment', 400);
-      }
-    }
-  }
+  const resolvedVoices = voices;
 
   // Fetch discovery metadata for topic-aware voice selection (same as worker + audio-generation)
   const discovery = await prisma.discovery.findUnique({
@@ -317,14 +295,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     return track;
   });
-
-  // Link VoicePurchase records
-  if (paymentIntentIds) {
-    await prisma.voicePurchase.updateMany({
-      where: { stripePaymentIntent: { in: paymentIntentIds } },
-      data: { podcastId },
-    });
-  }
 
   // Queue audio generation for each segment
   const vtSegments = await prisma.voiceTrackSegment.findMany({

@@ -171,8 +171,6 @@ export interface RecommendationsSection {
 export interface VoicesSection {
   totalClones: number;
   bySourceType: Array<{ sourceType: string; count: number }>;
-  requestableCount: number;
-  requestsByStatus: Array<{ status: string; count: number }>;
 }
 
 export interface ReferralsSection {
@@ -320,11 +318,9 @@ export async function buildTrafficReport(
     recsAgg,
     recsBySurface,
 
-    // === Voices (4) ===
+    // === Voices (2) ===
     voiceClonesTotal,
     voicesBySourceType,
-    voicesRequestable,
-    voiceRequestsByStatus,
 
     // === Referrals (3) ===
     referralAttributed,
@@ -767,11 +763,6 @@ export async function buildTrafficReport(
       by: ['sourceType'],
       _count: true,
     }),
-    prisma.voiceClone.count({ where: { requestable: true } }),
-    prisma.voiceRequest.groupBy({
-      by: ['status'],
-      _count: true,
-    }),
 
     // -----------------------------------------------------------------------
     // Referrals
@@ -1066,11 +1057,6 @@ export async function buildTrafficReport(
       totalClones: voiceClonesTotal,
       bySourceType: voicesBySourceType.map((r) => ({
         sourceType: r.sourceType,
-        count: r._count,
-      })),
-      requestableCount: voicesRequestable,
-      requestsByStatus: voiceRequestsByStatus.map((r) => ({
-        status: r.status,
         count: r._count,
       })),
     },

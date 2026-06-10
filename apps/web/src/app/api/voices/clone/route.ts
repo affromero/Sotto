@@ -334,11 +334,6 @@ export async function DELETE(request: NextRequest) {
     }
   }
 
-  // Clean up voice requests for this clone
-  await prisma.voiceRequest.deleteMany({
-    where: { voiceCloneId },
-  });
-
   await prisma.voiceClone.delete({
     where: { id: voiceCloneId },
   });

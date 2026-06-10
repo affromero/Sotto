@@ -132,13 +132,6 @@ model User {
   interests              UserInterest[]
   hasCompletedOnboarding Boolean        @default(false)
 
-  // Voice requests
-  voiceRequestsSent     VoiceRequest[] @relation("VoiceRequester")
-  voiceRequestsReceived VoiceRequest[] @relation("VoiceOwner")
-
-  // Voice allowlist
-  voiceAllowlistEntries VoiceAllowlist[] @relation("VoiceAllowlisted")
-
   // Podcast ratings
   podcastRatings PodcastRating[]
 
@@ -189,9 +182,6 @@ model User {
   // Stripe Connect (voice monetization)
   stripeAccountId String?
   stripeOnboarded Boolean @default(false)
-
-  // Voice purchases
-  voicePurchases VoicePurchase[] @relation("VoiceBuyer")
 
   // Voice preferences (multi-speaker)
   voicePreferences UserVoicePreference[]
@@ -377,7 +367,6 @@ model Podcast {
   listeningQueues     ListeningQueue[]
   savedIdea           SavedIdea?
   voices              PodcastVoice[]
-  voicePurchases      VoicePurchase[]
   ratings             PodcastRating[]
   claimReports        ClaimReport[]
   voiceTracks         VoiceTrack[]
@@ -1386,9 +1375,6 @@ model VoiceClone {
   createdAt          DateTime                @default(now())
 
   user                   User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  voiceRequests          VoiceRequest[]
-  allowlist              VoiceAllowlist[]
-  voicePurchases         VoicePurchase[]
   fingerprint            VoiceFingerprint?
   verificationChallenges VoiceVerificationChallenge[]
   similarityMatchesAs    VoiceSimilarityMatch[]       @relation("MatchedVoice")
@@ -1415,21 +1401,6 @@ enum VoiceVerificationStatus {
   ADMIN_VERIFIED
   ADMIN_BLOCKED
   PROTECTED
-}
-
-// ============ VOICE ALLOWLIST ============
-
-model VoiceAllowlist {
-  id            String   @id @default(cuid())
-  voiceCloneId  String
-  allowedUserId String
-  createdAt     DateTime @default(now())
-
-  voiceClone  VoiceClone @relation(fields: [voiceCloneId], references: [id], onDelete: Cascade)
-  allowedUser User       @relation("VoiceAllowlisted", fields: [allowedUserId], references: [id], onDelete: Cascade)
-
-  @@unique([voiceCloneId, allowedUserId])
-  @@index([allowedUserId])
 }
 
 // ============ VOICE FINGERPRINTS ============
@@ -1554,34 +1525,6 @@ model ReservedHandle {
   reason    String?
   createdBy String?
   createdAt DateTime @default(now())
-}
-
-// ============ VOICE REQUESTS ============
-
-model VoiceRequest {
-  id           String             @id @default(cuid())
-  requesterId  String
-  voiceOwnerId String
-  voiceCloneId String
-  status       VoiceRequestStatus @default(PENDING)
-  message      String?            @db.Text
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
-
-  requester  User       @relation("VoiceRequester", fields: [requesterId], references: [id], onDelete: Cascade)
-  voiceOwner User       @relation("VoiceOwner", fields: [voiceOwnerId], references: [id], onDelete: Cascade)
-  voiceClone VoiceClone @relation(fields: [voiceCloneId], references: [id], onDelete: Cascade)
-
-  @@unique([requesterId, voiceCloneId])
-  @@index([voiceOwnerId])
-  @@index([status])
-}
-
-enum VoiceRequestStatus {
-  PENDING
-  APPROVED
-  DENIED
-  REVOKED
 }
 
 // ============ USER TTS KEYS (Multi-Provider BYOK) ============
@@ -1756,30 +1699,6 @@ model FreeProviderUsage {
 
   @@unique([userId, category, provider])
   @@index([userId])
-}
-
-// ============ VOICE PURCHASES (Stripe) ============
-
-model VoicePurchase {
-  id                  String   @id @default(cuid())
-  buyerId             String
-  voiceCloneId        String
-  podcastId           String
-  amountCents         Int
-  platformFeeCents    Int
-  stripePaymentIntent String   @unique
-  status              String   @default("authorized") // authorized | captured | cancelled | refunded
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-
-  buyer      User       @relation("VoiceBuyer", fields: [buyerId], references: [id], onDelete: Cascade)
-  voiceClone VoiceClone @relation(fields: [voiceCloneId], references: [id], onDelete: Cascade)
-  podcast    Podcast    @relation(fields: [podcastId], references: [id], onDelete: Cascade)
-
-  @@index([buyerId])
-  @@index([voiceCloneId])
-  @@index([podcastId])
-  @@index([stripePaymentIntent])
 }
 
 // ============ LANDING SHOWCASE CONFIG (Admin Dashboard) ============

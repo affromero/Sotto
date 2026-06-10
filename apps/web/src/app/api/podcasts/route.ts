@@ -14,7 +14,6 @@ import {
   getProviderForModel,
   isValidModelId,
 } from '@/lib/providers/ai-registry';
-import { computeVoiceCharges } from '@/lib/voice-pricing';
 import { checkSuspension, requireAdmin } from '@/lib/auth-guards';
 import { generatePodcastSlug } from '@/lib/slugify';
 import type { ExtractContentPayload } from '@/lib/queue';
@@ -239,35 +238,7 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Check if selected voices require payment (skip if paymentIntentIds provided)
-  const paymentIntentIds: string[] | undefined = body.paymentIntentIds;
   const voiceEntries = parsed.data.voices ?? [];
-  const voicesWithIds = voiceEntries.filter(
-    (v): v is { speaker: string; voiceId: string } => !!v.voiceId
-  );
-  if (!paymentIntentIds) {
-    const voiceCharges = await computeVoiceCharges(authResult.userId, voicesWithIds);
-
-    if (voiceCharges.length > 0) {
-      return NextResponse.json(
-        {
-          requiresPayment: true,
-          voiceCharges,
-        },
-        { status: 402 }
-      );
-    }
-  } else {
-    // Verify all provided PaymentIntents are authorized
-    for (const piId of paymentIntentIds) {
-      const purchase = await prisma.voicePurchase.findUnique({
-        where: { stripePaymentIntent: piId },
-      });
-      if (!purchase || purchase.status !== 'authorized' || purchase.buyerId !== authResult.userId) {
-        return errorResponse('Invalid or unauthorized payment', 400);
-      }
-    }
-  }
 
   const verificationMode = parsed.data.metadata?.verificationMode ?? 'standard';
   const zeroCostVideo = parsed.data.metadata?.zeroCostVideo ?? false;
@@ -323,14 +294,6 @@ export async function POST(request: NextRequest) {
         voiceId: v.voiceId ?? null,
         provider: parsed.data.ttsProvider ?? autoResolvedTtsProvider ?? null,
       })),
-    });
-  }
-
-  // Link existing VoicePurchase records to this podcast
-  if (paymentIntentIds) {
-    await prisma.voicePurchase.updateMany({
-      where: { stripePaymentIntent: { in: paymentIntentIds } },
-      data: { podcastId: podcast.id },
     });
   }
 
