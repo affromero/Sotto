@@ -415,27 +415,6 @@ async function computePodcastFeatures(podcastId: string): Promise<void> {
       seekCount: Number(s.seekCount),
     }));
 
-    // Completion by source: join PlaybackSession with RecommendationLog
-    const sourceCompletion = await prisma.$queryRaw<
-      Array<{ source: string; avgCompletion: number }>
-    >`
-      SELECT
-        CASE
-          WHEN rl.id IS NOT NULL THEN 'recommendation'
-          ELSE 'direct'
-        END AS source,
-        AVG(ps."completionPercent")::float AS "avgCompletion"
-      FROM "PlaybackSession" ps
-      LEFT JOIN "RecommendationLog" rl
-        ON rl."userId" = ps."userId" AND rl."podcastId" = ps."podcastId" AND rl."clicked" = true
-      WHERE ps."podcastId" = ${podcastId}
-      GROUP BY source
-    `;
-    const completionBySource: Record<string, number> = {};
-    for (const row of sourceCompletion) {
-      completionBySource[row.source] = Math.round(row.avgCompletion * 10) / 10;
-    }
-
     // Question density by position: bucket Interaction.timestamp into 5% increments
     const interactions = await prisma.interaction.findMany({
       where: { podcastId },
@@ -508,8 +487,6 @@ async function computePodcastFeatures(podcastId: string): Promise<void> {
       speedDistribution,
       dropoffPoints,
       seekHotspots: seekHotspots.length > 0 ? seekHotspots : undefined,
-      completionBySource:
-        Object.keys(completionBySource).length > 0 ? completionBySource : undefined,
       questionDensityByPosition,
       segmentAbandonRates: segmentAbandonRates.length > 0 ? segmentAbandonRates : undefined,
       relistenRate,
@@ -529,7 +506,7 @@ async function computePodcastFeatures(podcastId: string): Promise<void> {
         INSERT INTO "PodcastFeature" (id, "podcastId", "avgCompletionRate", "medianCompletionRate",
           "totalUniqueListeners", "totalListenMinutes", "saveToListenRatio",
           "interactionRate", "abandonmentCurve", "avgListenSpeed",
-          "speedDistribution", "dropoffPoints", "seekHotspots", "completionBySource",
+          "speedDistribution", "dropoffPoints", "seekHotspots",
           "questionDensityByPosition", "segmentAbandonRates", "relistenRate",
           "segmentCount", "durationSeconds", "referenceCount", "verifiedReferenceRate",
           embedding, "computedAt", "updatedAt")
@@ -540,7 +517,6 @@ async function computePodcastFeatures(podcastId: string): Promise<void> {
           ${JSON.stringify(data.speedDistribution)}::jsonb,
           ${JSON.stringify(data.dropoffPoints)}::jsonb,
           ${data.seekHotspots ? JSON.stringify(data.seekHotspots) : null}::jsonb,
-          ${data.completionBySource ? JSON.stringify(data.completionBySource) : null}::jsonb,
           ${JSON.stringify(data.questionDensityByPosition)}::jsonb,
           ${data.segmentAbandonRates ? JSON.stringify(data.segmentAbandonRates) : null}::jsonb,
           ${data.relistenRate},
@@ -558,7 +534,6 @@ async function computePodcastFeatures(podcastId: string): Promise<void> {
           "speedDistribution" = EXCLUDED."speedDistribution",
           "dropoffPoints" = EXCLUDED."dropoffPoints",
           "seekHotspots" = EXCLUDED."seekHotspots",
-          "completionBySource" = EXCLUDED."completionBySource",
           "questionDensityByPosition" = EXCLUDED."questionDensityByPosition",
           "segmentAbandonRates" = EXCLUDED."segmentAbandonRates",
           "relistenRate" = EXCLUDED."relistenRate",

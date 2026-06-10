@@ -74,45 +74,6 @@ export async function getOptimalDurationByTopic(since: Date): Promise<DurationTo
   }));
 }
 
-export interface ContentMarketFitRow {
-  topic: string;
-  demandScore: number;
-  supply: number;
-  gapRatio: number;
-}
-
-export async function getContentMarketFit(since: Date): Promise<ContentMarketFitRow[]> {
-  const rows = await prisma.$queryRaw<
-    Array<{ topic: string; impressions: bigint; podcastCount: bigint }>
-  >`
-    SELECT
-      t.name AS topic,
-      COUNT(DISTINCT rl.id)::bigint AS impressions,
-      COUNT(DISTINCT p.id)::bigint AS "podcastCount"
-    FROM "RecommendationLog" rl
-    JOIN "Podcast" p ON p.id = rl."podcastId"
-    JOIN "PodcastTag" pt ON pt."podcastId" = p.id
-    JOIN "Tag" t ON t.id = pt."tagId"
-    WHERE rl."createdAt" >= ${since}
-      AND p."deletedAt" IS NULL
-    GROUP BY t.name
-    HAVING COUNT(DISTINCT rl.id) >= 5
-    ORDER BY impressions DESC
-    LIMIT 30
-  `;
-
-  return rows.map((r) => {
-    const impressions = Number(r.impressions);
-    const podcastCount = Number(r.podcastCount);
-    return {
-      topic: r.topic,
-      demandScore: impressions,
-      supply: podcastCount,
-      gapRatio: podcastCount > 0 ? Math.round((impressions / podcastCount) * 10) / 10 : impressions,
-    };
-  });
-}
-
 export interface GenerationListenRatio {
   totalGenerated: number;
   totalListened: number;

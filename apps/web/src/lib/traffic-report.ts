@@ -152,22 +152,6 @@ export interface PipelineSection {
   inProgressByStatus: Array<{ status: string; count: number }>;
 }
 
-export interface RecommendationsSection {
-  totalImpressions: number;
-  totalClicks: number;
-  totalQueues: number;
-  ctr: number;
-  queueRate: number;
-  bySurface: Array<{
-    surface: string;
-    impressions: number;
-    clicks: number;
-    queues: number;
-    ctr: number;
-  }>;
-  avgListenedPercent: number | null;
-}
-
 export interface VoicesSection {
   totalClones: number;
   bySourceType: Array<{ sourceType: string; count: number }>;
@@ -197,7 +181,6 @@ export interface TrafficReport {
   content: ContentSection;
   freeTier: FreeTierSection;
   pipeline: PipelineSection;
-  recommendations: RecommendationsSection;
   voices: VoicesSection;
   referrals: ReferralsSection;
 }
@@ -313,10 +296,6 @@ export async function buildTrafficReport(
     failedAtStage,
     avgTimeToReady,
     inProgressByStatus,
-
-    // === Recommendations (2) ===
-    recsAgg,
-    recsBySurface,
 
     // === Voices (2) ===
     voiceClonesTotal,
@@ -722,40 +701,6 @@ export async function buildTrafficReport(
     }),
 
     // -----------------------------------------------------------------------
-    // Recommendations
-    // -----------------------------------------------------------------------
-    prisma.$queryRaw<[{
-      impressions: bigint;
-      clicks: bigint;
-      queues: bigint;
-      avg_listened: number | null;
-    }]>`
-      SELECT
-        COUNT(*) FILTER (WHERE "impressed" = true)::bigint AS impressions,
-        COUNT(*) FILTER (WHERE "clicked" = true)::bigint AS clicks,
-        COUNT(*) FILTER (WHERE "queued" = true)::bigint AS queues,
-        AVG("listenedPercent") FILTER (WHERE "listenedPercent" IS NOT NULL)::float AS avg_listened
-      FROM "RecommendationLog"
-      WHERE "createdAt" >= ${since}
-    `,
-    prisma.$queryRaw<Array<{
-      surface: string;
-      impressions: bigint;
-      clicks: bigint;
-      queues: bigint;
-    }>>`
-      SELECT
-        "surface",
-        COUNT(*) FILTER (WHERE "impressed" = true)::bigint AS impressions,
-        COUNT(*) FILTER (WHERE "clicked" = true)::bigint AS clicks,
-        COUNT(*) FILTER (WHERE "queued" = true)::bigint AS queues
-      FROM "RecommendationLog"
-      WHERE "createdAt" >= ${since}
-      GROUP BY "surface"
-      ORDER BY impressions DESC
-    `,
-
-    // -----------------------------------------------------------------------
     // Voices
     // -----------------------------------------------------------------------
     prisma.voiceClone.count(),
@@ -791,11 +736,6 @@ export async function buildTrafficReport(
   const helpfulFalse =
     interactionsByHelpful.find((h) => h.helpful === false)?._count ?? 0;
   const helpfulTotal = helpfulTrue + helpfulFalse;
-
-  const recsRow = recsAgg[0] ?? { impressions: 0n, clicks: 0n, queues: 0n, avg_listened: null };
-  const impressions = n(recsRow.impressions as bigint);
-  const clicks = n(recsRow.clicks as bigint);
-  const queues = n(recsRow.queues as bigint);
 
   const creatorLabel = (user: { name: string | null; handle: string | null }) =>
     user.handle ? `@${user.handle}` : user.name ?? 'Unknown';
@@ -1032,25 +972,6 @@ export async function buildTrafficReport(
         status: r.status,
         count: r._count,
       })),
-    },
-
-    recommendations: {
-      totalImpressions: impressions,
-      totalClicks: clicks,
-      totalQueues: queues,
-      ctr: impressions > 0 ? clicks / impressions : 0,
-      queueRate: impressions > 0 ? queues / impressions : 0,
-      bySurface: recsBySurface.map((r) => {
-        const imp = n(r.impressions as bigint);
-        return {
-          surface: r.surface,
-          impressions: imp,
-          clicks: n(r.clicks as bigint),
-          queues: n(r.queues as bigint),
-          ctr: imp > 0 ? n(r.clicks as bigint) / imp : 0,
-        };
-      }),
-      avgListenedPercent: recsRow.avg_listened,
     },
 
     voices: {

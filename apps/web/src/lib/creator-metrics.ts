@@ -197,15 +197,11 @@ export async function getCreatorAudienceInsights(
     prisma.$queryRaw<Array<{ source: string; count: bigint }>>`
       SELECT
         CASE
-          WHEN rl.id IS NOT NULL THEN 'recommendation'
           WHEN be."referrer" LIKE '%/search%' OR be."referrer" LIKE '%q=%' THEN 'search'
           ELSE 'direct'
         END AS source,
         COUNT(*)::bigint AS count
       FROM "BehavioralEvent" be
-      LEFT JOIN "RecommendationLog" rl
-        ON rl."userId" = be."userId" AND rl."podcastId" = be."podcastId"
-        AND rl."clicked" = true
       WHERE be."podcastId" = ANY(${ids})
         AND be."eventType" = 'playback.play'
         AND be."createdAt" >= ${since}
