@@ -510,8 +510,6 @@ export async function generateScript(params: {
   provider: string;
   webSearchEnabled?: boolean;
   mode?: 'standard' | 'demo';
-  source?: string;
-  previousEpisodesContext?: string;
   targetLanguage?: string | null;
   languageMode?: string | null;
   mustIncludeVocabulary?: Array<{ word: string; translation: string }>;
@@ -542,61 +540,38 @@ export async function generateScript(params: {
     ? loadPrompt('generation/eli5-section.md')
     : '';
 
-  // Use briefing-specific prompt for BRIEFING source
-  const briefingMinRefs = Math.max(
-    getMinReferenceCount(params.depth || 'standard', params.durationTarget),
-    // Briefings should cite most of their input articles
-    Math.ceil((params.sourceContent?.match(/^\[\d+\]/gm)?.length ?? 5) * 0.6),
-  );
   const langInstr = buildLanguageInstruction(params.targetLanguage, params.languageMode, {
     mustIncludeVocabulary: params.mustIncludeVocabulary,
     forLearning: params.forLearning,
   });
-  const systemPrompt = params.source === 'BRIEFING'
-    ? loadAndRender('generation/briefing-script.md', {
-        VOICE_REALISM: VOICE_REALISM_INSTRUCTIONS,
-        CONTENT_SAFETY: CONTENT_SAFETY_INSTRUCTIONS,
-        DURATION_TARGET: String(params.durationTarget),
-        WORD_COUNT_MIN: String(wordCountBounds(params.durationTarget).min),
-        WORD_COUNT_MAX: String(wordCountBounds(params.durationTarget).max),
-        WORD_COUNT_IDEAL: String(minutesToWords(params.durationTarget)),
-        SPEAKER_SECTION: speakerSection,
-        HOST_SPEAKER: speakers[0].name,
-        EXPERT_SPEAKER: speakers.length > 1 ? speakers[1].name : speakers[0].name,
-        SOURCE_ARTICLES: params.sourceContent || '',
-        PREVIOUS_EPISODES: params.previousEpisodesContext || '',
-        MIN_REFERENCE_COUNT: String(briefingMinRefs),
-        LANGUAGE_INSTRUCTION: langInstr.languageInstruction,
-        VOCABULARY_INSTRUCTION: langInstr.vocabularyInstruction,
-        OPENING_LINE: langInstr.openingLine,
-        CLOSING_LINE: langInstr.closingLine,
-      })
-    : loadAndRender('generation/script-generator.md', {
-        SPEAKER_COUNT: String(speakerCount),
-        SPEAKER_SECTION: speakerSection,
-        VOICE_DELIVERY_GUIDELINES: voiceDeliveryGuidelines,
-        VOICE_REALISM: VOICE_REALISM_INSTRUCTIONS,
-        TONE_GUIDANCE: TONE_GUIDANCE_MAIN[params.tone] || '',
-        ELI5_SECTION: eli5Section,
-        AUDIENCE: params.audience || 'general',
-        AUDIENCE_GUIDANCE: getAudienceGuidance(params.audience),
-        DURATION_TARGET: String(params.durationTarget),
-        WORD_COUNT_MIN: String(wordCountBounds(params.durationTarget).min),
-        WORD_COUNT_MAX: String(wordCountBounds(params.durationTarget).max),
-        WORD_COUNT_IDEAL: String(minutesToWords(params.durationTarget)),
-        AUDIENCE_LEVEL: params.audienceLevel,
-        FOCUS_AREAS: params.focusAreas.join(', '),
-        HOST_SPEAKER: speakers[0].name,
-        EXPERT_SPEAKER: speakers.length > 1 ? speakers[1].name : speakers[0].name,
-        BIAS_GUIDANCE: renderBiasGuidance(params.sourceMetadata),
-        CONTENT_SAFETY: CONTENT_SAFETY_INSTRUCTIONS,
-        DEPTH: params.depth,
-        MIN_REFERENCE_COUNT: String(getMinReferenceCount(params.depth, params.durationTarget)),
-        MIN_SERIOUS_PERCENT: String(Math.round(getMinSeriousRatio(params.depth, params.tone) * 100)),
-        SERIOUS_RATIO_NOTE: ['comedic', 'satirical', 'storytelling'].includes(params.tone)
-          ? ' (Relaxed for this tone — prefer ARTICLE sources from established news outlets over academic papers.)'
-          : '',
-      });
+  const systemPrompt = loadAndRender('generation/script-generator.md', {
+    SPEAKER_COUNT: String(speakerCount),
+    SPEAKER_SECTION: speakerSection,
+    VOICE_DELIVERY_GUIDELINES: voiceDeliveryGuidelines,
+    LANGUAGE_INSTRUCTION: langInstr.languageInstruction,
+    VOCABULARY_INSTRUCTION: langInstr.vocabularyInstruction,
+    VOICE_REALISM: VOICE_REALISM_INSTRUCTIONS,
+    TONE_GUIDANCE: TONE_GUIDANCE_MAIN[params.tone] || '',
+    ELI5_SECTION: eli5Section,
+    AUDIENCE: params.audience || 'general',
+    AUDIENCE_GUIDANCE: getAudienceGuidance(params.audience),
+    DURATION_TARGET: String(params.durationTarget),
+    WORD_COUNT_MIN: String(wordCountBounds(params.durationTarget).min),
+    WORD_COUNT_MAX: String(wordCountBounds(params.durationTarget).max),
+    WORD_COUNT_IDEAL: String(minutesToWords(params.durationTarget)),
+    AUDIENCE_LEVEL: params.audienceLevel,
+    FOCUS_AREAS: params.focusAreas.join(', '),
+    HOST_SPEAKER: speakers[0].name,
+    EXPERT_SPEAKER: speakers.length > 1 ? speakers[1].name : speakers[0].name,
+    BIAS_GUIDANCE: renderBiasGuidance(params.sourceMetadata),
+    CONTENT_SAFETY: CONTENT_SAFETY_INSTRUCTIONS,
+    DEPTH: params.depth,
+    MIN_REFERENCE_COUNT: String(getMinReferenceCount(params.depth, params.durationTarget)),
+    MIN_SERIOUS_PERCENT: String(Math.round(getMinSeriousRatio(params.depth, params.tone) * 100)),
+    SERIOUS_RATIO_NOTE: ['comedic', 'satirical', 'storytelling'].includes(params.tone)
+      ? ' (Relaxed for this tone — prefer ARTICLE sources from established news outlets over academic papers.)'
+      : '',
+  });
 
   const userMessage = params.sourceContent
     ? `Topic: ${params.topic}\nDepth: ${params.depth}\n\n${formatSourceBlock(params.sourceContent, params.sourceMetadata)}`
@@ -610,64 +585,7 @@ export async function generateScript(params: {
     useWebSearch: params.webSearchEnabled !== false,
   });
 
-  const result = parseScriptResponse(response);
-
-  // For BRIEFING source: map references back to real source article URLs.
-  // The LLM may hallucinate URLs despite being told to use source articles.
-  // This deterministic post-processing replaces any reference URLs with the
-  // real URLs extracted from the formatted source articles.
-  if (params.source === 'BRIEFING' && params.sourceContent) {
-    result.references = mapBriefingReferences(result.references, params.sourceContent);
-  }
-
-  return result;
-}
-
-/**
- * Parse formatted source articles (from formatArticlesForPrompt) to extract
- * article number → { title, url } mapping, then replace LLM-generated reference
- * URLs with the real ones by matching on reference number or title similarity.
- */
-function mapBriefingReferences(
-  refs: GeneratedReference[],
-  sourceContent: string,
-): GeneratedReference[] {
-  // Parse source articles: [N] Source — "Title" (date)\n    URL: https://...\n    Summary
-  const articleMap = new Map<number, { title: string; url: string; source: string }>();
-  const articleRegex = /\[(\d+)\]\s+(.+?)\s*—\s*"(.+?)"\s*\(.+?\)\n\s+URL:\s*(\S+)/g;
-  let match;
-  while ((match = articleRegex.exec(sourceContent)) !== null) {
-    articleMap.set(parseInt(match[1], 10), {
-      source: match[2].trim(),
-      title: match[3].trim(),
-      url: match[4].trim(),
-    });
-  }
-
-  if (articleMap.size === 0) return refs;
-
-  return refs.map((ref) => {
-    // First: try exact number match
-    const byNumber = articleMap.get(ref.number);
-    if (byNumber) {
-      return { ...ref, url: byNumber.url, title: ref.title || byNumber.title, type: 'ARTICLE' as const };
-    }
-
-    // Second: fuzzy title match (LLM may reorder numbers)
-    const refTitleLower = (ref.title || '').toLowerCase();
-    for (const [, article] of articleMap) {
-      if (refTitleLower && article.title.toLowerCase().includes(refTitleLower.slice(0, 30))) {
-        return { ...ref, url: article.url, type: 'ARTICLE' as const };
-      }
-      if (refTitleLower && refTitleLower.includes(article.title.toLowerCase().slice(0, 30))) {
-        return { ...ref, url: article.url, type: 'ARTICLE' as const };
-      }
-    }
-
-    // No match — keep the reference but mark URL as null so verification catches it
-    // rather than using a hallucinated URL
-    return { ...ref, url: null };
-  });
+  return parseScriptResponse(response);
 }
 
 /**

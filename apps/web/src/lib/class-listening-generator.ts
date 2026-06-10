@@ -112,7 +112,6 @@ export async function composeListeningContent(p: ListeningContentParams): Promis
       provider: ai.provider,
       model: ai.model,
       apiKeyOverride: ai.apiKey,
-      source: 'CLASS',
       targetLanguage: p.targetLang,
       languageMode: 'conversational_mix',
       forLearning: true,

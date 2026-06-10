@@ -157,7 +157,6 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
         provider,
         webSearchEnabled: tierFeatures.webSearchEnabled,
         mode: podcast.verificationMode === 'showcase' ? 'demo' : 'standard',
-        source: podcast.source,
         targetLanguage: podcast.language,
       });
 
