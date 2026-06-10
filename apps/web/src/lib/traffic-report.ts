@@ -168,18 +168,6 @@ export interface RecommendationsSection {
   avgListenedPercent: number | null;
 }
 
-export interface CollectionsSection {
-  total: number;
-  totalItems: number;
-  newInPeriod: number;
-  largestByItems: Array<{
-    collectionId: string;
-    name: string;
-    creator: string;
-    podcastCount: number;
-  }>;
-}
-
 export interface VoicesSection {
   totalClones: number;
   bySourceType: Array<{ sourceType: string; count: number }>;
@@ -212,7 +200,6 @@ export interface TrafficReport {
   freeTier: FreeTierSection;
   pipeline: PipelineSection;
   recommendations: RecommendationsSection;
-  collections: CollectionsSection;
   voices: VoicesSection;
   referrals: ReferralsSection;
 }
@@ -332,12 +319,6 @@ export async function buildTrafficReport(
     // === Recommendations (2) ===
     recsAgg,
     recsBySurface,
-
-    // === Collections (4) ===
-    collectionsTotal,
-    collectionItemsTotal,
-    collectionsNewInPeriod,
-    largestCollections,
 
     // === Voices (4) ===
     voiceClonesTotal,
@@ -779,24 +760,6 @@ export async function buildTrafficReport(
     `,
 
     // -----------------------------------------------------------------------
-    // Collections
-    // -----------------------------------------------------------------------
-    prisma.collection.count(),
-    prisma.collectionItem.count(),
-    prisma.collection.count({ where: { createdAt: { gte: since } } }),
-    prisma.collection.findMany({
-      where: { podcastCount: { gt: 0 } },
-      orderBy: { podcastCount: 'desc' },
-      take: 5,
-      select: {
-        id: true,
-        name: true,
-        podcastCount: true,
-        user: { select: { name: true, handle: true } },
-      },
-    }),
-
-    // -----------------------------------------------------------------------
     // Voices
     // -----------------------------------------------------------------------
     prisma.voiceClone.count(),
@@ -1097,18 +1060,6 @@ export async function buildTrafficReport(
         };
       }),
       avgListenedPercent: recsRow.avg_listened,
-    },
-
-    collections: {
-      total: collectionsTotal,
-      totalItems: collectionItemsTotal,
-      newInPeriod: collectionsNewInPeriod,
-      largestByItems: largestCollections.map((c) => ({
-        collectionId: c.id,
-        name: c.name,
-        creator: creatorLabel(c.user),
-        podcastCount: c.podcastCount,
-      })),
     },
 
     voices: {

@@ -243,7 +243,6 @@ describe('open-source language-learning OSS surfaces', () => {
       'src/app/robots.ts',
       'src/app/sitemap.ts',
       'src/app/podcast/[podcastId]/page.tsx',
-      'src/app/collections/[collectionId]/page.tsx',
       'src/components/player/PodcastJsonLd.tsx',
       'src/components/landing/JsonLd.tsx',
       'src/app/api/oembed/route.ts',
@@ -1269,19 +1268,14 @@ describe('open-source language-learning OSS surfaces', () => {
 
   it('keeps traffic report and MCP contracts private-activity scoped', () => {
     const trafficReportSource = readSource('src/lib/traffic-report.ts');
-    const collectionE2ESource = readFileSync(
-      resolve(repoRoot, 'e2e/playwright/tests/api/collections.api.spec.ts'),
-      'utf8'
-    );
     const mcpSources = ['packages/mcp/src/types.ts', 'packages/mcp/src/format.ts']
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
-    const privateContractSources = [trafficReportSource, collectionE2ESource, mcpSources].join('\n');
+    const privateContractSources = [trafficReportSource, mcpSources].join('\n');
 
     expect(trafficReportSource).toContain('PrivateActivitySection');
     expect(trafficReportSource).toContain('privateActivity');
     expect(trafficReportSource).toContain('topSaved');
-    expect(trafficReportSource).toContain('largestByItems');
     expect(privateContractSources).not.toContain('EngagementSection');
     expect(privateContractSources).not.toContain('collectionFollow');
     expect(privateContractSources).not.toContain('followerCount');
@@ -1291,7 +1285,6 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(privateContractSources).not.toContain('forkedFromId');
     expect(privateContractSources).not.toContain('isLiked');
     expect(privateContractSources).not.toContain('Forked from');
-    expect(collectionE2ESource).not.toContain('/follow');
   });
 
   it('keeps feature computation private-signal scoped', () => {
@@ -1371,8 +1364,6 @@ describe('open-source language-learning OSS surfaces', () => {
       'src/app/api/saved/route.ts',
       'src/app/api/queue/route.ts',
       'src/app/api/users/me/podcasts/route.ts',
-      'src/app/api/collections/[collectionId]/route.ts',
-      'src/app/collections/[collectionId]/page.tsx',
       'src/app/api/inspire/all/route.ts',
       'src/components/feed/DailyPicks.tsx',
       'src/app/podcast/[podcastId]/page.tsx',
@@ -1445,8 +1436,6 @@ describe('open-source language-learning OSS surfaces', () => {
     const mobilePrivateSources = [
       'apps/mobile/app/_layout.tsx',
       'apps/mobile/app/settings.tsx',
-      'apps/mobile/app/collections/index.tsx',
-      'apps/mobile/app/collections/[id].tsx',
       'apps/mobile/app/analytics.tsx',
       'apps/mobile/app/(tabs)/notifications.tsx',
       'apps/mobile/CLAUDE.md',
@@ -1513,24 +1502,22 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(pitchScreenshotSource).not.toContain("visibility: 'PUBLIC'");
   });
 
-  it('does not ship collection follow contracts', () => {
-    const collectionSources = [
-      'src/app/collections/[collectionId]/page.tsx',
-      'src/app/api/collections/route.ts',
-      'src/app/api/collections/[collectionId]/route.ts',
-      'src/components/collections/CollectionDetail.tsx',
-      'src/components/collections/CollectionCard.tsx',
-    ]
-      .map(readSource)
-      .join('\n');
+  it('does not ship the curated-playlist collections feature', () => {
+    const removedCollectionPaths = [
+      'apps/web/src/app/api/collections',
+      'apps/web/src/app/collections',
+      'apps/web/src/components/collections',
+      'apps/mobile/app/collections',
+      'apps/mobile/components/AddToCollectionSheet.tsx',
+      'e2e/playwright/tests/api/collections.api.spec.ts',
+    ];
+    for (const path of removedCollectionPaths) {
+      expect(existsSync(resolve(repoRoot, path)), path).toBe(false);
+    }
 
-    expect(
-      existsSync(resolve(webRoot, 'src/app/api/collections/[collectionId]/follow/route.ts'))
-    ).toBe(false);
-    expect(collectionSources).not.toContain('/follow');
-    expect(collectionSources).not.toContain('collectionFollow');
-    expect(collectionSources).not.toContain('followerCount');
-    expect(collectionSources).not.toContain('isFollowing');
+    const schemaSource = readFileSync(resolve(repoRoot, 'apps/web/prisma/schema.prisma'), 'utf8');
+    expect(schemaSource).not.toContain('model Collection');
+    expect(schemaSource).not.toContain('model CollectionItem');
   });
 
   it('does not ship user follow or discovery social contracts', () => {
@@ -1560,10 +1547,7 @@ describe('open-source language-learning OSS surfaces', () => {
     const userValidationSources = ['src/lib/validations.ts', 'src/app/api/queue/route.ts']
       .map(readSource)
       .join('\n');
-    const activityWriteSources = [
-      'src/app/api/podcasts/route.ts',
-      'src/app/api/collections/route.ts',
-    ]
+    const activityWriteSources = ['src/app/api/podcasts/route.ts']
       .map(readSource)
       .join('\n');
 

@@ -17,8 +17,6 @@ const FEATURE_CATALOG: Record<string, string> = {
     'Review AI-generated scripts before audio generation. Edit turns, approve, or regenerate with feedback. Full control over content.',
   'video-generation':
     'Turn any podcast into a video with AI-generated visuals, transitions, and avatars. Each segment gets matched with relevant imagery.',
-  collections:
-    'Curate private lesson playlists and keep related research, meetings, and course content organized.',
   'multi-speaker':
     'Up to 4 speakers per podcast. Custom speaker names and descriptions — not just Host and Expert.',
 };
@@ -106,7 +104,6 @@ export function getAppSelectorReference(): string {
     '',
     '## Podcast Detail',
     '- `button[aria-label="Share podcast"]` — share button',
-    '- `button[aria-label="Save to collection"]` — save button',
     '- `[data-testid="script-section"]` — script review area',
     '- `button:has-text("Approve Script")` — script approval button',
     '',

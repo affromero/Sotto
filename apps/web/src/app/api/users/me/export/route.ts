@@ -19,8 +19,6 @@ export async function GET() {
     discoveries,
     discoveryMessages,
     interactions,
-    collections,
-    collectionItems,
     saves,
     ratings,
     userFeature,
@@ -111,25 +109,6 @@ export async function GET() {
         resolved: true,
         incorporated: true,
         createdAt: true,
-      },
-    }),
-    prisma.collection.findMany({
-      where: { userId },
-      select: {
-        id: true,
-        name: true,
-        description: true,
-        isPublic: true,
-        createdAt: true,
-      },
-    }),
-    prisma.collectionItem.findMany({
-      where: { collection: { userId } },
-      select: {
-        collectionId: true,
-        podcastId: true,
-        order: true,
-        addedAt: true,
       },
     }),
     prisma.save.findMany({
@@ -240,8 +219,6 @@ export async function GET() {
     discoveries,
     discoveryMessages,
     interactions,
-    collections,
-    collectionItems,
     saves,
     ratings,
     behavioralProfile: userFeature,

@@ -37,7 +37,6 @@ import type { PlaybackSnapshot } from '../../lib/usePlaybackTelemetry';
 import { ReferencesTab } from '../../components/ReferencesTab';
 import { VoiceTrackPicker } from '../../components/VoiceTrackPicker';
 import { VersionHistory } from '../../components/VersionHistory';
-import { AddToCollectionSheet } from '../../components/AddToCollectionSheet';
 import { usePlayerStore } from '../../lib/player-store';
 import type { VoiceTrackSummary } from '@sotto/shared';
 
@@ -69,7 +68,6 @@ export default function PodcastScreen() {
   const [teleprompterEnabled, setTeleprompterEnabled] = useState(false);
   const [voicePickerVisible, setVoicePickerVisible] = useState(false);
   const [versionHistoryVisible, setVersionHistoryVisible] = useState(false);
-  const [collectionSheetVisible, setCollectionSheetVisible] = useState(false);
   const [activeVoiceTrackId, setActiveVoiceTrackId] = useState<string | null>(null);
   const [showRating, setShowRating] = useState(false);
   const playbackEndedRef = useRef(false);
@@ -567,10 +565,8 @@ export default function PodcastScreen() {
                 );
                 saveMutation.mutate();
               }}
-              onLongPress={() => setCollectionSheetVisible(true)}
               style={styles.actionIcon}
               accessibilityLabel={podcast.isSaved ? 'Unsave podcast' : 'Save podcast'}
-              accessibilityHint="Long press to add to collection"
               accessibilityRole="button"
               testID="player-save-button"
             >
@@ -810,12 +806,6 @@ export default function PodcastScreen() {
         onClose={() => setVersionHistoryVisible(false)}
         versions={podcast.versions}
         currentVersion={podcast.currentVersion}
-      />
-
-      <AddToCollectionSheet
-        visible={collectionSheetVisible}
-        onClose={() => setCollectionSheetVisible(false)}
-        podcastId={podcast.id}
       />
 
       {/* Post-listen rating */}

@@ -128,9 +128,6 @@ model User {
   // BYOK AI keys (LLM providers)
   userAiKeys UserAiKey[]
 
-  // Collections
-  collections Collection[]
-
   // Interests (onboarding + settings)
   interests              UserInterest[]
   hasCompletedOnboarding Boolean        @default(false)
@@ -378,7 +375,6 @@ model Podcast {
   playbackSessions    PlaybackSession[]
   podcastFeature      PodcastFeature?
   listeningQueues     ListeningQueue[]
-  collectionItems     CollectionItem[]
   savedIdea           SavedIdea?
   voices              PodcastVoice[]
   voicePurchases      VoicePurchase[]
@@ -1646,38 +1642,6 @@ model UserAiKey {
 
   @@unique([userId, provider])
   @@index([userId])
-}
-
-// ============ COLLECTIONS (Curated Playlists) ============
-
-model Collection {
-  id           String   @id @default(cuid())
-  name         String
-  description  String?  @db.Text
-  userId       String
-  isPublic     Boolean  @default(true)
-  podcastCount Int      @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  user  User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  items CollectionItem[]
-
-  @@index([userId])
-}
-
-model CollectionItem {
-  id           String   @id @default(cuid())
-  collectionId String
-  podcastId    String
-  order        Int      @default(0)
-  addedAt      DateTime @default(now())
-
-  collection Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
-  podcast    Podcast    @relation(fields: [podcastId], references: [id], onDelete: Cascade)
-
-  @@unique([collectionId, podcastId])
-  @@index([collectionId])
 }
 
 // ============ AUTO MODEL CONFIG ============
