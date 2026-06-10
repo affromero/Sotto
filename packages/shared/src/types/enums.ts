@@ -195,3 +195,15 @@ export type EdgeType =
 export type PracticeKind = 'GRAMMAR' | 'READING' | 'LISTENING' | 'SPEAKING' | 'WRITING' | 'VOCAB';
 
 export type PracticeStatus = 'ACTIVE' | 'COMPLETED';
+
+// Mock exams: a full-length practice exam modeled on a flagship CEFR exam's FORMAT.
+// Never affiliated with the real institution; structure only, never exam content.
+export type ExamInstitution = 'GOETHE' | 'DELE' | 'CAMBRIDGE' | 'CEFR_GENERIC';
+
+export type MockExamStatus =
+  | 'GENERATING'
+  | 'READY'
+  | 'IN_PROGRESS'
+  | 'SUBMITTED'
+  | 'SCORED'
+  | 'FAILED';
