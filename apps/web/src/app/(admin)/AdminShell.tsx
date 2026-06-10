@@ -14,12 +14,10 @@ import {
   Star,
   Sparkles,
   DollarSign,
-  Wallet,
   Headphones,
   Activity,
   TrendingUp,
   Brain,
-  Target,
   FlaskConical,
   Gauge,
   HardDrive,
@@ -77,7 +75,6 @@ const navGroups: NavGroup[] = [
   {
     label: 'Business',
     items: [
-      { href: '/admin/revenue', label: 'Revenue', icon: Wallet },
       { href: '/admin/costs', label: 'Costs', icon: DollarSign },
       { href: '/admin/pricing', label: 'Pricing', icon: Tag },
       { href: '/admin/expenses', label: 'Expenses', icon: Receipt },
@@ -118,7 +115,6 @@ const navGroups: NavGroup[] = [
       { href: '/admin/quality', label: 'Quality Analytics', icon: Gauge },
       { href: '/admin/inspire', label: 'Inspire', icon: Sparkles },
       { href: '/admin/intelligence', label: 'Intelligence', icon: Brain },
-      { href: '/admin/recommendations', label: 'Recommendations', icon: Target },
     ],
   },
 ];
