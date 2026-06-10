@@ -21,78 +21,70 @@ const mockUser = {
 
 describe('Sidebar', () => {
   it('renders Sotto logo', () => {
-    render(<Sidebar currentPath="/dashboard" />);
+    render(<Sidebar currentPath="/learn" />);
     expect(screen.getByText('Sotto')).toBeInTheDocument();
   });
 
-  it('renders all navigation links for default USER role', () => {
-    render(<Sidebar currentPath="/dashboard" />);
+  it('renders the language-focused navigation for a default USER', () => {
+    render(<Sidebar currentPath="/learn" />);
 
-    expect(screen.getByText('Dashboard')).toBeInTheDocument();
-    expect(screen.getByText('Create')).toBeInTheDocument();
+    expect(screen.getByText('Learn')).toBeInTheDocument();
+    expect(screen.getByText('Memory')).toBeInTheDocument();
     expect(screen.getByText('API Keys')).toBeInTheDocument();
     expect(screen.getByText('Settings')).toBeInTheDocument();
-    // Voices, Analytics require hasPodcasts or ADMIN
-    expect(screen.queryByText('Voices')).not.toBeInTheDocument();
+    // Analytics is admin-only; the old podcast surfaces are gone.
     expect(screen.queryByText('Analytics')).not.toBeInTheDocument();
+    expect(screen.queryByText('Create')).not.toBeInTheDocument();
+    expect(screen.queryByText('Voices')).not.toBeInTheDocument();
+    expect(screen.queryByText('Library')).not.toBeInTheDocument();
   });
 
   it('marks active link with aria-current for exact path match', () => {
-    render(<Sidebar currentPath="/dashboard" />);
-
-    const activeLink = screen.getByText('Dashboard').closest('a');
-    expect(activeLink).toHaveAttribute('aria-current', 'page');
+    render(<Sidebar currentPath="/learn" />);
+    expect(screen.getByText('Learn').closest('a')).toHaveAttribute('aria-current', 'page');
   });
 
   it('does not mark inactive links with aria-current', () => {
-    render(<Sidebar currentPath="/dashboard" />);
-
-    const createLink = screen.getByText('Create').closest('a');
-    expect(createLink).not.toHaveAttribute('aria-current');
+    render(<Sidebar currentPath="/learn" />);
+    expect(screen.getByText('Memory').closest('a')).not.toHaveAttribute('aria-current');
   });
 
   it('has correct href attributes for all links', () => {
-    render(<Sidebar currentPath="/dashboard" />);
-
-    expect(screen.getByText('Dashboard').closest('a')).toHaveAttribute('href', '/dashboard');
-    expect(screen.getByText('Create').closest('a')).toHaveAttribute('href', '/create');
+    render(<Sidebar currentPath="/learn" />);
+    expect(screen.getByText('Learn').closest('a')).toHaveAttribute('href', '/learn');
+    expect(screen.getByText('Memory').closest('a')).toHaveAttribute('href', '/memory');
     expect(screen.getByText('API Keys').closest('a')).toHaveAttribute('href', '/billing');
     expect(screen.getByText('Settings').closest('a')).toHaveAttribute('href', '/settings');
   });
 
-  it('shows Voices and Analytics when user has podcasts', () => {
-    render(<Sidebar currentPath="/dashboard" user={mockUser} hasPodcasts />);
+  it('shows Analytics and the admin panel only for ADMIN', () => {
+    const adminUser = { ...mockUser, role: 'ADMIN' };
+    render(<Sidebar currentPath="/learn" user={adminUser} />);
 
     expect(screen.getByText('Analytics')).toBeInTheDocument();
-    expect(screen.getByText('Voices')).toBeInTheDocument();
+    expect(screen.getByText('Admin Panel')).toBeInTheDocument();
     expect(screen.getByText('API Keys')).toBeInTheDocument();
+  });
+
+  it('hides the admin panel for a non-admin user', () => {
+    render(<Sidebar currentPath="/learn" user={mockUser} />);
     expect(screen.queryByText('Admin Panel')).not.toBeInTheDocument();
   });
 
-  it('shows admin panel link for ADMIN role', () => {
-    const adminUser = { ...mockUser, role: 'ADMIN' };
-    render(<Sidebar currentPath="/dashboard" user={adminUser} hasPodcasts />);
-
-    expect(screen.getByText('Admin Panel')).toBeInTheDocument();
-    expect(screen.getByText('Analytics')).toBeInTheDocument();
-    expect(screen.getByText('API Keys')).toBeInTheDocument();
-  });
-
   it('renders AccountSwitcher with dashboard variant', () => {
-    render(<Sidebar currentPath="/dashboard" />);
+    render(<Sidebar currentPath="/learn" />);
     const switcher = screen.getByTestId('account-switcher');
     expect(switcher).toBeInTheDocument();
     expect(switcher).toHaveAttribute('data-variant', 'dashboard');
   });
 
   it('renders overlay when open', () => {
-    const { container } = render(<Sidebar currentPath="/dashboard" isOpen />);
-    const overlay = container.querySelector('[class*="overlay"]');
-    expect(overlay).toBeInTheDocument();
+    const { container } = render(<Sidebar currentPath="/learn" isOpen />);
+    expect(container.querySelector('[class*="overlay"]')).toBeInTheDocument();
   });
 
   it('overlay is hidden when closed', () => {
-    const { container } = render(<Sidebar currentPath="/dashboard" isOpen={false} />);
+    const { container } = render(<Sidebar currentPath="/learn" isOpen={false} />);
     const overlay = container.querySelector('[class*="overlay"]');
     expect(overlay).toBeInTheDocument();
     expect(overlay).toHaveStyle({ pointerEvents: 'none' });
@@ -101,7 +93,7 @@ describe('Sidebar', () => {
   it('calls onClose when overlay is clicked', async () => {
     const handleClose = vi.fn();
     const user = userEvent.setup();
-    const { container } = render(<Sidebar currentPath="/dashboard" isOpen onClose={handleClose} />);
+    const { container } = render(<Sidebar currentPath="/learn" isOpen onClose={handleClose} />);
 
     const overlay = container.querySelector('[aria-hidden="true"]') as HTMLElement;
     await user.click(overlay);
@@ -109,28 +101,25 @@ describe('Sidebar', () => {
     expect(handleClose).toHaveBeenCalledTimes(1);
   });
 
-  it('calls onClose when nav link is clicked', async () => {
+  it('calls onClose when a nav link is clicked', async () => {
     const handleClose = vi.fn();
     const user = userEvent.setup();
-    render(<Sidebar currentPath="/dashboard" isOpen onClose={handleClose} />);
+    render(<Sidebar currentPath="/learn" isOpen onClose={handleClose} />);
 
-    const createLink = screen.getByText('Create').closest('a');
-    if (createLink) await user.click(createLink);
+    const learnLink = screen.getByText('Learn').closest('a');
+    if (learnLink) await user.click(learnLink);
 
     expect(handleClose).toHaveBeenCalledTimes(1);
   });
 
   it('has proper ARIA navigation labels', () => {
-    const { container } = render(<Sidebar currentPath="/dashboard" />);
-
+    const { container } = render(<Sidebar currentPath="/learn" />);
     expect(screen.getByLabelText('Main navigation')).toBeInTheDocument();
-    const nav = container.querySelector('nav[aria-label="Dashboard navigation"]');
-    expect(nav).toBeInTheDocument();
+    expect(container.querySelector('nav[aria-label="Dashboard navigation"]')).toBeInTheDocument();
   });
 
   it('logo links to home page', () => {
-    render(<Sidebar currentPath="/dashboard" />);
-    const logo = screen.getByText('Sotto').closest('a');
-    expect(logo).toHaveAttribute('href', '/');
+    render(<Sidebar currentPath="/learn" />);
+    expect(screen.getByText('Sotto').closest('a')).toHaveAttribute('href', '/');
   });
 });

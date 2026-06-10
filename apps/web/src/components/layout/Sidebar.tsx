@@ -3,13 +3,11 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import {
-  LayoutDashboard,
-  PlusCircle,
+  GraduationCap,
+  Network,
   Settings,
   Key,
   BarChart2,
-  Mic,
-  Bookmark,
   Shield,
   Activity,
 } from 'lucide-react';
@@ -34,26 +32,20 @@ interface SidebarProps {
 interface NavItem {
   href: string;
   label: string;
-  icon: typeof LayoutDashboard;
+  icon: typeof GraduationCap;
 }
 
-function getNavItems(role: string, hasPodcasts: boolean): NavItem[] {
+function getNavItems(role: string): NavItem[] {
   const items: NavItem[] = [
-    { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/create', label: 'Create', icon: PlusCircle },
+    { href: '/learn', label: 'Learn', icon: GraduationCap },
+    { href: '/memory', label: 'Memory', icon: Network },
   ];
 
-  // Analytics - users with podcasts or ADMIN
-  if (hasPodcasts || role === 'ADMIN') {
+  // Server-wide cost + usage analytics are admin-only.
+  if (role === 'ADMIN') {
     items.push({ href: '/analytics', label: 'Analytics', icon: BarChart2 });
   }
 
-  // Voices - users with podcasts or ADMIN
-  if (hasPodcasts || role === 'ADMIN') {
-    items.push({ href: '/settings/voices', label: 'Voices', icon: Mic });
-  }
-
-  items.push({ href: '/ideas', label: 'Library', icon: Bookmark });
   items.push({ href: '/billing', label: 'API Keys', icon: Key });
   items.push({ href: '/settings', label: 'Settings', icon: Settings });
 
@@ -64,12 +56,11 @@ export function Sidebar({
   currentPath,
   isOpen = false,
   onClose,
-  hasPodcasts = false,
   hasActivePlayer = false,
   user,
 }: SidebarProps) {
   const role = user?.role || 'USER';
-  const navItems = getNavItems(role, hasPodcasts);
+  const navItems = getNavItems(role);
 
   return (
     <div className={isOpen ? styles.sidebarOpen : undefined}>
