@@ -1033,16 +1033,16 @@ describe('open-source language-learning OSS surfaces', () => {
   });
 
   it('keeps podcast analytics scoped to private listener activity', () => {
+    // The per-podcast creator analytics page is retired (redirects to /learn); the
+    // private-activity guard now covers the analytics lib + API route it backed.
     const podcastAnalyticsSources = [
       'src/lib/podcast-analytics.ts',
-      'src/app/podcast/[podcastId]/analytics/page.tsx',
       'src/app/api/podcasts/[podcastId]/analytics/route.ts',
     ]
       .map(readSource)
       .join('\n');
 
     expect(podcastAnalyticsSources).toContain('getPodcastPrivateActivity');
-    expect(podcastAnalyticsSources).toContain('Private Activity');
     expect(podcastAnalyticsSources).not.toContain('getPodcastEngagement');
     expect(podcastAnalyticsSources).not.toContain('likeCount');
     expect(podcastAnalyticsSources).not.toContain('forkCount');
