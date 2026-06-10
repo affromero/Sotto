@@ -1692,7 +1692,9 @@ describe('open-source language-learning OSS surfaces', () => {
 
     expect(voiceMarketplaceSources).toContain('voiceMarketplaceEnabled Boolean  @default(false)');
     expect(voiceMarketplaceSources).toContain('getPlanFeatureConfig');
-    expect(voiceMarketplaceSources).toContain("redirect(currentUserId ? '/settings/voices' : '/')");
+    // The shared voice marketplace page is retired in the language product: it now
+    // redirects to /learn instead of rendering, an even stronger off-by-default.
+    expect(readSource('src/app/voices/page.tsx')).toContain("redirect('/learn')");
     expect(voiceSettingsRouteSource).toContain(
       'voiceMarketplaceEnabled: voiceConfig.voiceMarketplaceEnabled'
     );
