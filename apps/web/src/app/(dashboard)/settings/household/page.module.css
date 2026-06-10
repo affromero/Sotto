@@ -229,32 +229,22 @@
   flex-shrink: 0;
 }
 
-/* Member rows */
-.avatarImage,
-.avatarInitials {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  object-fit: cover;
+/* Member rows — stack the identity line, actions, and any reveal panel. */
+.memberRow {
+  flex-direction: column;
+  align-items: stretch;
 }
 
-.avatarInitials {
+.memberMain {
   display: flex;
   align-items: center;
-  justify-content: center;
-  font: var(--text-caption);
-  font-weight: 600;
-  color: var(--color-text-secondary);
-  background: var(--color-surface-sunken);
-  border: 1px solid var(--color-border);
-  text-transform: uppercase;
+  gap: var(--spacing-md);
+  min-width: 0;
 }
 
-.avatarOwner {
-  color: var(--color-accent);
-  background: var(--color-accent-subtle);
-  border-color: var(--color-accent-light);
+.memberTile {
+  display: inline-flex;
+  flex-shrink: 0;
 }
 
 .memberInfo {
@@ -274,12 +264,9 @@
   white-space: nowrap;
 }
 
-.memberEmail {
+.memberSub {
   font: var(--text-caption);
   color: var(--color-text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .memberAside {
@@ -289,13 +276,221 @@
   flex-shrink: 0;
 }
 
-.courseCount {
+/* Per-member actions: wrap on narrow screens, keep 44px targets. */
+.memberActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-sm);
+}
+
+.confirmGroup {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.confirmLabel {
+  font: var(--text-body-sm);
+  color: var(--color-text-primary);
+}
+
+/* Inline edit panel under a member row. */
+.editPanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-md);
+  padding: var(--spacing-md);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.editActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+
+.memberErrorBar {
+  padding: var(--spacing-sm) var(--spacing-lg);
+  font: var(--text-body-sm);
+  color: var(--color-error);
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* ---- shared form fields (add + edit) ---- */
+.addForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.fieldLabel {
   font: var(--text-caption);
+  font-weight: 600;
   color: var(--color-text-secondary);
-  background: var(--color-surface-sunken);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.fieldHint {
+  font: var(--text-caption);
+  color: var(--color-text-tertiary);
+}
+
+.textInput {
+  height: 48px;
+  padding: 0 var(--spacing-md);
+  font: var(--text-body);
+  color: var(--color-text-primary);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  max-width: 360px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.textInput:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-subtle);
+}
+
+.textInput:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ---- avatar picker ---- */
+.avatarGrid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--spacing-sm);
+  max-width: 360px;
+}
+
+@media (min-width: 480px) {
+  .avatarGrid {
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+  }
+}
+
+.avatarItem {
+  display: flex;
+  justify-content: center;
+}
+
+.avatarBtn {
+  position: relative;
+  display: inline-flex;
+  padding: 3px;
+  min-width: 44px;
+  min-height: 44px;
+  background: transparent;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.avatarBtn:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+
+.avatarBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.avatarBtnSelected::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  box-shadow: 0 0 0 2px var(--color-primary);
+  pointer-events: none;
+}
+
+/* ---- temporary password readout ---- */
+.tempRow {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.tempValue,
+.credentialValue {
+  font-family: var(--font-mono, monospace);
+  font-size: var(--font-size-md);
+  letter-spacing: 0.04em;
+  color: var(--color-text-primary);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
-  padding: 2px var(--spacing-sm);
-  white-space: nowrap;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  word-break: break-all;
+}
+
+/* ---- credential result (new member + reset) ---- */
+.credentialResult,
+.resetResult {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  align-items: flex-start;
+  padding: var(--spacing-md);
+  background: var(--color-primary-subtle);
+  border: 1px solid var(--color-primary-light);
+  border-radius: var(--radius-lg);
+}
+
+.resetResult {
+  margin-top: var(--spacing-md);
+}
+
+.credentialTitle {
+  font: var(--text-body);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.credentialRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xxs);
+}
+
+.credentialLabel {
+  font: var(--text-caption);
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.credentialNote {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  max-width: 52ch;
+}
+
+.credentialActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
 }
 
 .errorText {

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { signIn } from 'next-auth/react';
 import { GlassBead } from '@/components/landing/GlassBead';
+import { ANIMAL_AVATARS, avatarImagePath } from '@/lib/avatars';
 import { AvatarTile } from './AvatarTile';
 import styles from './ProfilePicker.module.css';
 
@@ -18,13 +19,17 @@ interface Profile {
 
 interface ProfilesResponse {
   localAuth: boolean;
+  needsOwner?: boolean;
   profiles: Profile[];
 }
 
 type LoadState = 'loading' | 'ready' | 'error';
 
 const GENERIC_PASSWORD_ERROR = 'That password did not work. Please try again.';
+const GENERIC_OWNER_ERROR = 'We could not create the owner profile. Please try again.';
+const MIN_PASSWORD_LENGTH = 8;
 const SKELETON_COUNT = 6;
+const DEFAULT_AVATAR_SLUG = ANIMAL_AVATARS[0].slug;
 
 /**
  * Netflix-style household sign-in. Lists local profiles, lets the learner pick
@@ -36,6 +41,7 @@ const SKELETON_COUNT = 6;
 export function ProfilePicker() {
   const router = useRouter();
   const [state, setState] = useState<LoadState>('loading');
+  const [needsOwner, setNeedsOwner] = useState(false);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [selected, setSelected] = useState<Profile | null>(null);
   const [password, setPassword] = useState('');
@@ -53,6 +59,7 @@ export function ProfilePicker() {
         if (!res.ok) throw new Error('request failed');
         const data: ProfilesResponse = await res.json();
         if (!active) return;
+        setNeedsOwner(data?.needsOwner === true);
         setProfiles(Array.isArray(data?.profiles) ? data.profiles : []);
         setState('ready');
       })
@@ -135,7 +142,15 @@ export function ProfilePicker() {
           </div>
         )}
 
-        {state === 'ready' && !selected && (
+        {state === 'ready' && needsOwner && (
+          <CreateOwnerPanel
+            onCreated={() => {
+              router.push('/welcome');
+            }}
+          />
+        )}
+
+        {state === 'ready' && !needsOwner && !selected && (
           <div className={styles.stateBlock}>
             <p className={styles.eyebrow}>
               <span className={styles.eyebrowDash} />
@@ -187,7 +202,7 @@ export function ProfilePicker() {
           </div>
         )}
 
-        {state === 'ready' && selected && (
+        {state === 'ready' && !needsOwner && selected && (
           <div className={styles.stateBlock} key={selected.id}>
             <button type="button" className={styles.back} onClick={backToProfiles}>
               <BackGlyph />
@@ -252,6 +267,219 @@ export function ProfilePicker() {
           </div>
         )}
       </main>
+    </div>
+  );
+}
+
+/**
+ * First-run owner creation. Renders when the instance has zero accounts
+ * (needsOwner). Collects a name, a chosen animal avatar, and a password with a
+ * live confirm/length check, then POSTs to /api/auth/owner, signs in with the
+ * returned id, and hands off to onCreated. Errors stay generic and the password
+ * is never displayed or logged.
+ */
+function CreateOwnerPanel({ onCreated }: { onCreated: () => void }) {
+  const [name, setName] = useState('');
+  const [avatar, setAvatar] = useState<string>(DEFAULT_AVATAR_SLUG);
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const nameId = useId();
+  const passwordId = useId();
+  const confirmId = useId();
+  const matchId = useId();
+
+  const trimmedName = name.trim();
+  const tooShort = password.length > 0 && password.length < MIN_PASSWORD_LENGTH;
+  const mismatch = confirm.length > 0 && confirm !== password;
+  const passwordReady =
+    password.length >= MIN_PASSWORD_LENGTH && confirm === password;
+  const canSubmit = trimmedName.length > 0 && passwordReady && !submitting;
+
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    if (!canSubmit) return;
+
+    setSubmitting(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/auth/owner', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ name: trimmedName, password, avatar }),
+      });
+      if (!res.ok) {
+        setError(GENERIC_OWNER_ERROR);
+        setSubmitting(false);
+        return;
+      }
+      const data: { userId?: string } = await res.json();
+      if (!data?.userId) {
+        setError(GENERIC_OWNER_ERROR);
+        setSubmitting(false);
+        return;
+      }
+
+      const result = await signIn('credentials', {
+        userId: data.userId,
+        password,
+        redirect: false,
+      });
+      if (result?.ok) {
+        onCreated();
+        return;
+      }
+      setError(GENERIC_OWNER_ERROR);
+      setSubmitting(false);
+    } catch {
+      setError(GENERIC_OWNER_ERROR);
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className={styles.stateBlock}>
+      <p className={styles.eyebrow}>
+        <span className={styles.eyebrowDash} />
+        First run
+      </p>
+      <h1 className={styles.heading}>
+        Welcome to <em>Sotto</em>.
+      </h1>
+      <p className={styles.lede}>Create the owner profile to set up this instance.</p>
+
+      <form className={styles.ownerForm} onSubmit={handleSubmit} noValidate>
+        <div className={styles.ownerField}>
+          <label className={styles.fieldLabel} htmlFor={nameId}>
+            Your name
+          </label>
+          <input
+            id={nameId}
+            className={styles.input}
+            type="text"
+            value={name}
+            onChange={(event) => {
+              setName(event.target.value);
+              if (error) setError(null);
+            }}
+            disabled={submitting}
+            autoComplete="name"
+            enterKeyHint="next"
+            maxLength={100}
+            required
+          />
+        </div>
+
+        <div className={styles.ownerField}>
+          <span className={styles.fieldLabel} id={`${nameId}-avatar`}>
+            Pick an avatar
+          </span>
+          <ul
+            className={styles.avatarGrid}
+            role="radiogroup"
+            aria-labelledby={`${nameId}-avatar`}
+          >
+            {ANIMAL_AVATARS.map((animal) => {
+              const isSelected = animal.slug === avatar;
+              return (
+                <li key={animal.slug} className={styles.avatarItem}>
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={isSelected}
+                    aria-label={animal.name}
+                    className={`${styles.avatarBtn} ${
+                      isSelected ? styles.avatarBtnSelected : ''
+                    }`}
+                    onClick={() => setAvatar(animal.slug)}
+                    disabled={submitting}
+                  >
+                    <AvatarTile
+                      image={avatarImagePath(animal.slug)}
+                      emoji={animal.emoji}
+                      name={animal.name}
+                      size={72}
+                    />
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+
+        <div className={styles.ownerField}>
+          <label className={styles.fieldLabel} htmlFor={passwordId}>
+            Password
+          </label>
+          <input
+            id={passwordId}
+            className={styles.input}
+            type="password"
+            value={password}
+            onChange={(event) => {
+              setPassword(event.target.value);
+              if (error) setError(null);
+            }}
+            disabled={submitting}
+            autoComplete="new-password"
+            autoCapitalize="off"
+            spellCheck={false}
+            aria-invalid={tooShort ? true : undefined}
+            aria-describedby={matchId}
+          />
+        </div>
+
+        <div className={styles.ownerField}>
+          <label className={styles.fieldLabel} htmlFor={confirmId}>
+            Confirm password
+          </label>
+          <input
+            id={confirmId}
+            className={styles.input}
+            type="password"
+            value={confirm}
+            onChange={(event) => {
+              setConfirm(event.target.value);
+              if (error) setError(null);
+            }}
+            disabled={submitting}
+            autoComplete="new-password"
+            autoCapitalize="off"
+            spellCheck={false}
+            enterKeyHint="go"
+            aria-invalid={mismatch ? true : undefined}
+            aria-describedby={matchId}
+          />
+        </div>
+
+        <p
+          id={matchId}
+          className={`${styles.passwordHint} ${
+            mismatch || tooShort ? styles.passwordHintWarn : ''
+          } ${passwordReady ? styles.passwordHintOk : ''}`}
+          aria-live="polite"
+        >
+          {tooShort
+            ? `Use at least ${MIN_PASSWORD_LENGTH} characters.`
+            : mismatch
+              ? 'Both passwords need to match.'
+              : passwordReady
+                ? 'Passwords match.'
+                : `At least ${MIN_PASSWORD_LENGTH} characters, entered twice.`}
+        </p>
+
+        {error && (
+          <p className={styles.fieldError} role="alert">
+            {error}
+          </p>
+        )}
+
+        <button type="submit" className={styles.submit} disabled={!canSubmit}>
+          {submitting ? 'Creating your profile.' : 'Create owner profile'}
+        </button>
+      </form>
     </div>
   );
 }

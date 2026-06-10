@@ -24,6 +24,13 @@ export async function GET() {
     const allowed = await checkRateLimit('auth-profiles', 60, 60);
     if (!allowed) return errorResponse('Too many requests', 429);
 
+    // First run: local auth is on and the instance has no accounts at all, so the
+    // visitor should create the owner rather than pick a profile.
+    const totalUsers = await prisma.user.count();
+    if (totalUsers === 0) {
+      return NextResponse.json({ localAuth: true, needsOwner: true, profiles: [] });
+    }
+
     const users = await prisma.user.findMany({
       where: { passwordHash: { not: null } },
       select: { id: true, name: true, image: true, role: true },
@@ -45,7 +52,7 @@ export async function GET() {
       };
     });
 
-    return NextResponse.json({ localAuth: true, profiles });
+    return NextResponse.json({ localAuth: true, needsOwner: false, profiles });
   } catch (error: unknown) {
     logger.error('Failed to list profiles', {
       error: error instanceof Error ? error.message : String(error),

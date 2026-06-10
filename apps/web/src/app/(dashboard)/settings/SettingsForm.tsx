@@ -408,6 +408,18 @@ export function SettingsForm({
         </section>
       )}
 
+      {/* Password — local sign-in only; the page redirects OAuth accounts away */}
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>Password</h2>
+        <p className={styles.sectionDesc}>
+          Change the password you use to sign in to this instance.
+        </p>
+        <Link href="/settings/password" className={styles.householdLink}>
+          <span className={styles.householdLinkText}>Change password</span>
+          <span aria-hidden="true">&rarr;</span>
+        </Link>
+      </section>
+
       {/* Connect a device — available to every learner */}
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Devices</h2>
