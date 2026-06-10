@@ -1080,28 +1080,7 @@ model PodcastIdea {
   @@index([userId, createdAt])
 }
 
-// ============ RECOMMENDATION ENGINE ============
-
-model RecommendationLog {
-  id              String   @id @default(cuid())
-  userId          String
-  podcastId       String
-  surface         String // picks, explore, trending
-  position        Int
-  score           Float
-  signals         Json // {relevance, collaborative, quality, freshness, novelty}
-  explanation     String   @db.Text
-  impressed       Boolean  @default(false)
-  clicked         Boolean  @default(false)
-  queued          Boolean  @default(false)
-  listenedPercent Float?
-  refreshBatch    Int      @default(0)
-  createdAt       DateTime @default(now())
-
-  @@index([userId, createdAt])
-  @@index([podcastId, createdAt])
-  @@index([surface, createdAt])
-}
+// ============ BEHAVIORAL / ML FEATURE STORE (analytics) ============
 
 model ListeningQueue {
   id        String   @id @default(cuid())
