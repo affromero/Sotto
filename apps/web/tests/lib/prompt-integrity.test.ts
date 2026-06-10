@@ -64,8 +64,6 @@ const EXPECTED_FILES = [
   'research/fact-extraction.md',
   'research/source-discovery.md',
   'feeds/taste-quiz.md',
-  'feeds/for-you.md',
-  'feeds/curiosity.md',
   'audio/voice-assigner.md',
   'audio/tts-tag-converter.md',
   'demo/walkthrough.md',
@@ -117,13 +115,6 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
   'feeds/taste-quiz.md': [
     'DISLIKED_SUMMARY', 'INTEREST_SUMMARY', 'RECENT_QUESTIONS',
     'REQUEST_COUNT', 'TAXONOMY',
-  ].sort(),
-  'feeds/for-you.md': [
-    'INPUT_SANITIZATION', 'INTEREST_CONTEXT', 'REQUEST_COUNT',
-    'TAXONOMY', 'TOPIC_CONTEXT',
-  ].sort(),
-  'feeds/curiosity.md': [
-    'INPUT_SANITIZATION', 'REQUEST_COUNT', 'TAXONOMY', 'TOPIC_CONTEXT',
   ].sort(),
   'audio/voice-assigner.md': [
     'SPEAKERS', 'SPEAKER_COUNT', 'VOICE_CATALOG',
@@ -316,21 +307,11 @@ describe('verification templates', () => {
 
 describe('feed templates', () => {
   it('all feed templates produce JSON array output', () => {
-    for (const file of ['feeds/taste-quiz.md', 'feeds/for-you.md', 'feeds/curiosity.md']) {
+    for (const file of ['feeds/taste-quiz.md']) {
       const content = readFileSync(join(PROMPTS_DIR, file), 'utf-8');
       expect(content).toContain('JSON array');
       expect(content).toContain('"text"');
       expect(content).toContain('"tagSlugs"');
     }
-  });
-
-  it('curiosity.md explicitly avoids personalization', () => {
-    const content = readFileSync(join(PROMPTS_DIR, 'feeds/curiosity.md'), 'utf-8');
-    expect(content).toContain('Do NOT personalize');
-  });
-
-  it('for-you.md emphasizes creative combinations', () => {
-    const content = readFileSync(join(PROMPTS_DIR, 'feeds/for-you.md'), 'utf-8');
-    expect(content).toContain('CREATIVE COMBINATIONS');
   });
 });
