@@ -11,7 +11,6 @@ import {
   Download,
   Pencil,
   RefreshCw,
-  ListMusic,
   Trash2,
   BarChart2,
   Shield,
@@ -33,7 +32,6 @@ import { VocabularyList } from '@/components/player/VocabularyList';
 import { InterruptChatPanel } from '@/components/player/InterruptChatPanel';
 import { Modal } from '@/components/ui/Modal';
 import { Contributors } from '@/components/player/Contributors';
-import { AddToCollectionModal } from '@/components/collections/AddToCollectionModal';
 import { OverflowMenu } from '@/components/ui/OverflowMenu';
 import { VisibilityToggle } from '@/components/ui/VisibilityToggle';
 import { VoiceTrackSelector } from '@/components/player/VoiceTrackSelector';
@@ -168,7 +166,6 @@ export function PodcastPlayerView({
   const [viewMode, setViewMode] = useState<ViewMode>('transcript');
   const [pdfUrl, setPdfUrl] = useState<string | null>(podcast.pdfUrl);
   const [pdfLoading, setPdfLoading] = useState(false);
-  const [showAddToCollection, setShowAddToCollection] = useState(false);
   const [liveStatus, setLiveStatus] = useState(podcast.status);
   const [liveFailureReason, setLiveFailureReason] = useState(podcast.failureReason);
   const [liveFailedAtStatus, setLiveFailedAtStatus] = useState(podcast.failedAtStatus);
@@ -1354,15 +1351,6 @@ export function PodcastPlayerView({
               <OverflowMenu
                 triggerClassName={styles.actionBtn}
                 items={[
-                  ...(isAuthenticated
-                    ? [
-                        {
-                          icon: <ListMusic size={16} />,
-                          label: 'Add to Collection',
-                          onClick: () => setShowAddToCollection(true),
-                        },
-                      ]
-                    : []),
                   ...(isOwner
                     ? [
                         {
@@ -1722,12 +1710,6 @@ export function PodcastPlayerView({
           )}
         </Modal>
 
-        {/* Add to Collection Modal */}
-        <AddToCollectionModal
-          podcastId={podcast.id}
-          isOpen={showAddToCollection}
-          onClose={() => setShowAddToCollection(false)}
-        />
       </div>
 
       {/* Persistent footer mini-player */}
