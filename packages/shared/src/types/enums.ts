@@ -112,8 +112,6 @@ export type VoiceVerificationStatus =
   | 'ADMIN_BLOCKED'
   | 'PROTECTED';
 
-export type VoiceRequestStatus = 'PENDING' | 'APPROVED' | 'DENIED' | 'REVOKED';
-
 export type VoiceTrackStatus =
   | 'PENDING'
   | 'GENERATING_AUDIO'

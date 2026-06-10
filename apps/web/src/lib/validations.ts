@@ -394,18 +394,6 @@ export const reservedHandleSchema = z.object({
 });
 
 /**
- * Voice request validation
- */
-export const createVoiceRequestSchema = z.object({
-  voiceCloneId: z.string().min(1),
-  message: z.string().max(500).optional(),
-});
-
-export const updateVoiceRequestSchema = z.object({
-  status: z.enum(['APPROVED', 'DENIED', 'REVOKED']),
-});
-
-/**
  * Explicit user handle lookup validation
  */
 export const userSearchSchema = z.object({
