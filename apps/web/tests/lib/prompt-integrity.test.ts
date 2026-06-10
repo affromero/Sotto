@@ -76,6 +76,7 @@ const EXPECTED_FILES = [
   'writing/generate-writing-prompts.md',
   'writing/grade-writing.md',
   'curriculum/generate-curriculum.md',
+  'live/extract-vocab.md',
 ];
 
 // ── Variable contracts: template → expected placeholder names ──
@@ -83,6 +84,7 @@ const EXPECTED_FILES = [
 // If a .md file gains or loses a placeholder, these tests will catch it.
 
 const VARIABLE_CONTRACTS: Record<string, string[]> = {
+  'live/extract-vocab.md': ['LEVEL', 'MAX', 'NATIVE', 'TARGET'],
   'generation/script-generator.md': [
     'AUDIENCE', 'AUDIENCE_GUIDANCE', 'AUDIENCE_LEVEL', 'BIAS_GUIDANCE', 'CONTENT_SAFETY',
     'DEPTH', 'DURATION_TARGET',

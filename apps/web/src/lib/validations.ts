@@ -1084,3 +1084,10 @@ export const liveTranslateTokenSchema = z.object({
   courseId: z.string().min(1),
   direction: z.enum(['native_to_target', 'target_to_native']),
 });
+
+// POST /api/live-translate/session — persist a finished session's transcript so its
+// new target-language vocabulary can be fed into the course memory graph.
+export const liveTranslateSessionSchema = z.object({
+  courseId: z.string().min(1),
+  transcript: z.string().max(20000),
+});
