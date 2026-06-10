@@ -135,26 +135,6 @@ export function PlanFeaturesForm({ initialConfig }: PlanFeaturesFormProps) {
         </div>
       </section>
 
-      {/* Paid Voice Sharing */}
-      <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Paid Voice Sharing</h2>
-        <div className={styles.grid}>
-          <div className={styles.row}>
-            <div className={styles.rowLabel}>
-              <div className={styles.rowLabelText}>Paid voice sharing enabled</div>
-              <div className={styles.rowLabelDesc}>
-                Allows users to browse, request, and purchase access to verified voices. Disabling
-                blocks both browsing and requests for all users.
-              </div>
-            </div>
-            <Toggle
-              checked={config.voiceMarketplaceEnabled}
-              onChange={(v) => setBoolean('voiceMarketplaceEnabled', v)}
-            />
-          </div>
-        </div>
-      </section>
-
       {/* Avatar Image Controls */}
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Avatar Image Controls</h2>

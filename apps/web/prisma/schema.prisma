@@ -1674,8 +1674,6 @@ model PlanFeatureConfig {
   proVoiceTracksEnabled   Boolean  @default(true)
   freeMaxVoiceTracks      Int      @default(0)
   proMaxVoiceTracks       Int      @default(3)
-  // Optional paid voice sharing (disabled by default for private-first installs)
-  voiceMarketplaceEnabled Boolean  @default(false)
   // Avatar image controls
   avatarUploadsEnabled    Boolean  @default(true)
   avatarGenerationEnabled Boolean  @default(false)
