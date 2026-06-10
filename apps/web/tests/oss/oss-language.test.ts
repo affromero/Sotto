@@ -159,8 +159,6 @@ describe('open-source language-learning OSS surfaces', () => {
     const eventSources = [
       'src/types/events.ts',
       'src/lib/validations/events.ts',
-      'src/components/feed/PodcastCard.tsx',
-      'src/components/feed/SearchBar.tsx',
       'src/lib/hooks/useImpressionTracker.ts',
     ]
       .map(readSource)
@@ -821,11 +819,7 @@ describe('open-source language-learning OSS surfaces', () => {
       'src/components/player/ProposeRenditionButton.tsx',
     ];
     const playerSource = readSource('src/app/podcast/[podcastId]/PodcastPlayerView.tsx');
-    const podcastCardSource = [
-      'src/components/feed/PodcastCard.tsx',
-      'src/components/feed/PodcastCard.module.css',
-      'src/components/landing/chapters/AudioClipPlayer.tsx',
-    ]
+    const podcastCardSource = ['src/components/landing/chapters/AudioClipPlayer.tsx']
       .map(readSource)
       .join('\n');
 
@@ -1361,7 +1355,6 @@ describe('open-source language-learning OSS surfaces', () => {
       'src/app/api/queue/route.ts',
       'src/app/api/users/me/podcasts/route.ts',
       'src/app/api/inspire/all/route.ts',
-      'src/components/feed/DailyPicks.tsx',
       'src/app/podcast/[podcastId]/page.tsx',
     ]
       .map(readSource)
