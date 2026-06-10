@@ -23,16 +23,21 @@ export function LiveConversation({ courseId, nativeLabel, targetLabel, level }: 
   const sessionRef = useRef<LiveSessionHandle | null>(null);
   const lineId = useRef(0);
   const captionsRef = useRef<HTMLDivElement | null>(null);
+  // Accumulates the whole session's transcript so we can feed new vocab to the
+  // memory graph on stop. Spans direction toggles; cleared only when we end.
+  const allTextRef = useRef('');
 
   const [direction, setDirection] = useState<Direction>('native_to_target');
   const [phase, setPhase] = useState<Phase>('idle');
   const [error, setError] = useState<string | null>(null);
   const [lines, setLines] = useState<Line[]>([]);
+  const [saved, setSaved] = useState<number | null>(null);
 
   const speakLabel = direction === 'native_to_target' ? nativeLabel : targetLabel;
   const hearLabel = direction === 'native_to_target' ? targetLabel : nativeLabel;
 
   const appendLine = useCallback((role: Line['role'], text: string, finished: boolean) => {
+    allTextRef.current += `${text} `;
     setLines((prev) => {
       const next = prev.slice(-MAX_LINES);
       let idx = -1;
@@ -101,7 +106,22 @@ export function LiveConversation({ courseId, nativeLabel, targetLabel, level }: 
   const stop = useCallback(() => {
     teardown();
     setPhase('idle');
-  }, [teardown]);
+    // Feed the session's new target-language vocab into the memory graph.
+    const transcript = allTextRef.current.trim();
+    allTextRef.current = '';
+    if (transcript) {
+      void fetch('/api/live-translate/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ courseId, transcript }),
+      })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d: { added?: number } | null) => {
+          if (d && typeof d.added === 'number' && d.added > 0) setSaved(d.added);
+        })
+        .catch(() => undefined);
+    }
+  }, [teardown, courseId]);
 
   const toggleDirection = useCallback(async () => {
     const next: Direction = direction === 'native_to_target' ? 'target_to_native' : 'native_to_target';
@@ -192,6 +212,12 @@ export function LiveConversation({ courseId, nativeLabel, targetLabel, level }: 
           </button>
         )}
       </div>
+
+      {saved !== null && (
+        <p className={styles.saved} role="status">
+          Added {saved} new {saved === 1 ? 'word' : 'words'} to your review.
+        </p>
+      )}
 
       <div className={styles.captions} ref={captionsRef} aria-live="polite">
         {lines.length === 0 ? (

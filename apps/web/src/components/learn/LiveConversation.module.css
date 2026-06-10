@@ -172,6 +172,14 @@
   border-color: var(--accent);
 }
 
+.saved {
+  font-family: var(--sans);
+  font-size: 14px;
+  text-align: center;
+  color: var(--accent);
+  margin: 0;
+}
+
 /* Captions */
 .captions {
   min-height: 180px;
