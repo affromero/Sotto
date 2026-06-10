@@ -174,6 +174,7 @@ Provider variables are optional until the selected workflow needs them. Common e
 - Alpine + Chromium: pin Alpine version to match the Chromium version available in its repos. Alpine 3.22+ works with Chromium 136+.
 - Docker service names: workers reach sidecars via Docker service names such as `http://remotion:3100`; use `localhost` only for local dev outside Docker.
 - Prisma in Docker: always run `npx prisma generate` inside the Docker build because the generated client is platform-specific.
+- Compose files stay at the repo root: the `docker-compose*.yml` files resolve `build.context: .`, `env_file: .env`, and `${VAR}` substitution from the project directory (their own location). Moving them to a subfolder breaks every invocation in `scripts/install.sh`, `scripts/deploy.sh`, `.github/workflows/logs.yml`, and the docs unless each adds `--project-directory`/`--env-file`, and `docker-compose.selfhost.yml` is downloaded standalone by the installer and must keep flat paths. None of this is CI-verifiable, so a wrong path silently breaks deploy or self-host install. Keep them at root.
 - Monorepo paths: avoid `__dirname`-relative paths across package boundaries. Use `process.cwd()` for cross-package references.
 - DB enum values are uppercase, for example `AI_ILLUSTRATION`, `STOCK_FOOTAGE`, and `TEXT_CARD`.
 
