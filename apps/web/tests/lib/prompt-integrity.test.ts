@@ -36,8 +36,6 @@ const EXPECTED_FILES = [
   'shared/audience/general.md',
   'shared/audience/mature.md',
   'shared/bias-guidance.md',
-  'discovery/agent.md',
-  'discovery/fallback.md',
   'topic-assessor.md',
   'placement/placement-probe.md',
   'class/generate-listening-quiz.md',
