@@ -562,7 +562,6 @@ describe('open-source language-learning OSS surfaces', () => {
       'docs/17-authentication-setup.md',
       'docs/25-twitter-integration.md',
       'apps/web/src/app/(admin)/admin/queues/queue-metadata.ts',
-      'apps/web/src/app/(dashboard)/ideas/tabs/IdeasTab.tsx',
       'apps/web/src/app/(dashboard)/settings/SettingsForm.tsx',
       'apps/web/src/app/changelog/page.tsx',
       'apps/web/src/app/support/page.tsx',
