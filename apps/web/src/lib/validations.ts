@@ -1078,3 +1078,9 @@ export const onboardingSaveSchema = z.object({
     .optional(),
   infra: serverInfraSchema.optional(),
 });
+
+// POST /api/live-translate/token — mint an ephemeral Gemini Live token for a course.
+export const liveTranslateTokenSchema = z.object({
+  courseId: z.string().min(1),
+  direction: z.enum(['native_to_target', 'target_to_native']),
+});
