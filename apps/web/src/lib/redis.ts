@@ -209,38 +209,6 @@ export async function checkRateLimit(
   return { allowed: true, remaining: limit - current - 1, resetAt: now + windowSeconds * 1000 };
 }
 
-/**
- * Inspire Me failure event log — stores recent failures with reasons for admin visibility.
- * Capped to 100 entries. Each entry is a JSON object with section, reason, timestamp, userId.
- */
-export interface InspireFailureEvent {
-  section: string;
-  reason: string;
-  userId?: string;
-  timestamp: string;
-}
-
-export const inspireFailures = {
-  async push(event: InspireFailureEvent): Promise<void> {
-    const client = getRedisClient();
-    const key = 'inspire:failure_log';
-    await client.lpush(key, JSON.stringify(event));
-    await client.ltrim(key, 0, 99); // keep last 100
-    await client.expire(key, 7 * 86400); // 7 day TTL
-  },
-
-  async recent(count = 50): Promise<InspireFailureEvent[]> {
-    const client = getRedisClient();
-    const raw = await client.lrange('inspire:failure_log', 0, count - 1);
-    return raw.map((r) => JSON.parse(r) as InspireFailureEvent);
-  },
-
-  async clear(): Promise<void> {
-    const client = getRedisClient();
-    await client.del('inspire:failure_log');
-  },
-};
-
 // ---------------------------------------------------------------------------
 // Podcast status cache + pub/sub
 // ---------------------------------------------------------------------------

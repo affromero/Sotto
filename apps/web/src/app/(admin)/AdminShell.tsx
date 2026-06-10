@@ -12,7 +12,6 @@ import {
   Shield,
   AtSign,
   Star,
-  Sparkles,
   DollarSign,
   Headphones,
   Activity,
@@ -113,7 +112,6 @@ const navGroups: NavGroup[] = [
     items: [
       { href: '/admin/ratings', label: 'Quality Ratings', icon: Star },
       { href: '/admin/quality', label: 'Quality Analytics', icon: Gauge },
-      { href: '/admin/inspire', label: 'Inspire', icon: Sparkles },
       { href: '/admin/intelligence', label: 'Intelligence', icon: Brain },
     ],
   },
