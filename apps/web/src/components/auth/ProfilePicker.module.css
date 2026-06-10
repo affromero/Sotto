@@ -426,6 +426,102 @@
   cursor: not-allowed;
 }
 
+/* ---- create-owner form ---- */
+.ownerForm {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(16px, 3vh, 22px);
+  width: 100%;
+  max-width: 420px;
+  margin: clamp(22px, 4vh, 34px) 0 0;
+  text-align: left;
+}
+
+.ownerField {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* avatar picker grid */
+.avatarGrid {
+  list-style: none;
+  margin: 2px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(10px, 3vw, 16px);
+}
+
+@media (min-width: 480px) {
+  .avatarGrid {
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+  }
+}
+
+.avatarItem {
+  display: flex;
+  justify-content: center;
+}
+
+.avatarBtn {
+  position: relative;
+  display: inline-flex;
+  padding: 4px;
+  min-width: 44px;
+  min-height: 44px;
+  background: transparent;
+  border: none;
+  border-radius: 16px;
+  cursor: pointer;
+  transition: transform 0.2s var(--ease);
+}
+
+.avatarBtn:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+
+.avatarBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* selection ring drawn on a pseudo-element so it never shifts layout */
+.avatarBtnSelected::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+  box-shadow: 0 0 0 2px var(--accent);
+  pointer-events: none;
+}
+
+.avatarBtn:hover:not(.avatarBtnSelected)::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+  box-shadow: 0 0 0 2px var(--accent-line);
+  pointer-events: none;
+}
+
+/* live password hint */
+.passwordHint {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-mute);
+  transition: color 0.2s var(--ease);
+}
+
+.passwordHintWarn {
+  color: var(--error);
+}
+
+.passwordHintOk {
+  color: var(--accent);
+}
+
 /* ---- alternate sign-in ---- */
 .altLink {
   margin-top: clamp(28px, 5vh, 44px);
@@ -493,6 +589,8 @@
   .profileBtn,
   .profileBtn:hover,
   .profileBtn:active,
+  .avatarBtn,
+  .avatarBtn:hover:not(:disabled),
   .submit:active:not(:disabled) {
     animation: none;
     transform: none;

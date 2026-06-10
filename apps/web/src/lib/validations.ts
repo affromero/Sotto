@@ -1027,6 +1027,33 @@ export const credentialsAuthSchema = z.object({
   password: z.string().min(1).max(200),
 });
 
+// First-run owner creation (public, only when local auth is on and zero users).
+export const createOwnerSchema = z.object({
+  name: z.string().trim().min(1).max(100),
+  password: z.string().min(8).max(200),
+  avatar: z.string().trim().max(64).optional(),
+});
+
+// Admin household member management.
+export const createMemberSchema = z.object({
+  name: z.string().trim().min(1).max(100),
+  password: z.string().min(8).max(200),
+  avatar: z.string().trim().max(64).optional(),
+});
+
+export const updateMemberSchema = z.object({
+  memberId: z.string().trim().min(1).max(64),
+  name: z.string().trim().min(1).max(100).optional(),
+  avatar: z.string().trim().max(64).optional(),
+  resetPassword: z.string().min(8).max(200).optional(),
+});
+
+// Self-service password change.
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1).max(200),
+  newPassword: z.string().min(8).max(200),
+});
+
 // Unified onboarding-wizard save. Per-user fields persist on every self-hosted
 // save; `infra` persists only when the caller is the owner (enforced server-side).
 // BYOK keys are NOT here — they flow through the validated /api/settings/* routes.

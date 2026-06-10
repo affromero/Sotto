@@ -1,11 +1,35 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import Image from 'next/image';
+import { useCallback, useEffect, useId, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
+import { AvatarTile } from '@/components/auth/AvatarTile';
+import { ANIMAL_AVATARS, avatarImagePath, getAnimalAvatar } from '@/lib/avatars';
 import { generateQrDataUrl } from '@/lib/qr';
 import styles from './page.module.css';
+
+const MIN_PASSWORD_LENGTH = 8;
+const DEFAULT_AVATAR_SLUG = ANIMAL_AVATARS[0].slug;
+
+/** A readable temporary password the owner can hand to a new member. */
+function generateTempPassword(): string {
+  // Avoid ambiguous characters (no 0/O/1/l) so it is easy to read aloud or type.
+  const alphabet = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const length = 12;
+  const out: string[] = [];
+  const random = new Uint32Array(length);
+  crypto.getRandomValues(random);
+  for (let i = 0; i < length; i += 1) {
+    out.push(alphabet[random[i] % alphabet.length]);
+  }
+  return out.join('');
+}
+
+/** The /avatars/{slug}.png image path for a stored member image, if it is one. */
+function memberAvatarSlug(image: string | null): string | null {
+  if (!image || !image.startsWith('/avatars/')) return null;
+  return image.slice('/avatars/'.length).replace(/\.png$/, '');
+}
 
 type InvitationStatus = 'active' | 'used' | 'disabled' | 'expired';
 
@@ -65,6 +89,29 @@ export function HouseholdManager() {
 
   const [openSignup, setOpenSignup] = useState<boolean | null>(null);
   const [savingSignup, setSavingSignup] = useState(false);
+
+  // Add-member form.
+  const [addName, setAddName] = useState('');
+  const [addAvatar, setAddAvatar] = useState<string>(DEFAULT_AVATAR_SLUG);
+  const [addPassword, setAddPassword] = useState(() => generateTempPassword());
+  const [addingMember, setAddingMember] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
+  const [createdMember, setCreatedMember] = useState<{ name: string; password: string } | null>(
+    null
+  );
+  const [credentialsCopied, setCredentialsCopied] = useState(false);
+
+  // Per-member action tracking (one in flight at a time, keyed by id).
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editAvatar, setEditAvatar] = useState<string>(DEFAULT_AVATAR_SLUG);
+  const [savingMemberId, setSavingMemberId] = useState<string | null>(null);
+  const [resetResult, setResetResult] = useState<{ id: string; password: string } | null>(null);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
+  const [memberError, setMemberError] = useState<string | null>(null);
+
+  const addNameId = useId();
 
   const loadSiteConfig = useCallback(async () => {
     try {
@@ -188,6 +235,151 @@ export function HouseholdManager() {
     }
   }, []);
 
+  const resetAddForm = useCallback(() => {
+    setAddName('');
+    setAddAvatar(DEFAULT_AVATAR_SLUG);
+    setAddPassword(generateTempPassword());
+    setAddError(null);
+  }, []);
+
+  const handleAddMember = useCallback(
+    async (event: React.FormEvent) => {
+      event.preventDefault();
+      const trimmedName = addName.trim();
+      if (!trimmedName || addPassword.length < MIN_PASSWORD_LENGTH || addingMember) return;
+
+      setAddingMember(true);
+      setAddError(null);
+      setCreatedMember(null);
+      setCredentialsCopied(false);
+      try {
+        const response = await fetch('/api/household/members', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: trimmedName,
+            password: addPassword,
+            avatar: addAvatar,
+          }),
+        });
+        if (!response.ok) {
+          setAddError('Could not add this member. Please try again.');
+          return;
+        }
+        setCreatedMember({ name: trimmedName, password: addPassword });
+        await loadMembers();
+        resetAddForm();
+      } catch {
+        setAddError('Could not add this member. Please try again.');
+      } finally {
+        setAddingMember(false);
+      }
+    },
+    [addName, addPassword, addAvatar, addingMember, loadMembers, resetAddForm]
+  );
+
+  const handleCopyCredentials = useCallback(async () => {
+    if (!createdMember) return;
+    await navigator.clipboard.writeText(
+      `${createdMember.name}. Temporary password: ${createdMember.password}`
+    );
+    setCredentialsCopied(true);
+    setTimeout(() => setCredentialsCopied(false), 2000);
+  }, [createdMember]);
+
+  const startEdit = useCallback((member: MemberData) => {
+    setEditingId(member.id);
+    setEditName(member.name ?? '');
+    setEditAvatar(memberAvatarSlug(member.image) ?? DEFAULT_AVATAR_SLUG);
+    setMemberError(null);
+    setResetResult(null);
+    setConfirmRemoveId(null);
+  }, []);
+
+  const cancelEdit = useCallback(() => {
+    setEditingId(null);
+    setMemberError(null);
+  }, []);
+
+  const handleSaveEdit = useCallback(
+    async (memberId: string) => {
+      const trimmedName = editName.trim();
+      if (!trimmedName) {
+        setMemberError('A name is required.');
+        return;
+      }
+      setSavingMemberId(memberId);
+      setMemberError(null);
+      try {
+        const response = await fetch('/api/household/members', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ memberId, name: trimmedName, avatar: editAvatar }),
+        });
+        if (!response.ok) {
+          setMemberError('Could not save those changes. Please try again.');
+          return;
+        }
+        await loadMembers();
+        setEditingId(null);
+      } catch {
+        setMemberError('Could not save those changes. Please try again.');
+      } finally {
+        setSavingMemberId(null);
+      }
+    },
+    [editName, editAvatar, loadMembers]
+  );
+
+  const handleResetPassword = useCallback(async (memberId: string) => {
+    setSavingMemberId(memberId);
+    setMemberError(null);
+    setResetResult(null);
+    const tempPassword = generateTempPassword();
+    try {
+      const response = await fetch('/api/household/members', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ memberId, resetPassword: tempPassword }),
+      });
+      if (!response.ok) {
+        setMemberError('Could not reset the password. Please try again.');
+        return;
+      }
+      setResetResult({ id: memberId, password: tempPassword });
+    } catch {
+      setMemberError('Could not reset the password. Please try again.');
+    } finally {
+      setSavingMemberId(null);
+    }
+  }, []);
+
+  const handleRemoveMember = useCallback(
+    async (memberId: string) => {
+      setRemovingId(memberId);
+      setMemberError(null);
+      try {
+        const response = await fetch('/api/household/members', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ memberId }),
+        });
+        if (!response.ok) {
+          setMemberError('Could not remove this member. Please try again.');
+          return;
+        }
+        setMembers((prev) => prev.filter((m) => m.id !== memberId));
+        setConfirmRemoveId(null);
+        if (resetResult?.id === memberId) setResetResult(null);
+      } catch {
+        setMemberError('Could not remove this member. Please try again.');
+      } finally {
+        setRemovingId(null);
+      }
+    },
+    [resetResult]
+  );
+
   return (
     <>
       {/* Who can join */}
@@ -199,8 +391,8 @@ export function HouseholdManager() {
             </h2>
             <p className={styles.sectionHint}>
               {openSignup
-                ? 'Open — anyone who can reach this instance can create an account.'
-                : 'Invite-only — only people you invite can create an account. Recommended for a private household.'}
+                ? 'Open. Anyone who can reach this instance can create an account.'
+                : 'Invite only. Only people you invite can create an account, recommended for a private household.'}
             </p>
           </div>
           <div className={styles.signupControl}>
@@ -322,6 +514,104 @@ export function HouseholdManager() {
         )}
       </section>
 
+      {/* Add a member directly */}
+      <section className={styles.inviteCard} aria-labelledby="add-member-heading">
+        <div className={styles.inviteHead}>
+          <h2 id="add-member-heading" className={styles.sectionTitle}>
+            Add a member
+          </h2>
+          <p className={styles.sectionHint}>
+            Set up an account in person. They get a temporary password and choose their own the
+            first time they sign in to this instance.
+          </p>
+        </div>
+
+        {createdMember ? (
+          <div className={styles.credentialResult} role="status">
+            <p className={styles.credentialTitle}>
+              {createdMember.name} is ready to sign in.
+            </p>
+            <div className={styles.credentialRow}>
+              <span className={styles.credentialLabel}>Temporary password</span>
+              <code className={styles.credentialValue}>{createdMember.password}</code>
+            </div>
+            <p className={styles.credentialNote}>
+              Share this with {createdMember.name}. They will be asked to set their own password the
+              first time they sign in.
+            </p>
+            <div className={styles.credentialActions}>
+              <Button size="small" onClick={handleCopyCredentials}>
+                {credentialsCopied ? 'Copied' : 'Copy details'}
+              </Button>
+              <Button variant="ghost" size="small" onClick={() => setCreatedMember(null)}>
+                Add another
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <form className={styles.addForm} onSubmit={handleAddMember} noValidate>
+            <div className={styles.field}>
+              <label className={styles.fieldLabel} htmlFor={addNameId}>
+                Name
+              </label>
+              <input
+                id={addNameId}
+                className={styles.textInput}
+                type="text"
+                value={addName}
+                onChange={(event) => {
+                  setAddName(event.target.value);
+                  if (addError) setAddError(null);
+                }}
+                disabled={addingMember}
+                maxLength={100}
+                autoComplete="off"
+                required
+              />
+            </div>
+
+            <AvatarPicker
+              legend="Avatar"
+              value={addAvatar}
+              onChange={setAddAvatar}
+              disabled={addingMember}
+            />
+
+            <div className={styles.field}>
+              <span className={styles.fieldLabel}>Temporary password</span>
+              <div className={styles.tempRow}>
+                <code className={styles.tempValue}>{addPassword}</code>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="small"
+                  onClick={() => setAddPassword(generateTempPassword())}
+                  disabled={addingMember}
+                >
+                  Regenerate
+                </Button>
+              </div>
+              <p className={styles.fieldHint}>
+                The member changes this the first time they sign in. At least{' '}
+                {MIN_PASSWORD_LENGTH} characters.
+              </p>
+            </div>
+
+            {addError && <p className={styles.errorText}>{addError}</p>}
+
+            <div>
+              <Button
+                type="submit"
+                loading={addingMember}
+                disabled={addingMember || addName.trim().length === 0}
+              >
+                Add member
+              </Button>
+            </div>
+          </form>
+        )}
+      </section>
+
       {/* Household members */}
       <section className={styles.listCard} aria-labelledby="members-heading">
         <div className={styles.listHeader}>
@@ -329,6 +619,7 @@ export function HouseholdManager() {
             Members{!membersLoading && members.length > 0 ? ` (${members.length})` : ''}
           </h2>
         </div>
+        {memberError && <p className={styles.memberErrorBar}>{memberError}</p>}
         {membersLoading ? (
           <p className={styles.listEmpty}>Loading members…</p>
         ) : members.length === 0 ? (
@@ -336,21 +627,27 @@ export function HouseholdManager() {
         ) : (
           <ul className={styles.rows}>
             {members.map((member) => (
-              <li key={member.id} className={styles.memberRow}>
-                <MemberAvatar member={member} />
-                <div className={styles.memberInfo}>
-                  <span className={styles.memberName}>
-                    {member.name ?? member.email.split('@')[0]}
-                  </span>
-                  <span className={styles.memberEmail}>{member.email}</span>
-                </div>
-                <div className={styles.memberAside}>
-                  {member.isOwner && <Badge variant="admin">Owner</Badge>}
-                  <span className={styles.courseCount}>
-                    {member.courseCount} {member.courseCount === 1 ? 'course' : 'courses'}
-                  </span>
-                </div>
-              </li>
+              <MemberRow
+                key={member.id}
+                member={member}
+                isEditing={editingId === member.id}
+                editName={editName}
+                editAvatar={editAvatar}
+                onEditNameChange={setEditName}
+                onEditAvatarChange={setEditAvatar}
+                onStartEdit={() => startEdit(member)}
+                onCancelEdit={cancelEdit}
+                onSaveEdit={() => handleSaveEdit(member.id)}
+                onResetPassword={() => handleResetPassword(member.id)}
+                onRemove={() => handleRemoveMember(member.id)}
+                confirmRemove={confirmRemoveId === member.id}
+                onRequestRemove={() => setConfirmRemoveId(member.id)}
+                onCancelRemove={() => setConfirmRemoveId(null)}
+                saving={savingMemberId === member.id}
+                removing={removingId === member.id}
+                resetPassword={resetResult?.id === member.id ? resetResult.password : null}
+                onDismissReset={() => setResetResult(null)}
+              />
             ))}
           </ul>
         )}
@@ -359,35 +656,208 @@ export function HouseholdManager() {
   );
 }
 
-function MemberAvatar({ member }: { member: MemberData }) {
-  if (member.image) {
-    return (
-      <Image
-        src={member.image}
-        alt=""
-        width={40}
-        height={40}
-        className={styles.avatarImage}
-        unoptimized
-      />
-    );
-  }
+interface MemberRowProps {
+  member: MemberData;
+  isEditing: boolean;
+  editName: string;
+  editAvatar: string;
+  onEditNameChange: (value: string) => void;
+  onEditAvatarChange: (slug: string) => void;
+  onStartEdit: () => void;
+  onCancelEdit: () => void;
+  onSaveEdit: () => void;
+  onResetPassword: () => void;
+  onRemove: () => void;
+  confirmRemove: boolean;
+  onRequestRemove: () => void;
+  onCancelRemove: () => void;
+  saving: boolean;
+  removing: boolean;
+  resetPassword: string | null;
+  onDismissReset: () => void;
+}
+
+function MemberRow({
+  member,
+  isEditing,
+  editName,
+  editAvatar,
+  onEditNameChange,
+  onEditAvatarChange,
+  onStartEdit,
+  onCancelEdit,
+  onSaveEdit,
+  onResetPassword,
+  onRemove,
+  confirmRemove,
+  onRequestRemove,
+  onCancelRemove,
+  saving,
+  removing,
+  resetPassword,
+  onDismissReset,
+}: MemberRowProps) {
+  const displayName = member.name ?? member.email.split('@')[0];
+  const editNameId = useId();
+  const slug = memberAvatarSlug(member.image);
+  const emoji = slug ? (getAnimalAvatar(slug)?.emoji ?? null) : null;
+  const busy = saving || removing;
+
   return (
-    <span
-      className={`${styles.avatarInitials} ${member.isOwner ? styles.avatarOwner : ''}`}
-      aria-hidden="true"
-    >
-      {initialsFor(member.name, member.email)}
-    </span>
+    <li className={styles.memberRow}>
+      <div className={styles.memberMain}>
+        <span className={styles.memberTile}>
+          <AvatarTile image={member.image} emoji={emoji} name={member.name} size={48} />
+        </span>
+        <div className={styles.memberInfo}>
+          <span className={styles.memberName}>{displayName}</span>
+          <span className={styles.memberSub}>
+            {member.courseCount} {member.courseCount === 1 ? 'course' : 'courses'}
+          </span>
+        </div>
+        <div className={styles.memberAside}>
+          {member.isOwner && <Badge variant="admin">Owner</Badge>}
+        </div>
+      </div>
+
+      {/* Owners (and yourself) cannot be reset, edited, or removed here. */}
+      {!member.isOwner && !isEditing && (
+        <div className={styles.memberActions}>
+          <Button variant="ghost" size="small" onClick={onStartEdit} disabled={busy}>
+            Edit
+          </Button>
+          <Button
+            variant="secondary"
+            size="small"
+            onClick={onResetPassword}
+            loading={saving}
+            disabled={busy}
+          >
+            Reset password
+          </Button>
+          {confirmRemove ? (
+            <span className={styles.confirmGroup}>
+              <span className={styles.confirmLabel}>Remove {displayName}?</span>
+              <Button
+                variant="danger"
+                size="small"
+                onClick={onRemove}
+                loading={removing}
+                disabled={busy}
+              >
+                Remove
+              </Button>
+              <Button variant="ghost" size="small" onClick={onCancelRemove} disabled={busy}>
+                Cancel
+              </Button>
+            </span>
+          ) : (
+            <Button variant="danger" size="small" onClick={onRequestRemove} disabled={busy}>
+              Remove
+            </Button>
+          )}
+        </div>
+      )}
+
+      {isEditing && (
+        <div className={styles.editPanel}>
+          <div className={styles.field}>
+            <label className={styles.fieldLabel} htmlFor={editNameId}>
+              Name
+            </label>
+            <input
+              id={editNameId}
+              className={styles.textInput}
+              type="text"
+              value={editName}
+              onChange={(event) => onEditNameChange(event.target.value)}
+              disabled={saving}
+              maxLength={100}
+              autoComplete="off"
+            />
+          </div>
+          <AvatarPicker
+            legend="Avatar"
+            value={editAvatar}
+            onChange={onEditAvatarChange}
+            disabled={saving}
+          />
+          <div className={styles.editActions}>
+            <Button
+              size="small"
+              onClick={onSaveEdit}
+              loading={saving}
+              disabled={saving || editName.trim().length === 0}
+            >
+              Save changes
+            </Button>
+            <Button variant="ghost" size="small" onClick={onCancelEdit} disabled={saving}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {resetPassword && (
+        <div className={styles.resetResult} role="status">
+          <div className={styles.credentialRow}>
+            <span className={styles.credentialLabel}>New temporary password</span>
+            <code className={styles.credentialValue}>{resetPassword}</code>
+          </div>
+          <p className={styles.credentialNote}>
+            Share this with {displayName}. They will set their own password the next time they sign
+            in.
+          </p>
+          <Button variant="ghost" size="small" onClick={onDismissReset}>
+            Done
+          </Button>
+        </div>
+      )}
+    </li>
   );
 }
 
-function initialsFor(name: string | null, email: string): string {
-  const source = name?.trim() || email;
-  const parts = source.split(/[\s@.]+/).filter(Boolean);
-  if (parts.length === 0) return '?';
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[1][0]).toUpperCase();
+interface AvatarPickerProps {
+  legend: string;
+  value: string;
+  onChange: (slug: string) => void;
+  disabled?: boolean;
+}
+
+function AvatarPicker({ legend, value, onChange, disabled = false }: AvatarPickerProps) {
+  const groupId = useId();
+  return (
+    <div className={styles.field}>
+      <span className={styles.fieldLabel} id={groupId}>
+        {legend}
+      </span>
+      <ul className={styles.avatarGrid} role="radiogroup" aria-labelledby={groupId}>
+        {ANIMAL_AVATARS.map((animal) => {
+          const isSelected = animal.slug === value;
+          return (
+            <li key={animal.slug} className={styles.avatarItem}>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={isSelected}
+                aria-label={animal.name}
+                className={`${styles.avatarBtn} ${isSelected ? styles.avatarBtnSelected : ''}`}
+                onClick={() => onChange(animal.slug)}
+                disabled={disabled}
+              >
+                <AvatarTile
+                  image={avatarImagePath(animal.slug)}
+                  emoji={animal.emoji}
+                  name={animal.name}
+                  size={48}
+                />
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
 }
 
 function formatDate(iso: string): string {
