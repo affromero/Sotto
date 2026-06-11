@@ -36,7 +36,7 @@ vi.mock('@/lib/byok', () => ({
 }));
 
 vi.mock('@/lib/auto-model-config', () => ({
-  getAutoModelConfig: vi.fn().mockResolvedValue({ free: { ttsProvider: 'openai', ttsModel: 'tts-1-hd' }, dailyGenerationLimit: 3, dailyGenerationLimitPro: 5, dailyVideoLimit: 1, dailyVideoLimitPro: 2, dailyAvatarLimit: 1, dailyAvatarLimitPro: 1, aiAllocations: [], ttsAllocations: [] }),
+  getAutoModelConfig: vi.fn().mockResolvedValue({ model: { aiProvider: 'anthropic', aiModel: 'claude-haiku-4-5-20251001', ttsProvider: 'openai', ttsModel: 'tts-1-hd', sttProvider: 'openai', sttModel: 'whisper-1' } }),
 }));
 
 import { FalProvider } from '@/lib/providers/tts/fal.provider';
@@ -84,21 +84,6 @@ describe('FalProvider', () => {
     const body = JSON.parse(apiOpts.body);
     expect(body.voice).toBe('Vivian');
     expect(body.text).toBe('Hello world');
-    expect(body.speaker_voice_embedding_file_url).toBeUndefined();
-  });
-
-  it('uses speaker_voice_embedding_file_url for cloned voices', async () => {
-    const embeddingUrl = 'https://fal.run/embeddings/clone.safetensors';
-    const fetchMock = mockFetchResponses({
-      audio: { url: 'https://fal.run/output/audio.wav', duration: 1.0, sample_rate: 24000 },
-    });
-
-    const provider = new FalProvider('fal_sk_test');
-    await provider.generateSpeech({ text: 'Test', voiceId: embeddingUrl });
-
-    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
-    expect(body.speaker_voice_embedding_file_url).toBe(embeddingUrl);
-    expect(body.voice).toBeUndefined();
   });
 
   it('uses the 0.6b model endpoint when configured', async () => {

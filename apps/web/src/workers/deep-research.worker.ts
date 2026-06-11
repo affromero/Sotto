@@ -45,7 +45,7 @@ export async function processDeepResearch(job: Job<DeepResearchPayload>): Promis
   }
 
   // Load discovery + podcast metadata
-  const [discovery, podcast, user] = await Promise.all([
+  const [discovery, podcast] = await Promise.all([
     prisma.discovery.findUniqueOrThrow({
       where: { id: discoveryId },
       select: {
@@ -65,7 +65,6 @@ export async function processDeepResearch(job: Job<DeepResearchPayload>): Promis
       where: { id: podcastId },
       select: { source: true, aiProvider: true, aiModel: true },
     }),
-    prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { plan: true } }),
   ]);
 
   await job.updateProgress(10);
@@ -79,7 +78,6 @@ export async function processDeepResearch(job: Job<DeepResearchPayload>): Promis
   const { model, provider } = await resolveAiModelAndProvider({
     podcastAiModel: podcast.aiModel,
     aiKey,
-    plan: user.plan as 'FREE' | 'PRO',
   });
 
   const providerAiKey =

@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { DashboardShell } from './DashboardShell';
+import { InstallPrompt } from '@/components/pwa/InstallPrompt';
 
 export const metadata: Metadata = {
   robots: { index: false, follow: false },
@@ -31,6 +32,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       hasPodcasts={podcastCount > 0}
     >
       {children}
+      <InstallPrompt />
     </DashboardShell>
   );
 }

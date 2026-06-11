@@ -3,6 +3,7 @@ import { isReasoningModel } from './ai-registry';
 import type { AiProviderId } from './ai-registry';
 import { logger } from '../logger';
 import { withRetry } from '../retry';
+import { getServerInfra, infra } from '../server-config';
 
 /**
  * Minimum max_completion_tokens for reasoning models.
@@ -29,7 +30,7 @@ function textOf(content: string | ContentPart[]): string {
 }
 
 /** Convert ChatMessage[] to OpenAI Chat Completions format (images → image_url). */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 function toOpenAiMessages(system: string, messages: ChatMessage[]): any[] {
   return [
     { role: 'system', content: system },
@@ -37,7 +38,7 @@ function toOpenAiMessages(system: string, messages: ChatMessage[]): any[] {
       if (typeof m.content === 'string') return { role: m.role, content: m.content };
       return {
         role: m.role,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         content: m.content.map((p): any =>
           p.type === 'text'
             ? { type: 'text', text: p.text }
@@ -49,13 +50,13 @@ function toOpenAiMessages(system: string, messages: ChatMessage[]): any[] {
 }
 
 /** Convert ChatMessage[] to OpenAI Responses API format (input_text / input_image). */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 function toResponsesInput(messages: ChatMessage[]): any[] {
   return messages.map((m) => {
     if (typeof m.content === 'string') return { role: m.role, content: m.content };
     return {
       role: m.role,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       content: m.content.map((p): any =>
         p.type === 'text'
           ? { type: 'input_text', text: p.text }
@@ -162,7 +163,7 @@ class OpenAIProvider implements AIProvider {
     if (opts?.useWebSearch) {
       return withRetry('[OpenAI:Responses]', async () => {
         // OpenAI SDK v6 exposes client.responses but types may lag — cast to access it
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         const response = await (client as any).responses.create({
           model,
           instructions: system,
@@ -204,9 +205,9 @@ class OpenAIProvider implements AIProvider {
 
       const choice = response.choices[0];
       const content = choice?.message?.content || '';
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       if (!content && (choice as any)?.finish_reason === 'length') {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         const details = (response.usage as any)?.completion_tokens_details;
         logger.warn('[OpenAI] Empty content with finish_reason=length — reasoning model exhausted token budget', {
           model,
@@ -244,7 +245,7 @@ class OpenAIProvider implements AIProvider {
 
     // web_search_preview requires the Responses API (not Chat Completions)
     if (opts?.useWebSearch) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       const stream: any = await withRetry('[OpenAI:Responses:stream]', () => (client as any).responses.create({
         model,
         instructions: system,
@@ -255,9 +256,9 @@ class OpenAIProvider implements AIProvider {
         stream: true,
       }));
       for await (const event of stream) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         if ((event as any).type === 'response.output_text.delta') {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+           
           yield (event as any).delta;
         }
       }
@@ -281,7 +282,7 @@ class OpenAIProvider implements AIProvider {
     let lastFinishReason: string | null = null;
     for await (const chunk of stream) {
       const choice = chunk.choices[0];
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       const finishReason = (choice as any)?.finish_reason as string | null;
       if (finishReason) lastFinishReason = finishReason;
       const delta = choice?.delta?.content;
@@ -393,6 +394,108 @@ class GoogleProvider implements AIProvider {
   }
 }
 
+/**
+ * Local provider — talks to any OpenAI-compatible local inference server
+ * (Ollama, vLLM, LM Studio, llama.cpp server) via the OpenAI SDK with a
+ * configurable baseURL. Keyless by design: local servers usually ignore the
+ * API key, but the SDK requires a non-empty string, so we send 'local' unless
+ * AI_API_KEY is set (for remote OpenAI-compatible servers behind auth).
+ *
+ * The model is host-defined (AI_MODEL) and may arrive prefixed as "local:<model>"
+ * from the llm.ts router or resolveAiModelAndProvider — strip it before sending.
+ */
+class LocalProvider implements AIProvider {
+  private async getClient() {
+    // Read-through the owner's DB infra config (warms the sync snapshot) then env.
+    await getServerInfra();
+    const baseURL = infra('aiBaseUrl', 'AI_BASE_URL');
+    if (!baseURL) {
+      throw new Error(
+        'AI_BASE_URL is not set. Point it at your local OpenAI-compatible server (e.g. http://localhost:11434/v1 for Ollama).',
+      );
+    }
+    const { default: OpenAI } = await import('openai');
+    // AI_API_KEY is a secret — never sourced from DB config; env-only (or 'local').
+    // Disable SDK built-in retries — we handle retries via withRetry() to avoid stacking
+    return new OpenAI({ apiKey: process.env.AI_API_KEY?.trim() || 'local', maxRetries: 0, baseURL });
+  }
+
+  private resolveModel(optsModel?: string): string {
+    const raw = (optsModel || infra('aiModel', 'AI_MODEL') || '').trim();
+    const model = raw.startsWith('local:') ? raw.slice('local:'.length) : raw;
+    if (!model) {
+      throw new Error(
+        'No local model configured. Set AI_MODEL to the model your local server serves (e.g. "qwen3", "gemma3", "llama3.3").',
+      );
+    }
+    return model;
+  }
+
+  async generateResponse(
+    system: string,
+    messages: ChatMessage[],
+    opts?: AIOptions
+  ): Promise<AIResponse> {
+    if (!opts?.skipModeration) {
+      const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
+      if (lastUserMsg) await moderateOrThrow(textOf(lastUserMsg.content));
+    }
+
+    const client = await this.getClient();
+    const model = this.resolveModel(opts?.model);
+
+    return withRetry('[Local:ChatCompletions]', async () => {
+      const response = await client.chat.completions.create({
+        model,
+        max_completion_tokens: opts?.maxTokens || 4096,
+        temperature: opts?.temperature,
+        messages: toOpenAiMessages(system, messages),
+        ...(opts?.jsonSchema ? {
+          response_format: {
+            type: 'json_schema' as const,
+            json_schema: { name: opts.jsonSchema.name, schema: opts.jsonSchema.schema, strict: true },
+          },
+        } : {}),
+      });
+
+      const content = response.choices[0]?.message?.content || '';
+      return {
+        content,
+        inputTokens: response.usage?.prompt_tokens || 0,
+        outputTokens: response.usage?.completion_tokens || 0,
+        model,
+      };
+    });
+  }
+
+  async *streamResponse(
+    system: string,
+    messages: ChatMessage[],
+    opts?: AIOptions
+  ): AsyncGenerator<string> {
+    if (!opts?.skipModeration) {
+      const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
+      if (lastUserMsg) await moderateOrThrow(textOf(lastUserMsg.content));
+    }
+
+    const client = await this.getClient();
+    const model = this.resolveModel(opts?.model);
+
+    const stream = await withRetry('[Local:ChatCompletions:stream]', () => client.chat.completions.create({
+      model,
+      max_completion_tokens: opts?.maxTokens || 4096,
+      temperature: opts?.temperature,
+      messages: toOpenAiMessages(system, messages),
+      stream: true,
+    }));
+
+    for await (const chunk of stream) {
+      const delta = chunk.choices[0]?.delta?.content;
+      if (delta) yield delta;
+    }
+  }
+}
+
 class ClaudeCodeLazyProvider implements AIProvider {
   private async createProvider(): Promise<AIProvider> {
     const { ClaudeCodeProvider } = await import('./claude-code');
@@ -432,8 +535,10 @@ export function createAIProvider(type: string): AIProvider {
       return new GoogleProvider();
     case 'claude-code':
       return new ClaudeCodeLazyProvider();
+    case 'local':
+      return new LocalProvider();
     default:
-      throw new Error(`Unknown AI provider type: "${type}". Registered providers: anthropic, openai, google, claude-code`);
+      throw new Error(`Unknown AI provider type: "${type}". Registered providers: anthropic, openai, google, claude-code, local`);
   }
 }
 

@@ -7,9 +7,8 @@ Docs are part of the product surface for the open source release. They must desc
 | File | Purpose |
 |---|---|
 | `01-product-vision.md` | Private-first product vision, positioning, and boundaries |
-| `05-plan.md` | Implementation plan for OSS onboarding, providers, agents, meetings, news, bots, and managed hosting |
+| `05-plan.md` | Implementation plan for OSS onboarding, providers, agents, meetings, news, and webhooks |
 | `07-ai-prompts.md` | Prompt architecture for discovery, generation, verification, and Q&A |
-| `10-stripe-billing.md` | Hosted billing reference for managed infrastructure |
 | `11-provider-pricing.md` | Provider pricing reference |
 | `16-technical-architecture.md` | System architecture and private data model |
 | `17-authentication-setup.md` | OAuth and auth setup |
@@ -19,8 +18,6 @@ Docs are part of the product surface for the open source release. They must desc
 | `21-logo-brief.md` | Logo design reference |
 | `23-local-development.md` | Local OSS setup without Doppler |
 | `24-ios-testflight-appstore-guide.md` | iOS distribution guide |
-| `25-twitter-integration.md` | Owner-scoped private Twitter bot source |
-| `26-telegram-integration.md` | Owner-scoped private Telegram bot source |
 | `27-launch-readiness-status.md` | Launch readiness tracking |
 
 ## Removed Pitch-Era Docs
@@ -31,7 +28,7 @@ The old investor-pitch docs for public discovery, community ranking, creator net
 
 - Every active doc must have a title, date, and summary at the top.
 - Keep docs aligned with code in the same commit.
-- When removing a product surface, remove its docs and update `scripts/rebuild-pitch.sh`.
+- When removing a product surface, remove its stale docs in the same change.
 - Do not describe removed social primitives as current behavior.
 - Do not require Doppler for local OSS setup docs.
 - Do not document provider fallback chains. Document explicit provider selection and typed setup errors.

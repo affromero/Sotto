@@ -134,24 +134,21 @@ beforeEach(() => {
     { modelId: 'runway-characters', displayName: 'Runway Characters', costPerMinute: 0.2, avatarType: 'standard', maxDuration: null },
   ]);
   mockGetAutoModelConfig.mockResolvedValue({
-    freeAvatarModel: 'heygen-avatar-standard',
-    proAvatarModel: 'heygen-avatar-standard',
-    freeAvatarProvider: 'heygen',
-    proAvatarProvider: 'heygen',
-    freeIncludedAvatarModels: null,
-    proIncludedAvatarModels: null,
+    avatarModel: 'heygen-avatar-standard',
+    avatarProvider: 'heygen',
+    includedAvatarModels: null,
   });
   process.env.HEYGEN_API_KEY = 'test-heygen-key';
 });
 
-describe('GET /api/podcasts/[podcastId]/video/avatars', () => {
+describe('GET /api/v1/podcasts/[podcastId]/video/avatars', () => {
   it('returns cached avatars from Redis', async () => {
-    const { GET } = await import('@/app/api/podcasts/[podcastId]/video/avatars/route');
-    mockCheckAvatarGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', dailyUsed: 0, dailyLimit: 1, dailyRemaining: 1, isByokUser: false, isProUser: false });
+    const { GET } = await import('@/app/api/v1/podcasts/[podcastId]/video/avatars/route');
+    mockCheckAvatarGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok' });
     const cached = [{ id: 'av-1', name: 'Test', provider: 'heygen' }];
     mockRedisGet.mockResolvedValue(cached);
 
-    const res = await GET(makeGet('http://localhost/api/podcasts/pod-1/video/avatars'), routeParams);
+    const res = await GET(makeGet('http://localhost/api/v1/podcasts/pod-1/video/avatars'), routeParams);
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.avatars).toEqual(cached);
@@ -162,14 +159,14 @@ describe('GET /api/podcasts/[podcastId]/video/avatars', () => {
   });
 
   it('fetches avatars via listUnifiedAvatars', async () => {
-    const { GET } = await import('@/app/api/podcasts/[podcastId]/video/avatars/route');
-    mockCheckAvatarGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', dailyUsed: 0, dailyLimit: 1, dailyRemaining: 1, isByokUser: false, isProUser: false });
+    const { GET } = await import('@/app/api/v1/podcasts/[podcastId]/video/avatars/route');
+    mockCheckAvatarGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok' });
     mockRedisGet.mockResolvedValue(null);
     mockListUnifiedAvatars.mockResolvedValue([
       { id: 'av-1', name: 'Free', provider: 'heygen', isPreset: false, premium: false, previewImageUrl: '' },
     ]);
 
-    const res = await GET(makeGet('http://localhost/api/podcasts/pod-1/video/avatars'), routeParams);
+    const res = await GET(makeGet('http://localhost/api/v1/podcasts/pod-1/video/avatars'), routeParams);
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.avatars).toHaveLength(1);
@@ -177,24 +174,21 @@ describe('GET /api/podcasts/[podcastId]/video/avatars', () => {
   });
 
   it('fetches Runway avatars when provider=runway', async () => {
-    const { GET } = await import('@/app/api/podcasts/[podcastId]/video/avatars/route');
+    const { GET } = await import('@/app/api/v1/podcasts/[podcastId]/video/avatars/route');
     process.env.RUNWAY_API_KEY = 'test-runway-key';
-    mockCheckAvatarGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', dailyUsed: 0, dailyLimit: 1, dailyRemaining: 1, isByokUser: false, isProUser: false });
+    mockCheckAvatarGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok' });
     // Include a runway model so availableProviders.runway is true
     mockGetAutoModelConfig.mockResolvedValue({
-      freeAvatarModel: 'heygen-avatar-standard',
-      proAvatarModel: 'heygen-avatar-standard',
-      freeAvatarProvider: 'heygen',
-      proAvatarProvider: 'heygen',
-      freeIncludedAvatarModels: ['heygen-avatar-standard', 'runway-characters'],
-      proIncludedAvatarModels: ['heygen-avatar-standard', 'runway-characters'],
+      avatarModel: 'heygen-avatar-standard',
+      avatarProvider: 'heygen',
+      includedAvatarModels: ['heygen-avatar-standard', 'runway-characters'],
     });
     mockRedisGet.mockResolvedValue(null);
     mockListUnifiedAvatars.mockResolvedValue([
       { id: 'influencer', name: 'Influencer', provider: 'runway', isPreset: true, premium: false, previewImageUrl: '' },
     ]);
 
-    const res = await GET(makeGet('http://localhost/api/podcasts/pod-1/video/avatars?provider=runway'), routeParams);
+    const res = await GET(makeGet('http://localhost/api/v1/podcasts/pod-1/video/avatars?provider=runway'), routeParams);
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.avatars[0].provider).toBe('runway');
@@ -203,28 +197,28 @@ describe('GET /api/podcasts/[podcastId]/video/avatars', () => {
   });
 
   it('rejects unauthorized requests', async () => {
-    const { GET } = await import('@/app/api/podcasts/[podcastId]/video/avatars/route');
+    const { GET } = await import('@/app/api/v1/podcasts/[podcastId]/video/avatars/route');
     mockAuthenticateRequest.mockResolvedValue(null);
 
-    const res = await GET(makeGet('http://localhost/api/podcasts/pod-1/video/avatars'), routeParams);
+    const res = await GET(makeGet('http://localhost/api/v1/podcasts/pod-1/video/avatars'), routeParams);
     expect(res.status).toBe(401);
   });
 });
 
-describe('POST /api/podcasts/[podcastId]/video/avatars', () => {
+describe('POST /api/v1/podcasts/[podcastId]/video/avatars', () => {
   it('creates avatar overlays and auto-starts generation when video is READY', async () => {
-    const { POST } = await import('@/app/api/podcasts/[podcastId]/video/avatars/route');
+    const { POST } = await import('@/app/api/v1/podcasts/[podcastId]/video/avatars/route');
     mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'user-1', status: 'READY', duration: 300 });
     mockVideoGenFindFirst.mockResolvedValue({ id: 'vg-1', status: 'READY' });
     mockVideoGenUpdate.mockResolvedValue({});
-    mockCheckAvatarGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', dailyUsed: 0, dailyLimit: 1, dailyRemaining: 1, isByokUser: true, isProUser: false });
+    mockCheckAvatarGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok' });
     mockAvatarOverlayUpsert.mockImplementation(({ create }: { create: Record<string, unknown> }) => ({
       id: `overlay-${create.speaker}`,
       ...create,
     }));
 
     const res = await POST(
-      makeJson('http://localhost/api/podcasts/pod-1/video/avatars', 'POST', { avatars: [{ speaker: 'Host', avatarId: 'av-1' }] }),
+      makeJson('http://localhost/api/v1/podcasts/pod-1/video/avatars', 'POST', { avatars: [{ speaker: 'Host', avatarId: 'av-1' }] }),
       routeParams,
     );
 
@@ -248,7 +242,7 @@ describe('POST /api/podcasts/[podcastId]/video/avatars', () => {
   });
 
   it('creates overlays without auto-start when video is still generating', async () => {
-    const { POST } = await import('@/app/api/podcasts/[podcastId]/video/avatars/route');
+    const { POST } = await import('@/app/api/v1/podcasts/[podcastId]/video/avatars/route');
     mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'user-1', status: 'READY', duration: 300 });
     mockVideoGenFindFirst.mockResolvedValue({ id: 'vg-1', status: 'GENERATING_VISUALS' });
     mockAvatarOverlayUpsert.mockImplementation(({ create }: { create: Record<string, unknown> }) => ({
@@ -257,7 +251,7 @@ describe('POST /api/podcasts/[podcastId]/video/avatars', () => {
     }));
 
     const res = await POST(
-      makeJson('http://localhost/api/podcasts/pod-1/video/avatars', 'POST', { avatars: [{ speaker: 'Host', avatarId: 'av-1' }] }),
+      makeJson('http://localhost/api/v1/podcasts/pod-1/video/avatars', 'POST', { avatars: [{ speaker: 'Host', avatarId: 'av-1' }] }),
       routeParams,
     );
 
@@ -269,7 +263,7 @@ describe('POST /api/podcasts/[podcastId]/video/avatars', () => {
   });
 
   it('accepts podcasts with any duration (no duration limit)', async () => {
-    const { POST } = await import('@/app/api/podcasts/[podcastId]/video/avatars/route');
+    const { POST } = await import('@/app/api/v1/podcasts/[podcastId]/video/avatars/route');
     mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'user-1', status: 'READY', duration: 700 });
     mockVideoGenFindFirst.mockResolvedValue({ id: 'vg-1', status: 'GENERATING_VISUALS' });
     mockAvatarOverlayUpsert.mockImplementation(({ create }: { create: Record<string, unknown> }) => ({
@@ -278,7 +272,7 @@ describe('POST /api/podcasts/[podcastId]/video/avatars', () => {
     }));
 
     const res = await POST(
-      makeJson('http://localhost/api/podcasts/pod-1/video/avatars', 'POST', { avatars: [{ speaker: 'Host', avatarId: 'av-1' }] }),
+      makeJson('http://localhost/api/v1/podcasts/pod-1/video/avatars', 'POST', { avatars: [{ speaker: 'Host', avatarId: 'av-1' }] }),
       routeParams,
     );
 
@@ -286,11 +280,11 @@ describe('POST /api/podcasts/[podcastId]/video/avatars', () => {
   });
 
   it('rejects when podcast is not READY', async () => {
-    const { POST } = await import('@/app/api/podcasts/[podcastId]/video/avatars/route');
+    const { POST } = await import('@/app/api/v1/podcasts/[podcastId]/video/avatars/route');
     mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'user-1', status: 'GENERATING_AUDIO', duration: 300 });
 
     const res = await POST(
-      makeJson('http://localhost/api/podcasts/pod-1/video/avatars', 'POST', { avatars: [{ speaker: 'Host', avatarId: 'av-1' }] }),
+      makeJson('http://localhost/api/v1/podcasts/pod-1/video/avatars', 'POST', { avatars: [{ speaker: 'Host', avatarId: 'av-1' }] }),
       routeParams,
     );
 
@@ -298,11 +292,11 @@ describe('POST /api/podcasts/[podcastId]/video/avatars', () => {
   });
 
   it('passes avatarProvider and isPreset through overlay and job', async () => {
-    const { POST } = await import('@/app/api/podcasts/[podcastId]/video/avatars/route');
+    const { POST } = await import('@/app/api/v1/podcasts/[podcastId]/video/avatars/route');
     mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'user-1', status: 'READY', duration: 300 });
     mockVideoGenFindFirst.mockResolvedValue({ id: 'vg-1', status: 'READY' });
     mockVideoGenUpdate.mockResolvedValue({});
-    mockCheckAvatarGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', dailyUsed: 0, dailyLimit: 1, dailyRemaining: 1, isByokUser: true, isProUser: false });
+    mockCheckAvatarGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok' });
     mockAvatarOverlayUpsert.mockImplementation(({ create }: { create: Record<string, unknown> }) => ({
       id: `overlay-${create.speaker}`,
       speaker: create.speaker,
@@ -310,7 +304,7 @@ describe('POST /api/podcasts/[podcastId]/video/avatars', () => {
     }));
 
     const res = await POST(
-      makeJson('http://localhost/api/podcasts/pod-1/video/avatars', 'POST', {
+      makeJson('http://localhost/api/v1/podcasts/pod-1/video/avatars', 'POST', {
         avatars: [{ speaker: 'Host', avatarId: 'influencer', avatarProvider: 'runway', isPreset: true }],
       }),
       routeParams,
@@ -337,12 +331,12 @@ describe('POST /api/podcasts/[podcastId]/video/avatars', () => {
   });
 
   it('rejects invalid avatarProvider value', async () => {
-    const { POST } = await import('@/app/api/podcasts/[podcastId]/video/avatars/route');
+    const { POST } = await import('@/app/api/v1/podcasts/[podcastId]/video/avatars/route');
     mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'user-1', status: 'READY', duration: 300 });
     mockVideoGenFindFirst.mockResolvedValue({ id: 'vg-1', status: 'READY' });
 
     const res = await POST(
-      makeJson('http://localhost/api/podcasts/pod-1/video/avatars', 'POST', {
+      makeJson('http://localhost/api/v1/podcasts/pod-1/video/avatars', 'POST', {
         avatars: [{ speaker: 'Host', avatarId: 'av-1', avatarProvider: 'invalid-provider' }],
       }),
       routeParams,
@@ -352,9 +346,9 @@ describe('POST /api/podcasts/[podcastId]/video/avatars', () => {
   });
 });
 
-describe('DELETE /api/podcasts/[podcastId]/video/avatars', () => {
+describe('DELETE /api/v1/podcasts/[podcastId]/video/avatars', () => {
   it('deletes overlays but preserves R2 assets', async () => {
-    const { DELETE } = await import('@/app/api/podcasts/[podcastId]/video/avatars/route');
+    const { DELETE } = await import('@/app/api/v1/podcasts/[podcastId]/video/avatars/route');
     mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'user-1' });
     mockVideoGenFindFirst.mockResolvedValue({
       id: 'vg-1',
@@ -365,7 +359,7 @@ describe('DELETE /api/podcasts/[podcastId]/video/avatars', () => {
     mockAvatarOverlayDeleteMany.mockResolvedValue({ count: 1 });
 
     const res = await DELETE(
-      makeJson('http://localhost/api/podcasts/pod-1/video/avatars', 'DELETE'),
+      makeJson('http://localhost/api/v1/podcasts/pod-1/video/avatars', 'DELETE'),
       routeParams,
     );
 
@@ -375,15 +369,15 @@ describe('DELETE /api/podcasts/[podcastId]/video/avatars', () => {
   });
 });
 
-describe('PATCH /api/podcasts/[podcastId]/video/avatars/positions', () => {
+describe('PATCH /api/v1/podcasts/[podcastId]/video/avatars/positions', () => {
   it('updates avatar positions', async () => {
-    const { PATCH } = await import('@/app/api/podcasts/[podcastId]/video/avatars/positions/route');
+    const { PATCH } = await import('@/app/api/v1/podcasts/[podcastId]/video/avatars/positions/route');
     mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'user-1' });
     mockVideoGenFindFirst.mockResolvedValue({ id: 'vg-1' });
     mockAvatarOverlayUpdateMany.mockResolvedValue({ count: 1 });
 
     const res = await PATCH(
-      makeJson('http://localhost/api/podcasts/pod-1/video/avatars/positions', 'PATCH', {
+      makeJson('http://localhost/api/v1/podcasts/pod-1/video/avatars/positions', 'PATCH', {
           positions: [{ speaker: 'Host', posX: 0.1, posY: 0.5, width: 0.25, height: 0.35 }],
         }),
       routeParams,
@@ -399,12 +393,12 @@ describe('PATCH /api/podcasts/[podcastId]/video/avatars/positions', () => {
   });
 
   it('rejects invalid position values', async () => {
-    const { PATCH } = await import('@/app/api/podcasts/[podcastId]/video/avatars/positions/route');
+    const { PATCH } = await import('@/app/api/v1/podcasts/[podcastId]/video/avatars/positions/route');
     mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'user-1' });
     mockVideoGenFindFirst.mockResolvedValue({ id: 'vg-1' });
 
     const res = await PATCH(
-      makeJson('http://localhost/api/podcasts/pod-1/video/avatars/positions', 'PATCH', {
+      makeJson('http://localhost/api/v1/podcasts/pod-1/video/avatars/positions', 'PATCH', {
           positions: [{ speaker: 'Host', posX: 1.5, posY: 0.5, width: 0.25, height: 0.35 }],
         }),
       routeParams,

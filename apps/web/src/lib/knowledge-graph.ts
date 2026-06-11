@@ -50,6 +50,49 @@ export async function seedLessonItems(
   }
 }
 
+/**
+ * Add vocab surfaced during a live conversation (no class) to the course graph.
+ * Mirrors the seedLessonItems upsert but with no firstSeenClassId. Returns the
+ * count of lemmas that were newly created (already-known words are left as-is so
+ * their SRS state is preserved).
+ */
+export async function upsertLiveVocab(
+  courseId: string,
+  items: VocabItem[],
+  level?: CefrLevel,
+): Promise<number> {
+  const lemmas = items.map((i) => i.lemma).filter(Boolean);
+  if (lemmas.length === 0) return 0;
+  const existing = new Set(
+    (
+      await prisma.learnerVocab.findMany({
+        where: { courseId, lemma: { in: lemmas } },
+        select: { lemma: true },
+      })
+    ).map((r) => r.lemma),
+  );
+
+  let added = 0;
+  for (const v of items) {
+    if (!v.lemma) continue;
+    await prisma.learnerVocab.upsert({
+      where: { courseId_lemma: { courseId, lemma: v.lemma } },
+      create: {
+        courseId,
+        lemma: v.lemma,
+        translation: v.gloss ?? '',
+        partOfSpeech: v.pos ?? null,
+        pronunciation: v.pronunciation ?? null,
+        firstSeenClassId: null,
+        cefrLevel: level ?? null,
+      },
+      update: {},
+    });
+    if (!existing.has(v.lemma)) added++;
+  }
+  return added;
+}
+
 /** Update SRS for a lesson's vocab + grammar from per-section scores (0..1). */
 export async function applyReviewOutcome(
   courseId: string,

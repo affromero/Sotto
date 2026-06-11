@@ -16,6 +16,8 @@ export interface GeneratedQuestion {
   correctIndex: number;
   explanation: string;
   passageRef?: string;
+  /** Full leveled reading passage (sourced classes). Persisted to LessonQuestion.passageText. */
+  passageText?: string;
 }
 
 export interface SectionGenParams {
@@ -29,10 +31,24 @@ export interface SectionGenParams {
   targetVocab: Array<{ lemma: string; gloss: string }>;
   seed: string;
   note?: string;
+  /**
+   * Optional sourced-class reading passage (CEFR-leveled, target language). When
+   * present for a READING section, MCQs are based on it and each returned READING
+   * question carries it as `passageText`. Absent = today's curriculum behavior.
+   */
+  sourceContent?: string;
 }
 
 export async function generateSectionQuestions(p: SectionGenParams): Promise<GeneratedQuestion[]> {
   const ai = await resolveLearningAi(p.userId);
+
+  // Sourced READING classes: base the MCQs on the leveled passage. The
+  // {{SOURCE}} block is rendered only for a READING section that has source
+  // text; otherwise it is empty and the prompt behaves exactly as before.
+  const useSourcePassage = p.skill === 'READING' && !!p.sourceContent;
+  const sourceBlock = useSourcePassage
+    ? `Source passage (base READING questions on it): ${p.sourceContent}`
+    : '';
 
   const systemPrompt = loadAndRender('class/generate-section-quiz.md', {
     COUNT: String(QUESTIONS_PER_SECTION),
@@ -45,6 +61,7 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
     VOCAB: p.targetVocab.map((v) => `${v.lemma} (${v.gloss})`).join('; '),
     SEED: p.seed,
     NOTES: formatNotesForPrompt(p.note ?? ''),
+    SOURCE: sourceBlock,
   });
 
   const provider = createAIProvider(ai.provider);
@@ -88,6 +105,9 @@ export async function generateSectionQuestions(p: SectionGenParams): Promise<Gen
       correctIndex: Math.max(0, Math.min(3, q.correctIndex)),
       explanation: q.explanation ?? '',
       passageRef: q.passageRef,
+      // Sourced READING: attach the leveled passage so the learner reads the
+      // real excerpt the questions are about.
+      passageText: useSourcePassage ? p.sourceContent : undefined,
     }));
 
   if (questions.length === 0) {

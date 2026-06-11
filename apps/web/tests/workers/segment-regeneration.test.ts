@@ -13,11 +13,9 @@ const mockPrismaPodcastFindUniqueOrThrow = vi.fn().mockResolvedValue({
   voices: [],
   ttsProvider: 'elevenlabs',
   ttsModel: null,
-  user: { plan: 'FREE' },
 });
 
 const mockPrismaDiscoveryFindUnique = vi.fn().mockResolvedValue(null);
-const mockPrismaVoiceTrackUpdateMany = vi.fn().mockResolvedValue({ count: 0 });
 const mockPrismaVideoGenerationUpdateMany = vi.fn().mockResolvedValue({ count: 0 });
 const mockPrismaPodcastVoiceUpsert = vi.fn().mockResolvedValue({});
 
@@ -48,9 +46,6 @@ vi.mock('@/lib/prisma', () => {
     },
     discovery: {
       findUnique: (...args: unknown[]) => mockPrismaDiscoveryFindUnique(...args),
-    },
-    voiceTrack: {
-      updateMany: (...args: unknown[]) => mockPrismaVoiceTrackUpdateMany(...args),
     },
     videoGeneration: {
       updateMany: (...args: unknown[]) => mockPrismaVideoGenerationUpdateMany(...args),
@@ -111,6 +106,11 @@ vi.mock('@/lib/queue', () => ({
     STITCH_AUDIO: 'stitch_audio',
   },
   audioStitchingQueue: { name: 'audio-stitching' },
+}));
+
+vi.mock('@/lib/redis', () => ({
+  invalidatePodcastCache: vi.fn().mockResolvedValue(undefined),
+  publishPodcastStatus: vi.fn().mockResolvedValue(undefined),
 }));
 
 const mockWriteFile = vi.fn().mockResolvedValue(undefined);
@@ -192,7 +192,7 @@ describe('processSegmentRegeneration', () => {
       voices: [],
       ttsProvider: 'elevenlabs',
       ttsModel: null,
-      user: { plan: 'FREE' },
+      user: {},
     });
     mockPrismaSegmentCreate.mockResolvedValue({ id: 'segment-new-001' });
     mockPrismaSegmentUpdate.mockResolvedValue({});
@@ -245,7 +245,7 @@ describe('processSegmentRegeneration', () => {
         voices: [{ speaker: 'HOST', voiceId: 'custom-host-voice', provider: 'elevenlabs' }],
         ttsProvider: 'elevenlabs',
         ttsModel: null,
-        user: { plan: 'FREE' },
+        user: {},
       });
       const job = createMockJob({ ...defaultPayload, speaker: 'HOST' });
       await processSegmentRegeneration(job);
@@ -262,7 +262,7 @@ describe('processSegmentRegeneration', () => {
         voices: [{ speaker: 'EXPERT', voiceId: 'custom-expert-voice', provider: 'elevenlabs' }],
         ttsProvider: 'elevenlabs',
         ttsModel: null,
-        user: { plan: 'FREE' },
+        user: {},
       });
       const job = createMockJob({ ...defaultPayload, speaker: 'EXPERT' });
       await processSegmentRegeneration(job);
@@ -279,7 +279,7 @@ describe('processSegmentRegeneration', () => {
         voices: [{ speaker: 'EXPERT', voiceId: 'elevenlabs-voice-id', provider: 'elevenlabs' }],
         ttsProvider: 'openai',
         ttsModel: null,
-        user: { plan: 'FREE' },
+        user: {},
       });
       setupStandardProvider(); // openai
       mockStandardGetVoiceId.mockReturnValue('openai-pool-voice');
@@ -298,7 +298,7 @@ describe('processSegmentRegeneration', () => {
         voices: [{ speaker: 'EXPERT', voiceId: 'old-voice-id', provider: null }],
         ttsProvider: 'elevenlabs',
         ttsModel: null,
-        user: { plan: 'FREE' },
+        user: {},
       });
       mockProviderGetVoiceId.mockReturnValue('pool-voice');
       const job = createMockJob(defaultPayload);
@@ -362,7 +362,7 @@ describe('processSegmentRegeneration', () => {
         voices: [],
         ttsProvider: 'openai',
         ttsModel: null,
-        user: { plan: 'FREE' },
+        user: {},
       });
       setupStandardProvider();
     });
@@ -689,7 +689,7 @@ describe('processSegmentRegeneration', () => {
         voices: [],
         ttsProvider: 'openai',
         ttsModel: null,
-        user: { plan: 'FREE' },
+        user: {},
       });
       setupStandardProvider();
       mockStandardGetVoiceId.mockReturnValue('openai-expert-voice');
@@ -773,7 +773,7 @@ describe('processSegmentRegeneration', () => {
         voices: [],
         ttsProvider: null,
         ttsModel: null,
-        user: { plan: 'FREE' },
+        user: {},
       });
       const job = createMockJob(defaultPayload);
 
@@ -802,7 +802,7 @@ describe('processSegmentRegeneration', () => {
         voices: [],
         ttsProvider: 'openai',
         ttsModel: null,
-        user: { plan: 'FREE' },
+        user: {},
       });
       setupStandardProvider();
       mockStandardGenerateSpeech.mockRejectedValue(new Error('OpenAI TTS error'));

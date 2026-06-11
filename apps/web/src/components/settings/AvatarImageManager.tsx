@@ -8,7 +8,6 @@ interface AvatarImage {
   name: string;
   imageUrl: string;
   sourceType: 'UPLOAD' | 'GENERATED' | 'DEFAULT';
-  shareable?: boolean;
 }
 
 interface Capabilities {
@@ -16,12 +15,6 @@ interface Capabilities {
   canGenerate: boolean;
   isVerified: boolean;
   uploadsEnabled: boolean;
-}
-
-interface SharedImage {
-  shareId: string;
-  image: AvatarImage;
-  owner: { id: string; name: string | null; handle: string | null; image: string | null };
 }
 
 const MAX_IMAGES = 10;
@@ -36,7 +29,6 @@ const SOURCE_LABELS: Record<string, string> = {
 
 export function AvatarImageManager() {
   const [images, setImages] = useState<AvatarImage[]>([]);
-  const [sharedImages, setSharedImages] = useState<SharedImage[]>([]);
   const [capabilities, setCapabilities] = useState<Capabilities>({
     canUpload: false,
     canGenerate: false,
@@ -52,11 +44,10 @@ export function AvatarImageManager() {
 
   const fetchImages = useCallback(async () => {
     try {
-      const res = await fetch('/api/avatar-images');
+      const res = await fetch('/api/v1/avatar-images');
       if (!res.ok) throw new Error('Failed to load images');
       const data = await res.json();
       setImages(data.images);
-      setSharedImages(data.shared ?? []);
       setCapabilities(data.capabilities);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load images');
@@ -92,7 +83,7 @@ export function AvatarImageManager() {
         formData.append('name', file.name.replace(/\.[^.]+$/, ''));
         formData.append('consentAcknowledged', 'true');
 
-        const res = await fetch('/api/avatar-images', {
+        const res = await fetch('/api/v1/avatar-images', {
           method: 'POST',
           body: formData,
         });
@@ -122,7 +113,7 @@ export function AvatarImageManager() {
     setError(null);
 
     try {
-      const res = await fetch(`/api/avatar-images/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/v1/avatar-images/${id}`, { method: 'DELETE' });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(
@@ -135,21 +126,6 @@ export function AvatarImageManager() {
       setError(err instanceof Error ? err.message : 'Delete failed');
     } finally {
       setDeletingId(null);
-    }
-  }, []);
-
-  const handleToggleShareable = useCallback(async (id: string, shareable: boolean) => {
-    setError(null);
-    try {
-      const res = await fetch(`/api/avatar-images/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ shareable }),
-      });
-      if (!res.ok) throw new Error('Failed to update');
-      setImages((prev) => prev.map((img) => (img.id === id ? { ...img, shareable } : img)));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update shareable');
     }
   }, []);
 
@@ -185,66 +161,31 @@ export function AvatarImageManager() {
         </p>
       )}
 
-      {images.length === 0 && sharedImages.length === 0 ? (
+      {images.length === 0 ? (
         <p className={styles.empty}>
           No avatar images yet. Upload a portrait photo to use with lip-sync models.
           {!capabilities.isVerified && ' Verification is required before uploading.'}
         </p>
       ) : (
-        <>
-          {images.length > 0 && (
-            <div className={styles.grid}>
-              {images.map((img) => (
-                <div key={img.id} className={styles.card}>
-                  <img src={img.imageUrl} alt={img.name} className={styles.cardImage} />
-                  <span className={styles.cardName}>{img.name}</span>
-                  <span className={styles.cardSource}>
-                    {SOURCE_LABELS[img.sourceType] ?? img.sourceType}
-                  </span>
-                  <label className={styles.shareToggle}>
-                    <input
-                      type="checkbox"
-                      checked={img.shareable ?? false}
-                      onChange={(e) => handleToggleShareable(img.id, e.target.checked)}
-                      aria-label={`Allow sharing of ${img.name}`}
-                    />
-                    <span className={styles.shareToggleLabel}>Shareable</span>
-                  </label>
-                  <button
-                    className={styles.deleteBtn}
-                    onClick={() => handleDelete(img.id)}
-                    disabled={deletingId === img.id}
-                    aria-label={`Delete ${img.name}`}
-                  >
-                    {deletingId === img.id ? 'Deleting...' : 'Delete'}
-                  </button>
-                </div>
-              ))}
+        <div className={styles.grid}>
+          {images.map((img) => (
+            <div key={img.id} className={styles.card}>
+              <img src={img.imageUrl} alt={img.name} className={styles.cardImage} />
+              <span className={styles.cardName}>{img.name}</span>
+              <span className={styles.cardSource}>
+                {SOURCE_LABELS[img.sourceType] ?? img.sourceType}
+              </span>
+              <button
+                className={styles.deleteBtn}
+                onClick={() => handleDelete(img.id)}
+                disabled={deletingId === img.id}
+                aria-label={`Delete ${img.name}`}
+              >
+                {deletingId === img.id ? 'Deleting...' : 'Delete'}
+              </button>
             </div>
-          )}
-
-          {/* Shared With You */}
-          {sharedImages.length > 0 && (
-            <div className={styles.sharedSection}>
-              <h3 className={styles.sharedHeader}>Shared With You</h3>
-              <div className={styles.grid}>
-                {sharedImages.map((shared) => (
-                  <div key={shared.shareId} className={`${styles.card} ${styles.cardShared}`}>
-                    <img
-                      src={shared.image.imageUrl}
-                      alt={shared.image.name}
-                      className={styles.cardImage}
-                    />
-                    <span className={styles.cardName}>{shared.image.name}</span>
-                    <span className={styles.ownerBadge}>
-                      by {shared.owner.name ?? shared.owner.handle ?? 'Unknown'}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </>
+          ))}
+        </div>
       )}
 
       {/* Consent + Upload */}

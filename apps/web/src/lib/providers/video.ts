@@ -29,14 +29,11 @@ export interface ResolvedVideoProvider {
 export async function resolveVideoProvider(context: {
   userId: string;
   requestedModel?: string | null;
-  plan?: 'FREE' | 'PRO';
 }): Promise<ResolvedVideoProvider> {
-  const { userId, requestedModel, plan } = context;
+  const { userId, requestedModel } = context;
 
   const config = await getAutoModelConfig();
-  const tier = plan ?? 'PRO';
-  const defaultModel = tier === 'FREE' ? config.freeVideoModel : config.proVideoModel;
-  const model = requestedModel ?? defaultModel ?? 'fal-wan2.5-480p';
+  const model = requestedModel ?? config.videoModel ?? 'fal-wan2.5-480p';
 
   const providerId = getVideoModelProvider(model);
   if (!providerId) {

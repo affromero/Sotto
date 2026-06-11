@@ -1,14 +1,13 @@
 /**
  * Invite Redemption API — Behavioral Tests
  *
- * Tests valid redemption, expired/used/disabled links, and waitlist upsert.
+ * Tests valid redemption and expired/used/disabled links.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
 // Mock Prisma
 const mockInvitationLinkFindUnique = vi.fn();
-const mockWaitlistUpsert = vi.fn();
 const mockInvitationLinkUpdate = vi.fn();
 const mockTransaction = vi.fn();
 
@@ -26,12 +25,12 @@ vi.mock('@/lib/api-response', () => ({
 }));
 
 async function getHandler() {
-  const mod = await import('@/app/api/invite/redeem/route');
+  const mod = await import('@/app/api/v1/invite/redeem/route');
   return mod.POST;
 }
 
 function createRequest(body: unknown): NextRequest {
-  return new NextRequest(new URL('http://localhost:3000/api/invite/redeem'), {
+  return new NextRequest(new URL('http://localhost:3000/api/v1/invite/redeem'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -44,14 +43,11 @@ function setupTransaction() {
       findUnique: mockInvitationLinkFindUnique,
       update: mockInvitationLinkUpdate,
     },
-    waitlist: {
-      upsert: mockWaitlistUpsert,
-    },
   };
   mockTransaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => fn(tx));
 }
 
-describe('POST /api/invite/redeem', () => {
+describe('POST /api/v1/invite/redeem', () => {
   let handler: Awaited<ReturnType<typeof getHandler>>;
 
   beforeEach(async () => {
@@ -109,13 +105,12 @@ describe('POST /api/invite/redeem', () => {
     expect(body.error).toContain('expired');
   });
 
-  it('redeems a valid invitation and upserts waitlist as APPROVED', async () => {
+  it('redeems a valid invitation and marks the link as used', async () => {
     const email = 'newuser@test.com';
     mockInvitationLinkFindUnique.mockResolvedValue({
       id: 'inv-1', code: 'abc123', enabled: true, usedAt: null,
       expiresAt: new Date(Date.now() + 60000),
     });
-    mockWaitlistUpsert.mockResolvedValue({ id: 'wl-1', email, status: 'APPROVED' });
     mockInvitationLinkUpdate.mockResolvedValue({ id: 'inv-1' });
 
     const res = await handler(createRequest({ code: 'abc123', email }));
@@ -123,15 +118,6 @@ describe('POST /api/invite/redeem', () => {
 
     const body = await res.json();
     expect(body.success).toBe(true);
-
-    // Verify waitlist upsert
-    expect(mockWaitlistUpsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { email },
-        create: expect.objectContaining({ email, status: 'APPROVED', source: 'invitation' }),
-        update: expect.objectContaining({ status: 'APPROVED', source: 'invitation' }),
-      }),
-    );
 
     // Verify invitation marked as used
     expect(mockInvitationLinkUpdate).toHaveBeenCalledWith(
@@ -142,19 +128,22 @@ describe('POST /api/invite/redeem', () => {
     );
   });
 
-  it('handles duplicate email by upserting existing waitlist entry', async () => {
+  it('allows the same email to redeem a different invitation link', async () => {
     const email = 'existing@test.com';
     mockInvitationLinkFindUnique.mockResolvedValue({
       id: 'inv-1', code: 'abc123', enabled: true, usedAt: null,
       expiresAt: new Date(Date.now() + 60000),
     });
-    mockWaitlistUpsert.mockResolvedValue({ id: 'wl-1', email, status: 'APPROVED' });
     mockInvitationLinkUpdate.mockResolvedValue({ id: 'inv-1' });
 
     const res = await handler(createRequest({ code: 'abc123', email }));
     expect(res.status).toBe(200);
 
-    // Upsert handles both create and update paths
-    expect(mockWaitlistUpsert).toHaveBeenCalledTimes(1);
+    expect(mockInvitationLinkUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'inv-1' },
+        data: expect.objectContaining({ email, usedAt: expect.any(Date) }),
+      }),
+    );
   });
 });

@@ -9,9 +9,7 @@ const mockPodcastFindUnique = vi.fn();
 const mockPodcastUpdate = vi.fn();
 const mockSaveFindUnique = vi.fn();
 const mockDiscoveryCreate = vi.fn();
-const mockCheckGenerationGate = vi.fn();
 
-const mockGetFreeTierStatus = vi.fn();
 const mockGetAutoModelConfig = vi.fn();
 const mockAddJob = vi.fn();
 
@@ -72,25 +70,16 @@ vi.mock('@/lib/queue', () => ({
   JobType: { EXTRACT_CONTENT: 'EXTRACT_CONTENT' },
 }));
 
-vi.mock('@/lib/generation-gate', () => ({
-  checkGenerationGate: (...args: unknown[]) => mockCheckGenerationGate(...args),
-  getFreeTierStatus: (...args: unknown[]) => mockGetFreeTierStatus(...args),
-}));
-
 vi.mock('@/lib/auto-model-config', () => ({
   getAutoModelConfig: (...args: unknown[]) => mockGetAutoModelConfig(...args),
-}));
-
-vi.mock('@/lib/stripe', () => ({
-  LIMITS: { maxDurationMinutes: 60 },
 }));
 
 vi.mock('@/lib/voice-pricing', () => ({
   computeVoiceCharges: vi.fn().mockResolvedValue([]),
 }));
 
-vi.mock('@/lib/tier-features', () => ({
-  getTierFeatures: vi.fn().mockReturnValue({
+vi.mock('@/lib/generation-features', () => ({
+  getGenerationFeatures: vi.fn().mockReturnValue({
     maxDurationMinutes: 30,
     maxSpeakers: 4,
     autoApproveScript: false,
@@ -99,9 +88,6 @@ vi.mock('@/lib/tier-features', () => ({
     privateAllowed: true,
     priorityQueue: true,
     analyticsEnabled: true,
-    voiceTracksEnabled: true,
-    maxVoiceTracks: 3,
-    voiceCloningEnabled: true,
   }),
   getJobPriority: vi.fn().mockReturnValue(1),
 }));
@@ -115,20 +101,15 @@ vi.mock('@/lib/r2', () => ({
 }));
 
 vi.mock('@/lib/auth-guards', () => ({
-  checkSuspension: vi.fn().mockReturnValue(null),
   requireAdmin: vi.fn().mockReturnValue(null),
 }));
 
-vi.mock('@/lib/free-tier-provider-selector', () => ({
-  selectFreeTierProviders: vi.fn().mockReturnValue({ ai: null, tts: null }),
-}));
-
-import { GET as getList, POST as createPodcast } from '@/app/api/podcasts/route';
+import { GET as getList, POST as createPodcast } from '@/app/api/v1/podcasts/route';
 import {
   GET as getPodcast,
   PATCH as updatePodcast,
   DELETE as deletePodcast,
-} from '@/app/api/podcasts/[podcastId]/route';
+} from '@/app/api/v1/podcasts/[podcastId]/route';
 
 const mockPrisma = {
   podcast: {
@@ -146,7 +127,7 @@ const mockPrisma = {
   },
 };
 
-function createGetRequest(path = '/api/podcasts'): NextRequest {
+function createGetRequest(path = '/api/v1/podcasts'): NextRequest {
   const url = new URL(path, 'http://localhost:3000');
   return new NextRequest(url);
 }
@@ -230,7 +211,7 @@ const mockPodcastWithRelations = {
   interactions: [],
 };
 
-describe('GET /api/podcasts', () => {
+describe('GET /api/v1/podcasts', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -288,16 +269,30 @@ describe('GET /api/podcasts', () => {
   });
 });
 
-describe('POST /api/podcasts', () => {
+describe('POST /api/v1/podcasts', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUserFindUnique.mockResolvedValue({ preferredAiModel: null });
+    mockGetAutoModelConfig.mockResolvedValue({
+      model: {
+        aiProvider: 'anthropic',
+        aiModel: 'claude-haiku-4-5-20251001',
+        ttsProvider: 'openai',
+        ttsModel: 'tts-1-hd',
+        sttProvider: 'openai',
+        sttModel: 'whisper-1',
+      },
+      platform: {
+        aiProvider: 'anthropic',
+        aiModel: 'claude-haiku-4-5-20251001',
+      },
+    });
   });
 
   it('returns 401 when not authenticated', async () => {
     mockAuthenticateRequest.mockResolvedValue(null);
 
-    const request = createPostRequest('/api/podcasts', { title: 'Test', topic: 'Test topic' });
+    const request = createPostRequest('/api/v1/podcasts', { title: 'Test', topic: 'Test topic' });
     const response = await createPodcast(request);
 
     expect(response.status).toBe(401);
@@ -308,7 +303,6 @@ describe('POST /api/podcasts', () => {
   it('creates podcast and queues extraction pipeline', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 59, resetAt: Date.now() });
-    mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', isByokUser: true });
     mockDiscoveryCreate.mockResolvedValue({ id: 'disc-1' });
     mockAddJob.mockResolvedValue(undefined);
     mockPrisma.podcast.create.mockResolvedValue({
@@ -322,7 +316,7 @@ describe('POST /api/podcasts', () => {
       ...explicitTtsSelection,
     };
 
-    const request = createPostRequest('/api/podcasts', body);
+    const request = createPostRequest('/api/v1/podcasts', body);
     const response = await createPodcast(request);
 
     expect(response.status).toBe(201);
@@ -336,28 +330,39 @@ describe('POST /api/podcasts', () => {
     );
   });
 
-  it('returns 400 for BYOK creation without an explicit TTS provider', async () => {
+  it('auto-resolves TTS provider when none is explicit', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 59, resetAt: Date.now() });
-    mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', isByokUser: true });
+    mockDiscoveryCreate.mockResolvedValue({ id: 'disc-1' });
+    mockAddJob.mockResolvedValue(undefined);
+    mockPrisma.podcast.create.mockResolvedValue({
+      ...mockPodcast,
+      status: 'EXTRACTING',
+      ttsProvider: 'openai',
+      ttsModel: 'tts-1-hd',
+    });
 
-    const request = createPostRequest('/api/podcasts', {
+    const request = createPostRequest('/api/v1/podcasts', {
       title: 'Quantum Physics 101',
       topic: 'An introduction to quantum mechanics',
     });
     const response = await createPodcast(request);
-    const result = await response.json();
 
-    expect(response.status).toBe(400);
-    expect(result).toMatchObject({ code: 'tts_provider_required' });
-    expect(mockPodcastCreate).not.toHaveBeenCalled();
-    expect(mockAddJob).not.toHaveBeenCalled();
+    expect(response.status).toBe(201);
+    expect(mockPodcastCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          ttsProvider: 'openai',
+          ttsModel: 'tts-1-hd',
+          ttsAutoResolved: true,
+        }),
+      }),
+    );
   });
 
   it('creates podcast with optional voice IDs', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 59, resetAt: Date.now() });
-    mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', isByokUser: true });
     mockDiscoveryCreate.mockResolvedValue({ id: 'disc-1' });
     mockAddJob.mockResolvedValue(undefined);
     mockPrisma.podcast.create.mockResolvedValue(mockPodcast);
@@ -370,7 +375,7 @@ describe('POST /api/podcasts', () => {
       expertVoiceId: 'voice-expert-custom',
     };
 
-    const request = createPostRequest('/api/podcasts', body);
+    const request = createPostRequest('/api/v1/podcasts', body);
     const response = await createPodcast(request);
 
     expect(response.status).toBe(201);
@@ -383,7 +388,7 @@ describe('POST /api/podcasts', () => {
     mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 59, resetAt: Date.now() });
 
     const body = { topic: 'Test topic' };
-    const request = createPostRequest('/api/podcasts', body);
+    const request = createPostRequest('/api/v1/podcasts', body);
     const response = await createPodcast(request);
 
     expect(response.status).toBe(400);
@@ -396,7 +401,7 @@ describe('POST /api/podcasts', () => {
     mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 59, resetAt: Date.now() });
 
     const body = { title: 'Test Podcast' };
-    const request = createPostRequest('/api/podcasts', body);
+    const request = createPostRequest('/api/v1/podcasts', body);
     const response = await createPodcast(request);
 
     expect(response.status).toBe(400);
@@ -413,7 +418,7 @@ describe('POST /api/podcasts', () => {
       topic: 'Test topic',
     };
 
-    const request = createPostRequest('/api/podcasts', body);
+    const request = createPostRequest('/api/v1/podcasts', body);
     const response = await createPodcast(request);
 
     expect(response.status).toBe(400);
@@ -428,7 +433,7 @@ describe('POST /api/podcasts', () => {
       topic: 'a'.repeat(5001),
     };
 
-    const request = createPostRequest('/api/podcasts', body);
+    const request = createPostRequest('/api/v1/podcasts', body);
     const response = await createPodcast(request);
 
     expect(response.status).toBe(400);
@@ -443,7 +448,7 @@ describe('POST /api/podcasts', () => {
       topic: 'Test topic',
     };
 
-    const request = createPostRequest('/api/podcasts', body);
+    const request = createPostRequest('/api/v1/podcasts', body);
     const response = await createPodcast(request);
 
     expect(response.status).toBe(400);
@@ -458,7 +463,7 @@ describe('POST /api/podcasts', () => {
     });
 
     const body = { title: 'Test', topic: 'Test topic' };
-    const request = createPostRequest('/api/podcasts', body, 'Bearer sk_sotto_test123');
+    const request = createPostRequest('/api/v1/podcasts', body, 'Bearer sk_sotto_test123');
     const response = await createPodcast(request);
 
     expect(response.status).toBe(429);
@@ -468,7 +473,7 @@ describe('POST /api/podcasts', () => {
   });
 });
 
-describe('GET /api/podcasts/[podcastId]', () => {
+describe('GET /api/v1/podcasts/[podcastId]', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -477,7 +482,7 @@ describe('GET /api/podcasts/[podcastId]', () => {
     mockAuthenticateRequest.mockResolvedValue(null);
     mockPrisma.podcast.findUnique.mockResolvedValue(null);
 
-    const request = createGetRequest('/api/podcasts/pod-999');
+    const request = createGetRequest('/api/v1/podcasts/pod-999');
     const response = await getPodcast(request, {
       params: Promise.resolve({ podcastId: 'pod-999' }),
     });
@@ -491,7 +496,7 @@ describe('GET /api/podcasts/[podcastId]', () => {
     mockAuthenticateRequest.mockResolvedValue(null);
     mockPrisma.podcast.findUnique.mockResolvedValue(mockPodcastWithRelations);
 
-    const request = createGetRequest('/api/podcasts/pod-1');
+    const request = createGetRequest('/api/v1/podcasts/pod-1');
     const response = await getPodcast(request, {
       params: Promise.resolve({ podcastId: 'pod-1' }),
     });
@@ -510,7 +515,7 @@ describe('GET /api/podcasts/[podcastId]', () => {
       visibility: 'PRIVATE',
     });
 
-    const request = createGetRequest('/api/podcasts/pod-1');
+    const request = createGetRequest('/api/v1/podcasts/pod-1');
     const response = await getPodcast(request, {
       params: Promise.resolve({ podcastId: 'pod-1' }),
     });
@@ -527,7 +532,7 @@ describe('GET /api/podcasts/[podcastId]', () => {
       visibility: 'PRIVATE',
     });
 
-    const request = createGetRequest('/api/podcasts/pod-1');
+    const request = createGetRequest('/api/v1/podcasts/pod-1');
     const response = await getPodcast(request, {
       params: Promise.resolve({ podcastId: 'pod-1' }),
     });
@@ -543,7 +548,7 @@ describe('GET /api/podcasts/[podcastId]', () => {
     });
     mockSaveFindUnique.mockResolvedValue(null);
 
-    const request = createGetRequest('/api/podcasts/pod-1');
+    const request = createGetRequest('/api/v1/podcasts/pod-1');
     const response = await getPodcast(request, {
       params: Promise.resolve({ podcastId: 'pod-1' }),
     });
@@ -561,7 +566,7 @@ describe('GET /api/podcasts/[podcastId]', () => {
     });
     mockSaveFindUnique.mockResolvedValue(null);
 
-    const request = createGetRequest('/api/podcasts/pod-1');
+    const request = createGetRequest('/api/v1/podcasts/pod-1');
     const response = await getPodcast(request, {
       params: Promise.resolve({ podcastId: 'pod-1' }),
     });
@@ -578,7 +583,7 @@ describe('GET /api/podcasts/[podcastId]', () => {
       createdAt: new Date(),
     });
 
-    const request = createGetRequest('/api/podcasts/pod-1');
+    const request = createGetRequest('/api/v1/podcasts/pod-1');
     const response = await getPodcast(request, {
       params: Promise.resolve({ podcastId: 'pod-1' }),
     });
@@ -592,7 +597,7 @@ describe('GET /api/podcasts/[podcastId]', () => {
     mockAuthenticateRequest.mockResolvedValue(null);
     mockPrisma.podcast.findUnique.mockResolvedValue(mockPodcastWithRelations);
 
-    const request = createGetRequest('/api/podcasts/pod-1');
+    const request = createGetRequest('/api/v1/podcasts/pod-1');
     const response = await getPodcast(request, {
       params: Promise.resolve({ podcastId: 'pod-1' }),
     });
@@ -609,12 +614,12 @@ describe('GET /api/podcasts/[podcastId]', () => {
   });
 });
 
-describe('PATCH /api/podcasts/[podcastId]', () => {
+describe('PATCH /api/v1/podcasts/[podcastId]', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
-    mockUserFindUniqueOrThrow.mockResolvedValue({ plan: 'PRO', role: 'USER' });
-    const { getTierFeatures } = await import('@/lib/tier-features');
-    (getTierFeatures as ReturnType<typeof vi.fn>).mockReturnValue({
+    mockUserFindUniqueOrThrow.mockResolvedValue({ role: 'USER' });
+    const { getGenerationFeatures } = await import('@/lib/generation-features');
+    (getGenerationFeatures as ReturnType<typeof vi.fn>).mockReturnValue({
       maxDurationMinutes: 30,
       maxSpeakers: 4,
       autoApproveScript: false,
@@ -623,16 +628,13 @@ describe('PATCH /api/podcasts/[podcastId]', () => {
       privateAllowed: true,
       priorityQueue: true,
       analyticsEnabled: true,
-      voiceTracksEnabled: true,
-      maxVoiceTracks: 3,
-      voiceCloningEnabled: true,
     });
   });
 
   it('returns 401 when not authenticated', async () => {
     mockAuthenticateRequest.mockResolvedValue(null);
 
-    const request = createPatchRequest('/api/podcasts/pod-1', { title: 'Updated' });
+    const request = createPatchRequest('/api/v1/podcasts/pod-1', { title: 'Updated' });
     const response = await updatePodcast(request, {
       params: Promise.resolve({ podcastId: 'pod-1' }),
     });
@@ -646,7 +648,7 @@ describe('PATCH /api/podcasts/[podcastId]', () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockPrisma.podcast.findUnique.mockResolvedValue(null);
 
-    const request = createPatchRequest('/api/podcasts/pod-999', { title: 'Updated' });
+    const request = createPatchRequest('/api/v1/podcasts/pod-999', { title: 'Updated' });
     const response = await updatePodcast(request, {
       params: Promise.resolve({ podcastId: 'pod-999' }),
     });
@@ -660,7 +662,7 @@ describe('PATCH /api/podcasts/[podcastId]', () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-2' });
     mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1' });
 
-    const request = createPatchRequest('/api/podcasts/pod-1', { title: 'Updated' });
+    const request = createPatchRequest('/api/v1/podcasts/pod-1', { title: 'Updated' });
     const response = await updatePodcast(request, {
       params: Promise.resolve({ podcastId: 'pod-1' }),
     });
@@ -678,7 +680,7 @@ describe('PATCH /api/podcasts/[podcastId]', () => {
       title: 'Updated Title',
     });
 
-    const request = createPatchRequest('/api/podcasts/pod-1', { title: 'Updated Title' });
+    const request = createPatchRequest('/api/v1/podcasts/pod-1', { title: 'Updated Title' });
     const response = await updatePodcast(request, {
       params: Promise.resolve({ podcastId: 'pod-1' }),
     });
@@ -696,7 +698,7 @@ describe('PATCH /api/podcasts/[podcastId]', () => {
       topic: 'Updated topic',
     });
 
-    const request = createPatchRequest('/api/podcasts/pod-1', { topic: 'Updated topic' });
+    const request = createPatchRequest('/api/v1/podcasts/pod-1', { topic: 'Updated topic' });
     const response = await updatePodcast(request, {
       params: Promise.resolve({ podcastId: 'pod-1' }),
     });
@@ -709,13 +711,13 @@ describe('PATCH /api/podcasts/[podcastId]', () => {
   it('updates podcast visibility to PRIVATE for Pro user', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockPodcastFindUnique.mockResolvedValue({ userId: 'user-1' });
-    mockUserFindUniqueOrThrow.mockResolvedValue({ plan: 'PRO', role: 'USER' });
+    mockUserFindUniqueOrThrow.mockResolvedValue({ role: 'USER' });
     mockPodcastUpdate.mockResolvedValue({
       ...mockPodcastWithRelations,
       visibility: 'PRIVATE',
     });
 
-    const request = createPatchRequest('/api/podcasts/pod-1', { visibility: 'PRIVATE' });
+    const request = createPatchRequest('/api/v1/podcasts/pod-1', { visibility: 'PRIVATE' });
     const response = await updatePodcast(request, {
       params: Promise.resolve({ podcastId: 'pod-1' }),
     });
@@ -733,7 +735,7 @@ describe('PATCH /api/podcasts/[podcastId]', () => {
       visibility: 'PRIVATE',
     });
 
-    const request = createPatchRequest('/api/podcasts/pod-1', { visibility: 'PRIVATE' });
+    const request = createPatchRequest('/api/v1/podcasts/pod-1', { visibility: 'PRIVATE' });
     const response = await updatePodcast(request, {
       params: Promise.resolve({ podcastId: 'pod-1' }),
     });
@@ -751,7 +753,7 @@ describe('PATCH /api/podcasts/[podcastId]', () => {
       visibility: 'UNLISTED',
     });
 
-    const request = createPatchRequest('/api/podcasts/pod-1', { visibility: 'UNLISTED' });
+    const request = createPatchRequest('/api/v1/podcasts/pod-1', { visibility: 'UNLISTED' });
     const response = await updatePodcast(request, {
       params: Promise.resolve({ podcastId: 'pod-1' }),
     });
@@ -765,7 +767,7 @@ describe('PATCH /api/podcasts/[podcastId]', () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1' });
 
-    const request = createPatchRequest('/api/podcasts/pod-1', { visibility: 'INVALID' });
+    const request = createPatchRequest('/api/v1/podcasts/pod-1', { visibility: 'INVALID' });
     const response = await updatePodcast(request, {
       params: Promise.resolve({ podcastId: 'pod-1' }),
     });
@@ -777,7 +779,7 @@ describe('PATCH /api/podcasts/[podcastId]', () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1' });
 
-    const request = createPatchRequest('/api/podcasts/pod-1', { title: 'a'.repeat(201) });
+    const request = createPatchRequest('/api/v1/podcasts/pod-1', { title: 'a'.repeat(201) });
     const response = await updatePodcast(request, {
       params: Promise.resolve({ podcastId: 'pod-1' }),
     });
@@ -789,7 +791,7 @@ describe('PATCH /api/podcasts/[podcastId]', () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1' });
 
-    const request = createPatchRequest('/api/podcasts/pod-1', { title: '' });
+    const request = createPatchRequest('/api/v1/podcasts/pod-1', { title: '' });
     const response = await updatePodcast(request, {
       params: Promise.resolve({ podcastId: 'pod-1' }),
     });
@@ -807,7 +809,7 @@ describe('PATCH /api/podcasts/[podcastId]', () => {
       visibility: 'UNLISTED',
     });
 
-    const request = createPatchRequest('/api/podcasts/pod-1', {
+    const request = createPatchRequest('/api/v1/podcasts/pod-1', {
       title: 'New Title',
       topic: 'New Topic',
       visibility: 'UNLISTED',
@@ -824,7 +826,7 @@ describe('PATCH /api/podcasts/[podcastId]', () => {
   });
 });
 
-describe('DELETE /api/podcasts/[podcastId]', () => {
+describe('DELETE /api/v1/podcasts/[podcastId]', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -832,7 +834,7 @@ describe('DELETE /api/podcasts/[podcastId]', () => {
   it('returns 401 when not authenticated', async () => {
     mockAuthenticateRequest.mockResolvedValue(null);
 
-    const request = createDeleteRequest('/api/podcasts/pod-1');
+    const request = createDeleteRequest('/api/v1/podcasts/pod-1');
     const response = await deletePodcast(request, {
       params: Promise.resolve({ podcastId: 'pod-1' }),
     });
@@ -846,7 +848,7 @@ describe('DELETE /api/podcasts/[podcastId]', () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockPrisma.podcast.findUnique.mockResolvedValue(null);
 
-    const request = createDeleteRequest('/api/podcasts/pod-999');
+    const request = createDeleteRequest('/api/v1/podcasts/pod-999');
     const response = await deletePodcast(request, {
       params: Promise.resolve({ podcastId: 'pod-999' }),
     });
@@ -860,7 +862,7 @@ describe('DELETE /api/podcasts/[podcastId]', () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-2' });
     mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1' });
 
-    const request = createDeleteRequest('/api/podcasts/pod-1');
+    const request = createDeleteRequest('/api/v1/podcasts/pod-1');
     const response = await deletePodcast(request, {
       params: Promise.resolve({ podcastId: 'pod-1' }),
     });
@@ -875,7 +877,7 @@ describe('DELETE /api/podcasts/[podcastId]', () => {
     mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1' });
     mockPrisma.podcast.update.mockResolvedValue(mockPodcast);
 
-    const request = createDeleteRequest('/api/podcasts/pod-1');
+    const request = createDeleteRequest('/api/v1/podcasts/pod-1');
     const response = await deletePodcast(request, {
       params: Promise.resolve({ podcastId: 'pod-1' }),
     });

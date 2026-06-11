@@ -7,7 +7,6 @@ import { classifyError, isKeyInvalidationError, userMessage } from './byok-error
 import { markTtsKeyInvalid, markAiKeyInvalid } from './byok';
 import type { AiProviderId } from './providers/ai-registry';
 import type { TtsProviderId } from './providers/tts-registry';
-import type { SttProviderId } from '@sotto/shared';
 
 /** Cached admin user lookup — avoids hitting DB on every worker failure. */
 async function getCachedAdminUsers(): Promise<Array<{ id: string }>> {
@@ -40,17 +39,7 @@ export enum JobType {
   REGENERATE_SEGMENT = 'regenerate_segment',
   SEND_NOTIFICATION = 'send_notification',
   GENERATE_PDF = 'generate_pdf',
-  IMPORT_AUDIO = 'import_audio',
-  INGEST_EVENTS = 'ingest_events',
-  COMPUTE_FEATURES = 'compute_features',
-  EXPORT_DATA = 'export_data',
   VALIDATE_KEYS = 'validate_keys',
-MODERATE_CONTENT = 'moderate_content',
-  VERIFY_VOICE = 'verify_voice',
-  GENERATE_VOICE_TRACK_AUDIO = 'generate_voice_track_audio',
-  STITCH_VOICE_TRACK = 'stitch_voice_track',
-  CLEANUP_DRAFTS = 'cleanup_drafts',
-  COLLECT_R2_USAGE = 'collect_r2_usage',
   FETCH_PRICING = 'fetch_pricing',
   CLASSIFY_VISUALS = 'classify_visuals',
   GENERATE_VISUAL = 'generate_visual',
@@ -58,14 +47,6 @@ MODERATE_CONTENT = 'moderate_content',
   COMPOSE_VIDEO = 'compose_video',
   GENERATE_AVATAR = 'generate_avatar',
   PLACE_ENRICHMENT = 'place_enrichment',
-  GENERATE_DEMO_SCRIPT = 'generate_demo_script',
-  GENERATE_DEMO_RECORDING = 'generate_demo_recording',
-  GENERATE_DEMO_VOICEOVER = 'generate_demo_voiceover',
-  GENERATE_DEMO_VISUAL = 'generate_demo_visual',
-  GENERATE_DEMO_TRANSITION = 'generate_demo_transition',
-  COMPOSE_DEMO = 'compose_demo',
-  COMPOSE_DEMO_SCENE = 'compose_demo_scene',
-  GENERATE_MUSIC = 'generate_music',
   LIP_SYNC_TEST = 'lip_sync_test',
   GENERATE_WAVEFORM = 'generate_waveform',
   CLASSIFY_PIPELINE = 'classify_pipeline',
@@ -73,6 +54,7 @@ MODERATE_CONTENT = 'moderate_content',
   RENDER_SEGMENT_PREVIEW = 'render_segment_preview',
   SPEAKING_GRADING = 'speaking_grading',
   WORKSHEET_PDF = 'worksheet_pdf',
+  VERIFY_CLASS_REFERENCES = 'verify_class_references',
 }
 
 /**
@@ -186,13 +168,6 @@ export interface CompileScriptPayload {
   userId: string;
 }
 
-export interface VerifyVoicePayload {
-  voiceCloneId: string;
-  userId: string;
-  action: 'extract_fingerprint' | 'check_duplicates' | 'verify_challenge';
-  challengeId?: string;
-}
-
 export interface VerifyScriptPayload {
   podcastId: string;
   userId: string;
@@ -205,94 +180,7 @@ export interface GeneratePdfPayload {
   userId: string;
 }
 
-export interface ImportAudioPayload {
-  podcastId: string;
-  userId: string;
-  audioKey: string;
-  transcriptText?: string;
-  isHumanContent: boolean;
-  generateMetadata?: boolean;
-  sttProvider?: 'openai' | 'elevenlabs' | 'together' | 'deepgram' | 'assemblyai';
-  sttModel?: string;
-  sttApiKey?: string;
-}
-
-export interface IngestEventsPayload {
-  ip?: string;
-  events: Array<{
-    context: {
-      sessionId: string;
-      userId?: string;
-      pageUrl: string;
-      deviceType?: string;
-      userAgent?: string;
-      referrer?: string;
-      clientTs: number;
-    };
-    payload: Record<string, unknown> & { eventType: string };
-  }>;
-}
-
-export interface ComputeFeaturesPayload {
-  scope: 'user' | 'podcast' | 'all';
-  targetId?: string;
-}
-
-export interface DataExportPayload {
-  exportType:
-    | 'playback_sessions'
-    | 'behavioral_events'
-    | 'user_features'
-    | 'podcast_features'
-    | 'interactions'
-    | 'training_pairs';
-  dateFrom?: string;
-  dateTo?: string;
-  format: 'jsonl' | 'csv';
-}
-
 export interface ValidateKeysPayload {}
-
-export interface GenerateDemoScriptPayload {
-  projectId: string;
-  durationTarget?: number;
-}
-
-export interface GenerateDemoRecordingPayload {
-  projectId: string;
-  sceneId: string;
-}
-
-export interface GenerateDemoVoiceoverPayload {
-  projectId: string;
-  sceneId: string;
-}
-
-export interface GenerateDemoVisualPayload {
-  projectId: string;
-  sceneId: string;
-}
-
-export interface GenerateDemoTransitionPayload {
-  projectId: string;
-  sceneId: string;
-}
-
-export interface ComposeDemoPayload {
-  projectId: string;
-}
-
-export interface ComposeDemoScenePayload {
-  projectId: string;
-  sceneId: string;
-}
-
-export interface ModerateContentPayload {
-  targetType: 'podcast';
-  targetId: string;
-  content: string;
-  userId?: string;
-}
 
 export interface CollectR2UsagePayload {}
 
@@ -304,7 +192,6 @@ export interface ClassifyVisualsPayload {
   podcastId: string;
   videoGenerationId: string;
   userId: string;
-  voiceTrackId?: string;
   zeroCostVideo?: boolean;
 }
 
@@ -315,13 +202,11 @@ export interface GenerateVisualPayload {
   visualType: string;
   prompt: string;
   metadata: Record<string, unknown>;
-  voiceTrackId?: string;
 }
 
 export interface ComposeVideoPayload {
   podcastId: string;
   videoGenerationId: string;
-  voiceTrackId?: string;
 }
 
 export interface RenderSegmentPreviewPayload {
@@ -348,37 +233,12 @@ export interface GenerateAvatarPayload {
   avatarImageUrl?: string;
   avatarModelId?: string;
   isPreset?: boolean;
-  voiceTrackId?: string;
 }
 
 export interface GenerateTransitionPayload {
   podcastId: string;
   videoGenerationId: string;
   transitionId: string;
-  userId: string;
-}
-
-export interface GenerateVoiceTrackAudioPayload {
-  podcastId: string;
-  voiceTrackId: string;
-  voiceTrackSegmentId: string;
-  segmentId: string;
-  speaker: string;
-  text: string;
-  previousText?: string;
-  nextText?: string;
-  direction?: string;
-}
-
-export interface StitchVoiceTrackPayload {
-  podcastId: string;
-  voiceTrackId: string;
-  voiceTrackSegmentIds: string[];
-}
-
-export interface GenerateMusicPayload {
-  podcastId: string;
-  musicGenerationId: string;
   userId: string;
 }
 
@@ -394,8 +254,6 @@ export interface ClassifyPipelinePayload {
   aiProvider: string;
   aiModel: string;
   apiKeyOverride?: string;
-  tier: 'FREE' | 'PRO';
-  voiceTrackId?: string;
 }
 
 /**
@@ -430,17 +288,7 @@ const QUEUE_DEFINITIONS: Record<string, QueueDefinition> = {
   'segment-regeneration': { attempts: 2 },
   notifications: { attempts: 5, skipEvents: true },
   'pdf-generation': { attempts: 2, skipEvents: true },
-  'event-ingestion': { attempts: 2, removeOnComplete: { age: 3600, count: 500 }, skipEvents: true },
-  'audio-import': { attempts: 2 },
-  'feature-computation': { attempts: 2, skipEvents: true },
-  'data-export': { attempts: 2, skipEvents: true },
   'key-validation': { attempts: 1, skipEvents: true },
-  'content-moderation': { attempts: 2, skipEvents: true },
-  'voice-verification': { attempts: 2, skipEvents: true },
-  'voice-track-audio': { attempts: 3 },
-  'voice-track-stitching': { attempts: 2 },
-  'draft-cleanup': { attempts: 1, skipEvents: true },
-  'r2-usage': { attempts: 2, skipEvents: true },
   'pricing-fetch': { attempts: 2, skipEvents: true },
   'visual-classification': { attempts: 2 },
   'visual-generation': { attempts: 3 },
@@ -448,20 +296,13 @@ const QUEUE_DEFINITIONS: Record<string, QueueDefinition> = {
   'video-composition': { attempts: 2 },
   'avatar-generation': { attempts: 2 },
   'place-enrichment': { attempts: 2 },
-  'demo-script': { attempts: 2 },
-  'demo-recording': { attempts: 2 },
-  'demo-voiceover': { attempts: 2 },
-  'demo-visual': { attempts: 2 },
-  'demo-transition': { attempts: 2 },
-  'demo-composition': { attempts: 2 },
-  'demo-scene-composition': { attempts: 2 },
-  'music-generation': { attempts: 3 },
   'lip-sync-test': { attempts: 1 },
   'waveform-generation': { attempts: 2, skipEvents: true },
   'pipeline-classification': { attempts: 2, skipEvents: true },
   'tts-provider-monitor': { attempts: 2, skipEvents: true },
   'speaking-grading': { attempts: 3 },
   'worksheet-pdf': { attempts: 2, skipEvents: true },
+  'verify-class-references': { attempts: 2, skipEvents: true },
 };
 
 const queueInstances = new Map<string, Queue>();
@@ -562,60 +403,6 @@ async function handleWorkerFailure(
         })
       );
 
-    const VOICE_TRACK_QUEUES = ['voice-track-audio', 'voice-track-stitching'];
-    if (VOICE_TRACK_QUEUES.includes(queueName)) {
-      const voiceTrackId = (job?.data as Record<string, unknown> | undefined)?.voiceTrackId as
-        | string
-        | undefined;
-      if (!voiceTrackId) {
-        return;
-      }
-
-      const errorKind = classifyError(failedReason || '');
-      const failureReason = userMessage(errorKind, 'the provider');
-
-      const voiceTrack = await prisma.voiceTrack.findUnique({
-        where: { id: voiceTrackId },
-        select: { podcastId: true, name: true },
-      });
-      if (!voiceTrack) {
-        return;
-      }
-
-      await prisma.voiceTrack.update({
-        where: { id: voiceTrackId },
-        data: { status: 'FAILED', failureReason },
-      });
-
-      if (isKeyInvalidationError(errorKind)) {
-        const podcast = await prisma.podcast.findUnique({
-          where: { id: voiceTrack.podcastId },
-          select: { userId: true, ttsProvider: true },
-        });
-        if (podcast?.ttsProvider) {
-          await markTtsKeyInvalid(podcast.userId, podcast.ttsProvider as TtsProviderId);
-        }
-      }
-
-      const notifQueue = createQueue('notifications');
-      if (notifQueue) {
-        const podcast = await prisma.podcast.findUnique({
-          where: { id: voiceTrack.podcastId },
-          select: { userId: true },
-        });
-        if (podcast) {
-          await notifQueue.add('send_notification', {
-            userId: podcast.userId,
-            type: 'VOICE_TRACK_FAILED',
-            title: 'Voice Track Failed',
-            message: `Voice track "${voiceTrack.name}" failed: ${failureReason}`,
-            data: { podcastId: voiceTrack.podcastId, voiceTrackId },
-          });
-        }
-      }
-      return;
-    }
-
     const podcast = await prisma.podcast.findUnique({
       where: { id: podcastId },
       select: {
@@ -635,7 +422,7 @@ async function handleWorkerFailure(
     const notifQueue = createQueue('notifications');
     const ownerLabel = podcast.user?.name || podcast.user?.email || podcast.userId;
 
-    const TTS_QUEUES = ['audio-generation', 'segment-regeneration', 'voice-track-audio'];
+    const TTS_QUEUES = ['audio-generation', 'segment-regeneration'];
     const AI_QUEUES = ['script-generation', 'script-verification', 'reference-validation'];
 
     const VIDEO_QUEUES = [
@@ -702,45 +489,6 @@ async function handleWorkerFailure(
       return;
     }
 
-    const MUSIC_QUEUES = ['music-generation'];
-    if (MUSIC_QUEUES.includes(queueName)) {
-      const musicGenerationId = (job?.data as Record<string, unknown> | undefined)
-        ?.musicGenerationId as string | undefined;
-      if (!musicGenerationId) {
-        return;
-      }
-
-      const maxAttempts = job?.opts?.attempts ?? QUEUE_DEFINITIONS[queueName]?.attempts ?? 3;
-      const isTerminal = !job || (job.attemptsMade != null && job.attemptsMade >= maxAttempts);
-      if (!isTerminal) {
-        return;
-      }
-
-      const descriptive = `[${queueName}] ${failedReason || 'Unknown error'}`;
-      await prisma.musicGeneration
-        .update({
-          where: { id: musicGenerationId },
-          data: { status: 'FAILED', failureReason: descriptive },
-        })
-        .catch((err: unknown) => {
-          logger.error('Failed to mark MusicGeneration FAILED', {
-            musicGenerationId,
-            error: err instanceof Error ? err.message : String(err),
-          });
-        });
-
-      if (notifQueue) {
-        await notifQueue.add('send_notification', {
-          userId: podcast.userId,
-          type: 'MUSIC_FAILED',
-          title: 'Music Generation Failed',
-          message: `Background music generation failed: ${failedReason || 'Unknown error'}`,
-          data: { podcastId },
-        });
-      }
-      return;
-    }
-
     if (queueName === 'interactions') {
       if (isKeyInvalidationError(errorKind)) {
         const aiKey = await prisma.userAiKey.findFirst({
@@ -765,8 +513,7 @@ async function handleWorkerFailure(
     if (
       podcast.status === 'READY' ||
       podcast.status === 'FAILED' ||
-      podcast.status === 'SCRIPT_READY' ||
-      podcast.status === 'DRAFT'
+      podcast.status === 'SCRIPT_READY'
     ) {
       return;
     }
@@ -785,9 +532,6 @@ async function handleWorkerFailure(
       'audio-generation': 'Audio generation',
       'audio-stitching': 'Audio stitching',
       'segment-regeneration': 'Segment regeneration',
-      'audio-import': 'Audio import',
-      'voice-track-audio': 'Voice track generation',
-      'voice-track-stitching': 'Voice track stitching',
     };
     const stageLabel = STAGE_LABELS[queueName] || 'Generation';
     let failureReason = userMessage(errorKind, 'the provider', stageLabel);
@@ -814,17 +558,6 @@ async function handleWorkerFailure(
         if (aiKey) {
           didInvalidateKey = await markAiKeyInvalid(podcast.userId, aiKey.provider as AiProviderId);
           failureReason = userMessage(errorKind, aiKey.provider);
-        }
-      } else if (queueName === 'audio-import') {
-        const sttProvider = (job?.data as Record<string, unknown> | undefined)?.sttProvider as
-          | SttProviderId
-          | undefined;
-        if (sttProvider === 'elevenlabs') {
-          didInvalidateKey = await markTtsKeyInvalid(podcast.userId, 'elevenlabs');
-          failureReason = userMessage(errorKind, 'ElevenLabs');
-        } else if (sttProvider) {
-          didInvalidateKey = await markAiKeyInvalid(podcast.userId, sttProvider as AiProviderId);
-          failureReason = userMessage(errorKind, sttProvider);
         }
       }
 
@@ -1007,17 +740,7 @@ export const notificationQueue = createQueueReference('notifications');
 export const referenceValidationQueue = createQueueReference('reference-validation');
 export const pdfGenerationQueue = createQueueReference('pdf-generation');
 export const scriptVerificationQueue = createQueueReference('script-verification');
-export const eventIngestionQueue = createQueueReference('event-ingestion');
-export const audioImportQueue = createQueueReference('audio-import');
-export const featureComputationQueue = createQueueReference('feature-computation');
-export const dataExportQueue = createQueueReference('data-export');
 export const keyValidationQueue = createQueueReference('key-validation');
-export const contentModerationQueue = createQueueReference('content-moderation');
-export const voiceVerificationQueue = createQueueReference('voice-verification');
-export const voiceTrackAudioQueue = createQueueReference('voice-track-audio');
-export const voiceTrackStitchingQueue = createQueueReference('voice-track-stitching');
-export const draftCleanupQueue = createQueueReference('draft-cleanup');
-export const r2UsageQueue = createQueueReference('r2-usage');
 export const pricingFetchQueue = createQueueReference('pricing-fetch');
 export const visualClassificationQueue = createQueueReference('visual-classification');
 export const visualGenerationQueue = createQueueReference('visual-generation');
@@ -1039,22 +762,19 @@ export interface WorksheetPdfPayload {
   classId: string;
   appBaseUrl?: string;
 }
+
+export interface VerifyClassReferencesPayload {
+  podcastId: string;
+}
 export const lipSyncTestQueue = createQueueReference('lip-sync-test');
 export const placeEnrichmentQueue = createQueueReference('place-enrichment');
-export const demoScriptQueue = createQueueReference('demo-script');
-export const demoRecordingQueue = createQueueReference('demo-recording');
-export const demoVoiceoverQueue = createQueueReference('demo-voiceover');
-export const demoVisualQueue = createQueueReference('demo-visual');
-export const demoTransitionQueue = createQueueReference('demo-transition');
-export const demoCompositionQueue = createQueueReference('demo-composition');
-export const demoSceneCompositionQueue = createQueueReference('demo-scene-composition');
-export const musicGenerationQueue = createQueueReference('music-generation');
 export const waveformGenerationQueue = createQueueReference('waveform-generation');
 export const pipelineClassificationQueue = createQueueReference('pipeline-classification');
 export const ttsProviderMonitorQueue = createQueueReference('tts-provider-monitor');
 export const segmentPreviewQueue = createQueueReference('segment-preview');
 export const speakingGradingQueue = createQueueReference('speaking-grading');
 export const worksheetPdfQueue = createQueueReference('worksheet-pdf');
+export const verifyClassReferencesQueue = createQueueReference('verify-class-references');
 
 /** All queue names — single source of truth for admin and health endpoints */
 export const ALL_QUEUE_NAMES = Object.freeze(Object.keys(QUEUE_DEFINITIONS));

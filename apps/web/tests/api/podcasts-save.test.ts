@@ -29,7 +29,7 @@ vi.mock('@/lib/prisma', () => {
   return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
 });
 
-import { POST, DELETE } from '@/app/api/podcasts/[podcastId]/save/route';
+import { POST, DELETE } from '@/app/api/v1/podcasts/[podcastId]/save/route';
 import { auth } from '@/lib/auth';
 
 const mockAuth = auth as unknown as ReturnType<typeof vi.fn>;
@@ -48,7 +48,7 @@ const mockPrisma = {
 };
 
 function createRequest(podcastId: string): NextRequest {
-  const url = new URL(`http://localhost:3000/api/podcasts/${podcastId}/save`);
+  const url = new URL(`http://localhost:3000/api/v1/podcasts/${podcastId}/save`);
   return new NextRequest(url, { method: 'POST' });
 }
 
@@ -78,7 +78,7 @@ const mockSave = {
   createdAt: new Date('2025-01-15T10:00:00Z'),
 };
 
-describe('POST /api/podcasts/[podcastId]/save', () => {
+describe('POST /api/v1/podcasts/[podcastId]/save', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -196,7 +196,7 @@ describe('POST /api/podcasts/[podcastId]/save', () => {
   });
 });
 
-describe('DELETE /api/podcasts/[podcastId]/save', () => {
+describe('DELETE /api/v1/podcasts/[podcastId]/save', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });

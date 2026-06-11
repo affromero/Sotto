@@ -59,7 +59,7 @@
 }
 
 .codeBlock {
-  background: #1a1a1a;
+  background: var(--color-text-primary);
   color: #e5e7eb;
   font-family: 'SF Mono', 'Fira Code', monospace;
   font-size: 13px;
@@ -101,8 +101,8 @@
 }
 
 .method_post {
-  background: #fef3c7;
-  color: #92400e;
+  background: var(--color-primary-light);
+  color: var(--color-primary-active);
 }
 
 .method_delete {
@@ -120,8 +120,8 @@
 .authBadge {
   font-size: 11px;
   font-weight: 600;
-  color: #d97706;
-  background: #d9770610;
+  color: var(--color-primary);
+  background: var(--color-primary)10;
   padding: 2px 8px;
   border-radius: var(--radius-full);
 }

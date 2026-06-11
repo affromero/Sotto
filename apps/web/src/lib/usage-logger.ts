@@ -51,21 +51,6 @@ export async function logUsage(params: {
         });
       });
 
-    // Inline spend tracking for budget enforcement
-    if (params.userId && totalCost && totalCost > 0) {
-      const costCents = Math.round(totalCost * 100);
-      prisma.user
-        .update({
-          where: { id: params.userId },
-          data: { spentMonthCents: { increment: costCents } },
-        })
-        .catch((err) => {
-          logger.warn('logUsage: failed to increment spentMonthCents', {
-            userId: params.userId,
-            error: err instanceof Error ? err.message : String(err),
-          });
-        });
-    }
   } catch (err) {
     logger.warn('logUsage: unexpected error creating ApiUsageLog', {
       category: params.category,

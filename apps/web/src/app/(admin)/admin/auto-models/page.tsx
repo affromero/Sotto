@@ -6,7 +6,6 @@ import { getAllImageProviderMeta, getImageModelCost } from '@/lib/providers/imag
 import { fetchAvatarModels } from '@/lib/avatar-cost-estimator';
 import { getAllVideoProviderMeta } from '@/lib/providers/video-registry';
 import { getAllAvatarProviderMeta } from '@/lib/providers/avatar-registry';
-import { getAllMusicProviderMeta } from '@/lib/providers/music-registry';
 import { AutoModelForm } from './AutoModelForm';
 import styles from './page.module.css';
 
@@ -70,7 +69,7 @@ export default async function AutoModelsPage() {
 
   const avatarPricing = await fetchAvatarModels();
   const avatarPriceMap = new Map(avatarPricing.map((m) => [m.modelId, m]));
-  const imgSurcharge = getImageModelCost(config.proImageModel) * 1; // 1 MP portrait
+  const imgSurcharge = getImageModelCost(config.imageModel) * 1; // 1 MP portrait
   const LIP_SYNC_IMG_MODELS = new Set(['fal-veed-fabric-1.0', 'fal-kling-avatar-v2-pro']);
 
   const avatarProviders = getAllAvatarProviderMeta().map((p) => ({
@@ -94,23 +93,12 @@ export default async function AutoModelsPage() {
     }),
   }));
 
-  const musicProviders = getAllMusicProviderMeta().map((p) => ({
-    id: p.id,
-    displayName: p.displayName,
-    models: p.models.map((m) => ({
-      id: m.id,
-      displayName: m.displayName,
-      tier: 'standard' as const,
-      price: `$${m.costPerTrack}/track`,
-    })),
-  }));
-
   return (
     <div className={styles.container}>
       <div className={styles.header}>
         <h1 className={styles.title}>Auto Models</h1>
         <p className={styles.subtitle}>
-          Configure which models &ldquo;Auto&rdquo; resolves to for each plan tier
+          Configure the default models and available server-backed model set.
         </p>
       </div>
 
@@ -122,12 +110,11 @@ export default async function AutoModelsPage() {
         imageProviders={imageProviders}
         videoProviders={videoProviders}
         avatarProviders={avatarProviders}
-        musicProviders={musicProviders}
       />
 
       <div className={styles.platformNote}>
         <strong>Platform Operations</strong> uses a dedicated AI model for internal tasks
-        that run without user context. This can be more capable than the free/pro defaults.
+        that run without user context. This can be more capable than the learner-facing default.
         <ul>
           <li>Handle screening &mdash; classifying usernames as names, offensive, or OK</li>
           <li>Credential lookup &mdash; verifying participant credentials via web search</li>

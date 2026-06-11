@@ -4,12 +4,12 @@ import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { generateScript, generateScriptWithUserFeedback, type SourceMetadata } from '@/lib/script-generator';
 import { extractContent } from '@/lib/extractors';
 import { logUsage } from '@/lib/usage-logger';
-import { getAiKey, hasByokKey } from '@/lib/byok';
+import { getAiKey } from '@/lib/byok';
 import { getCheapestModelForProvider, resolveAiModelAndProvider, type AiProviderId } from '@/lib/providers/ai-registry';
 import { detectLanguage } from '@/lib/language-detect';
 import { invalidatePodcastCache, publishPodcastStatus } from '@/lib/redis';
 import { matchTopicTags, TAG_PARENT_MAP } from '@/lib/topic-tagger';
-import { getTierFeatures } from '@/lib/tier-features';
+import { getGenerationFeatures } from '@/lib/generation-features';
 import { logger } from '@/lib/logger';
 import { logPipelineStageComplete } from '@/lib/pipeline-events';
 
@@ -44,14 +44,12 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
     return;
   }
 
-  const [hasTts, user, podcast, discovery] = await Promise.all([
-    useAdminCredits ? Promise.resolve(true) : hasByokKey(userId),
-    prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { plan: true, role: true } }),
+  const [podcast, discovery] = await Promise.all([
     prisma.podcast.findUniqueOrThrow({ where: { id: podcastId }, select: { aiModel: true, verificationMode: true, source: true, language: true } }),
     prisma.discovery.findUniqueOrThrow({ where: { id: discoveryId } }),
   ]);
 
-  const tierFeatures = getTierFeatures(user.plan as 'FREE' | 'PRO', hasTts, user.role);
+  const genFeatures = getGenerationFeatures();
 
   const aiKey = useAdminCredits || podcast.aiModel ? null : await getAiKey(userId);
   if (!podcast.aiModel && !aiKey) {
@@ -62,7 +60,6 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
   const { model, provider } = await resolveAiModelAndProvider({
     podcastAiModel: podcast.aiModel,
     aiKey,
-    plan: user.plan as 'FREE' | 'PRO',
   });
 
   const providerAiKey =
@@ -107,16 +104,16 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
 
   const sourceMetadata = discovery.sourceMetadata as SourceMetadata | null;
 
-  // Apply tier caps to duration target
+  // Apply uniform safety cap to duration target.
   const requestedDuration = discovery.durationTarget || 10;
-  const cappedDuration = isFinite(tierFeatures.maxDurationMinutes)
-    ? Math.min(requestedDuration, tierFeatures.maxDurationMinutes)
+  const cappedDuration = isFinite(genFeatures.maxDurationMinutes)
+    ? Math.min(requestedDuration, genFeatures.maxDurationMinutes)
     : requestedDuration;
 
-  // Cap speakers to tier limit
+  // Cap speakers to the uniform safety limit.
   const requestedSpeakers = discovery.speakers as Array<{ name: string; description: string }> | null;
-  const cappedSpeakers = requestedSpeakers && requestedSpeakers.length > tierFeatures.maxSpeakers
-    ? requestedSpeakers.slice(0, tierFeatures.maxSpeakers)
+  const cappedSpeakers = requestedSpeakers && requestedSpeakers.length > genFeatures.maxSpeakers
+    ? requestedSpeakers.slice(0, genFeatures.maxSpeakers)
     : requestedSpeakers;
 
   const hasUserFeedback = job.data.userFeedback && job.data.previousTurns;
@@ -139,7 +136,7 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
         apiKeyOverride: providerAiKey?.apiKey,
         model,
         provider,
-        webSearchEnabled: tierFeatures.webSearchEnabled,
+        webSearchEnabled: genFeatures.webSearchEnabled,
       })
     : await generateScript({
         topic: discovery.topic || '',
@@ -155,9 +152,8 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
         apiKeyOverride: providerAiKey?.apiKey,
         model,
         provider,
-        webSearchEnabled: tierFeatures.webSearchEnabled,
+        webSearchEnabled: genFeatures.webSearchEnabled,
         mode: podcast.verificationMode === 'showcase' ? 'demo' : 'standard',
-        source: podcast.source,
         targetLanguage: podcast.language,
       });
 

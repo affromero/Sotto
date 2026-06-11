@@ -12,7 +12,6 @@ interface ModelTestPanelProps {
   imageProviders: TestableProvider[];
   videoProviders: TestableProvider[];
   avatarProviders: TestableProvider[];
-  musicProviders: TestableProvider[];
 }
 
 type TestStatus = 'idle' | 'running' | 'pass' | 'fail';
@@ -49,7 +48,7 @@ interface TestResponse {
 
 async function runTest(p: TestableProvider): Promise<TestResponse> {
   const keySource = p.hasPlatformKey ? 'platform' : 'byok';
-  const res = await fetch('/api/admin/test-model', {
+  const res = await fetch('/api/v1/admin/test-model', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ type: p.category, provider: p.providerId, model: p.modelId, keySource }),
@@ -266,7 +265,6 @@ export function ModelTestPanel({
   imageProviders,
   videoProviders,
   avatarProviders,
-  musicProviders,
 }: ModelTestPanelProps) {
   const [results, setResults] = useState<Record<string, TestResult>>({});
 
@@ -375,13 +373,6 @@ export function ModelTestPanel({
       <Section
         label="Avatar"
         providers={avatarProviders}
-        results={results}
-        onTest={runSingle}
-        onTestAll={runAll}
-      />
-      <Section
-        label="Music"
-        providers={musicProviders}
         results={results}
         onTest={runSingle}
         onTestAll={runAll}

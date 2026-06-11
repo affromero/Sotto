@@ -17,7 +17,7 @@ export default async function SignupPage() {
           <>
             <h1 className={styles.title}>Create your account</h1>
             <p className={styles.subtitle}>
-              Start creating podcasts in seconds.
+              Sign in to this instance and start learning a language in your own context.
             </p>
             <AuthButtons />
           </>
@@ -25,7 +25,7 @@ export default async function SignupPage() {
           <>
             <h1 className={styles.title}>Join Sotto</h1>
             <p className={styles.subtitle}>
-              Sign-up is currently invite-only. <a href="/">Join the waitlist</a> to get access.
+              Sign-up is currently invite-only. Use an invitation link from your administrator to get access.
             </p>
           </>
         )}

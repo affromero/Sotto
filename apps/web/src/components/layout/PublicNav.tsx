@@ -2,11 +2,17 @@ import Link from 'next/link';
 import Image from 'next/image';
 import styles from './PublicNav.module.css';
 
-const NAV_LINKS = [
-  { href: '/create', label: 'Create' },
-  { href: '/changelog', label: 'Changelog' },
+interface NavLink {
+  href: string;
+  label: string;
+  external?: boolean;
+}
+
+const NAV_LINKS: NavLink[] = [
+  { href: '/about', label: 'About' },
   { href: '/developers', label: 'Developers' },
   { href: '/support', label: 'Support' },
+  { href: 'https://github.com/affromero/Sotto', label: 'GitHub', external: true },
 ];
 
 export function PublicNav() {
@@ -18,13 +24,26 @@ export function PublicNav() {
           Sotto
         </Link>
         <ul className={styles.links} role="list">
-          {NAV_LINKS.map(({ href, label }) => (
-            <li key={href}>
-              <Link href={href} className={styles.link}>
-                {label}
-              </Link>
-            </li>
-          ))}
+          {NAV_LINKS.map(({ href, label, external }) =>
+            external ? (
+              <li key={href}>
+                <a
+                  href={href}
+                  className={styles.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {label}
+                </a>
+              </li>
+            ) : (
+              <li key={href}>
+                <Link href={href} className={styles.link}>
+                  {label}
+                </Link>
+              </li>
+            )
+          )}
         </ul>
       </div>
     </nav>

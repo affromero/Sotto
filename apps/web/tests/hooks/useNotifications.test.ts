@@ -65,7 +65,7 @@ describe('useNotifications', () => {
       });
 
       expect(result.current.notifications).toEqual(mockNotifications);
-      expect(fetch).toHaveBeenCalledWith('/api/notifications');
+      expect(fetch).toHaveBeenCalledWith('/api/v1/notifications');
     });
 
     it('calculates unread count correctly', async () => {
@@ -254,7 +254,7 @@ describe('useNotifications', () => {
 
       await waitFor(() => {
         expect(fetch).toHaveBeenCalledWith(
-          '/api/notifications/notif-1',
+          '/api/v1/notifications/notif-1',
           expect.objectContaining({
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
@@ -335,7 +335,7 @@ describe('useNotifications', () => {
       expect(result.current.unreadCount).toBe(0);
 
       await waitFor(() => {
-        expect(fetch).toHaveBeenCalledWith('/api/notifications/mark-all-read', {
+        expect(fetch).toHaveBeenCalledWith('/api/v1/notifications/mark-all-read', {
           method: 'POST',
         });
       });

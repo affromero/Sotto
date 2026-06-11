@@ -25,12 +25,6 @@
   gap: var(--spacing-sm);
 }
 
-.tierFilter {
-  display: flex;
-  gap: var(--spacing-xs);
-  flex-wrap: wrap;
-}
-
 .filterChip {
   padding: var(--spacing-xs) var(--spacing-sm);
   border-radius: var(--radius-md);
@@ -196,16 +190,6 @@
   letter-spacing: 0.025em;
 }
 
-.badgeFREE {
-  background: var(--color-border);
-  color: var(--color-text-secondary);
-}
-
-.badgePRO {
-  background: var(--color-primary-light);
-  color: var(--color-primary);
-}
-
 .badgeSTARTER {
   background: var(--color-info-light);
   color: var(--color-info);
@@ -219,15 +203,6 @@
 .badgeBYOK {
   background: var(--color-info-light);
   color: var(--color-info);
-}
-
-/* Tier Cell */
-
-.tierCell {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-xs);
-  flex-wrap: wrap;
 }
 
 .subDot {
@@ -269,67 +244,10 @@
   composes: pageInfo from '../admin.module.css';
 }
 
-/* Moderation Actions */
-
 .actionsCell {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-xs);
-}
-
-.moderationButtons {
-  display: flex;
-  gap: var(--spacing-xs);
-}
-
-.modBtn {
-  padding: 2px var(--spacing-xs);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  font: var(--text-caption);
-  font-weight: 500;
-  color: var(--color-text-secondary);
-  background: var(--color-surface);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.modBtn:hover:not(:disabled) {
-  border-color: var(--color-text-secondary);
-  color: var(--color-text-primary);
-}
-
-.modBtn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.modBtnWarn {
-  color: var(--color-primary);
-  border-color: var(--color-primary);
-}
-
-.modBtnWarn:hover:not(:disabled) {
-  background: var(--color-primary-lighter);
-  color: var(--color-primary-hover);
-  border-color: var(--color-primary-hover);
-}
-
-.modBtnDanger {
-  color: var(--color-error);
-  border-color: var(--color-error);
-}
-
-.modBtnDanger:hover:not(:disabled) {
-  background: var(--color-error-lighter);
-  color: var(--color-error-hover);
-  border-color: var(--color-error-hover);
-}
-
-.removedLabel {
-  font: var(--text-caption);
-  color: var(--color-text-muted);
-  font-style: italic;
 }
 
 .statusBadge {

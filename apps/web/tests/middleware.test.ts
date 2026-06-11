@@ -69,18 +69,8 @@ describe('Middleware Security Tests', () => {
       expect(getRedirectLocation(res)).toBe('/auth/login');
     });
 
-    it('redirects /settings/voices to login', async () => {
-      const res = await middleware(createRequest('/settings/voices'));
-      expect(getRedirectLocation(res)).toBe('/auth/login');
-    });
-
-    it('redirects /billing/checkout to login', async () => {
-      const res = await middleware(createRequest('/billing/checkout'));
-      expect(getRedirectLocation(res)).toBe('/auth/login');
-    });
-
-    it('redirects /onboarding to login', async () => {
-      const res = await middleware(createRequest('/onboarding'));
+    it('redirects /welcome to login', async () => {
+      const res = await middleware(createRequest('/welcome'));
       expect(getRedirectLocation(res)).toBe('/auth/login');
     });
   });
@@ -91,11 +81,9 @@ describe('Middleware Security Tests', () => {
   describe('Public Routes — Always Accessible', () => {
     const publicPaths = [
       '/',
-      '/api/health',
-      '/api/waitlist',
+      '/api/v1/health',
       '/feedback',
-      '/api/feedback',
-      '/pitch',
+      '/api/v1/feedback',
     ];
 
     for (const path of publicPaths) {
@@ -105,41 +93,16 @@ describe('Middleware Security Tests', () => {
       });
     }
 
-    it('allows /api/auth/providers (public prefix)', async () => {
-      const res = await middleware(createRequest('/api/auth/providers'));
+    it('allows /api/v1/auth/providers (public prefix)', async () => {
+      const res = await middleware(createRequest('/api/v1/auth/providers'));
       expect(isPassThrough(res)).toBe(true);
     });
 
-    it('allows /api/auth/callback/google (public prefix)', async () => {
-      const res = await middleware(createRequest('/api/auth/callback/google'));
+    it('allows /api/v1/auth/callback/google (public prefix)', async () => {
+      const res = await middleware(createRequest('/api/v1/auth/callback/google'));
       expect(isPassThrough(res)).toBe(true);
     });
 
-    it('allows /api/pitch/manifest (public prefix)', async () => {
-      const res = await middleware(createRequest('/api/pitch/manifest'));
-      expect(isPassThrough(res)).toBe(true);
-    });
-
-    it('allows /api/oembed (public prefix)', async () => {
-      const res = await middleware(createRequest('/api/oembed'));
-      expect(isPassThrough(res)).toBe(true);
-    });
-
-    it('allows /podcast/abc123/embed (embed bypass)', async () => {
-      const res = await middleware(createRequest('/podcast/abc123/embed'));
-      expect(isPassThrough(res)).toBe(true);
-    });
-
-    it('does NOT allow /podcast/abc123/embed/evil (must match exact pattern)', async () => {
-      const res = await middleware(createRequest('/podcast/abc123/embed/evil'));
-      // Not a public route — passes through as non-protected, non-auth route
-      expect(isPassThrough(res)).toBe(true);
-    });
-
-    it('allows /auth/waitlisted for unauthenticated users', async () => {
-      const res = await middleware(createRequest('/auth/waitlisted'));
-      expect(isPassThrough(res)).toBe(true);
-    });
   });
 
   // =====================================================================
@@ -176,22 +139,16 @@ describe('Middleware Security Tests', () => {
       expect(fullLocation).toContain('callbackUrl=%2Fcreate');
     });
 
-    it('/auth/login redirects authenticated users to /dashboard', async () => {
+    it('/auth/login redirects authenticated users to /learn', async () => {
       mockGetToken.mockResolvedValue({ sub: 'user-1', role: 'USER' });
       const res = await middleware(createRequest('/auth/login'));
-      expect(getRedirectLocation(res)).toBe('/dashboard');
+      expect(getRedirectLocation(res)).toBe('/learn');
     });
 
-    it('/auth/signup redirects authenticated users to /dashboard', async () => {
+    it('/auth/signup redirects authenticated users to /learn', async () => {
       mockGetToken.mockResolvedValue({ sub: 'user-1', role: 'USER' });
       const res = await middleware(createRequest('/auth/signup'));
-      expect(getRedirectLocation(res)).toBe('/dashboard');
-    });
-
-    it('/auth/waitlisted redirects authenticated users to /dashboard', async () => {
-      mockGetToken.mockResolvedValue({ sub: 'user-1', role: 'USER' });
-      const res = await middleware(createRequest('/auth/waitlisted'));
-      expect(getRedirectLocation(res)).toBe('/dashboard');
+      expect(getRedirectLocation(res)).toBe('/learn');
     });
 
     it('allows authenticated user to access /dashboard', async () => {
@@ -207,9 +164,9 @@ describe('Middleware Security Tests', () => {
     });
 
     it('passes through API routes (own auth handling)', async () => {
-      const res = await middleware(createRequest('/api/podcasts'));
+      const res = await middleware(createRequest('/api/v1/podcasts'));
       // API routes without Authorization header still need to reach the API handler
-      // They pass through because they're not in PROTECTED_ROUTES check (starts with /api/)
+      // They pass through because they're not in PROTECTED_ROUTES check (starts with /api/v1/)
       expect(isPassThrough(res)).toBe(true);
     });
 
@@ -226,19 +183,19 @@ describe('Middleware Security Tests', () => {
     it('blocks regular USER from /admin', async () => {
       mockGetToken.mockResolvedValue({ sub: 'user-1', role: 'USER' });
       const res = await middleware(createRequest('/admin'));
-      expect(getRedirectLocation(res)).toBe('/dashboard');
+      expect(getRedirectLocation(res)).toBe('/learn');
     });
 
     it('blocks user with no role from /admin', async () => {
       mockGetToken.mockResolvedValue({ sub: 'user-3' });
       const res = await middleware(createRequest('/admin'));
-      expect(getRedirectLocation(res)).toBe('/dashboard');
+      expect(getRedirectLocation(res)).toBe('/learn');
     });
 
     it('blocks user with fabricated role string from /admin', async () => {
       mockGetToken.mockResolvedValue({ sub: 'user-4', role: 'SUPERADMIN' });
       const res = await middleware(createRequest('/admin'));
-      expect(getRedirectLocation(res)).toBe('/dashboard');
+      expect(getRedirectLocation(res)).toBe('/learn');
     });
 
     it('allows ADMIN to access /admin', async () => {
@@ -256,7 +213,7 @@ describe('Middleware Security Tests', () => {
     it('blocks USER from /admin/users subpath', async () => {
       mockGetToken.mockResolvedValue({ sub: 'user-1', role: 'USER' });
       const res = await middleware(createRequest('/admin/users'));
-      expect(getRedirectLocation(res)).toBe('/dashboard');
+      expect(getRedirectLocation(res)).toBe('/learn');
     });
   });
 });

@@ -1,4 +1,4 @@
-/** Shared queue stats shape (matches GET /api/admin/queues response) */
+/** Shared queue stats shape (matches GET /api/v1/admin/queues response) */
 export interface QueueStats {
   waiting: number;
   active: number;
@@ -11,11 +11,8 @@ export type PipelineStage =
   | 'Content Pipeline'
   | 'Audio Pipeline'
   | 'Interactions'
-  | 'Analytics'
   | 'Platform Ops'
-  | 'Voice Features'
-  | 'Video Pipeline'
-  | 'Music Pipeline';
+  | 'Video Pipeline';
 
 interface QueueMeta {
   description: string;
@@ -26,11 +23,8 @@ export const PIPELINE_STAGE_ORDER: PipelineStage[] = [
   'Content Pipeline',
   'Audio Pipeline',
   'Interactions',
-  'Analytics',
   'Platform Ops',
-  'Voice Features',
   'Video Pipeline',
-  'Music Pipeline',
 ];
 
 export const QUEUE_METADATA: Record<string, QueueMeta> = {
@@ -50,6 +44,10 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
     description: 'Validates source URLs and citation quality',
     stage: 'Content Pipeline',
   },
+  'verify-class-references': {
+    description: 'Verify-only reference check for sourced classes (writes verdicts, never creates segments)',
+    stage: 'Content Pipeline',
+  },
   'audio-generation': {
     description: 'Converts script segments to audio via TTS providers',
     stage: 'Audio Pipeline',
@@ -66,10 +64,6 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
     description: 'Re-generates individual audio segments after edits',
     stage: 'Audio Pipeline',
   },
-  'audio-import': {
-    description: 'Imports and transcribes uploaded audio files',
-    stage: 'Audio Pipeline',
-  },
   'interactions': {
     description: 'Processes mid-playback Q&A interruptions',
     stage: 'Interactions',
@@ -78,48 +72,12 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
     description: 'Generates PDF transcripts with references',
     stage: 'Interactions',
   },
-  'event-ingestion': {
-    description: 'Ingests behavioral analytics events in batches',
-    stage: 'Analytics',
-  },
-  'feature-computation': {
-    description: 'Computes ML features for recommendations',
-    stage: 'Analytics',
-  },
-  'data-export': {
-    description: 'Exports analytics data for reporting',
-    stage: 'Analytics',
-  },
   'notifications': {
     description: 'Sends push notifications to user devices',
     stage: 'Platform Ops',
   },
   'key-validation': {
     description: 'Validates BYOK API keys for TTS and AI providers',
-    stage: 'Platform Ops',
-  },
-  'content-moderation': {
-    description: 'Moderates user-generated content via OpenAI',
-    stage: 'Platform Ops',
-  },
-  'draft-cleanup': {
-    description: 'Cleans up stale draft podcasts',
-    stage: 'Platform Ops',
-  },
-  'voice-verification': {
-    description: 'Verifies voice clone ownership and quality',
-    stage: 'Voice Features',
-  },
-  'voice-track-audio': {
-    description: 'Generates audio for paid voice-sharing tracks',
-    stage: 'Voice Features',
-  },
-  'voice-track-stitching': {
-    description: 'Stitches voice track audio segments together',
-    stage: 'Voice Features',
-  },
-  'r2-usage': {
-    description: 'Collects R2 storage usage and operations data from Cloudflare API',
     stage: 'Platform Ops',
   },
   'pricing-fetch': {
@@ -149,38 +107,6 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
   'place-enrichment': {
     description: 'Resolves place names to coordinates via gazetteers for map visuals',
     stage: 'Video Pipeline',
-  },
-  'demo-script': {
-    description: 'Generates demo video scripts from project features',
-    stage: 'Video Pipeline',
-  },
-  'demo-recording': {
-    description: 'Records browser sessions via Playwright for demo scenes',
-    stage: 'Video Pipeline',
-  },
-  'demo-voiceover': {
-    description: 'Generates TTS voiceover narration for demo scenes',
-    stage: 'Video Pipeline',
-  },
-  'demo-visual': {
-    description: 'Generates visual assets for demo scenes',
-    stage: 'Video Pipeline',
-  },
-  'demo-transition': {
-    description: 'Creates transition clips between demo scenes',
-    stage: 'Video Pipeline',
-  },
-  'demo-composition': {
-    description: 'Composes final demo video from all scene assets',
-    stage: 'Video Pipeline',
-  },
-  'demo-scene-composition': {
-    description: 'Composes individual demo scenes from visual, voiceover, and recording assets',
-    stage: 'Video Pipeline',
-  },
-  'music-generation': {
-    description: 'Generates AI background music for podcasts via Suno or ElevenLabs',
-    stage: 'Music Pipeline',
   },
   'lip-sync-test': {
     description: 'Tests lip-sync models with a short audio clip and avatar image via fal.ai',

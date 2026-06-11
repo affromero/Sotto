@@ -11,10 +11,6 @@ export type {
   ReferenceType,
   VerificationStatus,
   NotificationType,
-  VoiceCloneSource,
-  VoiceRequestStatus,
-  VoiceTrackStatus,
-  ProposalStatus,
   FeedbackType,
   FeedbackStatus,
   CefrLevel,
@@ -25,6 +21,9 @@ export type {
   EdgeType,
   PracticeKind,
   PracticeStatus,
+  ExamInstitution,
+  MockExamStatus,
+  PedagogyStyle,
 } from './types/enums';
 
 // Types
@@ -40,8 +39,6 @@ export type {
   TtsOption,
   ScriptTurn,
   VoiceProfile,
-  VoiceTrackSummary,
-  VoiceTrackContributor,
 } from './types/podcast';
 
 export type { ReferenceData, VerificationLayerResult } from './types/reference';
@@ -59,10 +56,7 @@ export type {
   DiscoveryState,
   TasteQuestion,
   TasteAnswer,
-  InspireSection,
 } from './types/discovery';
-
-export { INSPIRE_SECTION_LABELS } from './types/discovery';
 
 
 export type { PlayerState, PlayerControls } from './types/player';
@@ -77,40 +71,7 @@ export type { NotificationData, PushSubscriptionData } from './types/notificatio
 
 export type { PodcastVersionSummary, PodcastVersionDetail } from './types/version';
 
-export type {
-  ServiceBreakdown,
-  CategoryBreakdown,
-  UsageDataPoint,
-  AnalyticsSummary,
-  AnalyticsResponse,
-  CreatorOverview,
-  CreatorTopPodcast,
-  CreatorDailyPlays,
-  CreatorPrivateActivity,
-  CreatorAudienceInsights,
-  CreatorAnalyticsResponse,
-} from './types/analytics';
-
 export type { ApiKeyData, ApiKeyCreated } from './types/api-key';
-
-export type {
-  EventContext,
-  EventPayload,
-  EventType,
-  BehavioralEventInput,
-  EventBatch,
-} from './types/events';
-
-export type {
-  ImportPodcastRequest,
-  ImportProgress,
-  TranscriptionResult,
-  SourcePlatformValue,
-  SourcePlatformInfo,
-  SttProviderId,
-} from './types/import';
-
-export { SOURCE_PLATFORMS, SOURCE_PLATFORM_HELP } from './types/import';
 
 export { getContentBadgeLabel, getPodcastBadges } from './content-badge';
 export type { PodcastBadge } from './content-badge';
@@ -129,8 +90,6 @@ export {
   getTtsModelLabel,
   getLanguageLabel,
 } from './provider-display';
-
-export type { PitchDocument, PitchVersion, PitchManifest } from './types/pitch';
 
 // Brand copy (single source of truth)
 export { BRAND } from './brand';

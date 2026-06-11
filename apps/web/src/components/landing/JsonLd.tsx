@@ -1,6 +1,5 @@
 import { BRAND } from '@sotto/shared';
 import { getAppBaseUrl } from '@/lib/urls';
-import { getTwitterBotHandle, getTwitterProfileUrl } from '@/lib/bot-identity';
 
 interface WebSiteSchema {
   '@context': 'https://schema.org';
@@ -22,7 +21,6 @@ interface OrganizationSchema {
 
 export function JsonLd() {
   const appUrl = getAppBaseUrl();
-  const twitterUrl = getTwitterProfileUrl(getTwitterBotHandle());
   const websiteSchema: WebSiteSchema = {
     '@context': 'https://schema.org',
     '@type': 'WebSite',
@@ -36,7 +34,7 @@ export function JsonLd() {
     name: BRAND.name,
     url: appUrl,
     logo: `${appUrl}/icon-512.png`,
-    sameAs: twitterUrl ? [twitterUrl] : [],
+    sameAs: BRAND.twitter ? [BRAND.twitter] : [],
     description: BRAND.elevatorPitch,
   };
 

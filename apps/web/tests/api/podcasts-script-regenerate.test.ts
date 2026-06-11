@@ -57,25 +57,22 @@ vi.mock('@/lib/redis', () => ({
   publishPodcastStatus: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('@/lib/generation-gate', () => ({
-  checkGenerationGate: vi.fn().mockResolvedValue({ allowed: true, reason: 'ok', isByokUser: true }),
-}));
 
 vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
-import { POST } from '@/app/api/podcasts/[podcastId]/script/regenerate/route';
+import { POST } from '@/app/api/v1/podcasts/[podcastId]/script/regenerate/route';
 
 function createRequest(body?: object): NextRequest {
   if (body) {
-    return new NextRequest(new URL('http://localhost:3000/api/podcasts/pod-1/script/regenerate'), {
+    return new NextRequest(new URL('http://localhost:3000/api/v1/podcasts/pod-1/script/regenerate'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
   }
-  return new NextRequest(new URL('http://localhost:3000/api/podcasts/pod-1/script/regenerate'), {
+  return new NextRequest(new URL('http://localhost:3000/api/v1/podcasts/pod-1/script/regenerate'), {
     method: 'POST',
   });
 }
@@ -84,7 +81,7 @@ async function createParams(podcastId: string) {
   return { params: Promise.resolve({ podcastId }) };
 }
 
-describe('POST /api/podcasts/[podcastId]/script/regenerate', () => {
+describe('POST /api/v1/podcasts/[podcastId]/script/regenerate', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Default: dossier + outline exist (happy path goes to script-writing)
@@ -244,7 +241,7 @@ describe('POST /api/podcasts/[podcastId]/script/regenerate', () => {
   it('returns 400 for invalid feedback body', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
 
-    const req = new NextRequest(new URL('http://localhost:3000/api/podcasts/pod-1/script/regenerate'), {
+    const req = new NextRequest(new URL('http://localhost:3000/api/v1/podcasts/pod-1/script/regenerate'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: 'not valid json',

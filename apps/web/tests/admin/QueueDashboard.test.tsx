@@ -15,7 +15,6 @@ const mockQueues = {
   'script-generation': { waiting: 0, active: 0, completed: 50, failed: 2, delayed: 0 },
   'audio-generation': { waiting: 0, active: 2, completed: 200, failed: 0, delayed: 1 },
   'notifications': { waiting: 0, active: 0, completed: 500, failed: 0, delayed: 0 },
-  'voice-verification': { waiting: 1, active: 0, completed: 10, failed: 5, delayed: 0 },
 };
 
 function mockFetchSuccess(data = mockQueues) {
@@ -59,7 +58,6 @@ describe('QueueDashboard', () => {
     expect(screen.getByText('script-generation')).toBeInTheDocument();
     expect(screen.getByText('audio-generation')).toBeInTheDocument();
     expect(screen.getByText('notifications')).toBeInTheDocument();
-    expect(screen.getByText('voice-verification')).toBeInTheDocument();
   });
 
   it('displays summary card totals', async () => {
@@ -79,11 +77,11 @@ describe('QueueDashboard', () => {
       return within(card).getByText(/^\d+$/).textContent!;
     }
 
-    expect(cardValue('Total Queues')).toBe('5');
-    expect(cardValue('Active')).toBe('3');    // 1 + 0 + 2 + 0 + 0
-    expect(cardValue('Waiting')).toBe('4');   // 3 + 0 + 0 + 0 + 1
-    expect(cardValue('Failed')).toBe('7');    // 0 + 2 + 0 + 0 + 5
-    expect(cardValue('Delayed')).toBe('1');   // 0 + 0 + 1 + 0 + 0
+    expect(cardValue('Total Queues')).toBe('4');
+    expect(cardValue('Active')).toBe('3');    // 1 + 0 + 2 + 0
+    expect(cardValue('Waiting')).toBe('3');   // 3 + 0 + 0 + 0
+    expect(cardValue('Failed')).toBe('2');    // 0 + 2 + 0 + 0
+    expect(cardValue('Delayed')).toBe('1');   // 0 + 0 + 1 + 0
   });
 
   it('shows error banner on fetch failure', async () => {
@@ -136,9 +134,8 @@ describe('QueueDashboard', () => {
 
     await user.click(screen.getByRole('button', { name: 'Failed' }));
 
-    // Only queues with failed > 0: script-generation (2), voice-verification (5)
+    // Only queues with failed > 0: script-generation (2)
     expect(screen.getByText('script-generation')).toBeInTheDocument();
-    expect(screen.getByText('voice-verification')).toBeInTheDocument();
     expect(screen.queryByText('content-extraction')).not.toBeInTheDocument();
     expect(screen.queryByText('notifications')).not.toBeInTheDocument();
   });
@@ -186,7 +183,6 @@ describe('QueueDashboard', () => {
     expect(screen.getByText('Content Pipeline')).toBeInTheDocument();
     expect(screen.getByText('Audio Pipeline')).toBeInTheDocument();
     expect(screen.getByText('Platform Ops')).toBeInTheDocument();
-    expect(screen.getByText('Voice Features')).toBeInTheDocument();
   });
 
   it('toggles to flat view and removes stage headers', async () => {
@@ -225,11 +221,11 @@ describe('QueueDashboard', () => {
     expect(sortButton).toBeDefined();
     await user.click(sortButton!);
 
-    // After sorting by failed desc, voice-verification (5) should be first
+    // After sorting by failed desc, script-generation (2) should be first
     const rows = screen.getAllByRole('row');
     // First data row (index 1, after header)
     const firstDataRow = rows[1];
-    expect(within(firstDataRow).getByText('voice-verification')).toBeInTheDocument();
+    expect(within(firstDataRow).getByText('script-generation')).toBeInTheDocument();
   });
 
   it('renders QueueActions for queues with failures', async () => {
@@ -239,9 +235,8 @@ describe('QueueDashboard', () => {
       expect(screen.getByText('content-extraction')).toBeInTheDocument();
     });
 
-    // script-generation has 2 failed, voice-verification has 5 failed
+    // script-generation has 2 failed
     expect(screen.getByTestId('actions-script-generation')).toBeInTheDocument();
-    expect(screen.getByTestId('actions-voice-verification')).toBeInTheDocument();
     // content-extraction has 0 failed — no actions
     expect(screen.queryByTestId('actions-content-extraction')).not.toBeInTheDocument();
   });

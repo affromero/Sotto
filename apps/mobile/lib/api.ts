@@ -2,10 +2,9 @@ import axios from 'axios';
 import { getToken, deleteToken } from './auth';
 import { getApiBaseUrl } from './config';
 
-const BASE_URL = getApiBaseUrl();
-
+// No baseURL is frozen at import — it is resolved per-request below so that a
+// server paired at runtime ("scan to connect") takes effect without a restart.
 export const api = axios.create({
-  baseURL: BASE_URL,
   timeout: 30000,
   headers: { 'Content-Type': 'application/json' },
 });
@@ -25,6 +24,10 @@ function notifyAuthRevoked() {
 }
 
 api.interceptors.request.use(async (config) => {
+  // Resolve the base URL per request from the runtime-paired server (or the
+  // baked-in EXPO_PUBLIC_API_URL). Throws if no server is configured yet — the
+  // connect gate prevents authenticated calls before pairing.
+  config.baseURL = getApiBaseUrl();
   const token = await getToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;

@@ -1,6 +1,6 @@
 .root {
   position: relative;
-  background: #1A1A1A;
+  background: var(--color-text-primary);
   border-radius: var(--radius-2xl);
   overflow: hidden;
 }
@@ -229,11 +229,11 @@
 
 .speakerTag[data-speaker-index="0"] {
   color: var(--color-speaker-0);
-  background: rgba(217, 119, 6, 0.3);
+  background: rgba(63, 79, 176, 0.3);
 }
 .speakerTag[data-speaker-index="1"] {
   color: #93C5FD;
-  background: rgba(30, 58, 95, 0.5);
+  background: rgba(42, 53, 80, 0.5);
 }
 .speakerTag[data-speaker-index="2"] {
   color: #6EE7B7;
@@ -375,7 +375,7 @@
 }
 
 .shapeOptionActive {
-  border-color: var(--color-primary, #D97706);
+  border-color: var(--color-primary);
   color: #F5F5F5;
 }
 

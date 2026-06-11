@@ -46,24 +46,19 @@ async function getOverviewStats() {
   const [
     totalUsers,
     totalPodcasts,
-    waitlistSize,
     readyPodcasts,
     failedPodcasts,
     signupsToday,
     signupsThisWeek,
     signupsThisMonth,
     totalPlays,
-    // Monetization queries
-    revenueAgg,
     apiCostAgg,
-    dauRow,
     pipelineAttempted,
     pipelineFailed,
     byokUsersRow,
   ] = await Promise.all([
     prisma.user.count(),
     prisma.podcast.count(),
-    prisma.waitlist.count(),
     prisma.podcast.count({ where: { status: 'READY' } }),
     prisma.podcast.count({ where: { status: 'FAILED' } }),
     prisma.user.count({
@@ -78,23 +73,11 @@ async function getOverviewStats() {
     prisma.podcast.aggregate({
       _sum: { playCount: true },
     }),
-    // Revenue (30d captured)
-    prisma.voicePurchase.aggregate({
-      where: { status: 'captured', createdAt: { gte: monthAgo } },
-      _sum: { amountCents: true, platformFeeCents: true },
-    }),
     // API costs (30d)
     prisma.apiUsageLog.aggregate({
       where: { createdAt: { gte: monthAgo } },
       _sum: { totalCost: true },
     }),
-    // DAU
-    prisma.$queryRaw<[{ count: bigint }]>`
-      SELECT COUNT(DISTINCT "userId")::bigint AS count
-      FROM "BehavioralEvent"
-      WHERE "userId" IS NOT NULL
-        AND "createdAt" >= ${today}
-    `,
     // Pipeline (30d)
     prisma.podcast.count({
       where: { createdAt: { gte: monthAgo }, source: { not: 'IMPORT' } },
@@ -114,17 +97,13 @@ async function getOverviewStats() {
   return {
     totalUsers,
     totalPodcasts,
-    waitlistSize,
     readyPodcasts,
     failedPodcasts,
     signupsToday,
     signupsThisWeek,
     signupsThisMonth,
     totalPlays: totalPlays._sum.playCount ?? 0,
-    revenueCents: revenueAgg._sum.amountCents ?? 0,
-    platformFeesCents: revenueAgg._sum.platformFeeCents ?? 0,
     apiCosts: apiCostAgg._sum.totalCost ?? 0,
-    dau: Number(dauRow[0]?.count ?? 0),
     pipelineSuccessRate:
       pipelineAttempted > 0
         ? Math.round(((pipelineAttempted - pipelineFailed) / pipelineAttempted) * 100)
@@ -159,13 +138,6 @@ export default async function AdminOverviewPage() {
             <span className={styles.cardLabel}>Total Podcasts</span>
           </div>
           <div className={styles.cardValue}>{stats.totalPodcasts.toLocaleString()}</div>
-        </div>
-
-        <div className={styles.card}>
-          <div className={styles.cardHeader}>
-            <span className={styles.cardLabel}>Waitlist</span>
-          </div>
-          <div className={styles.cardValue}>{stats.waitlistSize.toLocaleString()}</div>
         </div>
 
         <div className={styles.card}>
@@ -209,23 +181,11 @@ export default async function AdminOverviewPage() {
       </div>
 
       <div className={styles.section}>
-        <h2 className={styles.sectionTitle}>Monetization (30d)</h2>
+        <h2 className={styles.sectionTitle}>Costs (30d)</h2>
         <div className={styles.statsGrid}>
-          <div className={styles.statCard}>
-            <span className={styles.statLabel}>Revenue</span>
-            <span className={styles.statValue}>${(stats.revenueCents / 100).toFixed(2)}</span>
-          </div>
-          <div className={styles.statCard}>
-            <span className={styles.statLabel}>Platform Fees</span>
-            <span className={styles.statValue}>${(stats.platformFeesCents / 100).toFixed(2)}</span>
-          </div>
           <div className={styles.statCard}>
             <span className={styles.statLabel}>API Costs</span>
             <span className={styles.statValue}>${stats.apiCosts.toFixed(2)}</span>
-          </div>
-          <div className={styles.statCard}>
-            <span className={styles.statLabel}>DAU</span>
-            <span className={styles.statValue}>{stats.dau.toLocaleString()}</span>
           </div>
           <div className={styles.statCard}>
             <span className={styles.statLabel}>Pipeline Success</span>

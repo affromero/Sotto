@@ -36,11 +36,6 @@
   background: var(--color-surface);
 }
 
-.cardShared {
-  border-style: dashed;
-  border-color: var(--color-primary);
-}
-
 .cardImage {
   width: 96px;
   height: 96px;
@@ -157,38 +152,6 @@
   font-size: 0.8125rem;
   color: var(--color-text-secondary);
   line-height: 1.4;
-}
-
-/* Shared section */
-.sharedSection {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-sm);
-}
-
-.sharedHeader {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--color-text);
-}
-
-.ownerBadge {
-  font-size: 0.6875rem;
-  color: var(--color-primary);
-  font-style: italic;
-}
-
-/* Shareable toggle on own cards */
-.shareToggle {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  cursor: pointer;
-  font-size: 0.6875rem;
-}
-
-.shareToggleLabel {
-  color: var(--color-text-secondary);
 }
 
 /* Disabled notice */

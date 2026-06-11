@@ -13,10 +13,11 @@ const reversedGoogleClientId = googleClientId
   : null;
 
 function getDeploymentHost() {
+  // A runtime-config ("scan to connect") build has no baked-in server — the user
+  // pairs one in-app. Only derive a fixed host (for universal/app links) when
+  // EXPO_PUBLIC_API_URL is provided; otherwise return null and skip those links.
   if (!apiUrl) {
-    throw new Error(
-      'EXPO_PUBLIC_API_URL is required for mobile builds. Set it to your Sotto deployment API URL, for example http://localhost:3000/api.'
-    );
+    return null;
   }
 
   const parsed = new URL(apiUrl);
@@ -32,7 +33,7 @@ module.exports = ({ config }) => ({
   ...config,
   ios: {
     ...config.ios,
-    associatedDomains: [`applinks:${deploymentHost}`],
+    ...(deploymentHost ? { associatedDomains: [`applinks:${deploymentHost}`] } : {}),
     infoPlist: {
       ...config.ios?.infoPlist,
       CFBundleURLTypes: reversedGoogleClientId
@@ -42,16 +43,18 @@ module.exports = ({ config }) => ({
   },
   android: {
     ...config.android,
-    intentFilters: [
-      {
-        action: 'VIEW',
-        autoVerify: true,
-        data: [
-          { scheme: 'https', host: deploymentHost, pathPrefix: '/podcast' },
-          { scheme: 'https', host: deploymentHost, pathPrefix: '/user' },
-        ],
-        category: ['BROWSABLE', 'DEFAULT'],
-      },
-    ],
+    intentFilters: deploymentHost
+      ? [
+          {
+            action: 'VIEW',
+            autoVerify: true,
+            data: [
+              { scheme: 'https', host: deploymentHost, pathPrefix: '/podcast' },
+              { scheme: 'https', host: deploymentHost, pathPrefix: '/user' },
+            ],
+            category: ['BROWSABLE', 'DEFAULT'],
+          },
+        ]
+      : [],
   },
 });

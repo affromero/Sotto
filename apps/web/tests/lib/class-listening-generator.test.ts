@@ -35,6 +35,8 @@ const {
 
 const { mockGenerateScript } = vi.hoisted(() => ({ mockGenerateScript: vi.fn() }));
 const { mockCreateSegmentsAndQueueAudio } = vi.hoisted(() => ({ mockCreateSegmentsAndQueueAudio: vi.fn() }));
+const { mockPersistGeneratedReferences } = vi.hoisted(() => ({ mockPersistGeneratedReferences: vi.fn() }));
+const { mockAddJob } = vi.hoisted(() => ({ mockAddJob: vi.fn() }));
 const { mockGetAiKey } = vi.hoisted(() => ({ mockGetAiKey: vi.fn() }));
 const { mockGetAiProviderMeta } = vi.hoisted(() => ({ mockGetAiProviderMeta: vi.fn() }));
 const { mockCreateAIProvider, mockGenerateResponse } = vi.hoisted(() => {
@@ -82,6 +84,17 @@ vi.mock('@/lib/segment-creator', () => ({
   createSegmentsAndQueueAudio: (...args: unknown[]) => mockCreateSegmentsAndQueueAudio(...args),
 }));
 
+vi.mock('@/lib/references', () => ({
+  persistGeneratedReferences: (...args: unknown[]) => mockPersistGeneratedReferences(...args),
+}));
+
+vi.mock('@/lib/queue', () => ({
+  addJob: (...args: unknown[]) => mockAddJob(...args),
+  verifyClassReferencesQueue: { name: 'verify-class-references' },
+  referenceValidationQueue: { name: 'reference-validation' },
+  JobType: { VERIFY_CLASS_REFERENCES: 'verify_class_references', VALIDATE_REFERENCES: 'validate_references' },
+}));
+
 vi.mock('@/lib/byok', () => ({
   getAiKey: (...args: unknown[]) => mockGetAiKey(...args),
 }));
@@ -92,6 +105,11 @@ vi.mock('@/lib/providers/ai-registry', () => ({
 
 vi.mock('@/lib/providers/ai', () => ({
   createAIProvider: (...args: unknown[]) => mockCreateAIProvider(...args),
+}));
+
+const mockGetConfiguredTtsProviderId = vi.fn(() => null as string | null);
+vi.mock('@/lib/providers/tts', () => ({
+  getConfiguredTtsProviderId: () => mockGetConfiguredTtsProviderId(),
 }));
 
 vi.mock('@/lib/prompt-loader', () => ({
@@ -211,6 +229,8 @@ function setupHappyPath() {
   mockScriptCreate.mockResolvedValue({});
   mockVocabEntryCreateMany.mockResolvedValue({ count: SAMPLE_VOCABULARY.length });
   mockCreateSegmentsAndQueueAudio.mockResolvedValue(undefined);
+  mockPersistGeneratedReferences.mockResolvedValue(undefined);
+  mockAddJob.mockResolvedValue({ id: 'job-1' });
   mockLearnerVocabUpsert.mockResolvedValue({});
   mockLoadAndRender.mockReturnValue('You are a quiz generator.');
   mockGenerateResponse.mockResolvedValue({
@@ -257,14 +277,26 @@ describe('generateClassListening', () => {
       );
     });
 
-    it('calls generateScript with CLASS source, targetLanguage, conversational_mix and forLearning', async () => {
+    it('seeds the CLASS podcast with the configured local TTS provider (TTS_PROVIDER=kokoro)', async () => {
+      setupHappyPath();
+      mockGetConfiguredTtsProviderId.mockReturnValue('kokoro');
+
+      await generateClassListening(PARAMS);
+
+      expect(mockPodcastCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ ttsProvider: 'kokoro' }),
+        }),
+      );
+    });
+
+    it('calls generateScript with targetLanguage, conversational_mix and forLearning', async () => {
       setupHappyPath();
 
       await generateClassListening(PARAMS);
 
       expect(mockGenerateScript).toHaveBeenCalledWith(
         expect.objectContaining({
-          source: 'CLASS',
           targetLanguage: 'es',
           languageMode: 'conversational_mix',
           forLearning: true,
@@ -519,5 +551,96 @@ describe('composeListeningContent', () => {
         create: expect.objectContaining({ firstSeenClassId: null }),
       }),
     );
+  });
+
+  describe('curriculum class (no sourceContent)', () => {
+    it('lets generateScript run with web search and persists no references', async () => {
+      setupHappyPath();
+
+      await composeListeningContent(CONTENT_PARAMS);
+
+      expect(mockGenerateScript).toHaveBeenCalledWith(
+        expect.objectContaining({ sourceContent: undefined, webSearchEnabled: true }),
+      );
+      // Empty references → persistGeneratedReferences is a no-op caller-side and
+      // the verify-class-references job is never enqueued.
+      expect(mockPersistGeneratedReferences).toHaveBeenCalledWith('podcast-1', []);
+      expect(mockAddJob).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('sourced class (with sourceContent)', () => {
+    const SOURCED_PARAMS: ListeningContentParams = {
+      ...CONTENT_PARAMS,
+      sourceContent: 'Una vez un científico descubrió algo importante. [1]',
+      sourceMetadata: { title: 'Discovery', author: 'A. Researcher', siteName: 'example.org' },
+      sourceUrl: 'https://example.org/article',
+    };
+
+    const SOURCED_REFERENCES = [
+      {
+        number: 1,
+        title: 'The Real Discovery',
+        authors: ['A. Researcher'],
+        year: 2020,
+        url: 'https://example.org/article',
+        type: 'ARTICLE' as const,
+        publisher: 'example.org',
+        doi: null,
+      },
+    ];
+
+    it('passes sourceContent + sourceMetadata and disables web search', async () => {
+      setupHappyPath();
+      mockGenerateScript.mockResolvedValue({ ...SAMPLE_SCRIPT_RESULT, references: SOURCED_REFERENCES });
+
+      await composeListeningContent(SOURCED_PARAMS);
+
+      expect(mockGenerateScript).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sourceContent: SOURCED_PARAMS.sourceContent,
+          sourceMetadata: SOURCED_PARAMS.sourceMetadata,
+          webSearchEnabled: false,
+        }),
+      );
+    });
+
+    it('persists the generated references and enqueues the verify-class-references job', async () => {
+      setupHappyPath();
+      mockGenerateScript.mockResolvedValue({ ...SAMPLE_SCRIPT_RESULT, references: SOURCED_REFERENCES });
+
+      await composeListeningContent(SOURCED_PARAMS);
+
+      expect(mockPersistGeneratedReferences).toHaveBeenCalledWith('podcast-1', SOURCED_REFERENCES);
+      expect(mockAddJob).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'verify-class-references' }),
+        'verify_class_references',
+        { podcastId: 'podcast-1' },
+      );
+    });
+
+    it('NEVER enqueues the reference-validation / VALIDATE_REFERENCES job for a class', async () => {
+      setupHappyPath();
+      mockGenerateScript.mockResolvedValue({ ...SAMPLE_SCRIPT_RESULT, references: SOURCED_REFERENCES });
+
+      await composeListeningContent(SOURCED_PARAMS);
+
+      // Only the verify-only job is enqueued — assert no call used VALIDATE_REFERENCES
+      // nor targeted the reference-validation queue.
+      for (const call of mockAddJob.mock.calls) {
+        expect(call[1]).not.toBe('validate_references');
+        expect((call[0] as { name?: string })?.name).not.toBe('reference-validation');
+      }
+    });
+
+    it('still creates segments exactly once (no double-queue)', async () => {
+      setupHappyPath();
+      mockGenerateScript.mockResolvedValue({ ...SAMPLE_SCRIPT_RESULT, references: SOURCED_REFERENCES });
+
+      await composeListeningContent(SOURCED_PARAMS);
+
+      expect(mockCreateSegmentsAndQueueAudio).toHaveBeenCalledTimes(1);
+      expect(mockCreateSegmentsAndQueueAudio).toHaveBeenCalledWith('podcast-1', SAMPLE_TURNS);
+    });
   });
 });

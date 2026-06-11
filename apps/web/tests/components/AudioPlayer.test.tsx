@@ -19,7 +19,6 @@ describe('AudioPlayer', () => {
     playbackRate: 1,
     volume: 0.8,
     isMuted: false,
-    activeVoiceTrackId: null,
     play: vi.fn(),
     pause: vi.fn(),
     toggle: vi.fn(),
@@ -28,17 +27,8 @@ describe('AudioPlayer', () => {
     setPlaybackRate: vi.fn(),
     setVolume: vi.fn(),
     toggleMute: vi.fn(),
-    setActiveVoiceTrackId: vi.fn(),
     loadPodcast: vi.fn(),
     clearPodcast: vi.fn(),
-    musicUrl: null,
-    musicVolume: 0.15,
-    isMusicMuted: false,
-    isMusicLoaded: false,
-    loadMusic: vi.fn(),
-    setMusicVolume: vi.fn(),
-    toggleMusicMute: vi.fn(),
-    clearMusic: vi.fn(),
   };
 
   beforeEach(() => {

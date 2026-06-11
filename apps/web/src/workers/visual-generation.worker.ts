@@ -523,7 +523,7 @@ export async function processVisualGeneration(job: Job<GenerateVisualPayload>): 
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
 
-    // Config/quota errors will never succeed on retry — fail immediately
+    // Configuration and provider usage-limit errors will never succeed on retry.
     const isConfigError = errMsg.includes('No Fal endpoint') ||
       errMsg.includes('No image provider available') ||
       errMsg.includes('No video provider available') ||

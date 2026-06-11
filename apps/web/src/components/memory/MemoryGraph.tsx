@@ -15,13 +15,13 @@ if (!fcoseRegistered) {
 
 // Brand color literals — Cytoscape styles its own <canvas> via JS.
 // This is an accepted, documented exception to the CSS-Modules-only rule.
-const COLOR_VOCAB = '#D97706';   // Golden Amber
-const COLOR_GRAMMAR = '#1E3A5F'; // Deep Navy
+const COLOR_VOCAB = '#3F4FB0';   // Aula Indigo
+const COLOR_GRAMMAR = '#2A3550'; // Aula Slate
 const COLOR_DUE_BORDER = '#DC2626';
-const COLOR_NORMAL_BORDER = '#E5E1D8';
-const COLOR_EDGE = '#C7C2B8';
-const COLOR_LABEL = '#1A1A1A';
-const COLOR_BG = '#FEFCF8';
+const COLOR_NORMAL_BORDER = '#E2E4EC';
+const COLOR_EDGE = '#C7C9D4';
+const COLOR_LABEL = '#1E2128';
+const COLOR_BG = '#F5F4F0';
 
 const MAX_NODES = 400;
 const MIN_NODE_SIZE = 22;
@@ -123,7 +123,7 @@ export function MemoryGraph({ graph }: MemoryGraphProps) {
             label: 'data(label)',
             'text-valign': 'bottom' as const,
             'text-halign': 'center' as const,
-            'font-family': 'Inter, -apple-system, sans-serif',
+            'font-family': 'IBM Plex Sans, -apple-system, sans-serif',
             'font-size': 10,
             color: COLOR_LABEL,
             'text-outline-width': 2,

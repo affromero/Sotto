@@ -33,7 +33,7 @@ Thin client — all business logic in web backend API. Mobile handles UI, backgr
 
 Uses API key-based auth (`sk_sotto_` tokens), not NextAuth sessions.
 
-- **Dev**: Email login → `POST /api/auth/mobile` → `{token, user}`
+- **Dev**: Email login → `POST /api/v1/auth/mobile` → `{token, user}`
 - **Google**: Native sign-in → `idToken` → backend
 - **Apple** (iOS only): Native sign-in → `identityToken` → backend
 - **GitHub**: Browser flow → code exchange → backend
@@ -44,14 +44,13 @@ Token lifecycle: SecureStore → Axios interceptor attaches Bearer → backend v
 
 ```
 app/
-├── _layout.tsx            # Root (fonts, providers, QueryClient, auth gate)
+├── _layout.tsx            # Root (fonts, providers, QueryClient, connect gate → auth gate)
+├── connect.tsx            # First-run "connect to your server" (enter URL) — routed to when no server is configured
 ├── (tabs)/
 │   ├── index.tsx          # Private library
-│   ├── create.tsx         # 5-step: discovery → voice → scripting → preview → generating
 │   ├── notifications.tsx  # Notifications
 │   └── profile.tsx        # Current user profile
 ├── auth/login.tsx         # Login (dev: email, prod: OAuth)
-├── ideas.tsx              # Saved ideas — swipe to dismiss, tap to generate
 ├── settings.tsx           # Settings hub — BYOK keys, logout
 ├── settings/api-keys.tsx  # BYOK key management
 ├── podcast/[id].tsx       # Full-screen player
@@ -66,14 +65,14 @@ app/
 
 | File | Purpose |
 |------|---------|
-| `api.ts` | Axios client, Bearer token, `onAuthRevoked()` on 401 |
+| `api.ts` | Axios client, Bearer token, `onAuthRevoked()` on 401. `baseURL` resolved per-request (not frozen at import) so a runtime-paired server takes effect without restart |
 | `auth.ts` | SecureStore token management |
+| `server-url.ts` | Runtime server URL (SecureStore + sync cache): `loadStoredServerUrl()`, `getStoredServerUrl()`, `setStoredServerUrl()`, `hasServerConfigured()`. Lets one build connect to any self-hosted server |
+| `connect.ts` | `connectToServer(url)` (store a server) + `pairWithToken(url, token)` (redeem a "scan to connect" pairing token → session) + `normalizeServerUrl()` |
 | `theme.ts` | @sotto/shared tokens → RN StyleSheet helpers |
 | `formatters.ts` | `formatDuration`, `formatCount`, `timeAgo`, etc. |
 | `audio-player.ts` | react-native-track-player setup + track loading |
 | `notifications.ts` | Push notification handler + token registration |
-| `event-buffer.ts` | Event batching: 5s flush, AppState-aware, silent failure |
-| `usePlaybackTelemetry.ts` | Observes RNTP state, fires playback events |
 | `learn-api.ts` | Learn flow API calls: placement, courses, classes, submit, speaking upload, memory graph |
 
 ## Components
@@ -83,34 +82,13 @@ app/
 | `Avatar.tsx` | Image with fallback initial circle |
 | `EmptyState.tsx` / `ErrorState.tsx` | Empty + error patterns |
 | `PodcastCard.tsx` | `variant="feed"` (full) / `variant="compact"` (row) |
-| `SwipeCard.tsx` / `SwipeQuiz.tsx` | Gesture-driven taste quiz |
-| `InspireMe.tsx` | Tabbed sections (forYou, trending, news, curiosity) |
-| `BottomSheet.tsx` / `OptionPicker.tsx` | Bottom sheet + selectable list |
-| `PillGroup.tsx` | Horizontal scrollable pill buttons |
-| `AiModelSelector.tsx` / `TtsModelSelector.tsx` | Model pickers (persist to SecureStore) |
-| `VoicePickerSheet.tsx` | Voice selection with auto-assign toggle |
-| `DurationPicker.tsx` / `VisibilityPicker.tsx` | Duration + visibility pickers |
-| `GenerationProgress.tsx` | 8-step pipeline progress indicator |
-| `ScriptPreview.tsx` | Read-only script preview with approve/regenerate |
-| `EventProvider.tsx` | React context providing `track()` + userId sync |
+| `BottomSheet.tsx` | Bottom sheet container |
 | `learn/PlacementQuiz.tsx` | Multi-step placement test UI — fetches questions, submits answers |
 | `learn/MCSection.tsx` | Multiple-choice section renderer for grammar/reading/listening |
 | `learn/ListeningSection.tsx` | Listening section: embedded audio player + MC questions |
 | `learn/SpeakingExercise.tsx` | Microphone capture for a SpeakingPrompt, polls for SCORED status |
 | `learn/MemoryGraphWebView.tsx` | WebView wrapping the web memory graph at `/memory?courseId=…` |
 | `learn/ClassWorksheet.tsx` | Displays the printable worksheet PDF + PencilKit ink overlay (requires custom dev build) |
-
-## Creation Flow
-
-5-step state machine in `app/(tabs)/create.tsx`:
-
-1. **discovery** — Chat with AI model selector pill
-2. **voice** — VoicePickerSheet, TtsModelSelector, DurationPicker, VisibilityPicker
-3. **scripting** — GenerationProgress, 3s polling, auto-advances on SCRIPT_READY
-4. **script-preview** — Approve → generating, regenerate → scripting
-5. **generating** — GenerationProgress, 3s polling, navigates to podcast on READY
-
-Preferences persist via SecureStore: `sotto:aiModel`, `sotto:ttsOption`.
 
 ## Environment Variables
 

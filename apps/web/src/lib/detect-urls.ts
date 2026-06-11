@@ -2,8 +2,7 @@
  * Detect URLs in a message string.
  * Returns an array of matched URLs (http/https only).
  *
- * Extracted to its own module so client-side code can import it
- * without pulling in server-only dependencies from discovery-agent.ts.
+ * Kept in its own client-safe module with no server-only dependencies.
  */
 export function detectUrls(message: string | undefined | null): string[] {
   if (!message) return [];

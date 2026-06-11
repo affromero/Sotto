@@ -2,9 +2,7 @@ import { PodcastSource, PodcastStatus, PodcastVisibility } from '@prisma/client'
 import { ReferenceData } from './reference';
 import type { VocabularyEntryData } from './vocabulary';
 import { PodcastVersionSummary } from './version';
-import type { VoiceTrackSummary, WordTiming } from '@sotto/shared';
-
-export type { VoiceTrackSummary };
+import type { WordTiming } from '@sotto/shared';
 
 export interface PodcastSummary {
   id: string;
@@ -18,7 +16,6 @@ export interface PodcastSummary {
   playCount: number;
   createdAt: string;
   source: PodcastSource;
-  isHumanContent: boolean;
   lowReferences?: boolean;
   sourcePlatform?: string | null;
   aiProvider?: string | null;
@@ -28,7 +25,6 @@ export interface PodcastSummary {
   language?: string | null;
   aiAutoResolved?: boolean | null;
   ttsAutoResolved?: boolean | null;
-  ownerIsPro: boolean;
   user: {
     id: string;
     name: string | null;
@@ -53,13 +49,7 @@ export interface PodcastDetail extends PodcastSummary {
   vocabularyEntries?: VocabularyEntryData[];
   pdfUrl: string | null;
   videoUrl: string | null;
-  musicUrl: string | null;
-  musicVolume: number;
-  musicBaked: boolean;
   isSaved: boolean;
-  voiceTracks: VoiceTrackSummary[];
-  defaultVoiceTrackId: string | null;
-  originalTrackName: string;
 }
 
 export interface SegmentData {

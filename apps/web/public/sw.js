@@ -69,6 +69,12 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
+  // Dev bypass: never cache on localhost — serving stale chunks while iterating
+  // makes the dev server look broken. Let the browser fetch normally.
+  if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
+    return;
+  }
+
   // Only handle same-origin requests and GET requests.
   // POST/PUT/DELETE should always go to the network.
   if (request.method !== 'GET') {
@@ -81,7 +87,7 @@ self.addEventListener('fetch', (event) => {
   }
 
   // API calls: network-first with cache fallback
-  if (url.pathname.startsWith('/api/')) {
+  if (url.pathname.startsWith('/api/v1/')) {
     event.respondWith(networkFirst(request));
     return;
   }

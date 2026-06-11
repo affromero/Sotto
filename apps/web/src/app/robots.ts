@@ -41,17 +41,14 @@ const AI_CRAWLERS = [
 ];
 
 const DISALLOWED_PATHS = [
-  '/api/',
+  '/api/v1/',
   '/admin',
   '/auth/',
   '/dashboard',
   '/create',
   '/settings',
-  '/billing',
-  '/analytics',
-  '/onboarding',
+  '/welcome',
   '/team',
-  '/pitch',
   '/_next/',
 ];
 

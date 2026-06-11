@@ -55,7 +55,7 @@ function ListeningAudio({ podcastId }: { podcastId: string }) {
     let timer: ReturnType<typeof setTimeout> | null = null;
     async function poll() {
       try {
-        const res = await fetch(`/api/podcasts/${podcastId}`);
+        const res = await fetch(`/api/v1/podcasts/${podcastId}`);
         if (res.ok) {
           const data = (await res.json()) as { audioUrl?: string | null };
           if (active && data.audioUrl) {
@@ -101,7 +101,7 @@ function McRunner({ start, onDone }: { start: Extract<PracticeStart, { status: '
     setPhase('submitting');
     setError('');
     try {
-      const res = await fetch(`/api/practice/${start.sessionId}/submit`, {
+      const res = await fetch(`/api/v1/practice/${start.sessionId}/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -221,7 +221,7 @@ function SpeakingRunner({
   async function finish() {
     setFinishing(true);
     // Apply SRS from whatever recordings have been graded so far.
-    await fetch(`/api/practice/${start.sessionId}/submit`, {
+    await fetch(`/api/v1/practice/${start.sessionId}/submit`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ answers: [] }),
@@ -231,7 +231,7 @@ function SpeakingRunner({
 
   return (
     <div className={styles.runner}>
-      <SpeakingExercise endpointBase={`/api/practice/${start.sessionId}/speaking`} prompts={start.prompts} />
+      <SpeakingExercise endpointBase={`/api/v1/practice/${start.sessionId}/speaking`} prompts={start.prompts} />
       <div className={styles.actions}>
         <button
           type="button"
@@ -269,7 +269,7 @@ function WritingRunner({
   async function finish() {
     setFinishing(true);
     // Apply SRS from whatever responses have been graded so far.
-    await fetch(`/api/practice/${start.sessionId}/submit`, {
+    await fetch(`/api/v1/practice/${start.sessionId}/submit`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ answers: [] }),
@@ -279,7 +279,7 @@ function WritingRunner({
 
   return (
     <div className={styles.runner}>
-      <WritingSection endpointBase={`/api/practice/${start.sessionId}/writing`} prompts={prompts} />
+      <WritingSection endpointBase={`/api/v1/practice/${start.sessionId}/writing`} prompts={prompts} />
       <div className={styles.actions}>
         <button
           type="button"

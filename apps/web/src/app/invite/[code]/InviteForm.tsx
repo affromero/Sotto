@@ -20,7 +20,7 @@ export function InviteForm({ code }: InviteFormProps) {
     setSubmitting(true);
 
     try {
-      const res = await fetch('/api/invite/redeem', {
+      const res = await fetch('/api/v1/invite/redeem', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code, email }),

@@ -11,8 +11,8 @@ src/app/
   events/           # Famous historical events
     [slug]/         # Full-screen MapSequence for an event
   api/
-    resolve/        # GET /api/resolve?q=Constantinople&year=1453
-    health/         # GET /api/health
+    resolve/        # GET /api/v1/resolve?q=Constantinople&year=1453
+    health/         # GET /api/v1/health
   docs/             # Developer docs + code snippets
 src/components/
   SearchBar         # Place search with year parsing

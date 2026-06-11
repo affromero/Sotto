@@ -20,7 +20,6 @@ import { getSpeakerIndex, getUniqueSpeakers } from '@/lib/speaker-colors';
 import type { ScriptTurn } from '@/lib/script-generator';
 import type { ReferenceData } from '@/types/reference';
 import { wordsToMinutes } from '@/lib/duration';
-import { ClaimFlagButton } from '@/components/player/ClaimFlagButton';
 import styles from './ScriptEditor.module.css';
 
 interface Highlight {
@@ -88,7 +87,7 @@ export function ScriptEditor({ podcastId, onApprove, onRegenerate, getApproveBod
     let mounted = true;
     async function fetchScript() {
       try {
-        const res = await fetch(`/api/podcasts/${podcastId}/script`);
+        const res = await fetch(`/api/v1/podcasts/${podcastId}/script`);
         if (!res.ok) throw new Error('Failed to load script');
         const data = await res.json();
         if (!mounted) return;
@@ -160,7 +159,7 @@ export function ScriptEditor({ podcastId, onApprove, onRegenerate, getApproveBod
     if (saving) return;
     setSaving(true);
     try {
-      const res = await fetch(`/api/podcasts/${podcastId}/script`, {
+      const res = await fetch(`/api/v1/podcasts/${podcastId}/script`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -287,7 +286,7 @@ export function ScriptEditor({ podcastId, onApprove, onRegenerate, getApproveBod
     try {
       // Auto-save if dirty
       if (dirty) {
-        const res = await fetch(`/api/podcasts/${podcastId}/script`, {
+        const res = await fetch(`/api/v1/podcasts/${podcastId}/script`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -303,7 +302,7 @@ export function ScriptEditor({ podcastId, onApprove, onRegenerate, getApproveBod
       }
 
       const extraBody = getApproveBody ? getApproveBody() : {};
-      const res = await fetch(`/api/podcasts/${podcastId}/script/approve`, {
+      const res = await fetch(`/api/v1/podcasts/${podcastId}/script/approve`, {
         method: 'POST',
         ...(Object.keys(extraBody).length > 0
           ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(extraBody) }
@@ -330,7 +329,7 @@ export function ScriptEditor({ podcastId, onApprove, onRegenerate, getApproveBod
       }
       const hasAnyFeedback = feedbackText || Object.keys(filteredComments).length > 0 || highlights.length > 0;
       const shouldSendBody = withFeedback && hasAnyFeedback;
-      const res = await fetch(`/api/podcasts/${podcastId}/script/regenerate`, {
+      const res = await fetch(`/api/v1/podcasts/${podcastId}/script/regenerate`, {
         method: 'POST',
         ...(shouldSendBody ? {
           headers: { 'Content-Type': 'application/json' },
@@ -709,11 +708,6 @@ export function ScriptEditor({ podcastId, onApprove, onRegenerate, getApproveBod
                           <span className={styles.turnCommentBadge} />
                         )}
                       </button>
-                      <ClaimFlagButton
-                        podcastId={podcastId}
-                        turnIndex={index}
-                        turnText={turn.text}
-                      />
                     </>
                   )}
                 </div>

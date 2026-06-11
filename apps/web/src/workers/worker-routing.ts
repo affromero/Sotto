@@ -11,19 +11,11 @@
 /** GPU/API-heavy workers that need beefy containers */
 export const HEAVY_WORKERS = new Set([
   'audio-generation',
-  'voice-track-audio',
   'visual-generation',
   'transition-generation',
   'avatar-generation',
   'video-composition',
   'audio-stitching',
-  'music-generation',
-  'demo-voiceover',
-  'demo-visual',
-  'demo-recording',
-  'demo-transition',
-  'demo-composition',
-  'demo-scene-composition',
   'segment-preview',
 ]);
 
@@ -35,33 +27,21 @@ export const PIPELINE_WORKERS = new Set([
   'script-writing',
   'compile-script',
   'script-generation',
-  'audio-import',
   'interactions',
   'segment-regeneration',
   'visual-classification',
   'place-enrichment',
-  'content-moderation',
-  'demo-script',
-  'voice-track-stitching',
   'pipeline-classification',
   'speaking-grading',
   'worksheet-pdf',
+  'verify-class-references',
 ]);
 
 /**
  * Workers excluded from the `core` preset — dev-only or experimental.
  * Everything NOT in this set runs by default under `core`.
  */
-export const EXPERIMENTAL_WORKERS = new Set([
-  'demo-script',
-  'demo-recording',
-  'demo-voiceover',
-  'demo-visual',
-  'demo-transition',
-  'demo-composition',
-  'demo-scene-composition',
-  'music-generation',
-]);
+export const EXPERIMENTAL_WORKERS = new Set<string>();
 
 /** Check if a worker matches the given profile (heavy/pipeline/light/all) */
 export function matchesProfile(name: string, profile: string): boolean {

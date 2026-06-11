@@ -1,9 +1,7 @@
 import { createStorageProvider, type StorageProvider } from './storage';
-import { createMLProvider, type MLProvider } from './ml';
 
 export interface Providers {
   storage: StorageProvider;
-  ml: MLProvider;
 }
 
 let _providers: Providers | null = null;
@@ -16,7 +14,6 @@ export function getProviders(): Providers {
   if (!_providers) {
     _providers = {
       storage: createStorageProvider(),
-      ml: createMLProvider(),
     };
   }
   return _providers;
@@ -26,7 +23,6 @@ export function getProviders(): Providers {
 export type { AIProvider, ChatMessage, AIOptions, AIResponse } from './ai';
 export type { TtsProvider, SpeechParams, SfxParams } from './tts';
 export type { StorageProvider } from './storage';
-export type { MLProvider, RecommendationSignals, ScoredPodcast } from './ml';
 
 // Re-export factory functions for direct use
 export { createAIProvider } from './ai';
@@ -40,7 +36,6 @@ export type { ResolvedProvider } from './tts';
 export { createSttProvider } from './stt';
 export type { TranscriptionResult, SttProvider, SttProviderId } from './stt';
 export { createStorageProvider } from './storage';
-export { createMLProvider } from './ml';
 
 // TTS registry
 export type { TtsProviderId, TtsProviderMeta, TtsModelOption } from './tts-registry';

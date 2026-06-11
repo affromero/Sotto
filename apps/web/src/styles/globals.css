@@ -39,17 +39,17 @@ body::before {
   content: '';
   position: fixed;
   inset: 0;
-  background: radial-gradient(ellipse at 20% 0%, rgba(217, 119, 6, 0.02), transparent 50%);
+  background: radial-gradient(ellipse at 20% 0%, rgba(63, 79, 176, 0.03), transparent 50%);
   pointer-events: none;
   z-index: -1;
 }
 
 [data-theme='dark'] body::before {
-  background: radial-gradient(ellipse at 20% 0%, rgba(232, 137, 15, 0.03), transparent 50%);
+  background: radial-gradient(ellipse at 20% 0%, rgba(105, 120, 220, 0.04), transparent 50%);
 }
 
 /* ============================================ */
-/* DESIGN SYSTEM: "Quiet Warmth"               */
+/* DESIGN SYSTEM: "SottoDesign aula"           */
 /* ============================================ */
 
 :root {
@@ -69,47 +69,47 @@ body::before {
   --full-height: 100vh;
   --full-height: 100dvh;
 
-  /* Colors - Primary (Golden Amber) */
-  --color-primary: #D97706;
-  --color-primary-hover: #B45309;
-  --color-primary-active: #92400E;
-  --color-primary-light: #FEF3C7;
-  --color-primary-lighter: #FFFBEB;
-  --color-primary-subtle: rgba(217, 119, 6, 0.08);
+  /* Colors - Primary (Aula Blue) */
+  --color-primary: #3F4FB0;
+  --color-primary-hover: #34419A;
+  --color-primary-active: #2A3580;
+  --color-primary-light: #E3E6F6;
+  --color-primary-lighter: #F0F2FF;
+  --color-primary-subtle: rgba(63, 79, 176, 0.08);
 
-  /* Colors - Accent (Deep Navy) */
-  --color-accent: #1E3A5F;
-  --color-accent-hover: #162D4A;
-  --color-accent-light: #DBEAFE;
-  --color-accent-lighter: #EFF6FF;
-  --color-accent-subtle: rgba(30, 58, 95, 0.08);
+  /* Colors - Accent (Ink Slate) */
+  --color-accent: #2A3550;
+  --color-accent-hover: #1E2128;
+  --color-accent-light: #E2E4EC;
+  --color-accent-lighter: #F0F1F6;
+  --color-accent-subtle: rgba(42, 53, 80, 0.08);
 
-  /* Colors - Background & Surface */
-  --color-background: #FEFCF8;
+  /* Colors - Background & Surface (Aula paper + ink) */
+  --color-background: #F5F4F0;
   --color-surface: #FFFFFF;
-  --color-surface-hover: #FFF9F0;
+  --color-surface-hover: #FBFAF7;
   --color-surface-elevated: #FFFFFF;
-  --color-surface-nested: #FAF8F4;
-  --color-surface-sunken: #F5F3EE;
-  --color-border: #E5E1D8;
-  --color-border-hover: #D1CCC2;
+  --color-surface-nested: #EFEEEA;
+  --color-surface-sunken: #E9E9E3;
+  --color-border: #DEDDD6;
+  --color-border-hover: #CCCBC3;
 
-  /* Colors - Text */
-  --color-text-primary: #1A1A1A;
+  /* Colors - Text (Aula ink) */
+  --color-text-primary: #1E2128;
   --color-text: var(--color-text-primary);
-  --color-text-secondary: #6B7280;
-  --color-text-tertiary: #9CA3AF;
+  --color-text-secondary: #565B68;
+  --color-text-tertiary: #8A8F9C;
   --color-text-inverse: #FFFFFF;
 
-  /* Colors - Speaker (Podcast) — indexed palette for up to 4 speakers */
-  --color-speaker-0: #D97706;
-  --color-speaker-0-bg: #FEF3C7;
-  --color-speaker-1: #1E3A5F;
-  --color-speaker-1-bg: #DBEAFE;
-  --color-speaker-2: #065F46;
+  /* Colors - Speaker — indexed palette for up to 4 voices (aula-harmonized) */
+  --color-speaker-0: #3F4FB0;
+  --color-speaker-0-bg: #E3E6F6;
+  --color-speaker-1: #2A3550;
+  --color-speaker-1-bg: #E2E4EC;
+  --color-speaker-2: #0D9488;
   --color-speaker-2-bg: #D1FAE5;
-  --color-speaker-3: #991B1B;
-  --color-speaker-3-bg: #FEE2E2;
+  --color-speaker-3: #B83280;
+  --color-speaker-3-bg: #FBE3F0;
   /* Aliases for legacy CSS (backward compat) */
   --color-speaker-host: var(--color-speaker-0);
   --color-speaker-host-bg: var(--color-speaker-0-bg);
@@ -123,7 +123,7 @@ body::before {
   --color-success-lighter: #ECFDF5;
 
   --color-warning: #F59E0B;
-  --color-warning-hover: #D97706;
+  --color-warning-hover: #C2730A;
   --color-warning-light: #FEF3C7;
   --color-warning-lighter: #FFFBEB;
 
@@ -150,10 +150,12 @@ body::before {
   --color-pink-light: #FCE7F3;
   --color-pink-lighter: #FDF2F8;
 
-  /* Typography - Fonts */
-  --font-heading: 'DM Serif Display', Georgia, 'Times New Roman', serif;
-  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-mono: 'JetBrains Mono', 'Fira Code', Menlo, Monaco, monospace;
+  /* Typography - Fonts (SottoDesign: Newsreader serif · IBM Plex Sans · IBM Plex Mono).
+     next/font (layout.tsx) overrides --font-heading/--font-body/--font-mono with the
+     loaded faces; these literals are the fallback chain. */
+  --font-heading: 'Newsreader', Georgia, 'Times New Roman', serif;
+  --font-body: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, Menlo, Monaco, monospace;
 
   /* Typography - Scale */
   --text-display: 700 48px/1.1 var(--font-heading);
@@ -226,7 +228,7 @@ body::before {
   --shadow-lg: 0 4px 8px rgba(0, 0, 0, 0.04), 0 8px 16px rgba(0, 0, 0, 0.06), 0 16px 32px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.04);
   --shadow-xl: 0 8px 16px rgba(0, 0, 0, 0.06), 0 16px 32px rgba(0, 0, 0, 0.08), 0 32px 64px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04);
   --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
-  --shadow-primary-glow: 0 4px 16px rgba(217, 119, 6, 0.15), 0 8px 32px rgba(217, 119, 6, 0.1);
+  --shadow-primary-glow: 0 4px 16px rgba(63, 79, 176, 0.15), 0 8px 32px rgba(63, 79, 176, 0.1);
 
   /* Player shadow (elevated mini player) */
   --shadow-player: 0 -4px 20px rgba(0, 0, 0, 0.1);
@@ -250,7 +252,7 @@ body::before {
   --glass-blur-strong: 20px;
 
   /* Gradients */
-  --gradient-warm: linear-gradient(135deg, #D97706 0%, #F59E0B 50%, #FBBF24 100%);
+  --gradient-warm: linear-gradient(135deg, #3F4FB0 0%, #5B8DEF 50%, #6AA0FF 100%);
   --gradient-hero: linear-gradient(170deg, #0b1120 0%, #122035 45%, #1a3050 100%);
   --gradient-glass: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
 
@@ -273,7 +275,7 @@ body::before {
   /* Landing page — section padding + atmospheric gradients */
   --section-pad-y: clamp(80px, 12vh, 160px);
   --section-pad-y-sm: clamp(60px, 8vh, 120px);
-  --gradient-amber-spot: radial-gradient(ellipse at 30% 20%, rgba(217,119,6,0.12) 0%, transparent 60%);
+  --gradient-amber-spot: radial-gradient(ellipse at 30% 20%, rgba(63,79,176,0.12) 0%, transparent 60%);
   --gradient-navy-spot: radial-gradient(ellipse at 70% 80%, rgba(30,58,95,0.08) 0%, transparent 60%);
   --noise-texture: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
 
@@ -289,51 +291,51 @@ body::before {
 }
 
 /* ============================================ */
-/* DARK THEME: "Cozy Evening Reading"            */
+/* DARK THEME: "SottoDesign terminal"            */
 /* ============================================ */
 
 [data-theme='dark'] {
-  /* Background & Surface — warm dark, not pure black */
-  --color-background: #1A1917;
-  --color-surface: #262420;
-  --color-surface-hover: #302D28;
-  --color-surface-elevated: #2E2B26;
-  --color-surface-nested: #2E2B26;
-  --color-surface-sunken: #1F1E1C;
-  --color-border: #3A3733;
-  --color-border-hover: #4A4742;
+  /* Background & Surface — SottoDesign terminal (cool dark) */
+  --color-background: #121310;
+  --color-surface: #1B1D17;
+  --color-surface-hover: #23251D;
+  --color-surface-elevated: #1F2118;
+  --color-surface-nested: #1F2118;
+  --color-surface-sunken: #15170F;
+  --color-border: #33352C;
+  --color-border-hover: #44473B;
 
   /* Text */
-  --color-text-primary: #F0EDE8;
+  --color-text-primary: #E9E3D3;
   --color-text: var(--color-text-primary);
-  --color-text-secondary: #A09B93;
-  --color-text-tertiary: #6B6660;
-  --color-text-inverse: #1A1917;
+  --color-text-secondary: #9D9684;
+  --color-text-tertiary: #6E6857;
+  --color-text-inverse: #121310;
 
-  /* Primary — brighten amber for dark backgrounds */
-  --color-primary: #E8890F;
-  --color-primary-hover: #F09A2A;
-  --color-primary-active: #D97706;
-  --color-primary-light: #3D2E14;
-  --color-primary-lighter: #2D2418;
-  --color-primary-subtle: rgba(232, 137, 15, 0.12);
+  /* Primary — brighten aula blue for dark backgrounds */
+  --color-primary: #6A9BFF;
+  --color-primary-hover: #88B0FF;
+  --color-primary-active: #3F4FB0;
+  --color-primary-light: #1E2540;
+  --color-primary-lighter: #1A1F33;
+  --color-primary-subtle: rgba(106, 155, 255, 0.14);
 
-  /* Accent — lighten navy (invisible on dark otherwise) */
-  --color-accent: #5B8ABD;
-  --color-accent-hover: #7BA3CF;
-  --color-accent-light: #1E2D3F;
-  --color-accent-lighter: #1A2535;
-  --color-accent-subtle: rgba(91, 138, 189, 0.12);
+  /* Accent — light slate */
+  --color-accent: #8A93B5;
+  --color-accent-hover: #A2ABC9;
+  --color-accent-light: #20242F;
+  --color-accent-lighter: #1A1E29;
+  --color-accent-subtle: rgba(138, 147, 181, 0.12);
 
-  /* Speaker — indexed palette for up to 4 speakers */
-  --color-speaker-0: #E8890F;
-  --color-speaker-0-bg: #3D2E14;
-  --color-speaker-1: #5B8ABD;
-  --color-speaker-1-bg: #1E2D3F;
+  /* Speaker — indexed palette for up to 4 voices */
+  --color-speaker-0: #6A9BFF;
+  --color-speaker-0-bg: #1E2540;
+  --color-speaker-1: #8A93B5;
+  --color-speaker-1-bg: #20242F;
   --color-speaker-2: #34D399;
   --color-speaker-2-bg: #1A2E25;
-  --color-speaker-3: #F87171;
-  --color-speaker-3-bg: #3D1A1A;
+  --color-speaker-3: #F472B6;
+  --color-speaker-3-bg: #341A2A;
   --color-speaker-host: var(--color-speaker-0);
   --color-speaker-host-bg: var(--color-speaker-0-bg);
   --color-speaker-expert: var(--color-speaker-1);
@@ -374,31 +376,31 @@ body::before {
   --shadow-xs: 0 1px 1px 0 rgba(0, 0, 0, 0.15);
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2), 0 1px 1px rgba(0, 0, 0, 0.1);
   --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.2), 0 4px 8px rgba(0, 0, 0, 0.2), 0 1px 2px rgba(0, 0, 0, 0.15);
-  --shadow-lg: 0 4px 8px rgba(0, 0, 0, 0.2), 0 8px 16px rgba(0, 0, 0, 0.2), 0 16px 32px rgba(0, 0, 0, 0.15), 0 0 8px rgba(217, 119, 6, 0.05);
-  --shadow-xl: 0 8px 16px rgba(0, 0, 0, 0.25), 0 16px 32px rgba(0, 0, 0, 0.2), 0 32px 64px rgba(0, 0, 0, 0.15), 0 0 12px rgba(217, 119, 6, 0.05);
+  --shadow-lg: 0 4px 8px rgba(0, 0, 0, 0.2), 0 8px 16px rgba(0, 0, 0, 0.2), 0 16px 32px rgba(0, 0, 0, 0.15), 0 0 8px rgba(106, 155, 255, 0.05);
+  --shadow-xl: 0 8px 16px rgba(0, 0, 0, 0.25), 0 16px 32px rgba(0, 0, 0, 0.2), 0 32px 64px rgba(0, 0, 0, 0.15), 0 0 12px rgba(106, 155, 255, 0.05);
   --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-  --shadow-primary-glow: 0 4px 16px rgba(232, 137, 15, 0.2), 0 8px 32px rgba(232, 137, 15, 0.12);
+  --shadow-primary-glow: 0 4px 16px rgba(106, 155, 255, 0.2), 0 8px 32px rgba(106, 155, 255, 0.12);
   --shadow-player: 0 -4px 20px rgba(0, 0, 0, 0.3);
 
   /* Glassmorphism — dark mode */
-  --glass-bg: rgba(38, 36, 32, 0.75);
-  --glass-bg-subtle: rgba(38, 36, 32, 0.4);
-  --glass-border: rgba(217, 119, 6, 0.06);
+  --glass-bg: rgba(27, 29, 23, 0.75);
+  --glass-bg-subtle: rgba(27, 29, 23, 0.4);
+  --glass-border: rgba(233, 227, 211, 0.08);
   --glass-blur: 12px;
   --glass-blur-strong: 20px;
 
   /* Landing page — atmospheric gradients (dark-adjusted) */
-  --gradient-amber-spot: radial-gradient(ellipse at 30% 20%, rgba(232,137,15,0.15) 0%, transparent 60%);
-  --gradient-navy-spot: radial-gradient(ellipse at 70% 80%, rgba(91,138,189,0.1) 0%, transparent 60%);
+  --gradient-amber-spot: radial-gradient(ellipse at 30% 20%, rgba(106,155,255,0.15) 0%, transparent 60%);
+  --gradient-navy-spot: radial-gradient(ellipse at 70% 80%, rgba(138,147,181,0.1) 0%, transparent 60%);
 }
 
-/* Dark mode ambient glow + warm selection */
+/* Dark mode ambient glow + selection */
 [data-theme='dark'] body {
-  background-image: radial-gradient(ellipse at 50% 0%, rgba(217, 119, 6, 0.03) 0%, transparent 60%);
+  background-image: radial-gradient(ellipse at 50% 0%, rgba(106, 155, 255, 0.03) 0%, transparent 60%);
 }
 
 [data-theme='dark'] ::selection {
-  background: rgba(217, 119, 6, 0.3);
+  background: rgba(63, 79, 176, 0.4);
 }
 
 /* ============================================ */

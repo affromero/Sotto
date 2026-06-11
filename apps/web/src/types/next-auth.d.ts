@@ -10,8 +10,6 @@ declare module 'next-auth' {
       email?: string | null;
       image?: string | null;
       role: UserRole;
-      bannedAt?: string | null;
-      suspendedUntil?: string | null;
       isImpersonating?: boolean;
       impersonatedRole?: UserRole;
       originalUser?: { id: string; name: string | null; image: string | null };
@@ -26,8 +24,9 @@ declare module 'next-auth' {
 declare module 'next-auth/jwt' {
   interface JWT {
     role?: UserRole;
-    bannedAt?: string | null;
-    suspendedUntil?: string | null;
+    /** Local (Credentials) session, subject to tokenVersion invalidation. */
+    local?: boolean;
+    tokenVersion?: number;
     impersonateUserId?: string;
     impersonateName?: string | null;
     impersonateEmail?: string | null;

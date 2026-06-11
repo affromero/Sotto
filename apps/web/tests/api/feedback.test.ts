@@ -25,7 +25,7 @@ vi.mock('@/lib/redis', () => ({
   checkRateLimit: vi.fn().mockResolvedValue({ allowed: true, remaining: 4 }),
 }));
 
-import { POST, GET } from '@/app/api/feedback/route';
+import { POST, GET } from '@/app/api/v1/feedback/route';
 
 const mockPrisma = {
   feedback: {
@@ -35,7 +35,7 @@ const mockPrisma = {
 };
 
 function createPostRequest(body: unknown): NextRequest {
-  return new NextRequest(new URL('http://localhost:3000/api/feedback'), {
+  return new NextRequest(new URL('http://localhost:3000/api/v1/feedback'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -49,7 +49,7 @@ const validFeedback = {
   message: 'I really love using Sotto for learning new topics.',
 };
 
-describe('POST /api/feedback', () => {
+describe('POST /api/v1/feedback', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -435,7 +435,7 @@ describe('POST /api/feedback', () => {
 
 });
 
-describe('GET /api/feedback', () => {
+describe('GET /api/v1/feedback', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });

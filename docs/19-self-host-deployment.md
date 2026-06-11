@@ -157,7 +157,7 @@ The deploy script:
 ## 7. Verify
 
 ```bash
-curl -s https://your-domain.example/api/health
+curl -s https://your-domain.example/api/v1/health
 docker compose -f docker-compose.infra.yml ps
 docker compose -f docker-compose.workers.yml ps
 ```
@@ -177,10 +177,10 @@ For each OAuth provider you enable, configure callback URLs using your exact app
 
 | Provider | Callback |
 | --- | --- |
-| Google | `https://your-domain.example/api/auth/callback/google` |
-| GitHub | `https://your-domain.example/api/auth/callback/github` |
-| Twitter/X | `https://your-domain.example/api/auth/callback/twitter` |
-| Apple | `https://your-domain.example/api/auth/callback/apple` |
+| Google | `https://your-domain.example/api/v1/auth/callback/google` |
+| GitHub | `https://your-domain.example/api/v1/auth/callback/github` |
+| Twitter/X | `https://your-domain.example/api/v1/auth/callback/twitter` |
+| Apple | `https://your-domain.example/api/v1/auth/callback/apple` |
 
 Providers are optional. If you leave a provider's env vars unset, its button is not shown.
 
@@ -220,7 +220,7 @@ Also back up the selected storage backend. A database backup without the generat
 | Caddy reload fails | `sudo caddy validate --config /etc/caddy/Caddyfile` |
 | Health check fails | `docker compose -f docker-compose.app.yml -p sotto-blue logs web --tail 80` and the green equivalent |
 | Workers do not process jobs | `REDIS_URL`, `DATABASE_URL`, and worker logs |
-| OAuth redirect mismatch | Provider callback must exactly match `NEXTAUTH_URL` plus `/api/auth/callback/{provider}` |
+| OAuth redirect mismatch | Provider callback must exactly match `NEXTAUTH_URL` plus `/api/v1/auth/callback/{provider}` |
 | Audio is not reachable | storage provider env, bucket CORS, and private stream route authorization |
 
 ## Update Flow

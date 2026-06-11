@@ -148,8 +148,8 @@ For internet-facing deployments, prefer an S3-compatible bucket such as Cloudfla
 Private playback paths go through authenticated app routes or private RSS tokens:
 
 ```text
-/api/podcasts/{podcastId}/stream
-/api/rss/private/{token}
+/api/v1/podcasts/{podcastId}/stream
+/api/v1/rss/private/{token}
 ```
 
 ## Backups
@@ -181,5 +181,5 @@ For single-VPS deployments, also enable provider snapshots or equivalent block-v
 - DNS points to the server.
 - Provider keys are set only for the explicit providers selected.
 - `SOTTO_ENV_FILE=~/sotto/.env.production bash scripts/deploy.sh` completes.
-- `https://your-domain.example/api/health` returns healthy JSON.
+- `https://your-domain.example/api/v1/health` returns healthy JSON.
 - Backups have been restored in a test path at least once.

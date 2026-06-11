@@ -13,7 +13,7 @@ vi.mock('@/lib/prisma', () => {
   return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
 });
 
-import { GET } from '@/app/api/tags/route';
+import { GET } from '@/app/api/v1/tags/route';
 
 const mockPrisma = {
   tag: {
@@ -22,10 +22,10 @@ const mockPrisma = {
 };
 
 function createRequest(): NextRequest {
-  return new NextRequest(new URL('http://localhost:3000/api/tags'));
+  return new NextRequest(new URL('http://localhost:3000/api/v1/tags'));
 }
 
-describe('GET /api/tags', () => {
+describe('GET /api/v1/tags', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });

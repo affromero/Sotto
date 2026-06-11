@@ -2,7 +2,8 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import Image from 'next/image';
-import { signIn, signOut } from 'next-auth/react';
+import Link from 'next/link';
+import { signOut } from 'next-auth/react';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -11,28 +12,14 @@ import type { CustomTag } from '@/components/discovery/InterestGrid';
 import type { TasteQuestion, TasteAnswer } from '@sotto/shared';
 import { LANGUAGE_DISPLAY } from '@sotto/shared';
 import { TasteQuiz } from '@/components/discovery/TasteQuiz';
-import { VoicePreferenceSelector } from '@/components/settings/VoicePreferenceSelector';
 import type { AiProviderClientMeta } from '@/lib/providers/ai-registry';
 import type { TtsProviderClientMeta } from '@/lib/providers/tts-registry';
-import type { MusicProviderClientMeta } from '@/lib/providers/music-registry';
 import { TtsProviderCards } from '@/components/settings/TtsProviderCards';
 import { AiProviderCards } from '@/components/settings/AiProviderCards';
-import { MusicProviderCards } from '@/components/settings/MusicProviderCards';
 import { AvatarImageManager } from '@/components/settings/AvatarImageManager';
-import {
-  PrivateRssFeedManager,
-  type PrivateFeedTokenMetadata,
-} from '@/components/settings/PrivateRssFeedManager';
 import { ThemeSelector } from '@/components/settings/ThemeSelector';
 import { usePushSubscription } from '@/lib/hooks/usePushSubscription';
-import { getTwitterBotLabel } from '@/lib/bot-identity';
 import styles from './page.module.css';
-
-interface VoiceCloneData {
-  id: string;
-  name: string;
-  externalVoiceId: string;
-}
 
 interface SubTag {
   id: string;
@@ -55,26 +42,16 @@ interface SettingsFormProps {
   image: string | null;
   role: 'USER' | 'ADMIN' | 'SYSTEM';
   connectedProviders: string[];
-  twitterHandle: string | null;
-  twitterEnabled: boolean;
-  voicePreferences: Array<{ speaker: string; voiceId: string }>;
   preferredLanguage: string | null;
-  voiceClones: VoiceCloneData[];
   interestCategories: CategoryTag[];
   selectedInterestTagIds: string[];
   configuredTtsProviders: Array<{ provider: string; isValid: boolean }>;
   configuredAiProviders: Array<{ provider: string; isValid: boolean }>;
   aiProviderMeta: AiProviderClientMeta[];
   ttsProviderMeta: TtsProviderClientMeta[];
-  musicProviderMeta: MusicProviderClientMeta[];
-  configuredMusicProviders: Array<{ provider: string; isValid: boolean }>;
   initialPreferredAiModel: string | null;
-  initialPreferredTtsProvider: string | null;
-  initialPreferredTtsModel: string | null;
-  isTwitterProviderAvailable: boolean;
   initialEmailNotifications: boolean;
   initialPushNotifications: boolean;
-  privateFeedTokens: PrivateFeedTokenMetadata[];
   quizAnswerCount: number;
   referredUsers: Array<{
     name: string | null;
@@ -83,7 +60,6 @@ interface SettingsFormProps {
     joinedAt: string;
     verified: boolean;
   }>;
-  referralBonus: number;
   appBaseUrl: string;
 }
 
@@ -102,32 +78,20 @@ export function SettingsForm({
   image,
   role,
   connectedProviders,
-  twitterHandle,
-  twitterEnabled: initialTwitterEnabled,
-  voicePreferences: initialVoicePreferences,
   preferredLanguage: initialPreferredLanguage,
-  voiceClones,
   interestCategories,
   selectedInterestTagIds,
   configuredTtsProviders,
   configuredAiProviders,
   aiProviderMeta,
   ttsProviderMeta,
-  musicProviderMeta,
-  configuredMusicProviders,
   initialPreferredAiModel,
-  initialPreferredTtsProvider,
-  initialPreferredTtsModel,
   initialEmailNotifications,
   initialPushNotifications,
-  privateFeedTokens,
   quizAnswerCount,
-  isTwitterProviderAvailable,
   referredUsers,
-  referralBonus,
   appBaseUrl,
 }: SettingsFormProps) {
-  const twitterBotLabel = getTwitterBotLabel();
   const [name, setName] = useState(initialName);
   const [bio, setBio] = useState(initialBio);
   const [handle, setHandle] = useState(initialHandle);
@@ -150,7 +114,7 @@ export function SettingsForm({
       setHandleStatus({ checking: true });
       handleCheckTimer.current = setTimeout(async () => {
         try {
-          const res = await fetch(`/api/handles/check?handle=${encodeURIComponent(value)}`);
+          const res = await fetch(`/api/v1/handles/check?handle=${encodeURIComponent(value)}`);
           if (res.ok) {
             const data = await res.json();
             setHandleStatus({ checking: false, available: data.available, reason: data.reason });
@@ -190,39 +154,19 @@ export function SettingsForm({
   const [languageSaving, setLanguageSaving] = useState(false);
   const [languageSaved, setLanguageSaved] = useState(false);
 
-  // Twitter state
-  const isTwitterConnected = connectedProviders.includes('twitter');
-  const [twitterEnabled, setTwitterEnabled] = useState(initialTwitterEnabled);
-  const [voicePrefs, setVoicePrefs] = useState(initialVoicePreferences);
-  const [twitterSaving, setTwitterSaving] = useState(false);
-  const [twitterSaved, setTwitterSaved] = useState(false);
-  const [disconnecting, setDisconnecting] = useState(false);
-
-  // AI model preference state (general, not Twitter-specific)
+  // AI model preference state
   const [preferredAiModel, setPreferredAiModel] = useState(initialPreferredAiModel ?? '');
   const [aiPrefSaving, setAiPrefSaving] = useState(false);
   const [aiPrefSaved, setAiPrefSaved] = useState(false);
-  const [preferredTtsOption, setPreferredTtsOption] = useState(
-    initialPreferredTtsProvider && initialPreferredTtsModel
-      ? `${initialPreferredTtsProvider}:${initialPreferredTtsModel}`
-      : ''
-  );
   const [aiModelOptions, setAiModelOptions] = useState<
     Array<{ id: string; displayName: string; tier: string; group?: string }>
   >([]);
-  const [ttsOptions, setTtsOptions] = useState<
-    Array<{ id: string; displayName: string; badge?: string; group?: string }>
-  >([]);
 
   useEffect(() => {
-    Promise.all([
-      fetch('/api/ai-models').then((r) => (r.ok ? r.json() : null)),
-      fetch('/api/tts-options').then((r) => (r.ok ? r.json() : null)),
-    ])
-      .then(([aiData, ttsData]) => {
+    fetch('/api/v1/ai-models')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((aiData) => {
         if (aiData?.models) setAiModelOptions(aiData.models);
-        if (ttsData?.options)
-          setTtsOptions(ttsData.options.filter((o: { id: string }) => o.id !== 'auto'));
       })
       .catch(() => {});
   }, []);
@@ -241,8 +185,6 @@ export function SettingsForm({
   const [interestsSaved, setInterestsSaved] = useState(false);
   const [interestsResetting, setInterestsResetting] = useState(false);
 
-  // Recommendations reset state
-  const [recsResetting, setRecsResetting] = useState(false);
 
   const handleInterestsChange = (tagIds: string[], custom: CustomTag[]) => {
     setInterestIds(tagIds);
@@ -253,7 +195,7 @@ export function SettingsForm({
     setInterestsSaving(true);
     setInterestsSaved(false);
     try {
-      const response = await fetch('/api/users/me', {
+      const response = await fetch('/api/v1/users/me', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ interests: interestIds, customTags }),
@@ -277,7 +219,7 @@ export function SettingsForm({
       if (handle && handle !== initialHandle) {
         payload.handle = handle;
       }
-      const response = await fetch('/api/users/me', {
+      const response = await fetch('/api/v1/users/me', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -292,48 +234,11 @@ export function SettingsForm({
   };
 
   const handleDeleteAccount = async () => {
-    const response = await fetch('/api/users/me', {
+    const response = await fetch('/api/v1/users/me', {
       method: 'DELETE',
     });
     if (response.ok) {
       signOut({ callbackUrl: '/' });
-    }
-  };
-
-  const handleSaveTwitterSettings = async () => {
-    setTwitterSaving(true);
-    setTwitterSaved(false);
-    try {
-      const response = await fetch('/api/users/me/twitter', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          twitterEnabled,
-          voicePreferences: voicePrefs,
-          preferredTtsProvider: preferredTtsOption ? preferredTtsOption.split(':')[0] : null,
-          preferredTtsModel: preferredTtsOption
-            ? preferredTtsOption.split(':').slice(1).join(':')
-            : null,
-        }),
-      });
-      if (response.ok) {
-        setTwitterSaved(true);
-        setTimeout(() => setTwitterSaved(false), 3000);
-      }
-    } finally {
-      setTwitterSaving(false);
-    }
-  };
-
-  const handleDisconnectTwitter = async () => {
-    setDisconnecting(true);
-    try {
-      const response = await fetch('/api/users/me/twitter', { method: 'DELETE' });
-      if (response.ok) {
-        window.location.reload();
-      }
-    } finally {
-      setDisconnecting(false);
     }
   };
 
@@ -362,7 +267,7 @@ export function SettingsForm({
       const formData = new FormData();
       formData.append('avatar', file);
 
-      const response = await fetch('/api/users/me/avatar', {
+      const response = await fetch('/api/v1/users/me/avatar', {
         method: 'POST',
         body: formData,
       });
@@ -390,6 +295,45 @@ export function SettingsForm({
         <h2 className={styles.sectionTitle}>Appearance</h2>
         <p className={styles.sectionDesc}>Choose your preferred theme</p>
         <ThemeSelector />
+      </section>
+
+      {/* Household Section — owner only */}
+      {role === 'ADMIN' && (
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Household</h2>
+          <p className={styles.sectionDesc}>
+            Invite your family to this instance. Each person learns on a private account of their
+            own.
+          </p>
+          <Link href="/settings/household" className={styles.householdLink}>
+            <span className={styles.householdLinkText}>Manage household</span>
+            <span aria-hidden="true">&rarr;</span>
+          </Link>
+        </section>
+      )}
+
+      {/* Password — local sign-in only; the page redirects OAuth accounts away */}
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>Password</h2>
+        <p className={styles.sectionDesc}>
+          Change the password you use to sign in to this instance.
+        </p>
+        <Link href="/settings/password" className={styles.householdLink}>
+          <span className={styles.householdLinkText}>Change password</span>
+          <span aria-hidden="true">&rarr;</span>
+        </Link>
+      </section>
+
+      {/* Connect a device — available to every learner */}
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>Devices</h2>
+        <p className={styles.sectionDesc}>
+          Link the app on your phone or tablet by scanning a one-time code — no password to type.
+        </p>
+        <Link href="/settings/devices" className={styles.householdLink}>
+          <span className={styles.householdLinkText}>Connect a device</span>
+          <span aria-hidden="true">&rarr;</span>
+        </Link>
       </section>
 
       {/* Profile Section */}
@@ -535,7 +479,7 @@ export function SettingsForm({
                 setLanguageSaving(true);
                 setLanguageSaved(false);
                 try {
-                  const response = await fetch('/api/users/me', {
+                  const response = await fetch('/api/v1/users/me', {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ preferredLanguage }),
@@ -571,7 +515,7 @@ export function SettingsForm({
             initialQuestions={quizQuestions}
             onComplete={async (answers: TasteAnswer[]) => {
               if (answers.length > 0) {
-                await fetch('/api/taste-quiz', {
+                await fetch('/api/v1/taste-quiz', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ answers }),
@@ -581,7 +525,7 @@ export function SettingsForm({
               setQuizActive(false);
             }}
             onRequestMore={async () => {
-              const res = await fetch('/api/taste-quiz?count=10');
+              const res = await fetch('/api/v1/taste-quiz?count=10');
               if (!res.ok) return [];
               const data = await res.json();
               return data.questions;
@@ -594,7 +538,7 @@ export function SettingsForm({
               onClick={async () => {
                 setQuizLoading(true);
                 try {
-                  const res = await fetch('/api/taste-quiz?count=10');
+                  const res = await fetch('/api/v1/taste-quiz?count=10');
                   if (res.ok) {
                     const data = await res.json();
                     setQuizQuestions(data.questions);
@@ -619,7 +563,7 @@ export function SettingsForm({
                     return;
                   setQuizResetting(true);
                   try {
-                    const res = await fetch('/api/taste-quiz', { method: 'DELETE' });
+                    const res = await fetch('/api/v1/taste-quiz', { method: 'DELETE' });
                     if (res.ok) {
                       setQuizCount(0);
                     }
@@ -669,7 +613,7 @@ export function SettingsForm({
                   return;
                 setInterestsResetting(true);
                 try {
-                  const res = await fetch('/api/users/me', {
+                  const res = await fetch('/api/v1/users/me', {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ interests: [], customTags: [] }),
@@ -709,7 +653,7 @@ export function SettingsForm({
               onChange={async (e) => {
                 const checked = e.target.checked;
                 setEmailNotifications(checked);
-                await fetch('/api/users/me', {
+                await fetch('/api/v1/users/me', {
                   method: 'PATCH',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ emailNotifications: checked }),
@@ -737,7 +681,7 @@ export function SettingsForm({
               onChange={async (e) => {
                 const checked = e.target.checked;
                 setPushNotifications(checked);
-                await fetch('/api/users/me', {
+                await fetch('/api/v1/users/me', {
                   method: 'PATCH',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ pushNotifications: checked }),
@@ -752,11 +696,6 @@ export function SettingsForm({
             />
           </label>
         </div>
-      </section>
-
-      {/* Private RSS Feed Section */}
-      <section className={styles.section}>
-        <PrivateRssFeedManager initialTokens={privateFeedTokens} />
       </section>
 
       {/* Connected Accounts Section */}
@@ -795,7 +734,7 @@ export function SettingsForm({
               </label>
               <select
                 id="preferredAiModel"
-                className={styles.twitterSelect}
+                className={styles.modelSelect}
                 value={preferredAiModel}
                 onChange={(e) => setPreferredAiModel(e.target.value)}
                 aria-label="Preferred AI model for podcast generation"
@@ -815,7 +754,7 @@ export function SettingsForm({
                   setAiPrefSaving(true);
                   setAiPrefSaved(false);
                   try {
-                    const response = await fetch('/api/users/me', {
+                    const response = await fetch('/api/v1/users/me', {
                       method: 'PATCH',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({ preferredAiModel: preferredAiModel || null }),
@@ -838,117 +777,12 @@ export function SettingsForm({
         </section>
       )}
 
-      {/* Twitter Integration Section */}
-      {isTwitterProviderAvailable && (
-        <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>Twitter Integration</h2>
-          {!isTwitterConnected ? (
-            <div>
-              <p className={styles.twitterDescription}>
-                Connect your Twitter account to generate podcasts by tweeting at {twitterBotLabel}.
-              </p>
-              <p className={styles.twitterDisclaimer}>
-                We only read your username to link your account. Sotto can&apos;t post tweets, read
-                your DMs, or see private data. You can disconnect anytime from this page.
-              </p>
-              <div className={styles.formActions}>
-                <Button onClick={() => signIn('twitter', { callbackUrl: '/settings' })}>
-                  Connect Twitter
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className={styles.form}>
-              {twitterHandle && <p className={styles.twitterHandle}>@{twitterHandle}</p>}
-
-              <label className={styles.toggleRow}>
-                <div className={styles.toggleInfo}>
-                  <span className={styles.toggleLabel}>Enable Tweet-to-Podcast</span>
-                  <span className={styles.toggleDescription}>
-                    Generate podcasts when you tweet at {twitterBotLabel}
-                  </span>
-                </div>
-                <input
-                  type="checkbox"
-                  className={styles.toggle}
-                  checked={twitterEnabled}
-                  onChange={(e) => setTwitterEnabled(e.target.checked)}
-                  aria-label="Toggle Twitter podcast generation"
-                />
-              </label>
-
-              {['Host', 'Expert'].map((speaker) => (
-                <VoicePreferenceSelector
-                  key={speaker}
-                  label={`Preferred ${speaker} Voice`}
-                  value={voicePrefs.find((v) => v.speaker === speaker)?.voiceId ?? null}
-                  onChange={(voiceId) => {
-                    setVoicePrefs((prev) => {
-                      const filtered = prev.filter((v) => v.speaker !== speaker);
-                      return voiceId ? [...filtered, { speaker, voiceId }] : filtered;
-                    });
-                  }}
-                  voiceClones={voiceClones}
-                />
-              ))}
-
-              {ttsOptions.length > 0 && (
-                <>
-                  <p className={styles.twitterModelHint}>
-                    Override the default voice model for your Twitter-generated podcasts.
-                  </p>
-
-                  <div className={styles.fieldGroup}>
-                    <label htmlFor="twitterTtsOption" className={styles.fieldLabel}>
-                      Voice Model
-                    </label>
-                    <select
-                      id="twitterTtsOption"
-                      className={styles.twitterSelect}
-                      value={preferredTtsOption}
-                      onChange={(e) => setPreferredTtsOption(e.target.value)}
-                      aria-label="Preferred voice model for Twitter podcasts"
-                    >
-                      <option value="">System default</option>
-                      {ttsOptions.map((o) => (
-                        <option key={o.id} value={o.id}>
-                          {o.displayName}
-                          {o.badge ? ` — ${o.badge}` : ''}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </>
-              )}
-
-              <div className={styles.formActions}>
-                <Button
-                  onClick={handleSaveTwitterSettings}
-                  loading={twitterSaving}
-                  disabled={twitterSaving}
-                >
-                  {twitterSaved ? 'Saved' : 'Save Twitter Settings'}
-                </Button>
-                <Button
-                  variant="danger"
-                  onClick={handleDisconnectTwitter}
-                  loading={disconnecting}
-                  disabled={disconnecting}
-                >
-                  Disconnect Twitter
-                </Button>
-              </div>
-            </div>
-          )}
-        </section>
-      )}
-
       {/* AI Provider Keys */}
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>AI Providers</h2>
         <p className={styles.sectionDesc}>
-          AI is free for all users &mdash; Sotto handles scripts, Q&amp;A, and discovery chat at no
-          cost. Add your own key for faster models or higher limits.
+          Configure your preferred AI providers for scripts, Q&amp;A, and discovery chat.
+          Keys are encrypted with AES-256-GCM.
         </p>
         <AiProviderCards initialConfigured={configuredAiProviders} providerMeta={aiProviderMeta} />
       </section>
@@ -957,25 +791,12 @@ export function SettingsForm({
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Voice Providers</h2>
         <p className={styles.sectionDesc}>
-          Add a voice provider key to remove the daily generation cap and unlock your choice of 7
-          TTS providers. Keys are encrypted with AES-256-GCM.
+          Add voice provider keys to use your preferred TTS models. Keys are encrypted with
+          AES-256-GCM.
         </p>
         <TtsProviderCards
           initialConfigured={configuredTtsProviders}
           providerMeta={ttsProviderMeta}
-        />
-      </section>
-
-      {/* Music Providers */}
-      <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Music Providers</h2>
-        <p className={styles.sectionDesc}>
-          Add a music provider key to generate AI background music for your podcasts. Keys are
-          encrypted with AES-256-GCM.
-        </p>
-        <MusicProviderCards
-          initialConfigured={configuredMusicProviders}
-          providerMeta={musicProviderMeta}
         />
       </section>
 
@@ -989,58 +810,13 @@ export function SettingsForm({
         <AvatarImageManager />
       </section>
 
-      {/* Reset Recommendations */}
-      <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Reset Recommendations</h2>
-        <p className={styles.sectionDesc}>
-          Start completely fresh. This clears your grid selections, quiz answers, learned
-          preferences, and recommendation history. Your podcasts and saved library are not affected.
-        </p>
-        <div className={styles.formActions}>
-          <Button
-            variant="danger"
-            onClick={async () => {
-              if (
-                !confirm(
-                  'Reset all recommendation data? This clears grid selections, quiz answers, learned preferences, and recommendation history. Your podcasts and saved library are not affected.'
-                )
-              )
-                return;
-              setRecsResetting(true);
-              try {
-                const res = await fetch('/api/users/me/recommendations', { method: 'DELETE' });
-                if (res.ok) {
-                  setInterestIds([]);
-                  setCustomTags([]);
-                  setQuizCount(0);
-                }
-              } finally {
-                setRecsResetting(false);
-              }
-            }}
-            loading={recsResetting}
-            disabled={recsResetting}
-          >
-            Reset All Recommendations
-          </Button>
-        </div>
-      </section>
-
       {/* Referrals */}
       {handle && (
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>Referrals</h2>
           <p className={styles.sectionDescription}>
-            Invite friends, get more podcasts. Each verified referral earns you +1 daily generation
-            for 7 days (up to +5).
+            Invite friends to self-host Sotto or join your instance.
           </p>
-
-          {referralBonus > 0 && (
-            <div className={styles.referralBonus}>
-              +{referralBonus} bonus daily {referralBonus === 1 ? 'generation' : 'generations'}{' '}
-              earned
-            </div>
-          )}
 
           <div className={styles.referralRow}>
             <Input value={`${new URL(appBaseUrl).host}/ref/${handle}`} readOnly />

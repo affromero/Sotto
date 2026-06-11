@@ -25,7 +25,7 @@ const STILL_FPS = 30;
 const STILL_CONCURRENCY = 4;
 
 export async function processVisualClassification(job: Job<ClassifyVisualsPayload>): Promise<void> {
-  const { podcastId, videoGenerationId, userId, voiceTrackId, zeroCostVideo: zeroCostFromPayload } = job.data;
+  const { podcastId, videoGenerationId, userId, zeroCostVideo: zeroCostFromPayload } = job.data;
 
   logger.info('Starting visual classification', { podcastId, videoGenerationId });
   await job.updateProgress(10);
@@ -38,7 +38,7 @@ export async function processVisualClassification(job: Job<ClassifyVisualsPayloa
 
   try {
     // Fetch podcast metadata + resolve AI model + segment timing + source data
-    const [podcast, user, segmentTimings, discovery] = await Promise.all([
+    const [podcast, segmentTimings, discovery] = await Promise.all([
       prisma.podcast.findUniqueOrThrow({
         where: { id: podcastId },
         select: {
@@ -51,8 +51,7 @@ export async function processVisualClassification(job: Job<ClassifyVisualsPayloa
           },
         },
       }),
-      prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { plan: true } }),
-      resolveSegmentTiming(podcastId, voiceTrackId),
+      resolveSegmentTiming(podcastId),
       prisma.discovery.findUnique({
         where: { podcastId },
         select: { sourceMetadata: true },
@@ -73,7 +72,6 @@ export async function processVisualClassification(job: Job<ClassifyVisualsPayloa
     const { model: aiModel, provider: aiProvider } = await resolveAiModelAndProvider({
       podcastAiModel: podcast.aiModel,
       aiKey,
-      plan: user.plan as 'FREE' | 'PRO',
     });
 
     const providerAiKey =
@@ -88,7 +86,7 @@ export async function processVisualClassification(job: Job<ClassifyVisualsPayloa
       throw new Error('No segments found for podcast');
     }
 
-    const motionProvider = await resolveMotionProvider(user.plan as 'FREE' | 'PRO');
+    const motionProvider = await resolveMotionProvider();
 
     const segmentInputs = segmentTimings.map((s) => ({
       segmentId: s.segmentId,

@@ -35,8 +35,8 @@ vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() },
 }));
 
-import { GET, POST } from '@/app/api/keys/route';
-import { DELETE } from '@/app/api/keys/[keyId]/route';
+import { GET, POST } from '@/app/api/v1/keys/route';
+import { DELETE } from '@/app/api/v1/keys/[keyId]/route';
 
 const mockPrisma = {
   apiKey: {
@@ -49,7 +49,7 @@ const mockPrisma = {
 };
 
 function createRequest(
-  url = 'http://localhost:3000/api/keys',
+  url = 'http://localhost:3000/api/v1/keys',
   options: RequestInit = {}
 ): NextRequest {
   return new NextRequest(url, options as any);
@@ -85,7 +85,7 @@ const mockRevokedApiKey = {
   revokedAt: new Date('2025-01-08T10:00:00Z'),
 };
 
-describe('GET /api/keys', () => {
+describe('GET /api/v1/keys', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -163,7 +163,7 @@ describe('GET /api/keys', () => {
   });
 });
 
-describe('POST /api/keys', () => {
+describe('POST /api/v1/keys', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -171,7 +171,7 @@ describe('POST /api/keys', () => {
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null);
 
-    const request = createRequest('http://localhost:3000/api/keys', {
+    const request = createRequest('http://localhost:3000/api/v1/keys', {
       method: 'POST',
       body: JSON.stringify({ name: 'Test Key' }),
     });
@@ -185,7 +185,7 @@ describe('POST /api/keys', () => {
   it('returns 400 for invalid input (missing name)', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
 
-    const request = createRequest('http://localhost:3000/api/keys', {
+    const request = createRequest('http://localhost:3000/api/v1/keys', {
       method: 'POST',
       body: JSON.stringify({}),
     });
@@ -200,7 +200,7 @@ describe('POST /api/keys', () => {
     mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
 
 
-    const request = createRequest('http://localhost:3000/api/keys', {
+    const request = createRequest('http://localhost:3000/api/v1/keys', {
       method: 'POST',
       body: JSON.stringify({ name: 'a'.repeat(101) }),
     });
@@ -214,7 +214,7 @@ describe('POST /api/keys', () => {
 
     mockPrisma.apiKey.count.mockResolvedValue(10);
 
-    const request = createRequest('http://localhost:3000/api/keys', {
+    const request = createRequest('http://localhost:3000/api/v1/keys', {
       method: 'POST',
       body: JSON.stringify({ name: 'Test Key' }),
     });
@@ -247,7 +247,7 @@ describe('POST /api/keys', () => {
       revokedAt: null,
     });
 
-    const request = createRequest('http://localhost:3000/api/keys', {
+    const request = createRequest('http://localhost:3000/api/v1/keys', {
       method: 'POST',
       body: JSON.stringify({ name: 'Production Key' }),
     });
@@ -282,7 +282,7 @@ describe('POST /api/keys', () => {
       revokedAt: null,
     });
 
-    const request = createRequest('http://localhost:3000/api/keys', {
+    const request = createRequest('http://localhost:3000/api/v1/keys', {
       method: 'POST',
       body: JSON.stringify({ name: 'Test Key' }),
     });
@@ -315,7 +315,7 @@ describe('POST /api/keys', () => {
       revokedAt: null,
     });
 
-    const request = createRequest('http://localhost:3000/api/keys', {
+    const request = createRequest('http://localhost:3000/api/v1/keys', {
       method: 'POST',
       body: JSON.stringify({ name: 'Test Key' }),
     });
@@ -328,7 +328,7 @@ describe('POST /api/keys', () => {
 
 });
 
-describe('DELETE /api/keys/[keyId]', () => {
+describe('DELETE /api/v1/keys/[keyId]', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -336,7 +336,7 @@ describe('DELETE /api/keys/[keyId]', () => {
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null);
 
-    const request = createRequest('http://localhost:3000/api/keys/key-1', { method: 'DELETE' });
+    const request = createRequest('http://localhost:3000/api/v1/keys/key-1', { method: 'DELETE' });
     const response = await DELETE(request, { params: Promise.resolve({ keyId: 'key-1' }) });
 
     expect(response.status).toBe(401);
@@ -348,7 +348,7 @@ describe('DELETE /api/keys/[keyId]', () => {
     mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
     mockPrisma.apiKey.findUnique.mockResolvedValue(null);
 
-    const request = createRequest('http://localhost:3000/api/keys/nonexistent', {
+    const request = createRequest('http://localhost:3000/api/v1/keys/nonexistent', {
       method: 'DELETE',
     });
     const response = await DELETE(request, { params: Promise.resolve({ keyId: 'nonexistent' }) });
@@ -365,7 +365,7 @@ describe('DELETE /api/keys/[keyId]', () => {
       revokedAt: null,
     });
 
-    const request = createRequest('http://localhost:3000/api/keys/key-1', { method: 'DELETE' });
+    const request = createRequest('http://localhost:3000/api/v1/keys/key-1', { method: 'DELETE' });
     const response = await DELETE(request, { params: Promise.resolve({ keyId: 'key-1' }) });
 
     expect(response.status).toBe(403);
@@ -380,7 +380,7 @@ describe('DELETE /api/keys/[keyId]', () => {
       revokedAt: new Date('2025-01-08T10:00:00Z'),
     });
 
-    const request = createRequest('http://localhost:3000/api/keys/key-revoked', {
+    const request = createRequest('http://localhost:3000/api/v1/keys/key-revoked', {
       method: 'DELETE',
     });
     const response = await DELETE(request, { params: Promise.resolve({ keyId: 'key-revoked' }) });
@@ -398,7 +398,7 @@ describe('DELETE /api/keys/[keyId]', () => {
     });
     mockPrisma.apiKey.update.mockResolvedValue(mockApiKey);
 
-    const request = createRequest('http://localhost:3000/api/keys/key-1', { method: 'DELETE' });
+    const request = createRequest('http://localhost:3000/api/v1/keys/key-1', { method: 'DELETE' });
     const response = await DELETE(request, { params: Promise.resolve({ keyId: 'key-1' }) });
 
     expect(response.status).toBe(204);

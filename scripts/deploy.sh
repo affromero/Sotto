@@ -289,7 +289,7 @@ echo ""
 echo "=== Health checking $NEW_SLOT slot (timeout: ${HEALTH_TIMEOUT}s) ==="
 HEALTH_OK=false
 for i in $(seq 1 $((HEALTH_TIMEOUT / 5))); do
-  HEALTH=$(curl -sf "http://127.0.0.1:${NEW_WEB_PORT}/api/health" 2>/dev/null || echo "")
+  HEALTH=$(curl -sf "http://127.0.0.1:${NEW_WEB_PORT}/api/v1/health" 2>/dev/null || echo "")
   if [ -n "$HEALTH" ]; then
     LIVE_VERSION=$(echo "$HEALTH" | sed -n 's/.*"version":"\([^"]*\)".*/\1/p')
     [ -z "$LIVE_VERSION" ] && LIVE_VERSION="unknown"
@@ -321,11 +321,11 @@ if [ "$HEALTH_OK" = false ]; then
 fi
 
 # Also check maps if it has a health endpoint
-MAPS_HEALTH=$(curl -sf "http://127.0.0.1:${NEW_MAPS_PORT}/api/health" 2>/dev/null || echo "")
+MAPS_HEALTH=$(curl -sf "http://127.0.0.1:${NEW_MAPS_PORT}/api/v1/health" 2>/dev/null || echo "")
 if [ -n "$MAPS_HEALTH" ]; then
   echo "Maps health check passed"
 else
-  echo "Maps health check skipped (no response — may not have /api/health)"
+  echo "Maps health check skipped (no response — may not have /api/v1/health)"
 fi
 
 # --- Post-deploy smoke check ---

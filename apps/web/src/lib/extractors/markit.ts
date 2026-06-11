@@ -3,7 +3,7 @@ import { countWords, MAX_CONTENT_LENGTH } from './html';
 import type { ExtractedContent } from './types';
 
 // Lazy-loaded to avoid crashing CJS workers — the package only exports ESM
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 let markitInstance: any = null;
 
 const PDF_EXTENSIONS = new Set(['.pdf']);

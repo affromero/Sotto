@@ -6,8 +6,6 @@ import { parseTextWithCitations } from '@/lib/citation-parser';
 import { parseTextWithVocabulary, parseTextWithCitationsAndVocabulary } from '@/lib/vocabulary-parser';
 import { useScrollFollow, isScrollable } from '@/lib/hooks/useScrollFollow';
 import { getSpeakerIndex, getUniqueSpeakers } from '@/lib/speaker-colors';
-import { SegmentQuestionBadge } from '@/components/player/SegmentQuestionBadge';
-import { ClaimFlagButton } from '@/components/player/ClaimFlagButton';
 import { AudioPlayerContext } from '@/components/providers/AudioPlayerProvider';
 import { SegmentData } from '@/types/podcast';
 import type { ReferenceData } from '@/types/reference';
@@ -20,8 +18,6 @@ interface TranscriptPanelProps {
   vocabularyEntries?: VocabularyEntryData[];
   currentTime: number;
   onSegmentClick?: (startTime: number) => void;
-  questionCounts?: Map<number, number>;
-  podcastId?: string;
 }
 
 function isCurrentSegment(segment: SegmentData, currentTime: number): boolean {
@@ -41,8 +37,6 @@ export function TranscriptPanel({
   vocabularyEntries = [],
   currentTime,
   onSegmentClick,
-  questionCounts,
-  podcastId,
 }: TranscriptPanelProps) {
   const [fontScale, setFontScale] = useState(1);
   const MIN_SCALE = 0.6;
@@ -100,7 +94,6 @@ export function TranscriptPanel({
       <div ref={scrollContainerRef as React.RefObject<HTMLDivElement>} className={styles.segments}>
         {segments.map((segment) => {
           const active = isCurrentSegment(segment, currentTime);
-          const qCount = questionCounts?.get(segment.order) ?? 0;
           const idx = getSpeakerIndex(segment.speaker, speakers);
           return (
             <div
@@ -120,7 +113,6 @@ export function TranscriptPanel({
             >
               <span className={styles.speaker} data-speaker-index={idx}>
                 {segment.speaker}
-                {qCount > 0 && <SegmentQuestionBadge count={qCount} />}
               </span>
               <div className={styles.text}>
                 {hasRefs && hasVocab
@@ -131,13 +123,6 @@ export function TranscriptPanel({
                       ? parseTextWithVocabulary(segment.text, vocabularyEntries, onVocabPause, onVocabResume)
                       : segment.text}
               </div>
-              {podcastId && (
-                <ClaimFlagButton
-                  podcastId={podcastId}
-                  turnIndex={segment.order}
-                  turnText={segment.text}
-                />
-              )}
             </div>
           );
         })}

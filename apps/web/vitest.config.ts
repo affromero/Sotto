@@ -13,6 +13,14 @@ export default defineConfig({
     maxWorkers: 4,
     testTimeout: 20_000,
     hookTimeout: 20_000,
+    exclude: [
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/.idea/**',
+      '**/.git/**',
+      '**/.cache/**',
+      '**/.next/**',
+    ],
   },
   resolve: {
     alias: {

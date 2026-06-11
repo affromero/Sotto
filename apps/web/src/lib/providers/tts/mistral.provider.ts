@@ -1,7 +1,7 @@
 /**
  * Mistral AI TTS provider — Voxtral text-to-speech via the Mistral API.
  *
- * Supports preset voices (voice_id) and zero-shot voice cloning (ref_audio).
+ * Supports preset voices (voice_id).
  * Response is base64-encoded audio in the requested format.
  *
  * API: POST https://api.mistral.ai/v1/audio/speech

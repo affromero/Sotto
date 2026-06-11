@@ -138,7 +138,7 @@ export default function HomePage() {
     try {
       const params = new URLSearchParams({ q: query });
       if (parsedYear != null) params.set('year', String(parsedYear));
-      const res = await fetch(`/api/resolve?${params.toString()}`);
+      const res = await fetch(`/api/v1/resolve?${params.toString()}`);
       if (!res.ok) {
         const data = await res.json();
         setError(data.error ?? 'Place not found');

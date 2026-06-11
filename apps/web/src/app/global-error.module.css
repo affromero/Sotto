@@ -1,8 +1,8 @@
 .body {
   margin: 0;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  background: #FEFCF8;
-  color: #1A1A1A;
+  font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #F5F4F0;
+  color: #1E2128;
 }
 
 :global([data-theme='dark']) .body {
@@ -34,7 +34,7 @@
 }
 
 .title {
-  font-family: 'DM Serif Display', Georgia, serif;
+  font-family: 'Newsreader', Georgia, serif;
   font-size: 32px;
   font-weight: 400;
   line-height: 1.2;
@@ -70,7 +70,7 @@
   display: inline-flex;
   align-items: center;
   padding: 12px 24px;
-  background: #D97706;
+  background: #3F4FB0;
   color: #FFFFFF;
   font-family: inherit;
   font-size: 16px;
@@ -82,25 +82,25 @@
 }
 
 .retry:hover {
-  background: #B45309;
+  background: #34419A;
 }
 
 :global([data-theme='dark']) .retry {
-  background: #F59E0B;
+  background: #6A9BFF;
   color: #1A1917;
 }
 
 :global([data-theme='dark']) .retry:hover {
-  background: #D97706;
+  background: #88B0FF;
 }
 
 @media (prefers-color-scheme: dark) {
   :global(:not([data-theme='light'])) .retry {
-    background: #F59E0B;
+    background: #6A9BFF;
     color: #1A1917;
   }
   :global(:not([data-theme='light'])) .retry:hover {
-    background: #D97706;
+    background: #88B0FF;
   }
 }
 
@@ -109,7 +109,7 @@
   align-items: center;
   padding: 12px 24px;
   background: #FFFFFF;
-  color: #1A1A1A;
+  color: #1E2128;
   font-family: inherit;
   font-size: 16px;
   font-weight: 600;

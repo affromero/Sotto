@@ -1,14 +1,26 @@
 {
+  "id": "/",
   "name": "Sotto — Learn a language in your context",
   "short_name": "Sotto",
   "description": "Open-source, self-hostable language learning, taught in your own context through the AI agent you already own.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#FEFCF8",
-  "theme_color": "#D97706",
+  "orientation": "portrait",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["education", "productivity"],
+  "background_color": "#F5F4F0",
+  "theme_color": "#3F4FB0",
   "icons": [
+    { "src": "/brand/sotto-mark.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
     { "src": "/favicon.ico", "sizes": "48x48", "type": "image/x-icon" },
-    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Learn", "short_name": "Learn", "url": "/learn", "description": "Continue your course" },
+    { "name": "Practice", "short_name": "Practice", "url": "/learn/practice", "description": "Ungated skill practice" },
+    { "name": "Connect a device", "short_name": "Connect", "url": "/settings/devices", "description": "Pair a phone or tablet" }
   ]
 }

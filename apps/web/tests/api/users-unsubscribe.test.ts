@@ -13,16 +13,16 @@ vi.mock('@/lib/prisma', () => {
   return { prisma, prismaUnfiltered: prisma };
 });
 
-import { GET } from '@/app/api/users/unsubscribe/route';
+import { GET } from '@/app/api/v1/users/unsubscribe/route';
 
 function signedRequest(userId: string): NextRequest {
   const sig = crypto.createHmac('sha256', 'test-secret').update(userId).digest('hex');
   return new NextRequest(
-    `https://selfhost.example.com/api/users/unsubscribe?userId=${userId}&sig=${sig}`
+    `https://selfhost.example.com/api/v1/users/unsubscribe?userId=${userId}&sig=${sig}`
   );
 }
 
-describe('GET /api/users/unsubscribe', () => {
+describe('GET /api/v1/users/unsubscribe', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://selfhost.example.com');

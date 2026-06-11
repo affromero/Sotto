@@ -10,8 +10,9 @@ import { composeListeningContent } from './class-listening-generator';
 import { composeSpeakingPrompts } from './class-speaking-generator';
 import { composeWritingPrompts } from './class-writing-generator';
 import { getCourseNote } from './course-notes';
+import { buildLearnerContext } from './pedagogy';
 import { logger } from './logger';
-import type { CefrLevel, PracticeKind, SkillType } from '@sotto/shared';
+import type { CefrLevel, PracticeKind, SkillType, PedagogyStyle } from '@sotto/shared';
 
 const MC_COUNT = 6;
 const VOCAB_COUNT = 12;
@@ -91,12 +92,13 @@ interface CourseCtx {
   targetLang: string;
   currentLevel: CefrLevel;
   curriculumId: string;
+  pedagogy: PedagogyStyle;
 }
 
 async function loadCourse(courseId: string, userId: string): Promise<CourseCtx> {
   const course = await prisma.course.findFirst({
     where: { id: courseId, userId },
-    select: { id: true, userId: true, nativeLang: true, targetLang: true, currentLevel: true, curriculumId: true },
+    select: { id: true, userId: true, nativeLang: true, targetLang: true, currentLevel: true, curriculumId: true, pedagogy: true },
   });
   if (!course) throw new PracticeCourseNotFoundError('Course not found');
   return course;
@@ -145,7 +147,7 @@ export async function startPractice(
 
   if (kind === 'VOCAB') return startVocab(course, seedToken);
 
-  const note = await getCourseNote(courseId);
+  const note = buildLearnerContext(await getCourseNote(courseId), course.pedagogy);
   const due = await getDueItems(courseId, MC_COUNT);
   const seed = await resolveSeed(course, due);
   if (!seed) return { status: 'unavailable', reason: 'no_content' };

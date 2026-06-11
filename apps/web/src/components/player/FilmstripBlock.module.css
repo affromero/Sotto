@@ -27,7 +27,7 @@
 
 .blockSelected {
   border-color: var(--color-primary);
-  background: rgba(217, 119, 6, 0.08);
+  background: rgba(63, 79, 176, 0.08);
 }
 
 .blockDirty {
@@ -52,7 +52,7 @@
   aspect-ratio: 16 / 9;
   border-radius: var(--radius-sm);
   overflow: hidden;
-  background: #1a1a1a;
+  background: var(--color-text-primary);
 }
 
 .thumbnailImage {

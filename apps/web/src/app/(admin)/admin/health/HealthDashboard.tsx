@@ -37,7 +37,7 @@ export function HealthDashboard({ initialData }: { initialData: HealthData }) {
   function refresh() {
     startTransition(async () => {
       try {
-        const res = await fetch('/api/health');
+        const res = await fetch('/api/v1/health');
         const json = await res.json();
         setData(json);
       } catch {

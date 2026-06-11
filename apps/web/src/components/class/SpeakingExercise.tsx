@@ -45,8 +45,8 @@ interface PromptState {
 }
 
 interface SpeakingExerciseProps {
-  /** Endpoint prefix for upload/poll, e.g. `/api/classes/{classId}/speaking`
-   *  or `/api/practice/{sessionId}/speaking`. Prompt id is appended. */
+  /** Endpoint prefix for upload/poll, e.g. `/api/v1/classes/{classId}/speaking`
+   *  or `/api/v1/practice/{sessionId}/speaking`. Prompt id is appended. */
   endpointBase: string;
   prompts: Prompt[];
 }

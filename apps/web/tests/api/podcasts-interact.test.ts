@@ -48,17 +48,8 @@ vi.mock('@/lib/redis', () => ({
   checkRateLimit: (...args: unknown[]) => mockCheckRateLimit(...args),
 }));
 
-// The route dynamically imports @/lib/auth for session-based suspension checks
-vi.mock('@/lib/auth', () => ({
-  auth: vi.fn().mockResolvedValue(null),
-}));
-
-vi.mock('@/lib/auth-guards', () => ({
-  checkSuspension: vi.fn().mockReturnValue(null),
-}));
-
-vi.mock('@/lib/tier-features', () => ({
-  getTierFeatures: vi.fn().mockReturnValue({
+vi.mock('@/lib/generation-features', () => ({
+  getGenerationFeatures: vi.fn().mockReturnValue({
     maxDurationMinutes: 30,
     maxSpeakers: 4,
     autoApproveScript: false,
@@ -67,9 +58,6 @@ vi.mock('@/lib/tier-features', () => ({
     privateAllowed: true,
     priorityQueue: true,
     analyticsEnabled: true,
-    voiceTracksEnabled: true,
-    maxVoiceTracks: 3,
-    voiceCloningEnabled: true,
   }),
 }));
 
@@ -78,7 +66,7 @@ vi.mock('@/lib/byok', () => ({
 }));
 
 // Import route after mocks are set up
-import { POST } from '@/app/api/podcasts/[podcastId]/interact/route';
+import { POST } from '@/app/api/v1/podcasts/[podcastId]/interact/route';
 
 function createRequest(
   podcastId: string,
@@ -87,7 +75,7 @@ function createRequest(
   request: NextRequest;
   params: { params: Promise<{ podcastId: string }> };
 } {
-  const url = new URL(`http://localhost:3000/api/podcasts/${podcastId}/interact`);
+  const url = new URL(`http://localhost:3000/api/v1/podcasts/${podcastId}/interact`);
   const request = new NextRequest(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -123,11 +111,11 @@ const mockInteraction = {
   },
 };
 
-describe('POST /api/podcasts/[podcastId]/interact', () => {
+describe('POST /api/v1/podcasts/[podcastId]/interact', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 59, resetAt: 0 });
-    mockUserFindUniqueOrThrow.mockResolvedValue({ plan: 'PRO', role: 'USER' });
+    mockUserFindUniqueOrThrow.mockResolvedValue({ role: 'USER' });
     mockUserFindUnique.mockResolvedValue(null);
     mockInteractionCount.mockResolvedValue(0);
   });

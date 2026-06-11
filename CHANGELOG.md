@@ -34,7 +34,7 @@
 - Hybrid carousel on landing page: featured video + thumbnail rail with auto-advance
 - Standalone feed package: core ranking signals, scoring, diversity, and social proof
 - Design system tokens: surface-nested, surface-sunken, state layers, consolidated spacing
-- Public `GET /api/showcase` endpoint for landing page consumption
+- Public `GET /api/v1/showcase` endpoint for landing page consumption
 
 ### Fixed
 - FLUX 2 Pro fal endpoint corrected (`fal-ai/flux-2-pro`)
@@ -59,7 +59,7 @@
 - PDF figure extraction via pdfjs-dist with embedded image capture
 - `SOURCE_FIGURE` visual type: renders actual source figures in video with attribution overlay
 - Per-section video preview: users can preview individual segments before final render
-- Preview API (`POST/GET /api/podcasts/[id]/video/preview`) with Zod validation and ownership auth
+- Preview API (`POST/GET /api/v1/podcasts/[id]/video/preview`) with Zod validation and ownership auth
 - Segment preview worker renders per-segment MP4 via sidecar `/clip` with audio
 - Per-segment feedback and selective regeneration via PATCH endpoint
 - FFmpeg concat optimization: skip full Remotion re-render when all segments have full-quality previews
@@ -138,7 +138,7 @@
 - Data URL audio uploaded to R2 before sending to Fal (was failing with raw base64)
 
 ### Changed
-- `/api/avatar-test` POST and GET now require ADMIN role (returns 403 for non-admins)
+- `/api/v1/avatar-test` POST and GET now require ADMIN role (returns 403 for non-admins)
 - LipSyncTester removed from user settings — replaced by AvatarImageManager gallery
 
 ## [0.25.0] - 2026-03-16

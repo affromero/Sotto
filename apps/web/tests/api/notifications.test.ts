@@ -26,9 +26,9 @@ vi.mock('@/lib/auth', () => ({
   auth: (...args: unknown[]) => mockAuth(...args),
 }));
 
-import { GET } from '@/app/api/notifications/route';
-import { PATCH } from '@/app/api/notifications/[notificationId]/route';
-import { POST } from '@/app/api/notifications/mark-all-read/route';
+import { GET } from '@/app/api/v1/notifications/route';
+import { PATCH } from '@/app/api/v1/notifications/[notificationId]/route';
+import { POST } from '@/app/api/v1/notifications/mark-all-read/route';
 
 const mockPrisma = {
   notification: {
@@ -41,7 +41,7 @@ const mockPrisma = {
 };
 
 function createRequest(params: Record<string, string> = {}): NextRequest {
-  const url = new URL('http://localhost:3000/api/notifications');
+  const url = new URL('http://localhost:3000/api/v1/notifications');
   for (const [key, value] of Object.entries(params)) {
     url.searchParams.set(key, value);
   }
@@ -90,7 +90,7 @@ const mockNotification3 = {
   createdAt: new Date('2025-01-13T10:00:00Z'),
 };
 
-describe('GET /api/notifications', () => {
+describe('GET /api/v1/notifications', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -254,7 +254,7 @@ describe('GET /api/notifications', () => {
   });
 });
 
-describe('PATCH /api/notifications/[notificationId]', () => {
+describe('PATCH /api/v1/notifications/[notificationId]', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -319,7 +319,7 @@ describe('PATCH /api/notifications/[notificationId]', () => {
   });
 });
 
-describe('POST /api/notifications/mark-all-read', () => {
+describe('POST /api/v1/notifications/mark-all-read', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });

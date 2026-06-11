@@ -142,6 +142,7 @@ describe('extractors', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
   });
 
   function mockFetchResponse(html: string, status = 200) {
@@ -381,6 +382,7 @@ describe('extractors', () => {
 
   describe('extractContent facade', () => {
     it('routes standard URLs to html extractor', async () => {
+      vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://selfhost.example.com');
       mockFetchResponse(WELL_STRUCTURED_HTML);
       const result = await extractContent('https://example.com/article');
 

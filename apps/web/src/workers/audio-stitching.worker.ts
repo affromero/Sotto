@@ -5,23 +5,19 @@ import {
   JobType,
   notificationQueue,
   pdfGenerationQueue,
-  featureComputationQueue,
   waveformGenerationQueue,
 } from '@/lib/queue';
 import { invalidatePodcastCache, publishPodcastStatus } from '@/lib/redis';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { markPodcastFailed } from '@/lib/pipeline-resume';
 import { downloadToFile, uploadPodcastAudio } from '@/lib/r2';
-import { stitchWithEffectsAndMusic, type SfxInsert } from '@/lib/audio-stitcher';
+import { stitchWithEffects, type SfxInsert } from '@/lib/audio-stitcher';
 import { generateSoundEffect } from '@/lib/elevenlabs';
-import { LIMITS } from '@/lib/stripe';
+import { MAX_LESSON_DURATION_MINUTES } from '@/lib/generation-limits';
 import { type SoundCue } from '@/lib/script-generator';
 import { logger } from '@/lib/logger';
-import { capturePodcastPayments } from '@/lib/voice-pricing';
 import { generateFingerprint } from '@/lib/audio-fingerprint';
 import { verifyReferral } from '@/lib/referrals';
-import { consumeFreeGeneration } from '@/lib/generation-gate';
-import { hasByokKey } from '@/lib/byok';
 
 import * as path from 'path';
 import * as os from 'os';
@@ -189,7 +185,7 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
       where: { id: podcastId },
       select: { userId: true, title: true, source: true },
     });
-    const usePremiumSfx = LIMITS.hasPremiumSfx;
+    const usePremiumSfx = true;
 
     await job.updateProgress(10);
 
@@ -230,7 +226,7 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
       const sfxPath = path.join(tmpDir, `sfx-${i}.mp3`);
 
       if (usePremiumSfx) {
-        // Creator tier: generate custom SFX via ElevenLabs
+        // Premium SFX mode: generate custom SFX via ElevenLabs.
         try {
           const sfxBuffer = await generateSoundEffect({
             prompt: cue.prompt,
@@ -249,7 +245,7 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
           await copyFile(stockPath, sfxPath);
         }
       } else {
-        // Free/Pro tier: use bundled stock SFX (zero marginal cost)
+        // Default mode: use bundled stock SFX.
         const stockFile = STOCK_SFX[cue.type];
         const stockPath = path.resolve(__dirname, '..', 'assets', 'sfx', stockFile);
         const { copyFile } = await import('fs/promises');
@@ -305,39 +301,22 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
 
     await job.updateProgress(65);
 
-    // 5c. Download background music if available (for baking into final MP3)
-    let musicLocalPath: string | undefined;
-    let musicVolume = 0.15;
-    if (!skipSfx) {
-      const podcastWithMusic = await prisma.podcast.findUnique({
-        where: { id: podcastId },
-        select: { musicUrl: true, musicVolume: true },
-      });
-      if (podcastWithMusic?.musicUrl) {
-        musicLocalPath = path.join(tmpDir, 'music-bed.mp3');
-        await downloadToFile(podcastWithMusic.musicUrl, musicLocalPath);
-        musicVolume = podcastWithMusic.musicVolume ?? 0.15;
-      }
-    }
-
-    // 6. Run FFmpeg stitching (with music ducking if music bed available)
+    // 6. Run FFmpeg stitching
     const outputPath = path.join(tmpDir, 'final.mp3');
-    const { duration } = await stitchWithEffectsAndMusic({
+    const { duration } = await stitchWithEffects({
       segmentPaths,
       sfxInserts,
       outputPath,
       crossfadeMs: 300,
-      musicPath: musicLocalPath,
-      musicVolume,
     });
 
     await job.updateProgress(80);
 
     // 7. Post-stitch duration hard check
-    const maxDurationSeconds = LIMITS.maxDurationMinutes * 60 * 1.1; // 10% grace
+    const maxDurationSeconds = MAX_LESSON_DURATION_MINUTES * 60 * 1.1; // 10% grace
     if (duration > maxDurationSeconds) {
       await markPodcastFailed(podcastId, {
-        failureReason: `"${podcast.title}" exceeded the ${LIMITS.maxDurationMinutes}-minute duration limit (${Math.round(duration / 60)} minutes). Please try with a shorter duration target.`,
+        failureReason: `"${podcast.title}" exceeded the ${MAX_LESSON_DURATION_MINUTES}-minute duration limit (${Math.round(duration / 60)} minutes). Please try with a shorter duration target.`,
         technicalError: `Duration ${Math.round(duration)}s exceeded max ${Math.round(maxDurationSeconds)}s`,
       });
 
@@ -345,7 +324,7 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
         userId: podcast.userId,
         type: 'PODCAST_FAILED',
         title: 'Podcast generation failed',
-        message: `"${podcast.title}" exceeded the ${LIMITS.maxDurationMinutes}-minute duration limit (${Math.round(duration / 60)} minutes). Please try with a shorter duration target.`,
+        message: `"${podcast.title}" exceeded the ${MAX_LESSON_DURATION_MINUTES}-minute duration limit (${Math.round(duration / 60)} minutes). Please try with a shorter duration target.`,
         data: { podcastId },
       });
 
@@ -432,28 +411,10 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
         durationDeviation,
         fileSize: finalAudio.length,
         currentVersion: newVersion,
-        musicBaked: !!musicLocalPath,
       },
     });
     await invalidatePodcastCache(podcastId);
     await publishPodcastStatus(podcastId, { status: 'READY' });
-
-    // Consume free-tier quota on successful generation (not at creation time)
-    const podcastUser = await prisma.user.findUniqueOrThrow({
-      where: { id: podcast.userId },
-      select: { role: true, plan: true },
-    });
-    const isByok = await hasByokKey(podcast.userId);
-    const isPrivileged = podcastUser.role === 'ADMIN' || podcastUser.role === 'SYSTEM';
-    if (!isByok && podcastUser.plan !== 'PRO' && !isPrivileged) {
-      await consumeFreeGeneration(podcast.userId).catch((err) => {
-        logger.warn('Failed to consume free generation', {
-          podcastId,
-          userId: podcast.userId,
-          error: err instanceof Error ? err.message : String(err),
-        });
-      });
-    }
 
     // Record pipeline completion event for accurate timing metrics
     await prisma.pipelineEvent.create({
@@ -465,13 +426,6 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
       },
     });
 
-    // 9a. Capture voice payments on successful generation
-    await capturePodcastPayments(podcastId).catch((err) => {
-      logger.error('Failed to capture voice payments', {
-        podcastId,
-        error: err instanceof Error ? err.message : String(err),
-      });
-    });
 
     // 9. Update segment start times by detecting silence boundaries in the stitched audio
     // This gives exact positions regardless of crossfade/SFX/normalization
@@ -503,7 +457,7 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
       // Fallback: cumulative durations adjusted for crossfade overlap.
       // acrossfade=d=0.3 overlaps each pair of adjacent segments by 300ms,
       // so each segment starts 0.3s earlier than naive cumulative sum.
-      const crossfadeSec = 0.3; // must match crossfadeMs: 300 in stitchWithEffectsAndMusic call
+      const crossfadeSec = 0.3; // must match crossfadeMs: 300 in stitchWithEffects call
       let cum = 0;
       detectedStarts = freshSegments.map((seg) => {
         const t = cum;
@@ -563,13 +517,7 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
       userId: podcast.userId,
     });
 
-    // 10c2. Compute ML features for this podcast
-    await addJob(featureComputationQueue, JobType.COMPUTE_FEATURES, {
-      scope: 'podcast' as const,
-      targetId: podcastId,
-    });
-
-    // 10c3. Generate waveform visualization data
+    // 10c2. Generate waveform visualization data
     await addJob(waveformGenerationQueue, JobType.GENERATE_WAVEFORM, {
       podcastId,
       userId: podcast.userId,

@@ -191,7 +191,7 @@
 }
 
 .itemActive {
-  background: var(--color-primary-subtle, rgba(217, 119, 6, 0.05));
+  background: var(--color-primary-subtle, rgba(63, 79, 176, 0.05));
 }
 
 @media (max-width: 768px) {

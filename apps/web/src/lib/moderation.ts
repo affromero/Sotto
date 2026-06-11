@@ -1,6 +1,5 @@
 import { createHash } from 'crypto';
 import { cache } from './redis';
-import { prisma } from './prisma';
 import { logUsage } from './usage-logger';
 import { logger } from './logger';
 
@@ -156,35 +155,4 @@ export async function moderateOrThrow(text: string): Promise<void> {
   if (result.flagged) {
     throw new ContentModerationError(result.blockedCategories);
   }
-}
-
-/**
- * Record a content flag for audit purposes. Fire-and-forget — never throws.
- * Used by the content moderation worker and inline screening.
- */
-export async function recordContentFlag(params: {
-  targetType: string;
-  targetId: string;
-  userId?: string;
-  result: ModerationResult;
-  source: 'auto_input' | 'auto_output' | 'worker_scan';
-}): Promise<void> {
-  if (!params.result.flagged) return;
-
-  await prisma.contentFlag
-    .create({
-      data: {
-        targetType: params.targetType,
-        targetId: params.targetId,
-        userId: params.userId ?? null,
-        categories: params.result.blockedCategories,
-        scores: params.result.scores,
-        source: params.source,
-      },
-    })
-    .catch((err) => {
-      logger.warn('Failed to record content flag', {
-        error: err instanceof Error ? err.message : String(err),
-      });
-    });
 }

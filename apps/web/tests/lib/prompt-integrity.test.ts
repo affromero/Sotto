@@ -36,12 +36,11 @@ const EXPECTED_FILES = [
   'shared/audience/general.md',
   'shared/audience/mature.md',
   'shared/bias-guidance.md',
-  'discovery/agent.md',
-  'discovery/fallback.md',
   'topic-assessor.md',
   'placement/placement-probe.md',
   'class/generate-listening-quiz.md',
   'class/generate-section-quiz.md',
+  'class/level-source.md',
   'import/import-metadata.md',
   'import/transcript-diarization.md',
   'verification/reference-validator.md',
@@ -65,8 +64,6 @@ const EXPECTED_FILES = [
   'research/fact-extraction.md',
   'research/source-discovery.md',
   'feeds/taste-quiz.md',
-  'feeds/for-you.md',
-  'feeds/curiosity.md',
   'audio/voice-assigner.md',
   'audio/tts-tag-converter.md',
   'demo/walkthrough.md',
@@ -75,6 +72,8 @@ const EXPECTED_FILES = [
   'writing/generate-writing-prompts.md',
   'writing/grade-writing.md',
   'curriculum/generate-curriculum.md',
+  'live/extract-vocab.md',
+  'exams/exam-feedback.md',
 ];
 
 // ── Variable contracts: template → expected placeholder names ──
@@ -82,13 +81,15 @@ const EXPECTED_FILES = [
 // If a .md file gains or loses a placeholder, these tests will catch it.
 
 const VARIABLE_CONTRACTS: Record<string, string[]> = {
+  'live/extract-vocab.md': ['LEVEL', 'MAX', 'NATIVE', 'TARGET'],
+  'exams/exam-feedback.md': ['EXAM_NAME', 'LEVEL', 'OVERALL', 'SECTIONS'],
   'generation/script-generator.md': [
     'AUDIENCE', 'AUDIENCE_GUIDANCE', 'AUDIENCE_LEVEL', 'BIAS_GUIDANCE', 'CONTENT_SAFETY',
     'DEPTH', 'DURATION_TARGET',
     'ELI5_SECTION', 'EXPERT_SPEAKER', 'FOCUS_AREAS', 'HOST_SPEAKER',
-    'MIN_REFERENCE_COUNT', 'MIN_SERIOUS_PERCENT',
+    'LANGUAGE_INSTRUCTION', 'MIN_REFERENCE_COUNT', 'MIN_SERIOUS_PERCENT',
     'SERIOUS_RATIO_NOTE', 'SPEAKER_COUNT', 'SPEAKER_SECTION', 'TONE_GUIDANCE',
-    'VOICE_DELIVERY_GUIDELINES', 'VOICE_REALISM',
+    'VOCABULARY_INSTRUCTION', 'VOICE_DELIVERY_GUIDELINES', 'VOICE_REALISM',
     'WORD_COUNT_IDEAL', 'WORD_COUNT_MAX', 'WORD_COUNT_MIN',
   ].sort(),
   'generation/script-revision-factcheck.md': [
@@ -114,13 +115,6 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
   'feeds/taste-quiz.md': [
     'DISLIKED_SUMMARY', 'INTEREST_SUMMARY', 'RECENT_QUESTIONS',
     'REQUEST_COUNT', 'TAXONOMY',
-  ].sort(),
-  'feeds/for-you.md': [
-    'INPUT_SANITIZATION', 'INTEREST_CONTEXT', 'REQUEST_COUNT',
-    'TAXONOMY', 'TOPIC_CONTEXT',
-  ].sort(),
-  'feeds/curiosity.md': [
-    'INPUT_SANITIZATION', 'REQUEST_COUNT', 'TAXONOMY', 'TOPIC_CONTEXT',
   ].sort(),
   'audio/voice-assigner.md': [
     'SPEAKERS', 'SPEAKER_COUNT', 'VOICE_CATALOG',
@@ -166,7 +160,10 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
     'COUNT', 'LEVEL', 'NATIVE', 'NOTES', 'TARGET', 'TRANSCRIPT',
   ].sort(),
   'class/generate-section-quiz.md': [
-    'COUNT', 'GRAMMAR_POINTS', 'LEVEL', 'NATIVE', 'NOTES', 'OBJECTIVE', 'SEED', 'SKILL', 'TARGET', 'VOCAB',
+    'COUNT', 'GRAMMAR_POINTS', 'LEVEL', 'NATIVE', 'NOTES', 'OBJECTIVE', 'SEED', 'SKILL', 'SOURCE', 'TARGET', 'VOCAB',
+  ].sort(),
+  'class/level-source.md': [
+    'LEVEL', 'NATIVE', 'SOURCE', 'TARGET', 'TITLE',
   ].sort(),
   'writing/generate-writing-prompts.md': [
     'COUNT', 'LEVEL', 'NATIVE', 'NOTES', 'OBJECTIVE', 'TARGET', 'VOCAB',
@@ -310,21 +307,11 @@ describe('verification templates', () => {
 
 describe('feed templates', () => {
   it('all feed templates produce JSON array output', () => {
-    for (const file of ['feeds/taste-quiz.md', 'feeds/for-you.md', 'feeds/curiosity.md']) {
+    for (const file of ['feeds/taste-quiz.md']) {
       const content = readFileSync(join(PROMPTS_DIR, file), 'utf-8');
       expect(content).toContain('JSON array');
       expect(content).toContain('"text"');
       expect(content).toContain('"tagSlugs"');
     }
-  });
-
-  it('curiosity.md explicitly avoids personalization', () => {
-    const content = readFileSync(join(PROMPTS_DIR, 'feeds/curiosity.md'), 'utf-8');
-    expect(content).toContain('Do NOT personalize');
-  });
-
-  it('for-you.md emphasizes creative combinations', () => {
-    const content = readFileSync(join(PROMPTS_DIR, 'feeds/for-you.md'), 'utf-8');
-    expect(content).toContain('CREATIVE COMBINATIONS');
   });
 });

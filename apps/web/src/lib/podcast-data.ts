@@ -86,25 +86,6 @@ export const getPodcastForDetailPage = cache(async (podcastId: string) => {
       voices: {
         select: { speaker: true, voiceId: true, provider: true },
       },
-      voiceTracks: {
-        orderBy: { createdAt: 'asc' as const },
-        select: {
-          id: true,
-          name: true,
-          status: true,
-          audioUrl: true,
-          duration: true,
-          ttsProvider: true,
-          ttsModel: true,
-          failureReason: true,
-          voices: { select: { speaker: true, voiceId: true, provider: true } },
-          proposalStatus: true,
-          proposalMessage: true,
-          contributor: {
-            select: { id: true, name: true, handle: true, image: true },
-          },
-        },
-      },
     },
   });
 });

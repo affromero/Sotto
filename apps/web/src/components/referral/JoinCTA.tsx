@@ -13,7 +13,7 @@ export function JoinCTA({ creatorHandle, creatorName }: JoinCTAProps) {
   return (
     <div className={styles.bar}>
       <p className={styles.text}>
-        Join {name} on Sotto — create private AI podcast briefings.
+        Join {name} on Sotto — learn a language with your own AI tutor.
       </p>
       <Link href={signupUrl} className={styles.cta}>
         Join Sotto

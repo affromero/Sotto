@@ -29,7 +29,7 @@ describe('matchesProfile', () => {
 
   it('profile=heavy matches only HEAVY_WORKERS', () => {
     expect(matchesProfile('audio-generation', 'heavy')).toBe(true);
-    expect(matchesProfile('voice-track-audio', 'heavy')).toBe(true);
+    expect(matchesProfile('video-composition', 'heavy')).toBe(true);
     expect(matchesProfile('content-extraction', 'heavy')).toBe(false);
     expect(matchesProfile('notifications', 'heavy')).toBe(false);
   });
@@ -55,20 +55,17 @@ describe('matchesProfile', () => {
 
 describe('matchesPreset', () => {
   it('preset=full includes everything', () => {
-    expect(matchesPreset('demo-voiceover', 'full')).toBe(true);
     expect(matchesPreset('audio-generation', 'full')).toBe(true);
     expect(matchesPreset('lip-sync-test', 'full')).toBe(true);
   });
 
-  it('preset=core excludes EXPERIMENTAL_WORKERS (denylist)', () => {
-    expect(matchesPreset('demo-voiceover', 'core')).toBe(false);
-    expect(matchesPreset('demo-script', 'core')).toBe(false);
-    expect(matchesPreset('music-generation', 'core')).toBe(false);
+  it('preset=core has no experimental denylist after demo workers were removed', () => {
+    expect(EXPERIMENTAL_WORKERS.size).toBe(0);
   });
 
   it('preset=core includes production workers', () => {
     expect(matchesPreset('audio-generation', 'core')).toBe(true);
-    expect(matchesPreset('voice-track-audio', 'core')).toBe(true);
+    expect(matchesPreset('audio-stitching', 'core')).toBe(true);
     expect(matchesPreset('visual-generation', 'core')).toBe(true);
     expect(matchesPreset('transition-generation', 'core')).toBe(true);
     expect(matchesPreset('video-composition', 'core')).toBe(true);
@@ -82,8 +79,8 @@ describe('matchesPreset', () => {
 });
 
 describe('shouldRun — the bug fix', () => {
-  it('voice-track-audio runs with heavy+core', () => {
-    expect(shouldRun('voice-track-audio', opts({ profile: 'heavy', preset: 'core' }))).toBe(true);
+  it('audio-stitching runs with heavy+core', () => {
+    expect(shouldRun('audio-stitching', opts({ profile: 'heavy', preset: 'core' }))).toBe(true);
   });
 
   it('visual-generation runs with heavy+core', () => {
@@ -99,31 +96,15 @@ describe('shouldRun — the bug fix', () => {
   });
 });
 
-describe('shouldRun — experimental workers excluded', () => {
-  it('demo-voiceover excluded with heavy+core', () => {
-    expect(shouldRun('demo-voiceover', opts({ profile: 'heavy', preset: 'core' }))).toBe(false);
-  });
-
-  it('demo-composition excluded with heavy+core', () => {
-    expect(shouldRun('demo-composition', opts({ profile: 'heavy', preset: 'core' }))).toBe(false);
-  });
-
+describe('shouldRun — retained video workers', () => {
   it('avatar-generation runs with heavy+core (not experimental)', () => {
     expect(shouldRun('avatar-generation', opts({ profile: 'heavy', preset: 'core' }))).toBe(true);
-  });
-
-  it('music-generation excluded with heavy+core', () => {
-    expect(shouldRun('music-generation', opts({ profile: 'heavy', preset: 'core' }))).toBe(false);
-  });
-
-  it('demo-script excluded with pipeline+core', () => {
-    expect(shouldRun('demo-script', opts({ profile: 'pipeline', preset: 'core' }))).toBe(false);
   });
 });
 
 describe('shouldRun — preset=full includes everything', () => {
-  it('demo-voiceover included with heavy+full', () => {
-    expect(shouldRun('demo-voiceover', opts({ profile: 'heavy', preset: 'full' }))).toBe(true);
+  it('visual-generation included with heavy+full', () => {
+    expect(shouldRun('visual-generation', opts({ profile: 'heavy', preset: 'full' }))).toBe(true);
   });
 
   it('lip-sync-test included with heavy+full', () => {
@@ -141,7 +122,7 @@ describe('shouldRun — filters', () => {
   it('include filter restricts to specified workers only', () => {
     const include = new Set(['audio-generation']);
     expect(shouldRun('audio-generation', opts({ profile: 'heavy', preset: 'core', includeFilter: include }))).toBe(true);
-    expect(shouldRun('voice-track-audio', opts({ profile: 'heavy', preset: 'core', includeFilter: include }))).toBe(false);
+    expect(shouldRun('audio-stitching', opts({ profile: 'heavy', preset: 'core', includeFilter: include }))).toBe(false);
   });
 
   it('exclude filter takes priority over include filter', () => {
@@ -165,7 +146,7 @@ describe('shouldRun — profile filtering with preset=core', () => {
     expect(shouldRun('content-extraction', opts({ profile: 'pipeline', preset: 'core' }))).toBe(true);
     expect(shouldRun('visual-classification', opts({ profile: 'pipeline', preset: 'core' }))).toBe(true);
     expect(shouldRun('place-enrichment', opts({ profile: 'pipeline', preset: 'core' }))).toBe(true);
-    expect(shouldRun('voice-track-stitching', opts({ profile: 'pipeline', preset: 'core' }))).toBe(true);
+    expect(shouldRun('pipeline-classification', opts({ profile: 'pipeline', preset: 'core' }))).toBe(true);
   });
 });
 

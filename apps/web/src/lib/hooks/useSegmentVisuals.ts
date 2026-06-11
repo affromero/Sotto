@@ -20,7 +20,7 @@ export function useSegmentVisuals(podcastId: string | null): UseSegmentVisualsRe
     setIsLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/podcasts/${podcastId}/video`);
+      const res = await fetch(`/api/v1/podcasts/${podcastId}/video`);
       if (!res.ok) {
         setIsLoading(false);
         return;

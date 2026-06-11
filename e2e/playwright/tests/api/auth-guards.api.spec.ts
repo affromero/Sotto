@@ -1,17 +1,12 @@
 import { test, expect } from '@playwright/test';
 
 const protectedRoutes: { method: 'get' | 'post' | 'patch' | 'delete'; path: string }[] = [
-  { method: 'get', path: '/api/podcasts' },
-  { method: 'get', path: '/api/notifications' },
-  { method: 'get', path: '/api/collections' },
-  { method: 'get', path: '/api/ideas' },
-  { method: 'get', path: '/api/keys' },
-  { method: 'get', path: '/api/saved' },
-  { method: 'get', path: '/api/picks' },
-  { method: 'patch', path: '/api/users/me' },
-  { method: 'post', path: '/api/collections' },
-  { method: 'post', path: '/api/drafts' },
-  { method: 'post', path: '/api/podcasts/e2e-podcast/interact' },
+  { method: 'get', path: '/api/v1/podcasts' },
+  { method: 'get', path: '/api/v1/notifications' },
+  { method: 'get', path: '/api/v1/keys' },
+  { method: 'patch', path: '/api/v1/users/me' },
+  { method: 'get', path: '/api/v1/users/me/podcasts' },
+  { method: 'post', path: '/api/v1/podcasts/e2e-podcast/interact' },
 ];
 
 test.describe('Auth guards — 401 without session', () => {

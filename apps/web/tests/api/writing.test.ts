@@ -24,12 +24,12 @@ vi.mock('@/lib/prisma', () => ({
 }));
 vi.mock('@/lib/logger', () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } }));
 
-import { POST } from '@/app/api/classes/[classId]/writing/[promptId]/route';
+import { POST } from '@/app/api/v1/classes/[classId]/writing/[promptId]/route';
 
 const PARAMS = { params: Promise.resolve({ classId: 'class-1', promptId: 'wp-1' }) };
 
 function req(body: unknown): NextRequest {
-  return new NextRequest('http://localhost/api/classes/class-1/writing/wp-1', {
+  return new NextRequest('http://localhost/api/v1/classes/class-1/writing/wp-1', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -51,7 +51,7 @@ beforeEach(() => {
   mockWritingResponseFindFirst.mockResolvedValue(null);
 });
 
-describe('POST /api/classes/[classId]/writing/[promptId]', () => {
+describe('POST /api/v1/classes/[classId]/writing/[promptId]', () => {
   it('grades a response and persists it', async () => {
     const res = await POST(req({ text: 'Sí, quiero ir.' }), PARAMS);
     expect(res.status).toBe(200);

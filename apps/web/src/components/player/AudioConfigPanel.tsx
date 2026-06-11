@@ -14,7 +14,6 @@ interface TtsOption {
 interface VoiceOption {
   id: string;
   name: string;
-  category: 'pool' | 'clone' | 'shared';
 }
 
 export interface AudioConfig {
@@ -55,7 +54,7 @@ export function AudioConfigPanel({ speakers, onConfigChange, failedProvider }: A
 
   // Fetch available TTS providers on mount
   useEffect(() => {
-    fetch('/api/tts-options')
+    fetch('/api/v1/tts-options')
       .then((res) => res.json())
       .then((data) => {
         setProviderOptions(data.options || []);
@@ -69,26 +68,13 @@ export function AudioConfigPanel({ speakers, onConfigChange, failedProvider }: A
 
     setLoadingVoices((prev) => ({ ...prev, [providerKey]: true }));
     try {
-      const res = await fetch(`/api/voices?provider=${providerKey}`);
+      const res = await fetch(`/api/v1/voices?provider=${providerKey}`);
       if (res.ok) {
         const data = await res.json();
-        const voices: VoiceOption[] = [
-          ...(data.userClones || []).map((c: { externalVoiceId: string; name: string }) => ({
-            id: c.externalVoiceId,
-            name: c.name,
-            category: 'clone' as const,
-          })),
-          ...(data.sharedVoices || []).map((v: { externalVoiceId: string; name: string }) => ({
-            id: v.externalVoiceId,
-            name: v.name,
-            category: 'shared' as const,
-          })),
-          ...(data.poolVoices || []).map((v: { id: string; name: string }) => ({
-            id: v.id,
-            name: v.name,
-            category: 'pool' as const,
-          })),
-        ];
+        const voices: VoiceOption[] = (data.poolVoices || []).map((v: { id: string; name: string }) => ({
+          id: v.id,
+          name: v.name,
+        }));
         setVoicesByProvider((prev) => ({ ...prev, [providerKey]: voices }));
       }
     } catch {
@@ -175,7 +161,7 @@ export function AudioConfigPanel({ speakers, onConfigChange, failedProvider }: A
                   <option value="">Auto</option>
                   {voices.map((v) => (
                     <option key={v.id} value={v.id}>
-                      {v.category === 'clone' ? `${v.name} (yours)` : v.category === 'shared' ? `${v.name} (shared)` : v.name}
+                      {v.name}
                     </option>
                   ))}
                 </select>

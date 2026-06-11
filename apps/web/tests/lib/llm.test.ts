@@ -439,7 +439,7 @@ describe('claude', () => {
       await logUsage({
         service: 'anthropic',
         model: 'claude-haiku-4-5-20251001',
-        category: 'handle_screening',
+        category: 'script_generation',
         inputTokens: 1_000_000,
         outputTokens: 1_000_000,
       });

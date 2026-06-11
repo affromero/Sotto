@@ -40,23 +40,23 @@
 }
 
 .creator {
-  background: rgba(30, 58, 95, 0.1);
+  background: rgba(42, 53, 80, 0.1);
   color: var(--color-accent);
 }
 
 .admin {
-  background: rgba(217, 119, 6, 0.1);
+  background: rgba(63, 79, 176, 0.1);
   color: var(--color-primary);
 }
 
 .system {
-  background: linear-gradient(135deg, rgba(217, 119, 6, 0.15), var(--color-primary-subtle));
+  background: linear-gradient(135deg, rgba(63, 79, 176, 0.15), var(--color-primary-subtle));
   color: var(--color-primary);
-  border: 1px solid rgba(217, 119, 6, 0.25);
+  border: 1px solid rgba(63, 79, 176, 0.25);
 }
 
 .earlyAccess {
   background: var(--color-primary-subtle);
   color: var(--color-primary);
-  border: 1px solid rgba(217, 119, 6, 0.15);
+  border: 1px solid rgba(63, 79, 176, 0.15);
 }

@@ -21,10 +21,13 @@ import { GrammarSection } from './GrammarSection';
 import { ListeningSection } from './ListeningSection';
 import { SpeakingSection } from './SpeakingSection';
 import { WritingSection } from './WritingSection';
+import { ClassSources } from './ClassSources';
 import {
   SKILL_GLYPH,
   skillLabel,
+  classRefToReferenceData,
   type ClassData,
+  type ClassReference,
   type ClassSection,
   type ClassSubmitResult,
 } from './classTypes';
@@ -70,9 +73,21 @@ export function ClassShell({ classId }: ClassShellProps) {
   const sections = useMemo(() => (cls ? orderSections(cls.sections) : []), [cls]);
   const gate = cls ? Math.round(cls.passThreshold * 100) : 70;
 
+  // The class's verified sources live on the LISTENING podcast (sourced classes).
+  // Collected once for the Sources panel + READING citation resolution.
+  const classReferences = useMemo<ClassReference[]>(() => {
+    const podcast = sections.find((s) => (s.podcast?.references?.length ?? 0) > 0)?.podcast;
+    return podcast?.references ?? [];
+  }, [sections]);
+
+  const passageReferences = useMemo(
+    () => classReferences.map(classRefToReferenceData),
+    [classReferences],
+  );
+
   const loadClass = useCallback(async () => {
     try {
-      const res = await fetch(`/api/classes/${classId}`);
+      const res = await fetch(`/api/v1/classes/${classId}`);
       if (res.status === 404) {
         setErrorMessage('Class not found.');
         setView('error');
@@ -141,7 +156,7 @@ export function ClassShell({ classId }: ClassShellProps) {
     }));
 
     try {
-      const res = await fetch(`/api/classes/${classId}/submit`, {
+      const res = await fetch(`/api/v1/classes/${classId}/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ answers: answerList }),
@@ -155,7 +170,7 @@ export function ClassShell({ classId }: ClassShellProps) {
       const submitResult = (await res.json()) as ClassSubmitResult;
       setResult(submitResult);
       // Reload so correctIndex + explanation are available if the learner reopens.
-      const classRes = await fetch(`/api/classes/${classId}`);
+      const classRes = await fetch(`/api/v1/classes/${classId}`);
       if (classRes.ok) {
         const updated = (await classRes.json()) as ClassData;
         setCls(updated);
@@ -182,7 +197,7 @@ export function ClassShell({ classId }: ClassShellProps) {
     setRegenerating(true);
     setErrorMessage('');
     try {
-      const res = await fetch(`/api/classes/${classId}`, { method: 'POST' });
+      const res = await fetch(`/api/v1/classes/${classId}`, { method: 'POST' });
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
         setErrorMessage(body.error ?? 'Failed to regenerate. Please try again.');
@@ -240,26 +255,41 @@ export function ClassShell({ classId }: ClassShellProps) {
   const nextName =
     segIdx < sections.length - 1 ? skillLabel(sections[segIdx + 1].skill) : null;
 
+  const sourcesPanel =
+    classReferences.length > 0 || cls.sourceUrl ? (
+      <ClassSources
+        references={classReferences}
+        sourceUrl={cls.sourceUrl}
+        sourceTitle={cls.sourceTitle}
+      />
+    ) : null;
+
   if (view === 'hub') {
     stage = (
-      <ClassHub
-        lesson={cls.lesson}
-        order={cls.order}
-        sections={sections}
-        scores={scores}
-        started={startedHour}
-        onBegin={beginHour}
-      />
+      <>
+        <ClassHub
+          lesson={cls.lesson}
+          order={cls.order}
+          sections={sections}
+          scores={scores}
+          started={startedHour}
+          onBegin={beginHour}
+        />
+        {sourcesPanel}
+      </>
     );
   } else if (view === 'summary' && result) {
     stage = (
-      <ClassSummary
-        lesson={cls.lesson}
-        order={cls.order}
-        result={result}
-        regenerating={regenerating}
-        onRetryFailed={() => void handleRegenerate()}
-      />
+      <>
+        <ClassSummary
+          lesson={cls.lesson}
+          order={cls.order}
+          result={result}
+          regenerating={regenerating}
+          onRetryFailed={() => void handleRegenerate()}
+        />
+        {sourcesPanel}
+      </>
     );
   } else if (view === 'submitting') {
     stage = (
@@ -279,6 +309,7 @@ export function ClassShell({ classId }: ClassShellProps) {
             questions={seg.questions}
             gate={gate}
             nextName={nextName}
+            references={passageReferences}
             onAnswer={recordAnswer}
             onScore={setCurScore}
             onContinue={advanceHour}
@@ -301,7 +332,7 @@ export function ClassShell({ classId }: ClassShellProps) {
         stage = (
           <SpeakingSection
             key={seg.id}
-            endpointBase={`/api/classes/${classId}/speaking`}
+            endpointBase={`/api/v1/classes/${classId}/speaking`}
             prompts={seg.prompts}
             gate={gate}
             nextName={nextName}
@@ -313,7 +344,7 @@ export function ClassShell({ classId }: ClassShellProps) {
         stage = (
           <WritingSection
             key={seg.id}
-            endpointBase={`/api/classes/${classId}/writing`}
+            endpointBase={`/api/v1/classes/${classId}/writing`}
             prompts={seg.writingPrompts}
             gate={gate}
             nextName={nextName}
