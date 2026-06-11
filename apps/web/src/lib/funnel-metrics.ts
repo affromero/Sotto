@@ -5,14 +5,14 @@
 import { PodcastStatus } from '@prisma/client';
 import { prisma } from './prisma';
 
-export interface FreeTierFunnel {
-  freeGenUsers: number;
+export interface ByokAdoptionFunnel {
+  generatingUsers: number;
   byokUsers: number;
   byokConversionRate: number;
 }
 
-export async function getFreeTierFunnel(): Promise<FreeTierFunnel> {
-  const [freeGenUsers, byokRows] = await Promise.all([
+export async function getByokAdoptionFunnel(): Promise<ByokAdoptionFunnel> {
+  const [generatingUsers, byokRows] = await Promise.all([
     prisma.user.count({
       where: { podcasts: { some: {} } },
     }),
@@ -25,10 +25,10 @@ export async function getFreeTierFunnel(): Promise<FreeTierFunnel> {
   ]);
 
   const byokUsers = Number(byokRows[0]?.count ?? 0);
-  const byokConversionRate = freeGenUsers > 0 ? byokUsers / freeGenUsers : 0;
+  const byokConversionRate = generatingUsers > 0 ? byokUsers / generatingUsers : 0;
 
   return {
-    freeGenUsers,
+    generatingUsers,
     byokUsers,
     byokConversionRate,
   };
