@@ -15,6 +15,8 @@ Open-source, self-hostable language-learning infrastructure — taught in the co
 [![Runs 100% offline](https://img.shields.io/badge/runs-100%25%20offline-1F8A5B)](#run-it-100-offline)
 [![CI](https://img.shields.io/github/actions/workflow/status/affromero/Sotto/ci.yml?branch=main&label=CI)](https://github.com/affromero/Sotto/actions/workflows/ci.yml)
 [![CodeQL](https://img.shields.io/github/actions/workflow/status/affromero/Sotto/codeql.yml?branch=main&label=CodeQL)](https://github.com/affromero/Sotto/actions/workflows/codeql.yml)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/affromero/Sotto/badge)](https://securityscorecards.dev/viewer/?uri=github.com/affromero/Sotto)
+[![gitleaks](https://img.shields.io/github/actions/workflow/status/affromero/Sotto/gitleaks.yml?branch=main&label=gitleaks)](https://github.com/affromero/Sotto/actions/workflows/gitleaks.yml)
 [![Socket](https://img.shields.io/badge/Socket-protected-blueviolet?logo=socket.dev)](https://socket.dev)
 [![Dependabot](https://img.shields.io/badge/Dependabot-enabled-025E8C?logo=dependabot&logoColor=white)](.github/dependabot.yml)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
