@@ -118,7 +118,7 @@ describe('getVoiceCatalog', () => {
 
       const catalog = await getVoiceCatalog('elevenlabs', 'test-key');
 
-      // Should filter out cloned voices
+      // Should only return preset catalog voices
       expect(catalog.length).toBe(1);
       expect(catalog[0]).toMatchObject({
         id: 'el-1',

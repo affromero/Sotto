@@ -84,21 +84,6 @@ describe('FalProvider', () => {
     const body = JSON.parse(apiOpts.body);
     expect(body.voice).toBe('Vivian');
     expect(body.text).toBe('Hello world');
-    expect(body.speaker_voice_embedding_file_url).toBeUndefined();
-  });
-
-  it('uses speaker_voice_embedding_file_url for cloned voices', async () => {
-    const embeddingUrl = 'https://fal.run/embeddings/clone.safetensors';
-    const fetchMock = mockFetchResponses({
-      audio: { url: 'https://fal.run/output/audio.wav', duration: 1.0, sample_rate: 24000 },
-    });
-
-    const provider = new FalProvider('fal_sk_test');
-    await provider.generateSpeech({ text: 'Test', voiceId: embeddingUrl });
-
-    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
-    expect(body.speaker_voice_embedding_file_url).toBe(embeddingUrl);
-    expect(body.voice).toBeUndefined();
   });
 
   it('uses the 0.6b model endpoint when configured', async () => {

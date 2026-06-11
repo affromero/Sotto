@@ -1376,11 +1376,8 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(schemaSource).not.toContain('model VoicePurchase');
     expect(schemaSource).not.toContain('model VoiceAllowlist');
 
-    // The shared voice directory still redirects to /learn; voice notifications route to settings.
+    // The shared voice directory still redirects to /learn.
     expect(readSource('src/app/voices/page.tsx')).toContain("redirect('/learn')");
-    const voiceNotificationSource = readSource('src/lib/notification-utils.ts');
-    expect(voiceNotificationSource).toContain("return '/settings/voices'");
-    expect(voiceNotificationSource).not.toContain("return '/voices'");
 
     // Mobile settings no longer exposes a voice marketplace or a /voices route.
     const mobileSettingsSource = readFileSync(

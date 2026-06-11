@@ -12,7 +12,6 @@ export interface GenerationFeatures {
   privateAllowed: boolean;
   priorityQueue: boolean;
   analyticsEnabled: boolean;
-  voiceCloningEnabled: boolean;
 }
 
 const FULL_ACCESS: GenerationFeatures = {
@@ -24,7 +23,6 @@ const FULL_ACCESS: GenerationFeatures = {
   privateAllowed: true,
   priorityQueue: false,
   analyticsEnabled: true,
-  voiceCloningEnabled: true,
 };
 
 /** Every learner gets full access — no plan/tier/quota gating. */

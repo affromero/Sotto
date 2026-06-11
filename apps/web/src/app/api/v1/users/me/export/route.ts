@@ -20,7 +20,6 @@ export async function GET() {
     discoveryMessages,
     interactions,
     saves,
-    voiceClones,
     feedback,
     tasteQuizAnswers,
   ] = await Promise.all([
@@ -109,17 +108,6 @@ export async function GET() {
       where: { userId },
       select: { podcastId: true, createdAt: true },
     }),
-    prisma.voiceClone.findMany({
-      where: { userId },
-      select: {
-        id: true,
-        name: true,
-        provider: true,
-        sourceType: true,
-        description: true,
-        createdAt: true,
-      },
-    }),
     prisma.feedback.findMany({
       where: { userId },
       select: {
@@ -157,7 +145,6 @@ export async function GET() {
     discoveryMessages,
     interactions,
     saves,
-    voiceClones,
     feedback,
     tasteQuizAnswers,
   };

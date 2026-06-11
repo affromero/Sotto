@@ -116,7 +116,6 @@ vi.mock('@/lib/referrals', () => ({
 
 vi.mock('@/lib/generation-limits', () => ({
   MAX_LESSON_DURATION_MINUTES: 30,
-  MAX_VOICE_CLONES: 10,
 }));
 
 const mockMarkPodcastFailed = vi.fn().mockResolvedValue(undefined);

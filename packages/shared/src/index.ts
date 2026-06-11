@@ -11,7 +11,6 @@ export type {
   ReferenceType,
   VerificationStatus,
   NotificationType,
-  VoiceCloneSource,
   FeedbackType,
   FeedbackStatus,
   CefrLevel,

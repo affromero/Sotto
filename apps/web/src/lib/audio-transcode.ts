@@ -32,7 +32,7 @@ export function getExtensionFromMime(mimeType: string): string {
 
 /**
  * Transcode an audio buffer to 128k mono 44100Hz MP3 via FFmpeg.
- * Used for normalizing voice clone samples before sending to TTS provider APIs.
+ * Used for normalizing uploaded audio before sending it to provider APIs.
  */
 export async function transcodeToMp3(
   inputBuffer: Buffer,

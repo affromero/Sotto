@@ -8,8 +8,6 @@ import {
   AlertOctagon,
   HelpCircle,
   FileText,
-  ShieldCheck,
-  ShieldAlert,
   Trash2,
   Gift,
   Video,
@@ -41,13 +39,6 @@ const typeIcons: Record<string, typeof Bell> = {
 
   QUESTION_ON_YOUR_PODCAST: HelpCircle,
   REFERRAL_SIGNUP: Gift,
-
-  // Voice verification
-  VOICE_VERIFICATION_REQUIRED: ShieldCheck,
-  VOICE_VERIFICATION_PASSED: ShieldCheck,
-  VOICE_VERIFICATION_FAILED: ShieldCheck,
-  VOICE_BLOCKED_DUPLICATE: ShieldAlert,
-  VOICE_OWNERSHIP_ALERT: ShieldAlert,
 
   // Moderation
   CONTENT_REMOVED: Trash2,
