@@ -79,7 +79,7 @@ export async function verifyReferral(userId: string): Promise<boolean> {
     userId: user.referredById,
     type: 'REFERRAL_SIGNUP',
     title: 'Referral joined Sotto',
-    message: `${referredName} created their first podcast on Sotto.`,
+    message: `${referredName} created their first lesson on Sotto.`,
     data: { referredUserId: userId },
   }).catch((err) => {
     logger.warn('Failed to queue referral notification', {

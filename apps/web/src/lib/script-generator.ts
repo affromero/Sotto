@@ -426,7 +426,7 @@ function buildLanguageInstruction(
   const modeInstructions: Record<string, string> = {
     vocabulary_intro: `## Language: ${langName} — Vocabulary Introduction Mode
 
-This is a LANGUAGE LEARNING podcast. Speak primarily in English (~90%).
+This is a LANGUAGE LEARNING audio lesson. Speak primarily in English (~90%).
 - Introduce 8-12 high-frequency, everyday ${langName} words and phrases naturally in conversation
 - Wrap each vocabulary word with [V{N}:word] notation (e.g., [V1:Guten Morgen], [V2:sprechen]). The word inside the marker is the exact target-language text that should be highlighted.
 - Use the ANTICIPATION technique: "How would you say 'good morning' in ${langName}?" [pause] "That's right — [V1:Guten Morgen]!"
@@ -437,7 +437,7 @@ This is a LANGUAGE LEARNING podcast. Speak primarily in English (~90%).
 
     conversational_mix: `## Language: ${langName} — Conversational Mix Mode
 
-This is a LANGUAGE LEARNING podcast. Mix ${langName} and English (~40% English / ~60% ${langName}).
+This is a LANGUAGE LEARNING audio lesson. Mix ${langName} and English (~40% English / ~60% ${langName}).
 - Use ${langName} for full sentences and dialogue; English for explanations and transitions
 - Wrap 10-15 vocabulary words with [V{N}:word] notation (e.g., [V1:Guten Morgen], [V2:sprechen]). The word inside the marker is the exact target-language text that should be highlighted.
 - Use anticipation prompts for new words before revealing them
@@ -448,7 +448,7 @@ This is a LANGUAGE LEARNING podcast. Mix ${langName} and English (~40% English /
 
     full_immersion: `## Language: ${langName} — Full Immersion Mode
 
-This is a LANGUAGE LEARNING podcast. Generate the ENTIRE script in ${langName} (~95%).
+This is a LANGUAGE LEARNING audio lesson. Generate the ENTIRE script in ${langName} (~95%).
 - Wrap 5-8 advanced or nuanced vocabulary items with [V{N}:word] notation (e.g., [V1:Guten Morgen], [V2:sprechen]). The word inside the marker is the exact target-language text that should be highlighted.
 - Speak naturally at near-native pace
 - Only use English for terms with no direct translation
@@ -947,13 +947,13 @@ export function parseScriptResponse(response: {
     validated.soundCues = [
       {
         type: 'intro',
-        prompt: 'warm podcast intro jingle with soft chimes',
+        prompt: 'warm lesson intro jingle with soft chimes',
         durationSeconds: 3,
         insertAfterTurn: -1,
       },
       {
         type: 'outro',
-        prompt: 'gentle melodic podcast outro with fade out',
+        prompt: 'gentle melodic lesson outro with fade out',
         durationSeconds: 4,
         insertAfterTurn: validated.turns.length - 1,
       },

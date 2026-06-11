@@ -19,7 +19,7 @@ export async function generateMetadata({ params }: PodcastPageProps): Promise<Me
   const { podcastId } = await params;
   const podcast = await getPodcastForDetailPage(podcastId);
 
-  if (!podcast) return { title: 'Podcast Not Found' };
+  if (!podcast) return { title: 'Lesson Not Found' };
 
   const appUrl = getAppBaseUrl();
   const podcastUrl = absolutePodcastUrl(

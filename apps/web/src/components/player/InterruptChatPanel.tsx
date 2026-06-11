@@ -151,7 +151,7 @@ export function InterruptChatPanel({
   );
 
   return (
-    <section className={styles.panel} aria-label="Ask a question about this podcast">
+    <section className={styles.panel} aria-label="Ask a question about this lesson">
       <div className={styles.header}>
         <h3 className={styles.title}>Ask a Question</h3>
         <button
@@ -251,13 +251,13 @@ export function InterruptChatPanel({
       {state === 'incorporating' && (
         <div className={styles.spinnerWrap}>
           <Spinner />
-          <p className={styles.statusMessage}>Updating podcast with this explanation...</p>
+          <p className={styles.statusMessage}>Updating lesson with this explanation...</p>
         </div>
       )}
 
       {state === 'incorporated' && (
         <p className={styles.successMessage}>
-          Podcast updated! The explanation has been incorporated.
+          Lesson updated! The explanation has been incorporated.
         </p>
       )}
 

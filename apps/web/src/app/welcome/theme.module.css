@@ -39,10 +39,14 @@
   --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
   --r: 4px;
 
-  /* shell layout */
-  height: 100%;
+  /* shell layout — fixed viewport height so the rail fills and each column
+     scrolls internally. height: 100% collapses to content height when the parent
+     chain is not a definite-height element, which leaves dead space below. The
+     rail is capped at 340px instead of 38% so it stays a sidebar, not a half. */
+  height: 100vh;
+  height: 100dvh;
   display: grid;
-  grid-template-columns: minmax(300px, 38%) 1fr;
+  grid-template-columns: minmax(280px, 340px) 1fr;
   background: var(--paper);
   overflow: hidden;
   position: relative;

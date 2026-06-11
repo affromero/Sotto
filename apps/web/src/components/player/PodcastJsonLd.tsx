@@ -58,7 +58,7 @@ export function PodcastJsonLd({
     ...(creatorUrl && {
       partOfSeries: {
         '@type': 'PodcastSeries',
-        name: `${creatorName}'s Sotto Podcasts`,
+        name: `${creatorName}'s Sotto Lessons`,
         url: creatorUrl,
       },
     }),

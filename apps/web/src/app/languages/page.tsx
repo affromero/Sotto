@@ -8,7 +8,7 @@ import styles from './page.module.css';
 export const metadata = {
   title: `Language Learning — ${BRAND.name}`,
   description:
-    'Learn any language through podcasts. Sotto highlights vocabulary inline, tracks your progress with spaced repetition, and supports 30+ languages at every level.',
+    'Learn any language through audio lessons. Sotto highlights vocabulary inline, tracks your progress with spaced repetition, and supports 30+ languages at every level.',
 };
 
 const MODES = [
@@ -28,7 +28,7 @@ const MODES = [
     key: 'full_immersion',
     title: 'Full Immersion',
     description:
-      'The entire podcast is in your target language. Vocabulary highlights still appear in the transcript so you can look up any word, but the audio is fully immersive.',
+      'The entire lesson is in your target language. Vocabulary highlights still appear in the transcript so you can look up any word, but the audio is fully immersive.',
   },
 ] as const;
 
@@ -37,7 +37,7 @@ const STEPS = [
     number: '1',
     title: 'Pick a language',
     description:
-      'Choose from 30+ languages when you create a podcast. Sotto generates the script, vocabulary, and audio in the language you pick.',
+      'Choose from 30+ languages when you create a lesson. Sotto generates the script, vocabulary, and audio in the language you pick.',
     icon: (
       <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
         <path d="M5 8l6 6" />
@@ -90,7 +90,7 @@ export default function LanguagesPage() {
               while you listen.
             </h1>
             <p className={styles.subtitle}>
-              Generate podcasts in 30+ languages with inline vocabulary
+              Generate lessons in 30+ languages with inline vocabulary
               highlighting, hover translations, and spaced repetition. Pick a
               topic you care about and learn a language through it — no
               textbooks, no flashcard apps, just press play.
@@ -106,7 +106,7 @@ export default function LanguagesPage() {
           <section className={styles.section}>
             <h2 className={styles.sectionTitle}>Three ways to learn</h2>
             <p className={styles.sectionText}>
-              Choose how much of the podcast is in your target language. Start
+              Choose how much of the lesson is in your target language. Start
               gentle and ramp up as your confidence grows.
             </p>
             <div className={styles.modes}>

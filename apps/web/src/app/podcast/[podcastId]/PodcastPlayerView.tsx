@@ -714,7 +714,7 @@ export function PodcastPlayerView({
             {!retrying && (
               <>
                 <p className={styles.failedText}>
-                  {liveFailureReason || 'Generation failed.'} You can retry or delete this podcast.
+                  {liveFailureReason || 'Generation failed.'} You can retry or delete this lesson.
                 </p>
                 {liveErrorId && (
                   <p className={styles.errorId}>
@@ -865,7 +865,7 @@ export function PodcastPlayerView({
                       (!videoStatus?.available && !isAdmin)
                     }
                     aria-label="Generate Video"
-                    title="Generate a video from your podcast with AI visuals"
+                    title="Generate a video from your lesson with AI visuals"
                     type="button"
                     data-loading={pipelineLoading || videoLoading ? 'true' : undefined}
                   >
@@ -1340,7 +1340,7 @@ export function PodcastPlayerView({
         {podcast.verificationMode === 'relaxed' && (
           <div
             className={styles.verificationBadge}
-            title="This podcast uses relaxed fact-checking at the creator's request. Claims may not be fully sourced."
+            title="This lesson uses relaxed fact-checking at the creator's request. Claims may not be fully sourced."
           >
             <svg
               width="14"
@@ -1365,7 +1365,7 @@ export function PodcastPlayerView({
           <div
             className={styles.limitedSourcesBadge}
             aria-label="Limited Sources"
-            title="This podcast has fewer verified references than recommended. Some claims may not be backed by cited sources."
+            title="This lesson has fewer verified references than recommended. Some claims may not be backed by cited sources."
           >
             <AlertTriangle size={14} aria-hidden="true" />
             Limited Sources ({podcast.references.length} verified)

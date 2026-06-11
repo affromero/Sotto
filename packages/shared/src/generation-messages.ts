@@ -30,7 +30,7 @@ export const STAGE_MESSAGES: Partial<Record<string, StageMessagePool>> = {
     early: [
       { text: 'Searching for the best sources on {topic}', topicAware: true },
       { text: 'Finding peer-reviewed research and expert perspectives', topicAware: false },
-      { text: 'A real podcast starts with real research', topicAware: false },
+      { text: 'A real lesson starts with real research', topicAware: false },
       { text: 'Digging into what the experts say about {topic}', topicAware: true },
       { text: 'No hallucinated sources — only verified ones', topicAware: false },
     ],
@@ -50,7 +50,7 @@ export const STAGE_MESSAGES: Partial<Record<string, StageMessagePool>> = {
     late: [
       { text: 'Mapping the tension curve beat by beat', topicAware: false },
       { text: 'Assigning sources to each story beat', topicAware: false },
-      { text: 'Every great podcast starts with a great plan', topicAware: false },
+      { text: 'Every great lesson starts with a great plan', topicAware: false },
     ],
   },
   SCRIPTING: {
@@ -82,7 +82,7 @@ export const STAGE_MESSAGES: Partial<Record<string, StageMessagePool>> = {
       { text: 'Recording the host voice', topicAware: false },
       { text: 'Generating audio for each segment', topicAware: false },
       { text: 'Bringing the conversation to life', topicAware: false },
-      { text: 'Your podcast about {topic} is taking shape', topicAware: true },
+      { text: 'Your lesson about {topic} is taking shape', topicAware: true },
       { text: 'Creating natural-sounding speech', topicAware: false },
       { text: 'Recording the expert voice', topicAware: false },
     ],
@@ -96,7 +96,7 @@ export const STAGE_MESSAGES: Partial<Record<string, StageMessagePool>> = {
     early: [
       { text: 'Mixing all the audio together', topicAware: false },
       { text: 'Normalizing volume levels', topicAware: false },
-      { text: 'Assembling your final podcast', topicAware: false },
+      { text: 'Assembling your final audio lesson', topicAware: false },
     ],
     late: [
       { text: 'Final mixing is almost done', topicAware: false },

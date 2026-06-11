@@ -172,7 +172,7 @@ export const SOURCES: Source[] = [
   { id: 'reading', label: 'Reading list', meta: 'what you follow', sample: 'papers on distributed systems, sci-fi' },
   { id: 'notes', label: 'Notes & docs', meta: 'what you think about', sample: 'design docs, daily journal' },
   { id: 'calendar', label: 'Calendar', meta: 'your week', sample: 'standups, a trip to Bologna in May' },
-  { id: 'music', label: 'Listening history', meta: 'your ear', sample: 'jazz, lo-fi, Italian podcasts' },
+  { id: 'music', label: 'Listening history', meta: 'your ear', sample: 'jazz, lo-fi, Italian lessons' },
   { id: 'manual', label: 'Topics, by hand', meta: 'tell it directly', sample: 'cooking, climbing, opera' },
 ];
 
@@ -254,7 +254,7 @@ export const COMPOSE_LOG: ComposeLogLine[] = [
   { t: 'ok', text: 'grammar · 9 units · gate: ≥85% recall' },
   { t: 'plan', text: 'curating reading from your domains …' },
   { t: 'ok', text: 'reading · "Sistemi distribuiti, spiegati piano"' },
-  { t: 'plan', text: 'synthesizing podcast ep.01 (adaptive, your pace)' },
+  { t: 'plan', text: 'synthesizing listening ep.01 (adaptive, your pace)' },
   { t: 'ok', text: 'listening · 6 min · {{TTS}} voice · jazz cold-open ☕' },
   { t: 'plan', text: 'scripting speaking drills · phoneme targets' },
   { t: 'ok', text: 'speaking · 12 prompts · {{STT}} phoneme scoring' },
@@ -266,7 +266,7 @@ export const COMPOSE_LOG: ComposeLogLine[] = [
 export const MODULES: Module[] = [
   { id: 'grammar', name: 'Grammar', meta: '9 units · mastery-gated', glyph: 'gate' },
   { id: 'reading', name: 'Reading', meta: 'in your domains', glyph: 'book' },
-  { id: 'listening', name: 'Listening', meta: 'adaptive podcast', glyph: 'wave' },
+  { id: 'listening', name: 'Listening', meta: 'adaptive audio lesson', glyph: 'wave' },
   { id: 'speaking', name: 'Speaking', meta: 'pronunciation scoring', glyph: 'mic' },
   { id: 'vocab', name: 'Vocab graph', meta: 'yours · exportable', glyph: 'graph' },
 ];

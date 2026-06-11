@@ -80,7 +80,7 @@ export function InsufficientRefsBanner({
     <div className={styles.banner} role="alert">
       <div className={styles.header}>
         <AlertTriangle size={18} className={styles.icon} aria-hidden="true" />
-        <h3 className={styles.title}>This podcast needs more references</h3>
+        <h3 className={styles.title}>This lesson needs more references</h3>
       </div>
 
       {verificationProgress?.phase === 'insufficient' && verificationProgress.failureDetails ? (

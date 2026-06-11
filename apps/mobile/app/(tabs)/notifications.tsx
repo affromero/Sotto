@@ -188,7 +188,7 @@ export default function NotificationsScreen() {
             <EmptyState
               iconName="notifications-outline"
               title="No notifications yet"
-              subtitle="When a podcast finishes generating or a question is answered, you will see it here."
+              subtitle="When a lesson finishes generating or a question is answered, you will see it here."
             />
           )
         }

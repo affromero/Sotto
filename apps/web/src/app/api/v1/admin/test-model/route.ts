@@ -351,7 +351,7 @@ export async function POST(request: NextRequest) {
       const imageProvider = new FalImageProvider(apiKey, model);
       const imageBuffer = await withTimeout(
         imageProvider.generateImage({
-          prompt: 'A warm golden podcast microphone, studio lighting',
+          prompt: 'A warm golden studio microphone, warm studio lighting',
           width: 256,
           height: 256,
         }),
@@ -376,12 +376,12 @@ export async function POST(request: NextRequest) {
       const falEndpoint = getFalVideoEndpoint(model);
       if (provider === 'fal' && falEndpoint) {
         const result = await withTimeout((async () => {
-          const prompt = 'A golden podcast microphone floating in a warm studio, soft cinematic lighting';
+          const prompt = 'A golden studio microphone floating in a warm studio, soft cinematic lighting';
 
           // Generate first-frame image if required
           let firstFrameUrl: string | undefined;
           if (videoModelRequiresFirstFrame(model)) {
-            firstFrameUrl = await generateFalImageUrl(apiKey, 'A golden podcast microphone in a warm studio, cinematic lighting');
+            firstFrameUrl = await generateFalImageUrl(apiKey, 'A golden studio microphone in a warm studio, cinematic lighting');
           }
 
           // Build request body
@@ -448,14 +448,14 @@ export async function POST(request: NextRequest) {
       const minimaxMapping = MINIMAX_MODEL_MAP[model];
       if (provider === 'minimax' && minimaxMapping) {
         const result = await withTimeout((async () => {
-          const prompt = 'A golden podcast microphone floating in a warm studio, soft cinematic lighting';
+          const prompt = 'A golden studio microphone floating in a warm studio, soft cinematic lighting';
 
           // Generate first-frame image if required (uses FAL_KEY)
           let firstFrameImage: string | undefined;
           if (minimaxMapping.requiresFirstFrame) {
             const falKey = process.env.FAL_KEY;
             if (!falKey) throw new Error('FAL_KEY required for first-frame image generation');
-            firstFrameImage = await generateFalImageUrl(falKey, 'A golden podcast microphone in a warm studio, cinematic lighting');
+            firstFrameImage = await generateFalImageUrl(falKey, 'A golden studio microphone in a warm studio, cinematic lighting');
           }
 
           const body: Record<string, unknown> = {
@@ -550,7 +550,7 @@ export async function POST(request: NextRequest) {
           // Generate portrait image
           const imageUrl = await generateFalImageUrl(
             apiKey,
-            'Professional headshot portrait of a friendly podcast host, warm studio lighting, neutral background, looking at camera, photorealistic',
+            'Professional headshot portrait of a friendly narrator, warm studio lighting, neutral background, looking at camera, photorealistic',
           );
 
           // Generate test audio

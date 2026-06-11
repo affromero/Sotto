@@ -22,7 +22,7 @@ export async function getOrCreateDefaultAvatarImage(
     voiceEntry.ageRange === 'young' ? 'young adult' : voiceEntry.ageRange === 'mature' ? 'older adult' : 'middle-aged',
     `${voiceEntry.accent} accent`,
     voiceEntry.character,
-    'podcast host avatar',
+    'narrator avatar',
     'simple neutral background',
     'head and shoulders',
   ].join(', ');

@@ -16,7 +16,7 @@ export function PushPrompt({ onEnable, onDismiss }: PushPromptProps) {
           <Bell size={20} />
         </span>
         <p className={styles.message}>
-          Enable push notifications to know when your podcast is ready
+          Enable push notifications to know when your lesson is ready
         </p>
       </div>
       <div className={styles.actions}>

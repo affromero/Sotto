@@ -50,8 +50,8 @@ export const CARTESIA_VOICE_POOL: ProviderVoice[] = [
 export const HUME_VOICE_POOL: ProviderVoice[] = [
   { id: 'ee96fb5f-ec1a-4f41-a9ba-6d119e64c8fd', name: 'Vince Douglas', gender: 'male', character: 'confident presenter' },
   { id: 'b201d214-914c-4d0a-b8e4-54adfc14a0dd', name: 'Inspiring Woman', gender: 'female', character: 'warm narrator' },
-  { id: '01854384-4e4e-48d4-90d1-b22f760a58b5', name: 'Male Podcaster', gender: 'male', character: 'authoritative expert' },
-  { id: '33045fd9-8010-43f6-b6b0-da3fbf326c29', name: 'Casual Podcast Host', gender: 'female', character: 'friendly conversationalist' },
+  { id: '01854384-4e4e-48d4-90d1-b22f760a58b5', name: 'Male Narrator', gender: 'male', character: 'authoritative expert' },
+  { id: '33045fd9-8010-43f6-b6b0-da3fbf326c29', name: 'Casual Narrator', gender: 'female', character: 'friendly conversationalist' },
   { id: '176a55b1-4468-4736-8878-db82729667c1', name: 'Nature Documentary Narrator', gender: 'male', character: 'polished professional' },
   { id: 'f3f69312-095c-4ec3-8e50-6961c676e898', name: 'Cool Journalist', gender: 'female', character: 'engaging storyteller' },
   { id: '99d2cb9c-9011-4ead-8734-641656d3df66', name: 'Comforting Male Conversationalist', gender: 'male', character: 'warm narrator' },

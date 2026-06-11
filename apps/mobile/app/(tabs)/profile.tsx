@@ -193,13 +193,13 @@ export default function ProfileScreen() {
       <View style={styles.statsRow}>
         <View style={styles.statItem}>
           <Text style={styles.statNumber}>{formatCount(profile?.podcastCount ?? 0)}</Text>
-          <Text style={styles.statLabel}>Podcasts</Text>
+          <Text style={styles.statLabel}>Lessons</Text>
         </View>
       </View>
 
 
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Your Podcasts</Text>
+        <Text style={styles.sectionTitle}>Your Lessons</Text>
       </View>
     </View>
   );
@@ -234,15 +234,15 @@ export default function ProfileScreen() {
               onRetry={() => refetchProfile()}
             />
           ) : isPodcastsError ? (
-            <EmptyState title="Error" subtitle="Failed to load your podcasts" />
+            <EmptyState title="Error" subtitle="Failed to load your lessons" />
           ) : isPodcastsLoading ? (
             <View style={styles.emptyState}>
               <ActivityIndicator size="small" color={colors.primary} />
             </View>
           ) : (
             <EmptyState
-              title="No podcasts yet"
-              subtitle="Create your first podcast from the Create tab"
+              title="No lessons yet"
+              subtitle="Create your first lesson from the Create tab"
             />
           )
         }

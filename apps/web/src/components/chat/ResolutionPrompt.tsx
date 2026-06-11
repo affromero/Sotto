@@ -62,14 +62,14 @@ export function ResolutionPrompt({ onResolve, isLoading = false, canIncorporate 
       )}
       {step === 'followup' && (
         <div className={styles.fadeIn}>
-          <p className={styles.question}>Update the podcast with this explanation?</p>
+          <p className={styles.question}>Update the lesson with this explanation?</p>
           <div className={styles.actions}>
             <button
               type="button"
               className={styles.buttonPrimary}
               onClick={handleIncorporate}
               disabled={isLoading}
-              aria-label="Yes, update the podcast"
+              aria-label="Yes, update the lesson"
             >
               {isLoading && <span className={styles.spinner} />}
               Yes, update

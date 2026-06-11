@@ -76,8 +76,8 @@ export default async function AdminPodcastsPage({ searchParams }: PageProps) {
     <div className={styles.container}>
       <div className={styles.header}>
         <div>
-          <h1 className={styles.title}>Podcasts</h1>
-          <p className={styles.subtitle}>{total.toLocaleString()} total podcasts</p>
+          <h1 className={styles.title}>Lessons</h1>
+          <p className={styles.subtitle}>{total.toLocaleString()} total lessons</p>
         </div>
         <CreateAsSystemOwnerButton />
       </div>
@@ -89,7 +89,7 @@ export default async function AdminPodcastsPage({ searchParams }: PageProps) {
           placeholder="Search by title..."
           defaultValue={search}
           className={styles.searchInput}
-          aria-label="Search podcasts"
+          aria-label="Search lessons"
         />
         <select
           name="status"

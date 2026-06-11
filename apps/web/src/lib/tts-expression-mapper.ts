@@ -99,7 +99,7 @@ const DIRECTION_MAP: Record<string, DirectionMapping> = {
     elevenlabs: { audioTagPrefix: '[excited] ', stability: 0.0, sustainedDelivery: true, speed: 1.15 },
     cartesia: { emotion: 'excited', speed: 1.1, volume: 1.3 },
     hume: { description: 'energetic, enthusiastic, high-energy delivery', speed: 1.3, trailingSilence: 0.15 },
-    openai: { instructions: 'Speak with high energy and enthusiasm, like an excited podcast host.' },
+    openai: { instructions: 'Speak with high energy and enthusiasm, like an engaging language tutor.' },
     minimax: { emotion: 'happy' },
     replicate: { emotionTag: '[happy]' },
   },
@@ -284,12 +284,12 @@ const DIRECTION_MAP: Record<string, DirectionMapping> = {
 
 const SPEAKER_BASELINES: Record<string, { hume: string; openai: string }> = {
   HOST: {
-    hume: 'warm, engaging podcast host',
-    openai: 'Speak naturally as a warm, engaging podcast host. Conversational and inviting.',
+    hume: 'warm, engaging narrator',
+    openai: 'Speak naturally as a warm, engaging narrator. Conversational and inviting.',
   },
   GUEST: {
-    hume: 'warm, engaging podcast host',
-    openai: 'Speak naturally as a warm, engaging podcast host. Conversational and inviting.',
+    hume: 'warm, engaging narrator',
+    openai: 'Speak naturally as a warm, engaging narrator. Conversational and inviting.',
   },
   EXPERT: {
     hume: 'knowledgeable, articulate expert',
@@ -302,8 +302,8 @@ const SPEAKER_BASELINES: Record<string, { hume: string; openai: string }> = {
 };
 
 const DEFAULT_BASELINE = {
-  hume: 'natural, conversational podcast speaker',
-  openai: 'Speak naturally and conversationally, like a podcast host.',
+  hume: 'natural, conversational narrator',
+  openai: 'Speak naturally and conversationally, like a language tutor.',
 };
 
 // ---------------------------------------------------------------------------

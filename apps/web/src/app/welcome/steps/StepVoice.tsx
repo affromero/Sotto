@@ -146,7 +146,7 @@ export function StepVoice({ voice, setVoice, onNext, onBack }: Props) {
 
       <VoicePicker
         label="Text to speech"
-        sub="your listening podcast & spoken examples"
+        sub="your listening lesson & spoken examples"
         providers={TTS_PROVIDERS}
         value={voice.tts}
         onChange={(v) => setVoice((s) => ({ ...s, tts: v }))}

@@ -207,7 +207,7 @@ export default function OnboardingScreen() {
       <Ionicons name="checkmark-circle" size={64} color={colors.primary} />
       <Text style={styles.doneHeading}>You're all set!</Text>
       <Text style={styles.doneSubheading}>
-        Start exploring podcasts or create your first one.
+        Start exploring lessons or create your first one.
       </Text>
       <Pressable style={styles.primaryButton} onPress={handleFinish} testID="onboarding-done-button">
         <Text style={styles.primaryButtonText}>Let's Go</Text>
