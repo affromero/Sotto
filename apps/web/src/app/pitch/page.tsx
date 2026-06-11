@@ -391,7 +391,7 @@ export default function PitchPage() {
       <main className={styles.main}>
         <div className={styles.gateContainer}>
           <h1 className={styles.logo}>Sotto</h1>
-          <p className={styles.subtitle}>Investor Materials</p>
+          <p className={styles.subtitle}>Language Learning Pitch</p>
           <form className={styles.form} onSubmit={handleAuth}>
             <input
               className={styles.input}
@@ -417,9 +417,9 @@ export default function PitchPage() {
       <main className={styles.main}>
         <div className={styles.gateContainer}>
           <h1 className={styles.logo}>Sotto</h1>
-          <p className={styles.subtitle}>Investor Materials</p>
+          <p className={styles.subtitle}>Language Learning Pitch</p>
           <p className={styles.subtitle}>
-            No pitch builds yet. Run the rebuild pipeline to generate.
+            No language-learning pitch builds yet. Run the rebuild pipeline to generate.
           </p>
         </div>
       </main>
@@ -529,7 +529,7 @@ export default function PitchPage() {
           </div>
         ) : (
           <div className={styles.emptyState}>
-            No documents in this build. Run /update-pitch to generate.
+            No documents in this build. Run the pitch rebuild pipeline to generate.
           </div>
         )}
       </main>
