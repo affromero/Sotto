@@ -6,7 +6,6 @@ const mockAuth = vi.fn();
 const mockCheckSuspension = vi.fn();
 const mockRequireAdmin = vi.fn();
 const mockCheckRateLimit = vi.fn();
-const mockCheckGenerationGate = vi.fn();
 const mockGetJobPriority = vi.fn();
 const mockIsModelAllowedForUser = vi.fn();
 const mockGetModelRequiredPlan = vi.fn();
@@ -60,10 +59,6 @@ vi.mock('@/lib/auth-guards', () => ({
 
 vi.mock('@/lib/redis', () => ({
   checkRateLimit: (...args: unknown[]) => mockCheckRateLimit(...args),
-}));
-
-vi.mock('@/lib/generation-gate', () => ({
-  checkGenerationGate: (...args: unknown[]) => mockCheckGenerationGate(...args),
 }));
 
 vi.mock('@/lib/generation-features', () => ({
@@ -130,10 +125,6 @@ describe('POST /api/v1/ingest/agent', () => {
     mockCheckSuspension.mockReturnValue(null);
     mockRequireAdmin.mockResolvedValue(null);
     mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 19, resetAt: Date.now() });
-    mockCheckGenerationGate.mockResolvedValue({
-      allowed: true,
-      reason: 'ok',
-    });
     mockGetJobPriority.mockReturnValue(1);
     mockIsModelAllowedForUser.mockReturnValue(true);
     mockGetModelRequiredPlan.mockReturnValue(null);

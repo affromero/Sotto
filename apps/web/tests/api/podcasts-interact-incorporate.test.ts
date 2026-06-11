@@ -89,11 +89,6 @@ vi.mock('@/lib/redis', () => ({
   checkRateLimit: (...args: unknown[]) => mockCheckRateLimit(...args),
 }));
 
-const mockCheckGenerationGate = vi.fn();
-
-vi.mock('@/lib/generation-gate', () => ({
-  checkGenerationGate: (...args: unknown[]) => mockCheckGenerationGate(...args),
-}));
 
 import { POST } from '@/app/api/v1/podcasts/[podcastId]/interact/[interactionId]/incorporate/route';
 
@@ -132,7 +127,6 @@ describe('POST /api/v1/podcasts/[podcastId]/interact/[interactionId]/incorporate
 
     mockAuth.mockResolvedValue({ user: { id: 'user-001' } });
     mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 19, resetAt: 0 });
-    mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok' });
     mockPrismaInteractionFindUnique.mockResolvedValue(createInteraction());
     mockPrismaInteractionUpdate.mockResolvedValue({});
     mockPrismaPodcastUpdate.mockResolvedValue({});
