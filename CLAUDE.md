@@ -14,7 +14,7 @@ Sotto is open-source, self-hostable language-learning infrastructure. Learners w
 6. Non-technical learners can use managed Sotto-hosted infrastructure when the product offers it.
 7. There is no social layer: no public feed, follows, likes, comments, leaderboards, or community ranking.
 
-Hosted billing, if present, must charge for infrastructure and convenience: workers, storage, scheduled lesson generation, agent hosting, provider routing, monitoring, and updates. Do not position generic AI-generated content as the core value — learner progress and ownership of the learning stack are the differentiators.
+Sotto is fully free and self-hosted: there is no billing, no payment path, and no plans, tiers, quotas, or daily limits — every learner gets full access on infrastructure they control. Do not reintroduce billing, plans, free/pro tiers, generation quotas, or position generic AI-generated content as the core value — learner progress and ownership of the learning stack are the differentiators.
 
 ## Tech Stack
 

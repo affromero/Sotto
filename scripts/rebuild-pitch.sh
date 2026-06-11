@@ -195,7 +195,6 @@ DOCS=(
   "01-product-vision.md:Product Vision"
   "05-plan.md:Open Source Plan"
   "07-ai-prompts.md:AI Prompts"
-  "10-stripe-billing.md:Managed Billing"
   "11-provider-pricing.md:Provider Pricing"
   "16-technical-architecture.md:Technical Architecture"
   "17-authentication-setup.md:Authentication Setup"
