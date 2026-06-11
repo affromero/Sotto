@@ -3,7 +3,7 @@ import type { Prisma } from '@prisma/client';
 /**
  * Prisma select for public-facing podcast fields.
  * Excludes internal/sensitive fields: failureReason, technicalError,
- * ttsProvider, aiProvider, importedAudioKey, draftData, etc.
+ * ttsProvider, aiProvider, draftData, etc.
  */
 export const PODCAST_PUBLIC_SELECT = {
   id: true,

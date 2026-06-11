@@ -187,7 +187,6 @@ describe('determineResumePoint', () => {
     mockPodcastFindUniqueOrThrow.mockResolvedValue({
       source: 'WEB',
       failedAtStatus: null,
-      importedAudioKey: null,
     });
     mockDiscoveryFindUnique.mockResolvedValue(null);
     mockScriptFindUnique.mockResolvedValue(null);
@@ -195,18 +194,6 @@ describe('determineResumePoint', () => {
     mockSegmentFindMany.mockResolvedValue([]);
     mockResearchDossierFindUnique.mockResolvedValue(null);
     mockCreativeOutlineFindUnique.mockResolvedValue(null);
-  });
-
-  it('returns IMPORT_AUDIO for import source podcasts', async () => {
-    mockPodcastFindUniqueOrThrow.mockResolvedValue({
-      source: 'IMPORT',
-      failedAtStatus: 'IMPORTING',
-      importedAudioKey: 'uploads/audio.mp3',
-    });
-
-    const result = await determineResumePoint('podcast-001');
-
-    expect(result).toEqual({ step: 'IMPORT_AUDIO' });
   });
 
   it('returns STITCH_AUDIO when all segments have audioUrl', async () => {

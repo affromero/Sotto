@@ -1,9 +1,8 @@
 import { z } from 'zod';
-import type { SttProviderId } from '@sotto/shared';
 import { prisma } from './prisma';
 import { getAiProviderMeta, getProviderForModel, type AiProviderId } from './providers/ai-registry';
 import { getProviderMeta, type TtsProviderId } from './providers/tts-registry';
-import { getSttProviderMeta } from './providers/stt-registry';
+import { getSttProviderMeta, type SttProviderId } from './providers/stt-registry';
 import { getAvatarProviderMeta, getAvatarModelProvider, type AvatarProviderId } from './providers/avatar-registry';
 import { logger } from './logger';
 

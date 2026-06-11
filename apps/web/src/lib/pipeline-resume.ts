@@ -14,8 +14,7 @@ export type ResumePoint =
   | { step: 'COMPILE_SCRIPT' }
   | { step: 'SCRIPT_READY' }
   | { step: 'GENERATE_AUDIO'; pendingSegmentIds: string[] }
-  | { step: 'STITCH_AUDIO'; segmentIds: string[] }
-  | { step: 'IMPORT_AUDIO' };
+  | { step: 'STITCH_AUDIO'; segmentIds: string[] };
 
 interface MarkFailedOptions {
   failureReason?: string;
@@ -79,11 +78,12 @@ export async function markPodcastFailed(
  * Checks from the end of the pipeline backward to preserve the most work.
  */
 export async function determineResumePoint(podcastId: string): Promise<ResumePoint> {
-  const [podcast, discovery, script, segments, dossier, outline] = await Promise.all([
-    prisma.podcast.findUniqueOrThrow({
-      where: { id: podcastId },
-      select: { source: true, failedAtStatus: true, importedAudioKey: true },
-    }),
+  await prisma.podcast.findUniqueOrThrow({
+    where: { id: podcastId },
+    select: { id: true },
+  });
+
+  const [discovery, script, segments, dossier, outline] = await Promise.all([
     prisma.discovery.findUnique({
       where: { podcastId },
       select: { sourceContent: true },
@@ -106,17 +106,12 @@ export async function determineResumePoint(podcastId: string): Promise<ResumePoi
     }),
   ]);
 
-  // 1. Import source → let the import worker handle its own idempotency
-  if (podcast.source === 'IMPORT' && podcast.importedAudioKey) {
-    return { step: 'IMPORT_AUDIO' };
-  }
-
-  // 2. All segments have audioUrl → just need to stitch
+  // 1. All segments have audioUrl → just need to stitch
   if (segments.length > 0 && segments.every((s) => s.audioUrl !== null)) {
     return { step: 'STITCH_AUDIO', segmentIds: segments.map((s) => s.id) };
   }
 
-  // 3. Some segments exist, some lack audioUrl
+  // 2. Some segments exist, some lack audioUrl
   if (segments.length > 0 && segments.some((s) => s.audioUrl === null)) {
     const scriptTurnCount = script ? (script.turns as unknown[]).length : 0;
     if (script && segments.length === scriptTurnCount) {
@@ -128,26 +123,26 @@ export async function determineResumePoint(podcastId: string): Promise<ResumePoi
     return { step: 'SCRIPT_READY' };
   }
 
-  // 4. Script exists → compile step
+  // 3. Script exists → compile step
   if (script) {
     return { step: 'COMPILE_SCRIPT' };
   }
 
-  // 5. Outline exists but no script → write script
+  // 4. Outline exists but no script → write script
   if (outline) {
     return { step: 'WRITE_SCRIPT' };
   }
 
-  // 6. Dossier exists but no outline → creative planning
+  // 5. Dossier exists but no outline → creative planning
   if (dossier) {
     return { step: 'CREATIVE_PLANNING' };
   }
 
-  // 7. Discovery has sourceContent but no dossier → research
+  // 6. Discovery has sourceContent but no dossier → research
   if (discovery?.sourceContent) {
     return { step: 'DEEP_RESEARCH' };
   }
 
-  // 8. Nothing exists → start from scratch
+  // 7. Nothing exists → start from scratch
   return { step: 'EXTRACT_CONTENT' };
 }

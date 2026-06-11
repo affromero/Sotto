@@ -71,7 +71,6 @@ vi.mock('@/lib/queue', () => ({
   referenceValidationQueue: { name: 'reference-validation' },
   audioGenerationQueue: { name: 'audio-generation' },
   audioStitchingQueue: { name: 'audio-stitching' },
-  audioImportQueue: { name: 'audio-import' },
   addJob: (...args: unknown[]) => mockAddJob(...args),
   JobType: {
     EXTRACT_CONTENT: 'extract_content',
@@ -80,7 +79,6 @@ vi.mock('@/lib/queue', () => ({
     VALIDATE_REFERENCES: 'validate_references',
     GENERATE_AUDIO: 'generate_audio',
     STITCH_AUDIO: 'stitch_audio',
-    IMPORT_AUDIO: 'import_audio',
   },
 }));
 
@@ -245,68 +243,6 @@ describe('POST /api/v1/podcasts/[podcastId]/generate', () => {
 
     expect(response.status).toBe(200);
     expect(data).toEqual({ success: true, message: 'Generation started' });
-  });
-
-  describe('import retry STT routing', () => {
-    it('rejects import restart when no STT provider is persisted', async () => {
-      mockAuthenticateRequest.mockResolvedValue({ userId: 'user-001' });
-      mockPrismaPodcastFindUnique.mockResolvedValue({
-        id: 'podcast-import',
-        userId: 'user-001',
-        status: 'PENDING',
-        source: 'IMPORT',
-        importedAudioKey: 'imports/podcast-import/original.mp3',
-        sttProvider: null,
-        sttModel: null,
-        isHumanContent: false,
-        title: 'Imported podcast',
-        discovery: null,
-      });
-
-      const request = createMockRequest();
-      const params = await createMockParams('podcast-import');
-      const response = await POST(request, params);
-      const data = await response.json();
-
-      expect(response.status).toBe(400);
-      expect(data).toMatchObject({ code: 'stt_provider_required' });
-      expect(mockAddJob).not.toHaveBeenCalled();
-    });
-
-    it('queues import restart with the stored STT provider and model', async () => {
-      vi.stubEnv('OPENAI_API_KEY', 'sk-platform');
-      mockAuthenticateRequest.mockResolvedValue({ userId: 'user-001' });
-      mockPrismaPodcastFindUnique.mockResolvedValue({
-        id: 'podcast-import',
-        userId: 'user-001',
-        status: 'PENDING',
-        source: 'IMPORT',
-        importedAudioKey: 'imports/podcast-import/original.mp3',
-        sttProvider: 'openai',
-        sttModel: 'whisper-1',
-        isHumanContent: false,
-        title: 'Imported podcast',
-        discovery: null,
-      });
-
-      const request = createMockRequest();
-      const params = await createMockParams('podcast-import');
-      const response = await POST(request, params);
-
-      expect(response.status).toBe(200);
-      expect(mockAddJob).toHaveBeenCalledWith(
-        { name: 'audio-import' },
-        'import_audio',
-        expect.objectContaining({
-          podcastId: 'podcast-import',
-          userId: 'user-001',
-          sttProvider: 'openai',
-          sttModel: 'whisper-1',
-          sttApiKey: 'sk-platform',
-        }),
-        expect.objectContaining({ jobId: expect.stringMatching(/^import-podcast-import-\d+$/) })
-      );
-    });
   });
 
   it('returns 400 when duration exceeds limit', async () => {

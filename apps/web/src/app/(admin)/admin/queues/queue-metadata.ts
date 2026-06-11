@@ -68,10 +68,6 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
     description: 'Re-generates individual audio segments after edits',
     stage: 'Audio Pipeline',
   },
-  'audio-import': {
-    description: 'Imports and transcribes uploaded audio files',
-    stage: 'Audio Pipeline',
-  },
   'interactions': {
     description: 'Processes mid-playback Q&A interruptions',
     stage: 'Interactions',

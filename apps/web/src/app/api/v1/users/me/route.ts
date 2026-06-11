@@ -272,7 +272,7 @@ export async function DELETE(request: NextRequest) {
     // Collect podcast IDs and storage keys before deleting
     const podcasts = await prisma.podcast.findMany({
       where: { userId },
-      select: { id: true, audioUrl: true, pdfUrl: true, importedAudioKey: true },
+      select: { id: true, audioUrl: true, pdfUrl: true },
     });
 
     const user = await prisma.user.findUnique({
@@ -303,9 +303,6 @@ export async function DELETE(request: NextRequest) {
         const keys = await listFiles(`podcasts/${p.id}/`);
         for (const key of keys) {
           deletePromises.push(deleteFile(key, { force: true }));
-        }
-        if (p.importedAudioKey) {
-          deletePromises.push(deleteFile(p.importedAudioKey));
         }
       }
 
