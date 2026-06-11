@@ -15,6 +15,7 @@ interface Profile {
   image: string | null;
   emoji: string | null;
   isAdmin: boolean;
+  hasPassword: boolean;
 }
 
 interface ProfilesResponse {
@@ -76,10 +77,31 @@ export function ProfilePicker() {
     if (selected) passwordRef.current?.focus();
   }, [selected]);
 
-  function choose(profile: Profile) {
+  async function attemptSignIn(userId: string, pw: string): Promise<boolean> {
+    const result = await signIn('credentials', { userId, password: pw, redirect: false });
+    return result?.ok === true;
+  }
+
+  async function choose(profile: Profile) {
+    setAuthError(null);
+    // Passwordless members tap straight in; everyone else gets a password panel.
+    if (!profile.hasPassword) {
+      if (submitting) return;
+      setSubmitting(true);
+      try {
+        if (await attemptSignIn(profile.id, '')) {
+          router.push('/learn');
+          return;
+        }
+        setAuthError(GENERIC_PASSWORD_ERROR);
+      } catch {
+        setAuthError(GENERIC_PASSWORD_ERROR);
+      }
+      setSubmitting(false);
+      return;
+    }
     setSelected(profile);
     setPassword('');
-    setAuthError(null);
   }
 
   function backToProfiles() {
@@ -96,12 +118,7 @@ export function ProfilePicker() {
     setSubmitting(true);
     setAuthError(null);
     try {
-      const result = await signIn('credentials', {
-        userId: selected.id,
-        password,
-        redirect: false,
-      });
-      if (result?.ok) {
+      if (await attemptSignIn(selected.id, password)) {
         router.push('/learn');
         return;
       }
@@ -172,6 +189,7 @@ export function ProfilePicker() {
                       type="button"
                       className={styles.profileBtn}
                       onClick={() => choose(profile)}
+                      disabled={submitting}
                     >
                       <span className={styles.tileWrap}>
                         <AvatarTile
@@ -194,6 +212,12 @@ export function ProfilePicker() {
                   </li>
                 ))}
               </ul>
+            )}
+
+            {authError && (
+              <p className={styles.fieldError} role="alert">
+                {authError}
+              </p>
             )}
 
             <a className={styles.altLink} href="/auth/login?oauth=1">

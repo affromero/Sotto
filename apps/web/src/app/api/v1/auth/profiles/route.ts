@@ -11,8 +11,10 @@ export const dynamic = 'force-dynamic';
 /**
  * GET /api/auth/profiles
  * The household roster for the Netflix-style sign-in picker. Returns only
- * non-secret fields (id, name, image, a derived emoji, and an admin flag). Lists
- * only accounts that have a local password. Empty when local auth is off.
+ * non-secret fields (id, name, image, a derived emoji, an admin flag, and a
+ * derived hasPassword so the picker knows who taps straight in). Lists local
+ * accounts that have a password plus intentional passwordless members; OAuth-only
+ * accounts are excluded. Empty when local auth is off.
  */
 export async function GET() {
   try {
@@ -32,8 +34,8 @@ export async function GET() {
     }
 
     const users = await prisma.user.findMany({
-      where: { passwordHash: { not: null } },
-      select: { id: true, name: true, image: true, role: true },
+      where: { OR: [{ passwordHash: { not: null } }, { passwordless: true }] },
+      select: { id: true, name: true, image: true, role: true, passwordHash: true },
       orderBy: { createdAt: 'asc' },
     });
 
@@ -49,6 +51,8 @@ export async function GET() {
         image: u.image,
         emoji: animal?.emoji ?? null,
         isAdmin: u.role === 'ADMIN',
+        // Derived only; the hash itself never leaves the server.
+        hasPassword: u.passwordHash !== null,
       };
     });
 

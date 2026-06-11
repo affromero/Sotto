@@ -92,10 +92,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (!allowed) return null;
 
         const user = await prisma.user.findUnique({ where: { id: userId } });
-        if (!user || !user.passwordHash) return null;
+        if (!user) return null;
 
-        const valid = await verifyPassword(password, user.passwordHash);
-        if (!valid) return null;
+        if (user.passwordHash) {
+          // Password-protected member: a valid password is required.
+          if (!password || !(await verifyPassword(password, user.passwordHash))) return null;
+        } else if (!user.passwordless) {
+          // No password hash and not an intentional passwordless member (e.g. an
+          // OAuth-only account): credentials sign-in is refused so such accounts
+          // can never be entered without a password.
+          return null;
+        }
+        // Passwordless member (passwordHash null + passwordless true): taps in.
 
         return { id: user.id, name: user.name, email: user.email, image: user.image };
       },

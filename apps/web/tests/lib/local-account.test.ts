@@ -68,6 +68,16 @@ describe('local-account', () => {
     expect(data.role).toBe('USER');
     expect(data.forcePasswordChange).toBe(true);
     expect(data.passwordHash).not.toBe('temppass12');
+    expect(data.passwordless).toBe(false);
+  });
+
+  it('createMember with no password makes a passwordless member who taps to sign in', async () => {
+    await createMember({ name: 'Guest' });
+    const data = mockCreate.mock.calls[0][0].data;
+    expect(data.role).toBe('USER');
+    expect(data.passwordHash).toBeNull();
+    expect(data.passwordless).toBe(true);
+    expect(data.forcePasswordChange).toBe(false);
   });
 
   it('changeOwnPassword rejects a wrong current password', async () => {

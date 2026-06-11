@@ -69,6 +69,10 @@ model User {
   // tokenVersion is bumped to invalidate active JWT sessions (member removal,
   // password reset). All null/zero for OAuth-only accounts.
   passwordHash        String?
+  // passwordless marks an INTENTIONAL no-password local member (taps to sign in,
+  // Netflix style). Kept distinct from passwordHash null on OAuth accounts, which
+  // must never be allowed to sign in without a password.
+  passwordless        Boolean @default(false)
   forcePasswordChange Boolean @default(false)
   tokenVersion        Int     @default(0)
 
