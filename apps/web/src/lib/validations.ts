@@ -615,8 +615,10 @@ export const credentialsAuthSchema = z.object({
 
 // First-run owner creation (public, only when local auth is on and zero users).
 export const createOwnerSchema = z.object({
-  name: z.string().trim().min(1).max(100),
-  password: z.string().min(8).max(200),
+  // Optional: defaults to "Owner" server-side when blank.
+  name: z.string().trim().max(100).optional(),
+  // Omit (or send empty) to create a passwordless owner who taps to sign in.
+  password: z.string().min(8).max(200).optional().or(z.literal('')),
   avatar: z.string().trim().max(64).optional(),
 });
 

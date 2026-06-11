@@ -4,7 +4,7 @@ import { AuthButtons } from '../AuthButtons';
 import styles from './page.module.css';
 
 export const metadata = {
-  title: 'Sign In',
+  title: 'Welcome to Sotto',
   robots: { index: false, follow: false },
 };
 
