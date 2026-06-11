@@ -1001,7 +1001,6 @@ describe('open-source language-learning OSS surfaces', () => {
       'apps/web/src/lib/creator-metrics.ts',
       'apps/web/src/app/api/v1/podcasts/[podcastId]/analytics',
       'apps/web/src/app/api/v1/creator-analytics',
-      'apps/web/src/app/api/v1/users/me/podcasts',
       'apps/web/src/app/(dashboard)/analytics',
       'apps/web/src/types/analytics.ts',
       'packages/shared/src/types/analytics.ts',
