@@ -148,14 +148,14 @@ export function ProfilePicker() {
           <div className={styles.stateBlock} role="alert">
             <p className={styles.eyebrow}>
               <span className={styles.eyebrowDash} />
-              Sign in
+              Welcome
             </p>
             <h1 className={styles.heading}>We could not load your profiles.</h1>
             <p className={styles.lede}>
-              Check your connection, then refresh. You can also sign in another way.
+              Check your connection, then refresh. You can also use an account.
             </p>
             <a className={styles.altLink} href="/auth/login?oauth=1">
-              Sign in another way
+              Use an account instead
             </a>
           </div>
         )}
@@ -172,7 +172,7 @@ export function ProfilePicker() {
           <div className={styles.stateBlock}>
             <p className={styles.eyebrow}>
               <span className={styles.eyebrowDash} />
-              Sign in
+              Welcome
             </p>
             <h1 className={styles.heading}>
               Who is <em>learning</em> today?
@@ -180,7 +180,7 @@ export function ProfilePicker() {
 
             {profiles.length === 0 ? (
               <p className={styles.lede}>
-                No profiles yet. Set one up, or sign in another way.
+                No profiles yet. Set one up, or use an account.
               </p>
             ) : (
               <ul className={styles.grid} aria-label="Choose your profile">
@@ -222,7 +222,7 @@ export function ProfilePicker() {
             )}
 
             <a className={styles.altLink} href="/auth/login?oauth=1">
-              Sign in another way
+              Use an account instead
             </a>
           </div>
         )}
@@ -282,12 +282,12 @@ export function ProfilePicker() {
                 className={styles.submit}
                 disabled={submitting || password.length === 0}
               >
-                {submitting ? 'Signing in.' : 'Sign in'}
+                {submitting ? 'Opening.' : 'Continue'}
               </button>
             </form>
 
             <a className={styles.altLink} href="/auth/login?oauth=1">
-              Sign in another way
+              Use an account instead
             </a>
           </div>
         )}
@@ -298,30 +298,25 @@ export function ProfilePicker() {
 
 /**
  * First-run owner creation. Renders when the instance has zero accounts
- * (needsOwner). Collects a name, a chosen animal avatar, and a password with a
- * live confirm/length check, then POSTs to /api/v1/auth/owner, signs in with the
- * returned id, and hands off to onCreated. Errors stay generic and the password
- * is never displayed or logged.
+ * (needsOwner). Only an avatar is needed: a blank name defaults to "Owner" and a
+ * blank password makes a passwordless owner who taps their profile to enter.
+ * POSTs to /api/v1/auth/owner, signs in with the returned id, and hands off to
+ * onCreated. Errors stay generic and the password is never displayed or logged.
  */
 function CreateOwnerPanel({ onCreated }: { onCreated: () => void }) {
   const [name, setName] = useState('');
   const [avatar, setAvatar] = useState<string>(DEFAULT_AVATAR_SLUG);
   const [password, setPassword] = useState('');
-  const [confirm, setConfirm] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const nameId = useId();
   const passwordId = useId();
-  const confirmId = useId();
-  const matchId = useId();
+  const hintId = useId();
 
-  const trimmedName = name.trim();
+  // A password is optional; if given it must be long enough.
   const tooShort = password.length > 0 && password.length < MIN_PASSWORD_LENGTH;
-  const mismatch = confirm.length > 0 && confirm !== password;
-  const passwordReady =
-    password.length >= MIN_PASSWORD_LENGTH && confirm === password;
-  const canSubmit = trimmedName.length > 0 && passwordReady && !submitting;
+  const canSubmit = !tooShort && !submitting;
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -333,7 +328,11 @@ function CreateOwnerPanel({ onCreated }: { onCreated: () => void }) {
       const res = await fetch('/api/v1/auth/owner', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ name: trimmedName, password, avatar }),
+        body: JSON.stringify({
+          name: name.trim() || undefined,
+          password: password || undefined,
+          avatar,
+        }),
       });
       if (!res.ok) {
         setError(GENERIC_OWNER_ERROR);
@@ -373,12 +372,14 @@ function CreateOwnerPanel({ onCreated }: { onCreated: () => void }) {
       <h1 className={styles.heading}>
         Welcome to <em>Sotto</em>.
       </h1>
-      <p className={styles.lede}>Create the owner profile to set up this instance.</p>
+      <p className={styles.lede}>
+        Set up this instance. Pick an avatar to start; a name and password are optional.
+      </p>
 
       <form className={styles.ownerForm} onSubmit={handleSubmit} noValidate>
         <div className={styles.ownerField}>
           <label className={styles.fieldLabel} htmlFor={nameId}>
-            Your name
+            Your name <span className={styles.optional}>optional</span>
           </label>
           <input
             id={nameId}
@@ -393,7 +394,7 @@ function CreateOwnerPanel({ onCreated }: { onCreated: () => void }) {
             autoComplete="name"
             enterKeyHint="next"
             maxLength={100}
-            required
+            placeholder="Owner"
           />
         </div>
 
@@ -403,13 +404,13 @@ function CreateOwnerPanel({ onCreated }: { onCreated: () => void }) {
             value={avatar}
             onChange={setAvatar}
             disabled={submitting}
-            size={72}
+            size={56}
           />
         </div>
 
         <div className={styles.ownerField}>
           <label className={styles.fieldLabel} htmlFor={passwordId}>
-            Password
+            Password <span className={styles.optional}>optional</span>
           </label>
           <input
             id={passwordId}
@@ -424,49 +425,20 @@ function CreateOwnerPanel({ onCreated }: { onCreated: () => void }) {
             autoComplete="new-password"
             autoCapitalize="off"
             spellCheck={false}
-            aria-invalid={tooShort ? true : undefined}
-            aria-describedby={matchId}
-          />
-        </div>
-
-        <div className={styles.ownerField}>
-          <label className={styles.fieldLabel} htmlFor={confirmId}>
-            Confirm password
-          </label>
-          <input
-            id={confirmId}
-            className={styles.input}
-            type="password"
-            value={confirm}
-            onChange={(event) => {
-              setConfirm(event.target.value);
-              if (error) setError(null);
-            }}
-            disabled={submitting}
-            autoComplete="new-password"
-            autoCapitalize="off"
-            spellCheck={false}
             enterKeyHint="go"
-            aria-invalid={mismatch ? true : undefined}
-            aria-describedby={matchId}
+            aria-invalid={tooShort ? true : undefined}
+            aria-describedby={hintId}
           />
+          <p
+            id={hintId}
+            className={`${styles.passwordHint} ${tooShort ? styles.passwordHintWarn : ''}`}
+            aria-live="polite"
+          >
+            {tooShort
+              ? `Use at least ${MIN_PASSWORD_LENGTH} characters, or leave it blank.`
+              : 'Leave blank to tap your profile to enter, like a TV. Add one to require it.'}
+          </p>
         </div>
-
-        <p
-          id={matchId}
-          className={`${styles.passwordHint} ${
-            mismatch || tooShort ? styles.passwordHintWarn : ''
-          } ${passwordReady ? styles.passwordHintOk : ''}`}
-          aria-live="polite"
-        >
-          {tooShort
-            ? `Use at least ${MIN_PASSWORD_LENGTH} characters.`
-            : mismatch
-              ? 'Both passwords need to match.'
-              : passwordReady
-                ? 'Passwords match.'
-                : `At least ${MIN_PASSWORD_LENGTH} characters, entered twice.`}
-        </p>
 
         {error && (
           <p className={styles.fieldError} role="alert">
@@ -475,7 +447,7 @@ function CreateOwnerPanel({ onCreated }: { onCreated: () => void }) {
         )}
 
         <button type="submit" className={styles.submit} disabled={!canSubmit}>
-          {submitting ? 'Creating your profile.' : 'Create owner profile'}
+          {submitting ? 'Setting up.' : 'Create owner profile'}
         </button>
       </form>
     </div>

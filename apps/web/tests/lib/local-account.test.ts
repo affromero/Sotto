@@ -62,6 +62,22 @@ describe('local-account', () => {
     expect(mockCreate).not.toHaveBeenCalled();
   });
 
+  it('createOwner with no password makes a passwordless ADMIN who taps to sign in', async () => {
+    mockCount.mockResolvedValue(0);
+    await createOwner({ avatar: 'capybara' });
+    const data = mockCreate.mock.calls[0][0].data;
+    expect(data.role).toBe('ADMIN');
+    expect(data.passwordHash).toBeNull();
+    expect(data.passwordless).toBe(true);
+  });
+
+  it('createOwner defaults a blank name to "Owner"', async () => {
+    mockCount.mockResolvedValue(0);
+    await createOwner({ name: '  ', avatar: 'capybara' });
+    const data = mockCreate.mock.calls[0][0].data;
+    expect(data.name).toBe('Owner');
+  });
+
   it('createMember makes a USER who must change the temporary password', async () => {
     await createMember({ name: 'Kid', password: 'temppass12' });
     const data = mockCreate.mock.calls[0][0].data;

@@ -34,23 +34,29 @@ function avatarToImage(avatar?: string): string | null {
   return avatar && isAnimalSlug(avatar) ? avatarImagePath(avatar) : null;
 }
 
-/** Create the first owner. Refuses (OwnerExistsError) if any account exists. */
+/**
+ * Create the first owner. Refuses (OwnerExistsError) if any account exists.
+ * Everything but the avatar is optional: a blank name defaults to "Owner", and
+ * an omitted password makes a passwordless owner who taps their profile to enter.
+ */
 export async function createOwner(input: {
-  name: string;
-  password: string;
+  name?: string;
+  password?: string;
   avatar?: string;
 }): Promise<{ id: string }> {
   const count = await prisma.user.count();
   if (count > 0) throw new OwnerExistsError();
 
-  const passwordHash = await hashPassword(input.password);
+  const hasPassword = typeof input.password === 'string' && input.password.length > 0;
+  const passwordHash = hasPassword ? await hashPassword(input.password as string) : null;
   return prisma.user.create({
     data: {
-      name: input.name,
+      name: input.name?.trim() || 'Owner',
       email: localEmail(),
       image: avatarToImage(input.avatar),
       role: 'ADMIN',
       passwordHash,
+      passwordless: !hasPassword,
       hasCompletedOnboarding: false,
     },
     select: { id: true },
