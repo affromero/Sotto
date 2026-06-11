@@ -146,9 +146,7 @@ model User {
   demoProjects DemoProject[]
 
   // Avatar images (lip-sync)
-  avatarImages         AvatarImage[]
-  avatarSharesSent     AvatarImageShare[] @relation("AvatarShareRequester")
-  avatarSharesReceived AvatarImageShare[] @relation("AvatarShareOwner")
+  avatarImages AvatarImage[]
 
   // Language learning
   courses            Course[]
@@ -744,10 +742,6 @@ enum NotificationType {
   VIDEO_READY
   VIDEO_FAILED
   AVATAR_FAILED
-  AVATAR_IMAGE_REQUEST_RECEIVED
-  AVATAR_IMAGE_REQUEST_APPROVED
-  AVATAR_IMAGE_REQUEST_DENIED
-  AVATAR_IMAGE_REQUEST_REVOKED
 }
 
 // ============ MODERATION ============
@@ -1754,39 +1748,10 @@ model AvatarImage {
   sourceType            AvatarImageSource
   prompt                String?           @db.Text
   consentAcknowledgedAt DateTime?
-  shareable             Boolean           @default(false)
   createdAt             DateTime          @default(now())
-
-  shares AvatarImageShare[]
 
   @@unique([userId, name])
   @@index([userId])
-}
-
-enum AvatarImageShareStatus {
-  PENDING
-  APPROVED
-  DENIED
-  REVOKED
-}
-
-model AvatarImageShare {
-  id            String                 @id @default(cuid())
-  requesterId   String
-  imageOwnerId  String
-  avatarImageId String
-  status        AvatarImageShareStatus @default(PENDING)
-  message       String?                @db.Text
-  createdAt     DateTime               @default(now())
-  updatedAt     DateTime               @updatedAt
-
-  requester   User        @relation("AvatarShareRequester", fields: [requesterId], references: [id], onDelete: Cascade)
-  imageOwner  User        @relation("AvatarShareOwner", fields: [imageOwnerId], references: [id], onDelete: Cascade)
-  avatarImage AvatarImage @relation(fields: [avatarImageId], references: [id], onDelete: Cascade)
-
-  @@unique([requesterId, avatarImageId])
-  @@index([imageOwnerId])
-  @@index([status])
 }
 
 // ============ DEMO VIDEO STUDIO ============

@@ -799,19 +799,6 @@ export const avatarImageGenerateSchema = z.object({
   prompt: z.string().min(1).max(1000),
 });
 
-export const createAvatarImageShareSchema = z.object({
-  avatarImageId: z.string().min(1),
-  message: z.string().max(500).optional(),
-});
-
-export const updateAvatarImageShareSchema = z.object({
-  status: z.enum(['APPROVED', 'DENIED', 'REVOKED']),
-});
-
-export const updateAvatarImageSchema = z.object({
-  shareable: z.boolean(),
-});
-
 // Sourced classes: build the next class from a real link or an interest topic.
 export const sourcedClassSchema = z.object({
   sourceUrl: z.string().url().max(2048).optional(),

@@ -70,13 +70,6 @@ export function getNotificationUrl(notification: NotificationData): string | nul
     case 'REFERRAL_SIGNUP':
       return '/settings';
 
-    // Avatar images
-    case 'AVATAR_IMAGE_REQUEST_RECEIVED':
-    case 'AVATAR_IMAGE_REQUEST_APPROVED':
-    case 'AVATAR_IMAGE_REQUEST_DENIED':
-    case 'AVATAR_IMAGE_REQUEST_REVOKED':
-      return '/settings';
-
     default:
       return null;
   }
