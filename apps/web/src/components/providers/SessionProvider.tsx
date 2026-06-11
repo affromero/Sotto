@@ -9,8 +9,11 @@ interface SessionProviderProps {
 }
 
 export function SessionProvider({ children, session }: SessionProviderProps) {
+  // The NextAuth handlers live under /api/v1/auth (see lib/auth.ts basePath), so
+  // the client must use the same base or useSession/signIn/signOut hit the
+  // default /api/auth/* and 404.
   return (
-    <NextAuthSessionProvider session={session}>
+    <NextAuthSessionProvider session={session} basePath="/api/v1/auth">
       {children}
     </NextAuthSessionProvider>
   );

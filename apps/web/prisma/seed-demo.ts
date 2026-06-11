@@ -1025,16 +1025,14 @@ async function main() {
       name: 'Nico Valerio',
       role: 'USER',
       bio: 'Curious mind, lifelong learner. I make podcasts about the things that keep me up at night — from quantum mechanics to ancient philosophy.',
-      image:
-        'https://ui-avatars.com/api/?name=K+B&background=D97706&color=fff&size=256&bold=true&format=png',
+      image: '/avatars/capybara.png',
     },
     create: {
       email: 'demo@example.com',
       name: 'Nico Valerio',
       role: 'USER',
       bio: 'Curious mind, lifelong learner. I make podcasts about the things that keep me up at night — from quantum mechanics to ancient philosophy.',
-      image:
-        'https://ui-avatars.com/api/?name=K+B&background=D97706&color=fff&size=256&bold=true&format=png',
+      image: '/avatars/capybara.png',
     },
   });
   console.log(`  Demo user: ${demoUser.id} (${demoUser.email})`);
@@ -1042,70 +1040,55 @@ async function main() {
   // ── 2. Admin user ───────────────────────────────────────────────
   const adminUser = await prisma.user.upsert({
     where: { email: 'admin@example.com' },
-    update: { name: 'Sotto Admin', role: 'ADMIN' },
+    update: { name: 'Sotto Admin', role: 'ADMIN', image: '/avatars/jaguar.png' },
     create: {
       email: 'admin@example.com',
       name: 'Sotto Admin',
       role: 'ADMIN',
-      image: 'https://api.dicebear.com/9.x/notionists/svg?seed=admin&backgroundColor=1E3A5F',
+      image: '/avatars/jaguar.png',
     },
   });
   console.log(`  Admin user: ${adminUser.id} (${adminUser.email})`);
 
   // ── 3. Additional users (varied tiers & roles) ─────────────────
   const extraUsers = [
-    {
-      email: 'maria.chen@example.com',
-      name: 'Maria Chen',
-      role: 'USER' as const,
-      seed: 'maria',
-    },
-    {
-      email: 'james.okafor@example.com',
-      name: 'James Okafor',
-      role: 'USER' as const,
-      seed: 'james',
-    },
-    {
-      email: 'sofia.petrov@example.com',
-      name: 'Sofia Petrov',
-      role: 'USER' as const,
-      seed: 'sofia',
-    },
-    { email: 'liam.tanaka@example.com', name: 'Liam Tanaka', role: 'USER' as const, seed: 'liam' },
-    {
-      email: 'priya.sharma@example.com',
-      name: 'Priya Sharma',
-      role: 'USER' as const,
-      seed: 'priya',
-    },
-    { email: 'noah.weber@example.com', name: 'Noah Weber', role: 'USER' as const, seed: 'noah' },
-    { email: 'elena.rossi@example.com', name: 'Elena Rossi', role: 'USER' as const, seed: 'elena' },
-    {
-      email: 'omar.hassan@example.com',
-      name: 'Omar Hassan',
-      role: 'USER' as const,
-      seed: 'omar',
-    },
-    {
-      email: 'chloe.dubois@example.com',
-      name: 'Chloe Dubois',
-      role: 'USER' as const,
-      seed: 'chloe',
-    },
-    { email: 'kai.nakamura@example.com', name: 'Kai Nakamura', role: 'USER' as const, seed: 'kai' },
+    { email: 'maria.chen@example.com', name: 'Maria Chen', role: 'USER' as const },
+    { email: 'james.okafor@example.com', name: 'James Okafor', role: 'USER' as const },
+    { email: 'sofia.petrov@example.com', name: 'Sofia Petrov', role: 'USER' as const },
+    { email: 'liam.tanaka@example.com', name: 'Liam Tanaka', role: 'USER' as const },
+    { email: 'priya.sharma@example.com', name: 'Priya Sharma', role: 'USER' as const },
+    { email: 'noah.weber@example.com', name: 'Noah Weber', role: 'USER' as const },
+    { email: 'elena.rossi@example.com', name: 'Elena Rossi', role: 'USER' as const },
+    { email: 'omar.hassan@example.com', name: 'Omar Hassan', role: 'USER' as const },
+    { email: 'chloe.dubois@example.com', name: 'Chloe Dubois', role: 'USER' as const },
+    { email: 'kai.nakamura@example.com', name: 'Kai Nakamura', role: 'USER' as const },
+  ];
+
+  // Preset profile animals (mirror of ANIMAL_AVATARS in src/lib/avatars.ts) so
+  // demo profiles use the offline, on-brand avatars rather than an external
+  // service.
+  const ANIMAL_SLUGS = [
+    'capybara',
+    'iguana',
+    'sloth',
+    'toucan',
+    'macaw',
+    'frog',
+    'hummingbird',
+    'jaguar',
   ];
 
   const createdUsers = [];
-  for (const u of extraUsers) {
+  for (const [i, u] of extraUsers.entries()) {
+    const image = `/avatars/${ANIMAL_SLUGS[i % ANIMAL_SLUGS.length]}.png`;
     const user = await prisma.user.upsert({
       where: { email: u.email },
-      update: { name: u.name, role: u.role },
+      update: { name: u.name, role: u.role, image },
       create: {
         email: u.email,
         name: u.name,
         role: u.role,
-        image: `https://api.dicebear.com/9.x/notionists/svg?seed=${u.seed}`,
+        image,
       },
     });
     createdUsers.push(user);
