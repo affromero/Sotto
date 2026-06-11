@@ -139,7 +139,6 @@ export interface UserCostRow {
   userId: string;
   name: string | null;
   email: string | null;
-  plan: string;
   totalCost: number;
   monthCost: number;
   podcastCount: number;
@@ -190,7 +189,7 @@ export async function getTopUsersByCost(
   const [users, podcastCounts] = await Promise.all([
     prisma.user.findMany({
       where: { id: { in: userIds } },
-      select: { id: true, name: true, email: true, plan: true },
+      select: { id: true, name: true, email: true },
     }),
     prisma.podcast.groupBy({
       by: ['userId'],
@@ -210,7 +209,6 @@ export async function getTopUsersByCost(
         userId: row.userId!,
         name: user?.name ?? null,
         email: user?.email ?? null,
-        plan: user?.plan ?? 'FREE',
         totalCost: row._sum.totalCost ?? 0,
         monthCost: monthCostMap.get(row.userId!) ?? 0,
         podcastCount: countMap.get(row.userId!) ?? 0,

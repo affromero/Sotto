@@ -90,7 +90,6 @@ export interface TtsGenerationParams {
   podcastId: string;
 
   requestedModel?: string | null;
-  plan: 'FREE' | 'PRO';
 
   /** Usage logging category (e.g. 'audio_generation', 'voice_track_audio'). */
   usageCategory: string;
@@ -139,7 +138,6 @@ export async function generateTtsAudio(
     userId,
     podcastId,
     requestedModel: _requestedModel,
-    plan: _plan,
     usageCategory,
     extraMetadata,
     isAborted,

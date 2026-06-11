@@ -224,7 +224,6 @@ export async function resolveTtsProvider(context: {
   podcastId: string;
   requestedProvider?: TtsProviderId | 'auto' | null;
   requestedModel?: string | null;
-  plan?: 'FREE' | 'PRO';
   /** Skip BYOK key lookup and go straight to platform keys. Used for fallback retries. */
   skipByok?: boolean;
   /** ISO 639-1 language code — when set, validates provider/model compatibility. */
@@ -272,7 +271,7 @@ export async function resolveTtsProvider(context: {
   // Prefer the requested model, then the admin-configured model for the same provider.
   if (requestedProvider === 'elevenlabs' && process.env.ELEVENLABS_API_KEY) {
     const config = await getAutoModelConfig();
-    const configModel = requestedModel ?? (config.free.ttsProvider === 'elevenlabs' ? config.free.ttsModel : undefined);
+    const configModel = requestedModel ?? (config.model.ttsProvider === 'elevenlabs' ? config.model.ttsModel : undefined);
     const model = resolveModelForLanguage('elevenlabs', configModel);
     return {
       provider: createPremiumTtsProvider(undefined, model),
@@ -282,7 +281,7 @@ export async function resolveTtsProvider(context: {
   }
   if (requestedProvider === 'openai' && process.env.OPENAI_API_KEY) {
     const config = await getAutoModelConfig();
-    const configModel = requestedModel ?? (config.free.ttsProvider === 'openai' ? config.free.ttsModel : undefined);
+    const configModel = requestedModel ?? (config.model.ttsProvider === 'openai' ? config.model.ttsModel : undefined);
     const model = resolveModelForLanguage('openai', configModel);
     return {
       provider: createTtsProvider('openai', undefined, model),
@@ -292,7 +291,7 @@ export async function resolveTtsProvider(context: {
   }
   if (requestedProvider === 'cartesia' && process.env.CARTESIA_API_KEY) {
     const config = await getAutoModelConfig();
-    const configModel = requestedModel ?? (config.free.ttsProvider === 'cartesia' ? config.free.ttsModel : undefined);
+    const configModel = requestedModel ?? (config.model.ttsProvider === 'cartesia' ? config.model.ttsModel : undefined);
     const model = resolveModelForLanguage('cartesia', configModel);
     const provider = await createTtsProviderAsync('cartesia', undefined, undefined, model);
     return { provider, source: 'platform', providerId: 'cartesia' };

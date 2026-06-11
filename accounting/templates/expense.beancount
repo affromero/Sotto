@@ -20,14 +20,12 @@
 ;   Expenses:TTS:ElevenLabs:Standard
 ;   Expenses:TTS:ElevenLabs:Premium
 ;   Expenses:TTS:OpenAI:Standard
-;   Expenses:PaymentProcessing:StripeFees
 ;   Expenses:Software:DevTools
 ;   Expenses:Software:Monitoring
 ;   Expenses:Admin:Legal
 ;
 ; Common payment accounts:
 ;   Assets:Current:Cash:Bank
-;   Assets:Current:Cash:Stripe
 ;   Liabilities:AccountsPayable:Hetzner
 ;   Liabilities:AccountsPayable:Anthropic
 ;   Liabilities:AccountsPayable:ElevenLabs

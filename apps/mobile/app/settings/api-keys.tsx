@@ -291,15 +291,14 @@ export default function ApiKeysScreen() {
             <View style={styles.infoCard}>
               <Text style={styles.infoText}>
                 Add your own API keys for unlimited generation, duration, and model
-                choice. Keys are encrypted and never shared. Pro features like private
-                podcasts and analytics require a separate subscription.
+                choice. Keys are encrypted and never shared.
               </Text>
             </View>
 
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>AI Providers</Text>
               <Text style={styles.sectionSubtitle}>
-                AI is free — add your own key for faster models or higher limits
+                Add your own key to use your preferred AI provider and models
               </Text>
               <View style={styles.card}>
                 {AI_PROVIDERS.map((p, i) => {

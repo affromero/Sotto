@@ -25,7 +25,7 @@ export async function GET() {
     ]);
 
     const pricingMap = new Map(pricing.map((m) => [m.modelId, m.costPerMinute]));
-    const includedIds = config?.proIncludedAvatarModels ?? null;
+    const includedIds = config?.includedAvatarModels ?? null;
     const providers = getAllAvatarProviderMeta().filter((p) => !p.disabled);
 
     const models = providers.flatMap((provider) =>

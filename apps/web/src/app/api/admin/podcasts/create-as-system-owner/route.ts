@@ -5,7 +5,7 @@ import { generatePodcastSlug } from '@/lib/slugify';
 import { errorResponse } from '@/lib/api-response';
 import { contentExtractionQueue, addJob, JobType } from '@/lib/queue';
 import type { ExtractContentPayload } from '@/lib/queue';
-import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
+import { getAutoModelConfig } from '@/lib/auto-model-config';
 import {
   getSystemUserErrorMessage,
   getSystemUserErrorStatus,
@@ -35,9 +35,7 @@ export async function POST(request: NextRequest) {
 
   const slug = await generatePodcastSlug(title, systemUser.id, prisma);
   const hasMetadata = metadata && typeof metadata === 'object';
-  const selectedProviders = hasMetadata && !aiModel
-    ? await selectFreeTierProviders(systemUser.id)
-    : null;
+  const autoConfig = hasMetadata && !aiModel ? await getAutoModelConfig() : null;
 
   const podcast = await prisma.podcast.create({
     data: {
@@ -50,7 +48,8 @@ export async function POST(request: NextRequest) {
       source: 'WEB',
       ...(ttsProvider ? { ttsProvider } : {}),
       ...(ttsModel ? { ttsModel } : {}),
-      aiModel: aiModel ?? selectedProviders?.aiModel ?? null,
+      aiProvider: aiModel ? null : (autoConfig?.model.aiProvider ?? null),
+      aiModel: aiModel ?? autoConfig?.model.aiModel ?? null,
     },
   });
 

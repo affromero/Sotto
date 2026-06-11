@@ -19,8 +19,6 @@ import { type SoundCue } from '@/lib/script-generator';
 import { logger } from '@/lib/logger';
 import { generateFingerprint } from '@/lib/audio-fingerprint';
 import { verifyReferral } from '@/lib/referrals';
-import { consumeFreeGeneration } from '@/lib/generation-gate';
-import { hasByokKey } from '@/lib/byok';
 
 import * as path from 'path';
 import * as os from 'os';
@@ -229,7 +227,7 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
       const sfxPath = path.join(tmpDir, `sfx-${i}.mp3`);
 
       if (usePremiumSfx) {
-        // Creator tier: generate custom SFX via ElevenLabs
+        // Premium SFX mode: generate custom SFX via ElevenLabs.
         try {
           const sfxBuffer = await generateSoundEffect({
             prompt: cue.prompt,
@@ -248,7 +246,7 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
           await copyFile(stockPath, sfxPath);
         }
       } else {
-        // Free/Pro tier: use bundled stock SFX (zero marginal cost)
+        // Default mode: use bundled stock SFX.
         const stockFile = STOCK_SFX[cue.type];
         const stockPath = path.resolve(__dirname, '..', 'assets', 'sfx', stockFile);
         const { copyFile } = await import('fs/promises');
@@ -436,23 +434,6 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
     });
     await invalidatePodcastCache(podcastId);
     await publishPodcastStatus(podcastId, { status: 'READY' });
-
-    // Consume free-tier quota on successful generation (not at creation time)
-    const podcastUser = await prisma.user.findUniqueOrThrow({
-      where: { id: podcast.userId },
-      select: { role: true, plan: true },
-    });
-    const isByok = await hasByokKey(podcast.userId);
-    const isPrivileged = podcastUser.role === 'ADMIN' || podcastUser.role === 'SYSTEM';
-    if (!isByok && podcastUser.plan !== 'PRO' && !isPrivileged) {
-      await consumeFreeGeneration(podcast.userId).catch((err) => {
-        logger.warn('Failed to consume free generation', {
-          podcastId,
-          userId: podcast.userId,
-          error: err instanceof Error ? err.message : String(err),
-        });
-      });
-    }
 
     // Record pipeline completion event for accurate timing metrics
     await prisma.pipelineEvent.create({

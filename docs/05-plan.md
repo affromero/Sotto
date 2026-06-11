@@ -2,22 +2,20 @@
 
 > **Date**: 2026-05-15
 >
-> **Summary**: This is the implementation plan for turning Sotto into a private-first open source product with simple onboarding, explicit provider routing, private RSS delivery, local-agent support, meeting ingestion, news briefings, bot workflows, and optional managed hosting.
+> **Summary**: This is the implementation plan for turning Sotto into a private-first open source product with simple onboarding, explicit provider routing, private RSS delivery, local-agent support, meeting ingestion, news briefings, and bot workflows.
 
 ---
 
 ## 1. Goal
 
-Release Sotto as open source infrastructure that lets users keep podcasts private while connecting their own agents, sources, and providers.
+Release Sotto as open source infrastructure that lets users keep lessons private while connecting their own agents, sources, and providers.
 
-The product should support four paths:
+The product should support self-hosted paths:
 
 1. **Local OSS**: self-host locally with `npm run setup`, local PostgreSQL, local Redis, local storage, and a provider key or local agent.
 2. **VPS self-hosted**: deploy on a Hetzner-style VPS with Docker Compose and Caddy.
-3. **BYOK hosted**: Sotto hosts the app, workers, database, and storage while the user supplies provider keys.
-4. **Fully managed hosted**: Sotto hosts infra and provider access, with a short trial before billing.
 
-The first release should be credible even if the managed hosted path is not fully automated yet. The OSS path cannot depend on managed infrastructure.
+The first release should be credible without managed infrastructure or Sotto billing.
 
 ---
 
@@ -58,7 +56,6 @@ Remaining release work:
 - Add meeting ingestion.
 - Add scheduled news briefings.
 - Harden bot hosting around private episode creation.
-- Add managed-hosting trial and billing boundaries.
 - Replace stale release docs and presentation tooling.
 
 ---
@@ -81,7 +78,6 @@ The setup script should:
 - Write `.env.local` from `.env.oss.example`.
 - Generate `AUTH_SECRET` and `BYOK_ENCRYPTION_KEY` when absent.
 - Set `STORAGE_PROVIDER=local`.
-- Set `PAYMENT_PROVIDER=none`.
 - Push the Prisma schema.
 - Generate the Prisma client.
 - Print the local URL and next required provider action.
@@ -129,16 +125,16 @@ Supported profiles should include:
 
 The generic adapter should accept a command template, input file path, output file path, timeout, and working directory. It must be opt-in because arbitrary local command execution is sensitive.
 
-### 4.4 Managed Hosting Path
+### 4.4 VPS Self-Hosted Path
 
 Target experience:
 
-1. User starts a hosted workspace trial.
-2. Sotto provisions app access, workers, storage, database, and private RSS.
-3. User creates or schedules a first briefing.
-4. Billing starts only after the trial.
+1. Operator deploys Sotto with Docker Compose and a reverse proxy.
+2. Operator supplies app, worker, database, Redis, storage, and provider configuration.
+3. Learners create or schedule their first briefing.
+4. The instance stays free of Sotto billing and commercial access controls.
 
-Trial success should be measured by workflow activation, not signups:
+Deployment success should be measured by workflow activation, not signups:
 
 - Private RSS token created.
 - At least one ready episode.
@@ -150,7 +146,7 @@ Trial success should be measured by workflow activation, not signups:
 
 First-run should be short and operational:
 
-1. **Choose runtime**: Local, BYOK hosted, or managed hosted.
+1. **Choose runtime**: local self-hosted or VPS self-hosted.
 2. **Choose generation**: one-key provider, local agent, or advanced separate providers.
 3. **Choose voice/TTS**: explicit provider and voice profile.
 4. **Choose delivery**: create private RSS token or continue with in-app listening.
@@ -245,7 +241,7 @@ Requirements:
 
 Twitter should create private episodes for the linked owner. The bot can reply with a private or authenticated link only when the user chooses that behavior.
 
-Self-hosted users should be able to run the bot on a VPS. Managed users can pay for polling, webhooks, retries, and operations.
+Self-hosted users should be able to run the bot on a VPS with their own polling, webhooks, retries, and operations.
 
 ### 6.6 Telegram Bot
 
@@ -395,15 +391,15 @@ Known non-fatal build warnings should be documented only when they are unrelated
 
 - Harden Twitter and Telegram as owner-scoped private episode sources.
 - Add self-hosted deployment docs.
-- Add managed hosting controls.
+- Add self-hosted operations controls.
 - Add tests.
 - Commit once CI passes.
 
-### Stage 8 - Managed Trial
+### Stage 8 - Self-Host Hardening
 
-- Add plan/trial state for hosted infrastructure.
-- Keep privacy independent from billing.
-- Add billing tests.
+- Remove remaining hosted billing assumptions.
+- Keep privacy independent from deployment topology.
+- Add self-host regression tests.
 - Commit once CI passes.
 
 ---
@@ -417,8 +413,8 @@ Known non-fatal build warnings should be documented only when they are unrelated
 - `npm run ci` passes.
 - Private RSS works end to end.
 - Local storage works end to end.
-- At least one hosted-provider path works end to end.
+- At least one BYOK provider path works end to end.
 - At least one local-agent path works end to end.
 - No stale social-network docs are included in the release packet.
 - SECURITY.md or equivalent reporting guidance exists.
-- Managed-hosting language clearly charges for operations, not privacy.
+- Self-hosted language clearly keeps Sotto billing out of feature access.

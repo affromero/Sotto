@@ -5,19 +5,16 @@ import { errorResponse } from '@/lib/api-response';
 import { fetchFalImageModels, fetchAllVideoModels } from '@/lib/video-cost-estimator';
 import { getAutoModelConfig, resolveIncludedImageModels, resolveIncludedVideoModels, resolveImageModel, resolveVideoModel } from '@/lib/auto-model-config';
 import { getVideoModelProvider, type VideoProviderId } from '@/lib/providers/video-registry';
-import { prisma } from '@/lib/prisma';
 
 /**
  * GET — Returns available image and video models with live pricetoken pricing.
- * Filters by user's plan tier: returns included models + models from BYOK providers.
- * Includes plan-appropriate default models.
+ * Returns the unified configured models plus models from BYOK providers.
  */
 export async function GET(request: NextRequest) {
   const auth = await authenticateRequest(request);
   if (!auth) return errorResponse('Unauthorized', 401);
 
-  const [user, imageModels, videoModels, autoConfig, userHasFalKey, userHasMiniMaxKey, userHasHeraKey, userHasReplicateKey] = await Promise.all([
-    prisma.user.findUnique({ where: { id: auth.userId }, select: { plan: true, role: true } }),
+  const [imageModels, videoModels, autoConfig, userHasFalKey, userHasMiniMaxKey, userHasHeraKey, userHasReplicateKey] = await Promise.all([
     fetchFalImageModels(),
     fetchAllVideoModels(),
     getAutoModelConfig(),
@@ -27,58 +24,47 @@ export async function GET(request: NextRequest) {
     hasByokKey(auth.userId, 'replicate'),
   ]);
 
-  const tier = (user?.plan as 'FREE' | 'PRO') ?? 'FREE';
-  const isAdmin = user?.role === 'ADMIN';
-
   // Platform keys count — users don't need BYOK if the platform provides them
   const hasFalKey = userHasFalKey || !!process.env.FAL_KEY;
   const hasMiniMaxKey = userHasMiniMaxKey || !!process.env.MINIMAX_API_KEY;
   const hasHeraKey = userHasHeraKey || !!process.env.HERA_API_KEY;
   const hasReplicateKey = userHasReplicateKey || !!process.env.REPLICATE_API_TOKEN;
 
-  // Resolve plan defaults
   const [configuredImage, configuredVideo] = await Promise.all([
-    resolveImageModel(tier),
-    resolveVideoModel(tier),
+    resolveImageModel(),
+    resolveVideoModel(),
   ]);
 
-  // Admins in PRO view mode see the same curated set as PRO users
-  const adminProView = isAdmin && autoConfig.adminViewMode === 'PRO';
-
-  // Admins (ALL mode) see all models; regular users + admins in PRO view see tier-included + BYOK-accessible models
-  let filteredImageModels = imageModels;
-  let filteredVideoModels = videoModels;
-
-  if (!isAdmin || adminProView) {
-    // Determine which BYOK video providers the user has access to
-    const byokVideoProviders = new Set<VideoProviderId>();
-    if (userHasFalKey) byokVideoProviders.add('fal');
-    if (userHasMiniMaxKey) byokVideoProviders.add('minimax');
-    if (userHasHeraKey) byokVideoProviders.add('hera');
-    if (userHasReplicateKey) byokVideoProviders.add('replicate');
-
-    // Image model filtering
-    const { freeImageModels, proImageModels } = resolveIncludedImageModels(autoConfig);
-    const effectiveTier = adminProView ? 'PRO' : tier;
-    const allowedImageSet = new Set(effectiveTier === 'PRO' ? proImageModels : freeImageModels);
-    // BYOK users with a fal key can use any fal image model
-    if (userHasFalKey) {
-      for (const m of imageModels) allowedImageSet.add(m.modelId);
-    }
-    filteredImageModels = imageModels.filter((m) => allowedImageSet.has(m.modelId));
-
-    // Video model filtering
-    const { freeVideoModels, proVideoModels } = resolveIncludedVideoModels(autoConfig);
-    const allowedVideoSet = new Set(effectiveTier === 'PRO' ? proVideoModels : freeVideoModels);
-    // BYOK users can use any model from their BYOK providers
-    for (const m of videoModels) {
-      const provider = getVideoModelProvider(m.modelId);
-      if (provider && byokVideoProviders.has(provider)) {
-        allowedVideoSet.add(m.modelId);
-      }
-    }
-    filteredVideoModels = videoModels.filter((m) => allowedVideoSet.has(m.modelId));
+  const allowedImageSet = new Set(resolveIncludedImageModels(autoConfig));
+  if (userHasFalKey) {
+    for (const model of imageModels) allowedImageSet.add(model.modelId);
   }
+  const filteredImageModels = hasFalKey
+    ? imageModels.filter((model) => allowedImageSet.has(model.modelId))
+    : [];
+
+  const accessibleVideoProviders = new Set<VideoProviderId>();
+  if (hasFalKey) accessibleVideoProviders.add('fal');
+  if (hasMiniMaxKey) accessibleVideoProviders.add('minimax');
+  if (hasHeraKey) accessibleVideoProviders.add('hera');
+  if (hasReplicateKey) accessibleVideoProviders.add('replicate');
+
+  const allowedVideoSet = new Set(resolveIncludedVideoModels(autoConfig));
+  for (const model of videoModels) {
+    const provider = getVideoModelProvider(model.modelId);
+    if (provider && (
+      (provider === 'fal' && userHasFalKey) ||
+      (provider === 'minimax' && userHasMiniMaxKey) ||
+      (provider === 'hera' && userHasHeraKey) ||
+      (provider === 'replicate' && userHasReplicateKey)
+    )) {
+      allowedVideoSet.add(model.modelId);
+    }
+  }
+  const filteredVideoModels = videoModels.filter((model) => {
+    const provider = getVideoModelProvider(model.modelId);
+    return !!provider && accessibleVideoProviders.has(provider) && allowedVideoSet.has(model.modelId);
+  });
 
   return NextResponse.json({
     imageModels: filteredImageModels.map((m) => ({

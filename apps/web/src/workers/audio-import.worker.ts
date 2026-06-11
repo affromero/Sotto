@@ -25,8 +25,6 @@ import { detectLanguage } from '@/lib/language-detect';
 import { getSttProviderMeta } from '@/lib/providers/stt-registry';
 import { logUsage } from '@/lib/usage-logger';
 import { matchTopicTags, TAG_PARENT_MAP } from '@/lib/topic-tagger';
-import { consumeFreeGeneration } from '@/lib/generation-gate';
-import { hasByokKey } from '@/lib/byok';
 import { generateFingerprint, findDuplicates } from '@/lib/audio-fingerprint';
 import * as path from 'path';
 import * as os from 'os';
@@ -104,16 +102,10 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
       return;
     }
 
-    const [podcastAiConfig, userPlan] = await Promise.all([
-      prisma.podcast.findUniqueOrThrow({
-        where: { id: podcastId },
-        select: { aiModel: true },
-      }),
-      prisma.user.findUniqueOrThrow({
-        where: { id: userId },
-        select: { plan: true },
-      }),
-    ]);
+    const podcastAiConfig = await prisma.podcast.findUniqueOrThrow({
+      where: { id: podcastId },
+      select: { aiModel: true },
+    });
     const aiKey = podcastAiConfig.aiModel ? null : await getAiKey(userId);
     if (!podcastAiConfig.aiModel && !aiKey) {
       throw new Error('AI model is required for audio import when no AI key is configured.');
@@ -121,7 +113,6 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
     const { provider: aiProvider } = await resolveAiModelAndProvider({
       podcastAiModel: podcastAiConfig.aiModel,
       aiKey,
-      plan: userPlan.plan as 'FREE' | 'PRO',
     });
     const providerAiKey =
       podcastAiConfig.aiModel && aiProvider !== 'claude-code'
@@ -573,23 +564,6 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
       podcastId,
       userId,
     });
-
-    // Consume free-tier quota on successful import (not at creation time)
-    const importUser = await prisma.user.findUniqueOrThrow({
-      where: { id: userId },
-      select: { role: true, plan: true },
-    });
-    const isByok = await hasByokKey(userId);
-    const isPrivileged = importUser.role === 'ADMIN' || importUser.role === 'SYSTEM';
-    if (!isByok && importUser.plan !== 'PRO' && !isPrivileged) {
-      await consumeFreeGeneration(userId).catch((err) => {
-        logger.warn('Failed to consume free generation', {
-          podcastId,
-          userId,
-          error: err instanceof Error ? err.message : String(err),
-        });
-      });
-    }
 
     // Clean up the original imported audio file from R2
     deleteFile(audioKey).catch((err) => {

@@ -74,7 +74,6 @@ AUTH_SECRET="<generated>"
 BYOK_ENCRYPTION_KEY="<generated>"
 STORAGE_PROVIDER="local"
 LOCAL_STORAGE_DIR="./.sotto/storage"
-PAYMENT_PROVIDER="none"
 ```
 
 Add provider settings only for the workflow you are testing.

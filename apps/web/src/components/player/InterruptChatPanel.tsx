@@ -130,10 +130,6 @@ export function InterruptChatPanel({
           if (incRes.ok) {
             setState('incorporated');
           } else {
-            const incData = await incRes.json().catch(() => ({}));
-            if (incData.code === 'daily_limit_reached') {
-              setError('Daily limit reached. Try again tomorrow or add your own API keys.');
-            }
             setState('resolved');
           }
         } else {

@@ -7,7 +7,7 @@ import { contentExtractionQueue, addJob, JobType } from '@/lib/queue';
 import type { ExtractContentPayload } from '@/lib/queue';
 import { setLandingShowcaseConfig } from '@/lib/landing-showcase';
 import { errorResponse } from '@/lib/api-response';
-import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
+import { getAutoModelConfig } from '@/lib/auto-model-config';
 import {
   getSystemUserErrorMessage,
   getSystemUserErrorStatus,
@@ -42,7 +42,7 @@ export async function POST() {
 
   const title = 'CRISPR Gene Editing Explained';
   const slug = await generatePodcastSlug(title, systemUser.id, prisma);
-  const selectedProviders = await selectFreeTierProviders(systemUser.id);
+  const autoConfig = await getAutoModelConfig();
 
   const podcast = await prisma.podcast.create({
     data: {
@@ -54,7 +54,8 @@ export async function POST() {
       visibility: 'PUBLIC',
       source: 'ADMIN',
       verificationMode: 'showcase',
-      aiModel: selectedProviders.aiModel,
+      aiProvider: autoConfig.model.aiProvider,
+      aiModel: autoConfig.model.aiModel,
     },
   });
 

@@ -36,7 +36,7 @@ vi.mock('@/lib/prisma', () => {
     },
     like: { findUnique: (...args: unknown[]) => mockLikeFindUnique(...args) },
     save: { findUnique: (...args: unknown[]) => mockSaveFindUnique(...args) },
-    user: { findUniqueOrThrow: vi.fn().mockResolvedValue({ plan: 'FREE', role: 'USER' }) },
+    user: { findUniqueOrThrow: vi.fn().mockResolvedValue({ role: 'USER' }) },
     $transaction: (...args: unknown[]) => mockTransaction(...args),
   };
   return { prisma: txProxy, prismaUnfiltered: txProxy };

@@ -294,7 +294,6 @@ export default async function AdminCostsPage({ searchParams }: PageProps) {
             <thead>
               <tr>
                 <th>User</th>
-                <th>Plan</th>
                 <th className={styles.numCell}>Period Cost</th>
                 <th className={styles.numCell}>This Month</th>
                 <th className={styles.numCell}>Generations</th>
@@ -304,7 +303,6 @@ export default async function AdminCostsPage({ searchParams }: PageProps) {
               {topUsers.map((u) => (
                 <tr key={u.userId}>
                   <td>{u.name || u.email || u.userId.slice(0, 8)}</td>
-                  <td>{u.plan}</td>
                   <td className={styles.numCell}>${u.totalCost.toFixed(2)}</td>
                   <td className={styles.numCell}>${u.monthCost.toFixed(2)}</td>
                   <td className={styles.numCell}>{u.podcastCount}</td>

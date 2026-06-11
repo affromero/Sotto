@@ -58,7 +58,7 @@ function makeJob(data: Record<string, unknown>) {
 beforeEach(() => {
   vi.clearAllMocks();
   mockGetAiKey.mockResolvedValue({ apiKey: 'anthropic-key', provider: 'anthropic' });
-  mockPrisma.user.findUniqueOrThrow.mockResolvedValue({ plan: 'FREE' });
+  mockPrisma.user.findUniqueOrThrow.mockResolvedValue({});
   mockResolveAiModel.mockResolvedValue({ model: 'claude-haiku-4-5-20251001', provider: 'anthropic' });
   mockResolveMotionProvider.mockResolvedValue('remotion');
   mockPrisma.segmentVisual.count.mockResolvedValue(0);
@@ -115,7 +115,6 @@ describe('visual-classification worker', () => {
     expect(mockResolveAiModel).toHaveBeenCalledWith({
       podcastAiModel: null,
       aiKey,
-      plan: 'FREE',
     });
     expect(mockClassify).toHaveBeenCalledWith(
       expect.any(Array),
@@ -139,7 +138,6 @@ describe('visual-classification worker', () => {
     expect(mockResolveAiModel).toHaveBeenCalledWith({
       podcastAiModel: 'gpt-5-mini',
       aiKey: null,
-      plan: 'FREE',
     });
     expect(mockGetAiKey).toHaveBeenCalledTimes(1);
     expect(mockGetAiKey).toHaveBeenCalledWith('user-1', 'openai');

@@ -123,7 +123,6 @@ function defaultParams(overrides?: Partial<TtsGenerationParams>): TtsGenerationP
     source: 'platform',
     userId: 'user-1',
     podcastId: 'podcast-1',
-    plan: 'FREE',
     usageCategory: 'audio_generation',
     isAborted: vi.fn().mockResolvedValue(false),
     ...overrides,

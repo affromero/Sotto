@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { authenticateRequest } from '@/lib/api-keys';
 import { requireAdmin } from '@/lib/auth-guards';
 import { errorResponse } from '@/lib/api-response';
-import { checkMusicGenerationGate, tryIncrementMusicGeneration } from '@/lib/music-gate';
+import { checkMusicGenerationGate } from '@/lib/music-gate';
 import { generateMusicSchema } from '@/lib/validations';
 import { addJob, JobType, musicGenerationQueue } from '@/lib/queue';
 import { deleteFile, extractR2Key } from '@/lib/r2';
@@ -30,14 +30,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   // Feature gate
   const gate = !isAdmin ? await checkMusicGenerationGate(authResult.userId) : null;
   if (gate && !gate.allowed) {
-    const message = gate.reason === 'daily_limit_reached'
-      ? 'Daily music generation limit reached. Try again later.'
-      : 'No music provider available. Add a Suno or ElevenLabs API key in Settings.';
-    return errorResponse(message, gate.reason === 'daily_limit_reached' ? 429 : 403, {
+    return errorResponse('No music provider available. Add a Suno or ElevenLabs API key in Settings.', 403, {
       code: gate.reason,
-      dailyUsed: gate.dailyUsed,
-      dailyLimit: gate.dailyLimit,
-      resetInSeconds: gate.resetInSeconds,
     });
   }
 
@@ -81,16 +75,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       musicGenerationId: inProgress.id,
       status: inProgress.status,
     });
-  }
-
-  // Increment daily counter (non-admin, non-BYOK users)
-  if (gate && !gate.isByokUser) {
-    const incremented = await tryIncrementMusicGeneration(authResult.userId, gate.dailyLimit);
-    if (!incremented) {
-      return errorResponse('Daily music generation limit reached. Try again later.', 429, {
-        code: 'daily_limit_reached',
-      });
-    }
   }
 
   // Create MusicGeneration record

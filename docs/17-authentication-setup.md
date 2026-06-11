@@ -184,7 +184,6 @@ model User {
   podcasts      Podcast[]
   discoveries   Discovery[]
   interactions  Interaction[]
-  subscription  Subscription?
   notifications Notification[]
   // ... additional relations
 }
@@ -437,7 +436,7 @@ Route protection is handled in `src/middleware.ts`:
 import { NextRequest, NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 
-const PROTECTED_ROUTES = ['/dashboard', '/create', '/settings', '/billing'];
+const PROTECTED_ROUTES = ['/dashboard', '/create', '/settings'];
 const AUTH_ROUTES = ['/auth/login', '/auth/signup'];
 
 export async function middleware(request: NextRequest) {
@@ -485,11 +484,9 @@ export const config = {
 | `/dashboard`    | Yes                        | Redirect to `/auth/login?callbackUrl=/dashboard`                    |
 | `/create`       | Yes                        | Redirect to `/auth/login?callbackUrl=/create`                       |
 | `/settings`     | Yes                        | Redirect to `/auth/login?callbackUrl=/settings`                     |
-| `/billing`      | Yes                        | Redirect to `/auth/login?callbackUrl=/billing`                      |
 | `/auth/login`   | No (redirect if logged in) | Redirect to `/dashboard` if already authenticated                   |
 | `/auth/signup`  | No (redirect if logged in) | Redirect to `/dashboard` if already authenticated                   |
 | `/podcast/[id]` | Depends on visibility      | Public podcasts: no auth. Private/unlisted: checked in the page/API |
-| `/pricing`      | No                         | Public access                                                       |
 | `/api/*`        | Varies                     | Auth checked per-route in the API handler                           |
 
 ### API Route Auth Pattern
@@ -591,7 +588,7 @@ For local development where you do not have Google or GitHub OAuth apps configur
 
 1. The app starts without errors (providers are conditionally loaded)
 2. The login page renders but shows no OAuth buttons
-3. You can test non-auth features such as public informational pages and pricing
+3. You can test non-auth features such as public informational pages
 4. To test authenticated features, set up at least one OAuth provider
 
 ### With Google OAuth (Recommended for Local Dev)

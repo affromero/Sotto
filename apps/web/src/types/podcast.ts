@@ -28,7 +28,6 @@ export interface PodcastSummary {
   language?: string | null;
   aiAutoResolved?: boolean | null;
   ttsAutoResolved?: boolean | null;
-  ownerIsPro: boolean;
   user: {
     id: string;
     name: string | null;

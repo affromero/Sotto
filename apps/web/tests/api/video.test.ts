@@ -109,7 +109,7 @@ describe('POST /api/podcasts/[id]/video', () => {
     vi.clearAllMocks();
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockRequireAdmin.mockResolvedValue(null);
-    mockCheckVideoGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', dailyUsed: 0, dailyLimit: 1, dailyRemaining: 1, isByokUser: false, isProUser: false });
+    mockCheckVideoGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok' });
     mockTryIncrementVideoGeneration.mockResolvedValue(true);
     mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'user-1', status: 'READY' });
     mockVideoGenFindFirst.mockResolvedValue(null);
@@ -176,35 +176,10 @@ describe('POST /api/podcasts/[id]/video', () => {
     }));
   });
 
-  it('returns 429 when daily video limit is reached', async () => {
-    mockCheckVideoGenerationGate.mockResolvedValue({
-      allowed: false,
-      reason: 'daily_limit_reached',
-      dailyUsed: 1,
-      dailyLimit: 1,
-      dailyRemaining: 0,
-      resetInSeconds: 3600,
-      isByokUser: false,
-      isProUser: false,
-    });
-
-    const res = await POST(createRequest(), routeParams);
-    expect(res.status).toBe(429);
-    const body = await res.json();
-    expect(body.code).toBe('daily_limit_reached');
-    expect(body.dailyUsed).toBe(1);
-    expect(body.resetInSeconds).toBe(3600);
-  });
-
   it('returns 403 when no image provider available', async () => {
     mockCheckVideoGenerationGate.mockResolvedValue({
       allowed: false,
       reason: 'no_image_provider',
-      dailyUsed: 0,
-      dailyLimit: 1,
-      dailyRemaining: 1,
-      isByokUser: false,
-      isProUser: false,
     });
 
     const res = await POST(createRequest(), routeParams);
@@ -213,22 +188,11 @@ describe('POST /api/podcasts/[id]/video', () => {
     expect(body.code).toBe('no_image_provider');
   });
 
-  it('returns 429 when atomic increment fails (TOCTOU race)', async () => {
-    mockTryIncrementVideoGeneration.mockResolvedValue(false);
-
-    const res = await POST(createRequest(), routeParams);
-    expect(res.status).toBe(429);
-  });
-
-  it('skips daily counter for BYOK users', async () => {
+  it('starts generation for configured BYOK providers', async () => {
     mockCheckVideoGenerationGate.mockResolvedValue({
       allowed: true,
       reason: 'ok',
-      dailyUsed: 0,
-      dailyLimit: 1,
-      dailyRemaining: Infinity,
-      isByokUser: true,
-      isProUser: false,
+      hasByokKey: true,
     });
 
     const res = await POST(createRequest(), routeParams);
@@ -236,7 +200,7 @@ describe('POST /api/podcasts/[id]/video', () => {
     expect(mockTryIncrementVideoGeneration).not.toHaveBeenCalled();
   });
 
-  it('skips daily counter for admin users', async () => {
+  it('skips the user gate for admin users', async () => {
     mockRequireAdmin.mockResolvedValue('admin-1');
 
     const res = await POST(createRequest(), routeParams);

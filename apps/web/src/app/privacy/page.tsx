@@ -133,7 +133,6 @@ export default function PrivacyPage() {
             <li>Provide private library, discovery, and recommendation features</li>
             <li>Build and update your behavioral profile for personalized recommendations</li>
             <li>Send notifications about your lessons and interactions</li>
-            <li>Process optional paid voice-sharing payments via Stripe Connect</li>
             <li>Moderate content for safety and policy compliance</li>
             <li>Improve service quality, fix bugs, and analyze usage patterns</li>
             <li>Prevent abuse, enforce rate limits, and detect fraudulent activity</li>
@@ -164,10 +163,6 @@ export default function PrivacyPage() {
             <li>
               <strong>Storage</strong> (Cloudflare R2): audio files, transcripts,
               and user avatars
-            </li>
-            <li>
-              <strong>Payments</strong> (Stripe): optional paid voice-sharing
-              transactions via Stripe Connect when enabled
             </li>
             <li>
               <strong>Authentication</strong> (Google, GitHub, Apple): OAuth sign-in
@@ -274,7 +269,7 @@ export default function PrivacyPage() {
 
           <h3>BYOK Key Removal</h3>
           <p>
-            You can remove your API keys at any time from the billing settings page.
+            You can remove your API keys at any time from the API key settings page.
             Removed keys are immediately deleted from our encrypted storage.
           </p>
 
@@ -283,8 +278,7 @@ export default function PrivacyPage() {
             Our primary infrastructure is hosted in the EU (Hetzner, Germany). When
             you use BYOK keys, API calls may be routed to providers based in the
             United States (Anthropic, OpenAI, ElevenLabs, and others). These
-            transfers are initiated by your use of your own API keys. Stripe payment
-            processing also involves data transfer to the US.
+            transfers are initiated by your use of your own API keys.
           </p>
 
           <h2>10. Cookies</h2>

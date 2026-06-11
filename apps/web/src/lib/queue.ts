@@ -395,7 +395,6 @@ export interface ClassifyPipelinePayload {
   aiProvider: string;
   aiModel: string;
   apiKeyOverride?: string;
-  tier: 'FREE' | 'PRO';
   voiceTrackId?: string;
 }
 

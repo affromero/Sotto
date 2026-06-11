@@ -52,6 +52,11 @@ vi.mock('@/lib/logger', () => ({
   },
 }));
 
+vi.mock('@/lib/redis', () => ({
+  invalidatePodcastCache: vi.fn().mockResolvedValue(undefined),
+  publishPodcastStatus: vi.fn().mockResolvedValue(undefined),
+}));
+
 // ---- Import under test ----
 import { markPodcastFailed, determineResumePoint } from '@/lib/pipeline-resume';
 

@@ -46,7 +46,7 @@ export async function processScriptWriting(job: Job<WriteScriptPayload>): Promis
   }
 
   // Load dossier, outline, discovery, podcast
-  const [dossier, outline, discovery, podcast, user] = await Promise.all([
+  const [dossier, outline, discovery, podcast] = await Promise.all([
     prisma.researchDossier.findUniqueOrThrow({
       where: { id: dossierId },
       select: { sources: true, evidence: true },
@@ -66,7 +66,6 @@ export async function processScriptWriting(job: Job<WriteScriptPayload>): Promis
       where: { id: podcastId },
       select: { aiModel: true },
     }),
-    prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { plan: true } }),
   ]);
 
   await job.updateProgress(15);
@@ -79,7 +78,6 @@ export async function processScriptWriting(job: Job<WriteScriptPayload>): Promis
   const { model, provider } = await resolveAiModelAndProvider({
     podcastAiModel: podcast.aiModel,
     aiKey,
-    plan: user.plan as 'FREE' | 'PRO',
   });
 
   const providerAiKey =

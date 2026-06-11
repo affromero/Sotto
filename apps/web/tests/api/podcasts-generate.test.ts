@@ -90,55 +90,6 @@ vi.mock('@/lib/pipeline-resume', () => ({
   determineResumePoint: (...args: unknown[]) => mockDetermineResumePoint(...args),
 }));
 
-const mockCheckGenerationGate = vi
-  .fn()
-  .mockResolvedValue({ allowed: true, reason: 'ok', isByokUser: true });
-const mockGetAutoModelConfig = vi.fn().mockResolvedValue({
-  free: {
-    aiProvider: 'anthropic',
-    aiModel: 'claude-haiku-4-5-20251001',
-    ttsProvider: 'openai',
-    ttsModel: 'tts-1-hd',
-    sttProvider: 'openai',
-    sttModel: 'whisper-1',
-  },
-  dailyGenerationLimit: 3,
-  dailyGenerationLimitPro: 5,
-  dailyVideoLimit: 1,
-  dailyVideoLimitPro: 2,
-  dailyAvatarLimit: 1,
-  dailyAvatarLimitPro: 1,
-  ttsAllocations: [],
-  aiAllocations: [],
-});
-
-vi.mock('@/lib/generation-gate', () => ({
-  checkGenerationGate: (...args: unknown[]) => mockCheckGenerationGate(...args),
-}));
-
-vi.mock('@/lib/auto-model-config', () => ({
-  getAutoModelConfig: (...args: unknown[]) => mockGetAutoModelConfig(...args),
-}));
-
-const mockSelectFreeTierProviders = vi.fn().mockResolvedValue({
-  aiProvider: 'anthropic',
-  aiModel: 'claude-haiku-4-5-20251001',
-  aiQuota: 10,
-  ttsProvider: 'elevenlabs',
-  ttsModel: 'eleven_multilingual_v2',
-  ttsQuota: 10,
-});
-
-vi.mock('@/lib/free-tier-provider-selector', () => ({
-  selectFreeTierProviders: (...args: unknown[]) => mockSelectFreeTierProviders(...args),
-}));
-
-const mockCheckRateLimit = vi.fn().mockResolvedValue({ allowed: true, remaining: 19, resetAt: 0 });
-
-vi.mock('@/lib/redis', () => ({
-  checkRateLimit: (...args: unknown[]) => mockCheckRateLimit(...args),
-}));
-
 vi.mock('@/lib/byok', () => ({
   getAiKey: vi.fn().mockResolvedValue(null),
   getByokKey: vi.fn().mockResolvedValue(null),
@@ -203,8 +154,6 @@ describe('POST /api/podcasts/[podcastId]/generate', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockRequireAdmin.mockResolvedValue(null); // non-admin by default
-    mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', isByokUser: true });
-    mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 19, resetAt: 0 });
     mockPrismaPodcastUpdate.mockResolvedValue({});
     mockPrismaPodcastUpdateMany.mockResolvedValue({ count: 1 });
     mockAddJob.mockResolvedValue({ id: 'job-1' });
@@ -275,40 +224,6 @@ describe('POST /api/podcasts/[podcastId]/generate', () => {
     expect(data).toMatchObject({
       error: 'Podcast must be in PENDING, DISCOVERING, or FAILED status to generate',
     });
-  });
-
-  it('returns 403 when TTS provider not configured', async () => {
-    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-001' });
-    mockCheckGenerationGate.mockResolvedValue({
-      allowed: false,
-      reason: 'no_provider',
-      isByokUser: false,
-    });
-
-    const request = createMockRequest();
-    const params = await createMockParams('podcast-noai');
-    const response = await POST(request, params);
-    const data = await response.json();
-
-    expect(response.status).toBe(403);
-    expect(data.error).toContain('No voice provider available');
-  });
-
-  it('returns 429 when rate limited', async () => {
-    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-001' });
-    mockCheckRateLimit.mockResolvedValue({
-      allowed: false,
-      remaining: 0,
-      resetAt: Date.now() + 3600000,
-    });
-
-    const request = createMockRequest();
-    const params = await createMockParams('podcast-rl');
-    const response = await POST(request, params);
-    const data = await response.json();
-
-    expect(response.status).toBe(429);
-    expect(data.error).toContain('Rate limit exceeded');
   });
 
   it('successfully starts generation for PENDING podcast', async () => {
@@ -651,54 +566,5 @@ describe('POST /api/podcasts/[podcastId]/generate', () => {
       expect(data).toEqual({ success: true, message: 'Generation started' });
     });
 
-    it('admin skips rate limit', async () => {
-      mockRequireAdmin.mockResolvedValue('admin-user-id');
-      mockAuthenticateRequest.mockResolvedValue({ userId: 'admin-user-id' });
-      mockCheckRateLimit.mockResolvedValue({
-        allowed: false,
-        remaining: 0,
-        resetAt: Date.now() + 3600000,
-      });
-      mockPrismaPodcastFindUnique.mockResolvedValue({
-        id: 'podcast-rl-admin',
-        userId: 'admin-user-id',
-        status: 'PENDING',
-        discovery: { id: 'disc-rl', sourceUrl: null, sourceContent: null, durationTarget: null },
-      });
-
-      const request = createMockRequest();
-      const params = await createMockParams('podcast-rl-admin');
-      const response = await POST(request, params);
-      const data = await response.json();
-
-      expect(response.status).toBe(200);
-      expect(data).toEqual({ success: true, message: 'Generation started' });
-      expect(mockCheckRateLimit).not.toHaveBeenCalled();
-    });
-
-    it('admin skips generation gate', async () => {
-      mockRequireAdmin.mockResolvedValue('admin-user-id');
-      mockAuthenticateRequest.mockResolvedValue({ userId: 'admin-user-id' });
-      mockCheckGenerationGate.mockResolvedValue({
-        allowed: false,
-        reason: 'no_provider',
-        isByokUser: false,
-      });
-      mockPrismaPodcastFindUnique.mockResolvedValue({
-        id: 'podcast-gate-admin',
-        userId: 'admin-user-id',
-        status: 'PENDING',
-        discovery: { id: 'disc-gate', sourceUrl: null, sourceContent: null, durationTarget: null },
-      });
-
-      const request = createMockRequest();
-      const params = await createMockParams('podcast-gate-admin');
-      const response = await POST(request, params);
-      const data = await response.json();
-
-      expect(response.status).toBe(200);
-      expect(data).toEqual({ success: true, message: 'Generation started' });
-      expect(mockCheckGenerationGate).not.toHaveBeenCalled();
-    });
   });
 });

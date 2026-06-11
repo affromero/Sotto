@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import styles from './AutoModelForm.module.css';
 
 interface ModelOption {
@@ -16,7 +16,7 @@ interface ProviderOption {
   models: ModelOption[];
 }
 
-interface PlanConfig {
+interface ModelConfig {
   aiProvider: string;
   aiModel: string;
   ttsProvider: string;
@@ -32,50 +32,24 @@ interface PlatformConfig {
 
 interface AutoModelFormProps {
   initialConfig: {
-    free: PlanConfig;
-    pro: PlanConfig;
+    model: ModelConfig;
     platform: PlatformConfig;
-    freeIncludedModels: string[] | null;
-    proIncludedModels: string[] | null;
-    freeIncludedTtsModels: string[] | null;
-    proIncludedTtsModels: string[] | null;
-    freeIncludedSttModels: string[] | null;
-    proIncludedSttModels: string[] | null;
-    freeImageProvider: string;
-    freeImageModel: string;
-    proImageProvider: string;
-    proImageModel: string;
-    freeIncludedImageModels: string[] | null;
-    proIncludedImageModels: string[] | null;
-    freeVideoProvider: string;
-    freeVideoModel: string;
-    proVideoProvider: string;
-    proVideoModel: string;
-    freeIncludedVideoModels: string[] | null;
-    proIncludedVideoModels: string[] | null;
-    freeAvatarProvider: string;
-    freeAvatarModel: string;
-    proAvatarProvider: string;
-    proAvatarModel: string;
-    freeIncludedAvatarModels: string[] | null;
-    proIncludedAvatarModels: string[] | null;
-    freeMusicProvider: string;
-    freeMusicModel: string;
-    proMusicProvider: string;
-    proMusicModel: string;
-    freeIncludedMusicModels: string[] | null;
-    proIncludedMusicModels: string[] | null;
-    dailyGenerationLimit: number;
-    dailyGenerationLimitPro: number;
-    dailyVideoLimit: number;
-    dailyVideoLimitPro: number;
-    dailyMusicLimit: number;
-    dailyMusicLimitPro: number;
-    dailyAvatarLimit: number;
-    dailyAvatarLimitPro: number;
-    freeMotionProvider: string;
-    proMotionProvider: string;
-    adminViewMode: 'ALL' | 'PRO';
+    includedModels: string[] | null;
+    includedTtsModels: string[] | null;
+    includedSttModels: string[] | null;
+    imageProvider: string;
+    imageModel: string;
+    includedImageModels: string[] | null;
+    videoProvider: string;
+    videoModel: string;
+    includedVideoModels: string[] | null;
+    avatarProvider: string;
+    avatarModel: string;
+    includedAvatarModels: string[] | null;
+    musicProvider: string;
+    musicModel: string;
+    includedMusicModels: string[] | null;
+    motionProvider: string;
   };
   aiProviders: ProviderOption[];
   ttsProviders: ProviderOption[];
@@ -86,15 +60,9 @@ interface AutoModelFormProps {
   musicProviders: ProviderOption[];
 }
 
-// --- Tri-state hook ---
-
-type TriState = 'off' | 'enabled' | 'default';
-
-interface ModalityStateConfig {
-  initialFreeDefault: { provider: string; model: string };
-  initialProDefault: { provider: string; model: string };
-  initialFreeIncluded: string[] | null;
-  initialProIncluded: string[] | null;
+interface UnifiedStateConfig {
+  initialDefault: { provider: string; model: string };
+  initialIncluded: string[] | null;
   providers: ProviderOption[];
   compositeIds: boolean;
 }
@@ -108,154 +76,82 @@ function parseKey(key: string, composite: boolean, providers: ProviderOption[]):
     const idx = key.indexOf(':');
     return { provider: key.slice(0, idx), model: key.slice(idx + 1) };
   }
-  for (const p of providers) {
-    if (p.models.some(m => m.id === key)) return { provider: p.id, model: key };
+
+  for (const provider of providers) {
+    if (provider.models.some((model) => model.id === key)) {
+      return { provider: provider.id, model: key };
+    }
   }
+
   return { provider: providers[0]?.id ?? '', model: key };
 }
 
 function firstModelKey(providers: ProviderOption[], composite: boolean): string {
-  for (const p of providers) {
-    if (p.models.length > 0) return toKey(p.id, p.models[0].id, composite);
+  for (const provider of providers) {
+    const model = provider.models[0];
+    if (model) return toKey(provider.id, model.id, composite);
   }
   return '';
 }
 
-function useModalityState(config: ModalityStateConfig) {
+function useUnifiedModelState(config: UnifiedStateConfig) {
   const { providers, compositeIds } = config;
+  const initialDefaultKey =
+    toKey(config.initialDefault.provider, config.initialDefault.model, compositeIds) ||
+    firstModelKey(providers, compositeIds);
 
-  const initFreeKey = toKey(config.initialFreeDefault.provider, config.initialFreeDefault.model, compositeIds);
-  const initProKey = toKey(config.initialProDefault.provider, config.initialProDefault.model, compositeIds);
-
-  const [freeDefaultKey, setFreeDefaultKey] = useState(initFreeKey);
-  const [proDefaultKey, setProDefaultKey] = useState(initProKey);
-  const [freeIncluded, setFreeIncluded] = useState<Set<string>>(
-    () => new Set(config.initialFreeIncluded ?? [])
-  );
-  const [proIncluded, setProIncluded] = useState<Set<string>>(
-    () => new Set(config.initialProIncluded ?? [])
+  const [defaultKey, setDefaultKey] = useState(initialDefaultKey);
+  const [included, setIncluded] = useState<Set<string>>(
+    () => new Set(config.initialIncluded ?? (initialDefaultKey ? [initialDefaultKey] : [])),
   );
 
-  const getState = useCallback((tier: 'free' | 'pro', key: string): TriState => {
-    const defaultKey = tier === 'free' ? freeDefaultKey : proDefaultKey;
-    const included = tier === 'free' ? freeIncluded : proIncluded;
-    if (key === defaultKey) return 'default';
-    if (included.has(key)) return 'enabled';
-    return 'off';
-  }, [freeDefaultKey, proDefaultKey, freeIncluded, proIncluded]);
+  const setDefault = useCallback((key: string) => {
+    setDefaultKey(key);
+    setIncluded((prev) => {
+      const next = new Set(prev);
+      next.add(key);
+      return next;
+    });
+  }, []);
 
-  const findFirstEnabled = useCallback((tier: 'free' | 'pro', excludeKey: string): string | null => {
-    const included = tier === 'free' ? freeIncluded : proIncluded;
-    for (const p of providers) {
-      for (const m of p.models) {
-        const k = toKey(p.id, m.id, compositeIds);
-        if (k !== excludeKey && included.has(k)) return k;
+  const toggleIncluded = useCallback((key: string) => {
+    setIncluded((prev) => {
+      const next = new Set(prev);
+      if (key === defaultKey) {
+        next.add(key);
+        return next;
       }
-    }
-    return null;
-  }, [freeIncluded, proIncluded, providers, compositeIds]);
-
-  // Left click: toggle off ↔ enabled (or disable if currently default)
-  const toggle = useCallback((tier: 'free' | 'pro', key: string) => {
-    const setDefaultFn = tier === 'free' ? setFreeDefaultKey : setProDefaultKey;
-    const setIncludedFn = tier === 'free' ? setFreeIncluded : setProIncluded;
-    const defaultKey = tier === 'free' ? freeDefaultKey : proDefaultKey;
-    const included = tier === 'free' ? freeIncluded : proIncluded;
-
-    if (key === defaultKey) {
-      // default → off: remove from included, pick fallback default
-      const fallback = findFirstEnabled(tier, key) ?? firstModelKey(providers, compositeIds);
-      setDefaultFn(fallback);
-      setIncludedFn(prev => {
-        const next = new Set(prev);
+      if (next.has(key)) {
         next.delete(key);
-        return next;
-      });
-    } else if (included.has(key)) {
-      // enabled → off
-      setIncludedFn(prev => {
-        const next = new Set(prev);
-        next.delete(key);
-        return next;
-      });
-    } else {
-      // off → enabled
-      setIncludedFn(prev => {
-        const next = new Set(prev);
+      } else {
         next.add(key);
-        return next;
-      });
-    }
-  }, [freeDefaultKey, proDefaultKey, freeIncluded, proIncluded, findFirstEnabled, providers, compositeIds]);
+      }
+      return next;
+    });
+  }, [defaultKey]);
 
-  // Right click: set as default (from any state), or demote default → enabled
-  const toggleDefault = useCallback((tier: 'free' | 'pro', key: string) => {
-    const setDefaultFn = tier === 'free' ? setFreeDefaultKey : setProDefaultKey;
-    const setIncludedFn = tier === 'free' ? setFreeIncluded : setProIncluded;
-    const defaultKey = tier === 'free' ? freeDefaultKey : proDefaultKey;
-
-    if (key === defaultKey) {
-      // Already default → demote to enabled, pick fallback
-      const fallback = findFirstEnabled(tier, key) ?? firstModelKey(providers, compositeIds);
-      setDefaultFn(fallback);
-    } else {
-      // off or enabled → default (enable + set as default)
-      const prevDefault = defaultKey;
-      setDefaultFn(key);
-      setIncludedFn(prev => {
-        const next = new Set(prev);
-        next.add(key);
-        if (prevDefault && prevDefault !== key) next.add(prevDefault);
-        return next;
-      });
-    }
-  }, [freeDefaultKey, proDefaultKey, freeIncluded, proIncluded, findFirstEnabled, providers, compositeIds]);
-
-  const clear = useCallback(() => {
-    setFreeDefaultKey(initFreeKey);
-    setProDefaultKey(initProKey);
-    setFreeIncluded(new Set());
-    setProIncluded(new Set());
-  }, [initFreeKey, initProKey]);
-
-  const hasOverrides = freeIncluded.size > 0 || proIncluded.size > 0;
+  const reset = useCallback(() => {
+    setDefaultKey(initialDefaultKey);
+    setIncluded(new Set(initialDefaultKey ? [initialDefaultKey] : []));
+  }, [initialDefaultKey]);
 
   return {
-    getState,
-    toggle,
-    toggleDefault,
-    freeDefault: parseKey(freeDefaultKey, compositeIds, providers),
-    proDefault: parseKey(proDefaultKey, compositeIds, providers),
-    freeIncluded,
-    proIncluded,
-    clear,
-    hasOverrides,
+    defaultKey,
+    defaultSelection: parseKey(defaultKey, compositeIds, providers),
+    included,
     providers,
     compositeIds,
+    setDefault,
+    toggleIncluded,
+    reset,
   };
 }
 
-type ModalityState = ReturnType<typeof useModalityState>;
+type UnifiedModelState = ReturnType<typeof useUnifiedModelState>;
 
-// --- Tri-state toggle icon SVGs ---
-
-function CheckIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-      <path d="M3 7l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
+function setToArray(set: Set<string>): string[] | null {
+  return set.size > 0 ? [...set] : null;
 }
-
-function StarIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-      <path d="M7 1l1.76 3.57L13 5.24l-3 2.92.71 4.13L7 10.27 3.29 12.29 4 8.16 1 5.24l4.24-.67L7 1z" fill="currentColor" />
-    </svg>
-  );
-}
-
-// --- Unified Model Editor ---
 
 function UnifiedModelEditor({
   title,
@@ -264,39 +160,46 @@ function UnifiedModelEditor({
 }: {
   title: string;
   description: string;
-  state: ModalityState;
+  state: UnifiedModelState;
 }) {
   const { providers, compositeIds } = state;
-
-  const modelKey = (providerId: string, modelId: string) =>
-    toKey(providerId, modelId, compositeIds);
-
-  const ariaLabel = (modelName: string, tier: string, triState: TriState): string => {
-    switch (triState) {
-      case 'off': return `${modelName} ${tier} tier: off. Click to enable, right-click to set as default.`;
-      case 'enabled': return `${modelName} ${tier} tier: enabled. Click to disable, right-click to set as default.`;
-      case 'default': return `${modelName} ${tier} tier: default. Click to disable, right-click to demote.`;
-    }
-  };
-
-  const handleContextMenu = (e: React.MouseEvent, tier: 'free' | 'pro', key: string) => {
-    e.preventDefault();
-    state.toggleDefault(tier, key);
-  };
+  const flatModels = useMemo(
+    () =>
+      providers.flatMap((provider) =>
+        provider.models.map((model) => ({
+          provider,
+          model,
+          key: toKey(provider.id, model.id, compositeIds),
+        })),
+      ),
+    [providers, compositeIds],
+  );
 
   return (
     <fieldset className={styles.section}>
       <legend className={styles.sectionTitle}>{title}</legend>
       <p className={styles.platformDescription}>{description}</p>
 
-      {!state.hasOverrides && (
-        <p className={styles.defaultsHint}>
-          Using defaults — only the auto model per tier is shown to users.
-        </p>
-      )}
+      <div className={styles.field}>
+        <label className={styles.label} htmlFor={`${title}-default`}>
+          Default model
+        </label>
+        <select
+          id={`${title}-default`}
+          className={styles.select}
+          value={state.defaultKey}
+          onChange={(event) => state.setDefault(event.target.value)}
+        >
+          {flatModels.map(({ provider, model, key }) => (
+            <option key={key} value={key}>
+              {provider.displayName} - {model.displayName} ({model.tier})
+            </option>
+          ))}
+        </select>
+      </div>
 
       <div className={styles.providerCards}>
-        {providers.filter(p => p.models.length > 0).map(provider => (
+        {providers.filter((provider) => provider.models.length > 0).map((provider) => (
           <div key={provider.id} className={styles.providerCard}>
             <div className={styles.providerCardHeader}>
               <span className={styles.providerCardName}>{provider.displayName}</span>
@@ -304,59 +207,26 @@ function UnifiedModelEditor({
                 {provider.models.length} model{provider.models.length !== 1 ? 's' : ''}
               </span>
             </div>
-
             <div className={styles.providerCardBody}>
-              <div className={styles.providerCardColumns}>
-                <span className={styles.modelNameHeader}>Model</span>
-                <span className={styles.tierHeader}>Free</span>
-                <span className={styles.tierHeader}>Pro</span>
-              </div>
-
-              {provider.models.map(model => {
-                const key = modelKey(provider.id, model.id);
-                const freeState = state.getState('free', key);
-                const proState = state.getState('pro', key);
-
+              {provider.models.map((model) => {
+                const key = toKey(provider.id, model.id, compositeIds);
+                const checked = state.included.has(key);
+                const isDefault = key === state.defaultKey;
                 return (
-                  <div key={key} className={styles.modelRow}>
+                  <label key={key} className={styles.modelRow}>
                     <span className={styles.modelName}>
                       {model.displayName}
-                      <span className={styles.modelTier}>{model.tier}</span>
-                      {model.price && (
-                        <span className={styles.modelPrice}>{model.price}</span>
-                      )}
+                      <span className={styles.modelTier}>{isDefault ? 'default' : model.tier}</span>
+                      {model.price && <span className={styles.modelPrice}>{model.price}</span>}
                     </span>
-                    <div className={styles.triToggleCell}>
-                      <button
-                        type="button"
-                        className={`${styles.triToggle} ${
-                          freeState === 'enabled' ? styles.triToggleEnabled :
-                          freeState === 'default' ? styles.triToggleDefault : ''
-                        }`}
-                        aria-label={ariaLabel(model.displayName, 'free', freeState)}
-                        onClick={() => state.toggle('free', key)}
-                        onContextMenu={(e) => handleContextMenu(e, 'free', key)}
-                      >
-                        {freeState === 'enabled' && <CheckIcon />}
-                        {freeState === 'default' && <StarIcon />}
-                      </button>
-                    </div>
-                    <div className={styles.triToggleCell}>
-                      <button
-                        type="button"
-                        className={`${styles.triToggle} ${
-                          proState === 'enabled' ? styles.triToggleEnabled :
-                          proState === 'default' ? styles.triToggleDefault : ''
-                        }`}
-                        aria-label={ariaLabel(model.displayName, 'pro', proState)}
-                        onClick={() => state.toggle('pro', key)}
-                        onContextMenu={(e) => handleContextMenu(e, 'pro', key)}
-                      >
-                        {proState === 'enabled' && <CheckIcon />}
-                        {proState === 'default' && <StarIcon />}
-                      </button>
-                    </div>
-                  </div>
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      disabled={isDefault}
+                      onChange={() => state.toggleIncluded(key)}
+                      aria-label={`${model.displayName} available`}
+                    />
+                  </label>
                 );
               })}
             </div>
@@ -364,123 +234,90 @@ function UnifiedModelEditor({
         ))}
       </div>
 
-      {state.hasOverrides && (
-        <button
-          type="button"
-          className={styles.clearButton}
-          onClick={state.clear}
-        >
-          Clear overrides (use defaults)
-        </button>
-      )}
+      <button type="button" className={styles.clearButton} onClick={state.reset}>
+        Reset to default only
+      </button>
     </fieldset>
   );
 }
 
-// --- Main form ---
-
-export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttProviders, imageProviders, videoProviders, avatarProviders, musicProviders }: AutoModelFormProps) {
+export function AutoModelForm({
+  initialConfig,
+  aiProviders,
+  ttsProviders,
+  sttProviders,
+  imageProviders,
+  videoProviders,
+  avatarProviders,
+  musicProviders,
+}: AutoModelFormProps) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // 7 modality states
-  const aiState = useModalityState({
-    initialFreeDefault: { provider: initialConfig.free.aiProvider, model: initialConfig.free.aiModel },
-    initialProDefault: { provider: initialConfig.pro.aiProvider, model: initialConfig.pro.aiModel },
-    initialFreeIncluded: initialConfig.freeIncludedModels,
-    initialProIncluded: initialConfig.proIncludedModels,
+  const aiState = useUnifiedModelState({
+    initialDefault: { provider: initialConfig.model.aiProvider, model: initialConfig.model.aiModel },
+    initialIncluded: initialConfig.includedModels,
     providers: aiProviders,
     compositeIds: false,
   });
 
-  const ttsState = useModalityState({
-    initialFreeDefault: { provider: initialConfig.free.ttsProvider, model: initialConfig.free.ttsModel },
-    initialProDefault: { provider: initialConfig.pro.ttsProvider, model: initialConfig.pro.ttsModel },
-    initialFreeIncluded: initialConfig.freeIncludedTtsModels,
-    initialProIncluded: initialConfig.proIncludedTtsModels,
+  const ttsState = useUnifiedModelState({
+    initialDefault: { provider: initialConfig.model.ttsProvider, model: initialConfig.model.ttsModel },
+    initialIncluded: initialConfig.includedTtsModels,
     providers: ttsProviders,
     compositeIds: true,
   });
 
-  const sttState = useModalityState({
-    initialFreeDefault: { provider: initialConfig.free.sttProvider, model: initialConfig.free.sttModel },
-    initialProDefault: { provider: initialConfig.pro.sttProvider, model: initialConfig.pro.sttModel },
-    initialFreeIncluded: initialConfig.freeIncludedSttModels,
-    initialProIncluded: initialConfig.proIncludedSttModels,
+  const sttState = useUnifiedModelState({
+    initialDefault: { provider: initialConfig.model.sttProvider, model: initialConfig.model.sttModel },
+    initialIncluded: initialConfig.includedSttModels,
     providers: sttProviders,
     compositeIds: true,
   });
 
-  const imageState = useModalityState({
-    initialFreeDefault: { provider: initialConfig.freeImageProvider, model: initialConfig.freeImageModel },
-    initialProDefault: { provider: initialConfig.proImageProvider, model: initialConfig.proImageModel },
-    initialFreeIncluded: initialConfig.freeIncludedImageModels,
-    initialProIncluded: initialConfig.proIncludedImageModels,
+  const imageState = useUnifiedModelState({
+    initialDefault: { provider: initialConfig.imageProvider, model: initialConfig.imageModel },
+    initialIncluded: initialConfig.includedImageModels,
     providers: imageProviders,
-    compositeIds: true,
+    compositeIds: false,
   });
 
-  const videoState = useModalityState({
-    initialFreeDefault: { provider: initialConfig.freeVideoProvider, model: initialConfig.freeVideoModel },
-    initialProDefault: { provider: initialConfig.proVideoProvider, model: initialConfig.proVideoModel },
-    initialFreeIncluded: initialConfig.freeIncludedVideoModels,
-    initialProIncluded: initialConfig.proIncludedVideoModels,
+  const videoState = useUnifiedModelState({
+    initialDefault: { provider: initialConfig.videoProvider, model: initialConfig.videoModel },
+    initialIncluded: initialConfig.includedVideoModels,
     providers: videoProviders,
-    compositeIds: true,
+    compositeIds: false,
   });
 
-  const avatarState = useModalityState({
-    initialFreeDefault: { provider: initialConfig.freeAvatarProvider, model: initialConfig.freeAvatarModel },
-    initialProDefault: { provider: initialConfig.proAvatarProvider, model: initialConfig.proAvatarModel },
-    initialFreeIncluded: initialConfig.freeIncludedAvatarModels,
-    initialProIncluded: initialConfig.proIncludedAvatarModels,
+  const avatarState = useUnifiedModelState({
+    initialDefault: { provider: initialConfig.avatarProvider, model: initialConfig.avatarModel },
+    initialIncluded: initialConfig.includedAvatarModels,
     providers: avatarProviders,
-    compositeIds: true,
+    compositeIds: false,
   });
 
-  const musicState = useModalityState({
-    initialFreeDefault: { provider: initialConfig.freeMusicProvider, model: initialConfig.freeMusicModel },
-    initialProDefault: { provider: initialConfig.proMusicProvider, model: initialConfig.proMusicModel },
-    initialFreeIncluded: initialConfig.freeIncludedMusicModels,
-    initialProIncluded: initialConfig.proIncludedMusicModels,
+  const musicState = useUnifiedModelState({
+    initialDefault: { provider: initialConfig.musicProvider, model: initialConfig.musicModel },
+    initialIncluded: initialConfig.includedMusicModels,
     providers: musicProviders,
-    compositeIds: true,
+    compositeIds: false,
   });
 
-  // Platform AI (stays as dropdown — not a modality toggle)
   const [platformAiProvider, setPlatformAiProvider] = useState(initialConfig.platform.aiProvider);
   const [platformAiModel, setPlatformAiModel] = useState(initialConfig.platform.aiModel);
-  const platformAiModels = aiProviders.find(p => p.id === platformAiProvider)?.models ?? [];
+  const [motionProvider, setMotionProvider] = useState(initialConfig.motionProvider);
 
-  const handlePlatformAiProviderChange = (newProvider: string) => {
+  const platformAiModels = aiProviders.find((provider) => provider.id === platformAiProvider)?.models ?? [];
+
+  function handlePlatformAiProviderChange(newProvider: string) {
     setPlatformAiProvider(newProvider);
-    const provider = aiProviders.find(p => p.id === newProvider);
-    if (provider && provider.models.length > 0) {
-      setPlatformAiModel(provider.models[0].id);
-    }
-  };
+    const provider = aiProviders.find((item) => item.id === newProvider);
+    const firstModel = provider?.models[0];
+    if (firstModel) setPlatformAiModel(firstModel.id);
+  }
 
-  // Daily limits
-  const [dailyGenerationLimit, setDailyGenerationLimit] = useState(initialConfig.dailyGenerationLimit);
-  const [dailyGenerationLimitPro, setDailyGenerationLimitPro] = useState(initialConfig.dailyGenerationLimitPro);
-  const [dailyVideoLimit, setDailyVideoLimit] = useState(initialConfig.dailyVideoLimit);
-  const [dailyVideoLimitPro, setDailyVideoLimitPro] = useState(initialConfig.dailyVideoLimitPro);
-  const [dailyMusicLimit, setDailyMusicLimit] = useState(initialConfig.dailyMusicLimit);
-  const [dailyMusicLimitPro, setDailyMusicLimitPro] = useState(initialConfig.dailyMusicLimitPro);
-  const [dailyAvatarLimit, setDailyAvatarLimit] = useState(initialConfig.dailyAvatarLimit);
-  const [dailyAvatarLimitPro, setDailyAvatarLimitPro] = useState(initialConfig.dailyAvatarLimitPro);
-
-  // Motion provider (simple select — only 2 fixed options)
-  const [freeMotionProvider, setFreeMotionProvider] = useState(initialConfig.freeMotionProvider);
-  const [proMotionProvider, setProMotionProvider] = useState(initialConfig.proMotionProvider);
-
-  // Admin view mode
-  const [adminViewMode, setAdminViewMode] = useState<'ALL' | 'PRO'>(initialConfig.adminViewMode);
-
-  const setToArray = (s: Set<string>) => s.size > 0 ? [...s] : null;
-
-  const handleSave = async () => {
+  async function handleSave() {
     setSaving(true);
     setError(null);
     setSaved(false);
@@ -490,64 +327,31 @@ export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttPro
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          free: {
-            aiProvider: aiState.freeDefault.provider,
-            aiModel: aiState.freeDefault.model,
-            ttsProvider: ttsState.freeDefault.provider,
-            ttsModel: ttsState.freeDefault.model,
-            sttProvider: sttState.freeDefault.provider,
-            sttModel: sttState.freeDefault.model,
-          },
-          pro: {
-            aiProvider: aiState.proDefault.provider,
-            aiModel: aiState.proDefault.model,
-            ttsProvider: ttsState.proDefault.provider,
-            ttsModel: ttsState.proDefault.model,
-            sttProvider: sttState.proDefault.provider,
-            sttModel: sttState.proDefault.model,
+          model: {
+            aiProvider: aiState.defaultSelection.provider,
+            aiModel: aiState.defaultSelection.model,
+            ttsProvider: ttsState.defaultSelection.provider,
+            ttsModel: ttsState.defaultSelection.model,
+            sttProvider: sttState.defaultSelection.provider,
+            sttModel: sttState.defaultSelection.model,
           },
           platform: { aiProvider: platformAiProvider, aiModel: platformAiModel },
-          freeIncludedModels: setToArray(aiState.freeIncluded),
-          proIncludedModels: setToArray(aiState.proIncluded),
-          freeIncludedTtsModels: setToArray(ttsState.freeIncluded),
-          proIncludedTtsModels: setToArray(ttsState.proIncluded),
-          freeIncludedSttModels: setToArray(sttState.freeIncluded),
-          proIncludedSttModels: setToArray(sttState.proIncluded),
-          freeImageProvider: imageState.freeDefault.provider,
-          freeImageModel: imageState.freeDefault.model,
-          proImageProvider: imageState.proDefault.provider,
-          proImageModel: imageState.proDefault.model,
-          freeIncludedImageModels: setToArray(imageState.freeIncluded),
-          proIncludedImageModels: setToArray(imageState.proIncluded),
-          freeVideoProvider: videoState.freeDefault.provider,
-          freeVideoModel: videoState.freeDefault.model,
-          proVideoProvider: videoState.proDefault.provider,
-          proVideoModel: videoState.proDefault.model,
-          freeIncludedVideoModels: setToArray(videoState.freeIncluded),
-          proIncludedVideoModels: setToArray(videoState.proIncluded),
-          freeAvatarProvider: avatarState.freeDefault.provider,
-          freeAvatarModel: avatarState.freeDefault.model,
-          proAvatarProvider: avatarState.proDefault.provider,
-          proAvatarModel: avatarState.proDefault.model,
-          freeIncludedAvatarModels: setToArray(avatarState.freeIncluded),
-          proIncludedAvatarModels: setToArray(avatarState.proIncluded),
-          freeMusicProvider: musicState.freeDefault.provider,
-          freeMusicModel: musicState.freeDefault.model,
-          proMusicProvider: musicState.proDefault.provider,
-          proMusicModel: musicState.proDefault.model,
-          freeIncludedMusicModels: setToArray(musicState.freeIncluded),
-          proIncludedMusicModels: setToArray(musicState.proIncluded),
-          dailyGenerationLimit,
-          dailyGenerationLimitPro,
-          dailyVideoLimit,
-          dailyVideoLimitPro,
-          dailyMusicLimit,
-          dailyMusicLimitPro,
-          dailyAvatarLimit,
-          dailyAvatarLimitPro,
-          freeMotionProvider,
-          proMotionProvider,
-          adminViewMode,
+          includedModels: setToArray(aiState.included),
+          includedTtsModels: setToArray(ttsState.included),
+          includedSttModels: setToArray(sttState.included),
+          imageProvider: imageState.defaultSelection.provider,
+          imageModel: imageState.defaultSelection.model,
+          includedImageModels: setToArray(imageState.included),
+          videoProvider: videoState.defaultSelection.provider,
+          videoModel: videoState.defaultSelection.model,
+          includedVideoModels: setToArray(videoState.included),
+          avatarProvider: avatarState.defaultSelection.provider,
+          avatarModel: avatarState.defaultSelection.model,
+          includedAvatarModels: setToArray(avatarState.included),
+          musicProvider: musicState.defaultSelection.provider,
+          musicModel: musicState.defaultSelection.model,
+          includedMusicModels: setToArray(musicState.included),
+          motionProvider,
         }),
       });
 
@@ -563,98 +367,64 @@ export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttPro
     } finally {
       setSaving(false);
     }
-  };
+  }
 
   return (
     <div className={styles.form}>
-      <div className={styles.viewModeBar}>
-        <div className={styles.viewModeInfo}>
-          <span className={styles.viewModeLabel}>Admin Experience</span>
-          <span className={styles.viewModeHint}>
-            {adminViewMode === 'PRO'
-              ? 'You see the same models as PRO users when browsing the app.'
-              : 'You see all platform models when browsing the app.'}
-          </span>
-        </div>
-        <button
-          type="button"
-          className={`${styles.viewModeToggle} ${adminViewMode === 'PRO' ? styles.viewModeTogglePro : ''}`}
-          onClick={() => setAdminViewMode(prev => prev === 'ALL' ? 'PRO' : 'ALL')}
-        >
-          <span className={styles.viewModeBadge}>
-            {adminViewMode === 'PRO' ? 'PRO View' : 'All Models'}
-          </span>
-        </button>
-      </div>
-
       <UnifiedModelEditor
         title="AI Models"
-        description="Control which AI models appear in the picker for non-BYOK users. Click to enable/disable, right-click to set default (★)."
+        description="Choose the default AI model and the server-configured models available in the picker."
         state={aiState}
       />
 
       <UnifiedModelEditor
         title="TTS Models"
-        description="Control which TTS models are available to non-BYOK users."
+        description="Choose the default text-to-speech model and the server-configured models available for voice generation."
         state={ttsState}
       />
 
       <UnifiedModelEditor
         title="STT Models"
-        description="Control which STT models are available to non-BYOK users."
+        description="Choose the default transcription model and the server-configured models available for imports."
         state={sttState}
       />
 
       <UnifiedModelEditor
         title="Image Models"
-        description="Control which image models are available for video generation."
+        description="Choose the default image model and the server-configured models available for storyboards."
         state={imageState}
       />
 
       <UnifiedModelEditor
         title="Video Models"
-        description="Control which video models are available for text-to-video generation."
+        description="Choose the default video model and the server-configured models available for text-to-video generation."
         state={videoState}
       />
 
       <UnifiedModelEditor
         title="Avatar Models"
-        description="Control which avatar engines are available for lip-sync overlays."
+        description="Choose the default avatar engine and the server-configured models available for lip-sync overlays."
         state={avatarState}
       />
 
       <UnifiedModelEditor
         title="Music Models"
-        description="Control which music models are available for background music generation."
+        description="Choose the default music model and the server-configured models available for background music."
         state={musicState}
       />
 
       <fieldset className={styles.section}>
         <legend className={styles.sectionTitle}>Motion Graphics</legend>
         <p className={styles.platformDescription}>
-          Rendering engine for programmatic visual types (charts, quotes, timelines, etc.). Remotion renders React components server-side. Hera generates AI-animated motion graphics.
+          Rendering engine for programmatic visual types such as charts, quotes, and timelines.
         </p>
-
-        <div className={styles.dailyLimitsGrid}>
-          <span className={styles.dailyLimitsHeader} />
-          <span className={styles.dailyLimitsHeader}>Free</span>
-          <span className={styles.dailyLimitsHeader}>Pro</span>
-
-          <label className={styles.dailyLimitsLabel} htmlFor="freeMotionProvider">Provider</label>
+        <div className={styles.field}>
+          <label className={styles.label} htmlFor="motionProvider">Provider</label>
           <select
-            id="freeMotionProvider"
+            id="motionProvider"
             className={styles.select}
-            value={freeMotionProvider}
-            onChange={(e) => setFreeMotionProvider(e.target.value)}
-          >
-            <option value="remotion">Remotion (React)</option>
-            <option value="hera">Hera (AI Motion)</option>
-          </select>
-          <select
-            id="proMotionProvider"
-            className={styles.select}
-            value={proMotionProvider}
-            onChange={(e) => setProMotionProvider(e.target.value)}
+            value={motionProvider}
+            onChange={(event) => setMotionProvider(event.target.value)}
           >
             <option value="remotion">Remotion (React)</option>
             <option value="hera">Hera (AI Motion)</option>
@@ -665,7 +435,7 @@ export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttPro
       <fieldset className={styles.section}>
         <legend className={styles.sectionTitle}>Platform Operations</legend>
         <p className={styles.platformDescription}>
-          AI model for internal platform tasks: handle screening (name/offensive classification) and credential lookup (participant verification via web search).
+          AI model for internal platform tasks such as handle screening, credential lookup, and language detection.
         </p>
 
         <div className={styles.field}>
@@ -674,10 +444,10 @@ export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttPro
             id="platform-aiProvider"
             className={styles.select}
             value={platformAiProvider}
-            onChange={(e) => handlePlatformAiProviderChange(e.target.value)}
+            onChange={(event) => handlePlatformAiProviderChange(event.target.value)}
           >
-            {aiProviders.map((p) => (
-              <option key={p.id} value={p.id}>{p.displayName}</option>
+            {aiProviders.map((provider) => (
+              <option key={provider.id} value={provider.id}>{provider.displayName}</option>
             ))}
           </select>
         </div>
@@ -688,103 +458,16 @@ export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttPro
             id="platform-aiModel"
             className={styles.select}
             value={platformAiModel}
-            onChange={(e) => setPlatformAiModel(e.target.value)}
+            onChange={(event) => setPlatformAiModel(event.target.value)}
           >
-            {platformAiModels.map((m) => (
-              <option key={m.id} value={m.id}>{m.displayName} ({m.tier})</option>
+            {platformAiModels.map((model) => (
+              <option key={model.id} value={model.id}>{model.displayName} ({model.tier})</option>
             ))}
           </select>
         </div>
       </fieldset>
 
-      <fieldset className={styles.section}>
-        <legend className={styles.sectionTitle}>Daily Limits</legend>
-        <p className={styles.platformDescription}>
-          Maximum generations per user per day. 0 = unlimited.
-        </p>
-
-        <div className={styles.dailyLimitsGrid}>
-          <span className={styles.dailyLimitsHeader} />
-          <span className={styles.dailyLimitsHeader}>Free</span>
-          <span className={styles.dailyLimitsHeader}>Pro</span>
-
-          <label className={styles.dailyLimitsLabel} htmlFor="dailyGenerationLimit">Podcasts</label>
-          <input
-            id="dailyGenerationLimit"
-            type="number"
-            className={styles.select}
-            min={0}
-            value={dailyGenerationLimit}
-            onChange={(e) => setDailyGenerationLimit(parseInt(e.target.value, 10) || 0)}
-          />
-          <input
-            id="dailyGenerationLimitPro"
-            type="number"
-            className={styles.select}
-            min={0}
-            value={dailyGenerationLimitPro}
-            onChange={(e) => setDailyGenerationLimitPro(parseInt(e.target.value, 10) || 0)}
-          />
-
-          <label className={styles.dailyLimitsLabel} htmlFor="dailyVideoLimit">Videos</label>
-          <input
-            id="dailyVideoLimit"
-            type="number"
-            className={styles.select}
-            min={0}
-            value={dailyVideoLimit}
-            onChange={(e) => setDailyVideoLimit(parseInt(e.target.value, 10) || 0)}
-          />
-          <input
-            id="dailyVideoLimitPro"
-            type="number"
-            className={styles.select}
-            min={0}
-            value={dailyVideoLimitPro}
-            onChange={(e) => setDailyVideoLimitPro(parseInt(e.target.value, 10) || 0)}
-          />
-
-          <label className={styles.dailyLimitsLabel} htmlFor="dailyMusicLimit">Music</label>
-          <input
-            id="dailyMusicLimit"
-            type="number"
-            className={styles.select}
-            min={0}
-            value={dailyMusicLimit}
-            onChange={(e) => setDailyMusicLimit(parseInt(e.target.value, 10) || 0)}
-          />
-          <input
-            id="dailyMusicLimitPro"
-            type="number"
-            className={styles.select}
-            min={0}
-            value={dailyMusicLimitPro}
-            onChange={(e) => setDailyMusicLimitPro(parseInt(e.target.value, 10) || 0)}
-          />
-
-          <label className={styles.dailyLimitsLabel} htmlFor="dailyAvatarLimit">Avatars</label>
-          <input
-            id="dailyAvatarLimit"
-            type="number"
-            className={styles.select}
-            min={0}
-            value={dailyAvatarLimit}
-            onChange={(e) => setDailyAvatarLimit(parseInt(e.target.value, 10) || 0)}
-          />
-          <input
-            id="dailyAvatarLimitPro"
-            type="number"
-            className={styles.select}
-            min={0}
-            value={dailyAvatarLimitPro}
-            onChange={(e) => setDailyAvatarLimitPro(parseInt(e.target.value, 10) || 0)}
-          />
-        </div>
-      </fieldset>
-
-      {error && (
-        <div className={styles.error} role="alert">{error}</div>
-      )}
+      {error && <div className={styles.error} role="alert">{error}</div>}
 
       <button
         type="button"

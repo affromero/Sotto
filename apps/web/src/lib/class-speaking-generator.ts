@@ -134,7 +134,7 @@ export async function composeSpeakingPrompts(
     } else {
       try {
         const config = await getAutoModelConfig();
-        requestedTtsProvider = config.free.ttsProvider;
+        requestedTtsProvider = config.model.ttsProvider;
       } catch {
         requestedTtsProvider = null;
       }

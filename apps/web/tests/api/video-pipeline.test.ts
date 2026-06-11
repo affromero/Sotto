@@ -183,9 +183,9 @@ describe('POST /api/podcasts/[id]/video/pipeline', () => {
     vi.clearAllMocks();
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockRequireAdmin.mockResolvedValue(null);
-    mockCheckVideoGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', dailyUsed: 0, dailyLimit: 1, dailyRemaining: 1, isByokUser: false, isProUser: false });
+    mockCheckVideoGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok' });
     mockFindUnique.mockResolvedValue(mockPodcast);
-    mockUserFindUniqueOrThrow.mockResolvedValue({ plan: 'FREE', preferredAiModel: null });
+    mockUserFindUniqueOrThrow.mockResolvedValue({ preferredAiModel: null });
     mockUserAiKeyFindMany.mockResolvedValue([]);
     mockGetAiKey.mockImplementation(async (_userId: string, provider?: string) => {
       if (provider === 'openai') return { apiKey: 'openai-key', provider: 'openai' };
@@ -231,14 +231,12 @@ describe('POST /api/podcasts/[id]/video/pipeline', () => {
         aiProvider: 'anthropic',
         aiModel: 'claude-haiku-4-5-20251001',
         apiKeyOverride: 'anthropic-key',
-        tier: 'FREE',
       }),
     );
     expect(mockGetAiKey).toHaveBeenCalledWith('user-1');
     expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
       podcastAiModel: null,
       aiKey: { apiKey: 'anthropic-key', provider: 'anthropic' },
-      plan: 'FREE',
     });
   });
 
@@ -265,17 +263,9 @@ describe('POST /api/podcasts/[id]/video/pipeline', () => {
   });
 
   it('returns 403 when no image provider', async () => {
-    mockCheckVideoGenerationGate.mockResolvedValue({ allowed: false, reason: 'no_image_provider', dailyUsed: 0, dailyLimit: 1, dailyRemaining: 1, isByokUser: false, isProUser: false });
+    mockCheckVideoGenerationGate.mockResolvedValue({ allowed: false, reason: 'no_image_provider' });
     const res = await POST(createRequest('POST'), routeParams);
     expect(res.status).toBe(403);
-  });
-
-  it('returns 429 when daily video limit reached', async () => {
-    mockCheckVideoGenerationGate.mockResolvedValue({ allowed: false, reason: 'daily_limit_reached', dailyUsed: 1, dailyLimit: 1, dailyRemaining: 0, resetInSeconds: 7200, isByokUser: false, isProUser: false });
-    const res = await POST(createRequest('POST'), routeParams);
-    expect(res.status).toBe(429);
-    const body = await res.json();
-    expect(body.code).toBe('daily_limit_reached');
   });
 
   it('passes aiProvider/aiModel override to job payload', async () => {
@@ -316,13 +306,12 @@ describe('POST /api/podcasts/[id]/video/pipeline', () => {
   });
 
   it('uses the selected user model and requires the matching provider key', async () => {
-    mockUserFindUniqueOrThrow.mockResolvedValue({ plan: 'FREE', preferredAiModel: 'gpt-5-nano' });
+    mockUserFindUniqueOrThrow.mockResolvedValue({ preferredAiModel: 'gpt-5-nano' });
     const res = await POST(createRequest('POST'), routeParams);
     expect(res.status).toBe(200);
     expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
       podcastAiModel: 'gpt-5-nano',
       aiKey: null,
-      plan: 'FREE',
     });
     expect(mockGetAiKey).toHaveBeenCalledWith('user-1', 'openai');
     expect(mockAddJob).toHaveBeenCalledWith(

@@ -87,14 +87,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   if (!isAdmin) {
     const gate = await checkVideoGenerationGate(auth.userId);
     if (!gate.allowed) {
-      const message = gate.reason === 'daily_limit_reached'
-        ? 'Daily video generation limit reached. Try again later.'
-        : 'No image provider available. Add a fal or MiniMax API key in Settings.';
-      return errorResponse(message, gate.reason === 'daily_limit_reached' ? 429 : 403, {
+      return errorResponse('No image provider available. Add a fal or MiniMax API key in Settings.', 403, {
         code: gate.reason,
-        dailyUsed: gate.dailyUsed,
-        dailyLimit: gate.dailyLimit,
-        resetInSeconds: gate.resetInSeconds,
       });
     }
   }
@@ -123,12 +117,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   // Parse optional body for AI provider override
   const body = pipelineBodySchema.parse(await request.json().catch(() => undefined));
 
-  // Resolve user plan for model defaults
+  // Resolve user model defaults
   const user = await prisma.user.findUniqueOrThrow({
     where: { id: auth.userId },
-    select: { plan: true, preferredAiModel: true },
+    select: { preferredAiModel: true },
   });
-  const tier = user.plan as 'FREE' | 'PRO';
 
   // Resolve AI provider (fast, needs request-scoped auth context)
   let aiModel: string;
@@ -173,7 +166,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       const resolved = await resolveAiModelAndProvider({
         podcastAiModel: user.preferredAiModel,
         aiKey: null,
-        plan: tier,
       });
       aiModel = resolved.model;
       aiProvider = resolved.provider;
@@ -191,7 +183,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const resolved = await resolveAiModelAndProvider({
       podcastAiModel: null,
       aiKey,
-      plan: tier,
     });
     aiModel = resolved.model;
     aiProvider = resolved.provider;
@@ -218,7 +209,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     aiProvider,
     aiModel,
     apiKeyOverride,
-    tier,
     voiceTrackId: body?.voiceTrackId,
   });
 

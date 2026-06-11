@@ -22,8 +22,6 @@ const RESERVED_HANDLES = new Set([
   'create',
   'settings',
   'dashboard',
-  'billing',
-  'pricing',
   'auth',
   'login',
   'signup',

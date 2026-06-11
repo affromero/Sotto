@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { hasByokKey } from '@/lib/byok';
 import { getTierFeatures } from '@/lib/tier-features';
 
 import { errorResponse } from '@/lib/api-response';
@@ -29,21 +28,10 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     return errorResponse('Forbidden', 403);
   }
 
-  // Gate: Pro or BYOK only
-  const [user, hasTts] = await Promise.all([
-    prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { plan: true, role: true } }),
-    hasByokKey(userId),
-  ]);
+  const features = getTierFeatures();
 
-  const isPrivileged = user.role === 'ADMIN' || user.role === 'SYSTEM';
-  const features = getTierFeatures(user.plan as 'FREE' | 'PRO', hasTts, user.role);
-
-  if (!features.analyticsEnabled && !isPrivileged) {
-    return errorResponse(
-      'Analytics are a Pro feature. Upgrade to Pro to access creator analytics.',
-      403,
-      { code: 'pro_required' }
-    );
+  if (!features.analyticsEnabled) {
+    return errorResponse('Analytics are unavailable.', 403, { code: 'analytics_unavailable' });
   }
 
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);

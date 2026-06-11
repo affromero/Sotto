@@ -41,15 +41,6 @@ tags: [settings]
     timeout: 3000
 - back
 
-# Navigate to Billing and back
-- tapOn:
-    id: "settings-billing"
-- extendedWaitUntil:
-    visible:
-      id: "billing-plan-card"
-    timeout: 3000
-- back
-
 # Navigate to Referral and back
 - tapOn:
     id: "settings-referral"

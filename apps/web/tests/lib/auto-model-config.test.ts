@@ -1,6 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-
-// ---- Mocks ----
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockAutoModelConfigFindUnique = vi.fn();
 const mockAutoModelConfigCreate = vi.fn();
@@ -8,7 +6,7 @@ const mockAutoModelConfigUpdate = vi.fn();
 const mockAutoModelConfigUpsert = vi.fn();
 
 vi.mock('@/lib/prisma', () => {
-  const _mockPrisma = {
+  const mockPrisma = {
     autoModelConfig: {
       findUnique: (...args: unknown[]) => mockAutoModelConfigFindUnique(...args),
       create: (...args: unknown[]) => mockAutoModelConfigCreate(...args),
@@ -16,13 +14,29 @@ vi.mock('@/lib/prisma', () => {
       upsert: (...args: unknown[]) => mockAutoModelConfigUpsert(...args),
     },
   };
-  return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
+  return { prisma: mockPrisma, prismaUnfiltered: mockPrisma };
 });
 
 vi.mock('@/lib/providers/ai-registry', () => ({
   getAiProviderMeta: (id: string) => {
-    if (id === 'anthropic') return { defaultModel: 'claude-haiku-4-5-20251001', models: [{ id: 'claude-haiku-4-5-20251001', tier: 'fast' }, { id: 'claude-sonnet-4-6', tier: 'balanced' }] };
-    if (id === 'openai') return { defaultModel: 'gpt-5', models: [{ id: 'gpt-5-mini', tier: 'fast' }, { id: 'gpt-5', tier: 'balanced' }] };
+    if (id === 'anthropic') {
+      return {
+        defaultModel: 'claude-sonnet-4-6',
+        models: [
+          { id: 'claude-haiku-4-5-20251001', tier: 'fast' },
+          { id: 'claude-sonnet-4-6', tier: 'balanced' },
+        ],
+      };
+    }
+    if (id === 'openai') {
+      return {
+        defaultModel: 'gpt-5',
+        models: [
+          { id: 'gpt-5-mini', tier: 'fast' },
+          { id: 'gpt-5', tier: 'balanced' },
+        ],
+      };
+    }
     return { defaultModel: '', models: [] };
   },
   getProviderForModel: (id: string) => {
@@ -47,224 +61,138 @@ vi.mock('@/lib/providers/stt-registry', () => ({
   },
 }));
 
+vi.mock('@/lib/providers/avatar-registry', () => ({
+  getAvatarProviderMeta: (id: string) => {
+    if (id === 'heygen') return { defaultModel: 'heygen-avatar-standard' };
+    if (id === 'runway') return { defaultModel: 'runway-characters' };
+    return { defaultModel: '' };
+  },
+  getAvatarModelProvider: (id: string) => {
+    if (id.startsWith('heygen')) return 'heygen';
+    if (id.startsWith('runway')) return 'runway';
+    return null;
+  },
+}));
+
 vi.mock('@/lib/logger', () => ({
   logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
 
-// ---- Import under test ----
+import {
+  getAutoModelConfig,
+  resolveIncludedImageModels,
+  resolveIncludedModels,
+  resolveIncludedVideoModels,
+  resolveSttIncludedModels,
+  resolveTtsIncludedModels,
+  setAutoModelConfig,
+  type AutoModelConfigData,
+} from '@/lib/auto-model-config';
 
-import { getAutoModelConfig, setAutoModelConfig, resolveIncludedModels, resolveTtsIncludedModels, resolveSttIncludedModels, resolveIncludedImageModels, resolveIncludedVideoModels } from '@/lib/auto-model-config';
-
-// ---- Default row ----
-
-const defaultRow = {
+const row = {
   id: 'singleton',
-  freeAiProvider: 'anthropic',
-  freeAiModel: 'claude-haiku-4-5-20251001',
-  freeTtsProvider: 'openai',
-  freeTtsModel: 'tts-1-hd',
-  freeSttProvider: 'openai',
-  freeSttModel: 'whisper-1',
-  proAiProvider: 'anthropic',
-  proAiModel: 'claude-haiku-4-5-20251001',
-  proTtsProvider: 'elevenlabs',
-  proTtsModel: 'eleven_v3',
-  proSttProvider: 'openai',
-  proSttModel: 'whisper-1',
+  aiProvider: 'anthropic',
+  aiModel: 'claude-sonnet-4-6',
+  ttsProvider: 'openai',
+  ttsModel: 'tts-1-hd',
+  sttProvider: 'openai',
+  sttModel: 'whisper-1',
   platformAiProvider: 'anthropic',
-  platformAiModel: 'claude-haiku-4-5-20251001',
-  freeIncludedModels: null,
-  proIncludedModels: null,
-  freeIncludedTtsModels: null,
-  proIncludedTtsModels: null,
-  freeIncludedSttModels: null,
-  proIncludedSttModels: null,
-  freeImageProvider: 'fal',
-  freeImageModel: 'fal-flux-1-schnell',
-  proImageProvider: 'fal',
-  proImageModel: 'fal-flux-1-schnell',
-  freeIncludedImageModels: null,
-  proIncludedImageModels: null,
-  freeVideoProvider: 'fal',
-  freeVideoModel: 'fal-wan2.5-480p',
-  proVideoProvider: 'fal',
-  proVideoModel: 'fal-wan2.5-480p',
-  freeIncludedVideoModels: null,
-  proIncludedVideoModels: null,
-  freeAvatarProvider: 'heygen',
-  freeAvatarModel: 'heygen-avatar-standard',
-  proAvatarProvider: 'heygen',
-  proAvatarModel: 'heygen-avatar-standard',
-  freeIncludedAvatarModels: null,
-  proIncludedAvatarModels: null,
-  freeMusicProvider: 'suno',
-  freeMusicModel: 'suno-v5',
-  proMusicProvider: 'suno',
-  proMusicModel: 'suno-v5',
-  freeIncludedMusicModels: null,
-  proIncludedMusicModels: null,
-  freeMotionProvider: 'remotion',
-  proMotionProvider: 'remotion',
-  dailyGenerationLimit: 1,
-  dailyGenerationLimitPro: 5,
-  dailyVideoLimit: 1,
-  dailyVideoLimitPro: 2,
-  dailyMusicLimit: 1,
-  dailyMusicLimitPro: 3,
-  dailyAvatarLimit: 1,
-  dailyAvatarLimitPro: 1,
-  aiAllocations: [],
-  ttsAllocations: [],
-  adminViewMode: 'ALL',
+  platformAiModel: 'claude-sonnet-4-6',
+  includedModels: null,
+  includedTtsModels: null,
+  includedSttModels: null,
+  imageProvider: 'fal',
+  imageModel: 'fal-flux-1-schnell',
+  includedImageModels: null,
+  videoProvider: 'fal',
+  videoModel: 'fal-wan2.5-480p',
+  includedVideoModels: null,
+  avatarProvider: 'heygen',
+  avatarModel: 'heygen-avatar-standard',
+  includedAvatarModels: null,
+  musicProvider: 'suno',
+  musicModel: 'suno-v5',
+  includedMusicModels: null,
+  motionProvider: 'remotion',
   updatedAt: new Date(),
   updatedBy: null,
 };
 
-// ---- Tests ----
+const config: AutoModelConfigData = {
+  model: {
+    aiProvider: 'anthropic',
+    aiModel: 'claude-sonnet-4-6',
+    ttsProvider: 'openai',
+    ttsModel: 'tts-1-hd',
+    sttProvider: 'openai',
+    sttModel: 'whisper-1',
+  },
+  platform: {
+    aiProvider: 'anthropic',
+    aiModel: 'claude-sonnet-4-6',
+  },
+  includedModels: null,
+  includedTtsModels: null,
+  includedSttModels: null,
+  imageProvider: 'fal',
+  imageModel: 'fal-flux-1-schnell',
+  includedImageModels: null,
+  videoProvider: 'fal',
+  videoModel: 'fal-wan2.5-480p',
+  includedVideoModels: null,
+  avatarProvider: 'heygen',
+  avatarModel: 'heygen-avatar-standard',
+  includedAvatarModels: null,
+  musicProvider: 'suno',
+  musicModel: 'suno-v5',
+  includedMusicModels: null,
+  motionProvider: 'remotion',
+};
 
 describe('getAutoModelConfig', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('returns correct structure with free, pro, and included model fields', async () => {
-    mockAutoModelConfigFindUnique.mockResolvedValue(defaultRow);
+  it('returns the unified config shape', async () => {
+    mockAutoModelConfigFindUnique.mockResolvedValue(row);
 
-    const result = await getAutoModelConfig();
-
-    expect(result).toEqual({
-      free: {
-        aiProvider: 'anthropic',
-        aiModel: 'claude-haiku-4-5-20251001',
-        ttsProvider: 'openai',
-        ttsModel: 'tts-1-hd',
-        sttProvider: 'openai',
-        sttModel: 'whisper-1',
-      },
-      pro: {
-        aiProvider: 'anthropic',
-        aiModel: 'claude-haiku-4-5-20251001',
-        ttsProvider: 'elevenlabs',
-        ttsModel: 'eleven_v3',
-        sttProvider: 'openai',
-        sttModel: 'whisper-1',
-      },
-      platform: {
-        aiProvider: 'anthropic',
-        aiModel: 'claude-haiku-4-5-20251001',
-      },
-      freeImageProvider: 'fal',
-      freeImageModel: 'fal-flux-1-schnell',
-      proImageProvider: 'fal',
-      proImageModel: 'fal-flux-1-schnell',
-      freeIncludedImageModels: null,
-      proIncludedImageModels: null,
-      freeVideoProvider: 'fal',
-      freeVideoModel: 'fal-wan2.5-480p',
-      proVideoProvider: 'fal',
-      proVideoModel: 'fal-wan2.5-480p',
-      freeIncludedVideoModels: null,
-      proIncludedVideoModels: null,
-      freeAvatarProvider: 'heygen',
-      freeAvatarModel: 'heygen-avatar-standard',
-      proAvatarProvider: 'heygen',
-      proAvatarModel: 'heygen-avatar-standard',
-      freeIncludedAvatarModels: null,
-      proIncludedAvatarModels: null,
-      freeMusicProvider: 'suno',
-      freeMusicModel: 'suno-v5',
-      proMusicProvider: 'suno',
-      proMusicModel: 'suno-v5',
-      freeIncludedMusicModels: null,
-      proIncludedMusicModels: null,
-      freeMotionProvider: 'remotion',
-      proMotionProvider: 'remotion',
-      dailyGenerationLimit: 1,
-      dailyGenerationLimitPro: 5,
-      dailyVideoLimit: 1,
-      dailyVideoLimitPro: 2,
-      dailyMusicLimit: 1,
-      dailyMusicLimitPro: 3,
-      dailyAvatarLimit: 1,
-      dailyAvatarLimitPro: 1,
-      aiAllocations: [],
-      ttsAllocations: [],
-      adminViewMode: 'ALL',
-      freeIncludedModels: null,
-      proIncludedModels: null,
-      freeIncludedTtsModels: null,
-      proIncludedTtsModels: null,
-      freeIncludedSttModels: null,
-      proIncludedSttModels: null,
-    });
+    await expect(getAutoModelConfig()).resolves.toEqual(config);
   });
 
-  it('parses JSON included model arrays from database', async () => {
+  it('parses included model arrays from database rows', async () => {
     mockAutoModelConfigFindUnique.mockResolvedValue({
-      ...defaultRow,
-      freeIncludedModels: ['model-a'],
-      proIncludedModels: ['model-a', 'model-b'],
-      freeIncludedTtsModels: ['elevenlabs:eleven_v3'],
-      proIncludedTtsModels: ['elevenlabs:eleven_v3', 'openai:tts-1-hd'],
-      freeIncludedSttModels: ['openai:whisper-1'],
-      proIncludedSttModels: ['openai:whisper-1'],
+      ...row,
+      includedModels: ['claude-sonnet-4-6', 'gpt-5'],
+      includedTtsModels: ['openai:tts-1-hd'],
+      includedSttModels: ['openai:whisper-1'],
+      includedImageModels: ['fal-flux-1-schnell'],
+      includedVideoModels: ['fal-wan2.5-480p'],
     });
 
     const result = await getAutoModelConfig();
 
-    expect(result.freeIncludedModels).toEqual(['model-a']);
-    expect(result.proIncludedModels).toEqual(['model-a', 'model-b']);
-    expect(result.freeIncludedTtsModels).toEqual(['elevenlabs:eleven_v3']);
-    expect(result.proIncludedTtsModels).toEqual(['elevenlabs:eleven_v3', 'openai:tts-1-hd']);
-    expect(result.freeIncludedSttModels).toEqual(['openai:whisper-1']);
-    expect(result.proIncludedSttModels).toEqual(['openai:whisper-1']);
+    expect(result.includedModels).toEqual(['claude-sonnet-4-6', 'gpt-5']);
+    expect(result.includedTtsModels).toEqual(['openai:tts-1-hd']);
+    expect(result.includedSttModels).toEqual(['openai:whisper-1']);
+    expect(result.includedImageModels).toEqual(['fal-flux-1-schnell']);
+    expect(result.includedVideoModels).toEqual(['fal-wan2.5-480p']);
   });
 
-  it('falls back to null for malformed JSON in included models', async () => {
-    mockAutoModelConfigFindUnique.mockResolvedValue({
-      ...defaultRow,
-      freeIncludedModels: 'not-an-array',
-      proIncludedModels: 123,
-      freeIncludedTtsModels: 'bad',
-      proIncludedTtsModels: 42,
-      freeIncludedSttModels: {},
-      proIncludedSttModels: true,
-    });
-
-    const result = await getAutoModelConfig();
-
-    expect(result.freeIncludedModels).toBeNull();
-    expect(result.proIncludedModels).toBeNull();
-    expect(result.freeIncludedTtsModels).toBeNull();
-    expect(result.proIncludedTtsModels).toBeNull();
-    expect(result.freeIncludedSttModels).toBeNull();
-    expect(result.proIncludedSttModels).toBeNull();
-  });
-
-  it('calls findUnique with singleton id and skips create when row exists', async () => {
-    mockAutoModelConfigFindUnique.mockResolvedValue(defaultRow);
-
-    await getAutoModelConfig();
-
-    expect(mockAutoModelConfigFindUnique).toHaveBeenCalledWith({
-      where: { id: 'singleton' },
-    });
-    expect(mockAutoModelConfigCreate).not.toHaveBeenCalled();
-  });
-
-  it('creates the singleton row when findUnique returns null', async () => {
+  it('creates the singleton with unified seed fields when missing', async () => {
     mockAutoModelConfigFindUnique.mockResolvedValueOnce(null);
-    mockAutoModelConfigCreate.mockResolvedValueOnce(defaultRow);
+    mockAutoModelConfigCreate.mockResolvedValueOnce(row);
 
     await getAutoModelConfig();
 
     expect(mockAutoModelConfigCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({
         id: 'singleton',
-        freeAiProvider: 'anthropic',
-        freeAiModel: 'claude-haiku-4-5-20251001',
-        platformAiProvider: 'anthropic',
-        platformAiModel: 'claude-haiku-4-5-20251001',
+        aiProvider: 'anthropic',
+        aiModel: 'claude-sonnet-4-6',
+        ttsProvider: 'openai',
+        ttsModel: 'tts-1-hd',
       }),
     });
   });
@@ -273,546 +201,77 @@ describe('getAutoModelConfig', () => {
 describe('setAutoModelConfig', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockAutoModelConfigFindUnique.mockResolvedValue(defaultRow);
-    mockAutoModelConfigUpsert.mockResolvedValue(defaultRow);
+    mockAutoModelConfigUpsert.mockResolvedValue(row);
   });
 
-  it('partial free update writes only provided fields', async () => {
-    await setAutoModelConfig({ free: { aiProvider: 'openai', aiModel: 'gpt-4o-mini' } }, 'admin-1');
-
-    expect(mockAutoModelConfigUpsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        update: expect.objectContaining({
-          updatedBy: 'admin-1',
-          freeAiProvider: 'openai',
-          freeAiModel: 'gpt-4o-mini',
-        }),
-      })
-    );
-    // Fields not provided are not included
-    const call = mockAutoModelConfigUpsert.mock.calls[0][0];
-    expect(call.update).not.toHaveProperty('freeTtsProvider');
-  });
-
-  it('partial pro update writes only provided fields', async () => {
-    await setAutoModelConfig({ pro: { ttsProvider: 'cartesia', ttsModel: 'sonic-2' } }, 'admin-2');
-
-    expect(mockAutoModelConfigUpsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        update: expect.objectContaining({
-          updatedBy: 'admin-2',
-          proTtsProvider: 'cartesia',
-          proTtsModel: 'sonic-2',
-        }),
-      })
-    );
-    const call = mockAutoModelConfigUpsert.mock.calls[0][0];
-    expect(call.update).not.toHaveProperty('proAiProvider');
-  });
-
-  it('can update both free and pro in one call', async () => {
+  it('maps default model updates to unified database fields', async () => {
     await setAutoModelConfig(
       {
-        free: { aiProvider: 'anthropic', aiModel: 'claude-haiku-4-5-20251001' },
-        pro: { aiProvider: 'anthropic', aiModel: 'claude-haiku-4-5-20251001' },
+        model: { aiProvider: 'openai', aiModel: 'gpt-5', ttsProvider: 'elevenlabs' },
+        includedModels: ['gpt-5'],
       },
-      'admin-3'
+      'admin-1',
     );
 
     const call = mockAutoModelConfigUpsert.mock.calls[0][0];
     expect(call.update).toMatchObject({
-      updatedBy: 'admin-3',
-      freeAiProvider: 'anthropic',
-      freeAiModel: 'claude-haiku-4-5-20251001',
-      proAiProvider: 'anthropic',
-      proAiModel: 'claude-haiku-4-5-20251001',
+      updatedBy: 'admin-1',
+      aiProvider: 'openai',
+      aiModel: 'gpt-5',
+      ttsProvider: 'elevenlabs',
+      includedModels: ['gpt-5'],
     });
   });
 
-  it('persists freeIncludedModels and proIncludedModels when provided', async () => {
-    await setAutoModelConfig(
-      { freeIncludedModels: ['model-a'], proIncludedModels: ['model-a', 'model-b'] },
-      'admin-1'
-    );
-
-    const call = mockAutoModelConfigUpsert.mock.calls[0][0];
-    expect(call.update.freeIncludedModels).toEqual(['model-a']);
-    expect(call.update.proIncludedModels).toEqual(['model-a', 'model-b']);
-  });
-
-  it('persists TTS and STT included models when provided', async () => {
+  it('persists category defaults and included lists', async () => {
     await setAutoModelConfig(
       {
-        freeIncludedTtsModels: ['elevenlabs:eleven_v3'],
-        proIncludedTtsModels: ['elevenlabs:eleven_v3', 'openai:tts-1-hd'],
-        freeIncludedSttModels: ['openai:whisper-1'],
-        proIncludedSttModels: ['openai:whisper-1'],
+        imageProvider: 'fal',
+        imageModel: 'fal-flux-2-pro',
+        includedImageModels: ['fal-flux-2-pro'],
+        videoProvider: 'fal',
+        videoModel: 'fal-kling3-1080p',
+        includedVideoModels: ['fal-kling3-1080p'],
+        motionProvider: 'hera',
       },
-      'admin-1'
+      'admin-2',
     );
 
     const call = mockAutoModelConfigUpsert.mock.calls[0][0];
-    expect(call.update.freeIncludedTtsModels).toEqual(['elevenlabs:eleven_v3']);
-    expect(call.update.proIncludedTtsModels).toEqual(['elevenlabs:eleven_v3', 'openai:tts-1-hd']);
-    expect(call.update.freeIncludedSttModels).toEqual(['openai:whisper-1']);
-    expect(call.update.proIncludedSttModels).toEqual(['openai:whisper-1']);
-  });
-
-  it('persists null to clear included model overrides', async () => {
-    await setAutoModelConfig(
-      { freeIncludedModels: null, proIncludedModels: null },
-      'admin-1'
-    );
-
-    const call = mockAutoModelConfigUpsert.mock.calls[0][0];
-    expect(call.update.freeIncludedModels).toBeNull();
-    expect(call.update.proIncludedModels).toBeNull();
-  });
-
-  it('persists null to clear TTS and STT included model overrides', async () => {
-    await setAutoModelConfig(
-      {
-        freeIncludedTtsModels: null,
-        proIncludedTtsModels: null,
-        freeIncludedSttModels: null,
-        proIncludedSttModels: null,
-      },
-      'admin-1'
-    );
-
-    const call = mockAutoModelConfigUpsert.mock.calls[0][0];
-    expect(call.update.freeIncludedTtsModels).toBeNull();
-    expect(call.update.proIncludedTtsModels).toBeNull();
-    expect(call.update.freeIncludedSttModels).toBeNull();
-    expect(call.update.proIncludedSttModels).toBeNull();
-  });
-
-  it('does not include included model fields when not provided', async () => {
-    await setAutoModelConfig({ free: { aiModel: 'gpt-4o-mini' } }, 'admin-1');
-
-    const call = mockAutoModelConfigUpsert.mock.calls[0][0];
-    expect(call.update).not.toHaveProperty('freeIncludedModels');
-    expect(call.update).not.toHaveProperty('proIncludedModels');
-    expect(call.update).not.toHaveProperty('freeIncludedTtsModels');
-    expect(call.update).not.toHaveProperty('proIncludedTtsModels');
-    expect(call.update).not.toHaveProperty('freeIncludedSttModels');
-    expect(call.update).not.toHaveProperty('proIncludedSttModels');
-  });
-
-  it('uses singleton id for upsert', async () => {
-    await setAutoModelConfig({ free: { aiModel: 'gpt-4o-mini' } }, 'admin-1');
-
-    expect(mockAutoModelConfigUpsert).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: 'singleton' } })
-    );
+    expect(call.update).toMatchObject({
+      imageProvider: 'fal',
+      imageModel: 'fal-flux-2-pro',
+      includedImageModels: ['fal-flux-2-pro'],
+      videoProvider: 'fal',
+      videoModel: 'fal-kling3-1080p',
+      includedVideoModels: ['fal-kling3-1080p'],
+      motionProvider: 'hera',
+    });
   });
 });
 
-describe('resolveIncludedModels', () => {
-  const baseConfig: Parameters<typeof resolveIncludedModels>[0] = {
-    free: {
-      aiProvider: 'anthropic' as const,
-      aiModel: 'claude-haiku-4-5-20251001',
-      ttsProvider: 'openai' as const,
-      ttsModel: 'tts-1-hd',
-      sttProvider: 'openai' as const,
-      sttModel: 'whisper-1',
-    },
-    pro: {
-      aiProvider: 'anthropic' as const,
-      aiModel: 'claude-haiku-4-5-20251001',
-      ttsProvider: 'elevenlabs' as const,
-      ttsModel: 'eleven_v3',
-      sttProvider: 'openai' as const,
-      sttModel: 'whisper-1',
-    },
-    platform: { aiProvider: 'anthropic' as const, aiModel: 'claude-haiku-4-5-20251001' },
-    freeIncludedModels: null,
-    proIncludedModels: null,
-    freeIncludedTtsModels: null,
-    proIncludedTtsModels: null,
-    freeIncludedSttModels: null,
-    proIncludedSttModels: null,
-    freeImageProvider: 'fal',
-    freeImageModel: 'fal-flux-1-schnell',
-    proImageProvider: 'fal',
-    proImageModel: 'fal-flux-1-schnell',
-    freeIncludedImageModels: null,
-    proIncludedImageModels: null,
-    freeVideoProvider: 'fal',
-    freeVideoModel: 'fal-wan2.5-480p',
-    proVideoProvider: 'fal',
-    proVideoModel: 'fal-wan2.5-480p',
-    freeIncludedVideoModels: null,
-    proIncludedVideoModels: null,
-    freeAvatarProvider: 'heygen',
-    freeAvatarModel: 'heygen-avatar-standard',
-    proAvatarProvider: 'heygen',
-    proAvatarModel: 'heygen-avatar-standard',
-    freeIncludedAvatarModels: null,
-    proIncludedAvatarModels: null,
-    freeMusicProvider: 'suno',
-    freeMusicModel: 'suno-v5',
-    proMusicProvider: 'suno',
-    proMusicModel: 'suno-v5',
-    freeIncludedMusicModels: null,
-    proIncludedMusicModels: null,
-    freeMotionProvider: 'remotion',
-    proMotionProvider: 'remotion',
-    dailyGenerationLimit: 1,
-    dailyGenerationLimitPro: 5,
-    dailyVideoLimit: 1,
-    dailyVideoLimitPro: 2,
-    dailyMusicLimit: 1,
-    dailyMusicLimitPro: 3,
-    dailyAvatarLimit: 1,
-    dailyAvatarLimitPro: 1,
-    aiAllocations: [],
-    ttsAllocations: [],
-    adminViewMode: 'ALL' as const,
-  };
-
-  it('derives from auto defaults when lists are null', () => {
-    const result = resolveIncludedModels(baseConfig);
-
-    expect(result.freeModels).toEqual(['claude-haiku-4-5-20251001']);
-    expect(result.proModels).toContain('claude-haiku-4-5-20251001');
+describe('included model resolvers', () => {
+  it('derive from unified defaults when lists are null', () => {
+    expect(resolveIncludedModels(config)).toEqual(['claude-sonnet-4-6']);
+    expect(resolveTtsIncludedModels(config)).toEqual(['openai:tts-1-hd']);
+    expect(resolveSttIncludedModels(config)).toEqual(['openai:whisper-1']);
+    expect(resolveIncludedImageModels(config)).toEqual(['fal-flux-1-schnell']);
+    expect(resolveIncludedVideoModels(config)).toEqual(['fal-wan2.5-480p']);
   });
 
-  it('returns explicit lists when set', () => {
-    const result = resolveIncludedModels({
-      ...baseConfig,
-      freeIncludedModels: ['model-a', 'model-b'],
-      proIncludedModels: ['model-a', 'model-b', 'model-c'],
-    });
-
-    expect(result.freeModels).toEqual(['model-a', 'model-b']);
-    expect(result.proModels).toContain('model-a');
-    expect(result.proModels).toContain('model-b');
-    expect(result.proModels).toContain('model-c');
-  });
-
-  it('always includes free models in pro output', () => {
-    const result = resolveIncludedModels({
-      ...baseConfig,
-      freeIncludedModels: ['free-only-model'],
-      proIncludedModels: ['pro-model'],
-    });
-
-    expect(result.proModels).toContain('free-only-model');
-    expect(result.proModels).toContain('pro-model');
-  });
-
-  it('deduplicates when free model is already in pro list', () => {
-    const result = resolveIncludedModels({
-      ...baseConfig,
-      freeIncludedModels: ['shared-model'],
-      proIncludedModels: ['shared-model', 'pro-model'],
-    });
-
-    const sharedCount = result.proModels.filter((m) => m === 'shared-model').length;
-    expect(sharedCount).toBe(1);
-  });
-});
-
-describe('resolveTtsIncludedModels', () => {
-  const baseConfig: Parameters<typeof resolveTtsIncludedModels>[0] = {
-    free: {
-      aiProvider: 'anthropic' as const,
-      aiModel: 'claude-haiku-4-5-20251001',
-      ttsProvider: 'openai' as const,
-      ttsModel: 'tts-1-hd',
-      sttProvider: 'openai' as const,
-      sttModel: 'whisper-1',
-    },
-    pro: {
-      aiProvider: 'anthropic' as const,
-      aiModel: 'claude-haiku-4-5-20251001',
-      ttsProvider: 'elevenlabs' as const,
-      ttsModel: 'eleven_v3',
-      sttProvider: 'openai' as const,
-      sttModel: 'whisper-1',
-    },
-    platform: { aiProvider: 'anthropic' as const, aiModel: 'claude-haiku-4-5-20251001' },
-    freeIncludedModels: null,
-    proIncludedModels: null,
-    freeIncludedTtsModels: null,
-    proIncludedTtsModels: null,
-    freeIncludedSttModels: null,
-    proIncludedSttModels: null,
-    freeImageProvider: 'fal',
-    freeImageModel: 'fal-flux-1-schnell',
-    proImageProvider: 'fal',
-    proImageModel: 'fal-flux-1-schnell',
-    freeIncludedImageModels: null,
-    proIncludedImageModels: null,
-    freeVideoProvider: 'fal',
-    freeVideoModel: 'fal-wan2.5-480p',
-    proVideoProvider: 'fal',
-    proVideoModel: 'fal-wan2.5-480p',
-    freeIncludedVideoModels: null,
-    proIncludedVideoModels: null,
-    freeAvatarProvider: 'heygen',
-    freeAvatarModel: 'heygen-avatar-standard',
-    proAvatarProvider: 'heygen',
-    proAvatarModel: 'heygen-avatar-standard',
-    freeIncludedAvatarModels: null,
-    proIncludedAvatarModels: null,
-    freeMusicProvider: 'suno',
-    freeMusicModel: 'suno-v5',
-    proMusicProvider: 'suno',
-    proMusicModel: 'suno-v5',
-    freeIncludedMusicModels: null,
-    proIncludedMusicModels: null,
-    freeMotionProvider: 'remotion',
-    proMotionProvider: 'remotion',
-    dailyGenerationLimit: 1,
-    dailyGenerationLimitPro: 5,
-    dailyVideoLimit: 1,
-    dailyVideoLimitPro: 2,
-    dailyMusicLimit: 1,
-    dailyMusicLimitPro: 3,
-    dailyAvatarLimit: 1,
-    dailyAvatarLimitPro: 1,
-    aiAllocations: [],
-    ttsAllocations: [],
-    adminViewMode: 'ALL' as const,
-  };
-
-  it('derives from auto defaults when lists are null', () => {
-    const result = resolveTtsIncludedModels(baseConfig);
-
-    expect(result.freeTtsModels).toEqual(['openai:tts-1-hd']);
-    expect(result.proTtsModels).toContain('elevenlabs:eleven_v3');
-    expect(result.proTtsModels).toContain('openai:tts-1-hd');
-  });
-
-  it('returns explicit lists when set', () => {
-    const result = resolveTtsIncludedModels({
-      ...baseConfig,
-      freeIncludedTtsModels: ['openai:tts-1-hd'],
-      proIncludedTtsModels: ['openai:tts-1-hd', 'elevenlabs:eleven_v3', 'openai:tts-1-hd'],
-    });
-
-    expect(result.freeTtsModels).toEqual(['openai:tts-1-hd']);
-    expect(result.proTtsModels).toContain('elevenlabs:eleven_v3');
-    expect(result.proTtsModels).toContain('openai:tts-1-hd');
-  });
-
-  it('always includes free TTS models in pro output', () => {
-    const result = resolveTtsIncludedModels({
-      ...baseConfig,
-      freeIncludedTtsModels: ['openai:tts-1-hd'],
-      proIncludedTtsModels: ['elevenlabs:eleven_v3'],
-    });
-
-    expect(result.proTtsModels).toContain('openai:tts-1-hd');
-    expect(result.proTtsModels).toContain('elevenlabs:eleven_v3');
-  });
-
-  it('deduplicates when free model is already in pro list', () => {
-    const result = resolveTtsIncludedModels({
-      ...baseConfig,
-      freeIncludedTtsModels: ['elevenlabs:eleven_v3'],
-      proIncludedTtsModels: ['elevenlabs:eleven_v3', 'openai:tts-1-hd'],
-    });
-
-    const count = result.proTtsModels.filter((m) => m === 'elevenlabs:eleven_v3').length;
-    expect(count).toBe(1);
-  });
-});
-
-describe('resolveSttIncludedModels', () => {
-  const baseConfig: Parameters<typeof resolveSttIncludedModels>[0] = {
-    free: {
-      aiProvider: 'anthropic' as const,
-      aiModel: 'claude-haiku-4-5-20251001',
-      ttsProvider: 'openai' as const,
-      ttsModel: 'tts-1-hd',
-      sttProvider: 'openai' as const,
-      sttModel: 'whisper-1',
-    },
-    pro: {
-      aiProvider: 'anthropic' as const,
-      aiModel: 'claude-haiku-4-5-20251001',
-      ttsProvider: 'elevenlabs' as const,
-      ttsModel: 'eleven_v3',
-      sttProvider: 'openai' as const,
-      sttModel: 'whisper-1',
-    },
-    platform: { aiProvider: 'anthropic' as const, aiModel: 'claude-haiku-4-5-20251001' },
-    freeIncludedModels: null,
-    proIncludedModels: null,
-    freeIncludedTtsModels: null,
-    proIncludedTtsModels: null,
-    freeIncludedSttModels: null,
-    proIncludedSttModels: null,
-    freeImageProvider: 'fal',
-    freeImageModel: 'fal-flux-1-schnell',
-    proImageProvider: 'fal',
-    proImageModel: 'fal-flux-1-schnell',
-    freeIncludedImageModels: null,
-    proIncludedImageModels: null,
-    freeVideoProvider: 'fal',
-    freeVideoModel: 'fal-wan2.5-480p',
-    proVideoProvider: 'fal',
-    proVideoModel: 'fal-wan2.5-480p',
-    freeIncludedVideoModels: null,
-    proIncludedVideoModels: null,
-    freeAvatarProvider: 'heygen',
-    freeAvatarModel: 'heygen-avatar-standard',
-    proAvatarProvider: 'heygen',
-    proAvatarModel: 'heygen-avatar-standard',
-    freeIncludedAvatarModels: null,
-    proIncludedAvatarModels: null,
-    freeMusicProvider: 'suno',
-    freeMusicModel: 'suno-v5',
-    proMusicProvider: 'suno',
-    proMusicModel: 'suno-v5',
-    freeIncludedMusicModels: null,
-    proIncludedMusicModels: null,
-    freeMotionProvider: 'remotion',
-    proMotionProvider: 'remotion',
-    dailyGenerationLimit: 1,
-    dailyGenerationLimitPro: 5,
-    dailyVideoLimit: 1,
-    dailyVideoLimitPro: 2,
-    dailyMusicLimit: 1,
-    dailyMusicLimitPro: 3,
-    dailyAvatarLimit: 1,
-    dailyAvatarLimitPro: 1,
-    aiAllocations: [],
-    ttsAllocations: [],
-    adminViewMode: 'ALL' as const,
-  };
-
-  it('derives from auto defaults when lists are null', () => {
-    const result = resolveSttIncludedModels(baseConfig);
-
-    expect(result.freeSttModels).toEqual(['openai:whisper-1']);
-    expect(result.proSttModels).toContain('openai:whisper-1');
-  });
-
-  it('returns explicit lists when set', () => {
-    const result = resolveSttIncludedModels({
-      ...baseConfig,
-      freeIncludedSttModels: ['openai:whisper-1'],
-      proIncludedSttModels: ['openai:whisper-1', 'openai:whisper-1'],
-    });
-
-    expect(result.freeSttModels).toEqual(['openai:whisper-1']);
-    expect(result.proSttModels).toContain('openai:whisper-1');
-  });
-
-  it('always includes free STT models in pro output', () => {
-    const result = resolveSttIncludedModels({
-      ...baseConfig,
-      freeIncludedSttModels: ['openai:whisper-1'],
-      proIncludedSttModels: ['openai:whisper-1'],
-    });
-
-    expect(result.proSttModels).toContain('openai:whisper-1');
-    expect(result.proSttModels).toContain('openai:whisper-1');
-  });
-
-  it('deduplicates when free model is already in pro list', () => {
-    const result = resolveSttIncludedModels({
-      ...baseConfig,
-      freeIncludedSttModels: ['openai:whisper-1'],
-      proIncludedSttModels: ['openai:whisper-1', 'openai:whisper-1'],
-    });
-
-    const count = result.proSttModels.filter((m) => m === 'openai:whisper-1').length;
-    expect(count).toBe(1);
-  });
-});
-
-describe('resolveIncludedImageModels', () => {
-  const baseConfig: Parameters<typeof resolveIncludedImageModels>[0] = {
-    free: { aiProvider: 'anthropic' as const, aiModel: 'claude-haiku-4-5-20251001', ttsProvider: 'openai' as const, ttsModel: 'tts-1-hd', sttProvider: 'openai' as const, sttModel: 'whisper-1' },
-    pro: { aiProvider: 'anthropic' as const, aiModel: 'claude-haiku-4-5-20251001', ttsProvider: 'elevenlabs' as const, ttsModel: 'eleven_v3', sttProvider: 'openai' as const, sttModel: 'whisper-1' },
-    platform: { aiProvider: 'anthropic' as const, aiModel: 'claude-haiku-4-5-20251001' },
-    freeIncludedModels: null, proIncludedModels: null, freeIncludedTtsModels: null, proIncludedTtsModels: null, freeIncludedSttModels: null, proIncludedSttModels: null,
-    freeImageProvider: 'fal', freeImageModel: 'fal-flux-1-schnell', proImageProvider: 'fal', proImageModel: 'fal-flux-2-pro',
-    freeIncludedImageModels: null, proIncludedImageModels: null,
-    freeVideoProvider: 'fal', freeVideoModel: 'fal-wan2.5-480p', proVideoProvider: 'fal', proVideoModel: 'fal-wan2.5-480p',
-    freeIncludedVideoModels: null, proIncludedVideoModels: null,
-    freeAvatarProvider: 'heygen', freeAvatarModel: 'heygen-avatar-standard', proAvatarProvider: 'heygen', proAvatarModel: 'heygen-avatar-standard',
-    freeIncludedAvatarModels: null, proIncludedAvatarModels: null,
-    freeMusicProvider: 'suno', freeMusicModel: 'suno-v5', proMusicProvider: 'suno', proMusicModel: 'suno-v5',
-    freeIncludedMusicModels: null, proIncludedMusicModels: null,
-    freeMotionProvider: 'remotion', proMotionProvider: 'remotion',
-    dailyGenerationLimit: 1, dailyGenerationLimitPro: 5, dailyVideoLimit: 1, dailyVideoLimitPro: 2,
-    dailyMusicLimit: 1, dailyMusicLimitPro: 3, dailyAvatarLimit: 1, dailyAvatarLimitPro: 1,
-    aiAllocations: [], ttsAllocations: [],
-    adminViewMode: 'ALL' as const,
-  };
-
-  it('derives from auto defaults when lists are null', () => {
-    const result = resolveIncludedImageModels(baseConfig);
-    expect(result.freeImageModels).toEqual(['fal-flux-1-schnell']);
-    expect(result.proImageModels).toContain('fal-flux-2-pro');
-    expect(result.proImageModels).toContain('fal-flux-1-schnell');
-  });
-
-  it('returns explicit lists when set', () => {
-    const result = resolveIncludedImageModels({ ...baseConfig, freeIncludedImageModels: ['img-a'], proIncludedImageModels: ['img-a', 'img-b'] });
-    expect(result.freeImageModels).toEqual(['img-a']);
-    expect(result.proImageModels).toContain('img-a');
-    expect(result.proImageModels).toContain('img-b');
-  });
-
-  it('always includes free image models in pro output', () => {
-    const result = resolveIncludedImageModels({ ...baseConfig, freeIncludedImageModels: ['free-img'], proIncludedImageModels: ['pro-img'] });
-    expect(result.proImageModels).toContain('free-img');
-    expect(result.proImageModels).toContain('pro-img');
-  });
-});
-
-describe('resolveIncludedVideoModels', () => {
-  const baseConfig: Parameters<typeof resolveIncludedVideoModels>[0] = {
-    free: { aiProvider: 'anthropic' as const, aiModel: 'claude-haiku-4-5-20251001', ttsProvider: 'openai' as const, ttsModel: 'tts-1-hd', sttProvider: 'openai' as const, sttModel: 'whisper-1' },
-    pro: { aiProvider: 'anthropic' as const, aiModel: 'claude-haiku-4-5-20251001', ttsProvider: 'elevenlabs' as const, ttsModel: 'eleven_v3', sttProvider: 'openai' as const, sttModel: 'whisper-1' },
-    platform: { aiProvider: 'anthropic' as const, aiModel: 'claude-haiku-4-5-20251001' },
-    freeIncludedModels: null, proIncludedModels: null, freeIncludedTtsModels: null, proIncludedTtsModels: null, freeIncludedSttModels: null, proIncludedSttModels: null,
-    freeImageProvider: 'fal', freeImageModel: 'fal-flux-1-schnell', proImageProvider: 'fal', proImageModel: 'fal-flux-1-schnell',
-    freeIncludedImageModels: null, proIncludedImageModels: null,
-    freeVideoProvider: 'fal', freeVideoModel: 'fal-wan2.5-480p', proVideoProvider: 'fal', proVideoModel: 'fal-kling3-1080p',
-    freeIncludedVideoModels: null, proIncludedVideoModels: null,
-    freeAvatarProvider: 'heygen', freeAvatarModel: 'heygen-avatar-standard', proAvatarProvider: 'heygen', proAvatarModel: 'heygen-avatar-standard',
-    freeIncludedAvatarModels: null, proIncludedAvatarModels: null,
-    freeMusicProvider: 'suno', freeMusicModel: 'suno-v5', proMusicProvider: 'suno', proMusicModel: 'suno-v5',
-    freeIncludedMusicModels: null, proIncludedMusicModels: null,
-    freeMotionProvider: 'remotion', proMotionProvider: 'remotion',
-    dailyGenerationLimit: 1, dailyGenerationLimitPro: 5, dailyVideoLimit: 1, dailyVideoLimitPro: 2,
-    dailyMusicLimit: 1, dailyMusicLimitPro: 3, dailyAvatarLimit: 1, dailyAvatarLimitPro: 1,
-    aiAllocations: [], ttsAllocations: [],
-    adminViewMode: 'ALL' as const,
-  };
-
-  it('derives from auto defaults when lists are null', () => {
-    const result = resolveIncludedVideoModels(baseConfig);
-    expect(result.freeVideoModels).toEqual(['fal-wan2.5-480p']);
-    expect(result.proVideoModels).toContain('fal-kling3-1080p');
-    expect(result.proVideoModels).toContain('fal-wan2.5-480p');
-  });
-
-  it('returns explicit lists when set', () => {
-    const result = resolveIncludedVideoModels({ ...baseConfig, freeIncludedVideoModels: ['vid-a'], proIncludedVideoModels: ['vid-a', 'vid-b'] });
-    expect(result.freeVideoModels).toEqual(['vid-a']);
-    expect(result.proVideoModels).toContain('vid-a');
-    expect(result.proVideoModels).toContain('vid-b');
-  });
-
-  it('always includes free video models in pro output', () => {
-    const result = resolveIncludedVideoModels({ ...baseConfig, freeIncludedVideoModels: ['free-vid'], proIncludedVideoModels: ['pro-vid'] });
-    expect(result.proVideoModels).toContain('free-vid');
-    expect(result.proVideoModels).toContain('pro-vid');
-  });
-
-  it('deduplicates when free model is already in pro list', () => {
-    const result = resolveIncludedVideoModels({ ...baseConfig, freeIncludedVideoModels: ['shared-vid'], proIncludedVideoModels: ['shared-vid', 'pro-vid'] });
-    const count = result.proVideoModels.filter((m) => m === 'shared-vid').length;
-    expect(count).toBe(1);
+  it('return explicit unified lists when configured', () => {
+    expect(resolveIncludedModels({ ...config, includedModels: ['gpt-5'] })).toEqual(['gpt-5']);
+    expect(resolveTtsIncludedModels({ ...config, includedTtsModels: ['elevenlabs:eleven_v3'] })).toEqual([
+      'elevenlabs:eleven_v3',
+    ]);
+    expect(resolveSttIncludedModels({ ...config, includedSttModels: ['openai:gpt-4o-transcribe'] })).toEqual([
+      'openai:gpt-4o-transcribe',
+    ]);
+    expect(resolveIncludedImageModels({ ...config, includedImageModels: ['fal-flux-2-pro'] })).toEqual([
+      'fal-flux-2-pro',
+    ]);
+    expect(resolveIncludedVideoModels({ ...config, includedVideoModels: ['fal-kling3-1080p'] })).toEqual([
+      'fal-kling3-1080p',
+    ]);
   });
 });

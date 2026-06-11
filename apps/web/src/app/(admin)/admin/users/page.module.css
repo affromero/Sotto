@@ -25,12 +25,6 @@
   gap: var(--spacing-sm);
 }
 
-.tierFilter {
-  display: flex;
-  gap: var(--spacing-xs);
-  flex-wrap: wrap;
-}
-
 .filterChip {
   padding: var(--spacing-xs) var(--spacing-sm);
   border-radius: var(--radius-md);
@@ -196,16 +190,6 @@
   letter-spacing: 0.025em;
 }
 
-.badgeFREE {
-  background: var(--color-border);
-  color: var(--color-text-secondary);
-}
-
-.badgePRO {
-  background: var(--color-primary-light);
-  color: var(--color-primary);
-}
-
 .badgeSTARTER {
   background: var(--color-info-light);
   color: var(--color-info);
@@ -219,15 +203,6 @@
 .badgeBYOK {
   background: var(--color-info-light);
   color: var(--color-info);
-}
-
-/* Tier Cell */
-
-.tierCell {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-xs);
-  flex-wrap: wrap;
 }
 
 .subDot {

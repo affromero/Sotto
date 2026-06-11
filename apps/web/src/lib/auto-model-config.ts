@@ -1,31 +1,13 @@
 import { z } from 'zod';
+import type { SttProviderId } from '@sotto/shared';
 import { prisma } from './prisma';
 import { getAiProviderMeta, getProviderForModel, type AiProviderId } from './providers/ai-registry';
 import { getProviderMeta, type TtsProviderId } from './providers/tts-registry';
 import { getSttProviderMeta } from './providers/stt-registry';
-import type { SttProviderId } from '@sotto/shared';
 import { getAvatarProviderMeta, getAvatarModelProvider, type AvatarProviderId } from './providers/avatar-registry';
 import { logger } from './logger';
 
-export interface ProviderAllocation {
-  provider: string;
-  model: string;
-  quota: number;
-}
-
-function parseAllocations(json: unknown): ProviderAllocation[] {
-  if (!Array.isArray(json)) return [];
-  return json.filter(
-    (item): item is ProviderAllocation =>
-      typeof item === 'object' &&
-      item !== null &&
-      typeof item.provider === 'string' &&
-      typeof item.model === 'string' &&
-      typeof item.quota === 'number'
-  );
-}
-
-export interface PlanModelConfig {
+export interface ModelConfig {
   aiProvider: AiProviderId;
   aiModel: string;
   ttsProvider: TtsProviderId;
@@ -40,105 +22,68 @@ export interface PlatformAiConfig {
 }
 
 export interface AutoModelConfigData {
-  free: PlanModelConfig;
-  pro: PlanModelConfig;
+  model: ModelConfig;
   platform: PlatformAiConfig;
-  freeIncludedModels: string[] | null;
-  proIncludedModels: string[] | null;
-  freeIncludedTtsModels: string[] | null;
-  proIncludedTtsModels: string[] | null;
-  freeIncludedSttModels: string[] | null;
-  proIncludedSttModels: string[] | null;
-  // Image
-  freeImageProvider: string;
-  freeImageModel: string;
-  proImageProvider: string;
-  proImageModel: string;
-  freeIncludedImageModels: string[] | null;
-  proIncludedImageModels: string[] | null;
-  // Video
-  freeVideoProvider: string;
-  freeVideoModel: string;
-  proVideoProvider: string;
-  proVideoModel: string;
-  freeIncludedVideoModels: string[] | null;
-  proIncludedVideoModels: string[] | null;
-  // Avatar
-  freeAvatarProvider: string;
-  freeAvatarModel: string;
-  proAvatarProvider: string;
-  proAvatarModel: string;
-  freeIncludedAvatarModels: string[] | null;
-  proIncludedAvatarModels: string[] | null;
-  // Music
-  freeMusicProvider: string;
-  freeMusicModel: string;
-  proMusicProvider: string;
-  proMusicModel: string;
-  freeIncludedMusicModels: string[] | null;
-  proIncludedMusicModels: string[] | null;
-  // Motion (programmatic visual rendering)
-  freeMotionProvider: string;
-  proMotionProvider: string;
-  // Admin view mode
-  adminViewMode: 'ALL' | 'PRO';
-  // Daily limits & allocations (migrated from FreeTierConfig)
-  dailyGenerationLimit: number;
-  dailyGenerationLimitPro: number;
-  dailyVideoLimit: number;
-  dailyVideoLimitPro: number;
-  dailyMusicLimit: number;
-  dailyMusicLimitPro: number;
-  dailyAvatarLimit: number;
-  dailyAvatarLimitPro: number;
-  aiAllocations: ProviderAllocation[];
-  ttsAllocations: ProviderAllocation[];
+  includedModels: string[] | null;
+  includedTtsModels: string[] | null;
+  includedSttModels: string[] | null;
+  imageProvider: string;
+  imageModel: string;
+  includedImageModels: string[] | null;
+  videoProvider: string;
+  videoModel: string;
+  includedVideoModels: string[] | null;
+  avatarProvider: string;
+  avatarModel: string;
+  includedAvatarModels: string[] | null;
+  musicProvider: string;
+  musicModel: string;
+  includedMusicModels: string[] | null;
+  motionProvider: string;
+}
+
+export interface AutoModelConfigUpdate {
+  model?: Partial<ModelConfig>;
+  platform?: Partial<PlatformAiConfig>;
+  includedModels?: string[] | null;
+  includedTtsModels?: string[] | null;
+  includedSttModels?: string[] | null;
+  imageProvider?: string;
+  imageModel?: string;
+  includedImageModels?: string[] | null;
+  videoProvider?: string;
+  videoModel?: string;
+  includedVideoModels?: string[] | null;
+  avatarProvider?: string;
+  avatarModel?: string;
+  includedAvatarModels?: string[] | null;
+  musicProvider?: string;
+  musicModel?: string;
+  includedMusicModels?: string[] | null;
+  motionProvider?: string;
 }
 
 const includedModelsSchema = z.array(z.string()).nullable().catch(null);
 
-// Seed values for fresh installs — derived from registry, not hardcoded
+// Seed values for fresh installs — derived from registry, not hardcoded.
 const SEEDS = {
-  freeAiProvider: 'anthropic' as const,
-  freeAiModel: getAiProviderMeta('anthropic').defaultModel,
-  freeTtsProvider: 'openai' as const,
-  freeTtsModel: getProviderMeta('openai').defaultModel,
-  freeSttProvider: 'openai' as const,
-  freeSttModel: getSttProviderMeta('openai').defaultModel,
-  proAiProvider: 'anthropic' as const,
-  proAiModel: getAiProviderMeta('anthropic').models.find(m => m.tier === 'balanced')?.id ?? getAiProviderMeta('anthropic').defaultModel,
-  proTtsProvider: 'elevenlabs' as const,
-  proTtsModel: getProviderMeta('elevenlabs').defaultModel,
-  proSttProvider: 'openai' as const,
-  proSttModel: getSttProviderMeta('openai').defaultModel,
+  aiProvider: 'anthropic' as const,
+  aiModel: getAiProviderMeta('anthropic').models.find(m => m.tier === 'balanced')?.id ?? getAiProviderMeta('anthropic').defaultModel,
+  ttsProvider: 'openai' as const,
+  ttsModel: getProviderMeta('openai').defaultModel,
+  sttProvider: 'openai' as const,
+  sttModel: getSttProviderMeta('openai').defaultModel,
   platformAiProvider: 'anthropic' as const,
   platformAiModel: getAiProviderMeta('anthropic').defaultModel,
-  freeImageProvider: 'fal',
-  freeImageModel: 'fal-flux-1-schnell',
-  proImageProvider: 'fal',
-  proImageModel: 'fal-flux-1-schnell',
-  freeVideoProvider: 'fal',
-  freeVideoModel: 'fal-wan2.5-480p',
-  proVideoProvider: 'fal',
-  proVideoModel: 'fal-wan2.5-480p',
-  freeAvatarProvider: 'heygen',
-  freeAvatarModel: getAvatarProviderMeta('heygen').defaultModel,
-  proAvatarProvider: 'heygen',
-  proAvatarModel: getAvatarProviderMeta('heygen').defaultModel,
-  freeMusicProvider: 'suno',
-  freeMusicModel: 'suno-v5',
-  proMusicProvider: 'suno',
-  proMusicModel: 'suno-v5',
-  freeMotionProvider: 'remotion',
-  proMotionProvider: 'remotion',
-  dailyGenerationLimit: 1,
-  dailyGenerationLimitPro: 5,
-  dailyVideoLimit: 1,
-  dailyVideoLimitPro: 2,
-  dailyMusicLimit: 1,
-  dailyMusicLimitPro: 3,
-  dailyAvatarLimit: 1,
-  dailyAvatarLimitPro: 1,
+  imageProvider: 'fal',
+  imageModel: 'fal-flux-1-schnell',
+  videoProvider: 'fal',
+  videoModel: 'fal-wan2.5-480p',
+  avatarProvider: 'heygen',
+  avatarModel: getAvatarProviderMeta('heygen').defaultModel,
+  musicProvider: 'suno',
+  musicModel: 'suno-v5',
+  motionProvider: 'remotion',
 };
 
 /**
@@ -156,17 +101,14 @@ export async function getAutoModelConfig(): Promise<AutoModelConfigData> {
         data: { id: 'singleton', ...SEEDS },
       });
     } catch {
-      // Another request may have created it first — read it
       row = await prisma.autoModelConfig.findUnique({ where: { id: 'singleton' } });
       if (!row) throw new Error('AutoModelConfig singleton missing after create race');
     }
   }
 
-  // Detect and fix orphaned model/provider pairs in existing rows
   const repairs: Record<string, string> = {};
   for (const [providerField, modelField, label] of [
-    ['freeAiProvider', 'freeAiModel', 'free'] as const,
-    ['proAiProvider', 'proAiModel', 'pro'] as const,
+    ['aiProvider', 'aiModel', 'default'] as const,
     ['platformAiProvider', 'platformAiModel', 'platform'] as const,
   ]) {
     const provider = row[providerField];
@@ -188,34 +130,26 @@ export async function getAutoModelConfig(): Promise<AutoModelConfigData> {
       });
     }
   }
-  // Self-heal legacy avatar model IDs (avatar-iii → heygen-avatar-standard, etc.)
-  const AVATAR_MODEL_MIGRATIONS: Record<string, string> = {
+
+  const avatarModelMigrations: Record<string, string> = {
     'avatar-iii': 'heygen-avatar-standard',
     'avatar-iv': 'heygen-avatar-iv',
     'runway-avatar-realtime': 'runway-characters',
   };
-  for (const [field, label] of [
-    ['freeAvatarModel', 'free'] as const,
-    ['proAvatarModel', 'pro'] as const,
-  ]) {
-    const current = row[field] as string;
-    const migrated = AVATAR_MODEL_MIGRATIONS[current];
-    if (migrated) {
-      repairs[field] = migrated;
-      logger.warn(`AutoModelConfig: migrated legacy ${label} avatar model`, {
-        was: current,
-        corrected: migrated,
-      });
-    } else if (!getAvatarModelProvider(current)) {
-      const providerField = field.replace('Model', 'Provider') as 'freeAvatarProvider' | 'proAvatarProvider';
-      const provider = row[providerField] as string;
-      const corrected = getAvatarProviderMeta(provider as AvatarProviderId).defaultModel;
-      repairs[field] = corrected;
-      logger.warn(`AutoModelConfig: repaired unknown ${label} avatar model`, {
-        was: `${provider}/${current}`,
-        corrected: `${provider}/${corrected}`,
-      });
-    }
+  const migratedAvatarModel = avatarModelMigrations[row.avatarModel];
+  if (migratedAvatarModel) {
+    repairs.avatarModel = migratedAvatarModel;
+    logger.warn('AutoModelConfig: migrated legacy avatar model', {
+      was: row.avatarModel,
+      corrected: migratedAvatarModel,
+    });
+  } else if (!getAvatarModelProvider(row.avatarModel)) {
+    const corrected = getAvatarProviderMeta(row.avatarProvider as AvatarProviderId).defaultModel;
+    repairs.avatarModel = corrected;
+    logger.warn('AutoModelConfig: repaired unknown avatar model', {
+      was: `${row.avatarProvider}/${row.avatarModel}`,
+      corrected: `${row.avatarProvider}/${corrected}`,
+    });
   }
 
   if (Object.keys(repairs).length > 0) {
@@ -227,158 +161,50 @@ export async function getAutoModelConfig(): Promise<AutoModelConfigData> {
   }
 
   return {
-    free: {
-      aiProvider: row.freeAiProvider as AiProviderId,
-      aiModel: row.freeAiModel,
-      ttsProvider: row.freeTtsProvider as TtsProviderId,
-      ttsModel: row.freeTtsModel,
-      sttProvider: row.freeSttProvider as SttProviderId,
-      sttModel: row.freeSttModel,
-    },
-    pro: {
-      aiProvider: row.proAiProvider as AiProviderId,
-      aiModel: row.proAiModel,
-      ttsProvider: row.proTtsProvider as TtsProviderId,
-      ttsModel: row.proTtsModel,
-      sttProvider: row.proSttProvider as SttProviderId,
-      sttModel: row.proSttModel,
+    model: {
+      aiProvider: row.aiProvider as AiProviderId,
+      aiModel: row.aiModel,
+      ttsProvider: row.ttsProvider as TtsProviderId,
+      ttsModel: row.ttsModel,
+      sttProvider: row.sttProvider as SttProviderId,
+      sttModel: row.sttModel,
     },
     platform: {
       aiProvider: row.platformAiProvider as AiProviderId,
       aiModel: row.platformAiModel,
     },
-    freeIncludedModels: includedModelsSchema.parse(row.freeIncludedModels),
-    proIncludedModels: includedModelsSchema.parse(row.proIncludedModels),
-    freeIncludedTtsModels: includedModelsSchema.parse(row.freeIncludedTtsModels),
-    proIncludedTtsModels: includedModelsSchema.parse(row.proIncludedTtsModels),
-    freeIncludedSttModels: includedModelsSchema.parse(row.freeIncludedSttModels),
-    proIncludedSttModels: includedModelsSchema.parse(row.proIncludedSttModels),
-    // Image
-    freeImageProvider: row.freeImageProvider,
-    freeImageModel: row.freeImageModel,
-    proImageProvider: row.proImageProvider,
-    proImageModel: row.proImageModel,
-    freeIncludedImageModels: includedModelsSchema.parse(row.freeIncludedImageModels),
-    proIncludedImageModels: includedModelsSchema.parse(row.proIncludedImageModels),
-    // Video
-    freeVideoProvider: row.freeVideoProvider,
-    freeVideoModel: row.freeVideoModel,
-    proVideoProvider: row.proVideoProvider,
-    proVideoModel: row.proVideoModel,
-    freeIncludedVideoModels: includedModelsSchema.parse(row.freeIncludedVideoModels),
-    proIncludedVideoModels: includedModelsSchema.parse(row.proIncludedVideoModels),
-    // Avatar
-    freeAvatarProvider: row.freeAvatarProvider,
-    freeAvatarModel: row.freeAvatarModel,
-    proAvatarProvider: row.proAvatarProvider,
-    proAvatarModel: row.proAvatarModel,
-    freeIncludedAvatarModels: includedModelsSchema.parse(row.freeIncludedAvatarModels),
-    proIncludedAvatarModels: includedModelsSchema.parse(row.proIncludedAvatarModels),
-    // Music
-    freeMusicProvider: row.freeMusicProvider,
-    freeMusicModel: row.freeMusicModel,
-    proMusicProvider: row.proMusicProvider,
-    proMusicModel: row.proMusicModel,
-    freeIncludedMusicModels: includedModelsSchema.parse(row.freeIncludedMusicModels),
-    proIncludedMusicModels: includedModelsSchema.parse(row.proIncludedMusicModels),
-    // Motion
-    freeMotionProvider: row.freeMotionProvider,
-    proMotionProvider: row.proMotionProvider,
-    // Admin view mode
-    adminViewMode: (row.adminViewMode === 'PRO' ? 'PRO' : 'ALL') as 'ALL' | 'PRO',
-    // Daily limits & allocations
-    dailyGenerationLimit: row.dailyGenerationLimit,
-    dailyGenerationLimitPro: row.dailyGenerationLimitPro,
-    dailyVideoLimit: row.dailyVideoLimit,
-    dailyVideoLimitPro: row.dailyVideoLimitPro,
-    dailyMusicLimit: row.dailyMusicLimit,
-    dailyMusicLimitPro: row.dailyMusicLimitPro,
-    dailyAvatarLimit: row.dailyAvatarLimit,
-    dailyAvatarLimitPro: row.dailyAvatarLimitPro,
-    aiAllocations: parseAllocations(row.aiAllocations),
-    ttsAllocations: parseAllocations(row.ttsAllocations),
+    includedModels: includedModelsSchema.parse(row.includedModels),
+    includedTtsModels: includedModelsSchema.parse(row.includedTtsModels),
+    includedSttModels: includedModelsSchema.parse(row.includedSttModels),
+    imageProvider: row.imageProvider,
+    imageModel: row.imageModel,
+    includedImageModels: includedModelsSchema.parse(row.includedImageModels),
+    videoProvider: row.videoProvider,
+    videoModel: row.videoModel,
+    includedVideoModels: includedModelsSchema.parse(row.includedVideoModels),
+    avatarProvider: row.avatarProvider,
+    avatarModel: row.avatarModel,
+    includedAvatarModels: includedModelsSchema.parse(row.includedAvatarModels),
+    musicProvider: row.musicProvider,
+    musicModel: row.musicModel,
+    includedMusicModels: includedModelsSchema.parse(row.includedMusicModels),
+    motionProvider: row.motionProvider,
   };
 }
 
 /**
  * Update the auto model configuration (admin only).
  */
-export async function setAutoModelConfig(
-  data: {
-    free?: Partial<PlanModelConfig>;
-    pro?: Partial<PlanModelConfig>;
-    platform?: Partial<PlatformAiConfig>;
-    freeIncludedModels?: string[] | null;
-    proIncludedModels?: string[] | null;
-    freeIncludedTtsModels?: string[] | null;
-    proIncludedTtsModels?: string[] | null;
-    freeIncludedSttModels?: string[] | null;
-    proIncludedSttModels?: string[] | null;
-    // Image
-    freeImageProvider?: string;
-    freeImageModel?: string;
-    proImageProvider?: string;
-    proImageModel?: string;
-    freeIncludedImageModels?: string[] | null;
-    proIncludedImageModels?: string[] | null;
-    // Video
-    freeVideoProvider?: string;
-    freeVideoModel?: string;
-    proVideoProvider?: string;
-    proVideoModel?: string;
-    freeIncludedVideoModels?: string[] | null;
-    proIncludedVideoModels?: string[] | null;
-    // Avatar
-    freeAvatarProvider?: string;
-    freeAvatarModel?: string;
-    proAvatarProvider?: string;
-    proAvatarModel?: string;
-    freeIncludedAvatarModels?: string[] | null;
-    proIncludedAvatarModels?: string[] | null;
-    // Music
-    freeMusicProvider?: string;
-    freeMusicModel?: string;
-    proMusicProvider?: string;
-    proMusicModel?: string;
-    freeIncludedMusicModels?: string[] | null;
-    proIncludedMusicModels?: string[] | null;
-    // Motion
-    freeMotionProvider?: string;
-    proMotionProvider?: string;
-    // Admin view mode
-    adminViewMode?: 'ALL' | 'PRO';
-    // Daily limits & allocations
-    dailyGenerationLimit?: number;
-    dailyGenerationLimitPro?: number;
-    dailyVideoLimit?: number;
-    dailyVideoLimitPro?: number;
-    dailyMusicLimit?: number;
-    dailyMusicLimitPro?: number;
-    dailyAvatarLimit?: number;
-    dailyAvatarLimitPro?: number;
-    aiAllocations?: ProviderAllocation[];
-    ttsAllocations?: ProviderAllocation[];
-  },
-  adminId: string
-): Promise<void> {
-  const update: Record<string, string | string[] | number | ProviderAllocation[] | null> = { updatedBy: adminId };
+export async function setAutoModelConfig(data: AutoModelConfigUpdate, adminId: string): Promise<void> {
+  const update: Record<string, string | string[] | null> = { updatedBy: adminId };
 
-  if (data.free) {
-    if (data.free.aiProvider) update.freeAiProvider = data.free.aiProvider;
-    if (data.free.aiModel) update.freeAiModel = data.free.aiModel;
-    if (data.free.ttsProvider) update.freeTtsProvider = data.free.ttsProvider;
-    if (data.free.ttsModel) update.freeTtsModel = data.free.ttsModel;
-    if (data.free.sttProvider) update.freeSttProvider = data.free.sttProvider;
-    if (data.free.sttModel) update.freeSttModel = data.free.sttModel;
-  }
-
-  if (data.pro) {
-    if (data.pro.aiProvider) update.proAiProvider = data.pro.aiProvider;
-    if (data.pro.aiModel) update.proAiModel = data.pro.aiModel;
-    if (data.pro.ttsProvider) update.proTtsProvider = data.pro.ttsProvider;
-    if (data.pro.ttsModel) update.proTtsModel = data.pro.ttsModel;
-    if (data.pro.sttProvider) update.proSttProvider = data.pro.sttProvider;
-    if (data.pro.sttModel) update.proSttModel = data.pro.sttModel;
+  if (data.model) {
+    if (data.model.aiProvider) update.aiProvider = data.model.aiProvider;
+    if (data.model.aiModel) update.aiModel = data.model.aiModel;
+    if (data.model.ttsProvider) update.ttsProvider = data.model.ttsProvider;
+    if (data.model.ttsModel) update.ttsModel = data.model.ttsModel;
+    if (data.model.sttProvider) update.sttProvider = data.model.sttProvider;
+    if (data.model.sttModel) update.sttModel = data.model.sttModel;
   }
 
   if (data.platform) {
@@ -386,80 +212,22 @@ export async function setAutoModelConfig(
     if (data.platform.aiModel) update.platformAiModel = data.platform.aiModel;
   }
 
-  if (data.freeIncludedModels !== undefined) {
-    update.freeIncludedModels = data.freeIncludedModels;
-  }
-
-  if (data.proIncludedModels !== undefined) {
-    update.proIncludedModels = data.proIncludedModels;
-  }
-
-  if (data.freeIncludedTtsModels !== undefined) {
-    update.freeIncludedTtsModels = data.freeIncludedTtsModels;
-  }
-
-  if (data.proIncludedTtsModels !== undefined) {
-    update.proIncludedTtsModels = data.proIncludedTtsModels;
-  }
-
-  if (data.freeIncludedSttModels !== undefined) {
-    update.freeIncludedSttModels = data.freeIncludedSttModels;
-  }
-
-  if (data.proIncludedSttModels !== undefined) {
-    update.proIncludedSttModels = data.proIncludedSttModels;
-  }
-
-  // Image
-  if (data.freeImageProvider) update.freeImageProvider = data.freeImageProvider;
-  if (data.freeImageModel) update.freeImageModel = data.freeImageModel;
-  if (data.proImageProvider) update.proImageProvider = data.proImageProvider;
-  if (data.proImageModel) update.proImageModel = data.proImageModel;
-  if (data.freeIncludedImageModels !== undefined) update.freeIncludedImageModels = data.freeIncludedImageModels;
-  if (data.proIncludedImageModels !== undefined) update.proIncludedImageModels = data.proIncludedImageModels;
-
-  // Video
-  if (data.freeVideoProvider) update.freeVideoProvider = data.freeVideoProvider;
-  if (data.freeVideoModel) update.freeVideoModel = data.freeVideoModel;
-  if (data.proVideoProvider) update.proVideoProvider = data.proVideoProvider;
-  if (data.proVideoModel) update.proVideoModel = data.proVideoModel;
-  if (data.freeIncludedVideoModels !== undefined) update.freeIncludedVideoModels = data.freeIncludedVideoModels;
-  if (data.proIncludedVideoModels !== undefined) update.proIncludedVideoModels = data.proIncludedVideoModels;
-
-  // Avatar
-  if (data.freeAvatarProvider) update.freeAvatarProvider = data.freeAvatarProvider;
-  if (data.freeAvatarModel) update.freeAvatarModel = data.freeAvatarModel;
-  if (data.proAvatarProvider) update.proAvatarProvider = data.proAvatarProvider;
-  if (data.proAvatarModel) update.proAvatarModel = data.proAvatarModel;
-  if (data.freeIncludedAvatarModels !== undefined) update.freeIncludedAvatarModels = data.freeIncludedAvatarModels;
-  if (data.proIncludedAvatarModels !== undefined) update.proIncludedAvatarModels = data.proIncludedAvatarModels;
-
-  // Music
-  if (data.freeMusicProvider) update.freeMusicProvider = data.freeMusicProvider;
-  if (data.freeMusicModel) update.freeMusicModel = data.freeMusicModel;
-  if (data.proMusicProvider) update.proMusicProvider = data.proMusicProvider;
-  if (data.proMusicModel) update.proMusicModel = data.proMusicModel;
-  if (data.freeIncludedMusicModels !== undefined) update.freeIncludedMusicModels = data.freeIncludedMusicModels;
-  if (data.proIncludedMusicModels !== undefined) update.proIncludedMusicModels = data.proIncludedMusicModels;
-
-  // Motion
-  if (data.freeMotionProvider) update.freeMotionProvider = data.freeMotionProvider;
-  if (data.proMotionProvider) update.proMotionProvider = data.proMotionProvider;
-
-  // Admin view mode
-  if (data.adminViewMode !== undefined) update.adminViewMode = data.adminViewMode;
-
-  // Daily limits & allocations
-  if (data.dailyGenerationLimit !== undefined) update.dailyGenerationLimit = data.dailyGenerationLimit;
-  if (data.dailyGenerationLimitPro !== undefined) update.dailyGenerationLimitPro = data.dailyGenerationLimitPro;
-  if (data.dailyVideoLimit !== undefined) update.dailyVideoLimit = data.dailyVideoLimit;
-  if (data.dailyVideoLimitPro !== undefined) update.dailyVideoLimitPro = data.dailyVideoLimitPro;
-  if (data.dailyMusicLimit !== undefined) update.dailyMusicLimit = data.dailyMusicLimit;
-  if (data.dailyMusicLimitPro !== undefined) update.dailyMusicLimitPro = data.dailyMusicLimitPro;
-  if (data.dailyAvatarLimit !== undefined) update.dailyAvatarLimit = data.dailyAvatarLimit;
-  if (data.dailyAvatarLimitPro !== undefined) update.dailyAvatarLimitPro = data.dailyAvatarLimitPro;
-  if (data.aiAllocations !== undefined) update.aiAllocations = data.aiAllocations;
-  if (data.ttsAllocations !== undefined) update.ttsAllocations = data.ttsAllocations;
+  if (data.includedModels !== undefined) update.includedModels = data.includedModels;
+  if (data.includedTtsModels !== undefined) update.includedTtsModels = data.includedTtsModels;
+  if (data.includedSttModels !== undefined) update.includedSttModels = data.includedSttModels;
+  if (data.imageProvider) update.imageProvider = data.imageProvider;
+  if (data.imageModel) update.imageModel = data.imageModel;
+  if (data.includedImageModels !== undefined) update.includedImageModels = data.includedImageModels;
+  if (data.videoProvider) update.videoProvider = data.videoProvider;
+  if (data.videoModel) update.videoModel = data.videoModel;
+  if (data.includedVideoModels !== undefined) update.includedVideoModels = data.includedVideoModels;
+  if (data.avatarProvider) update.avatarProvider = data.avatarProvider;
+  if (data.avatarModel) update.avatarModel = data.avatarModel;
+  if (data.includedAvatarModels !== undefined) update.includedAvatarModels = data.includedAvatarModels;
+  if (data.musicProvider) update.musicProvider = data.musicProvider;
+  if (data.musicModel) update.musicModel = data.musicModel;
+  if (data.includedMusicModels !== undefined) update.includedMusicModels = data.includedMusicModels;
+  if (data.motionProvider) update.motionProvider = data.motionProvider;
 
   await prisma.autoModelConfig.upsert({
     where: { id: 'singleton' },
@@ -469,145 +237,92 @@ export async function setAutoModelConfig(
 }
 
 /**
- * Resolve effective included models per tier.
- * When lists are null (unconfigured), derive from auto defaults.
+ * Resolve effective included AI models.
+ * When the list is null (unconfigured), derive from the auto default.
  */
-export function resolveIncludedModels(config: AutoModelConfigData): {
-  freeModels: string[];
-  proModels: string[];
-} {
-  const freeModels = config.freeIncludedModels ?? [config.free.aiModel];
-  const proSet = new Set([
-    ...(config.proIncludedModels ?? [config.pro.aiModel]),
-    ...freeModels,
-  ]);
-  return { freeModels, proModels: [...proSet] };
+export function resolveIncludedModels(config: AutoModelConfigData): string[] {
+  return config.includedModels ?? [config.model.aiModel];
 }
 
 /**
- * Resolve effective included TTS models per tier.
+ * Resolve effective included TTS models.
  * IDs use provider:model format (e.g. "elevenlabs:eleven_v3").
- * When lists are null (unconfigured), derive from auto defaults.
  */
-export function resolveTtsIncludedModels(config: AutoModelConfigData): {
-  freeTtsModels: string[];
-  proTtsModels: string[];
-} {
-  const freeTtsModels = config.freeIncludedTtsModels ?? [`${config.free.ttsProvider}:${config.free.ttsModel}`];
-  const proSet = new Set([
-    ...(config.proIncludedTtsModels ?? [`${config.pro.ttsProvider}:${config.pro.ttsModel}`]),
-    ...freeTtsModels,
-  ]);
-  return { freeTtsModels, proTtsModels: [...proSet] };
+export function resolveTtsIncludedModels(config: AutoModelConfigData): string[] {
+  return config.includedTtsModels ?? [`${config.model.ttsProvider}:${config.model.ttsModel}`];
 }
 
 /**
- * Resolve effective included STT models per tier.
+ * Resolve effective included STT models.
  * IDs use provider:model format (e.g. "openai:whisper-1").
- * When lists are null (unconfigured), derive from auto defaults.
  */
-export function resolveSttIncludedModels(config: AutoModelConfigData): {
-  freeSttModels: string[];
-  proSttModels: string[];
-} {
-  const freeSttModels = config.freeIncludedSttModels ?? [`${config.free.sttProvider}:${config.free.sttModel}`];
-  const proSet = new Set([
-    ...(config.proIncludedSttModels ?? [`${config.pro.sttProvider}:${config.pro.sttModel}`]),
-    ...freeSttModels,
-  ]);
-  return { freeSttModels, proSttModels: [...proSet] };
+export function resolveSttIncludedModels(config: AutoModelConfigData): string[] {
+  return config.includedSttModels ?? [`${config.model.sttProvider}:${config.model.sttModel}`];
 }
 
 /**
- * Resolve effective included image models per tier.
- * When lists are null (unconfigured), derive from auto defaults.
+ * Resolve effective included image models.
  */
-export function resolveIncludedImageModels(config: AutoModelConfigData): {
-  freeImageModels: string[];
-  proImageModels: string[];
-} {
-  const freeImageModels = config.freeIncludedImageModels ?? [config.freeImageModel];
-  const proSet = new Set([
-    ...(config.proIncludedImageModels ?? [config.proImageModel]),
-    ...freeImageModels,
-  ]);
-  return { freeImageModels, proImageModels: [...proSet] };
+export function resolveIncludedImageModels(config: AutoModelConfigData): string[] {
+  return config.includedImageModels ?? [config.imageModel];
 }
 
 /**
- * Resolve effective included video models per tier.
- * When lists are null (unconfigured), derive from auto defaults.
+ * Resolve effective included video models.
  */
-export function resolveIncludedVideoModels(config: AutoModelConfigData): {
-  freeVideoModels: string[];
-  proVideoModels: string[];
-} {
-  const freeVideoModels = config.freeIncludedVideoModels ?? [config.freeVideoModel];
-  const proSet = new Set([
-    ...(config.proIncludedVideoModels ?? [config.proVideoModel]),
-    ...freeVideoModels,
-  ]);
-  return { freeVideoModels, proVideoModels: [...proSet] };
+export function resolveIncludedVideoModels(config: AutoModelConfigData): string[] {
+  return config.includedVideoModels ?? [config.videoModel];
 }
 
 /**
  * Resolve the image provider and model for video generation.
  */
-export async function resolveImageModel(plan: 'FREE' | 'PRO' = 'PRO'): Promise<{
+export async function resolveImageModel(): Promise<{
   imageProvider: string;
   imageModel: string;
 }> {
   const config = await getAutoModelConfig();
-  return plan === 'FREE'
-    ? { imageProvider: config.freeImageProvider, imageModel: config.freeImageModel }
-    : { imageProvider: config.proImageProvider, imageModel: config.proImageModel };
+  return { imageProvider: config.imageProvider, imageModel: config.imageModel };
 }
 
 /**
  * Resolve the video provider and model for text-to-video generation.
  */
-export async function resolveVideoModel(plan: 'FREE' | 'PRO' = 'PRO'): Promise<{
+export async function resolveVideoModel(): Promise<{
   videoProvider: string;
   videoModel: string;
 }> {
   const config = await getAutoModelConfig();
-  return plan === 'FREE'
-    ? { videoProvider: config.freeVideoProvider, videoModel: config.freeVideoModel }
-    : { videoProvider: config.proVideoProvider, videoModel: config.proVideoModel };
+  return { videoProvider: config.videoProvider, videoModel: config.videoModel };
 }
 
 /**
  * Resolve the avatar provider and model for lip-sync overlays.
  */
-export async function resolveAvatarModel(plan: 'FREE' | 'PRO' = 'PRO'): Promise<{
+export async function resolveAvatarModel(): Promise<{
   avatarProvider: string;
   avatarModel: string;
 }> {
   const config = await getAutoModelConfig();
-  return plan === 'FREE'
-    ? { avatarProvider: config.freeAvatarProvider, avatarModel: config.freeAvatarModel }
-    : { avatarProvider: config.proAvatarProvider, avatarModel: config.proAvatarModel };
+  return { avatarProvider: config.avatarProvider, avatarModel: config.avatarModel };
 }
 
 /**
  * Resolve the music provider and model for background music generation.
  */
-export async function resolveMusicModel(plan: 'FREE' | 'PRO' = 'PRO'): Promise<{
+export async function resolveMusicModel(): Promise<{
   musicProvider: string;
   musicModel: string;
 }> {
   const config = await getAutoModelConfig();
-  return plan === 'FREE'
-    ? { musicProvider: config.freeMusicProvider, musicModel: config.freeMusicModel }
-    : { musicProvider: config.proMusicProvider, musicModel: config.proMusicModel };
+  return { musicProvider: config.musicProvider, musicModel: config.musicModel };
 }
 
 /**
  * Resolve the motion provider for programmatic visual rendering.
  * Returns 'hera' only when explicitly configured; defaults to 'remotion'.
  */
-export async function resolveMotionProvider(plan: 'FREE' | 'PRO' = 'PRO'): Promise<'remotion' | 'hera'> {
+export async function resolveMotionProvider(): Promise<'remotion' | 'hera'> {
   const config = await getAutoModelConfig();
-  const value = plan === 'FREE' ? config.freeMotionProvider : config.proMotionProvider;
-  return value === 'hera' ? 'hera' : 'remotion';
+  return config.motionProvider === 'hera' ? 'hera' : 'remotion';
 }

@@ -133,10 +133,6 @@ describe('POST /api/ingest/agent', () => {
     mockCheckGenerationGate.mockResolvedValue({
       allowed: true,
       reason: 'ok',
-      dailyUsed: 0,
-      dailyLimit: 100,
-      isByokUser: true,
-      isProUser: false,
     });
     mockGetJobPriority.mockReturnValue(1);
     mockIsModelAllowedForUser.mockReturnValue(true);
@@ -263,22 +259,4 @@ describe('POST /api/ingest/agent', () => {
     expect(mockAddJob).not.toHaveBeenCalled();
   });
 
-  it('blocks ingestion when the generation gate is closed', async () => {
-    mockCheckGenerationGate.mockResolvedValue({
-      allowed: false,
-      reason: 'generation_in_progress',
-      dailyUsed: 1,
-      dailyLimit: 1,
-      isByokUser: false,
-      isProUser: false,
-    });
-
-    const response = await POST(createRequest(validPayload));
-    const body = await response.json();
-
-    expect(response.status).toBe(403);
-    expect(body).toMatchObject({ code: 'generation_in_progress' });
-    expect(mockPodcastCreate).not.toHaveBeenCalled();
-    expect(mockAddJob).not.toHaveBeenCalled();
-  });
 });

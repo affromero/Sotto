@@ -165,7 +165,7 @@ Run `npm run ci` before every commit. No exceptions.
 
 Local OSS development uses `.env.oss.example` copied to `.env.local`. Root npm scripts source `.env.local` through `scripts/run-with-env.sh`; set `SOTTO_ENV_FILE` to point them at a different env file.
 
-Critical local variables: `DATABASE_URL`, `REDIS_URL`, `AUTH_SECRET`, `BYOK_ENCRYPTION_KEY`, `STORAGE_PROVIDER`, `PAYMENT_PROVIDER`.
+Critical local variables: `DATABASE_URL`, `REDIS_URL`, `AUTH_SECRET`, `BYOK_ENCRYPTION_KEY`, `STORAGE_PROVIDER`.
 
 Provider variables are optional until the selected workflow needs them. Common examples: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `ELEVENLABS_API_KEY`, `R2_*`, `AI_PROVIDER`, `TTS_PROVIDER`, `STT_PROVIDER`.
 

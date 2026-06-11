@@ -20,9 +20,9 @@ import {
 import { createSegmentsAndQueueAudio } from '@/lib/segment-creator';
 import { convertTurnsForProvider } from '@/lib/tts-tag-converter';
 import { getMinReferenceCount } from '@/lib/script-verifier';
-import { getAiKey, hasByokKey } from '@/lib/byok';
+import { getAiKey } from '@/lib/byok';
 import { getTierFeatures } from '@/lib/tier-features';
-import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
+import { getAutoModelConfig } from '@/lib/auto-model-config';
 import { assignVoicesForPodcast } from '@/lib/voice-assigner';
 import { resolveAiModelAndProvider, type AiProviderId } from '@/lib/providers/ai-registry';
 import type { TtsProviderId } from '@/lib/providers/tts-registry';
@@ -66,7 +66,7 @@ export async function processReferenceValidation(
   await job.updateProgress(5);
 
   // Load references and script
-  const [references, script, podcast, userPlanRecord, discovery] = await Promise.all([
+  const [references, script, podcast, discovery] = await Promise.all([
     prisma.reference.findMany({
       where: { podcastId },
       orderBy: { number: 'asc' },
@@ -78,7 +78,6 @@ export async function processReferenceValidation(
       where: { id: podcastId },
       select: { topic: true, aiModel: true, source: true, verificationMode: true },
     }),
-    prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { plan: true } }),
     prisma.discovery.findUnique({
       where: { podcastId },
       select: {
@@ -133,13 +132,15 @@ export async function processReferenceValidation(
     }
 
     logger.info('No references to validate, proceeding to audio generation', { podcastId });
-    // Select TTS provider at auto-approve time (deferred from pipeline start)
-    const isByokEarly = useAdminCredits ? true : await hasByokKey(userId);
-    if (!isByokEarly) {
-      const selected = await selectFreeTierProviders(userId);
+    const earlyExistingPodcast = await prisma.podcast.findUniqueOrThrow({
+      where: { id: podcastId },
+      select: { ttsProvider: true },
+    });
+    if (!earlyExistingPodcast.ttsProvider) {
+      const selected = await getAutoModelConfig();
       await prisma.podcast.update({
         where: { id: podcastId },
-        data: { ttsProvider: selected.ttsProvider, ttsModel: selected.ttsModel },
+        data: { ttsProvider: selected.model.ttsProvider, ttsModel: selected.model.ttsModel },
       });
     }
 
@@ -175,7 +176,6 @@ export async function processReferenceValidation(
   const { model, provider } = await resolveAiModelAndProvider({
     podcastAiModel: podcast?.aiModel,
     aiKey,
-    plan: userPlanRecord.plan as 'FREE' | 'PRO',
   });
   const verificationModel = model;
 
@@ -662,14 +662,7 @@ export async function processReferenceValidation(
   await job.updateProgress(80);
 
   // Check source + tier to decide whether to pause for review
-  const [isByok, userRecord] = await Promise.all([
-    useAdminCredits ? Promise.resolve(true) : hasByokKey(userId),
-    prisma.user.findUniqueOrThrow({
-      where: { id: userId },
-      select: { plan: true, role: true },
-    }),
-  ]);
-  const tierFeatures = getTierFeatures(userRecord.plan as 'FREE' | 'PRO', isByok, userRecord.role);
+  const tierFeatures = getTierFeatures();
 
   // Non-WEB/IMPORT sources always auto-approve; for WEB/IMPORT, check tier
   const isWebOrImport = podcast?.source === 'WEB' || podcast?.source === 'IMPORT';
@@ -694,16 +687,18 @@ export async function processReferenceValidation(
 
     logger.info('References validated, paused at SCRIPT_READY for review', { podcastId });
   } else {
-    // Auto-approve for TWITTER/API sources or Free users
-    // Select TTS provider at auto-approve time (deferred from pipeline start)
-    if (!isByok) {
-      const selected = await selectFreeTierProviders(userId);
+    // Auto-approve for non-WEB/IMPORT sources.
+    const existingPodcast = await prisma.podcast.findUniqueOrThrow({
+      where: { id: podcastId },
+      select: { ttsProvider: true },
+    });
+    if (!existingPodcast.ttsProvider) {
+      const selected = await getAutoModelConfig();
       await prisma.podcast.update({
         where: { id: podcastId },
-        data: { ttsProvider: selected.ttsProvider, ttsModel: selected.ttsModel },
+        data: { ttsProvider: selected.model.ttsProvider, ttsModel: selected.model.ttsModel },
       });
     }
-    // BYOK keeps the provider chosen at creation or script approval. Missing provider pauses below.
 
     // Assign voices for multi-speaker podcasts
     const latePodcast = await prisma.podcast.findUniqueOrThrow({

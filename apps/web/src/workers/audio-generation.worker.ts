@@ -77,7 +77,7 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
     return;
   }
 
-  // Fetch podcast + user plan to determine voice configuration
+  // Fetch podcast to determine voice configuration
   const podcast = await prisma.podcast.findUniqueOrThrow({
     where: { id: podcastId },
     select: {
@@ -86,7 +86,6 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
       voices: { select: { speaker: true, voiceId: true, provider: true } },
       ttsProvider: true,
       ttsModel: true,
-      user: { select: { plan: true } },
     },
   });
 
@@ -179,7 +178,6 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
       podcastId,
       requestedProvider: podcast.ttsProvider as TtsProviderId,
       requestedModel: podcast.ttsModel,
-      plan: podcast.user.plan as 'FREE' | 'PRO',
       language: podcast.language,
     });
     provider = resolved.provider;
@@ -243,7 +241,6 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
     userId: podcast.userId,
     podcastId,
     requestedModel: podcast.ttsModel,
-    plan: podcast.user.plan as 'FREE' | 'PRO',
     usageCategory: 'audio_generation',
     isAborted: async () => {
       const check = await prisma.podcast.findUnique({

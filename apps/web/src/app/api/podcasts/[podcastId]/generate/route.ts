@@ -15,12 +15,9 @@ import {
   addJob,
   JobType,
 } from '@/lib/queue';
-import { checkGenerationGate } from '@/lib/generation-gate';
-import { getTierFeatures } from '@/lib/tier-features';
-import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
-import { checkRateLimit } from '@/lib/redis';
 import { determineResumePoint, type ResumePoint } from '@/lib/pipeline-resume';
 import { resolveSttProvider } from '@/lib/providers/stt';
+import { MAX_LESSON_DURATION_MINUTES } from '@/lib/generation-limits';
 import type {
   ExtractContentPayload,
   ImportAudioPayload,
@@ -39,45 +36,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return errorResponse('Unauthorized', 401);
   }
 
-  // Admin bypass: skip rate limit, generation gate, and ownership checks
+  // Admin bypass: skip ownership checks.
   const adminId = await requireAdmin();
   const isAdmin = adminId !== null;
 
-  // Admin-only flag: use platform API keys + skip free-tier counter
+  // Admin-only flag: use platform API keys.
   const useAdminCredits = isAdmin && request.nextUrl.searchParams.get('useAdminCredits') === 'true';
-
-  // Rate limit: 20/hour, 100/day (skip for admins)
-  if (!isAdmin) {
-    const hourly = await checkRateLimit(`generate:hour:${authResult.userId}`, 20, 3600);
-    if (!hourly.allowed) {
-      return errorResponse('Rate limit exceeded: max 20 generations per hour.', 429);
-    }
-    const daily = await checkRateLimit(`generate:day:${authResult.userId}`, 100, 86400);
-    if (!daily.allowed) {
-      return errorResponse('Rate limit exceeded: max 100 generations per day.', 429);
-    }
-  }
-
-  // Generation gate: BYOK or free tier (skip for admins)
-  const gate = isAdmin
-    ? {
-        allowed: true as const,
-        reason: 'admin' as const,
-        isByokUser: true,
-        isProUser: true,
-        dailyUsed: 0,
-        dailyLimit: 0,
-      }
-    : await checkGenerationGate(authResult.userId);
-  if (!gate.allowed) {
-    const msg =
-      gate.reason === 'generation_in_progress'
-        ? 'A podcast is already generating. Wait for it to finish before starting another.'
-        : gate.reason === 'budget_exceeded'
-          ? 'Monthly spend budget exceeded. Contact your admin to increase your limit.'
-          : 'No voice provider available. Add a TTS key in Settings for unlimited generation.';
-    return errorResponse(msg, 403, { code: gate.reason });
-  }
 
   const podcast = await prisma.podcast.findUnique({
     where: { id: podcastId },
@@ -117,20 +81,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     );
   }
 
-  const plan: 'FREE' | 'PRO' = gate.isProUser ? 'PRO' : 'FREE';
-
-  // Duration validation — use tier features for duration cap
-  const tierFeatures = getTierFeatures(plan, gate.isByokUser, isAdmin ? 'ADMIN' : undefined);
-  const effectiveMaxDuration = isFinite(tierFeatures.maxDurationMinutes)
-    ? tierFeatures.maxDurationMinutes
-    : 9999;
   const durationTarget = podcast.discovery?.durationTarget;
-  if (durationTarget && durationTarget > effectiveMaxDuration) {
-    return NextResponse.json(
-      {
-        error: `Requested duration (${durationTarget} min) exceeds the maximum of ${effectiveMaxDuration} minutes.`,
-      },
-      { status: 400 }
+  if (durationTarget && durationTarget > MAX_LESSON_DURATION_MINUTES) {
+    return errorResponse(
+      `Requested duration of ${durationTarget} minutes exceeds the maximum of ${MAX_LESSON_DURATION_MINUTES} minutes.`,
+      400,
     );
   }
 
@@ -186,28 +141,19 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       // key invalidation errors. For transient failures, preserving the
       // provider ensures voice consistency.
 
-      if (useAdminCredits) {
-        const selected = await selectFreeTierProviders(podcast.userId);
-        await prisma.podcast.update({
-          where: { id: podcastId },
-          data: { aiModel: selected.aiModel },
-        });
-      }
-
       return await routeResume(
         podcastId,
         authResult.userId,
         podcast,
         resumePoint,
-        useAdminCredits,
-        plan
+        useAdminCredits
       );
     }
   }
 
   // Imported podcasts re-queue the import pipeline
   if (podcast.source === 'IMPORT' && podcast.importedAudioKey) {
-    return await startImport(podcastId, authResult.userId, podcast, plan);
+    return await startImport(podcastId, authResult.userId, podcast);
   }
 
   // Standard generation pipeline: start from scratch (CAS prevents concurrent starts)
@@ -217,17 +163,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   });
   if (cas.count === 0) {
     return errorResponse('Podcast is no longer in a startable state', 409);
-  }
-
-  if (useAdminCredits || !gate.isByokUser) {
-    // Persist the concrete platform model before the extraction job can run.
-    const selected = await selectFreeTierProviders(
-      useAdminCredits ? podcast.userId : authResult.userId
-    );
-    await prisma.podcast.update({
-      where: { id: podcastId },
-      data: { aiModel: selected.aiModel },
-    });
   }
 
   const payload: ExtractContentPayload = {
@@ -261,12 +196,11 @@ async function routeResume(
     discovery: { id: string; sourceUrl: string | null; sourceContent: string | null } | null;
   },
   resumePoint: ResumePoint,
-  useAdminCredits: boolean,
-  plan: 'FREE' | 'PRO'
+  useAdminCredits: boolean
 ): Promise<NextResponse> {
   switch (resumePoint.step) {
     case 'IMPORT_AUDIO': {
-      return await startImport(podcastId, userId, podcast, plan);
+      return await startImport(podcastId, userId, podcast);
     }
 
     case 'EXTRACT_CONTENT': {
@@ -536,8 +470,7 @@ async function startImport(
     sttModel: string | null;
     isHumanContent: boolean;
     title: string;
-  },
-  plan: 'FREE' | 'PRO'
+  }
 ): Promise<NextResponse> {
   if (!podcast.importedAudioKey) {
     return errorResponse('No audio key for import', 400);
@@ -560,7 +493,6 @@ async function startImport(
       userId,
       requestedProvider: podcast.sttProvider as SttProviderId,
       requestedModel: podcast.sttModel ?? undefined,
-      plan,
     });
     sttProvider = resolved.providerId;
     sttApiKey = resolved.apiKey;

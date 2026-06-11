@@ -1,5 +1,5 @@
 ; Sotto — Chart of Accounts
-; SaaS podcast platform: AI generation, TTS, hosting, subscriptions
+; Self-hosted language learning platform: AI generation, TTS, and hosting
 ; Last updated: 2026-02-09
 
 ; ============================================================
@@ -8,14 +8,10 @@
 
 ; Cash & equivalents
 2026-01-01 open Assets:Current:Cash:Bank                        USD
-2026-01-01 open Assets:Current:Cash:Stripe                      USD
 
 ; Prepaid expenses (amortized monthly)
 2026-01-01 open Assets:Prepaid:Domain                           USD
 2026-01-01 open Assets:Prepaid:APICredits                       USD
-
-; Accounts receivable (Stripe pending payouts)
-2026-01-01 open Assets:Receivable:Stripe                        USD
 
 ; ============================================================
 ; LIABILITIES
@@ -30,9 +26,6 @@
 ; Accrued usage-based costs (API calls not yet invoiced)
 2026-01-01 open Liabilities:Accrued:APIUsage                    USD
 
-; Deferred revenue (annual subscriptions paid upfront)
-2026-01-01 open Liabilities:DeferredRevenue:Subscriptions       USD
-
 ; ============================================================
 ; EQUITY
 ; ============================================================
@@ -43,13 +36,6 @@
 ; ============================================================
 ; INCOME (Revenue)
 ; ============================================================
-
-; Subscription revenue by tier
-2026-01-01 open Income:Subscriptions:Pro                        USD
-2026-01-01 open Income:Subscriptions:Creator                    USD
-
-; API key revenue (developer access)
-2026-01-01 open Income:APIKeys                                  USD
 
 ; Other revenue (tips, sponsorships, etc.)
 2026-01-01 open Income:Other                                    USD
@@ -113,12 +99,6 @@
 
 ; OpenAI TTS — standard voice generation (fallback/default)
 2026-01-01 open Expenses:TTS:OpenAI:Standard                    USD
-
-; ============================================================
-; EXPENSES — Payment Processing
-; ============================================================
-
-2026-01-01 open Expenses:PaymentProcessing:StripeFees           USD
 
 ; ============================================================
 ; EXPENSES — Software & Tools

@@ -4,7 +4,6 @@ import { listAiProviders } from '@/lib/byok';
 import { getAllAiProviderMeta, getAiProviderMeta, type AiProviderId } from '@/lib/providers/ai-registry';
 import { getAutoModelConfig, resolveIncludedModels } from '@/lib/auto-model-config';
 import { isClaudeAvailable } from '@/lib/claude-code-client';
-import { prisma } from '@/lib/prisma';
 
 import { errorResponse } from '@/lib/api-response';
 
@@ -25,7 +24,6 @@ const CLAUDE_CODE_MODELS = getAiProviderMeta('claude-code').models.map(m => ({
   id: `claude-code:${m.id}`,
   displayName: m.displayName,
   tier: m.tier,
-  requiredPlan: m.requiredPlan,
   isDefault: false,
   group: 'Claude Code (Local)',
 }));
@@ -36,177 +34,58 @@ export async function GET(request: NextRequest) {
     return errorResponse('Unauthorized', 401);
   }
 
-  const user = await prisma.user.findUnique({
-    where: { id: authResult.userId },
-    select: { plan: true, role: true },
-  });
-  const isAdmin = user?.role === 'ADMIN';
-  const [aiKeys, claudeAvailable] = await Promise.all([
+  const [aiKeys, claudeAvailable, autoConfig] = await Promise.all([
     listAiProviders(authResult.userId),
     isClaudeAvailable(),
+    getAutoModelConfig(),
   ]);
   const validKeys = aiKeys.filter((k) => k.isValid);
   const claudeCodeModels = claudeAvailable ? CLAUDE_CODE_MODELS : [];
-  const userPlan = (user?.plan ?? 'FREE') as 'FREE' | 'PRO';
   const isByok = validKeys.length > 0;
+  const includedModelIds = new Set(resolveIncludedModels(autoConfig));
+  const modelsById = new Map<string, {
+    id: string;
+    displayName: string;
+    tier: string;
+    isDefault: boolean;
+    group: string;
+    hint: string;
+  }>();
 
-  // No BYOK AI key
-  if (!isByok) {
-    const autoConfig = await getAutoModelConfig();
-    const tierConfig = userPlan === 'PRO' ? autoConfig.pro : autoConfig.free;
-
-    // Admins: respect adminViewMode toggle
-    if (isAdmin) {
-      const proView = autoConfig.adminViewMode === 'PRO';
-
-      if (proView) {
-        const { freeModels, proModels } = resolveIncludedModels(autoConfig);
-        const freeSet = new Set(freeModels);
-        const proSet = new Set(proModels);
-
-        const platformModels = getAllAiProviderMeta()
-          .filter((p) => p.id !== 'claude-code' && process.env[PLATFORM_PROVIDER_ENV[p.id] ?? ''])
-          .flatMap((p) =>
-            p.models
-              .filter((m) => proSet.has(m.id))
-              .map((m) => ({
-                id: m.id,
-                displayName: m.displayName,
-                tier: m.tier,
-                requiredPlan: freeSet.has(m.id) ? ('FREE' as const) : ('PRO' as const),
-                isDefault: m.id === tierConfig.aiModel,
-                group: p.displayName,
-                hint: p.displayName,
-              }))
-          );
-
-        return NextResponse.json({
-          provider: tierConfig.aiProvider,
-          readOnly: false,
-          userPlan: 'PRO',
-          isByok: false,
-          adminViewMode: autoConfig.adminViewMode,
-          models: sortModels(platformModels),
-        }, { headers: CACHE_HEADERS });
-      }
-
-      const platformModels = getAllAiProviderMeta()
-        .filter((p) => process.env[PLATFORM_PROVIDER_ENV[p.id] ?? ''])
-        .flatMap((p) =>
-          p.models.map((m) => ({
-            id: m.id,
-            displayName: m.displayName,
-            tier: m.tier,
-            requiredPlan: m.requiredPlan,
-            isDefault: m.id === tierConfig.aiModel,
-            group: p.displayName,
-            hint: p.displayName,
-          }))
-        );
-
-      return NextResponse.json({
-        provider: tierConfig.aiProvider,
-        readOnly: false,
-        userPlan: 'PRO',
-        isByok: false,
-        adminViewMode: autoConfig.adminViewMode,
-        models: sortModels([...platformModels, ...claudeCodeModels]),
-      }, { headers: CACHE_HEADERS });
+  for (const provider of getAllAiProviderMeta()) {
+    if (provider.id === 'claude-code' || provider.id === 'local') continue;
+    if (!process.env[PLATFORM_PROVIDER_ENV[provider.id] ?? '']) continue;
+    for (const model of provider.models) {
+      if (!includedModelIds.has(model.id)) continue;
+      modelsById.set(model.id, {
+        id: model.id,
+        displayName: model.displayName,
+        tier: model.tier,
+        isDefault: model.id === autoConfig.model.aiModel,
+        group: provider.displayName,
+        hint: provider.displayName,
+      });
     }
-
-    // Free/Pro non-BYOK: filter to only included models with dynamic requiredPlan
-    const { freeModels, proModels } = resolveIncludedModels(autoConfig);
-    const freeSet = new Set(freeModels);
-    const proSet = new Set(proModels);
-
-    const platformModels = getAllAiProviderMeta()
-      .filter((p) => p.id !== 'claude-code' && process.env[PLATFORM_PROVIDER_ENV[p.id] ?? ''])
-      .flatMap((p) =>
-        p.models
-          .filter((m) => proSet.has(m.id))
-          .map((m) => ({
-            id: m.id,
-            displayName: m.displayName,
-            tier: m.tier,
-            requiredPlan: freeSet.has(m.id) ? ('FREE' as const) : ('PRO' as const),
-            isDefault: m.id === tierConfig.aiModel,
-            group: p.displayName,
-            hint: p.displayName,
-          }))
-      );
-
-    return NextResponse.json({
-      provider: tierConfig.aiProvider,
-      readOnly: false,
-      userPlan,
-      isByok: false,
-      models: sortModels([...platformModels, ...claudeCodeModels]),
-    }, { headers: CACHE_HEADERS });
   }
 
-  // BYOK keys present — filter through AutoModelConfig (same as non-BYOK)
-  // Admins in free view bypass the filter and see all models
-  const seenProviders = new Set<string>();
-  const uniqueKeys = validKeys.filter((key) => {
-    if (seenProviders.has(key.provider)) return false;
-    seenProviders.add(key.provider);
-    return true;
-  });
-  const defaultProvider = getAiProviderMeta(uniqueKeys[0].provider as AiProviderId);
-
-  const autoConfig = await getAutoModelConfig();
-  const adminFreeView = isAdmin && autoConfig.adminViewMode !== 'PRO';
-
-  if (adminFreeView) {
-    // Admin free view: show all BYOK provider models unfiltered
-    const byokModels = uniqueKeys.flatMap((key) => {
-      const p = getAiProviderMeta(key.provider as AiProviderId);
-      return p.models.map((m) => ({
-        id: m.id,
-        displayName: m.displayName,
-        tier: m.tier,
-        requiredPlan: m.requiredPlan,
-        isDefault: key.provider === defaultProvider.id && m.id === defaultProvider.defaultModel,
-        group: p.displayName,
-        hint: p.displayName,
-      }));
-    });
-
-    return NextResponse.json({
-      provider: defaultProvider.id,
-      readOnly: false,
-      userPlan,
-      isByok: true,
-      adminViewMode: autoConfig.adminViewMode,
-      models: sortModels([...byokModels, ...claudeCodeModels]),
-    }, { headers: CACHE_HEADERS });
+  for (const key of validKeys) {
+    const provider = getAiProviderMeta(key.provider as AiProviderId);
+    for (const model of provider.models) {
+      modelsById.set(model.id, {
+        id: model.id,
+        displayName: model.displayName,
+        tier: model.tier,
+        isDefault: key.provider === autoConfig.model.aiProvider && model.id === autoConfig.model.aiModel,
+        group: provider.displayName,
+        hint: provider.displayName,
+      });
+    }
   }
-
-  // Everyone else (including admin PRO view): filter to AutoModelConfig included models
-  const { freeModels, proModels } = resolveIncludedModels(autoConfig);
-  const freeSet = new Set(freeModels);
-  const proSet = new Set(proModels);
-
-  const byokModels = uniqueKeys.flatMap((key) => {
-    const p = getAiProviderMeta(key.provider as AiProviderId);
-    return p.models
-      .filter((m) => proSet.has(m.id))
-      .map((m) => ({
-        id: m.id,
-        displayName: m.displayName,
-        tier: m.tier,
-        requiredPlan: freeSet.has(m.id) ? ('FREE' as const) : ('PRO' as const),
-        isDefault: key.provider === defaultProvider.id && m.id === defaultProvider.defaultModel,
-        group: p.displayName,
-        hint: p.displayName,
-      }));
-  });
 
   return NextResponse.json({
-    provider: defaultProvider.id,
+    provider: validKeys[0]?.provider ?? autoConfig.model.aiProvider,
     readOnly: false,
-    userPlan,
-    isByok: true,
-    models: sortModels([...byokModels, ...claudeCodeModels]),
+    isByok,
+    models: sortModels([...modelsById.values(), ...claudeCodeModels]),
   }, { headers: CACHE_HEADERS });
 }

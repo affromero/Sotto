@@ -4,8 +4,6 @@ import styles from './CostBreakdown.module.css';
 
 interface CostBreakdownProps {
   breakdown: PodcastCostBreakdown;
-  isPro: boolean;
-  isByok: boolean;
 }
 
 const BUCKETS = [
@@ -20,17 +18,15 @@ function formatCost(cost: number): string {
   return `$${cost.toFixed(2)}`;
 }
 
-export function CostBreakdown({ breakdown, isPro, isByok }: CostBreakdownProps) {
+export function CostBreakdown({ breakdown }: CostBreakdownProps) {
   const activeBuckets = BUCKETS.filter((b) => breakdown[b.key] > 0);
 
   if (activeBuckets.length === 0) return null;
 
-  const header = isPro || isByok ? 'Generation cost' : 'Generated for you, on us';
-
   return (
     <section className={styles.root} aria-label="Generation cost breakdown">
       <div className={styles.headerRow}>
-        <h3 className={styles.header}>{header}</h3>
+        <h3 className={styles.header}>Generation cost</h3>
         <OwnerOnlyBadge />
       </div>
       <div className={styles.chips}>

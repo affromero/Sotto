@@ -35,14 +35,11 @@ export interface ResolvedMusicProvider {
 export async function resolveMusicProvider(context: {
   userId: string;
   requestedModel?: string | null;
-  plan?: 'FREE' | 'PRO';
 }): Promise<ResolvedMusicProvider> {
-  const { userId, requestedModel, plan } = context;
+  const { userId, requestedModel } = context;
 
   const config = await getAutoModelConfig();
-  const tier = plan ?? 'PRO';
-  const defaultModel = tier === 'FREE' ? config.freeMusicModel : config.proMusicModel;
-  const model = requestedModel ?? defaultModel ?? 'suno-v5';
+  const model = requestedModel ?? config.musicModel ?? 'suno-v5';
 
   const providerId = getMusicModelProvider(model);
   if (!providerId) {

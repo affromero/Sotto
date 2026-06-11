@@ -5,15 +5,9 @@ import { authenticateRequest } from '@/lib/api-keys';
 import { createPodcastSchema } from '@/lib/validations';
 import { checkRateLimit } from '@/lib/redis';
 import { contentExtractionQueue, addJob, JobType } from '@/lib/queue';
-import { checkGenerationGate } from '@/lib/generation-gate';
-import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
 import { getAutoModelConfig } from '@/lib/auto-model-config';
-import { getTierFeatures, getJobPriority, isModelAllowedForUser } from '@/lib/tier-features';
-import {
-  getModelRequiredPlan,
-  getProviderForModel,
-  isValidModelId,
-} from '@/lib/providers/ai-registry';
+import { getTierFeatures, getJobPriority } from '@/lib/tier-features';
+import { getProviderForModel, isValidModelId } from '@/lib/providers/ai-registry';
 import { checkSuspension, requireAdmin } from '@/lib/auth-guards';
 import { generatePodcastSlug } from '@/lib/slugify';
 import type { ExtractContentPayload } from '@/lib/queue';
@@ -92,126 +86,48 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Admin bypass: skip rate limits
+  // Admin request context.
   const adminId = await requireAdmin();
   const isAdmin = adminId !== null;
 
-  // Rate limit: 20/hour, 100/day (skip for admins)
-  if (!isAdmin) {
-    const hourly = await checkRateLimit(`generate:hour:${authResult.userId}`, 20, 3600);
-    if (!hourly.allowed) {
-      return errorResponse('Rate limit exceeded: max 20 generations per hour.', 429);
-    }
-    const daily = await checkRateLimit(`generate:day:${authResult.userId}`, 100, 86400);
-    if (!daily.allowed) {
-      return errorResponse('Rate limit exceeded: max 100 generations per day.', 429);
-    }
-  }
+  const tierFeatures = getTierFeatures();
 
-  // Generation gate: BYOK, PRO, or free tier daily limit
-  const gate = await checkGenerationGate(authResult.userId);
-  if (!gate.allowed) {
-    if (gate.reason === 'generation_in_progress') {
-      return errorResponse(
-        'You already have a podcast being generated. Please wait for it to finish.',
-        403,
-        { code: gate.reason }
-      );
-    }
-    if (gate.reason === 'daily_limit_reached') {
-      const resetH = gate.resetInSeconds ? Math.ceil(gate.resetInSeconds / 3600) : 24;
-      return errorResponse(
-        `Daily podcast limit reached. Next podcast available in ~${resetH}h. Upgrade to Pro for unlimited generation.`,
-        403,
-        { code: gate.reason, resetInSeconds: gate.resetInSeconds }
-      );
-    }
-    return errorResponse(
-      'No voice provider available. Add a TTS key in Settings for unlimited generation.',
-      403,
-      { code: gate.reason }
-    );
-  }
-
-  // Get tier features for this user
-  const tierFeatures = getTierFeatures(
-    gate.isProUser ? 'PRO' : 'FREE',
-    gate.isByokUser,
-    isAdmin ? 'ADMIN' : undefined
-  );
-
-  // Model plan gating — block expensive models for free non-BYOK users
-  if (parsed.data.aiModel) {
-    const requiredPlan = getModelRequiredPlan(parsed.data.aiModel);
-    if (
-      requiredPlan &&
-      !isModelAllowedForUser(
-        requiredPlan,
-        gate.isProUser ? 'PRO' : 'FREE',
-        gate.isByokUser,
-        isAdmin ? 'ADMIN' : undefined
-      )
-    ) {
-      return errorResponse('This model requires a Pro subscription.', 403, {
-        code: 'model_requires_pro',
-      });
-    }
-  }
-
-  // Speaker count validation — enforce tier cap
+  // Speaker count validation — enforce uniform safety cap.
   const requestedSpeakers = parsed.data.metadata?.speakers;
   if (requestedSpeakers && requestedSpeakers.length > tierFeatures.maxSpeakers) {
     return errorResponse(
-      `Speaker count (${requestedSpeakers.length}) exceeds your plan limit of ${tierFeatures.maxSpeakers}.`,
+      `Speaker count (${requestedSpeakers.length}) exceeds the maximum of ${tierFeatures.maxSpeakers}.`,
       403
     );
   }
 
-  // Duration validation — enforce tier cap (before incrementing counter)
+  // Duration validation — enforce uniform safety cap.
   const effectiveMaxDuration = isFinite(tierFeatures.maxDurationMinutes)
     ? tierFeatures.maxDurationMinutes
     : 9999;
   const durationTarget = parsed.data.metadata?.durationTarget;
   if (durationTarget && durationTarget > effectiveMaxDuration) {
     return errorResponse(
-      `Requested duration (${durationTarget} min) exceeds your plan limit of ${effectiveMaxDuration} min.`,
+      `Requested duration (${durationTarget} min) exceeds the maximum of ${effectiveMaxDuration} min.`,
       400,
       {}
     );
   }
 
-  // Track whether the user explicitly chose a model in this request
   const requestedAiModel = parsed.data.aiModel;
-  if (gate.isByokUser && !parsed.data.ttsProvider) {
-    return errorResponse(
-      'TTS provider is required. Choose a provider before creating a podcast.',
-      400,
-      {
-        code: 'tts_provider_required',
-      }
-    );
-  }
 
-  // Auto-resolve providers for free-tier users (quota consumed on success by workers)
   let autoResolvedTtsProvider: string | undefined;
   let autoResolvedTtsModel: string | undefined;
   let autoResolvedAiModel: string | undefined;
   let autoResolvedAiProvider: string | undefined;
-  if (!gate.isByokUser && !gate.isProUser) {
-    const selected = await selectFreeTierProviders(authResult.userId);
-    autoResolvedTtsProvider = selected.ttsProvider;
-    autoResolvedTtsModel = selected.ttsModel;
-    autoResolvedAiModel = selected.aiModel;
-    autoResolvedAiProvider = selected.aiProvider;
+  const autoConfig = await getAutoModelConfig();
+  if (!parsed.data.aiModel) {
+    autoResolvedAiModel = autoConfig.model.aiModel;
+    autoResolvedAiProvider = autoConfig.model.aiProvider;
   }
-
-  // Pro non-BYOK: resolve auto model for Pro tier
-  if (!gate.isByokUser && gate.isProUser && !parsed.data.aiModel) {
-    const proConfig = (await getAutoModelConfig()).pro;
-    autoResolvedAiModel = proConfig.aiModel;
-    autoResolvedAiProvider = proConfig.aiProvider;
-    autoResolvedTtsProvider = proConfig.ttsProvider;
-    autoResolvedTtsModel = proConfig.ttsModel;
+  if (!parsed.data.ttsProvider) {
+    autoResolvedTtsProvider = autoConfig.model.ttsProvider;
+    autoResolvedTtsModel = autoConfig.model.ttsModel;
   }
 
   // User preference fallback (only when no explicit model was requested)
@@ -222,16 +138,7 @@ export async function POST(request: NextRequest) {
     });
     if (userPref?.preferredAiModel) {
       const prefModel = userPref.preferredAiModel;
-      const prefPlan = getModelRequiredPlan(prefModel);
-      if (
-        !prefPlan ||
-        isModelAllowedForUser(
-          prefPlan,
-          gate.isProUser ? 'PRO' : 'FREE',
-          gate.isByokUser,
-          isAdmin ? 'ADMIN' : undefined
-        )
-      ) {
+      if (isValidModelId(prefModel)) {
         autoResolvedAiModel = prefModel;
         autoResolvedAiProvider = getProviderForModel(prefModel) ?? autoResolvedAiProvider;
       }
@@ -351,7 +258,7 @@ export async function POST(request: NextRequest) {
     sourceUrl: sourceUrl ?? undefined,
     sourceText: sourceText ?? undefined,
   };
-  const jobPriority = getJobPriority(gate.isProUser ? 'PRO' : 'FREE', gate.isByokUser);
+  const jobPriority = getJobPriority();
   await addJob(contentExtractionQueue, JobType.EXTRACT_CONTENT, payload, { priority: jobPriority });
 
   return NextResponse.json({ id: podcast.id, status: podcast.status }, { status: 201 });

@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { authenticateRequest } from '@/lib/api-keys';
 import { requireAdmin } from '@/lib/auth-guards';
 import { errorResponse } from '@/lib/api-response';
-import { checkAvatarGenerationGate, tryIncrementAvatarGeneration } from '@/lib/video-gate';
+import { checkAvatarGenerationGate } from '@/lib/video-gate';
 import { configureAvatarsSchema } from '@/lib/validations';
 import { listUnifiedAvatars } from '@/lib/providers/avatar';
 import type { AvatarProviderId } from '@/lib/providers/avatar-registry';
@@ -29,10 +29,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
   const gate = await checkAvatarGenerationGate(authResult.userId);
   if (!gate.allowed) {
-    const message = gate.reason === 'daily_limit_reached'
-      ? 'Daily video generation limit reached. Try again later.'
-      : 'No image provider available.';
-    return errorResponse(message, gate.reason === 'daily_limit_reached' ? 429 : 403, { code: gate.reason });
+    return errorResponse('No image provider available.', 403, { code: gate.reason });
   }
 
   // Fetch config first to determine defaults
@@ -41,10 +38,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     getAutoModelConfig(),
   ]);
 
-  // Determine the default avatar model and included list for this user's plan
-  const defaultAvatarModel = gate.isProUser ? config.proAvatarModel : config.freeAvatarModel;
-  const defaultAvatarProvider = (gate.isProUser ? config.proAvatarProvider : config.freeAvatarProvider) as AvatarProviderId;
-  const includedModels = (gate.isProUser ? config.proIncludedAvatarModels : config.freeIncludedAvatarModels) ?? [defaultAvatarModel];
+  const defaultAvatarModel = config.avatarModel;
+  const defaultAvatarProvider = config.avatarProvider as AvatarProviderId;
+  const includedModels = config.includedAvatarModels ?? [defaultAvatarModel];
 
   // Derive available providers from config: a provider is available if it has an API key
   // AND at least one of its models is in the included list (or is the default)
@@ -233,23 +229,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   // Auto-start avatar generation if the video generation is already complete
   let generationStarted = false;
   if (videoGeneration.status === 'READY') {
-    // Check avatar daily limit (separate counter from video)
     const gate = await checkAvatarGenerationGate(authResult.userId);
     if (!gate.allowed) {
-      const message = gate.reason === 'daily_limit_reached'
-        ? 'Daily avatar generation limit reached. Try again later.'
-        : 'No image provider available.';
-      return errorResponse(message, gate.reason === 'daily_limit_reached' ? 429 : 403, { code: gate.reason });
-    }
-
-    // Increment daily avatar counter (non-admin, non-BYOK users)
-    if (!gate.isByokUser) {
-      const incremented = await tryIncrementAvatarGeneration(authResult.userId, gate.dailyLimit);
-      if (!incremented) {
-        return errorResponse('Daily avatar generation limit reached. Try again later.', 429, {
-          code: 'daily_limit_reached',
-        });
-      }
+      return errorResponse('No image provider available.', 403, { code: gate.reason });
     }
 
     for (const overlay of overlays) {

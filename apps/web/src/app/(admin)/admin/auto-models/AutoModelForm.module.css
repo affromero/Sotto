@@ -322,27 +322,3 @@
   border-color: var(--color-text-secondary);
   color: var(--color-text-primary);
 }
-
-/* Daily Limits Grid */
-
-.dailyLimitsGrid {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: var(--spacing-xs) var(--spacing-md);
-  align-items: center;
-}
-
-.dailyLimitsHeader {
-  font: var(--text-body-xs, 0.75rem/1 IBM Plex Sans, sans-serif);
-  font-weight: 600;
-  color: var(--color-text-tertiary);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  text-align: center;
-}
-
-.dailyLimitsLabel {
-  font: var(--text-body-sm);
-  font-weight: 600;
-  color: var(--color-text-primary);
-}

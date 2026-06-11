@@ -404,17 +404,6 @@
   margin-bottom: var(--spacing-md);
 }
 
-.referralBonus {
-  font: var(--text-body-sm);
-  font-weight: 600;
-  color: var(--color-primary);
-  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
-  padding: var(--spacing-xs) var(--spacing-sm);
-  border-radius: var(--radius-sm);
-  display: inline-block;
-  margin-bottom: var(--spacing-md);
-}
-
 .referralRow {
   display: flex;
   gap: var(--spacing-sm);
@@ -612,4 +601,3 @@
     flex-direction: column;
   }
 }
-

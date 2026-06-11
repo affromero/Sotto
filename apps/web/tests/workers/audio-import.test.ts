@@ -46,7 +46,7 @@ const mockPrismaSegmentCreate = vi.fn();
 const mockPrismaSegmentUpdate = vi.fn().mockResolvedValue({});
 const mockPrismaTagFindUnique = vi.fn().mockResolvedValue(null);
 const mockPrismaPodcastTagUpsert = vi.fn().mockResolvedValue({});
-const mockPrismaUserFindUniqueOrThrow = vi.fn().mockResolvedValue({ role: 'USER', plan: 'FREE' });
+const mockPrismaUserFindUniqueOrThrow = vi.fn().mockResolvedValue({ role: 'USER' });
 
 vi.mock('@/lib/prisma', () => {
   const _mockPrisma = {
@@ -338,7 +338,6 @@ describe('processAudioImport', () => {
       expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
         podcastAiModel: null,
         aiKey,
-        plan: 'FREE',
       });
       expect(mockDiarizeSpeakers).toHaveBeenCalledWith(
         expect.any(Array),
@@ -368,7 +367,6 @@ describe('processAudioImport', () => {
       expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
         podcastAiModel: 'gpt-5-mini',
         aiKey: null,
-        plan: 'FREE',
       });
       expect(mockGetAiKey).toHaveBeenCalledTimes(1);
       expect(mockGetAiKey).toHaveBeenCalledWith('user-001', 'openai');

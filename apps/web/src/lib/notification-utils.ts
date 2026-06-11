@@ -55,7 +55,7 @@ export function getNotificationUrl(notification: NotificationData): string | nul
 
     // Settings / BYOK
     case 'KEY_INVALID':
-      return '/billing';
+      return '/settings/api';
 
     // Account moderation
     case 'ACCOUNT_WARNING':

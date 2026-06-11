@@ -3,7 +3,6 @@ import { authenticateRequest } from '@/lib/api-keys';
 import { listByokProviders } from '@/lib/byok';
 import { getAllProviderMeta, type TtsProviderId } from '@/lib/providers/tts-registry';
 import { getAutoModelConfig, resolveTtsIncludedModels } from '@/lib/auto-model-config';
-import { prisma } from '@/lib/prisma';
 
 import { errorResponse } from '@/lib/api-response';
 
@@ -47,7 +46,6 @@ interface TtsOption {
   badge?: string;
   group?: string;
   hint?: string;
-  requiredPlan?: 'FREE' | 'PRO';
   supportedLanguages?: string[];
 }
 
@@ -57,158 +55,48 @@ export async function GET(request: NextRequest) {
     return errorResponse('Unauthorized', 401);
   }
 
-  const user = await prisma.user.findUnique({
-    where: { id: authResult.userId },
-    select: { plan: true, role: true },
-  });
-  const isAdmin = user?.role === 'ADMIN';
-  const byokKeys = await listByokProviders(authResult.userId);
+  const [byokKeys, autoConfig] = await Promise.all([
+    listByokProviders(authResult.userId),
+    getAutoModelConfig(),
+  ]);
   const validProviderIds = byokKeys.filter((k) => k.isValid).map((k) => k.provider);
+  const includedModelIds = new Set(resolveTtsIncludedModels(autoConfig));
+  const optionsById = new Map<string, TtsOption>();
 
-  // No BYOK TTS keys
-  if (validProviderIds.length === 0) {
-    // Admins: respect adminViewMode toggle
-    if (isAdmin) {
-      const autoConfig = await getAutoModelConfig();
-      const proView = autoConfig.adminViewMode === 'PRO';
-      const options: TtsOption[] = [];
-
-      if (!proView) {
-        options.push({
-          id: 'auto',
-          displayName: 'Auto',
-          badge: 'Best available',
-          hint: 'Picks the best voice and provider based on your podcast\u2019s topic, tone, and speakers',
-        });
-      }
-
-      if (proView) {
-        const { freeTtsModels, proTtsModels } = resolveTtsIncludedModels(autoConfig);
-        const freeSet = new Set(freeTtsModels);
-        const proSet = new Set(proTtsModels);
-
-        for (const meta of getAllProviderMeta()) {
-          if (!hasPlatformKey(meta.id)) continue;
-          for (const model of meta.models) {
-            const compositeId = `${meta.id}:${model.id}`;
-            if (!proSet.has(compositeId)) continue;
-            options.push({
-              id: compositeId,
-              displayName: `${meta.displayName} ${model.displayName}`,
-              badge: QUALITY_BADGES[model.tier],
-              group: meta.displayName,
-              hint: meta.displayName,
-              requiredPlan: freeSet.has(compositeId) ? 'FREE' : 'PRO',
-              supportedLanguages: [...model.supportedLanguages],
-            });
-          }
-        }
-      } else {
-        for (const meta of getAllProviderMeta()) {
-          if (!hasPlatformKey(meta.id)) continue;
-          for (const model of meta.models) {
-            options.push({
-              id: `${meta.id}:${model.id}`,
-              displayName: `${meta.displayName} ${model.displayName}`,
-              badge: QUALITY_BADGES[model.tier],
-              group: meta.displayName,
-              hint: meta.displayName,
-              supportedLanguages: [...model.supportedLanguages],
-            });
-          }
-        }
-      }
-
-      return NextResponse.json(
-        { readOnly: false, adminViewMode: autoConfig.adminViewMode, options: sortOptions(options) },
-        { headers: CACHE_HEADERS }
-      );
+  for (const meta of getAllProviderMeta()) {
+    if (!hasPlatformKey(meta.id)) continue;
+    for (const model of meta.models) {
+      const compositeId = `${meta.id}:${model.id}`;
+      if (!includedModelIds.has(compositeId)) continue;
+      optionsById.set(compositeId, {
+        id: compositeId,
+        displayName: `${meta.displayName} ${model.displayName}`,
+        badge: QUALITY_BADGES[model.tier],
+        group: meta.displayName,
+        hint: meta.displayName,
+        supportedLanguages: [...model.supportedLanguages],
+      });
     }
-
-    // Non-admins: show included TTS models with plan gating
-    const userPlan = (user?.plan ?? 'FREE') as 'FREE' | 'PRO';
-    const autoConfig = await getAutoModelConfig();
-    const { freeTtsModels, proTtsModels } = resolveTtsIncludedModels(autoConfig);
-    const freeSet = new Set(freeTtsModels);
-    const proSet = new Set(proTtsModels);
-
-    const options: TtsOption[] = [];
-
-    for (const meta of getAllProviderMeta()) {
-      if (!hasPlatformKey(meta.id)) continue;
-
-      for (const model of meta.models) {
-        const compositeId = `${meta.id}:${model.id}`;
-        if (!proSet.has(compositeId)) continue;
-
-        options.push({
-          id: compositeId,
-          displayName: `${meta.displayName} ${model.displayName}`,
-          badge: QUALITY_BADGES[model.tier],
-          group: meta.displayName,
-          hint: meta.displayName,
-          requiredPlan: freeSet.has(compositeId) ? 'FREE' : 'PRO',
-          supportedLanguages: [...model.supportedLanguages],
-        });
-      }
-    }
-
-    return NextResponse.json(
-      { readOnly: false, userPlan, isByok: false, options: sortOptions(options) },
-      { headers: CACHE_HEADERS }
-    );
   }
 
-  // BYOK keys present — filter through AutoModelConfig (same as non-BYOK)
-  // Admins in free view bypass the filter and see all models
-  const autoConfig = await getAutoModelConfig();
-  const adminFreeView = isAdmin && autoConfig.adminViewMode !== 'PRO';
-
-  const options: TtsOption[] = [];
-
-  if (adminFreeView) {
-    // Admin free view: show all BYOK provider models unfiltered
-    for (const providerId of validProviderIds) {
-      const meta = getAllProviderMeta().find((p) => p.id === providerId);
-      if (!meta) continue;
-      for (const model of meta.models) {
-        options.push({
-          id: `${meta.id}:${model.id}`,
-          displayName: `${meta.displayName} ${model.displayName}`,
-          badge: QUALITY_BADGES[model.tier],
-          group: meta.displayName,
-          hint: meta.displayName,
-          supportedLanguages: [...model.supportedLanguages],
-        });
-      }
-    }
-  } else {
-    // Everyone else (including admin PRO view): filter to AutoModelConfig included models
-    const { freeTtsModels, proTtsModels } = resolveTtsIncludedModels(autoConfig);
-    const freeSet = new Set(freeTtsModels);
-    const proSet = new Set(proTtsModels);
-
-    for (const providerId of validProviderIds) {
-      const meta = getAllProviderMeta().find((p) => p.id === providerId);
-      if (!meta) continue;
-      for (const model of meta.models) {
-        const compositeId = `${meta.id}:${model.id}`;
-        if (!proSet.has(compositeId)) continue;
-        options.push({
-          id: compositeId,
-          displayName: `${meta.displayName} ${model.displayName}`,
-          badge: QUALITY_BADGES[model.tier],
-          group: meta.displayName,
-          hint: meta.displayName,
-          requiredPlan: freeSet.has(compositeId) ? 'FREE' : 'PRO',
-          supportedLanguages: [...model.supportedLanguages],
-        });
-      }
+  for (const providerId of validProviderIds) {
+    const meta = getAllProviderMeta().find((p) => p.id === providerId);
+    if (!meta) continue;
+    for (const model of meta.models) {
+      const compositeId = `${meta.id}:${model.id}`;
+      optionsById.set(compositeId, {
+        id: compositeId,
+        displayName: `${meta.displayName} ${model.displayName}`,
+        badge: QUALITY_BADGES[model.tier],
+        group: meta.displayName,
+        hint: meta.displayName,
+        supportedLanguages: [...model.supportedLanguages],
+      });
     }
   }
 
   return NextResponse.json(
-    { readOnly: false, isByok: true, options: sortOptions(options) },
+    { readOnly: false, isByok: validProviderIds.length > 0, options: sortOptions([...optionsById.values()]) },
     { headers: CACHE_HEADERS }
   );
 }

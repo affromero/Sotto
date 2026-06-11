@@ -154,50 +154,13 @@ export default function TermsPage() {
             infringers.
           </p>
 
-          <h2>12. Optional Paid Voice Sharing and Payments</h2>
-          <p>
-            Private-first installs keep paid voice sharing disabled by default.
-            If an operator enables it, voice owners may set per-lesson pricing
-            for access to their voice clones.
-          </p>
-
-          <h3>Paid Access</h3>
-          <ul>
-            <li>Payments are processed securely via Stripe</li>
-            <li>Voice access is granted per lesson. One purchase covers one lesson generation</li>
-            <li>Payment is authorized upfront and captured only when the lesson reaches READY status</li>
-            <li>If lesson generation fails, the payment authorization is automatically cancelled</li>
-          </ul>
-
-          <h3>Platform Fee</h3>
-          <p>
-            Sotto charges a 10% platform fee on paid voice-sharing transactions
-            when this optional feature is enabled. The remaining 90% is
-            transferred to the voice owner via Stripe Connect.
-          </p>
-
-          <h3>Refunds</h3>
-          <p>
-            Since payment is only captured on successful lesson generation, refunds
-            are generally not applicable. If you experience issues with a completed
-            purchase, contact{' '}
-            <a href="mailto:support@example.com">support@example.com</a>.
-          </p>
-
-          <h3>Voice Owner Responsibilities</h3>
-          <p>
-            Voice owners who enable paid access to their voices must comply with
-            Stripe&apos;s terms of service and are responsible for any applicable
-            taxes on their earnings.
-          </p>
-
-          <h2>13. Changes to Terms</h2>
+          <h2>12. Changes to Terms</h2>
           <p>
             We may update these terms from time to time. Continued use of the service
             after changes constitutes acceptance of the new terms.
           </p>
 
-          <h2>14. Contact</h2>
+          <h2>13. Contact</h2>
           <p>
             Questions about these terms? Email us at{' '}
             <a href="mailto:support@example.com">support@example.com</a>.

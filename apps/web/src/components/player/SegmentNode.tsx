@@ -104,7 +104,7 @@ function StoryboardCardComponent({
       } else if (isAiIllustration) {
         // Keep current mode if already image/video, default to image from programmatic
         visualMode = segment.visualMode === 'programmatic' ? 'image' : segment.visualMode;
-        // Keep current model if switching from another non-programmatic type; otherwise use plan default
+        // Keep current model if switching from another non-programmatic type; otherwise use configured default
         if (segment.model && !PROGRAMMATIC_TYPES.has(segment.visualType)) {
           model = segment.model;
         } else if (visualMode === 'video') {

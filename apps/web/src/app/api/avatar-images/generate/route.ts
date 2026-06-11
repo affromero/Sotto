@@ -6,7 +6,6 @@ import { logger } from '@/lib/logger';
 import { errorResponse } from '@/lib/api-response';
 import { avatarImageGenerateSchema } from '@/lib/validations';
 import { resolveImageProvider } from '@/lib/providers/image';
-import { getPlanFeatureConfig } from '@/lib/plan-feature-config';
 
 const MAX_IMAGES = 10;
 
@@ -25,12 +24,6 @@ export async function POST(request: NextRequest) {
 
     if (user.role !== 'ADMIN') {
       return errorResponse('Avatar generation is admin-only', 403);
-    }
-
-    // Feature flag gate
-    const config = await getPlanFeatureConfig();
-    if (!config.avatarGenerationEnabled) {
-      return errorResponse('Avatar generation is currently disabled', 503);
     }
 
     const body = await request.json();

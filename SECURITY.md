@@ -27,11 +27,10 @@ The following are in scope:
 - Sotto API endpoints (`/api/*` on your configured deployment URL)
 - Authentication and authorization flows
 - Data handling and encryption (BYOK keys, user data)
-- Voice marketplace payment processing
 
 The following are **out of scope**:
 
-- Third-party services (Stripe, OAuth providers, AI/TTS providers)
+- Third-party services (OAuth providers, AI/TTS providers)
 - Social engineering attacks against Sotto team members
 - Denial of service attacks
 - Issues in dependencies without a demonstrated exploit in Sotto

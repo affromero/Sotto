@@ -127,7 +127,7 @@ describe('POST /api/podcasts/[podcastId]/interact', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 59, resetAt: 0 });
-    mockUserFindUniqueOrThrow.mockResolvedValue({ plan: 'PRO', role: 'USER' });
+    mockUserFindUniqueOrThrow.mockResolvedValue({ role: 'USER' });
     mockUserFindUnique.mockResolvedValue(null);
     mockInteractionCount.mockResolvedValue(0);
   });

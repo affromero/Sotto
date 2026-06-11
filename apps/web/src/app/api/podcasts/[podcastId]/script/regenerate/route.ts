@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { authenticateRequest } from '@/lib/api-keys';
 import { addJob, JobType, scriptWritingQueue } from '@/lib/queue';
-import { checkRateLimit, invalidatePodcastCache, publishPodcastStatus } from '@/lib/redis';
-import { checkGenerationGate } from '@/lib/generation-gate';
+import { invalidatePodcastCache, publishPodcastStatus } from '@/lib/redis';
 import { regenerateWithFeedbackSchema } from '@/lib/validations';
 
 import { errorResponse } from '@/lib/api-response';
@@ -17,25 +16,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   }
 
   const userId = authResult.userId;
-
-  // Rate limit: 20/hour, 100/day
-  const hourly = await checkRateLimit(`generate:hour:${userId}`, 20, 3600);
-  if (!hourly.allowed) {
-    return errorResponse('Rate limit exceeded: max 20 generations per hour.', 429);
-  }
-  const daily = await checkRateLimit(`generate:day:${userId}`, 100, 86400);
-  if (!daily.allowed) {
-    return errorResponse('Rate limit exceeded: max 100 generations per day.', 429);
-  }
-
-  // Generation gate: BYOK or free tier
-  const gate = await checkGenerationGate(userId);
-  if (!gate.allowed) {
-    const msg = gate.reason === 'generation_in_progress'
-      ? 'A podcast is already generating. Wait for it to finish before starting another.'
-      : 'No voice provider available. Add a TTS key in Settings for unlimited generation.';
-    return errorResponse(msg, 403, { code: gate.reason });
-  }
 
   // Parse optional feedback body
   let feedbackBody: { feedback?: string; turnComments?: Record<number, string>; highlights?: Array<{ turnIndex: number; text: string; note: string }>; sourceUrls?: string[] } | undefined;

@@ -58,7 +58,7 @@ vi.mock('@/lib/redis', () => ({
 }));
 
 vi.mock('@/lib/generation-gate', () => ({
-  checkGenerationGate: vi.fn().mockResolvedValue({ allowed: true, reason: 'ok', isByokUser: true }),
+  checkGenerationGate: vi.fn().mockResolvedValue({ allowed: true, reason: 'ok' }),
 }));
 
 vi.mock('@/lib/logger', () => ({

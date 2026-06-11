@@ -23,7 +23,6 @@ export async function seedTestUser() {
       name: TEST_USER_NAME,
       handle: 'e2e-test',
       role: 'USER',
-      plan: 'FREE',
     },
   });
 
@@ -68,7 +67,6 @@ export async function seedTestUser() {
       name: 'E2E Other User',
       handle: 'e2e-other',
       role: 'USER',
-      plan: 'FREE',
     },
   });
 
@@ -311,7 +309,6 @@ export async function seedTestUser() {
       name: 'E2E Empty User',
       handle: 'e2e-empty',
       role: 'USER',
-      plan: 'FREE',
     },
   });
 

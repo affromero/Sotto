@@ -27,7 +27,7 @@ vi.mock('@/lib/prisma', () => {
       createMany: (...args: unknown[]) => mockPrismaReferenceCreateMany(...args),
     },
     user: {
-      findUniqueOrThrow: vi.fn().mockResolvedValue({ plan: 'FREE' }),
+      findUniqueOrThrow: vi.fn().mockResolvedValue({}),
     },
     podcast: {
       findUniqueOrThrow: (...args: unknown[]) => mockPrismaPodcastFindUniqueOrThrow(...args),
@@ -120,14 +120,16 @@ vi.mock('@/lib/providers/ai-registry', () => ({
   getCheapestModelForProvider: vi.fn().mockReturnValue('claude-haiku-4-5-20251001'),
 }));
 
-vi.mock('@/lib/free-tier-provider-selector', () => ({
-  selectFreeTierProviders: vi.fn().mockResolvedValue({
-    aiProvider: 'anthropic',
-    aiModel: 'claude-haiku-4-5-20251001',
-    aiQuota: 10,
-    ttsProvider: 'elevenlabs',
-    ttsModel: 'eleven_multilingual_v2',
-    ttsQuota: 10,
+vi.mock('@/lib/auto-model-config', () => ({
+  getAutoModelConfig: vi.fn().mockResolvedValue({
+    model: {
+      aiProvider: 'anthropic',
+      aiModel: 'claude-haiku-4-5-20251001',
+      ttsProvider: 'elevenlabs',
+      ttsModel: 'eleven_multilingual_v2',
+      sttProvider: 'openai',
+      sttModel: 'whisper-1',
+    },
   }),
 }));
 
@@ -141,6 +143,11 @@ vi.mock('@/lib/tts-tag-converter', () => ({
 
 vi.mock('@/lib/pipeline-events', () => ({
   logPipelineStageComplete: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('@/lib/redis', () => ({
+  invalidatePodcastCache: vi.fn().mockResolvedValue(undefined),
+  publishPodcastStatus: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('@/lib/logger', () => ({
@@ -304,7 +311,6 @@ describe('processScriptVerification', () => {
       expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
         podcastAiModel: null,
         aiKey,
-        plan: 'FREE',
       });
       expect(mockVerifyScript).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -334,7 +340,6 @@ describe('processScriptVerification', () => {
       expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
         podcastAiModel: 'gpt-5-mini',
         aiKey: null,
-        plan: 'FREE',
       });
       expect(mockGetAiKey).toHaveBeenCalledTimes(1);
       expect(mockGetAiKey).toHaveBeenCalledWith('user-001', 'openai');
@@ -398,7 +403,6 @@ describe('processScriptVerification', () => {
       expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
         podcastAiModel: 'gpt-5-mini',
         aiKey: null,
-        plan: 'FREE',
       });
       expect(mockVerifyScript).toHaveBeenCalledWith(
         expect.objectContaining({
