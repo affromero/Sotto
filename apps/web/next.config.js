@@ -4,6 +4,9 @@ const { withSentryConfig } = require('@sentry/nextjs');
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
+  // Per-instance build dir, so two dev servers (e.g. the self-hosted instance and
+  // the SELF_HOSTED=false mock) can run side by side without fighting over .next.
+  distDir: process.env.NEXT_DIST_DIR || '.next',
   reactStrictMode: true,
   poweredByHeader: false,
   experimental: {
