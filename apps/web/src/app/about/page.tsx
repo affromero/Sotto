@@ -78,10 +78,9 @@ export default function AboutPage() {
           <section className={styles.section}>
             <h2 className={styles.sectionTitle}>Free and Self-Hosted</h2>
             <p className={styles.sectionText}>
-              Sotto is free and open-source. There is no subscription, no waitlist,
-              and no managed account standing between you and your courses. You bring
-              your own keys for AI and audio, and you pay those providers directly
-              for what you use.
+              Sotto is free and open-source. There is no subscription standing
+              between you and your courses. You bring your own keys for AI and
+              audio, and you pay those providers directly for what you use.
             </p>
             <p className={styles.sectionText}>
               Your keys are encrypted with AES-256-GCM on the instance you control.

@@ -46,12 +46,6 @@ export interface TrafficSection {
   dailyVisitors: Array<{ day: string; count: number }>;
 }
 
-export interface WaitlistSection {
-  total: number;
-  recentSignups: number;
-  bySource: Array<{ source: string; count: number }>;
-}
-
 export interface UsersSection {
   total: number;
   signupsToday: number;
@@ -167,7 +161,6 @@ export interface ReferralsSection {
 export interface TrafficReport {
   meta: TrafficReportMeta;
   traffic: TrafficSection;
-  waitlist: WaitlistSection;
   users: UsersSection;
   podcasts: PodcastsSection;
   playback: PlaybackSection;
@@ -210,11 +203,6 @@ export async function buildTrafficReport(
     devices,
     dailyVisitors,
     avgPages,
-
-    // === Waitlist (3) ===
-    waitlistTotal,
-    waitlistRecent,
-    waitlistBySource,
 
     // === Users (5) ===
     totalUsers,
@@ -350,17 +338,6 @@ export async function buildTrafficReport(
     prisma.userSession.aggregate({
       where: { startedAt: { gte: since } },
       _avg: { pageCount: true },
-    }),
-
-    // -----------------------------------------------------------------------
-    // Waitlist
-    // -----------------------------------------------------------------------
-    prisma.waitlist.count(),
-    prisma.waitlist.count({ where: { createdAt: { gte: since } } }),
-    prisma.waitlist.groupBy({
-      by: ['source'],
-      _count: true,
-      orderBy: { _count: { source: 'desc' } },
     }),
 
     // -----------------------------------------------------------------------
@@ -767,15 +744,6 @@ export async function buildTrafficReport(
       dailyVisitors: dailyVisitors.map((d) => ({
         day: d.day.toISOString().split('T')[0],
         count: n(d.count),
-      })),
-    },
-
-    waitlist: {
-      total: waitlistTotal,
-      recentSignups: waitlistRecent,
-      bySource: waitlistBySource.map((s) => ({
-        source: s.source ?? 'unknown',
-        count: s._count,
       })),
     },
 

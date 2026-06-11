@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  buildWaitlistWelcomeEmail,
+  buildWelcomeEmail,
   generateUserUnsubscribeUrl,
 } from '@/lib/email-templates';
 
@@ -20,11 +20,11 @@ describe('email templates', () => {
     );
   });
 
-  it('uses the configured deployment URL in waitlist emails', () => {
-    const waitlist = buildWaitlistWelcomeEmail('alice@example.com');
+  it('uses the configured deployment URL in welcome emails', () => {
+    const welcome = buildWelcomeEmail('Alice');
 
-    expect(waitlist.html).toContain('https://selfhost.example.com/create');
-    expect(waitlist.html).toContain('>selfhost.example.com</a>');
-    expect(waitlist.html).not.toContain('https://sotto.fm');
+    expect(welcome.html).toContain('https://selfhost.example.com/create');
+    expect(welcome.html).toContain('>selfhost.example.com</a>');
+    expect(welcome.html).not.toContain('https://sotto.fm');
   });
 });

@@ -1085,31 +1085,6 @@ model PlaybackSession {
   @@index([userId, startedAt])
 }
 
-// ============ WAITLIST ============
-
-enum WaitlistStatus {
-  PENDING
-  APPROVED
-  REJECTED
-}
-
-model Waitlist {
-  id            String         @id @default(cuid())
-  email         String         @unique
-  source        String?
-  wishlist      String?
-  referralCode  String?
-  status        WaitlistStatus @default(PENDING)
-  unsubscribed  Boolean        @default(false)
-  approvedAt    DateTime?
-  approvedBy    String?
-  signedUpAt    DateTime?
-  createdAt     DateTime       @default(now())
-
-  @@index([createdAt])
-  @@index([status])
-}
-
 // ============ INVITATION LINKS ============
 
 model InvitationLink {

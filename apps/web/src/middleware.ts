@@ -8,7 +8,7 @@ const PROTECTED_ROUTES = [
   '/admin',
   '/welcome',
 ];
-const AUTH_ROUTES = ['/auth/login', '/auth/signup', '/auth/waitlisted'];
+const AUTH_ROUTES = ['/auth/login', '/auth/signup'];
 
 // Routes that are always public — no auth required
 const PUBLIC_ROUTES = new Set([
@@ -21,7 +21,7 @@ const PUBLIC_ROUTES = new Set([
   '/developers',
   '/api/v1/monitoring',
 ]);
-const PUBLIC_PREFIXES = ['/api/v1/auth', '/api/v1/pitch', '/api/v1/waitlist', '/ref', '/podcast/by-slug'];
+const PUBLIC_PREFIXES = ['/api/v1/auth', '/api/v1/pitch', '/ref', '/podcast/by-slug'];
 
 function isPublicRoute(pathname: string): boolean {
   if (PUBLIC_ROUTES.has(pathname)) return true;
@@ -68,7 +68,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/banned', request.url));
   }
 
-  // Auth pages (login, signup, waitlisted): redirect to dashboard if already authenticated
+  // Auth pages: redirect to dashboard if already authenticated
   if (AUTH_ROUTES.some((route) => pathname.startsWith(route))) {
     if (token) {
       return NextResponse.redirect(new URL('/learn', request.url));

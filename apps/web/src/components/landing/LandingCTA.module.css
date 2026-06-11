@@ -1,10 +1,3 @@
-/*
- * LandingCTA.module.css — auth-aware CTA + inline waitlist capture, aula theme.
- * Consumes aula tokens from the page root. The email field visually fits the
- * light paper surface (the shared WaitlistForm is dark-hero styled, so this CTA
- * uses the same /api/v1/waitlist endpoint via WaitlistProvider with its own skin).
- */
-
 .wrap {
   display: flex;
   flex-direction: column;

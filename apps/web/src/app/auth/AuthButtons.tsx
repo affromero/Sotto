@@ -91,7 +91,7 @@ export function AuthButtons({ callbackUrl = '/learn' }: AuthButtonsProps) {
     try {
       const result = await signIn('resend', { email: trimmed, callbackUrl, redirect: false });
       if (result?.error) {
-        setEmailError('Unable to send magic link. You may not be on the waitlist yet.');
+        setEmailError('Unable to send magic link. Please check your email address and try again.');
       } else {
         setEmailSent(true);
       }

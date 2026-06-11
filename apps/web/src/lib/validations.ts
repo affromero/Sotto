@@ -289,32 +289,6 @@ export const voicePreviewSchema = z.object({
 });
 
 /**
- * Waitlist signup validation
- */
-export const waitlistSchema = z.object({
-  email: z.string().email().max(200),
-  source: z.string().max(50).optional(),
-  wishlist: z.string().max(500).optional(),
-  referralCode: z
-    .string()
-    .max(50)
-    .optional()
-    .transform((val) => (val ? val.replace(/^@/, '').trim().toLowerCase() : undefined)),
-});
-
-/**
- * Admin waitlist action validation (approve/reject)
- */
-export const adminWaitlistActionSchema = z.object({
-  id: z.string(),
-  status: z.enum(['APPROVED', 'REJECTED']),
-});
-
-export const adminWaitlistDeleteSchema = z.object({
-  id: z.string(),
-});
-
-/**
  * Custom tag input (for "Other" free-text sub-interests)
  */
 export const customTagSchema = z.object({

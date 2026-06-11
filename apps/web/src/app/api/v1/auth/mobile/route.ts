@@ -218,11 +218,15 @@ async function handleOAuthLogin(body: unknown) {
 
   // Step 3: No Account, no User — create both (full mobile sign-up)
 
-  // Admins bypass waitlist; when openSignup is on, everyone can sign up
-  if (!isAdminEmail(email) && !await isOpenSignup()) {
-    const waitlistEntry = await prisma.waitlist.findUnique({ where: { email } });
-    if (!waitlistEntry || waitlistEntry.status !== 'APPROVED') {
-      return errorResponse('Your email is not on the approved waitlist. Sign up from the configured web app first.', 403);
+  // Admins always allowed; otherwise signups must be open or a redeemed
+  // invitation must exist for this email.
+  if (!isAdminEmail(email) && !(await isOpenSignup())) {
+    const invite = await prisma.invitationLink.findFirst({
+      where: { email, usedAt: { not: null } },
+      select: { id: true },
+    });
+    if (!invite) {
+      return errorResponse('Signups are closed. Redeem an invitation first.', 403);
     }
   }
 
@@ -247,12 +251,6 @@ async function handleOAuthLogin(body: unknown) {
         },
       },
       select: USER_SELECT,
-    });
-
-    // Mark waitlist conversion.
-    await prisma.waitlist.updateMany({
-      where: { email },
-      data: { signedUpAt: new Date() },
     });
 
     return issueTokenAndRespond(newUser);
