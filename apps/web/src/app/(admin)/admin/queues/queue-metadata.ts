@@ -14,8 +14,7 @@ export type PipelineStage =
   | 'Analytics'
   | 'Platform Ops'
   | 'Voice Features'
-  | 'Video Pipeline'
-  | 'Music Pipeline';
+  | 'Video Pipeline';
 
 interface QueueMeta {
   description: string;
@@ -30,7 +29,6 @@ export const PIPELINE_STAGE_ORDER: PipelineStage[] = [
   'Platform Ops',
   'Voice Features',
   'Video Pipeline',
-  'Music Pipeline',
 ];
 
 export const QUEUE_METADATA: Record<string, QueueMeta> = {
@@ -87,7 +85,7 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
     stage: 'Analytics',
   },
   'feature-computation': {
-    description: 'Computes ML features for recommendations',
+    description: 'Computes private behavior features for learner and podcast analytics',
     stage: 'Analytics',
   },
   'data-export': {
@@ -102,24 +100,8 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
     description: 'Validates BYOK API keys for TTS and AI providers',
     stage: 'Platform Ops',
   },
-  'content-moderation': {
-    description: 'Moderates user-generated content via OpenAI',
-    stage: 'Platform Ops',
-  },
-  'draft-cleanup': {
-    description: 'Cleans up stale draft podcasts',
-    stage: 'Platform Ops',
-  },
   'voice-verification': {
     description: 'Verifies voice clone ownership and quality',
-    stage: 'Voice Features',
-  },
-  'voice-track-audio': {
-    description: 'Generates audio for shared voice tracks',
-    stage: 'Voice Features',
-  },
-  'voice-track-stitching': {
-    description: 'Stitches voice track audio segments together',
     stage: 'Voice Features',
   },
   'r2-usage': {
@@ -181,10 +163,6 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
   'demo-scene-composition': {
     description: 'Composes individual demo scenes from visual, voiceover, and recording assets',
     stage: 'Video Pipeline',
-  },
-  'music-generation': {
-    description: 'Generates AI background music for podcasts via Suno or ElevenLabs',
-    stage: 'Music Pipeline',
   },
   'lip-sync-test': {
     description: 'Tests lip-sync models with a short audio clip and avatar image via fal.ai',

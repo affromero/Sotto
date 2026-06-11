@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
     if (!user) return errorResponse('User not found', 404);
   }
 
-  const HIGH_PRIORITY_REASONS = ['FALSE_HUMAN_BADGE', 'MUSIC_UPLOAD', 'VOICE_THEFT'];
+  const HIGH_PRIORITY_REASONS = ['FALSE_HUMAN_BADGE', 'VOICE_THEFT'];
 
   try {
     const report = await prisma.report.create({

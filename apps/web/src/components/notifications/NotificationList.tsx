@@ -14,10 +14,7 @@ import {
   Gift,
   ImagePlus,
   Video,
-  Music,
-  MicVocal,
   Megaphone,
-  Flag,
 } from 'lucide-react';
 import type { NotificationData } from '@/types/notification';
 import { getNotificationUrl } from '@/lib/notification-utils';
@@ -35,14 +32,11 @@ const typeIcons: Record<string, typeof Bell> = {
   PODCAST_READY: Headphones,
   SCRIPT_READY: FileText,
   VIDEO_READY: Video,
-  MUSIC_READY: Music,
 
   // Pipeline — failure
   PODCAST_FAILED: AlertTriangle,
   VIDEO_FAILED: AlertTriangle,
-  MUSIC_FAILED: AlertTriangle,
   AVATAR_FAILED: AlertTriangle,
-  VOICE_TRACK_FAILED: AlertTriangle,
   KEY_INVALID: AlertTriangle,
   PIPELINE_FAILURE: AlertTriangle,
 
@@ -56,17 +50,11 @@ const typeIcons: Record<string, typeof Bell> = {
   VOICE_BLOCKED_DUPLICATE: ShieldAlert,
   VOICE_OWNERSHIP_ALERT: ShieldAlert,
 
-  // Voice tracks (renditions)
-  RENDITION_PROPOSED: MicVocal,
-  RENDITION_ACCEPTED: MicVocal,
-  RENDITION_REJECTED: MicVocal,
-
   // Moderation
   CONTENT_REMOVED: Trash2,
   ACCOUNT_WARNING: AlertOctagon,
   ACCOUNT_SUSPENDED: AlertOctagon,
   ACCOUNT_BANNED: AlertOctagon,
-  CLAIM_REPORT_ON_YOUR_PODCAST: Flag,
 
   // System
   PLATFORM_ANNOUNCEMENT: Megaphone,

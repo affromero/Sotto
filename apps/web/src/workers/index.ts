@@ -8,7 +8,6 @@ Sentry.init({
 import {
   createWorker,
   keyValidationQueue,
-  draftCleanupQueue,
   r2UsageQueue,
   pricingFetchQueue,
   ttsProviderMonitorQueue,
@@ -34,11 +33,7 @@ import { processFeatureComputation } from './feature-computation.worker';
 import { processDataExport } from './data-export.worker';
 import { processAudioImport } from './audio-import.worker';
 import { processKeyValidation } from './key-validation.worker';
-import { processContentModeration } from './content-moderation.worker';
 import { processVoiceVerification } from './voice-verification.worker';
-import { processVoiceTrackAudio } from './voice-track-audio.worker';
-import { processVoiceTrackStitching } from './voice-track-stitching.worker';
-import { processDraftCleanup } from './draft-cleanup.worker';
 import { processR2Usage } from './r2-usage.worker';
 import { processPricingFetch } from './pricing-fetch.worker';
 import { processTtsProviderMonitor } from './tts-provider-monitor.worker';
@@ -56,7 +51,6 @@ import { processDemoVisual } from './demo-visual.worker';
 import { processDemoTransition } from './demo-transition.worker';
 import { processDemoComposition } from './demo-composition.worker';
 import { processDemoSceneComposition } from './demo-scene-composition.worker';
-import { processMusicGeneration } from './music-generation.worker';
 import { processLipSyncTest } from './lip-sync-test.worker';
 import { processWaveformGeneration } from './waveform-generation.worker';
 import { processPipelineClassification } from './pipeline-classification.worker';
@@ -129,11 +123,7 @@ const workers = [
   shouldRun('data-export') && createWorker('data-export', processDataExport, { concurrency: 1 }),
   shouldRun('audio-import') && createWorker('audio-import', processAudioImport, { concurrency: 2 }),
   shouldRun('key-validation') && createWorker('key-validation', processKeyValidation, { concurrency: 1 }),
-  shouldRun('content-moderation') && createWorker('content-moderation', processContentModeration, { concurrency: 3 }),
   shouldRun('voice-verification') && createWorker('voice-verification', processVoiceVerification, { concurrency: 2 }),
-  shouldRun('voice-track-audio') && createWorker('voice-track-audio', processVoiceTrackAudio, { concurrency: 10 }),
-  shouldRun('voice-track-stitching') && createWorker('voice-track-stitching', processVoiceTrackStitching, { concurrency: 1 }),
-  shouldRun('draft-cleanup') && createWorker('draft-cleanup', processDraftCleanup, { concurrency: 1 }),
   shouldRun('r2-usage') && createWorker('r2-usage', processR2Usage, { concurrency: 1 }),
   shouldRun('pricing-fetch') && createWorker('pricing-fetch', processPricingFetch, { concurrency: 1 }),
   shouldRun('tts-provider-monitor') && createWorker('tts-provider-monitor', processTtsProviderMonitor, { concurrency: 1 }),
@@ -151,7 +141,6 @@ const workers = [
   shouldRun('demo-transition') && createWorker('demo-transition', processDemoTransition, { concurrency: 2 }),
   shouldRun('demo-composition') && createWorker('demo-composition', processDemoComposition, { concurrency: 1, lockDuration: 900000 }),
   shouldRun('demo-scene-composition') && createWorker('demo-scene-composition', processDemoSceneComposition, { concurrency: 2, lockDuration: 600000 }),
-  shouldRun('music-generation') && createWorker('music-generation', processMusicGeneration, { concurrency: 2, lockDuration: 600000 }),
   shouldRun('lip-sync-test') && createWorker('lip-sync-test', processLipSyncTest, { concurrency: 2, lockDuration: 300000 }),
   shouldRun('waveform-generation') && createWorker('waveform-generation', processWaveformGeneration, { concurrency: 2 }),
   shouldRun('pipeline-classification') && createWorker('pipeline-classification', processPipelineClassification, { concurrency: 2, lockDuration: 300000 }),
@@ -163,13 +152,6 @@ const workers = [
 // Cron jobs and webhooks run only on light (or all) profile to prevent duplicate repeat registrations
 if (WORKER_PROFILE === 'all' || WORKER_PROFILE === 'light') {
 // Schedule cleanup every 2 hours (stale drafts + stuck video generations)
-if (shouldRun('draft-cleanup')) {
-  draftCleanupQueue
-    .add(JobType.CLEANUP_DRAFTS, {}, { repeat: { every: 2 * 60 * 60 * 1000 } })
-    .then(() => logger.info('Cleanup scheduled', { intervalMs: '7200000' }))
-    .catch((err) => logger.error('Failed to schedule cleanup', { error: err.message }));
-}
-
 // Schedule BYOK key re-validation every 24 hours
 if (shouldRun('key-validation')) {
   keyValidationQueue

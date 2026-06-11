@@ -12,8 +12,6 @@ export type {
   VerificationStatus,
   NotificationType,
   VoiceCloneSource,
-  VoiceTrackStatus,
-  ProposalStatus,
   FeedbackType,
   FeedbackStatus,
   CefrLevel,
@@ -42,8 +40,6 @@ export type {
   TtsOption,
   ScriptTurn,
   VoiceProfile,
-  VoiceTrackSummary,
-  VoiceTrackContributor,
 } from './types/podcast';
 
 export type { ReferenceData, VerificationLayerResult } from './types/reference';
@@ -75,20 +71,6 @@ export type {
 export type { NotificationData, PushSubscriptionData } from './types/notification';
 
 export type { PodcastVersionSummary, PodcastVersionDetail } from './types/version';
-
-export type {
-  ServiceBreakdown,
-  CategoryBreakdown,
-  UsageDataPoint,
-  AnalyticsSummary,
-  AnalyticsResponse,
-  CreatorOverview,
-  CreatorTopPodcast,
-  CreatorDailyPlays,
-  CreatorPrivateActivity,
-  CreatorAudienceInsights,
-  CreatorAnalyticsResponse,
-} from './types/analytics';
 
 export type { ApiKeyData, ApiKeyCreated } from './types/api-key';
 

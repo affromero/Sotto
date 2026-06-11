@@ -25,7 +25,7 @@ const STILL_FPS = 30;
 const STILL_CONCURRENCY = 4;
 
 export async function processVisualClassification(job: Job<ClassifyVisualsPayload>): Promise<void> {
-  const { podcastId, videoGenerationId, userId, voiceTrackId, zeroCostVideo: zeroCostFromPayload } = job.data;
+  const { podcastId, videoGenerationId, userId, zeroCostVideo: zeroCostFromPayload } = job.data;
 
   logger.info('Starting visual classification', { podcastId, videoGenerationId });
   await job.updateProgress(10);
@@ -51,7 +51,7 @@ export async function processVisualClassification(job: Job<ClassifyVisualsPayloa
           },
         },
       }),
-      resolveSegmentTiming(podcastId, voiceTrackId),
+      resolveSegmentTiming(podcastId),
       prisma.discovery.findUnique({
         where: { podcastId },
         select: { sourceMetadata: true },

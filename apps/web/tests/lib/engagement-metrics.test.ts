@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mockSaveCount = vi.fn();
 const mockInteractionCount = vi.fn();
 const mockInteractionGroupBy = vi.fn();
-const mockPodcastRatingCount = vi.fn();
 const mockPodcastFindMany = vi.fn();
 const mockQueryRaw = vi.fn();
 
@@ -14,7 +13,6 @@ vi.mock('@/lib/prisma', () => ({
       count: (...args: unknown[]) => mockInteractionCount(...args),
       groupBy: (...args: unknown[]) => mockInteractionGroupBy(...args),
     },
-    podcastRating: { count: (...args: unknown[]) => mockPodcastRatingCount(...args) },
     podcast: { findMany: (...args: unknown[]) => mockPodcastFindMany(...args) },
     $queryRaw: (...args: unknown[]) => mockQueryRaw(...args),
   },
@@ -34,10 +32,9 @@ describe('engagement-metrics private activity queries', () => {
     vi.clearAllMocks();
   });
 
-  it('builds private activity overview from saves, questions, and ratings', async () => {
+  it('builds private activity overview from saves and questions', async () => {
     mockSaveCount.mockResolvedValue(12);
     mockInteractionCount.mockResolvedValueOnce(8).mockResolvedValueOnce(6).mockResolvedValueOnce(3);
-    mockPodcastRatingCount.mockResolvedValue(4);
 
     const result = await getPrivateActivityOverview(since);
 
@@ -46,7 +43,6 @@ describe('engagement-metrics private activity queries', () => {
       questions: 8,
       answered: 6,
       incorporated: 3,
-      ratings: 4,
     });
     expect(mockSaveCount).toHaveBeenCalledWith({ where: { createdAt: { gte: since } } });
     expect(mockInteractionCount).toHaveBeenCalledWith({
@@ -58,25 +54,23 @@ describe('engagement-metrics private activity queries', () => {
     expect(mockInteractionCount).toHaveBeenCalledWith({
       where: { createdAt: { gte: since }, incorporated: true },
     });
-    expect(mockPodcastRatingCount).toHaveBeenCalledWith({ where: { createdAt: { gte: since } } });
   });
 
   it('maps daily private activity without reading social tables', async () => {
     mockQueryRaw.mockResolvedValue([
-      { day: new Date('2026-01-01T00:00:00.000Z'), saves: 2n, questions: 3n, ratings: 1n },
-      { day: new Date('2026-01-02T00:00:00.000Z'), saves: 5n, questions: 1n, ratings: 0n },
+      { day: new Date('2026-01-01T00:00:00.000Z'), saves: 2n, questions: 3n },
+      { day: new Date('2026-01-02T00:00:00.000Z'), saves: 5n, questions: 1n },
     ]);
 
     const result = await getDailyPrivateActivityTrend(since);
     const sql = (mockQueryRaw.mock.calls[0][0] as TemplateStringsArray).join('');
 
     expect(result).toEqual([
-      { day: '2026-01-01', saves: 2, questions: 3, ratings: 1 },
-      { day: '2026-01-02', saves: 5, questions: 1, ratings: 0 },
+      { day: '2026-01-01', saves: 2, questions: 3 },
+      { day: '2026-01-02', saves: 5, questions: 1 },
     ]);
     expect(sql).toContain('"Save"');
     expect(sql).toContain('"Interaction"');
-    expect(sql).toContain('"PodcastRating"');
     expect(sql).not.toContain('"Like"');
     expect(sql).not.toContain('"Comment"');
     expect(sql).not.toContain('"Follow"');

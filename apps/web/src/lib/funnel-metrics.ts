@@ -268,32 +268,23 @@ export async function getPerStageTiming(since: Date): Promise<StageTiming[]> {
   return rows;
 }
 
-// ── Draft Abandonment Metrics ─────────────────────────────────────
+// ── Script Review Pause Metrics ─────────────────────────────────────
 
-export interface DraftAbandonmentMetrics {
-  totalDrafts: number;
-  stillDraft: number;
+export interface ScriptReviewPauseMetrics {
+  totalCreated: number;
   pausedAtScriptReady: number;
-  abandonmentRate: number;
+  pauseRate: number;
 }
 
-export async function getDraftAbandonmentMetrics(
+export async function getScriptReviewPauseMetrics(
   since: Date,
   until?: Date,
-): Promise<DraftAbandonmentMetrics> {
+): Promise<ScriptReviewPauseMetrics> {
   const dateFilter = { gte: since, ...(until ? { lt: until } : {}) };
 
-  const [totalDrafts, stillDraft, pausedAtScriptReady] = await Promise.all([
+  const [totalCreated, pausedAtScriptReady] = await Promise.all([
     prisma.podcast.count({
       where: { createdAt: dateFilter, source: { not: 'IMPORT' } },
-    }),
-    prisma.podcast.count({
-      where: {
-        createdAt: dateFilter,
-        status: PodcastStatus.DRAFT,
-        source: { not: 'IMPORT' },
-        deletedAt: null,
-      },
     }),
     prisma.podcast.count({
       where: {
@@ -306,9 +297,8 @@ export async function getDraftAbandonmentMetrics(
   ]);
 
   return {
-    totalDrafts,
-    stillDraft,
+    totalCreated,
     pausedAtScriptReady,
-    abandonmentRate: totalDrafts > 0 ? (stillDraft + pausedAtScriptReady) / totalDrafts : 0,
+    pauseRate: totalCreated > 0 ? pausedAtScriptReady / totalCreated : 0,
   };
 }

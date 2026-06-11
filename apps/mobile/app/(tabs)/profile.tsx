@@ -342,35 +342,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.textSecondary,
   },
-  savedIdeasRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
-    marginBottom: spacing.lg,
-    ...shadowSm,
-  },
-  savedIdeasRowPressed: {
-    backgroundColor: colors.surfaceHover,
-  },
-  savedIdeasIcon: {
-    fontSize: 20,
-    marginRight: spacing.sm + 4,
-  },
-  savedIdeasLabel: {
-    fontFamily: typography.fontBody,
-    fontSize: 16,
-    fontWeight: '500',
-    color: colors.textPrimary,
-    flex: 1,
-  },
-  savedIdeasChevron: {
-    fontFamily: typography.fontBody,
-    fontSize: 22,
-    color: colors.textTertiary,
-    fontWeight: '300',
-  },
   sectionHeader: {
     marginBottom: spacing.md,
   },

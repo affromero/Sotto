@@ -19,14 +19,13 @@ import { getVideoProviderMeta, videoModelRequiresFirstFrame, type VideoProviderI
 import { getFalVideoEndpoint, getFalFrameParams, isFalWanModel } from '@/lib/providers/fal-endpoints';
 import { MINIMAX_MODEL_MAP } from '@/lib/providers/video/minimax.provider';
 import { getAvatarProviderMeta, type AvatarProviderId } from '@/lib/providers/avatar-registry';
-import { getMusicProviderMeta, type MusicProviderId } from '@/lib/providers/music-registry';
 import { listAvatars } from '@/lib/heygen';
 import { submitFalLipSync, pollFalLipSync } from '@/lib/fal-lip-sync';
 import { uploadFile, deleteFile } from '@/lib/r2';
 import { randomUUID } from 'crypto';
 
 const requestSchema = z.object({
-  type: z.enum(['ai', 'tts', 'stt', 'image', 'video', 'avatar', 'music']),
+  type: z.enum(['ai', 'tts', 'stt', 'image', 'video', 'avatar']),
   provider: z.string().min(1),
   model: z.string().min(1),
   keySource: z.enum(['platform', 'byok']).default('platform'),
@@ -161,7 +160,7 @@ async function generateFalImageUrl(apiKey: string, prompt: string, size = 512): 
   return url;
 }
 
-/** Resolve API key for image/video/avatar/music providers (BYOK from UserTtsKey or platform env). */
+/** Resolve API key for image/video/avatar providers (BYOK from UserTtsKey or platform env). */
 async function resolveProviderKey(
   adminId: string,
   provider: string,
@@ -600,22 +599,6 @@ export async function POST(request: NextRequest) {
       }
 
       // Runway and others: auth validation only
-      const valid = await withTimeout(meta.auth.validate({ apiKey }), 10_000);
-      return NextResponse.json({
-        success: valid,
-        latencyMs: Date.now() - start,
-        response: valid ? 'API key valid' : 'API key invalid',
-        error: valid ? undefined : 'API key validation failed',
-      });
-    }
-
-    if (type === 'music') {
-      const meta = getMusicProviderMeta(provider as MusicProviderId);
-      const { apiKey, error } = await resolveProviderKey(adminId, provider, keySource, meta.platformKeyEnv);
-      if (!apiKey) {
-        return NextResponse.json({ success: false, latencyMs: Date.now() - start, error });
-      }
-
       const valid = await withTimeout(meta.auth.validate({ apiKey }), 10_000);
       return NextResponse.json({
         success: valid,

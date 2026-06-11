@@ -33,9 +33,8 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     return errorResponse(`Invalid request: ${parsed.error.issues[0].message}`, 400);
   }
 
-  const posVoiceTrackId = parsed.data.voiceTrackId ?? null;
   const videoGeneration = await prisma.videoGeneration.findFirst({
-    where: { podcastId, voiceTrackId: posVoiceTrackId },
+    where: { podcastId },
     select: { id: true },
   });
 

@@ -112,23 +112,6 @@
   color: var(--color-text-secondary);
 }
 
-.voiceTrackSelect {
-  width: 100%;
-  padding: 6px 8px;
-  margin-bottom: 12px;
-  background: #2a2a2a;
-  color: var(--color-text-primary);
-  border: 1px solid #444;
-  border-radius: var(--radius-md);
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.voiceTrackSelect:focus {
-  outline: none;
-  border-color: var(--color-primary);
-}
-
 .avatarGrid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));

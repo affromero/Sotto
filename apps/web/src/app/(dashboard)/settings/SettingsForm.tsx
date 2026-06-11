@@ -15,15 +15,9 @@ import { TasteQuiz } from '@/components/discovery/TasteQuiz';
 import { VoicePreferenceSelector } from '@/components/settings/VoicePreferenceSelector';
 import type { AiProviderClientMeta } from '@/lib/providers/ai-registry';
 import type { TtsProviderClientMeta } from '@/lib/providers/tts-registry';
-import type { MusicProviderClientMeta } from '@/lib/providers/music-registry';
 import { TtsProviderCards } from '@/components/settings/TtsProviderCards';
 import { AiProviderCards } from '@/components/settings/AiProviderCards';
-import { MusicProviderCards } from '@/components/settings/MusicProviderCards';
 import { AvatarImageManager } from '@/components/settings/AvatarImageManager';
-import {
-  PrivateRssFeedManager,
-  type PrivateFeedTokenMetadata,
-} from '@/components/settings/PrivateRssFeedManager';
 import { ThemeSelector } from '@/components/settings/ThemeSelector';
 import { usePushSubscription } from '@/lib/hooks/usePushSubscription';
 import { getTwitterBotLabel } from '@/lib/bot-identity';
@@ -67,15 +61,12 @@ interface SettingsFormProps {
   configuredAiProviders: Array<{ provider: string; isValid: boolean }>;
   aiProviderMeta: AiProviderClientMeta[];
   ttsProviderMeta: TtsProviderClientMeta[];
-  musicProviderMeta: MusicProviderClientMeta[];
-  configuredMusicProviders: Array<{ provider: string; isValid: boolean }>;
   initialPreferredAiModel: string | null;
   initialPreferredTtsProvider: string | null;
   initialPreferredTtsModel: string | null;
   isTwitterProviderAvailable: boolean;
   initialEmailNotifications: boolean;
   initialPushNotifications: boolean;
-  privateFeedTokens: PrivateFeedTokenMetadata[];
   quizAnswerCount: number;
   referredUsers: Array<{
     name: string | null;
@@ -113,14 +104,11 @@ export function SettingsForm({
   configuredAiProviders,
   aiProviderMeta,
   ttsProviderMeta,
-  musicProviderMeta,
-  configuredMusicProviders,
   initialPreferredAiModel,
   initialPreferredTtsProvider,
   initialPreferredTtsModel,
   initialEmailNotifications,
   initialPushNotifications,
-  privateFeedTokens,
   quizAnswerCount,
   isTwitterProviderAvailable,
   referredUsers,
@@ -790,11 +778,6 @@ export function SettingsForm({
         </div>
       </section>
 
-      {/* Private RSS Feed Section */}
-      <section className={styles.section}>
-        <PrivateRssFeedManager initialTokens={privateFeedTokens} />
-      </section>
-
       {/* Connected Accounts Section */}
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Connected Accounts</h2>
@@ -999,19 +982,6 @@ export function SettingsForm({
         <TtsProviderCards
           initialConfigured={configuredTtsProviders}
           providerMeta={ttsProviderMeta}
-        />
-      </section>
-
-      {/* Music Providers */}
-      <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Music Providers</h2>
-        <p className={styles.sectionDesc}>
-          Add a music provider key to generate AI background music for your podcasts. Keys are
-          encrypted with AES-256-GCM.
-        </p>
-        <MusicProviderCards
-          initialConfigured={configuredMusicProviders}
-          providerMeta={musicProviderMeta}
         />
       </section>
 

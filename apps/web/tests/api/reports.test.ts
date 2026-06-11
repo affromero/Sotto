@@ -49,7 +49,6 @@ const ALL_REASONS = [
   'IMPERSONATION',
   'COPYRIGHT',
   'VOICE_THEFT',
-  'MUSIC_UPLOAD',
   'FALSE_HUMAN_BADGE',
   'FALSE_CLAIM',
   'OTHER',
@@ -105,17 +104,6 @@ describe('POST /api/reports', () => {
       createRequest({ targetType: 'podcast', targetId: 'pod-1', reason: 'FALSE_HUMAN_BADGE' })
     );
     expect(response.status).toBe(201);
-
-    const createCall = mockReportCreate.mock.calls[0][0];
-    expect(createCall.data.status).toBe('REVIEWING');
-  });
-
-  it('auto-escalates MUSIC_UPLOAD reports to REVIEWING', async () => {
-    mockReportCreate.mockResolvedValue({ id: 'report-1', status: 'REVIEWING' });
-
-    await POST(
-      createRequest({ targetType: 'podcast', targetId: 'pod-1', reason: 'MUSIC_UPLOAD' })
-    );
 
     const createCall = mockReportCreate.mock.calls[0][0];
     expect(createCall.data.status).toBe('REVIEWING');

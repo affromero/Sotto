@@ -164,10 +164,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return errorResponse(`Invalid request: ${parsed.error.issues[0].message}`, 400);
   }
 
-
-  const avatarVoiceTrackId: string | null = parsed.data.voiceTrackId ?? null;
   const videoGeneration = await prisma.videoGeneration.findFirst({
-    where: { podcastId, voiceTrackId: avatarVoiceTrackId },
+    where: { podcastId },
     select: { id: true, status: true },
   });
 
@@ -193,7 +191,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           avatarImageUrl: avatar.avatarImageUrl ?? null,
           avatarModelId: avatar.avatarModelId ?? null,
           enabledSegmentIds: avatar.enabledSegmentIds ?? [],
-          voiceTrackId: avatar.voiceTrackId ?? null,
           status: 'pending',
         },
         update: {
@@ -202,7 +199,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           avatarImageUrl: avatar.avatarImageUrl ?? null,
           avatarModelId: avatar.avatarModelId ?? null,
           enabledSegmentIds: avatar.enabledSegmentIds ?? [],
-          voiceTrackId: avatar.voiceTrackId ?? null,
           status: 'pending',
           videoUrl: null,
           concatAudioUrl: null,
@@ -247,7 +243,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         avatarImageUrl: overlay.avatarImageUrl ?? avatarConfig?.avatarImageUrl ?? undefined,
         avatarModelId: overlay.avatarModelId ?? avatarConfig?.avatarModelId ?? undefined,
         isPreset: avatarConfig?.isPreset,
-        voiceTrackId: overlay.voiceTrackId ?? undefined,
       });
     }
 
@@ -290,10 +285,8 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     return errorResponse('Forbidden', 403);
   }
 
-  const delUrl = new URL(request.url);
-  const delVoiceTrackId = delUrl.searchParams.get('voiceTrackId');
   const videoGeneration = await prisma.videoGeneration.findFirst({
-    where: { podcastId, voiceTrackId: delVoiceTrackId ?? null },
+    where: { podcastId },
     select: {
       id: true,
       avatarOverlays: { select: { id: true, videoUrl: true, concatAudioUrl: true, chunkVideoUrl: true } },

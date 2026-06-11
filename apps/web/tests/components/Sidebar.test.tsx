@@ -57,13 +57,13 @@ describe('Sidebar', () => {
     expect(screen.getByText('Settings').closest('a')).toHaveAttribute('href', '/settings');
   });
 
-  it('shows Analytics and the admin panel only for ADMIN', () => {
+  it('shows the admin panel only for ADMIN', () => {
     const adminUser = { ...mockUser, role: 'ADMIN' };
     render(<Sidebar currentPath="/learn" user={adminUser} />);
 
-    expect(screen.getByText('Analytics')).toBeInTheDocument();
     expect(screen.getByText('Admin Panel')).toBeInTheDocument();
     expect(screen.getByText('API Keys')).toBeInTheDocument();
+    expect(screen.queryByText('Analytics')).not.toBeInTheDocument();
   });
 
   it('hides the admin panel for a non-admin user', () => {

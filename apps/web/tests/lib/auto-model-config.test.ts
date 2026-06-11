@@ -111,9 +111,6 @@ const row = {
   avatarProvider: 'heygen',
   avatarModel: 'heygen-avatar-standard',
   includedAvatarModels: null,
-  musicProvider: 'suno',
-  musicModel: 'suno-v5',
-  includedMusicModels: null,
   motionProvider: 'remotion',
   updatedAt: new Date(),
   updatedBy: null,
@@ -144,9 +141,6 @@ const config: AutoModelConfigData = {
   avatarProvider: 'heygen',
   avatarModel: 'heygen-avatar-standard',
   includedAvatarModels: null,
-  musicProvider: 'suno',
-  musicModel: 'suno-v5',
-  includedMusicModels: null,
   motionProvider: 'remotion',
 };
 

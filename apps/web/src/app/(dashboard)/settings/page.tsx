@@ -4,7 +4,6 @@ import { ONBOARDING_TAG_SLUGS } from '@/lib/tag-icons';
 import { listByokProviders, listAiProviders } from '@/lib/byok';
 import { getAllAiProviderClientMeta } from '@/lib/providers/ai-registry';
 import { getAllTtsProviderClientMeta } from '@/lib/providers/tts-registry';
-import { getMusicByokProviderMeta } from '@/lib/providers/music-registry';
 import { getAppBaseUrl } from '@/lib/urls';
 import { SettingsForm } from './SettingsForm';
 import styles from './page.module.css';
@@ -30,7 +29,6 @@ export default async function SettingsPage() {
     aiKeys,
     tasteQuizAnswerCount,
     referredUsers,
-    privateFeedTokens,
   ] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
@@ -91,17 +89,6 @@ export default async function SettingsPage() {
       orderBy: { createdAt: 'desc' },
       take: 10,
     }),
-    prisma.privateFeedToken.findMany({
-      where: { userId, revokedAt: null },
-      orderBy: { createdAt: 'desc' },
-      select: {
-        id: true,
-        name: true,
-        feedType: true,
-        createdAt: true,
-        lastUsedAt: true,
-      },
-    }),
   ]);
 
   if (!user) return null;
@@ -117,11 +104,7 @@ export default async function SettingsPage() {
   const configuredAiProviders = aiKeys.map((k) => ({ provider: k.provider, isValid: k.isValid }));
   const aiProviderMeta = getAllAiProviderClientMeta();
   const ttsProviderMeta = getAllTtsProviderClientMeta();
-  const musicProviderMeta = getMusicByokProviderMeta();
 
-  const configuredMusicProviders = configuredProviders.filter(
-    (p) => (p.provider as string) === 'suno'
-  );
   const isTwitterProviderAvailable =
     !!process.env.TWITTER_CLIENT_ID && !!process.env.TWITTER_CLIENT_SECRET;
   const appBaseUrl = getAppBaseUrl();
@@ -152,18 +135,9 @@ export default async function SettingsPage() {
         configuredAiProviders={configuredAiProviders}
         aiProviderMeta={aiProviderMeta}
         ttsProviderMeta={ttsProviderMeta}
-        musicProviderMeta={musicProviderMeta}
-        configuredMusicProviders={configuredMusicProviders}
         isTwitterProviderAvailable={isTwitterProviderAvailable}
         initialEmailNotifications={user.emailNotifications}
         initialPushNotifications={user.pushNotifications}
-        privateFeedTokens={privateFeedTokens.map((token) => ({
-          id: token.id,
-          name: token.name,
-          feedType: token.feedType,
-          createdAt: token.createdAt.toISOString(),
-          lastUsedAt: token.lastUsedAt?.toISOString() ?? null,
-        }))}
         quizAnswerCount={tasteQuizAnswerCount}
         referredUsers={referredUsers.map((u) => ({
           name: u.name,

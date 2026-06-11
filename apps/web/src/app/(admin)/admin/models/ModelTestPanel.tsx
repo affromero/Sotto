@@ -12,7 +12,6 @@ interface ModelTestPanelProps {
   imageProviders: TestableProvider[];
   videoProviders: TestableProvider[];
   avatarProviders: TestableProvider[];
-  musicProviders: TestableProvider[];
 }
 
 type TestStatus = 'idle' | 'running' | 'pass' | 'fail';
@@ -266,7 +265,6 @@ export function ModelTestPanel({
   imageProviders,
   videoProviders,
   avatarProviders,
-  musicProviders,
 }: ModelTestPanelProps) {
   const [results, setResults] = useState<Record<string, TestResult>>({});
 
@@ -375,13 +373,6 @@ export function ModelTestPanel({
       <Section
         label="Avatar"
         providers={avatarProviders}
-        results={results}
-        onTest={runSingle}
-        onTestAll={runAll}
-      />
-      <Section
-        label="Music"
-        providers={musicProviders}
         results={results}
         onTest={runSingle}
         onTestAll={runAll}

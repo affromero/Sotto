@@ -586,12 +586,10 @@ export function LandingShowcaseDashboard() {
               voiceCount={preview.voiceCount}
               sourceCount={preview.sourceCount}
               audioUrl={preview.audioClip.url}
-              originalTrackName={preview.originalTrackName}
               startTime={preview.audioClip.start}
               endTime={preview.audioClip.end}
               totalDuration={preview.audioClip.totalDuration}
               podcastId={preview.podcast.podcastId}
-              voiceTracks={preview.voiceTracks}
               videoClip={preview.videoClip}
               showVideoToggle={preview.showVideo}
             />

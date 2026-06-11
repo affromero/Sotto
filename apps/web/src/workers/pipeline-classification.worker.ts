@@ -43,7 +43,7 @@ function visualModeForType(visualType: VisualTypeString): VisualMode {
 }
 
 export async function processPipelineClassification(job: Job<ClassifyPipelinePayload>): Promise<void> {
-  const { classificationId, podcastId, userId, aiProvider, aiModel, apiKeyOverride, voiceTrackId } = job.data;
+  const { classificationId, podcastId, userId, aiProvider, aiModel, apiKeyOverride } = job.data;
   const redisKey = `${REDIS_KEY_PREFIX}${classificationId}`;
 
   logger.info('Starting pipeline classification', { classificationId, podcastId });
@@ -54,7 +54,7 @@ export async function processPipelineClassification(job: Job<ClassifyPipelinePay
         where: { id: podcastId },
         select: { id: true, title: true, topic: true },
       }),
-      resolveSegmentTiming(podcastId, voiceTrackId),
+      resolveSegmentTiming(podcastId),
       prisma.discovery.findUnique({
         where: { podcastId },
         select: { sourceMetadata: true },
@@ -204,7 +204,7 @@ export async function processPipelineClassification(job: Job<ClassifyPipelinePay
 
     // Persist as DRAFT to DB so the storyboard survives across sessions
     const existingGen = await prisma.videoGeneration.findFirst({
-      where: { podcastId, voiceTrackId: voiceTrackId ?? null },
+      where: { podcastId },
       select: { id: true, status: true },
     });
     // Only save if no active generation exists (don't overwrite READY/GENERATING_*)
@@ -222,7 +222,6 @@ export async function processPipelineClassification(job: Job<ClassifyPipelinePay
         await prisma.videoGeneration.create({
           data: {
             podcastId,
-            voiceTrackId: voiceTrackId ?? null,
             status: 'DRAFT',
             pipelineJson: pipeline as unknown as Prisma.InputJsonValue,
           },

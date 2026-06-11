@@ -47,10 +47,8 @@ export default async function PodcastInspectorPage({ params }: PageProps) {
     references,
     discovery,
     podcastVoices,
-    voiceTracks,
     podcastTags,
     interactions,
-    ratingsAgg,
     playbackCount,
   ] = await Promise.all([
     // Script
@@ -86,19 +84,6 @@ export default async function PodcastInspectorPage({ params }: PageProps) {
       where: { podcastId },
       select: { speaker: true, voiceId: true, provider: true },
     }),
-    // Voice tracks
-    prisma.voiceTrack.findMany({
-      where: { podcastId },
-      select: {
-        id: true,
-        name: true,
-        ttsProvider: true,
-        ttsModel: true,
-        status: true,
-        voices: { select: { speaker: true, voiceId: true, provider: true } },
-        _count: { select: { segments: true } },
-      },
-    }),
     // Tags
     prisma.podcastTag.findMany({
       where: { podcastId },
@@ -109,17 +94,6 @@ export default async function PodcastInspectorPage({ params }: PageProps) {
       where: { podcastId },
       select: { status: true, incorporated: true },
     }),
-    // Ratings
-    prisma.podcastRating.aggregate({
-      where: { podcastId },
-      _avg: {
-        overallSatisfaction: true,
-        voiceNaturalness: true,
-        contentAccuracy: true,
-        conversationFlow: true,
-      },
-      _count: true,
-    }),
     // Playback sessions
     prisma.playbackSession.count({ where: { podcastId } }),
   ]);
@@ -128,7 +102,6 @@ export default async function PodcastInspectorPage({ params }: PageProps) {
     podcastFeature,
     apiCostBreakdown,
     pipelineEventsRaw,
-    segmentVoiceMapRaw,
     r2Files,
   ] = await Promise.all([
     // ML Features
@@ -148,16 +121,6 @@ export default async function PodcastInspectorPage({ params }: PageProps) {
       by: ['type'],
       where: { podcastId },
       _count: true,
-    }),
-    // Segment voice map
-    prisma.voiceTrackSegment.findMany({
-      where: { segment: { podcastId } },
-      select: {
-        segmentId: true,
-        voiceTrackId: true,
-        audioUrl: true,
-        duration: true,
-      },
     }),
     // R2 files
     listObjectsDetailed(`podcasts/${podcastId}/`).catch(() => []),
@@ -217,18 +180,6 @@ export default async function PodcastInspectorPage({ params }: PageProps) {
   // Process tags
   const tags = podcastTags.map((pt) => pt.tag);
 
-  // Process ratings
-  const ratingsData =
-    ratingsAgg._count > 0
-      ? {
-          count: ratingsAgg._count,
-          avgOverall: ratingsAgg._avg.overallSatisfaction ?? 0,
-          avgVoice: ratingsAgg._avg.voiceNaturalness ?? 0,
-          avgAccuracy: ratingsAgg._avg.contentAccuracy ?? 0,
-          avgFlow: ratingsAgg._avg.conversationFlow ?? 0,
-        }
-      : null;
-
   // Process pipeline events
   const pipelineEvents: Record<string, number> = {};
   for (const e of pipelineEventsRaw) {
@@ -243,50 +194,10 @@ export default async function PodcastInspectorPage({ params }: PageProps) {
     resolvedName: v.voiceId ? (findVoiceName(v.voiceId) ?? null) : null,
   }));
 
-  // Process voice tracks
-  const voiceTrackData = voiceTracks.map((vt) => ({
-    id: vt.id,
-    name: vt.name,
-    ttsProvider: vt.ttsProvider,
-    ttsModel: vt.ttsModel,
-    status: vt.status,
-    segmentCount: vt._count.segments,
-    voices: vt.voices.map((v) => ({
-      speaker: v.speaker,
-      voiceId: v.voiceId,
-      provider: v.provider,
-    })),
-  }));
-
-  // Process segment voice map
-  const segmentVoiceMap = segments.map((seg) => {
-    const trackSegments = voiceTracks.map((vt) => {
-      const vts = segmentVoiceMapRaw.find(
-        (s) => s.segmentId === seg.id && s.voiceTrackId === vt.id
-      );
-      return {
-        trackId: vt.id,
-        trackName: vt.name,
-        hasAudio: vts?.audioUrl !== null && vts?.audioUrl !== undefined,
-        duration: vts?.duration ?? null,
-      };
-    });
-
-    return {
-      order: seg.order,
-      speaker: seg.speaker,
-      textExcerpt: seg.text.length > 80 ? seg.text.slice(0, 80) + '...' : seg.text,
-      hasAudio: seg.audioUrl !== null,
-      trackSegments,
-    };
-  });
-
   // Compute completeness
   const verifiedRefs = references.filter((r) => r.verificationStatus === 'VERIFIED').length;
   const answeredStatuses = ['ANSWERED', 'RESOLVED', 'INCORPORATING', 'INCORPORATED'];
   const answeredCount = interactions.filter((i) => answeredStatuses.includes(i.status)).length;
-  const completedTrackCount = voiceTracks.filter((vt) => vt.status === 'READY').length;
-  const segVoiceMapWithAudio = segmentVoiceMapRaw.filter((s) => s.audioUrl !== null).length;
 
   const completenessInput: CompletenessInput = {
     hasScript: turns.length > 0,
@@ -297,14 +208,11 @@ export default async function PodcastInspectorPage({ params }: PageProps) {
     verifiedReferenceCount: verifiedRefs,
     discoveryMessageCount: discovery?._count.messages ?? 0,
     voiceAssignmentCount: podcastVoices.length,
-    completedVoiceTrackCount: completedTrackCount,
     tagCount: podcastTags.length,
     answeredInteractionCount: answeredCount,
-    ratingCount: ratingsAgg._count,
     playbackSessionCount: playbackCount,
     hasMLFeatures: podcastFeature !== null,
     apiCostLogCount: apiCostBreakdown.callCount,
-    segmentVoiceMapCount: segVoiceMapWithAudio,
   };
 
   const completeness = computeCompletenessChecklist(completenessInput);
@@ -337,7 +245,6 @@ export default async function PodcastInspectorPage({ params }: PageProps) {
         }}
         discovery={discoveryData}
         tags={tags}
-        ratings={ratingsData}
         apiCosts={{
           totalCost: apiCostBreakdown.total,
           callCount: apiCostBreakdown.callCount,
@@ -353,8 +260,6 @@ export default async function PodcastInspectorPage({ params }: PageProps) {
 
       <InspectorVoices
         voiceAssignments={voiceAssignments}
-        voiceTracks={voiceTrackData}
-        segmentVoiceMap={segmentVoiceMap}
         providerMeta={providerMeta}
       />
     </div>

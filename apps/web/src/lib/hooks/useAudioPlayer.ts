@@ -5,7 +5,6 @@ import { PlayerState, PlayerControls } from '@/types/player';
 
 export function useAudioPlayer(): PlayerState & PlayerControls {
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const musicRef = useRef<HTMLAudioElement | null>(null);
   const [state, setState] = useState<PlayerState>({
     podcastId: null,
     podcastTitle: null,
@@ -16,11 +15,6 @@ export function useAudioPlayer(): PlayerState & PlayerControls {
     playbackRate: 1,
     volume: 1,
     isMuted: false,
-    activeVoiceTrackId: null,
-    musicUrl: null,
-    musicVolume: 0.15,
-    isMusicMuted: false,
-    isMusicLoaded: false,
   });
 
   function getAudio(): HTMLAudioElement | null {
@@ -38,7 +32,6 @@ export function useAudioPlayer(): PlayerState & PlayerControls {
             lastReported = now;
             setState((s) => ({ ...s, currentTime: now }));
           }
-          syncMusic(now);
         }
         rafId = requestAnimationFrame(tick);
       };
@@ -50,30 +43,10 @@ export function useAudioPlayer(): PlayerState & PlayerControls {
       audio.addEventListener('ended', () => {
         cancelAnimationFrame(rafId);
         setState((s) => ({ ...s, isPlaying: false }));
-        musicRef.current?.pause();
       });
       audioRef.current = audio;
     }
     return audioRef.current;
-  }
-
-  function getMusic(): HTMLAudioElement | null {
-    if (typeof window === 'undefined') return null;
-    if (!musicRef.current) {
-      const music = new Audio();
-      music.loop = true;
-      musicRef.current = music;
-    }
-    return musicRef.current;
-  }
-
-  function syncMusic(primaryTime: number) {
-    const music = musicRef.current;
-    if (!music || !music.src || !music.duration) return;
-    const expectedPos = primaryTime % music.duration;
-    if (Math.abs(music.currentTime - expectedPos) > 0.5) {
-      music.currentTime = expectedPos;
-    }
   }
 
   const play = useCallback(() => {
@@ -81,16 +54,11 @@ export function useAudioPlayer(): PlayerState & PlayerControls {
     if (!audio) return;
     setState((s) => ({ ...s, isPlaying: true }));
     audio.play().catch(() => setState((s) => ({ ...s, isPlaying: false })));
-    const music = musicRef.current;
-    if (music?.src) {
-      music.play().catch(() => {});
-    }
     if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
   }, []);
 
   const pause = useCallback(() => {
     getAudio()?.pause();
-    musicRef.current?.pause();
     setState((s) => ({ ...s, isPlaying: false }));
     if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
   }, []);
@@ -105,7 +73,6 @@ export function useAudioPlayer(): PlayerState & PlayerControls {
     if (audio) {
       audio.currentTime = time;
       setState((s) => ({ ...s, currentTime: time }));
-      syncMusic(time);
     }
   }, []);
 
@@ -113,7 +80,6 @@ export function useAudioPlayer(): PlayerState & PlayerControls {
     const audio = getAudio();
     if (audio) {
       audio.currentTime += seconds;
-      syncMusic(audio.currentTime);
     }
   }, []);
 
@@ -122,10 +88,6 @@ export function useAudioPlayer(): PlayerState & PlayerControls {
     if (audio) {
       audio.playbackRate = rate;
       setState((s) => ({ ...s, playbackRate: rate }));
-    }
-    const music = musicRef.current;
-    if (music) {
-      music.playbackRate = rate;
     }
   }, []);
 
@@ -145,10 +107,6 @@ export function useAudioPlayer(): PlayerState & PlayerControls {
     }
   }, []);
 
-  const setActiveVoiceTrackId = useCallback((id: string | null) => {
-    setState((s) => ({ ...s, activeVoiceTrackId: id }));
-  }, []);
-
   const updateMediaSession = useCallback((title: string | null, playing: boolean) => {
     if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
     navigator.mediaSession.metadata = new MediaMetadata({
@@ -162,7 +120,6 @@ export function useAudioPlayer(): PlayerState & PlayerControls {
     (podcastId: string, audioUrl: string, podcastTitle?: string) => {
       const audio = getAudio();
       if (!audio) return;
-      // Skip if same podcast AND same audio URL (voice track switch changes URL)
       if (state.podcastId === podcastId && state.audioUrl === audioUrl) {
         setState((s) => ({ ...s, podcastTitle: podcastTitle ?? s.podcastTitle }));
         return;
@@ -189,13 +146,6 @@ export function useAudioPlayer(): PlayerState & PlayerControls {
       audio.removeAttribute('src');
       audio.load();
     }
-    // Also clear music
-    const music = musicRef.current;
-    if (music) {
-      music.pause();
-      music.removeAttribute('src');
-      music.load();
-    }
     setState({
       podcastId: null,
       podcastTitle: null,
@@ -206,62 +156,7 @@ export function useAudioPlayer(): PlayerState & PlayerControls {
       playbackRate: 1,
       volume: 1,
       isMuted: false,
-      activeVoiceTrackId: null,
-      musicUrl: null,
-      musicVolume: 0.15,
-      isMusicMuted: false,
-      isMusicLoaded: false,
     });
-  }, []);
-
-  const loadMusic = useCallback((musicUrl: string, volume: number) => {
-    const music = getMusic();
-    if (!music) return;
-    music.src = musicUrl;
-    music.volume = volume;
-    music.load();
-    setState((s) => ({
-      ...s,
-      musicUrl,
-      musicVolume: volume,
-      isMusicLoaded: true,
-    }));
-    // If podcast is already playing, start music too
-    if (state.isPlaying) {
-      music.play().catch(() => {});
-    }
-  }, [state.isPlaying]);
-
-  const setMusicVolume = useCallback((volume: number) => {
-    const music = musicRef.current;
-    if (music) {
-      music.volume = volume;
-    }
-    setState((s) => ({ ...s, musicVolume: volume, isMusicMuted: volume === 0 }));
-  }, []);
-
-  const toggleMusicMute = useCallback(() => {
-    const music = musicRef.current;
-    if (music) {
-      music.muted = !music.muted;
-    }
-    setState((s) => ({ ...s, isMusicMuted: !s.isMusicMuted }));
-  }, []);
-
-  const clearMusic = useCallback(() => {
-    const music = musicRef.current;
-    if (music) {
-      music.pause();
-      music.removeAttribute('src');
-      music.load();
-    }
-    setState((s) => ({
-      ...s,
-      musicUrl: null,
-      musicVolume: 0.15,
-      isMusicMuted: false,
-      isMusicLoaded: false,
-    }));
   }, []);
 
   // Register MediaSession handlers for lock screen / notification controls
@@ -283,12 +178,7 @@ export function useAudioPlayer(): PlayerState & PlayerControls {
     setPlaybackRate,
     setVolume,
     toggleMute,
-    setActiveVoiceTrackId,
     loadPodcast,
     clearPodcast,
-    loadMusic,
-    setMusicVolume,
-    toggleMusicMute,
-    clearMusic,
   };
 }

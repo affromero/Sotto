@@ -5,7 +5,7 @@ import { RetryButton } from '../podcasts/RetryButton';
 import styles from './page.module.css';
 
 async function getModerationData() {
-  const [failedPodcasts, feedbackEntries, pendingReportCount, pendingClaimCount, pendingVoiceCount] =
+  const [failedPodcasts, feedbackEntries, pendingReportCount, pendingVoiceCount] =
     await Promise.all([
       prisma.podcast.findMany({
         where: { status: 'FAILED' },
@@ -38,17 +38,16 @@ async function getModerationData() {
         take: 50,
       }),
       prisma.report.count({ where: { status: 'PENDING' } }),
-      prisma.claimReport.count({ where: { status: 'PENDING' } }),
       prisma.voiceClone.count({
         where: { verificationStatus: { in: ['PENDING_VERIFICATION', 'BLOCKED', 'AWAITING_CHALLENGE'] } },
       }),
     ]);
 
-  return { failedPodcasts, feedbackEntries, pendingReportCount, pendingClaimCount, pendingVoiceCount };
+  return { failedPodcasts, feedbackEntries, pendingReportCount, pendingVoiceCount };
 }
 
 export default async function AdminModerationPage() {
-  const { failedPodcasts, feedbackEntries, pendingReportCount, pendingClaimCount, pendingVoiceCount } =
+  const { failedPodcasts, feedbackEntries, pendingReportCount, pendingVoiceCount } =
     await getModerationData();
 
   const failedPodcastsContent = (
@@ -172,7 +171,6 @@ export default async function AdminModerationPage() {
 
       <ModerationTabs
         pendingReportCount={pendingReportCount}
-        pendingClaimCount={pendingClaimCount}
         failedPodcastCount={failedPodcasts.length}
         feedbackCount={feedbackEntries.length}
         pendingVoiceCount={pendingVoiceCount}

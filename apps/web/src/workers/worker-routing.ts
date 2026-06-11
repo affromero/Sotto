@@ -11,13 +11,11 @@
 /** GPU/API-heavy workers that need beefy containers */
 export const HEAVY_WORKERS = new Set([
   'audio-generation',
-  'voice-track-audio',
   'visual-generation',
   'transition-generation',
   'avatar-generation',
   'video-composition',
   'audio-stitching',
-  'music-generation',
   'demo-voiceover',
   'demo-visual',
   'demo-recording',
@@ -40,9 +38,7 @@ export const PIPELINE_WORKERS = new Set([
   'segment-regeneration',
   'visual-classification',
   'place-enrichment',
-  'content-moderation',
   'demo-script',
-  'voice-track-stitching',
   'pipeline-classification',
   'speaking-grading',
   'worksheet-pdf',
@@ -61,7 +57,6 @@ export const EXPERIMENTAL_WORKERS = new Set([
   'demo-transition',
   'demo-composition',
   'demo-scene-composition',
-  'music-generation',
 ]);
 
 /** Check if a worker matches the given profile (heavy/pipeline/light/all) */

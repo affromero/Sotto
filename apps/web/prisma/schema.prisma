@@ -50,13 +50,6 @@ enum VideoStatus {
   STALE
 }
 
-enum MusicStatus {
-  PENDING
-  GENERATING
-  READY
-  FAILED
-}
-
 // ============ USERS & AUTH ============
 
 model User {
@@ -113,9 +106,8 @@ model User {
   saves Save[]
 
   // API Keys
-  apiKeys           ApiKey[]
-  privateFeedTokens PrivateFeedToken[]
-  pairingTokens     PairingToken[]
+  apiKeys       ApiKey[]
+  pairingTokens PairingToken[]
 
   // BYOK TTS keys (multi-provider)
   userTtsKeys UserTtsKey[]
@@ -127,14 +119,8 @@ model User {
   interests              UserInterest[]
   hasCompletedOnboarding Boolean        @default(false)
 
-  // Podcast ratings
-  podcastRatings PodcastRating[]
-
   // Taste quiz
   tasteQuizAnswers TasteQuizAnswer[]
-
-  // Saved ideas
-  savedIdeas SavedIdea[]
 
   // Podcast ideas (from Telegram bot)
   podcastIdeas PodcastIdea[]
@@ -153,8 +139,6 @@ model User {
   moderationActions   ModerationAction[] @relation("ModeratedUser")
   moderationPerformed ModerationAction[] @relation("Moderator")
   reports             Report[]           @relation("Reporter")
-  claimReports        ClaimReport[]      @relation("ClaimReporter")
-
   // Referrals
   referredById       String?
   referredBy         User?     @relation("Referrals", fields: [referredById], references: [id], onDelete: SetNull)
@@ -164,9 +148,6 @@ model User {
 
   // Voice preferences (multi-speaker)
   voicePreferences UserVoicePreference[]
-
-  // Voice track contributions (re-voice proposals)
-  voiceTrackContributions VoiceTrack[] @relation("VoiceTrackContributions")
 
   // Invitation links created by admin
   invitationLinks InvitationLink[] @relation("InvitationLinksCreated")
@@ -288,11 +269,6 @@ model Podcast {
   waveformUrl    String?
   spectrogramUrl String?
 
-  // Background music
-  musicUrl    String?
-  musicVolume Float   @default(0.15)
-  musicBaked  Boolean @default(false)
-
   // Import fields
   importedAudioKey     String?
   originalFormat       String?
@@ -305,9 +281,6 @@ model Podcast {
   // AI-suggested metadata (for imports where user provided their own)
   suggestedTitle String?
   suggestedTopic String? @db.Text
-
-  // Draft data (voice/config JSON, cleared on generation)
-  draftData Json?
 
   // Relations
   user                User               @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -324,15 +297,8 @@ model Podcast {
   playbackSessions    PlaybackSession[]
   podcastFeature      PodcastFeature?
   listeningQueues     ListeningQueue[]
-  savedIdea           SavedIdea?
   voices              PodcastVoice[]
-  ratings             PodcastRating[]
-  claimReports        ClaimReport[]
-  voiceTracks         VoiceTrack[]
-  voiceTrackProposals VoiceTrack[]       @relation("VoiceTrackProposals")
-  defaultVoiceTrackId String?
   videoGenerations    VideoGeneration[]
-  musicGenerations    MusicGeneration[]
   audioFingerprint    AudioFingerprint?
   duplicateSource     DuplicateMatch[]   @relation("DuplicateSource")
   duplicateMatches    DuplicateMatch[]   @relation("DuplicateMatch")
@@ -355,7 +321,6 @@ model Podcast {
 }
 
 enum PodcastStatus {
-  DRAFT
   PENDING
   DISCOVERING
   EXTRACTING
@@ -560,7 +525,6 @@ model Segment {
   updatedAt DateTime @updatedAt
 
   podcast            Podcast             @relation(fields: [podcastId], references: [id], onDelete: Cascade)
-  voiceTrackSegments VoiceTrackSegment[]
   segmentVisuals     SegmentVisual[]
   transitionsFrom    SegmentTransition[] @relation("TransitionFrom")
   transitionsTo      SegmentTransition[] @relation("TransitionTo")
@@ -691,33 +655,6 @@ model Save {
   @@index([podcastId])
 }
 
-// ============ PODCAST RATINGS ============
-
-model PodcastRating {
-  id        String @id @default(cuid())
-  userId    String
-  podcastId String
-
-  voiceNaturalness    Int // 1-5: "How natural do the voices sound?"
-  contentAccuracy     Int // 1-5: "Did the AI get the facts right?"
-  conversationFlow    Int // 1-5: "Does the back-and-forth feel natural?"
-  overallSatisfaction Int // 1-5: overall summary
-
-  comment           String? @db.Text
-  isCreator         Boolean @default(true)
-  completionPercent Float?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  podcast Podcast @relation(fields: [podcastId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, podcastId])
-  @@index([podcastId])
-  @@index([podcastId, isCreator])
-}
-
 // ============ TAGS ============
 
 model Tag {
@@ -784,25 +721,6 @@ model TasteQuizAnswer {
   @@index([userId])
 }
 
-// ============ SAVED IDEAS ============
-
-model SavedIdea {
-  id         String   @id @default(cuid())
-  userId     String
-  questionId String
-  question   String
-  tagSlugs   String[]
-  category   String
-  podcastId  String?  @unique
-  createdAt  DateTime @default(now())
-
-  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  podcast Podcast? @relation(fields: [podcastId], references: [id], onDelete: SetNull)
-
-  @@unique([userId, questionId])
-  @@index([userId, createdAt])
-}
-
 // ============ NOTIFICATIONS ============
 
 model Notification {
@@ -838,18 +756,11 @@ enum NotificationType {
   VOICE_VERIFICATION_FAILED
   VOICE_BLOCKED_DUPLICATE
   VOICE_OWNERSHIP_ALERT
-  CLAIM_REPORT_ON_YOUR_PODCAST
   PIPELINE_FAILURE
   REFERRAL_SIGNUP
-  VOICE_TRACK_FAILED
   VIDEO_READY
   VIDEO_FAILED
   AVATAR_FAILED
-  MUSIC_READY
-  MUSIC_FAILED
-  RENDITION_PROPOSED
-  RENDITION_ACCEPTED
-  RENDITION_REJECTED
   AVATAR_IMAGE_REQUEST_RECEIVED
   AVATAR_IMAGE_REQUEST_APPROVED
   AVATAR_IMAGE_REQUEST_DENIED
@@ -1294,25 +1205,6 @@ model PairingToken {
   @@index([tokenHash])
 }
 
-// ============ PRIVATE RSS FEEDS ============
-
-model PrivateFeedToken {
-  id         String    @id @default(cuid())
-  userId     String
-  name       String    @default("Private Sotto Feed")
-  tokenHash  String    @unique
-  feedType   String    @default("all")
-  lastUsedAt DateTime?
-  revokedAt  DateTime?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([revokedAt])
-}
-
 // ============ VOICE CLONES ============
 
 model VoiceClone {
@@ -1546,10 +1438,6 @@ model AutoModelConfig {
   avatarProvider      String   @default("heygen")
   avatarModel         String   @default("heygen-avatar-standard")
   includedAvatarModels Json?
-  // Music (AI-generated background music)
-  musicProvider       String   @default("suno")
-  musicModel          String   @default("suno-v5")
-  includedMusicModels Json?
   // Motion (programmatic visual rendering)
   motionProvider      String   @default("remotion")
   updatedAt           DateTime @updatedAt
@@ -1676,134 +1564,6 @@ model Report {
   @@index([targetType, targetId])
 }
 
-model ContentFlag {
-  id         String   @id @default(cuid())
-  targetType String // 'podcast' | 'comment' | 'discovery_message'
-  targetId   String
-  userId     String?
-  categories String[]
-  scores     Json
-  source     String // 'auto_input' | 'auto_output' | 'worker_scan'
-  reviewed   Boolean  @default(false)
-  createdAt  DateTime @default(now())
-
-  @@index([reviewed, createdAt])
-  @@index([targetType, targetId])
-}
-
-// ============ CLAIM REPORTS ============
-
-enum ClaimReportStatus {
-  PENDING
-  REVIEWING
-  RESOLVED_VERIFIED
-  RESOLVED_INACCURATE
-  DISMISSED
-}
-
-model ClaimReport {
-  id          String            @id @default(cuid())
-  reporterId  String
-  podcastId   String
-  turnIndex   Int
-  turnText    String            @db.Text
-  description String            @db.Text
-  status      ClaimReportStatus @default(PENDING)
-  resolvedBy  String?
-  resolution  String?           @db.Text
-  resolvedAt  DateTime?
-  createdAt   DateTime          @default(now())
-
-  reporter User    @relation("ClaimReporter", fields: [reporterId], references: [id], onDelete: Cascade)
-  podcast  Podcast @relation(fields: [podcastId], references: [id], onDelete: Cascade)
-
-  @@unique([reporterId, podcastId, turnIndex])
-  @@index([podcastId, status])
-  @@index([status, createdAt])
-}
-
-// ============ VOICE TRACKS ============
-
-enum VoiceTrackStatus {
-  PENDING
-  GENERATING_AUDIO
-  STITCHING
-  READY
-  FAILED
-  STALE
-}
-
-enum ProposalStatus {
-  PENDING
-  ACCEPTED
-  REJECTED
-}
-
-model VoiceTrack {
-  id            String           @id @default(cuid())
-  podcastId     String
-  name          String
-  status        VoiceTrackStatus @default(PENDING)
-  audioUrl      String?
-  duration      Int?
-  fileSize      Int?
-  ttsProvider   String?
-  ttsModel      String?
-  failureReason String?          @db.Text
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
-
-  // Re-voice proposal fields
-  contributorId         String?
-  proposalStatus        ProposalStatus?
-  proposalMessage       String?         @db.Text
-  proposedFromPodcastId String?
-  reviewedAt            DateTime?
-  rejectionReason       String?         @db.Text
-
-  podcast             Podcast             @relation(fields: [podcastId], references: [id], onDelete: Cascade)
-  contributor         User?               @relation("VoiceTrackContributions", fields: [contributorId], references: [id], onDelete: SetNull)
-  proposedFromPodcast Podcast?            @relation("VoiceTrackProposals", fields: [proposedFromPodcastId], references: [id], onDelete: SetNull)
-  voices              VoiceTrackVoice[]
-  segments            VoiceTrackSegment[]
-  avatarOverlays      AvatarOverlay[]
-  videoGenerations    VideoGeneration[]
-
-  @@index([podcastId])
-  @@index([status])
-  @@index([contributorId])
-  @@index([proposalStatus])
-}
-
-model VoiceTrackVoice {
-  id           String  @id @default(cuid())
-  voiceTrackId String
-  speaker      String
-  voiceId      String
-  provider     String? // TTS provider that assigned the voiceId
-  ttsModel     String? // TTS model for this speaker's provider
-
-  voiceTrack VoiceTrack @relation(fields: [voiceTrackId], references: [id], onDelete: Cascade)
-
-  @@unique([voiceTrackId, speaker])
-}
-
-model VoiceTrackSegment {
-  id           String  @id @default(cuid())
-  voiceTrackId String
-  segmentId    String
-  audioUrl     String?
-  duration     Float?
-  startTime    Float?
-  order        Int
-
-  voiceTrack VoiceTrack @relation(fields: [voiceTrackId], references: [id], onDelete: Cascade)
-  segment    Segment    @relation(fields: [segmentId], references: [id], onDelete: Cascade)
-
-  @@unique([voiceTrackId, segmentId])
-  @@index([voiceTrackId])
-}
-
 // ============ AUDIO FINGERPRINTING & DUPLICATE DETECTION ============
 
 model AudioFingerprint {
@@ -1888,7 +1648,6 @@ model ModelPricingSnapshot {
 model VideoGeneration {
   id             String      @id @default(cuid())
   podcastId      String
-  voiceTrackId   String?
   status         VideoStatus @default(PENDING)
   videoUrl       String?
   duration       Int? // seconds
@@ -1907,37 +1666,11 @@ model VideoGeneration {
   updatedAt      DateTime    @updatedAt
 
   podcast        Podcast             @relation(fields: [podcastId], references: [id], onDelete: Cascade)
-  voiceTrack     VoiceTrack?         @relation(fields: [voiceTrackId], references: [id], onDelete: Cascade)
   visuals        SegmentVisual[]
   avatarOverlays AvatarOverlay[]
   transitions    SegmentTransition[]
 
-  @@unique([podcastId, voiceTrackId])
   @@index([podcastId])
-}
-
-// ============ MUSIC GENERATION ============
-
-model MusicGeneration {
-  id             String      @id @default(cuid())
-  podcastId      String
-  status         MusicStatus @default(PENDING)
-  musicUrl       String?
-  duration       Int? // seconds
-  fileSize       Int? // bytes
-  provider       String? // 'suno' | 'elevenlabs'
-  model          String? // e.g., 'suno-v5', 'eleven-music-v1'
-  prompt         String?     @db.Text
-  externalTaskId String? // Suno taskId for async polling
-  failureReason  String?     @db.Text
-  selected       Boolean     @default(false)
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
-
-  podcast Podcast @relation(fields: [podcastId], references: [id], onDelete: Cascade)
-
-  @@index([podcastId])
-  @@index([podcastId, selected])
 }
 
 model SegmentTransition {
@@ -2031,7 +1764,6 @@ model AvatarOverlay {
   chunkVideoUrl        String?
   chunkDurationSeconds Float?
   enabledSegmentIds    String[] @default([])
-  voiceTrackId         String?
   posX                 Float    @default(0.02)
   posY                 Float    @default(0.55)
   width                Float    @default(0.25)
@@ -2040,11 +1772,9 @@ model AvatarOverlay {
   updatedAt            DateTime @updatedAt
 
   videoGeneration VideoGeneration @relation(fields: [videoGenerationId], references: [id], onDelete: Cascade)
-  voiceTrack      VoiceTrack?     @relation(fields: [voiceTrackId], references: [id], onDelete: SetNull)
 
   @@unique([videoGenerationId, speaker])
   @@index([videoGenerationId])
-  @@index([voiceTrackId])
 }
 
 enum AvatarImageSource {

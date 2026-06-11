@@ -20,14 +20,12 @@ export async function GET() {
     discoveryMessages,
     interactions,
     saves,
-    ratings,
     userFeature,
     behavioralEvents,
     playbackSessions,
     voiceClones,
     feedback,
     tasteQuizAnswers,
-    savedIdeas,
   ] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
@@ -115,18 +113,6 @@ export async function GET() {
       where: { userId },
       select: { podcastId: true, createdAt: true },
     }),
-    prisma.podcastRating.findMany({
-      where: { userId },
-      select: {
-        podcastId: true,
-        voiceNaturalness: true,
-        contentAccuracy: true,
-        conversationFlow: true,
-        overallSatisfaction: true,
-        comment: true,
-        createdAt: true,
-      },
-    }),
     prisma.userFeature.findUnique({
       where: { userId },
     }),
@@ -191,17 +177,6 @@ export async function GET() {
         createdAt: true,
       },
     }),
-    prisma.savedIdea.findMany({
-      where: { userId },
-      select: {
-        questionId: true,
-        question: true,
-        tagSlugs: true,
-        category: true,
-        podcastId: true,
-        createdAt: true,
-      },
-    }),
   ]);
 
   if (!user) {
@@ -218,14 +193,12 @@ export async function GET() {
     discoveryMessages,
     interactions,
     saves,
-    ratings,
     behavioralProfile: userFeature,
     recentBehavioralEvents: behavioralEvents,
     recentPlaybackSessions: playbackSessions,
     voiceClones,
     feedback,
     tasteQuizAnswers,
-    savedIdeas,
   };
 
   const date = new Date().toISOString().split('T')[0];

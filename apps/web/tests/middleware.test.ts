@@ -115,22 +115,6 @@ describe('Middleware Security Tests', () => {
       expect(isPassThrough(res)).toBe(true);
     });
 
-    it('allows /api/oembed (public prefix)', async () => {
-      const res = await middleware(createRequest('/api/oembed'));
-      expect(isPassThrough(res)).toBe(true);
-    });
-
-    it('allows /podcast/abc123/embed (embed bypass)', async () => {
-      const res = await middleware(createRequest('/podcast/abc123/embed'));
-      expect(isPassThrough(res)).toBe(true);
-    });
-
-    it('does NOT allow /podcast/abc123/embed/evil (must match exact pattern)', async () => {
-      const res = await middleware(createRequest('/podcast/abc123/embed/evil'));
-      // Not a public route — passes through as non-protected, non-auth route
-      expect(isPassThrough(res)).toBe(true);
-    });
-
     it('allows /auth/waitlisted for unauthenticated users', async () => {
       const res = await middleware(createRequest('/auth/waitlisted'));
       expect(isPassThrough(res)).toBe(true);

@@ -2,7 +2,6 @@ import { prisma } from '@/lib/prisma';
 import { getLandingShowcaseConfig } from '@/lib/landing-showcase';
 import type { LandingShowcaseConfig } from '@/lib/landing-showcase';
 import { logger } from '@/lib/logger';
-import { findVoiceName } from '@/lib/voice-pool';
 import type { ReferenceData } from '@/types/reference';
 import type { VocabularyEntryData } from '@/types/vocabulary';
 
@@ -26,8 +25,6 @@ export interface LandingShowcaseData {
 
   // JourneyChapter Step 3 — Audio clip
   audioClip: { url: string; start: number; end: number; totalDuration: number };
-  originalTrackName: string;
-  voiceTracks: { name: string; provider: string; model: string; audioUrl: string }[];
   voiceCount: number;
   sourceCount: number;
 
@@ -163,7 +160,6 @@ export async function buildShowcaseData(config: LandingShowcaseConfig): Promise<
         topic: true,
         audioUrl: true,
         duration: true,
-        ttsProvider: true,
         user: { select: { name: true, handle: true } },
         discovery: {
           select: {
@@ -198,9 +194,6 @@ export async function buildShowcaseData(config: LandingShowcaseConfig): Promise<
           orderBy: { order: 'asc' },
           select: { id: true, order: true, speaker: true, text: true, startTime: true, duration: true, wordTimings: true, ttsVoiceId: true },
         },
-        voices: {
-          select: { speaker: true, voiceId: true },
-        },
         vocabularyEntries: {
           orderBy: { number: 'asc' },
           select: {
@@ -214,18 +207,7 @@ export async function buildShowcaseData(config: LandingShowcaseConfig): Promise<
             difficulty: true,
           },
         },
-        voiceTracks: {
-          where: { status: 'READY', audioUrl: { not: null } },
-          orderBy: { createdAt: 'asc' },
-          select: {
-            name: true,
-            ttsProvider: true,
-            ttsModel: true,
-            audioUrl: true,
-          },
-        },
         videoGenerations: {
-          where: { voiceTrackId: null },
           take: 1,
           select: {
             videoUrl: true,
@@ -320,50 +302,10 @@ export async function buildShowcaseData(config: LandingShowcaseConfig): Promise<
       totalDuration: podcast.duration ?? 0,
     };
 
-    // Voice tracks — alternative renditions of the same podcast
-    const voiceTracks = podcast.voiceTracks
-      .filter((vt): vt is typeof vt & { audioUrl: string } => !!vt.audioUrl)
-      .map((vt) => ({
-        name: vt.name,
-        provider: vt.ttsProvider ?? 'Unknown',
-        model: vt.ttsModel ?? 'default',
-        audioUrl: vt.audioUrl,
-      }));
-
     // Voice count — distinct speakers
     const speakers = [...new Set(podcast.segments.map((s) => s.speaker))];
     const voiceCount = speakers.length || 2;
     const sourceCount = podcast.references.length;
-
-    // Original track label — "Original · VoiceName1 + VoiceName2 [Provider]"
-    const providerLabel = podcast.ttsProvider
-      ? podcast.ttsProvider.charAt(0).toUpperCase() + podcast.ttsProvider.slice(1)
-      : 'Sotto';
-    // Resolve voice names from PodcastVoice records (authoritative), then segment ttsVoiceId, then speakers
-    const voiceNames: string[] = [];
-    const seenVoiceIds = new Set<string>();
-    for (const pv of podcast.voices) {
-      if (pv.voiceId && !seenVoiceIds.has(pv.voiceId)) {
-        seenVoiceIds.add(pv.voiceId);
-        const name = findVoiceName(pv.voiceId);
-        voiceNames.push(name ?? pv.voiceId);
-      }
-    }
-    // Fallback to segment ttsVoiceId if no PodcastVoice records
-    if (voiceNames.length === 0) {
-      for (const seg of podcast.segments) {
-        if (seg.ttsVoiceId && !seenVoiceIds.has(seg.ttsVoiceId)) {
-          seenVoiceIds.add(seg.ttsVoiceId);
-          const name = findVoiceName(seg.ttsVoiceId);
-          if (name) voiceNames.push(name);
-        }
-      }
-    }
-    const displayNames = voiceNames.length > 0 ? voiceNames : speakers;
-    const voiceSuffix = displayNames.length > 0
-      ? `${displayNames.join(' + ')} [${providerLabel}]`
-      : providerLabel;
-    const originalTrackName = voiceSuffix;
 
     // Video segments — slice by config range
     const allVisuals = podcast.videoGenerations[0]?.visuals ?? [];
@@ -431,8 +373,6 @@ export async function buildShowcaseData(config: LandingShowcaseConfig): Promise<
       scriptTurns,
       references,
       audioClip,
-      originalTrackName,
-      voiceTracks,
       voiceCount,
       sourceCount,
       showAvatar: config.showAvatar,

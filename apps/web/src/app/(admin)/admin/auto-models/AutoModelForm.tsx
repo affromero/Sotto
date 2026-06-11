@@ -46,9 +46,6 @@ interface AutoModelFormProps {
     avatarProvider: string;
     avatarModel: string;
     includedAvatarModels: string[] | null;
-    musicProvider: string;
-    musicModel: string;
-    includedMusicModels: string[] | null;
     motionProvider: string;
   };
   aiProviders: ProviderOption[];
@@ -57,7 +54,6 @@ interface AutoModelFormProps {
   imageProviders: ProviderOption[];
   videoProviders: ProviderOption[];
   avatarProviders: ProviderOption[];
-  musicProviders: ProviderOption[];
 }
 
 interface UnifiedStateConfig {
@@ -249,7 +245,6 @@ export function AutoModelForm({
   imageProviders,
   videoProviders,
   avatarProviders,
-  musicProviders,
 }: AutoModelFormProps) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -297,13 +292,6 @@ export function AutoModelForm({
     compositeIds: false,
   });
 
-  const musicState = useUnifiedModelState({
-    initialDefault: { provider: initialConfig.musicProvider, model: initialConfig.musicModel },
-    initialIncluded: initialConfig.includedMusicModels,
-    providers: musicProviders,
-    compositeIds: false,
-  });
-
   const [platformAiProvider, setPlatformAiProvider] = useState(initialConfig.platform.aiProvider);
   const [platformAiModel, setPlatformAiModel] = useState(initialConfig.platform.aiModel);
   const [motionProvider, setMotionProvider] = useState(initialConfig.motionProvider);
@@ -348,9 +336,6 @@ export function AutoModelForm({
           avatarProvider: avatarState.defaultSelection.provider,
           avatarModel: avatarState.defaultSelection.model,
           includedAvatarModels: setToArray(avatarState.included),
-          musicProvider: musicState.defaultSelection.provider,
-          musicModel: musicState.defaultSelection.model,
-          includedMusicModels: setToArray(musicState.included),
           motionProvider,
         }),
       });
@@ -405,12 +390,6 @@ export function AutoModelForm({
         title="Avatar Models"
         description="Choose the default avatar engine and the server-configured models available for lip-sync overlays."
         state={avatarState}
-      />
-
-      <UnifiedModelEditor
-        title="Music Models"
-        description="Choose the default music model and the server-configured models available for background music."
-        state={musicState}
       />
 
       <fieldset className={styles.section}>

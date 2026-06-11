@@ -7,7 +7,6 @@ import {
   Network,
   Settings,
   Key,
-  BarChart2,
   Shield,
   Activity,
 } from 'lucide-react';
@@ -35,16 +34,11 @@ interface NavItem {
   icon: typeof GraduationCap;
 }
 
-function getNavItems(role: string): NavItem[] {
+function getNavItems(): NavItem[] {
   const items: NavItem[] = [
     { href: '/learn', label: 'Learn', icon: GraduationCap },
     { href: '/memory', label: 'Memory', icon: Network },
   ];
-
-  // Server-wide cost + usage analytics are admin-only.
-  if (role === 'ADMIN') {
-    items.push({ href: '/analytics', label: 'Analytics', icon: BarChart2 });
-  }
 
   items.push({ href: '/settings/api', label: 'API Keys', icon: Key });
   items.push({ href: '/settings', label: 'Settings', icon: Settings });
@@ -60,7 +54,7 @@ export function Sidebar({
   user,
 }: SidebarProps) {
   const role = user?.role || 'USER';
-  const navItems = getNavItems(role);
+  const navItems = getNavItems();
 
   return (
     <div className={isOpen ? styles.sidebarOpen : undefined}>

@@ -10,13 +10,6 @@ import type { SegmentData } from '@/types/podcast';
 import { useShowcaseToggles } from '../ShowcaseTogglesProvider';
 import styles from './AudioClipPlayer.module.css';
 
-interface VoiceTrackOption {
-  name: string;
-  provider: string;
-  model: string;
-  audioUrl: string;
-}
-
 interface VideoClip {
   url: string;
   start: number;
@@ -55,12 +48,10 @@ interface AudioClipPlayerProps {
   voiceCount: number;
   sourceCount: number;
   audioUrl: string;
-  originalTrackName: string;
   startTime: number;
   endTime: number;
   totalDuration: number;
   podcastId: string;
-  voiceTracks?: VoiceTrackOption[];
   videoClip?: VideoClip | null;
   clipSegments?: ClipSegment[];
   clipVisuals?: ClipVisual[];
@@ -86,12 +77,10 @@ export function AudioClipPlayer({
   voiceCount,
   sourceCount,
   audioUrl,
-  originalTrackName,
   startTime,
   endTime,
   totalDuration,
   podcastId,
-  voiceTracks = [],
   videoClip,
   clipSegments = [],
   clipVisuals = [],
@@ -100,10 +89,8 @@ export function AudioClipPlayer({
   const audioRef = useRef<HTMLAudioElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const remotionRef = useRef<PlayerRef>(null);
-  const pendingResumeRef = useRef<{ elapsed: number; play: boolean } | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
-  const [activeTrackIndex, setActiveTrackIndex] = useState(-1); // -1 = original
   const [localVideoEnabled, setLocalVideoEnabled] = useState(false);
 
   // When inside ShowcaseTogglesProvider (landing page), read from context.
@@ -137,7 +124,6 @@ export function AudioClipPlayer({
     branding: DEFAULT_BRANDING,
   }), [videoSegments]);
 
-  const activeUrl = activeTrackIndex >= 0 ? voiceTracks[activeTrackIndex].audioUrl : audioUrl;
   const clipDuration = endTime - startTime;
   const progress = clipDuration > 0 ? Math.min(currentTime / clipDuration, 1) : 0;
 
@@ -185,40 +171,11 @@ export function AudioClipPlayer({
     }
   }, [isPlaying, startTime, endTime, syncVideo]);
 
-  const handleTrackSwitch = useCallback((index: number) => {
-    if (index === activeTrackIndex) return;
-    const audio = audioRef.current;
-    const elapsed = audio ? audio.currentTime - startTime : 0;
-    if (audio) audio.pause();
-    syncVideo(startTime + Math.max(0, elapsed), false);
-    pendingResumeRef.current = { elapsed: Math.max(0, elapsed), play: isPlaying };
-    setActiveTrackIndex(index);
-  }, [isPlaying, startTime, activeTrackIndex, syncVideo]);
-
-  // When src changes, load and resume from saved position
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
-
-    const onCanPlay = () => {
-      const pending = pendingResumeRef.current;
-      if (!pending) return;
-      pendingResumeRef.current = null;
-      audio.currentTime = startTime + pending.elapsed;
-      if (pending.play) {
-        audio.play();
-        syncVideo(startTime + pending.elapsed, true);
-        setIsPlaying(true);
-      }
-    };
-
-    audio.addEventListener('canplay', onCanPlay, { once: true });
     audio.load();
-
-    return () => {
-      audio.removeEventListener('canplay', onCanPlay);
-    };
-  }, [activeUrl, startTime, syncVideo]);
+  }, [audioUrl]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -316,29 +273,6 @@ export function AudioClipPlayer({
           {formatDurationMinutes(totalDuration)} &middot; {voiceCount} voices &middot; {sourceCount} sources
         </div>
 
-        {voiceTracks.length > 0 && (
-          <div className={styles.trackSwitcher}>
-            <button
-              type="button"
-              className={`${styles.trackBtn} ${activeTrackIndex === -1 ? styles.trackBtnActive : ''}`}
-              onClick={() => handleTrackSwitch(-1)}
-            >
-              {originalTrackName}
-            </button>
-            {voiceTracks.map((track, i) => (
-              <button
-                key={i}
-                type="button"
-                className={`${styles.trackBtn} ${activeTrackIndex === i ? styles.trackBtnActive : ''}`}
-                onClick={() => handleTrackSwitch(i)}
-                title={`${track.provider} / ${track.model}`}
-              >
-                {track.name}
-              </button>
-            ))}
-          </div>
-        )}
-
         <div className={styles.playerPlayRow}>
           <button
             className={`${styles.playButton} ${isPlaying ? styles.playButtonActive : ''}`}
@@ -400,7 +334,7 @@ export function AudioClipPlayer({
         </div>
       </div>
       { }
-      <audio ref={audioRef} src={activeUrl} preload="metadata" />
+      <audio ref={audioRef} src={audioUrl} preload="metadata" />
     </div>
   );
 }

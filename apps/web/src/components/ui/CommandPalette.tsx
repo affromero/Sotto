@@ -6,10 +6,8 @@ import { Command } from 'cmdk';
 import {
   LayoutDashboard,
   PlusCircle,
-  BarChart2,
   Settings,
   Key,
-  Bookmark,
   Sun,
   Moon,
   LogOut,
@@ -21,8 +19,6 @@ import styles from './CommandPalette.module.css';
 const NAV_ITEMS = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/create', label: 'Create Podcast', icon: PlusCircle },
-  { href: '/analytics', label: 'Analytics', icon: BarChart2 },
-  { href: '/ideas', label: 'Library', icon: Bookmark },
   { href: '/settings/api', label: 'API Keys', icon: Key },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];

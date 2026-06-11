@@ -104,8 +104,6 @@ vi.mock('@/lib/generation-features', () => ({
     privateAllowed: true,
     priorityQueue: true,
     analyticsEnabled: true,
-    voiceTracksEnabled: true,
-    maxVoiceTracks: 3,
     voiceCloningEnabled: true,
   }),
 }));

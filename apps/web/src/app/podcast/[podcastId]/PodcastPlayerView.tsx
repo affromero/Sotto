@@ -12,12 +12,10 @@ import {
   Pencil,
   RefreshCw,
   Trash2,
-  BarChart2,
   Shield,
   Video,
   Users,
   X,
-  Music,
   MessageCircleQuestion,
   Check,
   AlertTriangle,
@@ -31,12 +29,9 @@ import { ReferenceList } from '@/components/player/ReferenceList';
 import { VocabularyList } from '@/components/player/VocabularyList';
 import { InterruptChatPanel } from '@/components/player/InterruptChatPanel';
 import { Modal } from '@/components/ui/Modal';
-import { Contributors } from '@/components/player/Contributors';
 import { OverflowMenu } from '@/components/ui/OverflowMenu';
 import { VisibilityToggle } from '@/components/ui/VisibilityToggle';
-import { VoiceTrackSelector } from '@/components/player/VoiceTrackSelector';
 import { VersionHistory } from '@/components/player/VersionHistory';
-import { PostListenRating } from '@/components/player/PostListenRating';
 import { Badge } from '@/components/ui/Badge';
 import { SottoBadge } from '@/components/ui/SottoBadge';
 import { MetadataBadges } from '@/components/ui/MetadataBadges';
@@ -51,7 +46,6 @@ import { VideoProgress } from '@/components/player/VideoProgress';
 import { VideoView } from '@/components/player/VideoView';
 import { PipelineEditor } from '@/components/player/PipelineEditor';
 import { VideoEditor } from '@/components/player/VideoEditor';
-import { MusicGenerator } from '@/components/player/MusicGenerator';
 import { AvatarPicker } from '@/components/player/AvatarPicker';
 import type { AvatarOverlayData } from '@/types/avatar';
 import type { AvatarMaskShape } from '@/components/player/AvatarOverlay';
@@ -73,14 +67,12 @@ interface PodcastPlayerViewProps {
   isAuthenticated: boolean;
   videoStatus?: VideoGenerationStatus;
   avatarStatus?: VideoGenerationStatus;
-  musicStatus?: VideoGenerationStatus;
 }
 
 type ViewMode = 'transcript' | 'teleprompter' | 'video';
 
 const statusVariants: Record<PodcastStatus, 'default' | 'success' | 'warning' | 'error' | 'info'> =
   {
-    DRAFT: 'default',
     PENDING: 'default',
     DISCOVERING: 'info',
     EXTRACTING: 'info',
@@ -152,10 +144,8 @@ export function PodcastPlayerView({
   isAuthenticated,
   videoStatus,
   avatarStatus,
-  musicStatus,
 }: PodcastPlayerViewProps) {
   const router = useRouter();
-  const player = usePlayer();
   const [currentTime, setCurrentTime] = useState(0);
   const seekRef = useRef<((time: number) => void) | null>(null);
   const [showInterruptChat, setShowInterruptChat] = useState(false);
@@ -181,9 +171,6 @@ export function PodcastPlayerView({
   );
   const [audioConfig, setAudioConfig] = useState<AudioConfig>({ voices: [] });
   const playerSectionRef = useRef<HTMLElement>(null);
-  const [showRatingPrompt, setShowRatingPrompt] = useState(false);
-  const [hasRated, setHasRated] = useState(false);
-  const completionPercentRef = useRef(0);
   const [questionCounts, setQuestionCounts] = useState<Map<number, number>>(new Map());
   const [videoState, setVideoState] = useState<'idle' | 'generating' | 'ready' | 'failed'>(
     podcast.videoUrl ? 'ready' : 'idle'
@@ -204,38 +191,12 @@ export function PodcastPlayerView({
   const [classificationId, setClassificationId] = useState<string | null>(null);
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   const [showVideoEditor, setShowVideoEditor] = useState(false);
-  const [showMusicModal, setShowMusicModal] = useState(false);
   const [avatarOverlays, setAvatarOverlays] = useState<AvatarOverlayData[]>([]);
   const [avatarsVisible, setAvatarsVisible] = useState(true);
   const [avatarGenerating, setAvatarGenerating] = useState(false);
   const [avatarDone, setAvatarDone] = useState(false);
 
-  // Filter avatar overlays to match the active audio source (original or voice track)
-  const activeVoiceTrackId = player.activeVoiceTrackId;
-  const filteredAvatarOverlays = useMemo(
-    () =>
-      avatarOverlays.filter((o) =>
-        activeVoiceTrackId ? o.voiceTrackId === activeVoiceTrackId : !o.voiceTrackId
-      ),
-    [avatarOverlays, activeVoiceTrackId]
-  );
-  // Load background music on mount if available (skip if already baked into audio)
-  useEffect(() => {
-    if (podcast.musicUrl && player && !podcast.musicBaked) {
-      player.loadMusic(podcast.musicUrl, podcast.musicVolume);
-    }
-  }, [podcast.musicUrl, podcast.musicVolume, podcast.musicBaked]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Check if user has already rated this podcast
-  useEffect(() => {
-    if (!isAuthenticated || liveStatus !== 'READY') return;
-    fetch(`/api/podcasts/${podcast.id}/rating`)
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (data?.rating) setHasRated(true);
-      })
-      .catch(() => {});
-  }, [isAuthenticated, liveStatus, podcast.id]);
+  const filteredAvatarOverlays = useMemo(() => avatarOverlays, [avatarOverlays]);
 
   // Fetch knowledge gaps for owner
   useEffect(() => {
@@ -305,16 +266,14 @@ export function PodcastPlayerView({
     ),
   });
 
-  // Check existing video generation status on mount / track switch
+  // Check existing video generation status on mount
   useEffect(() => {
     if (liveStatus !== 'READY') return;
-    // Reset video state while fetching for the new track
     setVideoState('idle');
     setSegmentVisuals([]);
     setVideoGenerationId(null);
     setVideoError(null);
-    const vtParam = activeVoiceTrackId ? `?voiceTrackId=${activeVoiceTrackId}` : '';
-    fetch(`/api/podcasts/${podcast.id}/video${vtParam}`)
+    fetch(`/api/podcasts/${podcast.id}/video`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (!data?.status) return;
@@ -348,7 +307,7 @@ export function PodcastPlayerView({
         }
       })
       .catch(() => {});
-  }, [isOwner, liveStatus, podcast.id, activeVoiceTrackId]);
+  }, [isOwner, liveStatus, podcast.id]);
 
   // Poll avatar overlay status while avatars are generating (independent of video state)
   useEffect(() => {
@@ -425,10 +384,7 @@ export function PodcastPlayerView({
         }
 
         // No saved draft — trigger classification
-        const pipelineBody = {
-          ...override,
-          ...(activeVoiceTrackId && { voiceTrackId: activeVoiceTrackId }),
-        };
+        const pipelineBody = { ...override };
         const hasBody = Object.keys(pipelineBody).length > 0;
         const pipelineOpts: RequestInit = hasBody
           ? {
@@ -460,7 +416,7 @@ export function PodcastPlayerView({
         setPipelineLoading(false);
       }
     },
-    [podcast.id, activeVoiceTrackId, pipelineData, falModels]
+    [podcast.id, pipelineData, falModels]
   );
 
   // Poll for pipeline classification result
@@ -517,10 +473,7 @@ export function PodcastPlayerView({
         const res = await fetch(`/api/podcasts/${podcast.id}/video`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            pipeline,
-            ...(activeVoiceTrackId && { voiceTrackId: activeVoiceTrackId }),
-          }),
+          body: JSON.stringify({ pipeline }),
         });
         if (!res.ok) throw new Error('Failed to start video generation');
         const data = await res.json();
@@ -690,14 +643,8 @@ export function PodcastPlayerView({
       <PlayerBridge
         onTimeUpdate={(time) => {
           setCurrentTime(time);
-          if (podcast.duration && podcast.duration > 0) {
-            completionPercentRef.current = Math.min((time / podcast.duration) * 100, 100);
-          }
         }}
         seekRef={seekRef}
-        onComplete={() => {
-          if (isAuthenticated && !hasRated) setShowRatingPrompt(true);
-        }}
       />
       <div className={styles.playerView}>
         {/* Back nav */}
@@ -952,17 +899,6 @@ export function PodcastPlayerView({
                     <Users size={14} />
                     Avatars
                   </button>
-                  <button
-                    className={styles.toolbarBtn}
-                    onClick={() => setShowMusicModal(true)}
-                    disabled={!musicStatus?.available}
-                    aria-label="Add Music"
-                    title="Add background music to your podcast"
-                    type="button"
-                  >
-                    <Music size={14} />
-                    Music
-                  </button>
                 </div>
                 {showModelPicker && !videoError && (
                   <VideoModelPicker
@@ -972,11 +908,6 @@ export function PodcastPlayerView({
                     }}
                     onCancel={() => setShowModelPicker(false)}
                     loading={pipelineLoading}
-                    activeVoiceTrackName={
-                      activeVoiceTrackId
-                        ? podcast.voiceTracks.find((t) => t.id === activeVoiceTrackId)?.name
-                        : undefined
-                    }
                   />
                 )}
                 {videoError && (
@@ -990,11 +921,6 @@ export function PodcastPlayerView({
                         }}
                         onCancel={() => setVideoError(null)}
                         loading={pipelineLoading}
-                        activeVoiceTrackName={
-                          activeVoiceTrackId
-                            ? podcast.voiceTracks.find((t) => t.id === activeVoiceTrackId)?.name
-                            : undefined
-                        }
                       />
                     )}
                   </div>
@@ -1005,7 +931,6 @@ export function PodcastPlayerView({
               <VideoProgress
                 podcastId={podcast.id}
                 videoGenerationId={videoGenerationId}
-                voiceTrackId={activeVoiceTrackId}
                 onComplete={(visuals) => {
                   setVideoState('ready');
                   setSegmentVisuals(visuals);
@@ -1089,17 +1014,6 @@ export function PodcastPlayerView({
                       Avatars
                     </>
                   )}
-                </button>
-                <button
-                  className={styles.toolbarBtn}
-                  onClick={() => setShowMusicModal(true)}
-                  disabled={!musicStatus?.available}
-                  aria-label="Add Music"
-                  title="Add background music to your podcast"
-                  type="button"
-                >
-                  <Music size={14} />
-                  Music
                 </button>
               </div>
             )}
@@ -1189,16 +1103,6 @@ export function PodcastPlayerView({
                     <Users size={14} />
                     Avatars
                   </button>
-                  <button
-                    className={styles.toolbarBtn}
-                    onClick={() => setShowMusicModal(true)}
-                    aria-label="Add Music"
-                    title="Add background music to your podcast"
-                    type="button"
-                  >
-                    <Music size={14} />
-                    Music
-                  </button>
                 </div>
               </>
             )}
@@ -1217,32 +1121,7 @@ export function PodcastPlayerView({
               audioUrl={podcast.audioUrl!}
               podcastTitle={podcast.title}
             />
-            {(podcast.voiceTracks.length > 0 || isOwner) && (
-              <VoiceTrackSelector
-                podcastId={podcast.id}
-                podcastAudioUrl={podcast.audioUrl!}
-                podcastTitle={podcast.title}
-                voiceTracks={podcast.voiceTracks}
-                defaultVoiceTrackId={podcast.defaultVoiceTrackId}
-                originalTrackName={podcast.originalTrackName}
-                isOwner={isOwner}
-                speakers={[...new Set(podcast.segments.map((s) => s.speaker))]}
-              />
-            )}
           </section>
-        )}
-
-        {/* Post-Listen Rating Prompt */}
-        {showRatingPrompt && !hasRated && (
-          <PostListenRating
-            podcastId={podcast.id}
-            isOwner={isOwner}
-            completionPercent={completionPercentRef.current}
-            onDismiss={() => {
-              setShowRatingPrompt(false);
-              setHasRated(true);
-            }}
-          />
         )}
 
         {/* Stats & Actions */}
@@ -1299,15 +1178,6 @@ export function PodcastPlayerView({
                   ...(isOwner
                     ? [
                         {
-                          icon: <BarChart2 size={16} />,
-                          label: 'Analytics',
-                          onClick: () => router.push(`/podcast/${podcast.id}/analytics`),
-                        },
-                      ]
-                    : []),
-                  ...(isOwner
-                    ? [
-                        {
                           icon: <Pencil size={16} />,
                           label: 'Edit',
                           onClick: () => router.push(`/podcast/${podcast.id}/edit`),
@@ -1345,34 +1215,15 @@ export function PodcastPlayerView({
           </div>
         </div>
 
-        {/* Collapsible details: Contributors and Version History */}
+        {/* Collapsible details: Version History */}
         {(() => {
-          const contributorMap = new Map<
-            string,
-            {
-              contributor: NonNullable<(typeof podcast.voiceTracks)[0]['contributor']>;
-              count: number;
-            }
-          >();
-          for (const t of podcast.voiceTracks) {
-            if (t.contributor && t.proposalStatus === 'ACCEPTED') {
-              const existing = contributorMap.get(t.contributor.id);
-              if (existing) {
-                existing.count++;
-              } else {
-                contributorMap.set(t.contributor.id, { contributor: t.contributor, count: 1 });
-              }
-            }
-          }
-          const contributors = Array.from(contributorMap.values());
           const hasVersions = podcast.versions.length > 1;
-          const hasDetails = contributors.length > 0 || hasVersions;
+          const hasDetails = hasVersions;
           if (!hasDetails) return null;
           return (
             <details className={styles.detailsSection}>
               <summary className={styles.detailsSummary}>More details</summary>
               <div className={styles.detailsContent}>
-                {contributors.length > 0 && <Contributors contributors={contributors} />}
                 {hasVersions && (
                   <VersionHistory
                     versions={podcast.versions}
@@ -1440,7 +1291,6 @@ export function PodcastPlayerView({
                     currentTime={currentTime}
                     onSegmentClick={handleSegmentClick}
                     questionCounts={isOwner ? questionCounts : undefined}
-                    podcastId={podcast.id}
                   />
                 ) : viewMode === 'teleprompter' ? (
                   <Teleprompter
@@ -1546,18 +1396,6 @@ export function PodcastPlayerView({
           </div>
         )}
 
-        {/* Music Modal */}
-        {isReady && isOwner && (
-          <MusicGenerator
-            podcastId={podcast.id}
-            initialMusicUrl={podcast.musicUrl}
-            onMusicReady={(url, vol) => player?.loadMusic(url, vol)}
-            onMusicRemoved={() => player?.clearMusic()}
-            isOpen={showMusicModal}
-            onClose={() => setShowMusicModal(false)}
-          />
-        )}
-
         {/* Avatar Picker Modal */}
         <Modal
           isOpen={showAvatarPicker}
@@ -1639,12 +1477,7 @@ export function PodcastPlayerView({
               segments={podcast.segments}
               segmentVisuals={segmentVisuals}
               falModels={falModels}
-              voices={
-                (activeVoiceTrackId
-                  ? podcast.voiceTracks.find((t) => t.id === activeVoiceTrackId)?.voices
-                  : podcast.voiceTracks.find((t) => t.id === podcast.defaultVoiceTrackId)
-                      ?.voices) ?? []
-              }
+              voices={[]}
               onRegenerate={(genId) => {
                 setShowVideoEditor(false);
                 setVideoState('generating');

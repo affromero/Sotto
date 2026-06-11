@@ -76,9 +76,6 @@ const config = {
   avatarProvider: 'heygen',
   avatarModel: 'heygen-avatar-standard',
   includedAvatarModels: null,
-  musicProvider: 'suno',
-  musicModel: 'suno-v5',
-  includedMusicModels: null,
   motionProvider: 'remotion',
 };
 
@@ -165,9 +162,6 @@ describe('PATCH /api/admin/auto-models', () => {
       avatarProvider: 'heygen',
       avatarModel: 'heygen-avatar-iv',
       includedAvatarModels: ['heygen-avatar-iv'],
-      musicProvider: 'suno',
-      musicModel: 'suno-v5',
-      includedMusicModels: ['suno-v5'],
       motionProvider: 'hera',
     };
 
@@ -186,7 +180,6 @@ describe('PATCH /api/admin/auto-models', () => {
       includedImageModels: null,
       includedVideoModels: null,
       includedAvatarModels: null,
-      includedMusicModels: null,
     };
 
     const response = await PATCH(patchRequest(body));

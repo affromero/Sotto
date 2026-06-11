@@ -12,7 +12,7 @@ import { invalidatePodcastCache, publishPodcastStatus } from '@/lib/redis';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { markPodcastFailed } from '@/lib/pipeline-resume';
 import { downloadToFile, uploadPodcastAudio } from '@/lib/r2';
-import { stitchWithEffectsAndMusic, type SfxInsert } from '@/lib/audio-stitcher';
+import { stitchWithEffects, type SfxInsert } from '@/lib/audio-stitcher';
 import { generateSoundEffect } from '@/lib/elevenlabs';
 import { MAX_LESSON_DURATION_MINUTES } from '@/lib/generation-limits';
 import { type SoundCue } from '@/lib/script-generator';
@@ -302,30 +302,13 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
 
     await job.updateProgress(65);
 
-    // 5c. Download background music if available (for baking into final MP3)
-    let musicLocalPath: string | undefined;
-    let musicVolume = 0.15;
-    if (!skipSfx) {
-      const podcastWithMusic = await prisma.podcast.findUnique({
-        where: { id: podcastId },
-        select: { musicUrl: true, musicVolume: true },
-      });
-      if (podcastWithMusic?.musicUrl) {
-        musicLocalPath = path.join(tmpDir, 'music-bed.mp3');
-        await downloadToFile(podcastWithMusic.musicUrl, musicLocalPath);
-        musicVolume = podcastWithMusic.musicVolume ?? 0.15;
-      }
-    }
-
-    // 6. Run FFmpeg stitching (with music ducking if music bed available)
+    // 6. Run FFmpeg stitching
     const outputPath = path.join(tmpDir, 'final.mp3');
-    const { duration } = await stitchWithEffectsAndMusic({
+    const { duration } = await stitchWithEffects({
       segmentPaths,
       sfxInserts,
       outputPath,
       crossfadeMs: 300,
-      musicPath: musicLocalPath,
-      musicVolume,
     });
 
     await job.updateProgress(80);
@@ -429,7 +412,6 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
         durationDeviation,
         fileSize: finalAudio.length,
         currentVersion: newVersion,
-        musicBaked: !!musicLocalPath,
       },
     });
     await invalidatePodcastCache(podcastId);
@@ -476,7 +458,7 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
       // Fallback: cumulative durations adjusted for crossfade overlap.
       // acrossfade=d=0.3 overlaps each pair of adjacent segments by 300ms,
       // so each segment starts 0.3s earlier than naive cumulative sum.
-      const crossfadeSec = 0.3; // must match crossfadeMs: 300 in stitchWithEffectsAndMusic call
+      const crossfadeSec = 0.3; // must match crossfadeMs: 300 in stitchWithEffects call
       let cum = 0;
       detectedStarts = freshSegments.map((seg) => {
         const t = cum;

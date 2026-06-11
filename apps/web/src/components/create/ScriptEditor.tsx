@@ -20,7 +20,6 @@ import { getSpeakerIndex, getUniqueSpeakers } from '@/lib/speaker-colors';
 import type { ScriptTurn } from '@/lib/script-generator';
 import type { ReferenceData } from '@/types/reference';
 import { wordsToMinutes } from '@/lib/duration';
-import { ClaimFlagButton } from '@/components/player/ClaimFlagButton';
 import styles from './ScriptEditor.module.css';
 
 interface Highlight {
@@ -709,11 +708,6 @@ export function ScriptEditor({ podcastId, onApprove, onRegenerate, getApproveBod
                           <span className={styles.turnCommentBadge} />
                         )}
                       </button>
-                      <ClaimFlagButton
-                        podcastId={podcastId}
-                        turnIndex={index}
-                        turnText={turn.text}
-                      />
                     </>
                   )}
                 </div>
