@@ -2,9 +2,14 @@
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in Sotto, please report it responsibly.
+If you discover a security vulnerability in Sotto, please report it responsibly
+and privately. Do not open a public issue for anything that could expose
+learners or their keys.
 
-**Email**: [security@example.com](mailto:security@example.com)
+Open a private report through GitHub's
+[Report a vulnerability](https://github.com/affromero/Sotto/security/advisories/new)
+flow (the **Security** tab, then **Report a vulnerability**). This keeps the
+report confidential until a fix ships.
 
 Please include:
 
@@ -47,6 +52,15 @@ We will not pursue legal action against researchers who:
 ## Recognition
 
 We appreciate the security research community. With your permission, we will acknowledge your contribution in our changelog when the vulnerability is resolved.
+
+## Automated Safeguards
+
+The repository runs continuous supply-chain and code-security checks:
+
+- **CodeQL** static analysis (security-extended) on every pull request and weekly.
+- **Dependency review** blocks pull requests that introduce high-severity advisories.
+- **Dependabot** tracks npm, GitHub Actions, and Docker manifests for known vulnerabilities and version drift.
+- A `min-release-age` guard in `.npmrc` keeps brand-new package versions from being pulled in automatically, reducing exposure to a compromised release.
 
 ## Supported Versions
 
