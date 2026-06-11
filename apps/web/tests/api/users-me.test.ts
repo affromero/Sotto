@@ -77,7 +77,6 @@ const mockUser = {
   name: 'Alice Johnson',
   email: 'alice@example.com',
   image: 'https://example.com/alice.jpg',
-  bio: 'Science educator and podcast creator',
   createdAt: new Date('2025-01-10T10:00:00Z'),
   preferredHostVoiceId: 'voice-host-1',
   preferredExpertVoiceId: 'voice-expert-1',
@@ -88,7 +87,6 @@ const mockUserMinimal = {
   name: 'Bob Smith',
   email: 'bob@example.com',
   image: null,
-  bio: null,
   createdAt: new Date('2025-01-15T10:00:00Z'),
   preferredHostVoiceId: null,
   preferredExpertVoiceId: null,
@@ -124,7 +122,6 @@ describe('GET /api/v1/users/me', () => {
     expect(body.id).toBe('user-1');
     expect(body.name).toBe('Alice Johnson');
     expect(body.email).toBe('alice@example.com');
-    expect(body.bio).toBe('Science educator and podcast creator');
   });
 
   it('handles user with null optional fields', async () => {
@@ -137,7 +134,6 @@ describe('GET /api/v1/users/me', () => {
 
     expect(response.status).toBe(200);
     expect(body.image).toBeNull();
-    expect(body.bio).toBeNull();
   });
 
   it('returns 404 when user not found in database', async () => {
@@ -185,41 +181,6 @@ describe('PATCH /api/v1/users/me', () => {
     expect(body.name).toBe('Alice Updated');
   });
 
-  it('updates user bio successfully', async () => {
-    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
-    mockPrisma.user.update.mockResolvedValue({
-      ...mockUser,
-      bio: 'New bio text',
-    });
-
-    const request = createPatchRequest({ bio: 'New bio text' });
-    const response = await PATCH(request);
-    const body = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(body.bio).toBe('New bio text');
-  });
-
-  it('updates both name and bio together', async () => {
-    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
-    mockPrisma.user.update.mockResolvedValue({
-      ...mockUser,
-      name: 'Alice Updated',
-      bio: 'Updated bio',
-    });
-
-    const request = createPatchRequest({
-      name: 'Alice Updated',
-      bio: 'Updated bio',
-    });
-    const response = await PATCH(request);
-    const body = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(body.name).toBe('Alice Updated');
-    expect(body.bio).toBe('Updated bio');
-  });
-
   it('returns 400 when name is empty string', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
 
@@ -240,32 +201,6 @@ describe('PATCH /api/v1/users/me', () => {
 
     expect(response.status).toBe(400);
     expect(body).toHaveProperty('error');
-  });
-
-  it('returns 400 when bio exceeds 500 characters', async () => {
-    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
-
-    const request = createPatchRequest({ bio: 'a'.repeat(501) });
-    const response = await PATCH(request);
-    const body = await response.json();
-
-    expect(response.status).toBe(400);
-    expect(body).toHaveProperty('error');
-  });
-
-  it('accepts empty bio to clear it', async () => {
-    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
-    mockPrisma.user.update.mockResolvedValue({
-      ...mockUser,
-      bio: '',
-    });
-
-    const request = createPatchRequest({ bio: '' });
-    const response = await PATCH(request);
-    const body = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(body.bio).toBe('');
   });
 
   it('handles empty request body without errors', async () => {
@@ -318,13 +253,11 @@ describe('PATCH /api/v1/users/me', () => {
     const updatedUser = {
       ...mockUser,
       name: 'Alice New',
-      bio: 'New bio',
     };
     mockPrisma.user.update.mockResolvedValue(updatedUser);
 
     const request = createPatchRequest({
       name: 'Alice New',
-      bio: 'New bio',
     });
     const response = await PATCH(request);
     const body = await response.json();
@@ -332,22 +265,8 @@ describe('PATCH /api/v1/users/me', () => {
     expect(body).toMatchObject({
       id: 'user-1',
       name: 'Alice New',
-      bio: 'New bio',
       email: 'alice@example.com',
     });
-  });
-
-  it('validates bio length at exactly 500 characters', async () => {
-    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
-    mockPrisma.user.update.mockResolvedValue({
-      ...mockUser,
-      bio: 'a'.repeat(500),
-    });
-
-    const request = createPatchRequest({ bio: 'a'.repeat(500) });
-    const response = await PATCH(request);
-
-    expect(response.status).toBe(200);
   });
 
   it('validates name length at exactly 100 characters', async () => {

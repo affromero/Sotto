@@ -28,7 +28,6 @@ interface UserProfile {
   name: string | null;
   handle: string | null;
   image: string | null;
-  bio: string | null;
   podcastCount: number;
 }
 
@@ -190,7 +189,6 @@ export default function ProfileScreen() {
 
       <Text style={styles.profileName}>{profile?.name ?? 'Anonymous'}</Text>
       {profile?.handle ? <Text style={styles.profileHandle}>@{profile.handle}</Text> : null}
-      {profile?.bio ? <Text style={styles.profileBio}>{profile.bio}</Text> : null}
 
       <View style={styles.statsRow}>
         <View style={styles.statItem}>
@@ -309,13 +307,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.textSecondary,
     marginBottom: spacing.sm,
-  },
-  profileBio: {
-    fontFamily: typography.fontBody,
-    fontSize: 15,
-    color: colors.textPrimary,
-    lineHeight: 22,
-    marginBottom: spacing.md,
   },
   statsRow: {
     flexDirection: 'row',

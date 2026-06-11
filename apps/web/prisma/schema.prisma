@@ -58,7 +58,6 @@ model User {
   name          String?
   handle        String?   @unique
   image         String?
-  bio           String?   @db.Text
   role          UserRole  @default(USER)
   emailVerified DateTime?
   createdAt     DateTime  @default(now())

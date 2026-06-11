@@ -17,7 +17,6 @@ vi.mock('next/image', () => ({
 
 const defaultProps = {
   initialName: 'Test User',
-  initialBio: 'A bio',
   initialHandle: 'testuser',
   email: 'test@example.com',
   image: null,

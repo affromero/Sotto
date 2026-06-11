@@ -304,7 +304,6 @@ async function main() {
       handle: systemUserConfig.handle,
       role: 'SYSTEM',
       name: systemUserConfig.name,
-      bio: systemUserConfig.bio,
       image: systemUserConfig.image,
     },
     create: {
@@ -312,7 +311,6 @@ async function main() {
       handle: systemUserConfig.handle,
       role: 'SYSTEM',
       name: systemUserConfig.name,
-      bio: systemUserConfig.bio,
       image: systemUserConfig.image,
     },
   });

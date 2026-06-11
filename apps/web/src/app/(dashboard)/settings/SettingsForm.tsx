@@ -36,7 +36,6 @@ interface CategoryTag {
 
 interface SettingsFormProps {
   initialName: string;
-  initialBio: string;
   initialHandle: string;
   email: string;
   image: string | null;
@@ -72,7 +71,6 @@ const providerLabels: Record<string, string> = {
 
 export function SettingsForm({
   initialName,
-  initialBio,
   initialHandle,
   email,
   image,
@@ -93,7 +91,6 @@ export function SettingsForm({
   appBaseUrl,
 }: SettingsFormProps) {
   const [name, setName] = useState(initialName);
-  const [bio, setBio] = useState(initialBio);
   const [handle, setHandle] = useState(initialHandle);
   const [handleStatus, setHandleStatus] = useState<{
     checking: boolean;
@@ -215,7 +212,7 @@ export function SettingsForm({
     setSaving(true);
     setSaved(false);
     try {
-      const payload: Record<string, string> = { name, bio };
+      const payload: Record<string, string> = { name };
       if (handle && handle !== initialHandle) {
         payload.handle = handle;
       }
@@ -420,22 +417,6 @@ export function SettingsForm({
             {!handleStatus.checking && handleStatus.available === false && (
               <span className={styles.handleTaken}>{handleStatus.reason || 'Not available'}</span>
             )}
-          </div>
-
-          <div className={styles.fieldGroup}>
-            <label htmlFor="bio" className={styles.fieldLabel}>
-              Bio
-            </label>
-            <textarea
-              id="bio"
-              className={styles.textarea}
-              value={bio}
-              onChange={(e) => setBio(e.target.value)}
-              placeholder="Tell people about yourself..."
-              rows={4}
-              maxLength={500}
-            />
-            <span className={styles.charCount}>{bio.length}/500</span>
           </div>
 
           <div className={styles.formActions}>

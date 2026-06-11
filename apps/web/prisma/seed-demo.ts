@@ -1024,14 +1024,12 @@ async function main() {
     update: {
       name: 'Nico Valerio',
       role: 'USER',
-      bio: 'Curious mind, lifelong learner. I make podcasts about the things that keep me up at night — from quantum mechanics to ancient philosophy.',
       image: '/avatars/capybara.png',
     },
     create: {
       email: 'demo@example.com',
       name: 'Nico Valerio',
       role: 'USER',
-      bio: 'Curious mind, lifelong learner. I make podcasts about the things that keep me up at night — from quantum mechanics to ancient philosophy.',
       image: '/avatars/capybara.png',
     },
   });

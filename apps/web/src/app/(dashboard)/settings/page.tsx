@@ -36,7 +36,6 @@ export default async function SettingsPage() {
         email: true,
         handle: true,
         image: true,
-        bio: true,
         role: true,
         preferredLanguage: true,
         preferredAiModel: true,
@@ -99,7 +98,6 @@ export default async function SettingsPage() {
 
       <SettingsForm
         initialName={user.name ?? ''}
-        initialBio={user.bio ?? ''}
         initialHandle={user.handle ?? ''}
         email={user.email}
         image={user.image}

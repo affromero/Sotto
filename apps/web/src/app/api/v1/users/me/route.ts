@@ -17,7 +17,6 @@ const updateUserSchema = z
       .transform((val) => val.trim())
       .pipe(z.string().min(1).max(100))
       .optional(),
-    bio: z.string().max(500).optional(),
     image: z.string().url().optional(),
     handle: handleSchema.optional(),
     voicePreferences: z
@@ -65,7 +64,6 @@ export async function GET(request: NextRequest) {
       email: user.email,
       handle: user.handle,
       image: user.image,
-      bio: user.bio,
       podcastCount,
       createdAt: user.createdAt.toISOString(),
       voicePreferences: user.voicePreferences,
@@ -240,7 +238,6 @@ export async function PATCH(request: NextRequest) {
       email: updatedUser.email,
       handle: updatedUser.handle,
       image: updatedUser.image,
-      bio: updatedUser.bio,
       createdAt: updatedUser.createdAt.toISOString(),
       voicePreferences: updatedUser.voicePreferences,
       preferredLanguage: updatedUser.preferredLanguage,
