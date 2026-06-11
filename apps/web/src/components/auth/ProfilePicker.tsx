@@ -151,12 +151,7 @@ export function ProfilePicker() {
               Welcome
             </p>
             <h1 className={styles.heading}>We could not load your profiles.</h1>
-            <p className={styles.lede}>
-              Check your connection, then refresh. You can also use an account.
-            </p>
-            <a className={styles.altLink} href="/auth/login?oauth=1">
-              Use an account instead
-            </a>
+            <p className={styles.lede}>Check your connection, then refresh.</p>
           </div>
         )}
 
@@ -179,9 +174,7 @@ export function ProfilePicker() {
             </h1>
 
             {profiles.length === 0 ? (
-              <p className={styles.lede}>
-                No profiles yet. Set one up, or use an account.
-              </p>
+              <p className={styles.lede}>No profiles yet. Set one up to begin.</p>
             ) : (
               <ul className={styles.grid} aria-label="Choose your profile">
                 {profiles.map((profile) => (
@@ -220,10 +213,6 @@ export function ProfilePicker() {
                 {authError}
               </p>
             )}
-
-            <a className={styles.altLink} href="/auth/login?oauth=1">
-              Use an account instead
-            </a>
           </div>
         )}
 
@@ -285,10 +274,6 @@ export function ProfilePicker() {
                 {submitting ? 'Opening.' : 'Continue'}
               </button>
             </form>
-
-            <a className={styles.altLink} href="/auth/login?oauth=1">
-              Use an account instead
-            </a>
           </div>
         )}
       </main>
