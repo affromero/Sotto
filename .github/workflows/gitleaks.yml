@@ -1,0 +1,31 @@
+name: gitleaks
+
+# Secret scanning: fails any pull request or push that introduces a committed
+# key, token, or credential. Automatic runs (pull_request, push) scan only the
+# event's commit range, so they guard new secrets without flagging historical
+# fixtures; workflow_dispatch runs a full-history audit on demand.
+# gitleaks-action is free for public repositories, so no license key is required.
+on:
+  pull_request:
+  push:
+    branches: ['main']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    name: gitleaks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: .gitleaks.toml
