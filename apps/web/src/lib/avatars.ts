@@ -42,3 +42,37 @@ export function isAnimalSlug(value: string): boolean {
 export function getAnimalAvatar(slug: string): AnimalAvatar | undefined {
   return BY_SLUG.get(slug);
 }
+
+/**
+ * A stable animal avatar for a seed string (typically a user id). Lets every
+ * profile show a distinct repo animal even when no avatar was ever chosen,
+ * instead of a bare initial. Deterministic, so the same profile always maps to
+ * the same animal.
+ */
+export function animalForSeed(seed: string): AnimalAvatar {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i += 1) {
+    hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+  }
+  return ANIMAL_AVATARS[hash % ANIMAL_AVATARS.length];
+}
+
+/**
+ * Resolve a profile's display avatar to one of the repo animals. Keeps an
+ * explicitly chosen animal image; for anything else (null, an OAuth photo, an
+ * old external placeholder) it falls back to a deterministic animal for the
+ * seed. Always returns a local `/avatars/*.png` path, so the household picker
+ * stays on-brand and works fully offline.
+ */
+export function resolveProfileAvatar(
+  seed: string,
+  image: string | null | undefined
+): { image: string; emoji: string } {
+  if (image && image.startsWith('/avatars/')) {
+    const slug = image.slice('/avatars/'.length).replace(/\.png$/, '');
+    const known = getAnimalAvatar(slug);
+    if (known) return { image: `/avatars/${known.slug}.png`, emoji: known.emoji };
+  }
+  const animal = animalForSeed(seed);
+  return { image: `/avatars/${animal.slug}.png`, emoji: animal.emoji };
+}

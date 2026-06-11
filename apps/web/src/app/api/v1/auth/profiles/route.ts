@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { isLocalAuthEnabled } from '@/lib/local-auth';
-import { getAnimalAvatar } from '@/lib/avatars';
+import { resolveProfileAvatar } from '@/lib/avatars';
 import { checkRateLimit } from '@/lib/redis';
 import { errorResponse } from '@/lib/api-response';
 import { logger } from '@/lib/logger';
@@ -40,16 +40,14 @@ export async function GET() {
     });
 
     const profiles = users.map((u) => {
-      const slug =
-        u.image && u.image.startsWith('/avatars/')
-          ? u.image.slice('/avatars/'.length).replace(/\.png$/, '')
-          : null;
-      const animal = slug ? getAnimalAvatar(slug) : undefined;
+      // Always resolve to a repo animal: an explicitly chosen one, otherwise a
+      // deterministic animal for this id. Offline-safe, never a generic avatar.
+      const { image, emoji } = resolveProfileAvatar(u.id, u.image);
       return {
         id: u.id,
         name: u.name,
-        image: u.image,
-        emoji: animal?.emoji ?? null,
+        image,
+        emoji,
         isAdmin: u.role === 'ADMIN',
         // Derived only; the hash itself never leaves the server.
         hasPassword: u.passwordHash !== null,
