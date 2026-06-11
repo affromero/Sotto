@@ -13,7 +13,6 @@ const REASONS = [
   { value: 'IMPERSONATION', label: 'Impersonation' },
   { value: 'COPYRIGHT', label: 'Copyright Violation' },
   { value: 'VOICE_THEFT', label: 'Voice Theft' },
-  { value: 'MUSIC_UPLOAD', label: 'Music Upload (Not a Podcast)' },
   { value: 'FALSE_HUMAN_BADGE', label: 'False Human Content Claim' },
   { value: 'FALSE_CLAIM', label: 'False Ownership or Attribution' },
   { value: 'OTHER', label: 'Other' },

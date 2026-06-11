@@ -4,7 +4,7 @@ import {
   getPipelineHealth,
   getInProgressPipelines,
   getRecentlySucceeded,
-  getDraftAbandonmentMetrics,
+  getScriptReviewPauseMetrics,
   getPerStageTiming,
 } from '@/lib/funnel-metrics';
 import {
@@ -125,7 +125,7 @@ export default async function AdminPipelinePage({ searchParams }: PageProps) {
 
   const [
     funnel, adoption, pipeline, recentErrors, discoveryChatErrors, errorStats,
-    inProgress, recentlySucceeded, draftAbandonment,
+    inProgress, recentlySucceeded, scriptReviewPause,
     voiceByProvider, topVoices, stageTiming,
   ] = await Promise.all([
     getFreeTierFunnel(),
@@ -136,7 +136,7 @@ export default async function AdminPipelinePage({ searchParams }: PageProps) {
     getDiscoveryChatErrorStats(since, until),
     getInProgressPipelines(),
     getRecentlySucceeded(since, until),
-    getDraftAbandonmentMetrics(since, until),
+    getScriptReviewPauseMetrics(since, until),
     getVoiceUsageByProvider(since),
     getTopVoices(since),
     getPerStageTiming(since),
@@ -432,25 +432,21 @@ export default async function AdminPipelinePage({ searchParams }: PageProps) {
         )}
       </section>
 
-      {/* Draft Abandonment */}
+      {/* Script review pauses */}
       <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Draft Abandonment ({rangeLabel})</h2>
+        <h2 className={styles.sectionTitle}>Script Review Pauses ({rangeLabel})</h2>
         <div className={styles.grid}>
           <div className={styles.card}>
             <span className={styles.cardLabel}>Total Created</span>
-            <span className={styles.cardValue}>{draftAbandonment.totalDrafts.toLocaleString()}</span>
-          </div>
-          <div className={styles.card}>
-            <span className={styles.cardLabel}>Still Draft</span>
-            <span className={styles.cardValue}>{draftAbandonment.stillDraft.toLocaleString()}</span>
+            <span className={styles.cardValue}>{scriptReviewPause.totalCreated.toLocaleString()}</span>
           </div>
           <div className={styles.card}>
             <span className={styles.cardLabel}>Paused at Script Ready</span>
-            <span className={styles.cardValue}>{draftAbandonment.pausedAtScriptReady.toLocaleString()}</span>
+            <span className={styles.cardValue}>{scriptReviewPause.pausedAtScriptReady.toLocaleString()}</span>
           </div>
           <div className={styles.card}>
-            <span className={styles.cardLabel}>Abandonment Rate</span>
-            <span className={styles.cardValue}>{Math.round(draftAbandonment.abandonmentRate * 100)}%</span>
+            <span className={styles.cardLabel}>Pause Rate</span>
+            <span className={styles.cardValue}>{Math.round(scriptReviewPause.pauseRate * 100)}%</span>
           </div>
         </div>
       </section>

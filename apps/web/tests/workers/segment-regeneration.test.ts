@@ -16,7 +16,6 @@ const mockPrismaPodcastFindUniqueOrThrow = vi.fn().mockResolvedValue({
 });
 
 const mockPrismaDiscoveryFindUnique = vi.fn().mockResolvedValue(null);
-const mockPrismaVoiceTrackUpdateMany = vi.fn().mockResolvedValue({ count: 0 });
 const mockPrismaVideoGenerationUpdateMany = vi.fn().mockResolvedValue({ count: 0 });
 const mockPrismaPodcastVoiceUpsert = vi.fn().mockResolvedValue({});
 
@@ -47,9 +46,6 @@ vi.mock('@/lib/prisma', () => {
     },
     discovery: {
       findUnique: (...args: unknown[]) => mockPrismaDiscoveryFindUnique(...args),
-    },
-    voiceTrack: {
-      updateMany: (...args: unknown[]) => mockPrismaVoiceTrackUpdateMany(...args),
     },
     videoGeneration: {
       updateMany: (...args: unknown[]) => mockPrismaVideoGenerationUpdateMany(...args),

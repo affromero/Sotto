@@ -22,7 +22,6 @@ export interface AvatarOverlayData {
   falChunkIndex?: number | null;
   falTotalChunks?: number | null;
   enabledSegmentIds?: string[];
-  voiceTrackId?: string | null;
 }
 
 export interface HeyGenAvatarData {

@@ -54,13 +54,6 @@ interface InspectorContentProps {
     focusAreas: string[];
   } | null;
   tags: { name: string; slug: string }[];
-  ratings: {
-    count: number;
-    avgOverall: number;
-    avgVoice: number;
-    avgAccuracy: number;
-    avgFlow: number;
-  } | null;
   apiCosts: {
     totalCost: number;
     callCount: number;
@@ -113,7 +106,6 @@ export function InspectorContent({
   interactions,
   discovery,
   tags,
-  ratings,
   apiCosts,
   pipelineEvents,
   mlFeatures,
@@ -370,42 +362,7 @@ export function InspectorContent({
             <span className={styles.cardLabel}>Questions</span>
             <span className={styles.cardValue}>{interactions.total.toLocaleString()}</span>
           </div>
-          <div className={styles.card}>
-            <span className={styles.cardLabel}>Ratings</span>
-            <span className={styles.cardValue}>{(ratings?.count ?? 0).toLocaleString()}</span>
-          </div>
         </div>
-      </section>
-
-      {/* Ratings */}
-      <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Ratings</h2>
-        {ratings ? (
-          <div className={styles.grid}>
-            <div className={styles.card}>
-              <span className={styles.cardLabel}>Count</span>
-              <span className={styles.cardValue}>{ratings.count}</span>
-            </div>
-            <div className={styles.card}>
-              <span className={styles.cardLabel}>Overall</span>
-              <span className={styles.cardValue}>{ratings.avgOverall.toFixed(1)}</span>
-            </div>
-            <div className={styles.card}>
-              <span className={styles.cardLabel}>Voice</span>
-              <span className={styles.cardValue}>{ratings.avgVoice.toFixed(1)}</span>
-            </div>
-            <div className={styles.card}>
-              <span className={styles.cardLabel}>Accuracy</span>
-              <span className={styles.cardValue}>{ratings.avgAccuracy.toFixed(1)}</span>
-            </div>
-            <div className={styles.card}>
-              <span className={styles.cardLabel}>Flow</span>
-              <span className={styles.cardValue}>{ratings.avgFlow.toFixed(1)}</span>
-            </div>
-          </div>
-        ) : (
-          <p className={styles.empty}>No ratings yet.</p>
-        )}
       </section>
 
       {/* API Costs */}

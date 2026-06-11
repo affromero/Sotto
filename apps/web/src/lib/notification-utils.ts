@@ -4,15 +4,12 @@ const PIPELINE_SUCCESS_TYPES = new Set([
   'PODCAST_READY',
   'SCRIPT_READY',
   'VIDEO_READY',
-  'MUSIC_READY',
 ]);
 
 const PIPELINE_ERROR_TYPES = new Set([
   'PODCAST_FAILED',
   'VIDEO_FAILED',
-  'MUSIC_FAILED',
   'AVATAR_FAILED',
-  'VOICE_TRACK_FAILED',
   'KEY_INVALID',
   'PIPELINE_FAILURE',
 ]);
@@ -42,15 +39,8 @@ export function getNotificationUrl(notification: NotificationData): string | nul
     case 'SCRIPT_READY':
     case 'VIDEO_READY':
     case 'VIDEO_FAILED':
-    case 'MUSIC_READY':
-    case 'MUSIC_FAILED':
     case 'AVATAR_FAILED':
-    case 'VOICE_TRACK_FAILED':
     case 'QUESTION_ON_YOUR_PODCAST':
-    case 'CLAIM_REPORT_ON_YOUR_PODCAST':
-    case 'RENDITION_PROPOSED':
-    case 'RENDITION_ACCEPTED':
-    case 'RENDITION_REJECTED':
       return podcastId ? `/podcast/${podcastId}` : null;
 
     // Settings / BYOK

@@ -9,14 +9,12 @@ export interface PrivateActivityOverview {
   questions: number;
   answered: number;
   incorporated: number;
-  ratings: number;
 }
 
 export interface DailyPrivateActivity {
   day: string;
   saves: number;
   questions: number;
-  ratings: number;
 }
 
 export interface TopContent {
@@ -36,7 +34,7 @@ export interface InteractionStats {
 }
 
 export async function getPrivateActivityOverview(since: Date): Promise<PrivateActivityOverview> {
-  const [saves, questions, answered, incorporated, ratings] = await Promise.all([
+  const [saves, questions, answered, incorporated] = await Promise.all([
     prisma.save.count({ where: { createdAt: { gte: since } } }),
     prisma.interaction.count({ where: { createdAt: { gte: since } } }),
     prisma.interaction.count({
@@ -46,24 +44,22 @@ export async function getPrivateActivityOverview(since: Date): Promise<PrivateAc
       },
     }),
     prisma.interaction.count({ where: { createdAt: { gte: since }, incorporated: true } }),
-    prisma.podcastRating.count({ where: { createdAt: { gte: since } } }),
   ]);
 
-  return { saves, questions, answered, incorporated, ratings };
+  return { saves, questions, answered, incorporated };
 }
 
 export async function getDailyPrivateActivityTrend(since: Date): Promise<DailyPrivateActivity[]> {
   const rows = await prisma.$queryRaw<
-    Array<{ day: Date; saves: bigint; questions: bigint; ratings: bigint }>
+    Array<{ day: Date; saves: bigint; questions: bigint }>
   >`
     WITH days AS (
       SELECT generate_series(${since}::date, NOW()::date, '1 day'::interval)::date AS day
     )
-    SELECT
-      d.day,
-      COALESCE((SELECT COUNT(*) FROM "Save" WHERE "createdAt"::date = d.day AND "createdAt" >= ${since}), 0)::bigint AS saves,
-      COALESCE((SELECT COUNT(*) FROM "Interaction" WHERE "createdAt"::date = d.day AND "createdAt" >= ${since}), 0)::bigint AS questions,
-      COALESCE((SELECT COUNT(*) FROM "PodcastRating" WHERE "createdAt"::date = d.day AND "createdAt" >= ${since}), 0)::bigint AS ratings
+      SELECT
+        d.day,
+        COALESCE((SELECT COUNT(*) FROM "Save" WHERE "createdAt"::date = d.day AND "createdAt" >= ${since}), 0)::bigint AS saves,
+        COALESCE((SELECT COUNT(*) FROM "Interaction" WHERE "createdAt"::date = d.day AND "createdAt" >= ${since}), 0)::bigint AS questions
     FROM days d
     ORDER BY d.day ASC
   `;
@@ -72,7 +68,6 @@ export async function getDailyPrivateActivityTrend(since: Date): Promise<DailyPr
     day: r.day.toISOString().split('T')[0],
     saves: Number(r.saves),
     questions: Number(r.questions),
-    ratings: Number(r.ratings),
   }));
 }
 

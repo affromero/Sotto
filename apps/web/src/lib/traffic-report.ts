@@ -98,8 +98,8 @@ export interface SourcesSection {
 }
 
 export interface PrivateActivitySection {
-  totals: { saves: number; questions: number; answered: number; incorporated: number; ratings: number };
-  dailyTrend: Array<{ day: string; saves: number; questions: number; ratings: number }>;
+  totals: { saves: number; questions: number; answered: number; incorporated: number };
+  dailyTrend: Array<{ day: string; saves: number; questions: number }>;
   topSaved: Array<{ podcastId: string; title: string; creator: string; saveCount: number }>;
 }
 
@@ -255,12 +255,11 @@ export async function buildTrafficReport(
     sourcePlatformDistribution,
     humanVsAiRaw,
 
-    // === Private Activity (7) ===
+    // === Private Activity (6) ===
     savesCount,
     questionsCount,
     answeredQuestionsCount,
     incorporatedAnswersCount,
-    ratingsCount,
     dailyPrivateActivity,
     topSavedPodcasts,
 
@@ -511,16 +510,14 @@ export async function buildTrafficReport(
       },
     }),
     prisma.interaction.count({ where: { createdAt: { gte: since }, incorporated: true } }),
-    prisma.podcastRating.count({ where: { createdAt: { gte: since } } }),
-    prisma.$queryRaw<Array<{ day: Date; saves: bigint; questions: bigint; ratings: bigint }>>`
+    prisma.$queryRaw<Array<{ day: Date; saves: bigint; questions: bigint }>>`
       WITH days AS (
         SELECT generate_series(${since}::date, NOW()::date, '1 day'::interval)::date AS day
       )
       SELECT
         d.day,
         COALESCE((SELECT COUNT(*) FROM "Save" WHERE "createdAt"::date = d.day AND "createdAt" >= ${since}), 0)::bigint AS saves,
-        COALESCE((SELECT COUNT(*) FROM "Interaction" WHERE "createdAt"::date = d.day AND "createdAt" >= ${since}), 0)::bigint AS questions,
-        COALESCE((SELECT COUNT(*) FROM "PodcastRating" WHERE "createdAt"::date = d.day AND "createdAt" >= ${since}), 0)::bigint AS ratings
+        COALESCE((SELECT COUNT(*) FROM "Interaction" WHERE "createdAt"::date = d.day AND "createdAt" >= ${since}), 0)::bigint AS questions
       FROM days d
       ORDER BY d.day ASC
     `,
@@ -880,7 +877,6 @@ export async function buildTrafficReport(
         questions: questionsCount,
         answered: answeredQuestionsCount,
         incorporated: incorporatedAnswersCount,
-        ratings: ratingsCount,
       },
       dailyTrend: dailyPrivateActivity.map((d) => ({
         day: d.day instanceof Date
@@ -888,7 +884,6 @@ export async function buildTrafficReport(
           : String(d.day),
         saves: n(d.saves),
         questions: n(d.questions),
-        ratings: n(d.ratings),
       })),
       topSaved: topSavedPodcasts.map((p) => ({
         podcastId: p.id,

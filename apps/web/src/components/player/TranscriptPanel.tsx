@@ -7,7 +7,6 @@ import { parseTextWithVocabulary, parseTextWithCitationsAndVocabulary } from '@/
 import { useScrollFollow, isScrollable } from '@/lib/hooks/useScrollFollow';
 import { getSpeakerIndex, getUniqueSpeakers } from '@/lib/speaker-colors';
 import { SegmentQuestionBadge } from '@/components/player/SegmentQuestionBadge';
-import { ClaimFlagButton } from '@/components/player/ClaimFlagButton';
 import { AudioPlayerContext } from '@/components/providers/AudioPlayerProvider';
 import { SegmentData } from '@/types/podcast';
 import type { ReferenceData } from '@/types/reference';
@@ -21,7 +20,6 @@ interface TranscriptPanelProps {
   currentTime: number;
   onSegmentClick?: (startTime: number) => void;
   questionCounts?: Map<number, number>;
-  podcastId?: string;
 }
 
 function isCurrentSegment(segment: SegmentData, currentTime: number): boolean {
@@ -42,7 +40,6 @@ export function TranscriptPanel({
   currentTime,
   onSegmentClick,
   questionCounts,
-  podcastId,
 }: TranscriptPanelProps) {
   const [fontScale, setFontScale] = useState(1);
   const MIN_SCALE = 0.6;
@@ -131,13 +128,6 @@ export function TranscriptPanel({
                       ? parseTextWithVocabulary(segment.text, vocabularyEntries, onVocabPause, onVocabResume)
                       : segment.text}
               </div>
-              {podcastId && (
-                <ClaimFlagButton
-                  podcastId={podcastId}
-                  turnIndex={segment.order}
-                  turnText={segment.text}
-                />
-              )}
             </div>
           );
         })}

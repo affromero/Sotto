@@ -249,17 +249,17 @@ describe('generateTtsAudio', () => {
   it('logs usage with correct category and metadata', async () => {
     await generateTtsAudio(
       defaultParams({
-        usageCategory: 'voice_track_audio',
-        extraMetadata: { voiceTrackId: 'vt-1' },
+        usageCategory: 'audio_generation',
+        extraMetadata: { segmentId: 'seg-1' },
       })
     );
 
     expect(mockLogUsage).toHaveBeenCalledWith(
       expect.objectContaining({
-        category: 'voice_track_audio',
+        category: 'audio_generation',
         podcastId: 'podcast-1',
         userId: 'user-1',
-        metadata: expect.objectContaining({ voiceTrackId: 'vt-1' }),
+        metadata: expect.objectContaining({ segmentId: 'seg-1' }),
       })
     );
   });

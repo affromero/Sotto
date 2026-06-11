@@ -37,7 +37,6 @@ describe('getCostBucket', () => {
   it('maps all known audio categories', () => {
     const audioCategories = [
       'audio_generation', 'stt_transcription', 'segment_regeneration',
-      'music_generation', 'voice_track_audio',
     ];
     for (const cat of audioCategories) {
       expect(getCostBucket(cat)).toBe('audio');
@@ -58,7 +57,7 @@ describe('getCostBucket', () => {
   });
 
   it('CATEGORY_BUCKET_MAP has entries for all expected categories', () => {
-    expect(Object.keys(CATEGORY_BUCKET_MAP).length).toBe(30);
+    expect(Object.keys(CATEGORY_BUCKET_MAP).length).toBe(28);
   });
 });
 

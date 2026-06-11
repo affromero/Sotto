@@ -176,12 +176,6 @@ export async function processSegmentRegeneration(
     data: { status: 'INCORPORATED', incorporated: true },
   });
 
-  // Mark all READY voice tracks as stale — they're missing the new segment's audio
-  await prisma.voiceTrack.updateMany({
-    where: { podcastId, status: 'READY' },
-    data: { status: 'STALE' },
-  });
-
   // Mark READY video generation as stale — segment timeline has shifted
   await prisma.videoGeneration.updateMany({
     where: { podcastId, status: 'READY' },

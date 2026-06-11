@@ -3,7 +3,6 @@
 export type UserRole = 'USER' | 'ADMIN' | 'SYSTEM';
 
 export type PodcastStatus =
-  | 'DRAFT'
   | 'PENDING'
   | 'DISCOVERING'
   | 'EXTRACTING'
@@ -61,11 +60,9 @@ export type NotificationType =
   | 'VOICE_VERIFICATION_FAILED'
   | 'VOICE_BLOCKED_DUPLICATE'
   | 'VOICE_OWNERSHIP_ALERT'
-  | 'VOICE_TRACK_FAILED'
-  | 'VOICE_TRACK_READY'
   | 'VIDEO_READY'
-  | 'MUSIC_READY'
-  | 'MUSIC_FAILED'
+  | 'VIDEO_FAILED'
+  | 'AVATAR_FAILED'
   | 'PIPELINE_FAILURE'
   | 'REFERRAL_SIGNUP'
   | 'AVATAR_IMAGE_REQUEST_RECEIVED'
@@ -83,7 +80,6 @@ export type ReportReason =
   | 'IMPERSONATION'
   | 'COPYRIGHT'
   | 'VOICE_THEFT'
-  | 'MUSIC_UPLOAD'
   | 'FALSE_HUMAN_BADGE'
   | 'FALSE_CLAIM'
   | 'OTHER';
@@ -108,16 +104,6 @@ export type VoiceVerificationStatus =
   | 'ADMIN_VERIFIED'
   | 'ADMIN_BLOCKED'
   | 'PROTECTED';
-
-export type VoiceTrackStatus =
-  | 'PENDING'
-  | 'GENERATING_AUDIO'
-  | 'STITCHING'
-  | 'READY'
-  | 'FAILED'
-  | 'STALE';
-
-export type ProposalStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED';
 
 export type FeedbackType = 'BUG' | 'FEATURE_REQUEST' | 'GENERAL' | 'PRAISE' | 'CONCERN';
 
@@ -144,12 +130,6 @@ export type VideoStatus =
   | 'GENERATING_TRANSITIONS'
   | 'GENERATING_AVATARS'
   | 'COMPOSING'
-  | 'READY'
-  | 'FAILED';
-
-export type MusicStatus =
-  | 'PENDING'
-  | 'GENERATING'
   | 'READY'
   | 'FAILED';
 

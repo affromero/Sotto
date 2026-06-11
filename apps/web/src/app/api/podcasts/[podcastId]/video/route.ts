@@ -54,7 +54,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
   // Parse optional body
   let imageModel: string | undefined;
-  let voiceTrackId: string | undefined;
   let pipeline: {
     version: 1 | 2 | 3;
     defaultImageModel: string;
@@ -97,30 +96,15 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const parsed = generateVideoSchema.safeParse(body);
     if (parsed.success && parsed.data) {
       imageModel = parsed.data.imageModel;
-      voiceTrackId = parsed.data.voiceTrackId;
       pipeline = parsed.data.pipeline;
     }
   } catch {
     // No body — use defaults
   }
 
-  // Validate voice track if provided
-  if (voiceTrackId) {
-    const track = await prisma.voiceTrack.findUnique({
-      where: { id: voiceTrackId },
-      select: { id: true, podcastId: true, status: true },
-    });
-    if (!track || track.podcastId !== podcastId) {
-      return errorResponse('Voice track not found for this podcast', 404);
-    }
-    if (track.status !== 'READY') {
-      return errorResponse('Voice track must be READY to generate video', 400);
-    }
-  }
-
   // Idempotency: return existing generation if in progress
   const existing = await prisma.videoGeneration.findFirst({
-    where: { podcastId, voiceTrackId: voiceTrackId ?? null },
+    where: { podcastId },
     select: { id: true, status: true, videoUrl: true },
   });
 
@@ -246,7 +230,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   const videoGeneration = await prisma.videoGeneration.create({
     data: {
       podcastId,
-      voiceTrackId: voiceTrackId ?? null,
       status: 'PENDING',
       imageModel: imageModel ?? null,
       zeroCostVideo: podcast.zeroCostVideo,
@@ -391,20 +374,19 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
   }
 
   const url = new URL(_request.url);
-  const queryVoiceTrackId = url.searchParams.get('voiceTrackId');
   const summary = url.searchParams.get('summary') === 'true';
 
-  // Summary mode: return status of all generations for this podcast
+  // Summary mode: return status of the current generation for this podcast
   if (summary) {
     const generations = await prisma.videoGeneration.findMany({
       where: { podcastId },
-      select: { voiceTrackId: true, status: true },
+      select: { status: true },
     });
     return NextResponse.json({ generations });
   }
 
   const videoGeneration = await prisma.videoGeneration.findFirst({
-    where: { podcastId, voiceTrackId: queryVoiceTrackId ?? null },
+    where: { podcastId },
     select: {
       id: true,
       status: true,
@@ -458,7 +440,6 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
           avatarProvider: true,
           maskShape: true,
           enabledSegmentIds: true,
-          voiceTrackId: true,
         },
       },
       transitions: {
@@ -524,14 +505,10 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
     return errorResponse('Forbidden', 403);
   }
 
-  const deleteUrl = new URL(_request.url);
-  const deleteVoiceTrackId = deleteUrl.searchParams.get('voiceTrackId');
-
   const videoGeneration = await prisma.videoGeneration.findFirst({
-    where: { podcastId, voiceTrackId: deleteVoiceTrackId ?? null },
+    where: { podcastId },
     select: {
       id: true,
-      voiceTrackId: true,
       videoUrl: true,
       visuals: { select: { assetUrl: true } },
       avatarOverlays: { select: { videoUrl: true, concatAudioUrl: true, chunkVideoUrl: true } },
@@ -550,15 +527,12 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
     where: { id: videoGeneration.id },
   });
 
-  // Only clear podcast videoUrl when deleting the original-audio generation
-  if (!videoGeneration.voiceTrackId) {
-    await prisma.podcast.update({
-      where: { id: podcastId },
-      data: { videoUrl: null },
-    });
-  }
+  await prisma.podcast.update({
+    where: { id: podcastId },
+    data: { videoUrl: null },
+  });
 
-  logger.info('Video generation deleted', { podcastId, voiceTrackId: deleteVoiceTrackId });
+  logger.info('Video generation deleted', { podcastId });
 
   return NextResponse.json({ success: true });
 }
@@ -589,12 +563,11 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   }
 
   const body = await request.json().catch(() => null);
-  const patchVoiceTrackId: string | null = body?.voiceTrackId ?? null;
 
   // Handle avatarsVisible toggle (simple boolean update)
   if (body && typeof body.avatarsVisible === 'boolean' && !body.segments) {
     const vg = await prisma.videoGeneration.findFirst({
-      where: { podcastId, voiceTrackId: patchVoiceTrackId },
+      where: { podcastId },
       select: { id: true },
     });
     if (!vg) return errorResponse('No video generation found', 404);
@@ -611,7 +584,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   }
 
   const videoGeneration = await prisma.videoGeneration.findFirst({
-    where: { podcastId, voiceTrackId: patchVoiceTrackId },
+    where: { podcastId },
     select: { id: true, status: true, videoUrl: true },
   });
 

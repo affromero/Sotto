@@ -34,7 +34,6 @@ describe('robots.ts', () => {
     expect(disallowed).toContain('/dashboard');
     expect(disallowed).toContain('/create');
     expect(disallowed).toContain('/settings');
-    expect(disallowed).toContain('/analytics');
     expect(disallowed).toContain('/welcome');
     expect(disallowed).toContain('/team');
     expect(disallowed).toContain('/pitch');

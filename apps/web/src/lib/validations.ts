@@ -118,33 +118,6 @@ export const updateDemoSceneSchema = z.object({
 });
 
 /**
- * Voice track validation schemas
- */
-export const createVoiceTrackSchema = z.object({
-  ttsProvider: z.string().optional(),
-  ttsModel: z.string().optional(),
-  voices: z
-    .array(
-      z.object({
-        speaker: z.string(),
-        voiceId: z.string(),
-        provider: z.string().optional(),
-      })
-    )
-    .min(1),
-  paymentIntentIds: z.array(z.string()).optional(),
-  skipPaidVoices: z.boolean().optional(),
-});
-
-export const updateVoiceTrackSchema = z.object({
-  name: z.string().min(1).max(100).optional(),
-});
-
-export const setDefaultTrackSchema = z.object({
-  voiceTrackId: z.string().nullable(),
-});
-
-/**
  * Discovery chat message validation
  */
 export const discoveryMessageSchema = z.object({
@@ -492,25 +465,6 @@ export const deleteAccountSchema = z.object({
 });
 
 /**
- * User discovery search validation
- */
-export const userDiscoverySearchSchema = z.object({
-  query: z.string().min(2).max(100),
-  page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(30).default(20),
-});
-
-/**
- * Saved idea validation
- */
-export const savedIdeaSchema = z.object({
-  questionId: z.string().min(1).max(20),
-  question: z.string().min(1).max(500),
-  tagSlugs: z.array(z.string().min(1).max(100)).min(1).max(3),
-  category: z.string().min(1).max(100),
-});
-
-/**
  * Taste quiz question request validation
  */
 export const tasteQuizQuerySchema = z.object({
@@ -535,18 +489,6 @@ export const tasteQuizAnswerSchema = z.object({
 });
 
 /**
- * Podcast rating validation
- */
-export const podcastRatingSchema = z.object({
-  voiceNaturalness: z.number().int().min(1).max(5),
-  contentAccuracy: z.number().int().min(1).max(5),
-  conversationFlow: z.number().int().min(1).max(5),
-  overallSatisfaction: z.number().int().min(1).max(5),
-  comment: z.string().max(2000).optional(),
-  completionPercent: z.number().min(0).max(100).optional(),
-});
-
-/**
  * Report creation validation
  */
 export const createReportSchema = z.object({
@@ -562,7 +504,6 @@ export const createReportSchema = z.object({
     'IMPERSONATION',
     'COPYRIGHT',
     'VOICE_THEFT',
-    'MUSIC_UPLOAD',
     'FALSE_HUMAN_BADGE',
     'FALSE_CLAIM',
     'OTHER',
@@ -584,18 +525,6 @@ export const adminUpdateBadgeSchema = z.object({
 export const resolveReportSchema = z.object({
   status: z.enum(['RESOLVED_ACTIONED', 'RESOLVED_DISMISSED', 'ASSET_REPLACED', 'DELISTED']),
   resolution: z.string().max(2000).optional(),
-});
-
-export const copyrightClaimSchema = z.object({
-  claimantEmail: z.string().email().max(320),
-  claimantName: z.string().min(1).max(200),
-  description: z.string().min(10).max(5000),
-  evidenceUrl: z.string().url().max(2000).optional(),
-  segmentVisualId: z.string().min(1).optional(),
-});
-
-export const copyrightCounterNoticeSchema = z.object({
-  counterNotice: z.string().min(10).max(5000),
 });
 
 /**
@@ -632,23 +561,6 @@ export const landingShowcaseUpdateSchema = z
  */
 export const referralSchema = z.object({
   handle: z.string().min(3).max(30),
-});
-
-/**
- * Claim report creation validation
- */
-export const createClaimReportSchema = z.object({
-  turnIndex: z.number().int().min(0),
-  turnText: z.string().min(1).max(10000),
-  description: z.string().min(10, 'Please describe the issue (at least 10 characters)').max(2000),
-});
-
-/**
- * Claim report resolution validation (admin)
- */
-export const resolveClaimReportSchema = z.object({
-  status: z.enum(['RESOLVED_VERIFIED', 'RESOLVED_INACCURATE', 'DISMISSED']),
-  resolution: z.string().max(2000).optional(),
 });
 
 /**
@@ -703,7 +615,6 @@ export const pipelineTransitionSchema = z.object({
 export const generateVideoSchema = z
   .object({
     imageModel: z.string().optional(),
-    voiceTrackId: z.string().optional(),
     pipeline: z
       .object({
         version: z.union([z.literal(1), z.literal(2), z.literal(3)]),
@@ -856,7 +767,6 @@ export const redeemInvitationSchema = z.object({
 });
 
 export const configureAvatarsSchema = z.object({
-  voiceTrackId: z.string().optional(),
   avatars: z
     .array(
       z.object({
@@ -867,7 +777,6 @@ export const configureAvatarsSchema = z.object({
         avatarModelId: z.string().optional(),
         isPreset: z.boolean().optional(),
         enabledSegmentIds: z.array(z.string()).optional(),
-        voiceTrackId: z.string().optional(),
       })
     )
     .min(1)
@@ -875,7 +784,6 @@ export const configureAvatarsSchema = z.object({
 });
 
 export const updateAvatarPositionsSchema = z.object({
-  voiceTrackId: z.string().optional(),
   positions: z.array(
     z.object({
       speaker: z.string().min(1),
@@ -888,13 +796,6 @@ export const updateAvatarPositionsSchema = z.object({
         .optional(),
     })
   ),
-});
-
-/**
- * Music generation
- */
-export const generateMusicSchema = z.object({
-  model: z.string().max(100).optional(),
 });
 
 export const avatarImageUploadSchema = z.object({
@@ -918,14 +819,6 @@ export const updateAvatarImageShareSchema = z.object({
 
 export const updateAvatarImageSchema = z.object({
   shareable: z.boolean(),
-});
-
-export const updateMusicVolumeSchema = z.object({
-  volume: z.number().min(0).max(1),
-});
-
-export const selectMusicGenerationSchema = z.object({
-  generationId: z.string().min(1).max(100),
 });
 
 // Sourced classes: build the next class from a real link or an interest topic.

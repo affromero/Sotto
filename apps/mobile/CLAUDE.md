@@ -51,7 +51,6 @@ app/
 │   ├── notifications.tsx  # Notifications
 │   └── profile.tsx        # Current user profile
 ├── auth/login.tsx         # Login (dev: email, prod: OAuth)
-├── ideas.tsx              # Saved ideas — swipe to dismiss, tap to generate
 ├── settings.tsx           # Settings hub — BYOK keys, logout
 ├── settings/api-keys.tsx  # BYOK key management
 ├── podcast/[id].tsx       # Full-screen player

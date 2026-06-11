@@ -2,14 +2,12 @@
 
 import { useState } from 'react';
 import { ReportQueue } from './ReportQueue';
-import { ClaimReportQueue } from './ClaimReportQueue';
 import { ModerationLog } from './ModerationLog';
 import { VoiceModeration } from './VoiceModeration';
 import styles from './page.module.css';
 
 interface ModerationTabsProps {
   pendingReportCount: number;
-  pendingClaimCount: number;
   failedPodcastCount: number;
   feedbackCount: number;
   pendingVoiceCount: number;
@@ -17,7 +15,7 @@ interface ModerationTabsProps {
   feedbackContent: React.ReactNode;
 }
 
-type TabId = 'reports' | 'claims' | 'log' | 'failed' | 'feedback' | 'voices';
+type TabId = 'reports' | 'log' | 'failed' | 'feedback' | 'voices';
 
 interface Tab {
   id: TabId;
@@ -27,7 +25,6 @@ interface Tab {
 
 export function ModerationTabs({
   pendingReportCount,
-  pendingClaimCount,
   failedPodcastCount,
   feedbackCount,
   pendingVoiceCount,
@@ -38,7 +35,6 @@ export function ModerationTabs({
 
   const tabs: Tab[] = [
     { id: 'reports', label: 'Reports', count: pendingReportCount },
-    { id: 'claims', label: 'Claims', count: pendingClaimCount },
     { id: 'log', label: 'Moderation Log' },
     { id: 'failed', label: 'Failed Podcasts', count: failedPodcastCount },
     { id: 'feedback', label: 'Feedback', count: feedbackCount },
@@ -73,7 +69,6 @@ export function ModerationTabs({
         className={styles.tabPanel}
       >
         {activeTab === 'reports' && <ReportQueue />}
-        {activeTab === 'claims' && <ClaimReportQueue />}
         {activeTab === 'log' && <ModerationLog />}
         {activeTab === 'failed' && failedPodcastsContent}
         {activeTab === 'feedback' && feedbackContent}

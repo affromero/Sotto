@@ -1,11 +1,8 @@
-import { notFound, redirect } from 'next/navigation';
+import { notFound } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getVideoGenerationStatus, getAvatarGenerationStatus } from '@/lib/video-gate';
-import { getMusicGenerationStatus } from '@/lib/music-gate';
 import { resolveAudioUrl } from '@/lib/r2';
-import { findVoiceName, formatModelName } from '@/lib/voice-pool';
-import { getProviderMeta } from '@/lib/providers/tts-registry';
 import type { Metadata } from 'next';
 import { PodcastPlayerView } from './PodcastPlayerView';
 import { PodcastJsonLd } from '@/components/player/PodcastJsonLd';
@@ -45,15 +42,7 @@ export async function generateMetadata({ params }: PodcastPageProps): Promise<Me
       type: 'article',
       url: podcastUrl,
       siteName: 'Sotto',
-      ...(() => {
-        if (podcast.visibility !== 'PUBLIC') return {};
-        const readyTracks = podcast.voiceTracks.filter((t) => t.status === 'READY');
-        const defaultTrack = podcast.defaultVoiceTrackId
-          ? readyTracks.find((t) => t.id === podcast.defaultVoiceTrackId)
-          : null;
-        const ogAudioUrl = defaultTrack?.audioUrl || podcast.audioUrl;
-        return ogAudioUrl ? { audio: ogAudioUrl } : {};
-      })(),
+      ...(podcast.visibility === 'PUBLIC' && podcast.audioUrl ? { audio: podcast.audioUrl } : {}),
     },
     twitter: {
       card: 'summary_large_image',
@@ -61,12 +50,7 @@ export async function generateMetadata({ params }: PodcastPageProps): Promise<Me
       description: podcast.topic,
       ...(twitterSite ? { site: twitterSite } : {}),
     },
-    alternates: {
-      canonical: podcastUrl,
-      types: {
-        'application/json+oembed': `${appUrl}/api/oembed?url=${encodeURIComponent(podcastUrl)}`,
-      },
-    },
+    alternates: { canonical: podcastUrl },
   };
 }
 
@@ -81,14 +65,6 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
     notFound();
   }
 
-  // Redirect drafts to the create page (owner only)
-  if (podcast.status === 'DRAFT') {
-    if (podcast.userId === userId) {
-      redirect(`/create?draftId=${podcastId}`);
-    }
-    notFound();
-  }
-
   // Check visibility
   if (podcast.visibility === 'PRIVATE' && podcast.userId !== userId) {
     notFound();
@@ -97,13 +73,8 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
   const isOwner = userId === podcast.userId;
   const isAdmin = session?.user?.role === 'ADMIN';
 
-  // Compute voiceIds needed for clone lookup (pure computation, no DB)
-  const allVoiceIds = [
-    ...new Set(podcast.voiceTracks.flatMap((t) => t.voices.map((v) => v.voiceId)).filter(Boolean)),
-  ];
-
   // All secondary queries in parallel
-  const [interactions, clones, ownerData] = await Promise.all([
+  const [interactions, ownerData] = await Promise.all([
     // Interactions (separate from cached query because it depends on userId)
     userId
       ? prisma.interaction.findMany({
@@ -121,20 +92,11 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
         })
       : Promise.resolve([]),
 
-    // Voice clone names
-    allVoiceIds.length > 0
-      ? prisma.voiceClone.findMany({
-          where: { externalVoiceId: { in: allVoiceIds } },
-          select: { externalVoiceId: true, name: true },
-        })
-      : Promise.resolve([]),
-
     // Owner-only gates (already internally parallel)
     isOwner && userId
       ? Promise.all([
           getVideoGenerationStatus(userId),
           getAvatarGenerationStatus(userId),
-          getMusicGenerationStatus(userId),
           podcast.status === 'READY'
             ? getPodcastCostBreakdown(podcastId)
             : Promise.resolve(undefined),
@@ -156,65 +118,22 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
         hasByokKey: boolean;
       }
     | undefined;
-  let musicStatus:
-    | {
-        available: boolean;
-        hasByokKey: boolean;
-      }
-    | undefined;
   let costBreakdown: Awaited<ReturnType<typeof getPodcastCostBreakdown>> | undefined;
   if (ownerData) {
-    const [vidStatus, avStatus, musStatus, costStats] = ownerData;
+    const [vidStatus, avStatus, costStats] = ownerData;
     videoStatus = vidStatus;
     avatarStatus = avStatus;
-    musicStatus = musStatus;
     costBreakdown = costStats;
   }
 
   const visibility = podcast.visibility;
-
-  // Build a voiceId → name map for tooltip enrichment
-  const voiceNameMap = new Map<string, string>();
-  for (const clone of clones) {
-    voiceNameMap.set(clone.externalVoiceId, clone.name);
-  }
-  for (const voiceId of allVoiceIds) {
-    if (!voiceNameMap.has(voiceId)) {
-      const name = findVoiceName(voiceId);
-      if (name) voiceNameMap.set(voiceId, name);
-    }
-  }
-
-  // Build original track display name from podcast's own voice assignments
-  const originalVoiceNames: string[] = [];
-  const seenVoiceIds = new Set<string>();
-  for (const pv of podcast.voices) {
-    if (pv.voiceId && !seenVoiceIds.has(pv.voiceId)) {
-      seenVoiceIds.add(pv.voiceId);
-      const name = voiceNameMap.get(pv.voiceId) ?? findVoiceName(pv.voiceId) ?? pv.voiceId;
-      originalVoiceNames.push(name);
-    }
-  }
-  const providerLabel = podcast.ttsProvider
-    ? getProviderMeta(podcast.ttsProvider as Parameters<typeof getProviderMeta>[0]).displayName
-    : null;
-  const modelLabel = podcast.ttsModel ? formatModelName(podcast.ttsModel) : null;
-  const providerSuffix = providerLabel
-    ? `[${modelLabel ? `${providerLabel} - ${modelLabel}` : providerLabel}]`
-    : '';
-  const originalTrackName =
-    originalVoiceNames.length > 0
-      ? `${originalVoiceNames.join(' + ')} ${providerSuffix}`.trim()
-      : providerSuffix || 'Original';
 
   // Resolve audio URLs: presigned for PRIVATE/UNLISTED, public CDN for PUBLIC
   const [
     resolvedAudioUrl,
     resolvedSegments,
     resolvedVersions,
-    resolvedVoiceTracks,
     resolvedVideoUrl,
-    resolvedMusicUrl,
   ] = await Promise.all([
     resolveAudioUrl(podcast.audioUrl, visibility),
     Promise.all(
@@ -238,33 +157,7 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
         createdAt: v.createdAt.toISOString(),
       }))
     ),
-    Promise.all(
-      (isOwner
-        ? podcast.voiceTracks
-        : podcast.voiceTracks.filter(
-            (t) =>
-              t.status === 'READY' && (t.proposalStatus === null || t.proposalStatus === 'ACCEPTED')
-          )
-      ).map(async (t) => ({
-        id: t.id,
-        name: t.name,
-        status: t.status,
-        audioUrl: await resolveAudioUrl(t.audioUrl, visibility),
-        duration: t.duration,
-        ttsProvider: t.ttsProvider,
-        ttsModel: t.ttsModel,
-        failureReason: t.failureReason,
-        voices: t.voices.map((v) => ({
-          ...v,
-          voiceName: voiceNameMap.get(v.voiceId) ?? null,
-        })),
-        contributor: t.contributor,
-        proposalStatus: t.proposalStatus,
-        proposalMessage: t.proposalMessage,
-      }))
-    ),
     podcast.videoUrl ? resolveAudioUrl(podcast.videoUrl, visibility) : Promise.resolve(null),
-    podcast.musicUrl ? resolveAudioUrl(podcast.musicUrl, visibility) : Promise.resolve(null),
   ]);
 
   const podcastData = {
@@ -305,14 +198,8 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
     vocabularyEntries: podcast.vocabularyEntries,
     pdfUrl: podcast.pdfUrl,
     videoUrl: resolvedVideoUrl ?? null,
-    musicUrl: resolvedMusicUrl ?? null,
-    musicVolume: podcast.musicVolume,
-    musicBaked: podcast.musicBaked,
     tags: podcast.tags.map((pt) => pt.tag),
     versions: resolvedVersions,
-    voiceTracks: resolvedVoiceTracks,
-    defaultVoiceTrackId: podcast.defaultVoiceTrackId,
-    originalTrackName,
     isSaved: false,
   };
 
@@ -341,7 +228,6 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
           isAuthenticated={!!userId}
           videoStatus={videoStatus}
           avatarStatus={avatarStatus}
-          musicStatus={musicStatus}
         />
         {costBreakdown && costBreakdown.total > 0 && (
           <CostBreakdown breakdown={costBreakdown} />

@@ -11,29 +11,26 @@ function makeInput(overrides: Partial<CompletenessInput> = {}): CompletenessInpu
     verifiedReferenceCount: 0,
     discoveryMessageCount: 0,
     voiceAssignmentCount: 0,
-    completedVoiceTrackCount: 0,
     tagCount: 0,
     answeredInteractionCount: 0,
-    ratingCount: 0,
     playbackSessionCount: 0,
     hasMLFeatures: false,
     apiCostLogCount: 0,
-    segmentVoiceMapCount: 0,
     ...overrides,
   };
 }
 
 describe('computeCompletenessChecklist', () => {
-  it('returns 0/15 when all dimensions are missing', () => {
+  it('returns 0/12 when all dimensions are missing', () => {
     const result = computeCompletenessChecklist(makeInput());
 
     expect(result.score).toBe(0);
-    expect(result.maxScore).toBe(15);
-    expect(result.dimensions).toHaveLength(15);
+    expect(result.maxScore).toBe(12);
+    expect(result.dimensions).toHaveLength(12);
     expect(result.dimensions.every((d) => !d.present)).toBe(true);
   });
 
-  it('returns 15/15 when all dimensions are present', () => {
+  it('returns 12/12 when all dimensions are present', () => {
     const result = computeCompletenessChecklist(makeInput({
       hasScript: true,
       hasAudio: true,
@@ -43,18 +40,15 @@ describe('computeCompletenessChecklist', () => {
       verifiedReferenceCount: 2,
       discoveryMessageCount: 4,
       voiceAssignmentCount: 2,
-      completedVoiceTrackCount: 1,
       tagCount: 3,
       answeredInteractionCount: 1,
-      ratingCount: 2,
       playbackSessionCount: 5,
       hasMLFeatures: true,
       apiCostLogCount: 10,
-      segmentVoiceMapCount: 5,
     }));
 
-    expect(result.score).toBe(15);
-    expect(result.maxScore).toBe(15);
+    expect(result.score).toBe(12);
+    expect(result.maxScore).toBe(12);
     expect(result.dimensions.every((d) => d.present)).toBe(true);
   });
 
@@ -70,7 +64,7 @@ describe('computeCompletenessChecklist', () => {
     }));
 
     expect(result.score).toBe(5);
-    expect(result.maxScore).toBe(15);
+    expect(result.maxScore).toBe(12);
 
     const presentKeys = result.dimensions.filter((d) => d.present).map((d) => d.key);
     expect(presentKeys).toContain('script');
@@ -111,29 +105,7 @@ describe('computeCompletenessChecklist', () => {
     expect(segDim?.present).toBe(false);
   });
 
-  it('includes voiceTracks dimension', () => {
-    const result = computeCompletenessChecklist(makeInput({
-      completedVoiceTrackCount: 1,
-    }));
-
-    const dim = result.dimensions.find((d) => d.key === 'voiceTracks');
-    expect(dim).toBeDefined();
-    expect(dim?.label).toBe('Voice Tracks');
-    expect(dim?.present).toBe(true);
-  });
-
-  it('includes segmentVoiceMap dimension', () => {
-    const result = computeCompletenessChecklist(makeInput({
-      segmentVoiceMapCount: 3,
-    }));
-
-    const dim = result.dimensions.find((d) => d.key === 'segmentVoiceMap');
-    expect(dim).toBeDefined();
-    expect(dim?.label).toBe('Segment Voice Map');
-    expect(dim?.present).toBe(true);
-  });
-
-  it('has correct labels for all 15 dimensions', () => {
+  it('has correct labels for all 12 dimensions', () => {
     const result = computeCompletenessChecklist(makeInput());
     const keys = result.dimensions.map((d) => d.key);
 
@@ -145,14 +117,11 @@ describe('computeCompletenessChecklist', () => {
       'verifiedReferences',
       'discoveryChat',
       'voiceAssignments',
-      'voiceTracks',
       'tags',
       'qaInteractions',
-      'ratings',
       'playbackData',
       'mlFeatures',
       'apiCostLogs',
-      'segmentVoiceMap',
     ]);
   });
 
@@ -162,17 +131,14 @@ describe('computeCompletenessChecklist', () => {
       verifiedReferenceCount: 1,
       discoveryMessageCount: 1,
       voiceAssignmentCount: 1,
-      completedVoiceTrackCount: 1,
       tagCount: 1,
       answeredInteractionCount: 1,
-      ratingCount: 1,
       playbackSessionCount: 1,
       apiCostLogCount: 1,
-      segmentVoiceMapCount: 1,
     }));
 
     // Script, Audio, Segments, ML Features are still false
-    expect(result.score).toBe(11);
+    expect(result.score).toBe(8);
   });
 
   it('each dimension is independently togglable', () => {
@@ -184,14 +150,11 @@ describe('computeCompletenessChecklist', () => {
       verifiedReferences: { verifiedReferenceCount: 1 },
       discoveryChat: { discoveryMessageCount: 1 },
       voiceAssignments: { voiceAssignmentCount: 1 },
-      voiceTracks: { completedVoiceTrackCount: 1 },
       tags: { tagCount: 1 },
       qaInteractions: { answeredInteractionCount: 1 },
-      ratings: { ratingCount: 1 },
       playbackData: { playbackSessionCount: 1 },
       mlFeatures: { hasMLFeatures: true },
       apiCostLogs: { apiCostLogCount: 1 },
-      segmentVoiceMap: { segmentVoiceMapCount: 1 },
     };
 
     for (const [key, overrides] of Object.entries(dimensionInputMap)) {
@@ -233,7 +196,7 @@ describe('computeCompletenessChecklist', () => {
       referenceCount: 3,
       verifiedReferenceCount: 1,
       tagCount: 2,
-      ratingCount: 5,
+      playbackSessionCount: 2,
       hasMLFeatures: true,
     }));
 
@@ -250,7 +213,7 @@ describe('computeCompletenessChecklist', () => {
     }
   });
 
-  it('maxScore is always 15 regardless of input', () => {
+  it('maxScore is always 12 regardless of input', () => {
     const empty = computeCompletenessChecklist(makeInput());
     const full = computeCompletenessChecklist(makeInput({
       hasScript: true,
@@ -261,18 +224,15 @@ describe('computeCompletenessChecklist', () => {
       verifiedReferenceCount: 1,
       discoveryMessageCount: 1,
       voiceAssignmentCount: 1,
-      completedVoiceTrackCount: 1,
       tagCount: 1,
       answeredInteractionCount: 1,
-      ratingCount: 1,
       playbackSessionCount: 1,
       hasMLFeatures: true,
       apiCostLogCount: 1,
-      segmentVoiceMapCount: 1,
     }));
 
-    expect(empty.maxScore).toBe(15);
-    expect(full.maxScore).toBe(15);
+    expect(empty.maxScore).toBe(12);
+    expect(full.maxScore).toBe(12);
   });
 
   it('no duplicate dimension keys', () => {

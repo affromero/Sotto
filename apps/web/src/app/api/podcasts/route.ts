@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { authenticateRequest } from '@/lib/api-keys';
 import { createPodcastSchema } from '@/lib/validations';
@@ -59,21 +58,9 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const draftId = typeof body.draftId === 'string' ? body.draftId : undefined;
   const parsed = createPodcastSchema.safeParse(body);
   if (!parsed.success) {
     return errorResponse(parsed.error.flatten(), 400);
-  }
-
-  // Validate draft ownership if resuming from a draft
-  if (draftId) {
-    const draft = await prisma.podcast.findUnique({
-      where: { id: draftId },
-      select: { userId: true, status: true },
-    });
-    if (!draft || draft.userId !== authResult.userId || draft.status !== 'DRAFT') {
-      return errorResponse('Invalid draft', 400);
-    }
   }
 
   // Validate model ID against registry (claude-code:* models are exempt)
@@ -177,14 +164,9 @@ export async function POST(request: NextRequest) {
     ...(isApiKeyAuth && { source: 'API' as const }),
   };
 
-  const podcast = draftId
-    ? await prisma.podcast.update({
-        where: { id: draftId },
-        data: { ...podcastData, draftData: Prisma.DbNull },
-      })
-    : await prisma.podcast.create({
-        data: { ...podcastData, userId: authResult.userId },
-      });
+  const podcast = await prisma.podcast.create({
+    data: { ...podcastData, userId: authResult.userId },
+  });
 
   // Generate slug for vanity URL
   const slug = await generatePodcastSlug(parsed.data.title, authResult.userId, prisma);
@@ -223,22 +205,14 @@ export async function POST(request: NextRequest) {
       verificationMode,
     };
 
-    if (draftId) {
-      // Draft already has a Discovery record — update it
-      await prisma.discovery.updateMany({
-        where: { podcastId: podcast.id },
-        data: discoveryData,
-      });
-    } else {
-      await prisma.discovery.create({
-        data: {
-          ...discoveryData,
-          podcastId: podcast.id,
-          userId: authResult.userId,
-        },
-      });
-    }
-  } else if (!draftId) {
+    await prisma.discovery.create({
+      data: {
+        ...discoveryData,
+        podcastId: podcast.id,
+        userId: authResult.userId,
+      },
+    });
+  } else {
     // Create a minimal Discovery record so the pipeline can find it
     await prisma.discovery.create({
       data: {

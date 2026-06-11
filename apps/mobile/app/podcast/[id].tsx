@@ -28,17 +28,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography, borderRadius, getContentBadgeLabel } from '@sotto/shared';
 import { getPodcastGradient } from '../../lib/gradients';
 import type { PodcastDetail, SegmentData } from '@sotto/shared';
-import { PostListenRating } from '../../components/PostListenRating';
 import { api } from '../../lib/api';
 import { setupPlayer, loadTrack } from '../../lib/audio-player';
 import { formatTime } from '../../lib/formatters';
 import { usePlaybackTelemetry } from '../../lib/usePlaybackTelemetry';
 import type { PlaybackSnapshot } from '../../lib/usePlaybackTelemetry';
 import { ReferencesTab } from '../../components/ReferencesTab';
-import { VoiceTrackPicker } from '../../components/VoiceTrackPicker';
 import { VersionHistory } from '../../components/VersionHistory';
 import { usePlayerStore } from '../../lib/player-store';
-import type { VoiceTrackSummary } from '@sotto/shared';
 
 const PLAYBACK_SPEEDS = [0.5, 1, 1.25, 1.5, 2] as const;
 
@@ -66,11 +63,7 @@ export default function PodcastScreen() {
   const [questionText, setQuestionText] = useState('');
   const [progressBarWidth, setProgressBarWidth] = useState(0);
   const [teleprompterEnabled, setTeleprompterEnabled] = useState(false);
-  const [voicePickerVisible, setVoicePickerVisible] = useState(false);
   const [versionHistoryVisible, setVersionHistoryVisible] = useState(false);
-  const [activeVoiceTrackId, setActiveVoiceTrackId] = useState<string | null>(null);
-  const [showRating, setShowRating] = useState(false);
-  const playbackEndedRef = useRef(false);
   const setCurrentPodcast = usePlayerStore((s) => s.setCurrentPodcast);
   const lastSeekFromRef = useRef<number | undefined>(undefined);
   const interactionCountRef = useRef(0);
@@ -82,20 +75,6 @@ export default function PodcastScreen() {
   const trackDuration = progress.duration;
   const playbackState = usePlaybackState();
   const isPlaying = playerReady && playbackState.state === State.Playing;
-
-  // Detect playback completion → show post-listen rating
-  useEffect(() => {
-    if (
-      !playbackEndedRef.current &&
-      trackDuration > 0 &&
-      position > 0 &&
-      position >= trackDuration - 1 &&
-      !isPlaying
-    ) {
-      playbackEndedRef.current = true;
-      setShowRating(true);
-    }
-  }, [position, trackDuration, isPlaying]);
 
   // Animation values for player buttons
   const playScale = useSharedValue(1);
@@ -291,23 +270,6 @@ export default function PodcastScreen() {
       timestamp: position,
     });
   }, [questionText, position, interactMutation]);
-
-  const handleVoiceTrackSelect = useCallback(
-    async (track: VoiceTrackSummary) => {
-      if (!track.audioUrl) return;
-      setActiveVoiceTrackId(track.id);
-      setVoicePickerVisible(false);
-      try {
-        await loadTrack(
-          podcast?.id ?? id,
-          track.audioUrl,
-          podcast?.title ?? '',
-          track.contributor?.name ?? 'Sotto'
-        );
-      } catch {}
-    },
-    [podcast?.id, podcast?.title, id]
-  );
 
   // Playback telemetry
   const playbackSnapshot: PlaybackSnapshot = useMemo(
@@ -580,17 +542,6 @@ export default function PodcastScreen() {
               {isOwner && <Text style={styles.actionCount}>{podcast.saveCount}</Text>}
             </Pressable>
 
-            {podcast.voiceTracks?.length > 1 && (
-              <Pressable
-                onPress={() => setVoicePickerVisible(true)}
-                style={styles.actionIcon}
-                accessibilityLabel="Voice tracks"
-                accessibilityRole="button"
-              >
-                <Ionicons name="mic-outline" size={22} color={colors.textSecondary} />
-              </Pressable>
-            )}
-
             {podcast.versions?.length > 1 && (
               <Pressable
                 onPress={() => setVersionHistoryVisible(true)}
@@ -793,36 +744,12 @@ export default function PodcastScreen() {
         </View>
       </Modal>
 
-      <VoiceTrackPicker
-        visible={voicePickerVisible}
-        onClose={() => setVoicePickerVisible(false)}
-        voiceTracks={podcast.voiceTracks}
-        activeTrackId={activeVoiceTrackId ?? podcast.defaultVoiceTrackId}
-        onSelect={handleVoiceTrackSelect}
-      />
-
       <VersionHistory
         visible={versionHistoryVisible}
         onClose={() => setVersionHistoryVisible(false)}
         versions={podcast.versions}
         currentVersion={podcast.currentVersion}
       />
-
-      {/* Post-listen rating */}
-      <Modal
-        visible={showRating}
-        animationType="slide"
-        transparent={false}
-        onRequestClose={() => setShowRating(false)}
-      >
-        <View style={styles.quizModal}>
-          <PostListenRating
-            podcastId={podcast.id}
-            completionPercent={trackDuration > 0 ? (position / trackDuration) * 100 : undefined}
-            onDismiss={() => setShowRating(false)}
-          />
-        </View>
-      </Modal>
     </View>
   );
 }

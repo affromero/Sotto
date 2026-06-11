@@ -34,7 +34,7 @@ export default async function AdminEngagementPage({ searchParams }: PageProps) {
     getInteractionStats(since),
   ]);
 
-  const maxDaily = Math.max(...dailyTrend.map((d) => d.saves + d.questions + d.ratings), 1);
+  const maxDaily = Math.max(...dailyTrend.map((d) => d.saves + d.questions), 1);
 
   return (
     <div className={styles.container}>
@@ -81,10 +81,6 @@ export default async function AdminEngagementPage({ searchParams }: PageProps) {
           <span className={styles.cardLabel}>Incorporated</span>
           <span className={styles.cardValue}>{overview.incorporated.toLocaleString()}</span>
         </div>
-        <div className={styles.card}>
-          <span className={styles.cardLabel}>Ratings</span>
-          <span className={styles.cardValue}>{overview.ratings.toLocaleString()}</span>
-        </div>
       </div>
 
       {/* Daily private activity trend */}
@@ -99,13 +95,13 @@ export default async function AdminEngagementPage({ searchParams }: PageProps) {
             aria-label="Daily private activity bar chart"
           >
             {dailyTrend.map((d) => {
-              const total = d.saves + d.questions + d.ratings;
+              const total = d.saves + d.questions;
               return (
                 <div key={d.day} className={styles.chartBar}>
                   <div
                     className={styles.chartBarFill}
                     style={{ height: `${(total / maxDaily) * 100}%` }}
-                    title={`${d.day}: ${d.saves} saves, ${d.questions} questions, ${d.ratings} ratings`}
+                    title={`${d.day}: ${d.saves} saves, ${d.questions} questions`}
                   />
                   <span className={styles.chartLabel}>
                     {new Date(d.day + 'T00:00:00').toLocaleDateString('en-US', {

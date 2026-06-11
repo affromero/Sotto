@@ -14,19 +14,11 @@ interface ScriptTurn {
   direction?: string;
 }
 
-interface VoiceTrack {
-  id: string;
-  name: string;
-  ttsProvider: string | null;
-  segments: Array<{ id: string; audioUrl: string | null; status: string }>;
-}
-
 interface PodcastData {
   id: string;
   title: string;
   status: string;
   script: { turns: ScriptTurn[] } | null;
-  voiceTracks: VoiceTrack[];
 }
 
 export function PodcastPrep({ project }: { project: DemoProject }) {
@@ -34,7 +26,6 @@ export function PodcastPrep({ project }: { project: DemoProject }) {
   const [loading, setLoading] = useState(false);
   const [linkId, setLinkId] = useState('');
   const [topic, setTopic] = useState('');
-  const [playingTrack, setPlayingTrack] = useState<string | null>(null);
 
   const loadPodcast = useCallback(async () => {
     const res = await fetch(`/api/admin/demo/${project.id}/podcast`);
@@ -129,41 +120,6 @@ export function PodcastPrep({ project }: { project: DemoProject }) {
               <div key={i} className={styles.turn}>
                 <span className={styles.speaker}>{turn.speaker}</span>
                 <p className={styles.turnText}>{turn.text}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Voice tracks / audio per provider */}
-      {podcast?.voiceTracks && podcast.voiceTracks.length > 0 && (
-        <div className={styles.section}>
-          <h4 className={styles.subtitle}>Audio Tracks</h4>
-          <div className={styles.trackList}>
-            {podcast.voiceTracks.map((track) => (
-              <div key={track.id} className={styles.trackCard}>
-                <div className={styles.trackHeader}>
-                  <span className={styles.trackName}>{track.name}</span>
-                  {track.ttsProvider && (
-                    <span className={styles.providerBadge}>{track.ttsProvider}</span>
-                  )}
-                </div>
-                {track.segments.some((s) => s.audioUrl) && (
-                  <button
-                    className={styles.btnSmall}
-                    onClick={() => setPlayingTrack(playingTrack === track.id ? null : track.id)}
-                  >
-                    {playingTrack === track.id ? 'Stop' : 'Play'}
-                  </button>
-                )}
-                {playingTrack === track.id && track.segments[0]?.audioUrl && (
-                  <audio
-                    src={track.segments[0].audioUrl}
-                    controls
-                    autoPlay
-                    className={styles.audio}
-                  />
-                )}
               </div>
             ))}
           </div>

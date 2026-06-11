@@ -36,9 +36,6 @@ export interface AutoModelConfigData {
   avatarProvider: string;
   avatarModel: string;
   includedAvatarModels: string[] | null;
-  musicProvider: string;
-  musicModel: string;
-  includedMusicModels: string[] | null;
   motionProvider: string;
 }
 
@@ -57,9 +54,6 @@ export interface AutoModelConfigUpdate {
   avatarProvider?: string;
   avatarModel?: string;
   includedAvatarModels?: string[] | null;
-  musicProvider?: string;
-  musicModel?: string;
-  includedMusicModels?: string[] | null;
   motionProvider?: string;
 }
 
@@ -81,8 +75,6 @@ const SEEDS = {
   videoModel: 'fal-wan2.5-480p',
   avatarProvider: 'heygen',
   avatarModel: getAvatarProviderMeta('heygen').defaultModel,
-  musicProvider: 'suno',
-  musicModel: 'suno-v5',
   motionProvider: 'remotion',
 };
 
@@ -185,9 +177,6 @@ export async function getAutoModelConfig(): Promise<AutoModelConfigData> {
     avatarProvider: row.avatarProvider,
     avatarModel: row.avatarModel,
     includedAvatarModels: includedModelsSchema.parse(row.includedAvatarModels),
-    musicProvider: row.musicProvider,
-    musicModel: row.musicModel,
-    includedMusicModels: includedModelsSchema.parse(row.includedMusicModels),
     motionProvider: row.motionProvider,
   };
 }
@@ -224,9 +213,6 @@ export async function setAutoModelConfig(data: AutoModelConfigUpdate, adminId: s
   if (data.avatarProvider) update.avatarProvider = data.avatarProvider;
   if (data.avatarModel) update.avatarModel = data.avatarModel;
   if (data.includedAvatarModels !== undefined) update.includedAvatarModels = data.includedAvatarModels;
-  if (data.musicProvider) update.musicProvider = data.musicProvider;
-  if (data.musicModel) update.musicModel = data.musicModel;
-  if (data.includedMusicModels !== undefined) update.includedMusicModels = data.includedMusicModels;
   if (data.motionProvider) update.motionProvider = data.motionProvider;
 
   await prisma.autoModelConfig.upsert({
@@ -305,17 +291,6 @@ export async function resolveAvatarModel(): Promise<{
 }> {
   const config = await getAutoModelConfig();
   return { avatarProvider: config.avatarProvider, avatarModel: config.avatarModel };
-}
-
-/**
- * Resolve the music provider and model for background music generation.
- */
-export async function resolveMusicModel(): Promise<{
-  musicProvider: string;
-  musicModel: string;
-}> {
-  const config = await getAutoModelConfig();
-  return { musicProvider: config.musicProvider, musicModel: config.musicModel };
 }
 
 /**

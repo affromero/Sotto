@@ -130,8 +130,6 @@ describe('open-source language-learning OSS surfaces', () => {
   });
 
   it('does not ship the public feed page or feed API route', () => {
-    const creatorMetricsSource = readSource('src/lib/creator-metrics.ts');
-
     expect(existsSync(resolve(webRoot, 'src/app/feed/page.tsx'))).toBe(false);
     expect(existsSync(resolve(webRoot, 'src/app/api/feed/route.ts'))).toBe(false);
     expect(existsSync(resolve(webRoot, 'src/app/api/activity/route.ts'))).toBe(false);
@@ -144,8 +142,6 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(existsSync(resolve(repoRoot, 'scripts/recording/flows/01-feed-browsing.ts'))).toBe(
       false
     );
-    expect(creatorMetricsSource).not.toContain("LIKE '%/feed%'");
-    expect(creatorMetricsSource).not.toContain("THEN 'feed'");
   });
 
   it('does not keep public feed contracts in mobile, shared, or MCP packages', () => {
@@ -242,15 +238,11 @@ describe('open-source language-learning OSS surfaces', () => {
       'src/app/podcast/[podcastId]/page.tsx',
       'src/components/player/PodcastJsonLd.tsx',
       'src/components/landing/JsonLd.tsx',
-      'src/app/api/oembed/route.ts',
       'src/app/api/admin/invitations/route.ts',
       'src/app/api/users/unsubscribe/route.ts',
-      'src/lib/rss.ts',
-      'src/lib/providers/music/suno.provider.ts',
       'src/lib/extractors/index.ts',
       'src/lib/extractors/html.ts',
       'src/lib/email-templates.ts',
-      'src/components/player/EmbedPlayer.tsx',
       'src/app/(dashboard)/settings/SettingsForm.tsx',
     ]
       .map(readSource)
@@ -436,7 +428,6 @@ describe('open-source language-learning OSS surfaces', () => {
       'apps/web/src/lib/auth.ts',
       'apps/web/src/middleware.ts',
       'apps/web/src/lib/email-templates.ts',
-      'apps/web/src/app/api/access/route.ts',
       'apps/web/src/app/api/users/unsubscribe/route.ts',
       'apps/web/src/app/api/waitlist/unsubscribe/route.ts',
       'apps/web/src/app/api/pitch/[...path]/route.ts',
@@ -891,7 +882,6 @@ describe('open-source language-learning OSS surfaces', () => {
   it('keeps onboarding setup explicit about transcription readiness', () => {
     const setupSources = [
       'apps/web/src/lib/setup-readiness.ts',
-      'apps/web/src/app/api/onboarding/readiness/route.ts',
       'apps/web/prisma/schema.prisma',
     ]
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
@@ -1006,51 +996,35 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(activityMetricSources).not.toContain('prisma.follow');
   });
 
-  it('keeps podcast analytics scoped to private listener activity', () => {
-    // The per-podcast creator analytics page is retired (redirects to /learn); the
-    // private-activity guard now covers the analytics lib + API route it backed.
-    const podcastAnalyticsSources = [
-      'src/lib/podcast-analytics.ts',
-      'src/app/api/podcasts/[podcastId]/analytics/route.ts',
+  it('does not ship creator or per-podcast analytics product routes', () => {
+    const removedAnalyticsPaths = [
+      'apps/web/src/lib/podcast-analytics.ts',
+      'apps/web/src/lib/creator-metrics.ts',
+      'apps/web/src/app/api/podcasts/[podcastId]/analytics',
+      'apps/web/src/app/api/creator-analytics',
+      'apps/web/src/app/api/users/me/podcasts',
+      'apps/web/src/app/(dashboard)/analytics',
+      'apps/web/src/types/analytics.ts',
+      'packages/shared/src/types/analytics.ts',
+    ];
+    for (const path of removedAnalyticsPaths) {
+      expect(existsSync(resolve(repoRoot, path)), path).toBe(false);
+    }
+
+    const privateActivitySources = [
+      'src/lib/engagement-metrics.ts',
+      'src/app/(admin)/admin/engagement/page.tsx',
+      'src/components/layout/Sidebar.tsx',
     ]
       .map(readSource)
       .join('\n');
 
-    expect(podcastAnalyticsSources).toContain('getPodcastPrivateActivity');
-    expect(podcastAnalyticsSources).not.toContain('getPodcastEngagement');
-    expect(podcastAnalyticsSources).not.toContain('likeCount');
-    expect(podcastAnalyticsSources).not.toContain('forkCount');
-    expect(podcastAnalyticsSources).not.toContain('commentCount');
-    expect(podcastAnalyticsSources).not.toContain('Upvotes');
-    expect(podcastAnalyticsSources).not.toContain("label: 'Likes'");
-    expect(podcastAnalyticsSources).not.toContain("label: 'Forks'");
-    expect(podcastAnalyticsSources).not.toContain("label: 'Comments'");
-  });
-
-  it('keeps creator analytics scoped to private activity', () => {
-    const creatorAnalyticsSources = [
-      'src/lib/creator-metrics.ts',
-      'src/app/(dashboard)/analytics/AnalyticsClient.tsx',
-      'src/app/(dashboard)/analytics/page.tsx',
-      'src/app/api/creator-analytics/route.ts',
-      'src/types/analytics.ts',
-    ]
-      .map(readSource)
-      .concat(readFileSync(resolve(repoRoot, 'packages/shared/src/types/analytics.ts'), 'utf8'))
-      .join('\n');
-
-    expect(creatorAnalyticsSources).toContain('privateActivity');
-    expect(creatorAnalyticsSources).toContain('getCreatorPrivateActivity');
-    expect(creatorAnalyticsSources).not.toContain('getCreatorEngagement');
-    expect(creatorAnalyticsSources).not.toContain('CreatorEngagement');
-    expect(creatorAnalyticsSources).not.toContain('data.engagement');
-    expect(creatorAnalyticsSources).not.toContain('likeCount');
-    expect(creatorAnalyticsSources).not.toContain('forkCount');
-    expect(creatorAnalyticsSources).not.toContain('prisma.like');
-    expect(creatorAnalyticsSources).not.toContain('prisma.follow');
-    expect(creatorAnalyticsSources).not.toContain("label: 'Likes'");
-    expect(creatorAnalyticsSources).not.toContain("label: 'Forks'");
-    expect(creatorAnalyticsSources).not.toContain("label: 'Follows'");
+    expect(privateActivitySources).toContain('Private Activity');
+    expect(privateActivitySources).not.toContain("href: '/analytics'");
+    expect(privateActivitySources).not.toContain('getCreatorEngagement');
+    expect(privateActivitySources).not.toContain('getPodcastEngagement');
+    expect(privateActivitySources).not.toContain('likeCount');
+    expect(privateActivitySources).not.toContain('forkCount');
   });
 
   it('does not ship the podcast recommendation engine or feed', () => {
@@ -1072,17 +1046,24 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(schemaSource).not.toContain('model RecommendationLog');
   });
 
-  it('keeps live podcast status and voice tracks owner-gated', () => {
-    const livePodcastSources = ['src/app/api/podcasts/[podcastId]/voice-tracks/route.ts']
+  it('does not ship voice-track APIs and keeps live podcast status owner-gated', () => {
+    const removedVoiceTrackPaths = [
+      'apps/web/src/app/api/podcasts/[podcastId]/voice-tracks',
+      'apps/web/src/app/api/podcasts/[podcastId]/default-track',
+    ];
+    for (const path of removedVoiceTrackPaths) {
+      expect(existsSync(resolve(repoRoot, path)), path).toBe(false);
+    }
+
+    const livePodcastSources = ['src/app/api/podcasts/[podcastId]/route.ts']
       .map(readSource)
       .join('\n');
 
     expect(livePodcastSources).toContain("errorResponse('Unauthorized', 401)");
-    expect(livePodcastSources).toContain('podcast.userId !== userId');
+    expect(livePodcastSources).toContain('podcast.userId !== authResult.userId');
     expect(livePodcastSources).not.toContain('No auth required');
     expect(livePodcastSources).not.toContain('Auth is optional');
     expect(livePodcastSources).not.toContain('public podcasts visible to all');
-    expect(livePodcastSources).not.toContain("visibility === 'PRIVATE'");
   });
 
   it('keeps local ingestion surfaces authenticated and private-only', () => {
@@ -1199,7 +1180,6 @@ describe('open-source language-learning OSS surfaces', () => {
       'src/components/ui/ReportButton.tsx',
       'src/app/(admin)/admin/moderation/ReportQueue.tsx',
       'src/lib/queue.ts',
-      'src/workers/content-moderation.worker.ts',
     ]
       .map(readSource)
       .join('\n');
@@ -1329,7 +1309,6 @@ describe('open-source language-learning OSS surfaces', () => {
       'src/lib/podcast-data.ts',
       'src/app/api/saved/route.ts',
       'src/app/api/queue/route.ts',
-      'src/app/api/users/me/podcasts/route.ts',
       'src/app/podcast/[podcastId]/page.tsx',
     ]
       .map(readSource)
@@ -1396,11 +1375,11 @@ describe('open-source language-learning OSS surfaces', () => {
     const removedMobileRoutes = [
       'apps/mobile/app/user/[userId].tsx',
       'apps/mobile/app/settings/notifications.tsx',
+      'apps/mobile/app/analytics.tsx',
     ];
     const mobilePrivateSources = [
       'apps/mobile/app/_layout.tsx',
       'apps/mobile/app/settings.tsx',
-      'apps/mobile/app/analytics.tsx',
       'apps/mobile/app/(tabs)/notifications.tsx',
       'apps/mobile/CLAUDE.md',
     ]
@@ -1543,20 +1522,12 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(userValidationSources).not.toContain("'following'");
   });
 
-  it('keeps voice sharing user lookup explicit instead of directory-style search', () => {
-    const userSearchRouteSource = readSource('src/app/api/users/search/route.ts');
+  it('does not ship directory-style user search', () => {
+    expect(existsSync(resolve(webRoot, 'src/app/api/users/search'))).toBe(false);
     const validationSource = readSource('src/lib/validations.ts');
-    const userLookupSources = [userSearchRouteSource, validationSource].join('\n');
 
-    expect(userSearchRouteSource).toContain('prisma.user.findUnique');
-    expect(userSearchRouteSource).toContain('where: { handle: parsed.data.handle }');
-    expect(userSearchRouteSource).toContain('select: {');
-    expect(userSearchRouteSource).toContain('handle: true');
     expect(validationSource).toContain('handle: handleSchema');
-    expect(userLookupSources).not.toContain('prisma.user.findMany');
-    expect(userLookupSources).not.toContain('contains: parsed.data.handle');
-    expect(userLookupSources).not.toContain("mode: 'insensitive'");
-    expect(userLookupSources).not.toContain('Search by @handle');
+    expect(validationSource).not.toContain('Search by @handle');
   });
 
   it('does not ship the voice marketplace', () => {
@@ -1630,11 +1601,8 @@ describe('open-source language-learning OSS surfaces', () => {
     const publicProfileSources = [
       'src/app/profile/page.tsx',
       'src/lib/urls.ts',
-      'src/lib/rss.ts',
       'src/lib/CLAUDE.md',
-      'src/app/api/oembed/route.ts',
       'src/app/sitemap.ts',
-      'src/components/player/Contributors.tsx',
       'src/app/CLAUDE.md',
       'src/components/CLAUDE.md',
     ]

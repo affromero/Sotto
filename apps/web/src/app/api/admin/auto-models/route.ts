@@ -51,10 +51,6 @@ const updateSchema = z.object({
   avatarProvider: z.string().min(1).optional(),
   avatarModel: z.string().min(1).optional(),
   includedAvatarModels: includedModelsField,
-  // Music
-  musicProvider: z.string().min(1).optional(),
-  musicModel: z.string().min(1).optional(),
-  includedMusicModels: includedModelsField,
   // Motion
   motionProvider: z.enum(['remotion', 'hera']).optional(),
 });

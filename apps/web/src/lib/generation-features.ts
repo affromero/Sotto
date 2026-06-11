@@ -12,8 +12,6 @@ export interface GenerationFeatures {
   privateAllowed: boolean;
   priorityQueue: boolean;
   analyticsEnabled: boolean;
-  voiceTracksEnabled: boolean;
-  maxVoiceTracks: number;
   voiceCloningEnabled: boolean;
 }
 
@@ -26,8 +24,6 @@ const FULL_ACCESS: GenerationFeatures = {
   privateAllowed: true,
   priorityQueue: false,
   analyticsEnabled: true,
-  voiceTracksEnabled: true,
-  maxVoiceTracks: Infinity,
   voiceCloningEnabled: true,
 };
 

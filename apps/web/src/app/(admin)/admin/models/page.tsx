@@ -8,7 +8,6 @@ import { getPlatformTtsKey } from '@/lib/tts-generation';
 import { getAllImageProviderMeta } from '@/lib/providers/image-registry';
 import { getAllVideoProviderMeta } from '@/lib/providers/video-registry';
 import { getAllAvatarProviderMeta } from '@/lib/providers/avatar-registry';
-import { getAllMusicProviderMeta } from '@/lib/providers/music-registry';
 import { ModelTestPanel } from './ModelTestPanel';
 import styles from './page.module.css';
 
@@ -22,7 +21,7 @@ function isClaudeCliAvailable(): boolean {
 }
 
 export type TestableProvider = {
-  category: 'ai' | 'tts' | 'stt' | 'image' | 'video' | 'avatar' | 'music';
+  category: 'ai' | 'tts' | 'stt' | 'image' | 'video' | 'avatar';
   providerId: string;
   providerName: string;
   modelId: string;
@@ -75,13 +74,6 @@ function hasPlatformKey(category: TestableProvider['category'], providerId: stri
       default: return false;
     }
   }
-  if (category === 'music') {
-    switch (providerId) {
-      case 'suno': return !!process.env.SUNO_API_KEY;
-      case 'elevenlabs': return !!process.env.ELEVENLABS_API_KEY;
-      default: return false;
-    }
-  }
   return false;
 }
 
@@ -97,11 +89,10 @@ function hasByokKey(
     if (providerId === 'openai' || providerId === 'together' || providerId === 'deepgram' || providerId === 'assemblyai') return aiSet.has(providerId);
     if (providerId === 'elevenlabs') return ttsSet.has('elevenlabs');
   }
-  // Image, video, avatar, music — BYOK keys stored in UserTtsKey
+  // Image, video, and avatar BYOK keys are stored in UserTtsKey.
   if (category === 'image') return ttsSet.has('fal');
   if (category === 'video') return ttsSet.has(providerId);
   if (category === 'avatar') return ttsSet.has(providerId);
-  if (category === 'music') return ttsSet.has(providerId);
   return false;
 }
 
@@ -209,19 +200,6 @@ export default async function AdminModelsPage() {
     )
   );
 
-  const musicProviders = withKeyFlags(
-    getAllMusicProviderMeta().flatMap((p) =>
-      p.models.map((m) => ({
-        category: 'music' as const,
-        providerId: p.id,
-        providerName: p.displayName,
-        modelId: m.id,
-        modelName: m.displayName,
-        tier: m.costPerTrack < 0.08 ? 'standard' : 'high',
-      }))
-    )
-  );
-
   return (
     <div className={styles.container}>
       <div className={styles.header}>
@@ -238,7 +216,6 @@ export default async function AdminModelsPage() {
         imageProviders={imageProviders}
         videoProviders={videoProviders}
         avatarProviders={avatarProviders}
-        musicProviders={musicProviders}
       />
     </div>
   );

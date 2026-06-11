@@ -290,7 +290,6 @@ export async function DELETE(request: NextRequest) {
       prisma.userSession.deleteMany({ where: { userId } }),
       prisma.playbackSession.deleteMany({ where: { userId } }),
       prisma.userFeature.deleteMany({ where: { userId } }),
-      prisma.contentFlag.deleteMany({ where: { userId } }),
       prisma.feedback.deleteMany({ where: { userId } }),
       prisma.listeningQueue.deleteMany({ where: { userId } }),
     ]);

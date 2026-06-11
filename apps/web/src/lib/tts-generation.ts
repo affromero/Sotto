@@ -1,5 +1,5 @@
 /**
- * Shared TTS generation core — used by audio-generation and voice-track-audio workers.
+ * Shared TTS generation core — used by the listening audio pipeline.
  *
  * Handles: API key resolution → concurrency limit → semaphore acquire/release →
  * text cleaning → generateSpeech (full params) → BYOK 404 fallback → 429 concurrency
@@ -91,15 +91,15 @@ export interface TtsGenerationParams {
 
   requestedModel?: string | null;
 
-  /** Usage logging category (e.g. 'audio_generation', 'voice_track_audio'). */
+  /** Usage logging category (e.g. 'audio_generation', 'segment_regeneration'). */
   usageCategory: string;
 
-  /** Extra metadata merged into logUsage (e.g. { voiceTrackId }). */
+  /** Extra metadata merged into logUsage (e.g. { segmentId }). */
   extraMetadata?: Record<string, unknown>;
 
   /**
    * Fail-fast callback: called during semaphore wait to check if the parent
-   * entity (Podcast or VoiceTrack) has already failed. Return true to abort.
+   * entity has already failed. Return true to abort.
    */
   isAborted: () => Promise<boolean>;
 }

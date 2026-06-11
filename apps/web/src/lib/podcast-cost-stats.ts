@@ -32,8 +32,6 @@ export const CATEGORY_BUCKET_MAP: Record<string, CostBucket> = {
   audio_generation: 'audio',
   stt_transcription: 'audio',
   segment_regeneration: 'audio',
-  music_generation: 'audio',
-  voice_track_audio: 'audio',
 
   // Video
   video_generation: 'video',

@@ -8,7 +8,7 @@ interface Params {
   params: Promise<{ projectId: string }>;
 }
 
-/** GET /api/admin/demo/[projectId]/podcast — Get the linked podcast with script + audio tracks */
+/** GET /api/admin/demo/[projectId]/podcast — Get the linked podcast with script */
 export async function GET(_request: NextRequest, { params }: Params) {
   const adminId = await requireAdmin();
   if (!adminId) return errorResponse('Forbidden', 403);
@@ -23,7 +23,6 @@ export async function GET(_request: NextRequest, { params }: Params) {
     where: { id: project.podcastId },
     include: {
       script: true,
-      voiceTracks: { include: { segments: true } },
     },
   });
 

@@ -160,21 +160,6 @@ export function ReportQueue() {
     [resolveReport]
   );
 
-  const deletePodcast = useCallback(
-    async (reportId: string, podcastId: string) => {
-      setActing(reportId);
-      const response = await fetch(`/api/admin/podcasts/${podcastId}`, {
-        method: 'DELETE',
-      });
-
-      if (response.ok) {
-        await resolveReport(reportId, 'RESOLVED_ACTIONED', 'Podcast deleted');
-      }
-      setActing(null);
-    },
-    [resolveReport]
-  );
-
   return (
     <div className={styles.root}>
       {stats && (
@@ -250,7 +235,6 @@ export function ReportQueue() {
           <option value="IMPERSONATION">Impersonation</option>
           <option value="COPYRIGHT">Copyright</option>
           <option value="VOICE_THEFT">Voice Theft</option>
-          <option value="MUSIC_UPLOAD">Music Upload</option>
           <option value="FALSE_HUMAN_BADGE">False Human Badge</option>
           <option value="FALSE_CLAIM">False Claim</option>
           <option value="OTHER">Other</option>
@@ -432,16 +416,6 @@ export function ReportQueue() {
                           type="button"
                         >
                           Remove Human Badge
-                        </button>
-                      )}
-                      {report.targetType === 'podcast' && report.reason === 'MUSIC_UPLOAD' && (
-                        <button
-                          className={`${styles.actionBtn} ${styles.actionBtnDanger}`}
-                          onClick={() => deletePodcast(report.id, report.targetId)}
-                          disabled={isActing}
-                          type="button"
-                        >
-                          Delete Podcast
                         </button>
                       )}
                       {report.reason === 'COPYRIGHT' && report.segmentVisualId && (

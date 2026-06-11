@@ -111,12 +111,6 @@ vi.mock('@/lib/providers/video/minimax.provider', () => ({
   },
 }));
 vi.mock('@/lib/heygen', () => ({ listAvatars: mockListAvatars }));
-vi.mock('@/lib/providers/music-registry', () => ({
-  getMusicProviderMeta: vi.fn(() => ({
-    platformKeyEnv: 'FAL_KEY',
-    auth: { validate: vi.fn().mockResolvedValue(true) },
-  })),
-}));
 vi.mock('@/lib/providers/image/fal.provider', () => ({
   FalImageProvider: vi.fn().mockImplementation(() => ({
     generateImage: vi.fn().mockResolvedValue(Buffer.from('fake-image')),
