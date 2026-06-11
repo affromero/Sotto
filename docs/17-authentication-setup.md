@@ -88,18 +88,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     signIn: '/auth/login',
     newUser: '/onboarding',
   },
-  events: {
-    async linkAccount({ user, account, profile }) {
-      // Sync Twitter handle when user links their Twitter account
-      if (account.provider === 'twitter' && user.id) {
-        const twitterHandle = (profile as Record<string, unknown>)?.username as string | undefined;
-        await prisma.user.update({
-          where: { id: user.id },
-          data: { twitterEnabled: true, ...(twitterHandle ? { twitterHandle } : {}) },
-        });
-      }
-    },
-  },
   callbacks: {
     async session({ session, token }) {
       if (session.user && token.sub) {
@@ -149,8 +137,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 **Custom pages:** The `signIn` page is `/auth/login` (not the default NextAuth sign-in page). After a brand-new user signs up, they are redirected to `/onboarding` to select interests and configure their profile.
 
 **User ID + role in session:** The `jwt` callback copies the database user ID, role, ban state, and suspension state into the JWT token. The `session` callback propagates these to `session.user`. This ensures every API route and server component can access the authenticated user's role and moderation status.
-
-**Twitter handle sync:** The `events.linkAccount` hook automatically syncs the user's Twitter handle when they link their Twitter account, enabling the configured bot integration.
 
 ---
 
@@ -309,8 +295,6 @@ TWITTER_CLIENT_SECRET=xxxxxxxxxxxxxxxxxxxx
 **Important notes:**
 
 - Twitter uses OAuth 2.0 with PKCE for NextAuth v5 (not OAuth 1.0a)
-- The `events.linkAccount` hook automatically syncs the user's Twitter handle to enable configured bot features
-- Users who sign in with Twitter get `twitterEnabled: true` set on their User record
 
 ### Apple Sign In
 

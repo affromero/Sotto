@@ -13,7 +13,6 @@ import { CommandPaletteLoader } from '@/components/ui/CommandPaletteLoader';
 import { ImpersonationBanner } from '@/components/layout/ImpersonationBanner';
 import { THEME_INIT_SCRIPT } from '@/lib/theme-script';
 import { getAppBaseUrl } from '@/lib/urls';
-import { getTwitterBotHandle } from '@/lib/bot-identity';
 import '@/styles/globals.css';
 
 const newsreader = Newsreader({
@@ -39,7 +38,6 @@ const ibmPlexMono = IBM_Plex_Mono({
 });
 
 const appBaseUrl = getAppBaseUrl();
-const twitterSite = getTwitterBotHandle();
 
 export const metadata: Metadata = {
   metadataBase: new URL(appBaseUrl),
@@ -62,7 +60,6 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    ...(twitterSite ? { site: twitterSite } : {}),
     title: BRAND.title,
     description: BRAND.description,
   },

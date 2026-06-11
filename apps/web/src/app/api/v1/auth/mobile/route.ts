@@ -249,23 +249,7 @@ async function handleOAuthLogin(body: unknown) {
       select: USER_SELECT,
     });
 
-    // Mark waitlist conversion + pre-associate twitter handle
-    const waitlistEntry = await prisma.waitlist.findUnique({
-      where: { email },
-      select: { twitterHandle: true },
-    });
-    if (waitlistEntry?.twitterHandle) {
-      const taken = await prisma.user.findUnique({
-        where: { twitterHandle: waitlistEntry.twitterHandle },
-        select: { id: true },
-      });
-      if (!taken) {
-        await prisma.user.update({
-          where: { id: newUser.id },
-          data: { twitterHandle: waitlistEntry.twitterHandle },
-        });
-      }
-    }
+    // Mark waitlist conversion.
     await prisma.waitlist.updateMany({
       where: { email },
       data: { signedUpAt: new Date() },

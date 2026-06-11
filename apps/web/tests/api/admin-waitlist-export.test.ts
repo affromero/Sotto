@@ -45,8 +45,8 @@ describe('GET /api/v1/admin/waitlist/export', () => {
   it('returns CSV with waitlist entries', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
     const entries = [
-      { email: 'alice@test.com', twitterHandle: 'alice', source: 'landing', referralCode: 'andres', wishlist: 'Would love podcast remixing!', status: 'APPROVED', createdAt: new Date('2026-01-15T10:00:00Z'), approvedAt: new Date('2026-01-16T00:00:00Z'), signedUpAt: null },
-      { email: 'bob@test.com', twitterHandle: null, source: null, referralCode: null, wishlist: null, status: 'PENDING', createdAt: new Date('2026-01-16T12:00:00Z'), approvedAt: null, signedUpAt: null },
+      { email: 'alice@test.com', source: 'landing', referralCode: 'andres', wishlist: 'Would love podcast remixing!', status: 'APPROVED', createdAt: new Date('2026-01-15T10:00:00Z'), approvedAt: new Date('2026-01-16T00:00:00Z'), signedUpAt: null },
+      { email: 'bob@test.com', source: null, referralCode: null, wishlist: null, status: 'PENDING', createdAt: new Date('2026-01-16T12:00:00Z'), approvedAt: null, signedUpAt: null },
     ];
     mockWaitlistFindMany.mockResolvedValue(entries);
 
@@ -56,9 +56,9 @@ describe('GET /api/v1/admin/waitlist/export', () => {
     expect(response.status).toBe(200);
     expect(response.headers.get('Content-Type')).toBe('text/csv');
     expect(response.headers.get('Content-Disposition')).toContain('waitlist-');
-    expect(text).toContain('Email,Twitter,Source,Referral,Wishlist,Status,Signed Up,Approved At,Converted At');
-    expect(text).toContain('alice@test.com,alice,landing,andres,Would love podcast remixing!,APPROVED,');
-    expect(text).toContain('bob@test.com,,unknown,,,PENDING,');
+    expect(text).toContain('Email,Source,Referral,Wishlist,Status,Signed Up,Approved At,Converted At');
+    expect(text).toContain('alice@test.com,landing,andres,Would love podcast remixing!,APPROVED,');
+    expect(text).toContain('bob@test.com,unknown,,,PENDING,');
   });
 
   it('returns CSV with only header when no entries', async () => {
@@ -69,7 +69,7 @@ describe('GET /api/v1/admin/waitlist/export', () => {
     const text = await response.text();
 
     expect(response.status).toBe(200);
-    expect(text).toBe('Email,Twitter,Source,Referral,Wishlist,Status,Signed Up,Approved At,Converted At');
+    expect(text).toBe('Email,Source,Referral,Wishlist,Status,Signed Up,Approved At,Converted At');
   });
 
   it('returns 500 when database throws', async () => {

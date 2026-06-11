@@ -110,7 +110,7 @@
   font-weight: 500;
 }
 
-.twitterCell {
+.secondaryCell {
   color: var(--color-text-secondary);
   font: var(--text-body-sm);
 }

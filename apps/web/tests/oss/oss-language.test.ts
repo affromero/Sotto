@@ -411,7 +411,6 @@ describe('open-source language-learning OSS surfaces', () => {
 
     expect(envExample).toContain('Use your own secret manager');
     expect(envExample).toContain('copy .env.oss.example to .env.local');
-    expect(envExample).toContain('Use the exact public host from NEXT_PUBLIC_APP_URL');
     expect(envTemplateSources).toContain('AUTH_SECRET');
     expect(envTemplateSources).not.toContain('NEXTAUTH_SECRET');
     expect(envTemplateSources).not.toContain('dashboard.doppler.com/workplace/projects/sotto');
@@ -531,20 +530,18 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(publicContactSources).not.toContain('Every voice. Every topic. One feed.');
   });
 
-  it('keeps bot identity configurable for self-hosted deployments', () => {
-    const botIdentitySources = [
+  it('keeps removed bot identity config out of self-hosted deployments', () => {
+    const removedBotSources = [
       '.env.example',
       '.env.oss.example',
       'docs/07-ai-prompts.md',
       'docs/17-authentication-setup.md',
-      'docs/25-twitter-integration.md',
       'apps/web/src/app/(admin)/admin/queues/queue-metadata.ts',
       'apps/web/src/app/(dashboard)/settings/SettingsForm.tsx',
       'apps/web/src/app/changelog/page.tsx',
       'apps/web/src/app/support/page.tsx',
       'apps/web/src/components/landing/JsonLd.tsx',
       'apps/web/src/components/layout/Footer.tsx',
-      'apps/web/src/lib/bot-identity.ts',
       'apps/web/src/lib/email-templates.ts',
       'apps/web/src/workers/CLAUDE.md',
       'packages/shared/src/brand.ts',
@@ -552,18 +549,20 @@ describe('open-source language-learning OSS surfaces', () => {
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
 
-    expect(botIdentitySources).toContain('NEXT_PUBLIC_TWITTER_BOT_HANDLE');
-    expect(botIdentitySources).toContain('NEXT_PUBLIC_TELEGRAM_BOT_USERNAME');
-    expect(botIdentitySources).toContain('TWITTER_BOT_USER_ID');
-    expect(botIdentitySources).toContain('your configured Twitter bot');
-    expect(botIdentitySources).not.toContain('@sottofm');
-    expect(botIdentitySources).not.toContain('@SottoFM');
-    expect(botIdentitySources).not.toContain('@SottoFMBot');
-    expect(botIdentitySources).not.toContain('SottoFMBot');
-    expect(botIdentitySources).not.toContain('TWITTER_SOTTO_USER_ID');
-    expect(botIdentitySources).not.toContain('TWITTER_ACCESS_TOKEN_SECRET');
-    expect(botIdentitySources).not.toContain('https://x.com/sottofm');
-    expect(botIdentitySources).not.toContain('https://twitter.com/SottoFM');
+    expect(removedBotSources).not.toContain('NEXT_PUBLIC_TWITTER_BOT_HANDLE');
+    expect(removedBotSources).not.toContain('NEXT_PUBLIC_TELEGRAM_BOT_USERNAME');
+    expect(removedBotSources).not.toContain('TWITTER_BOT_USER_ID');
+    expect(removedBotSources).not.toContain('TELEGRAM_BOT_TOKEN');
+    expect(removedBotSources).not.toContain('your configured Twitter bot');
+    expect(removedBotSources).not.toContain('your Telegram bot');
+    expect(removedBotSources).not.toContain('@sottofm');
+    expect(removedBotSources).not.toContain('@SottoFM');
+    expect(removedBotSources).not.toContain('@SottoFMBot');
+    expect(removedBotSources).not.toContain('SottoFMBot');
+    expect(removedBotSources).not.toContain('TWITTER_SOTTO_USER_ID');
+    expect(removedBotSources).not.toContain('TWITTER_ACCESS_TOKEN_SECRET');
+    expect(removedBotSources).not.toContain('https://x.com/sottofm');
+    expect(removedBotSources).not.toContain('https://twitter.com/SottoFM');
   });
 
   it('keeps system owner identity configurable for self-hosted deployments', () => {

@@ -79,8 +79,6 @@ const mockUser = {
   image: 'https://example.com/alice.jpg',
   bio: 'Science educator and podcast creator',
   createdAt: new Date('2025-01-10T10:00:00Z'),
-  twitterHandle: '@alicejohnson',
-  twitterEnabled: true,
   preferredHostVoiceId: 'voice-host-1',
   preferredExpertVoiceId: 'voice-expert-1',
 };
@@ -92,8 +90,6 @@ const mockUserMinimal = {
   image: null,
   bio: null,
   createdAt: new Date('2025-01-15T10:00:00Z'),
-  twitterHandle: null,
-  twitterEnabled: false,
   preferredHostVoiceId: null,
   preferredExpertVoiceId: null,
 };
@@ -142,8 +138,6 @@ describe('GET /api/v1/users/me', () => {
     expect(response.status).toBe(200);
     expect(body.image).toBeNull();
     expect(body.bio).toBeNull();
-    expect(body.twitterHandle).toBeNull();
-    expect(body.twitterEnabled).toBe(false);
   });
 
   it('returns 404 when user not found in database', async () => {

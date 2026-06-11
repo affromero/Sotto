@@ -22,7 +22,6 @@ export default async function SettingsPage() {
   const [
     user,
     accounts,
-    voiceClones,
     userInterests,
     categories,
     byokKeys,
@@ -39,13 +38,8 @@ export default async function SettingsPage() {
         image: true,
         bio: true,
         role: true,
-        twitterHandle: true,
-        twitterEnabled: true,
-        voicePreferences: { select: { speaker: true, voiceId: true } },
         preferredLanguage: true,
         preferredAiModel: true,
-        preferredTtsProvider: true,
-        preferredTtsModel: true,
         emailNotifications: true,
         pushNotifications: true,
       },
@@ -54,14 +48,6 @@ export default async function SettingsPage() {
       where: { userId },
       select: {
         provider: true,
-      },
-    }),
-    prisma.voiceClone.findMany({
-      where: { userId },
-      select: {
-        id: true,
-        name: true,
-        externalVoiceId: true,
       },
     }),
     prisma.userInterest.findMany({
@@ -105,8 +91,6 @@ export default async function SettingsPage() {
   const aiProviderMeta = getAllAiProviderClientMeta();
   const ttsProviderMeta = getAllTtsProviderClientMeta();
 
-  const isTwitterProviderAvailable =
-    !!process.env.TWITTER_CLIENT_ID && !!process.env.TWITTER_CLIENT_SECRET;
   const appBaseUrl = getAppBaseUrl();
 
   return (
@@ -121,21 +105,14 @@ export default async function SettingsPage() {
         image={user.image}
         role={user.role}
         connectedProviders={connectedProviders}
-        twitterHandle={user.twitterHandle}
-        twitterEnabled={user.twitterEnabled}
-        voicePreferences={user.voicePreferences}
         preferredLanguage={user.preferredLanguage}
         initialPreferredAiModel={user.preferredAiModel}
-        initialPreferredTtsProvider={user.preferredTtsProvider}
-        initialPreferredTtsModel={user.preferredTtsModel}
-        voiceClones={voiceClones}
         interestCategories={categories}
         selectedInterestTagIds={selectedInterestTagIds}
         configuredTtsProviders={configuredProviders}
         configuredAiProviders={configuredAiProviders}
         aiProviderMeta={aiProviderMeta}
         ttsProviderMeta={ttsProviderMeta}
-        isTwitterProviderAvailable={isTwitterProviderAvailable}
         initialEmailNotifications={user.emailNotifications}
         initialPushNotifications={user.pushNotifications}
         quizAnswerCount={tasteQuizAnswerCount}

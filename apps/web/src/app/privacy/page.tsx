@@ -27,8 +27,7 @@ export default function PrivacyPage() {
           <h3>Account Information</h3>
           <p>
             When you sign up, we collect your email address, name, and profile
-            information from your OAuth provider (Google, GitHub, or Apple). If you
-            link your Twitter account, we receive your Twitter handle.
+            information from your OAuth provider (Google, GitHub, Apple, or Twitter/X).
           </p>
 
           <h3>Content You Create</h3>
@@ -165,15 +164,7 @@ export default function PrivacyPage() {
               and user avatars
             </li>
             <li>
-              <strong>Authentication</strong> (Google, GitHub, Apple): OAuth sign-in
-            </li>
-            <li>
-              <strong>Account Linking</strong> (Twitter): optional Twitter account
-              connection for bot integration
-            </li>
-            <li>
-              <strong>Bot Integrations</strong> (Telegram): lesson creation via
-              Telegram bot
+              <strong>Authentication</strong> (Google, GitHub, Apple, Twitter/X): OAuth sign-in
             </li>
           </ul>
           <p>

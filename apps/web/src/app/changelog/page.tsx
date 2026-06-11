@@ -94,20 +94,6 @@ const entries: ChangelogEntry[] = [
     tags: ['feature'],
   },
   {
-    date: '2026-01-28',
-    title: 'Telegram Bot',
-    description:
-      'Generate audio lessons by messaging your configured Telegram bot. Send a topic or a URL and get a lesson link back. The full pipeline runs automatically.',
-    tags: ['feature'],
-  },
-  {
-    date: '2026-01-18',
-    title: 'Twitter Bot',
-    description:
-      'Tag your configured Twitter bot to generate a lesson from any tweet or thread. It replies automatically with the lesson link once generation completes.',
-    tags: ['feature'],
-  },
-  {
     date: '2026-01-15',
     title: 'Topic-Aware Voice Selection',
     description:

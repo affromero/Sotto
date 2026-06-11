@@ -2,7 +2,7 @@
 
 > **Date**: 2026-05-15
 >
-> **Summary**: Sotto is private-first open source infrastructure for turning personal agents, meetings, sources, bots, and manual requests into owned audio briefings. The product is not a public podcast network and should not compete as a generic AI content wrapper. Its value is the private delivery layer, simple provider onboarding, and optional managed infrastructure for people who do not want to operate the stack themselves.
+> **Summary**: Sotto is private-first open source infrastructure for turning personal agents, meetings, sources, webhooks, and manual requests into owned audio briefings. The product is not a public podcast network and should not compete as a generic AI content wrapper. Its value is the private delivery layer, simple provider onboarding, and optional managed infrastructure for people who do not want to operate the stack themselves.
 
 ---
 
@@ -29,7 +29,7 @@ Sotto turns structured input into private podcasts:
 - Manual topics and URLs.
 - Imported audio that the user owns or has permission to process.
 - Scheduled news digests for a separate "world briefing" podcast.
-- Twitter, Telegram, or webhook events when self-hosted or managed.
+- Webhook events when self-hosted or managed.
 
 The output is a private library plus private RSS delivery. The user can listen in Sotto or subscribe from any podcast app that accepts an authenticated RSS URL.
 
@@ -57,7 +57,7 @@ NotebookLM-style products usually start with documents and produce a one-off syn
 
 | Dimension | Notebook-style generator | Sotto |
 |---|---|---|
-| Starting point | Uploaded documents | Agents, meetings, bots, URLs, imports, news, manual topics |
+| Starting point | Uploaded documents | Agents, meetings, webhooks, URLs, imports, news, manual topics |
 | Cadence | One-off generation | Scheduled or event-driven briefings |
 | Delivery | Product-specific playback or export | Private RSS owned by the user |
 | Configuration | Vendor-managed model choices | Explicit local, BYOK, or managed provider selection |
@@ -133,9 +133,9 @@ Sotto should allow a user to invite an agent or recorder to meetings. The transc
 
 News should be a separate podcast stream from personal work. The user chooses sources and cadence. Sotto summarizes what happened in the world, cites source material, and avoids mixing public news with private meeting or agent content unless the user explicitly creates a combined briefing.
 
-### 6.7 Bot Workflows
+### 6.7 Webhook Workflows
 
-Twitter, Telegram, and webhook integrations should create private episodes for the owner. A self-hosted user can run the bot on their own VPS. A managed user can pay Sotto to host polling, webhooks, retries, and reply handling.
+Webhook integrations should create private episodes for the owner. A self-hosted user can run them on their own VPS or wire them to local agent automation.
 
 ---
 

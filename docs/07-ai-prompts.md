@@ -19,9 +19,6 @@ Sotto uses Anthropic Claude for 15+ distinct AI tasks across the pipeline. Each 
 | Reference Validation      | `src/lib/reference-validator.ts`                       | claude-sonnet-4-5 | No        | AI layer of 4-layer citation verification            |
 | Q&A Interaction           | `src/workers/interaction.worker.ts`                    | claude-sonnet-4-5 | No        | Answer questions during playback (multilingual)      |
 | Q&A Incorporation         | `src/app/api/v1/.../incorporate/route.ts`                 | claude-sonnet-4-5 | No        | Adapt Q&A answer into natural HOST segment           |
-| Tweet Intent Parser       | `src/lib/tweet-parser.ts`                              | claude-sonnet-4-5 | No        | Parse configured Twitter bot mentions into podcast metadata |
-| Tweet Thread Parser       | `src/lib/tweet-parser.ts`                              | claude-sonnet-4-5 | No        | Multi-tweet thread analysis for complex requests     |
-| Telegram Intent Parser    | `src/lib/telegram-parser.ts`                           | claude-sonnet-4-5 | No        | Parse Telegram bot messages into metadata            |
 | Taste Quiz (Onboarding)   | `src/lib/taste-quiz.ts`                                | claude-sonnet-4-5 | No        | Generate personalized onboarding questions           |
 | Taste Quiz (For You)      | `src/lib/taste-quiz.ts`                                | claude-sonnet-4-5 | No        | Interest-based personalized questions                |
 | Taste Quiz (In the News)  | `src/lib/taste-quiz.ts`                                | claude-sonnet-4-5 | Yes       | Current events questions (with web search)           |

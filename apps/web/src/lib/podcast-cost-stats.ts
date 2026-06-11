@@ -13,8 +13,6 @@ export const CATEGORY_BUCKET_MAP: Record<string, CostBucket> = {
   interaction: 'text',
   discovery: 'text',
   language_detection: 'text',
-  handle_screening: 'text',
-  telegram_parse: 'text',
   inspire_foryou: 'text',
   inspire_news: 'text',
   inspire_curiosity: 'text',
@@ -24,7 +22,6 @@ export const CATEGORY_BUCKET_MAP: Record<string, CostBucket> = {
   diarization: 'text',
   import_metadata: 'text',
   moderation: 'text',
-  tweet_parse: 'text',
   explore: 'text',
   trending: 'text',
 

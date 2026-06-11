@@ -28,7 +28,7 @@ The signed-in dashboard should show:
 - private RSS token status
 - provider readiness
 - local-agent readiness when configured
-- source status for meetings, agents, news, Twitter, Telegram, and webhooks
+- source status for meetings, agents, news, and webhooks
 - recent private activity such as listens, saves, and completed jobs
 
 The dashboard should not show public follower counts, public likes, public comments, public fork counts, or community rank.
@@ -72,7 +72,6 @@ Analytics should stay private and operational:
 | Handles | `/admin/handles` | reserved handle management where still needed |
 | Inspire | `/admin/inspire` | private inspiration/source management |
 | Ratings | `/admin/ratings` | quality/rating oversight |
-| Twitter | `/admin/twitter` | owner-scoped Twitter source health |
 | Costs | `/admin/costs` | provider and infrastructure cost tracking |
 | Pipeline | `/admin/pipeline` | queue status, failures, retries |
 | Engagement | `/admin/engagement` | private activity metrics |

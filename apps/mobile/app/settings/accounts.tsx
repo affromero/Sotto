@@ -23,16 +23,12 @@ const PROVIDER_ICONS: Record<string, { icon: string; label: string }> = {
 export default function ConnectedAccountsScreen() {
   const { data, isLoading, isError, refetch } = useQuery<{
     accounts: { provider: string; providerAccountId: string }[];
-    twitterHandle: string | null;
-    twitterEnabled: boolean;
   }>({
     queryKey: ['user', 'me', 'accounts'],
     queryFn: async () => {
       const res = await api.get('/users/me');
       return {
         accounts: res.data.accounts ?? [],
-        twitterHandle: res.data.twitterHandle,
-        twitterEnabled: res.data.twitterEnabled,
       };
     },
   });
@@ -87,17 +83,6 @@ export default function ConnectedAccountsScreen() {
                 </View>
               );
             })}
-          </View>
-        )}
-
-        {data?.twitterHandle && (
-          <View style={styles.twitterSection}>
-            <Text style={styles.twitterLabel}>
-              Twitter linked: @{data.twitterHandle}
-            </Text>
-            <Text style={styles.twitterStatus}>
-              {data.twitterEnabled ? 'Auto-posting enabled' : 'Linked (posting disabled)'}
-            </Text>
           </View>
         )}
       </ScrollView>
@@ -160,24 +145,5 @@ const styles = StyleSheet.create({
     height: StyleSheet.hairlineWidth,
     backgroundColor: colors.border,
     marginLeft: spacing.md,
-  },
-  twitterSection: {
-    marginTop: spacing.lg,
-    padding: spacing.md,
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    ...shadowSm,
-  },
-  twitterLabel: {
-    fontFamily: typography.fontBody,
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.textPrimary,
-    marginBottom: spacing.xs,
-  },
-  twitterStatus: {
-    fontFamily: typography.fontBody,
-    fontSize: 13,
-    color: colors.textSecondary,
   },
 });

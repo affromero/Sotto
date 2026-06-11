@@ -399,23 +399,6 @@
   color: #16a34a;
 }
 
-/* Bot preview */
-.previewBot {
-  padding: var(--spacing-md);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  font: var(--text-body-sm);
-  color: var(--color-text-secondary);
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.previewBot strong {
-  color: var(--color-text-primary);
-}
-
 @media (max-width: 768px) {
   .row {
     flex-direction: column;
