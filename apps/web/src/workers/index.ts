@@ -8,7 +8,6 @@ Sentry.init({
 import {
   createWorker,
   keyValidationQueue,
-  r2UsageQueue,
   pricingFetchQueue,
   ttsProviderMonitorQueue,
   featureComputationQueue,
@@ -33,7 +32,6 @@ import { processFeatureComputation } from './feature-computation.worker';
 import { processDataExport } from './data-export.worker';
 import { processKeyValidation } from './key-validation.worker';
 import { processVoiceVerification } from './voice-verification.worker';
-import { processR2Usage } from './r2-usage.worker';
 import { processPricingFetch } from './pricing-fetch.worker';
 import { processTtsProviderMonitor } from './tts-provider-monitor.worker';
 import { processVisualClassification } from './visual-classification.worker';
@@ -56,7 +54,6 @@ import { processPipelineClassification } from './pipeline-classification.worker'
 import { processSpeakingGrading } from './speaking-grading.worker';
 import { processWorksheetPdf } from './worksheet-pdf.worker';
 import { processVerifyClassReferences } from './verify-class-references.worker';
-import { isR2MonitoringConfigured } from '@/lib/cloudflare-r2-usage';
 import { startPricingRefreshInterval } from '@/lib/pricing';
 
 const WORKER_PROFILE = process.env.WORKER_PROFILE || 'all';
@@ -122,7 +119,6 @@ const workers = [
   shouldRun('data-export') && createWorker('data-export', processDataExport, { concurrency: 1 }),
   shouldRun('key-validation') && createWorker('key-validation', processKeyValidation, { concurrency: 1 }),
   shouldRun('voice-verification') && createWorker('voice-verification', processVoiceVerification, { concurrency: 2 }),
-  shouldRun('r2-usage') && createWorker('r2-usage', processR2Usage, { concurrency: 1 }),
   shouldRun('pricing-fetch') && createWorker('pricing-fetch', processPricingFetch, { concurrency: 1 }),
   shouldRun('tts-provider-monitor') && createWorker('tts-provider-monitor', processTtsProviderMonitor, { concurrency: 1 }),
   shouldRun('visual-classification') && createWorker('visual-classification', processVisualClassification, { concurrency: 2 }),
@@ -156,16 +152,6 @@ if (shouldRun('key-validation')) {
     .add(JobType.VALIDATE_KEYS, {}, { repeat: { every: 24 * 60 * 60 * 1000 } })
     .then(() => logger.info('BYOK key validation scheduled', { intervalMs: '86400000' }))
     .catch((err) => logger.error('Failed to schedule key validation', { error: err.message }));
-}
-
-// Schedule daily R2 usage collection if Cloudflare API token is configured
-if (shouldRun('r2-usage') && isR2MonitoringConfigured()) {
-  r2UsageQueue
-    .add(JobType.COLLECT_R2_USAGE, {}, { repeat: { every: 86400000 } })
-    .then(() => logger.info('R2 usage monitoring scheduled', { intervalMs: '86400000' }))
-    .catch((err) => logger.error('Failed to schedule R2 usage monitoring', { error: err.message }));
-} else if (shouldRun('r2-usage')) {
-  logger.info('R2 monitoring not configured — usage collection disabled');
 }
 
 // Schedule daily TTS provider monitor (6am UTC)

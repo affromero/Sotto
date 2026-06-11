@@ -7,25 +7,15 @@ import {
   LayoutDashboard,
   Users,
   Radio,
-  BarChart2,
   Shield,
   AtSign,
   Star,
-  DollarSign,
-  Headphones,
-  Activity,
-  TrendingUp,
-  Brain,
   FlaskConical,
   Gauge,
-  HardDrive,
-  Tag,
   Wand2,
   HeartPulse,
   ListTodo,
   Globe,
-  Scale,
-  Receipt,
   Film,
   Clapperboard,
   ArrowLeft,
@@ -38,7 +28,6 @@ import styles from './AdminShell.module.css';
 
 interface AdminShellProps {
   pendingReportCount?: number;
-  pendingDuplicateCount?: number;
   children: React.ReactNode;
 }
 
@@ -66,27 +55,6 @@ const navGroups: NavGroup[] = [
       { href: '/admin/users', label: 'Users', icon: Users },
       { href: '/admin/podcasts', label: 'Podcasts', icon: Radio },
       { href: '/admin/moderation', label: 'Moderation', icon: Shield },
-      { href: '/admin/duplicates', label: 'Duplicates', icon: Scale },
-    ],
-  },
-  {
-    label: 'Business',
-    items: [
-      { href: '/admin/costs', label: 'Costs', icon: DollarSign },
-      { href: '/admin/pricing', label: 'Pricing', icon: Tag },
-      { href: '/admin/expenses', label: 'Expenses', icon: Receipt },
-      { href: '/admin/storage', label: 'Storage', icon: HardDrive },
-    ],
-  },
-  {
-    label: 'Metrics',
-    items: [
-      { href: '/admin/engagement', label: 'Activity', icon: Activity },
-      { href: '/admin/playback', label: 'Playback', icon: Headphones },
-      { href: '/admin/pipeline', label: 'Pipeline', icon: Activity },
-      { href: '/admin/retention', label: 'Retention', icon: TrendingUp },
-      { href: '/admin/analytics', label: 'Analytics', icon: BarChart2 },
-      { href: '/admin/analytics/live', label: 'Live Map', icon: Globe },
     ],
   },
   {
@@ -94,7 +62,7 @@ const navGroups: NavGroup[] = [
     items: [
       { href: '/admin/handles', label: 'Handles', icon: AtSign },
       { href: '/admin/auto-models', label: 'Auto Models', icon: Wand2 },
-{ href: '/admin/models', label: 'Model Tester', icon: FlaskConical },
+      { href: '/admin/models', label: 'Model Tester', icon: FlaskConical },
       { href: '/admin/health', label: 'System Health', icon: HeartPulse },
       { href: '/admin/queues', label: 'Queues', icon: ListTodo },
       { href: '/admin/site-config', label: 'Site Config', icon: ToggleRight },
@@ -108,7 +76,6 @@ const navGroups: NavGroup[] = [
     items: [
       { href: '/admin/ratings', label: 'Quality Ratings', icon: Star },
       { href: '/admin/quality', label: 'Quality Analytics', icon: Gauge },
-      { href: '/admin/intelligence', label: 'Intelligence', icon: Brain },
     ],
   },
 ];
@@ -123,7 +90,7 @@ function getInitialExpanded(pathname: string): Record<string, boolean> {
   return expanded;
 }
 
-export function AdminShell({ pendingReportCount, pendingDuplicateCount, children }: AdminShellProps) {
+export function AdminShell({ pendingReportCount, children }: AdminShellProps) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [expanded, setExpanded] = useState(() => getInitialExpanded(pathname));
@@ -192,16 +159,8 @@ export function AdminShell({ pendingReportCount, pendingDuplicateCount, children
                       const showBadge =
                         (href === '/admin/moderation' &&
                           pendingReportCount !== undefined &&
-                          pendingReportCount > 0) ||
-                        (href === '/admin/duplicates' &&
-                          pendingDuplicateCount !== undefined &&
-                          pendingDuplicateCount > 0);
-                      const badgeCount =
-                        href === '/admin/moderation'
-                          ? pendingReportCount
-                          : href === '/admin/duplicates'
-                            ? pendingDuplicateCount
-                            : 0;
+                          pendingReportCount > 0);
+                      const badgeCount = href === '/admin/moderation' ? pendingReportCount : 0;
                       return (
                         <Link
                           key={href}

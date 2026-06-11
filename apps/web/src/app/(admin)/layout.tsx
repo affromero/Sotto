@@ -21,13 +21,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     redirect('/dashboard');
   }
 
-  const [pendingReportCount, pendingDuplicateCount] = await Promise.all([
-    prisma.report.count({ where: { status: 'PENDING' } }),
-    prisma.duplicateMatch.count({ where: { status: 'PENDING' } }),
-  ]);
+  const pendingReportCount = await prisma.report.count({ where: { status: 'PENDING' } });
 
   return (
-    <AdminShell pendingReportCount={pendingReportCount} pendingDuplicateCount={pendingDuplicateCount}>
+    <AdminShell pendingReportCount={pendingReportCount}>
       {children}
     </AdminShell>
   );

@@ -6,8 +6,6 @@ import { resolveAudioUrl } from '@/lib/r2';
 import type { Metadata } from 'next';
 import { PodcastPlayerView } from './PodcastPlayerView';
 import { PodcastJsonLd } from '@/components/player/PodcastJsonLd';
-import { CostBreakdown } from '@/components/player/CostBreakdown';
-import { getPodcastCostBreakdown } from '@/lib/podcast-cost-stats';
 import { JoinCTA } from '@/components/referral/JoinCTA';
 import { getPodcastForDetailPage } from '@/lib/podcast-data';
 import { absolutePodcastUrl, getAppBaseUrl } from '@/lib/urls';
@@ -94,13 +92,9 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
       ? Promise.all([
           getVideoGenerationStatus(userId),
           getAvatarGenerationStatus(userId),
-          podcast.status === 'READY'
-            ? getPodcastCostBreakdown(podcastId)
-            : Promise.resolve(undefined),
         ])
       : Promise.resolve(null),
   ]);
-
 
   // Owner data
   let videoStatus:
@@ -115,12 +109,10 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
         hasByokKey: boolean;
       }
     | undefined;
-  let costBreakdown: Awaited<ReturnType<typeof getPodcastCostBreakdown>> | undefined;
   if (ownerData) {
-    const [vidStatus, avStatus, costStats] = ownerData;
+    const [vidStatus, avStatus] = ownerData;
     videoStatus = vidStatus;
     avatarStatus = avStatus;
-    costBreakdown = costStats;
   }
 
   const visibility = podcast.visibility;
@@ -226,9 +218,6 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
           videoStatus={videoStatus}
           avatarStatus={avatarStatus}
         />
-        {costBreakdown && costBreakdown.total > 0 && (
-          <CostBreakdown breakdown={costBreakdown} />
-        )}
         {!userId && podcast.visibility === 'PUBLIC' && (
           <JoinCTA creatorHandle={podcast.user.handle} creatorName={podcast.user.name} />
         )}
