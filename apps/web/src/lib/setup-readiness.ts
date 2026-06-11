@@ -217,7 +217,7 @@ export function buildSetupReadiness(input: BuildSetupReadinessInput): SetupReadi
     {
       id: 'stt',
       label: 'Speech-to-text',
-      description: 'Optional transcription for raw meeting audio and imports without transcripts.',
+      description: 'Optional transcription for speaking-practice scoring and audio imports without transcripts.',
       status: sttReady ? 'ready' : selectedSttProvider ? 'action_required' : 'optional',
       actionLabel: 'Add optional transcription provider',
       actionHref: '/settings',
@@ -227,7 +227,7 @@ export function buildSetupReadiness(input: BuildSetupReadinessInput): SetupReadi
           ? sttProviderKnown
             ? `Add the ${selectedSttProvider} STT key.`
             : `Unknown STT provider: ${selectedSttProvider}`
-          : 'Transcript ingestion works without STT. Add STT only for raw meeting audio.',
+          : 'Transcript ingestion works without STT. Add STT only for speaking-practice scoring or raw audio imports.',
       required: false,
     },
   ];

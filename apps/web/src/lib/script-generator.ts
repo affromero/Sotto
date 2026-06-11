@@ -413,13 +413,11 @@ function buildLanguageInstruction(
   lang: string | null | undefined,
   mode: string | null | undefined,
   opts?: { mustIncludeVocabulary?: Array<{ word: string; translation: string }>; forLearning?: boolean },
-): { languageInstruction: string; vocabularyInstruction: string; openingLine: string; closingLine: string } {
+): { languageInstruction: string; vocabularyInstruction: string } {
   if (!lang || (lang === 'en' && !opts?.forLearning)) {
     return {
       languageInstruction: '',
       vocabularyInstruction: '',
-      openingLine: '"Good morning — here\'s what you need to know today."',
-      closingLine: '"That\'s your briefing for today. See you tomorrow."',
     };
   }
 
@@ -489,8 +487,6 @@ ${opts.mustIncludeVocabulary.map((v) => `- ${v.word} — ${v.translation}`).join
   return {
     languageInstruction: instruction,
     vocabularyInstruction: vocabularyInstruction + requiredItems,
-    openingLine: `A culturally appropriate greeting in ${langName} (with English translation if in vocabulary_intro mode)`,
-    closingLine: `A culturally appropriate farewell in ${langName} (with English translation if in vocabulary_intro mode)`,
   };
 }
 
