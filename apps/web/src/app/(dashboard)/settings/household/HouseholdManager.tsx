@@ -4,7 +4,8 @@ import { useCallback, useEffect, useId, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { AvatarTile } from '@/components/auth/AvatarTile';
-import { ANIMAL_AVATARS, avatarImagePath, getAnimalAvatar } from '@/lib/avatars';
+import { AvatarPicker } from '@/components/auth/AvatarPicker';
+import { ANIMAL_AVATARS, getAnimalAvatar } from '@/lib/avatars';
 import { generateQrDataUrl } from '@/lib/qr';
 import styles from './page.module.css';
 
@@ -845,49 +846,6 @@ function MemberRow({
         </div>
       )}
     </li>
-  );
-}
-
-interface AvatarPickerProps {
-  legend: string;
-  value: string;
-  onChange: (slug: string) => void;
-  disabled?: boolean;
-}
-
-function AvatarPicker({ legend, value, onChange, disabled = false }: AvatarPickerProps) {
-  const groupId = useId();
-  return (
-    <div className={styles.field}>
-      <span className={styles.fieldLabel} id={groupId}>
-        {legend}
-      </span>
-      <ul className={styles.avatarGrid} role="radiogroup" aria-labelledby={groupId}>
-        {ANIMAL_AVATARS.map((animal) => {
-          const isSelected = animal.slug === value;
-          return (
-            <li key={animal.slug} className={styles.avatarItem}>
-              <button
-                type="button"
-                role="radio"
-                aria-checked={isSelected}
-                aria-label={animal.name}
-                className={`${styles.avatarBtn} ${isSelected ? styles.avatarBtnSelected : ''}`}
-                onClick={() => onChange(animal.slug)}
-                disabled={disabled}
-              >
-                <AvatarTile
-                  image={avatarImagePath(animal.slug)}
-                  emoji={animal.emoji}
-                  name={animal.name}
-                  size={48}
-                />
-              </button>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
   );
 }
 
