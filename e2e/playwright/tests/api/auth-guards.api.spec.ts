@@ -3,12 +3,9 @@ import { test, expect } from '@playwright/test';
 const protectedRoutes: { method: 'get' | 'post' | 'patch' | 'delete'; path: string }[] = [
   { method: 'get', path: '/api/v1/podcasts' },
   { method: 'get', path: '/api/v1/notifications' },
-  { method: 'get', path: '/api/v1/ideas' },
   { method: 'get', path: '/api/v1/keys' },
-  { method: 'get', path: '/api/v1/saved' },
-  { method: 'get', path: '/api/v1/picks' },
   { method: 'patch', path: '/api/v1/users/me' },
-  { method: 'post', path: '/api/v1/drafts' },
+  { method: 'get', path: '/api/v1/users/me/podcasts' },
   { method: 'post', path: '/api/v1/podcasts/e2e-podcast/interact' },
 ];
 

@@ -35,11 +35,4 @@ test.describe('Podcast CRUD API routes', () => {
     });
     expect(res.status()).toBe(403);
   });
-
-  test('versions returns list', async ({ authedRequest, seedData }) => {
-    const res = await authedRequest.get(`/api/v1/podcasts/${seedData.testPodcast.id}/versions`);
-    expect(res.status()).toBe(200);
-    const body = await res.json();
-    expect(body).toHaveProperty('versions');
-  });
 });

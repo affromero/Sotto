@@ -7,7 +7,7 @@ test.describe('Authentication', () => {
   });
 
   test('login page renders with OAuth buttons', async ({ page }) => {
-    await page.goto('/auth/signin');
+    await page.goto('/auth/login');
     await expect(page.locator('text=Sign in')).toBeVisible();
   });
 

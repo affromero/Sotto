@@ -20,7 +20,7 @@ test.describe('Profile & Settings', () => {
 
   test('API keys page is accessible', async ({ authedContext }) => {
     const page = await authedContext.newPage();
-    await page.goto('/settings/keys');
+    await page.goto('/settings/api');
 
     // Should load the BYOK key management page
     await expect(page.locator('body')).toBeVisible();
