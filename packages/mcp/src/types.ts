@@ -43,7 +43,6 @@ export interface UserProfile {
   email: string | null;
   handle: string | null;
   image: string | null;
-  bio: string | null;
   podcastCount: number;
   createdAt: string;
 }

@@ -29,14 +29,12 @@ describe('system user identity', () => {
     vi.stubEnv('SYSTEM_USER_EMAIL', 'System@Example.com');
     vi.stubEnv('SYSTEM_USER_HANDLE', '@Team_Bot');
     vi.stubEnv('SYSTEM_USER_NAME', 'Team Bot');
-    vi.stubEnv('SYSTEM_USER_BIO', 'Local system owner');
     vi.stubEnv('SYSTEM_USER_IMAGE', '/brand/profile?v=amber');
 
     expect(getSystemUserConfig()).toEqual({
       email: 'system@example.com',
       handle: 'team_bot',
       name: 'Team Bot',
-      bio: 'Local system owner',
       image: '/brand/profile?v=amber',
     });
   });

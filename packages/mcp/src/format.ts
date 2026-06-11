@@ -66,7 +66,6 @@ export function formatProfile(u: UserProfile): string {
   const lines = [
     `**${u.name || 'Anonymous'}**`,
     u.handle ? `@${u.handle}` : null,
-    u.bio ? `Bio: ${u.bio}` : null,
     `Podcasts: ${u.podcastCount}`,
     `Member since: ${u.createdAt}`,
   ];

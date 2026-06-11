@@ -22,7 +22,6 @@ interface UserProfile {
   name: string | null;
   handle: string | null;
   image: string | null;
-  bio: string | null;
 }
 
 export default function ProfileEditScreen() {
@@ -38,13 +37,11 @@ export default function ProfileEditScreen() {
 
   const [name, setName] = useState('');
   const [handle, setHandle] = useState('');
-  const [bio, setBio] = useState('');
   const [initialized, setInitialized] = useState(false);
 
   if (profile && !initialized) {
     setName(profile.name ?? '');
     setHandle(profile.handle ?? '');
-    setBio(profile.bio ?? '');
     setInitialized(true);
   }
 
@@ -53,7 +50,6 @@ export default function ProfileEditScreen() {
       await api.patch('/users/me', {
         name: name.trim() || null,
         handle: handle.trim() || null,
-        bio: bio.trim() || null,
       });
     },
     onSuccess: () => {
@@ -130,18 +126,6 @@ export default function ProfileEditScreen() {
             <Text style={styles.checkButtonText}>Check</Text>
           </Pressable>
         </View>
-
-        <Text style={styles.label}>Bio</Text>
-        <TextInput
-          style={[styles.input, styles.bioInput]}
-          value={bio}
-          onChangeText={setBio}
-          placeholder="Tell people about yourself"
-          placeholderTextColor={colors.textTertiary}
-          multiline
-          maxLength={200}
-          testID="profile-edit-bio-input"
-        />
 
         <Pressable
           style={[styles.saveButton, saveMutation.isPending && styles.saveButtonDisabled]}
@@ -220,10 +204,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: colors.primary,
-  },
-  bioInput: {
-    minHeight: 80,
-    textAlignVertical: 'top',
   },
   saveButton: {
     backgroundColor: colors.primary,

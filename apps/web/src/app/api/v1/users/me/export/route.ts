@@ -30,7 +30,6 @@ export async function GET() {
         name: true,
         email: true,
         handle: true,
-        bio: true,
         image: true,
         role: true,
         voicePreferences: { select: { speaker: true, voiceId: true, sortOrder: true } },

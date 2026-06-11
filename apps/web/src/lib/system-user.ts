@@ -2,7 +2,6 @@ export interface SystemUserConfig {
   email: string;
   handle: string;
   name: string;
-  bio: string | null;
   image: string | null;
 }
 
@@ -80,7 +79,6 @@ export function getSystemUserConfig(): SystemUserConfig {
     email: requiredEnv('SYSTEM_USER_EMAIL').toLowerCase(),
     handle: getSystemUserHandle(),
     name: requiredEnv('SYSTEM_USER_NAME'),
-    bio: optionalEnv('SYSTEM_USER_BIO'),
     image: optionalEnv('SYSTEM_USER_IMAGE'),
   };
 }
