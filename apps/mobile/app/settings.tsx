@@ -159,21 +159,6 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        {/* Referral Section */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.textTertiary }]}>Referrals</Text>
-          <View style={[styles.card, { backgroundColor: colors.surface }]}>
-            <Pressable
-              style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-              onPress={() => router.push('/settings/referral')}
-              testID="settings-referral"
-            >
-              <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>Refer a Friend</Text>
-              <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
-            </Pressable>
-          </View>
-        </View>
-
         {/* Appearance Section */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.textTertiary }]}>Appearance</Text>
