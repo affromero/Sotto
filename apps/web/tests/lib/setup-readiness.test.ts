@@ -148,7 +148,7 @@ describe('buildSetupReadiness', () => {
     expect(readiness.ready).toBe(true);
     expect(stt?.status).toBe('optional');
     expect(stt?.detail).toBe(
-      'Transcript ingestion works without STT. Add STT only for raw meeting audio.'
+      'Transcript ingestion works without STT. Add STT only for speaking-practice scoring or raw audio imports.'
     );
     expect(stt?.required).toBe(false);
     expect(readiness.nextAction).toBeNull();
