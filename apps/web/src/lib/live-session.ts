@@ -1,7 +1,7 @@
 'use client';
 
 // Opens a Gemini Live session from the browser using the ephemeral token minted by
-// /api/live-translate/token. The BYOK key never reaches here. Outgoing mic frames
+// /api/v1/live-translate/token. The BYOK key never reaches here. Outgoing mic frames
 // (16 kHz Int16 base64) go in via sendAudio; incoming translated audio (24 kHz) and
 // the input/output transcriptions surface through callbacks. The caller wires these
 // to useLiveAudio (frames out, audio enqueue) and the UI captions.

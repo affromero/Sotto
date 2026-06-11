@@ -1,5 +1,5 @@
 /**
- * POST /api/exams/[examId]/submit. Adversarial: 401 unauth, 400 bad body, 404
+ * POST /api/v1/exams/[examId]/submit. Adversarial: 401 unauth, 400 bad body, 404
  * missing/non-owner exam, 200 with the scored result.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -15,11 +15,11 @@ vi.mock('@/lib/mock-exam-scoring', async () => {
 });
 vi.mock('@/lib/logger', () => ({ logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() } }));
 
-import { POST } from '@/app/api/exams/[examId]/submit/route';
+import { POST } from '@/app/api/v1/exams/[examId]/submit/route';
 import { ExamNotFoundError } from '@/lib/mock-exam-scoring';
 
 function req(body: unknown): NextRequest {
-  return new NextRequest('http://localhost:3000/api/exams/exam1/submit', {
+  return new NextRequest('http://localhost:3000/api/v1/exams/exam1/submit', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -28,7 +28,7 @@ function req(body: unknown): NextRequest {
 const PARAMS = { params: Promise.resolve({ examId: 'exam1' }) };
 const VALID = { answers: [{ questionId: 'q1', selectedIndex: 0 }] };
 
-describe('POST /api/exams/[examId]/submit', () => {
+describe('POST /api/v1/exams/[examId]/submit', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuth.mockResolvedValue({ userId: 'u1' });

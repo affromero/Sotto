@@ -12,13 +12,13 @@ vi.mock('@/lib/source-connectors', () => ({
   getPrivateSourceReadiness: (...args: unknown[]) => mockGetPrivateSourceReadiness(...args),
 }));
 
-import { GET } from '@/app/api/source-connectors/readiness/route';
+import { GET } from '@/app/api/v1/source-connectors/readiness/route';
 
 function createRequest(): NextRequest {
-  return new NextRequest('http://localhost:3000/api/source-connectors/readiness');
+  return new NextRequest('http://localhost:3000/api/v1/source-connectors/readiness');
 }
 
-describe('GET /api/source-connectors/readiness', () => {
+describe('GET /api/v1/source-connectors/readiness', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });

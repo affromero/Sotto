@@ -40,7 +40,7 @@ export function VoiceModeration() {
     try {
       const params = new URLSearchParams();
       if (statusFilter) params.set('status', statusFilter);
-      const res = await fetch(`/api/admin/voices?${params.toString()}`);
+      const res = await fetch(`/api/v1/admin/voices?${params.toString()}`);
       const data = await res.json();
       const sorted = [...(data.voices || [])].sort(
         (a: VoiceCloneAdmin, b: VoiceCloneAdmin) =>
@@ -61,7 +61,7 @@ export function VoiceModeration() {
   async function handleAction(voiceCloneId: string, action: string) {
     setActing(voiceCloneId);
     try {
-      await fetch('/api/admin/voices', {
+      await fetch('/api/v1/admin/voices', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ voiceCloneId, action }),

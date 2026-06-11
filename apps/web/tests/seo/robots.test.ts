@@ -28,7 +28,7 @@ describe('robots.ts', () => {
   it('disallows private paths for all user agents', () => {
     const defaultRule = rules.find((r) => r.userAgent === '*')!;
     const disallowed = defaultRule.disallow;
-    expect(disallowed).toContain('/api/');
+    expect(disallowed).toContain('/api/v1/');
     expect(disallowed).toContain('/admin');
     expect(disallowed).toContain('/auth/');
     expect(disallowed).toContain('/dashboard');

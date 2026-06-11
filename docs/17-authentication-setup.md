@@ -15,7 +15,7 @@ Sotto uses **NextAuth.js v5** (also known as Auth.js) with the Prisma adapter fo
 | Auth library     | NextAuth.js v5         | `src/lib/auth.ts`                              |
 | Database adapter | `@auth/prisma-adapter` | `src/lib/auth.ts`                              |
 | Middleware       | Next.js middleware     | `src/middleware.ts`                            |
-| Auth API route   | Catch-all handler      | `src/app/api/auth/[...nextauth]/route.ts`      |
+| Auth API route   | Catch-all handler      | `src/app/api/v1/auth/[...nextauth]/route.ts`      |
 | Session provider | React context          | `src/components/providers/SessionProvider.tsx` |
 
 ---
@@ -249,8 +249,8 @@ The `Account` model stores OAuth provider tokens. A user can have multiple accou
      - `http://localhost:3000` (development)
      - `https://your-domain.example` (production)
    - Authorized redirect URIs:
-     - `http://localhost:3000/api/auth/callback/google` (development)
-     - `https://your-domain.example/api/auth/callback/google` (production)
+     - `http://localhost:3000/api/v1/auth/callback/google` (development)
+     - `https://your-domain.example/api/v1/auth/callback/google` (production)
 7. Copy the **Client ID** and **Client Secret** into your `.env` file:
 
 ```bash
@@ -272,7 +272,7 @@ GOOGLE_CLIENT_SECRET=GOCSPX-xxxxxxxxxxxxxxxx
 3. Fill in the application details:
    - Application name: `Sotto`
    - Homepage URL: `http://localhost:3000` (development) or `https://your-domain.example` (production)
-   - Authorization callback URL: `http://localhost:3000/api/auth/callback/github` (development) or `https://your-domain.example/api/auth/callback/github` (production)
+   - Authorization callback URL: `http://localhost:3000/api/v1/auth/callback/github` (development) or `https://your-domain.example/api/v1/auth/callback/github` (production)
 4. Click **Register application**
 5. On the app page, copy the **Client ID**
 6. Click **Generate a new client secret** and copy it immediately (shown only once)
@@ -296,7 +296,7 @@ GITHUB_CLIENT_SECRET=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 3. Navigate to **User authentication settings** → **Set up**
 4. Configure OAuth 2.0:
    - Type of app: **Web App**
-   - Callback URI: `http://localhost:3000/api/auth/callback/twitter` (development) or `https://your-domain.example/api/auth/callback/twitter` (production)
+   - Callback URI: `http://localhost:3000/api/v1/auth/callback/twitter` (development) or `https://your-domain.example/api/v1/auth/callback/twitter` (production)
    - Website URL: `https://your-domain.example`
 5. Copy the **Client ID** and **Client Secret**
 6. Add to `.env`:
@@ -336,7 +336,7 @@ Apple Sign In is more involved than Google or GitHub. It requires an Apple Devel
    - Click **Configure** next to Sign In with Apple:
      - Primary App ID: select `com.sotto.app`
      - Domains: `your-domain.example` (production), `localhost` (development)
-     - Return URLs: `https://your-domain.example/api/auth/callback/apple`
+     - Return URLs: `https://your-domain.example/api/v1/auth/callback/apple`
    - Click **Save**, then **Continue**, then **Save**
 
 4. **Create a Key for Sign In with Apple:**
@@ -406,7 +406,7 @@ Apple Sign In is more involved than Google or GitHub. It requires an Apple Devel
 
 ## Auth API Route
 
-The catch-all auth route at `src/app/api/auth/[...nextauth]/route.ts` is minimal:
+The catch-all auth route at `src/app/api/v1/auth/[...nextauth]/route.ts` is minimal:
 
 ```typescript
 import { handlers } from '@/lib/auth';
@@ -416,15 +416,15 @@ export const { GET, POST } = handlers;
 
 NextAuth v5 exports `handlers` from the main config. This route handles all auth flows including:
 
-- `/api/auth/signin` — Sign in page redirect
-- `/api/auth/callback/google` — Google OAuth callback
-- `/api/auth/callback/github` — GitHub OAuth callback
-- `/api/auth/callback/twitter` — Twitter OAuth callback
-- `/api/auth/callback/apple` — Apple OAuth callback
-- `/api/auth/signout` — Sign out
-- `/api/auth/session` — Current session data (JSON)
-- `/api/auth/csrf` — CSRF token
-- `/api/auth/providers` — Available providers list
+- `/api/v1/auth/signin` — Sign in page redirect
+- `/api/v1/auth/callback/google` — Google OAuth callback
+- `/api/v1/auth/callback/github` — GitHub OAuth callback
+- `/api/v1/auth/callback/twitter` — Twitter OAuth callback
+- `/api/v1/auth/callback/apple` — Apple OAuth callback
+- `/api/v1/auth/signout` — Sign out
+- `/api/v1/auth/session` — Current session data (JSON)
+- `/api/v1/auth/csrf` — CSRF token
+- `/api/v1/auth/providers` — Available providers list
 
 ---
 
@@ -444,7 +444,7 @@ export async function middleware(request: NextRequest) {
   const token = await getToken({ req: request });
 
   // Skip API routes (handled by individual route handlers)
-  if (pathname.startsWith('/api/')) {
+  if (pathname.startsWith('/api/v1/')) {
     return NextResponse.next();
   }
 
@@ -487,7 +487,7 @@ export const config = {
 | `/auth/login`   | No (redirect if logged in) | Redirect to `/dashboard` if already authenticated                   |
 | `/auth/signup`  | No (redirect if logged in) | Redirect to `/dashboard` if already authenticated                   |
 | `/podcast/[id]` | Depends on visibility      | Public podcasts: no auth. Private/unlisted: checked in the page/API |
-| `/api/*`        | Varies                     | Auth checked per-route in the API handler                           |
+| `/api/v1/*`        | Varies                     | Auth checked per-route in the API handler                           |
 
 ### API Route Auth Pattern
 
@@ -507,7 +507,7 @@ export async function GET() {
 }
 ```
 
-This pattern allows fine-grained control: public informational routes can stay unauthenticated, while private workspace routes such as `/api/podcasts` POST require authentication.
+This pattern allows fine-grained control: public informational routes can stay unauthenticated, while private workspace routes such as `/api/v1/podcasts` POST require authentication.
 
 ### Callback URL Preservation
 
@@ -595,7 +595,7 @@ For local development where you do not have Google or GitHub OAuth apps configur
 
 1. Create a Google Cloud project and OAuth client as described above
 2. Use `http://localhost:3000` as the JavaScript origin
-3. Use `http://localhost:3000/api/auth/callback/google` as the redirect URI
+3. Use `http://localhost:3000/api/v1/auth/callback/google` as the redirect URI
 4. Add your Google account as a test user in the consent screen (while in testing mode)
 5. Set the environment variables:
 
@@ -616,7 +616,7 @@ NEXTAUTH_URL=http://localhost:3000
 
 1. Create a GitHub OAuth app as described above
 2. Use `http://localhost:3000` as the homepage URL
-3. Use `http://localhost:3000/api/auth/callback/github` as the callback URL
+3. Use `http://localhost:3000/api/v1/auth/callback/github` as the callback URL
 4. Set the environment variables:
 
 ```bash
@@ -630,7 +630,7 @@ After signing in, verify the following:
 
 | Check                 | How                                                                                                    |
 | --------------------- | ------------------------------------------------------------------------------------------------------ |
-| Session exists        | Visit `http://localhost:3000/api/auth/session` in browser — should return JSON with user data          |
+| Session exists        | Visit `http://localhost:3000/api/v1/auth/session` in browser — should return JSON with user data          |
 | User created in DB    | Open Prisma Studio (`npx prisma studio`) and check the `User` table                                    |
 | Account linked        | Check the `Account` table in Prisma Studio for the OAuth provider record                               |
 | Protected routes work | Navigate to `/dashboard` — should load (not redirect to login)                                         |
@@ -660,7 +660,7 @@ export async function GET(request: NextRequest) {
 | Issue                           | Cause                                            | Solution                                                                                |
 | ------------------------------- | ------------------------------------------------ | --------------------------------------------------------------------------------------- |
 | "CSRF token mismatch"           | Missing or wrong `AUTH_SECRET`                   | Ensure `AUTH_SECRET` is set and consistent                                              |
-| "OAuth redirect_uri mismatch"   | Callback URL in provider settings does not match | Verify the redirect URI is exactly `http://localhost:3000/api/auth/callback/{provider}` |
+| "OAuth redirect_uri mismatch"   | Callback URL in provider settings does not match | Verify the redirect URI is exactly `http://localhost:3000/api/v1/auth/callback/{provider}` |
 | "Access denied" on Google       | Account not added as test user                   | Add your Google account in OAuth consent screen > Test users                            |
 | Session is `null` in API routes | Using wrong import                               | Use `import { auth } from '@/lib/auth'`, not from `next-auth` directly                  |
 | User ID not in session          | Callbacks not configured                         | Ensure the `jwt` and `session` callbacks are in the NextAuth config                     |
@@ -677,7 +677,7 @@ Sotto is deployed on a Hetzner VPS with Docker Compose + Caddy reverse proxy:
    - `NEXTAUTH_URL` = `https://your-domain.example`
    - All OAuth provider credentials with production redirect URIs
 2. The `trustHost: true` flag in the NextAuth config is required for non-Vercel deployments (Caddy proxies HTTPS)
-3. Update all OAuth provider callback URIs to use `https://your-domain.example/api/auth/callback/{provider}`
+3. Update all OAuth provider callback URIs to use `https://your-domain.example/api/v1/auth/callback/{provider}`
 4. For Google: submit the app for verification to remove the "unverified app" warning
 5. For Apple: ensure the Services ID is configured with the production domain
 

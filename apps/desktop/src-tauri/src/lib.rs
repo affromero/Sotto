@@ -59,7 +59,7 @@ fn stop_stack() -> Result<String, String> {
     }
 }
 
-/// Health-check the web container by hitting its /api/health endpoint.
+/// Health-check the web container by hitting its /api/v1/health endpoint.
 #[tauri::command]
 fn is_healthy(port: u16) -> bool {
     // Use docker to curl from inside the network is overkill; a TCP connect to

@@ -33,12 +33,12 @@ vi.mock('@/lib/api-response', () => ({
 }));
 
 async function getHandlers() {
-  const mod = await import('@/app/api/admin/invitations/route');
+  const mod = await import('@/app/api/v1/admin/invitations/route');
   return { POST: mod.POST, GET: mod.GET, PATCH: mod.PATCH };
 }
 
 function createPatchRequest(body: unknown): NextRequest {
-  return new NextRequest(new URL('http://localhost:3000/api/admin/invitations'), {
+  return new NextRequest(new URL('http://localhost:3000/api/v1/admin/invitations'), {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),

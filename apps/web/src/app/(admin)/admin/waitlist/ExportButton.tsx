@@ -11,7 +11,7 @@ export function ExportButton() {
     setIsExporting(true);
 
     try {
-      const response = await fetch('/api/admin/waitlist/export');
+      const response = await fetch('/api/v1/admin/waitlist/export');
 
       if (!response.ok) {
         throw new Error('Failed to export waitlist');

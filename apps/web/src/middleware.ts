@@ -13,16 +13,16 @@ const AUTH_ROUTES = ['/auth/login', '/auth/signup', '/auth/waitlisted'];
 // Routes that are always public — no auth required
 const PUBLIC_ROUTES = new Set([
   '/',
-  '/api/health',
+  '/api/v1/health',
   '/feedback',
-  '/api/feedback',
+  '/api/v1/feedback',
   '/pitch',
   '/connect/telegram',
   '/changelog',
   '/developers',
-  '/api/monitoring',
+  '/api/v1/monitoring',
 ]);
-const PUBLIC_PREFIXES = ['/api/auth', '/api/pitch', '/api/waitlist', '/api/telegram', '/ref', '/podcast/by-slug'];
+const PUBLIC_PREFIXES = ['/api/v1/auth', '/api/v1/pitch', '/api/v1/waitlist', '/api/v1/telegram', '/ref', '/podcast/by-slug'];
 
 function isPublicRoute(pathname: string): boolean {
   if (PUBLIC_ROUTES.has(pathname)) return true;
@@ -49,7 +49,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // API routes with Authorization headers are handled by the route handler
-  if (pathname.startsWith('/api/') && request.headers.get('authorization')) {
+  if (pathname.startsWith('/api/v1/') && request.headers.get('authorization')) {
     return NextResponse.next();
   }
 
@@ -65,7 +65,7 @@ export async function middleware(request: NextRequest) {
   });
 
   // Banned user redirect — allow /banned page, auth routes, and API auth
-  if (token?.bannedAt && pathname !== '/banned' && !pathname.startsWith('/api/auth')) {
+  if (token?.bannedAt && pathname !== '/banned' && !pathname.startsWith('/api/v1/auth')) {
     return NextResponse.redirect(new URL('/banned', request.url));
   }
 
@@ -78,7 +78,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // Skip API routes (handled by individual route handlers)
-  if (pathname.startsWith('/api/')) {
+  if (pathname.startsWith('/api/v1/')) {
     return NextResponse.next();
   }
 

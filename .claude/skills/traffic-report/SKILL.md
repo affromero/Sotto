@@ -7,7 +7,7 @@ description: |
 
 # Traffic Report — Sotto Analytics Skill
 
-Pulls live analytics from sotto.fm's `/api/admin/traffic-report` endpoint and generates a polished HTML report via `/md-to-html`.
+Pulls live analytics from sotto.fm's `/api/v1/admin/traffic-report` endpoint and generates a polished HTML report via `/md-to-html`.
 
 ## Trigger
 
@@ -46,7 +46,7 @@ Extract the value of `ADMIN_REPORT_KEY`. If not found, stop and tell the user to
 ## Step 2: Fetch Data from Production
 
 ```bash
-curl -s -H "Authorization: Bearer $ADMIN_REPORT_KEY" "https://sotto.fm/api/admin/traffic-report?period=DAYS"
+curl -s -H "Authorization: Bearer $ADMIN_REPORT_KEY" "https://sotto.fm/api/v1/admin/traffic-report?period=DAYS"
 ```
 
 Replace `$ADMIN_REPORT_KEY` with the value from Step 1 and `DAYS` with the period from Step 0.

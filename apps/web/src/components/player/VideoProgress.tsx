@@ -191,7 +191,7 @@ export function VideoProgress({ podcastId, videoGenerationId, onComplete, onFail
 
   const poll = useCallback(async () => {
     try {
-      const res = await fetch(`/api/podcasts/${podcastId}/video`);
+      const res = await fetch(`/api/v1/podcasts/${podcastId}/video`);
       if (!res.ok) { schedulePoll(5000); return; }
       const json = await res.json() as VideoStatusResponse;
       if (!json.status) { schedulePoll(5000); return; }
@@ -255,7 +255,7 @@ export function VideoProgress({ podcastId, videoGenerationId, onComplete, onFail
     setRetrying(true);
     setRetryError(null);
     try {
-      const res = await fetch(`/api/podcasts/${podcastId}/video`, {
+      const res = await fetch(`/api/v1/podcasts/${podcastId}/video`, {
         method: 'POST',
       });
       if (!res.ok) {

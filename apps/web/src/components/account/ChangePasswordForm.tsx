@@ -19,7 +19,7 @@ interface ChangePasswordFormProps {
 /**
  * Self-service password change. Verifies the current password, checks the new
  * password against a min length and a live confirm match, then POSTs to
- * /api/account/password. A 403 surfaces inline as a wrong-current-password
+ * /api/v1/account/password. A 403 surfaces inline as a wrong-current-password
  * message; any other failure stays generic. Passwords are never displayed in
  * plain text, logged, or echoed back. Embeddable anywhere a learner can change
  * their own password (settings, or the forced first-sign-in flow).
@@ -52,7 +52,7 @@ export function ChangePasswordForm({ redirectTo, forced = false }: ChangePasswor
     setSubmitting(true);
     setError(null);
     try {
-      const res = await fetch('/api/account/password', {
+      const res = await fetch('/api/v1/account/password', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ currentPassword: current, newPassword: next }),

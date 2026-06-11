@@ -51,7 +51,7 @@ export function VoiceManager() {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch('/api/voices');
+      const response = await fetch('/api/v1/voices');
       if (!response.ok) throw new Error('Failed to fetch voices');
       const voiceData = await response.json();
       setUserClones(voiceData.userClones ?? []);
@@ -86,7 +86,7 @@ export function VoiceManager() {
       formData.append('name', cloneName.trim());
       formData.append('provider', cloneProvider);
 
-      const response = await fetch('/api/voices/clone', {
+      const response = await fetch('/api/v1/voices/clone', {
         method: 'POST',
         body: formData,
       });
@@ -121,7 +121,7 @@ export function VoiceManager() {
       formData.append('externalVoiceId', humeVoiceId.trim());
       formData.append('sourceType', 'IMPORT');
 
-      const response = await fetch('/api/voices/clone', {
+      const response = await fetch('/api/v1/voices/clone', {
         method: 'POST',
         body: formData,
       });
@@ -152,7 +152,7 @@ export function VoiceManager() {
       fd.append('provider', 'elevenlabs');
       fd.append('sourceType', 'IMPORT');
       fd.append('externalVoiceId', trimmed);
-      const res = await fetch('/api/voices/clone', { method: 'POST', body: fd });
+      const res = await fetch('/api/v1/voices/clone', { method: 'POST', body: fd });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to import voice');
       setElImportVoiceId('');
@@ -175,7 +175,7 @@ export function VoiceManager() {
       audioRef.current = null;
     }
     try {
-      const res = await fetch('/api/voices/preview', {
+      const res = await fetch('/api/v1/voices/preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ voiceId: trimmedId, text: trimmedText, provider }),
@@ -202,7 +202,7 @@ export function VoiceManager() {
       setDeleting(voiceCloneId);
       setError(null);
 
-      const response = await fetch('/api/voices/clone', {
+      const response = await fetch('/api/v1/voices/clone', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ voiceCloneId }),
@@ -231,7 +231,7 @@ export function VoiceManager() {
       setPlaying(externalVoiceId);
       setError(null);
 
-      const response = await fetch('/api/voices/preview', {
+      const response = await fetch('/api/v1/voices/preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

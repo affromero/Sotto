@@ -24,7 +24,7 @@ export function VideoModelPicker({ onGenerate, onCancel, loading }: VideoModelPi
 
   useEffect(() => {
     let cancelled = false;
-    fetch('/api/ai-models')
+    fetch('/api/v1/ai-models')
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (cancelled || !data?.models) return;

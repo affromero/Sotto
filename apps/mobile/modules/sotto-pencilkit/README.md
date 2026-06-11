@@ -14,7 +14,7 @@ This module contains native Swift code (`PKCanvasView` / PencilKit) and **cannot
 
 `index.ts` uses `requireOptionalNativeModule('SottoPencilKit')` to feature-detect the native layer. When the module is absent (Expo Go, Android), `isPencilKitAvailable` is `false` and `PencilKitCanvas` returns `null`. Callers must gate the ink overlay on that flag.
 
-Ink is capture-only — strokes are never graded by the module itself. The host screen receives each drawing change as a base64-encoded `PKDrawing` via the `onChange` event and may forward it to the API (`POST /api/classes/[classId]/ink`).
+Ink is capture-only — strokes are never graded by the module itself. The host screen receives each drawing change as a base64-encoded `PKDrawing` via the `onChange` event and may forward it to the API (`POST /api/v1/classes/[classId]/ink`).
 
 ## Rebuild after changes
 

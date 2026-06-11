@@ -17,7 +17,7 @@ Shared code consumed by both `apps/web/` and `apps/mobile/`.
 - **Prisma models** — server-side only, stay in `apps/web/`
 - **React components** — platform-specific (CSS Modules vs StyleSheet)
 - **Server-side libs** — auth, queue, storage clients stay in `apps/web/src/lib/`
-- **API route logic** — stays in `apps/web/src/app/api/`
+- **API route logic** — stays in `apps/web/src/app/api/v1/`
 
 ### Adding shared code
 

@@ -42,7 +42,7 @@ export function AiProviderCards({
     setErrors((prev) => ({ ...prev, [providerId]: '' }));
 
     try {
-      const res = await fetch('/api/settings/ai-keys', {
+      const res = await fetch('/api/v1/settings/ai-keys', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ provider: providerId, apiKey }),
@@ -79,7 +79,7 @@ export function AiProviderCards({
   const handleRemoveKey = async (providerId: string) => {
     setSavingId(providerId);
     try {
-      await fetch('/api/settings/ai-keys', {
+      await fetch('/api/v1/settings/ai-keys', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ provider: providerId }),

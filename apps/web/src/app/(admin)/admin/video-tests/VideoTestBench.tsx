@@ -42,7 +42,7 @@ async function renderClip(
   segment: Record<string, unknown>,
   durationSeconds?: number,
 ): Promise<{ videoBase64: string; latencyMs: number }> {
-  const res = await fetch('/api/admin/test-video-pipeline', {
+  const res = await fetch('/api/v1/admin/test-video-pipeline', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ type: 'render-clip', segment, durationSeconds }),
@@ -1105,7 +1105,7 @@ function LipSyncSection({
     setError(null);
     setVideoUrl(null);
     try {
-      const res = await fetch('/api/voices/preview', {
+      const res = await fetch('/api/v1/voices/preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ voiceId: DEFAULT_VOICE_ID, text: textPrompt, provider: 'elevenlabs' }),
@@ -1131,7 +1131,7 @@ function LipSyncSection({
     setGeneratingImage(true);
     setError(null);
     try {
-      const res = await fetch('/api/avatar-images/generate', {
+      const res = await fetch('/api/v1/avatar-images/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: `test-${Date.now()}`, prompt: imagePrompt }),
@@ -1157,7 +1157,7 @@ function LipSyncSection({
     setVideoUrl(null);
     setProgress(0);
     try {
-      const submitRes = await fetch('/api/avatar-test', {
+      const submitRes = await fetch('/api/v1/avatar-test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ audioUrl, avatarImageUrl, avatarModelId: selectedModel }),
@@ -1169,7 +1169,7 @@ function LipSyncSection({
       const { jobId } = await submitRes.json();
       for (let i = 0; i < 100; i++) {
         await new Promise((r) => setTimeout(r, 3000));
-        const pollRes = await fetch(`/api/avatar-test?jobId=${jobId}`);
+        const pollRes = await fetch(`/api/v1/avatar-test?jobId=${jobId}`);
         if (!pollRes.ok) continue;
         const status = await pollRes.json();
         if (typeof status.progress === 'number') setProgress(status.progress);
@@ -1360,7 +1360,7 @@ export function VideoTestBench({ envAvailability, mapPresets, imageModels, aiPro
     setResults((prev) => ({ ...prev, [testType]: { status: 'running' } }));
 
     try {
-      const res = await fetch('/api/admin/test-video-pipeline', {
+      const res = await fetch('/api/v1/admin/test-video-pipeline', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -1397,7 +1397,7 @@ export function VideoTestBench({ envAvailability, mapPresets, imageModels, aiPro
     setPreviews((prev) => ({ ...prev, 'map-image': { loading: true } }));
     try {
       // Generate zoom frames (globe → city) for the resolved place
-      const zfRes = await fetch('/api/admin/test-video-pipeline', {
+      const zfRes = await fetch('/api/v1/admin/test-video-pipeline', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type: 'map-image', place: resolvedPlace.name, preset, width: 1280, height: 720, zoomFrames: true }),
@@ -1472,7 +1472,7 @@ export function VideoTestBench({ envAvailability, mapPresets, imageModels, aiPro
     setPreviews((prev) => ({ ...prev, 'resolve-place': { loading: true } }));
     try {
       // Step 1: Generate zoom frames (globe → city)
-      const zfRes = await fetch('/api/admin/test-video-pipeline', {
+      const zfRes = await fetch('/api/v1/admin/test-video-pipeline', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type: 'map-image', place: place.name, preset: 'vintage', width: 1280, height: 720, zoomFrames: true }),
@@ -1551,7 +1551,7 @@ export function VideoTestBench({ envAvailability, mapPresets, imageModels, aiPro
 
         // Types needing external assets — generate them first
         if (sv.visualType === 'AI_ILLUSTRATION' && sv.prompt && envAvailability.fal) {
-          const imgRes = await fetch('/api/admin/test-video-pipeline', {
+          const imgRes = await fetch('/api/v1/admin/test-video-pipeline', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ type: 'ai-illustration', prompt: sv.prompt }),
@@ -1559,7 +1559,7 @@ export function VideoTestBench({ envAvailability, mapPresets, imageModels, aiPro
           const imgData = await imgRes.json();
           if (imgData.success) segmentInput.assetUrl = imgData.imageBase64;
         } else if (sv.visualType === 'STOCK_FOOTAGE' && sv.prompt && envAvailability.pexels) {
-          const stockRes = await fetch('/api/admin/test-video-pipeline', {
+          const stockRes = await fetch('/api/v1/admin/test-video-pipeline', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ type: 'stock-footage', query: sv.prompt }),
@@ -1571,7 +1571,7 @@ export function VideoTestBench({ envAvailability, mapPresets, imageModels, aiPro
         } else if (sv.visualType === 'MAP_OVERLAY' && envAvailability.mapbox) {
           // Extract place name from prompt or text — generate zoom frames for globe-to-location animation
           const placeName = sv.prompt ?? text.slice(0, 50);
-          const mapRes = await fetch('/api/admin/test-video-pipeline', {
+          const mapRes = await fetch('/api/v1/admin/test-video-pipeline', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ type: 'map-image', place: placeName, preset: 'vintage', width: 1280, height: 720, zoomFrames: true }),

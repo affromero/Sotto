@@ -31,10 +31,10 @@ vi.mock('@/lib/queue', () => ({
   JobType: { SEND_NOTIFICATION: 'send-notification' },
 }));
 
-import { PATCH } from '@/app/api/admin/podcasts/[podcastId]/badge/route';
+import { PATCH } from '@/app/api/v1/admin/podcasts/[podcastId]/badge/route';
 
 function createRequest(body: Record<string, unknown>): NextRequest {
-  return new NextRequest(new URL('http://localhost:3000/api/admin/podcasts/pod-1/badge'), {
+  return new NextRequest(new URL('http://localhost:3000/api/v1/admin/podcasts/pod-1/badge'), {
     method: 'PATCH',
     body: JSON.stringify(body),
     headers: { 'Content-Type': 'application/json' },
@@ -45,7 +45,7 @@ async function createParams(podcastId: string) {
   return { params: Promise.resolve({ podcastId }) };
 }
 
-describe('PATCH /api/admin/podcasts/[podcastId]/badge', () => {
+describe('PATCH /api/v1/admin/podcasts/[podcastId]/badge', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAddJob.mockResolvedValue(undefined);

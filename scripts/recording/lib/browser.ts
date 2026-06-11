@@ -35,7 +35,7 @@ export function getCookieName(): string {
 
 export async function checkAppHealth(appUrl: string): Promise<void> {
   try {
-    const res = await fetch(`${appUrl}/api/health`, { signal: AbortSignal.timeout(5000) });
+    const res = await fetch(`${appUrl}/api/v1/health`, { signal: AbortSignal.timeout(5000) });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     console.log(`Health check passed: ${appUrl}`);
   } catch (err) {

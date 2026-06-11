@@ -48,7 +48,7 @@ interface TestResponse {
 
 async function runTest(p: TestableProvider): Promise<TestResponse> {
   const keySource = p.hasPlatformKey ? 'platform' : 'byok';
-  const res = await fetch('/api/admin/test-model', {
+  const res = await fetch('/api/v1/admin/test-model', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ type: p.category, provider: p.providerId, model: p.modelId, keySource }),

@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 /**
  * Zod schemas for behavioral event validation.
- * Used by the /api/events endpoint to validate incoming batches.
+ * Used by the /api/v1/events endpoint to validate incoming batches.
  */
 
 export const eventContextSchema = z.object({

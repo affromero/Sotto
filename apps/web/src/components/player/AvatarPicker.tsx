@@ -92,7 +92,7 @@ export function AvatarPicker({ podcastId, speakers, segments, onConfigured, onCa
 
   useEffect(() => {
     const providerParam = activeProvider ? `&provider=${activeProvider}` : '';
-    fetch(`/api/podcasts/${podcastId}/video/avatars?_=1${providerParam}`)
+    fetch(`/api/v1/podcasts/${podcastId}/video/avatars?_=1${providerParam}`)
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error('Failed to load avatars'))))
       .then((data: {
         avatars: UnifiedAvatarData[];
@@ -188,7 +188,7 @@ export function AvatarPicker({ podcastId, speakers, segments, onConfigured, onCa
 
     setSubmitting(true);
     try {
-      const res = await fetch(`/api/podcasts/${podcastId}/video/avatars`, {
+      const res = await fetch(`/api/v1/podcasts/${podcastId}/video/avatars`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ avatars: configured }),

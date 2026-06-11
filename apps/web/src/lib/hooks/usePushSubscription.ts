@@ -59,7 +59,7 @@ export function usePushSubscription() {
       const json = subscription.toJSON();
       if (!json.endpoint || !json.keys) return false;
 
-      await fetch('/api/notifications/subscribe', {
+      await fetch('/api/v1/notifications/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -93,7 +93,7 @@ export function usePushSubscription() {
     const endpoint = subscription.endpoint;
     await subscription.unsubscribe();
 
-    await fetch('/api/notifications/subscribe', {
+    await fetch('/api/v1/notifications/subscribe', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ endpoint }),

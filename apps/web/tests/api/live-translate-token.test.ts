@@ -1,5 +1,5 @@
 /**
- * POST /api/live-translate/token — auth + Zod + ownership, then mints an ephemeral
+ * POST /api/v1/live-translate/token — auth + Zod + ownership, then mints an ephemeral
  * Gemini Live token. Adversarial: 401 unauth, 400 bad body, 404 non-owner course,
  * 422 when the key is missing or lacks Live access, 500 on the unexpected.
  */
@@ -18,7 +18,7 @@ vi.mock('@/lib/live-translate', async () => {
 });
 vi.mock('@/lib/logger', () => ({ logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() } }));
 
-import { POST } from '@/app/api/live-translate/token/route';
+import { POST } from '@/app/api/v1/live-translate/token/route';
 import {
   LiveTranslateKeyError,
   LiveTranslateCourseError,
@@ -26,7 +26,7 @@ import {
 } from '@/lib/live-translate';
 
 function req(body: unknown): NextRequest {
-  return new NextRequest('http://localhost:3000/api/live-translate/token', {
+  return new NextRequest('http://localhost:3000/api/v1/live-translate/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -44,7 +44,7 @@ const TOKEN = {
   expiresAt: '2026-06-09T00:30:00.000Z',
 };
 
-describe('POST /api/live-translate/token', () => {
+describe('POST /api/v1/live-translate/token', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuthenticate.mockResolvedValue({ userId: 'u1' });

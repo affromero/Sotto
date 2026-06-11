@@ -1,6 +1,6 @@
 /**
  * Shared types for the class flow. Mirrors the API contract returned by
- * `GET /api/classes/[classId]` (see the route + class-service). Kept in one
+ * `GET /api/v1/classes/[classId]` (see the route + class-service). Kept in one
  * place so ClassShell and every section module agree on shapes.
  */
 

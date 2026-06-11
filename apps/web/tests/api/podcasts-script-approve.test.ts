@@ -66,10 +66,10 @@ vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
-import { POST } from '@/app/api/podcasts/[podcastId]/script/approve/route';
+import { POST } from '@/app/api/v1/podcasts/[podcastId]/script/approve/route';
 
 function createRequest(body?: Record<string, unknown>): NextRequest {
-  return new NextRequest(new URL('http://localhost:3000/api/podcasts/pod-1/script/approve'), {
+  return new NextRequest(new URL('http://localhost:3000/api/v1/podcasts/pod-1/script/approve'), {
     method: 'POST',
     ...(body
       ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
@@ -86,7 +86,7 @@ const defaultTurns = [
   { speaker: 'EXPERT', text: 'Thanks for having me' },
 ];
 
-describe('POST /api/podcasts/[podcastId]/script/approve', () => {
+describe('POST /api/v1/podcasts/[podcastId]/script/approve', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetAutoModelConfig.mockResolvedValue({

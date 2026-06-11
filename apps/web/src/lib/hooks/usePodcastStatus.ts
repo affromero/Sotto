@@ -35,7 +35,7 @@ async function fetchCurrentStatus(
   onStatusChangeRef: React.RefObject<((event: PodcastStatusEvent) => void) | undefined>,
 ): Promise<string | null> {
   try {
-    const res = await fetch(`/api/podcasts/${podcastId}`);
+    const res = await fetch(`/api/v1/podcasts/${podcastId}`);
     if (!res.ok) return null;
     const data = await res.json();
     if (data.status) {
@@ -113,7 +113,7 @@ export function usePodcastStatus({
         reconnectTimeout = null;
       }
 
-      es = new EventSource(`/api/podcasts/${podcastId}/stream`);
+      es = new EventSource(`/api/v1/podcasts/${podcastId}/stream`);
 
       es.onopen = () => {
         setIsConnected(true);

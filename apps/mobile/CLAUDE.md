@@ -33,7 +33,7 @@ Thin client — all business logic in web backend API. Mobile handles UI, backgr
 
 Uses API key-based auth (`sk_sotto_` tokens), not NextAuth sessions.
 
-- **Dev**: Email login → `POST /api/auth/mobile` → `{token, user}`
+- **Dev**: Email login → `POST /api/v1/auth/mobile` → `{token, user}`
 - **Google**: Native sign-in → `idToken` → backend
 - **Apple** (iOS only): Native sign-in → `identityToken` → backend
 - **GitHub**: Browser flow → code exchange → backend

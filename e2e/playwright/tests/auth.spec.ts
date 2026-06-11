@@ -18,7 +18,7 @@ test.describe('Authentication', () => {
   });
 
   test('protected API routes return 401 without auth', async ({ request }) => {
-    const response = await request.get('/api/users/me');
+    const response = await request.get('/api/v1/users/me');
     expect(response.status()).toBe(401);
   });
 });

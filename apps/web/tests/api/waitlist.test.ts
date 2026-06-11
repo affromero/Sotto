@@ -47,19 +47,19 @@ vi.mock('@/lib/api-response', () => ({
 }));
 
 async function getHandler() {
-  const mod = await import('@/app/api/waitlist/route');
+  const mod = await import('@/app/api/v1/waitlist/route');
   return mod.POST;
 }
 
 function createPostRequest(body: unknown): NextRequest {
-  return new NextRequest(new URL('http://localhost:3000/api/waitlist'), {
+  return new NextRequest(new URL('http://localhost:3000/api/v1/waitlist'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
 }
 
-describe('POST /api/waitlist', () => {
+describe('POST /api/v1/waitlist', () => {
   let handler: Awaited<ReturnType<typeof getHandler>>;
 
   beforeEach(async () => {

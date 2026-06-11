@@ -1,5 +1,5 @@
 /**
- * GET/PATCH /api/courses/[courseId]/pedagogy. Adversarial: 401 unauth, 400 bad
+ * GET/PATCH /api/v1/courses/[courseId]/pedagogy. Adversarial: 401 unauth, 400 bad
  * value, 404 non-owner course, 200 read/update.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -20,19 +20,19 @@ vi.mock('@/lib/prisma', () => ({
 }));
 vi.mock('@/lib/logger', () => ({ logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() } }));
 
-import { GET, PATCH } from '@/app/api/courses/[courseId]/pedagogy/route';
+import { GET, PATCH } from '@/app/api/v1/courses/[courseId]/pedagogy/route';
 
 const PARAMS = { params: Promise.resolve({ courseId: 'c1' }) };
 
 function patchReq(body: unknown): NextRequest {
-  return new NextRequest('http://localhost:3000/api/courses/c1/pedagogy', {
+  return new NextRequest('http://localhost:3000/api/v1/courses/c1/pedagogy', {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
 }
 function getReq(): NextRequest {
-  return new NextRequest('http://localhost:3000/api/courses/c1/pedagogy');
+  return new NextRequest('http://localhost:3000/api/v1/courses/c1/pedagogy');
 }
 
 describe('course pedagogy route', () => {

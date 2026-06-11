@@ -26,12 +26,12 @@ vi.mock('@/lib/api-response', () => ({
 }));
 
 async function getHandler() {
-  const mod = await import('@/app/api/invite/redeem/route');
+  const mod = await import('@/app/api/v1/invite/redeem/route');
   return mod.POST;
 }
 
 function createRequest(body: unknown): NextRequest {
-  return new NextRequest(new URL('http://localhost:3000/api/invite/redeem'), {
+  return new NextRequest(new URL('http://localhost:3000/api/v1/invite/redeem'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -51,7 +51,7 @@ function setupTransaction() {
   mockTransaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => fn(tx));
 }
 
-describe('POST /api/invite/redeem', () => {
+describe('POST /api/v1/invite/redeem', () => {
   let handler: Awaited<ReturnType<typeof getHandler>>;
 
   beforeEach(async () => {

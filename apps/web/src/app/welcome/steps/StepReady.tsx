@@ -60,7 +60,7 @@ export function StepReady({
 
   async function postKey(post: KeyPost): Promise<boolean> {
     try {
-      const res = await fetch(`/api/settings/${post.endpoint}`, {
+      const res = await fetch(`/api/v1/settings/${post.endpoint}`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -108,7 +108,7 @@ export function StepReady({
       : undefined;
 
     try {
-      const res = await fetch('/api/onboarding/save', {
+      const res = await fetch('/api/v1/onboarding/save', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },

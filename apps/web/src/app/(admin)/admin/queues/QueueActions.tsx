@@ -30,7 +30,7 @@ export function QueueActions({
       return;
     }
     startTransition(async () => {
-      const res = await fetch(`/api/admin/queues/${queueName}/failed`);
+      const res = await fetch(`/api/v1/admin/queues/${queueName}/failed`);
       const data = await res.json();
       setJobs(data.jobs);
       setExpanded(true);
@@ -39,7 +39,7 @@ export function QueueActions({
 
   function retryJob(jobId: string) {
     startTransition(async () => {
-      await fetch(`/api/admin/queues/${queueName}/retry`, {
+      await fetch(`/api/v1/admin/queues/${queueName}/retry`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ jobId }),
@@ -51,7 +51,7 @@ export function QueueActions({
   function cleanAll() {
     if (!confirm(`Clear up to 100 failed jobs from "${queueName}"?`)) return;
     startTransition(async () => {
-      await fetch(`/api/admin/queues/${queueName}/clean`, { method: 'POST' });
+      await fetch(`/api/v1/admin/queues/${queueName}/clean`, { method: 'POST' });
       setExpanded(false);
       setJobs(null);
       onRefresh?.();

@@ -3,7 +3,7 @@ import { setToken, notifyAuthSuccess } from './auth';
 
 /**
  * Normalize a user-entered server address to a bare origin (no trailing slash,
- * no /api suffix, default http:// if no scheme). Throws on an invalid URL.
+ * no /api/v1 suffix, default http:// if no scheme). Throws on an invalid URL.
  */
 export function normalizeServerUrl(raw: string): string {
   const trimmed = raw.trim().replace(/\/+$/, '');
@@ -14,6 +14,7 @@ export function normalizeServerUrl(raw: string): string {
     throw new Error('Server address must use http or https.');
   }
   let path = url.pathname.replace(/\/+$/, '');
+  if (path.endsWith('/api/v1')) path = path.slice(0, -7);
   if (path.endsWith('/api')) path = path.slice(0, -4);
   url.pathname = path || '/';
   url.search = '';
@@ -32,7 +33,7 @@ export async function connectToServer(rawUrl: string): Promise<void> {
  */
 export async function pairWithToken(rawUrl: string, token: string): Promise<void> {
   const serverRoot = normalizeServerUrl(rawUrl);
-  const res = await fetch(`${serverRoot}/api/auth/pair/redeem`, {
+  const res = await fetch(`${serverRoot}/api/v1/auth/pair/redeem`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ token: token.trim() }),

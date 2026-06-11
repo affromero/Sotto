@@ -73,7 +73,7 @@ function ListeningAudio({ podcastId, initialUrl }: { podcastId: string; initialU
     let timer: ReturnType<typeof setTimeout>;
     async function poll() {
       try {
-        const res = await fetch(`/api/podcasts/${podcastId}`);
+        const res = await fetch(`/api/v1/podcasts/${podcastId}`);
         if (res.ok) {
           const data = (await res.json()) as { audioUrl?: string | null };
           if (active && data.audioUrl) {
@@ -128,7 +128,7 @@ export function ExamRunner({ exam: initialExam }: Props) {
       const payload = {
         answers: Object.entries(answers).map(([questionId, selectedIndex]) => ({ questionId, selectedIndex })),
       };
-      const res = await fetch(`/api/exams/${exam.id}/submit`, {
+      const res = await fetch(`/api/v1/exams/${exam.id}/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -140,7 +140,7 @@ export function ExamRunner({ exam: initialExam }: Props) {
         return;
       }
       // Re-fetch the now-SCORED exam so the answer key + per-section results show.
-      const fresh = await fetch(`/api/exams/${exam.id}`);
+      const fresh = await fetch(`/api/v1/exams/${exam.id}`);
       if (fresh.ok) setExam((await fresh.json()) as ExamData);
       setSubmitting(false);
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -190,7 +190,7 @@ export function ExamRunner({ exam: initialExam }: Props) {
 
             {section.format === 'speaking' ? (
               <SpeakingExercise
-                endpointBase={`/api/exams/${exam.id}/speaking`}
+                endpointBase={`/api/v1/exams/${exam.id}/speaking`}
                 prompts={section.speakingPrompts}
               />
             ) : section.format === 'writing' ? (
@@ -279,7 +279,7 @@ function ExamWritingPrompt({ examId, prompt, disabled }: { examId: string; promp
   async function submit() {
     setPhase('grading');
     try {
-      const res = await fetch(`/api/exams/${examId}/writing/${prompt.id}`, {
+      const res = await fetch(`/api/v1/exams/${examId}/writing/${prompt.id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text }),

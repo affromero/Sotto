@@ -8,7 +8,7 @@ export function CollectNowButton() {
 
   function handleClick() {
     startTransition(async () => {
-      await fetch('/api/admin/r2-usage/collect', { method: 'POST' });
+      await fetch('/api/v1/admin/r2-usage/collect', { method: 'POST' });
     });
   }
 

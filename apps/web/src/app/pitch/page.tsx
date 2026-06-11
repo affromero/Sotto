@@ -284,7 +284,7 @@ export default function PitchPage() {
 
   async function fetchManifest() {
     try {
-      const res = await fetch('/api/pitch/manifest');
+      const res = await fetch('/api/v1/pitch/manifest');
       if (res.status === 401) {
         setState('locked');
         return;
@@ -318,7 +318,7 @@ export default function PitchPage() {
     setSubmitting(true);
 
     try {
-      const res = await fetch('/api/pitch/auth', {
+      const res = await fetch('/api/v1/pitch/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password }),
@@ -370,7 +370,7 @@ export default function PitchPage() {
 
   function getIframeSrc(index: number): string {
     if (index < 0 || index >= documents.length) return 'about:blank';
-    return `/api/pitch/${selectedVersion}/${documents[index].filename}`;
+    return `/api/v1/pitch/${selectedVersion}/${documents[index].filename}`;
   }
 
   function getIframeTitle(index: number): string {

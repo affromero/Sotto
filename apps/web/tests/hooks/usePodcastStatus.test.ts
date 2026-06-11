@@ -92,7 +92,7 @@ describe('usePodcastStatus', () => {
         usePodcastStatus({ podcastId: 'pod-123', initialStatus: 'SCRIPTING' }),
       );
       expect(MockEventSource.instances).toHaveLength(1);
-      expect(MockEventSource.instances[0].url).toBe('/api/podcasts/pod-123/stream');
+      expect(MockEventSource.instances[0].url).toBe('/api/v1/podcasts/pod-123/stream');
     });
 
     it('sets isConnected=true on open', async () => {
@@ -121,7 +121,7 @@ describe('usePodcastStatus', () => {
         await Promise.resolve();
       });
 
-      expect(fetch).toHaveBeenCalledWith('/api/podcasts/pod-1');
+      expect(fetch).toHaveBeenCalledWith('/api/v1/podcasts/pod-1');
     });
 
     it('closes SSE when reconciliation fetch returns terminal status', async () => {
@@ -220,7 +220,7 @@ describe('usePodcastStatus', () => {
         await Promise.resolve();
       });
 
-      expect(fetch).toHaveBeenCalledWith('/api/podcasts/pod-1');
+      expect(fetch).toHaveBeenCalledWith('/api/v1/podcasts/pod-1');
     });
 
     it('stops polling when terminal status is received', async () => {
@@ -289,7 +289,7 @@ describe('usePodcastStatus', () => {
 
       // Each interval tick should produce at most 1 fetch
       const fetchCalls = vi.mocked(fetch).mock.calls.filter(
-        (c) => c[0] === '/api/podcasts/pod-1',
+        (c) => c[0] === '/api/v1/podcasts/pod-1',
       );
       expect(fetchCalls.length).toBeLessThanOrEqual(2);
     });

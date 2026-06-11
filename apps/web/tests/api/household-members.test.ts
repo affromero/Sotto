@@ -1,5 +1,5 @@
 /**
- * /api/household/members — admin-only member management. Adversarial: every
+ * /api/v1/household/members — admin-only member management. Adversarial: every
  * method refuses a non-admin, you cannot remove yourself or another admin, and
  * removal goes through removeMember (which revokes sessions).
  */
@@ -29,17 +29,17 @@ vi.mock('@/lib/local-account', () => ({
 }));
 vi.mock('@/lib/logger', () => ({ logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() } }));
 
-import { GET, POST, PATCH, DELETE } from '@/app/api/household/members/route';
+import { GET, POST, PATCH, DELETE } from '@/app/api/v1/household/members/route';
 
 function req(method: string, body?: unknown): NextRequest {
-  return new NextRequest('http://localhost:3000/api/household/members', {
+  return new NextRequest('http://localhost:3000/api/v1/household/members', {
     method,
     headers: { 'Content-Type': 'application/json' },
     ...(body !== undefined && { body: JSON.stringify(body) }),
   });
 }
 
-describe('/api/household/members', () => {
+describe('/api/v1/household/members', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockRequireAdmin.mockResolvedValue('admin1');

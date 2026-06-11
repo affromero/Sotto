@@ -54,7 +54,7 @@ export function ProfilePicker() {
   useEffect(() => {
     // state already initializes to 'loading'; this effect runs once on mount.
     let active = true;
-    fetch('/api/auth/profiles', { headers: { accept: 'application/json' } })
+    fetch('/api/v1/auth/profiles', { headers: { accept: 'application/json' } })
       .then(async (res) => {
         if (!res.ok) throw new Error('request failed');
         const data: ProfilesResponse = await res.json();
@@ -274,7 +274,7 @@ export function ProfilePicker() {
 /**
  * First-run owner creation. Renders when the instance has zero accounts
  * (needsOwner). Collects a name, a chosen animal avatar, and a password with a
- * live confirm/length check, then POSTs to /api/auth/owner, signs in with the
+ * live confirm/length check, then POSTs to /api/v1/auth/owner, signs in with the
  * returned id, and hands off to onCreated. Errors stay generic and the password
  * is never displayed or logged.
  */
@@ -305,7 +305,7 @@ function CreateOwnerPanel({ onCreated }: { onCreated: () => void }) {
     setSubmitting(true);
     setError(null);
     try {
-      const res = await fetch('/api/auth/owner', {
+      const res = await fetch('/api/v1/auth/owner', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ name: trimmedName, password, avatar }),

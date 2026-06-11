@@ -51,12 +51,12 @@ vi.mock('@/lib/logger', () => ({
 
 // ---- Import under test ----
 
-import { GET, POST } from '@/app/api/voices/verify/route';
+import { GET, POST } from '@/app/api/v1/voices/verify/route';
 
 // ---- Helpers ----
 
 function createGetRequest(params?: Record<string, string>): NextRequest {
-  const url = new URL('http://localhost:3000/api/voices/verify');
+  const url = new URL('http://localhost:3000/api/v1/voices/verify');
   if (params) {
     for (const [key, value] of Object.entries(params)) {
       url.searchParams.set(key, value);
@@ -67,7 +67,7 @@ function createGetRequest(params?: Record<string, string>): NextRequest {
 
 function createPostRequest(fields: Record<string, string>, includeAudio?: boolean): NextRequest {
   // Stub out the request then override formData() to avoid jsdom/undici FormData interop issues.
-  const req = new NextRequest('http://localhost:3000/api/voices/verify', {
+  const req = new NextRequest('http://localhost:3000/api/v1/voices/verify', {
     method: 'POST',
   });
 
@@ -104,7 +104,7 @@ const mockSession = { user: { id: 'user-1' } };
 
 // ---- Tests ----
 
-describe('GET /api/voices/verify', () => {
+describe('GET /api/v1/voices/verify', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -187,7 +187,7 @@ describe('GET /api/voices/verify', () => {
   });
 });
 
-describe('POST /api/voices/verify', () => {
+describe('POST /api/v1/voices/verify', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockPrismaTransaction.mockImplementation(async (args: unknown) => {

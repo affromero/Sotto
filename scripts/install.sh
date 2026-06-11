@@ -161,7 +161,7 @@ $DC up -d
 
 info "Waiting for Sotto to come up..."
 for _ in $(seq 1 30); do
-  if curl -fsS "http://localhost:$WEB_PORT/api/health" >/dev/null 2>&1; then READY=1; break; fi
+  if curl -fsS "http://localhost:$WEB_PORT/api/v1/health" >/dev/null 2>&1; then READY=1; break; fi
   sleep 2
 done
 

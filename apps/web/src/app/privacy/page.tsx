@@ -260,7 +260,7 @@ export default function PrivacyPage() {
           <h3>Data Export</h3>
           <p>
             You can export all your data at any time from your account settings or by
-            calling <code>GET /api/users/me/export</code>. The export includes your
+            calling <code>GET /api/v1/users/me/export</code>. The export includes your
             profile, lessons, scripts, discovery conversations, interactions,
             saves, ratings, behavioral
             profile, recent behavioral events, playback sessions, voice clones,

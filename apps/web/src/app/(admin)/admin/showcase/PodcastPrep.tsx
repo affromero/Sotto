@@ -28,7 +28,7 @@ export function PodcastPrep({ project }: { project: DemoProject }) {
   const [topic, setTopic] = useState('');
 
   const loadPodcast = useCallback(async () => {
-    const res = await fetch(`/api/admin/demo/${project.id}/podcast`);
+    const res = await fetch(`/api/v1/admin/demo/${project.id}/podcast`);
     if (res.ok) {
       const data = await res.json();
       setPodcast(data);
@@ -37,7 +37,7 @@ export function PodcastPrep({ project }: { project: DemoProject }) {
 
   const linkPodcast = useCallback(async (body: Record<string, string>) => {
     setLoading(true);
-    const res = await fetch(`/api/admin/demo/${project.id}/podcast`, {
+    const res = await fetch(`/api/v1/admin/demo/${project.id}/podcast`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),

@@ -34,7 +34,7 @@ jobs:
       GOOGLE_AI_BASE_URL: http://localhost:4100
       SKIP_DB_SYNC: '1'
       AI_PROVIDER: anthropic
-      EXPO_PUBLIC_API_URL: http://localhost:3000/api
+      EXPO_PUBLIC_API_URL: http://localhost:3000/api/v1
 
     steps:
       - uses: actions/checkout@v4

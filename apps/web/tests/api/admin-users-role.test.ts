@@ -16,10 +16,10 @@ vi.mock('@/lib/prisma', () => ({
   },
 }));
 
-import { PATCH } from '@/app/api/admin/users/[userId]/role/route';
+import { PATCH } from '@/app/api/v1/admin/users/[userId]/role/route';
 
 function createRequest(body: Record<string, unknown>): NextRequest {
-  return new NextRequest(new URL('http://localhost:3000/api/admin/users/user-2/role'), {
+  return new NextRequest(new URL('http://localhost:3000/api/v1/admin/users/user-2/role'), {
     method: 'PATCH',
     body: JSON.stringify(body),
     headers: { 'Content-Type': 'application/json' },
@@ -30,7 +30,7 @@ async function createParams(userId: string) {
   return { params: Promise.resolve({ userId }) };
 }
 
-describe('PATCH /api/admin/users/[userId]/role', () => {
+describe('PATCH /api/v1/admin/users/[userId]/role', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });

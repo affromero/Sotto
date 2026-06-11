@@ -137,7 +137,7 @@ export function SettingsForm({
       setHandleStatus({ checking: true });
       handleCheckTimer.current = setTimeout(async () => {
         try {
-          const res = await fetch(`/api/handles/check?handle=${encodeURIComponent(value)}`);
+          const res = await fetch(`/api/v1/handles/check?handle=${encodeURIComponent(value)}`);
           if (res.ok) {
             const data = await res.json();
             setHandleStatus({ checking: false, available: data.available, reason: data.reason });
@@ -203,8 +203,8 @@ export function SettingsForm({
 
   useEffect(() => {
     Promise.all([
-      fetch('/api/ai-models').then((r) => (r.ok ? r.json() : null)),
-      fetch('/api/tts-options').then((r) => (r.ok ? r.json() : null)),
+      fetch('/api/v1/ai-models').then((r) => (r.ok ? r.json() : null)),
+      fetch('/api/v1/tts-options').then((r) => (r.ok ? r.json() : null)),
     ])
       .then(([aiData, ttsData]) => {
         if (aiData?.models) setAiModelOptions(aiData.models);
@@ -238,7 +238,7 @@ export function SettingsForm({
     setInterestsSaving(true);
     setInterestsSaved(false);
     try {
-      const response = await fetch('/api/users/me', {
+      const response = await fetch('/api/v1/users/me', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ interests: interestIds, customTags }),
@@ -262,7 +262,7 @@ export function SettingsForm({
       if (handle && handle !== initialHandle) {
         payload.handle = handle;
       }
-      const response = await fetch('/api/users/me', {
+      const response = await fetch('/api/v1/users/me', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -277,7 +277,7 @@ export function SettingsForm({
   };
 
   const handleDeleteAccount = async () => {
-    const response = await fetch('/api/users/me', {
+    const response = await fetch('/api/v1/users/me', {
       method: 'DELETE',
     });
     if (response.ok) {
@@ -289,7 +289,7 @@ export function SettingsForm({
     setTwitterSaving(true);
     setTwitterSaved(false);
     try {
-      const response = await fetch('/api/users/me/twitter', {
+      const response = await fetch('/api/v1/users/me/twitter', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -313,7 +313,7 @@ export function SettingsForm({
   const handleDisconnectTwitter = async () => {
     setDisconnecting(true);
     try {
-      const response = await fetch('/api/users/me/twitter', { method: 'DELETE' });
+      const response = await fetch('/api/v1/users/me/twitter', { method: 'DELETE' });
       if (response.ok) {
         window.location.reload();
       }
@@ -347,7 +347,7 @@ export function SettingsForm({
       const formData = new FormData();
       formData.append('avatar', file);
 
-      const response = await fetch('/api/users/me/avatar', {
+      const response = await fetch('/api/v1/users/me/avatar', {
         method: 'POST',
         body: formData,
       });
@@ -559,7 +559,7 @@ export function SettingsForm({
                 setLanguageSaving(true);
                 setLanguageSaved(false);
                 try {
-                  const response = await fetch('/api/users/me', {
+                  const response = await fetch('/api/v1/users/me', {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ preferredLanguage }),
@@ -595,7 +595,7 @@ export function SettingsForm({
             initialQuestions={quizQuestions}
             onComplete={async (answers: TasteAnswer[]) => {
               if (answers.length > 0) {
-                await fetch('/api/taste-quiz', {
+                await fetch('/api/v1/taste-quiz', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ answers }),
@@ -605,7 +605,7 @@ export function SettingsForm({
               setQuizActive(false);
             }}
             onRequestMore={async () => {
-              const res = await fetch('/api/taste-quiz?count=10');
+              const res = await fetch('/api/v1/taste-quiz?count=10');
               if (!res.ok) return [];
               const data = await res.json();
               return data.questions;
@@ -618,7 +618,7 @@ export function SettingsForm({
               onClick={async () => {
                 setQuizLoading(true);
                 try {
-                  const res = await fetch('/api/taste-quiz?count=10');
+                  const res = await fetch('/api/v1/taste-quiz?count=10');
                   if (res.ok) {
                     const data = await res.json();
                     setQuizQuestions(data.questions);
@@ -643,7 +643,7 @@ export function SettingsForm({
                     return;
                   setQuizResetting(true);
                   try {
-                    const res = await fetch('/api/taste-quiz', { method: 'DELETE' });
+                    const res = await fetch('/api/v1/taste-quiz', { method: 'DELETE' });
                     if (res.ok) {
                       setQuizCount(0);
                     }
@@ -693,7 +693,7 @@ export function SettingsForm({
                   return;
                 setInterestsResetting(true);
                 try {
-                  const res = await fetch('/api/users/me', {
+                  const res = await fetch('/api/v1/users/me', {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ interests: [], customTags: [] }),
@@ -733,7 +733,7 @@ export function SettingsForm({
               onChange={async (e) => {
                 const checked = e.target.checked;
                 setEmailNotifications(checked);
-                await fetch('/api/users/me', {
+                await fetch('/api/v1/users/me', {
                   method: 'PATCH',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ emailNotifications: checked }),
@@ -761,7 +761,7 @@ export function SettingsForm({
               onChange={async (e) => {
                 const checked = e.target.checked;
                 setPushNotifications(checked);
-                await fetch('/api/users/me', {
+                await fetch('/api/v1/users/me', {
                   method: 'PATCH',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ pushNotifications: checked }),
@@ -834,7 +834,7 @@ export function SettingsForm({
                   setAiPrefSaving(true);
                   setAiPrefSaved(false);
                   try {
-                    const response = await fetch('/api/users/me', {
+                    const response = await fetch('/api/v1/users/me', {
                       method: 'PATCH',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({ preferredAiModel: preferredAiModel || null }),

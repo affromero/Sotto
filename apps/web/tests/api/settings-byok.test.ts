@@ -22,10 +22,10 @@ vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
-import { GET, POST, DELETE } from '@/app/api/settings/byok/route';
+import { GET, POST, DELETE } from '@/app/api/v1/settings/byok/route';
 
 function createRequest(method: string, body?: object): NextRequest {
-  const url = new URL('http://localhost:3000/api/settings/byok');
+  const url = new URL('http://localhost:3000/api/v1/settings/byok');
   const init: { method: string; body?: string; headers?: Record<string, string> } = { method };
   if (body) {
     init.body = JSON.stringify(body);
@@ -34,7 +34,7 @@ function createRequest(method: string, body?: object): NextRequest {
   return new NextRequest(url, init);
 }
 
-describe('GET /api/settings/byok', () => {
+describe('GET /api/v1/settings/byok', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -62,7 +62,7 @@ describe('GET /api/settings/byok', () => {
   });
 });
 
-describe('POST /api/settings/byok', () => {
+describe('POST /api/v1/settings/byok', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -129,7 +129,7 @@ describe('POST /api/settings/byok', () => {
   });
 });
 
-describe('DELETE /api/settings/byok', () => {
+describe('DELETE /api/v1/settings/byok', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -148,7 +148,7 @@ describe('DELETE /api/settings/byok', () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockRemoveByokKey.mockResolvedValue(undefined);
 
-    const url = new URL('http://localhost:3000/api/settings/byok');
+    const url = new URL('http://localhost:3000/api/v1/settings/byok');
     const request = new NextRequest(url, { method: 'DELETE' });
     const response = await DELETE(request);
     const body = await response.json();

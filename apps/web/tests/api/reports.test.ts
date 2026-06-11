@@ -29,10 +29,10 @@ vi.mock('@/lib/redis', () => ({
   checkRateLimit: (...args: unknown[]) => mockCheckRateLimit(...args),
 }));
 
-import { POST } from '@/app/api/reports/route';
+import { POST } from '@/app/api/v1/reports/route';
 
 function createRequest(body: Record<string, unknown>): NextRequest {
-  return new NextRequest(new URL('http://localhost:3000/api/reports'), {
+  return new NextRequest(new URL('http://localhost:3000/api/v1/reports'), {
     method: 'POST',
     body: JSON.stringify(body),
     headers: { 'Content-Type': 'application/json' },
@@ -54,7 +54,7 @@ const ALL_REASONS = [
   'OTHER',
 ] as const;
 
-describe('POST /api/reports', () => {
+describe('POST /api/v1/reports', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuth.mockResolvedValue({ user: { id: 'user-1' } });

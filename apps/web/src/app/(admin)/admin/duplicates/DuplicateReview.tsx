@@ -90,7 +90,7 @@ export function DuplicateReview({ initialPendingCount }: DuplicateReviewProps) {
       limit: '20',
     });
 
-    const response = await fetch(`/api/admin/duplicates?${params}`);
+    const response = await fetch(`/api/v1/admin/duplicates?${params}`);
     if (response.ok) {
       const data = await response.json();
       setMatches(data.items);
@@ -102,9 +102,9 @@ export function DuplicateReview({ initialPendingCount }: DuplicateReviewProps) {
 
   const fetchCounts = useCallback(async () => {
     const [pending, approved, rejected] = await Promise.all([
-      fetch('/api/admin/duplicates?status=PENDING&limit=1').then((r) => r.json()),
-      fetch('/api/admin/duplicates?status=APPROVED&limit=1').then((r) => r.json()),
-      fetch('/api/admin/duplicates?status=REJECTED&limit=1').then((r) => r.json()),
+      fetch('/api/v1/admin/duplicates?status=PENDING&limit=1').then((r) => r.json()),
+      fetch('/api/v1/admin/duplicates?status=APPROVED&limit=1').then((r) => r.json()),
+      fetch('/api/v1/admin/duplicates?status=REJECTED&limit=1').then((r) => r.json()),
     ]);
     setCounts({
       pending: pending.total ?? 0,
@@ -124,7 +124,7 @@ export function DuplicateReview({ initialPendingCount }: DuplicateReviewProps) {
       setActing(matchId);
       setConfirmAction(null);
 
-      const response = await fetch(`/api/admin/duplicates/${matchId}`, {
+      const response = await fetch(`/api/v1/admin/duplicates/${matchId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

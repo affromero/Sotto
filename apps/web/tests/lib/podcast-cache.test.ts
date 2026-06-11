@@ -80,7 +80,7 @@ vi.mock('@/lib/auth-guards', () => ({
 }));
 
 import { NextRequest } from 'next/server';
-import { GET as getPodcast, PATCH as updatePodcast } from '@/app/api/podcasts/[podcastId]/route';
+import { GET as getPodcast, PATCH as updatePodcast } from '@/app/api/v1/podcasts/[podcastId]/route';
 
 const basePodcast = {
   id: 'pod-1',
@@ -97,7 +97,7 @@ const basePodcast = {
 };
 
 function makeRequest(method = 'GET', body?: Record<string, unknown>) {
-  const url = 'http://localhost:3000/api/podcasts/pod-1';
+  const url = 'http://localhost:3000/api/v1/podcasts/pod-1';
   if (body) {
     return new NextRequest(url, {
       method,

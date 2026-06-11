@@ -43,12 +43,14 @@ export function getApiBaseUrl(): string {
   const pathname = trimTrailingSlashes(url.pathname);
 
   if (!pathname || pathname === '/') {
-    url.pathname = '/api';
-  } else if (pathname.endsWith('/api')) {
+    url.pathname = '/api/v1';
+  } else if (pathname.endsWith('/api/v1')) {
     url.pathname = pathname;
+  } else if (pathname.endsWith('/api')) {
+    url.pathname = `${pathname}/v1`;
   } else {
     throw new MobileConfigError(
-      `${API_URL_ENV} must point to a Sotto deployment root or API path ending in /api.`
+      `${API_URL_ENV} must point to a Sotto deployment root or API path ending in /api/v1.`
     );
   }
 
@@ -59,8 +61,12 @@ export function getAppBaseUrl(): string {
   const apiUrl = new URL(getApiBaseUrl());
   const pathname = trimTrailingSlashes(apiUrl.pathname);
 
-  if (pathname === '/api') {
+  if (pathname === '/api/v1') {
     apiUrl.pathname = '/';
+  } else if (pathname === '/api') {
+    apiUrl.pathname = '/';
+  } else if (pathname.endsWith('/api/v1')) {
+    apiUrl.pathname = pathname.slice(0, -7) || '/';
   } else if (pathname.endsWith('/api')) {
     apiUrl.pathname = pathname.slice(0, -4) || '/';
   }

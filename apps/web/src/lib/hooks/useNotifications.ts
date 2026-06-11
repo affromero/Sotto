@@ -53,7 +53,7 @@ export function useNotifications(options?: UseNotificationsOptions): UseNotifica
 
   const fetchNotifications = useCallback(async () => {
     try {
-      const response = await fetch('/api/notifications');
+      const response = await fetch('/api/v1/notifications');
       if (!response.ok) return;
       const json = await response.json();
       const data: NotificationData[] = json.notifications ?? [];
@@ -98,7 +98,7 @@ export function useNotifications(options?: UseNotificationsOptions): UseNotifica
     function connect() {
       if (disposed) return;
 
-      es = new EventSource('/api/notifications/stream');
+      es = new EventSource('/api/v1/notifications/stream');
 
       es.onopen = () => {
         sseConnectedRef.current = true;
@@ -172,7 +172,7 @@ export function useNotifications(options?: UseNotificationsOptions): UseNotifica
     );
 
     try {
-      const response = await fetch(`/api/notifications/${notificationId}`, {
+      const response = await fetch(`/api/v1/notifications/${notificationId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ read: true }),
@@ -192,7 +192,7 @@ export function useNotifications(options?: UseNotificationsOptions): UseNotifica
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
 
     try {
-      const response = await fetch('/api/notifications/mark-all-read', {
+      const response = await fetch('/api/v1/notifications/mark-all-read', {
         method: 'POST',
       });
       if (!response.ok) {

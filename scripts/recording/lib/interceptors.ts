@@ -19,7 +19,7 @@ function buildSSEBody(chunks: string[], done: {
   return body;
 }
 
-// ── Discovery (POST /api/discovery) ──────────────────────────────
+// ── Discovery (POST /api/v1/discovery) ──────────────────────────────
 
 interface DiscoveryInterceptOptions {
   textChunks: string[];
@@ -31,7 +31,7 @@ export async function interceptDiscovery(
   page: Page,
   options: DiscoveryInterceptOptions
 ): Promise<void> {
-  await page.route('**/api/discovery', async (route: Route) => {
+  await page.route('**/api/v1/discovery', async (route: Route) => {
     const body = buildSSEBody(options.textChunks, {
       chips: options.chips,
       metadata: options.metadata,
@@ -50,10 +50,10 @@ export async function interceptDiscovery(
 }
 
 export async function clearDiscoveryIntercept(page: Page): Promise<void> {
-  await page.unroute('**/api/discovery');
+  await page.unroute('**/api/v1/discovery');
 }
 
-// ── Interact (POST /api/podcasts/*/interact) ─────────────────────
+// ── Interact (POST /api/v1/podcasts/*/interact) ─────────────────────
 
 interface InteractInterceptOptions {
   interactionId: string;
@@ -67,8 +67,8 @@ export async function interceptInteract(
   podcastId: string,
   options: InteractInterceptOptions
 ): Promise<void> {
-  const postPattern = `**/api/podcasts/${podcastId}/interact`;
-  const pollPattern = `**/api/podcasts/${podcastId}/interact/${options.interactionId}`;
+  const postPattern = `**/api/v1/podcasts/${podcastId}/interact`;
+  const pollPattern = `**/api/v1/podcasts/${podcastId}/interact/${options.interactionId}`;
 
   // POST — create interaction
   await page.route(postPattern, async (route: Route) => {
@@ -128,14 +128,14 @@ export async function interceptInteract(
   });
 }
 
-// ── Script Approve (POST /api/podcasts/*/script/approve) ─────────
+// ── Script Approve (POST /api/v1/podcasts/*/script/approve) ─────────
 
 export async function interceptScriptApprove(
   page: Page,
   podcastId: string
 ): Promise<void> {
   await page.route(
-    `**/api/podcasts/${podcastId}/script/approve`,
+    `**/api/v1/podcasts/${podcastId}/script/approve`,
     async (route: Route) => {
       await route.fulfill({
         status: 200,

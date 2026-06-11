@@ -32,7 +32,7 @@ export function VoicePreferenceSelector({
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('/api/voices')
+    fetch('/api/v1/voices')
       .then((res) => (res.ok ? res.json() : { voices: [] }))
       .then((data) => setPoolVoices(data.voices ?? []))
       .catch(() => setPoolVoices([]))

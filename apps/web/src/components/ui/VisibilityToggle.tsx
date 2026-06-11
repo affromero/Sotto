@@ -43,7 +43,7 @@ export function VisibilityToggle({ podcastId, visibility }: VisibilityToggleProp
       setErrorMessage(null);
 
       try {
-        const response = await fetch(`/api/podcasts/${podcastId}`, {
+        const response = await fetch(`/api/v1/podcasts/${podcastId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ visibility: next }),

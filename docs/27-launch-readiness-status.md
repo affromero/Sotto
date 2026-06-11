@@ -49,7 +49,7 @@ This is the current safe operating mode.
 
 ### 6. Avatar route Redis connection leak
 
-`GET /api/podcasts/[podcastId]/video/avatars` was calling `createRedisConnection('avatar-cache')` on every request, creating a new ioredis TCP connection that was never closed. Under traffic, this silently exhausted Redis client slots. Fixed by switching to the `cache` singleton helper that reuses the module-level `getRedisClient()` connection.
+`GET /api/v1/podcasts/[podcastId]/video/avatars` was calling `createRedisConnection('avatar-cache')` on every request, creating a new ioredis TCP connection that was never closed. Under traffic, this silently exhausted Redis client slots. Fixed by switching to the `cache` singleton helper that reuses the module-level `getRedisClient()` connection.
 
 ## What Is Still Not Solved
 

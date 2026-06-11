@@ -118,7 +118,7 @@ Optional fields include `topic`, `duration_minutes`, `focus_areas`, `source_url`
 
 ### Workspace Source Connectors
 
-The web app exposes `/api/source-connectors/readiness` so self-hosted installs can verify private source setup before wiring workers. Slack is modeled as a user-owned Slack app with `SLACK_BOT_TOKEN` and `SLACK_SIGNING_SECRET`. Gmail is modeled through Google Workspace CLI (`gws`) so local and hosted installs can use the same owner-controlled command surface.
+The web app exposes `/api/v1/source-connectors/readiness` so self-hosted installs can verify private source setup before wiring workers. Slack is modeled as a user-owned Slack app with `SLACK_BOT_TOKEN` and `SLACK_SIGNING_SECRET`. Gmail is modeled through Google Workspace CLI (`gws`) so local and hosted installs can use the same owner-controlled command surface.
 
 ## Resources
 

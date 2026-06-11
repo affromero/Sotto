@@ -48,14 +48,14 @@ vi.mock('@/lib/script-updater', () => ({
   buildRenumberMap: vi.fn(() => new Map()),
 }));
 
-import { GET, PATCH } from '@/app/api/podcasts/[podcastId]/script/route';
+import { GET, PATCH } from '@/app/api/v1/podcasts/[podcastId]/script/route';
 
 function createGetRequest(): NextRequest {
-  return new NextRequest(new URL('http://localhost:3000/api/podcasts/pod-1/script'));
+  return new NextRequest(new URL('http://localhost:3000/api/v1/podcasts/pod-1/script'));
 }
 
 function createPatchRequest(body: unknown): NextRequest {
-  return new NextRequest(new URL('http://localhost:3000/api/podcasts/pod-1/script'), {
+  return new NextRequest(new URL('http://localhost:3000/api/v1/podcasts/pod-1/script'), {
     method: 'PATCH',
     body: JSON.stringify(body),
     headers: { 'Content-Type': 'application/json' },
@@ -66,7 +66,7 @@ async function createParams(podcastId: string) {
   return { params: Promise.resolve({ podcastId }) };
 }
 
-describe('GET /api/podcasts/[podcastId]/script', () => {
+describe('GET /api/v1/podcasts/[podcastId]/script', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -177,7 +177,7 @@ describe('GET /api/podcasts/[podcastId]/script', () => {
   });
 });
 
-describe('PATCH /api/podcasts/[podcastId]/script', () => {
+describe('PATCH /api/v1/podcasts/[podcastId]/script', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });

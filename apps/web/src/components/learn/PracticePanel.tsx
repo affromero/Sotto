@@ -43,7 +43,7 @@ export function PracticePanel({ courseId, courseName }: PracticePanelProps) {
 
   const loadOverview = useCallback(async () => {
     try {
-      const res = await fetch(`/api/courses/${courseId}/practice`);
+      const res = await fetch(`/api/v1/courses/${courseId}/practice`);
       if (res.ok) setOverview((await res.json()) as Overview);
     } catch {
       /* non-fatal — the picker still works */
@@ -61,7 +61,7 @@ export function PracticePanel({ courseId, courseName }: PracticePanelProps) {
     setError('');
     setMessage('');
     try {
-      const res = await fetch(`/api/courses/${courseId}/practice`, {
+      const res = await fetch(`/api/v1/courses/${courseId}/practice`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ kind }),

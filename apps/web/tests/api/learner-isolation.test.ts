@@ -67,11 +67,11 @@ beforeEach(() => {
 
 afterEach(() => vi.clearAllMocks());
 
-describe('GET /api/courses/[courseId]/graph — memory graph isolation', () => {
+describe('GET /api/v1/courses/[courseId]/graph — memory graph isolation', () => {
   it("lets the owner read their own course graph", async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: OWNER });
-    const { GET } = await import('@/app/api/courses/[courseId]/graph/route');
-    const res = await GET(req('/api/courses/course-A/graph'), {
+    const { GET } = await import('@/app/api/v1/courses/[courseId]/graph/route');
+    const res = await GET(req('/api/v1/courses/course-A/graph'), {
       params: Promise.resolve({ courseId: 'course-A' }),
     });
     expect(res.status).toBe(200);
@@ -80,8 +80,8 @@ describe('GET /api/courses/[courseId]/graph — memory graph isolation', () => {
 
   it("blocks another learner from reading course-A's graph (404, no data touched)", async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: INTRUDER });
-    const { GET } = await import('@/app/api/courses/[courseId]/graph/route');
-    const res = await GET(req('/api/courses/course-A/graph'), {
+    const { GET } = await import('@/app/api/v1/courses/[courseId]/graph/route');
+    const res = await GET(req('/api/v1/courses/course-A/graph'), {
       params: Promise.resolve({ courseId: 'course-A' }),
     });
     expect(res.status).toBe(404);
@@ -94,8 +94,8 @@ describe('GET /api/courses/[courseId]/graph — memory graph isolation', () => {
 
   it('rejects an unauthenticated request with 401', async () => {
     mockAuthenticateRequest.mockResolvedValue(null);
-    const { GET } = await import('@/app/api/courses/[courseId]/graph/route');
-    const res = await GET(req('/api/courses/course-A/graph'), {
+    const { GET } = await import('@/app/api/v1/courses/[courseId]/graph/route');
+    const res = await GET(req('/api/v1/courses/course-A/graph'), {
       params: Promise.resolve({ courseId: 'course-A' }),
     });
     expect(res.status).toBe(401);
@@ -103,11 +103,11 @@ describe('GET /api/courses/[courseId]/graph — memory graph isolation', () => {
   });
 });
 
-describe('GET /api/classes/[classId] — class isolation', () => {
+describe('GET /api/v1/classes/[classId] — class isolation', () => {
   it('lets the owner read their own class', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: OWNER });
-    const { GET } = await import('@/app/api/classes/[classId]/route');
-    const res = await GET(req('/api/classes/class-A'), {
+    const { GET } = await import('@/app/api/v1/classes/[classId]/route');
+    const res = await GET(req('/api/v1/classes/class-A'), {
       params: Promise.resolve({ classId: 'class-A' }),
     });
     expect(res.status).toBe(200);
@@ -116,8 +116,8 @@ describe('GET /api/classes/[classId] — class isolation', () => {
 
   it("blocks another learner from reading class-A (404)", async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: INTRUDER });
-    const { GET } = await import('@/app/api/classes/[classId]/route');
-    const res = await GET(req('/api/classes/class-A'), {
+    const { GET } = await import('@/app/api/v1/classes/[classId]/route');
+    const res = await GET(req('/api/v1/classes/class-A'), {
       params: Promise.resolve({ classId: 'class-A' }),
     });
     expect(res.status).toBe(404);

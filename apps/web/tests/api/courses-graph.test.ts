@@ -31,12 +31,12 @@ vi.mock('@/lib/logger', () => ({
 
 // ---- Import under test ----
 
-import { GET } from '@/app/api/courses/[courseId]/graph/route';
+import { GET } from '@/app/api/v1/courses/[courseId]/graph/route';
 
 // ---- Helpers ----
 
 function makeGetRequest(courseId: string): NextRequest {
-  return new NextRequest(`http://localhost:3000/api/courses/${courseId}/graph`, { method: 'GET' });
+  return new NextRequest(`http://localhost:3000/api/v1/courses/${courseId}/graph`, { method: 'GET' });
 }
 
 function courseParams(courseId: string) {
@@ -55,7 +55,7 @@ const SAMPLE_GRAPH = {
 
 // ---- Tests ----
 
-describe('GET /api/courses/[courseId]/graph', () => {
+describe('GET /api/v1/courses/[courseId]/graph', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuthenticateRequest.mockResolvedValue({ userId: 'u1' });

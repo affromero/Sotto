@@ -74,7 +74,7 @@ export function ReportQueue() {
     if (targetTypeFilter) params.set('targetType', targetTypeFilter);
     if (reasonFilter) params.set('reason', reasonFilter);
 
-    const response = await fetch(`/api/admin/reports?${params}`);
+    const response = await fetch(`/api/v1/admin/reports?${params}`);
     if (response.ok) {
       const data = await response.json();
       setReports(data.items);
@@ -84,7 +84,7 @@ export function ReportQueue() {
   }, [page, statusFilter, targetTypeFilter, reasonFilter]);
 
   const fetchStats = useCallback(async () => {
-    const response = await fetch('/api/admin/reports/stats');
+    const response = await fetch('/api/v1/admin/reports/stats');
     if (response.ok) {
       setStats(await response.json());
     }
@@ -101,7 +101,7 @@ export function ReportQueue() {
   const resolveReport = useCallback(
     async (reportId: string, status: string, resolution: string) => {
       setActing(reportId);
-      const response = await fetch(`/api/admin/reports/${reportId}`, {
+      const response = await fetch(`/api/v1/admin/reports/${reportId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status, resolution }),
@@ -126,7 +126,7 @@ export function ReportQueue() {
       const body: Record<string, unknown> = { action, reason };
       if (durationDays) body.durationDays = durationDays;
 
-      const modResponse = await fetch(`/api/admin/users/${userId}/moderate`, {
+      const modResponse = await fetch(`/api/v1/admin/users/${userId}/moderate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -143,7 +143,7 @@ export function ReportQueue() {
   const removeBadge = useCallback(
     async (reportId: string, podcastId: string) => {
       setActing(reportId);
-      const response = await fetch(`/api/admin/podcasts/${podcastId}/badge`, {
+      const response = await fetch(`/api/v1/admin/podcasts/${podcastId}/badge`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

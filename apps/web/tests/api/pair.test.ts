@@ -44,13 +44,13 @@ function postReq(path: string, body: unknown): NextRequest {
   });
 }
 
-describe('POST /api/auth/pair (issue)', () => {
+describe('POST /api/v1/auth/pair (issue)', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('rejects an unauthenticated request with 401', async () => {
     mockAuth.mockResolvedValue(null);
-    const { POST } = await import('@/app/api/auth/pair/route');
-    const res = await POST(postReq('/api/auth/pair', {}));
+    const { POST } = await import('@/app/api/v1/auth/pair/route');
+    const res = await POST(postReq('/api/v1/auth/pair', {}));
     expect(res.status).toBe(401);
     expect(mockCreatePairingToken).not.toHaveBeenCalled();
   });
@@ -61,8 +61,8 @@ describe('POST /api/auth/pair (issue)', () => {
       token: 'rawtok',
       expiresAt: new Date('2030-01-01T00:00:00Z'),
     });
-    const { POST } = await import('@/app/api/auth/pair/route');
-    const res = await POST(postReq('/api/auth/pair', { name: 'My iPad' }));
+    const { POST } = await import('@/app/api/v1/auth/pair/route');
+    const res = await POST(postReq('/api/v1/auth/pair', { name: 'My iPad' }));
     expect(res.status).toBe(201);
     const json = await res.json();
     expect(json.token).toBe('rawtok');
@@ -72,14 +72,14 @@ describe('POST /api/auth/pair (issue)', () => {
   });
 });
 
-describe('POST /api/auth/pair/redeem', () => {
+describe('POST /api/v1/auth/pair/redeem', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('mints an API key for a valid token', async () => {
     mockRedeemPairingToken.mockResolvedValue({ userId: 'user-1', name: 'iPad' });
     mockUserFindUnique.mockResolvedValue({ id: 'user-1', name: 'A', email: 'a@x.co', handle: null, image: null, role: 'USER' });
-    const { POST } = await import('@/app/api/auth/pair/redeem/route');
-    const res = await POST(postReq('/api/auth/pair/redeem', { token: 'rawtoken123' }));
+    const { POST } = await import('@/app/api/v1/auth/pair/redeem/route');
+    const res = await POST(postReq('/api/v1/auth/pair/redeem', { token: 'rawtoken123' }));
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.token).toBe('sk_sotto_paired');
@@ -91,15 +91,15 @@ describe('POST /api/auth/pair/redeem', () => {
 
   it('rejects an invalid/expired/used token with 401 and mints nothing', async () => {
     mockRedeemPairingToken.mockResolvedValue(null);
-    const { POST } = await import('@/app/api/auth/pair/redeem/route');
-    const res = await POST(postReq('/api/auth/pair/redeem', { token: 'badtoken123' }));
+    const { POST } = await import('@/app/api/v1/auth/pair/redeem/route');
+    const res = await POST(postReq('/api/v1/auth/pair/redeem', { token: 'badtoken123' }));
     expect(res.status).toBe(401);
     expect(mockApiKeyCreate).not.toHaveBeenCalled();
   });
 
   it('rejects a malformed body with 400', async () => {
-    const { POST } = await import('@/app/api/auth/pair/redeem/route');
-    const res = await POST(postReq('/api/auth/pair/redeem', { token: 'x' }));
+    const { POST } = await import('@/app/api/v1/auth/pair/redeem/route');
+    const res = await POST(postReq('/api/v1/auth/pair/redeem', { token: 'x' }));
     expect(res.status).toBe(400);
     expect(mockRedeemPairingToken).not.toHaveBeenCalled();
   });

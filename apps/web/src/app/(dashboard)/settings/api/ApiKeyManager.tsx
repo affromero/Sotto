@@ -28,7 +28,7 @@ export function ApiKeyManager({ initialKeys }: ApiKeyManagerProps) {
       setCreating(true);
       setError(null);
       try {
-        const response = await fetch('/api/keys', {
+        const response = await fetch('/api/v1/keys', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name: name.trim() }),
@@ -65,7 +65,7 @@ export function ApiKeyManager({ initialKeys }: ApiKeyManagerProps) {
   const handleRevoke = useCallback(async (keyId: string) => {
     setRevokingId(keyId);
     try {
-      const response = await fetch(`/api/keys/${keyId}`, { method: 'DELETE' });
+      const response = await fetch(`/api/v1/keys/${keyId}`, { method: 'DELETE' });
       if (response.ok || response.status === 204) {
         setKeys((prev) =>
           prev.map((k) => (k.id === keyId ? { ...k, revokedAt: new Date().toISOString() } : k))

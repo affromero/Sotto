@@ -56,7 +56,7 @@ export function TtsProviderCards({
         }
       }
 
-      const res = await fetch('/api/settings/byok', {
+      const res = await fetch('/api/v1/settings/byok', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -95,7 +95,7 @@ export function TtsProviderCards({
   const handleRemoveKey = async (providerId: string) => {
     setSavingId(providerId);
     try {
-      await fetch('/api/settings/byok', {
+      await fetch('/api/v1/settings/byok', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ provider: providerId }),

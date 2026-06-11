@@ -23,7 +23,7 @@ export function DeviceConnect() {
     setError(null);
     setCopied(false);
     try {
-      const res = await fetch('/api/auth/pair', { method: 'POST' });
+      const res = await fetch('/api/v1/auth/pair', { method: 'POST' });
       if (!res.ok) {
         setError('Could not create a pairing code. Try again.');
         return;

@@ -115,7 +115,7 @@ export function HouseholdManager() {
 
   const loadSiteConfig = useCallback(async () => {
     try {
-      const response = await fetch('/api/admin/site-config');
+      const response = await fetch('/api/v1/admin/site-config');
       if (!response.ok) return;
       const data: { openSignup: boolean } = await response.json();
       setOpenSignup(data.openSignup);
@@ -130,7 +130,7 @@ export function HouseholdManager() {
     setError(null);
     const next = !openSignup;
     try {
-      const response = await fetch('/api/admin/site-config', {
+      const response = await fetch('/api/v1/admin/site-config', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ openSignup: next }),
@@ -150,7 +150,7 @@ export function HouseholdManager() {
 
   const loadInvitations = useCallback(async () => {
     try {
-      const response = await fetch('/api/admin/invitations');
+      const response = await fetch('/api/v1/admin/invitations');
       if (!response.ok) {
         setError('Could not load invitations.');
         return;
@@ -166,7 +166,7 @@ export function HouseholdManager() {
 
   const loadMembers = useCallback(async () => {
     try {
-      const response = await fetch('/api/household/members');
+      const response = await fetch('/api/v1/household/members');
       if (!response.ok) {
         setError('Could not load household members.');
         return;
@@ -191,7 +191,7 @@ export function HouseholdManager() {
     setError(null);
     setCopied(false);
     try {
-      const response = await fetch('/api/admin/invitations', { method: 'POST' });
+      const response = await fetch('/api/v1/admin/invitations', { method: 'POST' });
       if (!response.ok) {
         const data = await response.json().catch(() => null);
         setError(data?.error ? String(data.error) : 'Could not create an invite.');
@@ -218,7 +218,7 @@ export function HouseholdManager() {
   const handleRevoke = useCallback(async (id: string) => {
     setRevokingId(id);
     try {
-      const response = await fetch('/api/admin/invitations', {
+      const response = await fetch('/api/v1/admin/invitations', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, enabled: false }),
@@ -253,7 +253,7 @@ export function HouseholdManager() {
       setCreatedMember(null);
       setCredentialsCopied(false);
       try {
-        const response = await fetch('/api/household/members', {
+        const response = await fetch('/api/v1/household/members', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -311,7 +311,7 @@ export function HouseholdManager() {
       setSavingMemberId(memberId);
       setMemberError(null);
       try {
-        const response = await fetch('/api/household/members', {
+        const response = await fetch('/api/v1/household/members', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ memberId, name: trimmedName, avatar: editAvatar }),
@@ -337,7 +337,7 @@ export function HouseholdManager() {
     setResetResult(null);
     const tempPassword = generateTempPassword();
     try {
-      const response = await fetch('/api/household/members', {
+      const response = await fetch('/api/v1/household/members', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ memberId, resetPassword: tempPassword }),
@@ -359,7 +359,7 @@ export function HouseholdManager() {
       setRemovingId(memberId);
       setMemberError(null);
       try {
-        const response = await fetch('/api/household/members', {
+        const response = await fetch('/api/v1/household/members', {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ memberId }),

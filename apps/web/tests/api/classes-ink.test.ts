@@ -36,7 +36,7 @@ vi.mock('@/lib/api-response', () => ({
 // ---- Helpers ----
 
 function makeRequest(method: string, body?: unknown): NextRequest {
-  return new NextRequest('http://localhost:3000/api/classes/class-1/ink', {
+  return new NextRequest('http://localhost:3000/api/v1/classes/class-1/ink', {
     method,
     headers: body ? { 'Content-Type': 'application/json' } : {},
     body: body !== undefined ? JSON.stringify(body) : undefined,
@@ -46,13 +46,13 @@ function makeRequest(method: string, body?: unknown): NextRequest {
 const PARAMS = Promise.resolve({ classId: 'class-1' });
 
 async function getHandlers() {
-  const mod = await import('@/app/api/classes/[classId]/ink/route');
+  const mod = await import('@/app/api/v1/classes/[classId]/ink/route');
   return { POST: mod.POST, GET: mod.GET };
 }
 
 // ---- Tests ----
 
-describe('POST /api/classes/[classId]/ink', () => {
+describe('POST /api/v1/classes/[classId]/ink', () => {
   let POST: Awaited<ReturnType<typeof getHandlers>>['POST'];
 
   beforeEach(async () => {
@@ -104,7 +104,7 @@ describe('POST /api/classes/[classId]/ink', () => {
   it('returns 400 for invalid JSON body', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockCourseClassFindFirst.mockResolvedValue({ id: 'class-1' });
-    const req = new NextRequest('http://localhost:3000/api/classes/class-1/ink', {
+    const req = new NextRequest('http://localhost:3000/api/v1/classes/class-1/ink', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: 'not-json',
@@ -145,7 +145,7 @@ describe('POST /api/classes/[classId]/ink', () => {
   });
 });
 
-describe('GET /api/classes/[classId]/ink', () => {
+describe('GET /api/v1/classes/[classId]/ink', () => {
   let GET: Awaited<ReturnType<typeof getHandlers>>['GET'];
 
   beforeEach(async () => {

@@ -201,7 +201,7 @@ export function PodcastPlayerView({
   // Fetch knowledge gaps for owner
   useEffect(() => {
     if (!isOwner || podcast.status !== 'READY') return;
-    fetch(`/api/podcasts/${podcast.id}/knowledge-gaps`)
+    fetch(`/api/v1/podcasts/${podcast.id}/knowledge-gaps`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data?.segments) {
@@ -222,7 +222,7 @@ export function PodcastPlayerView({
       ['GENERATING_AUDIO', 'STITCHING'].includes(liveFailedAtStatus ?? ''));
   useEffect(() => {
     if (!needsScript || !isOwner) return;
-    fetch(`/api/podcasts/${podcast.id}/script`)
+    fetch(`/api/v1/podcasts/${podcast.id}/script`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data?.turns) setScriptTurns(data.turns);
@@ -273,7 +273,7 @@ export function PodcastPlayerView({
     setSegmentVisuals([]);
     setVideoGenerationId(null);
     setVideoError(null);
-    fetch(`/api/podcasts/${podcast.id}/video`)
+    fetch(`/api/v1/podcasts/${podcast.id}/video`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (!data?.status) return;
@@ -314,7 +314,7 @@ export function PodcastPlayerView({
     if (!avatarGenerating) return;
     const poll = async () => {
       try {
-        const res = await fetch(`/api/podcasts/${podcast.id}/video`);
+        const res = await fetch(`/api/v1/podcasts/${podcast.id}/video`);
         if (!res.ok) return;
         const data = await res.json();
         if (data.avatarOverlays) {
@@ -355,7 +355,7 @@ export function PodcastPlayerView({
       // If we already have pipeline data in memory, just reopen the editor
       if (pipelineData && !override && !forceReclassify) {
         if (!falModels) {
-          const res = await fetch('/api/fal-models');
+          const res = await fetch('/api/v1/fal-models');
           if (res.ok) setFalModels(await res.json());
         }
         setShowPipelineEditor(true);
@@ -368,8 +368,8 @@ export function PodcastPlayerView({
         // Check for a saved draft before triggering classification
         if (!override && !forceReclassify) {
           const [draftRes, modelsRes] = await Promise.all([
-            fetch(`/api/podcasts/${podcast.id}/video/pipeline`),
-            !falModels ? fetch('/api/fal-models') : Promise.resolve(null),
+            fetch(`/api/v1/podcasts/${podcast.id}/video/pipeline`),
+            !falModels ? fetch('/api/v1/fal-models') : Promise.resolve(null),
           ]);
           if (modelsRes?.ok) setFalModels(await modelsRes.json());
           if (draftRes.ok) {
@@ -394,8 +394,8 @@ export function PodcastPlayerView({
             }
           : { method: 'POST' };
         const [pipelineRes, modelsRes] = await Promise.all([
-          fetch(`/api/podcasts/${podcast.id}/video/pipeline`, pipelineOpts),
-          !falModels ? fetch('/api/fal-models') : Promise.resolve(null),
+          fetch(`/api/v1/podcasts/${podcast.id}/video/pipeline`, pipelineOpts),
+          !falModels ? fetch('/api/v1/fal-models') : Promise.resolve(null),
         ]);
         if (modelsRes?.ok) setFalModels(await modelsRes.json());
         if (!pipelineRes.ok) {
@@ -426,7 +426,7 @@ export function PodcastPlayerView({
     const poll = async () => {
       try {
         const res = await fetch(
-          `/api/podcasts/${podcast.id}/video/pipeline?classificationId=${classificationId}`
+          `/api/v1/podcasts/${podcast.id}/video/pipeline?classificationId=${classificationId}`
         );
         if (cancelled) return;
         if (!res.ok) {
@@ -470,7 +470,7 @@ export function PodcastPlayerView({
       setVideoState('generating');
       setVideoLoading(true);
       try {
-        const res = await fetch(`/api/podcasts/${podcast.id}/video`, {
+        const res = await fetch(`/api/v1/podcasts/${podcast.id}/video`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ pipeline }),
@@ -501,7 +501,7 @@ export function PodcastPlayerView({
       // Debounce API call
       if (avatarPositionTimerRef.current) clearTimeout(avatarPositionTimerRef.current);
       avatarPositionTimerRef.current = setTimeout(() => {
-        fetch(`/api/podcasts/${podcast.id}/video/avatars/positions`, {
+        fetch(`/api/v1/podcasts/${podcast.id}/video/avatars/positions`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ positions: [{ speaker, ...pos }] }),
@@ -516,7 +516,7 @@ export function PodcastPlayerView({
       setAvatarOverlays((prev) =>
         prev.map((o) => (o.speaker === speaker ? { ...o, maskShape: shape } : o))
       );
-      fetch(`/api/podcasts/${podcast.id}/video/avatars/positions`, {
+      fetch(`/api/v1/podcasts/${podcast.id}/video/avatars/positions`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ positions: [{ speaker, maskShape: shape }] }),
@@ -536,7 +536,7 @@ export function PodcastPlayerView({
         body.ttsProvider = provider;
         if (modelParts.length) body.ttsModel = modelParts.join(':');
       }
-      const response = await fetch(`/api/podcasts/${podcast.id}/generate`, {
+      const response = await fetch(`/api/v1/podcasts/${podcast.id}/generate`, {
         method: 'POST',
         ...(Object.keys(body).length > 0
           ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
@@ -553,7 +553,7 @@ export function PodcastPlayerView({
   const handleDelete = useCallback(async () => {
     setDeleting(true);
     try {
-      const response = await fetch(`/api/podcasts/${podcast.id}`, {
+      const response = await fetch(`/api/v1/podcasts/${podcast.id}`, {
         method: 'DELETE',
       });
       if (response.ok) {
@@ -576,7 +576,7 @@ export function PodcastPlayerView({
 
     setPdfLoading(true);
     try {
-      const response = await fetch(`/api/podcasts/${podcast.id}/export`, {
+      const response = await fetch(`/api/v1/podcasts/${podcast.id}/export`, {
         method: 'POST',
       });
       const data = await response.json();
@@ -591,7 +591,7 @@ export function PodcastPlayerView({
       // Poll for completion
       const pollInterval = setInterval(async () => {
         try {
-          const pollResponse = await fetch(`/api/podcasts/${podcast.id}/export`);
+          const pollResponse = await fetch(`/api/v1/podcasts/${podcast.id}/export`);
           const pollData = await pollResponse.json();
           if (pollData.status === 'ready' && pollData.pdfUrl) {
             clearInterval(pollInterval);
@@ -938,7 +938,7 @@ export function PodcastPlayerView({
                 onRequestEdit={async (visuals) => {
                   setSegmentVisuals(visuals as SegmentVisualData[]);
                   if (!falModels) {
-                    const res = await fetch('/api/fal-models');
+                    const res = await fetch('/api/v1/fal-models');
                     if (res.ok) setFalModels(await res.json());
                   }
                   setVideoState('failed');
@@ -956,7 +956,7 @@ export function PodcastPlayerView({
                   className={styles.toolbarBtn}
                   onClick={async () => {
                     if (!falModels) {
-                      const res = await fetch('/api/fal-models');
+                      const res = await fetch('/api/v1/fal-models');
                       if (res.ok) setFalModels(await res.json());
                     }
                     setShowVideoEditor(true);
@@ -1037,9 +1037,9 @@ export function PodcastPlayerView({
                     className={styles.toolbarBtn}
                     onClick={async () => {
                       const [falRes, visualRes] = await Promise.all([
-                        !falModels ? fetch('/api/fal-models') : Promise.resolve(null),
+                        !falModels ? fetch('/api/v1/fal-models') : Promise.resolve(null),
                         segmentVisuals.length === 0
-                          ? fetch(`/api/podcasts/${podcast.id}/video`)
+                          ? fetch(`/api/v1/podcasts/${podcast.id}/video`)
                           : Promise.resolve(null),
                       ]);
                       if (falRes?.ok) setFalModels(await falRes.json());
@@ -1065,7 +1065,7 @@ export function PodcastPlayerView({
                       setVideoLoading(true);
                       setVideoError(null);
                       try {
-                        const res = await fetch(`/api/podcasts/${podcast.id}/video`, {
+                        const res = await fetch(`/api/v1/podcasts/${podcast.id}/video`, {
                           method: 'POST',
                         });
                         if (!res.ok) {
@@ -1312,7 +1312,7 @@ export function PodcastPlayerView({
                     avatarsVisible={avatarsVisible}
                     onAvatarsVisibleChange={async (visible) => {
                       setAvatarsVisible(visible);
-                      await fetch(`/api/podcasts/${podcast.id}/video`, {
+                      await fetch(`/api/v1/podcasts/${podcast.id}/video`, {
                         method: 'PATCH',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ avatarsVisible: visible }),
@@ -1447,7 +1447,7 @@ export function PodcastPlayerView({
                 setPipelineData(edited);
                 setShowPipelineEditor(false);
                 // Persist edits to DRAFT (fire-and-forget via PATCH)
-                fetch(`/api/podcasts/${podcast.id}/video/pipeline`, {
+                fetch(`/api/v1/podcasts/${podcast.id}/video/pipeline`, {
                   method: 'PATCH',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify(edited),

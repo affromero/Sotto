@@ -18,19 +18,19 @@ vi.mock('@/lib/course-notes', () => ({
 }));
 vi.mock('@/lib/logger', () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } }));
 
-import { GET, PUT } from '@/app/api/courses/[courseId]/notes/route';
+import { GET, PUT } from '@/app/api/v1/courses/[courseId]/notes/route';
 
 const PARAMS = { params: Promise.resolve({ courseId: 'course-1' }) };
 
 function putReq(body: unknown): NextRequest {
-  return new NextRequest('http://localhost:3000/api/courses/course-1/notes', {
+  return new NextRequest('http://localhost:3000/api/v1/courses/course-1/notes', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
 }
 function getReq(): NextRequest {
-  return new NextRequest('http://localhost:3000/api/courses/course-1/notes', { method: 'GET' });
+  return new NextRequest('http://localhost:3000/api/v1/courses/course-1/notes', { method: 'GET' });
 }
 
 beforeEach(() => {
@@ -39,7 +39,7 @@ beforeEach(() => {
   mockCourseFindFirst.mockResolvedValue({ id: 'course-1' });
 });
 
-describe('GET /api/courses/[courseId]/notes', () => {
+describe('GET /api/v1/courses/[courseId]/notes', () => {
   it('returns the note body for the owner', async () => {
     mockGetCourseNote.mockResolvedValue('travel to Italy');
     const res = await GET(getReq(), PARAMS);
@@ -61,7 +61,7 @@ describe('GET /api/courses/[courseId]/notes', () => {
   });
 });
 
-describe('PUT /api/courses/[courseId]/notes', () => {
+describe('PUT /api/v1/courses/[courseId]/notes', () => {
   it('saves a valid note for the owner', async () => {
     mockGetCourseNote.mockResolvedValue('focus on speaking');
     const res = await PUT(putReq({ body: 'focus on speaking' }), PARAMS);

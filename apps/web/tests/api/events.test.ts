@@ -23,12 +23,12 @@ vi.mock('@/lib/queue', () => ({
 
 // ── Import route AFTER mocks ──────────────────────────────────────────
 
-import { POST } from '@/app/api/events/route';
+import { POST } from '@/app/api/v1/events/route';
 
 // ── Helpers ───────────────────────────────────────────────────────────
 
 function createRequest(body: unknown, headers?: Record<string, string>): NextRequest {
-  return new NextRequest(new URL('http://localhost:3000/api/events'), {
+  return new NextRequest(new URL('http://localhost:3000/api/v1/events'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...headers },
     body: JSON.stringify(body),
@@ -60,7 +60,7 @@ function validBatch(events = [validEvent()]) {
 
 // ── Tests ─────────────────────────────────────────────────────────────
 
-describe('POST /api/events', () => {
+describe('POST /api/v1/events', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuth.mockResolvedValue(null);
@@ -71,7 +71,7 @@ describe('POST /api/events', () => {
   // ── Validation ────────────────────────────────────────────────────
 
   it('returns 400 for invalid JSON', async () => {
-    const req = new NextRequest(new URL('http://localhost:3000/api/events'), {
+    const req = new NextRequest(new URL('http://localhost:3000/api/v1/events'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: '{not-json',
