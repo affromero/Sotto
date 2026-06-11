@@ -124,7 +124,7 @@ const nextConfig = {
     // for duplicate header keys. So: API → catch-all → embed (most specific last).
     return [
       {
-        source: '/api/:path*',
+        source: '/api/v1/:path*',
         headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow, nosnippet' }],
       },
       {
@@ -164,7 +164,7 @@ module.exports = withSentryConfig(nextConfig, {
   org: process.env.SENTRY_ORG,
   project: process.env.SENTRY_PROJECT,
   silent: !process.env.CI,
-  tunnelRoute: '/api/monitoring',
+  tunnelRoute: '/api/v1/monitoring',
   widenClientFileUpload: true,
   sourcemaps: {
     deleteSourcemapsAfterUpload: true,

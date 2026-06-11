@@ -36,7 +36,7 @@ export function VoiceVerificationChallenge({
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`/api/voices/verify?voiceCloneId=${voiceCloneId}`);
+        const res = await fetch(`/api/v1/voices/verify?voiceCloneId=${voiceCloneId}`);
         if (cancelled) return;
         const data = await res.json();
         if (cancelled) return;
@@ -80,7 +80,7 @@ export function VoiceVerificationChallenge({
       formData.append('voiceCloneId', voiceCloneId);
       formData.append('audio', recorder.recordedBlob, 'challenge.webm');
 
-      const res = await fetch('/api/voices/verify', {
+      const res = await fetch('/api/v1/voices/verify', {
         method: 'POST',
         body: formData,
       });
@@ -95,11 +95,11 @@ export function VoiceVerificationChallenge({
       // Poll for result
       setStatus('polling');
       pollRef.current = setInterval(async () => {
-        const pollRes = await fetch(`/api/voices/verify?voiceCloneId=${voiceCloneId}`);
+        const pollRes = await fetch(`/api/v1/voices/verify?voiceCloneId=${voiceCloneId}`);
         const pollData = await pollRes.json();
 
         // Re-fetch the voice clone status
-        const voiceRes = await fetch('/api/voices');
+        const voiceRes = await fetch('/api/v1/voices');
         const voiceData = await voiceRes.json();
         const voice = voiceData.userClones?.find(
           (v: { id: string; verificationStatus: string }) => v.id === voiceCloneId

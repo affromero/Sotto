@@ -55,11 +55,11 @@ vi.mock('@/lib/auto-model-config', () => ({
   getAutoModelConfig: (...args: unknown[]) => mockGetAutoModelConfig(...args),
 }));
 
-import { POST } from '@/app/api/admin/podcasts/create-as-system-owner/route';
-import { DELETE } from '@/app/api/admin/podcasts/[podcastId]/route';
+import { POST } from '@/app/api/v1/admin/podcasts/create-as-system-owner/route';
+import { DELETE } from '@/app/api/v1/admin/podcasts/[podcastId]/route';
 
 function createPostRequest(body: Record<string, unknown>): NextRequest {
-  return new NextRequest(new URL('http://localhost:3000/api/admin/podcasts/create-as-system-owner'), {
+  return new NextRequest(new URL('http://localhost:3000/api/v1/admin/podcasts/create-as-system-owner'), {
     method: 'POST',
     body: JSON.stringify(body),
     headers: { 'Content-Type': 'application/json' },
@@ -67,7 +67,7 @@ function createPostRequest(body: Record<string, unknown>): NextRequest {
 }
 
 function createDeleteRequest(): NextRequest {
-  return new NextRequest(new URL('http://localhost:3000/api/admin/podcasts/pod-1'), {
+  return new NextRequest(new URL('http://localhost:3000/api/v1/admin/podcasts/pod-1'), {
     method: 'DELETE',
   });
 }
@@ -76,7 +76,7 @@ async function createParams(podcastId: string) {
   return { params: Promise.resolve({ podcastId }) };
 }
 
-describe('POST /api/admin/podcasts/create-as-system-owner', () => {
+describe('POST /api/v1/admin/podcasts/create-as-system-owner', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubEnv('SYSTEM_USER_HANDLE', 'system');
@@ -230,7 +230,7 @@ describe('POST /api/admin/podcasts/create-as-system-owner', () => {
   });
 });
 
-describe('DELETE /api/admin/podcasts/[podcastId]', () => {
+describe('DELETE /api/v1/admin/podcasts/[podcastId]', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });

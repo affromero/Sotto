@@ -24,7 +24,7 @@ export function PedagogySelector({ courseId, current }: Props) {
     setValue(next);
     setStatus('saving');
     try {
-      const res = await fetch(`/api/courses/${courseId}/pedagogy`, {
+      const res = await fetch(`/api/v1/courses/${courseId}/pedagogy`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pedagogy: next }),

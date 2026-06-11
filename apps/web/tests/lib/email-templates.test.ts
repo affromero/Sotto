@@ -16,7 +16,7 @@ describe('email templates', () => {
 
   it('generates user unsubscribe links for the configured deployment URL', () => {
     expect(generateUserUnsubscribeUrl('user-1')).toMatch(
-      /^https:\/\/selfhost\.example\.com\/api\/users\/unsubscribe\?userId=user-1&sig=[a-f0-9]{64}$/
+      /^https:\/\/selfhost\.example\.com\/api\/v1\/users\/unsubscribe\?userId=user-1&sig=[a-f0-9]{64}$/
     );
   });
 

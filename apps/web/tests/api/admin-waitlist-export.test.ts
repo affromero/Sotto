@@ -15,9 +15,9 @@ vi.mock('@/lib/prisma', () => ({
   },
 }));
 
-import { GET } from '@/app/api/admin/waitlist/export/route';
+import { GET } from '@/app/api/v1/admin/waitlist/export/route';
 
-describe('GET /api/admin/waitlist/export', () => {
+describe('GET /api/v1/admin/waitlist/export', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });

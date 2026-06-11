@@ -4,13 +4,13 @@ Admin-only UI for creating cinematic product launch videos.
 
 ## Workflow (7 Steps)
 
-1. **Script** — Import or generate a launch video script (`/api/admin/demo` POST)
+1. **Script** — Import or generate a launch video script (`/api/v1/admin/demo` POST)
 2. **Podcast** — Link a podcast episode for audio + timing
 3. **Video** — Classify and generate visuals per scene
 4. **Avatar** — Generate avatar clips (optional)
 5. **Recording** — Capture/upload scene recordings via Playwright on the Remotion sidecar
 6. **Timing** — Fine-tune timing segments, transitions, SFX cues
-7. **Compose** — Final video composition → `POST /api/admin/demo/[projectId]/compose`
+7. **Compose** — Final video composition → `POST /api/v1/admin/demo/[projectId]/compose`
 
 ## Components
 
@@ -45,7 +45,7 @@ DemoProject.scenes → demo-composition.worker.ts
 
 ## API Routes
 
-All under `/api/admin/demo/` — require admin auth.
+All under `/api/v1/admin/demo/` — require admin auth.
 
 | Route | Method | What |
 |-------|--------|------|

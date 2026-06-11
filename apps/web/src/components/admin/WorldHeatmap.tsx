@@ -56,7 +56,7 @@ export function WorldHeatmap({ initialData, range = '15m' }: WorldHeatmapProps) 
 
   const fetchLive = useCallback(async () => {
     try {
-      const res = await fetch(`/api/admin/analytics/live?range=${range}`);
+      const res = await fetch(`/api/v1/admin/analytics/live?range=${range}`);
       if (res.ok) {
         const json = await res.json();
         setData(json);

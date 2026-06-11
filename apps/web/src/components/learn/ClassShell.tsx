@@ -87,7 +87,7 @@ export function ClassShell({ classId }: ClassShellProps) {
 
   const loadClass = useCallback(async () => {
     try {
-      const res = await fetch(`/api/classes/${classId}`);
+      const res = await fetch(`/api/v1/classes/${classId}`);
       if (res.status === 404) {
         setErrorMessage('Class not found.');
         setView('error');
@@ -156,7 +156,7 @@ export function ClassShell({ classId }: ClassShellProps) {
     }));
 
     try {
-      const res = await fetch(`/api/classes/${classId}/submit`, {
+      const res = await fetch(`/api/v1/classes/${classId}/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ answers: answerList }),
@@ -170,7 +170,7 @@ export function ClassShell({ classId }: ClassShellProps) {
       const submitResult = (await res.json()) as ClassSubmitResult;
       setResult(submitResult);
       // Reload so correctIndex + explanation are available if the learner reopens.
-      const classRes = await fetch(`/api/classes/${classId}`);
+      const classRes = await fetch(`/api/v1/classes/${classId}`);
       if (classRes.ok) {
         const updated = (await classRes.json()) as ClassData;
         setCls(updated);
@@ -197,7 +197,7 @@ export function ClassShell({ classId }: ClassShellProps) {
     setRegenerating(true);
     setErrorMessage('');
     try {
-      const res = await fetch(`/api/classes/${classId}`, { method: 'POST' });
+      const res = await fetch(`/api/v1/classes/${classId}`, { method: 'POST' });
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
         setErrorMessage(body.error ?? 'Failed to regenerate. Please try again.');
@@ -332,7 +332,7 @@ export function ClassShell({ classId }: ClassShellProps) {
         stage = (
           <SpeakingSection
             key={seg.id}
-            endpointBase={`/api/classes/${classId}/speaking`}
+            endpointBase={`/api/v1/classes/${classId}/speaking`}
             prompts={seg.prompts}
             gate={gate}
             nextName={nextName}
@@ -344,7 +344,7 @@ export function ClassShell({ classId }: ClassShellProps) {
         stage = (
           <WritingSection
             key={seg.id}
-            endpointBase={`/api/classes/${classId}/writing`}
+            endpointBase={`/api/v1/classes/${classId}/writing`}
             prompts={seg.writingPrompts}
             gate={gate}
             nextName={nextName}

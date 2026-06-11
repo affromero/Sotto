@@ -124,16 +124,16 @@ vi.mock('@/lib/logger', () => ({
   },
 }));
 
-import { GET } from '@/app/api/voices/route';
+import { GET } from '@/app/api/v1/voices/route';
 import {
   POST as POST_CLONE,
   PATCH as PATCH_CLONE,
   DELETE as DELETE_CLONE,
-} from '@/app/api/voices/clone/route';
-import { POST as POST_PREVIEW } from '@/app/api/voices/preview/route';
+} from '@/app/api/v1/voices/clone/route';
+import { POST as POST_PREVIEW } from '@/app/api/v1/voices/preview/route';
 
 function createRequest(
-  url = 'http://localhost:3000/api/voices',
+  url = 'http://localhost:3000/api/v1/voices',
   options?: RequestInit
 ): NextRequest {
   return new NextRequest(url, options as any);
@@ -168,7 +168,7 @@ const mockVoiceClone2 = {
   updatedAt: new Date('2025-01-16T10:00:00Z'),
 };
 
-describe('GET /api/voices', () => {
+describe('GET /api/v1/voices', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUserFindUniqueOrThrow.mockResolvedValue({});
@@ -288,7 +288,7 @@ describe('GET /api/voices', () => {
       },
     ]);
 
-    const request = createRequest('http://localhost:3000/api/voices?provider=cartesia');
+    const request = createRequest('http://localhost:3000/api/v1/voices?provider=cartesia');
     const response = await GET(request);
     const body = await response.json();
 
@@ -317,7 +317,7 @@ describe('GET /api/voices', () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockVoiceCloneFindMany.mockResolvedValue([]);
 
-    const request = createRequest('http://localhost:3000/api/voices?provider=invalid');
+    const request = createRequest('http://localhost:3000/api/v1/voices?provider=invalid');
     const response = await GET(request);
     const body = await response.json();
 
@@ -327,7 +327,7 @@ describe('GET /api/voices', () => {
   });
 });
 
-describe('POST /api/voices/clone', () => {
+describe('POST /api/v1/voices/clone', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUserFindUniqueOrThrow.mockResolvedValue({ role: 'USER' });
@@ -340,7 +340,7 @@ describe('POST /api/voices/clone', () => {
     formData.append('name', 'Test Voice');
     formData.append('sourceType', 'UPLOAD');
 
-    const request = createRequest('http://localhost:3000/api/voices/clone', {
+    const request = createRequest('http://localhost:3000/api/v1/voices/clone', {
       method: 'POST',
       body: formData,
     });
@@ -359,7 +359,7 @@ describe('POST /api/voices/clone', () => {
     formData.append('name', 'Test Voice');
     formData.append('sourceType', 'UPLOAD');
 
-    const request = createRequest('http://localhost:3000/api/voices/clone', {
+    const request = createRequest('http://localhost:3000/api/v1/voices/clone', {
       method: 'POST',
       body: formData,
     });
@@ -377,7 +377,7 @@ describe('POST /api/voices/clone', () => {
     const formData = new FormData();
     formData.append('sourceType', 'UPLOAD');
 
-    const request = createRequest('http://localhost:3000/api/voices/clone', {
+    const request = createRequest('http://localhost:3000/api/v1/voices/clone', {
       method: 'POST',
       body: formData,
     });
@@ -394,7 +394,7 @@ describe('POST /api/voices/clone', () => {
     formData.append('name', 'Test Voice');
     formData.append('sourceType', 'INVALID');
 
-    const request = createRequest('http://localhost:3000/api/voices/clone', {
+    const request = createRequest('http://localhost:3000/api/v1/voices/clone', {
       method: 'POST',
       body: formData,
     });
@@ -411,7 +411,7 @@ describe('POST /api/voices/clone', () => {
     formData.append('name', 'Test Voice');
     formData.append('sourceType', 'UPLOAD');
 
-    const request = createRequest('http://localhost:3000/api/voices/clone', {
+    const request = createRequest('http://localhost:3000/api/v1/voices/clone', {
       method: 'POST',
       body: formData,
     });
@@ -570,7 +570,7 @@ describe('POST /api/voices/clone', () => {
   });
 });
 
-describe('PATCH /api/voices/clone', () => {
+describe('PATCH /api/v1/voices/clone', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -580,7 +580,7 @@ describe('PATCH /api/voices/clone', () => {
     mockVoiceCloneFindUnique.mockResolvedValue({ ...mockVoiceClone, userId: 'user-1' });
     mockVoiceCloneUpdate.mockResolvedValue({ ...mockVoiceClone, description: 'A warm narrator' });
 
-    const request = createRequest('http://localhost:3000/api/voices/clone', {
+    const request = createRequest('http://localhost:3000/api/v1/voices/clone', {
       method: 'PATCH',
       body: JSON.stringify({ voiceCloneId: 'clone-1', description: 'A warm narrator' }),
     });
@@ -598,7 +598,7 @@ describe('PATCH /api/voices/clone', () => {
   it('returns 400 when description is missing', async () => {
     mockAuth.mockResolvedValue(mockSession);
 
-    const request = createRequest('http://localhost:3000/api/voices/clone', {
+    const request = createRequest('http://localhost:3000/api/v1/voices/clone', {
       method: 'PATCH',
       body: JSON.stringify({ voiceCloneId: 'clone-1' }),
     });
@@ -612,7 +612,7 @@ describe('PATCH /api/voices/clone', () => {
     mockAuth.mockResolvedValue(mockSession);
     mockVoiceCloneFindUnique.mockResolvedValue({ ...mockVoiceClone, userId: 'user-2' });
 
-    const request = createRequest('http://localhost:3000/api/voices/clone', {
+    const request = createRequest('http://localhost:3000/api/v1/voices/clone', {
       method: 'PATCH',
       body: JSON.stringify({ voiceCloneId: 'clone-1', description: 'hijack' }),
     });
@@ -623,7 +623,7 @@ describe('PATCH /api/voices/clone', () => {
   });
 });
 
-describe('DELETE /api/voices/clone', () => {
+describe('DELETE /api/v1/voices/clone', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -631,7 +631,7 @@ describe('DELETE /api/voices/clone', () => {
   it('returns 401 when user is not authenticated', async () => {
     mockAuth.mockResolvedValue(null);
 
-    const request = createRequest('http://localhost:3000/api/voices/clone', {
+    const request = createRequest('http://localhost:3000/api/v1/voices/clone', {
       method: 'DELETE',
       body: JSON.stringify({ voiceCloneId: 'clone-1' }),
     });
@@ -645,7 +645,7 @@ describe('DELETE /api/voices/clone', () => {
   it('returns 400 when voiceCloneId is missing', async () => {
     mockAuth.mockResolvedValue(mockSession);
 
-    const request = createRequest('http://localhost:3000/api/voices/clone', {
+    const request = createRequest('http://localhost:3000/api/v1/voices/clone', {
       method: 'DELETE',
       body: JSON.stringify({}),
     });
@@ -660,7 +660,7 @@ describe('DELETE /api/voices/clone', () => {
     mockAuth.mockResolvedValue(mockSession);
     mockVoiceCloneFindUnique.mockResolvedValue(null);
 
-    const request = createRequest('http://localhost:3000/api/voices/clone', {
+    const request = createRequest('http://localhost:3000/api/v1/voices/clone', {
       method: 'DELETE',
       body: JSON.stringify({ voiceCloneId: 'nonexistent' }),
     });
@@ -681,7 +681,7 @@ describe('DELETE /api/voices/clone', () => {
       sourceType: 'UPLOAD',
     });
 
-    const request = createRequest('http://localhost:3000/api/voices/clone', {
+    const request = createRequest('http://localhost:3000/api/v1/voices/clone', {
       method: 'DELETE',
       body: JSON.stringify({ voiceCloneId: 'clone-1' }),
     });
@@ -699,7 +699,7 @@ describe('DELETE /api/voices/clone', () => {
     mockVoiceRequestDeleteMany.mockResolvedValue({ count: 0 });
     mockVoiceCloneDelete.mockResolvedValue(mockVoiceClone);
 
-    const request = createRequest('http://localhost:3000/api/voices/clone', {
+    const request = createRequest('http://localhost:3000/api/v1/voices/clone', {
       method: 'DELETE',
       body: JSON.stringify({ voiceCloneId: 'clone-1' }),
     });
@@ -723,7 +723,7 @@ describe('DELETE /api/voices/clone', () => {
     mockVoiceRequestDeleteMany.mockResolvedValue({ count: 0 });
     mockVoiceCloneDelete.mockResolvedValue({});
 
-    const request = createRequest('http://localhost:3000/api/voices/clone', {
+    const request = createRequest('http://localhost:3000/api/v1/voices/clone', {
       method: 'DELETE',
       body: JSON.stringify({ voiceCloneId: 'clone-import' }),
     });
@@ -734,7 +734,7 @@ describe('DELETE /api/voices/clone', () => {
   });
 });
 
-describe('POST /api/voices/preview', () => {
+describe('POST /api/v1/voices/preview', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetByokKey.mockResolvedValue('user-elevenlabs-key');
@@ -753,7 +753,7 @@ describe('POST /api/voices/preview', () => {
   it('returns 401 when user is not authenticated', async () => {
     mockAuth.mockResolvedValue(null);
 
-    const request = createRequest('http://localhost:3000/api/voices/preview', {
+    const request = createRequest('http://localhost:3000/api/v1/voices/preview', {
       method: 'POST',
       body: JSON.stringify({ voiceId: 'voice-1', text: 'Hello world' }),
     });
@@ -768,7 +768,7 @@ describe('POST /api/voices/preview', () => {
     mockAuth.mockResolvedValue(mockSession);
     mockCheckRateLimit.mockResolvedValue({ allowed: false, remaining: 0 });
 
-    const request = createRequest('http://localhost:3000/api/voices/preview', {
+    const request = createRequest('http://localhost:3000/api/v1/voices/preview', {
       method: 'POST',
       body: JSON.stringify({ voiceId: 'voice-1', text: 'Hello world' }),
     });
@@ -783,7 +783,7 @@ describe('POST /api/voices/preview', () => {
     mockAuth.mockResolvedValue(mockSession);
     mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 9 });
 
-    const request = createRequest('http://localhost:3000/api/voices/preview', {
+    const request = createRequest('http://localhost:3000/api/v1/voices/preview', {
       method: 'POST',
       body: JSON.stringify({ text: 'Hello world' }),
     });
@@ -796,7 +796,7 @@ describe('POST /api/voices/preview', () => {
     mockAuth.mockResolvedValue(mockSession);
     mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 9 });
 
-    const request = createRequest('http://localhost:3000/api/voices/preview', {
+    const request = createRequest('http://localhost:3000/api/v1/voices/preview', {
       method: 'POST',
       body: JSON.stringify({ voiceId: 'voice-1' }),
     });
@@ -809,7 +809,7 @@ describe('POST /api/voices/preview', () => {
     mockAuth.mockResolvedValue(mockSession);
     mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 9 });
 
-    const request = createRequest('http://localhost:3000/api/voices/preview', {
+    const request = createRequest('http://localhost:3000/api/v1/voices/preview', {
       method: 'POST',
       body: JSON.stringify({ voiceId: 'voice-1', text: 'a'.repeat(501) }),
     });
@@ -822,7 +822,7 @@ describe('POST /api/voices/preview', () => {
     mockAuth.mockResolvedValue(mockSession);
     mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 9 });
 
-    const request = createRequest('http://localhost:3000/api/voices/preview', {
+    const request = createRequest('http://localhost:3000/api/v1/voices/preview', {
       method: 'POST',
       body: JSON.stringify({ voiceId: 'voice-1', text: 'Hello world' }),
     });
@@ -836,7 +836,7 @@ describe('POST /api/voices/preview', () => {
     mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 9 });
     mockGetByokKey.mockResolvedValue(null);
 
-    const request = createRequest('http://localhost:3000/api/voices/preview', {
+    const request = createRequest('http://localhost:3000/api/v1/voices/preview', {
       method: 'POST',
       body: JSON.stringify({ voiceId: 'voice-1', text: 'Hello world', provider: 'elevenlabs' }),
     });
@@ -856,7 +856,7 @@ describe('POST /api/voices/preview', () => {
     const generateSpeech = vi.fn().mockResolvedValue(mockAudioBuffer);
     mockCreateTtsProviderAsync.mockResolvedValue({ generateSpeech });
 
-    const request = createRequest('http://localhost:3000/api/voices/preview', {
+    const request = createRequest('http://localhost:3000/api/v1/voices/preview', {
       method: 'POST',
       body: JSON.stringify({
         voiceId: 'voice-1',

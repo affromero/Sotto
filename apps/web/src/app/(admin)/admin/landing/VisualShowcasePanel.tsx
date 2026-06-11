@@ -43,7 +43,7 @@ export function VisualShowcasePanel() {
   const [selectedModel, setSelectedModel] = useState('');
 
   const fetchSets = useCallback(async () => {
-    const res = await fetch('/api/admin/showcase');
+    const res = await fetch('/api/v1/admin/showcase');
     if (!res.ok) return;
     const data = await res.json();
     setSets(data.sets ?? []);
@@ -64,7 +64,7 @@ export function VisualShowcasePanel() {
     setProgress('Generating clips for all 11 visual types...');
 
     try {
-      const res = await fetch('/api/admin/showcase', {
+      const res = await fetch('/api/v1/admin/showcase', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, imageModel: selectedModel || undefined }),
@@ -93,7 +93,7 @@ export function VisualShowcasePanel() {
   const handleRegenerateItem = async (setId: string, visualType: string) => {
     setRegenerating(visualType);
     try {
-      await fetch('/api/admin/showcase', {
+      await fetch('/api/v1/admin/showcase', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: setId, regenerateType: visualType, imageModel: selectedModel || undefined }),
@@ -107,7 +107,7 @@ export function VisualShowcasePanel() {
   const handleRegenerateAll = async (setId: string) => {
     setRegeneratingAll(true);
     try {
-      await fetch('/api/admin/showcase', {
+      await fetch('/api/v1/admin/showcase', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: setId, regenerateAll: true, imageModel: selectedModel || undefined }),
@@ -119,7 +119,7 @@ export function VisualShowcasePanel() {
   };
 
   const handleToggleActive = async (id: string, active: boolean) => {
-    await fetch('/api/admin/showcase', {
+    await fetch('/api/v1/admin/showcase', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id, active }),
@@ -129,7 +129,7 @@ export function VisualShowcasePanel() {
 
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(`Delete showcase "${name}"? This cannot be undone.`)) return;
-    await fetch(`/api/admin/showcase?id=${id}`, { method: 'DELETE' });
+    await fetch(`/api/v1/admin/showcase?id=${id}`, { method: 'DELETE' });
     if (selectedSetId === id) setSelectedSetId(null);
     await fetchSets();
   };

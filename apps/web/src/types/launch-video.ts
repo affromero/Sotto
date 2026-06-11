@@ -180,12 +180,12 @@ export const launchVideoScriptSchema = z.object({
   scenes: z.array(launchVideoSceneSchema).min(1),
 });
 
-/** Body for POST /api/admin/demo/[projectId]/import-script */
+/** Body for POST /api/v1/admin/demo/[projectId]/import-script */
 export const importScriptBodySchema = z.object({
   script: launchVideoScriptSchema,
 });
 
-/** Body for POST /api/admin/demo/[projectId]/podcast */
+/** Body for POST /api/v1/admin/demo/[projectId]/podcast */
 export const linkPodcastBodySchema = z.union([
   z.object({ podcastId: z.string().min(1) }),
   z.object({
@@ -194,7 +194,7 @@ export const linkPodcastBodySchema = z.union([
   }),
 ]);
 
-/** Body for POST /api/admin/demo/[projectId]/avatar */
+/** Body for POST /api/v1/admin/demo/[projectId]/avatar */
 export const generateAvatarBodySchema = z.object({
   narrationText: z.string().min(1).max(5000),
   avatarId: z.string().min(1),

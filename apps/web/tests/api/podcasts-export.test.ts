@@ -31,14 +31,14 @@ vi.mock('@/lib/queue', () => ({
 }));
 
 // ---- Import under test ----
-import { POST, GET } from '@/app/api/podcasts/[podcastId]/export/route';
+import { POST, GET } from '@/app/api/v1/podcasts/[podcastId]/export/route';
 
 const mockPdfGenerationQueue = {};
 
 // ---- Helpers ----
 
 function createMockRequest(): NextRequest {
-  return new NextRequest('http://localhost:3000/api/podcasts/test-id/export');
+  return new NextRequest('http://localhost:3000/api/v1/podcasts/test-id/export');
 }
 
 async function createMockParams(podcastId: string) {
@@ -47,7 +47,7 @@ async function createMockParams(podcastId: string) {
 
 // ---- Tests ----
 
-describe('POST /api/podcasts/[podcastId]/export', () => {
+describe('POST /api/v1/podcasts/[podcastId]/export', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -255,7 +255,7 @@ describe('POST /api/podcasts/[podcastId]/export', () => {
   });
 });
 
-describe('GET /api/podcasts/[podcastId]/export', () => {
+describe('GET /api/v1/podcasts/[podcastId]/export', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });

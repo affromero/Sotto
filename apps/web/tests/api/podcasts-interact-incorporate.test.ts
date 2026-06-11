@@ -95,10 +95,10 @@ vi.mock('@/lib/generation-gate', () => ({
   checkGenerationGate: (...args: unknown[]) => mockCheckGenerationGate(...args),
 }));
 
-import { POST } from '@/app/api/podcasts/[podcastId]/interact/[interactionId]/incorporate/route';
+import { POST } from '@/app/api/v1/podcasts/[podcastId]/interact/[interactionId]/incorporate/route';
 
 function createRequest(): NextRequest {
-  return new NextRequest(new URL('http://localhost:3000/api/podcasts/podcast-001/interact/interaction-001/incorporate'), {
+  return new NextRequest(new URL('http://localhost:3000/api/v1/podcasts/podcast-001/interact/interaction-001/incorporate'), {
     method: 'POST',
   });
 }
@@ -126,7 +126,7 @@ function createInteraction(aiModel: string | null = null) {
   };
 }
 
-describe('POST /api/podcasts/[podcastId]/interact/[interactionId]/incorporate', () => {
+describe('POST /api/v1/podcasts/[podcastId]/interact/[interactionId]/incorporate', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 

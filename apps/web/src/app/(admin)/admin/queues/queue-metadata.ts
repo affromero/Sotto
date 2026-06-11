@@ -1,4 +1,4 @@
-/** Shared queue stats shape (matches GET /api/admin/queues response) */
+/** Shared queue stats shape (matches GET /api/v1/admin/queues response) */
 export interface QueueStats {
   waiting: number;
   active: number;

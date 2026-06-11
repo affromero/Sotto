@@ -32,7 +32,7 @@ services:
       REDIS_URL: ${REDIS_URL:?Set REDIS_URL}
     healthcheck:
       test:
-        ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://127.0.0.1:3000/api/health']
+        ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://127.0.0.1:3000/api/v1/health']
       interval: 30s
       timeout: 10s
       retries: 3
@@ -64,7 +64,7 @@ services:
     ports:
       - '127.0.0.1:${MAPS_PORT:?Set MAPS_PORT}:3002'
     healthcheck:
-      test: ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://127.0.0.1:3002/api/health']
+      test: ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://127.0.0.1:3002/api/v1/health']
       interval: 30s
       timeout: 10s
       retries: 3

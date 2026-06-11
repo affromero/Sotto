@@ -5,7 +5,7 @@
  * the learner's suggested interest topics. Additive to the plain "Continue"
  * affordance (StartNextClass) on the /learn course card.
  *
- * Flow: paste a link OR pick a topic chip → POST /api/courses/[courseId]/next-class
+ * Flow: paste a link OR pick a topic chip → POST /api/v1/courses/[courseId]/next-class
  * with `{ sourceUrl }` or `{ topic }`. 201 navigates to the new class; 409 means a
  * class is already active (navigate to it); 422 means the link couldn't be
  * read/leveled (surface the message); other failures surface a generic error.
@@ -44,7 +44,7 @@ export function SourcedClassEntry({ courseId, activeClassId }: SourcedClassEntry
     let cancelled = false;
     void (async () => {
       try {
-        const res = await fetch(`/api/courses/${courseId}/topics`);
+        const res = await fetch(`/api/v1/courses/${courseId}/topics`);
         if (!res.ok) return;
         const data = (await res.json()) as { topics?: TopicSuggestion[] };
         if (!cancelled && Array.isArray(data.topics)) setTopics(data.topics);
@@ -72,7 +72,7 @@ export function SourcedClassEntry({ courseId, activeClassId }: SourcedClassEntry
 
       setPhase('starting');
       try {
-        const res = await fetch(`/api/courses/${courseId}/next-class`, {
+        const res = await fetch(`/api/v1/courses/${courseId}/next-class`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),

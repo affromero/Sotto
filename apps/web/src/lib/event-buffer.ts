@@ -84,7 +84,7 @@ export class EventBuffer {
     const events = this.buffer.splice(0);
 
     try {
-      await fetch('/api/events', {
+      await fetch('/api/v1/events', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ events }),
@@ -102,10 +102,10 @@ export class EventBuffer {
     const body = JSON.stringify({ events });
 
     if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
-      navigator.sendBeacon('/api/events', new Blob([body], { type: 'application/json' }));
+      navigator.sendBeacon('/api/v1/events', new Blob([body], { type: 'application/json' }));
     } else {
       try {
-        fetch('/api/events', {
+        fetch('/api/v1/events', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body,

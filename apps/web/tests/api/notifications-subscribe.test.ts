@@ -19,10 +19,10 @@ vi.mock('@/lib/prisma', () => {
   return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
 });
 
-import { POST, DELETE } from '@/app/api/notifications/subscribe/route';
+import { POST, DELETE } from '@/app/api/v1/notifications/subscribe/route';
 
 function createRequest(method: string, body: unknown): NextRequest {
-  return new NextRequest(new URL('http://localhost:3000/api/notifications/subscribe'), {
+  return new NextRequest(new URL('http://localhost:3000/api/v1/notifications/subscribe'), {
     method,
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -37,7 +37,7 @@ const validSubscription = {
   },
 };
 
-describe('POST /api/notifications/subscribe', () => {
+describe('POST /api/v1/notifications/subscribe', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockPushSubscriptionUpsert.mockResolvedValue({ id: 'sub-1' });
@@ -127,7 +127,7 @@ describe('POST /api/notifications/subscribe', () => {
   });
 });
 
-describe('DELETE /api/notifications/subscribe', () => {
+describe('DELETE /api/v1/notifications/subscribe', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockPushSubscriptionDeleteMany.mockResolvedValue({ count: 1 });

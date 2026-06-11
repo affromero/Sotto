@@ -232,18 +232,18 @@ Private RSS is the main delivery primitive.
 Token lifecycle:
 
 ```text
-POST /api/rss/private
+POST /api/v1/rss/private
   -> generate raw token
   -> store SHA-256 hash
   -> return raw token and feed URL once
 
-GET /api/rss/private
+GET /api/v1/rss/private
   -> list token metadata only
 
-DELETE /api/rss/private/tokens/:tokenId
+DELETE /api/v1/rss/private/tokens/:tokenId
   -> revoke token
 
-GET /api/rss/private/:token
+GET /api/v1/rss/private/:token
   -> hash token
   -> find active token
   -> return ready, non-deleted owner episodes

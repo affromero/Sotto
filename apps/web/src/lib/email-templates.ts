@@ -18,13 +18,13 @@ function requireAuthSecret(): string {
 export function generateUserUnsubscribeUrl(userId: string, appUrl = getAppBaseUrl()): string {
   const secret = requireAuthSecret();
   const signature = crypto.createHmac('sha256', secret).update(userId).digest('hex');
-  return `${appUrl}/api/users/unsubscribe?userId=${encodeURIComponent(userId)}&sig=${signature}`;
+  return `${appUrl}/api/v1/users/unsubscribe?userId=${encodeURIComponent(userId)}&sig=${signature}`;
 }
 
 function generateUnsubscribeUrl(email: string, appUrl = getAppBaseUrl()): string {
   const secret = requireAuthSecret();
   const signature = crypto.createHmac('sha256', secret).update(email).digest('hex');
-  return `${appUrl}/api/waitlist/unsubscribe?email=${encodeURIComponent(email)}&sig=${signature}`;
+  return `${appUrl}/api/v1/waitlist/unsubscribe?email=${encodeURIComponent(email)}&sig=${signature}`;
 }
 
 const HEADER = `

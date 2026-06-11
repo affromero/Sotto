@@ -201,7 +201,7 @@ describe('VideoEditor', () => {
     });
 
     expect(vi.mocked(global.fetch)).toHaveBeenCalledWith(
-      '/api/podcasts/pod-1/video',
+      '/api/v1/podcasts/pod-1/video',
       expect.objectContaining({
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },

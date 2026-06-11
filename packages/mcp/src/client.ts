@@ -60,7 +60,7 @@ export class SottoClient {
           .filter(Boolean)
       : undefined;
 
-    return this.request('/api/podcasts', {
+    return this.request('/api/v1/podcasts', {
       method: 'POST',
       body: JSON.stringify({
         title: params.title,
@@ -86,7 +86,7 @@ export class SottoClient {
           .filter(Boolean)
       : undefined;
 
-    return this.request('/api/ingest/agent', {
+    return this.request('/api/v1/ingest/agent', {
       method: 'POST',
       body: JSON.stringify({
         title: params.title,
@@ -113,26 +113,26 @@ export class SottoClient {
   }
 
   async getPodcast(id: string): Promise<PodcastDetail> {
-    return this.request(`/api/podcasts/${id}`);
+    return this.request(`/api/v1/podcasts/${id}`);
   }
 
   async listPodcasts(): Promise<Podcast[]> {
-    return this.request('/api/podcasts');
+    return this.request('/api/v1/podcasts');
   }
 
   async updatePodcast(id: string, params: UpdatePodcastParams): Promise<Podcast> {
-    return this.request(`/api/podcasts/${id}`, {
+    return this.request(`/api/v1/podcasts/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(params),
     });
   }
 
   async deletePodcast(id: string): Promise<void> {
-    return this.request(`/api/podcasts/${id}`, { method: 'DELETE' });
+    return this.request(`/api/v1/podcasts/${id}`, { method: 'DELETE' });
   }
 
   async getMe(): Promise<UserProfile> {
-    return this.request('/api/users/me');
+    return this.request('/api/v1/users/me');
   }
 }
 

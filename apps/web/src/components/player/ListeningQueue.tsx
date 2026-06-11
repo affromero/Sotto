@@ -38,7 +38,7 @@ export function ListeningQueue({ onPlayPodcast }: ListeningQueueProps) {
     let cancelled = false;
     async function loadQueue() {
       try {
-        const res = await fetch('/api/queue');
+        const res = await fetch('/api/v1/queue');
         if (res.ok && !cancelled) {
           const data = await res.json();
           setQueue(data.queue || []);
@@ -55,7 +55,7 @@ export function ListeningQueue({ onPlayPodcast }: ListeningQueueProps) {
 
   const handleRemove = useCallback(async (podcastId: string) => {
     try {
-      await fetch(`/api/queue?podcastId=${podcastId}`, { method: 'DELETE' });
+      await fetch(`/api/v1/queue?podcastId=${podcastId}`, { method: 'DELETE' });
       setQueue((prev) => prev.filter((item) => item.podcastId !== podcastId));
     } catch {
       // Silent failure

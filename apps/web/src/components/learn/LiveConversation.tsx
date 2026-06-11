@@ -66,7 +66,7 @@ export function LiveConversation({ courseId, nativeLabel, targetLabel, level }: 
       setError(null);
       setPhase('connecting');
       try {
-        const res = await fetch('/api/live-translate/token', {
+        const res = await fetch('/api/v1/live-translate/token', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ courseId, direction: dir }),
@@ -110,7 +110,7 @@ export function LiveConversation({ courseId, nativeLabel, targetLabel, level }: 
     const transcript = allTextRef.current.trim();
     allTextRef.current = '';
     if (transcript) {
-      void fetch('/api/live-translate/session', {
+      void fetch('/api/v1/live-translate/session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ courseId, transcript }),

@@ -1,5 +1,5 @@
 /**
- * POST /api/live-translate/session — persist a finished live conversation and feed
+ * POST /api/v1/live-translate/session — persist a finished live conversation and feed
  * its new vocab into the course graph. Adversarial: 401 unauth, 400 bad body, 404
  * for a course the caller does not own, 200 with the added count on success.
  */
@@ -16,10 +16,10 @@ vi.mock('@/lib/prisma', () => ({
 }));
 vi.mock('@/lib/live-vocab', () => ({ extractAndStoreLiveVocab: (...a: unknown[]) => mockExtract(...a) }));
 
-import { POST } from '@/app/api/live-translate/session/route';
+import { POST } from '@/app/api/v1/live-translate/session/route';
 
 function req(body: unknown): NextRequest {
-  return new NextRequest('http://localhost:3000/api/live-translate/session', {
+  return new NextRequest('http://localhost:3000/api/v1/live-translate/session', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -28,7 +28,7 @@ function req(body: unknown): NextRequest {
 
 const VALID = { courseId: 'c1', transcript: 'Ich möchte einen Kaffee bestellen.' };
 
-describe('POST /api/live-translate/session', () => {
+describe('POST /api/v1/live-translate/session', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuthenticate.mockResolvedValue({ userId: 'u1' });

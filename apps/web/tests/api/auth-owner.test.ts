@@ -1,5 +1,5 @@
 /**
- * POST /api/auth/owner — create the first owner. Public, but gated to local auth
+ * POST /api/v1/auth/owner — create the first owner. Public, but gated to local auth
  * on and zero users. Adversarial: refuses when local auth is off, refuses a
  * second owner, rate-limited, validates input.
  */
@@ -20,11 +20,11 @@ vi.mock('@/lib/local-account', async () => {
 vi.mock('@/lib/redis', () => ({ checkRateLimit: (...a: unknown[]) => mockRateLimit(...a) }));
 vi.mock('@/lib/logger', () => ({ logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() } }));
 
-import { POST } from '@/app/api/auth/owner/route';
+import { POST } from '@/app/api/v1/auth/owner/route';
 import { OwnerExistsError } from '@/lib/local-account';
 
 function req(body: unknown): NextRequest {
-  return new NextRequest('http://localhost:3000/api/auth/owner', {
+  return new NextRequest('http://localhost:3000/api/v1/auth/owner', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -33,7 +33,7 @@ function req(body: unknown): NextRequest {
 
 const VALID = { name: 'Andres', password: 'supersecret1', avatar: 'capybara' };
 
-describe('POST /api/auth/owner', () => {
+describe('POST /api/v1/auth/owner', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockIsLocalAuthEnabled.mockResolvedValue(true);

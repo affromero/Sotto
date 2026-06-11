@@ -12,7 +12,7 @@ export function RetryButton({ podcastId }: { podcastId: string }) {
   const handleRetry = async () => {
     setLoading(true);
     try {
-      const url = `/api/podcasts/${podcastId}/generate${useAdminCredits ? '?useAdminCredits=true' : ''}`;
+      const url = `/api/v1/podcasts/${podcastId}/generate${useAdminCredits ? '?useAdminCredits=true' : ''}`;
       const res = await fetch(url, { method: 'POST' });
       if (!res.ok) {
         const data = await res.json();

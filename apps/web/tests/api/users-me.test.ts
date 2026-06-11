@@ -49,7 +49,7 @@ vi.mock('@/lib/prisma', () => {
   return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
 });
 
-import { GET, PATCH } from '@/app/api/users/me/route';
+import { GET, PATCH } from '@/app/api/v1/users/me/route';
 
 const mockPrisma = {
   user: {
@@ -59,12 +59,12 @@ const mockPrisma = {
 };
 
 function createGetRequest(): NextRequest {
-  const url = new URL('http://localhost:3000/api/users/me');
+  const url = new URL('http://localhost:3000/api/v1/users/me');
   return new NextRequest(url, { method: 'GET' });
 }
 
 function createPatchRequest(body: Record<string, unknown>): NextRequest {
-  const url = new URL('http://localhost:3000/api/users/me');
+  const url = new URL('http://localhost:3000/api/v1/users/me');
   return new NextRequest(url, {
     method: 'PATCH',
     body: JSON.stringify(body),
@@ -98,7 +98,7 @@ const mockUserMinimal = {
   preferredExpertVoiceId: null,
 };
 
-describe('GET /api/users/me', () => {
+describe('GET /api/v1/users/me', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockPodcastCount.mockResolvedValue(0);
@@ -160,7 +160,7 @@ describe('GET /api/users/me', () => {
 
 });
 
-describe('PATCH /api/users/me', () => {
+describe('PATCH /api/v1/users/me', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });

@@ -150,12 +150,12 @@ export function getVoiceComparisonInstructions(providerNames: string[]): string 
 export function getInterceptorCatalog(): string {
   return [
     '## interact',
-    'Mocks POST /api/podcasts/{id}/interact + GET polling.',
+    'Mocks POST /api/v1/podcasts/{id}/interact + GET polling.',
     'Options: `{ podcastId: string, interactionId: string, answer: string, answerDelay?: number }`',
     'Use when: demo shows the interrupt/Q&A feature during playback.',
     '',
     '## scriptApprove',
-    'Mocks POST /api/podcasts/{id}/script/approve.',
+    'Mocks POST /api/v1/podcasts/{id}/script/approve.',
     'Options: `{ podcastId: string }`',
     'Use when: demo shows script review and approval.',
   ].join('\n');

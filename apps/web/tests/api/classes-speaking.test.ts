@@ -58,7 +58,7 @@ vi.mock('@/lib/logger', () => ({
 
 // ---- Imports under test ----
 
-import { POST, GET } from '@/app/api/classes/[classId]/speaking/[promptId]/route';
+import { POST, GET } from '@/app/api/v1/classes/[classId]/speaking/[promptId]/route';
 
 // ---- Helpers ----
 
@@ -72,7 +72,7 @@ function makeGetRequest(url: string): NextRequest {
 
 /**
  * Build a POST request that mocks formData() to avoid Node.js multipart parsing
- * issues in the test environment (same pattern used by tests/api/voices.test.ts).
+ * issues in the test environment (same pattern used by tests/api/v1/voices.test.ts).
  */
 function makePostRequest(
   _classId: string,
@@ -95,7 +95,7 @@ function makeAudioFile(type = 'audio/webm') {
 
 // ---- Tests ----
 
-describe('POST /api/classes/[classId]/speaking/[promptId]', () => {
+describe('POST /api/v1/classes/[classId]/speaking/[promptId]', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-001' });
@@ -181,7 +181,7 @@ describe('POST /api/classes/[classId]/speaking/[promptId]', () => {
   });
 });
 
-describe('GET /api/classes/[classId]/speaking/[promptId]', () => {
+describe('GET /api/v1/classes/[classId]/speaking/[promptId]', () => {
   const SCORED_RECORDING = {
     id: 'rec-001',
     status: 'SCORED',
@@ -201,33 +201,33 @@ describe('GET /api/classes/[classId]/speaking/[promptId]', () => {
 
   it('returns 401 when unauthenticated', async () => {
     mockAuthenticateRequest.mockResolvedValue(null);
-    const req = makeGetRequest('http://localhost/api/classes/class-001/speaking/prompt-001?recordingId=rec-001');
+    const req = makeGetRequest('http://localhost/api/v1/classes/class-001/speaking/prompt-001?recordingId=rec-001');
     const res = await GET(req, routeParams('class-001', 'prompt-001'));
     expect(res.status).toBe(401);
   });
 
   it('returns 400 when recordingId is missing', async () => {
-    const req = makeGetRequest('http://localhost/api/classes/class-001/speaking/prompt-001');
+    const req = makeGetRequest('http://localhost/api/v1/classes/class-001/speaking/prompt-001');
     const res = await GET(req, routeParams('class-001', 'prompt-001'));
     expect(res.status).toBe(400);
   });
 
   it('returns 404 when class does not belong to user', async () => {
     mockCourseClassFindFirst.mockResolvedValue(null);
-    const req = makeGetRequest('http://localhost/api/classes/class-999/speaking/prompt-001?recordingId=rec-001');
+    const req = makeGetRequest('http://localhost/api/v1/classes/class-999/speaking/prompt-001?recordingId=rec-001');
     const res = await GET(req, routeParams('class-999', 'prompt-001'));
     expect(res.status).toBe(404);
   });
 
   it('returns 404 when recording not found or not owned by user', async () => {
     mockSpeakingRecordingFindFirst.mockResolvedValue(null);
-    const req = makeGetRequest('http://localhost/api/classes/class-001/speaking/prompt-001?recordingId=rec-999');
+    const req = makeGetRequest('http://localhost/api/v1/classes/class-001/speaking/prompt-001?recordingId=rec-999');
     const res = await GET(req, routeParams('class-001', 'prompt-001'));
     expect(res.status).toBe(404);
   });
 
   it('returns scored fields when grading is complete', async () => {
-    const req = makeGetRequest('http://localhost/api/classes/class-001/speaking/prompt-001?recordingId=rec-001');
+    const req = makeGetRequest('http://localhost/api/v1/classes/class-001/speaking/prompt-001?recordingId=rec-001');
     const res = await GET(req, routeParams('class-001', 'prompt-001'));
 
     expect(res.status).toBe(200);
@@ -252,7 +252,7 @@ describe('GET /api/classes/[classId]/speaking/[promptId]', () => {
       feedback: null,
       phonemeScores: null,
     });
-    const req = makeGetRequest('http://localhost/api/classes/class-001/speaking/prompt-001?recordingId=rec-001');
+    const req = makeGetRequest('http://localhost/api/v1/classes/class-001/speaking/prompt-001?recordingId=rec-001');
     const res = await GET(req, routeParams('class-001', 'prompt-001'));
 
     expect(res.status).toBe(200);
@@ -262,7 +262,7 @@ describe('GET /api/classes/[classId]/speaking/[promptId]', () => {
   });
 
   it('scopes the recording lookup to the authenticated user', async () => {
-    const req = makeGetRequest('http://localhost/api/classes/class-001/speaking/prompt-001?recordingId=rec-001');
+    const req = makeGetRequest('http://localhost/api/v1/classes/class-001/speaking/prompt-001?recordingId=rec-001');
     await GET(req, routeParams('class-001', 'prompt-001'));
 
     expect(mockSpeakingRecordingFindFirst).toHaveBeenCalledWith(

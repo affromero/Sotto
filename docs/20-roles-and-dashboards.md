@@ -127,7 +127,7 @@ Users can manage account display data in settings. Profile-style fields may stil
 The `PageViewTracker` component records route-level analytics through the existing event pipeline:
 
 ```text
-EventBuffer -> /api/events -> BullMQ -> BehavioralEvent
+EventBuffer -> /api/v1/events -> BullMQ -> BehavioralEvent
 ```
 
 Admin analytics may show:

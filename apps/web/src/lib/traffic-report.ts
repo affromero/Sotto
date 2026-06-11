@@ -1,6 +1,6 @@
 /**
  * Traffic report builder: ~70 aggregation queries → structured JSON
- * for the /api/admin/traffic-report endpoint.
+ * for the /api/v1/admin/traffic-report endpoint.
  *
  * All queries run in a single Promise.all for maximum parallelism.
  */

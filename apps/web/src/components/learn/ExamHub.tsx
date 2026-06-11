@@ -43,7 +43,7 @@ export function ExamHub({ courseId, available, history }: Props) {
     setStarting(true);
     setError(null);
     try {
-      const res = await fetch('/api/exams', {
+      const res = await fetch('/api/v1/exams', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ courseId }),

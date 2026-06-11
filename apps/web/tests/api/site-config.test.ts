@@ -25,19 +25,19 @@ vi.mock('@/lib/api-response', () => ({
 }));
 
 async function getHandlers() {
-  const mod = await import('@/app/api/admin/site-config/route');
+  const mod = await import('@/app/api/v1/admin/site-config/route');
   return { GET: mod.GET, PATCH: mod.PATCH };
 }
 
 function patchRequest(body: unknown): NextRequest {
-  return new NextRequest(new URL('http://localhost:3000/api/admin/site-config'), {
+  return new NextRequest(new URL('http://localhost:3000/api/v1/admin/site-config'), {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
 }
 
-describe('GET /api/admin/site-config', () => {
+describe('GET /api/v1/admin/site-config', () => {
   beforeEach(() => vi.clearAllMocks());
   afterEach(() => vi.clearAllMocks());
 
@@ -59,7 +59,7 @@ describe('GET /api/admin/site-config', () => {
   });
 });
 
-describe('PATCH /api/admin/site-config', () => {
+describe('PATCH /api/v1/admin/site-config', () => {
   beforeEach(() => vi.clearAllMocks());
   afterEach(() => vi.clearAllMocks());
 

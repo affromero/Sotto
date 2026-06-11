@@ -41,10 +41,10 @@ vi.mock('@/lib/api-response', () => ({
     }),
 }));
 
-import { GET, PATCH } from '@/app/api/admin/auto-models/route';
+import { GET, PATCH } from '@/app/api/v1/admin/auto-models/route';
 
 function patchRequest(body: Record<string, unknown>): NextRequest {
-  return new NextRequest(new URL('http://localhost:3000/api/admin/auto-models'), {
+  return new NextRequest(new URL('http://localhost:3000/api/v1/admin/auto-models'), {
     method: 'PATCH',
     body: JSON.stringify(body),
     headers: { 'Content-Type': 'application/json' },
@@ -79,7 +79,7 @@ const config = {
   motionProvider: 'remotion',
 };
 
-describe('GET /api/admin/auto-models', () => {
+describe('GET /api/v1/admin/auto-models', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -113,7 +113,7 @@ describe('GET /api/admin/auto-models', () => {
   });
 });
 
-describe('PATCH /api/admin/auto-models', () => {
+describe('PATCH /api/v1/admin/auto-models', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });

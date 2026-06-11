@@ -119,7 +119,7 @@ export const LOCAL_AGENT_SOURCES: PrivateSourceConnectorDefinition[] = [
     setupActions: [
       'Install and authenticate the claude CLI.',
       'Create a Sotto API key.',
-      'Use the MCP ingest_agent_output tool or POST to /api/ingest/agent.',
+      'Use the MCP ingest_agent_output tool or POST to /api/v1/ingest/agent.',
     ],
   },
   {
@@ -140,7 +140,7 @@ export const LOCAL_AGENT_SOURCES: PrivateSourceConnectorDefinition[] = [
     setupActions: [
       'Install and authenticate the codex CLI.',
       'Create a Sotto API key.',
-      'Use the MCP ingest_agent_output tool or POST to /api/ingest/agent.',
+      'Use the MCP ingest_agent_output tool or POST to /api/v1/ingest/agent.',
     ],
   },
 ];

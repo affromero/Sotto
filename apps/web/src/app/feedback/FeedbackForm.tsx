@@ -28,7 +28,7 @@ export function FeedbackForm() {
     setSubmitting(true);
 
     try {
-      const response = await fetch('/api/feedback', {
+      const response = await fetch('/api/v1/feedback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type, rating: rating || undefined, subject, message, email: email || undefined, name: name || undefined }),

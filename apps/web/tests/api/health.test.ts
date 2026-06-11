@@ -41,9 +41,9 @@ vi.mock('@/lib/auth', () => ({
   auth: (...args: unknown[]) => mockAuth(...args),
 }));
 
-import { GET } from '@/app/api/health/route';
+import { GET } from '@/app/api/v1/health/route';
 
-describe('GET /api/health', () => {
+describe('GET /api/v1/health', () => {
   let originalFetch: typeof globalThis.fetch;
 
   beforeEach(() => {

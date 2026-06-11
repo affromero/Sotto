@@ -28,7 +28,7 @@ export function StartNextClass({ courseId, activeClassId }: StartNextClassProps)
     setPhase('generating');
 
     try {
-      const res = await fetch(`/api/courses/${courseId}/next-class`, { method: 'POST' });
+      const res = await fetch(`/api/v1/courses/${courseId}/next-class`, { method: 'POST' });
 
       if (res.status === 201) {
         const data = (await res.json()) as { classId: string };

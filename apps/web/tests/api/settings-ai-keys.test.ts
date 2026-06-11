@@ -27,10 +27,10 @@ vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
-import { GET, POST, DELETE } from '@/app/api/settings/ai-keys/route';
+import { GET, POST, DELETE } from '@/app/api/v1/settings/ai-keys/route';
 
 function createRequest(method: string, body?: object): NextRequest {
-  const url = new URL('http://localhost:3000/api/settings/ai-keys');
+  const url = new URL('http://localhost:3000/api/v1/settings/ai-keys');
   const init: { method: string; body?: string; headers?: Record<string, string> } = { method };
   if (body) {
     init.body = JSON.stringify(body);
@@ -39,7 +39,7 @@ function createRequest(method: string, body?: object): NextRequest {
   return new NextRequest(url, init);
 }
 
-describe('GET /api/settings/ai-keys', () => {
+describe('GET /api/v1/settings/ai-keys', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -67,7 +67,7 @@ describe('GET /api/settings/ai-keys', () => {
   });
 });
 
-describe('POST /api/settings/ai-keys', () => {
+describe('POST /api/v1/settings/ai-keys', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -130,7 +130,7 @@ describe('POST /api/settings/ai-keys', () => {
   });
 });
 
-describe('DELETE /api/settings/ai-keys', () => {
+describe('DELETE /api/v1/settings/ai-keys', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -148,7 +148,7 @@ describe('DELETE /api/settings/ai-keys', () => {
   it('returns 400 when no body provided', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
 
-    const url = new URL('http://localhost:3000/api/settings/ai-keys');
+    const url = new URL('http://localhost:3000/api/v1/settings/ai-keys');
     const request = new NextRequest(url, { method: 'DELETE' });
     const response = await DELETE(request);
     const body = await response.json();

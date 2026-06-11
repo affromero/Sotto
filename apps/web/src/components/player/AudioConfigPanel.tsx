@@ -55,7 +55,7 @@ export function AudioConfigPanel({ speakers, onConfigChange, failedProvider }: A
 
   // Fetch available TTS providers on mount
   useEffect(() => {
-    fetch('/api/tts-options')
+    fetch('/api/v1/tts-options')
       .then((res) => res.json())
       .then((data) => {
         setProviderOptions(data.options || []);
@@ -69,7 +69,7 @@ export function AudioConfigPanel({ speakers, onConfigChange, failedProvider }: A
 
     setLoadingVoices((prev) => ({ ...prev, [providerKey]: true }));
     try {
-      const res = await fetch(`/api/voices?provider=${providerKey}`);
+      const res = await fetch(`/api/v1/voices?provider=${providerKey}`);
       if (res.ok) {
         const data = await res.json();
         const voices: VoiceOption[] = [

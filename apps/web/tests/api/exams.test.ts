@@ -1,5 +1,5 @@
 /**
- * POST /api/exams + GET /api/exams/[examId]. Adversarial: 401 unauth, 400 bad
+ * POST /api/v1/exams + GET /api/v1/exams/[examId]. Adversarial: 401 unauth, 400 bad
  * body, 404 non-owner course / missing exam, 201 on create, 500 on the unexpected.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -20,19 +20,19 @@ vi.mock('@/lib/mock-exam-service', async () => {
 });
 vi.mock('@/lib/logger', () => ({ logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() } }));
 
-import { POST } from '@/app/api/exams/route';
-import { GET } from '@/app/api/exams/[examId]/route';
+import { POST } from '@/app/api/v1/exams/route';
+import { GET } from '@/app/api/v1/exams/[examId]/route';
 import { ExamCourseNotFoundError } from '@/lib/mock-exam-service';
 
 function postReq(body: unknown): NextRequest {
-  return new NextRequest('http://localhost:3000/api/exams', {
+  return new NextRequest('http://localhost:3000/api/v1/exams', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
 }
 
-describe('POST /api/exams', () => {
+describe('POST /api/v1/exams', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuth.mockResolvedValue({ userId: 'u1' });
@@ -71,7 +71,7 @@ describe('POST /api/exams', () => {
   });
 });
 
-describe('GET /api/exams/[examId]', () => {
+describe('GET /api/v1/exams/[examId]', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuth.mockResolvedValue({ userId: 'u1' });
@@ -79,7 +79,7 @@ describe('GET /api/exams/[examId]', () => {
   });
 
   function getReq(): NextRequest {
-    return new NextRequest('http://localhost:3000/api/exams/exam1');
+    return new NextRequest('http://localhost:3000/api/v1/exams/exam1');
   }
 
   it('rejects unauthenticated requests', async () => {

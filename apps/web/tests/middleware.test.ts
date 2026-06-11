@@ -86,10 +86,10 @@ describe('Middleware Security Tests', () => {
   describe('Public Routes — Always Accessible', () => {
     const publicPaths = [
       '/',
-      '/api/health',
-      '/api/waitlist',
+      '/api/v1/health',
+      '/api/v1/waitlist',
       '/feedback',
-      '/api/feedback',
+      '/api/v1/feedback',
       '/pitch',
     ];
 
@@ -100,18 +100,18 @@ describe('Middleware Security Tests', () => {
       });
     }
 
-    it('allows /api/auth/providers (public prefix)', async () => {
-      const res = await middleware(createRequest('/api/auth/providers'));
+    it('allows /api/v1/auth/providers (public prefix)', async () => {
+      const res = await middleware(createRequest('/api/v1/auth/providers'));
       expect(isPassThrough(res)).toBe(true);
     });
 
-    it('allows /api/auth/callback/google (public prefix)', async () => {
-      const res = await middleware(createRequest('/api/auth/callback/google'));
+    it('allows /api/v1/auth/callback/google (public prefix)', async () => {
+      const res = await middleware(createRequest('/api/v1/auth/callback/google'));
       expect(isPassThrough(res)).toBe(true);
     });
 
-    it('allows /api/pitch/manifest (public prefix)', async () => {
-      const res = await middleware(createRequest('/api/pitch/manifest'));
+    it('allows /api/v1/pitch/manifest (public prefix)', async () => {
+      const res = await middleware(createRequest('/api/v1/pitch/manifest'));
       expect(isPassThrough(res)).toBe(true);
     });
 
@@ -186,9 +186,9 @@ describe('Middleware Security Tests', () => {
     });
 
     it('passes through API routes (own auth handling)', async () => {
-      const res = await middleware(createRequest('/api/podcasts'));
+      const res = await middleware(createRequest('/api/v1/podcasts'));
       // API routes without Authorization header still need to reach the API handler
-      // They pass through because they're not in PROTECTED_ROUTES check (starts with /api/)
+      // They pass through because they're not in PROTECTED_ROUTES check (starts with /api/v1/)
       expect(isPassThrough(res)).toBe(true);
     });
 

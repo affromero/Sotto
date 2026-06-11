@@ -166,10 +166,10 @@ vi.mock('@/lib/api-response', () => ({
   },
 }));
 
-import { POST, GET, PATCH } from '@/app/api/podcasts/[podcastId]/video/pipeline/route';
+import { POST, GET, PATCH } from '@/app/api/v1/podcasts/[podcastId]/video/pipeline/route';
 
 function createRequest(method: string, body?: unknown, url?: string): NextRequest {
-  return new NextRequest(new URL(url ?? 'http://localhost:3000/api/podcasts/pod-1/video/pipeline'), {
+  return new NextRequest(new URL(url ?? 'http://localhost:3000/api/v1/podcasts/pod-1/video/pipeline'), {
     method,
     body: body ? JSON.stringify(body) : undefined,
     headers: body ? { 'Content-Type': 'application/json' } : {},
@@ -178,7 +178,7 @@ function createRequest(method: string, body?: unknown, url?: string): NextReques
 
 const routeParams = { params: Promise.resolve({ podcastId: 'pod-1' }) };
 
-describe('POST /api/podcasts/[id]/video/pipeline', () => {
+describe('POST /api/v1/podcasts/[id]/video/pipeline', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
@@ -402,7 +402,7 @@ describe('POST /api/podcasts/[id]/video/pipeline', () => {
   });
 });
 
-describe('GET /api/podcasts/[id]/video/pipeline', () => {
+describe('GET /api/v1/podcasts/[id]/video/pipeline', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
@@ -413,7 +413,7 @@ describe('GET /api/podcasts/[id]/video/pipeline', () => {
   it('returns classifying when Redis key does not exist', async () => {
     mockCacheGet.mockResolvedValue(null);
     const res = await GET(
-      createRequest('GET', undefined, 'http://localhost:3000/api/podcasts/pod-1/video/pipeline?classificationId=550e8400-e29b-41d4-a716-446655440000'),
+      createRequest('GET', undefined, 'http://localhost:3000/api/v1/podcasts/pod-1/video/pipeline?classificationId=550e8400-e29b-41d4-a716-446655440000'),
       routeParams,
     );
     expect(res.status).toBe(200);
@@ -425,7 +425,7 @@ describe('GET /api/podcasts/[id]/video/pipeline', () => {
     const mockPipeline = { version: 3, segments: [], transitions: [], totalEstimatedCost: 0 };
     mockCacheGet.mockResolvedValue({ status: 'ready', pipeline: mockPipeline });
     const res = await GET(
-      createRequest('GET', undefined, 'http://localhost:3000/api/podcasts/pod-1/video/pipeline?classificationId=550e8400-e29b-41d4-a716-446655440000'),
+      createRequest('GET', undefined, 'http://localhost:3000/api/v1/podcasts/pod-1/video/pipeline?classificationId=550e8400-e29b-41d4-a716-446655440000'),
       routeParams,
     );
     expect(res.status).toBe(200);
@@ -437,7 +437,7 @@ describe('GET /api/podcasts/[id]/video/pipeline', () => {
   it('returns failed status from Redis', async () => {
     mockCacheGet.mockResolvedValue({ status: 'failed', error: 'LLM error', isLlmError: true, currentProvider: 'anthropic' });
     const res = await GET(
-      createRequest('GET', undefined, 'http://localhost:3000/api/podcasts/pod-1/video/pipeline?classificationId=550e8400-e29b-41d4-a716-446655440000'),
+      createRequest('GET', undefined, 'http://localhost:3000/api/v1/podcasts/pod-1/video/pipeline?classificationId=550e8400-e29b-41d4-a716-446655440000'),
       routeParams,
     );
     expect(res.status).toBe(200);
@@ -450,7 +450,7 @@ describe('GET /api/podcasts/[id]/video/pipeline', () => {
   it('requires auth', async () => {
     mockAuthenticateRequest.mockResolvedValue(null);
     const res = await GET(
-      createRequest('GET', undefined, 'http://localhost:3000/api/podcasts/pod-1/video/pipeline?classificationId=550e8400-e29b-41d4-a716-446655440000'),
+      createRequest('GET', undefined, 'http://localhost:3000/api/v1/podcasts/pod-1/video/pipeline?classificationId=550e8400-e29b-41d4-a716-446655440000'),
       routeParams,
     );
     expect(res.status).toBe(401);
@@ -459,7 +459,7 @@ describe('GET /api/podcasts/[id]/video/pipeline', () => {
   it('returns none status when no classificationId and no draft exists', async () => {
     mockVideoGenFindFirst.mockResolvedValue(null);
     const res = await GET(
-      createRequest('GET', undefined, 'http://localhost:3000/api/podcasts/pod-1/video/pipeline'),
+      createRequest('GET', undefined, 'http://localhost:3000/api/v1/podcasts/pod-1/video/pipeline'),
       routeParams,
     );
     expect(res.status).toBe(200);
@@ -469,7 +469,7 @@ describe('GET /api/podcasts/[id]/video/pipeline', () => {
 
   it('rejects non-UUID classificationId', async () => {
     const res = await GET(
-      createRequest('GET', undefined, 'http://localhost:3000/api/podcasts/pod-1/video/pipeline?classificationId=not-a-uuid'),
+      createRequest('GET', undefined, 'http://localhost:3000/api/v1/podcasts/pod-1/video/pipeline?classificationId=not-a-uuid'),
       routeParams,
     );
     expect(res.status).toBe(400);
@@ -478,14 +478,14 @@ describe('GET /api/podcasts/[id]/video/pipeline', () => {
   it('requires podcast ownership', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'other-user' });
     const res = await GET(
-      createRequest('GET', undefined, 'http://localhost:3000/api/podcasts/pod-1/video/pipeline?classificationId=550e8400-e29b-41d4-a716-446655440000'),
+      createRequest('GET', undefined, 'http://localhost:3000/api/v1/podcasts/pod-1/video/pipeline?classificationId=550e8400-e29b-41d4-a716-446655440000'),
       routeParams,
     );
     expect(res.status).toBe(403);
   });
 });
 
-describe('PATCH /api/podcasts/[id]/video/pipeline', () => {
+describe('PATCH /api/v1/podcasts/[id]/video/pipeline', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });

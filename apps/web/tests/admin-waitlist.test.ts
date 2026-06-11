@@ -46,12 +46,12 @@ vi.mock('@/lib/api-response', () => ({
 }));
 
 async function getHandler() {
-  const mod = await import('@/app/api/admin/waitlist/route');
+  const mod = await import('@/app/api/v1/admin/waitlist/route');
   return mod.PATCH;
 }
 
 function createPatchRequest(body: unknown): NextRequest {
-  return new NextRequest(new URL('http://localhost:3000/api/admin/waitlist'), {
+  return new NextRequest(new URL('http://localhost:3000/api/v1/admin/waitlist'), {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),

@@ -39,7 +39,7 @@ export function UserActions({
     setIsLoading(true);
 
     try {
-      const response = await fetch(`/api/admin/users/${userId}/role`, {
+      const response = await fetch(`/api/v1/admin/users/${userId}/role`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role: newRole }),
@@ -76,7 +76,7 @@ export function UserActions({
     setIsLoading(true);
 
     try {
-      const response = await fetch(`/api/admin/users/${userId}/moderate`, {
+      const response = await fetch(`/api/v1/admin/users/${userId}/moderate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action, reason, durationDays }),
@@ -102,7 +102,7 @@ export function UserActions({
     if (!confirm('Remove this user and all their data? This cannot be undone.')) return;
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/admin/users/${userId}/remove`, {
+      const response = await fetch(`/api/v1/admin/users/${userId}/remove`, {
         method: 'DELETE',
       });
       if (!response.ok) {

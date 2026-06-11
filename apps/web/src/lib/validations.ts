@@ -896,7 +896,7 @@ export const changePasswordSchema = z.object({
 
 // Unified onboarding-wizard save. Per-user fields persist on every self-hosted
 // save; `infra` persists only when the caller is the owner (enforced server-side).
-// BYOK keys are NOT here — they flow through the validated /api/settings/* routes.
+// BYOK keys are NOT here — they flow through the validated /api/v1/settings/* routes.
 const langCode2 = z.string().trim().toLowerCase().length(2);
 const cefrLevel = z.enum(['A1', 'A2', 'B1', 'B2', 'C1', 'C2']);
 
@@ -919,33 +919,33 @@ export const onboardingSaveSchema = z.object({
   infra: serverInfraSchema.optional(),
 });
 
-// POST /api/live-translate/token — mint an ephemeral Gemini Live token for a course.
+// POST /api/v1/live-translate/token — mint an ephemeral Gemini Live token for a course.
 export const liveTranslateTokenSchema = z.object({
   courseId: z.string().min(1),
   direction: z.enum(['native_to_target', 'target_to_native']),
 });
 
-// POST /api/live-translate/session — persist a finished session's transcript so its
+// POST /api/v1/live-translate/session — persist a finished session's transcript so its
 // new target-language vocabulary can be fed into the course memory graph.
 export const liveTranslateSessionSchema = z.object({
   courseId: z.string().min(1),
   transcript: z.string().max(20000),
 });
 
-// POST /api/exams — start a mock exam for a course (optional level override).
+// POST /api/v1/exams — start a mock exam for a course (optional level override).
 export const examStartSchema = z.object({
   courseId: z.string().min(1),
   level: z.enum(['A1', 'A2', 'B1', 'B2', 'C1', 'C2']).optional(),
 });
 
-// POST /api/exams/[examId]/submit — submit MC answers and score the exam.
+// POST /api/v1/exams/[examId]/submit — submit MC answers and score the exam.
 export const examSubmitSchema = z.object({
   answers: z
     .array(z.object({ questionId: z.string().min(1), selectedIndex: z.number().int().min(0) }))
     .max(200),
 });
 
-// PATCH /api/courses/[courseId]/pedagogy — switch the course's teaching approach.
+// PATCH /api/v1/courses/[courseId]/pedagogy — switch the course's teaching approach.
 export const coursePedagogySchema = z.object({
   pedagogy: z.enum(['BALANCED', 'IMMERSION', 'GRAMMAR', 'COMMUNICATION', 'INTENSIVE']),
 });

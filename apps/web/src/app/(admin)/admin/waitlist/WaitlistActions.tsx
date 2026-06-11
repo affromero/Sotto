@@ -16,7 +16,7 @@ export function WaitlistActions({ id, status }: WaitlistActionsProps) {
   async function handleAction(newStatus: 'APPROVED' | 'REJECTED') {
     setLoading(newStatus);
     try {
-      await fetch('/api/admin/waitlist', {
+      await fetch('/api/v1/admin/waitlist', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, status: newStatus }),
@@ -31,7 +31,7 @@ export function WaitlistActions({ id, status }: WaitlistActionsProps) {
     if (!window.confirm('Remove this waitlist entry? This cannot be undone.')) return;
     setLoading('REMOVE');
     try {
-      await fetch('/api/admin/waitlist', {
+      await fetch('/api/v1/admin/waitlist', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id }),

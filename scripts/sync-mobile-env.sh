@@ -34,7 +34,7 @@ if [ -z "${EXPO_PUBLIC_API_URL:-}" ]; then
     echo "Error: EXPO_PUBLIC_API_URL or NEXT_PUBLIC_APP_URL is required in $ENV_SOURCE."
     exit 1
   fi
-  export EXPO_PUBLIC_API_URL="${NEXT_PUBLIC_APP_URL%/}/api"
+  export EXPO_PUBLIC_API_URL="${NEXT_PUBLIC_APP_URL%/}/api/v1"
 fi
 
 mkdir -p "$(dirname "$OUTPUT_FILE")"

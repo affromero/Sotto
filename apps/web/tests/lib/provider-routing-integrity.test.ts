@@ -76,7 +76,7 @@ describe('no hardcoded anthropic in logUsage service fields', () => {
     'lib/reference-verification/ai-layer.ts',
     'lib/reference-verification/grounding.ts',
     'lib/import-metadata-generator.ts',
-    'app/api/discovery/route.ts',
+    'app/api/v1/discovery/route.ts',
     // visual-classification always uses Anthropic Claude for batch classification
     'workers/visual-classification.worker.ts',
   ]);

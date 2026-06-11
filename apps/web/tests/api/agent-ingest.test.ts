@@ -87,7 +87,7 @@ vi.mock('@/lib/slugify', () => ({
   generatePodcastSlug: (...args: unknown[]) => mockGeneratePodcastSlug(...args),
 }));
 
-import { POST } from '@/app/api/ingest/agent/route';
+import { POST } from '@/app/api/v1/ingest/agent/route';
 
 function createRequest(body: unknown, authHeader?: string): NextRequest {
   const headers: Record<string, string> = { 'content-type': 'application/json' };
@@ -95,7 +95,7 @@ function createRequest(body: unknown, authHeader?: string): NextRequest {
     headers.authorization = authHeader;
   }
 
-  return new NextRequest('http://localhost:3000/api/ingest/agent', {
+  return new NextRequest('http://localhost:3000/api/v1/ingest/agent', {
     method: 'POST',
     headers,
     body: JSON.stringify(body),
@@ -121,7 +121,7 @@ const validPayload = {
   ttsModel: 'gpt-4o-mini-tts',
 };
 
-describe('POST /api/ingest/agent', () => {
+describe('POST /api/v1/ingest/agent', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 

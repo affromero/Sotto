@@ -68,7 +68,7 @@ export default function SiteConfigPage() {
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
   useEffect(() => {
-    fetch('/api/admin/site-config')
+    fetch('/api/v1/admin/site-config')
       .then((r) => r.json())
       .then((data: Config) => {
         setCfg(data);
@@ -91,7 +91,7 @@ export default function SiteConfigPage() {
       return acc;
     }, {});
     try {
-      const res = await fetch('/api/admin/site-config', {
+      const res = await fetch('/api/v1/admin/site-config', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ openSignup: cfg.openSignup, localAuth: cfg.localAuth, ...infra }),

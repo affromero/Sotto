@@ -24,7 +24,7 @@ Please include:
 The following are in scope:
 
 - Self-hosted Sotto web applications
-- Sotto API endpoints (`/api/*` on your configured deployment URL)
+- Sotto API endpoints (`/api/v1/*` on your configured deployment URL)
 - Authentication and authorization flows
 - Data handling and encryption (BYOK keys, user data)
 

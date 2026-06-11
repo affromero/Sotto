@@ -16,10 +16,10 @@ vi.mock('@/lib/cost-monitor', () => ({
   checkCostThresholds: (...args: unknown[]) => mockCheckCostThresholds(...args),
 }));
 
-import { GET } from '@/app/api/admin/costs/route';
+import { GET } from '@/app/api/v1/admin/costs/route';
 
 function createRequest(params?: Record<string, string>): NextRequest {
-  const url = new URL('http://localhost:3000/api/admin/costs');
+  const url = new URL('http://localhost:3000/api/v1/admin/costs');
   if (params) {
     for (const [key, value] of Object.entries(params)) {
       url.searchParams.set(key, value);
@@ -28,7 +28,7 @@ function createRequest(params?: Record<string, string>): NextRequest {
   return new NextRequest(url);
 }
 
-describe('GET /api/admin/costs', () => {
+describe('GET /api/v1/admin/costs', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });

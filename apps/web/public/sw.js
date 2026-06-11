@@ -87,7 +87,7 @@ self.addEventListener('fetch', (event) => {
   }
 
   // API calls: network-first with cache fallback
-  if (url.pathname.startsWith('/api/')) {
+  if (url.pathname.startsWith('/api/v1/')) {
     event.respondWith(networkFirst(request));
     return;
   }

@@ -37,14 +37,14 @@ const sections: Section[] = [
     endpoints: [
       {
         method: 'GET',
-        path: '/api/courses',
+        path: '/api/v1/courses',
         description: 'List the courses the signed-in learner is enrolled in.',
         auth: true,
         response: '{ courses: [{ id, nativeLang, targetLang, level }] }',
       },
       {
         method: 'POST',
-        path: '/api/courses',
+        path: '/api/v1/courses',
         description: 'Create a course enrollment for a native to target language pair.',
         auth: true,
         params: [
@@ -55,7 +55,7 @@ const sections: Section[] = [
       },
       {
         method: 'POST',
-        path: '/api/courses/:courseId/next-class',
+        path: '/api/v1/courses/:courseId/next-class',
         description:
           'Generate the next gated class for a course. Optionally sourced from a real link or an interest topic.',
         auth: true,
@@ -67,7 +67,7 @@ const sections: Section[] = [
       },
       {
         method: 'GET',
-        path: '/api/courses/:courseId/graph',
+        path: '/api/v1/courses/:courseId/graph',
         description:
           'Read the learner-owned vocabulary memory graph for a course: nodes and connections with spaced-repetition due markers.',
         auth: true,
@@ -81,14 +81,14 @@ const sections: Section[] = [
     endpoints: [
       {
         method: 'GET',
-        path: '/api/placement',
+        path: '/api/v1/placement',
         description: 'Generate adaptive placement questions for a language pair.',
         auth: true,
         response: '{ questions: [{ id, prompt, choices }] }',
       },
       {
         method: 'POST',
-        path: '/api/placement',
+        path: '/api/v1/placement',
         description: 'Submit placement answers. Creates a course and sets the starting CEFR level.',
         auth: true,
         params: [
@@ -104,7 +104,7 @@ const sections: Section[] = [
     endpoints: [
       {
         method: 'GET',
-        path: '/api/classes/:classId',
+        path: '/api/v1/classes/:classId',
         description:
           'Fetch a class with its sections, questions, and prompts for grammar, reading, listening, speaking, and writing.',
         auth: true,
@@ -112,7 +112,7 @@ const sections: Section[] = [
       },
       {
         method: 'POST',
-        path: '/api/classes/:classId/submit',
+        path: '/api/v1/classes/:classId/submit',
         description:
           'Submit a completed class. Scores the answers and advances the course level on a pass.',
         auth: true,
@@ -130,7 +130,7 @@ const sections: Section[] = [
     endpoints: [
       {
         method: 'POST',
-        path: '/api/ingest/agent',
+        path: '/api/v1/ingest/agent',
         description:
           'Ingest output from a local agent run, such as Claude Code or Codex. The result stays private to your account.',
         auth: true,
@@ -148,14 +148,14 @@ const sections: Section[] = [
     endpoints: [
       {
         method: 'GET',
-        path: '/api/keys',
+        path: '/api/v1/keys',
         description: 'List the API keys on the signed-in account. Key hashes are never returned.',
         auth: true,
         response: '{ keys: [{ id, name, createdAt, lastUsedAt }] }',
       },
       {
         method: 'POST',
-        path: '/api/keys',
+        path: '/api/v1/keys',
         description: 'Create a new API key. The raw key is returned once.',
         auth: true,
         params: [
@@ -165,7 +165,7 @@ const sections: Section[] = [
       },
       {
         method: 'GET',
-        path: '/api/health',
+        path: '/api/v1/health',
         description: 'Liveness check for your deployment. No authentication required.',
         auth: false,
         response: '{ status: "ok" }',

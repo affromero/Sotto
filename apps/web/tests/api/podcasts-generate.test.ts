@@ -118,7 +118,7 @@ vi.mock('@/lib/auth-guards', () => ({
 }));
 
 // ---- Import under test ----
-import { POST } from '@/app/api/podcasts/[podcastId]/generate/route';
+import { POST } from '@/app/api/v1/podcasts/[podcastId]/generate/route';
 
 // ---- Helpers ----
 
@@ -126,7 +126,7 @@ function createMockRequest(
   searchParams?: Record<string, string>,
   body?: Record<string, unknown>
 ): NextRequest {
-  const url = new URL('http://localhost/api/podcasts/p/generate');
+  const url = new URL('http://localhost/api/v1/podcasts/p/generate');
   if (searchParams) {
     for (const [k, v] of Object.entries(searchParams)) {
       url.searchParams.set(k, v);
@@ -148,7 +148,7 @@ async function createMockParams(podcastId: string) {
 
 // ---- Tests ----
 
-describe('POST /api/podcasts/[podcastId]/generate', () => {
+describe('POST /api/v1/podcasts/[podcastId]/generate', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockRequireAdmin.mockResolvedValue(null); // non-admin by default

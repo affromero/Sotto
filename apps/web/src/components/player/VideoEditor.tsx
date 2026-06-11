@@ -128,7 +128,7 @@ export function VideoEditor({
     let cancelled = false;
     async function fetchTransitions() {
       try {
-        const res = await fetch(`/api/podcasts/${podcastId}/video`);
+        const res = await fetch(`/api/v1/podcasts/${podcastId}/video`);
         if (!res.ok || cancelled) return;
         const json = await res.json() as { transitions?: TransitionData[] };
         if (cancelled || !json.transitions) return;
@@ -232,7 +232,7 @@ export function VideoEditor({
       }));
 
     try {
-      const res = await fetch(`/api/podcasts/${podcastId}/video`, {
+      const res = await fetch(`/api/v1/podcasts/${podcastId}/video`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ segments: changedSegments }),

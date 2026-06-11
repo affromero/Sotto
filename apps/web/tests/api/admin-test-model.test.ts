@@ -117,12 +117,12 @@ vi.mock('@/lib/providers/image/fal.provider', () => ({
   })),
 }));
 
-import { POST } from '@/app/api/admin/test-model/route';
+import { POST } from '@/app/api/v1/admin/test-model/route';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function createRequest(body: Record<string, unknown>): NextRequest {
-  return new NextRequest('http://localhost:3000/api/admin/test-model', {
+  return new NextRequest('http://localhost:3000/api/v1/admin/test-model', {
     method: 'POST',
     body: JSON.stringify(body),
     headers: { 'Content-Type': 'application/json' },
@@ -131,7 +131,7 @@ function createRequest(body: Record<string, unknown>): NextRequest {
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
-describe('POST /api/admin/test-model', () => {
+describe('POST /api/v1/admin/test-model', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockRequireAdmin.mockResolvedValue('admin-1');

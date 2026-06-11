@@ -101,7 +101,7 @@ export function LandingShowcaseDashboard() {
 
   const fetchSegments = useCallback(async (podcastId: string) => {
     try {
-      const res = await fetch(`/api/admin/landing-showcase/segments?podcastId=${encodeURIComponent(podcastId)}`);
+      const res = await fetch(`/api/v1/admin/landing-showcase/segments?podcastId=${encodeURIComponent(podcastId)}`);
       if (res.ok) {
         const data = await res.json();
         setSegments(data.segments ?? []);
@@ -112,7 +112,7 @@ export function LandingShowcaseDashboard() {
   }, []);
 
   useEffect(() => {
-    fetch('/api/admin/landing-showcase')
+    fetch('/api/v1/admin/landing-showcase')
       .then((r) => r.json())
       .then((data) => {
         if (data.config) {
@@ -132,7 +132,7 @@ export function LandingShowcaseDashboard() {
     }
     setSearching(true);
     try {
-      const res = await fetch(`/api/admin/landing-showcase/search?q=${encodeURIComponent(q)}`);
+      const res = await fetch(`/api/v1/admin/landing-showcase/search?q=${encodeURIComponent(q)}`);
       const data = await res.json();
       setSearchResults(data.results ?? []);
     } finally {
@@ -156,7 +156,7 @@ export function LandingShowcaseDashboard() {
     setSaving(true);
     setMessage('');
     try {
-      const res = await fetch('/api/admin/landing-showcase', {
+      const res = await fetch('/api/v1/admin/landing-showcase', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
@@ -181,7 +181,7 @@ export function LandingShowcaseDashboard() {
     setSaving(true);
     setMessage('');
     try {
-      const res = await fetch('/api/admin/landing-showcase', { method: 'DELETE' });
+      const res = await fetch('/api/v1/admin/landing-showcase', { method: 'DELETE' });
       if (res.ok) {
         setConfig(null);
         setPreview(null);
@@ -214,7 +214,7 @@ export function LandingShowcaseDashboard() {
     setBootstrapping(true);
     setMessage('');
     try {
-      const res = await fetch('/api/admin/landing-showcase/bootstrap', { method: 'POST' });
+      const res = await fetch('/api/v1/admin/landing-showcase/bootstrap', { method: 'POST' });
       const data = await res.json();
       if (res.ok) {
         setForm((f) => ({ ...f, podcastId: data.id }));
@@ -239,7 +239,7 @@ export function LandingShowcaseDashboard() {
     setPreviewing(true);
     setPreviewError('');
     try {
-      const res = await fetch('/api/admin/landing-showcase/preview', {
+      const res = await fetch('/api/v1/admin/landing-showcase/preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),

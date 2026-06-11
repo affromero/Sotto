@@ -56,12 +56,12 @@ vi.mock('@/lib/name-moderation', () => ({
   moderateDisplayName: (...args: unknown[]) => mockModerateDisplayName(...args),
 }));
 
-import { POST as completeOnboarding } from '@/app/api/onboarding/complete/route';
-import { POST as saveInterests } from '@/app/api/onboarding/interests/route';
-import { POST as setName } from '@/app/api/onboarding/name/route';
+import { POST as completeOnboarding } from '@/app/api/v1/onboarding/complete/route';
+import { POST as saveInterests } from '@/app/api/v1/onboarding/interests/route';
+import { POST as setName } from '@/app/api/v1/onboarding/name/route';
 
 function createRequest(body?: object): NextRequest {
-  const url = new URL('http://localhost:3000/api/onboarding/interests');
+  const url = new URL('http://localhost:3000/api/v1/onboarding/interests');
   const init: { method: string; body?: string; headers?: Record<string, string> } = { method: 'POST' };
   if (body) {
     init.body = JSON.stringify(body);
@@ -70,7 +70,7 @@ function createRequest(body?: object): NextRequest {
   return new NextRequest(url, init);
 }
 
-describe('POST /api/onboarding/complete', () => {
+describe('POST /api/v1/onboarding/complete', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -107,7 +107,7 @@ describe('POST /api/onboarding/complete', () => {
   });
 });
 
-describe('POST /api/onboarding/interests', () => {
+describe('POST /api/v1/onboarding/interests', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -216,14 +216,14 @@ describe('POST /api/onboarding/interests', () => {
 });
 
 function createNameRequest(body?: object): Request {
-  return new Request('http://localhost:3000/api/onboarding/name', {
+  return new Request('http://localhost:3000/api/v1/onboarding/name', {
     method: 'POST',
     body: JSON.stringify(body),
     headers: { 'Content-Type': 'application/json' },
   });
 }
 
-describe('POST /api/onboarding/name', () => {
+describe('POST /api/v1/onboarding/name', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockValidateDisplayName.mockReturnValue({ valid: true });

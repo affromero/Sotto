@@ -32,7 +32,7 @@ describe('PedagogySelector', () => {
     await user.selectOptions(screen.getByLabelText('Teaching approach'), 'GRAMMAR');
 
     expect(fetchMock).toHaveBeenCalledWith(
-      '/api/courses/c1/pedagogy',
+      '/api/v1/courses/c1/pedagogy',
       expect.objectContaining({ method: 'PATCH' }),
     );
     expect(await screen.findByText(/Applies to your next class/)).toBeInTheDocument();

@@ -1,5 +1,5 @@
 /**
- * POST /api/onboarding/save — the unified welcome-wizard persistence. Persists
+ * POST /api/v1/onboarding/save — the unified welcome-wizard persistence. Persists
  * the course, note, preferences, and (owner-only) server infra, then marks
  * onboarding complete. On the managed showcase (SELF_HOSTED=false) it writes
  * nothing and returns { demo: true }.
@@ -46,10 +46,10 @@ vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
-import { POST } from '@/app/api/onboarding/save/route';
+import { POST } from '@/app/api/v1/onboarding/save/route';
 
 function req(body: unknown): NextRequest {
-  return new NextRequest('http://localhost:3000/api/onboarding/save', {
+  return new NextRequest('http://localhost:3000/api/v1/onboarding/save', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -62,7 +62,7 @@ const BASE = {
   preferred: { language: 'de', aiProvider: 'local', aiModel: 'local:qwen3' },
 };
 
-describe('POST /api/onboarding/save', () => {
+describe('POST /api/v1/onboarding/save', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuth.mockResolvedValue({ user: { id: 'u1' } });

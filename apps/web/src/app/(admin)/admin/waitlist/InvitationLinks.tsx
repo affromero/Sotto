@@ -29,7 +29,7 @@ export function InvitationLinks({ initialInvitations }: InvitationLinksProps) {
   async function handleGenerate() {
     setGenerating(true);
     try {
-      const res = await fetch('/api/admin/invitations', { method: 'POST' });
+      const res = await fetch('/api/v1/admin/invitations', { method: 'POST' });
       if (!res.ok) return;
       const data = await res.json();
       await navigator.clipboard.writeText(data.url);
@@ -44,7 +44,7 @@ export function InvitationLinks({ initialInvitations }: InvitationLinksProps) {
   }
 
   async function handleToggle(id: string, enabled: boolean) {
-    const res = await fetch('/api/admin/invitations', {
+    const res = await fetch('/api/v1/admin/invitations', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id, enabled }),

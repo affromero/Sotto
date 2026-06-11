@@ -53,7 +53,7 @@ export function PlacementTest({ native, target }: PlacementTestProps) {
   const loadQuestions = useCallback(async () => {
     try {
       const res = await fetch(
-        `/api/placement?native=${encodeURIComponent(native)}&target=${encodeURIComponent(target)}`,
+        `/api/v1/placement?native=${encodeURIComponent(native)}&target=${encodeURIComponent(target)}`,
       );
       if (res.status === 401) {
         setErrorMessage('You must be signed in to take the placement test.');
@@ -126,7 +126,7 @@ export function PlacementTest({ native, target }: PlacementTestProps) {
       answers: Object.entries(answers).map(([id, selectedIndex]) => ({ id, selectedIndex })),
     };
     try {
-      const res = await fetch('/api/placement', {
+      const res = await fetch('/api/v1/placement', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),

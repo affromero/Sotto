@@ -20,12 +20,12 @@ vi.mock('@/lib/prisma', () => {
 
 // ---- Import under test ----
 
-import { GET } from '@/app/api/handles/check/route';
+import { GET } from '@/app/api/v1/handles/check/route';
 
 // ---- Helpers ----
 
 function createRequest(handle?: string): NextRequest {
-  const url = new URL('http://localhost:3000/api/handles/check');
+  const url = new URL('http://localhost:3000/api/v1/handles/check');
   if (handle !== undefined) {
     url.searchParams.set('handle', handle);
   }
@@ -34,7 +34,7 @@ function createRequest(handle?: string): NextRequest {
 
 // ---- Tests ----
 
-describe('GET /api/handles/check', () => {
+describe('GET /api/v1/handles/check', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });

@@ -52,7 +52,7 @@ export function AvatarImageManager() {
 
   const fetchImages = useCallback(async () => {
     try {
-      const res = await fetch('/api/avatar-images');
+      const res = await fetch('/api/v1/avatar-images');
       if (!res.ok) throw new Error('Failed to load images');
       const data = await res.json();
       setImages(data.images);
@@ -92,7 +92,7 @@ export function AvatarImageManager() {
         formData.append('name', file.name.replace(/\.[^.]+$/, ''));
         formData.append('consentAcknowledged', 'true');
 
-        const res = await fetch('/api/avatar-images', {
+        const res = await fetch('/api/v1/avatar-images', {
           method: 'POST',
           body: formData,
         });
@@ -122,7 +122,7 @@ export function AvatarImageManager() {
     setError(null);
 
     try {
-      const res = await fetch(`/api/avatar-images/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/v1/avatar-images/${id}`, { method: 'DELETE' });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(
@@ -141,7 +141,7 @@ export function AvatarImageManager() {
   const handleToggleShareable = useCallback(async (id: string, shareable: boolean) => {
     setError(null);
     try {
-      const res = await fetch(`/api/avatar-images/${id}`, {
+      const res = await fetch(`/api/v1/avatar-images/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ shareable }),

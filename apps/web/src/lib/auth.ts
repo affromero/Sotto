@@ -22,6 +22,7 @@ const emailProviderConfig = getOptionalEmailProviderConfig();
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
+  basePath: '/api/v1/auth',
   secret: process.env.AUTH_SECRET,
   adapter: PrismaAdapter(prisma),
   providers: [

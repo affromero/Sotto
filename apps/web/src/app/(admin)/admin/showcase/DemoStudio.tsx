@@ -178,7 +178,7 @@ function useJobProgress(jobId: string | null, onComplete?: () => void): JobProgr
     let cancelled = false;
     const poll = async () => {
       try {
-        const res = await fetch(`/api/admin/demo/job-status/${jobId}`);
+        const res = await fetch(`/api/v1/admin/demo/job-status/${jobId}`);
         if (cancelled) return;
         if (!res.ok) {
           setData(null);
@@ -234,7 +234,7 @@ export function DemoStudio() {
 
   const loadProjects = useCallback(async () => {
     try {
-      const res = await fetch('/api/admin/demo');
+      const res = await fetch('/api/v1/admin/demo');
       if (!res.ok) {
         setError(`Failed to load projects: ${res.status} ${await res.text()}`);
         return;
@@ -247,7 +247,7 @@ export function DemoStudio() {
 
   const loadProject = useCallback(async (id: string, navigate = false) => {
     try {
-      const res = await fetch(`/api/admin/demo/${id}`);
+      const res = await fetch(`/api/v1/admin/demo/${id}`);
       if (!res.ok) {
         setError(`Failed to load project: ${res.status} ${await res.text()}`);
         return;
@@ -266,7 +266,7 @@ export function DemoStudio() {
 
   const loadTtsOptions = useCallback(async () => {
     try {
-      const res = await fetch('/api/tts-options');
+      const res = await fetch('/api/v1/tts-options');
       if (!res.ok) {
         setError(`Failed to load TTS options: ${res.status} ${await res.text()}`);
         return;
@@ -301,7 +301,7 @@ export function DemoStudio() {
 
       // If no project selected, create one
       if (!selectedProject) {
-        const res = await fetch('/api/admin/demo', {
+        const res = await fetch('/api/v1/admin/demo', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ title: 'Launch Video', scriptJson: parsed }),
@@ -315,7 +315,7 @@ export function DemoStudio() {
         await loadProject(id, true);
       } else {
         // Import into existing project
-        const res = await fetch(`/api/admin/demo/${selectedProject.id}/import-script`, {
+        const res = await fetch(`/api/v1/admin/demo/${selectedProject.id}/import-script`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ script: parsed }),
@@ -337,7 +337,7 @@ export function DemoStudio() {
   const saveScene = useCallback(async (sceneId: string, data: Partial<DemoScene>) => {
     if (!selectedProject) return;
     try {
-      const res = await fetch(`/api/admin/demo/${selectedProject.id}/scenes/${sceneId}`, {
+      const res = await fetch(`/api/v1/admin/demo/${selectedProject.id}/scenes/${sceneId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -355,7 +355,7 @@ export function DemoStudio() {
   const generateAsset = useCallback(async (sceneId: string, assetType: string): Promise<string | undefined> => {
     if (!selectedProject) return undefined;
     try {
-      const res = await fetch(`/api/admin/demo/${selectedProject.id}/scenes/${sceneId}/${assetType}`, { method: 'POST' });
+      const res = await fetch(`/api/v1/admin/demo/${selectedProject.id}/scenes/${sceneId}/${assetType}`, { method: 'POST' });
       if (!res.ok) {
         setError(`Failed to generate ${assetType}: ${res.status} ${await res.text()}`);
         return undefined;
@@ -373,7 +373,7 @@ export function DemoStudio() {
     if (!selectedProject) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/demo/${selectedProject.id}/generate-assets`, { method: 'POST' });
+      const res = await fetch(`/api/v1/admin/demo/${selectedProject.id}/generate-assets`, { method: 'POST' });
       if (!res.ok) {
         setError(`Failed to generate assets: ${res.status} ${await res.text()}`);
       }
@@ -388,7 +388,7 @@ export function DemoStudio() {
   const composeScene = useCallback(async (sceneId: string): Promise<string | undefined> => {
     if (!selectedProject) return undefined;
     try {
-      const res = await fetch(`/api/admin/demo/${selectedProject.id}/scenes/${sceneId}/compose`, { method: 'POST' });
+      const res = await fetch(`/api/v1/admin/demo/${selectedProject.id}/scenes/${sceneId}/compose`, { method: 'POST' });
       if (!res.ok) {
         setError(`Failed to compose scene: ${res.status} ${await res.text()}`);
         return undefined;
@@ -409,7 +409,7 @@ export function DemoStudio() {
       for (const scene of selectedProject.scenes ?? []) {
         const ready = scene.recordingStatus === 'READY' && scene.voiceoverStatus === 'READY';
         if (ready && scene.compositedStatus !== 'READY') {
-          const res = await fetch(`/api/admin/demo/${selectedProject.id}/scenes/${scene.id}/compose`, { method: 'POST' });
+          const res = await fetch(`/api/v1/admin/demo/${selectedProject.id}/scenes/${scene.id}/compose`, { method: 'POST' });
           if (!res.ok) {
             setError(`Failed to compose scene ${scene.order + 1}: ${res.status} ${await res.text()}`);
           }
@@ -429,7 +429,7 @@ export function DemoStudio() {
     if (!selectedProject) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/demo/${selectedProject.id}/compose`, { method: 'POST' });
+      const res = await fetch(`/api/v1/admin/demo/${selectedProject.id}/compose`, { method: 'POST' });
       if (!res.ok) {
         setError(`Failed to compose video: ${res.status} ${await res.text()}`);
         return;
@@ -448,7 +448,7 @@ export function DemoStudio() {
   const cancelCompose = useCallback(async () => {
     if (!selectedProject) return;
     try {
-      await fetch(`/api/admin/demo/${selectedProject.id}/compose`, {
+      await fetch(`/api/v1/admin/demo/${selectedProject.id}/compose`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ jobId: composeVideoJobId }),
@@ -462,7 +462,7 @@ export function DemoStudio() {
 
   const deleteProject = useCallback(async (id: string) => {
     try {
-      const res = await fetch(`/api/admin/demo/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/v1/admin/demo/${id}`, { method: 'DELETE' });
       if (!res.ok) {
         setError(`Failed to delete project: ${res.status} ${await res.text()}`);
         return;
@@ -973,7 +973,7 @@ function AssetStatus({
     setCancelling(true);
     try {
       if (jobId) {
-        await fetch(`/api/admin/demo/job-status/${jobId}`, { method: 'DELETE' });
+        await fetch(`/api/v1/admin/demo/job-status/${jobId}`, { method: 'DELETE' });
         setJobId(null);
       }
       await onCancel?.();
@@ -1081,7 +1081,7 @@ function ComposeSceneButton({
     setCancelling(true);
     try {
       if (jobId) {
-        await fetch(`/api/admin/demo/job-status/${jobId}`, { method: 'DELETE' });
+        await fetch(`/api/v1/admin/demo/job-status/${jobId}`, { method: 'DELETE' });
         setJobId(null);
       }
       await onCancel?.();
@@ -1155,7 +1155,7 @@ function TtsPicker({
     async function fetchVoices() {
       setLoadingVoices(true);
       try {
-        const res = await fetch(`/api/voices?provider=${currentProvider}`);
+        const res = await fetch(`/api/v1/voices?provider=${currentProvider}`);
         if (!cancelled && res.ok) {
           const data = await res.json();
           setVoices((data.poolVoices ?? []).map((v: VoiceOption) => ({

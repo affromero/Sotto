@@ -6,7 +6,7 @@
  * CLI), so this is the single source of truth for the translation.
  *
  * Pure functions, no I/O — unit-tested. The wizard calls these to decide which
- * keys to POST (to /api/settings/ai-keys or /api/settings/byok), which per-user
+ * keys to POST (to /api/v1/settings/ai-keys or /api/v1/settings/byok), which per-user
  * preferences to save, and — for the owner — which server-infra fields to set.
  *
  * No availability-based fallback: each result reflects exactly what the learner

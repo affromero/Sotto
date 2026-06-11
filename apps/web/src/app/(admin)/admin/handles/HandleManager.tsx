@@ -30,7 +30,7 @@ export function HandleManager({ initialHandles }: HandleManagerProps) {
     setError(null);
 
     try {
-      const res = await fetch('/api/admin/handles', {
+      const res = await fetch('/api/v1/admin/handles', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -60,7 +60,7 @@ export function HandleManager({ initialHandles }: HandleManagerProps) {
     setError(null);
 
     try {
-      const res = await fetch('/api/admin/handles', {
+      const res = await fetch('/api/v1/admin/handles', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ handle }),

@@ -36,7 +36,7 @@ export interface FlowState {
   language: string;
 }
 
-/** How the wizard should behave, from /api/onboarding/config. */
+/** How the wizard should behave, from /api/v1/onboarding/config. */
 export interface OnboardingConfig {
   selfHosted: boolean;
   isOwner: boolean;
@@ -67,7 +67,7 @@ export function WelcomeFlow() {
 
   useEffect(() => {
     let active = true;
-    fetch('/api/onboarding/config', { credentials: 'include' })
+    fetch('/api/v1/onboarding/config', { credentials: 'include' })
       .then((r) => (r.ok ? r.json() : null))
       .then((data: OnboardingConfig | null) => {
         if (active && data) setConfig({ selfHosted: !!data.selfHosted, isOwner: !!data.isOwner });

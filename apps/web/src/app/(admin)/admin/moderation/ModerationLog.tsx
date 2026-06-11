@@ -42,7 +42,7 @@ export function ModerationLog() {
 
     async function load() {
       const response = await fetch(
-        `/api/admin/moderation-log?page=${page}&limit=30`
+        `/api/v1/admin/moderation-log?page=${page}&limit=30`
       );
       if (cancelled) return;
       if (response.ok) {

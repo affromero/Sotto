@@ -19,7 +19,7 @@ export function AvatarPrep({ project }: { project: DemoProject }) {
 
   const generateAvatar = useCallback(async () => {
     setLoading(true);
-    await fetch(`/api/admin/demo/${project.id}/avatar`, {
+    await fetch(`/api/v1/admin/demo/${project.id}/avatar`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ narrationText: narration, avatarId }),
@@ -29,7 +29,7 @@ export function AvatarPrep({ project }: { project: DemoProject }) {
 
   const setManualClipUrl = useCallback(async () => {
     if (!manualUrl) return;
-    await fetch(`/api/admin/demo/${project.id}`, {
+    await fetch(`/api/v1/admin/demo/${project.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ avatarClipUrl: manualUrl }),

@@ -11,10 +11,10 @@ vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() },
 }));
 
-import { GET } from '@/app/api/admin/traffic-report/route';
+import { GET } from '@/app/api/v1/admin/traffic-report/route';
 
 function createRequest(bearerToken?: string, period?: string): NextRequest {
-  const url = new URL('http://localhost:3000/api/admin/traffic-report');
+  const url = new URL('http://localhost:3000/api/v1/admin/traffic-report');
   if (period) {
     url.searchParams.set('period', period);
   }
@@ -25,7 +25,7 @@ function createRequest(bearerToken?: string, period?: string): NextRequest {
   return new NextRequest(url, { method: 'GET', headers });
 }
 
-describe('GET /api/admin/traffic-report', () => {
+describe('GET /api/v1/admin/traffic-report', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.ADMIN_REPORT_KEY = 'test-admin-key';

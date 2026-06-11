@@ -92,10 +92,10 @@ vi.mock('@/lib/api-response', () => ({
   },
 }));
 
-import { POST, PATCH } from '@/app/api/podcasts/[podcastId]/video/route';
+import { POST, PATCH } from '@/app/api/v1/podcasts/[podcastId]/video/route';
 
 function createRequest(body?: unknown): NextRequest {
-  return new NextRequest(new URL('http://localhost:3000/api/podcasts/pod-1/video'), {
+  return new NextRequest(new URL('http://localhost:3000/api/v1/podcasts/pod-1/video'), {
     method: 'POST',
     body: body ? JSON.stringify(body) : undefined,
     headers: body ? { 'Content-Type': 'application/json' } : {},
@@ -104,7 +104,7 @@ function createRequest(body?: unknown): NextRequest {
 
 const routeParams = { params: Promise.resolve({ podcastId: 'pod-1' }) };
 
-describe('POST /api/podcasts/[id]/video', () => {
+describe('POST /api/v1/podcasts/[id]/video', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
@@ -252,14 +252,14 @@ describe('POST /api/podcasts/[id]/video', () => {
 });
 
 function createPatchRequest(body: unknown): NextRequest {
-  return new NextRequest(new URL('http://localhost:3000/api/podcasts/pod-1/video'), {
+  return new NextRequest(new URL('http://localhost:3000/api/v1/podcasts/pod-1/video'), {
     method: 'PATCH',
     body: JSON.stringify(body),
     headers: { 'Content-Type': 'application/json' },
   });
 }
 
-describe('PATCH /api/podcasts/[id]/video', () => {
+describe('PATCH /api/v1/podcasts/[id]/video', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });

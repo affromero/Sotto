@@ -31,7 +31,7 @@ export function AccountSwitcher({ variant = 'dashboard', hasActivePlayer = false
 
   useEffect(() => {
     if (!isAdmin) return;
-    fetch('/api/admin/impersonate/targets')
+    fetch('/api/v1/admin/impersonate/targets')
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (data?.systemOwner) setSystemOwner(data.systemOwner);

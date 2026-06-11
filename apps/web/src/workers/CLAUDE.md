@@ -49,16 +49,16 @@ content-extraction → script-generation → script-verification ──→ refer
                                                                                    API/AGENT/MEETING: auto-approve
 
 Script review (at SCRIPT_READY):
-  User edits script → PATCH /api/podcasts/[id]/script (save edits)
-  User approves    → POST  /api/podcasts/[id]/script/approve (creates Segments, queues audio)
-  User regenerates → POST  /api/podcasts/[id]/script/regenerate (re-queues script-generation)
+  User edits script → PATCH /api/v1/podcasts/[id]/script (save edits)
+  User approves    → POST  /api/v1/podcasts/[id]/script/approve (creates Segments, queues audio)
+  User regenerates → POST  /api/v1/podcasts/[id]/script/regenerate (re-queues script-generation)
 
 Incorporation (post-READY):
   incorporate endpoint → segment-regeneration → audio-stitching (skipSfx) → READY
   (ANSWERED → INCORPORATING)  (TTS + insert)    (re-concat + startTimes)   (INCORPORATED)
 
 Video pipeline (post-READY, full access):
-  POST /api/podcasts/[id]/video → visual-classification → place-enrichment (MAP_OVERLAY) / visual-generation (×N parallel) → transition-generation (×N-1 parallel) → video-composition → notification
+  POST /api/v1/podcasts/[id]/video → visual-classification → place-enrichment (MAP_OVERLAY) / visual-generation (×N parallel) → transition-generation (×N-1 parallel) → video-composition → notification
                                    (Claude Haiku)          (fal FLUX / Pexels)              (fal video between segments)       (Remotion sidecar)    (VIDEO_READY)
 ```
 
@@ -82,7 +82,7 @@ Workers are idempotent — safe to re-run after a failure. Each worker checks fo
 | audio-import       | `PodcastVersion` exists with audioUrl       | Skips entire import, sets READY                          |
 | audio-import       | `Script` already exists (mid-import retry)  | Skips script creation (prevents @@unique violation)      |
 
-When a podcast fails, `POST /api/podcasts/[id]/generate` uses `determineResumePoint()` from `lib/pipeline-resume.ts` to inspect existing data and resume from the furthest completed step. Pass `?forceRestart=true` to nuke everything and start from scratch.
+When a podcast fails, `POST /api/v1/podcasts/[id]/generate` uses `determineResumePoint()` from `lib/pipeline-resume.ts` to inspect existing data and resume from the furthest completed step. Pass `?forceRestart=true` to nuke everything and start from scratch.
 
 ## Adding a New Worker
 

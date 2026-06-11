@@ -178,7 +178,7 @@ This is the simplest creation path and should remain the smoke test for the pipe
 Add an authenticated ingestion endpoint for agents:
 
 ```http
-POST /api/ingest/agent
+POST /api/v1/ingest/agent
 ```
 
 Payload:
@@ -367,7 +367,7 @@ Known non-fatal build warnings should be documented only when they are unrelated
 ### Stage 4 - Agent Ingestion
 
 - Add agent source token model if needed.
-- Add `/api/ingest/agent`.
+- Add `/api/v1/ingest/agent`.
 - Add queue integration.
 - Add tests for auth, idempotency, and private episode creation.
 - Commit once CI passes.
