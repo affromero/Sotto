@@ -41,7 +41,7 @@
   min-height: 44px;
   background: transparent;
   border: none;
-  border-radius: 12px;
+  border-radius: 50%;
   cursor: pointer;
   transition: transform 0.2s ease;
 }
@@ -65,7 +65,7 @@
   content: '';
   position: absolute;
   inset: 0;
-  border-radius: 12px;
+  border-radius: 50%;
   box-shadow: 0 0 0 2px var(--color-primary);
   pointer-events: none;
 }

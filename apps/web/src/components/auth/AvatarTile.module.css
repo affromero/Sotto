@@ -1,8 +1,9 @@
 /*
- * AvatarTile.module.css — square household avatar for the profile picker.
- * Consumes the aula tokens (--accent, --paper-2, --ink, --serif) defined on the
- * ProfilePicker root. The fallback gradient is a single calm aula wash built from
- * the locked blue accent, so no per-tile inline color is needed.
+ * AvatarTile.module.css — circular household avatar for the profile picker.
+ * The tile is a square box, so border-radius: 50% inscribes the largest circle
+ * that fits. Consumes the aula tokens (--accent, --paper-2, --ink, --serif)
+ * defined on the ProfilePicker root. The fallback gradient is a single calm aula
+ * wash built from the locked blue accent, so no per-tile inline color is needed.
  */
 
 .tile {
@@ -14,7 +15,7 @@
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  border-radius: 18px;
+  border-radius: 50%;
   background:
     radial-gradient(circle at 30% 24%, color-mix(in oklab, var(--accent) 22%, transparent), transparent 60%),
     linear-gradient(150deg, var(--paper-2), color-mix(in oklab, var(--accent) 12%, var(--well)));
