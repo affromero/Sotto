@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState, useEffect, useCallback, useRef, FormEvent } from 'react';
 import styles from './page.module.css';
 import type { PitchManifest, PitchDocument } from '@/types/pitch';
@@ -431,9 +432,9 @@ export default function PitchPage() {
       {/* Top bar */}
       <header className={styles.topBar}>
         <div className={styles.topBarLeft}>
-          <a href="/" className={styles.topBarLogo}>
+          <Link href="/" className={styles.topBarLogo}>
             Sotto
-          </a>
+          </Link>
           <span className={styles.topBarDivider} />
           {selectedDoc && <span className={styles.topBarTitle}>{selectedDoc.displayName}</span>}
         </div>
