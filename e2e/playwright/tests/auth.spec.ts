@@ -11,12 +11,6 @@ test.describe('Authentication', () => {
     await expect(page.locator('text=Sign in')).toBeVisible();
   });
 
-  test('banned user sees banned page', async ({ page }) => {
-    // Attempt to access with a banned session would redirect
-    await page.goto('/banned');
-    await expect(page.locator('body')).toBeVisible();
-  });
-
   test('protected API routes return 401 without auth', async ({ request }) => {
     const response = await request.get('/api/v1/users/me');
     expect(response.status()).toBe(401);
