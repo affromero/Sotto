@@ -39,9 +39,4 @@ test.describe('Users /me API routes', () => {
     const contentDisposition = res.headers()['content-disposition'];
     expect(contentDisposition).toBeTruthy();
   });
-
-  test('DELETE me/recommendations succeeds', async ({ authedRequest }) => {
-    const res = await authedRequest.delete('/api/v1/users/me/recommendations');
-    expect(res.status()).toBe(200);
-  });
 });

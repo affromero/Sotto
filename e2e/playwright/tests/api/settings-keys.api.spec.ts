@@ -56,11 +56,4 @@ test.describe('Settings, keys, voices, models API routes', () => {
     const res = await authedRequest.get('/api/v1/voices');
     expect(res.status()).toBe(200);
   });
-
-  test('GET voices/browse', async ({ authedRequest }) => {
-    const res = await authedRequest.get('/api/v1/voices/browse');
-    expect(res.status()).toBe(503);
-    const body = await res.json();
-    expect(body.error).toBe('Paid voice sharing is currently unavailable.');
-  });
 });

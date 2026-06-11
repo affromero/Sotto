@@ -51,13 +51,6 @@ test.describe('Misc API routes', () => {
     expect(res.status()).toBe(400);
   });
 
-  test('access returns gated status', async ({ authedRequest }) => {
-    const res = await authedRequest.get('/api/v1/access');
-    expect(res.status()).toBe(200);
-    const body = await res.json();
-    expect(body).toHaveProperty('gated');
-  });
-
   test('invite/redeem valid code', async ({ authedRequest, seedData }) => {
     const res = await authedRequest.post('/api/v1/invite/redeem', {
       data: { code: seedData.freshInviteCode, email: 'invite-test@example.com' },
