@@ -55,14 +55,12 @@ describe('matchesProfile', () => {
 
 describe('matchesPreset', () => {
   it('preset=full includes everything', () => {
-    expect(matchesPreset('demo-voiceover', 'full')).toBe(true);
     expect(matchesPreset('audio-generation', 'full')).toBe(true);
     expect(matchesPreset('lip-sync-test', 'full')).toBe(true);
   });
 
-  it('preset=core excludes EXPERIMENTAL_WORKERS (denylist)', () => {
-    expect(matchesPreset('demo-voiceover', 'core')).toBe(false);
-    expect(matchesPreset('demo-script', 'core')).toBe(false);
+  it('preset=core has no experimental denylist after demo workers were removed', () => {
+    expect(EXPERIMENTAL_WORKERS.size).toBe(0);
   });
 
   it('preset=core includes production workers', () => {
@@ -98,27 +96,15 @@ describe('shouldRun — the bug fix', () => {
   });
 });
 
-describe('shouldRun — experimental workers excluded', () => {
-  it('demo-voiceover excluded with heavy+core', () => {
-    expect(shouldRun('demo-voiceover', opts({ profile: 'heavy', preset: 'core' }))).toBe(false);
-  });
-
-  it('demo-composition excluded with heavy+core', () => {
-    expect(shouldRun('demo-composition', opts({ profile: 'heavy', preset: 'core' }))).toBe(false);
-  });
-
+describe('shouldRun — retained video workers', () => {
   it('avatar-generation runs with heavy+core (not experimental)', () => {
     expect(shouldRun('avatar-generation', opts({ profile: 'heavy', preset: 'core' }))).toBe(true);
-  });
-
-  it('demo-script excluded with pipeline+core', () => {
-    expect(shouldRun('demo-script', opts({ profile: 'pipeline', preset: 'core' }))).toBe(false);
   });
 });
 
 describe('shouldRun — preset=full includes everything', () => {
-  it('demo-voiceover included with heavy+full', () => {
-    expect(shouldRun('demo-voiceover', opts({ profile: 'heavy', preset: 'full' }))).toBe(true);
+  it('visual-generation included with heavy+full', () => {
+    expect(shouldRun('visual-generation', opts({ profile: 'heavy', preset: 'full' }))).toBe(true);
   });
 
   it('lip-sync-test included with heavy+full', () => {

@@ -28,7 +28,7 @@ The old investor-pitch docs for public discovery, community ranking, creator net
 
 - Every active doc must have a title, date, and summary at the top.
 - Keep docs aligned with code in the same commit.
-- When removing a product surface, remove its docs and update `scripts/rebuild-pitch.sh`.
+- When removing a product surface, remove its stale docs in the same change.
 - Do not describe removed social primitives as current behavior.
 - Do not require Doppler for local OSS setup docs.
 - Do not document provider fallback chains. Document explicit provider selection and typed setup errors.

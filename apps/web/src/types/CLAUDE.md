@@ -15,7 +15,6 @@ Shared types used across the application. These mirror Prisma models but are sha
 | `api-key.ts`      | ApiKeyData, CreateKeyRequest, KeyListResponse                                                                                                                     |
 | `team.ts`         | TeamData, TeamInviteData, TeamMember                                                                                                                              |
 | `version.ts`      | PodcastVersionData, PodcastVersionSegmentData                                                                                                                     |
-| `pitch.ts`        | PitchVersion, PitchAsset types                                                                                                                                    |
 | `next-auth.d.ts`  | NextAuth module augmentation: adds `role: UserRole` to Session.user, User, JWT                                                                                    |
 
 ## Shared Package Re-export Pattern

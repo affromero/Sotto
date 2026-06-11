@@ -1,6 +1,6 @@
 /**
  * API interceptors for browser recording.
- * Adapted from scripts/recording/lib/interceptors.ts for use in the Remotion sidecar.
+ * Used by the Remotion sidecar when a browser-driven render needs mocked API calls.
  */
 import type { Page, Route } from 'playwright';
 

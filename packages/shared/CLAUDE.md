@@ -17,9 +17,8 @@ src/
 │   ├── notification.ts   # NotificationData, PushSubscriptionData
 │   ├── version.ts        # PodcastVersionSummary, PodcastVersionDetail
 │   ├── analytics.ts      # AnalyticsResponse, AnalyticsSummary
-│   ├── api-key.ts        # ApiKeyData, ApiKeyCreated
-│   └── pitch.ts          # PitchDocument, PitchVersion, PitchManifest
-├── brand.ts              # BRAND constant — single source of truth for product tagline, descriptions, and pitch copy
+│   └── api-key.ts        # ApiKeyData, ApiKeyCreated
+├── brand.ts              # BRAND constant — single source of truth for product tagline and descriptions
 ├── content-badge.ts      # getContentBadgeLabel(), getPodcastBadges() — content/AI/TTS/language badge logic
 ├── provider-display.ts   # AI_PROVIDER_DISPLAY, TTS_PROVIDER_DISPLAY, AI_MODEL_DISPLAY, LANGUAGE_DISPLAY maps + label helpers
 ├── generation-messages.ts # STAGE_MESSAGES pools + resolveMessage() — rotating sub-messages for pipeline generation stages

@@ -36,13 +36,6 @@ import { processAvatarGeneration } from './avatar-generation.worker';
 import { processPlaceEnrichment } from './place-enrichment.worker';
 import { processTransitionGeneration } from './transition-generation.worker';
 import { processSegmentPreview } from './segment-preview.worker';
-import { processDemoScriptGeneration } from './demo-script-generation.worker';
-import { processDemoRecording } from './demo-recording.worker';
-import { processDemoVoiceover } from './demo-voiceover.worker';
-import { processDemoVisual } from './demo-visual.worker';
-import { processDemoTransition } from './demo-transition.worker';
-import { processDemoComposition } from './demo-composition.worker';
-import { processDemoSceneComposition } from './demo-scene-composition.worker';
 import { processLipSyncTest } from './lip-sync-test.worker';
 import { processWaveformGeneration } from './waveform-generation.worker';
 import { processPipelineClassification } from './pipeline-classification.worker';
@@ -119,13 +112,6 @@ const workers = [
   shouldRun('place-enrichment') && createWorker('place-enrichment', processPlaceEnrichment, { concurrency: 3 }),
   shouldRun('transition-generation') && createWorker('transition-generation', processTransitionGeneration, { concurrency: 3, lockDuration: 600000 }),
   shouldRun('segment-preview') && createWorker('segment-preview', processSegmentPreview, { concurrency: 3, lockDuration: 300000 }),
-  shouldRun('demo-script') && createWorker('demo-script', processDemoScriptGeneration, { concurrency: 2 }),
-  shouldRun('demo-recording') && createWorker('demo-recording', processDemoRecording, { concurrency: 1, lockDuration: 600000 }),
-  shouldRun('demo-voiceover') && createWorker('demo-voiceover', processDemoVoiceover, { concurrency: 5 }),
-  shouldRun('demo-visual') && createWorker('demo-visual', processDemoVisual, { concurrency: 3 }),
-  shouldRun('demo-transition') && createWorker('demo-transition', processDemoTransition, { concurrency: 2 }),
-  shouldRun('demo-composition') && createWorker('demo-composition', processDemoComposition, { concurrency: 1, lockDuration: 900000 }),
-  shouldRun('demo-scene-composition') && createWorker('demo-scene-composition', processDemoSceneComposition, { concurrency: 2, lockDuration: 600000 }),
   shouldRun('lip-sync-test') && createWorker('lip-sync-test', processLipSyncTest, { concurrency: 2, lockDuration: 300000 }),
   shouldRun('waveform-generation') && createWorker('waveform-generation', processWaveformGeneration, { concurrency: 2 }),
   shouldRun('pipeline-classification') && createWorker('pipeline-classification', processPipelineClassification, { concurrency: 2, lockDuration: 300000 }),

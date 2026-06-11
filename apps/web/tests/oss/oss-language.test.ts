@@ -86,7 +86,6 @@ describe('open-source language-learning OSS surfaces', () => {
       'src/app/privacy/page.tsx',
       'src/app/support/page.tsx',
       'src/app/layout.tsx',
-      'src/app/(admin)/admin/showcase/ActionEditor.tsx',
       'src/app/(dashboard)/settings/SettingsForm.tsx',
       'src/components/referral/JoinCTA.tsx',
     ]
@@ -137,9 +136,6 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(existsSync(resolve(webRoot, 'src/components/feed/ActivityItem.tsx'))).toBe(false);
     expect(existsSync(resolve(repoRoot, 'e2e/playwright/tests/feed.spec.ts'))).toBe(false);
     expect(existsSync(resolve(repoRoot, 'e2e/playwright/tests/api/feed-social.api.spec.ts'))).toBe(
-      false
-    );
-    expect(existsSync(resolve(repoRoot, 'scripts/recording/flows/01-feed-browsing.ts'))).toBe(
       false
     );
   });
@@ -317,7 +313,8 @@ describe('open-source language-learning OSS surfaces', () => {
     const commandSources = [packageJson, envRunner, e2eSources].join('\n');
 
     expect(packageJson).toContain('"dev": "scripts/run-with-env.sh');
-    expect(packageJson).toContain('"record": "scripts/run-with-env.sh');
+    expect(packageJson).not.toContain('"record": "scripts/run-with-env.sh');
+    expect(packageJson).not.toContain('"narrate": "scripts/run-with-env.sh');
     expect(packageJson).not.toContain('"db:sync"');
     expect(existsSync(resolve(repoRoot, 'scripts/sync-prod-db.sh'))).toBe(false);
     expect(envRunner).toContain('SOTTO_ENV_FILE');
@@ -386,14 +383,7 @@ describe('open-source language-learning OSS surfaces', () => {
       'apps/web/src/middleware.ts',
       'apps/web/src/lib/email-templates.ts',
       'apps/web/src/app/api/v1/users/unsubscribe/route.ts',
-      'apps/web/src/app/api/v1/pitch/[...path]/route.ts',
-      'apps/web/src/app/api/v1/pitch/auth/route.ts',
-      'apps/web/src/workers/demo-recording.worker.ts',
       'apps/web/src/lib/health.ts',
-      'scripts/capture-pitch-screenshots.ts',
-      'scripts/recording/index.ts',
-      'scripts/recording/lib/browser.ts',
-      'scripts/recording/narrate.ts',
       'docs/17-authentication-setup.md',
     ]
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
@@ -442,7 +432,6 @@ describe('open-source language-learning OSS surfaces', () => {
       'apps/web/src/app/join/page.tsx',
       'apps/web/src/app/api/v1/auth/mobile/route.ts',
       'apps/web/src/app/opengraph-image.tsx',
-      'apps/web/src/app/(admin)/admin/showcase/AvatarPrep.tsx',
       'apps/web/public/manifest.json',
       'apps/web/prisma/seed.ts',
       'apps/web/prisma/seed-demo.ts',
@@ -457,19 +446,12 @@ describe('open-source language-learning OSS surfaces', () => {
       'packages/verification-standard/package.json',
       'packages/verification-standard/README.md',
       'packages/verification-standard/CONTRIBUTING.md',
-      'scripts/capture-pitch-screenshots.ts',
-      'scripts/launch-video/AUTHORING_GUIDE.md',
-      'scripts/launch-video/SYSTEM_PROMPT.md',
-      'scripts/launch-video/sotto-launch.json',
-      'scripts/recording/index.ts',
-      'scripts/recording/lib/browser.ts',
     ]
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
 
     expect(publicContactSources).toContain('support@example.com');
     expect(publicContactSources).toContain('https://your-domain.example');
-    expect(publicContactSources).toContain('https://media.example.com/demos/');
     expect(publicContactSources).not.toContain('sotto.fm');
     expect(publicContactSources).not.toContain('@sottofm');
     expect(publicContactSources).not.toContain('r2.sotto.fm');
@@ -529,7 +511,6 @@ describe('open-source language-learning OSS surfaces', () => {
       'apps/web/src/lib/system-user.ts',
       'apps/web/src/workers/CLAUDE.md',
       'apps/web/src/app/api/v1/admin/podcasts/create-as-system-owner/route.ts',
-      'apps/web/src/app/api/v1/admin/landing-showcase/bootstrap/route.ts',
       'apps/web/src/app/api/v1/admin/impersonate/targets/route.ts',
       'apps/web/src/app/(admin)/admin/podcasts/CreateAsSystemOwnerButton.tsx',
       'apps/web/src/app/(admin)/admin/podcasts/page.tsx',
@@ -564,7 +545,6 @@ describe('open-source language-learning OSS surfaces', () => {
       'apps/web/src/lib/public-links.ts',
       'apps/web/src/components/player/ReferenceList.tsx',
       'apps/web/src/components/create/GenerationProgress.tsx',
-      'scripts/recording/flows/07-verification-github.ts',
     ]
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
@@ -678,7 +658,7 @@ describe('open-source language-learning OSS surfaces', () => {
     ]
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
-    const releaseIndexSources = ['docs/CLAUDE.md', 'scripts/rebuild-pitch.sh']
+    const releaseIndexSources = ['docs/CLAUDE.md']
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
 
@@ -751,9 +731,6 @@ describe('open-source language-learning OSS surfaces', () => {
       'src/components/player/ProposeRenditionButton.tsx',
     ];
     const playerSource = readSource('src/app/podcast/[podcastId]/PodcastPlayerView.tsx');
-    const podcastCardSource = ['src/components/landing/chapters/AudioClipPlayer.tsx']
-      .map(readSource)
-      .join('\n');
 
     for (const route of removedRoutes) {
       expect(existsSync(resolve(webRoot, route)), route).toBe(false);
@@ -765,12 +742,6 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(playerSource).not.toContain('/fork');
     expect(playerSource).not.toContain('/comments');
     expect(playerSource).not.toContain('ShareMenu');
-    expect(podcastCardSource).not.toContain('router.push');
-    expect(podcastCardSource).not.toContain('?fork=1');
-    expect(podcastCardSource).not.toContain('forkButton');
-    expect(podcastCardSource).not.toContain('Remix of');
-    expect(podcastCardSource).not.toContain('likeCount');
-    expect(podcastCardSource).not.toContain('forkCount');
   });
 
   it('does not keep social notification types or public Q&A voting tests', () => {
@@ -792,7 +763,6 @@ describe('open-source language-learning OSS surfaces', () => {
       'e2e/playwright/tests/api/feed-social.api.spec.ts',
       'e2e/playwright/tests/api/users-public.api.spec.ts',
       'e2e/playwright/tests/fork.spec.ts',
-      'scripts/recording/flows/04-fork-flow.ts',
     ];
 
     for (const testPath of removedTests) {
@@ -807,18 +777,14 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(notificationSources).not.toContain('COMMENT_REPLY');
   });
 
-  it('keeps demo and automation harnesses private-first', () => {
+  it('keeps automation harnesses private-first', () => {
     const harnessSources = [
       'e2e/llmock/setup.ts',
       'e2e/playwright/tests/podcast-player.spec.ts',
-      'scripts/launch-video/SYSTEM_PROMPT.md',
-      'scripts/launch-video/AUTHORING_GUIDE.md',
-      'scripts/recording/index.ts',
       'apps/web/src/app/changelog/page.tsx',
       'apps/web/src/app/welcome/WelcomeFlow.tsx',
       'apps/web/src/lib/CLAUDE.md',
       'apps/web/src/lib/auth-guards.ts',
-      'apps/web/src/lib/demo-context.ts',
     ]
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
@@ -885,7 +851,6 @@ describe('open-source language-learning OSS surfaces', () => {
     const releaseDocPaths = [
       'README.md',
       'CLAUDE.md',
-      'scripts/rebuild-pitch.sh',
       ...readdirSync(docsDir)
         .filter((name) => name.endsWith('.md'))
         .map((name) => `docs/${name}`),
@@ -1258,16 +1223,6 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(maestroSources).not.toContain('user-profile-follow-button');
     expect(maestroSources).not.toContain('collection-detail-follow-button');
     expect(maestroSources).not.toContain('E2E_OTHER_USER_HANDLE');
-  });
-
-  it('does not require public demo podcasts for screenshot capture', () => {
-    const pitchScreenshotSource = readFileSync(
-      resolve(repoRoot, 'scripts/capture-pitch-screenshots.ts'),
-      'utf8'
-    );
-
-    expect(pitchScreenshotSource).toContain('Find a READY demo podcast');
-    expect(pitchScreenshotSource).not.toContain("visibility: 'PUBLIC'");
   });
 
   it('does not ship the curated-playlist collections feature', () => {

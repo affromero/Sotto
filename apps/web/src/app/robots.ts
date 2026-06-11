@@ -49,7 +49,6 @@ const DISALLOWED_PATHS = [
   '/settings',
   '/welcome',
   '/team',
-  '/pitch',
   '/_next/',
 ];
 

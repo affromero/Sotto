@@ -108,34 +108,6 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
     description: 'Resolves place names to coordinates via gazetteers for map visuals',
     stage: 'Video Pipeline',
   },
-  'demo-script': {
-    description: 'Generates demo video scripts from project features',
-    stage: 'Video Pipeline',
-  },
-  'demo-recording': {
-    description: 'Records browser sessions via Playwright for demo scenes',
-    stage: 'Video Pipeline',
-  },
-  'demo-voiceover': {
-    description: 'Generates TTS voiceover narration for demo scenes',
-    stage: 'Video Pipeline',
-  },
-  'demo-visual': {
-    description: 'Generates visual assets for demo scenes',
-    stage: 'Video Pipeline',
-  },
-  'demo-transition': {
-    description: 'Creates transition clips between demo scenes',
-    stage: 'Video Pipeline',
-  },
-  'demo-composition': {
-    description: 'Composes final demo video from all scene assets',
-    stage: 'Video Pipeline',
-  },
-  'demo-scene-composition': {
-    description: 'Composes individual demo scenes from visual, voiceover, and recording assets',
-    stage: 'Video Pipeline',
-  },
   'lip-sync-test': {
     description: 'Tests lip-sync models with a short audio clip and avatar image via fal.ai',
     stage: 'Video Pipeline',
