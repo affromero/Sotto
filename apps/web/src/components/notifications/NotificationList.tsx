@@ -12,7 +12,6 @@ import {
   ShieldAlert,
   Trash2,
   Gift,
-  ImagePlus,
   Video,
   Megaphone,
 } from 'lucide-react';
@@ -58,12 +57,6 @@ const typeIcons: Record<string, typeof Bell> = {
 
   // System
   PLATFORM_ANNOUNCEMENT: Megaphone,
-
-  // Avatar images
-  AVATAR_IMAGE_REQUEST_RECEIVED: ImagePlus,
-  AVATAR_IMAGE_REQUEST_APPROVED: ImagePlus,
-  AVATAR_IMAGE_REQUEST_DENIED: ImagePlus,
-  AVATAR_IMAGE_REQUEST_REVOKED: ImagePlus,
 };
 
 function getRelativeTime(dateString: string): string {

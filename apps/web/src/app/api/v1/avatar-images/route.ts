@@ -17,7 +17,7 @@ export async function GET() {
       return errorResponse('Unauthorized', 401);
     }
 
-    const [user, images, sharedRecords] = await Promise.all([
+    const [user, images] = await Promise.all([
       prisma.user.findUniqueOrThrow({
         where: { id: session.user.id },
         select: { referralVerified: true, role: true },
@@ -26,24 +26,10 @@ export async function GET() {
         where: { userId: session.user.id },
         orderBy: { createdAt: 'desc' },
       }),
-      prisma.avatarImageShare.findMany({
-        where: { requesterId: session.user.id, status: 'APPROVED' },
-        include: {
-          avatarImage: true,
-          imageOwner: { select: { id: true, name: true, handle: true, image: true } },
-        },
-        orderBy: { createdAt: 'desc' },
-      }),
     ]);
 
     const isAdmin = user.role === 'ADMIN';
     const isVerified = user.referralVerified;
-
-    const shared = sharedRecords.map((s) => ({
-      shareId: s.id,
-      image: s.avatarImage,
-      owner: s.imageOwner,
-    }));
 
     const capabilities = {
       canUpload: isAdmin || isVerified,
@@ -52,7 +38,7 @@ export async function GET() {
       uploadsEnabled: true,
     };
 
-    return NextResponse.json({ images, shared, capabilities });
+    return NextResponse.json({ images, capabilities });
   } catch (error: unknown) {
     logger.error('Failed to list avatar images', { error: error instanceof Error ? error.message : String(error) });
     return errorResponse('Failed to list avatar images', 500);
