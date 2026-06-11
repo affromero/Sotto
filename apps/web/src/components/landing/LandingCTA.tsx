@@ -34,7 +34,7 @@ const ArrowIcon = () => (
  * Auth-aware call to action.
  *
  * - Signed in  → "Continue your course" → /learn
- * - Signed out → "Start your course" → /auth/signup
+ * - Signed out → "Start your course" → /auth/login (the profile picker)
  * - Secondary  → "View on GitHub" (the open-source repo)
  */
 export function LandingCTA({ withGhost = false }: LandingCTAProps) {
@@ -44,7 +44,7 @@ export function LandingCTA({ withGhost = false }: LandingCTAProps) {
 
   return (
     <div className={styles.actions}>
-      <Link href={signedIn ? '/learn' : '/auth/signup'} className={styles.btnPrimary}>
+      <Link href={signedIn ? '/learn' : '/auth/login'} className={styles.btnPrimary}>
         {signedIn ? 'Continue your course' : 'Start your course'}
         <ArrowIcon />
       </Link>

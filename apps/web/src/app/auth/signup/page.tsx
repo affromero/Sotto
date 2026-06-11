@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { isSelfHosted } from '@/lib/self-hosted';
+import { isLocalAuthEnabled } from '@/lib/local-auth';
 import { getSiteConfig } from '@/lib/site-config';
 import { AuthButtons } from '../AuthButtons';
 import styles from '../login/page.module.css';
@@ -10,10 +10,12 @@ export const metadata = {
 };
 
 export default async function SignupPage() {
-  // A self-hosted instance has no public signup: the first visitor creates the
-  // owner profile, and the owner adds household members. Send people to the
-  // profile screen instead of an invite-only dead end.
-  if (isSelfHosted()) {
+  // When the local profile picker is the web auth (self-hosted and the managed
+  // showcase), there is no public signup: the first visitor creates the owner
+  // profile and the owner adds household members. Send people to the profile
+  // screen instead of an invite-only dead end. Only a real OAuth multi-tenant
+  // deployment (ADMIN_EMAILS configured) renders the signup content below.
+  if (await isLocalAuthEnabled()) {
     redirect('/auth/login');
   }
 
