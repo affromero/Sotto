@@ -44,7 +44,6 @@ export enum JobType {
   EXPORT_DATA = 'export_data',
   VALIDATE_KEYS = 'validate_keys',
   VERIFY_VOICE = 'verify_voice',
-  COLLECT_R2_USAGE = 'collect_r2_usage',
   FETCH_PRICING = 'fetch_pricing',
   CLASSIFY_VISUALS = 'classify_visuals',
   GENERATE_VISUAL = 'generate_visual',
@@ -380,7 +379,6 @@ const QUEUE_DEFINITIONS: Record<string, QueueDefinition> = {
   'data-export': { attempts: 2, skipEvents: true },
   'key-validation': { attempts: 1, skipEvents: true },
   'voice-verification': { attempts: 2, skipEvents: true },
-  'r2-usage': { attempts: 2, skipEvents: true },
   'pricing-fetch': { attempts: 2, skipEvents: true },
   'visual-classification': { attempts: 2 },
   'visual-generation': { attempts: 3 },
@@ -844,7 +842,6 @@ export const featureComputationQueue = createQueueReference('feature-computation
 export const dataExportQueue = createQueueReference('data-export');
 export const keyValidationQueue = createQueueReference('key-validation');
 export const voiceVerificationQueue = createQueueReference('voice-verification');
-export const r2UsageQueue = createQueueReference('r2-usage');
 export const pricingFetchQueue = createQueueReference('pricing-fetch');
 export const visualClassificationQueue = createQueueReference('visual-classification');
 export const visualGenerationQueue = createQueueReference('visual-generation');

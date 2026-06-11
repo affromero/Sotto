@@ -634,7 +634,6 @@ describe('open-source language-learning OSS surfaces', () => {
       'apps/maps/CLAUDE.md',
       'apps/web/scripts/test-runway-browser.ts',
       'apps/web/scripts/test-runway-native.ts',
-      'apps/web/src/app/(admin)/admin/storage/page.tsx',
       'apps/web/src/lib/CLAUDE.md',
       'apps/web/src/lib/providers/video.ts',
       'packages/maps/CLAUDE.md',
@@ -952,26 +951,6 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(releaseDocsSource).toContain('self-hosted paths');
   });
 
-  it('keeps admin activity metrics private instead of social', () => {
-    const activityMetricSources = [
-      'src/lib/engagement-metrics.ts',
-      'src/app/(admin)/admin/engagement/page.tsx',
-      'src/app/(admin)/AdminShell.tsx',
-    ]
-      .map(readSource)
-      .join('\n');
-
-    expect(activityMetricSources).toContain('Private Activity');
-    expect(activityMetricSources).toContain('getTopSaved');
-    expect(activityMetricSources).not.toContain('getTopLiked');
-    expect(activityMetricSources).not.toContain('getTopForked');
-    expect(activityMetricSources).not.toContain('likeCount');
-    expect(activityMetricSources).not.toContain('forkCount');
-    expect(activityMetricSources).not.toContain('followerCount');
-    expect(activityMetricSources).not.toContain('prisma.like');
-    expect(activityMetricSources).not.toContain('prisma.follow');
-  });
-
   it('does not ship creator or per-podcast analytics product routes', () => {
     const removedAnalyticsPaths = [
       'apps/web/src/lib/podcast-analytics.ts',
@@ -986,20 +965,13 @@ describe('open-source language-learning OSS surfaces', () => {
       expect(existsSync(resolve(repoRoot, path)), path).toBe(false);
     }
 
-    const privateActivitySources = [
-      'src/lib/engagement-metrics.ts',
-      'src/app/(admin)/admin/engagement/page.tsx',
-      'src/components/layout/Sidebar.tsx',
-    ]
-      .map(readSource)
-      .join('\n');
+    const sidebarSource = readSource('src/components/layout/Sidebar.tsx');
 
-    expect(privateActivitySources).toContain('Private Activity');
-    expect(privateActivitySources).not.toContain("href: '/analytics'");
-    expect(privateActivitySources).not.toContain('getCreatorEngagement');
-    expect(privateActivitySources).not.toContain('getPodcastEngagement');
-    expect(privateActivitySources).not.toContain('likeCount');
-    expect(privateActivitySources).not.toContain('forkCount');
+    expect(sidebarSource).not.toContain("href: '/analytics'");
+    expect(sidebarSource).not.toContain('getCreatorEngagement');
+    expect(sidebarSource).not.toContain('getPodcastEngagement');
+    expect(sidebarSource).not.toContain('likeCount');
+    expect(sidebarSource).not.toContain('forkCount');
   });
 
   it('does not ship the podcast recommendation engine or feed', () => {
@@ -1168,44 +1140,20 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(reportModerationSources).not.toContain('(podcast scripts, comments)');
   });
 
-  it('keeps admin storage inspector private-activity scoped', () => {
-    const storageInspectorSources = [
-      'src/app/(admin)/admin/storage/[podcastId]/page.tsx',
-      'src/app/(admin)/admin/storage/[podcastId]/InspectorContent.tsx',
-      'src/app/(admin)/admin/storage/[podcastId]/page.module.css',
-    ]
-      .map(readSource)
-      .join('\n');
-
-    expect(storageInspectorSources).toContain('Private Activity');
-    expect(storageInspectorSources).toContain('privateActivityGrid');
-    expect(storageInspectorSources).not.toContain('likeCount');
-    expect(storageInspectorSources).not.toContain('forkCount');
-    expect(storageInspectorSources).not.toContain('commentCount');
-    expect(storageInspectorSources).not.toContain('Likes');
-    expect(storageInspectorSources).not.toContain('Forks');
-    expect(storageInspectorSources).not.toContain('Comments');
-  });
-
-  it('keeps traffic report and MCP contracts private-activity scoped', () => {
-    const trafficReportSource = readSource('src/lib/traffic-report.ts');
+  it('keeps MCP contracts private-activity scoped', () => {
     const mcpSources = ['packages/mcp/src/types.ts', 'packages/mcp/src/format.ts']
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
-    const privateContractSources = [trafficReportSource, mcpSources].join('\n');
 
-    expect(trafficReportSource).toContain('PrivateActivitySection');
-    expect(trafficReportSource).toContain('privateActivity');
-    expect(trafficReportSource).toContain('topSaved');
-    expect(privateContractSources).not.toContain('EngagementSection');
-    expect(privateContractSources).not.toContain('collectionFollow');
-    expect(privateContractSources).not.toContain('followerCount');
-    expect(privateContractSources).not.toContain('followingCount');
-    expect(privateContractSources).not.toContain('likeCount');
-    expect(privateContractSources).not.toContain('forkCount');
-    expect(privateContractSources).not.toContain('forkedFromId');
-    expect(privateContractSources).not.toContain('isLiked');
-    expect(privateContractSources).not.toContain('Forked from');
+    expect(mcpSources).not.toContain('EngagementSection');
+    expect(mcpSources).not.toContain('collectionFollow');
+    expect(mcpSources).not.toContain('followerCount');
+    expect(mcpSources).not.toContain('followingCount');
+    expect(mcpSources).not.toContain('likeCount');
+    expect(mcpSources).not.toContain('forkCount');
+    expect(mcpSources).not.toContain('forkedFromId');
+    expect(mcpSources).not.toContain('isLiked');
+    expect(mcpSources).not.toContain('Forked from');
   });
 
   it('keeps feature computation private-signal scoped', () => {

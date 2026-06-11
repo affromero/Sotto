@@ -1534,29 +1534,6 @@ model DuplicateMatch {
   @@index([status])
 }
 
-// ============ R2 USAGE MONITORING ============
-
-model R2UsageSnapshot {
-  id                  String   @id @default(cuid())
-  bucket              String
-  payloadSizeBytes    Float
-  metadataSizeBytes   Float
-  objectCount         Int
-  uploadCount         Int
-  classAOps           Int      @default(0)
-  classBOps           Int      @default(0)
-  freeOps             Int      @default(0)
-  storageCostEstimate Float    @default(0)
-  classACostEstimate  Float    @default(0)
-  classBCostEstimate  Float    @default(0)
-  totalCostEstimate   Float    @default(0)
-  prefixBreakdown     Json?
-  createdAt           DateTime @default(now())
-
-  @@index([createdAt])
-  @@index([bucket, createdAt])
-}
-
 // ============ MODEL PRICING SNAPSHOTS ============
 
 model ModelPricingSnapshot {

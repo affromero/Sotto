@@ -100,10 +100,6 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
     description: 'Verifies voice clone ownership and quality',
     stage: 'Voice Features',
   },
-  'r2-usage': {
-    description: 'Collects R2 storage usage and operations data from Cloudflare API',
-    stage: 'Platform Ops',
-  },
   'pricing-fetch': {
     description: 'Fetches AI model pricing from provider pages and updates snapshots',
     stage: 'Platform Ops',
