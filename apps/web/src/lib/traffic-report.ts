@@ -137,7 +137,7 @@ export interface ContentSection {
   };
 }
 
-export interface FreeTierSection {
+export interface ByokAdoptionSection {
   config: AutoModelConfigData;
   usersWithPodcasts: number;
   byokUsersCount: number;
@@ -179,7 +179,7 @@ export interface TrafficReport {
   interactions: InteractionsSection;
   playbackDetails: PlaybackDetailsSection;
   content: ContentSection;
-  freeTier: FreeTierSection;
+  byokAdoption: ByokAdoptionSection;
   pipeline: PipelineSection;
   voices: VoicesSection;
   referrals: ReferralsSection;
@@ -948,7 +948,7 @@ export async function buildTrafficReport(
       },
     },
 
-    freeTier: {
+    byokAdoption: {
       config: autoModelConfig,
       usersWithPodcasts: usersWithPodcasts,
       byokUsersCount: n(byokUsersCount[0]?.count ?? 0n),

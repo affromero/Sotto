@@ -1,5 +1,5 @@
 import {
-  getFreeTierFunnel,
+  getByokAdoptionFunnel,
   getByokAdoption,
   getPipelineHealth,
   getInProgressPipelines,
@@ -128,7 +128,7 @@ export default async function AdminPipelinePage({ searchParams }: PageProps) {
     inProgress, recentlySucceeded, scriptReviewPause,
     voiceByProvider, topVoices, stageTiming,
   ] = await Promise.all([
-    getFreeTierFunnel(),
+    getByokAdoptionFunnel(),
     getByokAdoption(),
     getPipelineHealth(since),
     getRecentPipelineErrors(20, since, until, pSortCol, pSortDir),
@@ -142,7 +142,7 @@ export default async function AdminPipelinePage({ searchParams }: PageProps) {
     getPerStageTiming(since),
   ]);
 
-  const funnelMax = Math.max(funnel.freeGenUsers, funnel.byokUsers, 1);
+  const funnelMax = Math.max(funnel.generatingUsers, funnel.byokUsers, 1);
   const maxAi = Math.max(...adoption.ai.map((a) => a.count), 1);
   const maxTts = Math.max(...adoption.tts.map((t) => t.count), 1);
   const maxDay = Math.max(...errorStats.daily.map((d) => d.total), 1);
@@ -216,7 +216,7 @@ export default async function AdminPipelinePage({ searchParams }: PageProps) {
         <div className={styles.grid}>
           <div className={styles.card}>
             <span className={styles.cardLabel}>Users with Podcasts</span>
-            <span className={styles.cardValue}>{funnel.freeGenUsers.toLocaleString()}</span>
+            <span className={styles.cardValue}>{funnel.generatingUsers.toLocaleString()}</span>
           </div>
           <div className={styles.card}>
             <span className={styles.cardLabel}>BYOK Converted</span>
@@ -229,7 +229,7 @@ export default async function AdminPipelinePage({ searchParams }: PageProps) {
         </div>
         <div className={styles.funnelContainer}>
           {[
-            { label: 'Created podcasts', value: funnel.freeGenUsers },
+            { label: 'Created podcasts', value: funnel.generatingUsers },
             { label: 'Added BYOK keys', value: funnel.byokUsers },
           ].map((step) => (
             <div key={step.label} className={styles.funnelStep}>
