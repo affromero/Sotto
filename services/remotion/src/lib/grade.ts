@@ -1,6 +1,5 @@
 /**
- * FFmpeg warm amber grading for demo recordings.
- * Adapted from scripts/recording/lib/grade.ts.
+ * FFmpeg warm amber grading for browser recordings.
  */
 import { execFile } from 'child_process';
 import { promisify } from 'util';

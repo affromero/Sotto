@@ -17,8 +17,6 @@
     "dev:web": "scripts/run-with-env.sh npm run dev:web --workspace=@sotto/web",
     "dev:workers": "scripts/run-with-env.sh env REMOTION_URL=http://localhost:3100 npm run dev:workers --workspace=@sotto/web",
     "dev:remotion": "scripts/run-with-env.sh npx tsx services/remotion/src/server.ts",
-    "record": "scripts/run-with-env.sh env NODE_PATH=apps/web/node_modules npx tsx scripts/recording/index.ts",
-    "narrate": "scripts/run-with-env.sh env NODE_PATH=apps/web/node_modules npx tsx scripts/recording/narrate.ts",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "lint": "npm run lint --workspace=@sotto/web",

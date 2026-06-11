@@ -1,7 +1,7 @@
 /**
  * MiniMax Speech-02 HD TTS provider — #1 ranked on Speech Arena.
  * Accessed via Fal.ai infrastructure (shares FAL_KEY).
- * Supports 17 preset voices, 7 emotions, speed/pitch control.
+ * Supports 17 preset voices, 7 emotions, speed and pitch control.
  *
  * @tts-research-date 2026-03-01 — MiniMax Speech-02 HD via Fal API
  */

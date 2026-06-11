@@ -47,13 +47,6 @@ export enum JobType {
   COMPOSE_VIDEO = 'compose_video',
   GENERATE_AVATAR = 'generate_avatar',
   PLACE_ENRICHMENT = 'place_enrichment',
-  GENERATE_DEMO_SCRIPT = 'generate_demo_script',
-  GENERATE_DEMO_RECORDING = 'generate_demo_recording',
-  GENERATE_DEMO_VOICEOVER = 'generate_demo_voiceover',
-  GENERATE_DEMO_VISUAL = 'generate_demo_visual',
-  GENERATE_DEMO_TRANSITION = 'generate_demo_transition',
-  COMPOSE_DEMO = 'compose_demo',
-  COMPOSE_DEMO_SCENE = 'compose_demo_scene',
   LIP_SYNC_TEST = 'lip_sync_test',
   GENERATE_WAVEFORM = 'generate_waveform',
   CLASSIFY_PIPELINE = 'classify_pipeline',
@@ -189,40 +182,6 @@ export interface GeneratePdfPayload {
 
 export interface ValidateKeysPayload {}
 
-export interface GenerateDemoScriptPayload {
-  projectId: string;
-  durationTarget?: number;
-}
-
-export interface GenerateDemoRecordingPayload {
-  projectId: string;
-  sceneId: string;
-}
-
-export interface GenerateDemoVoiceoverPayload {
-  projectId: string;
-  sceneId: string;
-}
-
-export interface GenerateDemoVisualPayload {
-  projectId: string;
-  sceneId: string;
-}
-
-export interface GenerateDemoTransitionPayload {
-  projectId: string;
-  sceneId: string;
-}
-
-export interface ComposeDemoPayload {
-  projectId: string;
-}
-
-export interface ComposeDemoScenePayload {
-  projectId: string;
-  sceneId: string;
-}
-
 export interface CollectR2UsagePayload {}
 
 export interface FetchPricingPayload {}
@@ -337,13 +296,6 @@ const QUEUE_DEFINITIONS: Record<string, QueueDefinition> = {
   'video-composition': { attempts: 2 },
   'avatar-generation': { attempts: 2 },
   'place-enrichment': { attempts: 2 },
-  'demo-script': { attempts: 2 },
-  'demo-recording': { attempts: 2 },
-  'demo-voiceover': { attempts: 2 },
-  'demo-visual': { attempts: 2 },
-  'demo-transition': { attempts: 2 },
-  'demo-composition': { attempts: 2 },
-  'demo-scene-composition': { attempts: 2 },
   'lip-sync-test': { attempts: 1 },
   'waveform-generation': { attempts: 2, skipEvents: true },
   'pipeline-classification': { attempts: 2, skipEvents: true },
@@ -816,13 +768,6 @@ export interface VerifyClassReferencesPayload {
 }
 export const lipSyncTestQueue = createQueueReference('lip-sync-test');
 export const placeEnrichmentQueue = createQueueReference('place-enrichment');
-export const demoScriptQueue = createQueueReference('demo-script');
-export const demoRecordingQueue = createQueueReference('demo-recording');
-export const demoVoiceoverQueue = createQueueReference('demo-voiceover');
-export const demoVisualQueue = createQueueReference('demo-visual');
-export const demoTransitionQueue = createQueueReference('demo-transition');
-export const demoCompositionQueue = createQueueReference('demo-composition');
-export const demoSceneCompositionQueue = createQueueReference('demo-scene-composition');
 export const waveformGenerationQueue = createQueueReference('waveform-generation');
 export const pipelineClassificationQueue = createQueueReference('pipeline-classification');
 export const ttsProviderMonitorQueue = createQueueReference('tts-provider-monitor');

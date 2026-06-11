@@ -16,12 +16,6 @@ export const HEAVY_WORKERS = new Set([
   'avatar-generation',
   'video-composition',
   'audio-stitching',
-  'demo-voiceover',
-  'demo-visual',
-  'demo-recording',
-  'demo-transition',
-  'demo-composition',
-  'demo-scene-composition',
   'segment-preview',
 ]);
 
@@ -37,7 +31,6 @@ export const PIPELINE_WORKERS = new Set([
   'segment-regeneration',
   'visual-classification',
   'place-enrichment',
-  'demo-script',
   'pipeline-classification',
   'speaking-grading',
   'worksheet-pdf',
@@ -48,15 +41,7 @@ export const PIPELINE_WORKERS = new Set([
  * Workers excluded from the `core` preset — dev-only or experimental.
  * Everything NOT in this set runs by default under `core`.
  */
-export const EXPERIMENTAL_WORKERS = new Set([
-  'demo-script',
-  'demo-recording',
-  'demo-voiceover',
-  'demo-visual',
-  'demo-transition',
-  'demo-composition',
-  'demo-scene-composition',
-]);
+export const EXPERIMENTAL_WORKERS = new Set<string>();
 
 /** Check if a worker matches the given profile (heavy/pipeline/light/all) */
 export function matchesProfile(name: string, profile: string): boolean {

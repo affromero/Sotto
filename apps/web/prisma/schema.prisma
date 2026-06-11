@@ -131,9 +131,6 @@ model User {
   // Invitation links created by admin
   invitationLinks InvitationLink[] @relation("InvitationLinksCreated")
 
-  // Demo projects (admin video studio)
-  demoProjects DemoProject[]
-
   // Avatar images (lip-sync)
   avatarImages AvatarImage[]
 
@@ -269,7 +266,6 @@ model Podcast {
   duplicateSource     DuplicateMatch[]   @relation("DuplicateSource")
   duplicateMatches    DuplicateMatch[]   @relation("DuplicateMatch")
   agentIngestion      AgentIngestion?
-  landingShowcase     LandingShowcase?
   researchDossier     ResearchDossier?
   creativeOutline     CreativeOutline?
   vocabularyEntries   VocabularyEntry[]
@@ -1089,36 +1085,6 @@ model SiteConfig {
   updatedBy String?
 }
 
-// ============ LANDING SHOWCASE CONFIG (Admin Dashboard) ============
-
-model LandingShowcase {
-  id        String @id @default("singleton")
-  podcastId String @unique
-
-  // JourneyChapter Step 2 — Script excerpt range
-  scriptTurnStart Int @default(0)
-  scriptTurnCount Int @default(2)
-
-  // JourneyChapter Step 3 — Audio clip range (seconds)
-  audioClipStart Float  @default(0)
-  audioClipEnd   Float? // null = 30s from start
-
-  // ShowcaseChapter — Video segment range
-  videoSegmentStart Int @default(0)
-  videoSegmentCount Int @default(4)
-
-  // Feature toggles — controls whether landing page shows interactive toggles
-  showAvatar Boolean @default(false)
-  showVideo  Boolean @default(false)
-
-  updatedAt DateTime @updatedAt
-  updatedBy String?
-
-  podcast Podcast @relation(fields: [podcastId], references: [id])
-
-  @@index([podcastId])
-}
-
 // ============ AUDIO FINGERPRINTING & DUPLICATE DETECTION ============
 
 model AudioFingerprint {
@@ -1326,119 +1292,6 @@ model AvatarImage {
 
   @@unique([userId, name])
   @@index([userId])
-}
-
-// ============ DEMO VIDEO STUDIO ============
-
-enum DemoProjectStatus {
-  DRAFT
-  SCRIPT_READY
-  GENERATING_ASSETS
-  COMPOSING
-  READY
-  FAILED
-}
-
-enum DemoSceneAssetStatus {
-  PENDING
-  GENERATING
-  READY
-  FAILED
-}
-
-model DemoProject {
-  id           String            @id @default(cuid())
-  userId       String
-  user         User              @relation(fields: [userId], references: [id])
-  title        String
-  description  String?
-  features     String[] // feature slugs to demonstrate
-  aiModel      String? // AI model for script generation (e.g. "claude-sonnet-4-20250514")
-  status       DemoProjectStatus @default(DRAFT)
-  failedReason String?
-  videoUrl     String? // final composed video
-  audioUrl     String? // final stitched voiceover
-
-  // Default TTS config — applied to all new scenes
-  defaultTtsProvider String?
-  defaultTtsModel    String?
-  defaultTtsVoiceId  String?
-
-  // TTS providers to showcase — voice comparison baked into the creation flow
-  showcaseProviders String[]
-
-  // Launch video fields
-  backgroundMusicUrl    String?
-  backgroundMusicVolume Float?
-  podcastId             String? // links to the podcast being showcased
-  avatarClipUrl         String? // pre-generated avatar clip R2 URL
-
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
-  scenes    DemoScene[]
-
-  @@index([userId])
-}
-
-model DemoScene {
-  id        String      @id @default(cuid())
-  projectId String
-  project   DemoProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  order     Int // 0-indexed scene order
-  title     String // "User creates a podcast"
-  narration String // voiceover text for this scene
-  actions   Json // DemoAction[] — browser automation steps
-  duration  Float? // estimated duration in seconds
-
-  // Independent asset URLs — each generated separately
-  recordingUrl     String?
-  recordingStatus  DemoSceneAssetStatus @default(PENDING)
-  voiceoverUrl     String?
-  voiceoverStatus  DemoSceneAssetStatus @default(PENDING)
-  visualUrl        String?
-  visualStatus     DemoSceneAssetStatus @default(PENDING)
-  visualType       String? // 'ai_image' | 'ai_video' | 'map' | null
-  visualPrompt     String? // editable prompt for AI visual
-  compositedUrl    String? // scene-level composite (recording + voiceover + visual)
-  compositedStatus DemoSceneAssetStatus @default(PENDING)
-  failedReason     String? // last error message from any asset worker
-
-  // Timing — speed zones within the recording
-  // TimingSegment[]: [{ start: 0, end: 5, speed: 1 }, { start: 5, end: 25, speed: 8 }, ...]
-  // speed: 0 = skip/cut, null = play entire recording at 1x
-  timingSegments Json?
-
-  // TTS config per scene (admin picks voice)
-  ttsProvider String?
-  ttsModel    String?
-  ttsVoiceId  String?
-
-  // Transition to next scene
-  transitionType   String? // 'fade' | 'dissolve' | 'wipe' | null
-  transitionUrl    String? // generated transition clip
-  transitionStatus DemoSceneAssetStatus @default(PENDING)
-
-  // Launch video cinematic fields
-  sfxConfig       Json? // SceneSfxConfig
-  providerBanner  Json? // ProviderBannerConfig
-  avatarConfig    Json? // AvatarConfig
-  overlays        Json? // TextOverlayConfig[]
-  subtitles       Json? // SubtitleConfig
-  actionTimingLog Json? // ActionTimingEntry[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([projectId, order])
-}
-
-model ShowcaseSet {
-  id        String   @id @default(cuid())
-  name      String
-  items     Json // Array of ShowcaseItem: { visualType, label, description, url, mediaType, credits? }
-  active    Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 }
 
 // ============ LANGUAGE LEARNING — CURRICULUM ============

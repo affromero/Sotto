@@ -84,7 +84,6 @@ describe('Middleware Security Tests', () => {
       '/api/v1/health',
       '/feedback',
       '/api/v1/feedback',
-      '/pitch',
     ];
 
     for (const path of publicPaths) {
@@ -101,11 +100,6 @@ describe('Middleware Security Tests', () => {
 
     it('allows /api/v1/auth/callback/google (public prefix)', async () => {
       const res = await middleware(createRequest('/api/v1/auth/callback/google'));
-      expect(isPassThrough(res)).toBe(true);
-    });
-
-    it('allows /api/v1/pitch/manifest (public prefix)', async () => {
-      const res = await middleware(createRequest('/api/v1/pitch/manifest'));
       expect(isPassThrough(res)).toBe(true);
     });
 

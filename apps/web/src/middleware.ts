@@ -16,12 +16,11 @@ const PUBLIC_ROUTES = new Set([
   '/api/v1/health',
   '/feedback',
   '/api/v1/feedback',
-  '/pitch',
   '/changelog',
   '/developers',
   '/api/v1/monitoring',
 ]);
-const PUBLIC_PREFIXES = ['/api/v1/auth', '/api/v1/pitch', '/ref', '/podcast/by-slug'];
+const PUBLIC_PREFIXES = ['/api/v1/auth', '/ref', '/podcast/by-slug'];
 
 function isPublicRoute(pathname: string): boolean {
   if (PUBLIC_ROUTES.has(pathname)) return true;
