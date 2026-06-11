@@ -1,8 +1,8 @@
 {
   "version": 1,
   "project": {
-    "title": "Sotto Product Launch",
-    "description": "Cinematic product launch video for Sotto private podcast infrastructure"
+    "title": "Sotto Language Launch",
+    "description": "Cinematic product launch video for Sotto, open-source self-hostable language-learning infrastructure"
   },
   "defaults": {
     "ttsProvider": "elevenlabs",
@@ -18,8 +18,8 @@
   },
   "scenes": [
     {
-      "title": "Landing Page — Brand Introduction",
-      "narration": "What if creating a podcast was as simple as having a conversation? Sotto turns any topic into a studio-quality, two-voice podcast — in minutes. No mic. No editing. Just your curiosity.",
+      "title": "Landing Page: Brand Introduction",
+      "narration": "Learn a language, taught in your own context. Sotto is open-source, self-hostable language learning. You connect your own Claude or Codex and your own keys, then progress through mastery-gated courses on a stack you fully control.",
       "actions": [
         { "type": "navigate", "url": "https://your-domain.example" },
         { "type": "wait", "ms": 1500 },
@@ -35,11 +35,11 @@
       },
       "overlays": [
         {
-          "text": "Your voices. Your topics. Private by default.",
+          "text": "Learn a language, taught in your own context.",
           "position": "center",
           "showAtSeconds": 0.5,
-          "hideAtSeconds": 3.5,
-          "fontSize": 42,
+          "hideAtSeconds": 4,
+          "fontSize": 40,
           "backgroundColor": "rgba(0,0,0,0.6)",
           "textColor": "#FFFFFF"
         }
@@ -47,117 +47,22 @@
       "transition": { "type": "fade" }
     },
     {
-      "title": "Navigate to Create",
-      "narration": "Let's create a podcast from scratch. One click to begin.",
+      "title": "Choose Your Language",
+      "narration": "Start by choosing what you want to learn. Here we pick German, taught from English. Your native language is first class, so every explanation meets you where you are.",
       "actions": [
-        { "type": "wait", "ms": 500 },
-        { "type": "click", "selector": "a[href='/create']" },
-        { "type": "waitForSelector", "selector": "[class*='chatArea'], [class*='inputBar']", "timeout": 5000 },
-        { "type": "wait", "ms": 1000 }
-      ],
-      "sfx": {
-        "clickSounds": true,
-        "typingSounds": false
-      },
-      "transition": { "type": "fade" }
-    },
-    {
-      "title": "Discovery Chat — Topic Input",
-      "narration": "Start by telling Sotto what you're curious about. The AI discovery chat digs deeper — asking follow-up questions to understand exactly what makes this topic fascinating to you.",
-      "actions": [
-        { "type": "intercept", "name": "discovery", "options": { "podcastId": "PODCAST_ID_PLACEHOLDER" } },
-        { "type": "intercept", "name": "interact", "options": { "podcastId": "PODCAST_ID_PLACEHOLDER" } },
-        { "type": "wait", "ms": 800 },
-        { "type": "click", "selector": "[class*='input']:not(button)" },
-        { "type": "type", "selector": "[class*='input']:not(button)", "text": "The science of why we dream — why do our brains create entire worlds while we sleep?", "speed": { "min": 25, "max": 65 } },
-        { "type": "wait", "ms": 600 },
-        { "type": "click", "selector": "[class*='sendButton'], button[type='submit']" },
-        { "type": "wait", "ms": 2000 },
-        { "type": "scroll", "distance": 200, "duration": 800 }
-      ],
-      "sfx": {
-        "clickSounds": true,
-        "typingSounds": true
-      },
-      "transition": { "type": "dissolve" }
-    },
-    {
-      "title": "Discovery Chat — AI Follow-up",
-      "narration": "Sotto doesn't just take your topic at face value. It asks the right questions — what angle interests you most, what level of depth you want, what surprised you. This shapes a podcast that's truly yours.",
-      "actions": [
-        { "type": "waitForSelector", "selector": "[class*='assistantBubble'], [class*='bubble']", "timeout": 5000 },
-        { "type": "wait", "ms": 2000 },
-        { "type": "scroll", "distance": 150, "duration": 600 },
-        { "type": "wait", "ms": 1500 },
-        { "type": "click", "selector": "[class*='input']:not(button)" },
-        { "type": "type", "selector": "[class*='input']:not(button)", "text": "I'm fascinated by lucid dreaming and the neuroscience behind it — why some people can control their dreams", "speed": { "min": 30, "max": 70 } },
-        { "type": "wait", "ms": 500 },
-        { "type": "click", "selector": "[class*='sendButton'], button[type='submit']" },
-        { "type": "wait", "ms": 2500 },
-        { "type": "scroll", "distance": 200, "duration": 800 }
-      ],
-      "sfx": {
-        "clickSounds": true,
-        "typingSounds": true
-      },
-      "transition": { "type": "dissolve" }
-    },
-    {
-      "title": "Script Generation",
-      "narration": "When the conversation is complete, Sotto generates a full podcast script — a natural two-voice dialogue between a Host and an Expert, with researched facts, smooth transitions, and your unique angle woven throughout.",
-      "actions": [
-        { "type": "intercept", "name": "scriptApprove", "options": { "podcastId": "PODCAST_ID_PLACEHOLDER" } },
-        { "type": "wait", "ms": 1000 },
-        { "type": "click", "selector": "[class*='generateButton'], button:has-text('Generate')" },
-        { "type": "wait", "ms": 3000 },
-        { "type": "waitForSelector", "selector": "[class*='turn'], [class*='turns']", "timeout": 10000 },
+        { "type": "navigate", "url": "https://your-domain.example/welcome" },
+        { "type": "waitForSelector", "selector": "[class*='pair'], [class*='language']", "timeout": 5000 },
+        { "type": "wait", "ms": 1200 },
+        { "type": "click", "selector": "[class*='pair']:first-child, [class*='languageCard']:first-child" },
         { "type": "wait", "ms": 1500 }
       ],
       "sfx": {
         "clickSounds": true,
         "typingSounds": false
       },
-      "transition": { "type": "fade" }
-    },
-    {
-      "title": "Script Review",
-      "narration": "Review every line before a single word is spoken. Edit turns, reorder sections, adjust the tone. This is your podcast — you have full creative control.",
-      "actions": [
-        { "type": "scroll", "distance": 300, "duration": 2000 },
-        { "type": "wait", "ms": 1500 },
-        { "type": "scroll", "distance": 300, "duration": 2000 },
-        { "type": "wait", "ms": 1500 },
-        { "type": "scroll", "distance": 300, "duration": 2000 },
-        { "type": "wait", "ms": 1000 },
-        { "type": "scroll", "distance": -900, "duration": 1500 }
-      ],
-      "sfx": {
-        "clickSounds": false,
-        "typingSounds": false
-      },
-      "transition": { "type": "dissolve" }
-    },
-    {
-      "title": "Custom Voice — Bring Your Own Voice ID",
-      "narration": "Already have an ElevenLabs voice you love? Paste its ID directly into Sotto. We validate it against your account in seconds and add it to your library — ready to use on any podcast.",
-      "actions": [
-        { "type": "wait", "ms": 500 },
-        { "type": "click", "selector": "[aria-label='Toggle custom voice selection']" },
-        { "type": "wait", "ms": 800 },
-        { "type": "click", "selector": "[aria-label='ElevenLabs voice ID']" },
-        { "type": "type", "selector": "[aria-label='ElevenLabs voice ID']", "text": "WOrdX7PQdxpL0gxOtCs3", "speed": { "min": 40, "max": 80 } },
-        { "type": "wait", "ms": 400 },
-        { "type": "click", "selector": "[aria-label='Add voice by ID']" },
-        { "type": "waitForSelector", "selector": "[class*='badge']", "timeout": 8000 },
-        { "type": "wait", "ms": 2000 }
-      ],
-      "sfx": {
-        "clickSounds": true,
-        "typingSounds": true
-      },
       "overlays": [
         {
-          "text": "Bring Your Own Voice",
+          "text": "German, from English",
           "position": "top-center",
           "showAtSeconds": 1,
           "hideAtSeconds": 4,
@@ -166,15 +71,112 @@
           "textColor": "#FFFFFF"
         }
       ],
+      "transition": { "type": "fade" }
+    },
+    {
+      "title": "Placement Test",
+      "narration": "Sotto places you at the right level. A short adaptive test across grammar, reading, and listening finds your CEFR band, so you never repeat what you already know or drown in what you do not.",
+      "actions": [
+        { "type": "navigate", "url": "https://your-domain.example/learn/placement" },
+        { "type": "waitForSelector", "selector": "[class*='question'], [class*='option']", "timeout": 5000 },
+        { "type": "wait", "ms": 1200 },
+        { "type": "click", "selector": "[class*='option']:nth-child(2)" },
+        { "type": "wait", "ms": 1500 },
+        { "type": "click", "selector": "button:has-text('Next'), [class*='nextButton']" },
+        { "type": "wait", "ms": 1200 },
+        { "type": "click", "selector": "[class*='option']:nth-child(1)" },
+        { "type": "wait", "ms": 1500 }
+      ],
+      "sfx": {
+        "clickSounds": true,
+        "typingSounds": false
+      },
+      "overlays": [
+        {
+          "text": "Placed at the right CEFR level",
+          "position": "top-center",
+          "showAtSeconds": 1,
+          "hideAtSeconds": 4,
+          "fontSize": 32,
+          "backgroundColor": "rgba(0,0,0,0.6)",
+          "textColor": "#FFFFFF"
+        }
+      ],
       "transition": { "type": "dissolve" }
     },
     {
-      "title": "Audio Generation — ElevenLabs",
-      "narration": "Now, choose a voice. Sotto supports six professional TTS providers — each with its own character. Here's ElevenLabs, known for expressive, natural-sounding speech.",
+      "title": "Your Course Path",
+      "narration": "This is your course. Classes are laid out as a path, each one a focused unit of grammar, reading, listening, and speaking. You advance by showing mastery, not by clicking through.",
       "actions": [
-        { "type": "wait", "ms": 500 },
-        { "type": "click", "selector": "button:has-text('Approve'), button:has-text('Generate Audio')" },
-        { "type": "wait", "ms": 3000 }
+        { "type": "navigate", "url": "https://your-domain.example/learn" },
+        { "type": "waitForSelector", "selector": "[class*='classCard'], [class*='path']", "timeout": 5000 },
+        { "type": "wait", "ms": 1500 },
+        { "type": "scroll", "distance": 300, "duration": 1800 },
+        { "type": "wait", "ms": 1200 },
+        { "type": "hover", "selector": "[class*='classCard']:first-child" },
+        { "type": "wait", "ms": 1200 },
+        { "type": "scroll", "distance": -300, "duration": 1200 }
+      ],
+      "sfx": {
+        "clickSounds": false,
+        "typingSounds": false
+      },
+      "overlays": [
+        {
+          "text": "Mastery-gated CEFR path",
+          "position": "top-center",
+          "showAtSeconds": 1,
+          "hideAtSeconds": 4,
+          "fontSize": 34,
+          "backgroundColor": "rgba(0,0,0,0.6)",
+          "textColor": "#FFFFFF"
+        }
+      ],
+      "transition": { "type": "fade" }
+    },
+    {
+      "title": "Grammar Section",
+      "narration": "Open a class and the first section is grammar. You answer in context, with explanations drawn from the same examples you just read. Get one wrong, and the section comes back in a new form until it sticks.",
+      "actions": [
+        { "type": "navigate", "url": "https://your-domain.example/learn/class/CLASS_ID_PLACEHOLDER" },
+        { "type": "waitForSelector", "selector": "[class*='section'], [class*='question']", "timeout": 5000 },
+        { "type": "wait", "ms": 1500 },
+        { "type": "click", "selector": "[class*='option']:nth-child(2)" },
+        { "type": "wait", "ms": 1500 },
+        { "type": "scroll", "distance": 250, "duration": 1200 }
+      ],
+      "sfx": {
+        "clickSounds": true,
+        "typingSounds": false
+      },
+      "transition": { "type": "dissolve" }
+    },
+    {
+      "title": "Reading Section",
+      "narration": "Reading comes next. A short passage at your level, then comprehension questions that check understanding, not guesswork. New words you meet here flow into your memory automatically.",
+      "actions": [
+        { "type": "scroll", "distance": 300, "duration": 1800 },
+        { "type": "wait", "ms": 1500 },
+        { "type": "click", "selector": "[class*='option']:nth-child(1)" },
+        { "type": "wait", "ms": 1500 },
+        { "type": "scroll", "distance": 250, "duration": 1200 }
+      ],
+      "sfx": {
+        "clickSounds": true,
+        "typingSounds": false
+      },
+      "transition": { "type": "dissolve" }
+    },
+    {
+      "title": "Adaptive Listening: Natural Voices",
+      "narration": "Listening is where Sotto comes alive. The same audio engine that powers the platform generates a lesson tuned to the words you are still learning, spoken by natural voices in your target language.",
+      "actions": [
+        { "type": "scroll", "distance": 300, "duration": 1500 },
+        { "type": "waitForSelector", "selector": "[class*='player'], [class*='playButton']", "timeout": 5000 },
+        { "type": "wait", "ms": 1000 },
+        { "type": "click", "selector": "[class*='playButton']" },
+        { "type": "wait", "ms": 8000 },
+        { "type": "click", "selector": "[class*='playButton']" }
       ],
       "sfx": {
         "clickSounds": true,
@@ -188,62 +190,25 @@
       },
       "ttsProvider": "elevenlabs",
       "ttsModel": "eleven_v3",
+      "overlays": [
+        {
+          "text": "Adaptive listening, built from your due words",
+          "position": "top-center",
+          "showAtSeconds": 1,
+          "hideAtSeconds": 5,
+          "fontSize": 32,
+          "backgroundColor": "rgba(0,0,0,0.6)",
+          "textColor": "#FFFFFF"
+        }
+      ],
       "transition": { "type": "fade" }
     },
     {
-      "title": "Podcast Playback — ElevenLabs Voice",
-      "narration": "Listen to the result. Two distinct voices, natural pacing, emotional range — all generated from text in under a minute.",
-      "actions": [
-        { "type": "navigate", "url": "https://your-domain.example/podcast/PODCAST_ID_PLACEHOLDER" },
-        { "type": "waitForSelector", "selector": "[class*='player']", "timeout": 5000 },
-        { "type": "wait", "ms": 1000 },
-        { "type": "click", "selector": "[class*='playButton']" },
-        { "type": "wait", "ms": 8000 },
-        { "type": "click", "selector": "[class*='playButton']" }
-      ],
-      "sfx": {
-        "clickSounds": true,
-        "typingSounds": false
-      },
-      "providerBanner": {
-        "provider": "ElevenLabs",
-        "showAtSeconds": 0,
-        "hideAtSeconds": null,
-        "position": "bottom-right"
-      },
-      "transition": { "type": "dissolve" }
-    },
-    {
-      "title": "Voice Comparison — OpenAI TTS",
-      "narration": "But you're not locked into one voice. Switch providers instantly. Here's OpenAI — crisp, clear, and remarkably fluid.",
+      "title": "Listening: Ask and Choose a Voice",
+      "narration": "Stuck on a phrase? Pause and ask, and you get a spoken clarification right away. Every voice and provider is yours to choose. Here is Cartesia, warm and low latency.",
       "actions": [
         { "type": "wait", "ms": 500 },
-        { "type": "click", "selector": "[class*='pill']:nth-child(2), [class*='voiceTrack']:nth-child(2)" },
-        { "type": "wait", "ms": 1000 },
-        { "type": "click", "selector": "[class*='playButton']" },
-        { "type": "wait", "ms": 7000 },
-        { "type": "click", "selector": "[class*='playButton']" }
-      ],
-      "sfx": {
-        "clickSounds": true,
-        "typingSounds": false
-      },
-      "providerBanner": {
-        "provider": "OpenAI TTS",
-        "showAtSeconds": 0,
-        "hideAtSeconds": null,
-        "position": "bottom-right"
-      },
-      "ttsProvider": "openai",
-      "ttsModel": "tts-1-hd",
-      "transition": { "type": "dissolve" }
-    },
-    {
-      "title": "Voice Comparison — Cartesia Sonic",
-      "narration": "And Cartesia Sonic — ultra-low latency with warm, conversational tone. Every provider brings something different. Pick the voice that matches your podcast's personality.",
-      "actions": [
-        { "type": "wait", "ms": 500 },
-        { "type": "click", "selector": "[class*='pill']:nth-child(3), [class*='voiceTrack']:nth-child(3)" },
+        { "type": "click", "selector": "[class*='voiceOption']:nth-child(2), [class*='pill']:nth-child(2)" },
         { "type": "wait", "ms": 1000 },
         { "type": "click", "selector": "[class*='playButton']" },
         { "type": "wait", "ms": 7000 },
@@ -261,124 +226,20 @@
       },
       "ttsProvider": "cartesia",
       "ttsModel": "sonic-3",
-      "transition": { "type": "fade" }
-    },
-    {
-      "title": "Music Generation — AI Soundtrack",
-      "narration": "Sotto can also score your podcast. One click generates a custom AI soundtrack — built from your topic, tags, and tone. No music library. No licensing. Just your content, set to music.",
-      "actions": [
-        { "type": "wait", "ms": 500 },
-        { "type": "click", "selector": "button:has-text('Music'), [class*='musicBtn'], [class*='musicGenerator']" },
-        { "type": "waitForSelector", "selector": "[class*='musicModal'], [class*='MusicGenerator'], [role='dialog']", "timeout": 5000 },
-        { "type": "wait", "ms": 1000 },
-        { "type": "click", "selector": "[class*='modelSelect'] [value*='suno'], [class*='modelOption']:has-text('Suno')" },
-        { "type": "wait", "ms": 500 },
-        { "type": "click", "selector": "button:has-text('Generate')" },
-        { "type": "waitForSelector", "selector": "[class*='waveform'], [class*='generating'], [class*='progress']", "timeout": 5000 },
-        { "type": "wait", "ms": 4000 }
-      ],
-      "sfx": {
-        "clickSounds": true,
-        "typingSounds": false
-      },
-      "providerBanner": {
-        "provider": "Suno",
-        "showAtSeconds": 2,
-        "hideAtSeconds": null,
-        "position": "bottom-right"
-      },
-      "overlays": [
-        {
-          "text": "AI-Generated Background Music",
-          "position": "top-center",
-          "showAtSeconds": 1,
-          "hideAtSeconds": 4,
-          "fontSize": 34,
-          "backgroundColor": "rgba(0,0,0,0.6)",
-          "textColor": "#FFFFFF"
-        }
-      ],
       "transition": { "type": "dissolve" }
     },
     {
-      "title": "Music Playback — Live Mix",
-      "narration": "When ready, the track plays under your voice automatically. Adjust the volume, generate variations, pick the one that fits. Your podcast now has a signature sound.",
+      "title": "Speaking: Pronunciation Feedback",
+      "narration": "Then you speak. Record a phrase and Sotto scores your pronunciation word by word, with a transcript and feedback you can act on. An optional avatar tutor models the phrase first.",
       "actions": [
-        { "type": "waitForSelector", "selector": "[class*='generationItem'][class*='ready'], [class*='musicReady']", "timeout": 120000 },
-        { "type": "wait", "ms": 1000 },
-        { "type": "click", "selector": "button:has-text('Select'), [class*='selectMusic']" },
-        { "type": "wait", "ms": 1000 },
-        { "type": "click", "selector": "[class*='closeModal'], [aria-label='Close'], button:has-text('Close')" },
-        { "type": "wait", "ms": 1000 },
-        { "type": "click", "selector": "[class*='playButton']" },
-        { "type": "wait", "ms": 8000 },
-        { "type": "click", "selector": "[class*='playButton']" }
-      ],
-      "sfx": {
-        "clickSounds": true,
-        "typingSounds": false
-      },
-      "providerBanner": {
-        "provider": "Suno",
-        "showAtSeconds": 0,
-        "hideAtSeconds": 5,
-        "position": "bottom-right"
-      },
-      "transition": { "type": "fade" }
-    },
-    {
-      "title": "Video Generation Introduction",
-      "narration": "But Sotto doesn't stop at audio. Every podcast can become a video — with AI-generated visuals, illustrations, and footage that bring your story to life.",
-      "actions": [
-        { "type": "wait", "ms": 1000 },
-        { "type": "scroll", "distance": 400, "duration": 1500 },
-        { "type": "wait", "ms": 1500 },
-        { "type": "click", "selector": "button:has-text('Video'), [class*='videoTab']" },
-        { "type": "wait", "ms": 2000 }
-      ],
-      "sfx": {
-        "clickSounds": true,
-        "typingSounds": false
-      },
-      "overlays": [
-        {
-          "text": "AI-Generated Video",
-          "position": "top-center",
-          "showAtSeconds": 1,
-          "hideAtSeconds": 4,
-          "fontSize": 36,
-          "backgroundColor": "rgba(0,0,0,0.6)",
-          "textColor": "#FFFFFF"
-        }
-      ],
-      "transition": { "type": "dissolve" }
-    },
-    {
-      "title": "Video Playback",
-      "narration": "Each segment is classified — illustration, stock footage, map, or text card — and matched with AI-generated visuals. Images or short video clips, tailored to your content. The result is a polished video podcast, ready to share.",
-      "actions": [
-        { "type": "waitForSelector", "selector": "video, [class*='videoPlayer']", "timeout": 5000 },
-        { "type": "wait", "ms": 1000 },
-        { "type": "click", "selector": "video, [class*='videoPlayer']" },
-        { "type": "wait", "ms": 10000 }
-      ],
-      "sfx": {
-        "clickSounds": false,
-        "typingSounds": false
-      },
-      "transition": { "type": "fade" }
-    },
-    {
-      "title": "Avatar Introduction",
-      "narration": "And for that personal touch — add an avatar. A photorealistic AI presenter who delivers your introduction, reacts to the conversation, and makes your podcast feel truly alive.",
-      "actions": [
-        { "type": "intercept", "name": "avatar", "options": { "videoUrl": "AVATAR_CLIP_URL_PLACEHOLDER" } },
-        { "type": "wait", "ms": 1000 },
-        { "type": "click", "selector": "button:has-text('Avatar'), [class*='avatarBtn']" },
-        { "type": "wait", "ms": 2000 },
-        { "type": "waitForSelector", "selector": "[class*='avatarPreview'], [class*='avatar'] video", "timeout": 5000 },
-        { "type": "wait", "ms": 5000 },
-        { "type": "clearIntercept", "name": "avatar" }
+        { "type": "scroll", "distance": 350, "duration": 1500 },
+        { "type": "waitForSelector", "selector": "[class*='record'], [class*='speaking']", "timeout": 5000 },
+        { "type": "wait", "ms": 1200 },
+        { "type": "click", "selector": "[class*='recordButton'], button:has-text('Record')" },
+        { "type": "wait", "ms": 3500 },
+        { "type": "click", "selector": "[class*='stopButton'], button:has-text('Stop')" },
+        { "type": "waitForSelector", "selector": "[class*='score'], [class*='feedback']", "timeout": 15000 },
+        { "type": "wait", "ms": 2500 }
       ],
       "sfx": {
         "clickSounds": true,
@@ -390,35 +251,130 @@
         "width": 0.25,
         "height": 0.35,
         "maskShape": "rounded",
-        "showAtSeconds": 3,
+        "showAtSeconds": 2,
         "hideAtSeconds": null
+      },
+      "overlays": [
+        {
+          "text": "Pronunciation feedback, word by word",
+          "position": "top-center",
+          "showAtSeconds": 1,
+          "hideAtSeconds": 5,
+          "fontSize": 32,
+          "backgroundColor": "rgba(0,0,0,0.6)",
+          "textColor": "#FFFFFF"
+        }
+      ],
+      "transition": { "type": "dissolve" }
+    },
+    {
+      "title": "Writing: Inline Corrections",
+      "narration": "Writing closes the loop. Respond to a prompt at your level and get inline corrections that show what changed and why, so the next sentence is stronger than the last.",
+      "actions": [
+        { "type": "scroll", "distance": 350, "duration": 1500 },
+        { "type": "waitForSelector", "selector": "[class*='writing'], textarea", "timeout": 5000 },
+        { "type": "wait", "ms": 1000 },
+        { "type": "click", "selector": "textarea, [class*='writingInput']" },
+        { "type": "type", "selector": "textarea, [class*='writingInput']", "text": "Ich gehe heute in die Stadt, um ein Buch zu kaufen.", "speed": { "min": 30, "max": 70 } },
+        { "type": "wait", "ms": 600 },
+        { "type": "click", "selector": "button:has-text('Submit'), [class*='submitButton']" },
+        { "type": "waitForSelector", "selector": "[class*='correction'], [class*='feedback']", "timeout": 15000 },
+        { "type": "wait", "ms": 2500 }
+      ],
+      "sfx": {
+        "clickSounds": true,
+        "typingSounds": true
       },
       "transition": { "type": "dissolve" }
     },
     {
-      "title": "Dashboard Tour",
-      "narration": "Your dashboard is your studio. Every podcast you've created, every private briefing, every voice track — all in one place. Track listens, manage voices, and keep your content under your control.",
+      "title": "Mastery Gate: Pass to Advance",
+      "narration": "Finish all four skills and submit. Pass, and the next class unlocks. Fall short on a section, and only that section comes back, in a new form. Progress is earned.",
       "actions": [
-        { "type": "navigate", "url": "https://your-domain.example/dashboard" },
-        { "type": "waitForSelector", "selector": "[class*='greeting'], [class*='header']", "timeout": 5000 },
+        { "type": "wait", "ms": 800 },
+        { "type": "click", "selector": "button:has-text('Submit class'), [class*='submitClass']" },
+        { "type": "waitForSelector", "selector": "[class*='passed'], [class*='result']", "timeout": 15000 },
+        { "type": "wait", "ms": 2500 }
+      ],
+      "sfx": {
+        "clickSounds": true,
+        "typingSounds": false
+      },
+      "overlays": [
+        {
+          "text": "Pass to advance",
+          "position": "center",
+          "showAtSeconds": 1,
+          "hideAtSeconds": 4,
+          "fontSize": 40,
+          "backgroundColor": "rgba(0,0,0,0.55)",
+          "textColor": "#FFFFFF"
+        }
+      ],
+      "transition": { "type": "fade" }
+    },
+    {
+      "title": "Memory Graph",
+      "narration": "Everything you learn lives in a memory graph you own. Vocabulary and grammar become connected nodes, scheduled for review the moment they are about to fade, and woven back into your next listening lesson.",
+      "actions": [
+        { "type": "navigate", "url": "https://your-domain.example/memory" },
+        { "type": "waitForSelector", "selector": "[class*='graph'], canvas", "timeout": 5000 },
         { "type": "wait", "ms": 1500 },
-        { "type": "scroll", "distance": 300, "duration": 1500 },
+        { "type": "zoom", "selector": "[class*='graph'], canvas", "scale": 1.4, "duration": 1200 },
         { "type": "wait", "ms": 2000 },
-        { "type": "scroll", "distance": 300, "duration": 1500 },
-        { "type": "wait", "ms": 1500 },
-        { "type": "hover", "selector": "[class*='card']:first-child, [class*='statCard']:first-child" },
-        { "type": "wait", "ms": 1000 },
-        { "type": "scroll", "distance": -600, "duration": 1200 }
+        { "type": "zoomReset", "duration": 800 },
+        { "type": "hover", "selector": "[class*='node']:first-child" },
+        { "type": "wait", "ms": 1500 }
       ],
       "sfx": {
         "clickSounds": false,
         "typingSounds": false
       },
+      "overlays": [
+        {
+          "text": "Your memory graph, with spaced review",
+          "position": "top-center",
+          "showAtSeconds": 1,
+          "hideAtSeconds": 5,
+          "fontSize": 32,
+          "backgroundColor": "rgba(0,0,0,0.6)",
+          "textColor": "#FFFFFF"
+        }
+      ],
+      "transition": { "type": "dissolve" }
+    },
+    {
+      "title": "Bring Your Own Agent: Self-Host",
+      "narration": "All of it runs on your terms. Connect your own Claude or Codex and your own provider keys, choose what the agent may read, and self-host the whole stack. Your keys, your data, your infrastructure.",
+      "actions": [
+        { "type": "navigate", "url": "https://your-domain.example/settings/api" },
+        { "type": "waitForSelector", "selector": "[class*='keyRow'], [class*='provider']", "timeout": 5000 },
+        { "type": "wait", "ms": 1500 },
+        { "type": "scroll", "distance": 250, "duration": 1500 },
+        { "type": "wait", "ms": 1200 },
+        { "type": "hover", "selector": "[class*='keyRow']:first-child, [class*='provider']:first-child" },
+        { "type": "wait", "ms": 1500 }
+      ],
+      "sfx": {
+        "clickSounds": false,
+        "typingSounds": false
+      },
+      "overlays": [
+        {
+          "text": "Self-hosted. Your agent, your keys, your data.",
+          "position": "top-center",
+          "showAtSeconds": 1,
+          "hideAtSeconds": 5,
+          "fontSize": 32,
+          "backgroundColor": "rgba(0,0,0,0.6)",
+          "textColor": "#FFFFFF"
+        }
+      ],
       "transition": { "type": "fade" }
     },
     {
-      "title": "Closing — Back to Landing",
-      "narration": "Sotto. Your voices. Your topics. Private by default. Start creating — it only takes a conversation.",
+      "title": "Closing: Back to Landing",
+      "narration": "Sotto. Learn a language, taught in your own context. Place. Practice. Progress.",
       "actions": [
         { "type": "navigate", "url": "https://your-domain.example" },
         { "type": "waitForSelector", "selector": "[class*='hero']", "timeout": 5000 },
@@ -430,11 +386,11 @@
       },
       "overlays": [
         {
-          "text": "your-domain.example",
+          "text": "Place. Practice. Progress.",
           "position": "center",
-          "showAtSeconds": 2,
-          "hideAtSeconds": 6,
-          "fontSize": 48,
+          "showAtSeconds": 1.5,
+          "hideAtSeconds": 5,
+          "fontSize": 44,
           "backgroundColor": "rgba(0,0,0,0.5)",
           "textColor": "#FFFFFF"
         }

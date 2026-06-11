@@ -12,7 +12,7 @@ Always set `"version": 1`.
 {
   "version": 1,
   "project": {
-    "title": "Sotto Product Launch",
+    "title": "Sotto Language Launch",
     "description": "Optional description"
   },
   "defaults": {
@@ -44,7 +44,7 @@ Each scene can override the default TTS provider with `ttsProvider`, `ttsModel`,
 ```json
 {
   "title": "Landing Page Introduction",
-  "narration": "Sotto is where every voice finds its place...",
+  "narration": "Learn a language, taught in your own context...",
   "actions": [...],
   "sfx": { ... },
   "providerBanner": { ... },
@@ -193,7 +193,7 @@ Timed text that appears over the video.
 {
   "overlays": [
     {
-      "text": "Your voices. Your topics. Private by default.",
+      "text": "Place. Practice. Progress.",
       "position": "center",
       "showAtSeconds": 1,
       "hideAtSeconds": 4,
