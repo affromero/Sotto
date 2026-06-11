@@ -2,17 +2,17 @@
 
 > **Date**: 2026-05-15
 >
-> **Summary**: Sotto is a private-first audio briefing system built around a Next.js web app, PostgreSQL, Redis/BullMQ workers, explicit provider routing, local or cloud storage, and private RSS delivery. Heavy generation work stays in workers. API routes stay thin. The system has no public social data model.
+> **Summary**: Sotto is free, open-source, self-hostable language-learning infrastructure built around a Next.js web app, PostgreSQL/Prisma, Redis/BullMQ workers, explicit BYOK/local provider routing, and local or S3-compatible storage. Heavy generation and grading work stays in workers. API routes stay thin. The active product is CEFR language learning with courses, classes, practice, exams, memory, and a reused audio engine for listening.
 
 ---
 
 ## 1. System Overview
 
 ```text
-Browser / Mobile / Bot / Agent
+Browser / Mobile / Local Agent
         |
         v
-Next.js App Router + API Routes
+Next.js App Router + /api/v1 routes
         |
         +--> PostgreSQL via Prisma
         +--> Redis via BullMQ
@@ -21,13 +21,13 @@ Next.js App Router + API Routes
         v
 Worker pool
         |
-        +--> LLM provider or local agent
-        +--> TTS provider
-        +--> STT provider when transcription is needed
-        +--> FFmpeg stitching
+        +--> Learning LLM provider or local agent
+        +--> TTS provider for listening/reference audio
+        +--> STT provider for speaking recordings
+        +--> FFmpeg stitching for listening audio
         |
         v
-Private library + private RSS
+Course classes + practice + exams + memory graph
 ```
 
 The default local OSS deployment uses:
@@ -35,9 +35,10 @@ The default local OSS deployment uses:
 - Next.js app and workers on the developer machine.
 - PostgreSQL and Redis from Docker Compose.
 - Local file storage under `.sotto/storage`.
-- Explicit provider configuration in `.env.local` and user settings.
+- Explicit provider configuration in `.env.local`, server config, and user settings.
+- BYOK or keyless local providers for the learning LLM, TTS, and STT.
 
-Hosted deployments can replace storage, database, Redis, and provider custody with managed services, but must keep the same private-first data model.
+Sotto may run on a VPS or managed infrastructure, but the self-hosted product must keep the same free, full-featured learning data model.
 
 ---
 
@@ -45,14 +46,15 @@ Hosted deployments can replace storage, database, Redis, and provider custody wi
 
 | Path | Responsibility |
 |---|---|
-| `apps/web` | Next.js app, API routes, Prisma schema, workers, tests |
-| `apps/mobile` | Expo app and mobile playback surfaces |
+| `apps/web` | Next.js app, `/api/v1` routes, Prisma schema, workers, tests |
+| `apps/mobile` | Expo app and mobile/iPad learning surfaces |
 | `apps/maps` | Next.js playground for `@sotto/maps` |
-| `packages/shared` | Shared TypeScript types, Zod schemas, tokens, provider display helpers |
-| `packages/maps` | Map components and related utilities |
-| `packages/mcp` | MCP integration surface |
+| `packages/shared` | Shared TypeScript types, Zod schemas, brand copy, tokens, provider display helpers |
+| `packages/maps` | Language curriculum maps and related utilities |
+| `packages/mcp` | MCP integration surface for local agents |
 | `packages/verification-standard` | Reference verification standard package |
-| `services/remotion` | Video rendering service |
+| `services/remotion` | Video/worksheet rendering service |
+| `services/local-tts` | Keyless Kokoro TTS sidecar for local listening and speaking audio |
 | `e2e` | Playwright and Maestro tests |
 | `scripts` | Setup, launch, recording, migration, and release automation |
 
@@ -62,16 +64,24 @@ Root scripts proxy the primary web commands to `@sotto/web`.
 
 ## 3. Core Data Model
 
-The active data model is private workspace oriented. Important groups:
+The active data model is learner and course oriented. Important groups:
 
 | Group | Models |
 |---|---|
-| Identity | `User`, `Account`, `Session`, `VerificationToken` |
-| Creation | `Discovery`, `DiscoveryMessage`, `Podcast`, `PodcastSegment`, `PodcastVersion` |
-| Delivery | `PrivateRssToken`, `Save`, `Collection`, `CollectionItem` |
-| Interaction | `PodcastInteraction`, `InteractionResolution`, analytics/event models |
-| Provider config | user keys, model config, provider settings, voice settings |
-| Operations | queue/job metadata, reports, audit/admin records |
+| Identity | `User`, `Account`, `Session`, `VerificationToken`, `ApiKey` |
+| Curriculum | `Curriculum`, `Lesson`, `CefrLevel`, `PedagogyStyle` |
+| Enrollment | `Course`, `CourseNote`, `PlacementResult` |
+| Classes | `CourseClass`, `ClassSection`, `LessonQuestion`, `ClassSubmission`, `SectionAnswer`, `ClassInkLayer` |
+| Speaking | `SpeakingPrompt`, `SpeakingRecording`, `SpeakingGradeStatus` |
+| Writing | `WritingPrompt`, `WritingResponse` |
+| Practice | `PracticeSession`, `PracticeKind`, `PracticeStatus` |
+| Mock exams | `MockExam`, `ExamSection`, `ExamQuestion`, `ExamSubmission`, `ExamSectionResult`, `ExamInstitution` |
+| Memory graph | `LearnerVocab`, `LearnerGrammar`, `VocabEdge`, `EdgeType` |
+| Reused audio engine | `Podcast`, `PodcastSegment`, `PodcastVersion`, interaction/reference models used by listening audio |
+| Provider config | `UserAiKey`, `UserTtsKey`, model config, provider settings, voice settings |
+| Operations | queue/job metadata, reports, audit/admin records, analytics/event models |
+
+`Podcast` remains because the listening skill reuses the existing audio engine for script generation, verification, TTS, stitching, playback, and references. It is an implementation detail for listening sections, listening practice, and exam listening, not a current podcast-platform product.
 
 Removed social primitives must stay removed:
 
@@ -84,7 +94,7 @@ Removed social primitives must stay removed:
 - podcast fork lineage fields
 - public engagement counters for likes, comments, forks, and followers
 
-`saveCount` remains because saving is a private library signal, not a public popularity mechanism.
+Billing, plan, tier, quota, and paid feature-gate models must not control access to the learning loop.
 
 ---
 
@@ -100,25 +110,41 @@ auth()
   -> return NextResponse.json()
 ```
 
-Routes should not run LLM calls, TTS calls, transcription, video work, or audio stitching directly. They enqueue jobs and return.
+Routes should not run LLM calls, TTS calls, transcription, video work, or audio stitching directly. They enqueue jobs or call narrow synchronous helpers only when the work is intentionally lightweight, such as scoring a writing response.
 
 ---
 
 ## 5. Worker Pipeline
 
-The normal episode pipeline is:
+The main learning work is split across class, audio, speaking, reference, and key-validation workers.
+
+Class generation flow:
 
 ```text
-content extraction
+course + lesson + CEFR level + memory seed + course note
+  -> section specs
+  -> grammar questions
+  -> reading passage + questions
+  -> listening audio request
+  -> speaking prompts
+  -> writing prompts
+  -> CourseClass AVAILABLE
+```
+
+Listening audio reuses the existing audio pipeline:
+
+```text
+lesson spec, source, vocabulary set, CEFR level, or exercise prompt
+  -> content extraction / curriculum resolution
   -> script generation
   -> script verification
   -> reference validation
   -> audio generation
   -> audio stitching
-  -> notification/private library update
+  -> listening section, practice session, or mock exam
 ```
 
-Episode statuses:
+Audio statuses remain:
 
 ```text
 PENDING
@@ -132,6 +158,16 @@ GENERATING_AUDIO
 STITCHING
 READY
 FAILED
+```
+
+Speaking flow:
+
+```text
+SpeakingRecording
+  -> STT transcription through resolveSttProvider()
+  -> pronunciation scoring
+  -> rubric and phoneme feedback
+  -> status SCORED or FAILED
 ```
 
 Worker rules:
@@ -152,19 +188,19 @@ Provider selection must be explicit. The architecture should reject implicit "tr
 Target resolution flow:
 
 ```text
-source request
-  -> selected provider profile
+learning request
+  -> selected provider or local-agent profile
   -> capability requirement (LLM, TTS, STT)
-  -> resolver validates credentials and model config
+  -> resolver validates credentials, base URL, and model config
   -> concrete provider client
 ```
 
 Expected resolvers:
 
-- Explicit LLM runtime resolution for script generation.
-- `resolveTtsProvider()` for TTS.
-- `resolveSttProvider()` for transcription.
-- Local-agent resolver for CLI-backed generation.
+- `resolveLearningAi()` for placement, class generation, practice generation, scoring, memory extraction, and curriculum work.
+- `resolveTtsProvider()` for listening audio, reference pronunciation audio, and spoken feedback.
+- `resolveSttProvider()` for learner recordings.
+- `resolveAutoModel()` and related model config helpers where admin-configured model selection is still used.
 
 Resolver output should be either:
 
@@ -177,15 +213,13 @@ No worker should silently route to a different provider because another API key 
 
 ## 7. Local Agents
 
-Local-agent support should be modeled as a provider family, not as a special case scattered through routes.
-
-Profiles:
+Local-agent support is modeled as a provider family. Supported profiles include:
 
 - Claude Code.
 - Codex.
 - OpenClaw.
 - Hermes.
-- Generic command adapter.
+- Generic command adapter when explicitly configured.
 
 The generic adapter should require explicit opt-in and configuration:
 
@@ -196,64 +230,66 @@ The generic adapter should require explicit opt-in and configuration:
 - timeout
 - environment allowlist
 
-Agent outputs should be treated as private user data. Logs must avoid leaking prompts, transcripts, API keys, or raw meeting content.
+Agent outputs should be treated as private learner data. Logs must avoid leaking prompts, transcripts, course notes, API keys, recordings, or raw source content.
 
 ---
 
 ## 8. Source Ingestion
 
-Sotto should support multiple source types through a common ingestion shape:
+Sotto supports learning context, not public content distribution. Current input types should feed course generation, practice, or the memory graph:
 
-| Source | Trigger | Output |
+| Input | Trigger | Output |
 |---|---|---|
-| Manual | user creates topic or URL | on-demand private episode |
-| Agent | CLI/webhook/API token | project or daily work briefing |
-| Meeting | upload, transcript, recorder, calendar integration | recap and daily roll-up |
-| News | schedule | separate world briefing |
-| Webhook | signed HTTP event | private episode or scheduled source |
+| Placement | learner starts a language pair | `Course` and `PlacementResult` |
+| Course note | learner edits goals/background/interests | personalization for placement, classes, and practice |
+| Sourced class | learner provides a URL or topic | CEFR-leveled class with verified references where available |
+| Agent context | local agent/MCP/API ingestion | private learning context for the learner's course |
+| Live conversation | learner finishes a Gemini Live session | target-language vocabulary extracted into the memory graph |
+| Practice/exam attempts | learner submits answers, recordings, or writing | SRS updates, scores, feedback, mock band |
 
 Common requirements:
 
 - user ownership
-- authentication or signature verification
-- idempotency key
-- source status and last error
-- private default visibility
+- authentication or token validation
+- idempotency where external agents submit data
 - queue handoff for heavy work
+- raw inputs handled as private learner data
+
+Do not describe meeting recap, news briefing, public feed, or bot workflow surfaces as current behavior.
 
 ---
 
-## 9. Private RSS
+## 9. Learning API Surfaces
 
-Private RSS is the main delivery primitive.
+The current learning API surface is under `/api/v1`:
 
-Token lifecycle:
+| Endpoint | Purpose |
+|---|---|
+| `/api/v1/placement` | Generate and submit placement, then create a course |
+| `/api/v1/courses` | List and create learner courses |
+| `/api/v1/courses/[courseId]/next-class` | Generate the next gated class, optionally from a source URL or topic |
+| `/api/v1/courses/[courseId]/graph` | Fetch memory graph vocabulary, grammar, and edges |
+| `/api/v1/courses/[courseId]/topics` | Suggest sourced-class topics from learner interests |
+| `/api/v1/courses/[courseId]/notes` | Read and update course-scoped learner notes |
+| `/api/v1/courses/[courseId]/practice` | Inspect due counts and start ungated practice |
+| `/api/v1/classes/[classId]` | Fetch or regenerate class sections |
+| `/api/v1/classes/[classId]/submit` | Submit a class and advance on mastery |
+| `/api/v1/classes/[classId]/speaking/[promptId]` | Upload a class speaking recording |
+| `/api/v1/classes/[classId]/writing/[promptId]` | Submit and score class writing |
+| `/api/v1/classes/[classId]/worksheet` | Fetch or generate worksheet PDF |
+| `/api/v1/classes/[classId]/ink` | Get/save PencilKit worksheet ink |
+| `/api/v1/practice/[sessionId]/submit` | Submit ungated practice and update SRS |
+| `/api/v1/practice/[sessionId]/speaking/[promptId]` | Upload/poll practice speaking |
+| `/api/v1/practice/[sessionId]/writing/[promptId]` | Submit and score practice writing |
+| `/api/v1/exams` | Start a mock exam |
+| `/api/v1/exams/[examId]` | Fetch exam sections |
+| `/api/v1/exams/[examId]/submit` | Submit and score exam answers |
+| `/api/v1/exams/[examId]/speaking/[promptId]` | Upload/poll exam speaking |
+| `/api/v1/exams/[examId]/writing/[promptId]` | Submit and score exam writing |
+| `/api/v1/live-translate/token` | Mint a BYOK Google Live token without exposing the key |
+| `/api/v1/live-translate/session` | Store live conversation transcript and extract vocabulary |
 
-```text
-POST /api/v1/rss/private
-  -> generate raw token
-  -> store SHA-256 hash
-  -> return raw token and feed URL once
-
-GET /api/v1/rss/private
-  -> list token metadata only
-
-DELETE /api/v1/rss/private/tokens/:tokenId
-  -> revoke token
-
-GET /api/v1/rss/private/:token
-  -> hash token
-  -> find active token
-  -> return ready, non-deleted owner episodes
-```
-
-Rules:
-
-- Never store raw private RSS tokens.
-- Never expose another user's private episodes.
-- Include private and unlisted episodes owned by the token owner.
-- Exclude deleted, failed, and processing episodes.
-- Keep public creator RSS routes removed.
+Existing `/api/v1/podcasts/*` routes may still be used by the reused audio engine and player components. They should not be documented as the primary product surface.
 
 ---
 
@@ -265,12 +301,12 @@ Local storage is the default for OSS.
 |---|---|
 | Local OSS | local filesystem under `.sotto/storage` |
 | VPS self-hosted | local volume or S3-compatible storage |
-| Managed hosted | S3/R2-compatible storage |
+| Managed infrastructure, if offered | S3/R2-compatible storage |
 
 Storage rules:
 
 - Workers must respect `STORAGE_PROVIDER`.
-- Local storage must support the full audio pipeline.
+- Local storage must support the full listening audio, worksheet, recording, and export paths.
 - No cleanup script may bulk-delete protected podcast or segment audio by pattern.
 - Deletion paths must go through existing storage guards.
 
@@ -280,56 +316,58 @@ Storage rules:
 
 Security priorities:
 
-- Session auth for dashboard and settings.
-- Route-level ownership checks for every private resource.
-- Hashed RSS tokens.
+- Session auth for dashboard, learning routes, settings, and admin.
+- Route-level ownership checks for every course, class, practice session, exam, recording, and memory graph.
 - Encrypted user provider keys.
-- Token-authenticated ingestion endpoints.
-- Signed webhook validation when the caller supports signatures.
-- Rate limits for webhooks and ingestion.
-- Redaction of provider keys and raw private content from logs.
+- Token-authenticated local-agent and mobile API flows.
+- Short-lived live-translation tokens that keep the learner's BYOK Google key server-side.
+- Redaction of provider keys, course notes, prompts, recordings, transcripts, and raw source content from logs.
+- Admin inspection that is explicit and auditable.
 
-Meeting and agent content should be treated as highly sensitive. Store raw inputs only as long as the configured retention policy requires.
+Learning data is sensitive. Course notes, vocabulary graphs, speaking recordings, writing responses, and agent context should be treated as private learner records.
 
 ---
 
 ## 12. Managed Hosting
 
-Managed hosting reuses the same architecture but Sotto operates the infrastructure:
+The active product should not depend on managed hosting or Sotto billing. The free self-hosted build includes the full learning loop.
+
+If managed infrastructure exists, it reuses the same architecture:
 
 - app runtime
 - worker runtime
 - PostgreSQL
 - Redis
 - storage
-- scheduled jobs
-- bot/webhook operations
+- provider configuration
 - backups and monitoring
 
-Billing boundaries:
+Boundaries:
 
-- Privacy stays available on OSS and free/local paths.
-- Billing is for managed operations.
-- Trial status should not alter private episode visibility.
+- Privacy stays available on OSS and local paths.
+- There are no paid feature tiers, daily limits, generation quotas, or plan gates in the learning product.
 - Provider custody must be explicit when Sotto-managed keys are used.
+- A learner's course level, memory graph, and content access must not depend on payment state.
 
 ---
 
 ## 13. Observability
 
-Track private operational health, not public popularity:
+Track private learning and operational health, not public popularity:
 
-- job duration
-- job failure reason
-- provider latency
-- provider cost estimate
-- storage writes
-- RSS token usage count and last used timestamp
-- source last run and last error
-- episode listen count and completion when available
-- save-to-listen ratio as a private library signal
+- course count and active class status
+- placement completion
+- class pass/fail and regeneration rates
+- practice due counts and completion
+- memory graph due items and mastery distribution
+- speaking grading duration and failure reason
+- writing scoring duration and failure reason
+- listening audio job duration and failure reason
+- provider latency and provider cost estimate
+- storage writes and recording/audio availability
+- setup readiness for LLM, TTS, STT, local agent, Redis, database, and storage
 
-Do not add public engagement metrics such as likes, public comments, public fork counts, followers, or public rank.
+Do not add public engagement metrics such as likes, public comments, public fork counts, followers, leaderboards, community rank, or public popularity score.
 
 ---
 
@@ -339,9 +377,9 @@ The architecture is considered aligned when:
 
 - `npm run ci` passes.
 - Prisma validates and generates.
-- OSS guard tests fail if removed social primitives return.
-- Root docs describe private-first OSS onboarding.
+- OSS guard tests fail if removed social, billing, plan, tier, quota, news, briefing, or public-discovery language returns as current behavior.
+- Root docs describe free, self-hostable language-learning onboarding.
 - Local setup works without Doppler.
-- Private RSS works with local storage.
+- Placement, courses, classes, practice, exams, memory, speaking, writing, and listening are documented against current routes and schema.
 - Provider setup errors are explicit.
-- Managed-hosting code does not gate privacy.
+- Listening audio works through the reused audio pipeline without positioning Sotto as a podcast platform.
