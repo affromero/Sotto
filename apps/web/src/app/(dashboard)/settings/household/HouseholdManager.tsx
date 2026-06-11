@@ -4,7 +4,8 @@ import { useCallback, useEffect, useId, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { AvatarTile } from '@/components/auth/AvatarTile';
-import { ANIMAL_AVATARS, avatarImagePath, getAnimalAvatar } from '@/lib/avatars';
+import { AvatarPicker } from '@/components/auth/AvatarPicker';
+import { ANIMAL_AVATARS, getAnimalAvatar } from '@/lib/avatars';
 import { generateQrDataUrl } from '@/lib/qr';
 import styles from './page.module.css';
 
@@ -94,6 +95,7 @@ export function HouseholdManager() {
   const [addName, setAddName] = useState('');
   const [addAvatar, setAddAvatar] = useState<string>(DEFAULT_AVATAR_SLUG);
   const [addPassword, setAddPassword] = useState(() => generateTempPassword());
+  const [addPasswordless, setAddPasswordless] = useState(false);
   const [addingMember, setAddingMember] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
   const [createdMember, setCreatedMember] = useState<{ name: string; password: string } | null>(
@@ -239,6 +241,7 @@ export function HouseholdManager() {
     setAddName('');
     setAddAvatar(DEFAULT_AVATAR_SLUG);
     setAddPassword(generateTempPassword());
+    setAddPasswordless(false);
     setAddError(null);
   }, []);
 
@@ -246,7 +249,12 @@ export function HouseholdManager() {
     async (event: React.FormEvent) => {
       event.preventDefault();
       const trimmedName = addName.trim();
-      if (!trimmedName || addPassword.length < MIN_PASSWORD_LENGTH || addingMember) return;
+      if (
+        !trimmedName ||
+        (!addPasswordless && addPassword.length < MIN_PASSWORD_LENGTH) ||
+        addingMember
+      )
+        return;
 
       setAddingMember(true);
       setAddError(null);
@@ -258,7 +266,7 @@ export function HouseholdManager() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             name: trimmedName,
-            password: addPassword,
+            password: addPasswordless ? '' : addPassword,
             avatar: addAvatar,
           }),
         });
@@ -266,7 +274,7 @@ export function HouseholdManager() {
           setAddError('Could not add this member. Please try again.');
           return;
         }
-        setCreatedMember({ name: trimmedName, password: addPassword });
+        setCreatedMember({ name: trimmedName, password: addPasswordless ? '' : addPassword });
         await loadMembers();
         resetAddForm();
       } catch {
@@ -275,14 +283,15 @@ export function HouseholdManager() {
         setAddingMember(false);
       }
     },
-    [addName, addPassword, addAvatar, addingMember, loadMembers, resetAddForm]
+    [addName, addPassword, addPasswordless, addAvatar, addingMember, loadMembers, resetAddForm]
   );
 
   const handleCopyCredentials = useCallback(async () => {
     if (!createdMember) return;
-    await navigator.clipboard.writeText(
-      `${createdMember.name}. Temporary password: ${createdMember.password}`
-    );
+    const details = createdMember.password
+      ? `${createdMember.name}. Temporary password: ${createdMember.password}`
+      : `${createdMember.name} signs in with no password (taps their profile).`;
+    await navigator.clipboard.writeText(details);
     setCredentialsCopied(true);
     setTimeout(() => setCredentialsCopied(false), 2000);
   }, [createdMember]);
@@ -531,14 +540,23 @@ export function HouseholdManager() {
             <p className={styles.credentialTitle}>
               {createdMember.name} is ready to sign in.
             </p>
-            <div className={styles.credentialRow}>
-              <span className={styles.credentialLabel}>Temporary password</span>
-              <code className={styles.credentialValue}>{createdMember.password}</code>
-            </div>
-            <p className={styles.credentialNote}>
-              Share this with {createdMember.name}. They will be asked to set their own password the
-              first time they sign in.
-            </p>
+            {createdMember.password ? (
+              <>
+                <div className={styles.credentialRow}>
+                  <span className={styles.credentialLabel}>Temporary password</span>
+                  <code className={styles.credentialValue}>{createdMember.password}</code>
+                </div>
+                <p className={styles.credentialNote}>
+                  Share this with {createdMember.name}. They will be asked to set their own password
+                  the first time they sign in.
+                </p>
+              </>
+            ) : (
+              <p className={styles.credentialNote}>
+                {createdMember.name} has no password. They tap their profile on the sign-in screen to
+                get in.
+              </p>
+            )}
             <div className={styles.credentialActions}>
               <Button size="small" onClick={handleCopyCredentials}>
                 {credentialsCopied ? 'Copied' : 'Copy details'}
@@ -577,25 +595,39 @@ export function HouseholdManager() {
               disabled={addingMember}
             />
 
-            <div className={styles.field}>
-              <span className={styles.fieldLabel}>Temporary password</span>
-              <div className={styles.tempRow}>
-                <code className={styles.tempValue}>{addPassword}</code>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="small"
-                  onClick={() => setAddPassword(generateTempPassword())}
-                  disabled={addingMember}
-                >
-                  Regenerate
-                </Button>
+            <label className={styles.tempRow}>
+              <input
+                type="checkbox"
+                checked={addPasswordless}
+                onChange={(event) => setAddPasswordless(event.target.checked)}
+                disabled={addingMember}
+              />
+              <span className={styles.fieldLabel}>
+                No password (taps their profile to sign in)
+              </span>
+            </label>
+
+            {!addPasswordless && (
+              <div className={styles.field}>
+                <span className={styles.fieldLabel}>Temporary password</span>
+                <div className={styles.tempRow}>
+                  <code className={styles.tempValue}>{addPassword}</code>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="small"
+                    onClick={() => setAddPassword(generateTempPassword())}
+                    disabled={addingMember}
+                  >
+                    Regenerate
+                  </Button>
+                </div>
+                <p className={styles.fieldHint}>
+                  The member changes this the first time they sign in. At least{' '}
+                  {MIN_PASSWORD_LENGTH} characters.
+                </p>
               </div>
-              <p className={styles.fieldHint}>
-                The member changes this the first time they sign in. At least{' '}
-                {MIN_PASSWORD_LENGTH} characters.
-              </p>
-            </div>
+            )}
 
             {addError && <p className={styles.errorText}>{addError}</p>}
 
@@ -814,49 +846,6 @@ function MemberRow({
         </div>
       )}
     </li>
-  );
-}
-
-interface AvatarPickerProps {
-  legend: string;
-  value: string;
-  onChange: (slug: string) => void;
-  disabled?: boolean;
-}
-
-function AvatarPicker({ legend, value, onChange, disabled = false }: AvatarPickerProps) {
-  const groupId = useId();
-  return (
-    <div className={styles.field}>
-      <span className={styles.fieldLabel} id={groupId}>
-        {legend}
-      </span>
-      <ul className={styles.avatarGrid} role="radiogroup" aria-labelledby={groupId}>
-        {ANIMAL_AVATARS.map((animal) => {
-          const isSelected = animal.slug === value;
-          return (
-            <li key={animal.slug} className={styles.avatarItem}>
-              <button
-                type="button"
-                role="radio"
-                aria-checked={isSelected}
-                aria-label={animal.name}
-                className={`${styles.avatarBtn} ${isSelected ? styles.avatarBtnSelected : ''}`}
-                onClick={() => onChange(animal.slug)}
-                disabled={disabled}
-              >
-                <AvatarTile
-                  image={avatarImagePath(animal.slug)}
-                  emoji={animal.emoji}
-                  name={animal.name}
-                  size={48}
-                />
-              </button>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
   );
 }
 

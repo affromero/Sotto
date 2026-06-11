@@ -4,6 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Search } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
+import { ProfileMenu } from './ProfileMenu';
 import styles from './TopBar.module.css';
 
 interface TopBarUser {
@@ -15,12 +16,6 @@ interface TopBarUser {
 
 interface TopBarProps {
   user?: TopBarUser | null;
-}
-
-function getInitial(name?: string | null, email?: string | null): string {
-  if (name) return name.charAt(0).toUpperCase();
-  if (email) return email.charAt(0).toUpperCase();
-  return 'U';
 }
 
 export function TopBar({ user }: TopBarProps) {
@@ -47,19 +42,7 @@ export function TopBar({ user }: TopBarProps) {
         </button>
         <ThemeToggle />
         {user ? (
-          <Link href="/learn" className={styles.avatarLink} aria-label="Go to your courses">
-            {user.image ? (
-              <Image
-                src={user.image}
-                alt={`${user.name || 'User'}'s avatar`}
-                width={32}
-                height={32}
-                className={styles.avatar}
-              />
-            ) : (
-              <span className={styles.avatarFallback}>{getInitial(user.name, user.email)}</span>
-            )}
-          </Link>
+          <ProfileMenu />
         ) : (
           <Link href="/auth/login" className={styles.signIn}>
             Sign In

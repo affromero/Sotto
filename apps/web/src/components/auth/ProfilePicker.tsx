@@ -5,8 +5,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { signIn } from 'next-auth/react';
 import { GlassBead } from '@/components/landing/GlassBead';
-import { ANIMAL_AVATARS, avatarImagePath } from '@/lib/avatars';
+import { ANIMAL_AVATARS } from '@/lib/avatars';
 import { AvatarTile } from './AvatarTile';
+import { AvatarPicker } from './AvatarPicker';
 import styles from './ProfilePicker.module.css';
 
 interface Profile {
@@ -15,6 +16,7 @@ interface Profile {
   image: string | null;
   emoji: string | null;
   isAdmin: boolean;
+  hasPassword: boolean;
 }
 
 interface ProfilesResponse {
@@ -76,10 +78,31 @@ export function ProfilePicker() {
     if (selected) passwordRef.current?.focus();
   }, [selected]);
 
-  function choose(profile: Profile) {
+  async function attemptSignIn(userId: string, pw: string): Promise<boolean> {
+    const result = await signIn('credentials', { userId, password: pw, redirect: false });
+    return result?.ok === true;
+  }
+
+  async function choose(profile: Profile) {
+    setAuthError(null);
+    // Passwordless members tap straight in; everyone else gets a password panel.
+    if (!profile.hasPassword) {
+      if (submitting) return;
+      setSubmitting(true);
+      try {
+        if (await attemptSignIn(profile.id, '')) {
+          router.push('/learn');
+          return;
+        }
+        setAuthError(GENERIC_PASSWORD_ERROR);
+      } catch {
+        setAuthError(GENERIC_PASSWORD_ERROR);
+      }
+      setSubmitting(false);
+      return;
+    }
     setSelected(profile);
     setPassword('');
-    setAuthError(null);
   }
 
   function backToProfiles() {
@@ -96,12 +119,7 @@ export function ProfilePicker() {
     setSubmitting(true);
     setAuthError(null);
     try {
-      const result = await signIn('credentials', {
-        userId: selected.id,
-        password,
-        redirect: false,
-      });
-      if (result?.ok) {
+      if (await attemptSignIn(selected.id, password)) {
         router.push('/learn');
         return;
       }
@@ -172,6 +190,7 @@ export function ProfilePicker() {
                       type="button"
                       className={styles.profileBtn}
                       onClick={() => choose(profile)}
+                      disabled={submitting}
                     >
                       <span className={styles.tileWrap}>
                         <AvatarTile
@@ -194,6 +213,12 @@ export function ProfilePicker() {
                   </li>
                 ))}
               </ul>
+            )}
+
+            {authError && (
+              <p className={styles.fieldError} role="alert">
+                {authError}
+              </p>
             )}
 
             <a className={styles.altLink} href="/auth/login?oauth=1">
@@ -373,40 +398,13 @@ function CreateOwnerPanel({ onCreated }: { onCreated: () => void }) {
         </div>
 
         <div className={styles.ownerField}>
-          <span className={styles.fieldLabel} id={`${nameId}-avatar`}>
-            Pick an avatar
-          </span>
-          <ul
-            className={styles.avatarGrid}
-            role="radiogroup"
-            aria-labelledby={`${nameId}-avatar`}
-          >
-            {ANIMAL_AVATARS.map((animal) => {
-              const isSelected = animal.slug === avatar;
-              return (
-                <li key={animal.slug} className={styles.avatarItem}>
-                  <button
-                    type="button"
-                    role="radio"
-                    aria-checked={isSelected}
-                    aria-label={animal.name}
-                    className={`${styles.avatarBtn} ${
-                      isSelected ? styles.avatarBtnSelected : ''
-                    }`}
-                    onClick={() => setAvatar(animal.slug)}
-                    disabled={submitting}
-                  >
-                    <AvatarTile
-                      image={avatarImagePath(animal.slug)}
-                      emoji={animal.emoji}
-                      name={animal.name}
-                      size={72}
-                    />
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+          <AvatarPicker
+            legend="Pick an avatar"
+            value={avatar}
+            onChange={setAvatar}
+            disabled={submitting}
+            size={72}
+          />
         </div>
 
         <div className={styles.ownerField}>
