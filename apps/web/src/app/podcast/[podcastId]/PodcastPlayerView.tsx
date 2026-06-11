@@ -171,7 +171,6 @@ export function PodcastPlayerView({
   );
   const [audioConfig, setAudioConfig] = useState<AudioConfig>({ voices: [] });
   const playerSectionRef = useRef<HTMLElement>(null);
-  const [questionCounts, setQuestionCounts] = useState<Map<number, number>>(new Map());
   const [videoState, setVideoState] = useState<'idle' | 'generating' | 'ready' | 'failed'>(
     podcast.videoUrl ? 'ready' : 'idle'
   );
@@ -197,23 +196,6 @@ export function PodcastPlayerView({
   const [avatarDone, setAvatarDone] = useState(false);
 
   const filteredAvatarOverlays = useMemo(() => avatarOverlays, [avatarOverlays]);
-
-  // Fetch knowledge gaps for owner
-  useEffect(() => {
-    if (!isOwner || podcast.status !== 'READY') return;
-    fetch(`/api/v1/podcasts/${podcast.id}/knowledge-gaps`)
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (data?.segments) {
-          const counts = new Map<number, number>();
-          for (const seg of data.segments) {
-            counts.set(seg.segmentOrder, seg.questionCount);
-          }
-          setQuestionCounts(counts);
-        }
-      })
-      .catch(() => {});
-  }, [isOwner, podcast.id, podcast.status]);
 
   // Fetch script turns for review when SCRIPT_READY or FAILED (for AudioConfigPanel speakers)
   const needsScript =
@@ -1292,7 +1274,6 @@ export function PodcastPlayerView({
                     vocabularyEntries={podcast.vocabularyEntries}
                     currentTime={currentTime}
                     onSegmentClick={handleSegmentClick}
-                    questionCounts={isOwner ? questionCounts : undefined}
                   />
                 ) : viewMode === 'teleprompter' ? (
                   <Teleprompter
