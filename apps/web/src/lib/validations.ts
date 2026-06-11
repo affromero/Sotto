@@ -609,7 +609,9 @@ export const siteConfigUpdateSchema = serverInfraSchema.extend({
 // input: a user id from the picker and the password.
 export const credentialsAuthSchema = z.object({
   userId: z.string().trim().min(1).max(64),
-  password: z.string().min(1).max(200),
+  // Optional: passwordless members sign in without one. The authorize callback
+  // still refuses an empty password for any account that has a passwordHash.
+  password: z.string().max(200).optional(),
 });
 
 // First-run owner creation (public, only when local auth is on and zero users).
@@ -622,7 +624,8 @@ export const createOwnerSchema = z.object({
 // Admin household member management.
 export const createMemberSchema = z.object({
   name: z.string().trim().min(1).max(100),
-  password: z.string().min(8).max(200),
+  // Omit (or send empty) to create a passwordless member who taps to sign in.
+  password: z.string().min(8).max(200).optional().or(z.literal('')),
   avatar: z.string().trim().max(64).optional(),
 });
 
