@@ -49,8 +49,6 @@ export function getNotificationUrl(notification: NotificationData): string | nul
 
     // Account moderation
     case 'ACCOUNT_WARNING':
-    case 'ACCOUNT_SUSPENDED':
-    case 'ACCOUNT_BANNED':
     case 'CONTENT_REMOVED':
       return '/settings';
 

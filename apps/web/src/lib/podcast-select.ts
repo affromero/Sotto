@@ -19,7 +19,6 @@ export const PODCAST_PUBLIC_SELECT = {
   playCount: true,
   saveCount: true,
   pdfUrl: true,
-  isHumanContent: true,
   lowReferences: true,
   sourcePlatform: true,
   source: true,

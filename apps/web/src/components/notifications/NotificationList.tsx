@@ -52,8 +52,6 @@ const typeIcons: Record<string, typeof Bell> = {
   // Moderation
   CONTENT_REMOVED: Trash2,
   ACCOUNT_WARNING: AlertOctagon,
-  ACCOUNT_SUSPENDED: AlertOctagon,
-  ACCOUNT_BANNED: AlertOctagon,
 
   // System
   PLATFORM_ANNOUNCEMENT: Megaphone,

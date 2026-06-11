@@ -28,7 +28,6 @@ export async function GET() {
           playCount: true,
           createdAt: true,
           source: true,
-          isHumanContent: true,
           sourcePlatform: true,
           language: true,
           user: { select: { id: true, name: true, handle: true, image: true } },

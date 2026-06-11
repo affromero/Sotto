@@ -93,8 +93,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (session.user && token.sub) {
         session.user.id = token.sub;
         session.user.role = token.role ?? 'USER';
-        session.user.bannedAt = token.bannedAt ?? null;
-        session.user.suspendedUntil = token.suspendedUntil ?? null;
       }
       return session;
     },
@@ -102,16 +100,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (user) {
         token.sub = user.id;
       }
-      // On sign-in or session update, fetch role + ban state from DB
+      // On sign-in or session update, fetch role from DB
       if ((user || trigger === 'update') && token.sub) {
         const dbUser = await prisma.user.findUnique({
           where: { id: token.sub },
-          select: { role: true, bannedAt: true, suspendedUntil: true },
+          select: { role: true },
         });
         if (dbUser) {
           token.role = dbUser.role;
-          token.bannedAt = dbUser.bannedAt?.toISOString() ?? null;
-          token.suspendedUntil = dbUser.suspendedUntil?.toISOString() ?? null;
         }
       }
       return token;

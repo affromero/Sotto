@@ -7,7 +7,6 @@ import {
   LayoutDashboard,
   Users,
   Radio,
-  Shield,
   AtSign,
   Star,
   FlaskConical,
@@ -26,7 +25,6 @@ import { AccountSwitcher } from '@/components/layout/AccountSwitcher';
 import styles from './AdminShell.module.css';
 
 interface AdminShellProps {
-  pendingReportCount?: number;
   children: React.ReactNode;
 }
 
@@ -53,7 +51,6 @@ const navGroups: NavGroup[] = [
     items: [
       { href: '/admin/users', label: 'Users', icon: Users },
       { href: '/admin/podcasts', label: 'Podcasts', icon: Radio },
-      { href: '/admin/moderation', label: 'Moderation', icon: Shield },
     ],
   },
   {
@@ -88,7 +85,7 @@ function getInitialExpanded(pathname: string): Record<string, boolean> {
   return expanded;
 }
 
-export function AdminShell({ pendingReportCount, children }: AdminShellProps) {
+export function AdminShell({ children }: AdminShellProps) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [expanded, setExpanded] = useState(() => getInitialExpanded(pathname));
@@ -154,11 +151,6 @@ export function AdminShell({ pendingReportCount, children }: AdminShellProps) {
                   <div className={styles.navGroupItems}>
                     {group.items.map(({ href, label, icon: Icon }) => {
                       const isActive = pathname === href;
-                      const showBadge =
-                        (href === '/admin/moderation' &&
-                          pendingReportCount !== undefined &&
-                          pendingReportCount > 0);
-                      const badgeCount = href === '/admin/moderation' ? pendingReportCount : 0;
                       return (
                         <Link
                           key={href}
@@ -169,11 +161,6 @@ export function AdminShell({ pendingReportCount, children }: AdminShellProps) {
                         >
                           <Icon className={styles.navIcon} aria-hidden="true" />
                           {label}
-                          {showBadge && (
-                            <span className={styles.navBadge} aria-label={`${badgeCount} pending`}>
-                              {badgeCount}
-                            </span>
-                          )}
                         </Link>
                       );
                     })}

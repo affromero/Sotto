@@ -285,7 +285,6 @@ describe('importPodcastSchema — STT providers', () => {
 
   it('accepts openai as sttProvider', () => {
     const result = importPodcastSchema.safeParse({
-      isHumanContent: false,
       sourcePlatform: 'youtube',
       sttProvider: 'openai',
     });
@@ -294,7 +293,6 @@ describe('importPodcastSchema — STT providers', () => {
 
   it('accepts elevenlabs as sttProvider', () => {
     const result = importPodcastSchema.safeParse({
-      isHumanContent: false,
       sourcePlatform: 'youtube',
       sttProvider: 'elevenlabs',
     });
@@ -303,7 +301,6 @@ describe('importPodcastSchema — STT providers', () => {
 
   it('rejects invalid sttProvider', () => {
     const result = importPodcastSchema.safeParse({
-      isHumanContent: false,
       sourcePlatform: 'youtube',
       sttProvider: 'invalid-provider',
     });
@@ -312,7 +309,6 @@ describe('importPodcastSchema — STT providers', () => {
 
   it('accepts together as sttProvider', () => {
     const result = importPodcastSchema.safeParse({
-      isHumanContent: false,
       sourcePlatform: 'youtube',
       sttProvider: 'together',
     });
@@ -321,7 +317,6 @@ describe('importPodcastSchema — STT providers', () => {
 
   it('accepts deepgram as sttProvider', () => {
     const result = importPodcastSchema.safeParse({
-      isHumanContent: false,
       sourcePlatform: 'youtube',
       sttProvider: 'deepgram',
     });
@@ -330,7 +325,6 @@ describe('importPodcastSchema — STT providers', () => {
 
   it('accepts assemblyai as sttProvider', () => {
     const result = importPodcastSchema.safeParse({
-      isHumanContent: false,
       sourcePlatform: 'youtube',
       sttProvider: 'assemblyai',
     });
@@ -339,7 +333,6 @@ describe('importPodcastSchema — STT providers', () => {
 
   it('accepts omitted sttProvider', () => {
     const result = importPodcastSchema.safeParse({
-      isHumanContent: false,
       sourcePlatform: 'youtube',
     });
     expect(result.success).toBe(true);

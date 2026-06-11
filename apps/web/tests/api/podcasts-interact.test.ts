@@ -48,15 +48,6 @@ vi.mock('@/lib/redis', () => ({
   checkRateLimit: (...args: unknown[]) => mockCheckRateLimit(...args),
 }));
 
-// The route dynamically imports @/lib/auth for session-based suspension checks
-vi.mock('@/lib/auth', () => ({
-  auth: vi.fn().mockResolvedValue(null),
-}));
-
-vi.mock('@/lib/auth-guards', () => ({
-  checkSuspension: vi.fn().mockReturnValue(null),
-}));
-
 vi.mock('@/lib/generation-features', () => ({
   getGenerationFeatures: vi.fn().mockReturnValue({
     maxDurationMinutes: 30,

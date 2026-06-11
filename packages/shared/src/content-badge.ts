@@ -16,9 +16,8 @@ const SOURCE_PLATFORM_LABELS: Record<string, string> = {
 };
 
 export function getContentBadgeLabel(
-  podcast: Pick<PodcastSummary, 'source' | 'isHumanContent' | 'sourcePlatform'>
+  podcast: Pick<PodcastSummary, 'source' | 'sourcePlatform'>
 ): string {
-  if (podcast.source === 'IMPORT' && podcast.isHumanContent) return 'Human';
   if (podcast.source === 'IMPORT') {
     return podcast.sourcePlatform
       ? SOURCE_PLATFORM_LABELS[podcast.sourcePlatform] ?? 'Imported'
@@ -37,19 +36,18 @@ export interface PodcastBadge {
 export function getPodcastBadges(
   podcast: Pick<
     PodcastSummary,
-    'source' | 'isHumanContent' | 'sourcePlatform' | 'aiProvider' | 'aiModel' | 'ttsProvider' | 'ttsModel' | 'language'
+    'source' | 'sourcePlatform' | 'aiProvider' | 'aiModel' | 'ttsProvider' | 'ttsModel' | 'language'
   >
 ): PodcastBadge[] {
   const badges: PodcastBadge[] = [];
 
   // 1. Content type badge
   const contentLabel = getContentBadgeLabel(podcast);
-  const isHuman = podcast.source === 'IMPORT' && podcast.isHumanContent;
   const isImport = podcast.source === 'IMPORT';
   badges.push({
     category: 'content',
     label: contentLabel,
-    variant: isHuman ? 'success' : isImport ? 'default' : 'info',
+    variant: isImport ? 'default' : 'info',
   });
 
   // 2. AI badge — "Provider · Model" format

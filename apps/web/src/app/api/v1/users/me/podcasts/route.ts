@@ -34,7 +34,6 @@ export async function GET(request: NextRequest) {
     playCount: p.playCount,
     createdAt: p.createdAt.toISOString(),
     source: p.source,
-    isHumanContent: p.isHumanContent,
     sourcePlatform: p.sourcePlatform,
     aiProvider: p.aiProvider,
     aiModel: p.aiModel,

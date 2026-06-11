@@ -115,7 +115,6 @@ export async function PATCH(request: NextRequest) {
       provider: true,
       externalVoiceId: true,
       sampleUrl: true,
-      userId: true,
     },
   });
 
@@ -149,21 +148,10 @@ export async function PATCH(request: NextRequest) {
       return errorResponse('Invalid action', 400);
   }
 
-  await prisma.$transaction([
-    prisma.voiceClone.update({
-      where: { id: voiceCloneId },
-      data: { verificationStatus: newStatus as never },
-    }),
-    prisma.moderationAction.create({
-      data: {
-        userId: voiceClone.userId,
-        moderatorId: adminId,
-        action: `voice_${action}`,
-        reason: `Admin ${action} on voice clone`,
-        metadata: { targetType: 'voice_clone', targetId: voiceCloneId },
-      },
-    }),
-  ]);
+  await prisma.voiceClone.update({
+    where: { id: voiceCloneId },
+    data: { verificationStatus: newStatus as never },
+  });
 
   return NextResponse.json({ success: true, verificationStatus: newStatus });
 }

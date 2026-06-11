@@ -383,22 +383,8 @@ export default function PodcastScreen() {
         </Text>
         <Text style={styles.creator}>{podcast.user?.name ?? 'Unknown Creator'}</Text>
         <View style={styles.podcastBadgeRow}>
-          <View
-            style={[
-              styles.podcastContentBadge,
-              podcast.source !== 'IMPORT' || !podcast.isHumanContent
-                ? styles.podcastContentBadgeAi
-                : styles.podcastContentBadgeHuman,
-            ]}
-          >
-            <Text
-              style={[
-                styles.podcastContentBadgeText,
-                podcast.source !== 'IMPORT' || !podcast.isHumanContent
-                  ? styles.podcastContentBadgeTextAi
-                  : styles.podcastContentBadgeTextHuman,
-              ]}
-            >
+          <View style={styles.podcastContentBadge}>
+            <Text style={styles.podcastContentBadgeText}>
               {getContentBadgeLabel(podcast)}
             </Text>
           </View>
@@ -835,23 +821,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
     borderRadius: borderRadius.sm,
-  },
-  podcastContentBadgeAi: {
     backgroundColor: colors.primaryLighter,
-  },
-  podcastContentBadgeHuman: {
-    backgroundColor: colors.successLighter,
   },
   podcastContentBadgeText: {
     fontFamily: typography.fontBody,
     fontSize: 11,
     fontWeight: '600',
-  },
-  podcastContentBadgeTextAi: {
     color: colors.primary,
-  },
-  podcastContentBadgeTextHuman: {
-    color: colors.success,
   },
   durationBadge: {
     fontFamily: typography.fontBody,

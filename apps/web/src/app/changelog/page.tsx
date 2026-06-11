@@ -104,7 +104,7 @@ const entries: ChangelogEntry[] = [
     date: '2026-01-12',
     title: 'Content Moderation',
     description:
-      'Automated safety checks on user-generated content using the OpenAI moderation API. Reports, warnings, suspensions, and bans for policy violations.',
+      'Automated input and output safety checks on learner content using the OpenAI moderation API.',
     tags: ['feature'],
   },
   {

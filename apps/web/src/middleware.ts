@@ -63,11 +63,6 @@ export async function middleware(request: NextRequest) {
     secureCookie,
   });
 
-  // Banned user redirect — allow /banned page, auth routes, and API auth
-  if (token?.bannedAt && pathname !== '/banned' && !pathname.startsWith('/api/v1/auth')) {
-    return NextResponse.redirect(new URL('/banned', request.url));
-  }
-
   // Auth pages: redirect to dashboard if already authenticated
   if (AUTH_ROUTES.some((route) => pathname.startsWith(route))) {
     if (token) {

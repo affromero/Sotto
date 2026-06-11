@@ -102,7 +102,6 @@ vi.mock('@/lib/r2', () => ({
 }));
 
 vi.mock('@/lib/auth-guards', () => ({
-  checkSuspension: vi.fn().mockReturnValue(null),
   requireAdmin: vi.fn().mockReturnValue(null),
 }));
 

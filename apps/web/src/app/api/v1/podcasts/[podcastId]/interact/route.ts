@@ -4,7 +4,6 @@ import { prisma } from '@/lib/prisma';
 import { interactionSchema } from '@/lib/validations';
 import { interactionQueue, notificationQueue, addJob, JobType } from '@/lib/queue';
 import { checkRateLimit } from '@/lib/redis';
-import { checkSuspension } from '@/lib/auth-guards';
 import type { ProcessInteractionPayload, SendNotificationPayload } from '@/lib/queue';
 
 import { errorResponse } from '@/lib/api-response';
@@ -16,18 +15,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
   if (!authResult) {
     return errorResponse('Unauthorized', 401);
-  }
-
-  // Session-based suspension check (skip for API key auth)
-  const authHeader = request.headers.get('authorization');
-  const isApiKeyAuth = authHeader?.startsWith('Bearer ');
-  if (!isApiKeyAuth) {
-    const { auth } = await import('@/lib/auth');
-    const session = await auth();
-    if (session) {
-      const suspended = checkSuspension(session);
-      if (suspended) return suspended;
-    }
   }
 
   // Rate limit: 60/hour

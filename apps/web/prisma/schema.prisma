@@ -118,17 +118,7 @@ model User {
   // Private agent output ingestions
   agentIngestions AgentIngestion[]
 
-  // Moderation
-  bannedAt        DateTime?
-  bannedReason    String?   @db.Text
-  suspendedUntil  DateTime?
-  suspendedReason String?   @db.Text
-  warningCount    Int       @default(0)
-
-  // Moderation relations
-  moderationActions   ModerationAction[] @relation("ModeratedUser")
-  moderationPerformed ModerationAction[] @relation("Moderator")
-  reports             Report[]           @relation("Reporter")
+  warningCount Int @default(0)
   // Referrals
   referredById       String?
   referredBy         User?     @relation("Referrals", fields: [referredById], references: [id], onDelete: SetNull)
@@ -258,7 +248,6 @@ model Podcast {
   spectrogramUrl String?
 
   // Content/verification flags
-  isHumanContent       Boolean @default(false)
   lowReferences        Boolean @default(false)
   verificationProgress Json? // transient progress during reference validation
   sourcePlatform       String? // e.g. "notebooklm", "spotify", "apple_podcasts", "youtube"
@@ -725,8 +714,6 @@ enum NotificationType {
   QUESTION_ON_YOUR_PODCAST
   SCRIPT_READY
   ACCOUNT_WARNING
-  ACCOUNT_SUSPENDED
-  ACCOUNT_BANNED
   CONTENT_REMOVED
   PLATFORM_ANNOUNCEMENT
   VOICE_VERIFICATION_REQUIRED
@@ -739,23 +726,6 @@ enum NotificationType {
   VIDEO_READY
   VIDEO_FAILED
   AVATAR_FAILED
-}
-
-// ============ MODERATION ============
-
-model ModerationAction {
-  id          String   @id @default(cuid())
-  userId      String
-  moderatorId String
-  action      String // 'warn' | 'suspend' | 'ban' | 'unban' | 'unsuspend' | 'remove_content'
-  reason      String   @db.Text
-  metadata    Json?
-  createdAt   DateTime @default(now())
-
-  user      User @relation("ModeratedUser", fields: [userId], references: [id], onDelete: Cascade)
-  moderator User @relation("Moderator", fields: [moderatorId], references: [id])
-
-  @@index([userId, createdAt])
 }
 
 // ============ PUSH SUBSCRIPTIONS ============
@@ -1250,61 +1220,6 @@ model LandingShowcase {
   @@index([podcastId])
 }
 
-// ============ REPORTS ============
-
-enum ReportReason {
-  HARASSMENT
-  HATE_SPEECH
-  VIOLENCE
-  SEXUAL_CONTENT
-  MISINFORMATION
-  SPAM
-  IMPERSONATION
-  COPYRIGHT
-  VOICE_THEFT
-  MUSIC_UPLOAD
-  FALSE_HUMAN_BADGE
-  FALSE_CLAIM
-  OTHER
-}
-
-enum ReportStatus {
-  PENDING
-  REVIEWING
-  RESOLVED_ACTIONED
-  RESOLVED_DISMISSED
-  ASSET_REPLACED
-  DELISTED
-}
-
-model Report {
-  id          String       @id @default(cuid())
-  reporterId  String
-  targetType  String // 'podcast' | 'comment' | 'user'
-  targetId    String
-  reason      ReportReason
-  description String?      @db.Text
-  status      ReportStatus @default(PENDING)
-  resolvedBy  String?
-  resolution  String?      @db.Text
-  resolvedAt  DateTime?
-  createdAt   DateTime     @default(now())
-
-  // Copyright claim fields (used when reason = COPYRIGHT)
-  claimantEmail   String?
-  claimantName    String?
-  evidenceUrl     String?
-  segmentVisualId String?
-  counterNotice   String? @db.Text
-
-  reporter      User           @relation("Reporter", fields: [reporterId], references: [id], onDelete: Cascade)
-  segmentVisual SegmentVisual? @relation(fields: [segmentVisualId], references: [id], onDelete: SetNull)
-
-  @@unique([reporterId, targetType, targetId])
-  @@index([status, createdAt])
-  @@index([targetType, targetId])
-}
-
 // ============ AUDIO FINGERPRINTING & DUPLICATE DETECTION ============
 
 model AudioFingerprint {
@@ -1449,8 +1364,6 @@ model SegmentVisual {
 
   videoGeneration VideoGeneration @relation(fields: [videoGenerationId], references: [id], onDelete: Cascade)
   segment         Segment         @relation(fields: [segmentId], references: [id], onDelete: Cascade)
-  reports         Report[]
-
   @@index([videoGenerationId])
   @@index([segmentId])
   @@index([segmentId, subOrder])
