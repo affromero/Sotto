@@ -27,14 +27,14 @@ const resolveSlug = cache(async (handle: string, slug: string): Promise<string |
 export async function generateMetadata({ params }: BySlugPageProps): Promise<Metadata> {
   const { handle, slug } = await params;
   const podcastId = await resolveSlug(handle, slug);
-  if (!podcastId) return { title: 'Podcast Not Found' };
+  if (!podcastId) return { title: 'Lesson Not Found' };
 
   // Delegate to the main podcast page's metadata by importing it dynamically
   const mod = await import('@/app/podcast/[podcastId]/page');
   if (mod.generateMetadata) {
     return mod.generateMetadata({ params: Promise.resolve({ podcastId }) });
   }
-  return { title: 'Podcast' };
+  return { title: 'Lesson' };
 }
 
 export default async function PodcastBySlugPage({ params }: BySlugPageProps) {

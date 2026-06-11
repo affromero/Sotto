@@ -323,7 +323,7 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
       await addJob(notificationQueue, JobType.SEND_NOTIFICATION, {
         userId: podcast.userId,
         type: 'PODCAST_FAILED',
-        title: 'Podcast generation failed',
+        title: 'Lesson generation failed',
         message: `"${podcast.title}" exceeded the ${MAX_LESSON_DURATION_MINUTES}-minute duration limit (${Math.round(duration / 60)} minutes). Please try with a shorter duration target.`,
         data: { podcastId },
       });
@@ -494,7 +494,7 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
       await addJob(notificationQueue, JobType.SEND_NOTIFICATION, {
         userId: podcast.userId,
         type: notificationType,
-        title: 'Your podcast is ready!',
+        title: 'Your lesson is ready!',
         message: `"${podcast.title}" is ready to play.`,
         data: { podcastId },
       });

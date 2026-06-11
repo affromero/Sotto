@@ -38,7 +38,7 @@ export function CreateAsSystemOwnerButton() {
       });
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || 'Failed to create podcast');
+        throw new Error(data.error || 'Failed to create lesson');
       }
       const data = await res.json();
       router.push(`/podcast/${data.id}`);

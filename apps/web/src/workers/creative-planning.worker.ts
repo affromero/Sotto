@@ -94,7 +94,7 @@ export async function processCreativePlanning(job: Job<CreativePlanningPayload>)
   const evidence = dossier.evidence as unknown as EvidenceCard[];
 
   const speakers = (discovery.speakers as Array<{ name: string; description: string }>) || [
-    { name: 'Host', description: 'Curious and engaging podcast host' },
+    { name: 'Host', description: 'Curious and engaging narrator' },
     { name: 'Expert', description: 'Knowledgeable authority on the topic' },
   ];
 

@@ -172,8 +172,8 @@ export default function LibraryScreen() {
             />
           ) : (
             <EmptyState
-              title="No podcasts yet"
-              subtitle="Create your first private podcast"
+              title="No lessons yet"
+              subtitle="Create your first private lesson"
               testID="library-empty-state"
             />
           )

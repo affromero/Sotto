@@ -63,7 +63,7 @@ export function EditPodcastForm({
         label="Title"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
-        placeholder="Podcast title"
+        placeholder="Lesson title"
         maxLength={200}
         required
       />
@@ -75,7 +75,7 @@ export function EditPodcastForm({
           className={styles.textarea}
           value={topic}
           onChange={(e) => setTopic(e.target.value)}
-          placeholder="Describe the podcast topic..."
+          placeholder="Describe the lesson topic..."
           rows={4}
           maxLength={5000}
           required

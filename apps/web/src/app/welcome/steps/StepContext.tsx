@@ -27,7 +27,7 @@ export function StepContext({ sources, toggle, note, setNote, onNext, onBack }: 
       </h1>
       <p className={t.lede}>
         This is the part that makes Sotto yours. Choose what the agent may read — it draws every
-        lesson, reading, and podcast from the context you share. Nothing leaves your machine.
+        lesson, reading, and audio lesson from the context you share. Nothing leaves your machine.
       </p>
 
       <div className={c.sourceList}>

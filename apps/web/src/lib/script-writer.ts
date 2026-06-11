@@ -115,7 +115,7 @@ export async function writeScript(params: WriteScriptParams): Promise<WriteScrip
 
   const ai = createAIProvider(params.provider);
   const response = await ai.generateResponse(systemPrompt, [
-    { role: 'user', content: `Write the podcast script following the outline. ${params.durationTarget} minutes, ${params.tone} tone.` },
+    { role: 'user', content: `Write the lesson script following the outline. ${params.durationTarget} minutes, ${params.tone} tone.` },
   ], {
     maxTokens: 12288,
     apiKeyOverride: params.apiKeyOverride,

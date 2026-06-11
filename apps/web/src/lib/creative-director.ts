@@ -148,7 +148,7 @@ export async function createCreativeOutline(params: CreateOutlineParams): Promis
 
   const ai = createAIProvider(params.provider);
   const response = await ai.generateResponse(systemPrompt, [
-    { role: 'user', content: `Design the episode structure for a ${params.durationTarget}-minute ${params.tone} podcast about: ${params.topic}` },
+    { role: 'user', content: `Design the episode structure for a ${params.durationTarget}-minute ${params.tone} lesson about: ${params.topic}` },
   ], {
     maxTokens: 6144,
     apiKeyOverride: params.apiKeyOverride,

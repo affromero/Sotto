@@ -208,8 +208,8 @@ async function analyzeChangesWithLlm(diffs: SnapshotDiff[]): Promise<string> {
     return `${meta.displayName}: default=${meta.defaultModel}, models=[${meta.models.map((m) => m.id).join(', ')}]`;
   }).join('\n');
 
-  const systemPrompt = `You are a TTS integration engineer for Sotto, a podcast generation platform.
-Analyze TTS provider API changes and assess their relevance to conversational podcast generation.
+  const systemPrompt = `You are a TTS integration engineer for Sotto, a language-learning audio platform.
+Analyze TTS provider API changes and assess their relevance to conversational audio lesson generation.
 Be concise and actionable. Output markdown suitable for a GitHub issue body.
 
 Current Sotto TTS config:

@@ -105,7 +105,7 @@ const SUB_MESSAGES: Record<string, string[]> = {
     'AI is reviewing your script structure...',
   ],
   GENERATING_VISUALS: [
-    'Creating AI illustrations for your podcast...',
+    'Creating AI illustrations for your lesson...',
     'Each segment gets its own unique visual...',
     'Generating images to match your content...',
     'This is the most visual-intensive step...',

@@ -83,11 +83,11 @@ export function buildWelcomeEmail(name: string): { subject: string; html: string
           ${BRAND.subline}
         </p>
         <p style="font-size:14px; line-height:1.7; color:#6B7280; margin:0 0 24px;">
-          Create your first podcast in minutes &mdash; just describe what you want to learn
+          Create your first lesson in minutes &mdash; just describe what you want to learn
           and we&apos;ll handle the rest.
         </p>
         <a href="${appUrl}/create" style="display:inline-block; background:#3F4FB0; color:#fff; font-size:14px; font-weight:600; padding:10px 24px; border-radius:8px; text-decoration:none;">
-          Create Your First Podcast
+          Create Your First Lesson
         </a>
       </div>
     ${simpleFooter}`,

@@ -79,7 +79,7 @@ describe('VideoView', () => {
     );
 
     expect(screen.getByTestId('remotion-player')).toBeInTheDocument();
-    expect(screen.getByLabelText('Podcast video')).toBeInTheDocument();
+    expect(screen.getByLabelText('Lesson video')).toBeInTheDocument();
   });
 
   it('shows current segment subtitle based on currentTime', () => {

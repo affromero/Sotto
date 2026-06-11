@@ -247,7 +247,7 @@ export function VideoView({
           fps={FPS}
           style={{ width: '100%', height: '100%' }}
           controls={false}
-          aria-label={title ? `Video for ${title}` : 'Podcast video'}
+          aria-label={title ? `Video for ${title}` : 'Lesson video'}
         />
         {isOwner && playableOverlays.length > 0 && onAvatarsVisibleChange && (
           <button

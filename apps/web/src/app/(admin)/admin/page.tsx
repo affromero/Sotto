@@ -135,21 +135,21 @@ export default async function AdminOverviewPage() {
 
         <div className={styles.card}>
           <div className={styles.cardHeader}>
-            <span className={styles.cardLabel}>Total Podcasts</span>
+            <span className={styles.cardLabel}>Total Lessons</span>
           </div>
           <div className={styles.cardValue}>{stats.totalPodcasts.toLocaleString()}</div>
         </div>
 
         <div className={styles.card}>
           <div className={styles.cardHeader}>
-            <span className={styles.cardLabel}>Ready Podcasts</span>
+            <span className={styles.cardLabel}>Ready Lessons</span>
           </div>
           <div className={styles.cardValue}>{stats.readyPodcasts.toLocaleString()}</div>
         </div>
 
         <div className={styles.card}>
           <div className={styles.cardHeader}>
-            <span className={styles.cardLabel}>Failed Podcasts</span>
+            <span className={styles.cardLabel}>Failed Lessons</span>
           </div>
           <div className={styles.cardValue}>{stats.failedPodcasts.toLocaleString()}</div>
         </div>

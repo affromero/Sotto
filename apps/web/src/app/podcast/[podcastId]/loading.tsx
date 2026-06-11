@@ -2,7 +2,7 @@ import styles from './loading.module.css';
 
 export default function PodcastLoading() {
   return (
-    <div className={styles.root} role="status" aria-label="Loading podcast">
+    <div className={styles.root} role="status" aria-label="Loading lesson">
       {/* Back link */}
       <div className={`${styles.bone} ${styles.backLink}`} aria-hidden="true" />
 

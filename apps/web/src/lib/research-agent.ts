@@ -311,7 +311,7 @@ export async function buildResearchDossier(params: BuildDossierParams): Promise<
   });
 
   const angleResponse = await ai.generateResponse(anglePrompt, [
-    { role: 'user', content: `Find the best angles for a ${params.tone} podcast about: ${params.topic}` },
+    { role: 'user', content: `Find the best angles for a ${params.tone} lesson about: ${params.topic}` },
   ], {
     maxTokens: 4096,
     apiKeyOverride: params.apiKeyOverride,

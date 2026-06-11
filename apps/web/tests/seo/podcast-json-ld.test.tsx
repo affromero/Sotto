@@ -80,7 +80,7 @@ describe('PodcastJsonLd', () => {
     const data = renderAndParse(BASE_PROPS);
     expect(data.partOfSeries).toEqual({
       '@type': 'PodcastSeries',
-      name: "Jane Doe's Sotto Podcasts",
+      name: "Jane Doe's Sotto Lessons",
       url: 'https://selfhost.example.com/@janedoe',
     });
   });

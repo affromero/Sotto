@@ -22,12 +22,12 @@ const PIPELINE_STEPS = [
   { key: 'EXTRACTING', label: 'Reading your source material' },
   { key: 'RESEARCHING', label: 'Researching the topic' },
   { key: 'PLANNING', label: 'Planning the narrative' },
-  { key: 'SCRIPTING', label: 'Writing your podcast script' },
+  { key: 'SCRIPTING', label: 'Writing your lesson script' },
   { key: 'COMPILING', label: 'Verifying citations' },
   { key: 'SCRIPT_READY', label: 'Your script is ready for review' },
   { key: 'GENERATING_AUDIO', label: 'Recording the voices' },
   { key: 'STITCHING', label: 'Mixing the final audio' },
-  { key: 'READY', label: 'Your podcast is ready!' },
+  { key: 'READY', label: 'Your lesson is ready!' },
 ] as const;
 
 type StepState = 'completed' | 'current' | 'future' | 'error' | 'paused';
@@ -86,7 +86,7 @@ export function GenerationProgress({ status, progress, error, topic, verificatio
     : progress;
 
   return (
-    <div className={styles.root} role="progressbar" aria-label="Podcast generation progress">
+    <div className={styles.root} role="progressbar" aria-label="Lesson generation progress">
       {/* Animated orb */}
       <div
         className={`${styles.orbWrap} ${

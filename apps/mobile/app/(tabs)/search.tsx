@@ -79,7 +79,7 @@ export default function SearchScreen() {
             style={styles.searchInput}
             value={query}
             onChangeText={setQuery}
-            placeholder="Search your podcasts..."
+            placeholder="Search your lessons..."
             placeholderTextColor={colors.textTertiary}
             returnKeyType="search"
             autoCapitalize="none"
@@ -95,7 +95,7 @@ export default function SearchScreen() {
         <Pressable
           style={[styles.filterButton, selectedTags.length > 0 && styles.filterButtonActive]}
           onPress={() => setFiltersVisible(true)}
-          accessibilityLabel="Filter private podcast results"
+          accessibilityLabel="Filter private lesson results"
           accessibilityRole="button"
         >
           <Ionicons
@@ -109,14 +109,14 @@ export default function SearchScreen() {
       {debouncedQuery.length < 2 ? (
         <EmptyState
           title="Search your library"
-          subtitle="Find private podcasts by title, topic, or tag"
+          subtitle="Find private lessons by title, topic, or tag"
         />
       ) : isLoading ? (
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : isError ? (
-        <ErrorState message="Failed to load your podcasts" onRetry={refetch} />
+        <ErrorState message="Failed to load your lessons" onRetry={refetch} />
       ) : (
         <FlatList
           testID="search-results-list"
@@ -133,7 +133,7 @@ export default function SearchScreen() {
           ListEmptyComponent={
             <EmptyState
               title="No results"
-              subtitle={`No private podcasts found for "${query.trim()}"`}
+              subtitle={`No private lessons found for "${query.trim()}"`}
             />
           }
         />

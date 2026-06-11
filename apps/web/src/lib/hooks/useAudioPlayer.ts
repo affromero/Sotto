@@ -110,7 +110,7 @@ export function useAudioPlayer(): PlayerState & PlayerControls {
   const updateMediaSession = useCallback((title: string | null, playing: boolean) => {
     if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
     navigator.mediaSession.metadata = new MediaMetadata({
-      title: title || 'Sotto Podcast',
+      title: title || 'Sotto Lesson',
       artist: 'Sotto',
     });
     navigator.mediaSession.playbackState = playing ? 'playing' : 'paused';

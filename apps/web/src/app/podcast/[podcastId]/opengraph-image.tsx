@@ -2,7 +2,7 @@ import { ImageResponse } from 'next/og';
 import { prisma } from '@/lib/prisma';
 
 export const runtime = 'nodejs';
-export const alt = 'Sotto Podcast';
+export const alt = 'Sotto Lesson';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
@@ -37,7 +37,7 @@ export default async function OgImage({ params }: { params: Promise<{ podcastId:
           fontFamily: 'sans-serif',
         }}
       >
-        <span style={{ fontSize: 48, color: '#1E2128' }}>Podcast Not Found</span>
+        <span style={{ fontSize: 48, color: '#1E2128' }}>Lesson Not Found</span>
       </div>,
       { ...size }
     );

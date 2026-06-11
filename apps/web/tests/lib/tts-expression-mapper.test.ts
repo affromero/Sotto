@@ -117,7 +117,7 @@ describe('tts-expression-mapper', () => {
 
     it('falls back to speaker baseline when no direction', () => {
       const result = mapDirectionToExpression(undefined, 'HOST', 'hume');
-      expect(result.hume?.description).toBe('warm, engaging podcast host');
+      expect(result.hume?.description).toBe('warm, engaging narrator');
     });
 
     it('uses EXPERT baseline', () => {
@@ -127,7 +127,7 @@ describe('tts-expression-mapper', () => {
 
     it('uses default baseline for unknown speaker', () => {
       const result = mapDirectionToExpression(undefined, undefined, 'hume');
-      expect(result.hume?.description).toBe('natural, conversational podcast speaker');
+      expect(result.hume?.description).toBe('natural, conversational narrator');
     });
 
     it('passes unknown direction as-is', () => {
@@ -174,7 +174,7 @@ describe('tts-expression-mapper', () => {
 
     it('falls back to speaker baseline when no direction', () => {
       const result = mapDirectionToExpression(undefined, 'HOST', 'openai');
-      expect(result.openai?.instructions).toContain('podcast host');
+      expect(result.openai?.instructions).toContain('narrator');
     });
 
     it('generates generic instruction for unknown direction', () => {

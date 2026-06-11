@@ -169,7 +169,7 @@ export default function RootLayout() {
               <Stack.Screen name="auth/login" options={{ headerShown: false }} />
               <Stack.Screen name="onboarding/index" options={{ headerShown: false }} />
               <Stack.Screen name="podcast/[id]" options={{ headerShown: false }} />
-              <Stack.Screen name="podcast/[id]/edit" options={{ title: 'Edit Podcast' }} />
+              <Stack.Screen name="podcast/[id]/edit" options={{ title: 'Edit Lesson' }} />
             </Stack>
             <MiniPlayer />
           </QueryClientProvider>

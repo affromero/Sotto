@@ -578,7 +578,7 @@ describe('processAudioStitching', () => {
       expect(mockAddJob).toHaveBeenCalledWith({ name: 'notifications' }, 'send_notification', {
         userId: 'user-1',
         type: 'PODCAST_READY',
-        title: 'Your podcast is ready!',
+        title: 'Your lesson is ready!',
         message: '"Test Podcast" is ready to play.',
         data: { podcastId: 'podcast-001' },
       });
@@ -667,7 +667,7 @@ describe('processAudioStitching', () => {
       expect(mockAddJob).toHaveBeenCalledWith(
         { name: 'notifications' },
         'send_notification',
-        expect.objectContaining({ type: 'PODCAST_FAILED', title: 'Podcast generation failed' })
+        expect.objectContaining({ type: 'PODCAST_FAILED', title: 'Lesson generation failed' })
       );
     });
   });

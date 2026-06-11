@@ -307,7 +307,7 @@ function ClassifierSection({
   return (
     <SectionShell
       label="Visual Classifier"
-      description="Tests the AI that decides which visual type each podcast segment gets (map, illustration, stock footage, text card, etc). Feed it a title, topic, and segment texts to see what visuals it picks."
+      description="Tests the AI that decides which visual type each lesson segment gets (map, illustration, stock footage, text card, etc). Feed it a title, topic, and segment texts to see what visuals it picks."
       result={result}
       disabled={disabled}
       disabledMessage={<>Requires at least one AI provider key (e.g. <code>ANTHROPIC_API_KEY</code>)</>}
@@ -320,7 +320,7 @@ function ClassifierSection({
               className={styles.fieldInput}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Podcast title"
+              placeholder="Lesson title"
             />
           </div>
           <div>
@@ -329,7 +329,7 @@ function ClassifierSection({
               className={styles.fieldInput}
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
-              placeholder="Podcast topic"
+              placeholder="Lesson topic"
             />
           </div>
         </div>

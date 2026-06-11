@@ -432,7 +432,7 @@ export function SettingsForm({
         <h2 className={styles.sectionTitle}>Language</h2>
         <p className={styles.sectionDesc}>
           Choose your preferred language for Q&amp;A interactions. If not set, responses will match
-          the podcast&apos;s language.
+          the lesson&apos;s language.
         </p>
         <div className={styles.form}>
           <div className={styles.fieldGroup}>
@@ -446,7 +446,7 @@ export function SettingsForm({
               onChange={(e) => setPreferredLanguage(e.target.value || null)}
               aria-label="Preferred interaction language"
             >
-              <option value="">Not set (use podcast language)</option>
+              <option value="">Not set (use lesson language)</option>
               {Object.entries(LANGUAGE_DISPLAY).map(([code, label]) => (
                 <option key={code} value={code}>
                   {label}
@@ -566,7 +566,7 @@ export function SettingsForm({
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Interests</h2>
         <p className={styles.interestsDescription}>
-          Select topics you&apos;re curious about. This helps us recommend better podcasts for you.
+          Select topics you&apos;re curious about. This helps us recommend better lessons for you.
         </p>
         <InterestGrid
           categories={interestCategories}
@@ -624,7 +624,7 @@ export function SettingsForm({
             <div className={styles.toggleInfo}>
               <span className={styles.toggleLabel}>Email Notifications</span>
               <span className={styles.toggleDescription}>
-                Receive updates about your podcasts via email
+                Receive updates about your lessons via email
               </span>
             </div>
             <input
@@ -651,7 +651,7 @@ export function SettingsForm({
                   ? 'Push notifications are blocked in your browser settings'
                   : pushState === 'unsupported'
                     ? 'Push notifications are not supported in this browser'
-                    : 'Get notified when your podcast is ready'}
+                    : 'Get notified when your lesson is ready'}
               </span>
             </div>
             <input
@@ -705,7 +705,7 @@ export function SettingsForm({
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>AI Preferences</h2>
           <p className={styles.sectionDesc}>
-            Choose your default AI model for new podcasts. You can override this per-podcast in the
+            Choose your default AI model for new lessons. You can override this per-lesson in the
             creation flow.
           </p>
           <div className={styles.form}>
@@ -718,7 +718,7 @@ export function SettingsForm({
                 className={styles.modelSelect}
                 value={preferredAiModel}
                 onChange={(e) => setPreferredAiModel(e.target.value)}
-                aria-label="Preferred AI model for podcast generation"
+                aria-label="Preferred AI model for lesson generation"
               >
                 <option value="">System default (Auto)</option>
                 {aiModelOptions.map((m) => (
@@ -864,7 +864,7 @@ export function SettingsForm({
         ) : (
           <div className={styles.deleteConfirm}>
             <p className={styles.confirmText}>
-              Are you sure? This will delete all your podcasts, data, and cannot be reversed.
+              Are you sure? This will delete all your lessons, data, and cannot be reversed.
             </p>
             <div className={styles.confirmActions}>
               <Button variant="danger" onClick={handleDeleteAccount}>

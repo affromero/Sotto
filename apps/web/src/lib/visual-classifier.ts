@@ -107,7 +107,7 @@ You MUST NOT use AI_ILLUSTRATION. It is not available. Use TEXT_CARD, STOCK_FOOT
 For narrative/abstract moments that would normally be AI_ILLUSTRATION, use TEXT_CARD with a descriptive headline and bullets.
 `;
 
-const SYSTEM_PROMPT = `You are a video producer. Given podcast segments, assign each one visual types for a video overlay.
+const SYSTEM_PROMPT = `You are a video producer. Given lesson segments, assign each one visual types for a video overlay.
 
 VISUAL TYPES:
 - AI_ILLUSTRATION: Rich editorial illustration. Provide a detailed image prompt (style: editorial illustration, clean, warm tones, no real people likenesses).
@@ -235,7 +235,7 @@ export async function classifySegmentVisuals(
 
   const structuredBlock = structuredSections.length > 0 ? `\n${structuredSections.join('\n')}` : '';
 
-  const userMessage = `Podcast: "${podcastTitle}"
+  const userMessage = `Lesson: "${podcastTitle}"
 Topic: ${podcastTopic}
 
 Segments:

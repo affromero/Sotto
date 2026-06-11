@@ -118,6 +118,6 @@ export function buildHeraPrompt(params: {
     case 'DATA_TABLE':
       return buildDataTablePrompt(metadata, segmentText);
     default:
-      return `Animated motion graphic for podcast visual. ${BRAND_STYLE} Context: ${truncate(segmentText, 300)}`;
+      return `Animated motion graphic for lesson visual. ${BRAND_STYLE} Context: ${truncate(segmentText, 300)}`;
   }
 }
