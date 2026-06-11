@@ -25,7 +25,6 @@ export interface TtsProviderMeta {
   displayName: string;
   getApiKeyUrl: string;
   supportsSfx: boolean;
-  supportsVoiceCloning: boolean;
   supportsStreaming: boolean;
   maxSegmentChars: number;
   defaultModel: string;
@@ -85,7 +84,6 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     displayName: 'ElevenLabs',
     getApiKeyUrl: 'https://elevenlabs.io/app/settings/api-keys',
     supportsSfx: true,
-    supportsVoiceCloning: true,
     supportsStreaming: true,
     maxSegmentChars: 5000,
     defaultModel: 'eleven_v3',
@@ -123,7 +121,6 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     displayName: 'OpenAI',
     getApiKeyUrl: 'https://platform.openai.com/api-keys',
     supportsSfx: false,
-    supportsVoiceCloning: false,
     supportsStreaming: true,
     maxSegmentChars: 4096,
     defaultModel: 'tts-1-hd',
@@ -160,7 +157,6 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     displayName: 'Cartesia',
     getApiKeyUrl: 'https://play.cartesia.ai/keys',
     supportsSfx: false,
-    supportsVoiceCloning: true,
     supportsStreaming: true,
     maxSegmentChars: 5000,
     defaultModel: 'sonic-3',
@@ -200,7 +196,6 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     displayName: 'Hume AI',
     getApiKeyUrl: 'https://platform.hume.ai/settings/keys',
     supportsSfx: false,
-    supportsVoiceCloning: true,
     supportsStreaming: false,
     maxSegmentChars: 5000,
     defaultModel: 'octave-v2',
@@ -245,7 +240,6 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     displayName: 'Fal',
     getApiKeyUrl: 'https://fal.ai/dashboard/keys',
     supportsSfx: false,
-    supportsVoiceCloning: true,
     supportsStreaming: false,
     maxSegmentChars: 5000,
     defaultModel: 'qwen3-tts-1.7b',
@@ -281,7 +275,6 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     displayName: 'MiniMax',
     getApiKeyUrl: 'https://fal.ai/dashboard/keys',
     supportsSfx: false,
-    supportsVoiceCloning: false,
     supportsStreaming: false,
     maxSegmentChars: 5000,
     defaultModel: 'speech-02-hd',
@@ -317,7 +310,6 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     displayName: 'Mistral (Voxtral)',
     getApiKeyUrl: 'https://console.mistral.ai/api-keys',
     supportsSfx: false,
-    supportsVoiceCloning: true,
     supportsStreaming: true,
     maxSegmentChars: 4096,
     defaultModel: 'voxtral-mini-tts-2603',
@@ -352,7 +344,6 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     displayName: 'Replicate',
     getApiKeyUrl: 'https://replicate.com/account/api-tokens',
     supportsSfx: false,
-    supportsVoiceCloning: false,
     supportsStreaming: false,
     maxSegmentChars: 5000,
     defaultModel: 'inworld-tts-1.5-max',
@@ -394,7 +385,6 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     displayName: 'Kokoro (Local)',
     getApiKeyUrl: '',
     supportsSfx: false,
-    supportsVoiceCloning: false,
     supportsStreaming: false,
     maxSegmentChars: 4096,
     defaultModel: 'kokoro',
@@ -476,7 +466,6 @@ export interface TtsProviderClientMeta {
   getApiKeyUrl: string;
   qualityTier: 'standard' | 'premium' | 'ultra';
   supportsSfx: boolean;
-  supportsVoiceCloning: boolean;
   supportsStreaming: boolean;
   models: TtsModelClientOption[];
   authFields: TtsProviderAuthField[];
@@ -501,7 +490,6 @@ export function getAllTtsProviderClientMeta(): TtsProviderClientMeta[] {
       getApiKeyUrl: p.getApiKeyUrl,
       qualityTier: p.qualityTier,
       supportsSfx: p.supportsSfx,
-      supportsVoiceCloning: p.supportsVoiceCloning,
       supportsStreaming: p.supportsStreaming,
       models: p.models.map((m) => ({
         id: m.id,

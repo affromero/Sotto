@@ -40,7 +40,6 @@ export enum JobType {
   SEND_NOTIFICATION = 'send_notification',
   GENERATE_PDF = 'generate_pdf',
   VALIDATE_KEYS = 'validate_keys',
-  VERIFY_VOICE = 'verify_voice',
   FETCH_PRICING = 'fetch_pricing',
   CLASSIFY_VISUALS = 'classify_visuals',
   GENERATE_VISUAL = 'generate_visual',
@@ -174,13 +173,6 @@ export interface WriteScriptPayload {
 export interface CompileScriptPayload {
   podcastId: string;
   userId: string;
-}
-
-export interface VerifyVoicePayload {
-  voiceCloneId: string;
-  userId: string;
-  action: 'extract_fingerprint' | 'check_duplicates' | 'verify_challenge';
-  challengeId?: string;
 }
 
 export interface VerifyScriptPayload {
@@ -338,7 +330,6 @@ const QUEUE_DEFINITIONS: Record<string, QueueDefinition> = {
   notifications: { attempts: 5, skipEvents: true },
   'pdf-generation': { attempts: 2, skipEvents: true },
   'key-validation': { attempts: 1, skipEvents: true },
-  'voice-verification': { attempts: 2, skipEvents: true },
   'pricing-fetch': { attempts: 2, skipEvents: true },
   'visual-classification': { attempts: 2 },
   'visual-generation': { attempts: 3 },
@@ -798,7 +789,6 @@ export const referenceValidationQueue = createQueueReference('reference-validati
 export const pdfGenerationQueue = createQueueReference('pdf-generation');
 export const scriptVerificationQueue = createQueueReference('script-verification');
 export const keyValidationQueue = createQueueReference('key-validation');
-export const voiceVerificationQueue = createQueueReference('voice-verification');
 export const pricingFetchQueue = createQueueReference('pricing-fetch');
 export const visualClassificationQueue = createQueueReference('visual-classification');
 export const visualGenerationQueue = createQueueReference('visual-generation');

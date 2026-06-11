@@ -29,8 +29,6 @@ import {
   generateSoundEffect,
   designVoice,
   getVoices,
-  cloneVoice,
-  deleteClonedVoice,
   getElevenLabsPerKCharRate,
   getOpenAiPerKCharRate,
   VOICE_POOL,
@@ -523,123 +521,6 @@ describe('elevenlabs', () => {
       });
 
       await expect(getVoices()).rejects.toThrow('ElevenLabs API error (401)');
-    });
-  });
-
-  describe('cloneVoice', () => {
-    it('clones voice from audio samples', async () => {
-      const audioFiles = [Buffer.from('audio sample 1'), Buffer.from('audio sample 2')];
-
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({ voice_id: 'cloned-voice-123' }),
-      });
-
-      const result = await cloneVoice('My Custom Voice', audioFiles, { description: 'Test voice' });
-
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/voices/add'),
-        expect.objectContaining({
-          method: 'POST',
-          headers: expect.objectContaining({
-            'xi-api-key': 'test-api-key',
-          }),
-        })
-      );
-      expect(result.voiceId).toBe('cloned-voice-123');
-    });
-
-    it('throws error when API key is missing', async () => {
-      delete process.env.ELEVENLABS_API_KEY;
-
-      await expect(cloneVoice('Test', [Buffer.from('audio')], { description: 'desc' })).rejects.toThrow(
-        'ElevenLabs API key not configured — set ELEVENLABS_API_KEY'
-      );
-    });
-
-    it('throws error on cloning failure', async () => {
-      mockFetch.mockResolvedValue({
-        ok: false,
-        status: 400,
-        text: async () => 'Audio quality too low',
-      });
-
-      await expect(cloneVoice('Test', [Buffer.from('audio')])).rejects.toThrow(
-        /ElevenLabs.*400/
-      );
-    });
-
-    it('uses apiKeyOverride when provided', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({ voice_id: 'byok-voice-123' }),
-      });
-
-      const result = await cloneVoice('BYOK Voice', [Buffer.from('audio')], {
-        apiKeyOverride: 'user-custom-key',
-      });
-
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/voices/add'),
-        expect.objectContaining({
-          headers: expect.objectContaining({
-            'xi-api-key': 'user-custom-key',
-          }),
-        })
-      );
-      expect(result.voiceId).toBe('byok-voice-123');
-    });
-  });
-
-  describe('deleteClonedVoice', () => {
-    it('deletes a cloned voice by ID', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-      });
-
-      await deleteClonedVoice('voice-to-delete');
-
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/voices/voice-to-delete'),
-        expect.objectContaining({
-          method: 'DELETE',
-          headers: expect.objectContaining({ 'xi-api-key': 'test-api-key' }),
-        })
-      );
-    });
-
-    it('throws error when API key is missing', async () => {
-      delete process.env.ELEVENLABS_API_KEY;
-
-      await expect(deleteClonedVoice('voice-123')).rejects.toThrow(
-        'ElevenLabs API key not configured'
-      );
-    });
-
-    it('throws error on deletion failure', async () => {
-      mockFetch.mockResolvedValue({
-        ok: false,
-        status: 404,
-        text: async () => 'Voice not found',
-      });
-
-      await expect(deleteClonedVoice('nonexistent-voice')).rejects.toThrow(
-        /ElevenLabs.*404/
-      );
-    });
-
-    it('uses apiKeyOverride when provided', async () => {
-      mockFetch.mockResolvedValue({ ok: true });
-
-      await deleteClonedVoice('voice-byok', 'user-custom-key');
-
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/voices/voice-byok'),
-        expect.objectContaining({
-          method: 'DELETE',
-          headers: expect.objectContaining({ 'xi-api-key': 'user-custom-key' }),
-        })
-      );
     });
   });
 

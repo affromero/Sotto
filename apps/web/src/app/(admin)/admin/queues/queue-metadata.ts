@@ -12,7 +12,6 @@ export type PipelineStage =
   | 'Audio Pipeline'
   | 'Interactions'
   | 'Platform Ops'
-  | 'Voice Features'
   | 'Video Pipeline';
 
 interface QueueMeta {
@@ -25,7 +24,6 @@ export const PIPELINE_STAGE_ORDER: PipelineStage[] = [
   'Audio Pipeline',
   'Interactions',
   'Platform Ops',
-  'Voice Features',
   'Video Pipeline',
 ];
 
@@ -81,10 +79,6 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
   'key-validation': {
     description: 'Validates BYOK API keys for TTS and AI providers',
     stage: 'Platform Ops',
-  },
-  'voice-verification': {
-    description: 'Verifies voice clone ownership and quality',
-    stage: 'Voice Features',
   },
   'pricing-fetch': {
     description: 'Fetches AI model pricing from provider pages and updates snapshots',

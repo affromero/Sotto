@@ -52,14 +52,6 @@ export function getNotificationUrl(notification: NotificationData): string | nul
     case 'CONTENT_REMOVED':
       return '/settings';
 
-    // Voice verification
-    case 'VOICE_VERIFICATION_REQUIRED':
-    case 'VOICE_VERIFICATION_PASSED':
-    case 'VOICE_VERIFICATION_FAILED':
-    case 'VOICE_BLOCKED_DUPLICATE':
-    case 'VOICE_OWNERSHIP_ALERT':
-      return '/settings/voices';
-
     // Pipeline failure (admin)
     case 'PIPELINE_FAILURE':
       return podcastId ? `/podcast/${podcastId}` : '/admin';

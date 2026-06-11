@@ -255,29 +255,6 @@ export const voiceBrowseQuerySchema = z.object({
 });
 
 /**
- * Voice clone creation validation
- */
-export const cloneVoiceSchema = z.object({
-  name: z.string().min(1).max(100),
-  sourceType: z.enum(['UPLOAD', 'RECORD', 'IMPORT']),
-});
-
-export const importVoiceSchema = z.object({
-  name: z.string().min(1).max(100),
-  externalVoiceId: z.string().min(1).max(200),
-  provider: z.literal('hume'),
-});
-
-export const importElevenLabsVoiceSchema = z.object({
-  externalVoiceId: z.string().min(1).max(200),
-  provider: z.literal('elevenlabs'),
-});
-
-export const voiceVerifyChallengeSchema = z.object({
-  voiceCloneId: z.string().min(1),
-});
-
-/**
  * Voice preview validation
  */
 export const voicePreviewSchema = z.object({

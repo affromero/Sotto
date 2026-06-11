@@ -33,8 +33,7 @@ export default function PrivacyPage() {
           <h3>Content You Create</h3>
           <p>
             We store lessons you generate, discovery chat conversations, scripts,
-            interactions (questions and answers), voice clones,
-            and saved lesson ideas.
+            interactions (questions and answers), and saved lesson ideas.
           </p>
 
           <h3>BYOK Keys</h3>
@@ -57,13 +56,6 @@ export default function PrivacyPage() {
           <p>
             Sotto does not collect anonymous activity events or maintain
             behavior-derived profile storage.
-          </p>
-
-          <h3>Voice Data</h3>
-          <p>
-            If you create a voice clone, you upload audio samples of your voice. These
-            samples are sent to your selected TTS provider for processing and the
-            resulting voice model is stored on our platform.
           </p>
 
           <h2>2. Personalization</h2>
@@ -119,7 +111,7 @@ export default function PrivacyPage() {
             </li>
             <li>
               <strong>TTS Providers</strong> (ElevenLabs, OpenAI, Cartesia,
-              Hume, Fal.ai, Replicate): audio generation and voice cloning
+              Hume, Fal.ai, Replicate): audio generation
             </li>
             <li>
               <strong>Content Moderation</strong> (OpenAI Moderation API): automated
@@ -207,9 +199,9 @@ export default function PrivacyPage() {
           <p>
             You can delete your account at any time from your profile settings. This
             permanently removes your profile, lessons, scripts, interactions,
-            voice clones, and all associated content. Audio files are deleted from
-            storage. Data in models without a direct foreign key, such as feedback,
-            is explicitly deleted before your account is removed.
+            and all associated content. Audio files are deleted from storage. Data in
+            models without a direct foreign key, such as feedback, is explicitly deleted
+            before your account is removed.
           </p>
 
           <h3>Data Export</h3>
@@ -217,8 +209,8 @@ export default function PrivacyPage() {
             You can export all your data at any time from your account settings or by
             calling <code>GET /api/v1/users/me/export</code>. The export includes your
             profile, lessons, scripts, discovery conversations, interactions,
-            saves, ratings, voice clones, feedback, taste quiz answers, and saved
-            ideas, all in a single JSON file.
+            saves, ratings, feedback, taste quiz answers, and saved ideas, all in a
+            single JSON file.
           </p>
 
           <h3>BYOK Key Removal</h3>

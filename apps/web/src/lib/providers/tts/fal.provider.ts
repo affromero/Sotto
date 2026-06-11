@@ -3,7 +3,7 @@
  * No expression/emotion controls — relies on text content for prosody.
  *
  * Models:
- *   - qwen3-tts-1.7b / qwen3-tts-0.6b: Named preset voices + voice cloning
+ *   - qwen3-tts-1.7b / qwen3-tts-0.6b: Named preset voices
  */
 import { logger } from '../../logger';
 import type { TtsProvider, SpeechParams } from '../tts';
@@ -44,15 +44,8 @@ export class FalProvider implements TtsProvider {
 
   async generateSpeech(params: SpeechParams): Promise<Buffer> {
     const url = MODEL_ENDPOINTS[this.model] ?? MODEL_ENDPOINTS['qwen3-tts-1.7b'];
-    const isClonedVoice = params.voiceId.startsWith('https://');
 
-    // Qwen3 uses { text, voice } or { text, speaker_voice_embedding_file_url }
-    const body: Record<string, unknown> = { text: params.text };
-    if (isClonedVoice) {
-      body.speaker_voice_embedding_file_url = params.voiceId;
-    } else {
-      body.voice = params.voiceId;
-    }
+    const body: Record<string, unknown> = { text: params.text, voice: params.voiceId };
 
     // Pass language hint when available (Qwen3 expects full language names)
     if (params.language) {

@@ -27,7 +27,6 @@ import { processSegmentRegeneration } from './segment-regeneration.worker';
 import { processNotification } from './notification.worker';
 import { processPdfGeneration } from './pdf-generation.worker';
 import { processKeyValidation } from './key-validation.worker';
-import { processVoiceVerification } from './voice-verification.worker';
 import { processPricingFetch } from './pricing-fetch.worker';
 import { processTtsProviderMonitor } from './tts-provider-monitor.worker';
 import { processVisualClassification } from './visual-classification.worker';
@@ -111,7 +110,6 @@ const workers = [
   shouldRun('notifications') && createWorker('notifications', processNotification, { concurrency: 5 }),
   shouldRun('pdf-generation') && createWorker('pdf-generation', processPdfGeneration, { concurrency: 2 }),
   shouldRun('key-validation') && createWorker('key-validation', processKeyValidation, { concurrency: 1 }),
-  shouldRun('voice-verification') && createWorker('voice-verification', processVoiceVerification, { concurrency: 2 }),
   shouldRun('pricing-fetch') && createWorker('pricing-fetch', processPricingFetch, { concurrency: 1 }),
   shouldRun('tts-provider-monitor') && createWorker('tts-provider-monitor', processTtsProviderMonitor, { concurrency: 1 }),
   shouldRun('visual-classification') && createWorker('visual-classification', processVisualClassification, { concurrency: 2 }),

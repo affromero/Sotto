@@ -88,7 +88,6 @@ vi.mock('@/lib/generation-features', () => ({
     privateAllowed: true,
     priorityQueue: true,
     analyticsEnabled: true,
-    voiceCloningEnabled: true,
   }),
   getJobPriority: vi.fn().mockReturnValue(1),
 }));
@@ -629,7 +628,6 @@ describe('PATCH /api/v1/podcasts/[podcastId]', () => {
       privateAllowed: true,
       priorityQueue: true,
       analyticsEnabled: true,
-      voiceCloningEnabled: true,
     });
   });
 

@@ -487,54 +487,6 @@ export function getOpenAiPerKCharRate(): number {
   return 0.015;
 }
 
-// ---------------------------------------------------------------------------
-// Voice Cloning (Instant Voice Cloning — IVC)
-// ---------------------------------------------------------------------------
-
-/**
- * Clone a voice from audio samples using ElevenLabs Instant Voice Cloning.
- * Requires a paid ElevenLabs plan.
- */
-export async function cloneVoice(
-  name: string,
-  audioFiles: Buffer[],
-  options?: { description?: string; apiKeyOverride?: string }
-): Promise<{ voiceId: string }> {
-  const apiKey = options?.apiKeyOverride || getApiKey();
-  if (!apiKey) {
-    throw new Error('ElevenLabs API key not configured — set ELEVENLABS_API_KEY');
-  }
-
-  const formData = new FormData();
-  formData.append('name', name);
-  if (options?.description) {
-    formData.append('description', options.description);
-  }
-
-  for (let i = 0; i < audioFiles.length; i++) {
-    const uint8 = new Uint8Array(audioFiles[i]);
-    const blob = new Blob([uint8], { type: 'audio/mpeg' });
-    formData.append('files', blob, `sample_${i}.mp3`);
-  }
-
-  const response = await fetch(`${ELEVENLABS_BASE_URL}/voices/add`, {
-    method: 'POST',
-    headers: {
-      'xi-api-key': apiKey,
-    },
-    body: formData,
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`ElevenLabs Voice Cloning error (${response.status}): ${errorText}`);
-  }
-
-  const data = await response.json();
-  logger.info('Voice cloned successfully', { name, voiceId: data.voice_id });
-  return { voiceId: data.voice_id };
-}
-
 /**
  * Fetch a single voice by ID to validate it exists and get its metadata.
  * Returns null if the voice is not found (404).
@@ -558,28 +510,6 @@ export async function getVoiceById(
 
   const data = await response.json();
   return { name: data.name as string, labels: (data.labels ?? {}) as Record<string, string> };
-}
-
-/**
- * Delete a cloned voice from ElevenLabs.
- */
-export async function deleteClonedVoice(voiceId: string, apiKeyOverride?: string): Promise<void> {
-  const apiKey = apiKeyOverride || getApiKey();
-  if (!apiKey) {
-    throw new Error('ElevenLabs API key not configured');
-  }
-
-  const response = await fetch(`${ELEVENLABS_BASE_URL}/voices/${voiceId}`, {
-    method: 'DELETE',
-    headers: { 'xi-api-key': apiKey },
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`ElevenLabs voice deletion error (${response.status}): ${errorText}`);
-  }
-
-  logger.info('Cloned voice deleted', { voiceId });
 }
 
 // Export the pool for external access (e.g. voice selection UI)

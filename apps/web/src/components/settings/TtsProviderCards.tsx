@@ -140,9 +140,6 @@ export function TtsProviderCards({
                     {qualityLabel} · {modelCount} {modelCount === 1 ? 'model' : 'models'}
                   </span>
                   <div className={styles.capabilityRow}>
-                    {provider.supportsVoiceCloning && (
-                      <span className={styles.capabilityPill}>Voice Cloning</span>
-                    )}
                     {provider.supportsSfx && (
                       <span className={styles.capabilityPill}>SFX</span>
                     )}

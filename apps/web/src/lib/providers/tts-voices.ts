@@ -113,8 +113,6 @@ export const MINIMAX_VOICE_POOL: ProviderVoice[] = [
 
 // ---------------------------------------------------------------------------
 // Mistral Voxtral TTS voices — voice_id values for the Mistral API.
-// Voxtral also supports zero-shot voice cloning via ref_audio (base64).
-// When cloned voice is available, it's used instead of these presets.
 // ---------------------------------------------------------------------------
 
 // Verified against Mistral API 2026-03-29. Preset voices (user_id=null).

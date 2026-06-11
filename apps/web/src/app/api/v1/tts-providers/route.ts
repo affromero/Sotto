@@ -11,7 +11,6 @@ export async function GET() {
     displayName: meta.displayName,
     qualityTier: meta.qualityTier,
     supportsSfx: meta.supportsSfx,
-    supportsVoiceCloning: meta.supportsVoiceCloning,
     supportsStreaming: meta.supportsStreaming,
     authFields: meta.auth.fields.map((f) => ({
       key: f.key,

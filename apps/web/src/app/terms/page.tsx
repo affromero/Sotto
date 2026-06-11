@@ -81,7 +81,6 @@ export default function TermsPage() {
             <li>Generate content that is illegal, harmful, or violates others&apos; rights</li>
             <li>Impersonate individuals or misrepresent AI content as human-created</li>
             <li>Attempt to circumvent rate limits or abuse the service</li>
-            <li>Use voice cloning features without the consent of the voice owner</li>
             <li>Upload content you do not have the right to distribute</li>
             <li>Engage in harassment, hate speech, or discrimination</li>
           </ul>

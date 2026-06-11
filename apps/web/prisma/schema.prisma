@@ -93,7 +93,6 @@ model User {
   apiUsageLogs        ApiUsageLog[]
   pushSubscriptions   PushSubscription[]
   expoPushTokens      ExpoPushToken[]
-  voiceClones         VoiceClone[]
 
   // Saves
   saves Save[]
@@ -716,11 +715,6 @@ enum NotificationType {
   ACCOUNT_WARNING
   CONTENT_REMOVED
   PLATFORM_ANNOUNCEMENT
-  VOICE_VERIFICATION_REQUIRED
-  VOICE_VERIFICATION_PASSED
-  VOICE_VERIFICATION_FAILED
-  VOICE_BLOCKED_DUPLICATE
-  VOICE_OWNERSHIP_ALERT
   PIPELINE_FAILURE
   REFERRAL_SIGNUP
   VIDEO_READY
@@ -919,101 +913,6 @@ model PairingToken {
 
   @@index([userId])
   @@index([tokenHash])
-}
-
-// ============ VOICE CLONES ============
-
-model VoiceClone {
-  id                 String                  @id @default(cuid())
-  userId             String
-  name               String
-  provider           String                  @default("elevenlabs")
-  externalVoiceId    String
-  sourceType         VoiceCloneSource
-  sampleUrl          String?
-  description        String?                 @db.VarChar(200)
-  verificationStatus VoiceVerificationStatus @default(PENDING_VERIFICATION)
-  createdAt          DateTime                @default(now())
-
-  user                   User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  fingerprint            VoiceFingerprint?
-  verificationChallenges VoiceVerificationChallenge[]
-  similarityMatchesAs    VoiceSimilarityMatch[]       @relation("MatchedVoice")
-  blockedMatchesAs       VoiceSimilarityMatch[]       @relation("BlockedVoice")
-
-  @@unique([userId, provider, externalVoiceId])
-  @@index([userId])
-  @@index([verificationStatus])
-}
-
-enum VoiceCloneSource {
-  UPLOAD
-  RECORD
-  IMPORT
-}
-
-enum VoiceVerificationStatus {
-  PENDING_VERIFICATION
-  AWAITING_CHALLENGE
-  CHALLENGE_SUBMITTED
-  VERIFIED
-  BLOCKED
-  REJECTED
-  ADMIN_VERIFIED
-  ADMIN_BLOCKED
-  PROTECTED
-}
-
-// ============ VOICE FINGERPRINTS ============
-
-model VoiceFingerprint {
-  id           String   @id @default(cuid())
-  voiceCloneId String   @unique
-  embedding    Float[]
-  modelVersion String
-  audioUrl     String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  voiceClone VoiceClone @relation(fields: [voiceCloneId], references: [id], onDelete: Cascade)
-}
-
-// ============ VOICE VERIFICATION CHALLENGES ============
-
-model VoiceVerificationChallenge {
-  id            String   @id @default(cuid())
-  voiceCloneId  String
-  phrase        String
-  recordingUrl  String?
-  similarity    Float?
-  passed        Boolean?
-  attemptNumber Int
-  expiresAt     DateTime
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  voiceClone VoiceClone @relation(fields: [voiceCloneId], references: [id], onDelete: Cascade)
-
-  @@index([voiceCloneId])
-}
-
-// ============ VOICE SIMILARITY MATCHES ============
-
-model VoiceSimilarityMatch {
-  id             String   @id @default(cuid())
-  matchedVoiceId String
-  blockedVoiceId String
-  similarity     Float
-  resolvedBy     String?
-  resolution     String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  matchedVoice VoiceClone @relation("MatchedVoice", fields: [matchedVoiceId], references: [id], onDelete: Cascade)
-  blockedVoice VoiceClone @relation("BlockedVoice", fields: [blockedVoiceId], references: [id], onDelete: Cascade)
-
-  @@index([matchedVoiceId])
-  @@index([blockedVoiceId])
 }
 
 // ============ REFERENCES (Citations) ============
