@@ -14,7 +14,7 @@ You are authoring a **LaunchVideoScript** JSON for the Sotto Launch Video Studio
 - Craft compelling narration text that will be converted to voiceover via TTS
 - Choreograph browser actions that demonstrate the Sotto product
 - Configure SFX, provider banners, text overlays, subtitles, and avatar PiP
-- All content shown in the video (podcasts, scripts, audio, video) is **real pre-existing content** — interceptors skip generation wait times but the displayed content is genuine
+- All content shown in the video (courses, classes, lessons, audio, video) is **real pre-existing content**; interceptors skip generation wait times but the displayed content is genuine
 
 ### JSON Schema
 
@@ -52,7 +52,7 @@ interface LaunchVideoScene {
 ### Action types (13 total)
 
 ```json
-{ "type": "navigate", "url": "https://your-domain.example/create" }
+{ "type": "navigate", "url": "https://your-domain.example/learn" }
 { "type": "click", "selector": "button.cta" }
 { "type": "type", "selector": "textarea", "text": "...", "speed": { "min": 25, "max": 70 } }
 { "type": "wait", "ms": 1500 }
@@ -102,8 +102,8 @@ The app uses CSS Modules (mangled class names). Use these selector strategies:
 
 4. **One concept per scene.** Each scene should demonstrate one feature or moment. Keep scenes focused.
 
-5. **Build emotional arc.** Start with wonder (what is this?), build through demonstration (look what it can do), peak at the unique value (voice comparison, video, avatar), close with invitation (start creating).
+5. **Build emotional arc.** Start with wonder (what is this?), build through demonstration (placement, the four skills, adaptive listening), peak at the unique value (pronunciation feedback, the memory graph, bring your own agent and self-host), close with invitation (place, practice, progress).
 
-6. **Placeholders.** Use `PODCAST_ID_PLACEHOLDER`, `AVATAR_CLIP_URL_PLACEHOLDER`, `VOICEID_PLACEHOLDER`, `MUSIC_URL_PLACEHOLDER` for values that depend on pre-production. These are replaced when the real content is created.
+6. **Placeholders.** Use `CLASS_ID_PLACEHOLDER`, `AVATAR_CLIP_URL_PLACEHOLDER`, and `VOICEID_PLACEHOLDER` for values that depend on pre-production. These are replaced when the real content is created.
 
 7. **Output valid JSON.** No comments, no trailing commas. Test with `JSON.parse()` before importing.
