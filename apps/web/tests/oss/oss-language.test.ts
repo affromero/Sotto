@@ -92,7 +92,7 @@ describe('open-source language-learning OSS surfaces', () => {
     ]
       .map(readSource)
       .join('\n');
-    const mobileCopySources = ['apps/mobile/app/settings/referral.tsx']
+    const mobileCopySources = ['apps/mobile/app/settings.tsx']
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
     const copySources = [webCopySources, mobileCopySources].join('\n');
@@ -261,7 +261,6 @@ describe('open-source language-learning OSS surfaces', () => {
       'apps/mobile/lib/config.ts',
       'apps/mobile/lib/api.ts',
       'apps/mobile/lib/event-buffer.ts',
-      'apps/mobile/app/settings/referral.tsx',
       'apps/mobile/app/auth/login.tsx',
       'apps/mobile/app/settings.tsx',
     ]
