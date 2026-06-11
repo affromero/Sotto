@@ -32,25 +32,8 @@ export async function POST(request: NextRequest) {
         return { error: 'This invitation has expired', status: 400 };
       }
 
-      // Upsert waitlist entry — handles both new and existing PENDING entries
-      await tx.waitlist.upsert({
-        where: { email },
-        create: {
-          email,
-          status: 'APPROVED',
-          source: 'invitation',
-          referralCode: code,
-          approvedAt: now,
-        },
-        update: {
-          status: 'APPROVED',
-          source: 'invitation',
-          referralCode: code,
-          approvedAt: now,
-        },
-      });
-
-      // Mark invitation as used
+      // Mark invitation as used. A used InvitationLink carrying this email is
+      // the access grant the signIn callback checks when signups are closed.
       await tx.invitationLink.update({
         where: { id: invitation.id },
         data: { email, usedAt: now },

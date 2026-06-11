@@ -20,12 +20,6 @@ export function generateUserUnsubscribeUrl(userId: string, appUrl = getAppBaseUr
   return `${appUrl}/api/v1/users/unsubscribe?userId=${encodeURIComponent(userId)}&sig=${signature}`;
 }
 
-function generateUnsubscribeUrl(email: string, appUrl = getAppBaseUrl()): string {
-  const secret = requireAuthSecret();
-  const signature = crypto.createHmac('sha256', secret).update(email).digest('hex');
-  return `${appUrl}/api/v1/waitlist/unsubscribe?email=${encodeURIComponent(email)}&sig=${signature}`;
-}
-
 const HEADER = `
   <div style="background-color:#F5F4F0; padding:40px 20px; font-family:'IBM Plex Sans',-apple-system,BlinkMacSystemFont,sans-serif;">
     <div style="max-width:560px; margin:0 auto; background:#fff; border-radius:12px; border:1px solid #e5e7eb; overflow:hidden;">
@@ -33,49 +27,8 @@ const HEADER = `
         <h1 style="font-family:'Newsreader',Georgia,serif; font-size:24px; color:#1E2128; margin:0 0 4px;">
           <span style="color:#3F4FB0;">Sotto</span>
         </h1>
-      </div>
-`;
-
-function footer(email: string): string {
-  const appUrl = getAppBaseUrl();
-  const unsubUrl = generateUnsubscribeUrl(email, appUrl);
-  return `
-      <div style="padding:24px 32px; border-top:1px solid #f3f4f6; text-align:center;">
-        <p style="font-size:12px; color:#9ca3af; margin:0;">
-          <a href="${unsubUrl}" style="color:#9ca3af; text-decoration:underline;">Unsubscribe</a>
-          &nbsp;·&nbsp;
-          <a href="${appUrl}" style="color:#9ca3af; text-decoration:underline;">${appLinkLabel(appUrl)}</a>
-        </p>
-      </div>
-    </div>
   </div>
-  `;
-}
-
-export function buildWaitlistWelcomeEmail(email: string): { subject: string; html: string } {
-  const appUrl = getAppBaseUrl();
-  return {
-    subject: "Welcome to Sotto — you're on the list",
-    html: `${HEADER}
-      <div style="padding:16px 32px 32px;">
-        <h2 style="font-family:'Newsreader',Georgia,serif; font-size:20px; color:#1E2128; margin:0 0 12px;">
-          You&apos;re in.
-        </h2>
-        <p style="font-size:14px; line-height:1.7; color:#6B7280; margin:0 0 16px;">
-          Thanks for joining the Sotto waitlist. ${BRAND.tagline}
-          ${BRAND.subline}
-        </p>
-        <p style="font-size:14px; line-height:1.7; color:#6B7280; margin:0 0 24px;">
-          We&apos;ll send you updates as we launch new features. In the meantime, check out
-          what&apos;s already live.
-        </p>
-        <a href="${appUrl}/create" style="display:inline-block; background:#3F4FB0; color:#fff; font-size:14px; font-weight:600; padding:10px 24px; border-radius:8px; text-decoration:none;">
-          Create a Private Podcast
-        </a>
-      </div>
-    ${footer(email)}`,
-  };
-}
+`;
 
 export function buildMagicLinkEmail(url: string): { subject: string; html: string } {
   const appUrl = getAppBaseUrl();
@@ -103,27 +56,6 @@ export function buildMagicLinkEmail(url: string): { subject: string; html: strin
       </div>
     </div>
   </div>`,
-  };
-}
-
-export function buildWaitlistApprovalEmail(email: string): { subject: string; html: string } {
-  const appUrl = getAppBaseUrl();
-  return {
-    subject: 'Your early access to Sotto is ready',
-    html: `${HEADER}
-      <div style="padding:16px 32px 32px;">
-        <h2 style="font-family:'Newsreader',Georgia,serif; font-size:20px; color:#1E2128; margin:0 0 12px;">
-          You&apos;ve been selected
-        </h2>
-        <p style="font-size:14px; line-height:1.7; color:#6B7280; margin:0 0 16px;">
-          We&apos;re opening Sotto to a small group of early members, and you made the cut.
-          Your account is ready &mdash; claim it before your invitation expires.
-        </p>
-        <a href="${appUrl}/auth/signup" style="display:inline-block; background:#3F4FB0; color:#fff; font-size:14px; font-weight:600; padding:12px 28px; border-radius:8px; text-decoration:none; margin:0 0 24px;">
-          Claim Your Spot
-        </a>
-      </div>
-    ${footer(email)}`,
   };
 }
 

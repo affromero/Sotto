@@ -7,7 +7,6 @@ import {
   LayoutDashboard,
   Users,
   Radio,
-  Mail,
   BarChart2,
   Shield,
   AtSign,
@@ -93,7 +92,6 @@ const navGroups: NavGroup[] = [
   {
     label: 'Tools',
     items: [
-      { href: '/admin/waitlist', label: 'Waitlist', icon: Mail },
       { href: '/admin/handles', label: 'Handles', icon: AtSign },
       { href: '/admin/auto-models', label: 'Auto Models', icon: Wand2 },
 { href: '/admin/models', label: 'Model Tester', icon: FlaskConical },

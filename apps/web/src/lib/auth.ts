@@ -120,12 +120,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
 
       if (user.email) {
-        // Mark waitlist conversion
-        await prisma.waitlist.updateMany({
-          where: { email: user.email },
-          data: { signedUpAt: new Date() },
-        });
-
         // Welcome email
         if (user.name) {
           const { buildWelcomeEmail } = await import('./email-templates');
@@ -145,7 +139,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
 
       const email = profile?.email ?? user?.email;
-      if (!email) return '/auth/waitlisted?reason=no-email';
+      if (!email) return '/auth/login?reason=no-email';
 
       // Existing users can always sign in
       const existingUser = await prisma.user.findUnique({
@@ -154,20 +148,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       });
       if (existingUser) return true;
 
-      // Admins bypass waitlist
+      // Admins always allowed.
       if (isAdminEmail(email)) return true;
 
-      // New user — check waitlist (bypassed when openSignup is enabled)
-      if (!await isOpenSignup()) {
-        const entry = await prisma.waitlist.findUnique({ where: { email } });
-        if (!entry) {
-          // Auto-add to waitlist so they don't have to sign up separately
-          await prisma.waitlist.create({
-            data: { email, source: 'oauth-signin' },
-          }).catch(() => {}); // ignore if duplicate race
-          return '/auth/waitlisted?reason=not-on-list';
-        }
-        if (entry.status !== 'APPROVED') return '/auth/waitlisted?reason=pending';
+      // New user — allowed when signups are open, or when a redeemed invitation
+      // exists for this email. Otherwise signups are closed.
+      if (!(await isOpenSignup())) {
+        const invite = await prisma.invitationLink.findFirst({
+          where: { email, usedAt: { not: null } },
+          select: { id: true },
+        });
+        if (!invite) return '/auth/login?reason=invite-required';
       }
       return true;
     },

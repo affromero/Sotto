@@ -87,7 +87,6 @@ describe('Middleware Security Tests', () => {
     const publicPaths = [
       '/',
       '/api/v1/health',
-      '/api/v1/waitlist',
       '/feedback',
       '/api/v1/feedback',
       '/pitch',
@@ -115,10 +114,6 @@ describe('Middleware Security Tests', () => {
       expect(isPassThrough(res)).toBe(true);
     });
 
-    it('allows /auth/waitlisted for unauthenticated users', async () => {
-      const res = await middleware(createRequest('/auth/waitlisted'));
-      expect(isPassThrough(res)).toBe(true);
-    });
   });
 
   // =====================================================================
@@ -164,12 +159,6 @@ describe('Middleware Security Tests', () => {
     it('/auth/signup redirects authenticated users to /learn', async () => {
       mockGetToken.mockResolvedValue({ sub: 'user-1', role: 'USER' });
       const res = await middleware(createRequest('/auth/signup'));
-      expect(getRedirectLocation(res)).toBe('/learn');
-    });
-
-    it('/auth/waitlisted redirects authenticated users to /learn', async () => {
-      mockGetToken.mockResolvedValue({ sub: 'user-1', role: 'USER' });
-      const res = await middleware(createRequest('/auth/waitlisted'));
       expect(getRedirectLocation(res)).toBe('/learn');
     });
 

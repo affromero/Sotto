@@ -31,7 +31,7 @@ const ArrowIcon = () => (
 );
 
 /**
- * Auth-aware call to action. Fully self-hosted + open source — no waitlist.
+ * Auth-aware call to action.
  *
  * - Signed in  → "Continue your course" → /learn
  * - Signed out → "Start your course" → /auth/signup

@@ -71,7 +71,6 @@ Do not use this role to add public creator pages, public distribution, follows, 
 | Overview | `/admin` | users, jobs, health, BYOK adoption, and setup status |
 | Users | `/admin/users` | search users, update role, inspect setup readiness |
 | Podcasts | `/admin/podcasts` | legacy audio-engine inspection for generated listening audio and ownership |
-| Waitlist | `/admin/waitlist` | export and manage early access where still enabled |
 | Analytics | `/admin/analytics` | site and product usage metrics |
 | Moderation | `/admin/moderation` | reports and failed content review |
 | Config | `/admin/config` | provider defaults and operational limits |

@@ -122,7 +122,7 @@ export default function SiteConfigPage() {
         <div className={styles.rowLabel}>
           <div className={styles.rowLabelText}>Open signup</div>
           <div className={styles.rowLabelDesc}>
-            When enabled, anyone can sign up without a waitlist invitation.
+            When enabled, anyone can sign up without an invitation link.
           </div>
         </div>
         <label className={styles.toggle}>

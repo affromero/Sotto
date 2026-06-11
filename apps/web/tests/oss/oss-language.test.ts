@@ -406,7 +406,6 @@ describe('open-source language-learning OSS surfaces', () => {
       'apps/web/src/middleware.ts',
       'apps/web/src/lib/email-templates.ts',
       'apps/web/src/app/api/v1/users/unsubscribe/route.ts',
-      'apps/web/src/app/api/v1/waitlist/unsubscribe/route.ts',
       'apps/web/src/app/api/v1/pitch/[...path]/route.ts',
       'apps/web/src/app/api/v1/pitch/auth/route.ts',
       'apps/web/src/workers/demo-recording.worker.ts',

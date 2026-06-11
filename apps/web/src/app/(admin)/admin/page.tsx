@@ -46,7 +46,6 @@ async function getOverviewStats() {
   const [
     totalUsers,
     totalPodcasts,
-    waitlistSize,
     readyPodcasts,
     failedPodcasts,
     signupsToday,
@@ -61,7 +60,6 @@ async function getOverviewStats() {
   ] = await Promise.all([
     prisma.user.count(),
     prisma.podcast.count(),
-    prisma.waitlist.count(),
     prisma.podcast.count({ where: { status: 'READY' } }),
     prisma.podcast.count({ where: { status: 'FAILED' } }),
     prisma.user.count({
@@ -107,7 +105,6 @@ async function getOverviewStats() {
   return {
     totalUsers,
     totalPodcasts,
-    waitlistSize,
     readyPodcasts,
     failedPodcasts,
     signupsToday,
@@ -150,13 +147,6 @@ export default async function AdminOverviewPage() {
             <span className={styles.cardLabel}>Total Podcasts</span>
           </div>
           <div className={styles.cardValue}>{stats.totalPodcasts.toLocaleString()}</div>
-        </div>
-
-        <div className={styles.card}>
-          <div className={styles.cardHeader}>
-            <span className={styles.cardLabel}>Waitlist</span>
-          </div>
-          <div className={styles.cardValue}>{stats.waitlistSize.toLocaleString()}</div>
         </div>
 
         <div className={styles.card}>
