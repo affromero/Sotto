@@ -66,7 +66,7 @@ vi.mock('@/lib/generation-gate', () => ({
   checkGenerationGate: (...args: unknown[]) => mockCheckGenerationGate(...args),
 }));
 
-vi.mock('@/lib/tier-features', () => ({
+vi.mock('@/lib/generation-features', () => ({
   getJobPriority: (...args: unknown[]) => mockGetJobPriority(...args),
   isModelAllowedForUser: (...args: unknown[]) => mockIsModelAllowedForUser(...args),
 }));

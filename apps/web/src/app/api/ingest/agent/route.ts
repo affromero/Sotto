@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { authenticateRequest } from '@/lib/api-keys';
 import { agentIngestionSchema } from '@/lib/validations';
 import { checkSuspension } from '@/lib/auth-guards';
-import { getJobPriority } from '@/lib/tier-features';
+import { getJobPriority } from '@/lib/generation-features';
 import { isValidModelId } from '@/lib/providers/ai-registry';
 import {
   createPrivateIngestionPodcast,

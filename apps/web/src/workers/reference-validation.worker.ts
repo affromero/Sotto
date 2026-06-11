@@ -21,7 +21,7 @@ import { createSegmentsAndQueueAudio } from '@/lib/segment-creator';
 import { convertTurnsForProvider } from '@/lib/tts-tag-converter';
 import { getMinReferenceCount } from '@/lib/script-verifier';
 import { getAiKey } from '@/lib/byok';
-import { getTierFeatures } from '@/lib/tier-features';
+import { getGenerationFeatures } from '@/lib/generation-features';
 import { getAutoModelConfig } from '@/lib/auto-model-config';
 import { assignVoicesForPodcast } from '@/lib/voice-assigner';
 import { resolveAiModelAndProvider, type AiProviderId } from '@/lib/providers/ai-registry';
@@ -662,11 +662,11 @@ export async function processReferenceValidation(
   await job.updateProgress(80);
 
   // Check source + tier to decide whether to pause for review
-  const tierFeatures = getTierFeatures();
+  const genFeatures = getGenerationFeatures();
 
   // Non-WEB/IMPORT sources always auto-approve; for WEB/IMPORT, check tier
   const isWebOrImport = podcast?.source === 'WEB' || podcast?.source === 'IMPORT';
-  const shouldAutoApprove = tierFeatures.autoApproveScript || !isWebOrImport;
+  const shouldAutoApprove = genFeatures.autoApproveScript || !isWebOrImport;
 
   if (!shouldAutoApprove) {
     // Pause for user review (Pro users get script review)

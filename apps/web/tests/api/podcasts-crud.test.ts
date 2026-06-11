@@ -78,8 +78,8 @@ vi.mock('@/lib/voice-pricing', () => ({
   computeVoiceCharges: vi.fn().mockResolvedValue([]),
 }));
 
-vi.mock('@/lib/tier-features', () => ({
-  getTierFeatures: vi.fn().mockReturnValue({
+vi.mock('@/lib/generation-features', () => ({
+  getGenerationFeatures: vi.fn().mockReturnValue({
     maxDurationMinutes: 30,
     maxSpeakers: 4,
     autoApproveScript: false,
@@ -622,8 +622,8 @@ describe('PATCH /api/podcasts/[podcastId]', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     mockUserFindUniqueOrThrow.mockResolvedValue({ role: 'USER' });
-    const { getTierFeatures } = await import('@/lib/tier-features');
-    (getTierFeatures as ReturnType<typeof vi.fn>).mockReturnValue({
+    const { getGenerationFeatures } = await import('@/lib/generation-features');
+    (getGenerationFeatures as ReturnType<typeof vi.fn>).mockReturnValue({
       maxDurationMinutes: 30,
       maxSpeakers: 4,
       autoApproveScript: false,

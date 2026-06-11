@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { getTierFeatures } from '@/lib/tier-features';
+import { getGenerationFeatures } from '@/lib/generation-features';
 
 import { errorResponse } from '@/lib/api-response';
 type RouteParams = { params: Promise<{ podcastId: string }> };
@@ -28,7 +28,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     return errorResponse('Forbidden', 403);
   }
 
-  const features = getTierFeatures();
+  const features = getGenerationFeatures();
 
   if (!features.analyticsEnabled) {
     return errorResponse('Analytics are unavailable.', 403, { code: 'analytics_unavailable' });

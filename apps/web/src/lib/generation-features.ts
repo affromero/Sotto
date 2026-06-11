@@ -3,7 +3,7 @@
  * quotas — every learner gets full access.
  */
 
-export interface TierFeatures {
+export interface GenerationFeatures {
   maxDurationMinutes: number;
   maxSpeakers: number;
   autoApproveScript: boolean;
@@ -17,7 +17,7 @@ export interface TierFeatures {
   voiceCloningEnabled: boolean;
 }
 
-const FULL_ACCESS: TierFeatures = {
+const FULL_ACCESS: GenerationFeatures = {
   maxDurationMinutes: Infinity,
   maxSpeakers: 4,
   autoApproveScript: false,
@@ -32,7 +32,7 @@ const FULL_ACCESS: TierFeatures = {
 };
 
 /** Every learner gets full access — no plan/tier/quota gating. */
-export function getTierFeatures(): TierFeatures {
+export function getGenerationFeatures(): GenerationFeatures {
   return FULL_ACCESS;
 }
 

@@ -97,8 +97,8 @@ vi.mock('@/lib/byok', () => ({
   getByokKey: (...args: unknown[]) => mockGetByokKey(...args),
 }));
 
-vi.mock('@/lib/tier-features', () => ({
-  getTierFeatures: vi.fn().mockReturnValue({
+vi.mock('@/lib/generation-features', () => ({
+  getGenerationFeatures: vi.fn().mockReturnValue({
     maxDurationMinutes: 40,
     maxSpeakers: 4,
     maxQaInteractions: Infinity,

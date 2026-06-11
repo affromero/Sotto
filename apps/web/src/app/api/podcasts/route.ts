@@ -6,7 +6,7 @@ import { createPodcastSchema } from '@/lib/validations';
 import { checkRateLimit } from '@/lib/redis';
 import { contentExtractionQueue, addJob, JobType } from '@/lib/queue';
 import { getAutoModelConfig } from '@/lib/auto-model-config';
-import { getTierFeatures, getJobPriority } from '@/lib/tier-features';
+import { getGenerationFeatures, getJobPriority } from '@/lib/generation-features';
 import { getProviderForModel, isValidModelId } from '@/lib/providers/ai-registry';
 import { checkSuspension, requireAdmin } from '@/lib/auth-guards';
 import { generatePodcastSlug } from '@/lib/slugify';
@@ -90,20 +90,20 @@ export async function POST(request: NextRequest) {
   const adminId = await requireAdmin();
   const isAdmin = adminId !== null;
 
-  const tierFeatures = getTierFeatures();
+  const genFeatures = getGenerationFeatures();
 
   // Speaker count validation — enforce uniform safety cap.
   const requestedSpeakers = parsed.data.metadata?.speakers;
-  if (requestedSpeakers && requestedSpeakers.length > tierFeatures.maxSpeakers) {
+  if (requestedSpeakers && requestedSpeakers.length > genFeatures.maxSpeakers) {
     return errorResponse(
-      `Speaker count (${requestedSpeakers.length}) exceeds the maximum of ${tierFeatures.maxSpeakers}.`,
+      `Speaker count (${requestedSpeakers.length}) exceeds the maximum of ${genFeatures.maxSpeakers}.`,
       403
     );
   }
 
   // Duration validation — enforce uniform safety cap.
-  const effectiveMaxDuration = isFinite(tierFeatures.maxDurationMinutes)
-    ? tierFeatures.maxDurationMinutes
+  const effectiveMaxDuration = isFinite(genFeatures.maxDurationMinutes)
+    ? genFeatures.maxDurationMinutes
     : 9999;
   const durationTarget = parsed.data.metadata?.durationTarget;
   if (durationTarget && durationTarget > effectiveMaxDuration) {
