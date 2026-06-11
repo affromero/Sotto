@@ -641,12 +641,6 @@
   }
 }
 
-.quotaBadge {
-  font: var(--text-caption);
-  color: var(--color-text-tertiary);
-  margin-left: var(--spacing-xs);
-}
-
 /* Collapsible Details */
 
 .detailsSection {

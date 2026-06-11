@@ -819,43 +819,6 @@
   margin: 0 0 var(--spacing-lg) 0;
 }
 
-/* Stripe Connect */
-
-.stripeConnected {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  font: var(--text-body);
-  font-weight: 600;
-  color: var(--color-success);
-}
-
-.stripeDashboardLink {
-  margin-left: auto;
-  font: var(--text-body-sm);
-  font-weight: 500;
-  color: var(--color-primary);
-  text-decoration: none;
-  transition: color var(--transition-fast);
-}
-
-.stripeDashboardLink:hover {
-  color: var(--color-primary-hover);
-  text-decoration: underline;
-}
-
-.stripePrompt {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-md);
-}
-
-.stripePromptText {
-  font: var(--text-body-sm);
-  color: var(--color-text-secondary);
-  margin: 0;
-}
-
 /* Price row */
 
 .priceRow {

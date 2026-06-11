@@ -658,7 +658,6 @@ export async function resolveSttProvider(context: {
   userId: string;
   requestedProvider?: SttProviderId;
   requestedModel?: string;
-  plan?: 'FREE' | 'PRO';
 }): Promise<ResolvedSttProvider> {
   const { userId, requestedProvider, requestedModel } = context;
 

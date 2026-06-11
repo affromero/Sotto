@@ -465,7 +465,7 @@ describe('resolveSttProvider', () => {
   });
 
   it('rejects missing provider instead of resolving from DB config', async () => {
-    await expect(resolveSttProvider({ userId: 'user-1', plan: 'FREE' })).rejects.toThrow(
+    await expect(resolveSttProvider({ userId: 'user-1' })).rejects.toThrow(
       'STT provider is required'
     );
     expect(mockGetAiKey).not.toHaveBeenCalled();

@@ -28,7 +28,7 @@ These mock API responses so the demo doesn't depend on real backend processing:
 
 ## Narration Tone
 
-Write narration as a **technical product narrator** — direct, precise, factual. Think Apple WWDC engineering sessions or Stripe product demos, NOT a hype video or sales pitch.
+Write narration as a **technical product narrator** — direct, precise, factual. Think Apple WWDC engineering sessions or infrastructure product demos, NOT a hype video or sales pitch.
 
 Rules:
 

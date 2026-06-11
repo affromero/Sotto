@@ -28,7 +28,6 @@ export async function processMusicGeneration(job: Job<GenerateMusicPayload>): Pr
         topic: true,
         duration: true,
         tags: { select: { tag: { select: { name: true } } } },
-        user: { select: { plan: true } },
       },
     }),
     prisma.musicGeneration.findUniqueOrThrow({
@@ -55,7 +54,6 @@ export async function processMusicGeneration(job: Job<GenerateMusicPayload>): Pr
   const { provider, source, providerId } = await resolveMusicProvider({
     userId,
     requestedModel: musicGen.model,
-    plan: podcast.user.plan === 'PRO' ? 'PRO' : 'FREE',
   });
 
   await job.updateProgress(30);

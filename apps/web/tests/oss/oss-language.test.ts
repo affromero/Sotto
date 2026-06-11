@@ -81,7 +81,6 @@ describe('open-source language-learning OSS surfaces', () => {
     const webCopySources = [
       'src/app/about/page.tsx',
       'src/app/join/page.tsx',
-      'src/app/pricing/page.tsx',
       'src/app/developers/page.tsx',
       'src/app/terms/page.tsx',
       'src/app/privacy/page.tsx',
@@ -663,7 +662,6 @@ describe('open-source language-learning OSS surfaces', () => {
       'SECURITY.md',
       'scripts/generate-apple-secret.mjs',
       'docs/05-plan.md',
-      'docs/10-stripe-billing.md',
       'docs/23-local-development.md',
       'docs/27-launch-readiness-status.md',
       'apps/maps/CLAUDE.md',
@@ -682,8 +680,8 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(releaseHygieneSources).toContain('AUTH_SECRET="<generated>"');
     expect(releaseHygieneSources).toContain('SOTTO_ENV_FILE');
     expect(releaseHygieneSources).toContain('scripts/run-with-env.sh');
-    expect(releaseHygieneSources).toContain('deployment secret manager or env file');
-    expect(releaseHygieneSources).toContain('Environment variables:');
+    expect(releaseHygieneSources).toContain('secret manager or env file');
+    expect(releaseHygieneSources).toContain('Set in your deployment environment:');
     expect(releaseHygieneSources).not.toContain('security@sotto.fm');
     expect(releaseHygieneSources).not.toContain('sotto.fm/api');
     expect(releaseHygieneSources).not.toContain('NEXTAUTH_SECRET');
@@ -910,7 +908,7 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(setupSources).not.toContain('sttProvider      String? // null = auto');
   });
 
-  it('keeps BYOK voice generation explicit instead of submitting Auto', () => {
+  it('keeps voice generation on concrete TTS provider options', () => {
     const ttsSources = [
       'apps/web/src/app/api/podcasts/route.ts',
       'apps/web/src/app/api/tts-options/route.ts',
@@ -919,9 +917,10 @@ describe('open-source language-learning OSS surfaces', () => {
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
 
-    expect(ttsSources).toContain('tts_provider_required');
-    expect(ttsSources).toContain('const options: TtsOption[] = [];');
+    expect(ttsSources).toContain('optionsById');
+    expect(ttsSources).toContain('resolveTtsIncludedModels');
     expect(ttsSources).not.toContain('ttsProvider      String? // null = auto');
+    expect(ttsSources).not.toContain("id: 'auto'");
   });
 
   it('keeps release docs aligned with open-source language-learning strategy', () => {
@@ -984,7 +983,7 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(releaseDocsSource).toContain('Learn a language, taught in your own context.');
     expect(releaseDocsSource).toContain('language-learning infrastructure');
     expect(releaseDocsSource).toContain('implicit provider fallback');
-    expect(releaseDocsSource).toContain('Managed hosting');
+    expect(releaseDocsSource).toContain('self-hosted paths');
   });
 
   it('keeps admin activity metrics private instead of social', () => {
@@ -1560,7 +1559,7 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(userLookupSources).not.toContain('Search by @handle');
   });
 
-  it('does not ship the voice marketplace (paid voice sharing removed)', () => {
+  it('does not ship the voice marketplace', () => {
     const removedMarketplacePaths = [
       'apps/web/src/lib/voice-pricing.ts',
       'apps/web/src/lib/revenue-metrics.ts',

@@ -476,7 +476,7 @@ export async function getShowcaseCostPreview(): Promise<ShowcaseCostPreview> {
   const { getAutoModelConfig } = await import('./auto-model-config');
   const { fetchFalImageModels, formatCost } = await import('./video-cost-estimator');
   const config = await getAutoModelConfig();
-  const imageModel = config.proImageModel ?? 'fal-flux-1-schnell';
+  const imageModel = config.imageModel ?? 'fal-flux-1-schnell';
 
   // Get live pricing from pricetoken
   let models: ImageModelOption[] = [];

@@ -1,6 +1,6 @@
 import { test, expect } from '../fixtures/auth';
 
-test.describe('Paid Voice Sharing', () => {
+test.describe('Voice Settings', () => {
   test('redirects authenticated users to private voice settings by default', async ({
     authedContext,
   }) => {

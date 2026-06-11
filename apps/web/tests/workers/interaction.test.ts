@@ -10,7 +10,7 @@ const mockPrismaScriptFindUnique = vi.fn().mockResolvedValue({
 });
 const mockPrismaPodcastFindUnique = vi.fn().mockResolvedValue({ language: null });
 const mockPrismaUserFindUnique = vi.fn().mockResolvedValue({ preferredLanguage: null });
-const mockPrismaUserFindUniqueOrThrow = vi.fn().mockResolvedValue({ plan: 'FREE', role: 'USER' });
+const mockPrismaUserFindUniqueOrThrow = vi.fn().mockResolvedValue({ role: 'USER' });
 const mockPrismaSegmentFindMany = vi.fn().mockResolvedValue([]);
 const mockPrismaInteractionUpdate = vi.fn().mockResolvedValue({});
 const mockPrismaApiUsageLogCreate = vi.fn().mockResolvedValue({});
@@ -139,7 +139,7 @@ describe('processInteraction', () => {
     vi.clearAllMocks();
     mockPrismaPodcastFindUnique.mockResolvedValue({ language: null, aiModel: null });
     mockPrismaUserFindUnique.mockResolvedValue({ preferredLanguage: null });
-    mockPrismaUserFindUniqueOrThrow.mockResolvedValue({ plan: 'FREE', role: 'USER' });
+    mockPrismaUserFindUniqueOrThrow.mockResolvedValue({ role: 'USER' });
     mockPrismaScriptFindUnique.mockResolvedValue({
       turns: [
         { speaker: 'HOST', text: 'Welcome to the show!' },
@@ -191,7 +191,6 @@ describe('processInteraction', () => {
       expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
         podcastAiModel: null,
         aiKey,
-        plan: 'FREE',
       });
       expect(mockCreateAIProvider).toHaveBeenCalledWith('anthropic');
       expect(mockGenerateResponse).toHaveBeenCalledWith(
@@ -214,7 +213,6 @@ describe('processInteraction', () => {
       expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
         podcastAiModel: 'gpt-5-mini',
         aiKey: null,
-        plan: 'FREE',
       });
       expect(mockGetAiKey).toHaveBeenCalledTimes(1);
       expect(mockGetAiKey).toHaveBeenCalledWith('user-001', 'openai');

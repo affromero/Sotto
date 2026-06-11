@@ -3,13 +3,9 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { createVoiceTrackSchema } from '@/lib/validations';
 import { voiceTrackAudioQueue, addJob, JobType } from '@/lib/queue';
-import { getTierFeatures } from '@/lib/tier-features';
-import { getPlanFeatureConfig } from '@/lib/plan-feature-config';
-import { checkGenerationGate } from '@/lib/generation-gate';
 import { resolveTtsProvider } from '@/lib/providers';
-import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
-import { checkRateLimit } from '@/lib/redis';
 import { checkSuspension } from '@/lib/auth-guards';
+import { getAutoModelConfig } from '@/lib/auto-model-config';
 import { getProviderMeta, type TtsProviderId } from '@/lib/providers/tts-registry';
 import { findVoiceName, formatModelName, type VoiceMatchMetadata } from '@/lib/voice-pool';
 import type { GenerateVoiceTrackAudioPayload } from '@/lib/queue';
@@ -89,51 +85,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return errorResponse('Podcast must be in READY status', 400);
   }
 
-  // Check tier features
-  const [gate, voiceConfig] = await Promise.all([
-    checkGenerationGate(userId),
-    getPlanFeatureConfig(),
-  ]);
-  const features = getTierFeatures(
-    gate.isProUser ? 'PRO' : 'FREE',
-    gate.isByokUser,
-    session.user.role,
-    voiceConfig
-  );
-
-  if (!features.voiceTracksEnabled) {
-    return errorResponse(
-      'Voice tracks are not available on your plan. Upgrade to Pro or add your own API keys.',
-      403
-    );
-  }
-
-  // Check track limit
-  const existingTrackCount = await prisma.voiceTrack.count({
-    where: { podcastId },
-  });
-  if (existingTrackCount >= features.maxVoiceTracks) {
-    return errorResponse(`Maximum ${features.maxVoiceTracks} voice tracks per podcast.`, 403);
-  }
-
-  // Rate limits
-  const hourly = await checkRateLimit(`generate:hour:${userId}`, 20, 3600);
-  if (!hourly.allowed) {
-    return errorResponse('Rate limit exceeded: max 20 generations per hour.', 429);
-  }
-  const daily = await checkRateLimit(`generate:day:${userId}`, 100, 86400);
-  if (!daily.allowed) {
-    return errorResponse('Rate limit exceeded: max 100 generations per day.', 429);
-  }
-
-  if (!gate.allowed) {
-    const msg =
-      gate.reason === 'generation_in_progress'
-        ? 'A podcast is already generating. Wait for it to finish before starting another.'
-        : 'No voice provider available. Add a TTS key in Settings for unlimited generation.';
-    return errorResponse(msg, 403, { code: gate.reason });
-  }
-
   // Parse body
   const body = await request.json().catch(() => ({}));
   const parsed = createVoiceTrackSchema.safeParse(body);
@@ -158,15 +109,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       }
     : undefined;
 
-  // Resolve TTS provider per speaker. Providerless voices require a request-level provider
-  // or a platform-selected provider; BYOK users must choose one explicitly.
-  const plan = gate.isProUser ? 'PRO' : 'FREE';
-  const selected = gate.isByokUser ? null : await selectFreeTierProviders(userId);
-  const selectedProviderId = selected?.ttsProvider as TtsProviderId | undefined;
+  // Resolve TTS provider per speaker. Providerless voices use the request-level provider
+  // or the platform-selected default provider.
+  const autoConfig = await getAutoModelConfig();
+  const selectedProviderId = autoConfig.model.ttsProvider as TtsProviderId | undefined;
   const defaultProviderId = (ttsProvider as TtsProviderId | undefined) ?? selectedProviderId;
-  const defaultModel =
-    ttsModel ??
-    (selected && selectedProviderId === defaultProviderId ? selected.ttsModel : undefined);
+  const defaultModel = ttsModel ?? (selectedProviderId === defaultProviderId ? autoConfig.model.ttsModel : undefined);
   const hasProviderlessVoice = resolvedVoices.some((v) => !v.provider);
   let defaultResolved: Awaited<ReturnType<typeof resolveTtsProvider>> | null = null;
   if (hasProviderlessVoice) {
@@ -180,7 +128,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       podcastId,
       requestedProvider: defaultProviderId,
       requestedModel: defaultModel,
-      plan,
     });
   }
 
@@ -194,14 +141,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         // Use explicit model, or the model from the same priority system as from-scratch
         const modelForProvider =
           explicitModel ??
-          (selected && selectedProviderId === providerKey ? selected.ttsModel : undefined) ??
+          (selectedProviderId === providerKey ? autoConfig.model.ttsModel : undefined) ??
           (defaultProviderId === providerKey ? defaultModel : undefined);
         const resolved = await resolveTtsProvider({
           userId,
           podcastId,
           requestedProvider: providerKey as TtsProviderId,
           requestedModel: modelForProvider,
-          plan,
         });
         const voiceId =
           v.voiceId || resolved.provider.getVoiceId(v.speaker, podcastId, voiceMetadata);

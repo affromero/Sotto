@@ -141,7 +141,7 @@ describe('POST /api/podcasts/[podcastId]/interact/[interactionId]/incorporate', 
       { order: 2, startTime: 15, duration: 20, speaker: 'EXPERT', text: 'Relevant context.' },
       { order: 3, startTime: 35, duration: 15, speaker: 'HOST', text: 'Follow-up context.' },
     ]);
-    mockPrismaUserFindUniqueOrThrow.mockResolvedValue({ plan: 'PRO' });
+    mockPrismaUserFindUniqueOrThrow.mockResolvedValue({});
     mockGetAiKey.mockResolvedValue({ apiKey: 'anthropic-key', provider: 'anthropic' });
     mockResolveAiModelAndProvider.mockResolvedValue({
       model: 'claude-haiku-4-5-20251001',
@@ -172,7 +172,6 @@ describe('POST /api/podcasts/[podcastId]/interact/[interactionId]/incorporate', 
     expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
       podcastAiModel: null,
       aiKey,
-      plan: 'PRO',
     });
     expect(mockCreateAIProvider).toHaveBeenCalledWith('anthropic');
     expect(mockGenerateResponse).toHaveBeenCalledWith(
@@ -207,7 +206,6 @@ describe('POST /api/podcasts/[podcastId]/interact/[interactionId]/incorporate', 
     expect(mockResolveAiModelAndProvider).toHaveBeenCalledWith({
       podcastAiModel: 'gpt-5-mini',
       aiKey: null,
-      plan: 'PRO',
     });
     expect(mockGetAiKey).toHaveBeenCalledTimes(1);
     expect(mockGetAiKey).toHaveBeenCalledWith('user-001', 'openai');

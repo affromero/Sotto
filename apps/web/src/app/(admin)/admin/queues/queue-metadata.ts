@@ -115,7 +115,7 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
     stage: 'Voice Features',
   },
   'voice-track-audio': {
-    description: 'Generates audio for paid voice-sharing tracks',
+    description: 'Generates audio for shared voice tracks',
     stage: 'Voice Features',
   },
   'voice-track-stitching': {

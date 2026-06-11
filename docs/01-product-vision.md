@@ -45,7 +45,7 @@ Sotto must keep these boundaries clear:
 - No follows, follower counts, likes, comments, forks, remix graph, or public activity ranking.
 - No implicit provider fallback chains. Provider choice must be explicit and observable.
 - No legacy social compatibility mode.
-- Hosted billing charges for infrastructure and convenience, not for the idea of AI-generated audio.
+- No paid feature tiers, daily quotas, or billing gates.
 
 These boundaries make the open source release credible. Reviewers should be able to scan the schema, API routes, docs, and tests and see the same product.
 
@@ -159,18 +159,14 @@ The first-run state should answer four questions:
 
 ---
 
-## 8. Business Model
+## 8. Operating Model
 
-The open source product should be useful without paying Sotto. Monetization should be optional managed infrastructure:
+The open source product should be useful without paying Sotto. The default operating model is self-hosted BYOK:
 
-- Hosted workers.
-- Hosted PostgreSQL, Redis, and storage.
-- Scheduled news and meeting ingestion.
-- Twitter, Telegram, and webhook hosting.
-- Provider-key custody for users who choose managed mode.
-- Monitoring, updates, backups, and support.
-
-The first paid plan should be activated only after a short trial. The trial should prove the recurring workflow: at least one generated episode, one private RSS subscription, and one scheduled or event-driven source.
+- The operator hosts PostgreSQL, Redis, storage, web, and workers.
+- Learners or operators provide provider keys for AI, speech, image, video, and avatar services.
+- Sotto does not sell feature tiers, daily quota upgrades, or paid unlocks.
+- Provider costs belong to the key owner and remain visible for operations, not monetization.
 
 ---
 
@@ -184,6 +180,6 @@ The open source release is credible when:
 - A user can create and revoke private RSS tokens.
 - Social schema tables, social routes, and social UI are absent.
 - Docs and tests consistently describe the private-first product.
-- The hosted plan is framed as managed infrastructure, not gated privacy.
+- Full generation features are available without Sotto billing or plan state.
 
 Longer-term product success is visible when users keep recurring private audio streams connected after the novelty of generation wears off.

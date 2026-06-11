@@ -5,7 +5,6 @@ import { uploadFile } from '@/lib/r2';
 import { logger } from '@/lib/logger';
 import { errorResponse } from '@/lib/api-response';
 import { avatarImageUploadSchema } from '@/lib/validations';
-import { getPlanFeatureConfig } from '@/lib/plan-feature-config';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -18,12 +17,11 @@ export async function GET() {
       return errorResponse('Unauthorized', 401);
     }
 
-    const [user, config, images, sharedRecords] = await Promise.all([
+    const [user, images, sharedRecords] = await Promise.all([
       prisma.user.findUniqueOrThrow({
         where: { id: session.user.id },
         select: { referralVerified: true, role: true },
       }),
-      getPlanFeatureConfig(),
       prisma.avatarImage.findMany({
         where: { userId: session.user.id },
         orderBy: { createdAt: 'desc' },
@@ -48,10 +46,10 @@ export async function GET() {
     }));
 
     const capabilities = {
-      canUpload: isAdmin || (isVerified && config.avatarUploadsEnabled),
-      canGenerate: isAdmin && config.avatarGenerationEnabled,
+      canUpload: isAdmin || isVerified,
+      canGenerate: isAdmin,
       isVerified,
-      uploadsEnabled: config.avatarUploadsEnabled,
+      uploadsEnabled: true,
     };
 
     return NextResponse.json({ images, shared, capabilities });
@@ -68,20 +66,12 @@ export async function POST(request: NextRequest) {
       return errorResponse('Unauthorized', 401);
     }
 
-    const [user, config] = await Promise.all([
-      prisma.user.findUniqueOrThrow({
-        where: { id: session.user.id },
-        select: { referralVerified: true, role: true },
-      }),
-      getPlanFeatureConfig(),
-    ]);
+    const user = await prisma.user.findUniqueOrThrow({
+      where: { id: session.user.id },
+      select: { referralVerified: true, role: true },
+    });
 
     const isAdmin = user.role === 'ADMIN';
-
-    // Feature flag gate
-    if (!isAdmin && !config.avatarUploadsEnabled) {
-      return errorResponse('Avatar uploads are currently disabled', 503);
-    }
 
     // Verification gate
     if (!isAdmin && !user.referralVerified) {

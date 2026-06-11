@@ -5,7 +5,6 @@ import { listByokProviders, listAiProviders } from '@/lib/byok';
 import { getAllAiProviderClientMeta } from '@/lib/providers/ai-registry';
 import { getAllTtsProviderClientMeta } from '@/lib/providers/tts-registry';
 import { getMusicByokProviderMeta } from '@/lib/providers/music-registry';
-import { getReferralBonus, getActiveReferralCount } from '@/lib/referrals';
 import { getAppBaseUrl } from '@/lib/urls';
 import { SettingsForm } from './SettingsForm';
 import styles from './page.module.css';
@@ -109,7 +108,6 @@ export default async function SettingsPage() {
 
   const connectedProviders = accounts.map((a) => a.provider);
   const selectedInterestTagIds = userInterests.map((i) => i.tagId);
-  const activeReferralCount = await getActiveReferralCount(userId);
 
   // Sort categories by the order defined in ONBOARDING_TAG_SLUGS
   const slugOrder = new Map(ONBOARDING_TAG_SLUGS.map((s, i) => [s, i]));
@@ -174,7 +172,6 @@ export default async function SettingsPage() {
           joinedAt: u.createdAt.toISOString(),
           verified: u.referralVerified,
         }))}
-        referralBonus={getReferralBonus(activeReferralCount)}
         appBaseUrl={appBaseUrl}
       />
     </main>

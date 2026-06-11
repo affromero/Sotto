@@ -6,7 +6,7 @@ const mockPodcastFindUnique = vi.fn();
 const mockVoiceTrackFindMany = vi.fn();
 const mockDiscoveryFindUnique = vi.fn();
 const mockResolveTtsProvider = vi.fn();
-const mockSelectFreeTierProviders = vi.fn();
+const mockGetAutoModelConfig = vi.fn();
 const mockVoiceTrackCount = vi.fn();
 const mockVoiceTrackCreate = vi.fn();
 const mockVoiceTrackVoiceCreateMany = vi.fn();
@@ -64,24 +64,6 @@ vi.mock('@/lib/redis', () => ({
   getRedisClient: vi.fn(),
 }));
 
-vi.mock('@/lib/plan-feature-config', () => ({
-  getPlanFeatureConfig: vi.fn().mockResolvedValue({
-    freeVoiceCloningEnabled: false,
-    proVoiceCloningEnabled: true,
-    freeVoiceTracksEnabled: false,
-    proVoiceTracksEnabled: true,
-    freeMaxVoiceTracks: 0,
-    proMaxVoiceTracks: 3,
-    voiceMarketplaceEnabled: true,
-  }),
-}));
-
-vi.mock('@/lib/generation-gate', () => ({
-  checkGenerationGate: vi
-    .fn()
-    .mockResolvedValue({ allowed: true, reason: 'ok', isProUser: false, isByokUser: true }),
-}));
-
 vi.mock('@/lib/tier-features', () => ({
   getTierFeatures: vi.fn().mockReturnValue({ voiceTracksEnabled: true, maxVoiceTracks: 10 }),
 }));
@@ -94,8 +76,8 @@ vi.mock('@/lib/providers', () => ({
   resolveTtsProvider: (...args: unknown[]) => mockResolveTtsProvider(...args),
 }));
 
-vi.mock('@/lib/free-tier-provider-selector', () => ({
-  selectFreeTierProviders: (...args: unknown[]) => mockSelectFreeTierProviders(...args),
+vi.mock('@/lib/auto-model-config', () => ({
+  getAutoModelConfig: (...args: unknown[]) => mockGetAutoModelConfig(...args),
 }));
 
 vi.mock('@/lib/voice-pool', () => ({
@@ -299,9 +281,19 @@ describe('POST /api/podcasts/[podcastId]/voice-tracks', () => {
         getVoiceId: () => 'voice-auto',
       },
     });
-    mockSelectFreeTierProviders.mockResolvedValue({
-      ttsProvider: 'openai',
-      ttsModel: 'tts-1-hd',
+    mockGetAutoModelConfig.mockResolvedValue({
+      model: {
+        aiProvider: 'anthropic',
+        aiModel: 'claude-haiku-4-5-20251001',
+        ttsProvider: 'openai',
+        ttsModel: 'tts-1-hd',
+        sttProvider: 'openai',
+        sttModel: 'whisper-1',
+      },
+      platform: {
+        aiProvider: 'anthropic',
+        aiModel: 'claude-haiku-4-5-20251001',
+      },
     });
     mockVoiceTrackCreate.mockResolvedValue({
       id: 'track-new',
@@ -321,32 +313,7 @@ describe('POST /api/podcasts/[podcastId]/voice-tracks', () => {
     );
   });
 
-  it('requires a provider for BYOK providerless voices', async () => {
-    const response = await POST(
-      createPostRequest({
-        voices: [{ speaker: 'HOST', voiceId: '' }],
-      }),
-      { params: Promise.resolve({ podcastId: 'pod-1' }) }
-    );
-    const body = await response.json();
-
-    expect(response.status).toBe(400);
-    expect(body).toMatchObject({
-      error: 'Choose a TTS provider before creating a voice track.',
-      code: 'tts_provider_required',
-    });
-    expect(mockResolveTtsProvider).not.toHaveBeenCalled();
-  });
-
-  it('uses platform-selected provider for non-BYOK providerless voices', async () => {
-    const { checkGenerationGate } = await import('@/lib/generation-gate');
-    (checkGenerationGate as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      allowed: true,
-      reason: 'ok',
-      isProUser: false,
-      isByokUser: false,
-    });
-
+  it('uses auto-model provider for providerless voices', async () => {
     const response = await POST(
       createPostRequest({
         voices: [{ speaker: 'HOST', voiceId: '' }],

@@ -1,5 +1,4 @@
 import Link from 'next/link';
-import { Newsreader, IBM_Plex_Mono, IBM_Plex_Sans } from 'next/font/google';
 import { BRAND } from '@sotto/shared';
 import { JsonLd } from '@/components/landing/JsonLd';
 import { LandingHeader } from '@/components/landing/LandingHeader';
@@ -12,28 +11,6 @@ import { getPublicGithubUrl } from '@/lib/public-links';
 import styles from './page.module.css';
 
 const GITHUB_URL = getPublicGithubUrl() ?? 'https://github.com/affromero/Sotto';
-
-const newsreader = Newsreader({
-  subsets: ['latin'],
-  style: ['normal', 'italic'],
-  weight: ['400', '500'],
-  variable: '--font-newsreader',
-  display: 'swap',
-});
-
-const ibmPlexMono = IBM_Plex_Mono({
-  subsets: ['latin'],
-  weight: ['400', '500'],
-  variable: '--font-ibm-plex-mono',
-  display: 'swap',
-});
-
-const ibmPlexSans = IBM_Plex_Sans({
-  subsets: ['latin'],
-  weight: ['400', '500', '600'],
-  variable: '--font-ibm-plex-sans',
-  display: 'swap',
-});
 
 interface Step {
   num: string;
@@ -373,7 +350,7 @@ function WalkFrameMock({ frame }: { frame: WalkStep['frame'] }) {
 export default function LandingPage() {
   return (
     <div
-      className={`${newsreader.variable} ${ibmPlexMono.variable} ${ibmPlexSans.variable} ${styles.root}`}
+      className={styles.root}
     >
       <JsonLd />
         <LandingHeader />

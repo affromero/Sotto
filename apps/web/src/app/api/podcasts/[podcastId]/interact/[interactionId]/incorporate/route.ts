@@ -10,9 +10,7 @@ import { loadAndRender } from '@/lib/prompt-loader';
 import { getAiKey } from '@/lib/byok';
 import { resolveAiModelAndProvider, type AiProviderId } from '@/lib/providers/ai-registry';
 import { getLanguageLabel } from '@sotto/shared';
-import { checkGenerationGate } from '@/lib/generation-gate';
 
-import { checkRateLimit } from '@/lib/redis';
 import type { RegenerateSegmentPayload } from '@/lib/queue';
 
 import { errorResponse } from '@/lib/api-response';
@@ -27,16 +25,6 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
   }
 
   const userId = session.user.id;
-
-  // Rate limit: 20/hour, 100/day
-  const hourly = await checkRateLimit(`generate:hour:${userId}`, 20, 3600);
-  if (!hourly.allowed) {
-    return errorResponse('Rate limit exceeded: max 20 generations per hour.', 429);
-  }
-  const daily = await checkRateLimit(`generate:day:${userId}`, 100, 86400);
-  if (!daily.allowed) {
-    return errorResponse('Rate limit exceeded: max 100 generations per day.', 429);
-  }
 
   // Fetch the interaction with podcast ownership check
   const interaction = await prisma.interaction.findUnique({
@@ -55,17 +43,6 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
     return errorResponse('Forbidden', 403);
   }
 
-  // Generation gate
-  const gate = await checkGenerationGate(userId);
-  if (!gate.allowed) {
-    const msg = gate.reason === 'generation_in_progress'
-      ? 'A podcast is already generating. Wait for it to finish before starting another.'
-      : 'No voice provider available. Add a TTS key in Settings for unlimited generation.';
-    return errorResponse(msg, 403, { code: gate.reason });
-  }
-
-  // Quota consumed on success by workers — no increment here
-
   if (interaction.podcast.source === 'IMPORT') {
     return errorResponse('Incorporation not yet supported for imported podcasts', 400);
   }
@@ -80,11 +57,6 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
     return errorResponse(`Podcast is currently "${interaction.podcast.status}", must be READY`, 409);
   }
 
-  const user = await prisma.user.findUniqueOrThrow({
-    where: { id: userId },
-    select: { plan: true },
-  });
-
   const aiKey = interaction.podcast.aiModel ? null : await getAiKey(userId);
   if (!interaction.podcast.aiModel && !aiKey) {
     return errorResponse('AI model is required for incorporation when no AI key is configured.', 403, {
@@ -96,7 +68,6 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
   const { model: resolvedModel, provider } = await resolveAiModelAndProvider({
     podcastAiModel: interaction.podcast.aiModel,
     aiKey,
-    plan: user.plan as 'FREE' | 'PRO',
   });
 
   const providerAiKey =

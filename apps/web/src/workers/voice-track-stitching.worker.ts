@@ -4,8 +4,6 @@ import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { downloadToFile, uploadVoiceTrackAudio } from '@/lib/r2';
 import { stitchWithEffects, type SfxInsert } from '@/lib/audio-stitcher';
 import { type SoundCue } from '@/lib/script-generator';
-import { consumeFreeGeneration } from '@/lib/generation-gate';
-import { hasByokKey } from '@/lib/byok';
 import { logger } from '@/lib/logger';
 
 import * as path from 'path';
@@ -174,24 +172,6 @@ export async function processVoiceTrackStitching(job: Job<StitchVoiceTrackPayloa
     });
 
     await job.updateProgress(95);
-
-    // 10. Consume free-tier quota on successful voice track generation
-    const podcastUser = await prisma.user.findUniqueOrThrow({
-      where: { id: podcast.userId },
-      select: { role: true, plan: true },
-    });
-    const isByok = await hasByokKey(podcast.userId);
-    const isPrivileged = podcastUser.role === 'ADMIN' || podcastUser.role === 'SYSTEM';
-    if (!isByok && podcastUser.plan !== 'PRO' && !isPrivileged) {
-      await consumeFreeGeneration(podcast.userId).catch((err) => {
-        logger.warn('Failed to consume free generation for voice track', {
-          podcastId,
-          voiceTrackId,
-          userId: podcast.userId,
-          error: err instanceof Error ? err.message : String(err),
-        });
-      });
-    }
 
     // 11. Send notification
     await addJob(notificationQueue, JobType.SEND_NOTIFICATION, {

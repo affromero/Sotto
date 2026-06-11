@@ -4,11 +4,9 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { authenticateRequest } from '@/lib/api-keys';
 import { agentIngestionSchema } from '@/lib/validations';
-import { checkRateLimit } from '@/lib/redis';
-import { checkGenerationGate } from '@/lib/generation-gate';
-import { checkSuspension, requireAdmin } from '@/lib/auth-guards';
-import { getJobPriority, isModelAllowedForUser } from '@/lib/tier-features';
-import { getModelRequiredPlan, isValidModelId } from '@/lib/providers/ai-registry';
+import { checkSuspension } from '@/lib/auth-guards';
+import { getJobPriority } from '@/lib/tier-features';
+import { isValidModelId } from '@/lib/providers/ai-registry';
 import {
   createPrivateIngestionPodcast,
   type PrivateIngestionTransaction,
@@ -141,64 +139,6 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const adminId = await requireAdmin();
-  const isAdmin = adminId !== null;
-
-  if (!isAdmin) {
-    const hourly = await checkRateLimit(`generate:hour:${authResult.userId}`, 20, 3600);
-    if (!hourly.allowed) {
-      return errorResponse('Rate limit exceeded: max 20 generations per hour.', 429);
-    }
-
-    const daily = await checkRateLimit(`generate:day:${authResult.userId}`, 100, 86400);
-    if (!daily.allowed) {
-      return errorResponse('Rate limit exceeded: max 100 generations per day.', 429);
-    }
-  }
-
-  const gate = await checkGenerationGate(authResult.userId);
-  if (!gate.allowed) {
-    if (gate.reason === 'generation_in_progress') {
-      return errorResponse(
-        'You already have a podcast being generated. Please wait for it to finish.',
-        403,
-        { code: gate.reason }
-      );
-    }
-
-    if (gate.reason === 'daily_limit_reached') {
-      const resetH = gate.resetInSeconds ? Math.ceil(gate.resetInSeconds / 3600) : 24;
-      return errorResponse(
-        `Daily podcast limit reached. Next podcast available in ~${resetH}h.`,
-        403,
-        { code: gate.reason, resetInSeconds: gate.resetInSeconds }
-      );
-    }
-
-    return errorResponse(
-      'No voice provider available. Add a TTS key in Settings before ingesting agent output.',
-      403,
-      { code: gate.reason }
-    );
-  }
-
-  if (input.aiModel) {
-    const requiredPlan = getModelRequiredPlan(input.aiModel);
-    if (
-      requiredPlan &&
-      !isModelAllowedForUser(
-        requiredPlan,
-        gate.isProUser ? 'PRO' : 'FREE',
-        gate.isByokUser,
-        isAdmin ? 'ADMIN' : undefined
-      )
-    ) {
-      return errorResponse('This model requires a Pro subscription.', 403, {
-        code: 'model_requires_pro',
-      });
-    }
-  }
-
   const hash = contentHash(input.content);
   const sourceContent = formatAgentSourceContent({
     provider: input.agent.provider,
@@ -239,7 +179,7 @@ export async function POST(request: NextRequest) {
         sourceContent,
         sourceMetadata,
       },
-      jobPriority: getJobPriority(gate.isProUser ? 'PRO' : 'FREE', gate.isByokUser),
+      jobPriority: getJobPriority(),
       jobIdPrefix: 'agent-ingest',
       writeIngestionRecord: async (tx: PrivateIngestionTransaction, podcastId: string) => {
         await tx.agentIngestion.create({

@@ -21,11 +21,6 @@ enum UserRole {
   SYSTEM
 }
 
-enum UserPlan {
-  FREE
-  PRO
-}
-
 // ============ VIDEO GENERATION ============
 
 enum VisualType {
@@ -147,17 +142,6 @@ model User {
   // Private agent output ingestions
   agentIngestions AgentIngestion[]
 
-  // Free tier
-  dailyGenerationOverride Int? // null = use global, 0 = unlimited, N = custom daily limit
-
-  // Budget enforcement
-  spentMonthCents   Int       @default(0)
-  budgetMonthCents  Int       @default(0) // 0 = no budget limit
-  spentMonthResetAt DateTime?
-
-  // Plan (vestigial single tier; no payment path)
-  plan UserPlan @default(FREE)
-
   // Moderation
   bannedAt        DateTime?
   bannedReason    String?   @db.Text
@@ -180,9 +164,6 @@ model User {
 
   // Voice preferences (multi-speaker)
   voicePreferences UserVoicePreference[]
-
-  // Per-provider free tier usage tracking
-  freeProviderUsage FreeProviderUsage[]
 
   // Voice track contributions (re-voice proposals)
   voiceTrackContributions VoiceTrack[] @relation("VoiceTrackContributions")
@@ -1541,73 +1522,38 @@ model UserAiKey {
 // ============ AUTO MODEL CONFIG ============
 
 model AutoModelConfig {
-  id                       String   @id @default("singleton")
-  freeAiProvider           String   @default("anthropic")
-  freeAiModel              String   @default("claude-haiku-4-5-20251001")
-  freeTtsProvider          String   @default("openai")
-  freeTtsModel             String   @default("tts-1-hd")
-  freeSttProvider          String   @default("openai")
-  freeSttModel             String   @default("whisper-large-v3-turbo")
-  proAiProvider            String   @default("anthropic")
-  proAiModel               String   @default("claude-haiku-4-5-20251001")
-  proTtsProvider           String   @default("elevenlabs")
-  proTtsModel              String   @default("eleven_v3")
-  proSttProvider           String   @default("openai")
-  proSttModel              String   @default("whisper-large-v3-turbo")
-  platformAiProvider       String   @default("anthropic")
-  platformAiModel          String   @default("claude-haiku-4-5-20251001")
-  freeIncludedModels       Json?
-  proIncludedModels        Json?
-  freeIncludedTtsModels    Json?
-  proIncludedTtsModels     Json?
-  freeIncludedSttModels    Json?
-  proIncludedSttModels     Json?
+  id                  String   @id @default("singleton")
+  aiProvider          String   @default("anthropic")
+  aiModel             String   @default("claude-haiku-4-5-20251001")
+  ttsProvider         String   @default("openai")
+  ttsModel            String   @default("tts-1-hd")
+  sttProvider         String   @default("openai")
+  sttModel            String   @default("whisper-large-v3-turbo")
+  platformAiProvider  String   @default("anthropic")
+  platformAiModel     String   @default("claude-haiku-4-5-20251001")
+  includedModels      Json?
+  includedTtsModels   Json?
+  includedSttModels   Json?
   // Image (still images for video visuals)
-  freeImageProvider        String   @default("fal")
-  freeImageModel           String   @default("fal-flux-1-schnell")
-  proImageProvider         String   @default("fal")
-  proImageModel            String   @default("fal-flux-1-schnell")
-  freeIncludedImageModels  Json?
-  proIncludedImageModels   Json?
+  imageProvider       String   @default("fal")
+  imageModel          String   @default("fal-flux-1-schnell")
+  includedImageModels Json?
   // Video (text-to-video)
-  freeVideoProvider        String   @default("fal")
-  freeVideoModel           String   @default("fal-wan2.5-480p")
-  proVideoProvider         String   @default("fal")
-  proVideoModel            String   @default("fal-wan2.5-480p")
-  freeIncludedVideoModels  Json?
-  proIncludedVideoModels   Json?
+  videoProvider       String   @default("fal")
+  videoModel          String   @default("fal-wan2.5-480p")
+  includedVideoModels Json?
   // Avatar (lip-sync avatar overlays)
-  freeAvatarProvider       String   @default("heygen")
-  freeAvatarModel          String   @default("heygen-avatar-standard")
-  proAvatarProvider        String   @default("heygen")
-  proAvatarModel           String   @default("heygen-avatar-standard")
-  freeIncludedAvatarModels Json?
-  proIncludedAvatarModels  Json?
+  avatarProvider      String   @default("heygen")
+  avatarModel         String   @default("heygen-avatar-standard")
+  includedAvatarModels Json?
   // Music (AI-generated background music)
-  freeMusicProvider        String   @default("suno")
-  freeMusicModel           String   @default("suno-v5")
-  proMusicProvider         String   @default("suno")
-  proMusicModel            String   @default("suno-v5")
-  freeIncludedMusicModels  Json?
+  musicProvider       String   @default("suno")
+  musicModel          String   @default("suno-v5")
+  includedMusicModels Json?
   // Motion (programmatic visual rendering)
-  freeMotionProvider       String   @default("remotion")
-  proMotionProvider        String   @default("remotion")
-  proIncludedMusicModels   Json?
-  // Admin view mode: "ALL" = see everything, "PRO" = see curated PRO set
-  adminViewMode            String   @default("ALL")
-  // Daily limits (migrated from FreeTierConfig)
-  dailyGenerationLimit     Int      @default(1)
-  dailyGenerationLimitPro  Int      @default(5)
-  dailyVideoLimit          Int      @default(1)
-  dailyVideoLimitPro       Int      @default(2)
-  dailyMusicLimit          Int      @default(1)
-  dailyMusicLimitPro       Int      @default(3)
-  dailyAvatarLimit         Int      @default(1)
-  dailyAvatarLimitPro      Int      @default(1)
-  aiAllocations            Json     @default("[]")
-  ttsAllocations           Json     @default("[]")
-  updatedAt                DateTime @updatedAt
-  updatedBy                String?
+  motionProvider      String   @default("remotion")
+  updatedAt           DateTime @updatedAt
+  updatedBy           String?
 }
 
 // ============ SITE CONFIG ============
@@ -1638,37 +1584,6 @@ model SiteConfig {
 
   updatedAt DateTime @updatedAt
   updatedBy String?
-}
-
-// ============ PLAN FEATURE CONFIG ============
-
-model PlanFeatureConfig {
-  id                      String   @id @default("singleton")
-  // Voice cloning (recording + ElevenLabs import) per plan
-  freeVoiceCloningEnabled Boolean  @default(false)
-  proVoiceCloningEnabled  Boolean  @default(true)
-  // Voice tracks per plan
-  freeVoiceTracksEnabled  Boolean  @default(false)
-  proVoiceTracksEnabled   Boolean  @default(true)
-  freeMaxVoiceTracks      Int      @default(0)
-  proMaxVoiceTracks       Int      @default(3)
-  // Avatar image controls
-  avatarUploadsEnabled    Boolean  @default(true)
-  avatarGenerationEnabled Boolean  @default(false)
-  updatedAt               DateTime @updatedAt
-  updatedBy               String?
-}
-
-model FreeProviderUsage {
-  id       String @id @default(cuid())
-  userId   String
-  category String // 'ai' | 'tts'
-  provider String
-  used     Int    @default(0)
-  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, category, provider])
-  @@index([userId])
 }
 
 // ============ LANDING SHOWCASE CONFIG (Admin Dashboard) ============

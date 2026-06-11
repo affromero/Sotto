@@ -62,12 +62,8 @@ import type { SegmentVisualData } from '@/lib/segment-utils';
 import styles from './page.module.css';
 
 export interface VideoGenerationStatus {
-  dailyUsed: number;
-  dailyLimit: number;
-  dailyRemaining: number;
-  resetInSeconds?: number;
-  isByokUser: boolean;
-  isProUser: boolean;
+  available: boolean;
+  hasByokKey: boolean;
 }
 
 interface PodcastPlayerViewProps {
@@ -935,26 +931,15 @@ export function PodcastPlayerView({
                       showModelPicker ||
                       pipelineLoading ||
                       videoLoading ||
-                      (videoStatus
-                        ? videoStatus.dailyRemaining <= 0 && !videoStatus.isByokUser
-                        : !isAdmin)
+                      (!videoStatus?.available && !isAdmin)
                     }
                     aria-label="Generate Video"
-                    title={
-                      videoStatus && !videoStatus.isByokUser && videoStatus.dailyRemaining <= 0
-                        ? `Daily video limit reached — resets in ~${Math.ceil((videoStatus.resetInSeconds ?? 86400) / 3600)}h`
-                        : 'Generate a video from your podcast with AI visuals'
-                    }
+                    title="Generate a video from your podcast with AI visuals"
                     type="button"
                     data-loading={pipelineLoading || videoLoading ? 'true' : undefined}
                   >
                     <Video size={14} />
                     Video
-                    {videoStatus && !videoStatus.isByokUser && (
-                      <span className={styles.quotaBadge}>
-                        {videoStatus.dailyRemaining}/{videoStatus.dailyLimit}
-                      </span>
-                    )}
                   </button>
                   <button
                     className={styles.toolbarBtn}
@@ -966,35 +951,17 @@ export function PodcastPlayerView({
                   >
                     <Users size={14} />
                     Avatars
-                    {avatarStatus && !avatarStatus.isByokUser && (
-                      <span className={styles.quotaBadge}>
-                        {avatarStatus.dailyRemaining}/{avatarStatus.dailyLimit}
-                      </span>
-                    )}
                   </button>
                   <button
                     className={styles.toolbarBtn}
                     onClick={() => setShowMusicModal(true)}
-                    disabled={
-                      musicStatus
-                        ? musicStatus.dailyRemaining <= 0 && !musicStatus.isByokUser
-                        : false
-                    }
+                    disabled={!musicStatus?.available}
                     aria-label="Add Music"
-                    title={
-                      musicStatus && !musicStatus.isByokUser && musicStatus.dailyRemaining <= 0
-                        ? `Daily music limit reached — resets in ~${Math.ceil((musicStatus.resetInSeconds ?? 86400) / 3600)}h`
-                        : 'Add background music to your podcast'
-                    }
+                    title="Add background music to your podcast"
                     type="button"
                   >
                     <Music size={14} />
                     Music
-                    {musicStatus && !musicStatus.isByokUser && (
-                      <span className={styles.quotaBadge}>
-                        {musicStatus.dailyRemaining}/{musicStatus.dailyLimit}
-                      </span>
-                    )}
                   </button>
                 </div>
                 {showModelPicker && !videoError && (
@@ -1079,11 +1046,7 @@ export function PodcastPlayerView({
                 <button
                   className={styles.toolbarBtn}
                   onClick={() => setShowAvatarPicker(true)}
-                  disabled={
-                    !avatarGenerating && !avatarDone && avatarStatus
-                      ? avatarStatus.dailyRemaining <= 0 && !avatarStatus.isByokUser
-                      : false
-                  }
+                  disabled={!avatarGenerating && !avatarDone && !avatarStatus?.available}
                   aria-label={
                     avatarGenerating
                       ? 'Generating avatars'
@@ -1096,9 +1059,7 @@ export function PodcastPlayerView({
                   title={
                     avatarGenerating
                       ? 'Generating avatars...'
-                      : avatarStatus && !avatarStatus.isByokUser && avatarStatus.dailyRemaining <= 0
-                        ? `Daily avatar limit reached — resets in ~${Math.ceil((avatarStatus.resetInSeconds ?? 86400) / 3600)}h`
-                        : avatarOverlays.length > 0
+                      : avatarOverlays.length > 0
                           ? 'Change the speaker avatars'
                           : 'Add AI-generated speaker avatars'
                   }
@@ -1126,35 +1087,19 @@ export function PodcastPlayerView({
                     <>
                       <Users size={14} />
                       Avatars
-                      {avatarStatus && !avatarStatus.isByokUser && (
-                        <span className={styles.quotaBadge}>
-                          {avatarStatus.dailyRemaining}/{avatarStatus.dailyLimit}
-                        </span>
-                      )}
                     </>
                   )}
                 </button>
                 <button
                   className={styles.toolbarBtn}
                   onClick={() => setShowMusicModal(true)}
-                  disabled={
-                    musicStatus ? musicStatus.dailyRemaining <= 0 && !musicStatus.isByokUser : false
-                  }
+                  disabled={!musicStatus?.available}
                   aria-label="Add Music"
-                  title={
-                    musicStatus && !musicStatus.isByokUser && musicStatus.dailyRemaining <= 0
-                      ? `Daily music limit reached — resets in ~${Math.ceil((musicStatus.resetInSeconds ?? 86400) / 3600)}h`
-                      : 'Add background music to your podcast'
-                  }
+                  title="Add background music to your podcast"
                   type="button"
                 >
                   <Music size={14} />
                   Music
-                  {musicStatus && !musicStatus.isByokUser && (
-                    <span className={styles.quotaBadge}>
-                      {musicStatus.dailyRemaining}/{musicStatus.dailyLimit}
-                    </span>
-                  )}
                 </button>
               </div>
             )}

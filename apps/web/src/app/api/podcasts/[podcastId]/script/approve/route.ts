@@ -4,9 +4,8 @@ import { authenticateRequest } from '@/lib/api-keys';
 import { createSegmentsAndQueueAudio } from '@/lib/segment-creator';
 import { convertTurnsForProvider } from '@/lib/tts-tag-converter';
 import type { TtsProviderId } from '@/lib/providers/tts-registry';
-import { checkRateLimit, invalidatePodcastCache, publishPodcastStatus } from '@/lib/redis';
-import { checkGenerationGate } from '@/lib/generation-gate';
-import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
+import { invalidatePodcastCache, publishPodcastStatus } from '@/lib/redis';
+import { getAutoModelConfig } from '@/lib/auto-model-config';
 import { assignVoicesForPodcast } from '@/lib/voice-assigner';
 import type { ScriptTurn } from '@/lib/script-generator';
 
@@ -22,28 +21,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
   const userId = authResult.userId;
 
-  // Rate limit: 20/hour, 100/day
-  const hourly = await checkRateLimit(`generate:hour:${userId}`, 20, 3600);
-  if (!hourly.allowed) {
-    return errorResponse('Rate limit exceeded: max 20 generations per hour.', 429);
-  }
-  const daily = await checkRateLimit(`generate:day:${userId}`, 100, 86400);
-  if (!daily.allowed) {
-    return errorResponse('Rate limit exceeded: max 100 generations per day.', 429);
-  }
-
-  // Generation gate: BYOK or free tier (re-check — user may have lost keys since script creation)
-  const gate = await checkGenerationGate(userId);
-  if (!gate.allowed) {
-    const msg = gate.reason === 'generation_in_progress'
-      ? 'A podcast is already generating. Wait for it to finish before starting another.'
-      : 'No voice provider available. Add a TTS key in Settings for unlimited generation.';
-    return errorResponse(msg, 403, { code: gate.reason });
-  }
-
   const podcast = await prisma.podcast.findUnique({
     where: { id: podcastId },
-    select: { userId: true, status: true },
+    select: { userId: true, status: true, ttsProvider: true, ttsModel: true },
   });
 
   if (!podcast) {
@@ -69,24 +49,16 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     // No JSON body — use defaults
   }
 
-  // Write TTS provider at approve time (deferred from pipeline start)
-  if (gate.isByokUser) {
-    if (bodyTtsProvider) {
-      // BYOK user explicitly picked a provider
-      await prisma.podcast.update({
-        where: { id: podcastId },
-        data: { ttsProvider: bodyTtsProvider, ttsModel: bodyTtsModel ?? null },
-      });
-    }
-    // Otherwise keep the existing provider. A missing provider is rejected below.
-  } else {
-    // Free-tier: auto-select provider (moved from generate route)
-    const selected = await selectFreeTierProviders(userId);
-    await prisma.podcast.update({
-      where: { id: podcastId },
-      data: { ttsProvider: selected.ttsProvider, ttsModel: selected.ttsModel },
-    });
-  }
+  const autoConfig = await getAutoModelConfig();
+  const nextTtsProvider = bodyTtsProvider ?? podcast.ttsProvider ?? autoConfig.model.ttsProvider;
+  const nextTtsModel = bodyTtsProvider
+    ? (bodyTtsModel ?? null)
+    : (podcast.ttsModel ?? autoConfig.model.ttsModel);
+
+  await prisma.podcast.update({
+    where: { id: podcastId },
+    data: { ttsProvider: nextTtsProvider, ttsModel: nextTtsModel },
+  });
 
   // Fetch resolved ttsProvider for voice assignment and tag conversion
   // (must happen after TTS provider is written to DB above)

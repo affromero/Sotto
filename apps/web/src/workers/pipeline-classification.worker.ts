@@ -43,7 +43,7 @@ function visualModeForType(visualType: VisualTypeString): VisualMode {
 }
 
 export async function processPipelineClassification(job: Job<ClassifyPipelinePayload>): Promise<void> {
-  const { classificationId, podcastId, userId, aiProvider, aiModel, apiKeyOverride, tier, voiceTrackId } = job.data;
+  const { classificationId, podcastId, userId, aiProvider, aiModel, apiKeyOverride, voiceTrackId } = job.data;
   const redisKey = `${REDIS_KEY_PREFIX}${classificationId}`;
 
   logger.info('Starting pipeline classification', { classificationId, podcastId });
@@ -93,7 +93,7 @@ export async function processPipelineClassification(job: Job<ClassifyPipelinePay
       }),
       fetchFalImageModels(),
       fetchAllVideoModels(),
-      resolveVideoModel(tier),
+      resolveVideoModel(),
     ]);
 
     await job.updateProgress(70);

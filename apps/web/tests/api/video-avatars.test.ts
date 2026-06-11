@@ -134,12 +134,9 @@ beforeEach(() => {
     { modelId: 'runway-characters', displayName: 'Runway Characters', costPerMinute: 0.2, avatarType: 'standard', maxDuration: null },
   ]);
   mockGetAutoModelConfig.mockResolvedValue({
-    freeAvatarModel: 'heygen-avatar-standard',
-    proAvatarModel: 'heygen-avatar-standard',
-    freeAvatarProvider: 'heygen',
-    proAvatarProvider: 'heygen',
-    freeIncludedAvatarModels: null,
-    proIncludedAvatarModels: null,
+    avatarModel: 'heygen-avatar-standard',
+    avatarProvider: 'heygen',
+    includedAvatarModels: null,
   });
   process.env.HEYGEN_API_KEY = 'test-heygen-key';
 });
@@ -147,7 +144,7 @@ beforeEach(() => {
 describe('GET /api/podcasts/[podcastId]/video/avatars', () => {
   it('returns cached avatars from Redis', async () => {
     const { GET } = await import('@/app/api/podcasts/[podcastId]/video/avatars/route');
-    mockCheckAvatarGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', dailyUsed: 0, dailyLimit: 1, dailyRemaining: 1, isByokUser: false, isProUser: false });
+    mockCheckAvatarGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok' });
     const cached = [{ id: 'av-1', name: 'Test', provider: 'heygen' }];
     mockRedisGet.mockResolvedValue(cached);
 
@@ -163,7 +160,7 @@ describe('GET /api/podcasts/[podcastId]/video/avatars', () => {
 
   it('fetches avatars via listUnifiedAvatars', async () => {
     const { GET } = await import('@/app/api/podcasts/[podcastId]/video/avatars/route');
-    mockCheckAvatarGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', dailyUsed: 0, dailyLimit: 1, dailyRemaining: 1, isByokUser: false, isProUser: false });
+    mockCheckAvatarGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok' });
     mockRedisGet.mockResolvedValue(null);
     mockListUnifiedAvatars.mockResolvedValue([
       { id: 'av-1', name: 'Free', provider: 'heygen', isPreset: false, premium: false, previewImageUrl: '' },
@@ -179,15 +176,12 @@ describe('GET /api/podcasts/[podcastId]/video/avatars', () => {
   it('fetches Runway avatars when provider=runway', async () => {
     const { GET } = await import('@/app/api/podcasts/[podcastId]/video/avatars/route');
     process.env.RUNWAY_API_KEY = 'test-runway-key';
-    mockCheckAvatarGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', dailyUsed: 0, dailyLimit: 1, dailyRemaining: 1, isByokUser: false, isProUser: false });
+    mockCheckAvatarGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok' });
     // Include a runway model so availableProviders.runway is true
     mockGetAutoModelConfig.mockResolvedValue({
-      freeAvatarModel: 'heygen-avatar-standard',
-      proAvatarModel: 'heygen-avatar-standard',
-      freeAvatarProvider: 'heygen',
-      proAvatarProvider: 'heygen',
-      freeIncludedAvatarModels: ['heygen-avatar-standard', 'runway-characters'],
-      proIncludedAvatarModels: ['heygen-avatar-standard', 'runway-characters'],
+      avatarModel: 'heygen-avatar-standard',
+      avatarProvider: 'heygen',
+      includedAvatarModels: ['heygen-avatar-standard', 'runway-characters'],
     });
     mockRedisGet.mockResolvedValue(null);
     mockListUnifiedAvatars.mockResolvedValue([
@@ -217,7 +211,7 @@ describe('POST /api/podcasts/[podcastId]/video/avatars', () => {
     mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'user-1', status: 'READY', duration: 300 });
     mockVideoGenFindFirst.mockResolvedValue({ id: 'vg-1', status: 'READY' });
     mockVideoGenUpdate.mockResolvedValue({});
-    mockCheckAvatarGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', dailyUsed: 0, dailyLimit: 1, dailyRemaining: 1, isByokUser: true, isProUser: false });
+    mockCheckAvatarGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok' });
     mockAvatarOverlayUpsert.mockImplementation(({ create }: { create: Record<string, unknown> }) => ({
       id: `overlay-${create.speaker}`,
       ...create,
@@ -302,7 +296,7 @@ describe('POST /api/podcasts/[podcastId]/video/avatars', () => {
     mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'user-1', status: 'READY', duration: 300 });
     mockVideoGenFindFirst.mockResolvedValue({ id: 'vg-1', status: 'READY' });
     mockVideoGenUpdate.mockResolvedValue({});
-    mockCheckAvatarGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', dailyUsed: 0, dailyLimit: 1, dailyRemaining: 1, isByokUser: true, isProUser: false });
+    mockCheckAvatarGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok' });
     mockAvatarOverlayUpsert.mockImplementation(({ create }: { create: Record<string, unknown> }) => ({
       id: `overlay-${create.speaker}`,
       speaker: create.speaker,

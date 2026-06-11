@@ -9,9 +9,7 @@ const mockPodcastFindUnique = vi.fn();
 const mockPodcastUpdate = vi.fn();
 const mockSaveFindUnique = vi.fn();
 const mockDiscoveryCreate = vi.fn();
-const mockCheckGenerationGate = vi.fn();
 
-const mockGetFreeTierStatus = vi.fn();
 const mockGetAutoModelConfig = vi.fn();
 const mockAddJob = vi.fn();
 
@@ -72,11 +70,6 @@ vi.mock('@/lib/queue', () => ({
   JobType: { EXTRACT_CONTENT: 'EXTRACT_CONTENT' },
 }));
 
-vi.mock('@/lib/generation-gate', () => ({
-  checkGenerationGate: (...args: unknown[]) => mockCheckGenerationGate(...args),
-  getFreeTierStatus: (...args: unknown[]) => mockGetFreeTierStatus(...args),
-}));
-
 vi.mock('@/lib/auto-model-config', () => ({
   getAutoModelConfig: (...args: unknown[]) => mockGetAutoModelConfig(...args),
 }));
@@ -113,10 +106,6 @@ vi.mock('@/lib/r2', () => ({
 vi.mock('@/lib/auth-guards', () => ({
   checkSuspension: vi.fn().mockReturnValue(null),
   requireAdmin: vi.fn().mockReturnValue(null),
-}));
-
-vi.mock('@/lib/free-tier-provider-selector', () => ({
-  selectFreeTierProviders: vi.fn().mockReturnValue({ ai: null, tts: null }),
 }));
 
 import { GET as getList, POST as createPodcast } from '@/app/api/podcasts/route';
@@ -288,6 +277,20 @@ describe('POST /api/podcasts', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUserFindUnique.mockResolvedValue({ preferredAiModel: null });
+    mockGetAutoModelConfig.mockResolvedValue({
+      model: {
+        aiProvider: 'anthropic',
+        aiModel: 'claude-haiku-4-5-20251001',
+        ttsProvider: 'openai',
+        ttsModel: 'tts-1-hd',
+        sttProvider: 'openai',
+        sttModel: 'whisper-1',
+      },
+      platform: {
+        aiProvider: 'anthropic',
+        aiModel: 'claude-haiku-4-5-20251001',
+      },
+    });
   });
 
   it('returns 401 when not authenticated', async () => {
@@ -304,7 +307,6 @@ describe('POST /api/podcasts', () => {
   it('creates podcast and queues extraction pipeline', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 59, resetAt: Date.now() });
-    mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', isByokUser: true });
     mockDiscoveryCreate.mockResolvedValue({ id: 'disc-1' });
     mockAddJob.mockResolvedValue(undefined);
     mockPrisma.podcast.create.mockResolvedValue({
@@ -332,28 +334,39 @@ describe('POST /api/podcasts', () => {
     );
   });
 
-  it('returns 400 for BYOK creation without an explicit TTS provider', async () => {
+  it('auto-resolves TTS provider when none is explicit', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 59, resetAt: Date.now() });
-    mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', isByokUser: true });
+    mockDiscoveryCreate.mockResolvedValue({ id: 'disc-1' });
+    mockAddJob.mockResolvedValue(undefined);
+    mockPrisma.podcast.create.mockResolvedValue({
+      ...mockPodcast,
+      status: 'EXTRACTING',
+      ttsProvider: 'openai',
+      ttsModel: 'tts-1-hd',
+    });
 
     const request = createPostRequest('/api/podcasts', {
       title: 'Quantum Physics 101',
       topic: 'An introduction to quantum mechanics',
     });
     const response = await createPodcast(request);
-    const result = await response.json();
 
-    expect(response.status).toBe(400);
-    expect(result).toMatchObject({ code: 'tts_provider_required' });
-    expect(mockPodcastCreate).not.toHaveBeenCalled();
-    expect(mockAddJob).not.toHaveBeenCalled();
+    expect(response.status).toBe(201);
+    expect(mockPodcastCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          ttsProvider: 'openai',
+          ttsModel: 'tts-1-hd',
+          ttsAutoResolved: true,
+        }),
+      }),
+    );
   });
 
   it('creates podcast with optional voice IDs', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 59, resetAt: Date.now() });
-    mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', isByokUser: true });
     mockDiscoveryCreate.mockResolvedValue({ id: 'disc-1' });
     mockAddJob.mockResolvedValue(undefined);
     mockPrisma.podcast.create.mockResolvedValue(mockPodcast);
@@ -608,7 +621,7 @@ describe('GET /api/podcasts/[podcastId]', () => {
 describe('PATCH /api/podcasts/[podcastId]', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
-    mockUserFindUniqueOrThrow.mockResolvedValue({ plan: 'PRO', role: 'USER' });
+    mockUserFindUniqueOrThrow.mockResolvedValue({ role: 'USER' });
     const { getTierFeatures } = await import('@/lib/tier-features');
     (getTierFeatures as ReturnType<typeof vi.fn>).mockReturnValue({
       maxDurationMinutes: 30,
@@ -705,7 +718,7 @@ describe('PATCH /api/podcasts/[podcastId]', () => {
   it('updates podcast visibility to PRIVATE for Pro user', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockPodcastFindUnique.mockResolvedValue({ userId: 'user-1' });
-    mockUserFindUniqueOrThrow.mockResolvedValue({ plan: 'PRO', role: 'USER' });
+    mockUserFindUniqueOrThrow.mockResolvedValue({ role: 'USER' });
     mockPodcastUpdate.mockResolvedValue({
       ...mockPodcastWithRelations,
       visibility: 'PRIVATE',

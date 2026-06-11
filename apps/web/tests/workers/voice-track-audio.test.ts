@@ -123,7 +123,7 @@ function setupVoiceTrack(
     podcast: {
       userId: 'user-001',
       language: null,
-      user: { plan: 'FREE' },
+      user: {},
     },
   });
 }

@@ -57,8 +57,6 @@ export interface AiModelOption {
   /** Short name without provider prefix, e.g. 'Haiku 4.5', '5 Mini'. */
   shortDisplayName: string;
   tier: 'fast' | 'balanced' | 'best' | 'max';
-  /** Minimum plan required to use this model on platform credits (BYOK bypasses). */
-  requiredPlan: 'FREE' | 'PRO';
   /** Maximum input context window in tokens. */
   contextWindow: number;
   /** Maximum output tokens the model can generate. */
@@ -99,9 +97,9 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
     defaultModel: 'claude-haiku-4-5-20251001',
     getApiKeyUrl: 'https://console.anthropic.com/settings/keys',
     models: [
-      { id: 'claude-haiku-4-5-20251001', displayName: 'Claude Haiku 4.5', shortDisplayName: 'Haiku 4.5', tier: 'fast', requiredPlan: 'FREE', contextWindow: 200_000, maxOutputTokens: 64_000 },
-      { id: 'claude-sonnet-4-6', displayName: 'Claude Sonnet 4.6', shortDisplayName: 'Sonnet 4.6', tier: 'balanced', requiredPlan: 'PRO', contextWindow: 200_000, maxOutputTokens: 64_000 },
-      { id: 'claude-opus-4-6', displayName: 'Claude Opus 4.6', shortDisplayName: 'Opus 4.6', tier: 'best', requiredPlan: 'PRO', contextWindow: 200_000, maxOutputTokens: 128_000 },
+      { id: 'claude-haiku-4-5-20251001', displayName: 'Claude Haiku 4.5', shortDisplayName: 'Haiku 4.5', tier: 'fast', contextWindow: 200_000, maxOutputTokens: 64_000 },
+      { id: 'claude-sonnet-4-6', displayName: 'Claude Sonnet 4.6', shortDisplayName: 'Sonnet 4.6', tier: 'balanced', contextWindow: 200_000, maxOutputTokens: 64_000 },
+      { id: 'claude-opus-4-6', displayName: 'Claude Opus 4.6', shortDisplayName: 'Opus 4.6', tier: 'best', contextWindow: 200_000, maxOutputTokens: 128_000 },
     ],
     auth: {
       fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'sk-ant-...' }],
@@ -136,14 +134,14 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
     defaultModel: 'gpt-5.4',
     getApiKeyUrl: 'https://platform.openai.com/api-keys',
     models: [
-      { id: 'gpt-5-nano', displayName: 'GPT-5 Nano', shortDisplayName: '5 Nano', tier: 'fast', requiredPlan: 'FREE', contextWindow: 400_000, maxOutputTokens: 128_000, isReasoning: true },
-      { id: 'gpt-5-mini', displayName: 'GPT-5 Mini', shortDisplayName: '5 Mini', tier: 'fast', requiredPlan: 'FREE', contextWindow: 400_000, maxOutputTokens: 128_000, isReasoning: true },
-      { id: 'gpt-5', displayName: 'GPT-5', shortDisplayName: '5', tier: 'balanced', requiredPlan: 'PRO', contextWindow: 400_000, maxOutputTokens: 128_000, isReasoning: true },
-      { id: 'gpt-5.2', displayName: 'GPT-5.2', shortDisplayName: '5.2', tier: 'best', requiredPlan: 'PRO', contextWindow: 400_000, maxOutputTokens: 128_000, isReasoning: true },
-      { id: 'gpt-5.4-nano', displayName: 'GPT-5.4 Nano', shortDisplayName: '5.4 Nano', tier: 'fast', requiredPlan: 'FREE', contextWindow: 400_000, maxOutputTokens: 128_000, isReasoning: true },
-      { id: 'gpt-5.4-mini', displayName: 'GPT-5.4 Mini', shortDisplayName: '5.4 Mini', tier: 'fast', requiredPlan: 'FREE', contextWindow: 400_000, maxOutputTokens: 128_000, isReasoning: true },
-      { id: 'gpt-5.4', displayName: 'GPT-5.4', shortDisplayName: '5.4', tier: 'balanced', requiredPlan: 'PRO', contextWindow: 1_050_000, maxOutputTokens: 128_000, isReasoning: true },
-      { id: 'gpt-5.4-pro', displayName: 'GPT-5.4 Pro', shortDisplayName: '5.4 Pro', tier: 'best', requiredPlan: 'PRO', contextWindow: 1_050_000, maxOutputTokens: 128_000, isReasoning: true },
+      { id: 'gpt-5-nano', displayName: 'GPT-5 Nano', shortDisplayName: '5 Nano', tier: 'fast', contextWindow: 400_000, maxOutputTokens: 128_000, isReasoning: true },
+      { id: 'gpt-5-mini', displayName: 'GPT-5 Mini', shortDisplayName: '5 Mini', tier: 'fast', contextWindow: 400_000, maxOutputTokens: 128_000, isReasoning: true },
+      { id: 'gpt-5', displayName: 'GPT-5', shortDisplayName: '5', tier: 'balanced', contextWindow: 400_000, maxOutputTokens: 128_000, isReasoning: true },
+      { id: 'gpt-5.2', displayName: 'GPT-5.2', shortDisplayName: '5.2', tier: 'best', contextWindow: 400_000, maxOutputTokens: 128_000, isReasoning: true },
+      { id: 'gpt-5.4-nano', displayName: 'GPT-5.4 Nano', shortDisplayName: '5.4 Nano', tier: 'fast', contextWindow: 400_000, maxOutputTokens: 128_000, isReasoning: true },
+      { id: 'gpt-5.4-mini', displayName: 'GPT-5.4 Mini', shortDisplayName: '5.4 Mini', tier: 'fast', contextWindow: 400_000, maxOutputTokens: 128_000, isReasoning: true },
+      { id: 'gpt-5.4', displayName: 'GPT-5.4', shortDisplayName: '5.4', tier: 'balanced', contextWindow: 1_050_000, maxOutputTokens: 128_000, isReasoning: true },
+      { id: 'gpt-5.4-pro', displayName: 'GPT-5.4 Pro', shortDisplayName: '5.4 Pro', tier: 'best', contextWindow: 1_050_000, maxOutputTokens: 128_000, isReasoning: true },
     ],
     auth: {
       fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'sk-...' }],
@@ -167,9 +165,9 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
     defaultModel: 'opus',
     getApiKeyUrl: '',
     models: [
-      { id: 'haiku', displayName: 'Haiku', shortDisplayName: 'Haiku 4.5', tier: 'fast', requiredPlan: 'FREE', contextWindow: 200_000, maxOutputTokens: 64_000 },
-      { id: 'sonnet', displayName: 'Sonnet', shortDisplayName: 'Sonnet 4.6', tier: 'balanced', requiredPlan: 'PRO', contextWindow: 200_000, maxOutputTokens: 64_000 },
-      { id: 'opus', displayName: 'Opus', shortDisplayName: 'Opus 4.6', tier: 'best', requiredPlan: 'PRO', contextWindow: 200_000, maxOutputTokens: 128_000 },
+      { id: 'haiku', displayName: 'Haiku', shortDisplayName: 'Haiku 4.5', tier: 'fast', contextWindow: 200_000, maxOutputTokens: 64_000 },
+      { id: 'sonnet', displayName: 'Sonnet', shortDisplayName: 'Sonnet 4.6', tier: 'balanced', contextWindow: 200_000, maxOutputTokens: 64_000 },
+      { id: 'opus', displayName: 'Opus', shortDisplayName: 'Opus 4.6', tier: 'best', contextWindow: 200_000, maxOutputTokens: 128_000 },
     ],
     auth: {
       fields: [],
@@ -269,8 +267,8 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
     defaultModel: 'gemini-3.1-flash-lite-preview',
     getApiKeyUrl: 'https://aistudio.google.com/apikey',
     models: [
-      { id: 'gemini-3.1-flash-lite-preview', displayName: 'Gemini 3.1 Flash Lite', shortDisplayName: 'Flash Lite 3.1', tier: 'fast', requiredPlan: 'FREE', contextWindow: 1_000_000, maxOutputTokens: 64_000 },
-      { id: 'gemini-3.1-pro-preview', displayName: 'Gemini 3.1 Pro', shortDisplayName: 'Pro 3.1', tier: 'balanced', requiredPlan: 'PRO', contextWindow: 1_000_000, maxOutputTokens: 64_000 },
+      { id: 'gemini-3.1-flash-lite-preview', displayName: 'Gemini 3.1 Flash Lite', shortDisplayName: 'Flash Lite 3.1', tier: 'fast', contextWindow: 1_000_000, maxOutputTokens: 64_000 },
+      { id: 'gemini-3.1-pro-preview', displayName: 'Gemini 3.1 Pro', shortDisplayName: 'Pro 3.1', tier: 'balanced', contextWindow: 1_000_000, maxOutputTokens: 64_000 },
     ],
     auth: {
       fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'AIza...' }],
@@ -442,7 +440,6 @@ export function isValidModelId(modelId: string): boolean {
 export async function resolveAiModelAndProvider(opts: {
   podcastAiModel?: string | null;
   aiKey?: { provider: string; apiKey: string } | null;
-  plan?: 'FREE' | 'PRO';
 }): Promise<{ model: string; provider: string }> {
   // 1. Podcast-level model override — only use if the model is in the registry
   if (opts.podcastAiModel) {
@@ -477,18 +474,6 @@ export async function resolveAiModelAndProvider(opts: {
   }
 
   throw new Error('AI model is required when no AI key is configured.');
-}
-
-/**
- * Look up the minimum plan required for a model ID.
- * Returns null if the model is not found in any provider.
- */
-export function getModelRequiredPlan(modelId: string): 'FREE' | 'PRO' | null {
-  for (const provider of Object.values(AI_PROVIDERS)) {
-    const model = provider.models.find((m) => m.id === modelId);
-    if (model) return model.requiredPlan;
-  }
-  return null;
 }
 
 /**

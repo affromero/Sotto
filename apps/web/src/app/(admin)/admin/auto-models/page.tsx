@@ -70,7 +70,7 @@ export default async function AutoModelsPage() {
 
   const avatarPricing = await fetchAvatarModels();
   const avatarPriceMap = new Map(avatarPricing.map((m) => [m.modelId, m]));
-  const imgSurcharge = getImageModelCost(config.proImageModel) * 1; // 1 MP portrait
+  const imgSurcharge = getImageModelCost(config.imageModel) * 1; // 1 MP portrait
   const LIP_SYNC_IMG_MODELS = new Set(['fal-veed-fabric-1.0', 'fal-kling-avatar-v2-pro']);
 
   const avatarProviders = getAllAvatarProviderMeta().map((p) => ({
@@ -110,7 +110,7 @@ export default async function AutoModelsPage() {
       <div className={styles.header}>
         <h1 className={styles.title}>Auto Models</h1>
         <p className={styles.subtitle}>
-          Configure which models &ldquo;Auto&rdquo; resolves to for each plan tier
+          Configure the default models and available server-backed model set.
         </p>
       </div>
 
@@ -127,7 +127,7 @@ export default async function AutoModelsPage() {
 
       <div className={styles.platformNote}>
         <strong>Platform Operations</strong> uses a dedicated AI model for internal tasks
-        that run without user context. This can be more capable than the free/pro defaults.
+        that run without user context. This can be more capable than the learner-facing default.
         <ul>
           <li>Handle screening &mdash; classifying usernames as names, offensive, or OK</li>
           <li>Credential lookup &mdash; verifying participant credentials via web search</li>

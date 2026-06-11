@@ -10,8 +10,7 @@ const mockDiscoveryFindFirst = vi.fn();
 const mockCreateSegmentsAndQueueAudio = vi.fn();
 const mockPodcastVoiceDeleteMany = vi.fn().mockResolvedValue({ count: 0 });
 const mockPodcastVoiceCreateMany = vi.fn().mockResolvedValue({ count: 0 });
-const mockCheckGenerationGate = vi.fn();
-const mockSelectFreeTierProviders = vi.fn();
+const mockGetAutoModelConfig = vi.fn();
 const mockAssignVoicesForPodcast = vi.fn();
 const mockConvertTurnsForProvider = vi.fn();
 
@@ -51,12 +50,8 @@ vi.mock('@/lib/redis', () => ({
   publishPodcastStatus: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('@/lib/generation-gate', () => ({
-  checkGenerationGate: (...args: unknown[]) => mockCheckGenerationGate(...args),
-}));
-
-vi.mock('@/lib/free-tier-provider-selector', () => ({
-  selectFreeTierProviders: (...args: unknown[]) => mockSelectFreeTierProviders(...args),
+vi.mock('@/lib/auto-model-config', () => ({
+  getAutoModelConfig: (...args: unknown[]) => mockGetAutoModelConfig(...args),
 }));
 
 vi.mock('@/lib/voice-assigner', () => ({
@@ -94,10 +89,19 @@ const defaultTurns = [
 describe('POST /api/podcasts/[podcastId]/script/approve', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', isByokUser: true });
-    mockSelectFreeTierProviders.mockResolvedValue({
-      aiProvider: 'anthropic', aiModel: 'claude-haiku-4-5-20251001', aiQuota: 10,
-      ttsProvider: 'elevenlabs', ttsModel: 'eleven_multilingual_v2', ttsQuota: 10,
+    mockGetAutoModelConfig.mockResolvedValue({
+      model: {
+        aiProvider: 'anthropic',
+        aiModel: 'claude-haiku-4-5-20251001',
+        ttsProvider: 'elevenlabs',
+        ttsModel: 'eleven_multilingual_v2',
+        sttProvider: 'openai',
+        sttModel: 'whisper-1',
+      },
+      platform: {
+        aiProvider: 'anthropic',
+        aiModel: 'claude-haiku-4-5-20251001',
+      },
     });
     mockPodcastUpdate.mockResolvedValue({});
     mockPodcastFindUniqueOrThrow.mockResolvedValue({ ttsProvider: 'elevenlabs' });
@@ -185,10 +189,10 @@ describe('POST /api/podcasts/[podcastId]/script/approve', () => {
   });
 
   describe('audio config at approve time', () => {
-    it('writes ttsProvider from body for BYOK user', async () => {
+    it('writes ttsProvider from body', async () => {
       mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
-      mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', isByokUser: true });
       mockPodcastFindUnique.mockResolvedValue({ userId: 'user-1', status: 'SCRIPT_READY' });
+      mockPodcastFindUniqueOrThrow.mockResolvedValue({ ttsProvider: 'openai' });
       mockScriptFindUnique.mockResolvedValue({ turns: defaultTurns });
 
       const response = await POST(
@@ -203,13 +207,16 @@ describe('POST /api/podcasts/[podcastId]/script/approve', () => {
           data: { ttsProvider: 'openai', ttsModel: 'tts-1-hd' },
         })
       );
-      expect(mockSelectFreeTierProviders).not.toHaveBeenCalled();
     });
 
-    it('uses existing ttsProvider for BYOK user when no body provider is provided', async () => {
+    it('uses existing ttsProvider when no body provider is provided', async () => {
       mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
-      mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', isByokUser: true });
-      mockPodcastFindUnique.mockResolvedValue({ userId: 'user-1', status: 'SCRIPT_READY' });
+      mockPodcastFindUnique.mockResolvedValue({
+        userId: 'user-1',
+        status: 'SCRIPT_READY',
+        ttsProvider: 'elevenlabs',
+        ttsModel: 'eleven_multilingual_v2',
+      });
       mockScriptFindUnique.mockResolvedValue({ turns: defaultTurns });
 
       const response = await POST(createRequest(), await createParams('pod-1'));
@@ -219,8 +226,11 @@ describe('POST /api/podcasts/[podcastId]/script/approve', () => {
         (call: unknown[]) => (call[0] as Record<string, unknown>).data &&
           'ttsProvider' in ((call[0] as Record<string, Record<string, unknown>>).data)
       );
-      expect(providerUpdateCalls).toHaveLength(0);
-      expect(mockSelectFreeTierProviders).not.toHaveBeenCalled();
+      expect(providerUpdateCalls).toHaveLength(1);
+      expect(providerUpdateCalls[0][0]).toEqual(expect.objectContaining({
+        where: { id: 'pod-1' },
+        data: { ttsProvider: 'elevenlabs', ttsModel: 'eleven_multilingual_v2' },
+      }));
       expect(mockAssignVoicesForPodcast).toHaveBeenCalledWith(
         'pod-1',
         expect.any(Array),
@@ -228,36 +238,14 @@ describe('POST /api/podcasts/[podcastId]/script/approve', () => {
       );
     });
 
-    it('requires a ttsProvider for BYOK user when none is selected or persisted', async () => {
+    it('uses auto-model TTS defaults when none is selected or persisted', async () => {
       mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
-      mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', isByokUser: true });
-      mockPodcastFindUnique.mockResolvedValue({ userId: 'user-1', status: 'SCRIPT_READY' });
-      mockPodcastFindUniqueOrThrow.mockResolvedValueOnce({ ttsProvider: null });
-
-      const response = await POST(createRequest(), await createParams('pod-1'));
-      const body = await response.json();
-
-      expect(response.status).toBe(400);
-      expect(body).toMatchObject({
-        error: 'Choose a TTS provider before approving the script.',
-        code: 'tts_provider_required',
-      });
-      expect(mockSelectFreeTierProviders).not.toHaveBeenCalled();
-      expect(mockScriptFindUnique).not.toHaveBeenCalled();
-      expect(mockAssignVoicesForPodcast).not.toHaveBeenCalled();
-      expect(mockCreateSegmentsAndQueueAudio).not.toHaveBeenCalled();
-    });
-
-    it('auto-selects ttsProvider for free-tier user', async () => {
-      mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
-      mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', isByokUser: false });
       mockPodcastFindUnique.mockResolvedValue({ userId: 'user-1', status: 'SCRIPT_READY' });
       mockScriptFindUnique.mockResolvedValue({ turns: defaultTurns });
 
       const response = await POST(createRequest(), await createParams('pod-1'));
 
       expect(response.status).toBe(200);
-      expect(mockSelectFreeTierProviders).toHaveBeenCalledWith('user-1');
       expect(mockPodcastUpdate).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: 'pod-1' },

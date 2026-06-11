@@ -129,20 +129,6 @@ function getScreenshotDefs(demoPodcastId: string): ScreenshotDef[] {
       fullPage: false,
     },
     {
-      name: 'pricing',
-      path: '/pricing',
-      viewport: { width: 1440, height: 900 },
-      auth: 'none',
-      fullPage: false,
-    },
-    {
-      name: 'billing',
-      path: '/billing',
-      viewport: { width: 1440, height: 900 },
-      auth: 'demo',
-      fullPage: false,
-    },
-    {
       name: 'admin-overview',
       path: '/admin',
       viewport: { width: 1440, height: 900 },

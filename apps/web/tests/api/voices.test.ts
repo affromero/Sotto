@@ -21,7 +21,6 @@ const mockCheckRateLimit = vi.fn();
 const mockGetVoiceCatalog = vi.fn();
 const mockGetByokKey = vi.fn();
 const mockCreateTtsProviderAsync = vi.fn();
-const mockGetPlanFeatureConfig = vi.fn();
 
 vi.mock('@/lib/auth', () => ({
   auth: (...args: unknown[]) => mockAuth(...args),
@@ -111,10 +110,6 @@ vi.mock('@/lib/tier-features', () => ({
   }),
 }));
 
-vi.mock('@/lib/plan-feature-config', () => ({
-  getPlanFeatureConfig: (...args: unknown[]) => mockGetPlanFeatureConfig(...args),
-}));
-
 vi.mock('@/lib/fal-voice-clone', () => ({
   cloneVoiceViaFal: vi.fn().mockResolvedValue({ voiceId: 'fal-voice-1' }),
 }));
@@ -155,20 +150,6 @@ const mockSession = {
   expires: '2025-12-31',
 };
 
-const defaultPlanFeatureConfig = {
-  freeVoiceCloningEnabled: false,
-  proVoiceCloningEnabled: true,
-  freeVoiceTracksEnabled: false,
-  proVoiceTracksEnabled: true,
-  freeMaxVoiceTracks: 0,
-  proMaxVoiceTracks: 3,
-  voiceMarketplaceEnabled: true,
-};
-
-beforeEach(() => {
-  mockGetPlanFeatureConfig.mockResolvedValue(defaultPlanFeatureConfig);
-});
-
 const mockVoiceClone = {
   id: 'clone-1',
   userId: 'user-1',
@@ -192,10 +173,7 @@ const mockVoiceClone2 = {
 describe('GET /api/voices', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockUserFindUniqueOrThrow.mockResolvedValue({
-      stripeAccountId: null,
-      stripeOnboarded: false,
-    });
+    mockUserFindUniqueOrThrow.mockResolvedValue({});
     mockVoiceAllowlistFindMany.mockResolvedValue([]);
     mockVoiceRequestFindMany.mockResolvedValue([]);
     mockGetVoiceCatalog.mockResolvedValue([
@@ -354,7 +332,7 @@ describe('GET /api/voices', () => {
 describe('POST /api/voices/clone', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockUserFindUniqueOrThrow.mockResolvedValue({ plan: 'PRO', role: 'USER' });
+    mockUserFindUniqueOrThrow.mockResolvedValue({ role: 'USER' });
   });
 
   it('returns 401 when user is not authenticated', async () => {
@@ -597,7 +575,6 @@ describe('POST /api/voices/clone', () => {
 describe('PATCH /api/voices/clone', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGetPlanFeatureConfig.mockResolvedValue(defaultPlanFeatureConfig);
   });
 
   it('updates the voice clone description for its owner', async () => {

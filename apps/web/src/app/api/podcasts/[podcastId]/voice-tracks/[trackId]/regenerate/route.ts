@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { voiceTrackAudioQueue, addJob, JobType } from '@/lib/queue';
-import { checkGenerationGate } from '@/lib/generation-gate';
-import { checkRateLimit } from '@/lib/redis';
 import { checkSuspension } from '@/lib/auth-guards';
 import type { GenerateVoiceTrackAudioPayload } from '@/lib/queue';
 
@@ -46,24 +44,6 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
 
   if (voiceTrack.status !== 'STALE' && voiceTrack.status !== 'FAILED') {
     return errorResponse('Only STALE or FAILED voice tracks can be regenerated', 400);
-  }
-
-  // Rate limits
-  const hourly = await checkRateLimit(`generate:hour:${userId}`, 20, 3600);
-  if (!hourly.allowed) {
-    return errorResponse('Rate limit exceeded: max 20 generations per hour.', 429);
-  }
-  const daily = await checkRateLimit(`generate:day:${userId}`, 100, 86400);
-  if (!daily.allowed) {
-    return errorResponse('Rate limit exceeded: max 100 generations per day.', 429);
-  }
-
-  const gate = await checkGenerationGate(userId);
-  if (!gate.allowed) {
-    const msg = gate.reason === 'generation_in_progress'
-      ? 'A podcast is already generating. Wait for it to finish before starting another.'
-      : 'No voice provider available. Add a TTS key in Settings for unlimited generation.';
-    return errorResponse(msg, 403, { code: gate.reason });
   }
 
   // Sync voice track segments with current podcast segments

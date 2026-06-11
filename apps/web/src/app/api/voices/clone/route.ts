@@ -4,11 +4,9 @@ import { prisma } from '@/lib/prisma';
 import { cloneVoice, deleteClonedVoice, getVoiceById } from '@/lib/elevenlabs';
 import { cloneVoiceViaFal } from '@/lib/fal-voice-clone';
 import { cloneVoiceViaCartesia } from '@/lib/cartesia-voice-clone';
-import { getByokKey, hasByokKey } from '@/lib/byok';
+import { getByokKey } from '@/lib/byok';
 import { cloneVoiceSchema, importVoiceSchema, importElevenLabsVoiceSchema } from '@/lib/validations';
 import { MAX_VOICE_CLONES } from '@/lib/generation-limits';
-import { getTierFeatures } from '@/lib/tier-features';
-import { getPlanFeatureConfig } from '@/lib/plan-feature-config';
 import { logUsage } from '@/lib/usage-logger';
 import { uploadFile } from '@/lib/r2';
 import { addJob, voiceVerificationQueue, JobType } from '@/lib/queue';
@@ -22,20 +20,6 @@ export async function POST(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
     return errorResponse('Unauthorized', 401);
-  }
-
-  // Pro gate — voice cloning requires Pro
-  const [user, isByok, voiceConfig] = await Promise.all([
-    prisma.user.findUniqueOrThrow({
-      where: { id: session.user.id },
-      select: { plan: true, role: true },
-    }),
-    hasByokKey(session.user.id),
-    getPlanFeatureConfig(),
-  ]);
-  const tierFeatures = getTierFeatures(user.plan as 'FREE' | 'PRO', isByok, user.role, voiceConfig);
-  if (!tierFeatures.voiceCloningEnabled) {
-    return errorResponse('Voice cloning requires a Pro subscription.', 403);
   }
 
   const existingCount = await prisma.voiceClone.count({

@@ -2,7 +2,7 @@
 
 > **Date**: 2026-05-15
 >
-> **Summary**: Sotto roles control workspace and admin access. They do not create a creator network or public ranking layer. Dashboards focus on private library health, provider readiness, source status, worker operations, and managed hosting administration.
+> **Summary**: Sotto roles control workspace and admin access. They do not create a creator network or public ranking layer. Dashboards focus on private library health, provider readiness, source status, worker operations, and self-host operations.
 
 ---
 
@@ -15,7 +15,7 @@
 | `ADMIN` | email allowlist or manual admin assignment | admin dashboards and operational controls |
 | `SYSTEM` | internal automation only | owns system operations; never assigned to a real login |
 
-Roles are not subscription tiers. Privacy, private RSS, and local operation are available without a paid plan.
+Roles are operational permissions only. Privacy, private RSS, and local operation are available without commercial access controls.
 
 ---
 
@@ -45,7 +45,7 @@ Possible controls:
 - source management
 - advanced analytics
 - team/workspace controls
-- managed hosting settings
+- self-host operations settings
 
 Analytics should stay private and operational:
 
@@ -62,7 +62,7 @@ Analytics should stay private and operational:
 
 | Page | Path | Purpose |
 |---|---|---|
-| Overview | `/admin` | users, podcasts, jobs, health, managed hosting status |
+| Overview | `/admin` | users, podcasts, jobs, health, and setup status |
 | Users | `/admin/users` | search users, update role, inspect setup readiness |
 | Podcasts | `/admin/podcasts` | inspect podcast status and ownership |
 | Waitlist | `/admin/waitlist` | export and manage early access |
@@ -73,7 +73,6 @@ Analytics should stay private and operational:
 | Inspire | `/admin/inspire` | private inspiration/source management |
 | Ratings | `/admin/ratings` | quality/rating oversight |
 | Twitter | `/admin/twitter` | owner-scoped Twitter source health |
-| Revenue | `/admin/revenue` | managed hosting and optional paid voice-sharing revenue |
 | Costs | `/admin/costs` | provider and infrastructure cost tracking |
 | Pipeline | `/admin/pipeline` | queue status, failures, retries |
 | Engagement | `/admin/engagement` | private activity metrics |

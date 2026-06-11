@@ -17,7 +17,7 @@ const mockPrismaPodcastUpdate = vi.fn().mockResolvedValue({});
 const mockPrismaPodcastVersionCreate = vi.fn().mockResolvedValue({});
 const mockPrismaDiscoveryFindUnique = vi.fn().mockResolvedValue({ durationTarget: 5 });
 const mockPrismaPipelineEventCreate = vi.fn().mockResolvedValue({});
-const mockPrismaUserFindUniqueOrThrow = vi.fn().mockResolvedValue({ role: 'USER', plan: 'FREE' });
+const mockPrismaUserFindUniqueOrThrow = vi.fn().mockResolvedValue({ role: 'USER' });
 const mockPrismaNotificationFindFirst = vi.fn().mockResolvedValue(null);
 
 vi.mock('@/lib/prisma', () => {
@@ -99,6 +99,11 @@ vi.mock('@/lib/byok', () => ({
   hasByokKey: vi.fn().mockResolvedValue(false),
 }));
 
+vi.mock('@/lib/redis', () => ({
+  invalidatePodcastCache: vi.fn().mockResolvedValue(undefined),
+  publishPodcastStatus: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock('@/lib/audio-fingerprint', () => ({
   generateFingerprint: vi.fn().mockResolvedValue({ fingerprint: [1, 2, 3], duration: 300 }),
 }));
@@ -109,11 +114,6 @@ vi.mock('@/lib/voice-pricing', () => ({
 
 vi.mock('@/lib/referrals', () => ({
   verifyReferral: vi.fn().mockResolvedValue(undefined),
-}));
-
-const mockConsumeFreeGeneration = vi.fn().mockResolvedValue(undefined);
-vi.mock('@/lib/generation-gate', () => ({
-  consumeFreeGeneration: (...args: unknown[]) => mockConsumeFreeGeneration(...args),
 }));
 
 vi.mock('@/lib/generation-limits', () => ({

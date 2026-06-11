@@ -115,7 +115,6 @@ export async function processContentExtraction(job: Job<ExtractContentPayload>):
     select: {
       source: true,
       aiModel: true,
-      user: { select: { plan: true } },
     },
   });
 
@@ -131,7 +130,6 @@ export async function processContentExtraction(job: Job<ExtractContentPayload>):
       const { model, provider } = await resolveAiModelAndProvider({
         podcastAiModel: podcast.aiModel,
         aiKey: initialAiKey,
-        plan: podcast.user.plan as 'FREE' | 'PRO',
       });
 
       const providerAiKey =

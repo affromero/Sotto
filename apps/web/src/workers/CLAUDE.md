@@ -58,7 +58,7 @@ Incorporation (post-READY):
   incorporate endpoint → segment-regeneration → audio-stitching (skipSfx) → READY
   (ANSWERED → INCORPORATING)  (TTS + insert)    (re-concat + startTimes)   (INCORPORATED)
 
-Video pipeline (post-READY, PRO/admin only):
+Video pipeline (post-READY, full access):
   POST /api/podcasts/[id]/video → visual-classification → place-enrichment (MAP_OVERLAY) / visual-generation (×N parallel) → transition-generation (×N-1 parallel) → video-composition → notification
                                    (Claude Haiku)          (fal FLUX / Pexels)              (fal video between segments)       (Remotion sidecar)    (VIDEO_READY)
 ```

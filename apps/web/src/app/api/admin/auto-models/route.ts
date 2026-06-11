@@ -17,7 +17,7 @@ export async function GET() {
   return NextResponse.json(config);
 }
 
-const planModelSchema = z.object({
+const modelSchema = z.object({
   aiProvider: z.enum(aiProviderEnum).optional(),
   aiModel: z.string().min(1).optional(),
   ttsProvider: z.enum(['elevenlabs', 'openai', 'cartesia', 'hume', 'fal', 'replicate', 'minimax', 'mistral']).optional(),
@@ -34,67 +34,29 @@ const platformSchema = z.object({
 const includedModelsField = z.array(z.string().min(1)).nullable().optional();
 
 const updateSchema = z.object({
-  free: planModelSchema.optional(),
-  pro: planModelSchema.optional(),
+  model: modelSchema.optional(),
   platform: platformSchema.optional(),
-  freeIncludedModels: includedModelsField,
-  proIncludedModels: includedModelsField,
-  freeIncludedTtsModels: includedModelsField,
-  proIncludedTtsModels: includedModelsField,
-  freeIncludedSttModels: includedModelsField,
-  proIncludedSttModels: includedModelsField,
+  includedModels: includedModelsField,
+  includedTtsModels: includedModelsField,
+  includedSttModels: includedModelsField,
   // Image
-  freeImageProvider: z.string().min(1).optional(),
-  freeImageModel: z.string().min(1).optional(),
-  proImageProvider: z.string().min(1).optional(),
-  proImageModel: z.string().min(1).optional(),
-  freeIncludedImageModels: includedModelsField,
-  proIncludedImageModels: includedModelsField,
+  imageProvider: z.string().min(1).optional(),
+  imageModel: z.string().min(1).optional(),
+  includedImageModels: includedModelsField,
   // Video
-  freeVideoProvider: z.string().min(1).optional(),
-  freeVideoModel: z.string().min(1).optional(),
-  proVideoProvider: z.string().min(1).optional(),
-  proVideoModel: z.string().min(1).optional(),
-  freeIncludedVideoModels: includedModelsField,
-  proIncludedVideoModels: includedModelsField,
+  videoProvider: z.string().min(1).optional(),
+  videoModel: z.string().min(1).optional(),
+  includedVideoModels: includedModelsField,
   // Avatar
-  freeAvatarProvider: z.string().min(1).optional(),
-  freeAvatarModel: z.string().min(1).optional(),
-  proAvatarProvider: z.string().min(1).optional(),
-  proAvatarModel: z.string().min(1).optional(),
-  freeIncludedAvatarModels: includedModelsField,
-  proIncludedAvatarModels: includedModelsField,
+  avatarProvider: z.string().min(1).optional(),
+  avatarModel: z.string().min(1).optional(),
+  includedAvatarModels: includedModelsField,
   // Music
-  freeMusicProvider: z.string().min(1).optional(),
-  freeMusicModel: z.string().min(1).optional(),
-  proMusicProvider: z.string().min(1).optional(),
-  proMusicModel: z.string().min(1).optional(),
-  freeIncludedMusicModels: includedModelsField,
-  proIncludedMusicModels: includedModelsField,
+  musicProvider: z.string().min(1).optional(),
+  musicModel: z.string().min(1).optional(),
+  includedMusicModels: includedModelsField,
   // Motion
-  freeMotionProvider: z.enum(['remotion', 'hera']).optional(),
-  proMotionProvider: z.enum(['remotion', 'hera']).optional(),
-  // Admin view mode
-  adminViewMode: z.enum(['ALL', 'PRO']).optional(),
-  // Daily limits & allocations
-  dailyGenerationLimit: z.number().int().min(0).optional(),
-  dailyGenerationLimitPro: z.number().int().min(0).optional(),
-  dailyVideoLimit: z.number().int().min(0).optional(),
-  dailyVideoLimitPro: z.number().int().min(0).optional(),
-  dailyMusicLimit: z.number().int().min(0).optional(),
-  dailyMusicLimitPro: z.number().int().min(0).optional(),
-  dailyAvatarLimit: z.number().int().min(0).optional(),
-  dailyAvatarLimitPro: z.number().int().min(0).optional(),
-  aiAllocations: z.array(z.object({
-    provider: z.string().min(1),
-    model: z.string().min(1),
-    quota: z.number().int().min(1),
-  })).optional(),
-  ttsAllocations: z.array(z.object({
-    provider: z.string().min(1),
-    model: z.string().min(1),
-    quota: z.number().int().min(1),
-  })).optional(),
+  motionProvider: z.enum(['remotion', 'hera']).optional(),
 });
 
 export async function PATCH(request: NextRequest) {
@@ -110,14 +72,14 @@ export async function PATCH(request: NextRequest) {
   }
 
   // Validate aiModel fields against registry
-  for (const block of [parsed.data.free, parsed.data.pro, parsed.data.platform]) {
+  for (const block of [parsed.data.model, parsed.data.platform]) {
     if (block?.aiModel && !isValidModelId(block.aiModel)) {
       return errorResponse(`Unknown AI model: "${block.aiModel}". Check /api/ai-models for available models.`, 400);
     }
   }
 
   // Validate model/provider consistency — reject mismatched pairs
-  for (const [label, block] of [['free', parsed.data.free], ['pro', parsed.data.pro], ['platform', parsed.data.platform]] as const) {
+  for (const [label, block] of [['default', parsed.data.model], ['platform', parsed.data.platform]] as const) {
     if (!block) continue;
     if (block.aiModel && block.aiProvider) {
       const owner = getProviderForModel(block.aiModel);

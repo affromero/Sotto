@@ -7,9 +7,8 @@ Docs are part of the product surface for the open source release. They must desc
 | File | Purpose |
 |---|---|
 | `01-product-vision.md` | Private-first product vision, positioning, and boundaries |
-| `05-plan.md` | Implementation plan for OSS onboarding, providers, agents, meetings, news, bots, and managed hosting |
+| `05-plan.md` | Implementation plan for OSS onboarding, providers, agents, meetings, news, and bots |
 | `07-ai-prompts.md` | Prompt architecture for discovery, generation, verification, and Q&A |
-| `10-stripe-billing.md` | Hosted billing reference for managed infrastructure |
 | `11-provider-pricing.md` | Provider pricing reference |
 | `16-technical-architecture.md` | System architecture and private data model |
 | `17-authentication-setup.md` | OAuth and auth setup |

@@ -84,7 +84,6 @@ interface SettingsFormProps {
     joinedAt: string;
     verified: boolean;
   }>;
-  referralBonus: number;
   appBaseUrl: string;
 }
 
@@ -125,7 +124,6 @@ export function SettingsForm({
   quizAnswerCount,
   isTwitterProviderAvailable,
   referredUsers,
-  referralBonus,
   appBaseUrl,
 }: SettingsFormProps) {
   const twitterBotLabel = getTwitterBotLabel();
@@ -985,8 +983,8 @@ export function SettingsForm({
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>AI Providers</h2>
         <p className={styles.sectionDesc}>
-          AI is free for all users &mdash; Sotto handles scripts, Q&amp;A, and discovery chat at no
-          cost. Add your own key for faster models or higher limits.
+          Configure your preferred AI providers for scripts, Q&amp;A, and discovery chat.
+          Keys are encrypted with AES-256-GCM.
         </p>
         <AiProviderCards initialConfigured={configuredAiProviders} providerMeta={aiProviderMeta} />
       </section>
@@ -995,8 +993,8 @@ export function SettingsForm({
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Voice Providers</h2>
         <p className={styles.sectionDesc}>
-          Add a voice provider key to remove the daily generation cap and unlock your choice of 7
-          TTS providers. Keys are encrypted with AES-256-GCM.
+          Add voice provider keys to use your preferred TTS models. Keys are encrypted with
+          AES-256-GCM.
         </p>
         <TtsProviderCards
           initialConfigured={configuredTtsProviders}
@@ -1032,16 +1030,8 @@ export function SettingsForm({
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>Referrals</h2>
           <p className={styles.sectionDescription}>
-            Invite friends, get more podcasts. Each verified referral earns you +1 daily generation
-            for 7 days (up to +5).
+            Invite friends to self-host Sotto or join your instance.
           </p>
-
-          {referralBonus > 0 && (
-            <div className={styles.referralBonus}>
-              +{referralBonus} bonus daily {referralBonus === 1 ? 'generation' : 'generations'}{' '}
-              earned
-            </div>
-          )}
 
           <div className={styles.referralRow}>
             <Input value={`${new URL(appBaseUrl).host}/ref/${handle}`} readOnly />

@@ -101,13 +101,6 @@ const entries: ChangelogEntry[] = [
     tags: ['feature'],
   },
   {
-    date: '2026-01-25',
-    title: 'Paid Voice Sharing',
-    description:
-      'Operators can enable paid access requests for verified voice clones via Stripe Connect. The feature stays disabled by default for private-first and self-hosted installs.',
-    tags: ['feature'],
-  },
-  {
     date: '2026-01-18',
     title: 'Twitter Bot',
     description:

@@ -169,7 +169,7 @@ describe('resolveAiModelAndProvider — explicit model routing', () => {
   });
 
   it('rejects missing model and key instead of falling back to auto config', async () => {
-    await expect(resolveAiModelAndProvider({ plan: 'FREE' })).rejects.toThrow(
+    await expect(resolveAiModelAndProvider({})).rejects.toThrow(
       'AI model is required when no AI key is configured.'
     );
   });

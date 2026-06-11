@@ -144,11 +144,6 @@ describe('POST /api/podcasts/[id]/music', () => {
     mockCheckMusicGenerationGate.mockResolvedValue({
       allowed: true,
       reason: 'ok',
-      dailyUsed: 0,
-      dailyLimit: 1,
-      dailyRemaining: 1,
-      isByokUser: false,
-      isProUser: false,
     });
     mockTryIncrementMusicGeneration.mockResolvedValue(true);
     mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'user-1', status: 'READY' });
@@ -189,34 +184,10 @@ describe('POST /api/podcasts/[id]/music', () => {
     expect(body.error).toContain('READY');
   });
 
-  it('returns 429 when daily music limit is reached', async () => {
-    mockCheckMusicGenerationGate.mockResolvedValue({
-      allowed: false,
-      reason: 'daily_limit_reached',
-      dailyUsed: 1,
-      dailyLimit: 1,
-      dailyRemaining: 0,
-      resetInSeconds: 3600,
-      isByokUser: false,
-      isProUser: false,
-    });
-    const res = await POST(createPostRequest(), routeParams);
-    expect(res.status).toBe(429);
-    const body = await res.json();
-    expect(body.code).toBe('daily_limit_reached');
-    expect(body.dailyUsed).toBe(1);
-    expect(body.resetInSeconds).toBe(3600);
-  });
-
   it('returns 403 when no music provider available', async () => {
     mockCheckMusicGenerationGate.mockResolvedValue({
       allowed: false,
       reason: 'no_music_provider',
-      dailyUsed: 0,
-      dailyLimit: 1,
-      dailyRemaining: 1,
-      isByokUser: false,
-      isProUser: false,
     });
     const res = await POST(createPostRequest(), routeParams);
     expect(res.status).toBe(403);
@@ -287,21 +258,11 @@ describe('POST /api/podcasts/[id]/music', () => {
     expect(mockAddJob).toHaveBeenCalled();
   });
 
-  it('returns 429 when atomic increment fails (TOCTOU race)', async () => {
-    mockTryIncrementMusicGeneration.mockResolvedValue(false);
-    const res = await POST(createPostRequest(), routeParams);
-    expect(res.status).toBe(429);
-  });
-
-  it('skips daily counter for BYOK users', async () => {
+  it('starts generation for configured BYOK providers', async () => {
     mockCheckMusicGenerationGate.mockResolvedValue({
       allowed: true,
       reason: 'ok',
-      dailyUsed: 0,
-      dailyLimit: 1,
-      dailyRemaining: Infinity,
-      isByokUser: true,
-      isProUser: false,
+      hasByokKey: true,
     });
 
     const res = await POST(createPostRequest(), routeParams);
@@ -309,7 +270,7 @@ describe('POST /api/podcasts/[id]/music', () => {
     expect(mockTryIncrementMusicGeneration).not.toHaveBeenCalled();
   });
 
-  it('skips gate check and daily counter for admin users', async () => {
+  it('skips the user gate for admin users', async () => {
     mockRequireAdmin.mockResolvedValue('admin-1');
 
     const res = await POST(createPostRequest(), routeParams);

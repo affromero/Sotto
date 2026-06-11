@@ -93,7 +93,7 @@ export async function processVoiceTrackAudio(
       ttsModel: true,
       voices: { select: { speaker: true, voiceId: true, provider: true, ttsModel: true } },
       podcast: {
-        select: { userId: true, language: true, user: { select: { plan: true } } },
+        select: { userId: true, language: true },
       },
     },
   });
@@ -133,7 +133,6 @@ export async function processVoiceTrackAudio(
     podcastId,
     requestedProvider,
     requestedModel,
-    plan: voiceTrack.podcast.user.plan as 'FREE' | 'PRO',
     language: podcastLanguage,
   });
 
@@ -193,7 +192,6 @@ export async function processVoiceTrackAudio(
     requestedModel,
     userId,
     podcastId,
-    plan: voiceTrack.podcast.user.plan as 'FREE' | 'PRO',
     usageCategory: 'voice_track_audio',
     extraMetadata: { voiceTrackId },
     isAborted: async () => {

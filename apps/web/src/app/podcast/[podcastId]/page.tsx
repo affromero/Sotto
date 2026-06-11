@@ -1,7 +1,6 @@
 import { notFound, redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { getFreeTierStatus } from '@/lib/generation-gate';
 import { getVideoGenerationStatus, getAvatarGenerationStatus } from '@/lib/video-gate';
 import { getMusicGenerationStatus } from '@/lib/music-gate';
 import { resolveAudioUrl } from '@/lib/r2';
@@ -133,7 +132,6 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
     // Owner-only gates (already internally parallel)
     isOwner && userId
       ? Promise.all([
-          getFreeTierStatus(userId),
           getVideoGenerationStatus(userId),
           getAvatarGenerationStatus(userId),
           getMusicGenerationStatus(userId),
@@ -148,45 +146,29 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
   // Owner data
   let videoStatus:
     | {
-        dailyUsed: number;
-        dailyLimit: number;
-        dailyRemaining: number;
-        resetInSeconds?: number;
-        isByokUser: boolean;
-        isProUser: boolean;
+        available: boolean;
+        hasByokKey: boolean;
       }
     | undefined;
   let avatarStatus:
     | {
-        dailyUsed: number;
-        dailyLimit: number;
-        dailyRemaining: number;
-        resetInSeconds?: number;
-        isByokUser: boolean;
-        isProUser: boolean;
+        available: boolean;
+        hasByokKey: boolean;
       }
     | undefined;
   let musicStatus:
     | {
-        dailyUsed: number;
-        dailyLimit: number;
-        dailyRemaining: number;
-        resetInSeconds?: number;
-        isByokUser: boolean;
-        isProUser: boolean;
+        available: boolean;
+        hasByokKey: boolean;
       }
     | undefined;
   let costBreakdown: Awaited<ReturnType<typeof getPodcastCostBreakdown>> | undefined;
-  let ownerIsPro = false;
-  let ownerIsByok = false;
   if (ownerData) {
-    const [freeTier, vidStatus, avStatus, musStatus, costStats] = ownerData;
+    const [vidStatus, avStatus, musStatus, costStats] = ownerData;
     videoStatus = vidStatus;
     avatarStatus = avStatus;
     musicStatus = musStatus;
     costBreakdown = costStats;
-    ownerIsPro = freeTier.isProUser;
-    ownerIsByok = freeTier.isByokUser;
   }
 
   const visibility = podcast.visibility;
@@ -308,7 +290,6 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
     language: podcast.language,
     aiAutoResolved: podcast.aiAutoResolved,
     ttsAutoResolved: podcast.ttsAutoResolved,
-    ownerIsPro: false,
     failureReason: podcast.failureReason,
     failedAtStatus: podcast.failedAtStatus,
     errorId: podcast.errorId,
@@ -363,7 +344,7 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
           musicStatus={musicStatus}
         />
         {costBreakdown && costBreakdown.total > 0 && (
-          <CostBreakdown breakdown={costBreakdown} isPro={ownerIsPro} isByok={ownerIsByok} />
+          <CostBreakdown breakdown={costBreakdown} />
         )}
         {!userId && podcast.visibility === 'PUBLIC' && (
           <JoinCTA creatorHandle={podcast.user.handle} creatorName={podcast.user.name} />

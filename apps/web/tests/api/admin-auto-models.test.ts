@@ -1,7 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
-
-// ---- Mocks ----
 
 const mockAuth = vi.fn();
 const mockGetAutoModelConfig = vi.fn();
@@ -43,13 +41,9 @@ vi.mock('@/lib/api-response', () => ({
     }),
 }));
 
-// ---- Import under test ----
-
 import { GET, PATCH } from '@/app/api/admin/auto-models/route';
 
-// ---- Helpers ----
-
-function createPatchRequest(body: Record<string, unknown>): NextRequest {
+function patchRequest(body: Record<string, unknown>): NextRequest {
   return new NextRequest(new URL('http://localhost:3000/api/admin/auto-models'), {
     method: 'PATCH',
     body: JSON.stringify(body),
@@ -57,26 +51,36 @@ function createPatchRequest(body: Record<string, unknown>): NextRequest {
   });
 }
 
-const mockConfig = {
-  free: {
+const config = {
+  model: {
     aiProvider: 'anthropic',
-    aiModel: 'claude-haiku-4-5-20251001',
+    aiModel: 'claude-sonnet-4-6',
     ttsProvider: 'openai',
     ttsModel: 'tts-1-hd',
     sttProvider: 'openai',
     sttModel: 'whisper-1',
   },
-  pro: {
+  platform: {
     aiProvider: 'anthropic',
-    aiModel: 'claude-haiku-4-5-20251001',
-    ttsProvider: 'elevenlabs',
-    ttsModel: 'eleven_v3',
-    sttProvider: 'openai',
-    sttModel: 'whisper-1',
+    aiModel: 'claude-sonnet-4-6',
   },
+  includedModels: null,
+  includedTtsModels: null,
+  includedSttModels: null,
+  imageProvider: 'fal',
+  imageModel: 'fal-flux-1-schnell',
+  includedImageModels: null,
+  videoProvider: 'fal',
+  videoModel: 'fal-wan2.5-480p',
+  includedVideoModels: null,
+  avatarProvider: 'heygen',
+  avatarModel: 'heygen-avatar-standard',
+  includedAvatarModels: null,
+  musicProvider: 'suno',
+  musicModel: 'suno-v5',
+  includedMusicModels: null,
+  motionProvider: 'remotion',
 };
-
-// ---- Tests ----
 
 describe('GET /api/admin/auto-models', () => {
   beforeEach(() => {
@@ -87,431 +91,129 @@ describe('GET /api/admin/auto-models', () => {
     mockAuth.mockResolvedValue(null);
 
     const response = await GET();
-    const body = await response.json();
 
     expect(response.status).toBe(403);
-    expect(body).toMatchObject({ error: 'Forbidden' });
+    await expect(response.json()).resolves.toMatchObject({ error: 'Forbidden' });
   });
 
-  it('returns 403 when user is not admin', async () => {
+  it('returns 403 when the user is not admin', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'USER' } });
 
     const response = await GET();
-    const body = await response.json();
 
     expect(response.status).toBe(403);
-    expect(body).toMatchObject({ error: 'Forbidden' });
+    await expect(response.json()).resolves.toMatchObject({ error: 'Forbidden' });
   });
 
-  it('returns auto model config when user is admin', async () => {
+  it('returns the unified auto model config for admins', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
-    mockGetAutoModelConfig.mockResolvedValue(mockConfig);
+    mockGetAutoModelConfig.mockResolvedValue(config);
 
     const response = await GET();
-    const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(body).toEqual(mockConfig);
+    await expect(response.json()).resolves.toEqual(config);
   });
 });
 
 describe('PATCH /api/admin/auto-models', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
     mockSetAutoModelConfig.mockResolvedValue(undefined);
-    mockGetAutoModelConfig.mockResolvedValue(mockConfig);
+    mockGetAutoModelConfig.mockResolvedValue(config);
   });
 
   it('returns 403 when unauthenticated', async () => {
     mockAuth.mockResolvedValue(null);
 
-    const response = await PATCH(createPatchRequest({ free: { aiProvider: 'anthropic' } }));
-    const body = await response.json();
+    const response = await PATCH(patchRequest({ model: { aiProvider: 'anthropic' } }));
 
     expect(response.status).toBe(403);
-    expect(body).toMatchObject({ error: 'Forbidden' });
+    expect(mockSetAutoModelConfig).not.toHaveBeenCalled();
   });
 
-  it('returns 403 when user is not admin', async () => {
+  it('returns 403 when the user is not admin', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'USER' } });
 
-    const response = await PATCH(createPatchRequest({ free: { aiProvider: 'anthropic' } }));
-    const body = await response.json();
+    const response = await PATCH(patchRequest({ model: { aiProvider: 'anthropic' } }));
 
     expect(response.status).toBe(403);
-    expect(body).toMatchObject({ error: 'Forbidden' });
+    expect(mockSetAutoModelConfig).not.toHaveBeenCalled();
   });
 
-  it('updates config and returns updated state', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
-    const updated = { ...mockConfig, free: { ...mockConfig.free, aiProvider: 'openai' } };
-    mockGetAutoModelConfig.mockResolvedValue(updated);
+  it('accepts unified defaults, included lists, and category model config', async () => {
+    const body = {
+      model: {
+        aiProvider: 'openai',
+        aiModel: 'gpt-5',
+        ttsProvider: 'elevenlabs',
+        ttsModel: 'eleven_v3',
+        sttProvider: 'deepgram',
+        sttModel: 'nova-3',
+      },
+      platform: { aiProvider: 'anthropic', aiModel: 'claude-sonnet-4-6' },
+      includedModels: ['gpt-5'],
+      includedTtsModels: ['elevenlabs:eleven_v3'],
+      includedSttModels: ['deepgram:nova-3'],
+      imageProvider: 'fal',
+      imageModel: 'fal-flux-2-pro',
+      includedImageModels: ['fal-flux-2-pro'],
+      videoProvider: 'fal',
+      videoModel: 'fal-kling3-1080p',
+      includedVideoModels: ['fal-kling3-1080p'],
+      avatarProvider: 'heygen',
+      avatarModel: 'heygen-avatar-iv',
+      includedAvatarModels: ['heygen-avatar-iv'],
+      musicProvider: 'suno',
+      musicModel: 'suno-v5',
+      includedMusicModels: ['suno-v5'],
+      motionProvider: 'hera',
+    };
 
-    const response = await PATCH(
-      createPatchRequest({ free: { aiProvider: 'openai', aiModel: 'gpt-4o-mini' } })
-    );
-    const body = await response.json();
+    const response = await PATCH(patchRequest(body));
 
     expect(response.status).toBe(200);
-    expect(mockSetAutoModelConfig).toHaveBeenCalledWith(
-      { free: { aiProvider: 'openai', aiModel: 'gpt-4o-mini' } },
-      'admin-1'
-    );
-    expect(body).toEqual(updated);
+    expect(mockSetAutoModelConfig).toHaveBeenCalledWith(body, 'admin-1');
+    await expect(response.json()).resolves.toEqual(config);
   });
 
-  it('rejects invalid aiProvider value', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
+  it('accepts null to clear unified included lists', async () => {
+    const body = {
+      includedModels: null,
+      includedTtsModels: null,
+      includedSttModels: null,
+      includedImageModels: null,
+      includedVideoModels: null,
+      includedAvatarModels: null,
+      includedMusicModels: null,
+    };
 
-    const response = await PATCH(
-      createPatchRequest({ free: { aiProvider: 'invalid-provider' } })
-    );
+    const response = await PATCH(patchRequest(body));
+
+    expect(response.status).toBe(200);
+    expect(mockSetAutoModelConfig).toHaveBeenCalledWith(body, 'admin-1');
+  });
+
+  it('rejects invalid model block provider values', async () => {
+    const response = await PATCH(patchRequest({ model: { aiProvider: 'invalid' } }));
 
     expect(response.status).toBe(400);
     expect(mockSetAutoModelConfig).not.toHaveBeenCalled();
   });
 
-  it('rejects invalid ttsProvider value', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
-
-    const response = await PATCH(
-      createPatchRequest({ pro: { ttsProvider: 'not-a-provider' } })
-    );
+  it('rejects mismatched AI provider/model pairs', async () => {
+    const response = await PATCH(patchRequest({ model: { aiProvider: 'anthropic', aiModel: 'gpt-5' } }));
 
     expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error: expect.stringContaining('belongs to "openai"'),
+    });
     expect(mockSetAutoModelConfig).not.toHaveBeenCalled();
   });
 
-  it('accepts partial update with only pro fields', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
-
-    const response = await PATCH(
-      createPatchRequest({ pro: { ttsProvider: 'elevenlabs', ttsModel: 'eleven_v3' } })
-    );
-
-    expect(response.status).toBe(200);
-    expect(mockSetAutoModelConfig).toHaveBeenCalledWith(
-      { pro: { ttsProvider: 'elevenlabs', ttsModel: 'eleven_v3' } },
-      'admin-1'
-    );
-  });
-
-  it('accepts freeIncludedModels and proIncludedModels in PATCH', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
-
-    const response = await PATCH(
-      createPatchRequest({
-        freeIncludedModels: ['model-a'],
-        proIncludedModels: ['model-a', 'model-b'],
-      })
-    );
-
-    expect(response.status).toBe(200);
-    expect(mockSetAutoModelConfig).toHaveBeenCalledWith(
-      { freeIncludedModels: ['model-a'], proIncludedModels: ['model-a', 'model-b'] },
-      'admin-1'
-    );
-  });
-
-  it('accepts free models that are not a subset of pro models', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
-
-    const response = await PATCH(
-      createPatchRequest({
-        freeIncludedModels: ['model-a', 'model-c'],
-        proIncludedModels: ['model-a', 'model-b'],
-      })
-    );
-
-    expect(response.status).toBe(200);
-    expect(mockSetAutoModelConfig).toHaveBeenCalledWith(
-      { freeIncludedModels: ['model-a', 'model-c'], proIncludedModels: ['model-a', 'model-b'] },
-      'admin-1'
-    );
-  });
-
-  it('accepts null to clear included model overrides', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
-
-    const response = await PATCH(
-      createPatchRequest({
-        freeIncludedModels: null,
-        proIncludedModels: null,
-      })
-    );
-
-    expect(response.status).toBe(200);
-    expect(mockSetAutoModelConfig).toHaveBeenCalledWith(
-      { freeIncludedModels: null, proIncludedModels: null },
-      'admin-1'
-    );
-  });
-
-  it('allows freeIncludedModels without proIncludedModels', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
-
-    const response = await PATCH(
-      createPatchRequest({ freeIncludedModels: ['model-a'] })
-    );
-
-    expect(response.status).toBe(200);
-    expect(mockSetAutoModelConfig).toHaveBeenCalledWith(
-      { freeIncludedModels: ['model-a'] },
-      'admin-1'
-    );
-  });
-
-  it('accepts TTS included models in PATCH', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
-
-    const response = await PATCH(
-      createPatchRequest({
-        freeIncludedTtsModels: ['openai:tts-1-hd'],
-        proIncludedTtsModels: ['openai:tts-1-hd', 'elevenlabs:eleven_v3'],
-      })
-    );
-
-    expect(response.status).toBe(200);
-    expect(mockSetAutoModelConfig).toHaveBeenCalledWith(
-      {
-        freeIncludedTtsModels: ['openai:tts-1-hd'],
-        proIncludedTtsModels: ['openai:tts-1-hd', 'elevenlabs:eleven_v3'],
-      },
-      'admin-1'
-    );
-  });
-
-  it('accepts STT included models in PATCH', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
-
-    const response = await PATCH(
-      createPatchRequest({
-        freeIncludedSttModels: ['openai:whisper-1'],
-        proIncludedSttModels: ['openai:whisper-1'],
-      })
-    );
-
-    expect(response.status).toBe(200);
-    expect(mockSetAutoModelConfig).toHaveBeenCalledWith(
-      {
-        freeIncludedSttModels: ['openai:whisper-1'],
-        proIncludedSttModels: ['openai:whisper-1'],
-      },
-      'admin-1'
-    );
-  });
-
-  it('accepts free TTS models that are not a subset of pro TTS models', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
-
-    const response = await PATCH(
-      createPatchRequest({
-        freeIncludedTtsModels: ['elevenlabs:eleven_v3', 'openai:tts-1-hd'],
-        proIncludedTtsModels: ['elevenlabs:eleven_v3'],
-      })
-    );
-
-    expect(response.status).toBe(200);
-    expect(mockSetAutoModelConfig).toHaveBeenCalledWith(
-      { freeIncludedTtsModels: ['elevenlabs:eleven_v3', 'openai:tts-1-hd'], proIncludedTtsModels: ['elevenlabs:eleven_v3'] },
-      'admin-1'
-    );
-  });
-
-  it('accepts free STT models that are not a subset of pro STT models', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
-
-    const response = await PATCH(
-      createPatchRequest({
-        freeIncludedSttModels: ['openai:whisper-1'],
-        proIncludedSttModels: ['openai:whisper-1', 'elevenlabs:scribe_v1'],
-      })
-    );
-
-    expect(response.status).toBe(200);
-    expect(mockSetAutoModelConfig).toHaveBeenCalledWith(
-      { freeIncludedSttModels: ['openai:whisper-1'], proIncludedSttModels: ['openai:whisper-1', 'elevenlabs:scribe_v1'] },
-      'admin-1'
-    );
-  });
-
-  it('accepts null to clear TTS and STT included model overrides', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
-
-    const response = await PATCH(
-      createPatchRequest({
-        freeIncludedTtsModels: null,
-        proIncludedTtsModels: null,
-        freeIncludedSttModels: null,
-        proIncludedSttModels: null,
-      })
-    );
-
-    expect(response.status).toBe(200);
-    expect(mockSetAutoModelConfig).toHaveBeenCalledWith(
-      {
-        freeIncludedTtsModels: null,
-        proIncludedTtsModels: null,
-        freeIncludedSttModels: null,
-        proIncludedSttModels: null,
-      },
-      'admin-1'
-    );
-  });
-
-  it('accepts image model config in PATCH', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
-
-    const response = await PATCH(
-      createPatchRequest({
-        proImageProvider: 'fal',
-        proImageModel: 'fal-flux-1-schnell',
-        proIncludedImageModels: ['fal:fal-flux-1-schnell', 'fal:fal-flux-2-pro'],
-      })
-    );
-
-    expect(response.status).toBe(200);
-    expect(mockSetAutoModelConfig).toHaveBeenCalledWith(
-      {
-        proImageProvider: 'fal',
-        proImageModel: 'fal-flux-1-schnell',
-        proIncludedImageModels: ['fal:fal-flux-1-schnell', 'fal:fal-flux-2-pro'],
-      },
-      'admin-1'
-    );
-  });
-
-  it('accepts video model config in PATCH', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
-
-    const response = await PATCH(
-      createPatchRequest({
-        freeVideoProvider: 'fal',
-        freeVideoModel: 'fal-wan2.5-480p',
-        proVideoProvider: 'minimax',
-        proVideoModel: 'minimax-hailuo02-768p',
-        freeIncludedVideoModels: ['fal:fal-wan2.5-480p'],
-        proIncludedVideoModels: ['fal:fal-wan2.5-480p', 'minimax:minimax-hailuo02-768p'],
-      })
-    );
-
-    expect(response.status).toBe(200);
-    expect(mockSetAutoModelConfig).toHaveBeenCalledWith(
-      {
-        freeVideoProvider: 'fal',
-        freeVideoModel: 'fal-wan2.5-480p',
-        proVideoProvider: 'minimax',
-        proVideoModel: 'minimax-hailuo02-768p',
-        freeIncludedVideoModels: ['fal:fal-wan2.5-480p'],
-        proIncludedVideoModels: ['fal:fal-wan2.5-480p', 'minimax:minimax-hailuo02-768p'],
-      },
-      'admin-1'
-    );
-  });
-
-  it('accepts motion provider config in PATCH', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
-
-    const response = await PATCH(
-      createPatchRequest({
-        freeMotionProvider: 'remotion',
-        proMotionProvider: 'hera',
-      })
-    );
-
-    expect(response.status).toBe(200);
-    expect(mockSetAutoModelConfig).toHaveBeenCalledWith(
-      {
-        freeMotionProvider: 'remotion',
-        proMotionProvider: 'hera',
-      },
-      'admin-1'
-    );
-  });
-
-  it('rejects invalid motion provider value', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
-
-    const response = await PATCH(
-      createPatchRequest({ proMotionProvider: 'invalid' })
-    );
-
-    expect(response.status).toBe(400);
-    expect(mockSetAutoModelConfig).not.toHaveBeenCalled();
-  });
-
-  it('accepts avatar model config in PATCH', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
-
-    const response = await PATCH(
-      createPatchRequest({
-        freeAvatarProvider: 'heygen',
-        freeAvatarModel: 'heygen-avatar-standard',
-        proAvatarProvider: 'heygen',
-        proAvatarModel: 'heygen-avatar-iv',
-      })
-    );
-
-    expect(response.status).toBe(200);
-    expect(mockSetAutoModelConfig).toHaveBeenCalledWith(
-      {
-        freeAvatarProvider: 'heygen',
-        freeAvatarModel: 'heygen-avatar-standard',
-        proAvatarProvider: 'heygen',
-        proAvatarModel: 'heygen-avatar-iv',
-      },
-      'admin-1'
-    );
-  });
-
-  it('accepts null to clear image included model overrides', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
-
-    const response = await PATCH(
-      createPatchRequest({ proIncludedImageModels: null })
-    );
-
-    expect(response.status).toBe(200);
-    expect(mockSetAutoModelConfig).toHaveBeenCalledWith(
-      { proIncludedImageModels: null },
-      'admin-1'
-    );
-  });
-
-  it('accepts adminViewMode ALL in PATCH', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
-
-    const response = await PATCH(
-      createPatchRequest({ adminViewMode: 'ALL' })
-    );
-
-    expect(response.status).toBe(200);
-    expect(mockSetAutoModelConfig).toHaveBeenCalledWith(
-      { adminViewMode: 'ALL' },
-      'admin-1'
-    );
-  });
-
-  it('accepts adminViewMode PRO in PATCH', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
-
-    const response = await PATCH(
-      createPatchRequest({ adminViewMode: 'PRO' })
-    );
-
-    expect(response.status).toBe(200);
-    expect(mockSetAutoModelConfig).toHaveBeenCalledWith(
-      { adminViewMode: 'PRO' },
-      'admin-1'
-    );
-  });
-
-  it('rejects invalid adminViewMode value', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
-
-    const response = await PATCH(
-      createPatchRequest({ adminViewMode: 'INVALID' })
-    );
+  it('rejects invalid motion provider values', async () => {
+    const response = await PATCH(patchRequest({ motionProvider: 'invalid' }));
 
     expect(response.status).toBe(400);
     expect(mockSetAutoModelConfig).not.toHaveBeenCalled();
