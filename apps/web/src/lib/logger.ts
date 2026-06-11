@@ -2,6 +2,7 @@
  * Simple logger for Sotto
  * Wraps console with structured output and log levels
  */
+/* eslint-disable no-console -- this module is the one sanctioned console wrapper */
 
 type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 

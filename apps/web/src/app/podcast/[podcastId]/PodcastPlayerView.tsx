@@ -262,6 +262,8 @@ export function PodcastPlayerView({
           router.refresh();
         }
       },
+      // `podcast` appears only in a `typeof` type cast above (no runtime use), so it is not a real dependency.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
       [router]
     ),
   });

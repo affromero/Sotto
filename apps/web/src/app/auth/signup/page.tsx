@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { getSiteConfig } from '@/lib/site-config';
 import { AuthButtons } from '../AuthButtons';
 import styles from '../login/page.module.css';
@@ -25,7 +26,7 @@ export default async function SignupPage() {
           <>
             <h1 className={styles.title}>Join Sotto</h1>
             <p className={styles.subtitle}>
-              Sign-up is currently invite-only. <a href="/">Join the waitlist</a> to get access.
+              Sign-up is currently invite-only. <Link href="/">Join the waitlist</Link> to get access.
             </p>
           </>
         )}
