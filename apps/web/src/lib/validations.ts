@@ -294,11 +294,6 @@ export const voicePreviewSchema = z.object({
  */
 export const waitlistSchema = z.object({
   email: z.string().email().max(200),
-  twitterHandle: z
-    .string()
-    .max(50)
-    .optional()
-    .transform((val) => (val ? val.replace(/^@/, '').trim() : undefined)),
   source: z.string().max(50).optional(),
   wishlist: z.string().max(500).optional(),
   referralCode: z
@@ -550,9 +545,6 @@ export const landingShowcaseUpdateSchema = z
     videoSegmentCount: z.number().int().min(1).max(50).optional(),
     showAvatar: z.boolean().optional(),
     showVideo: z.boolean().optional(),
-    twitterHandle: z.string().min(1).max(50).optional(),
-    twitterName: z.string().min(1).max(100).optional(),
-    telegramTopic: z.string().max(200).nullable().optional(),
   })
   .strict();
 

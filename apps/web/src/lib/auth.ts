@@ -120,25 +120,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
 
       if (user.email) {
-        const entry = await prisma.waitlist.findUnique({
-          where: { email: user.email },
-          select: { twitterHandle: true },
-        });
-
-        // Pre-associate Twitter handle from waitlist (if not taken)
-        if (entry?.twitterHandle) {
-          const taken = await prisma.user.findUnique({
-            where: { twitterHandle: entry.twitterHandle },
-            select: { id: true },
-          });
-          if (!taken) {
-            await prisma.user.update({
-              where: { id: user.id! },
-              data: { twitterHandle: entry.twitterHandle },
-            });
-          }
-        }
-
         // Mark waitlist conversion
         await prisma.waitlist.updateMany({
           where: { email: user.email },
@@ -154,25 +135,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         }
       }
     },
-    async linkAccount({ user, account, profile }) {
-      if (account.provider === 'twitter' && user.id) {
-        const twitterHandle =
-          ((profile as Record<string, unknown>)?.username as string | undefined) ??
-          ((profile as Record<string, unknown>)?.screen_name as string | undefined);
-
-        await prisma.user.update({
-          where: { id: user.id },
-          data: {
-            twitterEnabled: true,
-            ...(twitterHandle ? { twitterHandle } : {}),
-          },
-        });
-      }
-    },
   },
   callbacks: {
     async signIn({ user, profile }) {
-      // Account linking (e.g. Twitter connect) — user already exists in DB
+      // OAuth account linking — user already exists in DB.
       if (user?.id) {
         const existing = await prisma.user.findUnique({ where: { id: user.id }, select: { id: true } });
         if (existing) return true;

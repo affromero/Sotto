@@ -138,7 +138,7 @@ Deployment success should be measured by workflow activation, not signups:
 
 - Private RSS token created.
 - At least one ready episode.
-- At least one recurring source or bot connected.
+- At least one recurring source or webhook connected.
 
 ---
 
@@ -150,7 +150,7 @@ First-run should be short and operational:
 2. **Choose generation**: one-key provider, local agent, or advanced separate providers.
 3. **Choose voice/TTS**: explicit provider and voice profile.
 4. **Choose delivery**: create private RSS token or continue with in-app listening.
-5. **Create first source**: manual topic, agent inbox, meeting, news, Twitter, Telegram, or webhook.
+5. **Create first source**: manual topic, agent inbox, meeting, news, or webhook.
 
 The setup UI should show a compact readiness checklist:
 
@@ -237,22 +237,7 @@ Requirements:
 - Clear source timestamp.
 - Option to create separate categories such as world, technology, finance, or local.
 
-### 6.5 Twitter Bot
-
-Twitter should create private episodes for the linked owner. The bot can reply with a private or authenticated link only when the user chooses that behavior.
-
-Self-hosted users should be able to run the bot on a VPS with their own polling, webhooks, retries, and operations.
-
-### 6.6 Telegram Bot
-
-Telegram should mirror the Twitter owner-scoped behavior:
-
-- Private episode creation.
-- Linked account ownership.
-- Optional private RSS routing.
-- No public ranking or public bot directory.
-
-### 6.7 Generic Webhook
+### 6.5 Generic Webhook
 
 Add a generic webhook source for GitHub Actions, calendar systems, support tools, and custom automation.
 
@@ -293,8 +278,6 @@ Add a source abstraction only when needed by implementation:
 - Agent.
 - Meeting.
 - News.
-- Twitter.
-- Telegram.
 - Webhook.
 
 Each source should have user ownership, status, cadence, last run, and error state.
@@ -387,9 +370,8 @@ Known non-fatal build warnings should be documented only when they are unrelated
 - Add tests for source isolation and generated private episodes.
 - Commit once CI passes.
 
-### Stage 7 - Bot Hosting
+### Stage 7 - Source Operations
 
-- Harden Twitter and Telegram as owner-scoped private episode sources.
 - Add self-hosted deployment docs.
 - Add self-hosted operations controls.
 - Add tests.

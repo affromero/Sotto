@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { signIn, signOut } from 'next-auth/react';
+import { signOut } from 'next-auth/react';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -12,7 +12,6 @@ import type { CustomTag } from '@/components/discovery/InterestGrid';
 import type { TasteQuestion, TasteAnswer } from '@sotto/shared';
 import { LANGUAGE_DISPLAY } from '@sotto/shared';
 import { TasteQuiz } from '@/components/discovery/TasteQuiz';
-import { VoicePreferenceSelector } from '@/components/settings/VoicePreferenceSelector';
 import type { AiProviderClientMeta } from '@/lib/providers/ai-registry';
 import type { TtsProviderClientMeta } from '@/lib/providers/tts-registry';
 import { TtsProviderCards } from '@/components/settings/TtsProviderCards';
@@ -20,14 +19,7 @@ import { AiProviderCards } from '@/components/settings/AiProviderCards';
 import { AvatarImageManager } from '@/components/settings/AvatarImageManager';
 import { ThemeSelector } from '@/components/settings/ThemeSelector';
 import { usePushSubscription } from '@/lib/hooks/usePushSubscription';
-import { getTwitterBotLabel } from '@/lib/bot-identity';
 import styles from './page.module.css';
-
-interface VoiceCloneData {
-  id: string;
-  name: string;
-  externalVoiceId: string;
-}
 
 interface SubTag {
   id: string;
@@ -50,11 +42,7 @@ interface SettingsFormProps {
   image: string | null;
   role: 'USER' | 'ADMIN' | 'SYSTEM';
   connectedProviders: string[];
-  twitterHandle: string | null;
-  twitterEnabled: boolean;
-  voicePreferences: Array<{ speaker: string; voiceId: string }>;
   preferredLanguage: string | null;
-  voiceClones: VoiceCloneData[];
   interestCategories: CategoryTag[];
   selectedInterestTagIds: string[];
   configuredTtsProviders: Array<{ provider: string; isValid: boolean }>;
@@ -62,9 +50,6 @@ interface SettingsFormProps {
   aiProviderMeta: AiProviderClientMeta[];
   ttsProviderMeta: TtsProviderClientMeta[];
   initialPreferredAiModel: string | null;
-  initialPreferredTtsProvider: string | null;
-  initialPreferredTtsModel: string | null;
-  isTwitterProviderAvailable: boolean;
   initialEmailNotifications: boolean;
   initialPushNotifications: boolean;
   quizAnswerCount: number;
@@ -93,11 +78,7 @@ export function SettingsForm({
   image,
   role,
   connectedProviders,
-  twitterHandle,
-  twitterEnabled: initialTwitterEnabled,
-  voicePreferences: initialVoicePreferences,
   preferredLanguage: initialPreferredLanguage,
-  voiceClones,
   interestCategories,
   selectedInterestTagIds,
   configuredTtsProviders,
@@ -105,16 +86,12 @@ export function SettingsForm({
   aiProviderMeta,
   ttsProviderMeta,
   initialPreferredAiModel,
-  initialPreferredTtsProvider,
-  initialPreferredTtsModel,
   initialEmailNotifications,
   initialPushNotifications,
   quizAnswerCount,
-  isTwitterProviderAvailable,
   referredUsers,
   appBaseUrl,
 }: SettingsFormProps) {
-  const twitterBotLabel = getTwitterBotLabel();
   const [name, setName] = useState(initialName);
   const [bio, setBio] = useState(initialBio);
   const [handle, setHandle] = useState(initialHandle);
@@ -177,39 +154,19 @@ export function SettingsForm({
   const [languageSaving, setLanguageSaving] = useState(false);
   const [languageSaved, setLanguageSaved] = useState(false);
 
-  // Twitter state
-  const isTwitterConnected = connectedProviders.includes('twitter');
-  const [twitterEnabled, setTwitterEnabled] = useState(initialTwitterEnabled);
-  const [voicePrefs, setVoicePrefs] = useState(initialVoicePreferences);
-  const [twitterSaving, setTwitterSaving] = useState(false);
-  const [twitterSaved, setTwitterSaved] = useState(false);
-  const [disconnecting, setDisconnecting] = useState(false);
-
-  // AI model preference state (general, not Twitter-specific)
+  // AI model preference state
   const [preferredAiModel, setPreferredAiModel] = useState(initialPreferredAiModel ?? '');
   const [aiPrefSaving, setAiPrefSaving] = useState(false);
   const [aiPrefSaved, setAiPrefSaved] = useState(false);
-  const [preferredTtsOption, setPreferredTtsOption] = useState(
-    initialPreferredTtsProvider && initialPreferredTtsModel
-      ? `${initialPreferredTtsProvider}:${initialPreferredTtsModel}`
-      : ''
-  );
   const [aiModelOptions, setAiModelOptions] = useState<
     Array<{ id: string; displayName: string; tier: string; group?: string }>
   >([]);
-  const [ttsOptions, setTtsOptions] = useState<
-    Array<{ id: string; displayName: string; badge?: string; group?: string }>
-  >([]);
 
   useEffect(() => {
-    Promise.all([
-      fetch('/api/v1/ai-models').then((r) => (r.ok ? r.json() : null)),
-      fetch('/api/v1/tts-options').then((r) => (r.ok ? r.json() : null)),
-    ])
-      .then(([aiData, ttsData]) => {
+    fetch('/api/v1/ai-models')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((aiData) => {
         if (aiData?.models) setAiModelOptions(aiData.models);
-        if (ttsData?.options)
-          setTtsOptions(ttsData.options.filter((o: { id: string }) => o.id !== 'auto'));
       })
       .catch(() => {});
   }, []);
@@ -282,43 +239,6 @@ export function SettingsForm({
     });
     if (response.ok) {
       signOut({ callbackUrl: '/' });
-    }
-  };
-
-  const handleSaveTwitterSettings = async () => {
-    setTwitterSaving(true);
-    setTwitterSaved(false);
-    try {
-      const response = await fetch('/api/v1/users/me/twitter', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          twitterEnabled,
-          voicePreferences: voicePrefs,
-          preferredTtsProvider: preferredTtsOption ? preferredTtsOption.split(':')[0] : null,
-          preferredTtsModel: preferredTtsOption
-            ? preferredTtsOption.split(':').slice(1).join(':')
-            : null,
-        }),
-      });
-      if (response.ok) {
-        setTwitterSaved(true);
-        setTimeout(() => setTwitterSaved(false), 3000);
-      }
-    } finally {
-      setTwitterSaving(false);
-    }
-  };
-
-  const handleDisconnectTwitter = async () => {
-    setDisconnecting(true);
-    try {
-      const response = await fetch('/api/v1/users/me/twitter', { method: 'DELETE' });
-      if (response.ok) {
-        window.location.reload();
-      }
-    } finally {
-      setDisconnecting(false);
     }
   };
 
@@ -814,7 +734,7 @@ export function SettingsForm({
               </label>
               <select
                 id="preferredAiModel"
-                className={styles.twitterSelect}
+                className={styles.modelSelect}
                 value={preferredAiModel}
                 onChange={(e) => setPreferredAiModel(e.target.value)}
                 aria-label="Preferred AI model for podcast generation"
@@ -854,111 +774,6 @@ export function SettingsForm({
               </Button>
             </div>
           </div>
-        </section>
-      )}
-
-      {/* Twitter Integration Section */}
-      {isTwitterProviderAvailable && (
-        <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>Twitter Integration</h2>
-          {!isTwitterConnected ? (
-            <div>
-              <p className={styles.twitterDescription}>
-                Connect your Twitter account to generate podcasts by tweeting at {twitterBotLabel}.
-              </p>
-              <p className={styles.twitterDisclaimer}>
-                We only read your username to link your account. Sotto can&apos;t post tweets, read
-                your DMs, or see private data. You can disconnect anytime from this page.
-              </p>
-              <div className={styles.formActions}>
-                <Button onClick={() => signIn('twitter', { callbackUrl: '/settings' })}>
-                  Connect Twitter
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className={styles.form}>
-              {twitterHandle && <p className={styles.twitterHandle}>@{twitterHandle}</p>}
-
-              <label className={styles.toggleRow}>
-                <div className={styles.toggleInfo}>
-                  <span className={styles.toggleLabel}>Enable Tweet-to-Podcast</span>
-                  <span className={styles.toggleDescription}>
-                    Generate podcasts when you tweet at {twitterBotLabel}
-                  </span>
-                </div>
-                <input
-                  type="checkbox"
-                  className={styles.toggle}
-                  checked={twitterEnabled}
-                  onChange={(e) => setTwitterEnabled(e.target.checked)}
-                  aria-label="Toggle Twitter podcast generation"
-                />
-              </label>
-
-              {['Host', 'Expert'].map((speaker) => (
-                <VoicePreferenceSelector
-                  key={speaker}
-                  label={`Preferred ${speaker} Voice`}
-                  value={voicePrefs.find((v) => v.speaker === speaker)?.voiceId ?? null}
-                  onChange={(voiceId) => {
-                    setVoicePrefs((prev) => {
-                      const filtered = prev.filter((v) => v.speaker !== speaker);
-                      return voiceId ? [...filtered, { speaker, voiceId }] : filtered;
-                    });
-                  }}
-                  voiceClones={voiceClones}
-                />
-              ))}
-
-              {ttsOptions.length > 0 && (
-                <>
-                  <p className={styles.twitterModelHint}>
-                    Override the default voice model for your Twitter-generated podcasts.
-                  </p>
-
-                  <div className={styles.fieldGroup}>
-                    <label htmlFor="twitterTtsOption" className={styles.fieldLabel}>
-                      Voice Model
-                    </label>
-                    <select
-                      id="twitterTtsOption"
-                      className={styles.twitterSelect}
-                      value={preferredTtsOption}
-                      onChange={(e) => setPreferredTtsOption(e.target.value)}
-                      aria-label="Preferred voice model for Twitter podcasts"
-                    >
-                      <option value="">System default</option>
-                      {ttsOptions.map((o) => (
-                        <option key={o.id} value={o.id}>
-                          {o.displayName}
-                          {o.badge ? ` — ${o.badge}` : ''}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </>
-              )}
-
-              <div className={styles.formActions}>
-                <Button
-                  onClick={handleSaveTwitterSettings}
-                  loading={twitterSaving}
-                  disabled={twitterSaving}
-                >
-                  {twitterSaved ? 'Saved' : 'Save Twitter Settings'}
-                </Button>
-                <Button
-                  variant="danger"
-                  onClick={handleDisconnectTwitter}
-                  loading={disconnecting}
-                  disabled={disconnecting}
-                >
-                  Disconnect Twitter
-                </Button>
-              </div>
-            </div>
-          )}
         </section>
       )}
 

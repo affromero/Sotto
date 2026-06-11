@@ -16,9 +16,6 @@ interface Config {
   videoSegmentCount: number;
   showAvatar: boolean;
   showVideo: boolean;
-  twitterHandle: string;
-  twitterName: string;
-  telegramTopic: string | null;
 }
 
 interface SearchResult {
@@ -94,9 +91,6 @@ export function LandingShowcaseDashboard() {
     videoSegmentCount: 4,
     showAvatar: false,
     showVideo: false,
-    twitterHandle: 'andres',
-    twitterName: 'Andres',
-    telegramTopic: null,
   });
 
   const fetchSegments = useCallback(async (podcastId: string) => {
@@ -195,9 +189,6 @@ export function LandingShowcaseDashboard() {
           videoSegmentCount: 4,
           showAvatar: false,
           showVideo: false,
-          twitterHandle: 'andres',
-          twitterName: 'Andres',
-          telegramTopic: null,
         });
         setSelectedTitle('');
         setMessage('Reset to defaults — landing page now shows hardcoded content');
@@ -469,44 +460,6 @@ export function LandingShowcaseDashboard() {
         </div>
       </section>
 
-      {/* Bot Overrides */}
-      <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Bot Overrides</h2>
-        <div className={styles.row}>
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>Twitter handle</span>
-            <input
-              type="text"
-              value={form.twitterHandle}
-              onChange={(e) => setForm((f) => ({ ...f, twitterHandle: e.target.value }))}
-              className={styles.input}
-            />
-          </label>
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>Twitter name</span>
-            <input
-              type="text"
-              value={form.twitterName}
-              onChange={(e) => setForm((f) => ({ ...f, twitterName: e.target.value }))}
-              className={styles.input}
-            />
-          </label>
-        </div>
-        <label className={styles.field}>
-          <span className={styles.fieldLabel}>Telegram topic (blank = derive from podcast)</span>
-          <input
-            type="text"
-            value={form.telegramTopic ?? ''}
-            onChange={(e) => setForm((f) => ({
-              ...f,
-              telegramTopic: e.target.value || null,
-            }))}
-            className={styles.input}
-            placeholder="auto"
-          />
-        </label>
-      </section>
-
       {/* Actions */}
       <div className={styles.actions}>
         <button
@@ -613,15 +566,6 @@ export function LandingShowcaseDashboard() {
             </div>
           )}
 
-          {/* Bot overrides */}
-          <div className={styles.previewBlock}>
-            <h3 className={styles.previewBlockTitle}>Bot — Overrides</h3>
-            <div className={styles.previewBot}>
-              <div>Twitter: <strong>@{preview.bot.twitterHandle}</strong> ({preview.bot.twitterName})</div>
-              <div>Podcast: <strong>{preview.bot.podcastTitle}</strong> &middot; {preview.bot.podcastDuration}</div>
-              <div>Telegram topic: <strong>{preview.bot.telegramTopic}</strong></div>
-            </div>
-          </div>
         </section>
       )}
     </div>

@@ -44,15 +44,6 @@ export interface LandingShowcaseData {
   // Vocabulary entries for clip transcript demo
   clipVocabulary?: VocabularyEntryData[];
 
-  // BotChapter — Real links + overrides
-  bot: {
-    twitterHandle: string;
-    twitterName: string;
-    podcastTitle: string;
-    podcastDuration: string;
-    telegramTopic: string;
-    podcastUrl: string;
-  };
 }
 
 const VISUAL_TYPE_LABELS: Record<string, string> = {
@@ -94,12 +85,6 @@ function extractVisualLabel(v: { order: number; prompt: string | null; metadata:
   // No label found — this is a data bug, log it so we can fix the visual
   logger.warn(`Visual #${v.order} (${v.visualType}) has no label: missing prompt and metadata`);
   return v.visualType;
-}
-
-function formatDurationMinutes(seconds: number | null): string {
-  if (!seconds) return '10 min';
-  const minutes = Math.round(seconds / 60);
-  return `${minutes} min`;
 }
 
 /**
@@ -357,16 +342,6 @@ export async function buildShowcaseData(config: LandingShowcaseConfig): Promise<
         status: v.status,
       }));
 
-    // Bot overrides
-    const bot = {
-      twitterHandle: config.twitterHandle,
-      twitterName: config.twitterName,
-      podcastTitle: podcast.title,
-      podcastDuration: formatDurationMinutes(podcast.duration),
-      telegramTopic: config.telegramTopic ?? podcast.topic ?? podcast.title,
-      podcastUrl: `/podcast/${podcast.id}`,
-    };
-
     return {
       podcast: showcasePodcast,
       chatMessages,
@@ -385,7 +360,6 @@ export async function buildShowcaseData(config: LandingShowcaseConfig): Promise<
       clipVocabulary: podcast.vocabularyEntries.length > 0
         ? (podcast.vocabularyEntries as VocabularyEntryData[])
         : undefined,
-      bot,
     };
   } catch (err) {
     logger.warn('Failed to build landing showcase data', {

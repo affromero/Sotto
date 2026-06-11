@@ -1,10 +1,7 @@
 import { BRAND } from '@sotto/shared';
-import { getTwitterBotHandle, getTwitterProfileUrl } from '@/lib/bot-identity';
 import styles from './Footer.module.css';
 
 export function Footer() {
-  const twitterUrl = getTwitterProfileUrl(getTwitterBotHandle());
-
   return (
     <footer className={styles.footer}>
       <div className={styles.inner}>
@@ -27,8 +24,8 @@ export function Footer() {
             <a href="https://discord.gg/Dm4T42RXa" target="_blank" rel="noopener noreferrer">
               Discord
             </a>
-            {twitterUrl && (
-              <a href={twitterUrl} target="_blank" rel="noopener noreferrer">
+            {BRAND.twitter && (
+              <a href={BRAND.twitter} target="_blank" rel="noopener noreferrer">
                 Twitter
               </a>
             )}

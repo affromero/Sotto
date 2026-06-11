@@ -129,7 +129,6 @@ Local agent CLIs must be installed and authenticated outside Sotto. Sotto should
 | plus selected LLM or local agent | discovery, scripting, Q&A text paths |
 | plus selected TTS | end-to-end audio generation |
 | plus selected STT | meeting/audio transcription |
-| plus bot credentials | Twitter or Telegram source testing |
 
 No missing capability should be hidden by an implicit provider fallback.
 

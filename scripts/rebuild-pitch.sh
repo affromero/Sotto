@@ -204,8 +204,6 @@ DOCS=(
   "21-logo-brief.md:Logo Brief"
   "23-local-development.md:Local Development"
   "24-ios-testflight-appstore-guide.md:iOS TestFlight & App Store Guide"
-  "25-twitter-integration.md:Twitter Bot Integration"
-  "26-telegram-integration.md:Telegram Bot Integration"
   "27-launch-readiness-status.md:Launch Readiness"
 )
 

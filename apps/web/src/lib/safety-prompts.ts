@@ -18,8 +18,8 @@ import { loadPrompt } from './prompt-loader';
 export const CONTENT_SAFETY_INSTRUCTIONS = loadPrompt('shared/content-safety.md');
 
 /**
- * Appended to prompts that process external user input (discovery chat, tweets,
- * Telegram messages). Defends against prompt injection and jailbreak attempts.
+ * Appended to prompts that process external user input such as discovery chat
+ * and imported source text. Defends against prompt injection and jailbreak attempts.
  */
 export const INPUT_SANITIZATION_INSTRUCTIONS = loadPrompt('shared/input-sanitization.md');
 

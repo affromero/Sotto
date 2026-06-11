@@ -108,7 +108,7 @@ export function InvitationLinks({ initialInvitations }: InvitationLinksProps) {
                       {inv.status}
                     </span>
                   </td>
-                  <td className={styles.twitterCell}>{inv.email ?? ''}</td>
+                  <td className={styles.secondaryCell}>{inv.email ?? ''}</td>
                   <td className={styles.dateCell}>
                     {new Date(inv.createdAt).toLocaleDateString('en-US', {
                       month: 'short',

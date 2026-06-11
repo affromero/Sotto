@@ -39,7 +39,6 @@ export async function GET() {
         role: true,
         voicePreferences: { select: { speaker: true, voiceId: true, sortOrder: true } },
         preferredLanguage: true,
-        twitterHandle: true,
         createdAt: true,
       },
     }),

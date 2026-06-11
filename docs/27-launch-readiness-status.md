@@ -114,7 +114,7 @@ Safe-for-launch core flow:
 2. content extraction runs
 3. script generation and verification run (≤3 loops)
 4. reference validation runs (if references exist)
-5. SCRIPT_READY pause (Pro/BYOK web users review and approve; Twitter/API/Telegram auto-approve)
+5. SCRIPT_READY pause (Pro/BYOK web users review and approve; API sources auto-approve)
 6. audio generation (parallel per segment) and stitching run
 7. notifications run
 

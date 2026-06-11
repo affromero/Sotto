@@ -72,9 +72,6 @@ model User {
   forcePasswordChange Boolean @default(false)
   tokenVersion        Int     @default(0)
 
-  // Twitter integration
-  twitterHandle        String? @unique
-  twitterEnabled       Boolean @default(false)
   preferredLanguage    String?
   preferredTtsProvider String?
   preferredTtsModel    String?
@@ -84,10 +81,6 @@ model User {
   // Notification preferences
   emailNotifications Boolean @default(true)
   pushNotifications  Boolean @default(true)
-
-  // Telegram integration
-  telegramEnabled Boolean @default(false)
-  telegramChatId  String?
 
   // Relations
   accounts            Account[]
@@ -121,9 +114,6 @@ model User {
 
   // Taste quiz
   tasteQuizAnswers TasteQuizAnswer[]
-
-  // Podcast ideas (from Telegram bot)
-  podcastIdeas PodcastIdea[]
 
   // Private agent output ingestions
   agentIngestions AgentIngestion[]
@@ -921,21 +911,6 @@ enum FeedbackStatus {
   ARCHIVED
 }
 
-// ============ PODCAST IDEAS (Telegram Save-for-Later) ============
-
-model PodcastIdea {
-  id        String   @id @default(cuid())
-  userId    String
-  text      String   @db.Text
-  sourceUrl String?
-  source    String   @default("telegram")
-  createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, createdAt])
-}
-
 // ============ BEHAVIORAL / ML FEATURE STORE (analytics) ============
 
 model ListeningQueue {
@@ -1134,7 +1109,6 @@ enum WaitlistStatus {
 model Waitlist {
   id            String         @id @default(cuid())
   email         String         @unique
-  twitterHandle String?
   source        String?
   wishlist      String?
   referralCode  String?
@@ -1495,11 +1469,6 @@ model LandingShowcase {
   // Feature toggles — controls whether landing page shows interactive toggles
   showAvatar Boolean @default(false)
   showVideo  Boolean @default(false)
-
-  // BotChapter — Twitter/Telegram overrides
-  twitterHandle String  @default("andres")
-  twitterName   String  @default("Andres")
-  telegramTopic String? // null = derive from podcast topic
 
   updatedAt DateTime @updatedAt
   updatedBy String?

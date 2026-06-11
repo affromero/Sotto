@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     return errorResponse(parsed.error.flatten(), 400);
   }
 
-  const { email, twitterHandle, source, wishlist, referralCode } = parsed.data;
+  const { email, source, wishlist, referralCode } = parsed.data;
 
   // Check if this is a genuinely new signup before upserting
   const existing = await prisma.waitlist.findUnique({ where: { email } });
@@ -48,9 +48,8 @@ export async function POST(request: NextRequest) {
   // Upsert: if email already exists, just return success (no error to user)
   await prisma.waitlist.upsert({
     where: { email },
-    create: { email, twitterHandle, source, wishlist, referralCode },
+    create: { email, source, wishlist, referralCode },
     update: {
-      ...(twitterHandle ? { twitterHandle } : {}),
       ...(wishlist ? { wishlist } : {}),
       ...(referralCode ? { referralCode } : {}),
     },

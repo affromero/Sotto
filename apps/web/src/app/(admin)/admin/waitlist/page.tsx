@@ -113,7 +113,6 @@ export default async function AdminWaitlistPage({ searchParams }: PageProps) {
           <thead>
             <tr>
               <th>Email</th>
-              <th>Twitter</th>
               <th>Source</th>
               <th>Referral</th>
               <th>Wishlist</th>
@@ -127,9 +126,6 @@ export default async function AdminWaitlistPage({ searchParams }: PageProps) {
             {entries.map((entry) => (
               <tr key={entry.id}>
                 <td className={styles.emailCell}>{entry.email}</td>
-                <td className={styles.twitterCell}>
-                  {entry.twitterHandle ? `@${entry.twitterHandle}` : ''}
-                </td>
                 <td>
                   <span className={styles.badge}>{entry.source ?? 'unknown'}</span>
                 </td>

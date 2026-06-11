@@ -210,8 +210,6 @@ Sotto should support multiple source types through a common ingestion shape:
 | Agent | CLI/webhook/API token | project or daily work briefing |
 | Meeting | upload, transcript, recorder, calendar integration | recap and daily roll-up |
 | News | schedule | separate world briefing |
-| Twitter | mention, DM, or owner command depending on deployment | private episode |
-| Telegram | bot command | private episode |
 | Webhook | signed HTTP event | private episode or scheduled source |
 
 Common requirements:
@@ -288,7 +286,7 @@ Security priorities:
 - Encrypted user provider keys.
 - Token-authenticated ingestion endpoints.
 - Signed webhook validation when the caller supports signatures.
-- Rate limits for bots and ingestion.
+- Rate limits for webhooks and ingestion.
 - Redaction of provider keys and raw private content from logs.
 
 Meeting and agent content should be treated as highly sensitive. Store raw inputs only as long as the configured retention policy requires.

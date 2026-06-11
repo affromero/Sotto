@@ -11,9 +11,6 @@ export interface LandingShowcaseConfig {
   videoSegmentCount: number;
   showAvatar: boolean;
   showVideo: boolean;
-  twitterHandle: string;
-  twitterName: string;
-  telegramTopic: string | null;
 }
 
 export async function getLandingShowcaseConfig(): Promise<LandingShowcaseConfig | null> {
@@ -33,9 +30,6 @@ export async function getLandingShowcaseConfig(): Promise<LandingShowcaseConfig 
       videoSegmentCount: row.videoSegmentCount,
       showAvatar: row.showAvatar,
       showVideo: row.showVideo,
-      twitterHandle: row.twitterHandle,
-      twitterName: row.twitterName,
-      telegramTopic: row.telegramTopic,
     };
   } catch (err) {
     logger.warn('Failed to read landing showcase config', {
@@ -61,9 +55,6 @@ export async function setLandingShowcaseConfig(
       ...(data.videoSegmentCount !== undefined && { videoSegmentCount: data.videoSegmentCount }),
       ...(data.showAvatar !== undefined && { showAvatar: data.showAvatar }),
       ...(data.showVideo !== undefined && { showVideo: data.showVideo }),
-      ...(data.twitterHandle !== undefined && { twitterHandle: data.twitterHandle }),
-      ...(data.twitterName !== undefined && { twitterName: data.twitterName }),
-      ...(data.telegramTopic !== undefined && { telegramTopic: data.telegramTopic }),
       updatedBy: adminId,
     },
     create: {
@@ -77,9 +68,6 @@ export async function setLandingShowcaseConfig(
       videoSegmentCount: data.videoSegmentCount ?? 4,
       showAvatar: data.showAvatar ?? false,
       showVideo: data.showVideo ?? false,
-      twitterHandle: data.twitterHandle ?? 'andres',
-      twitterName: data.twitterName ?? 'Andres',
-      telegramTopic: data.telegramTopic ?? null,
       updatedBy: adminId,
     },
   });
