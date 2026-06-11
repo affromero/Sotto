@@ -24,6 +24,43 @@
   max-width: 52ch;
 }
 
+.step {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.stepHead {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+}
+
+.stepNum {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: #ffffff;
+  font: var(--text-label);
+  font-weight: 600;
+}
+
+.stepTitle {
+  font: var(--text-heading-sm);
+  color: var(--color-text-primary);
+}
+
+.stepText {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  max-width: 48ch;
+  margin-top: 2px;
+}
+
 .card {
   background: var(--color-surface);
   border: 1px solid var(--color-border);

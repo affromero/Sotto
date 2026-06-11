@@ -57,13 +57,17 @@ export async function createOwner(input: {
   });
 }
 
-/** Create a household member (USER) with a temporary password they must change. */
+/**
+ * Create a household member (USER). With a password they must change it on first
+ * sign-in; with no password they become a passwordless member who taps to sign in.
+ */
 export async function createMember(input: {
   name: string;
-  password: string;
+  password?: string;
   avatar?: string;
 }): Promise<{ id: string }> {
-  const passwordHash = await hashPassword(input.password);
+  const hasPassword = typeof input.password === 'string' && input.password.length > 0;
+  const passwordHash = hasPassword ? await hashPassword(input.password as string) : null;
   return prisma.user.create({
     data: {
       name: input.name,
@@ -71,7 +75,8 @@ export async function createMember(input: {
       image: avatarToImage(input.avatar),
       role: 'USER',
       passwordHash,
-      forcePasswordChange: true,
+      passwordless: !hasPassword,
+      forcePasswordChange: hasPassword,
       hasCompletedOnboarding: false,
     },
     select: { id: true },
