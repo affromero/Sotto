@@ -38,7 +38,7 @@ function config(over: Partial<SiteConfigData>): SiteConfigData {
   return { ...EMPTY, ...over };
 }
 
-const ENV_KEYS = ['AI_PROVIDER', 'AI_MODEL', 'STT_PROVIDER', 'TTS_BASE_URL'];
+const ENV_KEYS = ['AI_PROVIDER', 'AI_MODEL', 'STT_PROVIDER', 'TTS_PROVIDER', 'TTS_BASE_URL'];
 const savedEnv: Record<string, string | undefined> = {};
 
 describe('server-config infra accessor', () => {

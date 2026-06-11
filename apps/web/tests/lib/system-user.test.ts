@@ -19,6 +19,7 @@ describe('system user identity', () => {
   });
 
   it('rejects missing or invalid handles', () => {
+    vi.stubEnv('SYSTEM_USER_HANDLE', '');
     expect(() => getSystemUserHandle()).toThrow(SystemUserConfigError);
     expect(() => normalizeSystemUserHandle('x')).toThrow(SystemUserConfigError);
     expect(() => normalizeSystemUserHandle('bad-handle')).toThrow(SystemUserConfigError);
