@@ -1,0 +1,37 @@
+version: 2
+updates:
+  # JavaScript / TypeScript (npm workspaces — the root lockfile covers
+  # apps/web, apps/mobile, packages/*, and services/*).
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    # Supply-chain guard: never open a PR for a release younger than 7 days,
+    # so a freshly compromised version is not pulled in immediately.
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 10
+    groups:
+      npm:
+        patterns:
+          - '*'
+  # GitHub Actions used by the workflows.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 10
+    groups:
+      actions:
+        patterns:
+          - '*'
+  # Container base images (Dockerfiles live at the repo root).
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
