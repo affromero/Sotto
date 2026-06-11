@@ -282,12 +282,7 @@ export async function DELETE(request: NextRequest) {
 
     // Delete orphaned models (no User FK, won't cascade)
     await Promise.all([
-      prisma.behavioralEvent.deleteMany({ where: { userId } }),
-      prisma.userSession.deleteMany({ where: { userId } }),
-      prisma.playbackSession.deleteMany({ where: { userId } }),
-      prisma.userFeature.deleteMany({ where: { userId } }),
       prisma.feedback.deleteMany({ where: { userId } }),
-      prisma.listeningQueue.deleteMany({ where: { userId } }),
     ]);
 
     // Delete user — cascades handle all FK-linked records

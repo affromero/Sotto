@@ -10,7 +10,6 @@ import {
   keyValidationQueue,
   pricingFetchQueue,
   ttsProviderMonitorQueue,
-  featureComputationQueue,
   JobType,
 } from '@/lib/queue';
 import { logger } from '@/lib/logger';
@@ -27,9 +26,6 @@ import { processInteraction } from './interaction.worker';
 import { processSegmentRegeneration } from './segment-regeneration.worker';
 import { processNotification } from './notification.worker';
 import { processPdfGeneration } from './pdf-generation.worker';
-import { processEventIngestion } from './event-ingestion.worker';
-import { processFeatureComputation } from './feature-computation.worker';
-import { processDataExport } from './data-export.worker';
 import { processKeyValidation } from './key-validation.worker';
 import { processVoiceVerification } from './voice-verification.worker';
 import { processPricingFetch } from './pricing-fetch.worker';
@@ -114,9 +110,6 @@ const workers = [
   shouldRun('segment-regeneration') && createWorker('segment-regeneration', processSegmentRegeneration, { concurrency: 2 }),
   shouldRun('notifications') && createWorker('notifications', processNotification, { concurrency: 5 }),
   shouldRun('pdf-generation') && createWorker('pdf-generation', processPdfGeneration, { concurrency: 2 }),
-  shouldRun('event-ingestion') && createWorker('event-ingestion', processEventIngestion, { concurrency: 5 }),
-  shouldRun('feature-computation') && createWorker('feature-computation', processFeatureComputation, { concurrency: 2 }),
-  shouldRun('data-export') && createWorker('data-export', processDataExport, { concurrency: 1 }),
   shouldRun('key-validation') && createWorker('key-validation', processKeyValidation, { concurrency: 1 }),
   shouldRun('voice-verification') && createWorker('voice-verification', processVoiceVerification, { concurrency: 2 }),
   shouldRun('pricing-fetch') && createWorker('pricing-fetch', processPricingFetch, { concurrency: 1 }),
@@ -168,14 +161,6 @@ if (shouldRun('pricing-fetch')) {
     .add(JobType.FETCH_PRICING, {}, { repeat: { every: 86400000 } })
     .then(() => logger.info('Pricing fetch scheduled', { intervalMs: '86400000' }))
     .catch((err) => logger.error('Failed to schedule pricing fetch', { error: err.message }));
-}
-
-// Schedule daily ML feature computation catch-up (every 24 hours)
-if (shouldRun('feature-computation')) {
-  featureComputationQueue
-    .add(JobType.COMPUTE_FEATURES, { scope: 'all' }, { repeat: { every: 86400000 } })
-    .then(() => logger.info('Feature computation catch-up scheduled', { intervalMs: '86400000' }))
-    .catch((err) => logger.error('Failed to schedule feature computation', { error: err.message }));
 }
 
 // Start in-memory pricing refresh interval (picks up DB changes every 5 min)

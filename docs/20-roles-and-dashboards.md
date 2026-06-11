@@ -126,18 +126,9 @@ Users can manage account display data in settings. Profile-style fields may stil
 
 ## 8. Site Analytics
 
-The `PageViewTracker` component records route-level analytics through the existing event pipeline:
-
-```text
-EventBuffer -> /api/v1/events -> BullMQ -> BehavioralEvent
-```
-
-Admin analytics may show:
-
-- page views
-- unique visitors
-- referrers
-- devices
+The event pipeline and model-backed reporting store have been removed. Do not add
+route-level tracking, anonymous session analytics, or profile-backed admin
+dashboards.
 - conversion through onboarding
 - placement completion
 - course creation

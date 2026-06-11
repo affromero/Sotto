@@ -148,21 +148,6 @@ export async function seedTestUser() {
     },
   });
 
-  // PodcastFeature for testPodcast (non-zero values for quality route)
-  await prisma.podcastFeature.upsert({
-    where: { podcastId: testPodcast.id },
-    update: {},
-    create: {
-      podcastId: testPodcast.id,
-      avgCompletionRate: 0.75,
-      medianCompletionRate: 0.8,
-      totalUniqueListeners: 10,
-      totalListenMinutes: 50.0,
-      segmentCount: 2,
-      durationSeconds: 300,
-    },
-  });
-
   // Save (user → otherPodcast)
   await prisma.save.upsert({
     where: { userId_podcastId: { userId: user.id, podcastId: otherPodcast.id } },

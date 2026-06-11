@@ -14,7 +14,6 @@ import { loadStoredServerUrl, hasServerConfigured } from '../lib/server-url';
 import { useThemeColors, useThemeStore } from '../lib/useThemeColors';
 import { api, onAuthRevoked } from '../lib/api';
 import { registerForPushNotifications } from '../lib/notifications';
-import { EventProvider } from '../components/EventProvider';
 import { MiniPlayer } from '../components/MiniPlayer';
 import { AppErrorBoundary } from '../components/AppErrorBoundary';
 
@@ -158,23 +157,21 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <GestureHandlerRootView style={{ flex: 1 }}>
           <QueryClientProvider client={queryClient}>
-            <EventProvider>
-              <StatusBar style={isDark ? 'light' : 'dark'} />
-              <Stack
-                screenOptions={{
-                  headerStyle: { backgroundColor: colors.background },
-                  headerTintColor: colors.textPrimary,
-                  contentStyle: { backgroundColor: colors.background },
-                }}
-              >
-                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                <Stack.Screen name="auth/login" options={{ headerShown: false }} />
-                <Stack.Screen name="onboarding/index" options={{ headerShown: false }} />
-                <Stack.Screen name="podcast/[id]" options={{ headerShown: false }} />
-                <Stack.Screen name="podcast/[id]/edit" options={{ title: 'Edit Podcast' }} />
-              </Stack>
-              <MiniPlayer />
-            </EventProvider>
+            <StatusBar style={isDark ? 'light' : 'dark'} />
+            <Stack
+              screenOptions={{
+                headerStyle: { backgroundColor: colors.background },
+                headerTintColor: colors.textPrimary,
+                contentStyle: { backgroundColor: colors.background },
+              }}
+            >
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen name="auth/login" options={{ headerShown: false }} />
+              <Stack.Screen name="onboarding/index" options={{ headerShown: false }} />
+              <Stack.Screen name="podcast/[id]" options={{ headerShown: false }} />
+              <Stack.Screen name="podcast/[id]/edit" options={{ title: 'Edit Podcast' }} />
+            </Stack>
+            <MiniPlayer />
           </QueryClientProvider>
         </GestureHandlerRootView>
       </SafeAreaProvider>

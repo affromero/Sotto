@@ -13,11 +13,4 @@ test.describe('Public podcast API routes', () => {
     const res = await authedRequest.get('/api/v1/podcasts/nonexistent-id-xyz');
     expect(res.status()).toBe(404);
   });
-
-  test('quality returns score', async ({ authedRequest, seedData }) => {
-    const res = await authedRequest.get(`/api/v1/podcasts/${seedData.testPodcast.id}/quality`);
-    expect(res.status()).toBe(200);
-    const body = await res.json();
-    expect(body).toHaveProperty('qualityScore');
-  });
 });

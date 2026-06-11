@@ -79,7 +79,7 @@ The active data model is learner and course oriented. Important groups:
 | Memory graph | `LearnerVocab`, `LearnerGrammar`, `VocabEdge`, `EdgeType` |
 | Reused audio engine | `Podcast`, `PodcastSegment`, `PodcastVersion`, interaction/reference models used by listening audio |
 | Provider config | `UserAiKey`, `UserTtsKey`, model config, provider settings, voice settings |
-| Operations | queue/job metadata, reports, audit/admin records, analytics/event models |
+| Operations | queue/job metadata, reports, audit/admin records, usage and cost records |
 
 `Podcast` remains because the listening skill reuses the existing audio engine for script generation, verification, TTS, stitching, playback, and references. It is an implementation detail for listening sections, listening practice, and exam listening, not a current podcast-platform product.
 
