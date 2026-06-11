@@ -7,7 +7,6 @@ import { classifyError, isKeyInvalidationError, userMessage } from './byok-error
 import { markTtsKeyInvalid, markAiKeyInvalid } from './byok';
 import type { AiProviderId } from './providers/ai-registry';
 import type { TtsProviderId } from './providers/tts-registry';
-import type { SttProviderId } from '@sotto/shared';
 
 /** Cached admin user lookup — avoids hitting DB on every worker failure. */
 async function getCachedAdminUsers(): Promise<Array<{ id: string }>> {
@@ -40,7 +39,6 @@ export enum JobType {
   REGENERATE_SEGMENT = 'regenerate_segment',
   SEND_NOTIFICATION = 'send_notification',
   GENERATE_PDF = 'generate_pdf',
-  IMPORT_AUDIO = 'import_audio',
   INGEST_EVENTS = 'ingest_events',
   COMPUTE_FEATURES = 'compute_features',
   EXPORT_DATA = 'export_data',
@@ -199,18 +197,6 @@ export interface VerifyScriptPayload {
 export interface GeneratePdfPayload {
   podcastId: string;
   userId: string;
-}
-
-export interface ImportAudioPayload {
-  podcastId: string;
-  userId: string;
-  audioKey: string;
-  transcriptText?: string;
-  isHumanContent: boolean;
-  generateMetadata?: boolean;
-  sttProvider?: SttProviderId;
-  sttModel?: string;
-  sttApiKey?: string;
 }
 
 export interface IngestEventsPayload {
@@ -390,7 +376,6 @@ const QUEUE_DEFINITIONS: Record<string, QueueDefinition> = {
   notifications: { attempts: 5, skipEvents: true },
   'pdf-generation': { attempts: 2, skipEvents: true },
   'event-ingestion': { attempts: 2, removeOnComplete: { age: 3600, count: 500 }, skipEvents: true },
-  'audio-import': { attempts: 2 },
   'feature-computation': { attempts: 2, skipEvents: true },
   'data-export': { attempts: 2, skipEvents: true },
   'key-validation': { attempts: 1, skipEvents: true },
@@ -646,7 +631,6 @@ async function handleWorkerFailure(
       'audio-generation': 'Audio generation',
       'audio-stitching': 'Audio stitching',
       'segment-regeneration': 'Segment regeneration',
-      'audio-import': 'Audio import',
     };
     const stageLabel = STAGE_LABELS[queueName] || 'Generation';
     let failureReason = userMessage(errorKind, 'the provider', stageLabel);
@@ -673,17 +657,6 @@ async function handleWorkerFailure(
         if (aiKey) {
           didInvalidateKey = await markAiKeyInvalid(podcast.userId, aiKey.provider as AiProviderId);
           failureReason = userMessage(errorKind, aiKey.provider);
-        }
-      } else if (queueName === 'audio-import') {
-        const sttProvider = (job?.data as Record<string, unknown> | undefined)?.sttProvider as
-          | SttProviderId
-          | undefined;
-        if (sttProvider === 'elevenlabs') {
-          didInvalidateKey = await markTtsKeyInvalid(podcast.userId, 'elevenlabs');
-          failureReason = userMessage(errorKind, 'ElevenLabs');
-        } else if (sttProvider) {
-          didInvalidateKey = await markAiKeyInvalid(podcast.userId, sttProvider as AiProviderId);
-          failureReason = userMessage(errorKind, sttProvider);
         }
       }
 
@@ -867,7 +840,6 @@ export const referenceValidationQueue = createQueueReference('reference-validati
 export const pdfGenerationQueue = createQueueReference('pdf-generation');
 export const scriptVerificationQueue = createQueueReference('script-verification');
 export const eventIngestionQueue = createQueueReference('event-ingestion');
-export const audioImportQueue = createQueueReference('audio-import');
 export const featureComputationQueue = createQueueReference('feature-computation');
 export const dataExportQueue = createQueueReference('data-export');
 export const keyValidationQueue = createQueueReference('key-validation');

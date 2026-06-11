@@ -2,9 +2,13 @@
  * Declarative STT provider registry — models and metadata for every
  * supported speech-to-text provider.
  */
-import type { SttProviderId } from '@sotto/shared';
-
-export type { SttProviderId };
+export type SttProviderId =
+  | 'openai'
+  | 'elevenlabs'
+  | 'together'
+  | 'deepgram'
+  | 'assemblyai'
+  | 'local';
 
 export interface SttModelOption {
   id: string;

@@ -1,5 +1,4 @@
 import type { PodcastSummary } from './types/podcast';
-import { SOURCE_PLATFORMS } from './types/import';
 import {
   AI_PROVIDER_DISPLAY,
   AI_MODEL_SHORT_DISPLAY,
@@ -8,13 +7,22 @@ import {
   getLanguageLabel,
 } from './provider-display';
 
+const SOURCE_PLATFORM_LABELS: Record<string, string> = {
+  notebooklm: 'NotebookLM',
+  spotify: 'Spotify',
+  apple_podcasts: 'Apple Podcasts',
+  youtube: 'YouTube',
+  other: 'Other',
+};
+
 export function getContentBadgeLabel(
   podcast: Pick<PodcastSummary, 'source' | 'isHumanContent' | 'sourcePlatform'>
 ): string {
   if (podcast.source === 'IMPORT' && podcast.isHumanContent) return 'Human';
   if (podcast.source === 'IMPORT') {
-    const platform = SOURCE_PLATFORMS.find((p) => p.value === podcast.sourcePlatform);
-    return platform?.label ?? 'Imported';
+    return podcast.sourcePlatform
+      ? SOURCE_PLATFORM_LABELS[podcast.sourcePlatform] ?? 'Imported'
+      : 'Imported';
   }
   return 'AI-Generated';
 }

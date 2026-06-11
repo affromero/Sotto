@@ -124,7 +124,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     return errorResponse(parsed.error.flatten(), 400);
   }
 
-  const { dismissSuggestion, ...updateData } = parsed.data;
+  const updateData = parsed.data;
 
   // Regenerate slug when title changes
   const slugData = updateData.title
@@ -136,7 +136,6 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     data: {
       ...updateData,
       ...slugData,
-      ...(dismissSuggestion && { suggestedTitle: null, suggestedTopic: null }),
     },
     select: {
       ...PODCAST_PUBLIC_SELECT,

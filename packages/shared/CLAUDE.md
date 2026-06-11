@@ -18,7 +18,6 @@ src/
 │   ├── version.ts        # PodcastVersionSummary, PodcastVersionDetail
 │   ├── analytics.ts      # AnalyticsResponse, AnalyticsSummary
 │   ├── api-key.ts        # ApiKeyData, ApiKeyCreated
-│   ├── import.ts         # ImportPodcastRequest, ImportProgress
 │   ├── events.ts         # EventPayload (17 private workspace event types), EventContext
 │   └── pitch.ts          # PitchDocument, PitchVersion, PitchManifest
 ├── brand.ts              # BRAND constant — single source of truth for product tagline, descriptions, and pitch copy

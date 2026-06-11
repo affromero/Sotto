@@ -33,7 +33,6 @@ export const PIPELINE_WORKERS = new Set([
   'script-writing',
   'compile-script',
   'script-generation',
-  'audio-import',
   'interactions',
   'segment-regeneration',
   'visual-classification',

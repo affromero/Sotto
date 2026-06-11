@@ -31,7 +31,6 @@ import { processPdfGeneration } from './pdf-generation.worker';
 import { processEventIngestion } from './event-ingestion.worker';
 import { processFeatureComputation } from './feature-computation.worker';
 import { processDataExport } from './data-export.worker';
-import { processAudioImport } from './audio-import.worker';
 import { processKeyValidation } from './key-validation.worker';
 import { processVoiceVerification } from './voice-verification.worker';
 import { processR2Usage } from './r2-usage.worker';
@@ -121,7 +120,6 @@ const workers = [
   shouldRun('event-ingestion') && createWorker('event-ingestion', processEventIngestion, { concurrency: 5 }),
   shouldRun('feature-computation') && createWorker('feature-computation', processFeatureComputation, { concurrency: 2 }),
   shouldRun('data-export') && createWorker('data-export', processDataExport, { concurrency: 1 }),
-  shouldRun('audio-import') && createWorker('audio-import', processAudioImport, { concurrency: 2 }),
   shouldRun('key-validation') && createWorker('key-validation', processKeyValidation, { concurrency: 1 }),
   shouldRun('voice-verification') && createWorker('voice-verification', processVoiceVerification, { concurrency: 2 }),
   shouldRun('r2-usage') && createWorker('r2-usage', processR2Usage, { concurrency: 1 }),

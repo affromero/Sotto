@@ -11,20 +11,16 @@ import {
   compileScriptQueue,
   audioGenerationQueue,
   audioStitchingQueue,
-  audioImportQueue,
   addJob,
   JobType,
 } from '@/lib/queue';
 import { determineResumePoint, type ResumePoint } from '@/lib/pipeline-resume';
-import { resolveSttProvider } from '@/lib/providers/stt';
 import { MAX_LESSON_DURATION_MINUTES } from '@/lib/generation-limits';
 import type {
   ExtractContentPayload,
-  ImportAudioPayload,
   GenerateAudioPayload,
   StitchAudioPayload,
 } from '@/lib/queue';
-import type { SttProviderId } from '@sotto/shared';
 
 type RouteParams = { params: Promise<{ podcastId: string }> };
 
@@ -50,12 +46,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       userId: true,
       status: true,
       failedAtStatus: true,
-      source: true,
-      importedAudioKey: true,
-      sttProvider: true,
-      sttModel: true,
-      isHumanContent: true,
-      title: true,
       discovery: {
         select: { id: true, sourceUrl: true, sourceContent: true, durationTarget: true },
       },
@@ -151,11 +141,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
   }
 
-  // Imported podcasts re-queue the import pipeline
-  if (podcast.source === 'IMPORT' && podcast.importedAudioKey) {
-    return await startImport(podcastId, authResult.userId, podcast);
-  }
-
   // Standard generation pipeline: start from scratch (CAS prevents concurrent starts)
   const cas = await prisma.podcast.updateMany({
     where: { id: podcastId, status: { in: ['PENDING', 'DISCOVERING'] } },
@@ -187,22 +172,12 @@ async function routeResume(
   podcastId: string,
   userId: string,
   podcast: {
-    source: string;
-    importedAudioKey: string | null;
-    sttProvider: string | null;
-    sttModel: string | null;
-    isHumanContent: boolean;
-    title: string;
     discovery: { id: string; sourceUrl: string | null; sourceContent: string | null } | null;
   },
   resumePoint: ResumePoint,
   useAdminCredits: boolean
 ): Promise<NextResponse> {
   switch (resumePoint.step) {
-    case 'IMPORT_AUDIO': {
-      return await startImport(podcastId, userId, podcast);
-    }
-
     case 'EXTRACT_CONTENT': {
       const casExtract = await prisma.podcast.updateMany({
         where: { id: podcastId, status: 'FAILED' },
@@ -456,78 +431,4 @@ async function routeResume(
       });
     }
   }
-}
-
-/**
- * Start or restart the import pipeline.
- */
-async function startImport(
-  podcastId: string,
-  userId: string,
-  podcast: {
-    importedAudioKey: string | null;
-    sttProvider: string | null;
-    sttModel: string | null;
-    isHumanContent: boolean;
-    title: string;
-  }
-): Promise<NextResponse> {
-  if (!podcast.importedAudioKey) {
-    return errorResponse('No audio key for import', 400);
-  }
-  if (!podcast.sttProvider) {
-    return errorResponse(
-      'Speech-to-text provider is required before restarting an audio import.',
-      400,
-      {
-        code: 'stt_provider_required',
-      }
-    );
-  }
-
-  let sttProvider: SttProviderId;
-  let sttApiKey: string;
-  let sttModel: string;
-  try {
-    const resolved = await resolveSttProvider({
-      userId,
-      requestedProvider: podcast.sttProvider as SttProviderId,
-      requestedModel: podcast.sttModel ?? undefined,
-    });
-    sttProvider = resolved.providerId;
-    sttApiKey = resolved.apiKey;
-    sttModel = resolved.model;
-  } catch (err) {
-    return errorResponse(
-      err instanceof Error
-        ? err.message
-        : 'No API key available for selected speech-to-text provider.',
-      400
-    );
-  }
-
-  const casImport = await prisma.podcast.updateMany({
-    where: { id: podcastId, status: { in: ['PENDING', 'DISCOVERING', 'FAILED'] } },
-    data: { status: 'IMPORTING', failedAtStatus: null, failureReason: null },
-  });
-  if (casImport.count === 0) {
-    return errorResponse('Podcast is no longer in a restartable state', 409);
-  }
-
-  const importPayload: ImportAudioPayload = {
-    podcastId,
-    userId,
-    audioKey: podcast.importedAudioKey,
-    isHumanContent: podcast.isHumanContent,
-    generateMetadata: !podcast.title || podcast.title === 'Untitled Import',
-    sttProvider,
-    sttApiKey,
-    sttModel,
-  };
-
-  await addJob(audioImportQueue, JobType.IMPORT_AUDIO, importPayload, {
-    jobId: `import-${podcastId}-${Date.now()}`,
-  });
-
-  return NextResponse.json({ success: true, message: 'Import retry started' });
 }

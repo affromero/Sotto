@@ -1,7 +1,9 @@
 import { logger } from '../logger';
-import { getSttProviderMeta, isValidSttProviderId } from './stt-registry';
+import { getSttProviderMeta, isValidSttProviderId, type SttProviderId } from './stt-registry';
 import { getAiKey, getByokKey } from '../byok';
 import { infra } from '../server-config';
+
+export type { SttProviderId } from './stt-registry';
 
 /**
  * Speech-to-text transcription result
@@ -550,9 +552,6 @@ class AssemblyAIProvider implements SttProvider {
     throw new Error('AssemblyAI transcription timed out after 10 minutes');
   }
 }
-
-export type { SttProviderId } from '@sotto/shared';
-import type { SttProviderId } from '@sotto/shared';
 
 /**
  * Create an STT provider instance
