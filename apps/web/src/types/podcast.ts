@@ -16,7 +16,6 @@ export interface PodcastSummary {
   playCount: number;
   createdAt: string;
   source: PodcastSource;
-  isHumanContent: boolean;
   lowReferences?: boolean;
   sourcePlatform?: string | null;
   aiProvider?: string | null;

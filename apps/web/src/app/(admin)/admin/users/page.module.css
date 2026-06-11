@@ -244,67 +244,10 @@
   composes: pageInfo from '../admin.module.css';
 }
 
-/* Moderation Actions */
-
 .actionsCell {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-xs);
-}
-
-.moderationButtons {
-  display: flex;
-  gap: var(--spacing-xs);
-}
-
-.modBtn {
-  padding: 2px var(--spacing-xs);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  font: var(--text-caption);
-  font-weight: 500;
-  color: var(--color-text-secondary);
-  background: var(--color-surface);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.modBtn:hover:not(:disabled) {
-  border-color: var(--color-text-secondary);
-  color: var(--color-text-primary);
-}
-
-.modBtn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.modBtnWarn {
-  color: var(--color-primary);
-  border-color: var(--color-primary);
-}
-
-.modBtnWarn:hover:not(:disabled) {
-  background: var(--color-primary-lighter);
-  color: var(--color-primary-hover);
-  border-color: var(--color-primary-hover);
-}
-
-.modBtnDanger {
-  color: var(--color-error);
-  border-color: var(--color-error);
-}
-
-.modBtnDanger:hover:not(:disabled) {
-  background: var(--color-error-lighter);
-  color: var(--color-error-hover);
-  border-color: var(--color-error-hover);
-}
-
-.removedLabel {
-  font: var(--text-caption);
-  color: var(--color-text-muted);
-  font-style: italic;
 }
 
 .statusBadge {

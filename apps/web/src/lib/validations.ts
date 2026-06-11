@@ -390,7 +390,6 @@ export const createDraftSchema = z.object({
       title: z.string().max(200).optional(),
       topic: z.string().max(5000).optional(),
       sourcePlatform: z.string().max(50).optional(),
-      isHumanContent: z.boolean().optional(),
       sttProvider: z.string().optional(),
     })
     .optional(),
@@ -412,7 +411,6 @@ export const appendDraftMessagesSchema = z.object({
 export const importPodcastSchema = z.object({
   title: z.string().max(200).optional(),
   topic: z.string().max(5000).optional(),
-  isHumanContent: z.boolean().default(false),
   sourcePlatform: z.string().min(1).max(50),
   sttProvider: z.enum(['openai', 'elevenlabs', 'together', 'deepgram', 'assemblyai']).optional(),
   sttModel: z.string().max(100).optional(),
@@ -454,54 +452,6 @@ export const tasteQuizAnswerSchema = z.object({
     )
     .min(1)
     .max(20),
-});
-
-/**
- * Report creation validation
- */
-export const createReportSchema = z.object({
-  targetType: z.enum(['podcast', 'user']),
-  targetId: z.string().min(1),
-  reason: z.enum([
-    'HARASSMENT',
-    'HATE_SPEECH',
-    'VIOLENCE',
-    'SEXUAL_CONTENT',
-    'MISINFORMATION',
-    'SPAM',
-    'IMPERSONATION',
-    'COPYRIGHT',
-    'VOICE_THEFT',
-    'FALSE_HUMAN_BADGE',
-    'FALSE_CLAIM',
-    'OTHER',
-  ]),
-  description: z.string().max(2000).optional(),
-});
-
-/**
- * Admin badge update validation
- */
-export const adminUpdateBadgeSchema = z.object({
-  isHumanContent: z.boolean(),
-  reason: z.string().min(1).max(2000),
-});
-
-/**
- * Report resolution validation (admin)
- */
-export const resolveReportSchema = z.object({
-  status: z.enum(['RESOLVED_ACTIONED', 'RESOLVED_DISMISSED', 'ASSET_REPLACED', 'DELISTED']),
-  resolution: z.string().max(2000).optional(),
-});
-
-/**
- * Admin user moderation validation
- */
-export const moderateUserSchema = z.object({
-  action: z.enum(['warn', 'suspend', 'ban', 'unban', 'unsuspend']),
-  reason: z.string().min(1).max(2000),
-  durationDays: z.number().int().min(1).max(365).optional(),
 });
 
 /**

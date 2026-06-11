@@ -2,8 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
 const mockAuthenticateRequest = vi.fn();
-const mockAuth = vi.fn();
-const mockCheckSuspension = vi.fn();
 const mockRequireAdmin = vi.fn();
 const mockCheckRateLimit = vi.fn();
 const mockGetJobPriority = vi.fn();
@@ -48,12 +46,7 @@ vi.mock('@/lib/api-keys', () => ({
   authenticateRequest: (...args: unknown[]) => mockAuthenticateRequest(...args),
 }));
 
-vi.mock('@/lib/auth', () => ({
-  auth: (...args: unknown[]) => mockAuth(...args),
-}));
-
 vi.mock('@/lib/auth-guards', () => ({
-  checkSuspension: (...args: unknown[]) => mockCheckSuspension(...args),
   requireAdmin: (...args: unknown[]) => mockRequireAdmin(...args),
 }));
 
@@ -121,8 +114,6 @@ describe('POST /api/v1/ingest/agent', () => {
     vi.clearAllMocks();
 
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockCheckSuspension.mockReturnValue(null);
     mockRequireAdmin.mockResolvedValue(null);
     mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 19, resetAt: Date.now() });
     mockGetJobPriority.mockReturnValue(1);
@@ -175,7 +166,6 @@ describe('POST /api/v1/ingest/agent', () => {
       source: 'AGENT',
       discoveryId: 'disc-agent-1',
     });
-    expect(mockAuth).not.toHaveBeenCalled();
     expect(mockPodcastCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({
         userId: 'user-1',

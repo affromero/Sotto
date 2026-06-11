@@ -7,7 +7,7 @@ import { contentExtractionQueue, addJob, JobType } from '@/lib/queue';
 import { getAutoModelConfig } from '@/lib/auto-model-config';
 import { getGenerationFeatures, getJobPriority } from '@/lib/generation-features';
 import { getProviderForModel, isValidModelId } from '@/lib/providers/ai-registry';
-import { checkSuspension, requireAdmin } from '@/lib/auth-guards';
+import { requireAdmin } from '@/lib/auth-guards';
 import { generatePodcastSlug } from '@/lib/slugify';
 import type { ExtractContentPayload } from '@/lib/queue';
 
@@ -38,16 +38,6 @@ export async function POST(request: NextRequest) {
   // Detect API key auth (Bearer token) vs browser session
   const authHeader = request.headers.get('authorization');
   const isApiKeyAuth = authHeader?.startsWith('Bearer ');
-
-  // Session-based suspension check (skip for API key auth — those have separate controls)
-  if (!isApiKeyAuth) {
-    const { auth } = await import('@/lib/auth');
-    const session = await auth();
-    if (session) {
-      const suspended = checkSuspension(session);
-      if (suspended) return suspended;
-    }
-  }
 
   // Rate limit API key requests (60 requests per minute)
   if (isApiKeyAuth) {

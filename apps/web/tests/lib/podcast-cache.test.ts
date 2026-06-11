@@ -75,10 +75,6 @@ vi.mock('@/lib/api-response', () => ({
   errorResponse: (msg: string, status: number) => new Response(JSON.stringify({ error: msg }), { status }),
 }));
 
-vi.mock('@/lib/auth-guards', () => ({
-  checkSuspension: vi.fn().mockReturnValue(null),
-}));
-
 import { NextRequest } from 'next/server';
 import { GET as getPodcast, PATCH as updatePodcast } from '@/app/api/v1/podcasts/[podcastId]/route';
 

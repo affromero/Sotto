@@ -71,7 +71,6 @@ Do not use this role to add public creator pages, public distribution, follows, 
 | Overview | `/admin` | users, jobs, health, BYOK adoption, and setup status |
 | Users | `/admin/users` | search users, update role, inspect setup readiness |
 | Podcasts | `/admin/podcasts` | legacy audio-engine inspection for generated listening audio and ownership |
-| Moderation | `/admin/moderation` | reports and failed content review |
 | Config | `/admin/config` | provider defaults and operational limits |
 | Handles | `/admin/handles` | reserved handle management where still needed |
 | Inspire | `/admin/inspire` | private inspiration/source management where still enabled |

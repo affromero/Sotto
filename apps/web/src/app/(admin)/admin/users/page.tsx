@@ -36,8 +36,6 @@ async function getUsers(search: string | undefined, page: number) {
         image: true,
         role: true,
         createdAt: true,
-        bannedAt: true,
-        suspendedUntil: true,
         _count: {
           select: {
             podcasts: true,
@@ -139,8 +137,6 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
                       userId={user.id}
                       currentRole={user.role}
                       isOwnUser={user.id === currentUserId}
-                      isBanned={!!user.bannedAt}
-                      isSuspended={!!user.suspendedUntil && new Date(user.suspendedUntil) > new Date()}
                     />
                   </td>
                   <td className={styles.numberCell}>{user._count.podcasts}</td>

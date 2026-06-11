@@ -4,7 +4,6 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { authenticateRequest } from '@/lib/api-keys';
 import { agentIngestionSchema } from '@/lib/validations';
-import { checkSuspension } from '@/lib/auth-guards';
 import { getJobPriority } from '@/lib/generation-features';
 import { isValidModelId } from '@/lib/providers/ai-registry';
 import {
@@ -93,18 +92,6 @@ export async function POST(request: NextRequest) {
   const authResult = await authenticateRequest(request);
   if (!authResult) {
     return errorResponse('Unauthorized', 401);
-  }
-
-  const authHeader = request.headers.get('authorization');
-  const isApiKeyAuth = authHeader?.startsWith('Bearer ') ?? false;
-
-  if (!isApiKeyAuth) {
-    const { auth } = await import('@/lib/auth');
-    const session = await auth();
-    if (session) {
-      const suspended = checkSuspension(session);
-      if (suspended) return suspended;
-    }
   }
 
   const body: unknown = await request.json();

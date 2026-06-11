@@ -435,7 +435,6 @@ describe('open-source language-learning OSS surfaces', () => {
   it('keeps public contact and demo surfaces self-host neutral', () => {
     const publicContactSources = [
       'apps/web/src/app/about/page.tsx',
-      'apps/web/src/app/banned/page.tsx',
       'apps/web/src/app/support/page.tsx',
       'apps/web/src/app/terms/page.tsx',
       'apps/web/src/app/privacy/page.tsx',
@@ -1078,27 +1077,6 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(voiceProviderSources).not.toContain(
       'falls back to elevenlabs for invalid provider param'
     );
-  });
-
-  it('keeps reports and content moderation free of comment targets', () => {
-    const reportModerationSources = [
-      'src/app/api/v1/reports/route.ts',
-      'src/lib/validations.ts',
-      'src/components/ui/ReportModal.tsx',
-      'src/components/ui/ReportButton.tsx',
-      'src/app/(admin)/admin/moderation/ReportQueue.tsx',
-      'src/lib/queue.ts',
-    ]
-      .map(readSource)
-      .join('\n');
-
-    expect(reportModerationSources).not.toContain('prisma.comment');
-    expect(reportModerationSources).not.toContain("targetType === 'comment'");
-    expect(reportModerationSources).not.toContain("'podcast' | 'comment'");
-    expect(reportModerationSources).not.toContain("'podcast', 'comment', 'user'");
-    expect(reportModerationSources).not.toContain('value="comment"');
-    expect(reportModerationSources).not.toContain('Comment not found');
-    expect(reportModerationSources).not.toContain('(podcast scripts, comments)');
   });
 
   it('keeps MCP contracts private-activity scoped', () => {

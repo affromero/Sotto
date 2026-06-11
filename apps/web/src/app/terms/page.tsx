@@ -94,11 +94,10 @@ export default function TermsPage() {
             content.
           </p>
 
-          <h2>8. Account Termination</h2>
+          <h2>8. Account Deletion</h2>
           <p>
-            You may delete your account at any time from your profile settings. We may
-            suspend or terminate accounts that violate these terms. Upon deletion, your
-            data is permanently removed as described in our{' '}
+            You may delete your account at any time from your profile settings. Upon
+            deletion, your data is permanently removed as described in our{' '}
             <a href="/privacy">Privacy Policy</a>.
           </p>
 

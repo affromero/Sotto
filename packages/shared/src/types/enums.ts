@@ -51,8 +51,6 @@ export type NotificationType =
   | 'QUESTION_ON_YOUR_PODCAST'
   | 'SCRIPT_READY'
   | 'ACCOUNT_WARNING'
-  | 'ACCOUNT_SUSPENDED'
-  | 'ACCOUNT_BANNED'
   | 'CONTENT_REMOVED'
   | 'PLATFORM_ANNOUNCEMENT'
   | 'VOICE_VERIFICATION_REQUIRED'
@@ -65,28 +63,6 @@ export type NotificationType =
   | 'AVATAR_FAILED'
   | 'PIPELINE_FAILURE'
   | 'REFERRAL_SIGNUP';
-
-export type ReportReason =
-  | 'HARASSMENT'
-  | 'HATE_SPEECH'
-  | 'VIOLENCE'
-  | 'SEXUAL_CONTENT'
-  | 'MISINFORMATION'
-  | 'SPAM'
-  | 'IMPERSONATION'
-  | 'COPYRIGHT'
-  | 'VOICE_THEFT'
-  | 'FALSE_HUMAN_BADGE'
-  | 'FALSE_CLAIM'
-  | 'OTHER';
-
-export type ReportStatus =
-  | 'PENDING'
-  | 'REVIEWING'
-  | 'RESOLVED_ACTIONED'
-  | 'RESOLVED_DISMISSED'
-  | 'ASSET_REPLACED'
-  | 'DELISTED';
 
 export type VoiceCloneSource = 'UPLOAD' | 'RECORD' | 'IMPORT';
 
