@@ -4,8 +4,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Command } from 'cmdk';
 import {
-  LayoutDashboard,
-  PlusCircle,
+  GraduationCap,
+  Brain,
   Settings,
   Key,
   Sun,
@@ -17,8 +17,8 @@ import { useTheme } from '@/components/providers/ThemeProvider';
 import styles from './CommandPalette.module.css';
 
 const NAV_ITEMS = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/create', label: 'Create Podcast', icon: PlusCircle },
+  { href: '/learn', label: 'Learn', icon: GraduationCap },
+  { href: '/memory', label: 'Memory', icon: Brain },
   { href: '/settings/api', label: 'API Keys', icon: Key },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
@@ -133,14 +133,6 @@ export function CommandPalette() {
 
         {/* Actions */}
         <Command.Group heading="Actions" className={styles.group}>
-          <Command.Item
-            value="Create Podcast"
-            onSelect={() => navigate('/create')}
-            className={styles.item}
-          >
-            <PlusCircle size={16} aria-hidden="true" />
-            <span className={styles.itemLabel}>Create Podcast</span>
-          </Command.Item>
           <Command.Item
             value={`Toggle theme ${resolvedTheme === 'dark' ? 'light' : 'dark'}`}
             onSelect={toggleTheme}
