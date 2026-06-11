@@ -33,7 +33,7 @@ import * as crypto from 'crypto';
 import { writeFile, rm } from 'fs/promises';
 
 // ---------------------------------------------------------------------------
-// Platform key helper — shared by audio-generation, voice-track, demo-voiceover
+// Platform key helper — shared by audio-generation, demo-voiceover
 // ---------------------------------------------------------------------------
 
 /** Return the platform API key for a given TTS provider (not BYOK). */

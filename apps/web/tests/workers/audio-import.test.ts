@@ -198,10 +198,6 @@ vi.mock('@/lib/providers/ai-registry', () => ({
   getCheapestModelForProvider: (...args: unknown[]) => mockGetCheapestModelForProvider(...args),
 }));
 
-const mockConsumeFreeGeneration = vi.fn().mockResolvedValue(undefined);
-vi.mock('@/lib/generation-gate', () => ({
-  consumeFreeGeneration: (...args: unknown[]) => mockConsumeFreeGeneration(...args),
-}));
 
 const mockAddJob = vi.fn().mockResolvedValue({ id: 'job-1' });
 vi.mock('@/lib/queue', () => ({

@@ -57,9 +57,6 @@ vi.mock('@/lib/redis', () => ({
   publishPodcastStatus: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('@/lib/generation-gate', () => ({
-  checkGenerationGate: vi.fn().mockResolvedValue({ allowed: true, reason: 'ok' }),
-}));
 
 vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },

@@ -101,9 +101,7 @@ export function getAppSelectorReference(): string {
     '- `button:has-text("Approve Script")` — script approval button',
     '',
     '## Voice Comparison',
-    '- `[data-testid="voice-track-list"]` — voice track sidebar',
-    '- `button:has-text("Compare Voices")` — compare button',
-    '- `button:has-text("Add Voice Track")` — add voice track',
+    '- the player voice/provider selector — switch the active TTS provider',
     '',
     '## Settings & BYOK',
     '- `a[href="/settings"]` — settings link',
@@ -136,10 +134,6 @@ export function getVoiceComparisonInstructions(providerNames: string[]): string 
     '5. The narration should name each provider as it plays: "ElevenLabs. OpenAI TTS. Cartesia."',
     '6. Keep narration minimal during the comparison — let the voices speak for themselves.',
     '7. Use `zoom` on the provider name/label in the UI so the viewer can read which provider is active.',
-    '',
-    'Relevant selectors:',
-    '- `[data-testid="voice-track-list"]` — voice track sidebar',
-    '- `button:has-text("Add Voice Track")` — add voice track',
   ].join('\n');
 }
 
