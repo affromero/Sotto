@@ -2,7 +2,7 @@
 
 > **Date**: 2026-02-08
 >
-> **Summary**: Comprehensive logo design brief for Sotto, an interactive AI podcast platform. This document is self-contained — no codebase access required. It provides brand context, creative directions, AI generation prompts, technical specifications, and usage guidelines. Suitable for human designers and AI generation tools (Midjourney, DALL-E, Ideogram, etc.).
+> **Summary**: Comprehensive logo design brief for Sotto, an open-source self-hostable language-learning platform. This document is self-contained — no codebase access required. It provides brand context, creative directions, AI generation prompts, technical specifications, and usage guidelines. Suitable for human designers and AI generation tools (Midjourney, DALL-E, Ideogram, etc.).
 
 ---
 
@@ -10,9 +10,9 @@
 
 ### 1.1 What is Sotto?
 
-Sotto is an AI-powered podcast platform where users describe a topic through natural conversation, and the platform generates a personalized two-voice podcast they can listen to anywhere. The core innovation: listeners can **interrupt mid-playback** to ask questions, get contextual answers, and optionally update the podcast with those clarifications for all future listeners.
+Sotto is an open-source, self-hostable language-learning platform. Learners work through mastery-gated CEFR courses across grammar, reading, adaptive listening, and speaking — running the whole stack on their own infrastructure with their own AI/TTS/STT keys. The adaptive listening lessons are AI-generated audio a learner can **pause mid-playback** to ask contextual questions and get spoken clarifications.
 
-Think of it as "where podcasts get social."
+Think of it as the language tutor that already knows you — private, on infrastructure you control.
 
 ### 1.2 Name Etymology
 
