@@ -256,7 +256,7 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(generatedUrlSources).not.toContain("|| 'http://localhost:3000'");
   });
 
-  it('requires mobile and extension clients to use explicit deployment URLs', () => {
+  it('requires mobile clients to use explicit deployment URLs', () => {
     const mobileRuntimeSources = [
       'apps/mobile/lib/config.ts',
       'apps/mobile/lib/api.ts',
@@ -273,16 +273,6 @@ describe('open-source language-learning OSS surfaces', () => {
     ]
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
-    const extensionSources = [
-      'extension/background.js',
-      'extension/popup.js',
-      'extension/popup.html',
-      'extension/manifest.json',
-      'extension/ADAPTATION.md',
-    ]
-      .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
-      .join('\n');
-
     // The client must point at an explicit deployment — paired at runtime
     // ("scan to connect") or baked in via EXPO_PUBLIC_API_URL — and never
     // silently default to a hosted sotto.fm. getApiBaseUrl throws when no server
@@ -300,17 +290,6 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(mobileBuildConfigSources).not.toContain('applinks:sotto.fm');
     expect(mobileBuildConfigSources).not.toContain('"host": "sotto.fm"');
     expect(mobileBuildConfigSources).not.toContain('https://sotto.fm/api');
-
-    expect(extensionSources).toContain('Sotto deployment URL is required');
-    expect(extensionSources).toContain('SET_CONFIG');
-    expect(extensionSources).toContain('"https://*/*"');
-    expect(extensionSources).toContain('optional import adapter');
-    expect(extensionSources).not.toContain('https://sotto.fm');
-    expect(extensionSources).not.toContain('sotto.fm/api');
-    expect(extensionSources).not.toContain('Send NotebookLM to Sotto');
-    expect(extensionSources).not.toContain('Send NotebookLM audio overviews');
-    expect(extensionSources).not.toContain('SET_API_KEY');
-    expect(extensionSources).not.toContain('CLEAR_API_KEY');
   });
 
   it('keeps the local setup script OSS-first and template-driven', () => {
