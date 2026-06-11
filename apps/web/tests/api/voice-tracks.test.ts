@@ -64,8 +64,8 @@ vi.mock('@/lib/redis', () => ({
   getRedisClient: vi.fn(),
 }));
 
-vi.mock('@/lib/tier-features', () => ({
-  getTierFeatures: vi.fn().mockReturnValue({ voiceTracksEnabled: true, maxVoiceTracks: 10 }),
+vi.mock('@/lib/generation-features', () => ({
+  getGenerationFeatures: vi.fn().mockReturnValue({ voiceTracksEnabled: true, maxVoiceTracks: 10 }),
 }));
 
 vi.mock('@/lib/voice-pricing', () => ({

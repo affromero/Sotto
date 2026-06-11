@@ -25,7 +25,7 @@ import { getAiKey } from '@/lib/byok';
 import { resolveAiModelAndProvider, type AiProviderId } from '@/lib/providers/ai-registry';
 import { assignVoicesForPodcast } from '@/lib/voice-assigner';
 import type { TtsProviderId } from '@/lib/providers/tts-registry';
-import { getTierFeatures } from '@/lib/tier-features';
+import { getGenerationFeatures } from '@/lib/generation-features';
 import { getAutoModelConfig } from '@/lib/auto-model-config';
 import { logger } from '@/lib/logger';
 import { logPipelineStageComplete } from '@/lib/pipeline-events';
@@ -48,7 +48,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
   logger.info('Starting script verification', { podcastId });
   await job.updateProgress(5);
 
-  const tierFeatures = getTierFeatures();
+  const genFeatures = getGenerationFeatures();
 
   const [script, discovery, references, podcastRecord] = await Promise.all([
     prisma.script.findUniqueOrThrow({
@@ -106,8 +106,8 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
   }
 
   const requestedDuration = discovery.durationTarget || 10;
-  const maxDurationMinutes = isFinite(tierFeatures.maxDurationMinutes)
-    ? Math.min(requestedDuration, tierFeatures.maxDurationMinutes)
+  const maxDurationMinutes = isFinite(genFeatures.maxDurationMinutes)
+    ? Math.min(requestedDuration, genFeatures.maxDurationMinutes)
     : requestedDuration;
 
   const generatedRefs: GeneratedReference[] = references.map((r) => ({
@@ -318,7 +318,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
       });
 
       // Free users auto-approve (no script review pause)
-      const shouldAutoApprove = tierFeatures.autoApproveScript ||
+      const shouldAutoApprove = genFeatures.autoApproveScript ||
         (podcast.source !== 'WEB' && podcast.source !== 'IMPORT');
 
       if (!shouldAutoApprove) {

@@ -57,8 +57,8 @@ vi.mock('@/lib/auth-guards', () => ({
   checkSuspension: vi.fn().mockReturnValue(null),
 }));
 
-vi.mock('@/lib/tier-features', () => ({
-  getTierFeatures: vi.fn().mockReturnValue({
+vi.mock('@/lib/generation-features', () => ({
+  getGenerationFeatures: vi.fn().mockReturnValue({
     maxDurationMinutes: 30,
     maxSpeakers: 4,
     autoApproveScript: false,

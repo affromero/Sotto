@@ -59,8 +59,8 @@ vi.mock('@/lib/slugify', () => ({
   generatePodcastSlug: vi.fn().mockResolvedValue('new-title'),
 }));
 
-vi.mock('@/lib/tier-features', () => ({
-  getTierFeatures: vi.fn().mockReturnValue({ privateAllowed: false }),
+vi.mock('@/lib/generation-features', () => ({
+  getGenerationFeatures: vi.fn().mockReturnValue({ privateAllowed: false }),
 }));
 
 vi.mock('@/lib/byok', () => ({

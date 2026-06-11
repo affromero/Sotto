@@ -6,7 +6,7 @@ import { compileScript } from '@/lib/script-compiler';
 import { createSegmentsAndQueueAudio } from '@/lib/segment-creator';
 import type { SourceRecord, EvidenceCard } from '@/lib/research-agent';
 import { invalidatePodcastCache, publishPodcastStatus } from '@/lib/redis';
-import { getTierFeatures } from '@/lib/tier-features';
+import { getGenerationFeatures } from '@/lib/generation-features';
 import { getAutoModelConfig } from '@/lib/auto-model-config';
 import { assignVoicesForPodcast } from '@/lib/voice-assigner';
 import type { TtsProviderId } from '@/lib/providers/tts-registry';
@@ -101,10 +101,10 @@ export async function processCompileScript(job: Job<CompileScriptPayload>): Prom
   );
 
   // Determine whether to auto-approve or pause at SCRIPT_READY
-  const tierFeatures = getTierFeatures();
+  const genFeatures = getGenerationFeatures();
 
   const isWebOrImport = podcast.source === 'WEB' || podcast.source === 'IMPORT';
-  const shouldAutoApprove = tierFeatures.autoApproveScript || !isWebOrImport || podcast.zeroCostVideo;
+  const shouldAutoApprove = genFeatures.autoApproveScript || !isWebOrImport || podcast.zeroCostVideo;
 
   if (!shouldAutoApprove) {
     // Pause for user review

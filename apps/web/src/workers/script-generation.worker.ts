@@ -9,7 +9,7 @@ import { getCheapestModelForProvider, resolveAiModelAndProvider, type AiProvider
 import { detectLanguage } from '@/lib/language-detect';
 import { invalidatePodcastCache, publishPodcastStatus } from '@/lib/redis';
 import { matchTopicTags, TAG_PARENT_MAP } from '@/lib/topic-tagger';
-import { getTierFeatures } from '@/lib/tier-features';
+import { getGenerationFeatures } from '@/lib/generation-features';
 import { logger } from '@/lib/logger';
 import { logPipelineStageComplete } from '@/lib/pipeline-events';
 
@@ -49,7 +49,7 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
     prisma.discovery.findUniqueOrThrow({ where: { id: discoveryId } }),
   ]);
 
-  const tierFeatures = getTierFeatures();
+  const genFeatures = getGenerationFeatures();
 
   const aiKey = useAdminCredits || podcast.aiModel ? null : await getAiKey(userId);
   if (!podcast.aiModel && !aiKey) {
@@ -106,14 +106,14 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
 
   // Apply uniform safety cap to duration target.
   const requestedDuration = discovery.durationTarget || 10;
-  const cappedDuration = isFinite(tierFeatures.maxDurationMinutes)
-    ? Math.min(requestedDuration, tierFeatures.maxDurationMinutes)
+  const cappedDuration = isFinite(genFeatures.maxDurationMinutes)
+    ? Math.min(requestedDuration, genFeatures.maxDurationMinutes)
     : requestedDuration;
 
   // Cap speakers to the uniform safety limit.
   const requestedSpeakers = discovery.speakers as Array<{ name: string; description: string }> | null;
-  const cappedSpeakers = requestedSpeakers && requestedSpeakers.length > tierFeatures.maxSpeakers
-    ? requestedSpeakers.slice(0, tierFeatures.maxSpeakers)
+  const cappedSpeakers = requestedSpeakers && requestedSpeakers.length > genFeatures.maxSpeakers
+    ? requestedSpeakers.slice(0, genFeatures.maxSpeakers)
     : requestedSpeakers;
 
   const hasUserFeedback = job.data.userFeedback && job.data.previousTurns;
@@ -136,7 +136,7 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
         apiKeyOverride: providerAiKey?.apiKey,
         model,
         provider,
-        webSearchEnabled: tierFeatures.webSearchEnabled,
+        webSearchEnabled: genFeatures.webSearchEnabled,
       })
     : await generateScript({
         topic: discovery.topic || '',
@@ -152,7 +152,7 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
         apiKeyOverride: providerAiKey?.apiKey,
         model,
         provider,
-        webSearchEnabled: tierFeatures.webSearchEnabled,
+        webSearchEnabled: genFeatures.webSearchEnabled,
         mode: podcast.verificationMode === 'showcase' ? 'demo' : 'standard',
         targetLanguage: podcast.language,
       });
