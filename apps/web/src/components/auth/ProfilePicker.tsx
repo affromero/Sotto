@@ -5,8 +5,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { signIn } from 'next-auth/react';
 import { GlassBead } from '@/components/landing/GlassBead';
-import { ANIMAL_AVATARS, avatarImagePath } from '@/lib/avatars';
+import { ANIMAL_AVATARS } from '@/lib/avatars';
 import { AvatarTile } from './AvatarTile';
+import { AvatarPicker } from './AvatarPicker';
 import styles from './ProfilePicker.module.css';
 
 interface Profile {
@@ -397,40 +398,13 @@ function CreateOwnerPanel({ onCreated }: { onCreated: () => void }) {
         </div>
 
         <div className={styles.ownerField}>
-          <span className={styles.fieldLabel} id={`${nameId}-avatar`}>
-            Pick an avatar
-          </span>
-          <ul
-            className={styles.avatarGrid}
-            role="radiogroup"
-            aria-labelledby={`${nameId}-avatar`}
-          >
-            {ANIMAL_AVATARS.map((animal) => {
-              const isSelected = animal.slug === avatar;
-              return (
-                <li key={animal.slug} className={styles.avatarItem}>
-                  <button
-                    type="button"
-                    role="radio"
-                    aria-checked={isSelected}
-                    aria-label={animal.name}
-                    className={`${styles.avatarBtn} ${
-                      isSelected ? styles.avatarBtnSelected : ''
-                    }`}
-                    onClick={() => setAvatar(animal.slug)}
-                    disabled={submitting}
-                  >
-                    <AvatarTile
-                      image={avatarImagePath(animal.slug)}
-                      emoji={animal.emoji}
-                      name={animal.name}
-                      size={72}
-                    />
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+          <AvatarPicker
+            legend="Pick an avatar"
+            value={avatar}
+            onChange={setAvatar}
+            disabled={submitting}
+            size={72}
+          />
         </div>
 
         <div className={styles.ownerField}>
