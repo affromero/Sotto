@@ -5,7 +5,6 @@ import {
   JobType,
   notificationQueue,
   pdfGenerationQueue,
-  featureComputationQueue,
   waveformGenerationQueue,
 } from '@/lib/queue';
 import { invalidatePodcastCache, publishPodcastStatus } from '@/lib/redis';
@@ -518,13 +517,7 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
       userId: podcast.userId,
     });
 
-    // 10c2. Compute ML features for this podcast
-    await addJob(featureComputationQueue, JobType.COMPUTE_FEATURES, {
-      scope: 'podcast' as const,
-      targetId: podcastId,
-    });
-
-    // 10c3. Generate waveform visualization data
+    // 10c2. Generate waveform visualization data
     await addJob(waveformGenerationQueue, JobType.GENERATE_WAVEFORM, {
       podcastId,
       userId: podcast.userId,

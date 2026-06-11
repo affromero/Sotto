@@ -11,7 +11,6 @@ import {
   AtSign,
   Star,
   FlaskConical,
-  Gauge,
   Wand2,
   HeartPulse,
   ListTodo,
@@ -75,7 +74,6 @@ const navGroups: NavGroup[] = [
     label: 'AI / ML',
     items: [
       { href: '/admin/ratings', label: 'Quality Ratings', icon: Star },
-      { href: '/admin/quality', label: 'Quality Analytics', icon: Gauge },
     ],
   },
 ];

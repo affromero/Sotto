@@ -48,42 +48,15 @@ export default function PrivacyPage() {
             beyond what is necessary to deliver your lesson.
           </p>
 
-          <h3>Usage and Behavioral Data</h3>
+          <h3>Usage Data</h3>
           <p>
-            We collect behavioral events to improve the service and provide
-            personalized recommendations. These events are grouped into the following
-            categories:
+            We keep the operational records needed to deliver the service, including
+            generated lessons, saved lessons, interactions, feedback, notifications,
+            API usage logs, and provider-cost records.
           </p>
-          <ul>
-            <li>
-              <strong>Playback</strong>: play, pause, seek, speed change, complete,
-              abandon, heartbeat (periodic position updates)
-            </li>
-            <li>
-              <strong>Library &amp; Discovery</strong>: library impression, library click,
-              search query, recommendation impression, recommendation click
-            </li>
-            <li>
-              <strong>Private Activity</strong>: save, unsave, rate, ask a question,
-              answer a question, incorporate an answer, share by link
-            </li>
-            <li>
-              <strong>Creation</strong>: generation start, generation complete
-            </li>
-            <li>
-              <strong>Navigation</strong>: page view
-            </li>
-          </ul>
           <p>
-            Each event may include your user ID (if signed in), a session ID, device
-            type, user agent, page URL, referrer, and a client-side timestamp.
-          </p>
-
-          <h3>Anonymous Tracking</h3>
-          <p>
-            Behavioral events are collected for both signed-in and anonymous users.
-            Anonymous events are linked by a random session ID (not your IP address).
-            If you later sign in, your session may be associated with your account.
+            Sotto does not collect anonymous activity events or maintain
+            behavior-derived profile storage.
           </p>
 
           <h3>Voice Data</h3>
@@ -93,23 +66,17 @@ export default function PrivacyPage() {
             resulting voice model is stored on our platform.
           </p>
 
-          <h2>2. Behavioral Profiling</h2>
+          <h2>2. Personalization</h2>
           <p>
-            We build a behavioral profile for each user to power personalized
-            recommendations. This profile includes:
+            Personalized recommendations use information you provide directly,
+            such as onboarding interests, taste quiz answers, saved lessons, and
+            course context. Sotto does not maintain behavior-derived vectors or
+            anonymous session profiles.
           </p>
-          <ul>
-            <li>Listener archetype classification (e.g., deep diver, casual listener)</li>
-            <li>Topic affinity scores derived from listening patterns</li>
-            <li>Embedding vectors for content similarity matching</li>
-            <li>Peak listening hours and preferred lesson duration</li>
-            <li>Average completion rate, listen speed, and abandonment patterns</li>
-          </ul>
           <p>
-            This profiling is used solely for content recommendations and service
-            improvement. No automated decisions with legal or similarly significant
-            effects are made based on your profile. You can request deletion of your
-            behavioral profile at any time by deleting your account.
+            No automated decisions with legal or similarly significant effects are
+            made from personalization inputs. You can request deletion of this data
+            at any time by deleting your account.
           </p>
 
           <h2>3. Legal Basis for Processing (GDPR)</h2>
@@ -130,7 +97,6 @@ export default function PrivacyPage() {
           <ul>
             <li>Generate and deliver lessons you request</li>
             <li>Provide private library, discovery, and recommendation features</li>
-            <li>Build and update your behavioral profile for personalized recommendations</li>
             <li>Send notifications about your lessons and interactions</li>
             <li>Moderate content for safety and policy compliance</li>
             <li>Improve service quality, fix bugs, and analyze usage patterns</li>
@@ -241,11 +207,9 @@ export default function PrivacyPage() {
           <p>
             You can delete your account at any time from your profile settings. This
             permanently removes your profile, lessons, scripts, interactions,
-            behavioral data, voice clones, and all associated content.
-            Audio files are deleted from storage. Data in models without a direct
-            foreign key (behavioral events, sessions, playback sessions, content
-            flags, feedback, recommendations, listening queue, and your behavioral
-            profile) is explicitly deleted before your account is removed.
+            voice clones, and all associated content. Audio files are deleted from
+            storage. Data in models without a direct foreign key, such as feedback,
+            is explicitly deleted before your account is removed.
           </p>
 
           <h3>Data Export</h3>
@@ -253,9 +217,8 @@ export default function PrivacyPage() {
             You can export all your data at any time from your account settings or by
             calling <code>GET /api/v1/users/me/export</code>. The export includes your
             profile, lessons, scripts, discovery conversations, interactions,
-            saves, ratings, behavioral
-            profile, recent behavioral events, playback sessions, voice clones,
-            feedback, taste quiz answers, and saved ideas, all in a single JSON file.
+            saves, ratings, voice clones, feedback, taste quiz answers, and saved
+            ideas, all in a single JSON file.
           </p>
 
           <h3>BYOK Key Removal</h3>

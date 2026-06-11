@@ -73,8 +73,6 @@ app/
 | `formatters.ts` | `formatDuration`, `formatCount`, `timeAgo`, etc. |
 | `audio-player.ts` | react-native-track-player setup + track loading |
 | `notifications.ts` | Push notification handler + token registration |
-| `event-buffer.ts` | Event batching: 5s flush, AppState-aware, silent failure |
-| `usePlaybackTelemetry.ts` | Observes RNTP state, fires playback events |
 | `learn-api.ts` | Learn flow API calls: placement, courses, classes, submit, speaking upload, memory graph |
 
 ## Components
@@ -85,7 +83,6 @@ app/
 | `EmptyState.tsx` / `ErrorState.tsx` | Empty + error patterns |
 | `PodcastCard.tsx` | `variant="feed"` (full) / `variant="compact"` (row) |
 | `BottomSheet.tsx` | Bottom sheet container |
-| `EventProvider.tsx` | React context providing `track()` + userId sync |
 | `learn/PlacementQuiz.tsx` | Multi-step placement test UI — fetches questions, submits answers |
 | `learn/MCSection.tsx` | Multiple-choice section renderer for grammar/reading/listening |
 | `learn/ListeningSection.tsx` | Listening section: embedded audio player + MC questions |

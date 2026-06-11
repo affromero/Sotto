@@ -80,12 +80,10 @@ vi.mock('@/lib/queue', () => ({
   JobType: {
     SEND_NOTIFICATION: 'send_notification',
     GENERATE_PDF: 'generate_pdf',
-    COMPUTE_FEATURES: 'compute_features',
     GENERATE_WAVEFORM: 'generate_waveform',
   },
   notificationQueue: { name: 'notifications' },
   pdfGenerationQueue: { name: 'pdf-generation' },
-  featureComputationQueue: { name: 'feature-computation' },
   waveformGenerationQueue: { name: 'waveform-generation' },
 }));
 
@@ -608,18 +606,7 @@ describe('processAudioStitching', () => {
     });
   });
 
-  describe('feature computation', () => {
-    it('enqueues feature computation after successful stitching', async () => {
-      const job = createMockJob(defaultPayload);
-      await processAudioStitching(job);
-
-      expect(mockAddJob).toHaveBeenCalledWith(
-        { name: 'feature-computation' },
-        'compute_features',
-        { scope: 'podcast', targetId: 'podcast-001' }
-      );
-    });
-
+  describe('waveform generation', () => {
     it('enqueues waveform generation after successful stitching', async () => {
       const job = createMockJob(defaultPayload);
       await processAudioStitching(job);
@@ -629,17 +616,6 @@ describe('processAudioStitching', () => {
         'generate_waveform',
         { podcastId: 'podcast-001', userId: 'user-1' }
       );
-    });
-
-    it('does not enqueue feature computation when duration exceeds limit', async () => {
-      mockStitchWithEffects.mockResolvedValue({ duration: 2100 });
-      const job = createMockJob(defaultPayload);
-      await processAudioStitching(job);
-
-      const featureCall = mockAddJob.mock.calls.find(
-        (call) => call[1] === 'compute_features'
-      );
-      expect(featureCall).toBeUndefined();
     });
   });
 

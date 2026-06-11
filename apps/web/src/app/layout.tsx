@@ -3,9 +3,7 @@ import { Newsreader, IBM_Plex_Sans, IBM_Plex_Mono } from 'next/font/google';
 import { BRAND } from '@sotto/shared';
 import { SessionProvider } from '@/components/providers/SessionProvider';
 import { ThemeProvider } from '@/components/providers/ThemeProvider';
-import { EventProvider } from '@/components/providers/EventProvider';
 import { AudioPlayerProvider } from '@/components/providers/AudioPlayerProvider';
-import { PageViewTracker } from '@/components/providers/PageViewTracker';
 import { GlobalMiniPlayer } from '@/components/player/GlobalMiniPlayer';
 import { ToastProvider } from '@/components/providers/ToastProvider';
 import { NotificationProvider } from '@/components/providers/NotificationProvider';
@@ -95,14 +93,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <ThemeProvider>
             <ToastProvider>
               <NotificationProvider>
-                <EventProvider>
-                  <AudioPlayerProvider>
-                    <PageViewTracker />
-                    {children}
-                    <GlobalMiniPlayer />
-                    <CommandPaletteLoader />
-                  </AudioPlayerProvider>
-                </EventProvider>
+                <AudioPlayerProvider>
+                  {children}
+                  <GlobalMiniPlayer />
+                  <CommandPaletteLoader />
+                </AudioPlayerProvider>
               </NotificationProvider>
             </ToastProvider>
           </ThemeProvider>

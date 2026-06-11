@@ -74,14 +74,6 @@ export type { PodcastVersionSummary, PodcastVersionDetail } from './types/versio
 
 export type { ApiKeyData, ApiKeyCreated } from './types/api-key';
 
-export type {
-  EventContext,
-  EventPayload,
-  EventType,
-  BehavioralEventInput,
-  EventBatch,
-} from './types/events';
-
 export { getContentBadgeLabel, getPodcastBadges } from './content-badge';
 export type { PodcastBadge } from './content-badge';
 

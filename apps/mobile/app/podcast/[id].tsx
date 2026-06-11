@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -31,8 +31,6 @@ import type { PodcastDetail, SegmentData } from '@sotto/shared';
 import { api } from '../../lib/api';
 import { setupPlayer, loadTrack } from '../../lib/audio-player';
 import { formatTime } from '../../lib/formatters';
-import { usePlaybackTelemetry } from '../../lib/usePlaybackTelemetry';
-import type { PlaybackSnapshot } from '../../lib/usePlaybackTelemetry';
 import { ReferencesTab } from '../../components/ReferencesTab';
 import { VersionHistory } from '../../components/VersionHistory';
 import { usePlayerStore } from '../../lib/player-store';
@@ -65,8 +63,6 @@ export default function PodcastScreen() {
   const [teleprompterEnabled, setTeleprompterEnabled] = useState(false);
   const [versionHistoryVisible, setVersionHistoryVisible] = useState(false);
   const setCurrentPodcast = usePlayerStore((s) => s.setCurrentPodcast);
-  const lastSeekFromRef = useRef<number | undefined>(undefined);
-  const interactionCountRef = useRef(0);
 
   // TrackPlayer hooks are safe — they return defaults when player isn't ready.
   // But wrap in try/catch at the usage sites to prevent native exceptions from crashing the app.
@@ -157,8 +153,6 @@ export default function PodcastScreen() {
       setQuestionText('');
       Alert.alert('Answer', data.answer ?? 'Your question is being processed.');
       queryClient.invalidateQueries({ queryKey: ['podcast', id] });
-      interactionCountRef.current++;
-      incrementInteraction();
     },
     onError: () => {
       Alert.alert('Error', 'Failed to submit your question. Please try again.');
@@ -217,7 +211,6 @@ export default function PodcastScreen() {
     if (!playerReady) return;
     try {
       const current = await TrackPlayer.getProgress();
-      lastSeekFromRef.current = current.position;
       await TrackPlayer.seekTo(current.position + 15);
     } catch {
       // Ignore native player errors
@@ -228,7 +221,6 @@ export default function PodcastScreen() {
     if (!playerReady) return;
     try {
       const current = await TrackPlayer.getProgress();
-      lastSeekFromRef.current = current.position;
       await TrackPlayer.seekTo(Math.max(0, current.position - 15));
     } catch {
       // Ignore native player errors
@@ -251,13 +243,12 @@ export default function PodcastScreen() {
       if (!playerReady) return;
       const totalDuration = podcast?.duration ?? trackDuration;
       if (totalDuration > 0) {
-        lastSeekFromRef.current = position;
         try {
           await TrackPlayer.seekTo(ratio * totalDuration);
         } catch {}
       }
     },
-    [podcast?.duration, trackDuration, position, playerReady]
+    [podcast?.duration, trackDuration, playerReady]
   );
 
   const handleAskQuestion = useCallback(async () => {
@@ -270,26 +261,6 @@ export default function PodcastScreen() {
       timestamp: position,
     });
   }, [questionText, position, interactMutation]);
-
-  // Playback telemetry
-  const playbackSnapshot: PlaybackSnapshot = useMemo(
-    () => ({
-      podcastId: id,
-      isPlaying,
-      position,
-      duration: podcast?.duration ?? trackDuration,
-      playbackRate: PLAYBACK_SPEEDS[speedIndex],
-      lastSeekFrom: lastSeekFromRef.current,
-      interactionCount: interactionCountRef.current,
-    }),
-    [id, isPlaying, position, podcast?.duration, trackDuration, speedIndex]
-  );
-
-  const clearLastSeekFrom = useCallback(() => {
-    lastSeekFromRef.current = undefined;
-  }, []);
-
-  const { incrementInteraction } = usePlaybackTelemetry(playbackSnapshot, clearLastSeekFrom);
 
   const totalDuration = podcast?.duration ?? trackDuration;
   const progressRatio = totalDuration > 0 ? position / totalDuration : 0;

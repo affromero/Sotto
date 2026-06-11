@@ -14,7 +14,6 @@ Shared types used across the application. These mirror Prisma models but are sha
 | `reference.ts`    | ReferenceData (id, number, title, authors, year, url, type, publisher, doi)                                                                                       |
 | `api-key.ts`      | ApiKeyData, CreateKeyRequest, KeyListResponse                                                                                                                     |
 | `team.ts`         | TeamData, TeamInviteData, TeamMember                                                                                                                              |
-| `events.ts`       | EventPayload (discriminated union of 17 private workspace event types), EventContext, BehavioralEventInput                                                        |
 | `version.ts`      | PodcastVersionData, PodcastVersionSegmentData                                                                                                                     |
 | `pitch.ts`        | PitchVersion, PitchAsset types                                                                                                                                    |
 | `next-auth.d.ts`  | NextAuth module augmentation: adds `role: UserRole` to Session.user, User, JWT                                                                                    |

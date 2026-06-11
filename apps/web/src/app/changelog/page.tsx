@@ -60,9 +60,9 @@ const entries: ChangelogEntry[] = [
   },
   {
     date: '2026-02-10',
-    title: 'Learner Analytics',
+    title: 'Learner Progress',
     description:
-      'Per-lesson analytics with retention curves, behavior breakdowns, and progress metrics. Plus instance-wide recommendation and quality dashboards.',
+      'Per-lesson progress metrics help learners see what is ready, in progress, or needs attention.',
     tags: ['feature'],
   },
   {
@@ -111,7 +111,7 @@ const entries: ChangelogEntry[] = [
     date: '2026-01-08',
     title: 'Taste Quiz & Recommendations',
     description:
-      'A quick yes or no taste quiz during onboarding builds a behavioral profile. Your library now shows personalized "Picks for You" based on your interests.',
+      'A quick yes or no taste quiz during onboarding captures explicit interests. Your library now shows personalized picks based on those interests.',
     tags: ['feature'],
   },
 ];

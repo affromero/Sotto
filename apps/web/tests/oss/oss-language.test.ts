@@ -151,31 +151,12 @@ describe('open-source language-learning OSS surfaces', () => {
     const mcpSources = ['packages/mcp/src/server.ts', 'packages/mcp/src/client.ts']
       .map((file) => readFileSync(resolve(repoRoot, file), 'utf8'))
       .join('\n');
-    const eventSources = [
-      'src/types/events.ts',
-      'src/lib/validations/events.ts',
-      'src/lib/hooks/useImpressionTracker.ts',
-    ]
-      .map(readSource)
-      .concat(readFileSync(resolve(repoRoot, 'packages/shared/src/types/events.ts'), 'utf8'))
-      .join('\n');
-
     expect(mobileSources).not.toContain("'/feed'");
     expect(mobileSources).not.toContain('"/feed"');
     expect(mobileSources).not.toContain('/users/discover');
     expect(mobileSources).not.toContain('/users/suggested');
     expect(mcpSources).not.toContain('browse_feed');
     expect(mcpSources).not.toContain('/api/v1/feed');
-    expect(eventSources).not.toContain('feed.impression');
-    expect(eventSources).not.toContain('feed.click');
-    expect(eventSources).not.toContain('feed.search');
-    expect(eventSources).not.toContain('feedSort');
-    expect(eventSources).not.toContain('social.like');
-    expect(eventSources).not.toContain('social.follow');
-    expect(eventSources).not.toContain('social.fork');
-    expect(eventSources).toContain('library.impression');
-    expect(eventSources).toContain('library.click');
-    expect(eventSources).toContain('library.search');
     expect(existsSync(resolve(repoRoot, 'packages/shared/src/types/feed.ts'))).toBe(false);
     expect(existsSync(resolve(webRoot, 'src/types/feed.ts'))).toBe(false);
   });
@@ -260,7 +241,6 @@ describe('open-source language-learning OSS surfaces', () => {
     const mobileRuntimeSources = [
       'apps/mobile/lib/config.ts',
       'apps/mobile/lib/api.ts',
-      'apps/mobile/lib/event-buffer.ts',
       'apps/mobile/app/auth/login.tsx',
       'apps/mobile/app/settings.tsx',
     ]
@@ -725,7 +705,6 @@ describe('open-source language-learning OSS surfaces', () => {
       'apps/web/next.config.js',
       'apps/web/Dockerfile',
       'apps/web/Dockerfile.workers',
-      'apps/web/src/workers/feature-computation.worker.ts',
       'apps/web/src/lib/CLAUDE.md',
       'CHANGELOG.md',
     ]
@@ -836,7 +815,6 @@ describe('open-source language-learning OSS surfaces', () => {
       'scripts/launch-video/SYSTEM_PROMPT.md',
       'scripts/launch-video/AUTHORING_GUIDE.md',
       'scripts/recording/index.ts',
-      'scripts/ml/prepare-quality-training.ts',
       'apps/web/src/app/changelog/page.tsx',
       'apps/web/src/app/welcome/WelcomeFlow.tsx',
       'apps/web/src/lib/CLAUDE.md',
@@ -1102,23 +1080,6 @@ describe('open-source language-learning OSS surfaces', () => {
     );
   });
 
-  it('keeps recommendation training exports free of social labels', () => {
-    const trainingExportSources = [
-      'src/workers/data-export.worker.ts',
-      '../../scripts/ml/prepare-recommendation-training.ts',
-    ]
-      .map(readSource)
-      .join('\n');
-
-    expect(trainingExportSources).toContain('trainingLabel');
-    expect(trainingExportSources).toContain('saved');
-    expect(trainingExportSources).not.toContain('liked');
-    expect(trainingExportSources).not.toContain('forked');
-    expect(trainingExportSources).not.toContain('forkedFromId');
-    expect(trainingExportSources).not.toContain('engagementLabel');
-    expect(trainingExportSources).not.toContain('prisma.like');
-  });
-
   it('keeps reports and content moderation free of comment targets', () => {
     const reportModerationSources = [
       'src/app/api/v1/reports/route.ts',
@@ -1154,42 +1115,6 @@ describe('open-source language-learning OSS surfaces', () => {
     expect(mcpSources).not.toContain('forkedFromId');
     expect(mcpSources).not.toContain('isLiked');
     expect(mcpSources).not.toContain('Forked from');
-  });
-
-  it('keeps feature computation private-signal scoped', () => {
-    const schemaSource = readFileSync(resolve(repoRoot, 'apps/web/prisma/schema.prisma'), 'utf8');
-    const userFeatureModel = schemaSource.slice(
-      schemaSource.indexOf('model UserFeature'),
-      schemaSource.indexOf('model PodcastFeature')
-    );
-    const podcastFeatureModel = schemaSource.slice(
-      schemaSource.indexOf('model PodcastFeature'),
-      schemaSource.indexOf('model BehavioralEvent')
-    );
-    const featureSources = [
-      'src/workers/feature-computation.worker.ts',
-      'src/workers/data-export.worker.ts',
-      'src/app/api/v1/podcasts/[podcastId]/quality/route.ts',
-      'src/workers/CLAUDE.md',
-    ]
-      .map(readSource)
-      .concat(userFeatureModel, podcastFeatureModel)
-      .join('\n');
-
-    expect(featureSources).toContain('Private activity');
-    expect(featureSources).toContain('saveToListenRatio');
-    expect(featureSources).toContain('interactionRate');
-    expect(featureSources).not.toContain('prisma.like');
-    expect(featureSources).not.toContain('prisma.follow');
-    expect(featureSources).not.toContain('followingCount');
-    expect(featureSources).not.toContain('followerCount');
-    expect(featureSources).not.toContain('likeRate');
-    expect(featureSources).not.toContain('forkRate');
-    expect(featureSources).not.toContain('likeToListenRatio');
-    expect(featureSources).not.toContain('forkToListenRatio');
-    expect(featureSources).not.toContain('forkedFromId');
-    expect(featureSources).not.toContain('liked: pct');
-    expect(featureSources).not.toContain('forked: pct');
   });
 
   it('keeps Prisma schema and seeds free of social tables', () => {
@@ -1231,7 +1156,6 @@ describe('open-source language-learning OSS surfaces', () => {
       'src/lib/podcast-select.ts',
       'src/lib/podcast-data.ts',
       'src/app/api/v1/saved/route.ts',
-      'src/app/api/v1/queue/route.ts',
       'src/app/podcast/[podcastId]/page.tsx',
     ]
       .map(readSource)
@@ -1410,7 +1334,7 @@ describe('open-source language-learning OSS surfaces', () => {
     ]
       .map(readSource)
       .join('\n');
-    const userValidationSources = ['src/lib/validations.ts', 'src/app/api/v1/queue/route.ts']
+    const userValidationSources = ['src/lib/validations.ts']
       .map(readSource)
       .join('\n');
     const activityWriteSources = ['src/app/api/v1/podcasts/route.ts']

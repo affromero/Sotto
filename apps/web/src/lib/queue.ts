@@ -39,9 +39,6 @@ export enum JobType {
   REGENERATE_SEGMENT = 'regenerate_segment',
   SEND_NOTIFICATION = 'send_notification',
   GENERATE_PDF = 'generate_pdf',
-  INGEST_EVENTS = 'ingest_events',
-  COMPUTE_FEATURES = 'compute_features',
-  EXPORT_DATA = 'export_data',
   VALIDATE_KEYS = 'validate_keys',
   VERIFY_VOICE = 'verify_voice',
   FETCH_PRICING = 'fetch_pricing',
@@ -198,40 +195,6 @@ export interface GeneratePdfPayload {
   userId: string;
 }
 
-export interface IngestEventsPayload {
-  ip?: string;
-  events: Array<{
-    context: {
-      sessionId: string;
-      userId?: string;
-      pageUrl: string;
-      deviceType?: string;
-      userAgent?: string;
-      referrer?: string;
-      clientTs: number;
-    };
-    payload: Record<string, unknown> & { eventType: string };
-  }>;
-}
-
-export interface ComputeFeaturesPayload {
-  scope: 'user' | 'podcast' | 'all';
-  targetId?: string;
-}
-
-export interface DataExportPayload {
-  exportType:
-    | 'playback_sessions'
-    | 'behavioral_events'
-    | 'user_features'
-    | 'podcast_features'
-    | 'interactions'
-    | 'training_pairs';
-  dateFrom?: string;
-  dateTo?: string;
-  format: 'jsonl' | 'csv';
-}
-
 export interface ValidateKeysPayload {}
 
 export interface GenerateDemoScriptPayload {
@@ -374,9 +337,6 @@ const QUEUE_DEFINITIONS: Record<string, QueueDefinition> = {
   'segment-regeneration': { attempts: 2 },
   notifications: { attempts: 5, skipEvents: true },
   'pdf-generation': { attempts: 2, skipEvents: true },
-  'event-ingestion': { attempts: 2, removeOnComplete: { age: 3600, count: 500 }, skipEvents: true },
-  'feature-computation': { attempts: 2, skipEvents: true },
-  'data-export': { attempts: 2, skipEvents: true },
   'key-validation': { attempts: 1, skipEvents: true },
   'voice-verification': { attempts: 2, skipEvents: true },
   'pricing-fetch': { attempts: 2, skipEvents: true },
@@ -837,9 +797,6 @@ export const notificationQueue = createQueueReference('notifications');
 export const referenceValidationQueue = createQueueReference('reference-validation');
 export const pdfGenerationQueue = createQueueReference('pdf-generation');
 export const scriptVerificationQueue = createQueueReference('script-verification');
-export const eventIngestionQueue = createQueueReference('event-ingestion');
-export const featureComputationQueue = createQueueReference('feature-computation');
-export const dataExportQueue = createQueueReference('data-export');
 export const keyValidationQueue = createQueueReference('key-validation');
 export const voiceVerificationQueue = createQueueReference('voice-verification');
 export const pricingFetchQueue = createQueueReference('pricing-fetch');

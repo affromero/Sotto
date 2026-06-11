@@ -53,7 +53,6 @@ async function getOverviewStats() {
     signupsThisMonth,
     totalPlays,
     apiCostAgg,
-    dauRow,
     pipelineAttempted,
     pipelineFailed,
     byokUsersRow,
@@ -79,13 +78,6 @@ async function getOverviewStats() {
       where: { createdAt: { gte: monthAgo } },
       _sum: { totalCost: true },
     }),
-    // DAU
-    prisma.$queryRaw<[{ count: bigint }]>`
-      SELECT COUNT(DISTINCT "userId")::bigint AS count
-      FROM "BehavioralEvent"
-      WHERE "userId" IS NOT NULL
-        AND "createdAt" >= ${today}
-    `,
     // Pipeline (30d)
     prisma.podcast.count({
       where: { createdAt: { gte: monthAgo }, source: { not: 'IMPORT' } },
@@ -112,7 +104,6 @@ async function getOverviewStats() {
     signupsThisMonth,
     totalPlays: totalPlays._sum.playCount ?? 0,
     apiCosts: apiCostAgg._sum.totalCost ?? 0,
-    dau: Number(dauRow[0]?.count ?? 0),
     pipelineSuccessRate:
       pipelineAttempted > 0
         ? Math.round(((pipelineAttempted - pipelineFailed) / pipelineAttempted) * 100)
@@ -195,10 +186,6 @@ export default async function AdminOverviewPage() {
           <div className={styles.statCard}>
             <span className={styles.statLabel}>API Costs</span>
             <span className={styles.statValue}>${stats.apiCosts.toFixed(2)}</span>
-          </div>
-          <div className={styles.statCard}>
-            <span className={styles.statLabel}>DAU</span>
-            <span className={styles.statValue}>{stats.dau.toLocaleString()}</span>
           </div>
           <div className={styles.statCard}>
             <span className={styles.statLabel}>Pipeline Success</span>
