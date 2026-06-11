@@ -113,19 +113,16 @@ HEADER
   declare -A DESKTOP_LABELS=(
     ["landing"]="Landing Page"
     ["login"]="Authentication"
-    ["dashboard"]="Private Dashboard"
-    ["create"]="Podcast Creation (Discovery Chat)"
-    ["podcast-player"]="Podcast Player"
-    ["pricing"]="Pricing"
-    ["billing"]="Billing & Credits"
+    ["learn"]="Learn — Course Home"
+    ["memory"]="Vocabulary Memory Graph"
+    ["podcast-player"]="Adaptive Listening Lesson"
     ["admin-overview"]="Admin Dashboard"
     ["admin-users"]="Admin — User Management"
     ["settings"]="Settings"
   )
 
   DESKTOP_ORDER=(
-    "landing" "login" "dashboard" "create" "podcast-player"
-    "pricing" "billing"
+    "landing" "login" "learn" "memory" "podcast-player"
     "admin-overview" "admin-users" "settings"
   )
 
@@ -143,8 +140,8 @@ EOF
   done
 
   # Mobile screenshots
-  MOBILE_NAMES=("mobile-landing" "mobile-dashboard" "mobile-player")
-  MOBILE_LABELS=("Landing" "Dashboard" "Player")
+  MOBILE_NAMES=("mobile-landing" "mobile-learn" "mobile-player")
+  MOBILE_LABELS=("Landing" "Learn" "Player")
 
   has_mobile=false
   for name in "${MOBILE_NAMES[@]}"; do
