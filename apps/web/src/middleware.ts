@@ -17,12 +17,11 @@ const PUBLIC_ROUTES = new Set([
   '/feedback',
   '/api/v1/feedback',
   '/pitch',
-  '/connect/telegram',
   '/changelog',
   '/developers',
   '/api/v1/monitoring',
 ]);
-const PUBLIC_PREFIXES = ['/api/v1/auth', '/api/v1/pitch', '/api/v1/waitlist', '/api/v1/telegram', '/ref', '/podcast/by-slug'];
+const PUBLIC_PREFIXES = ['/api/v1/auth', '/api/v1/pitch', '/api/v1/waitlist', '/ref', '/podcast/by-slug'];
 
 function isPublicRoute(pathname: string): boolean {
   if (PUBLIC_ROUTES.has(pathname)) return true;
